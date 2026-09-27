@@ -1,5 +1,6 @@
 /** Local real-file document backend rooted below the operating-system home. @module @deepseek-ai/dsh-userdoc-local */
 
+import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -263,6 +264,8 @@ export class LocalUserDocStore extends UserDocStore {
       ? usesDefaultRoot ? join(homedir(), LEGACY_UPLOAD_DIR_NAME) : undefined
       : resolve(expandHomePath(config.legacyUploadRoot))
     this.trashRetentionMs = (config.trashRetentionDays ?? 30) * 86_400_000
+    registerManagedDataPath({ owner: '@deepseek-ai/dsh-userdoc-local', kind: 'directory', path: this.root }, process.env.DSH_MANAGED_DATA_MANIFEST)
+    if (this.legacyRoot !== undefined) registerManagedDataPath({ owner: '@deepseek-ai/dsh-userdoc-local', kind: 'directory', path: this.legacyRoot }, process.env.DSH_MANAGED_DATA_MANIFEST)
     this.limits = Object.freeze({
       maxFileBytes: config.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES,
       maxFilesPerMessage: config.maxFilesPerMessage ?? DEFAULT_MAX_FILES_PER_MESSAGE,

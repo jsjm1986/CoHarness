@@ -1,15 +1,16 @@
 /**
  * Out-of-process ACP subagent backend. Each child has its own process, session, model, and
  * tools, so it shares no Cordis context and advertises no parent-enforced start capabilities;
- * the ONE thing it reads off `request.parent` is the session's workspace cwd (see
- * {@link resolveCwd}). This plugin uses named exports only; a default would hide its
+ * workspace and process execution use the owning Session's target. Named exports preserve
  * loader metadata (see `docs/postmortem/0001-acp-default-export-drops-inject.md`).
  * @module @deepseek-ai/dsh-subagent-acp
  */
 
-import { accessSync, constants, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { isAbsolute, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { SessionId } from '@deepseek-ai/dsh-session'
+import { resolveChildExecution, externalMemberAgent, type ChildExecution } from '@deepseek-ai/dsh-subagent'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {
@@ -18,7 +19,6 @@ import type {
   ResolvedSubagentStartRequest,
   SubagentCapabilities,
   SubagentProvider,
-  SubagentStartRequest,
 } from '@deepseek-ai/dsh-subagent'
 import { ExternalBindingStore } from '@deepseek-ai/dsh-subagent/external'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
@@ -89,9 +89,8 @@ export interface Config {
    */
   stateDir?: string
   /**
-   * Workspace for member ACP sessions. Member turns have no parent session to
-   * inherit one from; defaults to {@link cwd}, else the harness launch
-   * directory. Used only when {@link resume} is enabled.
+   * Workspace override for persistent ACP members; defaults to {@link cwd},
+   * else the member Session working directory. Used only with {@link resume}.
    */
   memberCwd?: string
 }
@@ -123,60 +122,6 @@ type ResolvedConfig =
   & Pick<Config, 'cwd' | 'stateDir' | 'memberCwd'>
 
 /**
- * Whether `path` names an existing directory the harness can ENTER. The
- * search-permission probe matters: `statSync().isDirectory()` is true for a
- * mode-600 directory, but a subprocess cwd needs `X_OK` or spawn fails EACCES.
- */
-function isDirectory(path: string): boolean {
-  try {
-    if (!statSync(path).isDirectory()) return false
-    accessSync(path, constants.X_OK)
-    return true
-  } catch {
-    // statSync/accessSync throw only filesystem access errors here
-    // (ENOENT/EACCES/ENOTDIR/…), and every one of them means the path cannot
-    // serve as the child's cwd.
-    return false
-  }
-}
-
-/**
- * Assert `cwd` can actually host the child: absolute (it doubles as the ACP
- * session workspace, and a relative path would be re-anchored to the server
- * process's launch directory) and an existing directory (fail here, before the
- * process boundary, instead of as an ambiguous spawn ENOENT).
- * @param label - which source supplied the value, for the diagnostic.
- * @param cwd - the candidate working directory.
- * @returns `cwd`, validated.
- */
-function assertUsableCwd(label: string, cwd: string): string {
-  if (!isAbsolute(cwd)) {
-    throw new Error(`subagent-acp: ${label} must be an absolute path: ${cwd}`)
-  }
-  if (!isDirectory(cwd)) {
-    throw new Error(`subagent-acp: ${label} is not an accessible directory: ${cwd}`)
-  }
-  return cwd
-}
-
-/**
- * Resolve the child's working directory: the deployment `cwd` override when
- * configured (already validated at load), else the parent session's workspace
- * cwd (validated here, its earliest resolvable point). Fails loud when neither
- * exists — falling back to the harness process cwd would silently bind the
- * child to the server's launch directory instead of the delegating session's
- * workspace (one server process serves many sessions, each with its own cwd).
- */
-function resolveCwd(configured: string | undefined, request: SubagentStartRequest): string {
-  if (configured !== undefined) return configured
-  const parentCwd = request.parent.session.header.cwd
-  if (parentCwd === undefined) {
-    throw new Error('subagent-acp: no working directory for the child — configure `cwd` or delegate from a parent session that has one')
-  }
-  return assertUsableCwd('parent session cwd', parentCwd)
-}
-
-/**
  * The ACP provider. Advertises NO start-time capabilities: an out-of-process
  * child cannot honor `outputSchema`/`maxDepth`/`toolFilter` (the service rejects
  * a request needing any of them before `start` runs).
@@ -197,9 +142,9 @@ class AcpProvider implements SubagentProvider {
     readonly name: string,
     private readonly ctx: Context,
     private readonly config: ResolvedConfig,
-    transport?: AcpMemberTransport,
+    prepareMember?: (request: ContinuableCreateRequest) => Promise<void>,
   ) {
-    if (transport !== undefined) {
+    if (prepareMember !== undefined) {
       this.agentRouteDefaults = {
         provider: ACP_MEMBER_ROUTE,
         model: ACP_MEMBER_MODEL,
@@ -209,7 +154,7 @@ class AcpProvider implements SubagentProvider {
       ): Promise<ContinuableCreateSpec> => {
         // Probe once at member creation: a one-shot-only ACP agent is rejected
         // here, before the durable child exists.
-        await transport.probe(request.signal)
+        await prepareMember(request)
         return {}
       }
     }
@@ -219,27 +164,28 @@ class AcpProvider implements SubagentProvider {
     request: ContinuableCreateRequest,
   ) => Promise<ContinuableCreateSpec>
 
-  start(request: ResolvedSubagentStartRequest) {
+  async start(request: ResolvedSubagentStartRequest) {
     if (request.signal.aborted) {
       throw new Error('subagent request was aborted before the ACP child started')
     }
-    let cwd: string
+    let execution: ChildExecution
     try {
-      cwd = resolveCwd(this.config.cwd, request)
+      execution = await resolveChildExecution(this.ctx, request.parent, this.config.cwd, request.signal)
     } catch (error: unknown) {
       const failure = acpConfigurationFailure(error)
       this.ctx.logger.warn(`subagent-acp "${this.name}": child start failed: %o`, error)
       throw failure
     }
     const spec: AcpRunSpec = {
-      command: this.config.command,
+      command: execution.remote
+        ? await execution.subprocess.resolveExecutable(this.config.command, this.config.env, request.signal) : this.config.command,
       args: this.config.args,
-      cwd,
+      cwd: execution.cwd,
       permission: this.config.permission,
       env: this.config.env,
       disposeEofGraceMs: this.config.disposeEofGraceMs,
       disposeGraceMs: this.config.disposeGraceMs,
-      spawn: spec => this.ctx.subprocess.spawn(spec),
+      spawn: spec => execution.subprocess.spawn(spec),
       onError: (error, stopReason) => {
         // The seam forbids `result` rejecting, so a child-level failure is
         // flattened to a stop reason — preserve it here rather than losing it.
@@ -261,15 +207,15 @@ export function apply(ctx: Context, config: Config): void {
     throw new Error('subagent-acp: config cwd must not be empty — omit the key to inherit the parent session cwd')
   }
   // Interpret a relative configured cwd against the harness launch directory
-  // ONCE, at load, and fail a misconfigured directory here — not per start.
+  // once at load; directory access is checked on the selected execution target.
   const validated: ResolvedConfig = resolved.cwd === undefined
     ? resolved
-    : { ...resolved, cwd: assertUsableCwd('config cwd', resolve(resolved.cwd)) }
+    : { ...resolved, cwd: resolve(resolved.cwd) }
 
   // Persistent members need the `llm` service for their model route AND the
   // `resume` opt-in. Without either the provider stays one-shot only: no
   // `prepareContinuable`, so continuable starts are rejected.
-  let transport: AcpMemberTransport | undefined
+  let prepareMember: ((request: ContinuableCreateRequest) => Promise<void>) | undefined
   const llm = ctx.get('llm')
   if (validated.resume) {
     if (llm === undefined) {
@@ -277,29 +223,32 @@ export function apply(ctx: Context, config: Config): void {
         'subagent-acp: `resume` requires the `llm` service for the member model route',
       )
     }
-    const memberCwd = validated.memberCwd === undefined
-      ? validated.cwd ?? process.cwd()
-      : assertUsableCwd('memberCwd', resolve(validated.memberCwd))
-    const memberConfig: AcpMemberConfig = {
-      command: validated.command,
-      args: validated.args,
-      cwd: memberCwd,
-      permission: validated.permission,
-      env: validated.env,
-      disposeEofGraceMs: validated.disposeEofGraceMs,
-      disposeGraceMs: validated.disposeGraceMs,
-    }
-    transport = new AcpMemberTransport(
-      memberConfig,
-      spec => ctx.subprocess.spawn(spec),
-    )
     const store = new ExternalBindingStore(
       join(validated.stateDir ?? join(homedir(), '.dsh', 'external-members'), 'acp.jsonl'),
     )
+    const resolveMember = async (agent: Agent, signal: AbortSignal) => {
+      const execution = await resolveChildExecution(ctx, agent, validated.memberCwd ?? validated.cwd, signal)
+      const memberConfig: AcpMemberConfig = {
+        command: execution.remote
+          ? await execution.subprocess.resolveExecutable(validated.command, validated.env, signal) : validated.command,
+        args: validated.args, cwd: execution.cwd, permission: validated.permission, env: validated.env,
+        disposeEofGraceMs: validated.disposeEofGraceMs, disposeGraceMs: validated.disposeGraceMs,
+      }
+      return { execution, transport: new AcpMemberTransport(memberConfig, spec => execution.subprocess.spawn(spec)) }
+    }
+    prepareMember = async (request) => {
+      const { transport } = await resolveMember(request.parent, request.signal)
+      await transport.probe(request.signal)
+    }
+    const transport = async (child: SessionId, signal: AbortSignal) => {
+      const member = await resolveMember(externalMemberAgent(ctx, child), signal)
+      store.assertExecution(child, member.execution)
+      return member.transport
+    }
     ctx.effect(() => {
       const registration = llm.registerAdapter(
         [ACP_MEMBER_ROUTE],
-        new AcpMemberAdapter(transport as AcpMemberTransport, store),
+        new AcpMemberAdapter(transport, store),
       )
       return () => { registration() }
     })
@@ -308,6 +257,6 @@ export function apply(ctx: Context, config: Config): void {
     validated.providerName,
     ctx,
     validated,
-    transport,
+    prepareMember,
   ))
 }

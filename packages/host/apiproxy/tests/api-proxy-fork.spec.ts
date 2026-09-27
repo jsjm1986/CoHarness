@@ -41,7 +41,7 @@ async function composed(workspaces: readonly Workspace[] = []): Promise<Context>
       Object.assign(agent, { id: session.id, session, status: 'idle', ctx: agentCtx })
       await options.setup?.(agentCtx, agent)
       await ctx.agents.register(agent)
-      return { agent, dispose: () => Promise.resolve() }
+      return { agent, dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
     },
     resume: () => Promise.reject(new Error('fork test sources are live')),
   })
@@ -88,6 +88,25 @@ const api = (ctx: Context) => createApiProxy(ctx, {
 })
 
 describe('sessions.fork', () => {
+  it('holds the source identity during cold reads and refuses a concurrent removal', async () => {
+    const ctx = await composed(), sessionId = sid('cold-fork-reservation')
+    const entered = Promise.withResolvers<undefined>(), finish = Promise.withResolvers<never>()
+    ctx.provide('sessionPersistence', {
+      list: async () => [{ header: { id: sessionId, cwd: '/proj' } }],
+      inspect: async () => { entered.resolve(undefined); return await finish.promise },
+    } as never)
+    try {
+      const forking = api(ctx).sessions.fork(request({ sessionId }))
+      await entered.promise
+      expect(() => ctx.agents.reserveRemoval([sessionId])).toThrow('pending lifecycle')
+      finish.reject(new Error('fixture read failed'))
+      expect((await forking).result).toMatchObject({ ok: false, error: { code: 'internal' } })
+      using _removal = ctx.agents.reserveRemoval([sessionId])
+      expect((await api(ctx).sessions.fork(request({ sessionId }))).result)
+        .toMatchObject({ ok: false, error: { code: 'fork-unavailable' } })
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('cuts at the anchored completed turn and records lineage and cwd', async () => {
     const ctx = await composed()
     const source = await liveAgent(ctx, 'session-source', 2)

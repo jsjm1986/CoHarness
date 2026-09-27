@@ -35,15 +35,20 @@ SDK 接收由文本块原样拼接成的任务。提供方会完整迭代 SDK �
 | `permissionMode` | `dontAsk` | 为该提供方实例的每次运行固定原生非交互权限策略。 |
 | `disposeGraceMs` | `3000` | 共享进程树责任方各终止层级之间的宽限期，单位为毫秒且须为正有限值，并不得大于仓库共享的 [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.zh.md)；随后资源释放会等待整棵进程树退出。 |
 | `stateDir` | `~/.dsh/external-members` | 实例独立绑定存储的目录；`claude-code.jsonl` 属于默认实例。仅由持续成员使用。 |
-| `memberCwd` | harness 启动目录 | 成员 Claude 会话的工作区。仅由持续成员使用。 |
+| `memberCwd` | 成员 Session cwd | 持续成员的工作区覆盖值，在其执行目标上验证。 |
+| `remoteCommand` | `claude` | 在 SSH 目标内解析的预装程序；本机继续使用随包固定的程序。 |
 
 ## 持续成员
+
+SSH 使用目标机器预装的 `remoteCommand`。子进程只接收显式配置的环境变量，不携带 Host 的 HOME、PATH 或 SDK 进程环境；目标程序自行读取远端用户及项目配置。
+
+每次调用通过实际成员 Session 解析工作区及子进程提供方，SSH 会话必须使用同一 standing realm 的文件系统和子进程，缺失时拒绝而不回退到 Host。绑定存储在首次启动前固定规范路径及执行目标，重启后拒绝目标变化。损坏或不可读的记录不能被视为新成员；缺少目标证明的旧绑定保留原记录，须新建成员后才能执行。
 
 默认 `claude-code` 实例保留既有模型路由及 `claude-code.jsonl` 存储。其他名称根据完整提供方名称生成独立、确定的路由和文件，在大小写不敏感的文件系统上仍保持隔离；卸载一个实例只释放其路由。重命名实例会改变其持久身份，不会收养其他实例的绑定。
 
 挂载 `llm` 服务时本提供方同时声明 `prepareContinuable`，`ctx.subagents.startContinuable` 即可接受它——包括 Team roster 的提供方选择通道。成员子级是由 continuation 管理器拥有的普通进程内 Agent（耐用身份、inbox、持久化、重启）；本包只提供模型路由：每次成员模型调用在成员的耐用 Claude 会话上运行一次 Agent SDK `query`（已绑定时 `resume`，带 `persistSession`），然后释放 SDK 进程。
 
-绑定存储记录 harness 子会话 ↔ Claude 会话映射与最后发出的提示词；轮次中途崩溃后，下一次调用可经 `~/.claude/projects/` 下的耐用 transcript 证明该提示词：已完结的答案直接重放不重发，可证未送达的提示词重发一次，不可证的提示词被丢弃而非重复投递。没有 `llm` 服务时提供方保持仅一次性能力——没有 `prepareContinuable`，可继续启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
+绑定存储记录子会话 ↔ Claude 会话映射、待决提示词和已消费游标。实时轮次必须收到 SDK 成功结果才能完成。中断后，transcript 文本无法证明某次准确请求已完成或从未送达：待决请求报告 `EXTERNAL_TURN_OUTCOME_UNKNOWN`，不再次查询。耐用成员仍可接收新的明确提示词。未挂载 `llm` 时，持续成员启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
 
 | `permissionMode` 值 | 原生行为 |
 |---|---|

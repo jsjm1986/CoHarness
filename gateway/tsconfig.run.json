@@ -14,6 +14,8 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "@deepseek-ai/dsh-brand": ["../packages/util/brand/lib/types/index.js"],
+      "@deepseek-ai/dsh-managed-data": ["../packages/util/managed-data/lib/types/index.js"],
+      "@deepseek-ai/dsh-atomic-write": ["../packages/util/atomic-write/lib/types/index.js"],
       "@deepseek-ai/dsh-typert-protocol": ["../packages/typert/protocol/lib/types/index.js"]
     }
   }

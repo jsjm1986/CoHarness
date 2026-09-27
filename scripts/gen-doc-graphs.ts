@@ -97,6 +97,14 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'hostSessionLifecycle',
+    pkg: 'host-apiproxy',
+    title: 'Host ownership and idle release of Session handles',
+    mode: 'core',
+    consumers: ['host-apiproxy', 'archive-gateway'],
+    note: 'The Host retains its factory handles, reserves Session identities during removal, and releases only idle resources before durable archive deletion.',
+  },
+  {
     key: 'executionAuthority',
     pkg: 'execution-authority',
     title: 'Verified human participants and current execution privileges',
@@ -998,7 +1006,7 @@ type CallSiteIndex = Map<ts.SignatureDeclaration | ts.JSDocSignature, ts.CallExp
  * must appear here — the prefilter drops non-members before any branch runs,
  * so a branch for an unlisted name is silently dead.
  */
-const EVENT_API_METHODS = new Set(['on', 'once', 'emit', 'parallel', 'serial', 'waterfall', 'dispatch'])
+const EVENT_API_METHODS = new Set(['on', 'once', 'emit', 'parallel', 'serial', 'waterfall', 'bail', 'dispatch'])
 
 /**
  * Dispatchers implemented by loadable plugins outside the packages/ TypeScript
@@ -1185,7 +1193,7 @@ export class EventRelationCollector {
             const eventNames = this.eventNamesFromCall(node, receiverKind)
             if (method === 'on' || method === 'once') {
               for (const event of eventNames) this.ensure(event).listeners.add(source.pkg)
-            } else if (method === 'emit' || method === 'parallel' || method === 'serial' || method === 'waterfall') {
+            } else if (method === 'emit' || method === 'parallel' || method === 'serial' || method === 'waterfall' || method === 'bail') {
               for (const event of eventNames) this.addDispatcher(event, source.pkg, method)
             }
           }

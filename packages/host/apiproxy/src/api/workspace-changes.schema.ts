@@ -12,6 +12,7 @@ export const workspaceChangesSummaryRequestSchema = z.object({ sessionId: sessio
 export const workspaceChangesDiffRequestSchema = workspaceChangesSummaryRequestSchema.extend({ index: count }) satisfies z.ZodType<Wire<RequestPayload<'workspaceChanges.diff'>>>
 /** Bounded recorder summary without storage metadata. */
 export const workspaceChangesSummaryValueSchema = z.object({
+  incomplete: z.literal(true).optional(),
   turn: z.number().int().positive(), total: count, added: count, deleted: count,
   files: z.array(file.extend({ added: count, deleted: count, binary: z.literal(true).optional(), oversized: z.literal(true).optional() })),
 }).nullable() satisfies z.ZodType<Wire<ResponseValue<'workspaceChanges.summary'>>>

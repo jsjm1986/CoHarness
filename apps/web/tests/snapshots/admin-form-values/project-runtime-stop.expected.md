@@ -1,0 +1,6 @@
+- dialog "停止项目实例":
+  - heading "停止项目实例" [level=2]
+  - paragraph: 此操作影响项目 Form fixture 的所有在线成员，并会中断正在执行的 Agent、子任务和终端。停止后后台任务不会自动唤醒实例。
+  - button "关闭"
+  - button "取消"
+  - button "确认执行"

@@ -6,6 +6,8 @@ English | [中文](README.zh.md)
 
 Opening the document picker captures its destination Session. Switching panes while the dialog is open does not change which composer receives a selected document.
 
+Private image, PDF and download URLs carry the Connection’s confirmed account and runtime, including native iframe and anchor requests. The picker captures its destination runtime separately from its browsing scope: an attachment from another runtime is copied through the authorized transfer service before the new reference reaches the composer. Resumable upload chunks carry the same account and runtime conditions as their metadata requests.
+
 ## Summary
 
 Use `dsh-client-ui-documents` as the workspace document manager in the Web UI: organize folders, preview, upload, move, download, delete, and insert stored documents into the conversation input. The picker captures its destination Session when opened, so switching panes mid-dialog never sends a document to the wrong composer.

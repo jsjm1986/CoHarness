@@ -4,6 +4,8 @@
 
 Web Client 是由独立加载插件组装而成的浏览器侧 Cordis 应用。它有四个可复用底座：[Client Modules](client-modules.zh.md) 加载插件图，[API Gateway](../api-gateway.zh.md) 提供类型化 Host 通信，[Slots](slots.zh.md) 组合 React UI，[Conversation](conversation.zh.md) 把 Session 历史窗口变成各 target 自有的视图。本文串联这些系统，并规定 Client model 与功能包各自所在的位置。
 
+池化 Client Session 身份采用规范的、带 runtime 限定的浏览器键。`ClientSessionAddress` 保留原始 Host `sessionId` 及个人或项目 runtime；`ClientSessionKey` 为缓存、binding 和布局编码该地址。Wire 解码由 [Connection 传输层](../../packages/client/connection/README.zh.md)拥有，generation 和保留由 [Client runtime](../../packages/client/runtime/README.zh.md)拥有。
+
 ## 分层与所有权
 
 | 层 | 主要 owner | 职责 |

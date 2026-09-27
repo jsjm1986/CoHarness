@@ -1,7 +1,7 @@
 /** Public webhook ingress: provider verification, durable reservation, managed runtime dispatch. */
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { RuntimeLeaseUnavailableError, type RuntimeTarget } from './instances.ts'
+import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
 import { DISPATCH_BODY_LIMIT, WebhookEndpointError, type PostgresWebhookEndpointService, type WebhookIntakeConfig } from './postgres/webhook-endpoint-service.ts'
 import { WebhookReceiptError, type PostgresWebhookDeliveryService, type WebhookEndpointId, type WebhookReceipt } from './postgres/webhook-delivery-service.ts'
@@ -93,8 +93,8 @@ export class GatewayWebhookIntake {
     private readonly deps: {
       cfg: Pick<GatewayDeps['cfg'], 'upstreamTimeoutMs'>
       users: Pick<GatewayDeps['users'], 'getById'>
-      projects: Pick<GatewayDeps['projects'], 'getById'>
-      instances: Pick<GatewayDeps['instances'], 'isLive' | 'generationOf' | 'portOf' | 'operationRef'>
+      collaboration: Pick<NonNullable<GatewayDeps['collaboration']>, 'projectForUser'>
+      instances: Pick<GatewayDeps['instances'], 'isLive' | 'generationOf' | 'portOf' | 'operationRef' | 'ensureRunning'>
     },
     private readonly endpoints: Pick<PostgresWebhookEndpointService, 'intake' | 'dispatchConfig'>,
     private readonly deliveries: Pick<PostgresWebhookDeliveryService, 'get' | 'reserve' | 'redispatch' | 'complete'>,
@@ -231,7 +231,39 @@ export class GatewayWebhookIntake {
       return { state: 'unknown', errorCode: 'dispatch-unavailable' }
     }
     if (user === null || user.status !== 'active') return { state: 'rejected', errorCode: 'execution-account' }
-    if (!live) return { state: 'rejected', errorCode: 'runtime-offline' }
+    if (config.permissionPreset === 'auto' && user.autoReviewEligible !== true) {
+      return { state: 'rejected', errorCode: 'execution-auto-ineligible' }
+    }
+    let subject: Parameters<GatewayDeps['instances']['ensureRunning']>[0] = user
+    let scope: Parameters<GatewayPrincipalSigner['issueWebhookDispatch']>[0]['scope']
+    if (target.kind === 'user') {
+      if (target.id !== user.id) return { state: 'rejected', errorCode: 'execution-account' }
+      scope = { kind: 'personal' }
+    } else {
+      let membership: Awaited<ReturnType<typeof this.deps.collaboration.projectForUser>>
+      try {
+        membership = await this.deps.collaboration.projectForUser(target.id, user.id)
+      } catch {
+        return { state: 'unknown', errorCode: 'dispatch-unavailable' }
+      }
+      if (membership === null || membership.mode !== 'rw') {
+        return { state: 'rejected', errorCode: 'execution-project-access' }
+      }
+      scope = { kind: 'project', projectId: target.id, projectName: membership.name, mode: membership.mode }
+      subject = { kind: 'project', id: target.id, name: membership.name, path: membership.path }
+    }
+    if (!live) {
+      try {
+        generation = (await instances.ensureRunning(subject, 'webhook')).generation
+      } catch (error) {
+        if (error instanceof RuntimeStartBlockedError) {
+          const errorCode = error.reason === 'manual' ? 'runtime-manually-stopped'
+            : error.reason === 'maintenance' || error.reason === 'stale-epoch' ? error.reason : 'runtime-offline'
+          return { state: 'rejected', errorCode }
+        }
+        return { state: 'unknown', errorCode: 'runtime-start-failed' }
+      }
+    }
     if (instances.operationRef === undefined) return { state: 'unknown', errorCode: 'dispatch-unavailable' }
     let title: string
     let prompt: string
@@ -254,6 +286,7 @@ export class GatewayWebhookIntake {
       request: {
         workspacePath: config.workspacePath, title, prompt,
         agentPreset: config.agentPreset, permissionPreset: config.permissionPreset,
+        projectVisibility: config.projectVisibility,
         ...(config.modelProvider === null || config.modelId === null ? {} : {
           model: {
             provider: config.modelProvider, model: config.modelId,
@@ -271,15 +304,10 @@ export class GatewayWebhookIntake {
       return { state: error instanceof RuntimeLeaseUnavailableError ? 'rejected' : 'unknown', errorCode: 'runtime-lease' }
     }
     try {
-      const projectName = target.kind === 'project'
-        ? (await this.deps.projects.getById(target.id))?.name ?? ''
-        : ''
       const assertion = this.signer.issueWebhookDispatch({
         user,
         runtime: { ...target, generation },
-        scope: target.kind === 'user'
-          ? { kind: 'personal' }
-          : { kind: 'project', projectId: target.id, projectName, mode: 'ro' },
+        scope,
       }, this.deps.cfg.upstreamTimeoutMs)
       const port = await instances.portOf(target)
       const authority = `127.0.0.1:${String(port)}`

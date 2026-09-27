@@ -105,6 +105,8 @@ turn/end
 
 详情见[时序图](agent-lifecycle.zh.md)、[工具流水线](tool-execution-pipeline.zh.md)和[取消与错误恢复](subsystems/core.zh.md#the-agent-handle)。AgentLoop 发布操作在回滚处理范围内等待串行 `agent/created` 初始化完成；它是唯一的启动初始化事件，setup 与发布通过维护任务暂存唤醒输入，成功后才放行。
 
+永久清理 Session 时保留生命周期所有权：预留阻止新工作，插件可因持有资源而拒绝，确认空闲释放后才进行持久删除。普通取消行为不变。[空闲清理决定](../.agents/notes/implemented/architecture/2026-09-27-idle-session-purge.zh.md)规定执行顺序与失败处理。
+
 ## 会话日志
 
 会话日志是模型所见上下文的来源。`deriveMessages()` 从中投影出模型历史，原始 `assistant/chunk` 事件则保证回放和 UI 保真。fork、恢复、transcript（文本记录）、遥测和持久化都派生自该事件流。

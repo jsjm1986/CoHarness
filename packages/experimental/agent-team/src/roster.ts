@@ -255,6 +255,7 @@ export class TeamRoster {
     const name = this.memberName(request.name)
     const description = requiredText(request.description, 'description', 200)
     const childId = SessionId(randomUUID())
+    using _admission = this.ctx.agents.reserveUse([root.id, childId])
     const member: TeamMemberSnapshot = {
       id: childId,
       name,
@@ -389,6 +390,7 @@ export class TeamRoster {
   /** Settle provisioning-only members from their independently durable child Sessions. */
   private async reconcileProvisioning(root: Agent, signal: AbortSignal): Promise<void> {
     const provisioning = [...this.journal.state(root).members.values()].filter(member => member.phase === 'provisioning')
+    using _admission = this.ctx.agents.reserveUse([root.id, ...provisioning.map(member => member.id)])
     for (const member of provisioning) {
       signal.throwIfAborted()
       // A live child means creation is still completing in this process. Its

@@ -6,7 +6,7 @@ import { expect, it } from 'vitest'
 import { createAdminApiHandler } from '../src/admin-api.ts'
 import { AuditService } from '../src/audit.ts'
 import { AuthService } from '../src/auth.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ModelGovernanceService } from '../src/model-governance.ts'
@@ -20,7 +20,7 @@ const refreshing = process.env.DSH_SNAPSHOT === 'record' || process.env.DSH_SNAP
 it('serves the real Gateway usage overview with separate billing and activity fields', async () => {
   const root = mkdtempSync(join(tmpdir(), 'hgw-admin-usage-snapshot-'))
   const db = openDb(join(root, 'gateway.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_STATE_ROOT: join(root, 'state') })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), HGW_STATE_ROOT: join(root, 'state') })
   const governance = new ModelGovernanceService(db)
   const deps: GatewayDeps = {
     cfg, auth: new AuthService(db, cfg), users: new UserService(db, cfg), projects: new ProjectService(db, cfg),

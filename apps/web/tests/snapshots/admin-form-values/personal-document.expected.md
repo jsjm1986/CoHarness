@@ -1,0 +1,25 @@
+- dialog "Fixture document":
+  - heading "Fixture document" [level=2]
+  - paragraph: 默认仅显示元数据；回收、恢复、永久清理和所有权变更都会写入审计日志。
+  - button "关闭"
+  - term: 目录 ID
+  - definition: 11111111-1111-4111-8111-111111111111
+  - term: 作用域
+  - definition: 个人
+  - term: 文件 ID
+  - definition: fixture-doc
+  - term: 大小
+  - definition: 7 B
+  - term: 状态
+  - definition: 活跃
+  - term: 来源
+  - definition: 上传
+  - term: 谱系根
+  - definition: 当前根文档
+  - paragraph: 所有者：Admin fixture（个人文档归属其所在账号）
+  - heading "操作历史" [level=3]
+  - paragraph: 暂无历史记录。
+  - heading "复制记录" [level=3]
+  - paragraph: 暂无复制记录。
+  - button "移入回收站"
+  - button "关闭"

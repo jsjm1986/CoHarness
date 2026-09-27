@@ -1,6 +1,7 @@
 /** Opt-in acceptance against an explicitly configured, disposable POSIX SSH workspace. */
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
 import { once } from 'node:events'
 import type { ChildProcess } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -135,7 +136,7 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
       }))
       const resolved = await ctx.fs.resolve('file.txt', { cwd: `${root}/lexical/link/..` })
       expect(ctx.fs.processPath(resolved)).toBe(`${root}/physical/file.txt`)
-      expect(ctx.fs.fileUrl(resolved)).toBe(`file://${root}/physical/file.txt`)
+      expect(ctx.fs.fileUrl(resolved)).toBe(pathToFileURL(`${root}/physical/file.txt`).href)
       await ctx.fs.writeText(resolved, 'physical')
       expect(await ctx.fs.readText(await ctx.fs.resolve(`${root}/physical/file.txt`))).toBe('physical')
     } finally { await removeOwned(test) }
@@ -307,8 +308,10 @@ describe.skipIf(!enabled)('POSIX SSH runtime acceptance', () => {
       await stdio
       const request = { filePath: 'source.ts', workspaceRoot: test.root, position: { line: 1, character: 24 } }
       const definition = await test.ctx.lsp.query({ ...request, operation: 'goToDefinition' })
-      expect(definition).toMatchObject({ kind: 'locations', resolvedWorkspaceUri: `file://${test.root}` })
-      if (definition.kind === 'locations') expect(definition.locations).toContainEqual(expect.objectContaining({ uri: `file://${test.root}/source.ts` }))
+      expect(definition).toMatchObject({ kind: 'locations', resolvedWorkspaceUri: pathToFileURL(test.root).href })
+      if (definition.kind === 'locations') {
+        expect(definition.locations).toContainEqual(expect.objectContaining({ uri: pathToFileURL(`${test.root}/source.ts`).href }))
+      }
       const hover = await test.ctx.lsp.query({ ...request, operation: 'hover' })
       expect(hover.kind).toBe('hover')
       if (hover.kind === 'hover') expect(hover.hover?.contents).toContain('number')

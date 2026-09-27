@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import inspect
+import os
 import sys
 import threading
 import time
@@ -43,19 +44,27 @@ for line in sys.stdin:
         print(json.dumps({"jsonrpc": "2.0", "method": "session.status", "params": {"sessionId": params["sessionId"], "status": "running"}}), flush=True)
         print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": {"messageId": "message-1"}}), flush=True)
         print(json.dumps({"jsonrpc": "2.0", "method": "session.event", "params": {
+            "sessionId": params["sessionId"], "event": {"type": "gateway/scoped-execution", "data": {"version": 1}}
+        }}), flush=True)
+        print(json.dumps({"jsonrpc": "2.0", "method": "session.event", "params": {
             "sessionId": params["sessionId"], "event": {"type": "gateway/execution", "data": {
-                "kind": "accepted", "state": {"revision": "1", "inputs": ["00000000-0000-4000-8000-000000000001"],
+                "kind": "accepted", "state": {"revision": "1", "scopeId": "10000000-0000-4000-8000-000000000001", "inputs": ["00000000-0000-4000-8000-000000000001"],
                     "actors": [{"userId": 7}], "primaryActorUserId": 7, "unverifiedHistory": False}
             }}
         }}), flush=True)
         for event in [
+            {"type": "gateway/continuation", "data": {"key": "goal:example:1", "scope": {
+                "parentSessionId": params["sessionId"], "scopeId": "10000000-0000-4000-8000-000000000001",
+                "inputs": ["00000000-0000-4000-8000-000000000001"], "primaryActorUserId": 7, "unverifiedHistory": False,
+            }}},
             {"type": "user/message", "data": {"turn": 0, "step": 0, "message": {
                 "id": "webhook-message", "role": "user", "content": [{"type": "text", "text": "External request"}],
                 "source": {"kind": "webhook", "provider": "github", "source": "endpoint", "deliveryId": "delivery", "ruleId": "review",
                     "form": "notice", "summary": "github webhook handled by review"},
             }}},
             {"type": "deliverables/presented", "data": {"turn": 0, "callId": "present-1", "files": [{"path": "report.txt", "description": "Report"}]}},
-            {"type": "workspace/changes", "data": {"turn": 0}},
+            {"type": "workspace/changes", "data": {"turn": 0, "reviewId": "a" * 64}},
+            {"type": "workspace/changes", "data": {"turn": 1, "incomplete": True, "requiredReviewBytes": 8192}},
         ]:
             print(json.dumps({"jsonrpc": "2.0", "method": "session.event", "params": {"sessionId": params["sessionId"], "event": event}}), flush=True)
         print(json.dumps({
@@ -122,16 +131,23 @@ for line in sys.stdin:
         result = harness.run("say hello", session_id="main")
 
     assert result.final_response == "hello from runtime"
+    assert next(event for event in result.events if event["type"] == "gateway/scoped-execution")["data"] == {"version": 1}
     execution = next(event for event in result.events if event["type"] == "gateway/execution")
     assert execution["data"] == {
         "kind": "accepted", "state": {
-            "revision": "1", "inputs": ["00000000-0000-4000-8000-000000000001"],
+            "revision": "1", "scopeId": "10000000-0000-4000-8000-000000000001", "inputs": ["00000000-0000-4000-8000-000000000001"],
             "actors": [{"userId": 7}], "primaryActorUserId": 7, "unverifiedHistory": False,
         },
     }
+    continuation = next(event for event in result.events if event["type"] == "gateway/continuation")
+    assert continuation["data"] == {"key": "goal:example:1", "scope": {
+        "parentSessionId": "main", "scopeId": "10000000-0000-4000-8000-000000000001",
+        "inputs": ["00000000-0000-4000-8000-000000000001"], "primaryActorUserId": 7, "unverifiedHistory": False,
+    }}
     assert [event for event in result.events if event["type"] in {"deliverables/presented", "workspace/changes"}] == [
         {"type": "deliverables/presented", "data": {"turn": 0, "callId": "present-1", "files": [{"path": "report.txt", "description": "Report"}]}},
-        {"type": "workspace/changes", "data": {"turn": 0}},
+        {"type": "workspace/changes", "data": {"turn": 0, "reviewId": "a" * 64}},
+        {"type": "workspace/changes", "data": {"turn": 1, "incomplete": True, "requiredReviewBytes": 8192}},
     ]
     assert next(event for event in result.events if event["type"] == "user/message")["data"] == {
         "turn": 0, "step": 0, "message": {
@@ -991,6 +1007,7 @@ json.dump({
     "argv": sys.argv[1:],
     "DSH_HOME": os.environ.get("DSH_HOME"),
     "DSH_CORDIS_CONFIG": os.environ.get("DSH_CORDIS_CONFIG"),
+    "DSH_MANAGED_DATA_MANIFEST": os.environ.get("DSH_MANAGED_DATA_MANIFEST"),
 }, open(os.environ["ENV_DUMP"], "w"))
 for line in sys.stdin:
     msg = json.loads(line)
@@ -1040,6 +1057,7 @@ def test_client_default_launch_uses_bundled_dsh_sdk_profile_and_explicit_home(
         "argv": ["--profile", "sdk", "--patch", str(patch)],
         "DSH_HOME": str(home),
         "DSH_CORDIS_CONFIG": None,
+        "DSH_MANAGED_DATA_MANIFEST": None,
     }
 
 
@@ -1059,6 +1077,7 @@ def test_client_accepts_explicit_environment_dsh_home(
         "argv": ["--profile", "custom"],
         "DSH_HOME": str(home),
         "DSH_CORDIS_CONFIG": None,
+        "DSH_MANAGED_DATA_MANIFEST": None,
     }
 
 
@@ -1070,6 +1089,50 @@ def test_client_rejects_an_implicit_default_dsh_home(
 
     with pytest.raises(ValueError, match="explicit dsh_home or non-empty DSH_HOME"):
         HarnessClient(HarnessConfig(env={})).start()
+
+
+@pytest.mark.parametrize("select_home", ["option", "environment"])
+def test_sdk_independent_home_does_not_inherit_parent_managed_inventory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, select_home: str
+) -> None:
+    _install_fake_bundled_dsh(tmp_path, monkeypatch)
+    parent = tmp_path / "parent"
+    child = tmp_path / "child"
+    manifest = parent / "managed-data.jsonl"
+    monkeypatch.setenv("DSH_HOME", str(parent))
+    monkeypatch.setenv("DSH_MANAGED_DATA_MANIFEST", str(manifest))
+    env_dump = tmp_path / "env.json"
+    env = {"ENV_DUMP": str(env_dump)}
+    if select_home == "environment":
+        env["DSH_HOME"] = str(child)
+    with HarnessClient(HarnessConfig(
+        dsh_home=str(child) if select_home == "option" else None, env=env
+    )) as client:
+        client.initialize(provider="deepseek-official", cwd="/workspace", model="deepseek-v4-pro")
+    assert json.loads(env_dump.read_text())["DSH_MANAGED_DATA_MANIFEST"] is None
+    assert os.environ["DSH_MANAGED_DATA_MANIFEST"] == str(manifest)
+
+
+@pytest.mark.parametrize("explicit_inventory", [False, True])
+def test_sdk_preserves_same_home_or_explicit_inventory_ownership(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit_inventory: bool
+) -> None:
+    _install_fake_bundled_dsh(tmp_path, monkeypatch)
+    parent = tmp_path / "parent"
+    manifest = parent / "managed-data.jsonl"
+    monkeypatch.setenv("DSH_HOME", str(parent))
+    monkeypatch.setenv("DSH_MANAGED_DATA_MANIFEST", str(manifest))
+    env_dump = tmp_path / "env.json"
+    env = {"ENV_DUMP": str(env_dump)}
+    if explicit_inventory:
+        env["DSH_MANAGED_DATA_MANIFEST"] = str(tmp_path / "explicit-inventory.jsonl")
+    with HarnessClient(HarnessConfig(
+        dsh_home=str(tmp_path / "child") if explicit_inventory else str(parent), env=env
+    )) as client:
+        client.initialize(provider="deepseek-official", cwd="/workspace", model="deepseek-v4-pro")
+    assert json.loads(env_dump.read_text())["DSH_MANAGED_DATA_MANIFEST"] == env.get(
+        "DSH_MANAGED_DATA_MANIFEST", str(manifest)
+    )
 
 
 def test_client_reports_missing_bundled_runtime_dependency(monkeypatch: pytest.MonkeyPatch) -> None:

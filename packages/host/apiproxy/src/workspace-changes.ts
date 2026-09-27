@@ -86,7 +86,8 @@ export function createWorkspaceChangesApi(ctx: Context, options: ReadOptions): W
         if ('error' in access) return { rpcId: request.rpcId, result: { ok: false, error: access.error } }
         signal = options.principalSignal(signal, access.authority)
         signal.throwIfAborted()
-        const summary = ctx.get('workspaceChanges')?.summary(sessionId, seq)
+        const recorder = ctx.get('workspaceChanges')
+        const summary = await recorder?.summary(sessionId, seq, signal)
         if (summary === undefined) return { rpcId: request.rpcId, result: { ok: true, value: null } }
         const refused = await checkPaths(sessionId, summary, access.authority, signal)
         if (refused !== undefined) return { rpcId: request.rpcId, result: { ok: false, error: refused } }
@@ -95,8 +96,8 @@ export function createWorkspaceChangesApi(ctx: Context, options: ReadOptions): W
         if (recheck !== undefined) return { rpcId: request.rpcId, result: { ok: false, error: recheck } }
         await access.authority?.authorize(sessionId, 'read')
         signal.throwIfAborted()
-        // Disposal invalidates the snapshot while a comparison is in flight.
-        if (ctx.get('workspaceChanges')?.summary(sessionId, seq) !== summary) {
+        // A replaced provider cannot finish a read admitted by its predecessor.
+        if (ctx.get('workspaceChanges') !== recorder) {
           return { rpcId: request.rpcId, result: { ok: true, value: null } }
         }
         return { rpcId: request.rpcId, result: { ok: true, value } }
@@ -113,8 +114,8 @@ export function createWorkspaceChangesApi(ctx: Context, options: ReadOptions): W
   }
 
   return {
-    summary: (request, signal) => read(request, signal, ({ turn, files, total, added, deleted }) =>
-      Promise.resolve({ turn, files, total, added, deleted })),
+    summary: (request, signal) => read(request, signal, ({ turn, files, total, added, deleted, incomplete }) =>
+      Promise.resolve({ turn, files, total, added, deleted, ...(incomplete === undefined ? {} : { incomplete }) })),
     diff: (request, signal) => read(request, signal, async (_summary, abort) =>
       await ctx.get('workspaceChanges')?.diff(request.payload.sessionId, request.payload.seq, request.payload.index, abort) ?? null),
   }

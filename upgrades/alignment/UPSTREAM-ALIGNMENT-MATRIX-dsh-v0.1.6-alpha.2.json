@@ -5219,7 +5219,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "adapted",
       "localDisposition": "Source-verified: client/retention.ts holds a terminal window by remote.retain(sessionId, id, signal) — the session-retain Remote verb 7A ports is a 7B prerequisite for sidebar-terminal window holds.",
       "notes": "cumulative review 2026-09-25: adapted surface; 8/28 files byte-identical; 20 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
@@ -5379,8 +5379,8 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
-      "notes": "cumulative review 2026-09-25: tracked surface; 9/14 files byte-identical; 5 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "localSovereignty": "adapted",
+      "notes": "cumulative review 2026-09-25: tracked surface; 9/14 files byte-identical; 5 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green. Local repair 2026-09-27: The local attachment provider registers its actual managed directory before writing so deployment backups include attachment bytes. Candidate integration and deployment acceptance are recorded separately."
     },
     {
       "area": "packages/boot/app-boot",
@@ -5519,7 +5519,7 @@
         "packages/boot/hmr/tsconfig.json"
       ],
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked"
+      "localSovereignty": "adapted"
     },
     {
       "area": "packages/boot/plugin-manager",
@@ -5613,7 +5613,7 @@
     },
     {
       "area": "packages/bundle/acp-app",
-      "status": "reject",
+      "status": "retain",
       "localOwner": "packages/bundle/acp-app",
       "commitScope": [
         "packages/bundle/acp-app/"
@@ -5642,13 +5642,15 @@
         "area": "packages/bundle/acp-app",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "not-carried",
+      "targetAssessment": "increment-review-required",
       "localSovereignty": "tracked",
-      "upstreamOnly": {
-        "reason": "CoHarness ships its own installable bundle profiles; the upstream ACP bundle is not carried"
-      },
-      "localDisposition": "Not carried: CoHarness ships its own installable bundle profiles; upstream example-bundle churn needs no port.",
-      "notes": "not carried — upstream surface rejected (no local consumer). Cumulative review 2026-09-25 verified local absence/owner; vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "localDisposition": "Carried by the app-boot ACP profile and CLI dependency closure; its profile composition matches the pinned upstream target.",
+      "notes": "Source and consumer review 2026-09-27 against ddefc45fbc7f8e46dd73185e68295696d1297887. Carried-package classification agrees with scripts/upstream-sync.json. Focused local suite: 27 files, 661 passed, 1 skipped test; this does not establish production or external-provider acceptance.",
+      "consumerEvidence": [
+        "apps/cli/package.json",
+        "packages/boot/app-boot/src/profile.ts",
+        "packages/boot/app-boot/tests/profile.spec.ts"
+      ]
     },
     {
       "area": "packages/bundle/base",
@@ -5724,7 +5726,7 @@
     },
     {
       "area": "packages/bundle/sdk-app",
-      "status": "reject",
+      "status": "adapt",
       "localOwner": "packages/bundle/sdk-app",
       "commitScope": [
         "packages/bundle/sdk-app/"
@@ -5753,17 +5755,23 @@
         "area": "packages/bundle/sdk-app",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "not-carried",
+      "targetAssessment": "increment-review-required",
       "localSovereignty": "tracked",
-      "upstreamOnly": {
-        "reason": "CoHarness ships its own installable bundle profiles; the upstream SDK bundle is not carried"
-      },
-      "localDisposition": "Not carried: CoHarness ships its own installable bundle profiles; upstream example-bundle churn needs no port.",
-      "notes": "not carried — upstream surface rejected (no local consumer). Cumulative review 2026-09-25 verified local absence/owner; vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "localDisposition": "Carried by the app-boot SDK profile and CLI. The local patch disables the legacy string-replace editor for the structured SDK file tools; the startup and JSON-RPC assembly remain upstream-derived.",
+      "notes": "Source and consumer review 2026-09-27 against ddefc45fbc7f8e46dd73185e68295696d1297887. Carried-package classification agrees with scripts/upstream-sync.json. Focused local suite: 27 files, 661 passed, 1 skipped test; this does not establish production or external-provider acceptance.",
+      "consumerEvidence": [
+        "apps/cli/package.json",
+        "apps/cli/tests/built-bin.e2e.ts",
+        "packages/bundle/sdk-minimal/package.json",
+        "packages/bundle/sdk-minimal/tests/sdk-minimal.spec.ts",
+        "packages/bundle/sdk-minimal/cordis.patch.yml",
+        "packages/boot/app-boot/src/profile.ts",
+        "packages/boot/app-boot/tests/profile.spec.ts"
+      ]
     },
     {
       "area": "packages/bundle/sdk-minimal",
-      "status": "reject",
+      "status": "retain",
       "localOwner": "packages/bundle/sdk-minimal",
       "commitScope": [
         "packages/bundle/sdk-minimal/"
@@ -5787,13 +5795,17 @@
         "area": "packages/bundle/sdk-minimal",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "not-carried",
+      "targetAssessment": "increment-review-required",
       "localSovereignty": "tracked",
-      "upstreamOnly": {
-        "reason": "CoHarness ships its own installable bundle profiles; the upstream minimal SDK bundle is not carried"
-      },
-      "localDisposition": "Not carried: CoHarness ships its own installable bundle profiles; upstream example-bundle churn needs no port.",
-      "notes": "not carried — upstream surface rejected (no local consumer). Cumulative review 2026-09-25 verified local absence/owner; vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "localDisposition": "Carried as the standalone minimal SDK profile, including CLI built-bin and keyless SDK consumers; its profile composition matches the pinned upstream target.",
+      "notes": "Source and consumer review 2026-09-27 against ddefc45fbc7f8e46dd73185e68295696d1297887. Carried-package classification agrees with scripts/upstream-sync.json. Focused local suite: 27 files, 661 passed, 1 skipped test; this does not establish production or external-provider acceptance.",
+      "consumerEvidence": [
+        "apps/cli/package.json",
+        "apps/cli/tests/built-bin.e2e.ts",
+        "apps/cli/tests/profiles/sdk/keyless-smoke.e2e.ts",
+        "packages/boot/app-boot/src/profile.ts",
+        "packages/boot/app-boot/tests/profile.spec.ts"
+      ]
     },
     {
       "area": "packages/bundle/web-app",
@@ -6701,7 +6713,7 @@
     },
     {
       "area": "packages/client/ui-dockkit",
-      "status": "reject",
+      "status": "retain",
       "localOwner": "packages/client/ui-dockkit",
       "commitScope": [
         "packages/client/ui-dockkit/"
@@ -6724,13 +6736,48 @@
         "area": "packages/client/ui-dockkit",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "not-carried",
-      "localSovereignty": "upstreamOnly",
-      "upstreamOnly": {
-        "reason": "the desktop docking layout belongs to the rejected upstream ui-package tree; the Workbench owns the cloud layout"
-      },
-      "localDisposition": "Rejected upstream desktop docking layout; the Workbench owns the cloud layout.",
-      "notes": "not carried — upstream surface rejected (no local consumer). Cumulative review 2026-09-25 verified local absence/owner; vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "tracked",
+      "localDisposition": "Carried shared tab and docking primitives consumed by the right sidebar, Browser, terminal and Review; CoHarness Workbench retains the outer layout owner.",
+      "notes": "Source and consumer review 2026-09-27 against ddefc45fbc7f8e46dd73185e68295696d1297887. Carried-package classification agrees with scripts/upstream-sync.json. Focused local suite: 27 files, 661 passed, 1 skipped test; this does not establish production or external-provider acceptance.",
+      "consumerEvidence": [
+        "scripts/check-workspace-constraints.ts",
+        "scripts/verify-plugin-surfaces.spec.ts",
+        "apps/web/package.json",
+        "packages/client/web/src/platform.ts",
+        "packages/client/web/src/seed.ts",
+        "packages/client/web/package.json",
+        "packages/client/ui-deliverables/src/client/review-store.ts",
+        "packages/client/ui-deliverables/package.json",
+        "packages/client/ui-deliverables/tests/review-tab.client.spec.tsx",
+        "packages/client/ui-sidebar-browser/src/client/browser/store.ts",
+        "packages/client/ui-sidebar-browser/src/client/browser/persistence.ts",
+        "packages/client/ui-sidebar-browser/src/client/browser/BrowserController.ts",
+        "packages/client/ui-sidebar-browser/package.json",
+        "packages/client/ui-sidebar-browser/tests/store.client.spec.ts",
+        "packages/client/ui-sidebar-browser/tests/persistence.client.spec.ts",
+        "packages/client/ui-sidebar-browser/tests/browser-title.client.spec.tsx",
+        "packages/client/ui-sidebar-browser/tests/browser-body.client.spec.tsx",
+        "packages/client/ui-sidebar-browser/tests/browser-controller.client.spec.ts",
+        "packages/client/ui-sidebar-right/src/client/labels.ts",
+        "packages/client/ui-sidebar-right/src/client/service.ts",
+        "packages/client/ui-sidebar-right/src/client/persistence.ts",
+        "packages/client/ui-sidebar-right/src/client/index.ts",
+        "packages/client/ui-sidebar-right/src/client/stores.ts",
+        "packages/client/ui-sidebar-right/src/client/tab-info.ts",
+        "packages/client/ui-sidebar-right/src/client/tab-inventory.ts",
+        "packages/client/ui-sidebar-right/src/client/tab-domain.ts",
+        "packages/client/ui-sidebar-right/src/client/shell/SidebarRight.tsx",
+        "packages/client/ui-sidebar-right/package.json",
+        "packages/client/ui-sidebar-right/src/client/contract/slots.ts",
+        "packages/client/ui-sidebar-right/tests/tab-inventory.client.spec.ts",
+        "packages/client/ui-sidebar-right/tests/persistence.client.spec.ts",
+        "packages/client/ui-sidebar-right/tests/tab-domain.client.spec.ts",
+        "packages/client/ui-sidebar-right/tests/tab-info.client.spec.tsx",
+        "packages/client/ui-sidebar-right/tests/stores.client.spec.ts",
+        "packages/client/ui-sidebar-right/tests/service.client.spec.ts",
+        "packages/client/ui-sidebar-right/tests/seat.client.spec.tsx"
+      ]
     },
     {
       "area": "packages/client/ui-goal",
@@ -7738,7 +7785,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 5/14 files byte-identical; 9 carry CoHarness-owned diffs; decision .agents/notes/implemented/feature/2026-09-25-session-unarchive-restore-surface.md; real-browser acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -7865,7 +7912,7 @@
         "packages/client/ui-sidebar-browser/tsdown.config.ts"
       ],
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 10/27 files byte-identical; 17 carry CoHarness-owned diffs; real-browser acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -8133,10 +8180,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "upstreamOnly",
-      "upstreamOnly": {
-        "reason": "the right-sidebar dock is part of the rejected upstream ui-package tree; the Workbench owns the cloud panel layout"
-      },
+      "localSovereignty": "adapted",
       "localDisposition": "Upstream-only dock tree; the Workbench right-sidebar slots (client/ui-slots) own the cloud panel layout — review delta for the replacement owner.",
       "notes": "cumulative review 2026-09-25: adapted surface; 9/27 files byte-identical; 18 carry CoHarness-owned diffs; real-browser acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
@@ -8208,7 +8252,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 17/32 files byte-identical; 14 carry CoHarness-owned diffs; 1 upstream files not carried (0 src via removedUpstreamPaths); real-browser acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -8826,7 +8870,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "localDisposition": "Merge the inherited and incremental routing claims for this existing local package. All cumulative and incremental paths remain claimed; source review and consumer acceptance remain pending.",
       "historicalPathAliases": [
         {
@@ -9052,7 +9096,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 2/8 files byte-identical; 6 carry CoHarness-owned diffs; managed-desktop GUI acceptance on 3 platforms pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -9635,7 +9679,7 @@
         "packages/deliverables/tool-present/tsconfig.json"
       ],
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "tracked",
       "notes": "cumulative review 2026-09-25: tracked surface; 5/9 files byte-identical; 4 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -9695,7 +9739,7 @@
         "packages/deliverables/workspace-changes/tsconfig.json"
       ],
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 10/21 files byte-identical; 11 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -9743,7 +9787,7 @@
         "packages/document/office-to-pdf/tsconfig.json"
       ],
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 7/15 files byte-identical; 7 carry CoHarness-owned diffs; 1 upstream files not carried (0 src via removedUpstreamPaths); non-macOS platform acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -9881,12 +9925,12 @@
     },
     {
       "area": "packages/experimental/agent-team-profile",
-      "status": "defer",
+      "status": "retain",
       "localOwner": "packages/experimental/agent-team-profile",
       "commitScope": [
         "packages/experimental/agent-team-profile/"
       ],
-      "reviewState": "deferred-platform-review",
+      "reviewState": "local-tests-passing-real-provider-unverified",
       "phase": "0R",
       "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
@@ -9908,22 +9952,24 @@
         "area": "packages/experimental/agent-team-profile",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "deferred-this-release",
+      "targetAssessment": "increment-review-required",
       "localSovereignty": "tracked",
-      "upstreamOnly": {
-        "reason": "Agent Teams productization for the cloud offer is deferred pending a product decision"
-      },
-      "localDisposition": "Agent Teams productization deferred pending a product decision.",
-      "notes": "cumulative review 2026-09-25: tracked surface; 5/6 files byte-identical; 1 carry CoHarness-owned diffs; deferred this release; consumers documented. vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "localDisposition": "Carried by app-boot as the explicit Agent Team profile. Product scope is approved; external-member completion recovery and workspace targeting still require repair and real acceptance.",
+      "notes": "Source and consumer review 2026-09-27 against ddefc45fbc7f8e46dd73185e68295696d1297887. Carried-package classification agrees with scripts/upstream-sync.json. Focused local suite: 27 files, 661 passed, 1 skipped test; this does not establish production or external-provider acceptance.",
+      "consumerEvidence": [
+        "apps/cli/package.json",
+        "scripts/release/families.spec.ts",
+        "packages/boot/app-boot/src/profile.ts"
+      ]
     },
     {
       "area": "packages/experimental/agent-team-web-profile",
-      "status": "defer",
+      "status": "retain",
       "localOwner": "packages/experimental/agent-team-web-profile",
       "commitScope": [
         "packages/experimental/agent-team-web-profile/"
       ],
-      "reviewState": "deferred-platform-review",
+      "reviewState": "local-tests-passing-real-provider-unverified",
       "phase": "0R",
       "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
@@ -9943,13 +9989,14 @@
         "area": "packages/experimental/agent-team-web-profile",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "deferred-this-release",
-      "localSovereignty": "upstreamOnly",
-      "upstreamOnly": {
-        "reason": "Agent Teams productization for the cloud offer is deferred pending a product decision"
-      },
-      "localDisposition": "Agent Teams productization deferred pending a product decision.",
-      "notes": "cumulative review 2026-09-25: tracked surface; 3/4 files byte-identical; 1 carry CoHarness-owned diffs; deferred this release; consumers documented. vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "tracked",
+      "localDisposition": "Carried as the Team Web overlay on the host Team and Web profiles. The overlay exists and is selected by app-boot; external-member acceptance remains open.",
+      "notes": "Source and consumer review 2026-09-27 against ddefc45fbc7f8e46dd73185e68295696d1297887. Carried-package classification agrees with scripts/upstream-sync.json. Focused local suite: 27 files, 661 passed, 1 skipped test; this does not establish production or external-provider acceptance.",
+      "consumerEvidence": [
+        "scripts/release/families.spec.ts",
+        "packages/boot/app-boot/src/profile.ts"
+      ]
     },
     {
       "area": "packages/experimental/auto-review",
@@ -10139,12 +10186,12 @@
     },
     {
       "area": "packages/experimental/client-ui-agent-team",
-      "status": "defer",
+      "status": "adapt",
       "localOwner": "packages/experimental/client-ui-agent-team",
       "commitScope": [
         "packages/experimental/client-ui-agent-team/"
       ],
-      "reviewState": "deferred-platform-review",
+      "reviewState": "local-tests-passing-browser-unverified",
       "phase": "0R",
       "phaseAssignment": "owner-confirmed-2026-09-18",
       "cumulativeFiles": [
@@ -10166,13 +10213,16 @@
         "area": "packages/experimental/client-ui-agent-team",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "deferred-this-release",
-      "localSovereignty": "upstreamOnly",
-      "upstreamOnly": {
-        "reason": "Agent Teams productization for the cloud offer is deferred pending a product decision"
-      },
-      "localDisposition": "Agent Teams productization deferred pending a product decision.",
-      "notes": "cumulative review 2026-09-25: adapted surface; 2/6 files byte-identical; 4 carry CoHarness-owned diffs; deferred this release; consumers documented. vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted",
+      "localDisposition": "Carried through the Team Web overlay with local TeamAction and mount adaptation. Browser and external-member lifecycle acceptance remain separate from local component tests.",
+      "notes": "Source and consumer review 2026-09-27 against ddefc45fbc7f8e46dd73185e68295696d1297887. Carried-package classification agrees with scripts/upstream-sync.json. Focused local suite: 27 files, 661 passed, 1 skipped test; this does not establish production or external-provider acceptance.",
+      "consumerEvidence": [
+        "scripts/release/families.spec.ts",
+        "packages/experimental/agent-team-web-profile/package.json",
+        "packages/experimental/agent-team-web-profile/tests/profile.spec.ts",
+        "packages/experimental/agent-team-web-profile/cordis.patch.yml"
+      ]
     },
     {
       "area": "packages/experimental/ptc-runtime-python",
@@ -10262,7 +10312,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 1/10 files byte-identical; 9 carry CoHarness-owned diffs; non-macOS platform acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -10297,7 +10347,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 3/11 files byte-identical; 8 carry CoHarness-owned diffs; non-macOS platform acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -11471,8 +11521,8 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
-      "notes": "cumulative review 2026-09-25: tracked surface; 0/4 files byte-identical; 4 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "localSovereignty": "adapted",
+      "notes": "cumulative review 2026-09-25: tracked surface; 0/4 files byte-identical; 4 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green. Local repair 2026-09-27: the anonymous identity provider records its exact persisted identity file before access so complete deployment backups retain that identity. Candidate validation is recorded separately."
     },
     {
       "area": "packages/interaction/commands",
@@ -11657,8 +11707,8 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
-      "notes": "cumulative review 2026-09-25: tracked surface; 0/4 files byte-identical; 4 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "localSovereignty": "adapted",
+      "notes": "cumulative review 2026-09-25: tracked surface; 0/4 files byte-identical; 4 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green. Local repair 2026-09-27: JobSnapshot carries optional captured ExecutionInheritance for delayed Gateway work; standalone jobs and the upstream job lifecycle remain unchanged. Candidate integration and deployment acceptance are recorded separately."
     },
     {
       "area": "packages/jobs/jobs-local",
@@ -12183,7 +12233,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 12/27 files byte-identical; 13 carry CoHarness-owned diffs; 2 files deleted in both trees since baseline (upstream-side removal); real provider/service acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -12829,10 +12879,6 @@
       },
       "targetAssessment": "increment-review-required",
       "localSovereignty": "adapted",
-      "upstreamOnly": {
-        "reason": "the catalog now exists locally: session/session-format-catalog owns the released physical catalog and sessionLogicalFormatCatalog for stored decoded input",
-        "replacedBy": "session/session-format-catalog"
-      },
       "localDisposition": "Carried as packages/session/session-format-catalog: the released chain serves JSONL readers and sessionLogicalFormatCatalog serves SQLite/Gateway providers, routing the v2 edge through the CoHarness dialect stage.",
       "notes": "cumulative review 2026-09-25: adapted surface; 2/8 files byte-identical; 6 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
@@ -12904,10 +12950,6 @@
       },
       "targetAssessment": "increment-review-required",
       "localSovereignty": "tracked",
-      "upstreamOnly": {
-        "reason": "real v1 normalization inlines into session/session-format; kept as a read path for upstream-produced v1 logs",
-        "replacedBy": "session/session-format"
-      },
       "localDisposition": "Not carried as a package: the migration is inlined in session/session-format — review delta for drift only.",
       "notes": "cumulative review 2026-09-25: tracked surface; 8/9 files byte-identical; 1 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
@@ -13311,9 +13353,6 @@
       },
       "targetAssessment": "increment-review-required",
       "localSovereignty": "tracked",
-      "upstreamOnly": {
-        "reason": "readHistoryIndex covers the lookup surface but only the gateway provider produces indexes; the exclusion is under review"
-      },
       "localDisposition": "Upstream-only pending review: decide during 2B whether the gateway index producer needs this read path.",
       "notes": "cumulative review 2026-09-25: tracked surface; 2/3 files byte-identical; 1 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
@@ -13368,8 +13407,8 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
-      "notes": "cumulative review 2026-09-25: tracked surface; 0/3 files byte-identical; 3 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "localSovereignty": "adapted",
+      "notes": "cumulative review 2026-09-25: tracked surface; 0/3 files byte-identical; 3 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green. Local repair 2026-09-27: The file settings provider registers its configured private file before writing so deployment backups include settings at declared locations. Candidate integration and deployment acceptance are recorded separately."
     },
     {
       "area": "packages/shell/bash-local",
@@ -13820,7 +13859,7 @@
         "packages/skill/skill-office/tsconfig.json"
       ],
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "tracked",
       "notes": "cumulative review 2026-09-25: tracked surface; 13/14 files byte-identical; 1 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -13965,7 +14004,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 0/7 files byte-identical; 7 carry CoHarness-owned diffs; real provider/service acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -13996,7 +14035,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "tracked",
       "notes": "cumulative review 2026-09-25: tracked surface; 5/7 files byte-identical; 2 carry CoHarness-owned diffs; real provider/service acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -14062,7 +14101,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 26/35 files byte-identical; 9 carry CoHarness-owned diffs; real provider/service acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -14102,7 +14141,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "unmanifested",
+      "localSovereignty": "tracked",
       "notes": "cumulative review 2026-09-25: tracked surface; 9/11 files byte-identical; 2 carry CoHarness-owned diffs; real provider/service acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -14571,7 +14610,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: tracked surface; 9/10 files byte-identical; 1 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -14657,7 +14696,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 31/38 files byte-identical; 7 carry CoHarness-owned diffs; non-macOS platform acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -14714,9 +14753,6 @@
       },
       "targetAssessment": "increment-review-required",
       "localSovereignty": "tracked",
-      "upstreamOnly": {
-        "reason": "shared Windows process helper library; adopted or rejected with the PR-11 subprocess runner rebuild"
-      },
       "localDisposition": "Upstream-only: adopted or rejected together with the local subprocess runner rebuild decided in 4B.",
       "notes": "cumulative review 2026-09-25: tracked surface; 15/17 files byte-identical; 2 carry CoHarness-owned diffs; non-macOS platform acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
@@ -14745,7 +14781,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 3/4 files byte-identical; 1 carry CoHarness-owned diffs; non-macOS platform acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -14786,7 +14822,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 8/11 files byte-identical; 3 carry CoHarness-owned diffs; non-macOS platform acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -14816,7 +14852,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: adapted surface; 3/6 files byte-identical; 3 carry CoHarness-owned diffs; non-macOS platform acceptance pending. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -15043,7 +15079,7 @@
     },
     {
       "area": "packages/test-support/session-snapshot",
-      "status": "reject",
+      "status": "adapt",
       "localOwner": "packages/test-support/session-snapshot",
       "commitScope": [
         "packages/test-support/session-snapshot/"
@@ -15075,13 +15111,30 @@
         "area": "packages/test-support/session-snapshot",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "not-carried",
-      "localSovereignty": "upstreamOnly",
-      "upstreamOnly": {
-        "reason": "snapshot coverage runs through test:snapshot and apps/web fixtures; the helper package is not carried"
-      },
-      "localDisposition": "Not carried: snapshot coverage runs through test:snapshot and apps/web fixtures.",
-      "notes": "not carried — snapshot coverage runs through test:snapshot and apps/web fixtures; the helper package is not carried. Cumulative review 2026-09-25 verified local absence/owner; vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "adapted",
+      "localDisposition": "Carried by ACP, headless and JSON-RPC example snapshots and the corpus runner. Local adapters preserve fixture transport, workspace and identity behavior; this helper is an active consumer dependency.",
+      "notes": "Source and consumer review 2026-09-27 against ddefc45fbc7f8e46dd73185e68295696d1297887. Carried-package classification agrees with scripts/upstream-sync.json. Focused local suite: 27 files, 661 passed, 1 skipped test; this does not establish production or external-provider acceptance.",
+      "consumerEvidence": [
+        "examples/headless-agent/tests/subagent-diagnostic.snapshot.ts",
+        "examples/headless-agent/tests/desktop.snapshot.ts",
+        "examples/headless-agent/tests/subagent-inheritance.snapshot.ts",
+        "examples/headless-agent/tests/headless.snapshot.ts",
+        "examples/headless-agent/tests/userdoc-agent.snapshot.ts",
+        "scripts/session-snapshot-corpus.corpus.ts",
+        "examples/headless-agent/tests/semantic-checkpoint.snapshot.ts",
+        "examples/headless-agent/tests/workspace-context-resume.snapshot.ts",
+        "examples/headless-agent/tests/userdoc.snapshot.ts",
+        "scripts/session-snapshot-corpus-policy.ts",
+        "apps/web/tests/scaffold.ts",
+        "examples/jsonrpc-agent/tests/sdk.snapshot.ts",
+        "examples/acp-agent/tests/hooks.e2e.ts",
+        "examples/acp-agent/tests/acp.snapshot.ts",
+        "examples/acp-agent/tests/cleanup.ts",
+        "examples/acp-agent/tests/acp.e2e.ts",
+        "examples/acp-agent/tests/goal.snapshot.ts",
+        "examples/acp-agent/tests/escalation.e2e.ts"
+      ]
     },
     {
       "area": "packages/todo/tool-todo",
@@ -15304,7 +15357,7 @@
         "reviewState": "pending-cumulative-source-review"
       },
       "targetAssessment": "increment-review-required",
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "notes": "cumulative review 2026-09-25: tracked surface; 1/6 files byte-identical; 5 carry CoHarness-owned diffs. vitest full run 2026-09-25: 1422 files / 24073 tests green."
     },
     {
@@ -15390,7 +15443,7 @@
     },
     {
       "area": "packages/util/deque",
-      "status": "reject",
+      "status": "retain",
       "localOwner": "packages/util/deque",
       "commitScope": [
         "packages/util/deque/"
@@ -15411,13 +15464,16 @@
         "area": "packages/util/deque",
         "reviewState": "pending-cumulative-source-review"
       },
-      "targetAssessment": "not-carried",
-      "localSovereignty": "upstreamOnly",
-      "upstreamOnly": {
-        "reason": "no current consumer requires it"
-      },
-      "localDisposition": "No consumer requires it.",
-      "notes": "not carried — upstream surface rejected (no local consumer). Cumulative review 2026-09-25 verified local absence/owner; vitest full run 2026-09-25: 1422 files / 24073 tests green."
+      "targetAssessment": "increment-review-required",
+      "localSovereignty": "tracked",
+      "localDisposition": "Carried upstream deque implementation used by terminal-controller stream buffering.",
+      "notes": "Source and consumer review 2026-09-27 against ddefc45fbc7f8e46dd73185e68295696d1297887. Carried-package classification agrees with scripts/upstream-sync.json. Focused local suite: 27 files, 661 passed, 1 skipped test; this does not establish production or external-provider acceptance.",
+      "consumerEvidence": [
+        "scripts/verify-package-dependencies.spec.ts",
+        "scripts/package-dependency-policy.ts",
+        "packages/api/terminal-controller/src/stream.ts",
+        "packages/api/terminal-controller/package.json"
+      ]
     },
     {
       "area": "packages/util/home-paths",

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createAdminApiHandler } from '../src/admin-api.ts'
 import { AuditService } from '../src/audit.ts'
 import { AuthService } from '../src/auth.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ProjectService } from '../src/projects.ts'
@@ -34,7 +34,7 @@ async function setupWithAdminAssets() {
   writeFileSync(join(root, 'secret.txt'), 'nope')
   symlinkSync(join(root, 'secret.txt'), join(adminRoot, 'assets', 'leak.txt'))
   const db = openDb(join(root, 'g.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users') })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users') })
   const deps: GatewayDeps = {
     cfg,
     auth: new AuthService(db, cfg),

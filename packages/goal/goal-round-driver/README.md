@@ -37,7 +37,7 @@ At whole-agent idle, durable goal phase and revision are authoritative. An activ
 
 ## Lifecycle and durability
 
-`goal/changed` creates a durability obligation. Before queuing work, the driver awaits `ctx.sessions.flush()` and rechecks both the goal revision and competing input after the await. A flush failure arriving through `agent/error` disarms continuation before another round can start.
+`goal/changed` creates a durability obligation. Before queuing work, the driver awaits `ctx.sessions.flush()` and rechecks both the goal revision and competing input after the await. Each admitted driver task retains its Session against permanent removal until its checkpoints settle and a round is queued or continuation is abandoned. Paused and disarmed goals hold no reservation between tasks. Checkpoint failure or removal already in progress disarms continuation without automatic retry.
 
 Activation is never inherited when this plugin loads over an existing agent. `GoalService.disarm()` removes process-local authority without changing durable phase, revision, or history; explicit human-authorized resume records the later reactivation. The same rule applies after session resume and fork through the goal domain's `agent/created` handling.
 

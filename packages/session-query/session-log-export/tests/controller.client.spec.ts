@@ -144,3 +144,20 @@ describe('browser download helpers', () => {
     expect(anchor.download).toBe('archive.zip')
   })
 })
+
+it('keeps native ZIP download bound to its original runtime, Session and account after HEAD succeeds', async () => {
+  const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
+  const fetcher = vi.fn(async (_input: string | URL, _init?: RequestInit) => new Response(null, { status: 200 }))
+  const save = vi.fn()
+  const controller = new SessionLogDownloadController(fetcher, save, (value) => {
+    const url = new URL(value); url.searchParams.set('dshPrincipal', '7'); return url.toString()
+  })
+  try {
+    await controller.download(clientSessionKey({ kind: 'project', projectId: 9 }, SID))
+    const url = new URL(String(fetcher.mock.calls[0]?.[0]))
+    expect(url.searchParams.get('sessionId')).toBe(SID)
+    expect(url.searchParams.get('dshTarget')).toBe('project:9')
+    expect(url.searchParams.get('dshPrincipal')).toBe('7')
+    expect(save).toHaveBeenCalledWith(url.toString(), sessionLogZipFilename(SID))
+  } finally { await controller.dispose() }
+})

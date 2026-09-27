@@ -9,11 +9,14 @@ export interface WorkspaceBrowserOwner {
 }
 
 interface WorkbenchState {
+  workbenchMenuOpen: boolean
   pickerOpen: boolean
   replace: boolean
   browser: WorkspaceBrowserOwner | undefined
 }
 type WorkbenchActions = {
+  toggleWorkbenchMenu: (draft: WorkbenchState) => void
+  closeWorkbenchMenu: (draft: WorkbenchState) => void
   openPicker: (draft: WorkbenchState, replace?: boolean) => void
   closePicker: (draft: WorkbenchState) => void
   openBrowser: (draft: WorkbenchState, owner: WorkspaceBrowserOwner) => void
@@ -25,8 +28,10 @@ type WorkbenchActions = {
  */
 export function createWorkbenchStore(): EngineStoreHandle<WorkbenchState, WorkbenchActions> {
   return defineStore({
-    init: (): WorkbenchState => ({ pickerOpen: false, replace: false, browser: undefined }),
+    init: (): WorkbenchState => ({ workbenchMenuOpen: false, pickerOpen: false, replace: false, browser: undefined }),
     actions: {
+      toggleWorkbenchMenu: (draft) => { draft.workbenchMenuOpen = !draft.workbenchMenuOpen },
+      closeWorkbenchMenu: (draft) => { draft.workbenchMenuOpen = false },
       openPicker: (draft, replace = false) => { draft.pickerOpen = true; draft.replace = replace },
       closePicker: (draft) => { draft.pickerOpen = false },
       openBrowser: (draft, owner) => { draft.browser = owner },

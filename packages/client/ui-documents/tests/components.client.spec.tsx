@@ -973,6 +973,32 @@ describe('DocumentsModal', () => {
     })
   })
 
+  it.each([false, true])('copies into the captured project pane before attaching, and preserves ACL refusal (%s)', async (refused) => {
+    const client = makeClient()
+    const attach = vi.fn(() => true)
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ scope: { kind: 'personal' }, projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }] }),
+    })))
+    if (refused) client.transfer.mockRejectedValue(new UserDocHttpError(403, 'Project permission revoked'))
+    createUserDocClient.mockReturnValue(client)
+    render(<DocumentsModal open onClose={() => {}} t={t} mode="select"
+      attachmentScope={{ kind: 'project', projectId: 41 }} onAttachDocument={attach} />)
+    await screen.findByText('report.pdf')
+    fireEvent.click(namedButton('attach', 'report.pdf'))
+    await waitFor(() => { expect(client.transfer).toHaveBeenCalledOnce() })
+    expect(client.transfer).toHaveBeenCalledWith(expect.objectContaining({
+      source: { kind: 'personal' }, target: { kind: 'project', projectId: 41 },
+    }))
+    if (refused) {
+      await screen.findByText('Project permission revoked')
+      expect(attach).not.toHaveBeenCalled()
+    } else {
+      await waitFor(() => { expect(attach).toHaveBeenCalledWith(expect.objectContaining({ docId: 'report.pdf' })) })
+      expect(attach).not.toHaveBeenCalledWith(expect.objectContaining({ docId: '2026-08-17/report.pdf' }))
+    }
+  })
+
   it('browses a project source from a personal composer and copies it back to personal documents', async () => {
     const client = makeClient()
     const attach = vi.fn(() => true)
@@ -1593,4 +1619,20 @@ describe('DocumentsModal', () => {
       expect(screen.queryByText(t('selection.selected', { count: '1' }))).toBeNull()
     })
   })
+})
+
+it.each(['application/pdf', 'image/png'])('pins %s preview and download URLs to their account', async (mediaType) => {
+  const client = makeClient()
+  const name = mediaType === 'application/pdf' ? 'pinned.pdf' : 'pinned.png'
+  client.browse.mockImplementation(async () => ({ directoryId: '' as UserDocDirectoryIdType,
+    directories: [], documents: [doc({ docId: `2026-08-17/${name}`, name, mediaType })], limits }))
+  createUserDocClient.mockReturnValue(client)
+  const pin = (url: string): string => `${url}${url.includes('?') ? '&' : '?'}dshPrincipal=7`
+  render(<DocumentsModal open onClose={() => {}} t={t} privateResourceUrl={pin} />)
+  await screen.findByText(name)
+  expect(screen.getByRole('link', { name: t('action.downloadNamed', { name }) }).getAttribute('href')).toContain('dshPrincipal=7')
+  fireEvent.click(namedButton('preview', name))
+  const preview = await screen.findByRole('dialog', { name: t('preview.title', { name }) })
+  const content = mediaType === 'application/pdf' ? within(preview).getByTitle(name) : within(preview).getByRole('img', { name })
+  expect(content.getAttribute('src')).toContain('dshPrincipal=7')
 })

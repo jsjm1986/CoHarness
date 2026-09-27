@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-idle-session-purge.md
+2026-09-27-idle-session-purge.md: 2be459e7a669c2ccf17fc34f8752f85a57fccc23
+2026-09-27-idle-session-purge.zh.md: 38cb24f4c031f2eca4e0509e7b05f08d973243a5

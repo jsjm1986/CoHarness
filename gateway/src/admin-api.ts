@@ -1,3 +1,4 @@
+import { auditSummary } from './audit-summary.ts'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -10,6 +11,7 @@ import {
 } from './apply-model-governance.ts'
 import type { UserRow } from './auth.ts'
 import { CollaborationDeniedError } from './collaboration.ts'
+import { ORGANIZATION_PROVIDER_PATTERN } from './model-governance.ts'
 import type {
   ModelRegistrationEvent,
   ModelRegistrationFilter,
@@ -35,6 +37,7 @@ import { WebhookReceiptError } from './postgres/webhook-delivery-service.ts'
 import { WebhookEndpointError } from './postgres/webhook-endpoint-service.ts'
 import { WebhookIntakeError } from './webhook-intake.ts'
 import { SshTargetError } from './postgres/ssh-target-service.ts'
+import { NodeConfigurationError } from './node-config-store.ts'
 import { MaintenanceError } from './postgres/maintenance-service.ts'
 import { BackupError } from './postgres/backup-service.ts'
 import { DeploymentCommandError } from './deployment-commands.ts'
@@ -96,6 +99,7 @@ function mapError(error: unknown): { status: number; error: string } {
   if (error instanceof WebhookEndpointError) return { status: error.status, error: error.message }
   if (error instanceof WebhookIntakeError) return { status: error.status, error: error.message }
   if (error instanceof SshTargetError) return { status: error.status, error: error.message }
+  if (error instanceof NodeConfigurationError) return { status: error.status, error: error.message }
   if (error instanceof MaintenanceError) return { status: error.status, error: error.message }
   if (error instanceof BackupError) return { status: error.status, error: error.message }
   if (error instanceof DeploymentCommandError) return { status: 500, error: 'deployment-command-failed' }
@@ -182,6 +186,23 @@ async function dispatch(
 ): Promise<boolean> {
   const method = req.method ?? 'GET'
   const ip = req.socket.remoteAddress ?? ''
+  if (pathname === '/admin/api/deployment/configuration') {
+    if (deps.nodeConfiguration === undefined) { sendError(res, 503, 'node-configuration-unavailable'); return true }
+    if (method === 'GET') { sendJson(res, 200, await deps.nodeConfiguration.view()); return true }
+    if (method !== 'POST') return false
+    const input = parseObject(body)
+    if (typeof input.organizationId !== 'string' || typeof input.nodeId !== 'string'
+      || typeof input.revision !== 'number' || !Number.isSafeInteger(input.revision) || input.revision < 0) throw new NodeConfigurationError(400, 'node-configuration-identity-and-revision-required')
+    const identity = { organizationId: input.organizationId, nodeId: input.nodeId }
+    let result
+    if (input.action === 'save') result = await deps.nodeConfiguration.save(identity, input.revision, input.values)
+    else if (input.action === 'apply') result = await deps.nodeConfiguration.requestApply(identity, input.revision, admin.id)
+    else throw new NodeConfigurationError(400, 'invalid-node-configuration-action')
+    await deps.audit.write({ userId: admin.id, action: `admin.deployment.configuration.${input.action}`,
+      detail: JSON.stringify({ nodeId: identity.nodeId, revision: result.revision }), ip })
+    sendJson(res, 200, result)
+    return true
+  }
   if (pathname === '/admin/api/webhook-deliveries' && method === 'GET') {
     if (deps.webhookDeliveries === undefined) { sendError(res, 503, 'webhook-deliveries-unavailable'); return true }
     const query = new URL(req.url ?? pathname, 'http://admin').searchParams
@@ -224,7 +245,7 @@ async function dispatch(
     const input = parseObject(body)
     const receipt = await deps.webhookIntake.redispatch(input.receiptId)
     await deps.audit.write({ userId: admin.id, action: 'admin.webhook-deliveries.redispatch',
-      detail: JSON.stringify({ receiptId: input.receiptId, redispatchId: receipt.id }), ip })
+      detail: JSON.stringify({ receiptId: input.receiptId, redispatchId: receipt.id, state: receipt.state }), ip })
     sendJson(res, 200, receipt)
     return true
   }
@@ -273,9 +294,10 @@ async function dispatch(
     if (backupId === undefined) throw new MaintenanceError(400, 'backup-id-required')
     const backup = await deps.backups.get(backupId)
     if (backup.status !== 'verified' && backup.status !== 'restored') throw new MaintenanceError(409, 'backup-not-verified')
+    if (backup.managedSnapshot === null || backup.sha256 === null) throw new MaintenanceError(409, 'backup-lacks-complete-managed-data-manifest')
     const operation = await deps.maintenance.requestRestore(admin.id, backup.id)
     await deps.audit.write({ userId: admin.id, action: 'admin.deployment.restore.request',
-      detail: JSON.stringify({ backupId: backup.id, operationId: operation.id }), ip })
+      detail: JSON.stringify({ backupId: backup.id, operationId: operation.id, status: operation.status }), ip })
     sendJson(res, 200, operation)
     return true
   }
@@ -286,29 +308,10 @@ async function dispatch(
   }
   if (pathname === '/admin/api/backups' && method === 'POST') {
     if (deps.backups === undefined || deps.backupWork === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
-    const work = deps.backupWork
-    try {
-      const dump = await work.commands.backup(work.backupDir, work.databaseUrl, work.managedPaths)
-      const plan = await deps.migrationPlan?.() ?? { current: 0 }
-      const writeEpoch = (await deps.maintenance?.state())?.writeEpoch ?? '1'
-      const record = await deps.backups.record({
-        path: dump.dumpPath,
-        migrationVersion: plan.current,
-        writeEpoch: BigInt(writeEpoch),
-        sizeBytes: dump.sizeBytes,
-        sha256: dump.sha256,
-        managedFiles: dump.managedFiles,
-        actor: admin.id,
-      })
-      await deps.maintenance?.logOperation('backup', 'completed', admin.id, { backupId: record.id, path: record.path })
-      await deps.audit.write({ userId: admin.id, action: 'admin.backups.create',
-        detail: JSON.stringify({ backupId: record.id, path: record.path }), ip })
-      sendJson(res, 200, record)
-    } catch (error) {
-      await deps.maintenance?.logOperation('backup', 'failed', admin.id,
-        { error: error instanceof Error ? error.message : String(error) }).catch(() => {})
-      throw error
-    }
+    const record = await deps.backupWork.create(admin.id)
+    await deps.audit.write({ userId: admin.id, action: 'admin.backups.create',
+      detail: JSON.stringify({ backupId: record.id, path: record.path, status: record.status }), ip })
+    sendJson(res, 200, record)
     return true
   }
   if (pathname === '/admin/api/backups/verify' && method === 'POST') {
@@ -316,17 +319,17 @@ async function dispatch(
     const input = parseObject(body)
     const id = str(input, 'id')
     if (id === undefined) throw new BackupError(400, 'backup-id-required')
-    const backup = await deps.backups.get(id)
-    let record
-    try {
-      await deps.backupWork.commands.verifyDump(backup.path)
-      record = await deps.backups.setVerified(id, true)
-    } catch (error) {
-      record = await deps.backups.setVerified(id, false, error instanceof Error ? error.message : String(error))
-    }
+    const record = await deps.backupWork.verify(id)
     await deps.audit.write({ userId: admin.id, action: 'admin.backups.verify',
       detail: JSON.stringify({ backupId: id, status: record.status }), ip })
     sendJson(res, 200, record)
+    return true
+  }
+  if (pathname === '/admin/api/backups/node-configuration' && method === 'POST') {
+    if (deps.backupWork === undefined) { sendError(res, 503, 'deployment-unavailable'); return true }
+    const id = str(parseObject(body), 'id')
+    if (id === undefined) throw new BackupError(400, 'backup-id-required')
+    sendJson(res, 200, await deps.backupWork.previewNodeConfiguration(id))
     return true
   }
 
@@ -431,6 +434,15 @@ async function dispatch(
     return true
   }
 
+  const archiveStatusPath = /^\/admin\/api\/archives\/([^/]+)\/status$/.exec(pathname)
+  if (archiveStatusPath !== null && method === 'GET') {
+    if (deps.archives === undefined) { sendError(res, 503, 'conversation-archive-unavailable'); return true }
+    const record = await deps.archives.status(decodeURIComponent(archiveStatusPath[1] ?? ''))
+    if (record === null) { sendError(res, 404, 'archive not found'); return true }
+    sendJson(res, 200, record)
+    return true
+  }
+
   const archivePath = /^\/admin\/api\/archives\/([^/]+)$/.exec(pathname)
   const archiveExportPath = /^\/admin\/api\/archives\/([^/]+)\/export$/.exec(pathname)
   if (archiveExportPath !== null && method === 'GET') {
@@ -481,7 +493,8 @@ async function dispatch(
     for (const rootSessionId of ids as string[]) {
       try {
         if (action === 'purge') {
-          await deps.archives.purge(rootSessionId, admin.id, idempotencyKey === undefined ? undefined : `${idempotencyKey}:${rootSessionId}`)
+          const accepted = await deps.archives.purge(rootSessionId, admin.id, idempotencyKey === undefined ? undefined : `${idempotencyKey}:${rootSessionId}`)
+          if (!accepted) throw new Error('archive not found')
         } else {
           const value = await deps.archives.setState(rootSessionId, action === 'restore' ? 'archived' : 'trash', admin.id,
             idempotencyKey === undefined ? undefined : `${idempotencyKey}:${rootSessionId}`)
@@ -871,10 +884,10 @@ async function dispatch(
     const target = await deps.users.getById(userId)
     if (target === null) { sendError(res, 404, 'user not found'); return true }
     if (op === 'stop') await deps.instances.stop(userId)
-    else if (op === 'start') await deps.instances.ensureRunning(target)
+    else if (op === 'start') await deps.instances.ensureRunning(target, 'explicit')
     else {
       await deps.instances.stop(userId)
-      await deps.instances.ensureRunning(target)
+      await deps.instances.ensureRunning(target, 'explicit')
     }
     await write(`admin.instances.${op}`, { id: userId })
     sendNoContent(res)
@@ -1097,6 +1110,10 @@ async function dispatch(
         || (status !== 'draft' && status !== 'enabled' && status !== 'disabled' && status !== 'archived')
         || (credential !== undefined && credential !== null && typeof credential !== 'string')) {
         sendError(res, 400, 'valid provider, displayName, driver, protocol, baseURL, authMode and status required')
+        return true
+      }
+      if (!ORGANIZATION_PROVIDER_PATTERN.test(provider)) {
+        sendError(res, 400, 'organization provider must use an org- prefix and lowercase letters, digits, and single hyphens')
         return true
       }
       await deps.governance.upsertProvider({
@@ -1359,6 +1376,21 @@ async function dispatch(
     return false
   }
 
+  const projectInstance = /^\/admin\/api\/projects\/(\d+)\/instance\/(start|stop|restart)$/.exec(pathname)
+  if (projectInstance !== null) {
+    if (method !== 'POST') return false
+    const projectId = Number(projectInstance[1])
+    const op = projectInstance[2] as 'start' | 'stop' | 'restart'
+    const project = await deps.projects.getById(projectId)
+    if (project === null) { sendError(res, 404, 'project not found'); return true }
+    const target = { kind: 'project' as const, id: projectId }
+    if (op !== 'start') await deps.instances.stop(target)
+    if (op !== 'stop') await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path }, 'explicit')
+    await write(`admin.project-instances.${op}`, { projectId })
+    sendNoContent(res)
+    return true
+  }
+
   const projectIdPath = /^\/admin\/api\/projects\/(\d+)$/.exec(pathname)
   if (projectIdPath !== null) {
     const projectId = Number(projectIdPath[1])
@@ -1449,6 +1481,7 @@ async function dispatch(
       offset: num('offset'),
     })).map(r => ({
       id: r.id, ts: r.ts, userId: r.userId, action: r.action, methodPath: r.methodPath, status: r.status, ip: r.ip,
+      ...auditSummary(r),
     }))
     sendJson(res, 200, rows)
     return true

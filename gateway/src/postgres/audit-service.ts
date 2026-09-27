@@ -75,9 +75,10 @@ export class PostgresAuditService {
       status_code: number | null
       source_ip: string | null
       detail_text: string
+      outcome: string
     }>(`SELECT e.id::text,(extract(epoch FROM e.occurred_at)*1000)::text ts,
       u.public_id::text user_id,e.action,COALESCE(e.detail->>'methodPath','') method_path,
-      e.status_code,e.source_ip::text,
+      e.status_code,e.source_ip::text,e.outcome,
       CASE WHEN e.detail ? 'detail' THEN e.detail->>'detail'
         WHEN e.detail ? 'legacyDetail' THEN e.detail->>'legacyDetail' ELSE '' END detail_text
       FROM harness.audit_events e
@@ -92,6 +93,7 @@ export class PostgresAuditService {
       status: row.status_code,
       ip: row.source_ip ?? '',
       detail: row.detail_text,
+      outcome: row.outcome,
     }))
   }
 }

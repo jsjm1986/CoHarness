@@ -10,11 +10,13 @@ Session provider 需要在读取事件体前对存储 header 分类，也需要�
 
 ## 决策
 
-`@deepseek-ai/dsh-session-format` 拥有 provider 无关的迁移机制；`@deepseek-ai/dsh-session-format-catalog` 编译完整的发布链 v0 → v1 → v2 → v3 → v4 → v5，是唯一的准入与迁移规则来源。新代次在读取事件体前拒绝；旧代次必须经过每条声明的边。输入会被快照并冻结，catalog 不会写入存储。
+`@deepseek-ai/dsh-session-format` 拥有 provider 无关的迁移机制；`@deepseek-ai/dsh-session-format-catalog` 编译完整的发布链 v0 → v1 → v2 → v3 → v4 → v5 → v6，是唯一的准入与迁移规则来源。新代次在读取事件体前拒绝；旧代次必须经过每条声明的边。输入会被快照并冻结，catalog 不会写入存储。
 
-两个 catalog 共享同一条链。`sessionFormatCatalog` 服务 JSONL 读取方：解码发布版物理行、应用发布版 codec 的准入、还原当前 artifact。`sessionLogicalFormatCatalog` 服务存储已解码 header 与事件行的后端（SQLite、Gateway/PostgreSQL、脱离对象的协调器读取）：把存储元数据投影到发布版 header 要求上（`seedLength` 即 `isSeeded` 的存储拼写；未知键拒绝），准入逻辑事件信封，并把事件流经同一套发布版边与同一套当前 artifact 校验。v2 边路由到 `coharnessV2ToV3Dialect`——声明的 CoHarness 数据库方言，只负责排序与归一化（首个 `step/start` 前的 turn 级 surface 载体、请求头携带的系统提示提升为生成的 `system/message` 节点、在继承截断处存在或合成的 `session/end-seed` 标记），同时复用发布版 stage 的载荷准入、引用重映射、规范化与退役词汇改名。
+物理与逻辑读取入口共享同一条链。`sessionFormatCatalog` 服务 JSONL 读取方：解码发布版物理行、应用发布版 codec 的准入、还原当前 artifact。`sessionLogicalFormatCatalog` 服务存储已解码 header 与事件行的后端（SQLite、Gateway/PostgreSQL、脱离对象的协调器读取）：把存储元数据投影到发布版 header 要求上（`seedLength` 即 `isSeeded` 的存储拼写；未知键拒绝），准入逻辑事件信封，并把事件流经同一套发布版边与同一套当前 artifact 校验。v2 边路由到 `coharnessV2ToV3Dialect`——声明的 CoHarness 数据库方言，只负责排序与归一化（首个 `step/start` 前的 turn 级 surface 载体、请求头携带的系统提示提升为生成的 `system/message` 节点、在继承截断处存在或合成的 `session/end-seed` 标记），同时复用发布版 stage 的载荷准入、引用重映射、规范化与退役词汇改名。
 
 v3 之前的边会归一化每个代次可能携带的历史事件词汇（旧版消息载荷、`start`/`end` replace 键），同时推进代次标记。`Session` 构造本身只接受当前版本 header——迁移归存储边界负责，与上游一致。JSONL 会原子发布当前 generation，SQLite 在一次写事务中替换事件行与元数据行；Gateway 的迁移 wire 只携带目标 header，因此它不声明 body 迁移支持，coordinator 直接跳过发布，而不是让服务端在未迁移的 body 上落一个新版本 header。provider 备份仍由 adapter 负责，本纯包不会隐藏这些行为。
+
+`coharnessJsonlFormatCatalog` 选择已发布的 CoHarness v0–v3 物理方言：`seedLength` 给出继承边界，未继承的头部省略该字段，压缩流式记录在 v3 中仍然有效。这些事实由历史写入代码确定，不是按较宽校验器碰巧能接受的内容推断。适配器复用已发布的编码、现有 CoHarness 归一化和 v3-to-v4 chunk 折叠，迁移顺序来自 `generated.ts`。草稿元数据在无法表示它的前代头部之外保留。v3 的确切继承边界转为后续迁移可读取的显式标记；被合并的 chunk 不能阻塞后续权限或附件字段的恢复。冻结编码器和当前写入格式保持不变。
 
 ## 考虑过的替代方案
 

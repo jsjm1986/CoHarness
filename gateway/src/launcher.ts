@@ -204,6 +204,7 @@ export class LocalLauncher implements Launcher {
         ...scrubbedParentEnv(),
         HOME: runtime.homePath,
         DSH_HOME: runtime.dshHome,
+        DSH_MANAGED_DATA_MANIFEST: join(runtime.dshHome, 'managed-data.jsonl'),
         DSH_GATEWAY_CREDENTIAL_FD: '3',
         // Source-run instances load TypeScript through tsx, which resolves
         // the workspace `paths` map from tsconfig — discovered from cwd,

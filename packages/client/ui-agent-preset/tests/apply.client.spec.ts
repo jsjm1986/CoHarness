@@ -220,6 +220,39 @@ function sessionsDouble(state: {
 }
 
 describe('ui-agent-preset apply', () => {
+  it('reads a retained pane roster without borrowing the runtime plugin’s injection list and rejects a late released read', async () => {
+    const { ctx, slots } = await bench()
+    const runtime = new Context()
+    const response = Promise.withResolvers<typeof ROSTER_ONE>()
+    const read = vi.fn().mockResolvedValue(ROSTER_ONE)
+    await runtime.plugin({ apply: (provider) => { provider.provide('remote.agentPresets', { list: read } as never) } }).await()
+    const child = await runtime.plugin(() => {}).await()
+    const binding = { ctx: child.ctx }
+    let current: typeof binding | undefined = binding
+    declareRoot(slots)
+    declareConversation(slots)
+    ctx.provide('conversation', {} as never)
+    ctx.provide('workspaces', workspacesDouble() as never)
+    ctx.provide('sessions', {
+      ...sessionsDouble({ current: 's1', byId: { s1: { id: 's1', blank: false, agentPreset: 'standard' } } }),
+      keyFor: (id: string) => id,
+      binding: () => current,
+    } as never)
+    try {
+      await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
+      const label = (slots.entries('conversation.session.header.actions')[0]!.inject as unknown as (id: string) => AgentPresetLabelInjected)('s1')
+      await label.load()
+      expect(label.hooks.agentPresets.getSnapshot()).toMatchObject({ error: null, options: [{ id: 'standard' }] })
+      read.mockReturnValue(response.promise)
+      const pending = label.load()
+      current = undefined
+      response.resolve(ROSTER_MOVED)
+      await pending
+      expect(label.hooks.agentPresets.getSnapshot().error).toContain('generation was released')
+      expect(label.hooks.agentPresets.getSnapshot().options.some(option => option.id === 'minimal')).toBe(false)
+    } finally { await runtime.fiber.dispose(); await ctx.fiber.dispose() }
+  })
+
   it('declares the services it uses', () => {
     expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.agentPresets', 'settingsScope'])
   })

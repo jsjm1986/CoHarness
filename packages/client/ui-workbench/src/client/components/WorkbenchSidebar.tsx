@@ -76,7 +76,7 @@ export function WorkbenchSidebar({
           {paneIds.map((id) => {
             const summary = sessions.byId[id]
             const state = stateOf(summary)
-            const status = state === 'warning' ? 'waiting' : state === 'ongoing' ? 'running' : 'ready'
+            const status = summary === undefined ? 'notLoaded' : state === 'warning' ? 'waiting' : state === 'ongoing' ? 'running' : 'ready'
             const scope = workspaces.items.find(item => item.sessionIds.includes(id))?.title
               ?? summary?.workspaceName
               ?? workspaceTitleOf(summary?.cwd ?? '')
@@ -114,7 +114,7 @@ export function WorkbenchSidebar({
           <button
             type="button"
             className={css.sidebarAction}
-            disabled={paneIds.length >= 4}
+            disabled={paneIds.length >= 4 || viewport.pendingIdentity === true}
             onClick={() => { actions.openPicker() }}
           >
             <IconPlusOutline16 />
@@ -123,7 +123,7 @@ export function WorkbenchSidebar({
           <button
             type="button"
             className={css.sidebarAction}
-            disabled={paneIds.length < 2}
+            disabled={paneIds.length < 2 || viewport.pendingIdentity === true}
             onClick={() => { setPaneRatios(paneIds.map(() => 1)) }}
           >
             {t('equalize')}

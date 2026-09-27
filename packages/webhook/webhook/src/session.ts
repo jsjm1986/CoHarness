@@ -1,7 +1,7 @@
 /** Workspace-backed Session creation for one settled webhook rule result. */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
+import { executionAuthorityOf, sameExecutionAuthority } from '@deepseek-ai/dsh-execution-authority'
 import { randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
 import { brandString } from '@deepseek-ai/dsh-brand'
@@ -165,7 +165,7 @@ export async function createWebhookSession(
     const admitted = authority === undefined ? message : await authority.stamp(handle.agent.session, message)
     await authority?.authorizeSelection(handle.agent, resolved.permissionPreset)
     signal.throwIfAborted()
-    if (executionAuthorityOf(ctx) !== authority) throw new Error('webhook execution authority changed before admission')
+    if (!sameExecutionAuthority(executionAuthorityOf(ctx), authority)) throw new Error('webhook execution authority changed before admission')
     ctx.permissionPresets.set(handle.agent.session, resolved.permissionPreset)
     ctx.sessionTitle.rename(handle.agent.session, resolved.title)
     handle.agent.followup(admitted)

@@ -1,0 +1,21 @@
+- dialog "配置模型治理":
+  - heading "配置模型治理" [level=2]
+  - paragraph: Provider 和模型身份由组织模型插件维护；此处只配置运行权限和计价。
+  - button "关闭"
+  - strong: Price fixture A
+  - text: org-fixture/model-a
+  - checkbox "启用模型"
+  - text: 启用模型
+  - checkbox "管理员默认允许"
+  - text: 管理员默认允许
+  - checkbox "普通用户默认允许"
+  - text: 普通用户默认允许 单价（人民币元 / 百万 Token） 输入
+  - textbox "输入": "1.234567"
+  - text: 输出
+  - textbox "输出": "2.345678"
+  - text: 缓存读取
+  - textbox "缓存读取": "0.000001"
+  - text: 缓存写入
+  - textbox "缓存写入": "0.000000"
+  - button "取消"
+  - button "保存治理配置"

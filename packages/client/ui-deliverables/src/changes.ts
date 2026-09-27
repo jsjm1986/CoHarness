@@ -15,7 +15,7 @@ export const CHANGES_OPEN_PATH = '/api/changes.open'
 export const CHANGES_REVIEW_ADDRESS = 'dsh-resource://changes-review/session/'
 
 /** The summary fields the route serves; the Host keeps the working directory and snapshot ids to itself. */
-export type ChangesSummary = Pick<WorkspaceChangesSummary, 'turn' | 'files' | 'total' | 'added' | 'deleted'>
+export type ChangesSummary = Pick<WorkspaceChangesSummary, 'turn' | 'files' | 'total' | 'added' | 'deleted' | 'incomplete'>
 
 /** The comparison the route serves, as the Host computed it. */
 export type ChangesDiff = WorkspaceFileDiff
@@ -55,6 +55,7 @@ export function isChangesSummary(value: unknown): value is ChangesSummary {
   const { turn, files, total, added, deleted } = value
   return Number.isSafeInteger(turn) && (turn as number) >= 1 && Number.isSafeInteger(total)
     && Number.isSafeInteger(added) && Number.isSafeInteger(deleted)
+    && (value.incomplete === undefined || value.incomplete === true)
     && Array.isArray(files) && files.every(isChangedFile)
 }
 

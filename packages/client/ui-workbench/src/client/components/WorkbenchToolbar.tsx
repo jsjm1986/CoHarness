@@ -1,3 +1,4 @@
+import { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 /** Workbench controls, Workspace/session chooser, and compact pane tabs. */
 import { useEffect, useState } from 'react'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
@@ -26,7 +27,7 @@ interface Actions {
   focusSession: (id: SessionId) => void
   createSession: (target: SessionRuntimeTarget, replace: boolean) => Promise<AddPaneResult>
   hydrateCatalog?: (catalog: WorkbenchCatalog, paneIds: readonly SessionId[]) => Promise<void>
-  markCatalogReady?: () => void
+  catalogUnavailable?: () => void
   setMode: (mode: ConversationViewportMode) => void
   listWorkspaceDirectory?: ListWorkspaceDirectory
   openWorkspaceResource?: OpenWorkspaceResource
@@ -53,22 +54,22 @@ function conversationDisplayName(item: WorkbenchConversation, untitled: string):
  */
 export function WorkbenchToolbar({
   viewport, tabbed, inline = false, useStore, actions, useSessions, useWorkspaces,
-  chooseSession, focusSession, createSession, hydrateCatalog, markCatalogReady, setMode,
+  chooseSession, focusSession, createSession, hydrateCatalog, catalogUnavailable, setMode,
   listWorkbenches, currentWorkbench, switchWorkbench, createWorkbench, renameWorkbench,
   duplicateWorkbench, deleteWorkbench,
   listWorkspaceDirectory, openWorkspaceResource, filesAvailable, openFiles, t,
 }: Props) {
-  const { pickerOpen, replace, browser } = useStore(state => state)
+  const { pickerOpen, replace, browser, workbenchMenuOpen } = useStore(state => state)
   const sessions = useSessions(s => s)
   const workspaces = useWorkspaces(s => s)
   const [query, setQuery] = useState('')
   const [workspace, setWorkspace] = useState('')
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
-  const [workbenchMenuOpen, setWorkbenchMenuOpen] = useState(false)
   const [workbenchDialog, setWorkbenchDialog] = useState<'create' | 'rename' | 'duplicate' | undefined>()
   const [deleteWorkbenchOpen, setDeleteWorkbenchOpen] = useState(false)
   const [workbenchName, setWorkbenchName] = useState('')
   const [catalog, setCatalog] = useState<WorkbenchCatalog | undefined>()
+  const [catalogAttempt, setCatalogAttempt] = useState(0)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | undefined>()
   useEffect(() => {
@@ -76,19 +77,19 @@ export function WorkbenchToolbar({
     void loadWorkbenchCatalog(abort.signal).then((next) => {
       if (abort.signal.aborted) return
       setCatalog(next)
-      const runtime = next.activeRuntime
-      const project = runtime.kind === 'project'
-        ? next.projects.find(candidate => candidate.projectId === runtime.projectId)
-        : undefined
-      const activeRuntime: SessionRuntimeTarget = runtime.kind === 'project' && project !== undefined
-        ? { ...runtime, projectName: project.name }
-        : runtime
-      if (hydrateCatalog !== undefined) {
-        void hydrateCatalog({ ...next, activeRuntime }, viewport.paneIds)
-      }
-    }, () => { if (!abort.signal.aborted) markCatalogReady?.() })
+    }, () => { if (!abort.signal.aborted) catalogUnavailable?.() })
     return () => { abort.abort() }
-  }, [pickerOpen])
+  }, [pickerOpen, catalogAttempt])
+  const restoredPanes = JSON.stringify(viewport.paneIds)
+  useEffect(() => {
+    if (catalog === undefined || hydrateCatalog === undefined) return
+    const runtime = catalog.activeRuntime
+    const project = runtime.kind === 'project'
+      ? catalog.projects.find(candidate => candidate.projectId === runtime.projectId) : undefined
+    const activeRuntime: SessionRuntimeTarget = runtime.kind === 'project' && project !== undefined
+      ? { ...runtime, projectName: project.name } : runtime
+    void hydrateCatalog({ ...catalog, activeRuntime }, viewport.paneIds)
+  }, [catalog, viewport.mode, restoredPanes])
   const full = viewport.paneIds.length >= 4 && !replace
   // The root crumb names the owning pane's Workspace so cross-project browsing
   // cannot be mistaken for the active pane's scope.
@@ -111,11 +112,13 @@ export function WorkbenchToolbar({
     if (summary === undefined || summary.origin === 'subagent'
       || (summary.blank && summary.id !== sessions.current)
       || workspaces.archivedSessionIds.includes(summary.id)) return []
+    const address = parseClientSessionKey(summary.id)
+    const runtime: SessionRuntimeTarget = address?.runtime ?? (summary.projectId === undefined
+      ? { kind: 'personal' } : { kind: 'project', projectId: summary.projectId })
     return [{
-      sessionId: summary.id,
-      runtime: summary.projectId === undefined
-        ? { kind: 'personal' as const }
-        : { kind: 'project' as const, projectId: summary.projectId, projectName: `Project ${String(summary.projectId)}` },
+      sessionId: address?.sessionId ?? summary.id,
+      runtime: runtime.kind === 'personal' ? runtime
+        : { ...runtime, projectName: summary.workspaceName ?? `Project ${String(runtime.projectId)}` },
       title: summary.title ?? summary.displayTitle,
       ...(summary.cwd === undefined ? {} : { cwd: summary.cwd }),
       visibility: summary.projectId === undefined ? 'personal' as const : 'project' as const,
@@ -126,11 +129,12 @@ export function WorkbenchToolbar({
       canWrite: true,
     }]
   })
+  const browserKey = (item: WorkbenchConversation): SessionId => clientSessionKey(item.runtime, item.sessionId)
   const catalogItems = catalog?.items ?? fallbackCandidates
   const candidates = catalogItems.filter((item) => {
     const projectId = item.runtime.kind === 'project' ? String(item.runtime.projectId) : 'personal'
-    return (!item.blank || item.sessionId === sessions.current)
-      && !workspaces.archivedSessionIds.includes(item.sessionId)
+    return (!item.blank || browserKey(item) === sessions.current)
+      && !workspaces.archivedSessionIds.includes(browserKey(item))
       && (workspace === '' || workspace === projectId)
       && `${item.title ?? item.sessionId} ${item.cwd ?? ''} ${item.runtime.kind === 'project'
         ? item.runtime.projectName
@@ -166,8 +170,8 @@ export function WorkbenchToolbar({
   return (
     <div className={css.toolbar} data-workbench-toolbar="" data-inline={inline || undefined} data-tabbed={tabbed || undefined}>
       <div className={css.toolbarTitle}>
-        <Menu open={workbenchMenuOpen} onClose={() => { setWorkbenchMenuOpen(false) }} onSelect={(id) => {
-          setWorkbenchMenuOpen(false)
+        <Menu open={workbenchMenuOpen} onClose={() => { actions.closeWorkbenchMenu() }} onSelect={(id) => {
+          actions.closeWorkbenchMenu()
           if (id === '__new') { setWorkbenchName(''); setWorkbenchDialog('create') }
           else if (id === '__rename') { setWorkbenchName(currentWorkbench?.()?.name ?? ''); setWorkbenchDialog('rename') }
           else if (id === '__duplicate') { setWorkbenchName(`${currentWorkbench?.()?.name ?? '我的工作台'} 副本`); setWorkbenchDialog('duplicate') }
@@ -177,13 +181,13 @@ export function WorkbenchToolbar({
         }} items={[
           ...(listWorkbenches?.() ?? [{ id: 'default', name: '我的工作台', paneIds: [], updatedAt: Date.now() }]).map(item => ({ id: item.id, label: `${item.name} · ${item.paneIds.length}/4` })),
           { type: 'separator' as const, id: 'workbench-actions-separator' },
-          { id: '__new', label: t('newWorkbench'), icon: <IconPlusOutline16 /> },
-          { id: '__rename', label: t('renameWorkbench'), icon: <IconEditOutline16 /> },
-          { id: '__duplicate', label: t('duplicateWorkbench'), icon: <IconCopyOutline16 /> },
-          { id: '__delete', label: t('deleteWorkbench'), icon: <IconTrashOutline16 />, danger: true },
+          { id: '__new', label: t('newWorkbench'), icon: <IconPlusOutline16 />, disabled: viewport.pendingIdentity === true },
+          { id: '__rename', label: t('renameWorkbench'), icon: <IconEditOutline16 />, disabled: viewport.pendingIdentity === true },
+          { id: '__duplicate', label: t('duplicateWorkbench'), icon: <IconCopyOutline16 />, disabled: viewport.pendingIdentity === true },
+          { id: '__delete', label: t('deleteWorkbench'), icon: <IconTrashOutline16 />, danger: true, disabled: viewport.pendingIdentity === true },
           { type: 'separator' as const, id: 'workbench-exit-separator' },
           { id: '__exit', label: t('exitWorkbench'), icon: <IconLogoutOutline16 /> },
-        ]} selectedId={viewport.mode === 'workbench' ? currentWorkbench?.()?.id : undefined} anchor={<button type="button" className={css.workbenchTrigger} aria-label={t('select')} aria-haspopup="menu" aria-expanded={workbenchMenuOpen} onClick={() => { setWorkbenchMenuOpen(value => !value) }}>{viewport.mode === 'workbench' ? currentWorkbench?.()?.name ?? t('mode') : t('mode')} <IconChevronDownOutline14 /></button>} />
+        ]} selectedId={viewport.mode === 'workbench' ? currentWorkbench?.()?.id : undefined} anchor={<button type="button" className={css.workbenchTrigger} aria-label={t('select')} aria-haspopup="menu" aria-expanded={workbenchMenuOpen} onClick={() => { actions.toggleWorkbenchMenu() }}>{viewport.mode === 'workbench' ? currentWorkbench?.()?.name ?? t('mode') : t('mode')} <IconChevronDownOutline14 /></button>} />
         {viewport.mode === 'workbench' && <span className={css.paneCount} aria-label={`${viewport.paneIds.length}/4`}>{viewport.paneIds.length}/4</span>}
       </div>
       <div className={css.toolbarActions}>
@@ -199,11 +203,17 @@ export function WorkbenchToolbar({
           </button>
         )}
         {viewport.mode === 'workbench' && (
-          <Button size="sm" variant="toolbar" icon={<IconPlusOutline16 />} onClick={() => { setError(undefined); actions.openPicker() }}>
+          <Button size="sm" variant="toolbar" disabled={viewport.pendingIdentity === true} icon={<IconPlusOutline16 />} onClick={() => { setError(undefined); actions.openPicker() }}>
             {t('add')}
           </Button>
         )}
       </div>
+      {viewport.pendingIdentity === true && (
+        <div className={css.notice} role="status">
+          {t('layoutPending')}
+          <Button size="sm" onClick={() => { setCatalogAttempt(value => value + 1) }}>{t('retryCatalog')}</Button>
+        </div>
+      )}
       {browser !== undefined && listWorkspaceDirectory !== undefined && openWorkspaceResource !== undefined && (
         <WorkspaceFileBrowser
           key={`${browser.runtimeTarget.kind}:${browser.runtimeTarget.kind === 'project' ? String(browser.runtimeTarget.projectId) : 'base'}:${browser.sessionId}`}
@@ -222,7 +232,7 @@ export function WorkbenchToolbar({
             const workspaceName = sessions.byId[id]?.projectId === undefined
               ? catalog?.personal.name
               : catalog?.projects.find(project => project.projectId === sessions.byId[id]?.projectId)?.name
-            const status = summary?.pendingInteraction !== undefined ? 'waiting' : summary?.running ? 'running' : 'ready'
+            const status = summary === undefined ? 'notLoaded' : summary.pendingInteraction !== undefined ? 'waiting' : summary.running ? 'running' : 'ready'
             return (
               <button key={id} type="button" role="tab" aria-selected={viewport.activePaneId === id}
                 tabIndex={viewport.activePaneId === id ? 0 : -1}
@@ -240,7 +250,7 @@ export function WorkbenchToolbar({
                   const tabs = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
                   tabs?.[next]?.focus()
                 }}>
-                <StateDot state={status === 'waiting' ? 'warning' : status === 'running' ? 'ongoing' : 'done'} size={8} />
+                <StateDot state={status === 'waiting' || status === 'notLoaded' ? 'warning' : status === 'running' ? 'ongoing' : 'done'} size={8} />
                 <span>{workspaceName === undefined ? '' : `${workspaceName} · `}{summary?.displayTitle ?? t('untitled')}</span>
                 <span className={css.srOnly}>{t(status)}</span>
               </button>
@@ -275,7 +285,7 @@ export function WorkbenchToolbar({
         <div className={css.candidates}>
           {candidates.length === 0 && <p className={css.notice}>{t('noSessions')}</p>}
           {candidates.map((item) => {
-            const pinned = viewport.paneIds.includes(item.sessionId)
+            const pinned = viewport.paneIds.includes(browserKey(item))
             const title = conversationDisplayName(item, t('untitled'))
             /* v8 ignore next -- scopeName is always a personal or project name */
             const scopeName = (item.runtime.kind === 'project' ? item.runtime.projectName : t('personal')) ?? ''
@@ -283,7 +293,7 @@ export function WorkbenchToolbar({
               <button
                 key={`${item.runtime.kind}:${item.runtime.kind === 'project' ? item.runtime.projectId : 'personal'}:${item.sessionId}`}
                 type="button" aria-label={`${title} ${item.cwd ?? ''}`}
-                disabled={pending || (full && !pinned)} className={css.candidate}
+                disabled={viewport.pendingIdentity === true || pending || (full && !pinned)} className={css.candidate}
                 onClick={() => {
                   setPending(true)
                   void Promise.resolve(chooseSession(item, replace)).then(
@@ -301,7 +311,7 @@ export function WorkbenchToolbar({
         </div>
         <div className={css.pickerFooter}>
           <span>{t('chooseWorkspace')}</span>
-          <Button variant="primary" size="sm" disabled={workspace === '' || pending || full || selectedProject?.mode === 'ro'} onClick={create}>{t(pending ? 'creating' : 'create')}</Button>
+          <Button variant="primary" size="sm" disabled={viewport.pendingIdentity === true || workspace === '' || pending || full || selectedProject?.mode === 'ro'} onClick={create}>{t(pending ? 'creating' : 'create')}</Button>
         </div>
       </Modal>
       <Modal open={workbenchDialog !== undefined} onClose={() => { setWorkbenchDialog(undefined) }} title={t(workbenchDialog === 'rename' ? 'renameWorkbench' : workbenchDialog === 'duplicate' ? 'duplicateWorkbench' : 'newWorkbench')} closeLabel={t('dismiss')}

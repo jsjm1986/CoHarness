@@ -6,6 +6,7 @@
  * @module client
  */
 
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -28,12 +29,15 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-export const inject = ['slots', 'locale', 'sessions', 'conversation']
+export const inject = ['slots', 'locale', 'sessions', 'conversation', 'connection']
 
 export function apply(ctx: ClientContext): void {
+  const connection = ctx.get('connection') as ConnectionHandle
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-documents: dictionaries')
 
   const injected = (): DocumentsButtonInjected => ({
+    documentScopeFor: sessionId => ctx.sessions.runtimeIdentityFor?.(sessionId),
+    privateResourceUrl: url => connection.privateResourceUrl?.(url) ?? url,
     attachDocument: (document, targetSessionId) => {
       const sessionId = targetSessionId ?? ctx.sessions.list.getSnapshot().current
       if (sessionId === undefined) return false

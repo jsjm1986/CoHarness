@@ -1,12 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs'
+import { AgentRegistry, type Agent } from '@deepseek-ai/dsh-agent'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { realpathSync, mkdirSync, mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
@@ -44,6 +45,7 @@ const signal = new AbortController().signal
 const roots: string[] = []
 const contexts: Context[] = []
 afterEach(async () => {
+  vi.restoreAllMocks()
   for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
   for (const root of roots.splice(0)) {
     rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
@@ -189,7 +191,7 @@ describe('externalMemberTurn over ACP', () => {
     expect(transcriptRead(transcript)).toHaveLength(4)
   })
 
-  it('replays a proven pending result without resending the prompt', async () => {
+  it('refuses replayed assistant chunks as completion and does not resend', async () => {
     const dir = root()
     const transcript = join(dir, 'transcript.jsonl')
     const env = loadEnv(transcript)
@@ -197,9 +199,6 @@ describe('externalMemberTurn over ACP', () => {
     const messages = userMessages(['task one'])
     const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
 
-    // Seed as if a prior turn issued the prompt and its outcome was lost:
-    // the binding is live, a pending record names the prompt, and the agent's
-    // durable transcript already holds the settled answer.
     store.bind(child, 'acp-session-1')
     store.markPending(child, {
       prompt: 'task one',
@@ -210,17 +209,16 @@ describe('externalMemberTurn over ACP', () => {
     appendFileSync(transcript, JSON.stringify({ sessionId: 'acp-session-1', role: 'agent', text: 'settled answer' }) + '\n')
 
     const transport = new AcpMemberTransport(memberConfig(dir, env), spawnSubprocess)
-    const chunks = await collect(externalMemberTurn(
+    await expect(collect(externalMemberTurn(
       { sessionId: child, messages, signal },
       store, transport,
-    ))
-    expect(outcomeText(chunks)).toBe('settled answer')
+    ))).rejects.toMatchObject({ code: EXTERNAL_TURN_OUTCOME_UNKNOWN })
     // The prompt was NOT re-issued: the transcript still holds one exchange.
     expect(transcriptRead(transcript)).toHaveLength(2)
     expect(store.binding(child)?.pending).toBeUndefined()
   })
 
-  it('resends a prompt the transcript proves absent', async () => {
+  it('does not resend a bound prompt absent from loaded history', async () => {
     const dir = root()
     const transcript = join(dir, 'transcript.jsonl')
     const env = loadEnv(transcript)
@@ -232,16 +230,13 @@ describe('externalMemberTurn over ACP', () => {
       prompt: 'lost task',
       throughMessageId: messages[0]!.id,
     })
-    // Transcript has no trace of the prompt: the issue never landed.
 
     const transport = new AcpMemberTransport(memberConfig(dir, env), spawnSubprocess)
-    const chunks = await collect(externalMemberTurn(
+    await expect(collect(externalMemberTurn(
       { sessionId: child, messages, signal },
       store, transport,
-    ))
-    expect(outcomeText(chunks)).toBe('mock answer')
-    // The prompt was sent exactly once — on the retry, not duplicated.
-    expect(transcriptRead(transcript).filter(e => e.role === 'user')).toHaveLength(1)
+    ))).rejects.toMatchObject({ code: EXTERNAL_TURN_OUTCOME_UNKNOWN })
+    expect(transcriptRead(transcript)).toHaveLength(0)
   })
 
   it('drops an unprovable pending prompt rather than resending it', async () => {
@@ -302,13 +297,23 @@ describe('ACP member plugin composition', () => {
     })).rejects.toThrow(/llm/)
   })
 
-  it('serves member model calls through the llm adapter route', async () => {
+  it.each([false, true])('routes ACP member and one-shot calls to the selected world (remote=%s)', async (remote) => {
     const dir = root()
     const transcript = join(dir, 'transcript.jsonl')
     const ctx = new Context()
     contexts.push(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
+    const target = remote ? new Context() : ctx
+    if (remote) {
+      contexts.push(target)
+      await target.plugin(LocalSubprocessRuntime)
+      vi.spyOn(await import('@deepseek-ai/dsh-subagent'), 'resolveChildExecution').mockResolvedValue({
+        cwd: dir, remote: true, target: 'ssh:17', subprocess: target.subprocess,
+      })
+      vi.spyOn(target.subprocess, 'resolveExecutable').mockResolvedValue(process.execPath)
+    }
+    const hostSpawn = remote ? vi.spyOn(ctx.subprocess, 'spawn') : undefined
     const { LlmRuntime } = await import('@deepseek-ai/dsh-llm')
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(acp, {
@@ -326,6 +331,10 @@ describe('ACP member plugin composition', () => {
         MOCK_TEXT: 'member answer',
       },
     })
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    const memberSession = ctx.sessions.create(SessionId('member-child'), { meta: { cwd: dir } })
+    ctx.agents.register({ id: memberSession.id, session: memberSession, ctx, status: 'idle' } as Agent)
     const chunks = await collect(ctx.llm.stream({
       provider: ACP_MEMBER_ROUTE,
       model: 'acp',
@@ -334,6 +343,41 @@ describe('ACP member plugin composition', () => {
     }))
     expect(outcomeText(chunks)).toBe('member answer')
     expect(transcriptRead(transcript)).toHaveLength(2)
+    if (remote) {
+      const run = await ctx.subagents.start('acp', { parent: { id: memberSession.id, session: memberSession, ctx } as Agent,
+        prompt: [{ type: 'text', text: 'one shot' }], signal })
+      expect((await run.result).stopReason).toBe('completed')
+      await run.dispose()
+      expect(hostSpawn).not.toHaveBeenCalled()
+    }
+  })
+
+  it('keeps two member workspaces distinct through real ACP processes without a memberCwd override', async () => {
+    const dir = root(), ctx = new Context()
+    contexts.push(ctx)
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    await ctx.plugin(acp, {
+      providerName: 'acp', permission: 'reject', command: process.execPath, args: [mockServer], resume: true,
+      stateDir: join(dir, 'bindings'), env: { MOCK_LOAD_SESSION: '1', MOCK_ECHO_CWD: '1' },
+    })
+    const owners = []
+    for (const name of ['workspace A', '工作区 B']) {
+      const cwd = join(dir, name)
+      mkdirSync(cwd)
+      owners.push(await ctx.agents.create({ sessionId: SessionId(name), meta: { cwd } }))
+    }
+    try {
+      const results = await Promise.all(owners.map(async ({ agent }) => outcomeText(await collect(ctx.llm.stream({
+        provider: ACP_MEMBER_ROUTE, model: 'acp', sessionId: agent.id, messages: userMessages(['workspace']),
+      })))))
+      expect(results).toEqual(owners.map(({ agent }) => {
+        const cwd = realpathSync(agent.session.header.cwd!)
+        return `${cwd}\n${cwd}`
+      }))
+    } finally { for (const owner of owners) await owner.dispose() }
   })
 
   it('rejects startContinuable for a non-resume ACP provider and accepts one with resume', async () => {
@@ -581,17 +625,15 @@ describe('AcpMemberTransport permission policy', () => {
   })
 
   it('cancels the prompt under the allow policy when no allow option exists', async () => {
-    const chunks = await memberTurnChunks(
+    await expect(memberTurnChunks(
       root(),
       { MOCK_PERMISSION: '1', MOCK_NO_ALLOW: '1' },
       'allow',
-    )
-    expect(outcomeText(chunks)).toBe('')
+    )).rejects.toThrow('turn ended with cancelled')
   })
 
   it('cancels every permission prompt under the reject policy', async () => {
-    const chunks = await memberTurnChunks(root(), { MOCK_PERMISSION: '1' }, 'reject')
-    expect(outcomeText(chunks)).toBe('')
+    await expect(memberTurnChunks(root(), { MOCK_PERMISSION: '1' }, 'reject')).rejects.toThrow('turn ended with cancelled')
   })
 })
 
@@ -638,7 +680,7 @@ describe('ACP member plugin defaults', () => {
     expect(ctx.subagents.getProvider('acp-member-cwd')).toBeDefined()
   })
 
-  it('falls back to the launch cwd and the default state dir when both are omitted', async () => {
+  it('registers the default store without capturing a workspace at plugin load', async () => {
     const ctx = new Context()
     contexts.push(ctx)
     await ctx.plugin(SubagentRuntime)

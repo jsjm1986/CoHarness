@@ -285,6 +285,9 @@ export class ConnectionController {
         if (!descriptionResult.ok) {
           throw new HandshakeRpcError(descriptionResult.error)
         }
+        if (descriptionResult.value.executionAuthorityRequired === true && descriptionResult.value.runtimeTarget === undefined) {
+          throw new Error('Managed Host did not declare its runtime identity')
+        }
         if (ac.signal.aborted) throw new Error('generation aborted during readiness handshake')
         this.attempt = 0
         this.emitState('connected')

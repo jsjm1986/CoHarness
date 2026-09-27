@@ -15,7 +15,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
-import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
+import { executionAuthorityOf, sameExecutionAuthority } from '@deepseek-ai/dsh-execution-authority'
 import z from '@deepseek-ai/schemastery'
 import { z as zod } from 'zod'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
@@ -278,7 +278,7 @@ export class PermissionPresetService extends TypertRemoteService {
             throw new Error('permission: managed defaults require live authorization')
           }
           await policy?.authorizeDefault?.(value.defaultPreset)
-          if (executionAuthorityOf(ctx) !== authority || ctx.get('permissionPresetAuthorization') !== policy) {
+          if (!sameExecutionAuthority(executionAuthorityOf(ctx), authority) || ctx.get('permissionPresetAuthorization') !== policy) {
             throw new Error('permission: default authorization changed before persistence')
           }
         },
@@ -336,7 +336,7 @@ export class PermissionPresetService extends TypertRemoteService {
           }
           await policy?.authorizeSelection?.(agent, name)
           signal.throwIfAborted()
-          if (executionAuthorityOf(this.ctx) !== authority || this.ctx.get('permissionPresetAuthorization') !== policy) {
+          if (!sameExecutionAuthority(executionAuthorityOf(this.ctx), authority) || this.ctx.get('permissionPresetAuthorization') !== policy) {
             throw new Error('permission: selection authorization changed before applying')
           }
           this.apply(agent.session, name, (policy) => { this.ctx.approval.setPolicy(agent, policy) }, 'selection')

@@ -229,6 +229,9 @@ export class ContinuableActivationRegistry {
     // child-first ordering.
     const scope = ctx.plugin(function activationOwner() {})
     this.ownerCtx = scope.ctx
+    ctx.on('agent/idle-release-check', ({ agent }) => (this.pendingActivationsByParent.get(agent.id) ?? 0) > 0
+      || (this.activationsByParent.get(agent.id) ?? 0) > 0
+      || [...this.materializations].some(operation => operation.lineage.includes(agent)) ? 'busy' : undefined, { global: true })
     ctx.on('agent/disposed', ({ agent }) => {
       this.closingScopes.delete(agent)
     })
@@ -458,6 +461,7 @@ export class ContinuableActivationRegistry {
    * @param agent - exact live Agent whose lineage determines admission.
    */
   assertAdmitting(agent: Agent): void {
+    if (this.ctx.agents.isRemoving(agent.id)) throw new SubagentError('Parent Session is being removed', 'DRAINING')
     const closing = this.closingTeardownFor(agent)
     if (closing === undefined) return
     throw new SubagentError(

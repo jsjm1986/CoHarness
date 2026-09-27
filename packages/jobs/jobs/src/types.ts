@@ -3,6 +3,7 @@
  * service implementation lives in `./index.ts`.
  * @module @deepseek-ai/dsh-jobs/types
  */
+import type { ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority/types'
 
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
@@ -95,6 +96,8 @@ export interface JobHooks {
  * a fresh object per call, never live registry state.
  */
 export interface JobSnapshot {
+  /** Origin retained for completion input; never a current authorization grant. */
+  executionScope?: ExecutionInheritance
   /** The registry-issued id (`<kind>-N`). */
   id: JobId
   /** The producer kind the job was registered with. */

@@ -68,6 +68,8 @@ export abstract class JobRegistry extends Service {
       throw new Error('@deepseek-ai/dsh-jobs is the abstract job registry seam; load an implementation such as @deepseek-ai/dsh-jobs-local instead')
     }
     super(ctx, 'jobs')
+    ctx.on('agent/idle-release-check', ({ agent }) => this.list(agent).some(job => job.ownerSession === agent.id
+      && (job.status === 'running' || job.status === 'stopping')) ? 'busy' : undefined, { global: true })
   }
 
   /**

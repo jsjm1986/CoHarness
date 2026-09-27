@@ -114,6 +114,7 @@ export class TerminalSessionService extends Service {
 
   constructor(ctx: Context) {
     super(ctx, 'terminals')
+    ctx.on('agent/idle-release-check', ({ agent }) => this.hasOwnerActivity(agent) ? 'busy' : undefined, { global: true })
     ctx.effect(() => () => this.disposeAll(), 'pty teardown')
   }
 
@@ -316,7 +317,8 @@ export class TerminalSessionService extends Service {
   }
 
   private isLiveOwner(owner: Agent): boolean {
-    return !this.disposedOwners.has(owner) && this.ctx.get('agents')?.get(owner.id) === owner
+    const registry = this.ctx.get('agents')
+    return !this.disposedOwners.has(owner) && registry?.get(owner.id) === owner && !registry.isRemoving(owner.id)
   }
 
   private ensureOwnerCleanup(owner: Agent): void {

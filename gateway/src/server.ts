@@ -7,9 +7,9 @@ import {
   AccountPreferencesInputError,
   normalizeAccountPreferenceMutation,
 } from './account-preferences.ts'
-import { CollaborationDeniedError, type AccountConversationView } from './collaboration.ts'
+import { CollaborationDeniedError } from './collaboration.ts'
 import type { GatewayConfig } from './config.ts'
-import type { ProjectRuntime } from './instances.ts'
+import { RuntimeStartBlockedError, type ProjectRuntime } from './instances.ts'
 import type { PrincipalScope } from './principal.ts'
 import type { GatewayPushService, PushProvider } from './push-notifications.ts'
 import { loginPage, passwordPage } from './html.ts'
@@ -83,6 +83,8 @@ export interface GatewayDeps {
   /** Maintenance windows, writer convergence, and restore fencing for shared PostgreSQL. */
   maintenance?: Pick<import('./postgres/maintenance-service.ts').PostgresMaintenanceService,
     'state' | 'enterMaintenance' | 'exitMaintenance' | 'setNodeStatus' | 'listOperations' | 'requestRestore' | 'logOperation'>
+  /** Current-node configuration with identity and revision checks. */
+  nodeConfiguration?: Pick<import('./node-config-store.ts').NodeConfigurationStore, 'view' | 'save' | 'requestApply'>
   /** Deployment backup registry. */
   backups?: Pick<import('./postgres/backup-service.ts').PostgresBackupService, 'list' | 'get' | 'record' | 'setVerified'>
   /** Backup execution context for administrator-driven dumps. */
@@ -106,15 +108,18 @@ export interface GatewayDeps {
 }
 
 /** Backup execution wiring shared by the admin backup routes. */
-export interface GatewayBackupWork {
-  commands: import('./deployment-commands.ts').DeploymentCommands
-  databaseUrl: string
-  backupDir: string
-  managedPaths: string[]
-}
+export type GatewayBackupWork = Pick<import('./postgres/deployment-backups.ts').PostgresDeploymentBackups, 'create' | 'verify' | 'previewNodeConfiguration'>
 
 export const SESSION_COOKIE = 'hgw_session'
 export const SCOPE_COOKIE = 'hgw_scope'
+
+/** A browser's previously observed account is a refusal condition, never an identity grant. */
+function browserPrincipalMatches(req: IncomingMessage, user: UserRow): boolean {
+  const expected = req.headers['x-dsh-expected-principal-id']
+  const query = new URL(req.url ?? '/', 'http://x').searchParams.getAll('dshPrincipal')
+  const current = String(user.id)
+  return (expected === undefined || expected === current) && (query.length === 0 || query.length === 1 && query[0] === current)
+}
 
 export function parseCookies(header: string | undefined): Map<string, string> {
   const map = new Map<string, string>()
@@ -563,6 +568,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (!res.writableEnded) {
         if (error instanceof BodyTooLargeError) {
           send(res, 413, JSON.stringify({ error: 'request-too-large' }), 'application/json')
+        } else if (error instanceof RuntimeStartBlockedError) {
+          send(res, error.code === 'INSTANCE_STOPPED' ? 409 : 503, JSON.stringify({ error: { code: error.code, message: error.message } }), 'application/json')
         } else if (error instanceof InvalidRuntimeTargetError) {
           send(res, 400, JSON.stringify({ error: error.message }), 'application/json')
         } else if (error instanceof CollaborationDeniedError) {
@@ -599,6 +606,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     deps.writerSpan?.(res)
     const verdict = await deps.maintenanceGate()
     if (verdict === 'open') return true
+    if (verdict === 'maintenance' && req.method === 'POST'
+      && /^\/admin\/api\/(users|projects)\/\d+\/instance\/stop$/u.test(pathname)) return true
     send(res, 503, JSON.stringify({ error: verdict }), 'application/json')
     return false
   }
@@ -607,14 +616,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     const pathname = new URL(req.url ?? '/', 'http://x').pathname
 
     if (pathname === '/healthz/live') {
-      send(res, 200, JSON.stringify({ ok: true, release: cfg.releaseId }), 'application/json')
+      send(res, 200, JSON.stringify({ ok: true, release: cfg.releaseId, configurationRevision: cfg.configurationRevision }), 'application/json')
       return
     }
 
     if (pathname === '/healthz' || pathname === '/healthz/ready') {
       try {
         await checkReadiness()
-        send(res, 200, JSON.stringify({ ok: true, release: cfg.releaseId }), 'application/json')
+        send(res, 200, JSON.stringify({ ok: true, release: cfg.releaseId, configurationRevision: cfg.configurationRevision }), 'application/json')
       } catch {
         send(res, 503, JSON.stringify({ ok: false, release: cfg.releaseId }), 'application/json')
       }
@@ -693,6 +702,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (wantsHtml(req)) { redirect(res, '/login'); return }
       send(res, 401, '{"error":"unauthorized"}', 'application/json')
       return
+    }
+    if (pathname === '/api' || pathname.startsWith('/api/') || pathname.startsWith('/account/api/')) {
+      res.setHeader('x-dsh-principal-id', String(session.user.id))
+      if (!browserPrincipalMatches(req, session.user)) {
+        req.resume()
+        send(res, 409, JSON.stringify({ error: 'account-changed' }), 'application/json')
+        return
+      }
     }
     if (!await writesOpen(req, res, pathname)) return
     const { token, user } = session
@@ -797,10 +814,18 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       return
     }
 
-    if (pathname === '/account/api/scope' && req.method === 'POST') {
+    if ((pathname === '/account/api/scope' || pathname === '/account/runtime/start') && req.method === 'POST') {
+      const htmlStart = pathname === '/account/runtime/start'
+      const finish = (scope: 'personal' | `project:${number}`): void => {
+        if (htmlStart) redirect(res, '/', [scopeCookie(scope, cfg)])
+        else { res.writeHead(204, { 'set-cookie': scopeCookie(scope, cfg) }); res.end() }
+      }
       let requested: unknown
       try {
-        requested = JSON.parse(await readBody(req))
+        const body = await readBody(req)
+        const form = htmlStart ? new URLSearchParams(body) : undefined
+        requested = form === undefined ? JSON.parse(body)
+          : { kind: form.get('kind'), projectId: Number(form.get('projectId')) }
       } catch {
         send(res, 400, '{"error":"invalid-json"}', 'application/json')
         return
@@ -811,9 +836,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       }
       const value = requested as { kind?: unknown; projectId?: unknown }
       if (value.kind === 'personal') {
-        await deps.instances.ensureRunning(user)
-        res.writeHead(204, { 'set-cookie': scopeCookie('personal', cfg) })
-        res.end()
+        await deps.instances.ensureRunning(user, 'explicit')
+        finish('personal')
         return
       }
       if (value.kind !== 'project' || typeof value.projectId !== 'number'
@@ -831,9 +855,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         id: value.projectId,
         name: project.name,
         path: project.path,
-      })
-      res.writeHead(204, { 'set-cookie': scopeCookie(`project:${value.projectId}`, cfg) })
-      res.end()
+      }, 'explicit')
+      finish(`project:${value.projectId}`)
       return
     }
 
@@ -1106,10 +1129,10 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       res.setHeader('cache-control', 'no-store')
       const scopes = await deps.collaboration.projectsForUser(user.id)
       const abort = requestAbort(req, res)
-      let items: AccountConversationView[]
+      let catalog: Awaited<ReturnType<GatewayWorkbenchCatalogHandler>>
       try {
-        items = handlers.workbenchCatalog === undefined
-          ? await deps.collaboration.listAccountConversations(user.id)
+        catalog = handlers.workbenchCatalog === undefined
+          ? { items: await deps.collaboration.listAccountConversations(user.id), personalComplete: false }
           : await handlers.workbenchCatalog(user, abort.signal)
       } finally {
         abort.dispose()
@@ -1121,7 +1144,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         personal: { id: user.id, name: user.displayName || user.username },
         activeRuntime,
         projects: scopes,
-        items,
+        items: catalog.items,
+        personalComplete: catalog.personalComplete,
       }), 'application/json')
       return
     }
@@ -1644,8 +1668,16 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (conversationRoute !== null && deps.collaboration !== undefined) {
       try {
         const sessionId = decodeURIComponent(conversationRoute[1] ?? '')
+        const projectValue = new URL(req.url ?? '/', 'http://x').searchParams.get('projectId')
+        const requestedProject = projectValue === null ? undefined : Number(projectValue)
+        if (requestedProject !== undefined && (!Number.isSafeInteger(requestedProject) || requestedProject <= 0 || String(requestedProject) !== projectValue)) {
+          send(res, 400, '{"error":"invalid-project-id"}', 'application/json'); return
+        }
         if (req.method === 'GET') {
           const access = await deps.collaboration.access(user.id, sessionId, 'read')
+          if (requestedProject !== undefined && access.projectId !== requestedProject) {
+            send(res, 404, '{"error":"conversation-not-found"}', 'application/json'); return
+          }
           const items = await deps.collaboration.listConversations(user.id, access.projectId)
           send(res, 200, JSON.stringify({ access, conversation: items.find(item => item.sessionId === access.rootSessionId) ?? null }), 'application/json')
           return
@@ -1657,6 +1689,9 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
             return
           }
           const access = await deps.collaboration.access(user.id, sessionId, 'read')
+          if (requestedProject !== undefined && access.projectId !== requestedProject) {
+            send(res, 404, '{"error":"conversation-not-found"}', 'application/json'); return
+          }
           await deps.collaboration.setVisibility(user.id, sessionId, body.visibility)
           handlers.invalidateAccess?.({ projectId: access.projectId })
           res.writeHead(204)
@@ -1716,6 +1751,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (origin !== undefined && !cfg.publicOrigins.includes(origin)) { socket.destroy(); return }
       const session = await currentUser(req)
       if (session === null || session.user.mustChangePassword) { socket.destroy(); return }
+      if (!browserPrincipalMatches(req, session.user)) {
+        const body = JSON.stringify({ error: 'account-changed' })
+        socket.end(`HTTP/1.1 409 Conflict\r\nConnection: close\r\nx-dsh-principal-id: ${session.user.id}\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`)
+        return
+      }
       if (handlers.upgrade === undefined || !pathname.startsWith('/api')) { socket.destroy(); return }
       const resolved = await requestContext(req, session.user)
       await handlers.upgrade(req, socket, head, resolved.context)

@@ -62,6 +62,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   agentPresets: 'core.md',
   agents: 'core.md',
   apiProxy: 'typert.md',
+  hostSessionLifecycle: 'typert.md',
   approval: 'approval.md',
   attachments: 'attachment.md',
   authorization: 'credentials.md',
@@ -709,6 +710,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
 
 /** TypeScript lib and pinned framework types with no repository-owned data page. */
 export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
+  'Disposable',
   'Plugin',
   'AbortSignal',
   'AsyncIterable',
@@ -723,6 +725,7 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
   'ReturnType',
   'Pick',
   'Promise',
+  'Awaited',
   'ReadableStream',
   'Record',
   'Request',

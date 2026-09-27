@@ -39,3 +39,5 @@ HMR 收容实时刷新 rejection。其 `registerConfig(filename, refresh)` 方�
 ## Testing
 
 `packages/boot/app-boot/tests/config-reload.spec.ts` 启动真实的临时 Loader/Include 树，并覆盖对解析和形状错误的拒绝、先导入再 dispose、插件/配置恢复、多配置项回滚、祖先禁用、overlay 收敛、option 对象身份、失败的直接更新不持久化以及失败的程序化移动。`packages/boot/hmr/tests/watch-config.spec.ts` 覆盖现有和缺失的确切路径、添加/变更/移除、串行化合并、dispose 排空、非 `Error` 值的规范化、失败广播以及对发生 rejection 的观察者的收容。`packages/host/webserver/tests/webserver.spec.ts` 证明受服务门控的启动失败会让 Loader 组合以其 bind 诊断 reject；`packages/typert/loader/tests/loader.spec.ts` 则通过真实 Loader 消费方演练可等待的程序化移除；ACP（Agent Client Protocol）的 `pty-tools` 快照会防止并发组合改变同优先级提示词段的顺序。
+
+配置发现分别验证监听器报告 ready 后的一次父目录／文件创建，以及持续无关目录活动期间的发现。原生事件与轮询的一次创建用例都只执行一组文件系统变更；等待过程只观察结果。监听器关闭后才删除各自的测试目录。

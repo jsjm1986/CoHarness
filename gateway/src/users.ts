@@ -1,9 +1,9 @@
-import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type Database from 'better-sqlite3'
 import { toUserRow, type UserRow } from './auth.ts'
 import type { GatewayConfig } from './config.ts'
 import { hashPassword } from './password.ts'
+import { prepareUserData } from './user-data.ts'
 
 const USERNAME_RE = /^[a-z][a-z0-9-]{1,30}$/
 
@@ -34,9 +34,6 @@ export class UserService {
   async create(input: { username: string; password: string; role?: 'admin' | 'user'; displayName?: string }): Promise<UserRow> {
     if (!USERNAME_RE.test(input.username)) throw new Error(`invalid username: ${input.username}`)
     const homePath = join(this.cfg.usersRoot, input.username, 'home')
-    mkdirSync(homePath, { recursive: true })
-    mkdirSync(join(homePath, 'documents'), { recursive: true })
-    mkdirSync(join(this.cfg.usersRoot, input.username, 'dsh'), { recursive: true })
     const now = Date.now()
     const hash = await hashPassword(input.password)
     const insert = this.db.transaction(() => {
@@ -48,6 +45,7 @@ export class UserService {
       const port = this.allocatePort()
       this.db.prepare(`INSERT INTO instances(user_id, port, state) VALUES(?, ?, 'stopped')`)
         .run(userId, port)
+      prepareUserData(this.cfg, input.username)
       return userId
     })
     const id = insert()

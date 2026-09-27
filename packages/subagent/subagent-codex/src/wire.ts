@@ -326,11 +326,13 @@ export class CodexAppServerWire {
    * terminal notification.
    * @param texts - already validated task text blocks.
    * @param signal - local cancellation for the published run.
+   * @param started - persist the validated turn identity before awaiting completion.
    * @returns the shared subagent result.
    */
   async runTurn(
     texts: readonly string[],
     signal: AbortSignal,
+    started?: (turnId: string) => void,
   ): Promise<SubagentResult> {
     const completion = Promise.withResolvers<{
       readonly params: JsonObject
@@ -345,6 +347,7 @@ export class CodexAppServerWire {
       }, signal), signal), 'turn/start response')
       const turn = object(response.turn, 'turn/start turn')
       this.commitTurnId(string(turn.id, 'turn/start turn id'))
+      started?.(this.turnId as string)
     } catch (error: unknown) {
       this.recordFailure({ stage: 'turn-start', category: 'unknown' })
       throw error

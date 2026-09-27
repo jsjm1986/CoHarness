@@ -1,0 +1,19 @@
+- dialog "应用节点配置并重启":
+  - heading "应用节点配置并重启" [level=2]
+  - paragraph: 独立应用器先核验维护状态、端口、数据库及数据目录，再重启当前节点 Gateway。连接会暂时中断；修改公开地址或端口前须先配置外部入口。失败时尝试恢复上一可用配置，失败证据保留。
+  - button "关闭"
+  - paragraph: 将应用配置版本 1，节点 node-fixture。
+  - region "待应用配置变化":
+    - table:
+      - rowgroup:
+        - row "设置 当前生效值 待应用值":
+          - columnheader "设置"
+          - columnheader "当前生效值"
+          - columnheader "待应用值"
+      - rowgroup:
+        - row "Gateway 端口 8899 9330":
+          - cell "Gateway 端口"
+          - cell "8899"
+          - cell "9330"
+  - button "取消"
+  - button "确认应用并重启"

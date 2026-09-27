@@ -29,8 +29,13 @@ function lastStep(context: ConversationNodeContext<TurnErrorState>): number {
 }
 
 function failureFrom(match: ConversationMatch): TurnErrorState['failure'] | undefined {
-  if (match.event.type !== 'turn/end' || match.event.data.reason.kind !== 'error') return undefined
-  const failure = match.event.data.reason.error
+  if (match.event.type !== 'turn/end') return undefined
+  const reason = match.event.data.reason
+  if (reason.kind === 'aborted' && reason.reason.kind === 'hook') {
+    return { seq: match.event.seq, time: match.event.time, message: reason.reason.reason }
+  }
+  if (reason.kind !== 'error') return undefined
+  const failure = reason.error
   return {
     seq: match.event.seq,
     time: match.event.time,
@@ -49,7 +54,8 @@ function fallbackState(context: ConversationNodeContext<TurnErrorState>): TurnEr
 
 /**
  * Terminal turn failure Definition. Retries run inside the failing turn, so the
- * turn's retry history never suppresses this terminal row; the retry node
+ * turn's retry history never suppresses this terminal row; hook cancellation
+ * keeps its explicit stopping and recovery reason visible. The retry node
  * renders that history separately.
  */
 export const turnErrorDefinition: ConversationNodeDefinition<TurnErrorState> = {
@@ -57,7 +63,8 @@ export const turnErrorDefinition: ConversationNodeDefinition<TurnErrorState> = {
   target: 'chat',
   match: (event) => {
     if (event.type === 'turn/start') return { id: String(event.data.turn), role: 'start' }
-    if (event.type === 'turn/end' && event.data.reason.kind === 'error') {
+    if (event.type === 'turn/end' && (event.data.reason.kind === 'error'
+      || (event.data.reason.kind === 'aborted' && event.data.reason.reason.kind === 'hook'))) {
       return { id: String(event.data.turn), role: 'update' }
     }
     return null

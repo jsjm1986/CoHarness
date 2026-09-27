@@ -101,6 +101,8 @@ The first accepted terminal outcome owns the run result. Cancellation stops the 
 
 -----
 
+Managed workflow callbacks retain the execution scope captured when the workflow starts. Delayed worker requests to spawn children cannot borrow a later human request on the parent Agent.
+
 <a id="further-exploration"></a>
 ## Further Exploration
 

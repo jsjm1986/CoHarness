@@ -165,6 +165,25 @@ export class RuntimeLeaseUnavailableError extends Error {
   }
 }
 
+/** Durable reason for a stopped runtime; a new runtime has no stop reason. */
+export type RuntimeStopReason = 'manual' | 'idle' | 'shutdown' | 'failed' | 'access-change'
+/** Explicit starts require an authenticated user action at the owning HTTP route. */
+export type RuntimeStartIntent = 'passive' | 'explicit' | 'webhook'
+
+/** Startup intent cannot override an unavailable owner or a durable stop decision. */
+export class RuntimeStartBlockedError extends Error {
+  readonly code: 'INSTANCE_STOPPED' | 'INSTANCE_UNAVAILABLE'
+  constructor(readonly reason: RuntimeStopReason | 'maintenance' | 'stale-epoch' | 'unavailable' | null) {
+    super(reason === 'unavailable'
+      ? 'Runtime start is unavailable. Check the owner status, membership and instance assignment.'
+      : reason === 'maintenance' || reason === 'stale-epoch'
+      ? 'Runtime start is unavailable during maintenance or after a database restore.'
+      : 'The runtime requires an explicit start by an authorized user.')
+    this.name = 'RuntimeStartBlockedError'
+    this.code = reason === 'maintenance' || reason === 'stale-epoch' || reason === 'unavailable' ? 'INSTANCE_UNAVAILABLE' : 'INSTANCE_STOPPED'
+  }
+}
+
 function targetOf(input: RuntimeTargetInput): RuntimeTarget {
   return typeof input === 'number' ? { kind: 'user', id: input } : input
 }
@@ -184,15 +203,21 @@ export interface InstanceRepository {
   initialize(instancesOutliveGateway: boolean): Promise<void>
   portOf(target: RuntimeTarget): Promise<number>
   stateOf(target: RuntimeTarget): Promise<string>
+  stopReasonOf(target: RuntimeTarget): Promise<RuntimeStopReason | null>
+  /**
+   * @param target - exact runtime assignment to check without mutating it.
+   * @returns current eligible owner/instance policy, or null when unavailable; beginStart rechecks it atomically.
+   */
+  startEligibility(target: RuntimeTarget): Promise<{ stopReason: RuntimeStopReason | null } | null>
   generationOf(target: RuntimeTarget): Promise<number>
   touch(target: RuntimeTarget, at: number): Promise<void>
-  beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer): Promise<number>
+  beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer, intent?: RuntimeStartIntent): Promise<number>
   markReady(target: RuntimeTarget, generation: number): Promise<void>
   idleTargets(cutoff: number): Promise<RuntimeTarget[]>
   /** Re-check one idle candidate without rescanning the whole instance table. */
   idleTarget(target: RuntimeTarget, cutoff: number): Promise<boolean>
-  markStopping(target: RuntimeTarget): Promise<void>
-  markStopped(target: RuntimeTarget): Promise<void>
+  markStopping(target: RuntimeTarget, reason?: RuntimeStopReason): Promise<void>
+  markStopped(target: RuntimeTarget, reason?: RuntimeStopReason): Promise<void>
   owner(target: RuntimeTarget): Promise<InstanceOwner | null>
 }
 
@@ -200,7 +225,9 @@ class SqliteInstanceRepository implements InstanceRepository {
   constructor(private readonly db: Database.Database) {}
 
   async initialize(instancesOutliveGateway: boolean): Promise<void> {
-    if (!instancesOutliveGateway) this.db.prepare(`UPDATE instances SET state = 'stopped', pid = NULL`).run()
+    if (!instancesOutliveGateway) this.db.prepare(`UPDATE instances SET
+      stop_reason = CASE WHEN state IN ('ready','starting') THEN 'shutdown' ELSE stop_reason END,
+      state = 'stopped', pid = NULL`).run()
   }
 
   private userId(target: RuntimeTarget): number {
@@ -228,21 +255,43 @@ class SqliteInstanceRepository implements InstanceRepository {
     return 1
   }
 
+  async stopReasonOf(target: RuntimeTarget): Promise<RuntimeStopReason | null> {
+    const row = this.db.prepare('SELECT stop_reason FROM instances WHERE user_id = ?').get(this.userId(target)) as
+      { stop_reason: RuntimeStopReason | null } | undefined
+    if (row === undefined) throw new Error(`no instance row for user ${target.id}`)
+    return row.stop_reason
+  }
+
   async touch(target: RuntimeTarget, at: number): Promise<void> {
     const userId = this.userId(target)
     this.db.prepare(`UPDATE instances SET last_activity_at = ? WHERE user_id = ?`).run(at, userId)
   }
 
-  async beginStart(target: RuntimeTarget, at: number, _runtimeTokenHash: Buffer): Promise<number> {
+  async beginStart(target: RuntimeTarget, at: number, _runtimeTokenHash: Buffer, intent: RuntimeStartIntent = 'passive'): Promise<number> {
     const userId = this.userId(target)
-    this.db.prepare(`UPDATE instances SET state = 'starting', started_at = ?, last_activity_at = ? WHERE user_id = ?`)
-      .run(at, at, userId)
+    const updated = this.db.prepare(`UPDATE instances SET state = 'starting', stop_reason = NULL, started_at = ?, last_activity_at = ?
+      WHERE user_id = ? AND (? = 'explicit' OR (stop_reason IS NOT 'manual' AND (? <> 'webhook' OR stop_reason = 'idle')))
+        AND EXISTS(SELECT 1 FROM users WHERE id = ? AND status = 'active' AND deleted_at IS NULL)`)
+      .run(at, at, userId, intent, intent, userId)
+    if (updated.changes !== 1) {
+      const eligible = await this.startEligibility(target), reason = eligible?.stopReason
+      const blockedIntent = intent !== 'explicit' && (reason === 'manual' || intent === 'webhook' && reason !== 'idle')
+      throw new RuntimeStartBlockedError(eligible !== null && blockedIntent ? eligible.stopReason : 'unavailable')
+    }
     return 1
+  }
+
+  async startEligibility(target: RuntimeTarget): Promise<{ stopReason: RuntimeStopReason | null } | null> {
+    const row = this.db.prepare(`SELECT i.stop_reason FROM instances i JOIN users u ON u.id=i.user_id
+      WHERE i.user_id=? AND u.status='active' AND u.deleted_at IS NULL`).get(this.userId(target)) as
+      { stop_reason: RuntimeStopReason | null } | undefined
+    return row === undefined ? null : { stopReason: row.stop_reason }
   }
 
   async markReady(target: RuntimeTarget, _generation: number): Promise<void> {
     const userId = this.userId(target)
-    this.db.prepare(`UPDATE instances SET state = 'ready' WHERE user_id = ?`).run(userId)
+    const updated = this.db.prepare(`UPDATE instances SET state = 'ready' WHERE user_id = ? AND state = 'starting' AND stop_reason IS NULL`).run(userId)
+    if (updated.changes !== 1) throw new RuntimeStartBlockedError(await this.stopReasonOf(target))
   }
 
   async idleTargets(cutoff: number): Promise<RuntimeTarget[]> {
@@ -260,14 +309,15 @@ class SqliteInstanceRepository implements InstanceRepository {
     return row !== undefined
   }
 
-  async markStopping(target: RuntimeTarget): Promise<void> {
+  async markStopping(target: RuntimeTarget, reason: RuntimeStopReason = 'manual'): Promise<void> {
     const userId = this.userId(target)
-    this.db.prepare(`UPDATE instances SET state = 'stopping' WHERE user_id = ?`).run(userId)
+    this.db.prepare(`UPDATE instances SET state = 'stopping', stop_reason = CASE WHEN stop_reason = 'manual' THEN 'manual' ELSE ? END WHERE user_id = ?`).run(reason, userId)
   }
 
-  async markStopped(target: RuntimeTarget): Promise<void> {
+  async markStopped(target: RuntimeTarget, reason?: RuntimeStopReason): Promise<void> {
     const userId = this.userId(target)
-    this.db.prepare(`UPDATE instances SET state = 'stopped', pid = NULL WHERE user_id = ?`).run(userId)
+    this.db.prepare(`UPDATE instances SET state = 'stopped', pid = NULL, stop_reason = CASE WHEN stop_reason = 'manual' THEN 'manual' ELSE COALESCE(?,stop_reason) END WHERE user_id = ?`)
+      .run(reason ?? null, userId)
   }
 
   async owner(target: RuntimeTarget): Promise<InstanceOwner | null> {
@@ -293,6 +343,8 @@ export class InstanceManager {
   private readonly operationTotals = new Map<string, number>()
   /** Per-runtime operation chain: serializes start vs stop so a reap cannot orphan a fresh spawn. */
   private readonly ops = new Map<string, Promise<unknown>>()
+  /** Gateway maintenance admission and writer accounting around the complete start operation. */
+  startAdmission?: (operation: () => Promise<{ port: number; generation: number }>) => Promise<{ port: number; generation: number }>
 
   /**
    * Called with the resolved runtime just before it is spawned, on every start.
@@ -328,6 +380,12 @@ export class InstanceManager {
   async generationOf(target: RuntimeTargetInput): Promise<number> {
     await this.initialized
     return this.repository.generationOf(targetOf(target))
+  }
+
+  /** Read the durable stop reason without starting the target. */
+  async stopReasonOf(target: RuntimeTargetInput): Promise<RuntimeStopReason | null> {
+    await this.initialized
+    return this.repository.stopReasonOf(targetOf(target))
   }
 
   /**
@@ -466,7 +524,7 @@ export class InstanceManager {
     }
   }
 
-  async ensureRunning(subject: UserRow | ProjectRuntime): Promise<{ port: number; generation: number }> {
+  async ensureRunning(subject: UserRow | ProjectRuntime, intent: RuntimeStartIntent = 'passive'): Promise<{ port: number; generation: number }> {
     const target: RuntimeTarget = 'username' in subject
       ? { kind: 'user', id: subject.id }
       : { kind: 'project', id: subject.id }
@@ -505,7 +563,16 @@ export class InstanceManager {
         }
         this.procs.delete(targetKey(target))
       }
-      return this.start(await this.launchContext(subject), port)
+      const reason = await this.repository.stopReasonOf(target)
+      if (intent !== 'explicit' && (reason === 'manual' || intent === 'webhook' && reason !== 'idle')) {
+        const eligible = await this.repository.startEligibility(target)
+        if (eligible === null) throw new RuntimeStartBlockedError('unavailable')
+        if (eligible.stopReason === 'manual' || intent === 'webhook' && eligible.stopReason !== 'idle') {
+          throw new RuntimeStartBlockedError(eligible.stopReason)
+        }
+      }
+      const start = async () => this.start(await this.launchContext(subject), port, intent)
+      return this.startAdmission === undefined ? start() : this.startAdmission(start)
     })
   }
 
@@ -653,6 +720,7 @@ export class InstanceManager {
   private async start(
     descriptor: Omit<RuntimeLaunchContext, 'generation'>,
     port: number,
+    intent: RuntimeStartIntent,
   ): Promise<{ port: number; generation: number }> {
     // Mount policy bundles first: a missing mandatory policy must refuse the
     // start before any state transition, not strand the row in 'starting'.
@@ -664,6 +732,7 @@ export class InstanceManager {
       descriptor.target,
       now,
       createHash('sha256').update(runtimeToken).digest(),
+      intent,
     )
     const runtime: RuntimeLaunchContext = { ...descriptor, generation }
     const key = targetKey(runtime.target)
@@ -733,7 +802,7 @@ export class InstanceManager {
       // `starting`; terminate the child first, then publish the stopped state.
       if (proc !== undefined) await proc.terminate(STOP_GRACE_MS).catch(() => {})
       if (this.procs.get(key) === proc) this.procs.delete(key)
-      await this.repository.markStopped(runtime.target).catch((cleanupError: unknown) => {
+      await this.repository.markStopped(runtime.target, 'failed').catch((cleanupError: unknown) => {
         console.error(`[gateway] failed to roll back instance ${key}:`, cleanupError)
       })
       throw error
@@ -757,7 +826,7 @@ export class InstanceManager {
         if (!stillIdle
           || (this.wsTotals.get(targetKey(target)) ?? 0) > 0
           || (this.operationTotals.get(targetKey(target)) ?? 0) > 0) return false
-        await this.terminate(target)
+        await this.terminate(target, 'idle')
         return true
       })
       if (didStop) stopped += 1
@@ -765,8 +834,8 @@ export class InstanceManager {
     return stopped
   }
 
-  async stop(target: RuntimeTargetInput): Promise<void> {
-    return this.withStopped(target, async () => {})
+  async stop(target: RuntimeTargetInput, reason: RuntimeStopReason = 'manual'): Promise<void> {
+    return this.serialize(target, () => this.terminate(targetOf(target), reason))
   }
 
   /**
@@ -777,7 +846,7 @@ export class InstanceManager {
    */
   async withStopped<T>(target: RuntimeTargetInput, operation: () => Promise<T>): Promise<T> {
     return this.serialize(target, async () => {
-      await this.terminate(targetOf(target))
+      await this.terminate(targetOf(target), 'manual')
       return operation()
     })
   }
@@ -787,9 +856,9 @@ export class InstanceManager {
    * previous gateway process started (systemd survivors). Assumes the caller
    * holds the per-user op slot.
    */
-  private async terminate(target: RuntimeTarget): Promise<void> {
+  private async terminate(target: RuntimeTarget, reason: RuntimeStopReason): Promise<void> {
     await this.initialized
-    await this.repository.markStopping(target)
+    await this.repository.markStopping(target, reason)
     const key = targetKey(target)
     let proc = this.procs.get(key)
     if (proc === undefined && this.launcher.attach !== undefined) {
@@ -860,7 +929,7 @@ export class InstanceManager {
         const target = targets[index]
         if (target === undefined) break
         try {
-          await this.stop(target)
+          await this.stop(target, 'shutdown')
         } catch (error) {
           errors.push(error)
         }

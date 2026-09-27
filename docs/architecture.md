@@ -103,6 +103,8 @@ Input reaches the driver through one inbox. Some messages wake it immediately; i
 
 Details: the [sequence diagram](agent-lifecycle.md), the [tool pipeline](tool-execution-pipeline.md), and [cancellation and error recovery](subsystems/core.md#the-agent-handle). AgentLoop publication awaits serial `agent/created` initialization within its rollback handler; this is the sole startup initialization event, and setup and publication hold waking input in maintenance until success.
 
+Permanent Session removal preserves the lifecycle owner: reservations fence new work, plugins can veto busy resources, and durable deletion follows confirmed idle release. Ordinary cancellation is unchanged. The [idle purge decision](../.agents/notes/implemented/architecture/2026-09-27-idle-session-purge.md) defines the ordering and failure behavior.
+
 ## Session log
 
 The session log is the source of the context the model sees. `deriveMessages()` projects model history from it, and raw `assistant/chunk` events preserve replay and UI fidelity. Fork, resume, transcripts, telemetry, and persistence all derive from this stream.

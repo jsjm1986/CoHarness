@@ -68,6 +68,8 @@ export interface ConversationArchiveRow {
   readonly trashedAt: number | null
   readonly purgeAfter: number | null
   readonly syncState: 'pending' | 'synced' | 'conflict' | 'unavailable'
+  /** The last runtime refusal; retained until an explicit replacement request. */
+  readonly lastSyncError?: string
   readonly childCount: number
   readonly messageCount: number
   readonly updatedAt: number
@@ -301,6 +303,7 @@ interface ArchiveDbRow {
   trashed_at_ms: string | null
   purge_after_ms: string | null
   sync_state: 'pending' | 'synced' | 'conflict' | 'unavailable'
+  last_sync_error: string | null
   child_count: string
   message_count: string
   updated_at_ms: string
@@ -388,6 +391,7 @@ function archiveRow(row: ArchiveDbRow): ConversationArchiveRow {
     trashedAt: safeNumber(row.trashed_at_ms, 'trashed time', true),
     purgeAfter: safeNumber(row.purge_after_ms, 'purge time', true),
     syncState: row.sync_state,
+    ...row.last_sync_error === null ? {} : { lastSyncError: row.last_sync_error },
     childCount: safeNumber(row.child_count, 'child count')!,
     messageCount: safeNumber(row.message_count, 'message count')!,
     updatedAt: safeNumber(row.updated_at_ms, 'updated time')!,
@@ -418,7 +422,7 @@ const ARCHIVE_COLUMNS = `a.root_session_id,
   (extract(epoch FROM a.restored_at)*1000)::bigint::text restored_at_ms,
   (extract(epoch FROM a.trashed_at)*1000)::bigint::text trashed_at_ms,
   (extract(epoch FROM a.purge_after)*1000)::bigint::text purge_after_ms,
-  a.sync_state,
+  a.sync_state,a.last_sync_error,
   (SELECT COUNT(*) FROM harness.conversation_sessions child
     WHERE child.organization_id=a.organization_id AND child.root_session_id=a.root_session_id
       AND child.id<>a.root_session_id AND child.status<>'deleted')::text child_count,
@@ -843,7 +847,12 @@ export class ConversationArchiveService {
         workspace_position=EXCLUDED.workspace_position,
         message_count=GREATEST(conversation_archive_records.message_count,EXCLUDED.message_count),
         sync_revision=GREATEST(conversation_archive_records.sync_revision,EXCLUDED.sync_revision),
-        sync_state='synced',last_sync_error=NULL,updated_at=now()
+        sync_state=CASE WHEN EXISTS(SELECT 1 FROM harness.conversation_archive_commands c
+          WHERE c.organization_id=conversation_archive_records.organization_id
+            AND c.root_session_id=conversation_archive_records.root_session_id AND c.status='pending') THEN 'pending'
+          WHEN conversation_archive_records.sync_state='conflict' THEN 'conflict' ELSE 'synced' END,
+        last_sync_error=CASE WHEN conversation_archive_records.sync_state='conflict'
+          THEN conversation_archive_records.last_sync_error ELSE NULL END,updated_at=now()
       WHERE EXCLUDED.sync_revision >= conversation_archive_records.sync_revision`, [
         this.context.organizationId, snapshot.rootSessionId, snapshot.runtime.kind, snapshot.runtime.id,
         project, creator, snapshot.title ?? null, snapshot.workspace?.path ?? null,
@@ -959,39 +968,57 @@ export class ConversationArchiveService {
     return pending.rows.map(row => ({ id: row.id, rootSessionId: row.root_session_id, action: row.action }))
   }
 
+  /**
+   * Check for queued commands without scanning or uploading Session histories.
+   * @param runtime - authenticated runtime kind and public identity.
+   * @returns whether this runtime has an unapplied command.
+   */
+  async hasPendingCommands(runtime: ConversationArchiveRuntimeIdentity): Promise<boolean> {
+    const result = await this.context.pool.query(`SELECT 1 FROM harness.conversation_archive_commands c
+      JOIN harness.conversation_archive_records a
+        ON a.organization_id=c.organization_id AND a.root_session_id=c.root_session_id
+      WHERE c.organization_id=$1 AND a.runtime_kind=$2 AND a.runtime_public_id=$3 AND c.status='pending' LIMIT 1`,
+    [this.context.organizationId, runtime.kind, runtime.id])
+    return result.rows.length > 0
+  }
+
   /** Mark a runtime command applied or failed and update the archive sync state. */
   async acknowledgeCommand(
     commandId: string,
     runtimeRevision: number,
     error?: string,
     caller?: ConversationArchiveRuntimeIdentity,
-  ): Promise<void> {
-    await transaction(this.context.pool, async client => {
+  ): Promise<boolean> {
+    return transaction(this.context.pool, async client => {
       const status = error === undefined ? 'applied' : 'failed'
-      const row = await client.query<{ root_session_id: string; desired_revision: string; status: string }>(`SELECT c.root_session_id,c.desired_revision::text,c.status
-        FROM harness.conversation_archive_commands c
-        LEFT JOIN harness.conversation_archive_records a
+      const owner = await client.query<{ root_session_id: string }>(`SELECT a.root_session_id
+        FROM harness.conversation_archive_records a JOIN harness.conversation_archive_commands c
           ON a.organization_id=c.organization_id AND a.root_session_id=c.root_session_id
         WHERE c.organization_id=$1 AND c.id=$2
-          AND ($3::text IS NULL OR (a.runtime_kind=$3 AND a.runtime_public_id=$4))
-        FOR UPDATE`, [this.context.organizationId, commandId, caller?.kind ?? null, caller?.id ?? null])
+          AND ($3::text IS NULL OR (a.runtime_kind=$3 AND a.runtime_public_id=$4)) FOR UPDATE OF a`,
+      [this.context.organizationId, commandId, caller?.kind ?? null, caller?.id ?? null])
+      if (owner.rows[0] === undefined) return false
+      const row = await client.query<{ root_session_id: string; desired_revision: string; status: string; action: string }>(`SELECT
+        root_session_id,desired_revision::text,status,action FROM harness.conversation_archive_commands
+        WHERE organization_id=$1 AND id=$2 FOR UPDATE`, [this.context.organizationId, commandId])
       const command = row.rows[0]
-      if (command === undefined) return
-      if (command.status !== 'pending') return
+      if (command === undefined) return false
+      if (command.status !== 'pending') return command.status === status
       const desiredRevision = Number(command.desired_revision)
       if (!Number.isSafeInteger(runtimeRevision) || runtimeRevision < 0) throw new Error('invalid runtime archive revision')
       if (!Number.isSafeInteger(desiredRevision) || desiredRevision < 0) {
         throw new Error('stored archive revision is outside the safe integer range')
       }
+      if (error === undefined && command.action === 'purge') await this.purgeStoredTree(client, command.root_session_id)
       await client.query(`UPDATE harness.conversation_archive_commands
         SET status=$2,error=$3,applied_at=CASE WHEN $2='applied' THEN now() ELSE NULL END
         WHERE organization_id=$1 AND id=$4`, [this.context.organizationId, status, error ?? null, commandId])
       const root = command.root_session_id
-      if (root === undefined) return
       await client.query(`UPDATE harness.conversation_archive_records SET sync_revision=GREATEST(sync_revision,$3),
         sync_state=$4,last_sync_error=$5,updated_at=now() WHERE organization_id=$1 AND root_session_id=$2`, [
         this.context.organizationId, root, Math.max(runtimeRevision, desiredRevision), error === undefined ? 'synced' : 'conflict', error ?? null,
       ])
+      return true
     })
   }
 
@@ -1017,6 +1044,8 @@ export class ConversationArchiveService {
       const current = row.rows[0]
       if (current === undefined) return null
       if (current.state === 'purged') throw new Error('archive-already-purged')
+      if (await this.pendingPurge(client, rootSessionId)) throw new Error('archive-purge-pending')
+      await this.supersedeCommands(client, rootSessionId)
       const nextRevision = nextArchiveRevision(current.sync_revision, 'archive sync revision')
       const now = new Date()
       if (state === 'archived') {
@@ -1039,9 +1068,9 @@ export class ConversationArchiveService {
     })
   }
 
-  /** Permanently purge one root tree from PostgreSQL and leave its tombstone. */
+  /** Queue permanent cleanup; durable data remains until its runtime confirms idle resource release. */
   async purge(rootSessionId: string, actorUserId?: number, idempotencyKey?: string): Promise<boolean> {
-    const result = await transaction(this.context.pool, async client => {
+    return transaction(this.context.pool, async client => {
       const actor = actorUserId === undefined ? null : await this.internalUserId(client, actorUserId)
       if (actorUserId !== undefined && actor === null) throw new Error('archive actor not found')
       if (idempotencyKey !== undefined) {
@@ -1049,73 +1078,62 @@ export class ConversationArchiveService {
           FROM harness.conversation_archive_commands
           WHERE organization_id=$1 AND idempotency_key=$2`, [this.context.organizationId, idempotencyKey])
         if (prior.rows[0] !== undefined) {
-          if (prior.rows[0].action !== 'purge' || prior.rows[0].root_session_id !== rootSessionId) {
-            throw new Error('archive-idempotency-key-reused')
-          }
-          return { found: true, paths: [] as string[] }
+          if (prior.rows[0].action !== 'purge' || prior.rows[0].root_session_id !== rootSessionId) throw new Error('archive-idempotency-key-reused')
+          return true
         }
       }
-      const row = await client.query<{ state: ConversationArchiveState; sync_revision: string }>(`SELECT state,sync_revision::text
+      const row = await client.query<{ state: ConversationArchiveState; sync_revision: string; sync_state: string }>(`SELECT state,sync_revision::text,sync_state
         FROM harness.conversation_archive_records WHERE organization_id=$1 AND root_session_id=$2 FOR UPDATE`, [this.context.organizationId, rootSessionId])
       const current = row.rows[0]
-      if (current === undefined) return { found: false, paths: [] as string[] }
-      if (current.state === 'purged') return { found: true, paths: [] as string[] }
+      if (current === undefined) return false
+      if (current.state === 'purged' && current.sync_state === 'synced') return true
+      if (await this.pendingPurge(client, rootSessionId)) return true
       const nextRevision = nextArchiveRevision(current.sync_revision, 'archive sync revision')
-      const files = await client.query<{ local_path: string }>(`SELECT DISTINCT f.local_path
-        FROM harness.content_files f JOIN harness.conversation_sessions s
-          ON s.id=f.session_id AND s.organization_id=f.organization_id
-        WHERE f.organization_id=$1 AND s.root_session_id=$2`, [this.context.organizationId, rootSessionId])
-      const paths = [...new Set(files.rows.map(row => row.local_path))]
-      await this.enqueueFileCleanup(client, rootSessionId, paths)
-      await client.query(`DELETE FROM harness.content_files WHERE organization_id=$1 AND session_id IN
-        (SELECT id FROM harness.conversation_sessions WHERE organization_id=$1 AND root_session_id=$2)`, [this.context.organizationId, rootSessionId])
-      await client.query(`DELETE FROM harness.conversation_events WHERE session_id IN
-        (SELECT id FROM harness.conversation_sessions WHERE organization_id=$1 AND root_session_id=$2)`, [this.context.organizationId, rootSessionId])
-      await client.query(`DELETE FROM harness.conversation_search WHERE session_id IN
-        (SELECT id FROM harness.conversation_sessions WHERE organization_id=$1 AND root_session_id=$2)`, [this.context.organizationId, rootSessionId])
-      await client.query(`DELETE FROM harness.conversation_sessions
-        WHERE organization_id=$1 AND root_session_id=$2`, [this.context.organizationId, rootSessionId])
-      await client.query(`DELETE FROM harness.conversation_archive_search WHERE organization_id=$1 AND root_session_id=$2`, [this.context.organizationId, rootSessionId])
-      await client.query(`UPDATE harness.conversation_archive_records SET state='purged',purge_after=NULL,
-        sync_revision=$3,sync_state='pending',updated_at=now() WHERE organization_id=$1 AND root_session_id=$2`, [this.context.organizationId, rootSessionId, nextRevision])
+      await this.supersedeCommands(client, rootSessionId)
+      await client.query(`UPDATE harness.conversation_archive_records SET sync_revision=$3,sync_state='pending',last_sync_error=NULL,updated_at=now()
+        WHERE organization_id=$1 AND root_session_id=$2`, [this.context.organizationId, rootSessionId, nextRevision])
       await client.query(`INSERT INTO harness.conversation_archive_commands(
         organization_id,root_session_id,action,requested_by_user_id,desired_revision,idempotency_key
-      ) VALUES($1,$2,'purge',$3,$4,$5) ON CONFLICT (organization_id,idempotency_key) DO NOTHING`, [
-        this.context.organizationId, rootSessionId, actor, nextRevision, idempotencyKey ?? null,
-      ])
-      return { found: true, paths }
+      ) VALUES($1,$2,'purge',$3,$4,$5)`, [this.context.organizationId, rootSessionId, actor, nextRevision, idempotencyKey ?? null])
+      return true
     })
-    if (!result.found) return false
-    if (result.paths.length > 0) {
-      try {
-        let claimed: ArchiveFileCleanupDbRow[] = []
-        try {
-          claimed = await this.claimFileCleanupRows(rootSessionId, Math.min(result.paths.length, ARCHIVE_FILE_CLEANUP_BATCH_SIZE))
-        } catch {
-          // A test double or a rolling migration may not expose the cleanup
-          // ledger; preserve the database purge and use the safe direct path
-          // operation as a compatibility fallback.
-        }
-        if (claimed.length > 0) {
-          await this.processFileCleanupRows(claimed)
-        } else {
-          for (const path of result.paths.slice(0, ARCHIVE_FILE_CLEANUP_BATCH_SIZE)) {
-            // The durable ledger is authoritative when present. A direct
-            // fallback is intentionally best effort and still performs the
-            // database-reference check before unlinking.
-            await this.cleanupFilePath(path)
-          }
-        }
-      } catch {
-        // The database purge has already committed. A cleanup/readback fault
-        // leaves the leased ledger task for the next maintenance sweep and
-        // must not report the completed purge as a failed mutation.
-      }
-    }
-    return true
   }
 
-  /** Purge trash records whose configured recovery window has elapsed. */
+  private async pendingPurge(client: PoolClient, rootSessionId: string): Promise<boolean> {
+    const result = await client.query(`SELECT 1 FROM harness.conversation_archive_commands
+      WHERE organization_id=$1 AND root_session_id=$2 AND action='purge' AND status='pending' LIMIT 1`,
+    [this.context.organizationId, rootSessionId])
+    return result.rows.length > 0
+  }
+
+  private async supersedeCommands(client: PoolClient, rootSessionId: string): Promise<void> {
+    await client.query(`UPDATE harness.conversation_archive_commands SET status='failed',error='superseded by a newer archive request'
+      WHERE organization_id=$1 AND root_session_id=$2 AND status='pending'`, [this.context.organizationId, rootSessionId])
+  }
+
+  private async purgeStoredTree(client: PoolClient, rootSessionId: string): Promise<void> {
+    const files = await client.query<{ local_path: string }>(`SELECT DISTINCT f.local_path
+      FROM harness.content_files f JOIN harness.conversation_sessions s
+        ON s.id=f.session_id AND s.organization_id=f.organization_id
+      WHERE f.organization_id=$1 AND s.root_session_id=$2`, [this.context.organizationId, rootSessionId])
+    const paths = [...new Set(files.rows.map(row => row.local_path))]
+    await this.enqueueFileCleanup(client, rootSessionId, paths)
+    await client.query(`DELETE FROM harness.content_files WHERE organization_id=$1 AND session_id IN
+      (SELECT id FROM harness.conversation_sessions WHERE organization_id=$1 AND root_session_id=$2)`, [this.context.organizationId, rootSessionId])
+    await client.query(`DELETE FROM harness.conversation_events WHERE session_id IN
+      (SELECT id FROM harness.conversation_sessions WHERE organization_id=$1 AND root_session_id=$2)`, [this.context.organizationId, rootSessionId])
+    await client.query(`DELETE FROM harness.conversation_search WHERE session_id IN
+      (SELECT id FROM harness.conversation_sessions WHERE organization_id=$1 AND root_session_id=$2)`, [this.context.organizationId, rootSessionId])
+    await client.query(`DELETE FROM harness.conversation_draft_reservations WHERE organization_id=$1 AND session_id IN
+      (SELECT id FROM harness.conversation_sessions WHERE organization_id=$1 AND root_session_id=$2)`, [this.context.organizationId, rootSessionId])
+    await client.query(`DELETE FROM harness.conversation_sessions
+      WHERE organization_id=$1 AND root_session_id=$2`, [this.context.organizationId, rootSessionId])
+    await client.query(`DELETE FROM harness.conversation_archive_search WHERE organization_id=$1 AND root_session_id=$2`, [this.context.organizationId, rootSessionId])
+    await client.query(`UPDATE harness.conversation_archive_records SET state='purged',purge_after=NULL,updated_at=now()
+      WHERE organization_id=$1 AND root_session_id=$2`, [this.context.organizationId, rootSessionId])
+  }
+
+  /** Queue cleanup for trash whose recovery window elapsed; runtimes must confirm resource release. */
   async purgeDue(limit = 50): Promise<number> {
     const due = await this.context.pool.query<{ root_session_id: string }>(`SELECT root_session_id
       FROM harness.conversation_archive_records
@@ -1166,7 +1184,18 @@ export class ConversationArchiveService {
     }
   }
 
+  /** Read archive operation metadata without loading a transcript or contacting its runtime. */
+  async status(rootSessionId: string): Promise<ConversationArchiveRow | null> {
+    return this.findRecord(this.context.pool, rootSessionId)
+  }
+
   private async detailForClient(client: PoolClient, rootSessionId: string): Promise<ConversationArchiveRow> {
+    const row = await this.findRecord(client, rootSessionId)
+    if (row === null) throw new Error('archive record disappeared')
+    return row
+  }
+
+  private async findRecord(client: Pool | PoolClient, rootSessionId: string): Promise<ConversationArchiveRow | null> {
     const result = await client.query<ArchiveDbRow>(`SELECT ${ARCHIVE_COLUMNS}
       FROM harness.conversation_archive_records a
       LEFT JOIN harness.conversation_sessions r ON r.organization_id=a.organization_id AND r.id=a.root_session_id
@@ -1174,8 +1203,7 @@ export class ConversationArchiveService {
       LEFT JOIN harness.projects project ON project.organization_id=a.organization_id AND project.id=COALESCE(a.project_id,r.project_id)
       WHERE a.organization_id=$1 AND a.root_session_id=$2`, [this.context.organizationId, rootSessionId])
     const row = result.rows[0]
-    if (row === undefined) throw new Error('archive record disappeared')
-    return archiveRow(row)
+    return row === undefined ? null : archiveRow(row)
   }
 
   private async internalUserId(client: Pool | PoolClient, publicId: number): Promise<string | null> {

@@ -105,6 +105,8 @@ Snapshots are fresh read-only projections. `ownerSession` carries the shared `Se
  * a fresh object per call, never live registry state.
  */
 interface JobSnapshot {
+  /** Origin retained for completion input; never a current authorization grant. */
+  executionScope?: ExecutionInheritance
   /** The registry-issued id (`<kind>-N`). */
   id: JobId
   /** The producer kind the job was registered with. */

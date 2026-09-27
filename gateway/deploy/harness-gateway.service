@@ -13,6 +13,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/srv/harness/gateway
+EnvironmentFile=-/srv/harness/gateway-data/node-launch.env
 Environment=HGW_PORT=8899
 Environment=HGW_PUBLIC_ORIGINS=https://harness.maycran.com
 Environment=HGW_DATABASE_URL_FILE=/srv/harness/gateway-data/database-url

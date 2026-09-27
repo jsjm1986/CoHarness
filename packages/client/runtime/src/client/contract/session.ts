@@ -55,7 +55,7 @@ export interface ProjectionsFace {
 
 /** Identity plus the behavior verbs features may invoke on a session. */
 export interface ISession {
-  /** The session's host identity (agent id — same axis). */
+  /** Browser resource identity; pooled Sessions qualify the original Host ID with its runtime. */
   readonly sessionId: SessionId
   /** Host-computed projection values by key (the useProjection seat). */
   readonly projections: ProjectionsFace

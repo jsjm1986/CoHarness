@@ -1,7 +1,8 @@
+import type { ExecutionInheritance, ExecutionInputId, ExecutionScopeId } from '@deepseek-ai/dsh-execution-authority'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentCarrier } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { bindScopeParent, createScope, scopeOf } from '@deepseek-ai/dsh-scope'
 import type { ScopeKey } from '@deepseek-ai/dsh-scope'
@@ -113,6 +114,45 @@ function waitResolverCount(ctx: Context, id: JobId): number {
 }
 
 describe('LocalJobRegistry.start', () => {
+  it('blocks idle removal for running and stopping work, then closes admission during removal', async () => {
+    const ctx = await harness(), owner = stubAgent(ctx, 'purge-job-owner'), other = stubAgent(ctx, 'other-job-owner')
+    await ctx.agents.register(owner)
+    await ctx.agents.register(other)
+    const task = producer({ owner }), id = ctx.jobs.start(task.spec)
+    try {
+      expect(ctx.bail(agentCarrier(owner), 'agent/idle-release-check', { agent: owner })).toBe('busy')
+      expect(ctx.bail(agentCarrier(other), 'agent/idle-release-check', { agent: other })).toBeUndefined()
+      ctx.jobs.kill(id, owner)
+      expect(ctx.bail(agentCarrier(owner), 'agent/idle-release-check', { agent: owner })).toBe('busy')
+      task.settle({ status: 'killed' })
+      await tick()
+      expect(ctx.bail(agentCarrier(owner), 'agent/idle-release-check', { agent: owner })).toBeUndefined()
+      using _removal = ctx.agents.reserveRemoval([owner.id])
+      expect(() => ctx.jobs.start(producer({ owner }).spec)).toThrow()
+    } finally { task.settle({ status: 'killed' }); await ctx.fiber.dispose() }
+  })
+
+  it('retains the originating execution scope after another request becomes current', async () => {
+    const ctx = await harness(), owner = stubAgent(ctx, 'job-scope')
+    await ctx.agents.register(owner)
+    const scope: ExecutionInheritance = Object.freeze({ parentSessionId: owner.id,
+      scopeId: '10000000-0000-4000-8000-000000000001' as ExecutionScopeId,
+      inputs: Object.freeze(['00000000-0000-4000-8000-000000000001' as ExecutionInputId]),
+      primaryActorUserId: 1, unverifiedHistory: false })
+    let current = scope
+    ctx.provide('executionAuthority', { capture: () => current } as never)
+    const task = producer({ owner }), id = ctx.jobs.start(task.spec)
+    try {
+      current = { ...scope, primaryActorUserId: 2 }
+      expect(ctx.jobs.get(id, owner).executionScope).toEqual(scope)
+      const done = vi.fn()
+      ctx.jobs.onJobDone(done)
+      task.settle({ status: 'completed', output: 'original work' })
+      await ctx.jobs.wait(id, 1000, owner)
+      expect(done).toHaveBeenCalledWith(expect.objectContaining({ executionScope: scope }), owner)
+    } finally { task.settle({ status: 'killed' }); await ctx.fiber.dispose() }
+  })
+
   it('preserves the SessionId brand on public owner snapshots', () => {
     expectTypeOf<JobSnapshot['ownerSession']>().toEqualTypeOf<SessionId | undefined>()
   })
@@ -1021,18 +1061,23 @@ describe('LocalJobRegistry disposal', () => {
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(LocalJobRegistry)
     const standing = createScope(ctx, {})
+    const completed = vi.fn()
     // One mount contributes both kinds into the same layer, as `tool-jobs`
     // does; unloading it must leave nothing serving the agents that joined it.
     const mount = await standing.ctx.plugin({
       inject: ['jobs'],
       apply(pluginCtx: Context) {
         pluginCtx.jobs.attachController('tool-jobs')
-        pluginCtx.jobs.onJobDone(() => {})
+        pluginCtx.jobs.onJobDone(completed)
       },
     })
     const owner = stubAgent(ctx, 'joined', scopeOf(standing.ctx))
     await ctx.agents.register(owner)
-    expect(() => ctx.jobs.start(producer({ owner }).spec)).not.toThrow()
+    const task = producer({ owner })
+    ctx.jobs.start(task.spec)
+    task.settle({ status: 'completed' })
+    await tick()
+    expect(completed).toHaveBeenCalledOnce()
 
     await mount.dispose()
 

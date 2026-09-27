@@ -805,7 +805,7 @@ describe('Remote Agent and Session lookup policy', () => {
       } as unknown as Agent
       sessionBackedInbox(resumedAgent)
       await ctx.agents.register(resumedAgent)
-      return { agent: resumedAgent, dispose: () => Promise.resolve() }
+      return { agent: resumedAgent, dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
     })
     const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
 
@@ -845,7 +845,8 @@ describe('Remote Agent and Session lookup policy', () => {
     const release = Promise.withResolvers<undefined>()
     const resume = vi.spyOn(ctx.agents, 'resume').mockImplementation(async () => {
       await release.promise
-      return { agent: resumedAgent, dispose: () => Promise.resolve() }
+      await ctx.agents.register(resumedAgent)
+      return { agent: resumedAgent, dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
     })
     const defaultAgentLookup = ctx.typert.lookups.get('agent')
     const defaultSessionLookup = ctx.typert.lookups.get('session')
@@ -866,6 +867,7 @@ describe('Remote Agent and Session lookup policy', () => {
     await expect(resolvedAgent).resolves.toBe(resumedAgent)
     await expect(resolvedSession).resolves.toBe(resumedSession)
     expect(inspect).toHaveBeenCalledOnce()
+    await ctx.fiber.dispose()
   })
 
   it('preserves the subagent ownership fence for cold and live Remote lookups', async () => {

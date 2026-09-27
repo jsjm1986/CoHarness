@@ -12,8 +12,13 @@ const admission = z.union([grant, z.object({ status: z.literal('queued'), queueI
 const heartbeat = z.object({ status: z.enum(['held', 'stopping', 'lost']) })
 type Grant = z.infer<typeof grant>
 
+/** Lease loss applies to the shared resource even when the caller changes. */
+class DesktopLeaseLostError extends Error {}
+
 /** Deployment-owned transport and live ownership, independent of browser request assertions. */
 export interface DesktopExecutionHost {
+  /** Capture caller execution, or the root projection after its driver call ends. */
+  bind?(agent: Agent, source: 'caller' | 'root'): <T>(operation: () => Promise<T>) => Promise<T>
   /** Resolve the actual root; a historical Session parent is insufficient. */
   root(agent: Agent): Agent
   /** Recheck qualification, confirmation and runtime liveness for the exact caller. */
@@ -27,6 +32,8 @@ export interface DesktopExecutionHost {
 interface Workflow {
   root: Agent
   actor: Agent
+  binding: <T>(operation: () => Promise<T>) => Promise<T>
+  actorGeneration: number
   requestId: string
   controller: AbortController
   watch: AbortController
@@ -62,13 +69,15 @@ export class GatewayDesktopPolicy implements ComputerUseAuthorization {
     if (this.stopped || execution.agent === undefined) throw new Error('Desktop execution policy is unavailable.')
     execution.signal.throwIfAborted()
     const actor = execution.agent, root = this.host.root(actor)
+    const binding = this.bind(actor, 'caller')
     let workflow = this.workflows.get(root)
     if (workflow?.closing !== undefined) {
       await workflow.closing
-      return this.run(execution, operation)
+      return binding(() => this.run(execution, operation))
     }
     if (workflow === undefined) {
-      workflow = { root, actor, requestId: randomUUID(), controller: new AbortController(), watch: new AbortController(),
+      workflow = { root, actor, binding, actorGeneration: 0, requestId: randomUUID(),
+        controller: new AbortController(), watch: new AbortController(),
         tail: Promise.resolve(), monitor: Promise.resolve(), pending: 0, insideDriver: false, uncertain: false, requested: false }
       this.workflows.set(root, workflow)
     }
@@ -78,18 +87,20 @@ export class GatewayDesktopPolicy implements ComputerUseAuthorization {
       const signal = AbortSignal.any([execution.signal, current.controller.signal])
       signal.throwIfAborted()
       current.actor = actor
-      await this.host.authorize(actor, signal)
+      current.binding = binding
+      current.actorGeneration++
+      await binding(() => this.host.authorize(actor, signal))
       if (this.host.root(actor) !== root) throw new Error('Desktop runtime ownership changed.')
       if (current.grant === undefined) await this.acquire(current, signal)
-      await this.checkLease(current, actor, signal)
+      await binding(() => this.checkLease(current, actor, signal))
       signal.throwIfAborted()
       if (this.host.root(actor) !== root) throw new Error('Desktop runtime ownership changed.')
       current.insideDriver = true
       try {
         const result = await operation(signal)
         signal.throwIfAborted()
-        await this.host.authorize(actor, signal)
-        await this.checkLease(current, actor, signal)
+        await binding(() => this.host.authorize(actor, signal))
+        await binding(() => this.checkLease(current, actor, signal))
         signal.throwIfAborted()
         return result
       } catch (error) {
@@ -99,6 +110,8 @@ export class GatewayDesktopPolicy implements ComputerUseAuthorization {
       } finally {
         current.insideDriver = false
         current.actor = root
+        current.binding = this.bind(root, 'root')
+        current.actorGeneration++
       }
     }).catch((error: unknown) => { current.controller.abort(error); throw error })
     current.tail = work.then(() => undefined, () => undefined)
@@ -128,13 +141,17 @@ export class GatewayDesktopPolicy implements ComputerUseAuthorization {
     await Promise.all(workflows.map(async (workflow) => { await workflow.tail; await this.close(workflow) }))
   }
 
+  private bind(agent: Agent, source: 'caller' | 'root'): <T>(operation: () => Promise<T>) => Promise<T> {
+    return this.host.bind?.(agent, source) ?? (operation => operation())
+  }
+
   private async acquire(workflow: Workflow, signal: AbortSignal): Promise<void> {
     workflow.requested = true
-    let response = admission.parse(await this.host.request(workflow.actor, 'acquire', { requestId: workflow.requestId }, signal))
+    let response = admission.parse(await workflow.binding(() => this.host.request(workflow.actor, 'acquire', { requestId: workflow.requestId }, signal)))
     while (response.status === 'queued') {
       await delay(this.pollMs, undefined, { signal })
-      await this.host.authorize(workflow.actor, signal)
-      response = admission.parse(await this.host.request(workflow.actor, 'status', { requestId: workflow.requestId }, signal))
+      await workflow.binding(() => this.host.authorize(workflow.actor, signal))
+      response = admission.parse(await workflow.binding(() => this.host.request(workflow.actor, 'status', { requestId: workflow.requestId }, signal)))
     }
     workflow.grant = response
     workflow.monitor = this.renew(workflow)
@@ -150,8 +167,15 @@ export class GatewayDesktopPolicy implements ComputerUseAuthorization {
       while (!signal.aborted) {
         await delay(interval, undefined, { signal })
         const deadline = AbortSignal.any([signal, AbortSignal.timeout(interval)])
-        await this.host.authorize(workflow.actor, deadline)
-        await this.checkLease(workflow, workflow.actor, deadline)
+        const generation = workflow.actorGeneration, actor = workflow.actor, binding = workflow.binding
+        try {
+          await binding(() => this.host.authorize(actor, deadline))
+          if (generation !== workflow.actorGeneration) continue
+          await binding(() => this.checkLease(workflow, actor, deadline))
+        } catch (error) {
+          if (generation !== workflow.actorGeneration && !(error instanceof DesktopLeaseLostError)) continue
+          throw error
+        }
       }
     } catch (error) {
       if (workflow.watch.signal.aborted) return
@@ -166,7 +190,7 @@ export class GatewayDesktopPolicy implements ComputerUseAuthorization {
     if (grantId === undefined) throw new Error('Desktop lease is not held.')
     const result = heartbeat.parse(await this.host.request(actor, 'heartbeat', { grantId }, signal))
     signal.throwIfAborted()
-    if (result.status !== 'held') throw new Error('Desktop lease is stopping or lost.')
+    if (result.status !== 'held') throw new DesktopLeaseLostError('Desktop lease is stopping or lost.')
   }
 
   private close(workflow: Workflow): Promise<void> {

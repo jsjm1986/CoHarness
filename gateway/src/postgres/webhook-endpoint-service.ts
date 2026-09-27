@@ -29,6 +29,8 @@ export interface WebhookEndpointView {
   executionUserId: number
   runtimeKind: 'user' | 'project'
   runtimePublicId: number
+  /** Visibility of project roots; personal targets remain personal. */
+  projectVisibility: 'project' | 'private'
   intakeLimit: number
   intakeWindowMs: number
   replayWindowMs: number
@@ -58,6 +60,8 @@ export interface WebhookIntakeConfig {
   executionUserId: number
   runtimeKind: 'user' | 'project'
   runtimePublicId: number
+  /** Visibility of project roots; personal targets remain personal. */
+  projectVisibility: 'project' | 'private'
   intakeLimit: number
   intakeWindowMs: number
   replayWindowMs: number
@@ -133,6 +137,7 @@ const fields = z.object({
   executionUserId: z.number().int().positive(),
   runtimeKind: z.enum(['user', 'project']),
   runtimePublicId: z.number().int().positive(),
+  projectVisibility: z.enum(['project', 'private']).default('project'),
   intakeLimit: z.number().int().min(1).max(1_000_000),
   intakeWindowMs: z.number().int().min(1).max(86_400_000),
   replayWindowMs: z.number().int().min(1).max(REPLAY_WINDOW_LIMIT_MS),
@@ -167,6 +172,7 @@ interface EndpointRow {
   execution_user_public_id: string
   runtime_kind: 'user' | 'project'
   runtime_public_id: string
+  project_visibility: 'project' | 'private'
   intake_limit: number
   intake_window_ms: string
   replay_window_ms: string
@@ -182,7 +188,7 @@ interface EndpointRow {
 const columns = `e.id,e.public_id::text,e.name,e.provider,e.source,e.events,e.actions,e.repositories,
   e.title_template,e.prompt_template,e.workspace_path,e.agent_preset,e.permission_preset,
   e.model_provider,e.model_id,e.model_max_tokens,e.execution_user_id,u.public_id::text execution_user_public_id,
-  e.runtime_kind,e.runtime_public_id::text,e.intake_limit,e.intake_window_ms::text,e.replay_window_ms::text,
+  e.runtime_kind,e.runtime_public_id::text,e.project_visibility,e.intake_limit,e.intake_window_ms::text,e.replay_window_ms::text,
   e.max_body_bytes,e.key_version,e.nonce,e.ciphertext,e.auth_tag,e.enabled,e.revision::text`
 const from = `FROM harness.webhook_endpoints e
   JOIN harness.users u ON u.organization_id=e.organization_id AND u.id=e.execution_user_id`
@@ -197,6 +203,7 @@ function view(row: EndpointRow): WebhookEndpointView {
     modelProvider: row.model_provider, modelId: row.model_id, modelMaxTokens: row.model_max_tokens,
     executionUserId: Number(row.execution_user_public_id),
     runtimeKind: row.runtime_kind, runtimePublicId: Number(row.runtime_public_id),
+    projectVisibility: row.project_visibility,
     intakeLimit: row.intake_limit, intakeWindowMs: Number(row.intake_window_ms),
     replayWindowMs: Number(row.replay_window_ms), maxBodyBytes: row.max_body_bytes,
     enabled: row.enabled, revision: row.revision,
@@ -212,6 +219,7 @@ function intake(row: EndpointRow, secret: string): WebhookIntakeConfig {
     modelProvider: row.model_provider, modelId: row.model_id, modelMaxTokens: row.model_max_tokens,
     executionUserUuid: row.execution_user_id, executionUserId: Number(row.execution_user_public_id),
     runtimeKind: row.runtime_kind, runtimePublicId: Number(row.runtime_public_id),
+    projectVisibility: row.project_visibility,
     intakeLimit: row.intake_limit, intakeWindowMs: Number(row.intake_window_ms),
     replayWindowMs: Number(row.replay_window_ms), maxBodyBytes: row.max_body_bytes,
     revision: row.revision, secret,
@@ -271,8 +279,8 @@ export class PostgresWebhookEndpointService {
         (id,organization_id,name,provider,source,events,actions,repositories,title_template,prompt_template,workspace_path,
           agent_preset,permission_preset,model_provider,model_id,model_max_tokens,execution_user_id,
           runtime_kind,runtime_public_id,intake_limit,intake_window_ms,replay_window_ms,max_body_bytes,
-          key_version,nonce,ciphertext,auth_tag,created_by)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
+          key_version,nonce,ciphertext,auth_tag,created_by,project_visibility)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
         RETURNING public_id::text`,
       [id, this.context.organizationId, value.name, value.provider, value.source, value.events, value.actions,
         value.repositories, value.titleTemplate, value.promptTemplate, value.workspacePath, value.agentPreset,
@@ -280,7 +288,7 @@ export class PostgresWebhookEndpointService {
         value.modelProvider ?? null, value.modelId ?? null, value.modelMaxTokens ?? null, user.rows[0].id,
         value.runtimeKind, value.runtimePublicId, value.intakeLimit, value.intakeWindowMs, value.replayWindowMs,
         value.maxBodyBytes, secret.keyVersion, secret.nonce, secret.ciphertext, secret.authTag,
-        admin.rows[0]?.id ?? null])
+        admin.rows[0]?.id ?? null, value.projectVisibility])
       const created = await client.query<EndpointRow>(
         `SELECT ${columns} ${from} WHERE e.organization_id=$1 AND e.public_id=$2`,
         [this.context.organizationId, inserted.rows[0]!.public_id])
@@ -323,7 +331,7 @@ export class PostgresWebhookEndpointService {
         replay_window_ms=$22,max_body_bytes=$23,
         key_version=COALESCE($24,key_version),nonce=COALESCE($25,nonce),
         ciphertext=COALESCE($26,ciphertext),auth_tag=COALESCE($27,auth_tag),
-        revision=revision+1,updated_at=clock_timestamp()
+        project_visibility=$28,revision=revision+1,updated_at=clock_timestamp()
         WHERE organization_id=$1 AND public_id=$2`,
       [this.context.organizationId, targetId, value.name, value.provider, value.source, value.events,
         value.actions, value.repositories, value.titleTemplate, value.promptTemplate, value.workspacePath,
@@ -331,7 +339,7 @@ export class PostgresWebhookEndpointService {
         value.permissionPreset, value.modelProvider ?? null, value.modelId ?? null, value.modelMaxTokens ?? null,
         user.rows[0].id, value.runtimeKind, value.runtimePublicId, value.intakeLimit, value.intakeWindowMs,
         value.replayWindowMs, value.maxBodyBytes,
-        rotated?.keyVersion ?? null, rotated?.nonce ?? null, rotated?.ciphertext ?? null, rotated?.authTag ?? null])
+        rotated?.keyVersion ?? null, rotated?.nonce ?? null, rotated?.ciphertext ?? null, rotated?.authTag ?? null, value.projectVisibility])
       const updated = await client.query<EndpointRow>(
         `SELECT ${columns} ${from} WHERE e.organization_id=$1 AND e.public_id=$2`,
         [this.context.organizationId, targetId])

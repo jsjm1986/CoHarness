@@ -9,14 +9,38 @@
     "rewriteRelativeImportExtensions": true,
     "tsBuildInfoFile": "./lib/tsconfig.tsbuildinfo",
     "paths": {
-      "@deepseek-ai/dsh-brand": ["../packages/util/brand/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-llm/discovery": ["../packages/llm/llm/lib/types/discovery.d.ts"],
-      "@deepseek-ai/dsh-session-format": ["../packages/session/session-format/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-session-format-catalog": ["../packages/session/session-format-catalog/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-session-format/surface": ["../packages/session/session-format/lib/types/surface.d.ts"],
-      "@deepseek-ai/dsh-util-values": ["../packages/util/values/lib/types/index.d.ts"]
+      "@deepseek-ai/dsh-brand": [
+        "../packages/util/brand/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-llm/discovery": [
+        "../packages/llm/llm/lib/types/discovery.d.ts"
+      ],
+      "@deepseek-ai/dsh-session-format": [
+        "../packages/session/session-format/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-session-format-catalog": [
+        "../packages/session/session-format-catalog/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-session-format/surface": [
+        "../packages/session/session-format/lib/types/surface.d.ts"
+      ],
+      "@deepseek-ai/dsh-util-values": [
+        "../packages/util/values/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-managed-data": [
+        "../packages/util/managed-data/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-atomic-write": [
+        "../packages/util/atomic-write/lib/types/index.d.ts"
+      ]
     }
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["tests", "scripts", "src/workspace-modules.d.ts"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "tests",
+    "scripts",
+    "src/workspace-modules.d.ts"
+  ]
 }

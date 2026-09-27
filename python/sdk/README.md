@@ -24,7 +24,7 @@ with DeepSeekHarness(dsh_home="./.harness") as harness:
 
 `DeepSeekHarness` keeps its lazily started runtime subprocess for reuse across calls. Use it as a context manager, as above, or call `close()` explicitly when finished.
 
-The SDK launches the bundled `dsh` executable with the `sdk` runtime profile. Set `dsh_home` or a nonempty `DSH_HOME` explicitly; the SDK does not choose a personal home implicitly. Use `profile` and ordered `patches` to configure the shipped application. The selected profile must provide stdio JSON-RPC and its required services.
+The SDK launches the bundled `dsh` executable with the `sdk` runtime profile. Set `dsh_home` or a nonempty `DSH_HOME` explicitly; the SDK does not choose a personal home implicitly. Use `profile` and ordered `patches` to configure the shipped application. The selected profile must provide stdio JSON-RPC and its required services. An independent home removes an inherited `DSH_MANAGED_DATA_MANIFEST`; a same-home launch retains it. To register the child's data for backup, pass its own inventory explicitly through `HarnessConfig.env`, which overlays the inherited environment.
 
 ```py
 from deepseek_harness import DeepSeekHarness

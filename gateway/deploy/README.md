@@ -166,4 +166,6 @@ Gateway startup waits with bounded exponential backoff when PostgreSQL is tempor
 
 ## Upgrades and backup
 
+[Current-node configuration](node-configuration/README.md) covers administrator settings, the independent configuration worker and local recovery. Saving and applying are separate actions.
+
 Upgrade dsh: `npm install -g @deepseek-ai/dsh@<next>` on Linux staging, run both acceptance scripts plus the collaboration smoke, then roll production runtimes one by one (`systemctl restart harness-<user>` / `systemctl restart harness-project-<id>`, or let idle runtimes pick the new binary on next access). Linux Gateway upgrades replace `/srv/harness/gateway`, apply PostgreSQL migrations, then restart `harness-gateway`; a protocol/package change also requires rolling runtime restarts. macOS release deployments use the controller above so Gateway and local runtimes always come from one immutable directory. Database: install `deploy/postgres/backup-postgres.sh` under cron, retain its restore-checked dumps, and copy successful dumps to a second machine or NAS.

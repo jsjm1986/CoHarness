@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import Database from 'better-sqlite3'
 
-export const SCHEMA_VERSION = 8
+export const SCHEMA_VERSION = 9
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS instances (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   port INTEGER NOT NULL UNIQUE,
   state TEXT NOT NULL DEFAULT 'stopped' CHECK (state IN ('stopped','starting','ready','stopping')),
+  stop_reason TEXT CHECK (stop_reason IN ('manual','idle','shutdown','failed','access-change')),
   pid INTEGER,
   started_at INTEGER,
   last_activity_at INTEGER
@@ -319,6 +320,12 @@ function migrate(db: Database.Database): void {
     }
     if (!userColumns.has('deleted_at')) {
       db.exec('ALTER TABLE users ADD COLUMN deleted_at INTEGER')
+    }
+
+    if (!columnNames(db, 'instances').has('stop_reason')) {
+      db.exec(`ALTER TABLE instances ADD COLUMN stop_reason TEXT
+        CHECK (stop_reason IN ('manual','idle','shutdown','failed','access-change'))`)
+      db.exec("UPDATE instances SET stop_reason='manual' WHERE state IN ('stopped','stopping')")
     }
 
     db.exec('DELETE FROM schema_meta')

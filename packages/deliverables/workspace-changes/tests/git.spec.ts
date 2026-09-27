@@ -6,6 +6,7 @@ import { Context } from '@deepseek-ai/cordis'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { GitRunner, blobText, diffTrees, ignoredPaths, locateGitWorkspace, snapshotTree, treeBlob } from '../src/git.ts'
 import { TurnRecorder } from '../src/recorder.ts'
+import { ReviewStore } from '../src/review-store.ts'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { git, scratchDir, startTurn, toolCall } from './support.ts'
 
@@ -175,7 +176,7 @@ describe('TurnRecorder', () => {
     let release!: (runner: GitRunner | null) => void
     const gate = new Promise<GitRunner | null>((resolve) => { release = resolve })
     const tempRoot = await scratchDir('dsh-git-store-', cleanups)
-    const env = { git: gate, tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100, warn: (m: string) => { warnings.push(m) } }
+    const env = { reviewStore: new ReviewStore(join(tempRoot, 'reviews'), 1_000_000), git: gate, tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100, warn: (m: string) => { warnings.push(m) } }
     const disposed = new TurnRecorder(session, cwd, env)
     disposed.start(1)
     await new Promise(resolve => setTimeout(resolve, 5))
@@ -190,7 +191,7 @@ describe('TurnRecorder', () => {
     const { git: missing } = await runner(undefined, '/nonexistent/git-binary')
     const failing = new TurnRecorder(session, cwd, { ...env, git: Promise.resolve(missing) })
     failing.start(1)
-    await failing.settled()
+    await expect(failing.settled()).rejects.toThrow('Historical review storage failed')
     expect(warnings).toHaveLength(1)
     expect(warnings[0]).toContain('workspace-changes:')
   })
@@ -199,6 +200,7 @@ describe('TurnRecorder', () => {
     const tempRoot = await scratchDir('dsh-git-store-', cleanups)
     const { ctx, git: runnerGit } = await runner()
     const env = {
+      reviewStore: new ReviewStore(join(tempRoot, 'reviews'), 1_000_000),
       git: Promise.resolve(runnerGit), tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100,
       warn: (m: string) => { throw new Error(m) },
     }
@@ -218,6 +220,37 @@ describe('TurnRecorder', () => {
     expect(await readdir(tempRoot)).toEqual([])
   })
 
+  it('ignores pre-start capture and keeps publication failure blocked when the Session log is unavailable', async () => {
+    const root = await scratchDir('dsh-review-closed-log-', cleanups)
+    const { ctx } = await runner()
+    const session = ctx.sessions.create(SessionId('closed-log'), { meta: { cwd: root } })
+    const warn = vi.fn()
+    const recorder = new TurnRecorder(session, root, {
+      reviewStore: new ReviewStore(join(root, 'reviews'), 1_000_000), git: Promise.resolve(null),
+      tempRoot: root, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100, warn,
+    })
+    recorder.capture('write', { file_path: 'file.txt', content: 'x' })
+    await recorder.settled()
+    recorder.start(1)
+    await recorder.settled()
+    const append = vi.spyOn(session, 'append').mockImplementation(() => { throw new Error('Session log unavailable') })
+    recorder.failStorage(1, new Error('Storage write failed'))
+    expect(warn.mock.calls.flat().join(' ')).toContain('Session log unavailable')
+    await expect(recorder.settled()).rejects.toThrow('storage failed')
+    append.mockRestore()
+    recorder.start(2)
+    await recorder.settled()
+    let disposed: Promise<void> | undefined
+    const off = ctx.on('session/event', (_, event) => {
+      if (event.type === 'workspace/changes') disposed = recorder.dispose()
+    })
+    warn.mockClear()
+    recorder.failStorage(2, new Error('late failure'))
+    await disposed
+    off()
+    expect(warn).not.toHaveBeenCalled()
+  })
+
   it('keeps its own directory out of the snapshots when the temporary root lies inside the work tree', async () => {
     const cwd = await scratchDir('dsh-recorder-tmp-in-tree-', cleanups)
     git(cwd, 'init', '-q', '-b', 'main')
@@ -228,6 +261,7 @@ describe('TurnRecorder', () => {
     const { ctx, git: runnerGit } = await runner()
     const session = ctx.sessions.create(SessionId('tmp-in-tree'), { meta: { cwd } })
     const env = {
+      reviewStore: new ReviewStore(join(tempRoot, 'reviews'), 1_000_000),
       git: Promise.resolve(runnerGit), tempRoot, maxFiles: 10, maxFileBytes: 1024, diffTimeoutMs: 100,
       warn: (m: string) => { throw new Error(m) },
     }

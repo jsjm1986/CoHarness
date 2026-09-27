@@ -7,9 +7,10 @@
  * @module @deepseek-ai/dsh-tool-jobs
  */
 
+import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { boundContextSummary, createUserMessage, type ContentBlock } from '@deepseek-ai/dsh-llm'
+import { boundContextSummary, createUserMessage, MessageId, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import { TextRetainer } from '@deepseek-ai/dsh-output-retention'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView, ToolDefinition, ToolExecution } from '@deepseek-ai/dsh-tools'
@@ -278,6 +279,10 @@ export function apply(ctx: Context, config: Config): void {
   // agents; this listener owns delivery, not the choice of whom to deliver to.
   ctx.jobs.onJobDone((snapshot, owner) => {
     if (snapshot.reported || owner === undefined) return
+    const authority = executionAuthorityOf(ctx)
+    const captured = snapshot.executionScope
+    const scope = authority === undefined || captured === undefined ? captured
+      : authority.runCaptured(owner, captured, () => authority.capture(owner))
     const message = createUserMessage({
       content: [{
         type: 'text',
@@ -286,6 +291,7 @@ export function apply(ctx: Context, config: Config): void {
       source: {
         kind: 'plugin',
         plugin: 'tool-jobs',
+        ...(scope === undefined ? {} : { gatewayExecutionScope: scope }),
         form: 'notice',
         summary: completionSummary(snapshot),
       },
@@ -332,6 +338,19 @@ export function apply(ctx: Context, config: Config): void {
       if (args.wait === true) {
         const timeout = Math.min(args.timeout_ms ?? waitDefault, waitCap)
         await ctx.jobs.wait(id, timeout, exec.agent, exec.signal)
+      }
+      const snapshot = ctx.jobs.get(id, exec.agent)
+      const authority = executionAuthorityOf(ctx)
+      if ((snapshot.status === 'running' || snapshot.status === 'stopping')
+        && exec.agent !== undefined && snapshot.executionScope !== undefined && authority !== undefined) {
+        const agent = exec.agent, origin = snapshot.executionScope
+        for (;;) {
+          exec.signal.throwIfAborted()
+          const captured = authority.runCaptured(agent, origin, () => authority.capture(agent))
+          await authority.relay(agent.session, captured, MessageId(`job-output:${exec.callId}`), exec.signal)
+          const current = authority.runCaptured(agent, origin, () => authority.capture(agent))
+          if (JSON.stringify(current) === JSON.stringify(captured)) break
+        }
       }
       const read = ctx.jobs.read(id, exec.agent)
       return { text: read.text, job: publicJob(read.snapshot) }

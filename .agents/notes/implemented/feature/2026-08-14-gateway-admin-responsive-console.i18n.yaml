@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-gateway-admin-responsive-console.md
-2026-08-14-gateway-admin-responsive-console.md: a02639a64791477acb01d94d7c9f9f7a95921fff
-2026-08-14-gateway-admin-responsive-console.zh.md: 72f599172d346180629c3d295f8d7f2078efc003
+2026-08-14-gateway-admin-responsive-console.md: 5b7f55dc1df515c8dff48502ed5345aef52f9abf
+2026-08-14-gateway-admin-responsive-console.zh.md: d545b37b916396420c87c2416886ddd10e8e5118

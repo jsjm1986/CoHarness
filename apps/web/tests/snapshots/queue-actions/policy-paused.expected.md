@@ -1,0 +1,10 @@
+- status: This turn failedGateway execution authority was revoked or could not be verified. Remaining queued input is kept. Send a new message to continue.
+- list:
+  - listitem:
+    - text: Queue item preserved after stop
+    - button "Edit queued message":
+      - img
+    - button "Remove queued message":
+      - img
+    - button "Steer queued message" [disabled]:
+      - img

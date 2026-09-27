@@ -1,5 +1,5 @@
 /** Named external Providers cannot share routes or persisted child bindings. */
-import { writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -170,7 +170,7 @@ describe('ExternalBindingStore fold on reload', () => {
     }
   })
 
-  it('skips pending and consumed records that name an unbound child', async () => {
+  it('rejects pending and consumed records that name an unbound child', async () => {
     const root = await mkdtemp(join(tmpdir(), 'external-store-'))
     try {
       const file = join(root, 'bindings.jsonl')
@@ -182,7 +182,8 @@ describe('ExternalBindingStore fold on reload', () => {
         '',
       ].join('\n'))
       const store = new ExternalBindingStore(file)
-      expect(store.binding(SessionId('ghost'))).toBeUndefined()
+      expect(() => store.binding(SessionId('ghost'))).toThrow('has no binding')
+      expect(() => store.binding(SessionId('ghost'))).toThrow('has no binding')
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -503,4 +504,52 @@ describe('externalMemberTurn', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+})
+
+it('pins a member to one workspace and target across process restarts', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'member-execution-'))
+  try {
+    const file = join(root, 'store.jsonl'), child = SessionId('pinned')
+    const store = new ExternalBindingStore(file)
+    const execution = { cwd: '/target/workspace', target: 'ssh:17' }
+    store.assertExecution(child, execution)
+    store.assertExecution(child, execution)
+    store.bind(child, 'external-pinned')
+    const restored = new ExternalBindingStore(file)
+    expect(() => { restored.assertExecution(child, execution) }).not.toThrow()
+    for (const moved of [{ ...execution, cwd: '/other' }, { ...execution, target: 'ssh:18' }, { ...execution, target: 'local' }]) {
+      expect(() => { restored.assertExecution(child, moved) }).toThrow('execution target changed')
+    }
+    const legacy = SessionId('legacy')
+    store.bind(legacy, 'old-external')
+    expect(() => { store.assertExecution(legacy, execution) }).toThrow('no verified execution target')
+    expect(store.binding(legacy)).toEqual({ externalId: 'old-external' })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+it('refuses corrupt or unreadable binding data consistently instead of creating a new external Session', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'member-broken-store-'))
+  try {
+    const file = join(root, 'store.jsonl'), child = SessionId('child')
+    const records = [
+      '{torn',
+      JSON.stringify({ v: 2, kind: 'bind', child, externalId: 'future' }),
+      JSON.stringify({ v: 1, kind: 'consumed', child, messageId: 'lost' }),
+      [JSON.stringify({ v: 1, kind: 'execution', child, cwd: '/a', target: 'local' }),
+        JSON.stringify({ v: 1, kind: 'execution', child, cwd: '/a', target: 'ssh:1' })].join('\n'),
+      [JSON.stringify({ v: 1, kind: 'execution', child, cwd: '/a', target: 'local' }),
+        JSON.stringify({ v: 1, kind: 'execution', child, cwd: '/b', target: 'local' })].join('\n'),
+    ]
+    for (const content of records) {
+      writeFileSync(file, content)
+      const store = new ExternalBindingStore(file)
+      expect(() => store.binding(child)).toThrow()
+      expect(() => store.binding(child)).toThrow()
+    }
+    const directory = join(root, 'unreadable')
+    mkdirSync(directory)
+    const store = new ExternalBindingStore(directory)
+    expect(() => store.binding(child)).toThrow()
+    expect(() => store.binding(child)).toThrow()
+  } finally { await rm(root, { recursive: true, force: true }) }
 })

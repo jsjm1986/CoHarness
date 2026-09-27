@@ -1,0 +1,23 @@
+- alert: 会话仍有运行中的终端，请关闭终端后重试。
+- term: 创建者
+- definition: Admin fixture
+- term: Workspace
+- definition: 未分组
+- term: 项目
+- definition: 个人会话
+- term: 归档时间
+- definition:
+  - time: 2026/09/27 08:00
+- term: 记录状态
+- definition: 已归档
+- term: 同步状态
+- definition: 操作未完成
+- region "对话记录":
+  - heading "对话记录" [level=3]
+  - paragraph: 以聊天方式显示用户、助手和工具交互；运行配置等内部事件已收起。
+  - text: 1 条消息
+  - article:
+    - text: 用户
+    - time: 2026/09/27 08:00
+    - text: 需要保留的对话内容
+- group: 查看技术详情 1 个原始事件

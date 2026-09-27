@@ -26,6 +26,10 @@ Settlement is first-wins: the earliest terminal outcome — producer settlement,
 
 Controllers and listeners are layered by the scope that registered them, in the tools-registry shape: a registration files into its registering context's scope, and a read unions the global layer with the owner's scope chain. One process-wide registry therefore answers per-owner questions per owner — `start()` refuses `background jobs unavailable: no job controller serves this agent (load @deepseek-ai/dsh-tool-jobs in its composition)` for an owner whose own composition attaches none, however many other compositions attach theirs, and a settlement reaches only the listeners its owner's composition registered.
 
+A Session removal reservation refuses new owned jobs before producer execution. Running and stopping jobs veto idle Session release until their producer reaches a terminal outcome.
+
+Managed jobs capture execution identity before producer startup. A later request on the same Agent cannot replace a running job’s origin or its completion attribution.
+
 ## Invariants
 
 **Runtime invariant:** No companion is published. Records are private in-memory state handed out only as snapshots, with issue/snapshot semantics asserted by unit specs; execution ownership stays with the shell and tool seams.

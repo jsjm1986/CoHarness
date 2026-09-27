@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
@@ -8,6 +8,7 @@ vi.mock('../api.ts', () => ({
   applyArchiveAction: vi.fn(),
   exportArchive: vi.fn((id: string) => `/admin/api/archives/${id}/export`),
   getArchive: vi.fn(),
+  getArchiveStatus: vi.fn(),
   listArchives: vi.fn(),
   previewEmptyDrafts: vi.fn(),
   trashEmptyDrafts: vi.fn(),
@@ -27,7 +28,7 @@ const emptyCandidates: api.EmptyDraftCandidate[] = [
 ]
 
 describe('ArchivesPage', () => {
-  afterEach(() => cleanup())
+  afterEach(() => { cleanup(); vi.useRealTimers() })
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -43,6 +44,7 @@ describe('ArchivesPage', () => {
       ],
       hasMore: false,
     })
+    vi.mocked(api.getArchiveStatus).mockResolvedValue(row)
     vi.mocked(api.applyArchiveAction).mockResolvedValue({ action: 'restore', results: [{ rootSessionId: row.rootSessionId, ok: true }] })
     vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: Date.now() - 3_600_000, candidates: [] })
     vi.mocked(api.trashEmptyDrafts).mockResolvedValue({ trashed: [] })
@@ -153,4 +155,45 @@ describe('ArchivesPage', () => {
     await userEvent.click(within(screen.getAllByRole('dialog').at(-1)!).getByRole('button', { name: /^移入回收站$/ }))
     expect(api.applyArchiveAction).toHaveBeenCalledWith('trash', ['session-1'])
   })
+  it('shows pending confirmation in the open dialog and then the recorded refusal without reloading history', async () => {
+    vi.useFakeTimers()
+    vi.mocked(api.getArchive).mockResolvedValue({ record: { ...row, syncState: 'pending' }, descendants: [], events: [], hasMore: false })
+    vi.mocked(api.getArchiveStatus).mockResolvedValue({ ...row, syncState: 'conflict', lastSyncError: '请先停止仍在运行的终端' })
+    await act(async () => { render(<ArchivesPage />) })
+    await act(async () => { fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: '查看 产品讨论' })) })
+    expect(within(screen.getByRole('dialog')).getByText('等待实例确认')).toBeTruthy()
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    expect(within(screen.getByRole('dialog')).getByText('请先停止仍在运行的终端')).toBeTruthy()
+    expect(within(screen.getByRole('dialog')).getByText('操作未完成')).toBeTruthy()
+    expect(api.getArchive).toHaveBeenCalledOnce()
+    expect(api.getArchiveStatus).toHaveBeenCalledWith(row.rootSessionId)
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
+    expect(api.getArchiveStatus).toHaveBeenCalledOnce()
+  })
+
+  it('preserves selection while a pending archive row refreshes in the background', async () => {
+    vi.useFakeTimers()
+    vi.mocked(api.listArchives).mockResolvedValue([{ ...row, syncState: 'pending' }])
+    await act(async () => { render(<ArchivesPage />) })
+    const checkbox = within(screen.getByRole('table')).getByRole('checkbox', { name: '选择 产品讨论' }) as HTMLInputElement
+    fireEvent.click(checkbox)
+    expect(checkbox.checked).toBe(true)
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    expect(api.listArchives).toHaveBeenCalledOnce()
+    expect(api.getArchiveStatus).toHaveBeenCalledWith(row.rootSessionId)
+    expect((within(screen.getByRole('table')).getByRole('checkbox', { name: '选择 产品讨论' }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('keeps the selected filter when an older request completes late', async () => {
+    const first = Promise.withResolvers<api.ConversationArchiveRow[]>()
+    vi.mocked(api.listArchives).mockReturnValueOnce(first.promise).mockResolvedValue([{ ...row, title: '回收站记录', state: 'trash' }])
+    render(<ArchivesPage />)
+    await userEvent.selectOptions(screen.getByLabelText('状态'), 'trash')
+    await userEvent.click(screen.getByRole('button', { name: '应用筛选' }))
+    await screen.findAllByText('回收站记录')
+    await act(async () => { first.resolve([row]) })
+    expect(screen.queryByText('产品讨论')).toBeNull()
+    expect(screen.getAllByText('回收站记录').length).toBeGreaterThan(0)
+  })
+
 })
