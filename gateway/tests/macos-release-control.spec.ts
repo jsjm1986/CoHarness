@@ -78,9 +78,11 @@ function fakeTools(root: string, state: string): string {
 set -euo pipefail
 case "$1" in
   print)
+    if [[ "$2" == *-config ]]; then [[ "\${FAKE_CONFIG_APPLIER:-}" == 1 ]] || exit 1; fi
     printf 'pid = %s\\n' "$(cat "$FAKE_STATE/pid")"
     ;;
   kickstart)
+    if [[ "$3" == *-config ]]; then printf 'restarted\\n' > "$FAKE_STATE/config-applier"; exit 0; fi
     next=$(( $(cat "$FAKE_STATE/pid") + 1 ))
     printf '%s\\n' "$next" > "$FAKE_STATE/pid"
     current="$(cd "$HGW_RELEASES_ROOT/current" && pwd -P)"

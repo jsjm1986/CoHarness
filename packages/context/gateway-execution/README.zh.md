@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-按每位已验证人工贡献者的当前权限授权受管 Agent 工作。在编辑、委派、投递和恢复中保留这些贡献者，并在权限检查或授权更新不可用时停止活动工作。Gateway PostgreSQL 记录拥有身份与权限；Session 事件保留核查所需的引用。
+按已验证发起人的当前权限，为每次受管请求及其继承执行链授权。新的根请求不继承无关的历史参与人；编辑、子任务、排队投递和延迟回调保留各自的贡献者。Gateway PostgreSQL 记录拥有身份与权限，会话事件保留恢复后核验所需的引用。
 
 ## 目录
 
@@ -26,12 +26,16 @@ kind: "package-reference"
 
 在 Gateway 拥有的运行时中，将本提供者与 [Gateway Runtime](../gateway-runtime/README.zh.md)、Agent 和 Session 服务、Session Query、权限预设及沙箱策略组合。独立本机 profile 不加载它。Gateway Runtime 将应用标记为必须具有执行授权；销毁本提供者不会移除该要求。
 
-Gateway 数据库需要[执行身份迁移 030](../../../gateway/deploy/postgres/migrations/030_execution_identity.sql) 和 [Auto 资格迁移 031](../../../gateway/deploy/postgres/migrations/031_auto_review_eligibility.sql)。启动迁移处理由 [Gateway](../../../gateway/README.zh.md) 负责。
+受管 webhook 路由使用与 webhook 运行时相同的会话创建服务依赖。注册会等待这些服务就绪；任一服务卸载都会移除路由，并在提示词提交前取消尚未完成的接纳。
+
+项目投递要求协作提供方，并按配置的项目可见或私有可见性创建根会话。Gateway 重新核验当前写入成员资格，将持久化归属绑定到执行账号；其他受限用途断言不能创建根会话。
+
+Gateway 数据库需要执行身份迁移 030、031 和[不可变执行范围迁移 047](../../../gateway/deploy/postgres/migrations/047_execution_scopes.sql)。启动迁移处理由 [Gateway](../../../gateway/README.zh.md) 负责。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `reconnectDelayMs` | `1000` | 授权更新流断开后的重连等待时间；必须为不大于 `2147483647` 的正整数。 |
-| `jobStopTimeoutMs` | `30000` | 等待被撤权后台任务释放资源的最长时间；必须为不大于 `2147483647` 的正整数。 |
+| `jobStopTimeoutMs` | `30000` | 等待被撤销任务与独立工具调用释放资源的最长时间；正整数，不超过 `2147483647`。 |
 | `desktop` | 未设置 | 当前节点的桌面标识；未设置时拒绝受管驱动操作。需要迁移 032 和 033。 |
 | `desktopPollMs` | `1000` | 队列轮询及租约续期的最大间隔，单位毫秒；必须为不大于 `2147483647` 的正整数。 |
 | `desktopCleanupMs` | `30000` | 桌面清理请求超时，单位毫秒；必须为不大于 `2147483647` 的正整数。 |
@@ -43,16 +47,16 @@ Gateway 数据库需要[执行身份迁移 030](../../../gateway/deploy/postgres
 
 只有仍在处理中的、不受用途限制的 HTTP 主体可以为人工消息或问题答案作证。证明将精确输入绑定到 Gateway 的不可变记录。即使可信上下文插件随后渲染了引用，输入进入时仍核查其原始内容摘要。队列编辑保留先前编辑者；被认领的问题答案加入回答者。展示参与者和普通审批响应不会创建授权身份。
 
-提供者通过 `gateway/execution` 事件记录已确认的参与者集合和显式继承。捕获先于异步委派；恢复的继承资料和相邻转发则在执行前由 Gateway 验证。选择更短的分叉前缀或替换展示元数据不能移除历史参与者。消费者义务由[服务定义](../execution-authority/README.zh.md) 负责。
+提供者在 `gateway/execution` 事件中记录不可变执行范围。新的根回合从本次接纳的输入开始；编辑保留所有编辑者，受管子 Agent 的输入保留真实继承链。Goal 回合、后台任务结果、Team 消息和 PTC 回调携带各自产生时捕获的范围。迟到结果不能替换新请求的身份。历史凭据引用仍用于审计与延迟计费。[服务定义](../execution-authority/README.zh.md) 规定消费者义务。
 
-在模型请求或获准工具调用前，提供者向 Gateway 核查真正的活动 Agent。普通执行要求当前写入权限；Full 和 profile 管理还要求完整参与者集合都具有管理员权限，Auto 则要求每位参与者都拥有单独授予的资格。无法验证的历史输入会阻止特权执行。显式选择特权预设还会检查当前选择者。[权限预设](../../interaction/permission-presets/README.zh.md) 负责选择和默认设置规则。
+在模型请求或允许的工具调用之前，提供者核验该次执行范围中的每位参与人。普通执行要求当前写权限；Full 和 profile 管理要求管理员权限，Auto 要求独立资格。当前链中的未知输入会阻止特权执行，但新的已验证根请求可在未知历史输入之后继续。预设选择核验当前选择者，真实执行再次核验完整执行链。[权限预设](../../interaction/permission-presets/README.zh.md) 负责选择与默认值。
 
 本提供者拥有 `pluginManagementAuthorization` 和 `permissionPresetAuthorization`。交互式 profile 操作使用 Gateway 的实时管理员检查；Agent 发起的操作使用该 Agent 的完整参与者集合。授权缺失不会回退到先前 HTTP 请求或浏览器自报角色。[Profile 管理授权](../../../.agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.zh.md) 定义受保护操作和取消行为。
 
 <a id="revocation-and-cancellation"></a>
 ## 撤权与取消
 
-授权要求 Gateway 更新流已就绪。相关失效通知会重新核查活动工作；检查失败或更新流丢失都会取消工作。过期流代次、已销毁 Agent、已取消操作或较旧授权修订的响应都不能授权执行。重连恢复检查权限的能力，不会重放已取消的模型调用或工具副作用。
+授权要求 Gateway 更新流已就绪。参与人失效时逐个复核受影响的执行范围，停止对应当前回合、任务和工具调用，不取消其他合资格用户的独立请求。更新流中断时停止所有活跃范围。旧流代次、已变更范围、已释放 Agent 或已取消操作的响应不能授权执行。单个参与人引起的取消保留已接收队列项，但按原语义停放，直到新的唤醒发送；重连不重放效果。
 
 空闲 Agent 拥有的运行中或停止中任务会保留所需资格，直到这些任务结算。最后一个自有任务结算后，提供者会清除该空闲 Agent 缓存的资格。撤权通过现有 Jobs 服务停止任务，并在 `jobStopTimeoutMs` 内等待；仍未停止的任务会产生清理失败，不会返回停止成功。
 
@@ -61,7 +65,7 @@ Gateway 数据库需要[执行身份迁移 030](../../../gateway/deploy/postgres
 <a id="invariants"></a>
 ## 不变量
 
-本地镜像无法独立证明 PostgreSQL 中的当前权限，因此不发布不变量配套入口。提供者在记录 Gateway 响应时验证单调修订和参与者保留，并在执行准入时重新检查授权。
+本包不发布 invariant 伴生模块，因为本地镜像无法独立证明当前 PostgreSQL 权限。提供者验证不可变执行范围引用，并在执行准入时重新核验授权。
 
 <a id="further-exploration"></a>
 ## 进一步阅读

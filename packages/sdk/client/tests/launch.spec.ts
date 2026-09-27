@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_INITIALIZE_TIMEOUT_MS,
   installedDshBin,
@@ -15,6 +15,7 @@ import {
 
 const cleanups: string[] = []
 afterEach(() => {
+  vi.unstubAllEnvs()
   for (const path of cleanups.splice(0)) rmSync(path, { recursive: true, force: true })
 })
 
@@ -142,6 +143,26 @@ describe('SDK dsh launch resolution', () => {
     } finally {
       delete process.env.DSH_SDK_LATE_ENV_TEST
     }
+  })
+
+  it.each([undefined, '   ', resolve('/tmp', 'parent-harness')])('does not attach an independently selected home to the inherited inventory (%j)', (inheritedHome) => {
+    const parent = resolve('/tmp', 'parent-harness'), child = resolve('/tmp', 'independent-sdk')
+    vi.stubEnv('DSH_HOME', inheritedHome)
+    vi.stubEnv('DSH_MANAGED_DATA_MANIFEST', join(parent, 'managed-data.jsonl'))
+    const launch = resolveDshLaunch({ dshBin: '/bin/dsh', dshHome: child })
+    expect(launch.environment().DSH_HOME).toBe(child)
+    expect(launch.environment().DSH_MANAGED_DATA_MANIFEST).toBeUndefined()
+    expect(process.env.DSH_MANAGED_DATA_MANIFEST).toBe(join(parent, 'managed-data.jsonl'))
+  })
+
+  it('retains same-home inventory ownership and a caller-provided child inventory', () => {
+    const home = resolve('/tmp', 'parent-harness'), inventory = join(home, 'managed-data.jsonl')
+    vi.stubEnv('DSH_HOME', home)
+    vi.stubEnv('DSH_MANAGED_DATA_MANIFEST', inventory)
+    expect(resolveDshLaunch({ dshBin: '/bin/dsh', dshHome: home }).environment().DSH_MANAGED_DATA_MANIFEST).toBe(inventory)
+    expect(resolveDshLaunch({ dshBin: '/bin/dsh' }).environment().DSH_MANAGED_DATA_MANIFEST).toBe(inventory)
+    expect(resolveDshLaunch({ dshBin: '/bin/dsh', dshHome: './child', env: { DSH_MANAGED_DATA_MANIFEST: '/explicit/inventory' } })
+      .environment().DSH_MANAGED_DATA_MANIFEST).toBe('/explicit/inventory')
   })
 
   it.each([2, '2.0.0'])(

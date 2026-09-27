@@ -5,7 +5,8 @@ import { join } from 'node:path'
 import type { Browser } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { LlmAdapter, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { LlmAdapter, type GenerateOptions, type StreamChunk, type UserMessage } from '@deepseek-ai/dsh-llm'
+import ExecutionAuthority from '@deepseek-ai/dsh-execution-authority'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { WebhookDeliveryId, WebhookRuleId, WebhookSourceId } from '@deepseek-ai/dsh-webhook'
 import {
@@ -18,7 +19,7 @@ const directory = fileURLToPath(new URL('./snapshots/webhook', import.meta.url))
 const prompt = 'A signed external event requests a review.'
 const reply = 'The webhook review is complete.'
 
-/** Only the external model is controlled; Session and permission behavior remain composed. */
+/** Deterministic model replies for the composed Session and browser transcript. */
 class WebhookModel extends LlmAdapter {
   calls: GenerateOptions[] = []
   async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
@@ -27,6 +28,20 @@ class WebhookModel extends LlmAdapter {
     yield { type: 'block-end', index: 0, block: { type: 'text', text: reply } }
     yield { type: 'finish', reason: { kind: 'stop' } }
   }
+}
+
+/** An accepting local provider with ordinary Cordis receiver tracing and lifetime. */
+class WebhookAuthority extends ExecutionAuthority {
+  runCaptured<T>(_agent: unknown, _scope: unknown, work: () => T): T { return work() }
+  async runRequest<T>(_agent: unknown, _input: unknown, work: () => T): Promise<Awaited<T>> { return await work() }
+  async stamp(_session: unknown, message: UserMessage): Promise<UserMessage> { return message }
+  async authorizeSelection(): Promise<void> {}
+  async answer(): Promise<never> { throw new Error('Webhook fixture has no interactive questions') }
+  capture(): never { throw new Error('Webhook fixture does not delegate') }
+  async captureSession(): Promise<never> { throw new Error('Webhook fixture does not fork') }
+  inherit(): never { throw new Error('Webhook fixture has no inherited execution') }
+  async relay(): Promise<never> { throw new Error('Webhook fixture does not relay messages') }
+  async authorize(): Promise<never> { throw new Error('Webhook fixture has no managed execution checks') }
 }
 
 describe('webhook composed delivery', () => {
@@ -41,6 +56,7 @@ describe('webhook composed delivery', () => {
       extraInstallAnchors: ['webhook', 'webhook-github'].map(name =>
         fileURLToPath(new URL(`../../../packages/webhook/${name}/package.json`, import.meta.url))),
     })
+    await scaffold.ctx.plugin(WebhookAuthority)
     scaffold.ctx.llm.registerAdapter(['webhook-fixture'], model)
     scaffold.ctx.webhookRuntime.register({
       id: WebhookRuleId('review'), kind: 'github',

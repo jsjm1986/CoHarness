@@ -127,33 +127,38 @@ function uploadNetworkError(status: number): Error {
 }
 
 /**
- * Create the conversation's relative-path document client.
- * @returns a client targeting the current host's document route.
+ * Create the conversation's document client with one explicit request owner.
+ * @param requestUrl - binds every HTTP and XHR request to the captured account/runtime.
+ * @returns a client targeting that owner's document route.
  */
-export function createUserDocClient(): UserDocClient {
+export function createUserDocClient(requestUrl: (url: string) => string = url => url): UserDocClient {
   return {
-    list: signal => requestJson<UserDocListResponse>(ROOT, signal === undefined ? {} : { signal }),
-    upload: (file, signal, onProgress) => resumableUpload(file, '' as UserDocDirectoryIdType, signal, onProgress, {
-      root: ROOT,
-      requestJson,
-      networkError: uploadNetworkError,
-      responseError: errorFrom,
-    }),
+    list: signal => requestJson<UserDocListResponse>(requestUrl(ROOT), signal === undefined ? {} : { signal }),
+    upload: (file, signal, onProgress) => {
+      const query = new URL(requestUrl(ROOT), 'http://dsh.internal').search
+      return resumableUpload(file, '' as UserDocDirectoryIdType, signal, onProgress, {
+        root: ROOT, query, resumeNamespace: query,
+        requestJson,
+        networkError: uploadNetworkError,
+        responseError: errorFrom,
+      })
+    },
     remove: async (docId, signal) => {
       try {
-        await requestJson<undefined>(`${ROOT}?id=${encodeURIComponent(docId)}`, signal === undefined ? { method: 'DELETE' } : { method: 'DELETE', signal })
+        await requestJson<undefined>(requestUrl(`${ROOT}?id=${encodeURIComponent(docId)}`),
+          signal === undefined ? { method: 'DELETE' } : { method: 'DELETE', signal })
       } catch (error) {
         if (error instanceof UserDocServiceUnavailableError) return
         if (error instanceof UserDocHttpError && error.status === 404) return
         throw error
       }
     },
-    transfer: (request, signal) => requestJson<UserDocTransferResponse>(TRANSFER_PATH, {
+    transfer: (request, signal) => requestJson<UserDocTransferResponse>(requestUrl(TRANSFER_PATH), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(request),
       ...(signal === undefined ? {} : { signal }),
     }),
-    contentUrl,
+    contentUrl: docId => requestUrl(contentUrl(docId)),
   }
 }

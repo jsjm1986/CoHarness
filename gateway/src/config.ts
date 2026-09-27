@@ -60,10 +60,20 @@ export interface GatewayConfig {
   bootstrapAdminPasswordFile: string
   /** Deployment backup directory holding dumps plus managed-file snapshots. */
   backupDir: string
+  /** Stable private node-configuration file selected by the launcher. */
+  nodeConfigFile: string
+  /** Private database connection file; its location is backed up without exposing its contents. */
+  databaseUrlFile?: string
+  /** Applied configuration revision reported by the process health endpoint. */
+  configurationRevision: number
+  /** Node-owned JSONL approvals for custom provider data roots, qualified by runtime identity. */
+  managedDataApprovalFile?: string
   /** pg_dump command prefix (e.g. `pg_dump` or `docker compose exec -T postgres pg_dump`); the database URL is appended. */
   pgDumpCommand: string[]
   /** pg_restore command prefix used for dump verification and restores. */
   pgRestoreCommand: string[]
+  /** Optional SQL command wrapper; otherwise use the pg_restore command's psql sibling. */
+  psqlCommand?: string[]
   /** Interval at which this node publishes its maintenance acknowledgement heartbeat. */
   nodeHeartbeatMs: number
   /** Heartbeat age at which a node stops counting as a live writer for quiesce checks. */
@@ -299,6 +309,8 @@ function requireReleasePath(actual: string, expected: string, variable: string):
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig {
+  const configurationRevision = Number(env.HGW_NODE_CONFIG_REVISION ?? '0')
+  if (!Number.isSafeInteger(configurationRevision) || configurationRevision < 0) throw new Error('HGW_NODE_CONFIG_REVISION must be a non-negative safe integer')
   const port = portNumber(env.HGW_PORT, 8899, 'HGW_PORT')
   const publicOrigins = (env.HGW_PUBLIC_ORIGINS ?? `http://127.0.0.1:${port}`)
     .split(',').map(s => s.trim()).filter(Boolean)
@@ -550,8 +562,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     webhookSecretKeyFile,
     bootstrapAdminPasswordFile,
     backupDir: env.HGW_BACKUP_DIR ?? join(stateRoot, 'backups'),
+    nodeConfigFile: resolve(env.HGW_NODE_CONFIG_FILE ?? join(stateRoot, 'node-config.json')),
+    ...(env.HGW_DATABASE_URL_FILE === undefined || env.HGW_DATABASE_URL_FILE.trim() === '' ? {} : { databaseUrlFile: resolve(env.HGW_DATABASE_URL_FILE) }),
+    configurationRevision,
+    ...(env.HGW_MANAGED_DATA_APPROVAL_FILE === undefined ? {} : { managedDataApprovalFile: resolve(env.HGW_MANAGED_DATA_APPROVAL_FILE) }),
     pgDumpCommand: env.HGW_PGDUMP_COMMAND === undefined ? ['pg_dump'] : parseCommandLine(env.HGW_PGDUMP_COMMAND, 'HGW_PGDUMP_COMMAND'),
     pgRestoreCommand: env.HGW_PGRESTORE_COMMAND === undefined ? ['pg_restore'] : parseCommandLine(env.HGW_PGRESTORE_COMMAND, 'HGW_PGRESTORE_COMMAND'),
+    ...(env.HGW_PSQL_COMMAND === undefined ? {} : { psqlCommand: parseCommandLine(env.HGW_PSQL_COMMAND, 'HGW_PSQL_COMMAND') }),
     nodeHeartbeatMs: timerDelay(env.HGW_NODE_HEARTBEAT_MS, 5_000, 'HGW_NODE_HEARTBEAT_MS'),
     nodeStaleMs: timerDelay(env.HGW_NODE_STALE_MS, 30_000, 'HGW_NODE_STALE_MS'),
     deployMigrationsDir: env.HGW_DEPLOY_MIGRATIONS_DIR ?? join(gatewayRoot, 'deploy/postgres/migrations'),

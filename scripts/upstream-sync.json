@@ -28,7 +28,8 @@
       "sovereignty": "tracked"
     },
     "attachment/attachment-local": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
     },
     "attachment/tool-userdoc": {
       "sovereignty": "owned"
@@ -659,7 +660,8 @@
       "sovereignty": "adapted"
     },
     "identity/anonymous-user-id": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
     },
     "interaction/commands": {
       "sovereignty": "tracked"
@@ -677,7 +679,8 @@
       "sovereignty": "tracked"
     },
     "jobs/jobs": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.md"
     },
     "jobs/jobs-local": {
       "sovereignty": "adapted"
@@ -866,7 +869,8 @@
       "sovereignty": "adapted"
     },
     "settings/settings-file": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
     },
     "shell/bash-local": {
       "sovereignty": "adapted"
@@ -1066,6 +1070,10 @@
     },
     "util/lazy-require": {
       "sovereignty": "tracked"
+    },
+    "util/managed-data": {
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
     },
     "util/native-command": {
       "sovereignty": "adapted"

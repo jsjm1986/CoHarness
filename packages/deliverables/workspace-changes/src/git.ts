@@ -179,7 +179,7 @@ export async function snapshotTree(git: GitRunner, workspace: GitWorkspace, sign
     await git.storage.copyIndex(join(workspace.gitDir, 'index'), index, signal)
     const env = { ...workspace.env, GIT_INDEX_FILE: index }
     // `--ignore-errors` skips unreadable files and reports them through exit code 1; the index is still complete.
-    const pathspec = workspace.excludes.length === 0 ? [] : ['--', '.', ...workspace.excludes.map(path => `:(exclude)${path}`)]
+    const pathspec = workspace.excludes.length === 0 ? [] : ['--', '.', ...workspace.excludes.map(path => `:(exclude,literal)${path}`)]
     const added = await git.run(['add', '--all', '--ignore-errors', ...pathspec], { cwd: workspace.root, env, signal })
     /* v8 ignore next -- git reports a skipped unreadable file only on hosts whose permissions the tests can revoke. */
     if (added.exitCode !== 1) ok(added, `git add in ${workspace.root}`)

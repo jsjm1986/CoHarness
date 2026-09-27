@@ -1,4 +1,4 @@
-import type { InstanceRepository, RuntimeTarget } from '../instances.ts'
+import { RuntimeStartBlockedError, type InstanceRepository, type RuntimeTarget, type RuntimeStartIntent, type RuntimeStopReason } from '../instances.ts'
 import { createHash } from 'node:crypto'
 import { transaction } from './database.ts'
 import { allocateInstancePorts } from './port-allocation.ts'
@@ -16,6 +16,16 @@ function ownerJoin(target: RuntimeTarget): { join: string; predicate: string; no
         predicate: 'owner.public_id=$3',
         noun: 'project',
       }
+}
+
+function activeOwnerPredicate(target: RuntimeTarget): string {
+  return target.kind === 'user'
+    ? `owner.status='active' AND owner.deleted_at IS NULL AND EXISTS(
+        SELECT 1 FROM harness.memberships membership
+        WHERE membership.organization_id=owner.organization_id AND membership.user_id=owner.id
+          AND membership.status='active'
+      )`
+    : `owner.status='active'`
 }
 
 /** PostgreSQL instance rows scoped to one organization and compute node. */
@@ -82,7 +92,9 @@ export class PostgresInstanceRepository implements InstanceRepository {
         ])
       }
       if (!instancesOutliveGateway) {
-        await client.query(`UPDATE harness.instances SET desired_state='stopped',observed_state='stopped',
+        await client.query(`UPDATE harness.instances SET
+          stop_reason=CASE WHEN observed_state IN ('ready','starting') THEN 'shutdown' ELSE stop_reason END,
+          desired_state='stopped',observed_state='stopped',
           updated_at=now() WHERE organization_id=$1 AND assigned_node_id=$2`,
         [this.context.organizationId, this.context.nodeId])
       }
@@ -120,6 +132,17 @@ export class PostgresInstanceRepository implements InstanceRepository {
     return Number(generation)
   }
 
+  async stopReasonOf(target: RuntimeTarget): Promise<RuntimeStopReason | null> {
+    const owner = ownerJoin(target)
+    const result = await this.context.pool.query<{ stop_reason: RuntimeStopReason | null }>(`SELECT i.stop_reason
+      FROM harness.instances i ${owner.join}
+      WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND ${owner.predicate}`,
+    [this.context.organizationId, this.context.nodeId, target.id])
+    const row = result.rows[0]
+    if (row === undefined) throw new Error(`no instance row for ${owner.noun} ${String(target.id)}`)
+    return row.stop_reason
+  }
+
   async touch(target: RuntimeTarget, at: number): Promise<void> {
     const owner = ownerJoin(target)
     await this.context.pool.query(`UPDATE harness.instances i SET
@@ -131,27 +154,36 @@ export class PostgresInstanceRepository implements InstanceRepository {
     [this.context.organizationId, this.context.nodeId, target.id, at])
   }
 
-  async beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer): Promise<number> {
-    const activeOwner = target.kind === 'user'
-      ? `owner.status='active' AND EXISTS(
-          SELECT 1 FROM harness.memberships membership
-          WHERE membership.organization_id=owner.organization_id AND membership.user_id=owner.id
-            AND membership.status='active'
-        )`
-      : `owner.status='active'`
+  async beginStart(target: RuntimeTarget, at: number, runtimeTokenHash: Buffer, intent: RuntimeStartIntent = 'passive'): Promise<number> {
+    const activeOwner = activeOwnerPredicate(target)
     const result = await this.context.pool.query<{ generation: string }>(`UPDATE harness.instances i
-      SET desired_state='running',observed_state='starting',
+      SET desired_state='running',observed_state='starting',stop_reason=NULL,
       generation=generation+1,started_at=to_timestamp($4/1000.0),last_activity_at=to_timestamp($4/1000.0),
       runtime_token_hash=$5,runtime_token_issued_at=now(),updated_at=now()
       FROM harness.${target.kind === 'user' ? 'users' : 'projects'} owner
       WHERE owner.id=${target.kind === 'user' ? 'i.user_id' : 'i.project_id'}
         AND owner.organization_id=i.organization_id AND i.organization_id=$1
         AND i.assigned_node_id=$2 AND owner.public_id=$3 AND ${activeOwner}
+        AND ($6='explicit' OR (i.stop_reason IS DISTINCT FROM 'manual' AND ($6<>'webhook' OR i.stop_reason='idle')))
       RETURNING i.generation::text`,
-    [this.context.organizationId, this.context.nodeId, target.id, at, runtimeTokenHash])
+    [this.context.organizationId, this.context.nodeId, target.id, at, runtimeTokenHash, intent])
     const generation = result.rows[0]?.generation
-    if (generation === undefined) throw new Error(`no instance row for ${target.kind} ${String(target.id)}`)
+    if (generation === undefined) {
+      const eligible = await this.startEligibility(target), reason = eligible?.stopReason
+      const blockedIntent = intent !== 'explicit' && (reason === 'manual' || intent === 'webhook' && reason !== 'idle')
+      throw new RuntimeStartBlockedError(eligible !== null && blockedIntent ? eligible.stopReason : 'unavailable')
+    }
     return Number(generation)
+  }
+
+  async startEligibility(target: RuntimeTarget): Promise<{ stopReason: RuntimeStopReason | null } | null> {
+    const owner = ownerJoin(target)
+    const result = await this.context.pool.query<{ stop_reason: RuntimeStopReason | null }>(`SELECT i.stop_reason
+      FROM harness.instances i ${owner.join}
+      WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND ${owner.predicate} AND ${activeOwnerPredicate(target)}`,
+    [this.context.organizationId, this.context.nodeId, target.id])
+    const row = result.rows[0]
+    return row === undefined ? null : { stopReason: row.stop_reason }
   }
 
   async markReady(target: RuntimeTarget, generation: number): Promise<void> {
@@ -160,7 +192,8 @@ export class PostgresInstanceRepository implements InstanceRepository {
       FROM harness.${target.kind === 'user' ? 'users' : 'projects'} owner
       WHERE owner.id=${target.kind === 'user' ? 'i.user_id' : 'i.project_id'}
         AND owner.organization_id=i.organization_id AND i.organization_id=$1
-        AND i.assigned_node_id=$2 AND owner.public_id=$3 AND i.generation=$4`,
+        AND i.assigned_node_id=$2 AND owner.public_id=$3 AND i.generation=$4
+        AND i.desired_state='running' AND i.observed_state='starting' AND i.stop_reason IS NULL`,
     [this.context.organizationId, this.context.nodeId, target.id, generation])
     if (result.rowCount !== 1) throw new Error(`stale instance generation for ${target.kind} ${String(target.id)}`)
   }
@@ -188,23 +221,23 @@ export class PostgresInstanceRepository implements InstanceRepository {
     return result.rows.length > 0
   }
 
-  async markStopping(target: RuntimeTarget): Promise<void> {
+  async markStopping(target: RuntimeTarget, reason: RuntimeStopReason = 'manual'): Promise<void> {
     await this.context.pool.query(`UPDATE harness.instances i SET desired_state='stopped',observed_state='stopping',
-      updated_at=now() FROM harness.${target.kind === 'user' ? 'users' : 'projects'} owner
+      stop_reason=CASE WHEN i.stop_reason='manual' THEN 'manual' ELSE $4 END,updated_at=now() FROM harness.${target.kind === 'user' ? 'users' : 'projects'} owner
       WHERE owner.id=${target.kind === 'user' ? 'i.user_id' : 'i.project_id'}
         AND owner.organization_id=i.organization_id AND i.organization_id=$1
         AND i.assigned_node_id=$2 AND owner.public_id=$3`,
-    [this.context.organizationId, this.context.nodeId, target.id])
+    [this.context.organizationId, this.context.nodeId, target.id, reason])
   }
 
-  async markStopped(target: RuntimeTarget): Promise<void> {
+  async markStopped(target: RuntimeTarget, reason?: RuntimeStopReason): Promise<void> {
     await this.context.pool.query(`UPDATE harness.instances i SET desired_state='stopped',observed_state='stopped',
-      last_heartbeat_at=now(),runtime_token_hash=NULL,runtime_token_issued_at=NULL,updated_at=now()
+      stop_reason=CASE WHEN i.stop_reason='manual' THEN 'manual' ELSE COALESCE($4,i.stop_reason) END,last_heartbeat_at=now(),runtime_token_hash=NULL,runtime_token_issued_at=NULL,updated_at=now()
       FROM harness.${target.kind === 'user' ? 'users' : 'projects'} owner
       WHERE owner.id=${target.kind === 'user' ? 'i.user_id' : 'i.project_id'}
         AND owner.organization_id=i.organization_id AND i.organization_id=$1
         AND i.assigned_node_id=$2 AND owner.public_id=$3`,
-    [this.context.organizationId, this.context.nodeId, target.id])
+    [this.context.organizationId, this.context.nodeId, target.id, reason ?? null])
   }
 
   async owner(target: RuntimeTarget): Promise<{

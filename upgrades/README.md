@@ -18,3 +18,4 @@ Rules:
 - Add new records under the matching folder with the existing `<TYPE>-dsh-<version>` naming; do not invent a new top-level prefix.
 - Links between folders use repository-relative paths (`upgrades/plans/…`) so they survive moves; cross-references inside a plan may use `../alignment/…`.
 - A record that documents a shipped sync stays as the source of truth for that version; update the facts (paths, names, versions) when the code moves, never rewrite the decision.
+- The active matrix must match [the sovereignty manifest](../scripts/upstream-sync.json) for carried packages. Source presence does not imply completed business or deployment acceptance; keep those evidence states explicit.

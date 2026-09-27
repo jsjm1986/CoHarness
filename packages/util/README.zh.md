@@ -8,6 +8,7 @@
 |---|---|
 | [`brand/`](brand/README.zh.md) | 提供带名义品牌的类型 |
 | [`paths/`](home-paths/README.zh.md) | 解析 Harness 数据根目录和共享路径 |
+| [`managed-data/`](managed-data/README.zh.md) | 为可验证备份记录持久本地数据归属 |
 | [`package-manifest/`](package-manifest/README.zh.md) | 插件 package manifest 的共享声明 |
 | [`timeout/`](timeout/README.zh.md) | 提供截止时间和超时分类原语 |
 | [`retention/`](output-retention/README.zh.md) | 限制保留文本和项集合的大小 |

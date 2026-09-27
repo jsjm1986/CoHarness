@@ -4,6 +4,8 @@ English | [中文](README.zh.md)
 
 Gateway collaboration UI for the Web client. One plugin owns the account-context HTTP state, personal/project scope selector, staged root-conversation visibility, conversation sharing menu, and read-only project composer policy through existing Client slots and session-create waterfall events.
 
+Workbench sharing, read-only composer selection and creation eligibility follow the pane or requested runtime, independently of the page’s current space. Browser sharing requests carry the original Session ID and explicit project ID; Gateway verifies the project before reading or changing visibility. Personal panes do not inherit a project pane’s read-only state or sharing controls.
+
 ## Summary
 
 Use `dsh-client-ui-collaboration` for Gateway collaboration UI in the Web client: an account scope selector, staged root-conversation visibility, a conversation sharing menu, and a read-only project composer policy. One plugin contributes these through existing Client slots and session-create waterfall events, so shared project conversations work without a separate account surface.
@@ -18,7 +20,7 @@ Use `dsh-client-ui-collaboration` for Gateway collaboration UI in the Web client
 - `conversation.session.header.actions` keeps visibility and participant count in one compact trigger. The menu loads root-inherited access, creator, the participant roster, and contribution counts; the creator or an organization administrator can request visibility changes, and a `visibility-locked` response remains visible there.
 - A high-priority `conversation.composer` registration replaces the whole composer for `ro` project members, covering ordinary input, approval, and question controls. `sessions/prepare-create` also rejects root-session creation before RPC dispatch.
 - New `rw` project-session flows pass the staged visibility through `sessions/prepare-create`. Before reusing a blank candidate, `sessions/confirm-blank-reuse` revalidates its root visibility through the Gateway and accepts only an exact match; a mismatch creates a new root with the prepared visibility. HTTP responses are decoded at the browser trust boundary through a streaming 16 MiB byte budget before any state is published.
-- All registrations are effects and unload cleanly. Personal scope keeps the ordinary Web UI and clears project conversation detail state.
+- All registrations are effects and unload cleanly. Personal panes keep the ordinary Web UI. Account changes and removed memberships clear their cached conversation details.
 
 Account context also publishes the current account's Full and Auto choice qualifications into the existing runtime UI policy. Refresh starts by withdrawing verification; a failed request keeps display context but does not retain permission eligibility. Connection reset aborts and discards the previous context request. Consumers combine that account value with their own connection's deployment facts, following the [permission UI rules](../ui-permission-presets/README.md).
 

@@ -1,7 +1,7 @@
 /** Host BFF policy for resolving Remote Agent and Session identities. */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { Agent, AgentOptions, AgentSetup } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentHandle, AgentOptions, AgentSetup } from '@deepseek-ai/dsh-agent'
 import type { Session, SessionEvent, SessionHeader, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import { TypertLookupFailure, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
@@ -27,6 +27,11 @@ export type ApiRemoteAgentResult =
 
 /** Resume configuration supplied by the owning Host composition. */
 export interface ApiRemoteAgentOptions {
+  /**
+   * Retain the exact factory handle for Host-owned idle release.
+   * @param handle - newly resumed Agent; shared waiters do not repeat ownership.
+   */
+  readonly onResumed?: (handle: AgentHandle) => void
   /** Read the per-Agent defaults when a cold identity must resume. */
   readonly agentOptions?: () => AgentOptions
   /**
@@ -165,6 +170,11 @@ export function createApiRemoteAgentResolver(
   }
 
   const agentFor = async (sessionId: SessionId): Promise<ApiRemoteAgentResult> => {
+    let admission: Disposable
+    try { admission = ctx.agents.reserveUse([sessionId]) } catch (error: unknown) {
+      return { error: { code: 'internal', message: String(error), details: {} } }
+    }
+    using _admission = admission
     const fenced = await fencedLiveAgent(sessionId)
     if (fenced !== undefined) return fenced
     const attached = ctx.sessions.get(sessionId)
@@ -195,6 +205,7 @@ export function createApiRemoteAgentResolver(
             ...options.agentOptions === undefined ? {} : { agentOptions: options.agentOptions() },
             ...setup === undefined ? {} : { setup },
           })
+          options.onResumed?.(handle)
           return handle.agent
         } finally {
           resumes.delete(sessionId)

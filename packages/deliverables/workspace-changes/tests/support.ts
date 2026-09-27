@@ -76,9 +76,9 @@ export async function settle(ctx: Context, session: Session): Promise<void> {
 }
 
 /** The summaries the Host still serves for one session's `workspace/changes` events, in log order. */
-export function changes(ctx: Context, session: Session): WorkspaceChangesSummary[] {
-  return session.snapshotEvents()
+export async function changes(ctx: Context, session: Session): Promise<WorkspaceChangesSummary[]> {
+  const summaries = await Promise.all(session.snapshotEvents()
     .filter(event => event.type === 'workspace/changes')
-    .map(event => ctx.workspaceChanges.summary(session.id, event.seq))
-    .filter(summary => summary !== undefined)
+    .map(async event => await ctx.workspaceChanges.summary(session.id, event.seq)))
+  return summaries.filter(summary => summary !== undefined)
 }

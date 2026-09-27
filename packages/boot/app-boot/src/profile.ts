@@ -34,6 +34,7 @@ import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { applyEntryPatches, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import type { DshPackageManifest } from '@deepseek-ai/dsh-package-manifest'
 import { resolve as resolvePackage, type Package as ResolvePackageManifest } from 'resolve.exports'
 import { loadOverlayPatches } from './index.ts'
@@ -200,6 +201,7 @@ export function initProfile(
   dir: string,
   bundles: readonly string[],
 ): void {
+  registerProfileData(dir)
   mkdirSync(dir, { recursive: true })
   const manifestPath = join(dir, 'package.json')
   if (!existsSync(manifestPath)) {
@@ -789,7 +791,15 @@ export function readProfileManifest(binName: string, dir: string): ProfileManife
  * @param manifest - the manifest value to persist.
  */
 export function writeProfileManifest(dir: string, manifest: ProfileManifest): void {
+  registerProfileData(dir)
   writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest, undefined, 2) + '\n')
+}
+
+/** Profile configuration and installation declarations exclude generated dependency trees. */
+function registerProfileData(dir: string): void {
+  for (const name of ['package.json', PROFILE_PATCH_FILENAME, 'pnpm-workspace.yaml', 'pnpm-lock.yaml']) {
+    registerManagedDataPath({ owner: 'app-boot', kind: 'file', path: join(dir, name) }, process.env.DSH_MANAGED_DATA_MANIFEST)
+  }
 }
 
 /** Return whether two bundle lists have the same values in the same order. */
@@ -884,6 +894,7 @@ export function loadProfileDirectory(
   installAnchor: string,
   options: { userLayer?: boolean } = {},
 ): Profile {
+  registerProfileData(dir)
   const manifest = readProfileManifest(binName, dir)
   const bundles = manifest.dsh?.profile?.bundles ?? []
   const layers = bundles.map((packageName): ProfileLayer => {

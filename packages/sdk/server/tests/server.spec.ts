@@ -191,8 +191,8 @@ describe('HarnessSdkJsonRpcServer', () => {
       id: SessionId('other'),
       followup: otherFollowup,
     } satisfies Pick<Agent, 'id' | 'followup'>) as unknown as Agent
-    const mainHandle = { agent: mainAgent, dispose: vi.fn(() => Promise.resolve()) }
-    const otherHandle = { agent: otherAgent, dispose: vi.fn(() => Promise.resolve()) }
+    const mainHandle = { agent: mainAgent, dispose: vi.fn(() => Promise.resolve()) , tryDisposeIdle: async () => false }
+    const otherHandle = { agent: otherAgent, dispose: vi.fn(() => Promise.resolve()) , tryDisposeIdle: async () => false }
     const create = vi.fn(async (options: { sessionId: SessionId }) =>
       String(options.sessionId) === 'main' ? mainHandle : otherHandle)
     const liveAgents = new Map<string, Agent>([['main', mainAgent], ['other', otherAgent]])
@@ -223,7 +223,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   it('admits inline SDK images before the user message enters the session', async () => {
     const followup = vi.fn<Agent['followup']>()
     const agent = ({ id: SessionId('image'), followup } satisfies Pick<Agent, 'id' | 'followup'>) as unknown as Agent
-    const handle = { agent, dispose: vi.fn(() => Promise.resolve()) }
+    const handle = { agent, dispose: vi.fn(() => Promise.resolve()) , tryDisposeIdle: async () => false }
     const ref = {
       attachmentId: 'sha256:image',
       mediaType: 'image/png',
@@ -260,7 +260,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   it('rejects inline SDK images when the composition has no attachment store', async () => {
     const followup = vi.fn<Agent['followup']>()
     const agent = ({ id: SessionId('image'), followup } satisfies Pick<Agent, 'id' | 'followup'>) as unknown as Agent
-    const handle = { agent, dispose: vi.fn(() => Promise.resolve()) }
+    const handle = { agent, dispose: vi.fn(() => Promise.resolve()) , tryDisposeIdle: async () => false }
     const ctx = {
       on: vi.fn(() => () => undefined),
       agents: { create: vi.fn(async () => handle), get: () => agent },
@@ -281,7 +281,7 @@ describe('HarnessSdkJsonRpcServer', () => {
   it('rechecks agent liveness after asynchronous image admission', async () => {
     const followup = vi.fn<Agent['followup']>()
     const agent = ({ id: SessionId('image-race'), followup } satisfies Pick<Agent, 'id' | 'followup'>) as unknown as Agent
-    const handle = { agent, dispose: vi.fn(() => Promise.resolve()) }
+    const handle = { agent, dispose: vi.fn(() => Promise.resolve()) , tryDisposeIdle: async () => false }
     const admitted = Promise.withResolvers<Array<{
       attachmentId: string
       mediaType: string
@@ -321,7 +321,7 @@ describe('HarnessSdkJsonRpcServer', () => {
       followup,
       whenIdle: vi.fn(() => Promise.resolve()),
     } satisfies Pick<Agent, 'id' | 'followup' | 'whenIdle'>) as unknown as Agent
-    const handle = { agent, dispose: vi.fn(() => Promise.resolve()) }
+    const handle = { agent, dispose: vi.fn(() => Promise.resolve()) , tryDisposeIdle: async () => false }
     // The registry drops the agent after creation, modelling an agent-loop-only
     // reload that leaves the server's SessionRecord pointing at a detached agent.
     let live = true
@@ -1093,8 +1093,8 @@ describe('HarnessSdkJsonRpcServer', () => {
   it('coalesces concurrent session creation and retries a failed creation', async () => {
     let resolveShared: ((handle: AgentHandle) => void) | undefined
     const sharedCreation = new Promise<AgentHandle>((resolve) => { resolveShared = resolve })
-    const sharedHandle = { agent: {} as Agent, dispose: vi.fn(() => Promise.resolve()) }
-    const retryHandle = { agent: {} as Agent, dispose: vi.fn(() => Promise.resolve()) }
+    const sharedHandle = { agent: {} as Agent, dispose: vi.fn(() => Promise.resolve()) , tryDisposeIdle: async () => false }
+    const retryHandle = { agent: {} as Agent, dispose: vi.fn(() => Promise.resolve()) , tryDisposeIdle: async () => false }
     const create = vi.fn<(options: unknown) => Promise<AgentHandle>>()
       .mockReturnValueOnce(sharedCreation)
       .mockRejectedValueOnce(new Error('creation failed'))
@@ -1128,7 +1128,7 @@ describe('HarnessSdkJsonRpcServer', () => {
 
   it('resolves a relative cwd before creating the session', async () => {
     const create = vi.fn<(options: unknown) => Promise<AgentHandle>>()
-      .mockResolvedValue({ agent: {} as Agent, dispose: () => Promise.resolve() })
+      .mockResolvedValue({ agent: {} as Agent, dispose: () => Promise.resolve() , tryDisposeIdle: async () => false })
     const resolveCallConfig = vi.fn(async (config: unknown) => config)
     const ctx = {
       on: vi.fn(() => () => undefined),
@@ -1174,8 +1174,8 @@ describe('HarnessSdkJsonRpcServer', () => {
       sessions: Map<string, { handle: AgentHandle; lastTurnEnd: undefined; activePrompt: boolean }>
       shutdown(): Promise<Record<string, never>>
     }
-    server.sessions.set('first', { handle: { agent: {} as Agent, dispose: firstDispose }, lastTurnEnd: undefined, activePrompt: false })
-    server.sessions.set('second', { handle: { agent: {} as Agent, dispose: secondDispose }, lastTurnEnd: undefined, activePrompt: false })
+    server.sessions.set('first', { handle: { agent: {} as Agent, dispose: firstDispose , tryDisposeIdle: async () => false }, lastTurnEnd: undefined, activePrompt: false })
+    server.sessions.set('second', { handle: { agent: {} as Agent, dispose: secondDispose , tryDisposeIdle: async () => false }, lastTurnEnd: undefined, activePrompt: false })
 
     await expect(server.shutdown()).rejects.toThrow('SDK server teardown failed')
     expect(firstDispose).toHaveBeenCalledOnce()

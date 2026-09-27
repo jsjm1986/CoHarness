@@ -2,6 +2,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
+import { parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type {
   DirectoryListing, IApiClient, RpcError,
   SessionDraftId, SessionId, WorkspaceId, WorkspaceView,
@@ -185,7 +186,11 @@ export class WorkspaceRuntime implements IWorkspaces {
           this.activeDrafts.delete(workspaceId)
         } else {
           const current = this.activeDrafts.get(workspaceId)
-          if (current !== undefined) this.activeDrafts.set(workspaceId, { ...current, sessionId })
+          if (current !== undefined) {
+            const original = this.sessions.keyFor === undefined ? sessionId : parseClientSessionKey(sessionId)?.sessionId
+            if (original === undefined) throw new Error('Pooled Session creation returned no runtime-qualified identity')
+            this.activeDrafts.set(workspaceId, { ...current, sessionId: original })
+          }
         }
         saveActiveDrafts(this.activeDrafts)
         return sessionId
@@ -323,7 +328,7 @@ export class WorkspaceRuntime implements IWorkspaces {
   async create(input: { path: string }): Promise<WorkspaceView> {
     const result = await this.manager.create(input)
     if (!result.ok) throw new WorkspaceCreateError(result.error)
-    return result.value.workspace
+    return this.presentWorkspace(result.value.workspace)
   }
 
   /**
@@ -382,7 +387,7 @@ export class WorkspaceRuntime implements IWorkspaces {
   async rename(workspaceId: WorkspaceId, title: string): Promise<WorkspaceView> {
     const result = await this.manager.rename(workspaceId, title)
     if (!result.ok) throw new Error(`workspace rename failed: ${result.error.code}: ${result.error.message}`)
-    return result.value.workspace
+    return this.presentWorkspace(result.value.workspace)
   }
 
   /**
@@ -441,7 +446,7 @@ export class WorkspaceRuntime implements IWorkspaces {
   ): Promise<WorkspaceView> {
     const result = await this.manager.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     if (!result.ok) throw new Error(`workspace move failed: ${result.error.code}: ${result.error.message}`)
-    return result.value.workspace
+    return this.presentWorkspace(result.value.workspace)
   }
 
   /**
@@ -465,11 +470,20 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.manager.handleConnected()
   }
 
+  private presentWorkspace(workspace: WorkspaceView): WorkspaceView {
+    return { ...workspace, sessionIds: workspace.sessionIds.map(id => this.sessions.keyFor?.(id) ?? id) }
+  }
+
   private project(): void {
-    const workspace = this.manager.getSnapshot()
+    const raw = this.manager.getSnapshot()
+    const key = (id: SessionId): SessionId => this.sessions.keyFor?.(id) ?? id
+    const workspace = { ...raw,
+      items: raw.items.map(item => this.presentWorkspace(item)),
+      archivedSessionIds: raw.archivedSessionIds.map(key),
+    }
     const sessions = this.sessions.list.getSnapshot()
     for (const [workspaceId, draft] of this.activeDrafts) {
-      const summary = sessions.byId[draft.sessionId]
+      const summary = sessions.byId[key(draft.sessionId)]
       if (summary !== undefined && !summary.blank) this.activeDrafts.delete(workspaceId)
     }
     saveActiveDrafts(this.activeDrafts)

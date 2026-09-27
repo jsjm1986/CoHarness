@@ -16,6 +16,14 @@
 
 `Session.readCallHistory(callId, signal)` 通过已注册的 Conversation 定义组装独立聊天快照。它使用该 Session 的普通传输或带父地址的子会话传输，不改变可见历史，并随读取者或 Session 生命周期取消。调用者持有读取结果，不另建 Session 或持久缓存。
 
+池化浏览器 Session 键编码所属 runtime 与原始 Host ID。列表、作用域 store、Workbench 窗格、保留的 binding、文件观察及已声明的 Remote 事件地址使用该键；runtime 保留原始 wire ID 和持久事件。多个 runtime 共有的裸 ID 会被拒绝，不会任意选择归属。`host.describe.runtimeTarget` 在打开历史前固定引导连接身份。已保留的 generation 不能改标为另一个 runtime。
+
+`usingRuntime` 在发现、异步操作和后续 Session 引用接管期间持有目标，不授予权限。消费者合并导航与所有者生命周期；取消只释放本次操作的持有，不释放其他消费者。引导目标和其他目标都等待各自的首个 Session 列表基线。
+
+引导连接明确失去授权时，先撤下池内所有 Session，再由 Connection 执行页面清理与重载。其他 runtime 被拒绝只撤下该 runtime。普通重连失败保留当前账号已授权的缓存。
+
+Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除 Session 列表归属，再允许连接释放发布后续目录变化。未解析或已撤权的 Session 没有目录，不会回退到其他 runtime 的选项；在途读取在返回前复核归属。
+
 ## 概述
 
 使用 `dsh-client-runtime` 作为客户端对象层：它引导 Cordis 浏览器上下文，持有 `Session`/`Workspace` 运行时对象、共享宿主事件流的分发、投影存储与会话视图订阅的历史分页。客户端会话一律由宿主创建；域包经此层读取属主事件与投影切片，自身不持有会话状态。
@@ -74,7 +82,7 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 
 刚预留的草稿仍为空白时，列表行会携带仅客户端使用的 `workspaceId` 提示，因此 Host 刷新期间占位行仍留在目标 Workspace 下；首条可见内容或移除后提示会清掉，且不会发送到 wire。
 
-`WorkspaceRuntime.connectWorkspace(workspaceId)` 解析 New Session 流程最终落入的会话：它从列表镜像收集该 Workspace 的既有空会话（`blank && cwd == workspace.path && sessionIds.includes(id)`——Host 自己的成员规则，绝不只按 cwd，避免劫持 cwd 匹配但未入账的空白会话），排除已归档行，再让 `SessionRuntime.createOrReuse()` 返回首个与插件创建选项兼容的候选项，或者创建新会话。新建分支携带稳定的 draft id 和预分配 Session id；收到可见消息前，这对身份会保存在受限浏览器存储中，因此刷新或并发的新会话操作会复用同一 reservation，但不会保存凭据。共享的 `startSession` 操作优先使用明确指定的 Workspace，其次使用当前 Session 所属 Workspace，再其次使用派生的最近活跃 Workspace；一个 Workspace 都没有时则清空选择，进入空白 New Session 页面。`SessionSummary.blank` 镜像 Host 的“没有可见内容”位：由 `session.list`／`host/session-added` 帧播种，只有收到非空对话事件才转为非 blank，因此已受理但最终为空的轮次仍可复用；列表重拉会在合并本地已观测证据后重新对齐。列表界面隐藏 blank 行；store 保留每一行。`SessionRuntime.create` 接受可选的、由调用方预先分配的 SessionId，失败时抛出 `SessionCreateError`（携带 `requestedSessionId`）。
+`WorkspaceRuntime.connectWorkspace(workspaceId)` 解析 New Session 流程最终落入的会话：它从列表镜像收集该 Workspace 的既有空会话（`blank && cwd == workspace.path && sessionIds.includes(id)`——Host 自己的成员规则，绝不只按 cwd，避免劫持 cwd 匹配但未入账的空白会话），排除已归档行，再让 `SessionRuntime.createOrReuse()` 返回首个与插件创建选项兼容的候选项，或者创建新会话。新建分支携带稳定的 draft id 和预分配 Session id；收到可见消息前，这对身份会保存在受限浏览器存储中，因此刷新或并发的新会话操作会复用同一 reservation，但不会保存凭据。草稿预留保存原始 Host ID；仅对池化创建返回值解码回该表示，避免再次创建时把浏览器键预留为新的 Session。共享的 `startSession` 操作优先使用明确指定的 Workspace，其次使用当前 Session 所属 Workspace，再其次使用派生的最近活跃 Workspace；一个 Workspace 都没有时则清空选择，进入空白 New Session 页面。`SessionSummary.blank` 镜像 Host 的“没有可见内容”位：由 `session.list`／`host/session-added` 帧播种，只有收到非空对话事件才转为非 blank，因此已受理但最终为空的轮次仍可复用；列表重拉会在合并本地已观测证据后重新对齐。列表界面隐藏 blank 行；store 保留每一行。`SessionRuntime.create` 接受可选的、由调用方预先分配的 SessionId，失败时抛出 `SessionCreateError`（携带 `requestedSessionId`）。
 
 `WorkspaceRuntime.openWorkspace(workspaceId)` 从现有列表快照中选择该 Workspace 最新的、当前用户可见、非空、未归档的根 Session，不额外请求列表；没有符合条件的历史 Session 时委托 `connectWorkspace`，因此调用方仍会得到正常复用或新建的空会话。启动流程与 Hero 工作区选择器使用历史优先入口，明确的新会话操作继续调用 `connectWorkspace`。
 

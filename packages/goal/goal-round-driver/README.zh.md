@@ -37,7 +37,7 @@
 
 ## 生命周期与持久性
 
-`goal/changed` 会产生持久性义务。排队工作前，驱动器会等待 `ctx.sessions.flush()`，并在等待后重新检查 goal revision 与竞争输入。通过 `agent/error` 到达的 flush 失败会停用续行，避免另一 Round 启动。
+`goal/changed` 会产生持久性义务。排队工作前，驱动器会等待 `ctx.sessions.flush()`，并在等待后重新检查 goal revision 与竞争输入。每个已准入的驱动任务都会阻止永久删除其 Session，直到检查点完成并排入一个 Round 或放弃续行。暂停和停用续行的目标不会在任务之间保留占用。检查点失败或删除已在进行时会停用续行，不自动重试。
 
 此插件加载到现有 agent 上时绝不会继承续行启用状态。`GoalService.disarm()` 会移除进程本地权限，而不改变持久 phase、revision 或历史；之后由用户明确授权的 resume 会记录重新启用续行。会话 resume 和 fork 后，goal 领域通过 `agent/created` 处理应用相同规则。
 

@@ -8,6 +8,7 @@
  * teardown cancel force-fails only the record and reports a possible orphan.
  * @module @deepseek-ai/dsh-jobs-local
  */
+import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -50,6 +51,7 @@ export interface Config {
 
 /** The registry's mutable per-job record (never handed out — see {@link LocalJobRegistry.snapshot}). */
 interface TrackedTask {
+  executionScope: ExecutionInheritance | undefined
   id: JobId
   kind: JobKind
   label: string
@@ -192,6 +194,7 @@ export class LocalJobRegistry extends JobRegistry {
       )
     }
 
+    const executionScope = spec.owner === undefined ? undefined : executionAuthorityOf(this.ctx)?.capture(spec.owner)
     const hooks = spec.run()
     const count = (this.counters.get(spec.kind) ?? 0) + 1
     this.counters.set(spec.kind, count)
@@ -200,6 +203,7 @@ export class LocalJobRegistry extends JobRegistry {
     let markSettled!: () => void
     const settled = new Promise<void>((resolve) => { markSettled = resolve })
     const job: TrackedTask = {
+      executionScope,
       id,
       kind: spec.kind,
       label: spec.label,
@@ -415,6 +419,7 @@ export class LocalJobRegistry extends JobRegistry {
     const ownerSession = job.owner?.id
     return {
       id: job.id,
+      ...(job.executionScope === undefined ? {} : { executionScope: job.executionScope }),
       kind: job.kind,
       label: job.label,
       ...job.outputLimitBytes !== undefined ? { outputLimitBytes: job.outputLimitBytes } : {},
@@ -538,7 +543,7 @@ export class LocalJobRegistry extends JobRegistry {
     if (agents === undefined) {
       throw new Error('background job ownership requires the agent registry (load @deepseek-ai/dsh-agent)')
     }
-    if (agents.get(ownerId) !== owner) {
+    if (agents.get(ownerId) !== owner || agents.isRemoving(ownerId)) {
       throw new Error(`agent "${ownerId}" is not the registered agent instance (background job owner must be live)`)
     }
     if (this.ownerCleanups.has(owner)) return

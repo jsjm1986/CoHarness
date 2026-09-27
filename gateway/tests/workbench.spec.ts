@@ -40,7 +40,8 @@ describe('workbench account catalog', () => {
       principals: new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'test', 30_000),
       maxResponseBytes: 1024 * 1024, upstreamTimeoutMs: 30_000,
     })
-    const rows = await handler(user, new AbortController().signal)
+    const { items: rows, personalComplete } = await handler(user, new AbortController().signal)
+    expect(personalComplete).toBe(true)
     expect(rows.map(row => row.sessionId)).toEqual(['personal-root', 'project-root'])
     expect(rows[0]).toMatchObject({ title: 'Personal', runtime: { kind: 'personal' }, creatorUserId: 1 })
     expect(operationRef.mock.calls).toEqual([
@@ -72,6 +73,47 @@ describe('workbench account catalog', () => {
       maxResponseBytes: 1024 * 1024, upstreamTimeoutMs: 30_000,
     })
 
-    await expect(handler(user, new AbortController().signal)).resolves.toEqual(projectRows)
+    await expect(handler(user, new AbortController().signal)).resolves.toEqual({ items: projectRows, personalComplete: false })
+  })
+
+  it.each(['unavailable', 'empty', 'invalid-archive', 'cancelled'] as const)('distinguishes %s personal metadata from verified deletion', async (state) => {
+    const controller = new AbortController()
+    const operationRef = vi.fn(async () => {})
+    const instances = {
+      ensureRunning: async () => {
+        if (state === 'unavailable') throw new Error('manually stopped')
+        return { port: 42000, generation: 4 }
+      },
+      operationRef,
+    } as unknown as GatewayInstanceService
+    const user: UserRow = {
+      id: 1, username: 'me', displayName: 'Me', role: 'user', status: 'active',
+      homePath: '/home/me', mustChangePassword: false, autoReviewEligible: false,
+    }
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (state === 'cancelled') {
+        controller.abort()
+        throw new Error('request cancelled')
+      }
+      const value = url.endsWith('/workspace.list')
+        ? { archivedSessionIds: state === 'invalid-archive' ? [123] : [] }
+        : { items: [] }
+      return new Response(JSON.stringify({ result: { ok: true, value } }))
+    }))
+    const handler = createGatewayWorkbenchCatalogHandler({
+      instances,
+      collaboration: { listAccountConversations: async () => [] } as unknown as GatewayCollaborationService,
+      principals: new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'test', 30_000),
+      maxResponseBytes: 1024 * 1024, upstreamTimeoutMs: 30_000,
+    })
+    if (state === 'cancelled') {
+      await expect(handler(user, controller.signal)).rejects.toThrow('request cancelled')
+    } else {
+      await expect(handler(user, controller.signal)).resolves.toEqual({ items: [], personalComplete: state === 'empty' })
+    }
+    expect(operationRef.mock.calls).toEqual(state === 'unavailable' ? [] : [
+      [{ kind: 'user', id: 1 }, 1, 4],
+      [{ kind: 'user', id: 1 }, -1, 4],
+    ])
   })
 })

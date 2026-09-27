@@ -294,6 +294,41 @@ describe('createUserDocClient', () => {
     ])
   })
 
+  it.each([false, true])('pins every HTTP and XHR upload request to its account and runtime (%s)', async (scoped) => {
+    const session = {
+      uploadId: '00000000-0000-4000-8000-000000000011',
+      name: 'a.txt', directoryId: '', bytes: 1, fingerprint: 'fingerprint', chunkBytes: 65536,
+      receivedBytes: 0, expiresAt: Date.now() + 1000, state: 'uploading',
+    }
+    const complete = { ...session, receivedBytes: 1, state: 'complete', ref }
+    const urls: URL[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(typeof input === 'string' ? input : 'url' in input ? input.url : input.href, 'http://fixture')
+      urls.push(url)
+      return { ok: true, status: 200, text: async () => JSON.stringify(url.pathname.endsWith('/complete') ? complete : session) }
+    }))
+    installXhr((xhr) => {
+      xhr.open = vi.fn((_method: string, url: string) => { urls.push(new URL(url, 'http://fixture')) })
+      xhr.send = vi.fn(function send(this: MockXhr) { this.status = 200; this.responseText = '{}'; this.onload?.() })
+    })
+    const client = createUserDocClient((path) => {
+      const url = new URL(path, 'http://fixture')
+      url.searchParams.set('dshTarget', 'personal')
+      url.searchParams.set('dshPrincipal', '7')
+      return `${url.pathname}${url.search}`
+    })
+    const file = new File(['x'], 'a.txt')
+    if (scoped) await client.uploadToScope({ kind: 'project', projectId: 41 }, file, rootDirectoryId)
+    else await client.upload(file, rootDirectoryId)
+    expect(urls).toHaveLength(3)
+    for (const url of urls) {
+      expect(url.searchParams.get('dshPrincipal')).toBe('7')
+      expect(url.searchParams.get('dshTarget')).toBe('personal')
+      expect(url.searchParams.get('scope')).toBe(scoped ? 'project:41' : null)
+    }
+    expect(urls[1]!.pathname).toContain('/chunks/')
+  })
+
   it('keeps the legacy alternate-scope fallback on local paging when it has no cursor', async () => {
     const calls: string[] = []
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo, init?: RequestInit) => {

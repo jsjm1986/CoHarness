@@ -883,7 +883,7 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
     await retried.close()
   })
 
-  it.each(['read', 'write'] as const)('refuses the frozen pre-step V0 fixture on %s open without publishing a successor', async (access) => {
+  it.each(['read', 'write'] as const)('restores CoHarness pre-step V0 chronology on %s open while preserving its source', async (access) => {
     const id = SessionId('released-v0-real-shapes')
     const sourcePath = historicalLogPath(root, '/work', id)
     const currentPath = rawLogPath(root, '/work', id)
@@ -894,19 +894,26 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
     await writeFile(sourcePath, source)
     const before = await stat(sourcePath, { bigint: true })
 
-    await expect(ctx.sessionPersistence.open(id, access)).rejects.toMatchObject({
-      name: 'SessionFormatUnsupportedError',
-      message: expect.stringContaining('surface before first step') as unknown,
-    })
+    const handle = await ctx.sessionPersistence.open(id, access)
+    try {
+      const restored = await handle.read()
+      expect(handle.header.version).toBe(SESSION_FORMAT_VERSION)
+      expect(restored.events.some(event => event.type === 'system/message')).toBe(true)
+      expect(restored.events.some(event => event.type === 'user/message')).toBe(true)
+      expect(restored.events.map(event => event.seq)).toEqual(restored.events.map((_event, seq) => seq))
+      if (access === 'write') expect(scanLog(await readFile(currentPath)).events).toEqual(restored.events)
+      else await expect(readFile(currentPath)).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally {
+      await handle.close()
+    }
     await ctx.sessionPersistence.flush()
 
     const after = await stat(sourcePath, { bigint: true })
     expect({ dev: after.dev, ino: after.ino, size: after.size, mtimeNs: after.mtimeNs, ctimeNs: after.ctimeNs })
       .toEqual({ dev: before.dev, ino: before.ino, size: before.size, mtimeNs: before.mtimeNs, ctimeNs: before.ctimeNs })
     expect(await readFile(sourcePath)).toEqual(source)
-    await expect(readFile(currentPath)).rejects.toMatchObject({ code: 'ENOENT' })
-    expect((await readdir(dirname(sourcePath))).filter(name => name !== 'session.lock'))
-      .toEqual(['session.jsonl'])
+    expect((await readdir(dirname(sourcePath))).filter(name => name !== 'session.lock').sort())
+      .toEqual(access === 'write' ? ['session.jsonl', `session.v${SESSION_FORMAT_VERSION}.jsonl`] : ['session.jsonl'])
   })
 
   it.each(['read', 'write'] as const)('restores canonical replacement envelopes from valid V2 chronology on %s open', async (access) => {

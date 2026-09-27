@@ -12,6 +12,7 @@ const scopedSubjectResolvers: Readonly<Record<string, ScopedSubjectResolver | nu
   'agent/created': args => (args[0] as Record<string, unknown>)['agent'],
   'agent/disposed': args => (args[0] as Record<string, unknown>)['agent'],
   'agent/error': args => (args[0] as Record<string, unknown>)['agent'],
+  'agent/idle-release-check': args => (args[0] as Record<string, unknown>)['agent'],
   'agent/inbox/claimed': args => (args[0] as Record<string, unknown>)['agent'],
   'agent/inbox/discarded': args => (args[0] as Record<string, unknown>)['agent'],
   'agent/inbox/inserted': args => (args[0] as Record<string, unknown>)['agent'],

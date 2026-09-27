@@ -25,6 +25,8 @@
 
 该服务要求 Agent、Session、Session persistence 与 continuable-subagent 服务。没有持久 Session 存储的组合不会激活它。
 
+尚未结束的日志修改、队友创建与恢复、邮箱投递和异步确认，会持有相关 Session 标识直到最后一个异步检查点结束。操作完成、失败或取消前，永久清理会拒绝这些标识；Team 请求仍持有会话时，不会关闭其写入者。
+
 ## Team 身份与 roster
 
 每个普通运行时 Root 都是一个隐式 Team 的 Lead，其 `TeamId` 等于 `SessionId`；因此，在写入第一条成员、消息或任务记录前，创建 Team 不需要额外状态。teammate 是记录在 Root Session 中的具名 continuable 直接 child。名字采用小写 kebab-case，最长 64 个字符，在 Team 生命周期内不可变。Session id 始终是持久化与授权身份。

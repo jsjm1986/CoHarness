@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAdminApiHandler } from '../src/admin-api.ts'
 import { AuditService } from '../src/audit.ts'
 import { AuthService } from '../src/auth.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ModelGovernanceService } from '../src/model-governance.ts'
@@ -20,7 +20,6 @@ import {
   type ClusterState,
   type DeploymentOperationView,
 } from '../src/postgres/maintenance-service.ts'
-import type { DeploymentCommands } from '../src/deployment-commands.ts'
 import type { BackupRecordView } from '../src/postgres/backup-service.ts'
 
 let closer: (() => Promise<void>) | undefined
@@ -38,7 +37,7 @@ async function login(base: string, username: string, password: string): Promise<
 async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'hgw-deploy-'))
   const db = openDb(join(root, 'g.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects') })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects') })
   const deps: GatewayDeps = {
     cfg,
     auth: new AuthService(db, cfg),
@@ -77,7 +76,7 @@ const operation = (over: Partial<DeploymentOperationView> = {}): DeploymentOpera
 })
 const nodeView = (over: Partial<ClusterNodeView> = {}): ClusterNodeView => ({
   nodeId: 'n1', name: 'node-a', status: 'active', lastHeartbeatAt: null,
-  heartbeatAgeMs: null, maintenanceAppliedEpoch: '0', inflightWrites: 0, quiesced: true, ...over,
+  heartbeatAgeMs: null, maintenanceAppliedEpoch: '0', inflightWrites: 0, activeRuntimes: 0, quiesced: true, ...over,
 })
 const maintenanceStub = (over: Partial<MaintenanceStub> = {}): MaintenanceStub => ({
   state: async () => state(),
@@ -112,7 +111,7 @@ describe('deployment admin API', () => {
     const exit = vi.fn(async () => state())
     const nodeStatus = vi.fn(async (): Promise<ClusterNodeView> => ({
       nodeId: 'n1', name: 'node-a', status: 'draining', lastHeartbeatAt: null,
-      heartbeatAgeMs: null, maintenanceAppliedEpoch: '0', inflightWrites: 0, quiesced: false,
+      heartbeatAgeMs: null, maintenanceAppliedEpoch: '0', inflightWrites: 0, activeRuntimes: 0, quiesced: false,
     }))
     deps.maintenance = maintenanceStub({
       enterMaintenance: enter, exitMaintenance: exit, setNodeStatus: nodeStatus,
@@ -138,7 +137,7 @@ describe('deployment admin API', () => {
     deps.maintenance = maintenanceStub({ requestRestore })
     const get = vi.fn(async (id: string): Promise<BackupRecordView> => ({
       id, path: '/tmp/d.dump', format: 'pg-dump-custom', migrationVersion: 41, writeEpoch: '1',
-      sizeBytes: 1, sha256: null, managedFiles: [], status: id === 'b1' ? 'verified' : 'recording',
+      sizeBytes: 1, sha256: 'f'.repeat(64), managedSnapshot: { version: 1, roots: [], directories: [], absent: [], files: [] }, status: id === 'b1' ? 'verified' : 'recording',
       createdBy: 1, createdAt: 'now', verifiedAt: null, restoredAt: null, error: null,
     }))
     deps.backups = { list: vi.fn(async () => []), get, record: vi.fn(), setVerified: vi.fn() }
@@ -148,40 +147,29 @@ describe('deployment admin API', () => {
     expect((await post('/admin/api/deployment/restore', {})).status).toBe(400)
   })
 
-  it('creates and verifies backups through the deployment commands', async () => {
+  it('delegates backup creation and complete artifact verification and propagates admission refusal', async () => {
     const { deps, post } = await setup()
-    const dump = {
-      dumpPath: '/backups/harness-x.dump', filesDir: '/backups/harness-x.files',
-      sizeBytes: 42, sha256: 'f'.repeat(64),
-      managedFiles: [{ member: '000-k', sourcePath: '/k', sizeBytes: 1, sha256: 'e'.repeat(64) }],
-    }
-    const commands: DeploymentCommands = {
-      backup: vi.fn(async () => dump),
-      verifyDump: vi.fn(async () => {}),
-      restoreDump: vi.fn(async () => {}),
-      restoreManagedFiles: vi.fn(async () => {}),
-      verifyManagedFiles: vi.fn(async () => []),
-    }
-    deps.backupWork = { commands, databaseUrl: 'postgres://x', backupDir: '/backups', managedPaths: ['/k'] }
     const recorded: BackupRecordView = {
-      id: 'b1', path: dump.dumpPath, format: 'pg-dump-custom', migrationVersion: 41, writeEpoch: '1',
-      sizeBytes: 42, sha256: dump.sha256, managedFiles: dump.managedFiles, status: 'recording',
-      createdBy: 1, createdAt: 'now', verifiedAt: null, restoredAt: null, error: null,
+      id: 'b1', path: '/backups/fixture.dump', format: 'pg-dump-custom', migrationVersion: 46, writeEpoch: '1',
+      sizeBytes: 42, sha256: 'f'.repeat(64),
+      managedSnapshot: { version: 1, roots: [], directories: [], absent: [], files: [] }, status: 'verified',
+      createdBy: 1, createdAt: 'now', verifiedAt: 'now', restoredAt: null, error: null,
     }
-    const record = vi.fn(async () => recorded)
-    const setVerified = vi.fn(async (id: string, ok: boolean): Promise<BackupRecordView> => ({
-      ...recorded, status: ok ? 'verified' : 'failed',
-    }))
-    deps.backups = { list: vi.fn(async () => [recorded]), get: vi.fn(async () => recorded), record, setVerified }
-    deps.maintenance = maintenanceStub({ logOperation: vi.fn(async () => 'op') })
-    deps.migrationPlan = async () => ({ applied: [41], pending: [], drifted: [], current: 41 })
-    const created = await post('/admin/api/backups', {})
-    expect(created.status).toBe(200)
-    expect(commands.backup).toHaveBeenCalledWith('/backups', 'postgres://x', ['/k'])
-    expect(record).toHaveBeenCalledWith(expect.objectContaining({ path: dump.dumpPath, migrationVersion: 41 }))
+    const create = vi.fn(async () => recorded), verify = vi.fn(async () => recorded)
+    const previewNodeConfiguration = vi.fn(async (id: string) => ({ backupId: id, configFile: null,
+      appliedRevision: null, values: null, incompatibleFields: [] }))
+    deps.backupWork = { create, verify, previewNodeConfiguration }
+    deps.backups = { list: vi.fn(async () => [recorded]), get: vi.fn(async () => recorded), record: vi.fn(), setVerified: vi.fn() }
+    expect((await post('/admin/api/backups', {})).status).toBe(200)
+    expect(create).toHaveBeenCalledExactlyOnceWith(expect.any(Number))
     expect((await post('/admin/api/backups/verify', { id: 'b1' })).status).toBe(200)
-    expect(commands.verifyDump).toHaveBeenCalledWith(dump.dumpPath)
-    expect(setVerified).toHaveBeenCalledWith('b1', true)
+    expect(verify).toHaveBeenCalledExactlyOnceWith('b1')
+    expect((await post('/admin/api/backups/node-configuration', { id: 'b1' })).status).toBe(200)
+    expect(previewNodeConfiguration).toHaveBeenCalledExactlyOnceWith('b1')
+    create.mockRejectedValueOnce(new MaintenanceError(409, 'writers-not-quiesced'))
+    expect((await post('/admin/api/backups', {})).status).toBe(409)
+    verify.mockRejectedValueOnce(new MaintenanceError(409, 'backup-manifest-differs-from-registry'))
+    expect((await post('/admin/api/backups/verify', { id: 'b1' })).status).toBe(409)
   })
 })
 
@@ -206,7 +194,14 @@ describe('maintenance write gate', () => {
       body: '{}',
     })
     expect(runtime.status).toBe(503)
+    const user = (await deps.users.list())[0]!
+    const stop = vi.spyOn(deps.instances, 'stop').mockResolvedValue(undefined)
+    expect((await post(`/admin/api/users/${user.id}/instance/stop`, {})).status).toBe(204)
+    expect(stop).toHaveBeenCalledExactlyOnceWith(user.id)
+    expect((await post(`/admin/api/users/${user.id}/instance/start`, {})).status).toBe(503)
     gate.mockResolvedValue('stale-epoch')
+    expect((await post(`/admin/api/users/${user.id}/instance/stop`, {})).status).toBe(503)
+    expect(stop).toHaveBeenCalledOnce()
     const stale = await post('/admin/api/users/create', { username: 'y', password: 'pw-12345678' })
     expect(stale.status).toBe(503)
     expect(await stale.json()).toEqual({ error: 'stale-epoch' })

@@ -29,7 +29,8 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-home-paths": "workspace:^",
-    "@deepseek-ai/dsh-userdoc": "workspace:^"
+    "@deepseek-ai/dsh-userdoc": "workspace:^",
+    "@deepseek-ai/dsh-managed-data": "workspace:^"
   },
   "dependencies": {
     "@deepseek-ai/dsh-atomic-write": "workspace:^",
@@ -38,6 +39,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-home-paths": "workspace:^",
-    "@deepseek-ai/dsh-userdoc": "workspace:^"
+    "@deepseek-ai/dsh-userdoc": "workspace:^",
+    "@deepseek-ai/dsh-managed-data": "workspace:^"
   }
 }

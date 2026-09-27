@@ -1,3 +1,4 @@
+import { clientSessionKey } from '@deepseek-ai/dsh-client-connection/client'
 /**
  * Runtime plugin browser-half apply: slots + object services mounting over the
  * connection handle, stream-loop sink wiring into the object layer, and the
@@ -31,7 +32,7 @@ interface Bench {
   dispatchForwarded: (event: string, args?: readonly unknown[]) => void
 }
 
-async function mount(): Promise<Bench> {
+async function mount(overrides: Partial<ConnectionHandle> = {}): Promise<Bench> {
   const ctx = new Context()
   await ctx.plugin(TypertRegistry)
   const api = new FakeApiClient()
@@ -82,6 +83,7 @@ async function mount(): Promise<Bench> {
       bench.sinks = sinks
       return { stop: () => { bench.stopped += 1 } }
     },
+    ...overrides,
   }
   ctx.reflect.provide('connection', handle)
   ctx.reflect.provide('remote', remote)
@@ -117,7 +119,7 @@ describe('runtime client apply', () => {
       payload: { type: 'host/session-added', blank: true, sessionId: 's-new' } as never,
     })
     await Promise.resolve()
-    expect((sessions as { list: { getSnapshot(): { ids: string[] } } }).list.getSnapshot().ids).toContain('s-new')
+    expect((sessions as { list: { getSnapshot(): { ids: string[] } } }).list.getSnapshot().ids).toContain(clientSessionKey({ kind: 'personal' }, 's-new' as never))
     bench.sinks?.onHostEnvelope?.({
       rpcId: 'r-workspace' as never,
       payload: {
@@ -160,7 +162,7 @@ describe('runtime client apply', () => {
     expect(create).toMatchObject({ workspaceId: 'w-recent' })
     expect(typeof (create as { draftId?: unknown })?.draftId).toBe('string')
     expect(typeof (create as { sessionId?: unknown })?.sessionId).toBe('string')
-    expect(sessions.list.getSnapshot().current).toBe((create as { sessionId?: unknown })?.sessionId)
+    expect(sessions.list.getSnapshot().current).toBe(clientSessionKey({ kind: 'personal' }, (create as { sessionId: never }).sessionId))
 
     sessions.clear()
     await workspaces.refresh()
@@ -236,4 +238,31 @@ describe('runtime client apply', () => {
     expect(bench.stopped).toBe(1)
     void fiber
   })
+})
+
+it('disposes every retained Client generation before reloading for a different confirmed account', async () => {
+  const { createBrowserIdentityFence } = await import('@deepseek-ai/dsh-client-connection/src/client/identity-fence.ts')
+  const reload = vi.fn()
+  const fence = createBrowserIdentityFence(vi.fn<typeof fetch>(), 'https://gateway.example', reload)
+  const b = await mount({ confirmPrincipal: fence.confirm, onPrincipalChange: fence.subscribe })
+  const policy = b.ctx.projectUiPolicy
+  const sessions = b.ctx.sessions
+  try {
+    policy.setVerifiedAccountId(7)
+    b.sinks?.onHostEnvelope?.({ rpcId: 'owned-frame' as never,
+      payload: { type: 'host/session-added', sessionId: 'same' as never, blank: true } })
+    await flushMicrotasks()
+    const key = clientSessionKey({ kind: 'personal' }, 'same' as never)
+    const reference = sessions.retain(key, { source: 'controllerOperation' })
+    await reference.ready
+    policy.setVerifiedAccountId(undefined)
+    expect(reference.binding.session.sessionId).toBe(key)
+    expect(reload).not.toHaveBeenCalled()
+    expect(() => { policy.setVerifiedAccountId(8) }).toThrow('Gateway account changed')
+    await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce() })
+    expect(() => reference.binding).toThrow()
+    expect(b.ctx.get('sessions')).toBeUndefined()
+    expect(b.ctx.get('slots')).toBeUndefined()
+    expect(b.stopped).toBe(1)
+  } finally { fence.dispose(); await b.ctx.fiber.dispose() }
 })

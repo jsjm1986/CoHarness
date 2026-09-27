@@ -8,7 +8,7 @@ import { apply, inject } from '../src/client/index.ts'
 
 describe('ui-documents apply', () => {
   it('declares only the services it reads', () => {
-    expect(inject).toEqual(['slots', 'locale', 'sessions', 'conversation'])
+    expect(inject).toEqual(['slots', 'locale', 'sessions', 'conversation', 'connection'])
   })
 
   it('registers the documents entry in the sidebar footer action slot', async () => {
@@ -20,6 +20,7 @@ describe('ui-documents apply', () => {
       list: { getSnapshot: () => ({ current: 'session-1' }), subscribe: () => () => {} },
     })
     ctx.provide('conversation', { attachDocument })
+    ctx.provide('connection', {} as never)
     ctx.slots.register({
       name: 'root',
       children: {

@@ -193,7 +193,7 @@ describe('built-in conversation node Definitions', () => {
     const empty = assembler([
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
-      at(3, 'turn/end', { turn: 1, reason: { kind: 'aborted' } }),
+      at(3, 'turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'legacy' } } }),
     ])
     expect(node(snapshot(empty), 'turn-process')).toBeUndefined()
 
@@ -231,7 +231,7 @@ describe('built-in conversation node Definitions', () => {
       at(20, 'turn/start', { turn: 3 }),
       at(21, 'step/start', { turn: 3, step: 1 }),
       at(22, 'tool/call', { turn: 3, step: 1, callId: 'cancelled', name: 'read', arguments: '{}' }),
-      at(23, 'turn/end', { turn: 3, reason: { kind: 'aborted' } }),
+      at(23, 'turn/end', { turn: 3, reason: { kind: 'aborted', reason: { kind: 'legacy' } } }),
     ])
     expect(node(snapshot(interrupted), 'turn-process')?.data).toMatchObject({
       turn: 3,
@@ -1121,6 +1121,22 @@ describe('built-in conversation node Definitions', () => {
 
     expect(node(snapshot(value), 'model-retry')).toBeUndefined()
     expect(node(snapshot(value), 'tool-call')).toBeUndefined()
+  })
+
+  it('renders an explicit policy cancellation and preserves its recovery instructions', () => {
+    const reason = 'Access was revoked. Remaining queued input is kept. Send a new message to continue.'
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'hook', reason } } }),
+    ])
+    expect(node(snapshot(value), 'turn-error')?.data).toMatchObject({ message: reason, turn: 1 })
+    const restored = assembler([at(2, 'turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'hook', reason } } })], true)
+    expect(node(snapshot(restored), 'turn-error')?.data).toMatchObject({ message: reason })
+    const stopped = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } }),
+    ])
+    expect(node(snapshot(stopped), 'turn-error')).toBeUndefined()
   })
 
   it('renders the terminal turn error when the loaded tail contains only a later retry attempt', () => {

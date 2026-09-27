@@ -143,11 +143,19 @@ export function resolveDshLaunch(
     command: process.execPath,
     args: [...dshLaunch.nodeArgs, '--profile', profile, ...patches.flatMap(path => ['--patch', path])],
     ...options.processCwd === undefined ? {} : { cwd: resolve(callerCwd, options.processCwd) },
-    environment: () => ({
-      ...(options.env ?? process.env),
-      ...dshLaunch.environment,
-      ...dshHome === undefined ? {} : { DSH_HOME: dshHome },
-    }),
+    environment: () => {
+      const inherited = options.env ?? process.env
+      const environment: NodeJS.ProcessEnv = { ...inherited, ...dshLaunch.environment,
+        ...dshHome === undefined ? {} : { DSH_HOME: dshHome } }
+      // Inventory ownership follows the selected home; an explicit child
+      // environment may deliberately supply its own inventory destination.
+      if (options.env === undefined && dshHome !== undefined
+        && (inherited.DSH_HOME === undefined || inherited.DSH_HOME.trim() === ''
+          || resolve(callerCwd, inherited.DSH_HOME) !== dshHome)) {
+        delete environment.DSH_MANAGED_DATA_MANIFEST
+      }
+      return environment
+    },
     description: `dsh profile ${JSON.stringify(profile)}`,
     initializeTimeoutMs: options.initializeTimeoutMs ?? DEFAULT_INITIALIZE_TIMEOUT_MS,
     ...options.requestTimeoutMs === undefined ? {} : { requestTimeoutMs: options.requestTimeoutMs },

@@ -5,6 +5,9 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 /** Immutable input identity in the Gateway's execution registry. */
 export type ExecutionInputId = Branded<'ExecutionInputId'>
 
+/** Immutable server-owned participants of one admitted execution. */
+export type ExecutionScopeId = Branded<'ExecutionScopeId'>
+
 /** Host RPC identity of the pending human question claimed by the Gateway. */
 export type ExecutionQuestionId = Branded<'rpc-id'>
 
@@ -14,6 +17,7 @@ export type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review
 /** Gateway-confirmed participant set, with bounded identity witnesses. */
 export interface ExecutionState {
   readonly revision: string
+  readonly scopeId?: ExecutionScopeId
   readonly inputs: readonly ExecutionInputId[]
   readonly actors: readonly { readonly userId: number }[]
   readonly primaryActorUserId?: number
@@ -23,6 +27,7 @@ export interface ExecutionState {
 /** A delegation captures its parent before awaiting child creation. */
 export interface ExecutionInheritance {
   readonly parentSessionId: SessionId
+  readonly scopeId?: ExecutionScopeId
   readonly inputs: readonly ExecutionInputId[]
   readonly unverifiedHistory: boolean
   readonly primaryActorUserId?: number
@@ -47,6 +52,10 @@ declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     /** Verified execution participants and captured delegation; omission loses authorization constraints. */
     'gateway/execution': ExecutionEvent
+    /** Required reader admission for immutable per-request scopes instead of Session-wide accumulation. */
+    'gateway/scoped-execution': { readonly version: 1 }
+    /** Captured initiator for an autonomous continuation; omission would lend a later caller's authority. */
+    'gateway/continuation': { readonly key: string; readonly scope: ExecutionInheritance }
   }
 }
 

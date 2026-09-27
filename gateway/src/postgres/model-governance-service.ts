@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
+import { decimalToMicros, microsToDecimal } from '../money.ts'
 import { verifyExecutionAttribution } from '../execution-identity.ts'
 import type { UserRow } from '../auth.ts'
 import type {
@@ -66,23 +67,6 @@ function credentialClassOf(source: string): CredentialClass {
 
 function tokenHash(token: string): Buffer {
   return createHash('sha256').update(token).digest()
-}
-
-function microsToDecimal(value: number): string {
-  nonnegative(value, 'monetary value')
-  return `${String(Math.floor(value / 1_000_000))}.${String(value % 1_000_000).padStart(6, '0')}`
-}
-
-function decimalToMicros(value: string | number): number {
-  const text = String(value)
-  const match = /^(\d+)(?:\.(\d+))?$/.exec(text)
-  if (match === null) throw new Error(`invalid non-negative decimal monetary value: ${text}`)
-  const whole = Number(match[1])
-  const fraction = (match[2] ?? '').padEnd(7, '0')
-  let micros = whole * 1_000_000 + Number(fraction.slice(0, 6))
-  if (Number(fraction[6]) >= 5) micros += 1
-  if (!Number.isSafeInteger(micros)) throw new Error(`monetary value exceeds safe integer range: ${text}`)
-  return micros
 }
 
 function safeCount(value: string | number, name: string): number {

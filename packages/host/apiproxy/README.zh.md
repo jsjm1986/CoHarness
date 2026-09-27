@@ -12,9 +12,13 @@
 
 `session.history` 和 `subagent.history` 接受 `toolCallId`，独立读取调用所属的完整轮次。查询复用现有 Session 观察所有者，不激活 Agent 或计算投影；子会话读取保留目录及父子会话授权检查。该参数不能与分页选择或仅对话详情组合。Fetch 传输压缩轮次但不裁掉前缀；客户端响应大小限制仍会拒绝超大响应。调用不存在时返回空结果，授权、持久化与取消失败仍是错误。
 
-`workspaceChanges.summary` 与 `workspaceChanges.diff` 通过相同的 Session 和目录授权读取已记录的轮次差异。读取完成后重新核验权限；记录器已释放快照时返回 null。已删除的文件仍可审阅，不用当前内容替代历史证据，也不公开私有存储路径或 Git 对象标识。
+`workspaceChanges.summary` 与 `workspaceChanges.diff` 通过相同的 Session 和目录授权读取已记录的轮次差异。读取完成后重新核验权限，通过已加载或持久 Session 的通知定位不可变记录。内容缺失时返回 null；存储损坏仍作为错误返回。已删除的文件仍可审阅，不用当前内容替代历史证据，也不公开私有存储路径或 Git 对象标识。
 
 `desktop.status` 和 `desktop.confirm` 使用会话写入授权及部署的交互确认控制器，不启动模型回合。未配置控制器时，状态返回 null，写入被拒绝；确认绑定页面显示的根会话、节点和桌面。Host 在异步操作完成后复核访问权限，取消或卸载后不能返回迟到的成功响应。
+
+Host 为 `hostSessionLifecycle` 保存创建、恢复与 fork 句柄。永久清理只释放这些确切的空闲所有者，并将标识预留保持到存储删除和 Gateway 回执完成。忙碌或所有权不明时，在删除前拒绝。
+
+`host.describe.runtimeTarget` 根据受管启动凭据标识 runtime，独立 Host 则声明个人作用域。可在浏览器使用的 API 导出规范 Client Session 地址，以及与 Host 授权共用的显式 Remote Session 路径策略；这些辅助函数不改写任意载荷字符串，也不改变持久 ID。
 
 ## 概述
 

@@ -4,6 +4,8 @@ English | [中文](README.zh.md)
 
 The background job registry contract (`ctx.jobs`). The abstract `JobRegistry` and its vocabulary types give long-running producers shared ids, owner isolation, reads, cancellation, waiting, notices, and cleanup under one contract; the process-local registry lives in [`dsh-jobs-local`](../jobs-local/README.md). Producer plugins extend `JobKindMap` with their opaque id namespace.
 
+A running or stopping job vetoes idle disposal of its exact owning Agent through `agent/idle-release-check`. Completed jobs do not block removal; resource cleanup remains the producer’s responsibility.
+
 ## Summary
 
 `dsh-jobs` lets tools keep long-running work active while an agent continues. Each job receives a stable `<kind>-N` id, and its owning agent can read output, wait with a timeout, or request cancellation. Ownership is scoped to the agent session, so other agents cannot inspect or stop the job; completion arrives as an in-session notice without polling. Background jobs can start only when the deployment supplies job execution.
@@ -28,6 +30,8 @@ Owned access compares the job's `SessionId` with the caller's. Ids such as `bash
 Implementations also owe the lifecycle semantics of the contract: registrations outlive producer and controller fibers, owner and service disposal cancel live work and await compliant producers, and settlement is first-wins — one terminal record, one round of contained listener notification, released waiters.
 
 See the [job type catalog](../../../docs/subsystems/jobs.md), the [runtime Agent Note](../../../.agents/notes/implemented/architecture/2026-06-20-generic-long-running-tool-runtime.md), and the [seam Agent Note](../../../.agents/notes/implemented/architecture/2026-07-26-job-registry-seam.md).
+
+Managed job snapshots include the immutable execution scope captured at job creation. Completion consumers retain this origin; model-facing job summaries omit authorization metadata.
 
 ## Model Experience
 

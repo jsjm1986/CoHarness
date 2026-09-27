@@ -1,4 +1,5 @@
 /** Session catalog, view references, local scope generations, and renderer bindings. */
+import { sessionPresentation } from './presentation.ts'
 import type { Context, Fiber } from '@deepseek-ai/cordis'
 import type { HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
 import type {
@@ -20,7 +21,7 @@ import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionFace } from '../contract/session.ts'
 import type { AgentContext, ISessions } from '../contract/sessions.ts'
 import { NavigationController } from '../navigation.ts'
-import { createScope, scopeIdentityOf, scopeOf as scopeTagOf } from '../scope.ts'
+import { createScope, scopeIdentityOf } from '../scope.ts'
 import type { ConversationRuntime } from './conversation-assembler.ts'
 import { SessionManager } from './manager.ts'
 import type { SessionRemotes } from './remotes.ts'
@@ -401,7 +402,20 @@ export class SessionRuntime implements ISessions {
     )
     this.manager = new SessionManager(
       api,
-      remote,
+      {
+        commands: { ...remote.commands,
+          execute: (id, ...args) => remote.commands.execute(this.presentationKey(id), ...args),
+        },
+        subagents: { ...remote.subagents,
+          list: (id, ...args) => remote.subagents.list(this.presentationKey(id), ...args),
+          prompt: (request, ...args) => remote.subagents.prompt({ ...request,
+            parentSessionId: this.presentationKey(request.parentSessionId),
+            childSessionId: this.presentationKey(request.childSessionId),
+          }, ...args),
+          interruptByParent: (parent, child, ...args) =>
+            remote.subagents.interruptByParent(this.presentationKey(parent), this.presentationKey(child), ...args),
+        },
+      },
       restored.sessionId,
       restored.subagentAddress,
       conversation,
@@ -477,6 +491,24 @@ export class SessionRuntime implements ISessions {
     }, 'sessions: scope disposal')
     if (options.provideService !== false) rootCtx.reflect.provide('sessions', this, undefined)
   }
+
+  private runtimeTarget: import('@deepseek-ai/dsh-client-connection/client').ConnectionRuntimeTarget | undefined
+  private presentationKey: (id: SessionId) => SessionId = id => id
+
+  /** Set the Client identity projection before materializing any Session scope.
+   * @param key - browser identity derived from this runtime and the original Session ID.
+   * @param target - explicit runtime passed to Client preparation hooks.
+   */
+  setPresentationKey(key: (id: SessionId) => SessionId, target?: import('@deepseek-ai/dsh-client-connection/client').ConnectionRuntimeTarget): void {
+    if (this.scopes.size !== 0) throw new Error('Cannot change a runtime identity while Session scopes are retained')
+    this.presentationKey = key
+    this.runtimeTarget = target
+  }
+
+  /** Read the current provider roster with every Session value absent.
+   * @returns the renderer kit used while an account is being withdrawn.
+   */
+  unboundProvideInfo(): SessionMaybeProvideInfo { return this.provideChannel.maybeInfo }
 
   beginNavigation(): AbortSignal {
     return this.navigation.begin()
@@ -706,18 +738,19 @@ export class SessionRuntime implements ISessions {
 
   private prepareCreate(opts: SessionCreateOptions): Promise<SessionCreateOptions> {
     return this.rootCtx.waterfall(
-      'sessions/prepare-create', opts, () => Promise.resolve(opts),
+      'sessions/prepare-create', this.runtimeTarget === undefined ? opts : { ...opts, runtimeTarget: this.runtimeTarget }, () => Promise.resolve(this.runtimeTarget === undefined ? opts : { ...opts, runtimeTarget: this.runtimeTarget }),
     )
   }
 
   private async createPrepared(prepared: SessionCreateOptions, reuseSessionId?: SessionId): Promise<SessionId> {
     const sessionId = reuseSessionId ?? prepared.sessionId
+    const { runtimeTarget: _runtimeTarget, ...wireOptions } = prepared
     // A reservation belongs only to a newly minted draft. Reusing an existing
     // blank session must not attach or consume another tab's reservation key.
     const request = reuseSessionId === undefined
-      ? prepared
+      ? wireOptions
       : (() => {
-        const { draftId: _draftId, ...rest } = prepared
+        const { draftId: _draftId, ...rest } = wireOptions
         return { ...rest, sessionId: reuseSessionId }
       })()
     const result = await this.manager.create(
@@ -789,7 +822,9 @@ export class SessionRuntime implements ISessions {
    * @returns the session id, or undefined on root contexts.
    */
   scopeOf(ctx: Context): SessionId | undefined {
-    return scopeTagOf(ctx)
+    const identity = scopeIdentityOf(ctx)
+    const record = identity === undefined ? undefined : this.scopes.get(identity.sessionId)
+    return record !== undefined && scopeIdentityOf(record.ctx) === identity ? identity?.sessionId : undefined
   }
 
   /**
@@ -802,7 +837,7 @@ export class SessionRuntime implements ISessions {
    * @returns the session face, or undefined when the ctx is untagged or its scope was pruned.
    */
   sessionOf(ctx: Context): SessionFace | undefined {
-    const id = scopeTagOf(ctx)
+    const id = scopeIdentityOf(ctx)?.sessionId
     if (id === undefined) return undefined
     const record = this.scopes.get(id)
     return record !== undefined && scopeIdentityOf(record.ctx) === scopeIdentityOf(ctx)
@@ -926,13 +961,15 @@ export class SessionRuntime implements ISessions {
 
   /** Materialize one validated local generation for its first reference. */
   private materializeScope(id: SessionId): ScopeRecord {
-    const { fiber, ctx } = createScope(this.rootCtx, id)
+    const presentationId = this.presentationKey(id)
+    const { fiber, ctx } = createScope(this.rootCtx, id, presentationId)
     const session = this.manager.get(id)
     // The Session owns its scoped dispatch point (host Agent.loopCtx mirror);
     // mint and bind are one step so a live scope record implies a bound actx.
     session.bindScope(ctx)
     const binding: SessionBinding = {
-      sessionId: id, session, ctx,
+      sessionId: presentationId,
+      session: presentationId === id ? session : sessionPresentation(session, presentationId, this.presentationKey), ctx,
       ...this.hostDescription === undefined ? {} : { hostDescription: this.hostDescription },
     }
     const record: ScopeRecord = {
@@ -1071,7 +1108,7 @@ export class SessionRuntime implements ISessions {
     this.manager.drop(id, record.session)
     // Optional lookup: slots and sessions are sibling services with no
     // declared dependency; a slots-less boot (object-layer tests) skips.
-    this.rootCtx.get('slots')?.pruneStoreScope(id)
+    this.rootCtx.get('slots')?.pruneStoreScope(record.binding.sessionId)
     try {
       if (disposeFiber) await record.fiber.dispose()
     } finally {

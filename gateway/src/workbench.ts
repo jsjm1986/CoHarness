@@ -7,7 +7,14 @@ import { PRINCIPAL_HEADER } from './principal.ts'
 import type { GatewayCollaborationService, GatewayInstanceService } from './services.ts'
 import { readResponseJson } from './response-budget.ts'
 
-export type GatewayWorkbenchCatalogHandler = (user: UserRow, signal: AbortSignal) => Promise<AccountConversationView[]>
+/** Catalog metadata and whether absence proves deletion from the personal runtime. */
+export interface GatewayWorkbenchCatalog {
+  items: AccountConversationView[]
+  personalComplete: boolean
+}
+
+/** Read authenticated catalog metadata without treating an unavailable runtime as an empty one. */
+export type GatewayWorkbenchCatalogHandler = (user: UserRow, signal: AbortSignal) => Promise<GatewayWorkbenchCatalog>
 
 function object(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -30,18 +37,14 @@ export function createGatewayWorkbenchCatalogHandler(deps: {
   return async (user, signal) => {
     const projectRows = await deps.collaboration.listAccountConversations?.(user.id) ?? []
     const target = { kind: 'user' as const, id: user.id }
-    // The account catalog is also the user's only cross-runtime directory.
-    // A single unreadable legacy personal artifact must not hide project
-    // conversations that PostgreSQL has already authorized.  Return the
-    // authoritative project rows while the personal runtime can be repaired;
-    // cancellation still propagates so a closed browser request is not turned
-    // into a successful partial response.
+    // Project authorization remains authoritative while the personal runtime
+    // is unavailable. Incomplete personal metadata cannot prove deletion.
     let running: Awaited<ReturnType<GatewayInstanceService['ensureRunning']>>
     try {
       running = await deps.instances.ensureRunning(user)
     } catch (error: unknown) {
       if (signal.aborted) throw error
-      return projectRows
+      return { items: projectRows, personalComplete: false }
     }
     let leased = false
     try {
@@ -113,11 +116,12 @@ export function createGatewayWorkbenchCatalogHandler(deps: {
         }]
       })
       const personalIds = new Set(personalRows.map(row => row.sessionId))
-      return [...personalRows.filter(row => !archivedIds.has(row.sessionId)), ...projectRows.filter(row => row.runtime.kind !== 'personal' || !personalIds.has(row.sessionId))]
+      const items = [...personalRows.filter(row => !archivedIds.has(row.sessionId)), ...projectRows.filter(row => row.runtime.kind !== 'personal' || !personalIds.has(row.sessionId))]
         .sort((left, right) => right.updatedAt - left.updatedAt || left.sessionId.localeCompare(right.sessionId))
+      return { items, personalComplete: true }
     } catch (error: unknown) {
       if (signal.aborted) throw error
-      return projectRows
+      return { items: projectRows, personalComplete: false }
     } finally {
       if (leased) await deps.instances.operationRef?.(target, -1, running.generation)
     }

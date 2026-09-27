@@ -14,6 +14,7 @@ import {
   applyArchiveAction,
   exportArchive,
   getArchive,
+  getArchiveStatus,
   listArchives,
   previewEmptyDrafts,
   trashEmptyDrafts,
@@ -60,6 +61,10 @@ export function ArchivesPage() {
   const [emptySelected, setEmptySelected] = useState<Set<string>>(new Set())
   const [emptyLoading, setEmptyLoading] = useState(false)
   const [emptyError, setEmptyError] = useState('')
+  const rowsGeneration = useRef(0)
+  const detailGeneration = useRef(0)
+  const viewKey = useRef(JSON.stringify([EMPTY_DRAFT, 0]))
+  useEffect(() => () => { rowsGeneration.current++; detailGeneration.current++ }, [])
 
   const fetchRows = useCallback(async (filter: Draft, nextOffset: number, showLoading = true) => {
     const userId = filter.userId === '' ? undefined : Number(filter.userId)
@@ -69,27 +74,82 @@ export function ArchivesPage() {
       setError('用户 ID 和项目 ID 必须是正整数')
       return
     }
+    const key = JSON.stringify([filter, nextOffset])
+    if (showLoading) viewKey.current = key
+    else if (viewKey.current !== key) return
+    const generation = ++rowsGeneration.current
     if (showLoading) setLoading(true)
     try {
-      setRows(await listArchives({
+      const current = await listArchives({
         state: filter.state,
         query: filter.query,
         userId,
         projectId,
         limit: PAGE_SIZE,
         offset: nextOffset,
-      }))
+      })
+      if (generation !== rowsGeneration.current || viewKey.current !== key) return
+      setRows(current)
       setOffset(nextOffset)
-      setSelected(new Set())
+      if (showLoading) setSelected(new Set())
+      else setSelected(previous => new Set([...previous].filter(id => current.some(row => row.rootSessionId === id))))
       setError('')
     } catch (cause) {
-      setError(messageFrom(cause))
+      if (generation === rowsGeneration.current) setError(messageFrom(cause))
     } finally {
-      if (showLoading) setLoading(false)
+      if (showLoading && generation === rowsGeneration.current) setLoading(false)
     }
   }, [])
 
   useEffect(() => { void fetchRows(EMPTY_DRAFT, 0) }, [fetchRows])
+
+  useEffect(() => {
+    const pending = rows.filter(row => row.syncState === 'pending' && row.rootSessionId !== detail?.record.rootSessionId)
+    if (pending.length === 0) return
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout>
+    const generation = rowsGeneration.current
+    const poll = async () => {
+      try {
+        const statuses = await Promise.all(pending.map(row => getArchiveStatus(row.rootSessionId)))
+        if (cancelled || generation !== rowsGeneration.current) return
+        if (statuses.some(row => active.state !== 'all' && row.state !== active.state)) {
+          await fetchRows(active, offset, false)
+        } else {
+          const byId = new Map(statuses.map(row => [row.rootSessionId, row]))
+          setRows(current => current.map(row => byId.get(row.rootSessionId) ?? row))
+        }
+      } catch (cause) {
+        if (!cancelled && generation === rowsGeneration.current) setError(messageFrom(cause))
+      }
+      if (!cancelled) timer = setTimeout(() => void poll(), 5000)
+    }
+    timer = setTimeout(() => void poll(), 5000)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [active, detail?.record.rootSessionId, fetchRows, offset, rows])
+
+  useEffect(() => {
+    if (detail?.record.syncState !== 'pending') return
+    const id = detail.record.rootSessionId
+    const generation = detailGeneration.current
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout>
+    const poll = async () => {
+      try {
+        const record = await getArchiveStatus(id)
+        if (cancelled || generation !== detailGeneration.current) return
+        setDetail(current => current?.record.rootSessionId !== id ? current : {
+          ...current, record, ...record.state === 'purged' ? { descendants: [], events: [], hasMore: false } : {},
+        })
+        if (record.syncState !== 'pending') { void fetchRows(active, offset, false); return }
+      } catch (cause) {
+        if (!cancelled && generation === detailGeneration.current) setActionError(messageFrom(cause))
+      }
+      if (!cancelled) timer = setTimeout(() => void poll(), 2000)
+    }
+    timer = setTimeout(() => void poll(), 2000)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [active, detail?.record.rootSessionId, detail?.record.syncState, fetchRows, offset])
 
   function onFilter(event: FormEvent) {
     event.preventDefault()
@@ -133,14 +193,16 @@ export function ArchivesPage() {
   }
 
   async function openDetail(row: ConversationArchiveRow) {
+    const generation = ++detailGeneration.current
     setDetailLoading(true)
     setActionError('')
     try {
-      setDetail(await getArchive(row.rootSessionId))
+      const current = await getArchive(row.rootSessionId)
+      if (generation === detailGeneration.current) setDetail(current)
     } catch (cause) {
-      setError(messageFrom(cause))
+      if (generation === detailGeneration.current) setError(messageFrom(cause))
     } finally {
-      setDetailLoading(false)
+      if (generation === detailGeneration.current) setDetailLoading(false)
     }
   }
 
@@ -153,7 +215,13 @@ export function ArchivesPage() {
       const result = await applyArchiveAction(action, ids)
       const failed = result.results.filter(item => !item.ok)
       if (failed.length > 0) setActionError(`有 ${failed.length} 条记录未完成：${failed.map(item => item.error ?? item.rootSessionId).join('；')}`)
-      else if (detail !== null) setDetail(null)
+      else if (detail !== null) {
+        const generation = detailGeneration.current
+        const record = await getArchiveStatus(detail.record.rootSessionId)
+        if (generation === detailGeneration.current) setDetail(current => current?.record.rootSessionId !== record.rootSessionId ? current : {
+          ...current, record, ...record.state === 'purged' ? { descendants: [], events: [], hasMore: false } : {},
+        })
+      }
       await fetchRows(active, offset, false)
     } catch (cause) {
       setActionError(messageFrom(cause))
@@ -275,13 +343,13 @@ export function ArchivesPage() {
         )}
         {loading || (rows.length === 0 && offset === 0) ? null : <div className="pagination"><span>第 {page} 页</span><IconButton label="上一页" icon={ChevronLeft} variant="secondary" disabled={offset === 0} onClick={() => void fetchRows(active, Math.max(0, offset - PAGE_SIZE))} /><IconButton label="下一页" icon={ChevronRight} variant="secondary" disabled={rows.length < PAGE_SIZE} onClick={() => void fetchRows(active, offset + PAGE_SIZE)} /></div>}
       </Section>
-      <Dialog open={detail !== null || detailLoading} title={detail?.record.title ?? '归档对话'} description={detail === null ? '正在加载对话内容' : `${detail.record.workspace?.title ?? '未分组'} · ${detail.record.project?.name ?? '个人会话'}`} onClose={() => { if (!detailLoading) setDetail(null) }} wide footer={detail === null ? undefined : <div className="dialogActionRow"><a className="button button-secondary" href={exportArchive(detail.record.rootSessionId)}>导出</a><Button icon={Undo2} onClick={() => setConfirmAction('restore')} loading={pendingAction === 'restore'}>恢复</Button><Button icon={Trash2} variant="danger" onClick={() => setConfirmAction('trash')} loading={pendingAction === 'trash'}>移入回收站</Button><Button variant="danger" onClick={() => setConfirmAction('purge')} loading={pendingAction === 'purge'}>永久清理</Button></div>}>
+      <Dialog open={detail !== null || detailLoading} title={detail?.record.title ?? '归档对话'} description={detail === null ? '正在加载对话内容' : `${detail.record.workspace?.title ?? '未分组'} · ${detail.record.project?.name ?? '个人会话'}`} onClose={() => { if (!detailLoading) { detailGeneration.current++; setDetail(null) } }} wide footer={detail === null ? undefined : <div className="dialogActionRow">{detail.record.state === 'purged' ? <Button variant="secondary" disabled>导出</Button> : <a className="button button-secondary" href={exportArchive(detail.record.rootSessionId)}>导出</a>}<Button icon={Undo2} onClick={() => setConfirmAction('restore')} loading={pendingAction === 'restore'} disabled={detail.record.syncState === 'pending' || detail.record.state === 'purged'}>恢复</Button><Button icon={Trash2} variant="danger" onClick={() => setConfirmAction('trash')} loading={pendingAction === 'trash'} disabled={detail.record.syncState === 'pending' || detail.record.state === 'purged'}>移入回收站</Button><Button variant="danger" onClick={() => setConfirmAction('purge')} loading={pendingAction === 'purge'} disabled={detail.record.syncState === 'pending' || (detail.record.state === 'purged' && detail.record.syncState === 'synced')}>永久清理</Button></div>}>
         {detailLoading ? <LoadingState label="正在读取对话" /> : detail === null ? null : <ArchiveDetail detail={detail} error={actionError} />}
       </Dialog>
       <ConfirmDialog
         open={confirmAction !== null}
         title={confirmAction === 'purge' ? '永久清理归档对话？' : confirmAction === 'trash' ? '移入回收站？' : '恢复归档对话？'}
-        description={confirmAction === 'purge' ? '该操作会清理整棵对话树和已关联的内容，不能恢复。' : confirmAction === 'trash' ? '对话会进入回收站，并在部署配置的保留窗口内可恢复。' : '对话会恢复到原来的 Workspace 位置。'}
+        description={confirmAction === 'purge' ? '请求将在实例确认资源释放后清理整棵对话树及关联内容，不能恢复。仍有运行、子任务、终端或待处理输入时会拒绝，请先停止。' : confirmAction === 'trash' ? '对话会进入回收站，并在部署配置的保留窗口内可恢复。' : '对话会恢复到原来的 Workspace 位置。'}
         confirmLabel={confirmAction === 'purge' ? '永久清理' : confirmAction === 'trash' ? '移入回收站' : '恢复'}
         pending={pendingAction !== null}
         onClose={() => { if (pendingAction === null) setConfirmAction(null) }}
@@ -292,21 +360,33 @@ export function ArchivesPage() {
 }
 
 function ArchiveTableRow({ row, checked, onCheck, onOpen }: { row: ConversationArchiveRow; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void }) {
-  return <tr><td><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong>{row.contentPreview === undefined || row.contentPreview === null ? <small className="archivePreview archivePreviewEmpty">暂无正文摘要</small> : <small className="archivePreview" title={row.contentPreview}>{row.contentPreview}</small>}<span className="codeText archiveSessionId">{row.rootSessionId}</span></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? '未知用户'}<small>{row.project?.name ?? '个人会话'}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td><ArchiveStateBadge state={row.state} /></td><td>{row.messageCount}</td><td className="alignRight"><IconButton label={`查看 ${row.title}`} icon={Eye} onClick={onOpen} /></td></tr>
+  return <tr><td><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong>{row.contentPreview === undefined || row.contentPreview === null ? <small className="archivePreview archivePreviewEmpty">暂无正文摘要</small> : <small className="archivePreview" title={row.contentPreview}>{row.contentPreview}</small>}<span className="codeText archiveSessionId">{row.rootSessionId}</span></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? '未知用户'}<small>{row.project?.name ?? '个人会话'}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td><ArchiveStateBadge state={row.state} /><ArchiveSyncState row={row} /></td><td>{row.messageCount}</td><td className="alignRight"><IconButton label={`查看 ${row.title}`} icon={Eye} onClick={onOpen} /></td></tr>
 }
 
 function ArchiveMobileRow({ row, checked, onCheck, onOpen }: { row: ConversationArchiveRow; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void }) {
-  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /><span className="archiveIdentity"><strong>{row.title}</strong><small className="archivePreview">{row.contentPreview ?? '暂无正文摘要'}</small><small className="codeText archiveSessionId">{row.rootSessionId}</small></span></label><ArchiveStateBadge state={row.state} /></div><button type="button" className="archiveMobileOpen" onClick={onOpen}><span>{row.creator?.displayName ?? '未知用户'} · {row.project?.name ?? '个人会话'}</span><span>{formatTime(row.archivedAt)} · {row.messageCount} 条消息</span></button></article>
+  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /><span className="archiveIdentity"><strong>{row.title}</strong><small className="archivePreview">{row.contentPreview ?? '暂无正文摘要'}</small><small className="codeText archiveSessionId">{row.rootSessionId}</small></span></label><div><ArchiveStateBadge state={row.state} /><ArchiveSyncState row={row} /></div></div><button type="button" className="archiveMobileOpen" onClick={onOpen}><span>{row.creator?.displayName ?? '未知用户'} · {row.project?.name ?? '个人会话'}</span><span>{formatTime(row.archivedAt)} · {row.messageCount} 条消息</span></button></article>
+}
+
+function ArchiveSyncState({ row }: { row: ConversationArchiveRow }) {
+  if (row.syncState === 'synced') return null
+  const label = row.syncState === 'pending' ? '等待实例确认' : row.syncState === 'conflict' ? '操作未完成' : '实例暂不可用'
+  return <small className="archiveSyncState" title={row.lastSyncError}>{label}</small>
 }
 
 function ArchiveDetail({ detail, error }: { detail: ConversationArchiveDetail; error: string }) {
   const syncLabels: Record<ConversationArchiveDetail['record']['syncState'], string> = {
-    pending: '等待同步',
+    pending: '等待实例确认',
     synced: '已同步',
-    conflict: '存在冲突',
+    conflict: '操作未完成',
     unavailable: '运行时暂不可用',
   }
-  return <div className="archiveDetail"><ErrorBanner message={error} /><dl className="definitionGrid"><div className="definitionRow"><dt>创建者</dt><dd>{detail.record.creator?.displayName ?? '未知用户'}</dd></div><div className="definitionRow"><dt>Workspace</dt><dd>{detail.record.workspace?.title ?? '未分组'}</dd></div><div className="definitionRow"><dt>项目</dt><dd>{detail.record.project?.name ?? '个人会话'}</dd></div><div className="definitionRow"><dt>归档时间</dt><dd><time dateTime={new Date(detail.record.archivedAt).toISOString()}>{formatTime(detail.record.archivedAt)}</time></dd></div><div className="definitionRow"><dt>记录状态</dt><dd><ArchiveStateBadge state={detail.record.state} /></dd></div><div className="definitionRow"><dt>同步状态</dt><dd>{syncLabels[detail.record.syncState]}</dd></div></dl><ArchiveConversation detail={detail} /></div>
+  return <div className="archiveDetail"><ErrorBanner message={error || detail.record.lastSyncError || ''} /><dl className="definitionGrid"><div className="definitionRow"><dt>创建者</dt><dd>{detail.record.creator?.displayName ?? '未知用户'}</dd></div><div className="definitionRow"><dt>Workspace</dt><dd>{detail.record.workspace?.title ?? '未分组'}</dd></div><div className="definitionRow"><dt>项目</dt><dd>{detail.record.project?.name ?? '个人会话'}</dd></div><div className="definitionRow"><dt>归档时间</dt><dd><time dateTime={new Date(detail.record.archivedAt).toISOString()}>{formatTime(detail.record.archivedAt)}</time></dd></div><div className="definitionRow"><dt>记录状态</dt><dd><ArchiveStateBadge state={detail.record.state} /></dd></div><div className="definitionRow"><dt>同步状态</dt><dd>{syncLabels[detail.record.syncState]}</dd></div></dl><ArchiveConversationOrRemoval detail={detail} /></div>
+}
+
+function ArchiveConversationOrRemoval({ detail }: { detail: ConversationArchiveDetail }) {
+  return detail.record.state === 'purged' && detail.record.syncState === 'synced'
+    ? <EmptyState icon={Archive} title="对话已永久清理" detail="正文和历史 Review 已清理，不能恢复。" />
+    : <ArchiveConversation detail={detail} />
 }
 
 function ArchiveStateBadge({ state }: { state: ConversationArchiveState }) {

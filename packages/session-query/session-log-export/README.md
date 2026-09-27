@@ -17,6 +17,8 @@ Web Session-log download control over the host-streamed ZIP endpoint owned by `d
 
 The command is mounted only by the Web bundle. The local `command/executed` acknowledgment triggers the slash download only after a successful `/export` result in the browser that submitted it; other tabs still render the durable command row without repeating the browser side effect. The Header button calls the same controller directly. Both entry paths issue a `HEAD` preflight, then hand the GET URL to the browser download manager without buffering the ZIP in JavaScript; they share in-flight collapsing, cancellation of the preflight on plugin disposal, preparation-error handling, browser save behavior, and the same Modal.
 
+The controller decodes the pane’s runtime-qualified Session key into its original Host ID and explicit runtime target. The `HEAD` preflight and browser save use the same account-pinned URL, so another tab’s account or scope change cannot redirect a pending download.
+
 The Host download endpoint flushes a live root Session before `readRaw`, so a slash-triggered ZIP includes the `command/run` and `command/done` pair whose acknowledgment started the download. Cold persisted Sessions require no flush.
 
 The modal reports preparation, download start, or failure. Closing it does not cancel an in-flight download and does not reopen it when that operation later settles. One Session admits one active download at a time; repeated gestures share that operation.

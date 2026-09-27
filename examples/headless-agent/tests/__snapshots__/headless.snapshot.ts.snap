@@ -1,0 +1,50 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`headless stream-json snapshots > renders commentary external recovery through the headless app 1`] = `
+{
+  "output": "",
+  "reason": {
+    "error": {
+      "code": "UNKNOWN",
+      "message": "external member turn outcome is unknown and was not resent; the member needs a new prompt",
+    },
+    "kind": "error",
+  },
+  "stderr": "",
+}
+`;
+
+exports[`headless stream-json snapshots > renders complete external recovery through the headless app 1`] = `
+{
+  "output": "EXTERNAL_TURN_RECOVERED",
+  "reason": {
+    "kind": "completed",
+  },
+  "stderr": "",
+}
+`;
+
+exports[`headless stream-json snapshots > renders selected external workspace execution through the headless app 1`] = `
+{
+  "output": "<member-workspace>
+<member-workspace>",
+  "reason": {
+    "kind": "completed",
+  },
+  "stderr": "",
+}
+`;
+
+exports[`headless stream-json snapshots > renders target-moved external workspace execution through the headless app 1`] = `
+{
+  "output": "",
+  "reason": {
+    "error": {
+      "code": "UNKNOWN",
+      "message": "External member execution target changed",
+    },
+    "kind": "error",
+  },
+  "stderr": "",
+}
+`;

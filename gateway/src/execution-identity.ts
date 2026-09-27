@@ -23,6 +23,8 @@ export class ExecutionIdentityError extends Error {
 export interface ExecutionIdentityState {
   /** Monotonic authority-row version; equal revisions identify equal returned state. */
   revision: string
+  /** Immutable participant set for one admitted execution chain. */
+  scopeId?: string
   /** One immutable origin witness per actor, deduplicated across shared witnesses. */
   inputs: string[]
   actors: Array<{ userId: number }>
@@ -40,6 +42,14 @@ interface SessionRow {
   primary_actor_user_id: string | null
   unverified_history: boolean
   inheritance_hash: string | null
+}
+
+interface ExecutionScopeRow {
+  id: string
+  revision: string
+  input_ids: string[]
+  primary_actor_user_id: string | null
+  unverified: boolean
 }
 
 interface InputRow {
@@ -72,13 +82,13 @@ function identity(value: unknown): string {
   return value
 }
 
-function desktopRequest(value: unknown): { sessionId: string; desktop: string; owners: string[] } {
-  const request = object(value, ['sessionId', 'desktop', 'ownerSessionIds'])
+function desktopRequest(value: unknown): { sessionId: string; desktop: string; owners: string[]; scopeId?: string } {
+  const request = object(value, ['sessionId', 'desktop', 'ownerSessionIds', 'scopeId'])
   const sessionId = identity(request.sessionId), desktop = identity(request.desktop)
   if (request.ownerSessionIds !== undefined && !Array.isArray(request.ownerSessionIds)) throw new ExecutionIdentityError(400, 'invalid desktop runtime owners')
   const owners = request.ownerSessionIds === undefined ? [] : (request.ownerSessionIds as unknown[]).map(identity)
   if (new Set([sessionId, ...owners]).size !== owners.length + 1) throw new ExecutionIdentityError(400, 'desktop runtime ownership contains a cycle')
-  return { sessionId, desktop, owners }
+  return { sessionId, desktop, owners, ...(request.scopeId === undefined ? {} : { scopeId: inputId(request.scopeId) }) }
 }
 
 function inputId(value: unknown): string {
@@ -133,7 +143,12 @@ export async function verifyExecutionAttribution(database: Queryable, input: {
     `SELECT actor_witnesses FROM harness.execution_sessions WHERE ${SESSION_SCOPE}`,
     [input.organizationId, input.runtime.kind, input.runtime.id, sessionId],
   )
-  const recorded = new Set(Object.values(state.rows[0]?.actor_witnesses ?? {}))
+  const scopes = await database.query<{ witness: string }>(
+    `SELECT DISTINCT witness FROM (SELECT unnest(input_ids) witness FROM harness.execution_scopes
+      WHERE ${SESSION_SCOPE} AND input_ids && $5::uuid[]) scoped WHERE witness=ANY($5::uuid[])`,
+    [input.organizationId, input.runtime.kind, input.runtime.id, sessionId, ids],
+  )
+  const recorded = new Set([...Object.values(state.rows[0]?.actor_witnesses ?? {}), ...scopes.rows.map(row => row.witness)])
   if (ids.some(id => !recorded.has(id))) throw new ExecutionIdentityError(403, 'execution attribution contains an unentered input')
   const inputs = await database.query<{ actor_user_ids: string[] }>(`SELECT actor_user_ids FROM harness.execution_inputs
     WHERE organization_id=$1 AND runtime_kind=$2 AND runtime_public_id=$3 AND id=ANY($4::uuid[])`,
@@ -227,9 +242,11 @@ export class GatewayExecutionIdentity {
    * @returns current origin facts, including an empty set for unverified legacy data
    */
   async capture(subject: RuntimeCredentialSubject, value: unknown): Promise<ExecutionIdentityState> {
-    const request = object(value, ['sessionId'])
+    const request = object(value, ['sessionId', 'scopeId'])
     const sessionId = identity(request.sessionId)
-    return transaction(this.pool, async client => this.state(client, subject, await this.session(client, subject, sessionId, false)))
+    return transaction(this.pool, async client => request.scopeId === undefined
+      ? this.state(client, subject, await this.session(client, subject, sessionId, false))
+      : this.scopeState(client, subject, await this.readScope(client, subject, sessionId, inputId(request.scopeId))))
   }
 
   /**
@@ -262,7 +279,7 @@ export class GatewayExecutionIdentity {
    * @returns canonical witnesses and actors after the atomic merge
    */
   async enter(subject: RuntimeCredentialSubject, value: unknown): Promise<ExecutionIdentityState> {
-    const request = object(value, ['sessionId', 'inputId', 'messageId', 'contentHash', 'creationAuthorization', 'unverifiedHistory'])
+    const request = object(value, ['sessionId', 'inputId', 'messageId', 'contentHash', 'creationAuthorization', 'unverifiedHistory', 'currentScopeId'])
     const sessionId = identity(request.sessionId), id = inputId(request.inputId)
     const messageId = identity(request.messageId), hash = contentHash(request.contentHash)
     if (request.unverifiedHistory !== undefined && typeof request.unverifiedHistory !== 'boolean') throw new ExecutionIdentityError(400, 'invalid unverified history flag')
@@ -270,7 +287,12 @@ export class GatewayExecutionIdentity {
       const state = await this.session(client, subject, sessionId)
       const receipt = await this.receipt(client, subject, sessionId, id)
       if (receipt.message_id !== messageId || receipt.content_hash !== hash) throw new ExecutionIdentityError(403, 'execution input does not match the entered message')
-      return this.consume(client, subject, sessionId, state, receipt, request.unverifiedHistory === true)
+      const recorded = await this.consume(client, subject, sessionId, state, receipt, request.unverifiedHistory === true)
+      if (!('currentScopeId' in request)) return recorded
+      const previous = request.currentScopeId === null ? undefined
+        : await this.readScope(client, subject, sessionId, inputId(request.currentScopeId))
+      return this.createScope(client, subject, sessionId, [...(previous?.input_ids ?? []), receipt.id],
+        receipt.created_by_user_id, (previous?.unverified ?? false) || request.unverifiedHistory === true)
     })
   }
 
@@ -281,9 +303,10 @@ export class GatewayExecutionIdentity {
    * @returns the child's canonical actor set
    */
   async inherit(subject: RuntimeCredentialSubject, value: unknown): Promise<ExecutionIdentityState> {
-    const request = object(value, ['sessionId', 'parentSessionId', 'inputs', 'primaryActorUserId', 'unverifiedHistory'])
+    const request = object(value, ['sessionId', 'parentSessionId', 'inputs', 'primaryActorUserId', 'unverifiedHistory', 'scopeId', 'scoped'])
     const sessionId = identity(request.sessionId), parentId = identity(request.parentSessionId)
     if (sessionId === parentId || !Array.isArray(request.inputs)) throw new ExecutionIdentityError(400, 'invalid execution inheritance')
+    if (request.scoped !== undefined && request.scoped !== true) throw new ExecutionIdentityError(400, 'invalid execution scope protocol')
     const inputs = [...new Set(request.inputs.map(inputId))]
     const captured = primaryActor(request.primaryActorUserId)
     if (inputs.length === 0 ? captured !== undefined || request.unverifiedHistory !== true : captured === undefined) {
@@ -294,9 +317,23 @@ export class GatewayExecutionIdentity {
     return transaction(this.pool, async (client) => {
       const [parent, child] = await this.relatedSessions(client, subject, parentId, sessionId)
       if (child.parent_session_id !== parentId) throw new ExecutionIdentityError(403, 'execution inheritance requires the registered parent')
+      if (request.scopeId !== undefined) {
+        if (child.inheritance_hash !== null && child.inheritance_hash !== hash) throw new ExecutionIdentityError(409, 'execution inheritance conflicts with its first admission')
+        const capturedScope = await this.readScope(client, subject, parentId, inputId(request.scopeId))
+        await this.assertCapturedScope(client, subject, capturedScope, inputs, captured, request.unverifiedHistory)
+        const receipts = await Promise.all(inputs.map(id => this.receipt(client, subject, undefined, id)))
+        await client.query(`UPDATE harness.execution_sessions SET inheritance_hash=$5 WHERE ${SESSION_SCOPE}`, [...scope(subject, sessionId), hash])
+        await this.merge(client, subject, sessionId, child, receipts, capturedScope.primary_actor_user_id, capturedScope.unverified)
+        return this.createScope(client, subject, sessionId, inputs, capturedScope.primary_actor_user_id, capturedScope.unverified)
+      }
       const unverified = parent.unverified_history || request.unverifiedHistory === true
       if (child.inheritance_hash !== null) {
         if (child.inheritance_hash !== hash) throw new ExecutionIdentityError(409, 'execution inheritance conflicts with its first admission')
+        if (request.scoped === true) {
+          const receipts = await Promise.all(inputs.map(id => this.receipt(client, subject, undefined, id)))
+          const primary = captured === undefined ? null : await this.capturedPrimary(client, subject, receipts, captured)
+          return this.createScope(client, subject, sessionId, inputs, primary, unverified)
+        }
         return this.replayTransfer(client, subject, sessionId, child, unverified)
       }
       const witnesses = new Set(Object.values(parent.actor_witnesses))
@@ -305,7 +342,8 @@ export class GatewayExecutionIdentity {
       const receipts = await Promise.all(inputs.map(id => this.receipt(client, subject, undefined, id)))
       const primary = captured === undefined ? null : await this.capturedPrimary(client, subject, receipts, captured)
       await client.query(`UPDATE harness.execution_sessions SET inheritance_hash=$5 WHERE ${SESSION_SCOPE}`, [...scope(subject, sessionId), hash])
-      return this.merge(client, subject, sessionId, child, receipts, child.primary_actor_user_id ?? primary, unverified)
+      const recorded = await this.merge(client, subject, sessionId, child, receipts, child.primary_actor_user_id ?? primary, unverified)
+      return request.scoped === true ? this.createScope(client, subject, sessionId, inputs, primary, unverified) : recorded
     })
   }
 
@@ -316,9 +354,10 @@ export class GatewayExecutionIdentity {
    * @returns receiver authority after the monotonic merge
    */
   async relay(subject: RuntimeCredentialSubject, value: unknown): Promise<ExecutionIdentityState> {
-    const request = object(value, ['sessionId', 'senderSessionId', 'messageId', 'inputs', 'primaryActorUserId', 'unverifiedHistory'])
+    const request = object(value, ['sessionId', 'senderSessionId', 'messageId', 'inputs', 'primaryActorUserId', 'unverifiedHistory', 'scopeId', 'scoped'])
     const sessionId = identity(request.sessionId), senderId = identity(request.senderSessionId), messageId = identity(request.messageId)
     if (sessionId === senderId || !Array.isArray(request.inputs)) throw new ExecutionIdentityError(400, 'invalid execution relay')
+    if (request.scoped !== undefined && request.scoped !== true) throw new ExecutionIdentityError(400, 'invalid execution scope protocol')
     const inputs = [...new Set(request.inputs.map(inputId))]
     const captured = primaryActor(request.primaryActorUserId)
     if (inputs.length === 0 ? captured !== undefined || request.unverifiedHistory !== true : captured === undefined) {
@@ -331,11 +370,28 @@ export class GatewayExecutionIdentity {
       if (sender.parent_session_id !== sessionId && receiver.parent_session_id !== senderId) {
         throw new ExecutionIdentityError(403, 'execution relay requires adjacent parent and child Sessions')
       }
+      if (request.scopeId !== undefined) {
+        const capturedScope = await this.readScope(client, subject, senderId, inputId(request.scopeId))
+        await this.assertCapturedScope(client, subject, capturedScope, inputs, captured, request.unverifiedHistory)
+        const previous = await client.query<{ request_hash: string }>(`SELECT request_hash FROM harness.execution_relays
+          WHERE ${SESSION_SCOPE} AND message_id=$5`, [...scope(subject, sessionId), messageId])
+        if (previous.rows[0] !== undefined && previous.rows[0].request_hash !== hash) throw new ExecutionIdentityError(409, 'execution relay conflicts with its first admission')
+        await client.query(`INSERT INTO harness.execution_relays(organization_id,runtime_kind,runtime_public_id,session_id,message_id,request_hash)
+          VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, [...scope(subject, sessionId), messageId, hash])
+        const receipts = await Promise.all(inputs.map(id => this.receipt(client, subject, undefined, id)))
+        await this.merge(client, subject, sessionId, receiver, receipts, capturedScope.primary_actor_user_id, capturedScope.unverified)
+        return this.createScope(client, subject, sessionId, inputs, capturedScope.primary_actor_user_id, capturedScope.unverified)
+      }
       const unverified = sender.unverified_history || request.unverifiedHistory === true
       const previous = await client.query<{ request_hash: string }>(`SELECT request_hash FROM harness.execution_relays
         WHERE ${SESSION_SCOPE} AND message_id=$5`, [...scope(subject, sessionId), messageId])
       if (previous.rows[0] !== undefined) {
         if (previous.rows[0].request_hash !== hash) throw new ExecutionIdentityError(409, 'execution relay conflicts with its first admission')
+        if (request.scoped === true) {
+          const receipts = await Promise.all(inputs.map(id => this.receipt(client, subject, undefined, id)))
+          const primary = captured === undefined ? null : await this.capturedPrimary(client, subject, receipts, captured)
+          return this.createScope(client, subject, sessionId, inputs, primary, unverified)
+        }
         return this.replayTransfer(client, subject, sessionId, receiver, unverified)
       }
       const witnesses = new Set(Object.values(sender.actor_witnesses))
@@ -345,7 +401,8 @@ export class GatewayExecutionIdentity {
       const primary = captured === undefined ? receiver.primary_actor_user_id : await this.capturedPrimary(client, subject, receipts, captured)
       await client.query(`INSERT INTO harness.execution_relays(organization_id,runtime_kind,runtime_public_id,session_id,message_id,request_hash)
         VALUES($1,$2,$3,$4,$5,$6)`, [...scope(subject, sessionId), messageId, hash])
-      return this.merge(client, subject, sessionId, receiver, receipts, primary, unverified)
+      const recorded = await this.merge(client, subject, sessionId, receiver, receipts, primary, unverified)
+      return request.scoped === true ? this.createScope(client, subject, sessionId, inputs, primary, unverified) : recorded
     })
   }
 
@@ -356,11 +413,21 @@ export class GatewayExecutionIdentity {
    * @returns the canonical set only when every actor remains eligible
    */
   async authorize(subject: RuntimeCredentialSubject, value: unknown): Promise<ExecutionIdentityState> {
-    const request = object(value, ['sessionId', 'capability', 'unverifiedHistory'])
+    const request = object(value, ['sessionId', 'capability', 'unverifiedHistory', 'scopeId'])
     const sessionId = identity(request.sessionId), capability = request.capability
     if (capability !== 'execute' && capability !== 'plugin-management' && capability !== 'auto-review' && capability !== 'desktop') throw new ExecutionIdentityError(400, 'invalid execution capability')
     await this.markUnverified(subject, sessionId, request.unverifiedHistory)
     return transaction(this.pool, async (client) => {
+      if (request.scopeId !== undefined) {
+        const captured = await this.readScope(client, subject, sessionId, inputId(request.scopeId))
+        const receipts = await Promise.all(captured.input_ids.map(id => this.receipt(client, subject, undefined, id)))
+        const actors = [...new Set(receipts.flatMap(receipt => receipt.actor_user_ids))]
+        if (actors.length === 0 || captured.primary_actor_user_id === null || (capability !== 'execute' && captured.unverified)) {
+          throw new ExecutionIdentityError(403, 'execution authority has no verified complete actor set')
+        }
+        await this.eligibleActors(client, subject, sessionId, actors, capability)
+        return this.scopeState(client, subject, captured)
+      }
       const state = await this.session(client, subject, sessionId)
       const actors = Object.keys(state.actor_witnesses)
       if (actors.length === 0 || state.primary_actor_user_id === null || (capability !== 'execute' && state.unverified_history)) {
@@ -382,10 +449,9 @@ export class GatewayExecutionIdentity {
     const sessionId = identity(request.sessionId), capability = request.capability
     if (capability !== 'plugin-management' && capability !== 'auto-review') throw new ExecutionIdentityError(400, 'invalid execution selection')
     await transaction(this.pool, async (client) => {
-      const state = await this.session(client, subject, sessionId)
-      if (state.unverified_history) throw new ExecutionIdentityError(403, 'execution selection requires verified history')
+      await this.session(client, subject, sessionId)
       const selector = await this.principalActor(client, subject, sessionId, principal)
-      await this.eligibleActors(client, subject, sessionId, [...new Set([selector, ...Object.keys(state.actor_witnesses)])], capability)
+      await this.eligibleActors(client, subject, sessionId, [selector], capability)
     })
   }
 
@@ -402,7 +468,7 @@ export class GatewayExecutionIdentity {
     const sessionId = identity(request.sessionId), desktop = identity(request.desktop)
     if (typeof request.confirmed !== 'boolean') throw new ExecutionIdentityError(400, 'invalid desktop confirmation')
     await transaction(this.pool, async (client) => {
-      const state = await this.session(client, subject, sessionId)
+      await this.session(client, subject, sessionId)
       const actor = await this.principalActor(client, subject, sessionId, principal)
       const coordinates = [...scope(subject, sessionId), nodeId, subject.generation, desktop, actor]
       if (!request.confirmed) {
@@ -411,7 +477,6 @@ export class GatewayExecutionIdentity {
         await client.query('SELECT harness.invalidate_access($1,$2::jsonb)', [subject.organizationId, JSON.stringify({ userId: principal.user.id })])
         return
       }
-      if (state.unverified_history) throw new ExecutionIdentityError(403, 'desktop confirmation requires verified history')
       await this.eligibleActors(client, subject, sessionId, [actor], 'desktop')
       const policy = await client.query<{ user_revision: string; project_revision: string }>(`SELECT u.revision::text user_revision,
         COALESCE(p.revision,0)::text project_revision FROM harness.desktop_access_policies u
@@ -438,7 +503,7 @@ export class GatewayExecutionIdentity {
     const request = object(value, ['sessionId', 'desktop'])
     const sessionId = identity(request.sessionId), desktop = identity(request.desktop)
     return transaction(this.pool, async client => {
-      const state = await this.session(client, subject, sessionId)
+      await this.session(client, subject, sessionId)
       const actor = await this.principalActor(client, subject, sessionId, principal)
       const base = { rootSessionId: sessionId, nodeId, desktop, userId: principal.user.id }
       try {
@@ -447,7 +512,6 @@ export class GatewayExecutionIdentity {
         if (!(error instanceof ExecutionIdentityError) || error.status !== 403) throw error
         return { ...base, eligible: false, confirmed: false }
       }
-      if (state.unverified_history) return { ...base, eligible: false, confirmed: false }
       const confirmed = await this.confirmedDesktopActors(client, subject, sessionId, nodeId, desktop, [actor])
       return { ...base, eligible: true, confirmed: confirmed === 1 }
     })
@@ -461,18 +525,20 @@ export class GatewayExecutionIdentity {
    * @returns canonical participants only when every confirmation remains current.
    */
   async authorizeDesktop(subject: RuntimeCredentialSubject, nodeId: string, value: unknown): Promise<ExecutionIdentityState> {
-    const { sessionId, desktop, owners } = desktopRequest(value)
+    const { sessionId, desktop, owners, scopeId } = desktopRequest(value)
     return transaction(this.pool, async (client) => {
       const state = await this.session(client, subject, sessionId)
-      const actors = Object.keys(state.actor_witnesses)
-      if (actors.length === 0 || state.primary_actor_user_id === null || state.unverified_history) {
+      const execution = scopeId === undefined ? undefined : await this.readScope(client, subject, sessionId, scopeId)
+      const inputs = execution === undefined ? undefined : await Promise.all(execution.input_ids.map(id => this.receipt(client, subject, undefined, id)))
+      const actors = inputs === undefined ? Object.keys(state.actor_witnesses) : [...new Set(inputs.flatMap(input => input.actor_user_ids))]
+      if (actors.length === 0 || (execution?.primary_actor_user_id ?? state.primary_actor_user_id) === null || (execution?.unverified ?? state.unverified_history)) {
         throw new ExecutionIdentityError(403, 'desktop access requires verified execution actors')
       }
       await this.eligibleActors(client, subject, sessionId, actors, 'desktop')
       const { rootSessionId: confirmationSessionId } = await this.desktopRoot(client, subject, sessionId, state, owners)
       const confirmed = await this.confirmedDesktopActors(client, subject, confirmationSessionId, nodeId, desktop, actors)
       if (confirmed !== actors.length) throw new ExecutionIdentityError(403, 'each execution actor must confirm this Session and desktop again')
-      return this.state(client, subject, state)
+      return execution === undefined ? this.state(client, subject, state) : this.scopeState(client, subject, execution)
     })
   }
 
@@ -497,15 +563,16 @@ export class GatewayExecutionIdentity {
    * @returns server-owned workflow identity and attribution for the coordinator.
    */
   async desktopHolder(subject: RuntimeCredentialSubject, value: unknown): Promise<DesktopHolder> {
-    const { sessionId, owners } = desktopRequest(value)
+    const { sessionId, owners, scopeId } = desktopRequest(value)
     return transaction(this.pool, async client => {
       const state = await this.session(client, subject, sessionId)
       const { rootSessionId, root } = await this.desktopRoot(client, subject, sessionId, state, owners)
+      const captured = scopeId === undefined ? undefined : await this.readScope(client, subject, sessionId, scopeId)
       const attribution = await client.query<{ public_id: string; username: string; organization: string; project_name: string | null }>(`
         SELECT u.public_id::text,u.username,o.slug organization,p.name project_name FROM harness.users u
         JOIN harness.organizations o ON o.id=u.organization_id
         LEFT JOIN harness.projects p ON p.organization_id=o.id AND p.id=$3
-        WHERE u.organization_id=$1 AND u.id=$2`, [subject.organizationId, root.primary_actor_user_id, subject.projectInternalId ?? null])
+        WHERE u.organization_id=$1 AND u.id=$2`, [subject.organizationId, captured?.primary_actor_user_id ?? root.primary_actor_user_id, subject.projectInternalId ?? null])
       const actor = attribution.rows[0]
       if (actor === undefined) throw new ExecutionIdentityError(403, 'desktop workflow has no recorded actor')
       return {
@@ -551,11 +618,12 @@ export class GatewayExecutionIdentity {
    * @returns an idempotent claim and the canonical execution set
    */
   async question(subject: RuntimeCredentialSubject, principal: GatewayPrincipalClaims, value: unknown): Promise<ExecutionIdentityState & { claimed: true }> {
-    const request = object(value, ['sessionId', 'questionId', 'answer'])
+    const request = object(value, ['sessionId', 'questionId', 'answer', 'scopeId'])
     const sessionId = identity(request.sessionId), questionId = identity(request.questionId)
     const answer = JSON.stringify(request.answer)
     if (answer === undefined) throw new ExecutionIdentityError(400, 'invalid execution question answer')
-    const hash = createHash('sha256').update(answer).digest('hex')
+    const hash = createHash('sha256').update(request.scopeId === undefined ? answer
+      : JSON.stringify({ answer: request.answer, scopeId: inputId(request.scopeId) })).digest('hex')
     return transaction(this.pool, async (client) => {
       const state = await this.session(client, subject, sessionId)
       const actor = await this.principalActor(client, subject, sessionId, principal)
@@ -576,8 +644,74 @@ export class GatewayExecutionIdentity {
         if (claim.rowCount !== 1) throw new ExecutionIdentityError(409, 'execution question was claimed by another response')
       }
       const receipt = await this.insertInput(client, subject, sessionId, questionId, 'question', hash, actor)
-      return { claimed: true, ...await this.consume(client, subject, sessionId, state, receipt, false) }
+      const recorded = await this.consume(client, subject, sessionId, state, receipt, false)
+      if (request.scopeId === undefined) return { claimed: true, ...recorded }
+      const original = await this.readScope(client, subject, sessionId, inputId(request.scopeId))
+      return { claimed: true, ...await this.createScope(client, subject, sessionId, [...original.input_ids, receipt.id],
+        receipt.created_by_user_id, original.unverified) }
     })
+  }
+
+  /**
+   * Combine exact admitted scopes without replacing their immutable participants.
+   * @param subject - authenticated runtime owning the receiving Session.
+   * @param value - own scope references and explicit unknown input state.
+   * @returns a new scope; an empty unknown scope grants no execution.
+   */
+  async combine(subject: RuntimeCredentialSubject, value: unknown): Promise<ExecutionIdentityState> {
+    const request = object(value, ['sessionId', 'scopeIds', 'unverified'])
+    const sessionId = identity(request.sessionId)
+    if (!Array.isArray(request.scopeIds) || typeof request.unverified !== 'boolean') throw new ExecutionIdentityError(400, 'invalid execution scopes')
+    const ids = [...new Set(request.scopeIds.map(inputId))]
+    return transaction(this.pool, async client => {
+      await this.session(client, subject, sessionId)
+      const scopes = await Promise.all(ids.map(id => this.readScope(client, subject, sessionId, id)))
+      return this.createScope(client, subject, sessionId, scopes.flatMap(scope => scope.input_ids),
+        scopes.findLast(scope => scope.primary_actor_user_id !== null)?.primary_actor_user_id ?? null, request.unverified === true || scopes.some(scope => scope.unverified) || scopes.length === 0)
+    })
+  }
+
+  private async assertCapturedScope(client: PoolClient, subject: RuntimeCredentialSubject, scope: ExecutionScopeRow,
+    inputs: string[], primary: number | undefined, unverified: unknown): Promise<void> {
+    const state = await this.scopeState(client, subject, scope)
+    if (JSON.stringify(state.inputs.toSorted()) !== JSON.stringify(inputs.toSorted())
+      || state.primaryActorUserId !== primary || state.unverifiedHistory !== unverified) {
+      throw new ExecutionIdentityError(403, 'captured execution differs from its immutable scope')
+    }
+  }
+
+  private async readScope(client: PoolClient, subject: RuntimeCredentialSubject, sessionId: string, id: string): Promise<ExecutionScopeRow> {
+    const rows = await client.query<ExecutionScopeRow>(`SELECT id,revision::text,input_ids,primary_actor_user_id,unverified
+      FROM harness.execution_scopes WHERE ${SESSION_SCOPE} AND id=$5`, [...scope(subject, sessionId), id])
+    const row = rows.rows[0]
+    if (row === undefined) throw new ExecutionIdentityError(403, 'execution scope belongs to another Session or runtime')
+    return row
+  }
+
+  private async scopeState(client: PoolClient, subject: RuntimeCredentialSubject, captured: ExecutionScopeRow): Promise<ExecutionIdentityState> {
+    const receipts = await Promise.all(captured.input_ids.map(id => this.receipt(client, subject, undefined, id)))
+    const actors = [...new Set(receipts.flatMap(receipt => receipt.actor_user_ids))]
+    const primary = captured.primary_actor_user_id === null ? undefined : await this.publicActors(client, subject, [captured.primary_actor_user_id])
+    return { scopeId: captured.id, revision: captured.revision, inputs: captured.input_ids,
+      actors: await this.publicActors(client, subject, actors), unverifiedHistory: captured.unverified,
+      ...(primary === undefined ? {} : { primaryActorUserId: primary[0]!.userId }) }
+  }
+
+  private async createScope(client: PoolClient, subject: RuntimeCredentialSubject, sessionId: string,
+    inputs: string[], primary: string | null, unverified: boolean): Promise<ExecutionIdentityState> {
+    const ids = [...new Set(inputs)].sort()
+    const fingerprint = createHash('sha256').update(JSON.stringify({ ids, primary, unverified })).digest('hex')
+    const existing = await client.query<ExecutionScopeRow>(`SELECT id,revision::text,input_ids,primary_actor_user_id,unverified
+      FROM harness.execution_scopes WHERE ${SESSION_SCOPE} AND fingerprint=$5`, [...scope(subject, sessionId), fingerprint])
+    if (existing.rows[0] !== undefined) return this.scopeState(client, subject, existing.rows[0])
+    const changed = await client.query<{ revision: string }>(`UPDATE harness.execution_sessions SET revision=revision+1,updated_at=now()
+      WHERE ${SESSION_SCOPE} RETURNING revision::text`, scope(subject, sessionId))
+    await client.query(`INSERT INTO harness.execution_scopes(organization_id,runtime_kind,runtime_public_id,session_id,fingerprint,revision,input_ids,primary_actor_user_id,unverified)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING`,
+    [...scope(subject, sessionId), fingerprint, changed.rows[0]!.revision, ids, primary, unverified])
+    const rows = await client.query<ExecutionScopeRow>(`SELECT id,revision::text,input_ids,primary_actor_user_id,unverified
+      FROM harness.execution_scopes WHERE ${SESSION_SCOPE} AND fingerprint=$5`, [...scope(subject, sessionId), fingerprint])
+    return this.scopeState(client, subject, rows.rows[0]!)
   }
 
   private async session(client: PoolClient, subject: RuntimeCredentialSubject, sessionId: string, lock = true): Promise<SessionRow> {

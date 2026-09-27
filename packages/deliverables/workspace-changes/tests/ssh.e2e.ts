@@ -1,6 +1,9 @@
 /** Opt-in real SSH proof that historical Review uses the execution target's files and Git index. */
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
@@ -16,6 +19,7 @@ const configPath = process.env.DSH_SSH_TEST_CONFIG
 
 describe.skipIf(configPath === undefined || process.platform === 'win32')('SSH workspace history', () => {
   it('records shell and ignored file-tool changes, retains old contents, and releases its remote storage', async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), 'ssh-review-history-'))
     const ctx = new Context()
     const config = JSON.parse(readFileSync(configPath!, 'utf8')) as SshConfig
     const fibers = [ctx.plugin(SessionStore), ctx.plugin(SessionProjectionRegistry),
@@ -52,6 +56,7 @@ describe.skipIf(configPath === undefined || process.platform === 'win32')('SSH w
         return spawn(spec)
       })
       recorder = ctx.plugin(WorkspaceChanges, {
+        storageRoot, maxReviewBytes: 64 * 1024 * 1024,
         timeoutMs: 30_000, outputMaxBytes: 65536, maxFiles: 10, maxFileBytes: 65536, diffTimeoutMs: 100,
       })
       await recorder
@@ -64,7 +69,7 @@ describe.skipIf(configPath === undefined || process.platform === 'win32')('SSH w
       await mutate(ctx, session, 1, 'write', { file_path: '.ignored', content: 'private draft\n' }, async () => { await write('.ignored', 'private draft\n') })
       endTurn(session, 1)
       await settle(ctx, session)
-      const [summary] = changes(ctx, session)
+      const [summary] = (await changes(ctx, session))
       expect(summary?.files.map(file => file.path)).toEqual(['.ignored', 'shell.txt', 'tracked.txt'])
       const event = session.snapshotEvents().find(value => value.type === 'workspace/changes')!
       await write('tracked.txt', 'later mutation\n')
@@ -92,6 +97,7 @@ describe.skipIf(configPath === undefined || process.platform === 'win32')('SSH w
       }
       vi.restoreAllMocks()
       await ctx.fiber.dispose()
+      await rm(storageRoot, { recursive: true, force: true })
     }
   }, 120_000)
 })

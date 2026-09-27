@@ -33,12 +33,13 @@ export class TeamJournal {
   }
 
   /**
-   * Serialize one Lead's asynchronous mutation operation.
+   * Serialize one Lead's asynchronous mutation operation and retain its identity through the queued checkpoint.
    * @param rootId - Lead Session identity selecting the transaction queue.
    * @param operation - complete read-check-append operation.
    * @returns the operation result.
    */
   async transact<T>(rootId: SessionId, operation: () => Promise<T>): Promise<T> {
+    using _admission = this.ctx.agents.reserveUse([rootId])
     const prior = this.tails.get(rootId) ?? Promise.resolve()
     const run = prior.then(operation, operation)
     const tail = run.then(() => undefined, () => undefined)

@@ -117,7 +117,8 @@ async function bench() {
   // The runtime-owned directory wired exactly as runtime apply wires it: the
   // per-connection catalog transport, ownership-driven faces, and the host's
   // catalog-changed forward attributed to the delivering connection.
-  const catalogDirectory = new PermissionCatalogDirectory(connection as never, createSnapshotStore({}))
+  const catalogDirectory = new PermissionCatalogDirectory(connection as never,
+    createSnapshotStore({ byId: Object.fromEntries(['s1', 'local', 'managed'].map(id => [id, {}])) }))
   const releaseCatalog = ctx.provide('permissionCatalog', catalogDirectory)
   remote.$on('permission-presets/catalog-changed', () => { catalogDirectory.invalidateFor(connection as never) })
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()

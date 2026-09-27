@@ -22,7 +22,7 @@ import type {
 import { parseSessionFormatLogFilename, sessionFormatLogFilename, SessionFormatUnsupportedMigrationError } from '@deepseek-ai/dsh-session-format'
 import type { SessionFormatEvent } from '@deepseek-ai/dsh-session-format'
 import type { SessionFormatRecovery, SessionFormatRestore } from '@deepseek-ai/dsh-session-format'
-import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
+import { coharnessJsonlFormatCatalog as sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import { assertV3RowAdmission } from '@deepseek-ai/dsh-session-format-v2-to-v3'
 import { assertV4RowAdmission } from '@deepseek-ai/dsh-session-format-v3-to-v4'
 import {

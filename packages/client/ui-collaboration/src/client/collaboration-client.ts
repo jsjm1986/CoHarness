@@ -1,3 +1,4 @@
+import { parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore, readApiResponseJson } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ProjectModelSettingsTransport,
@@ -469,6 +470,25 @@ async function emptyRequest(fetcher: typeof fetch, path: string, init: RequestIn
   if (!response.ok) throw new CollaborationRequestError(response.status, await errorCode(response))
 }
 
+/** Resolve a Session's project from its explicit runtime, retaining standalone legacy callers.
+ * @param snapshot - authenticated account metadata.
+ * @param sessionId - browser Session identity, or absence for the current-space creation flow.
+ * @returns the owning project, or undefined for personal/unverified resources.
+ */
+export function conversationProject(snapshot: CollaborationSnapshot, sessionId?: string): number | undefined {
+  const target = sessionId === undefined ? undefined : parseClientSessionKey(sessionId)?.runtime
+  if (target?.kind === 'personal') return undefined
+  if (target?.kind === 'project') return snapshot.context?.projects.some(project => project.projectId === target.projectId) === true ? target.projectId : undefined
+  return snapshot.context?.scope.kind === 'project' ? snapshot.context.scope.projectId : undefined
+}
+
+function conversationUrl(sessionId: string): string {
+  const address = parseClientSessionKey(sessionId)
+  const path = `/account/api/conversations/${encodeURIComponent(address?.sessionId ?? sessionId)}`
+  if (address?.runtime.kind === 'personal') throw new Error('Personal Sessions have no project sharing policy')
+  return address?.runtime.kind === 'project' ? `${path}?projectId=${String(address.runtime.projectId)}` : path
+}
+
 /**
  * Create the browser transport for Gateway account collaboration endpoints.
  * @param options - browser fetch and reload overrides.
@@ -490,13 +510,13 @@ export function createBrowserCollaborationTransport(options: {
     }),
     loadConversation: (sessionId, signal) => jsonRequest(
       fetcher,
-      `/account/api/conversations/${encodeURIComponent(sessionId)}`,
+      conversationUrl(sessionId),
       { signal },
       parseConversationDetail,
     ),
     setVisibility: (sessionId, nextVisibility, signal) => emptyRequest(
       fetcher,
-      `/account/api/conversations/${encodeURIComponent(sessionId)}`,
+      conversationUrl(sessionId),
       {
         method: 'PATCH', signal, headers: jsonHeaders,
         body: JSON.stringify({ visibility: nextVisibility }),
@@ -662,9 +682,11 @@ export class CollaborationClient {
         this.store.update((draft) => {
           draft.status = 'ready'
           draft.contextVerified = true
+          if (draft.context?.user.id !== context.user.id) draft.conversations = {}
           draft.context = context
           delete draft.scopeError
-          if (context.scope.kind === 'personal') draft.conversations = {}
+          draft.conversations = Object.fromEntries(Object.entries(draft.conversations)
+            .filter(([id]) => conversationProject(draft, id) !== undefined))
         })
       })
       .catch((_contextLoadFailure: unknown) => {
@@ -883,7 +905,8 @@ export class CollaborationClient {
    */
   loadConversation(sessionId: string, options: { force?: boolean } = {}): Promise<void> {
     const snapshot = this.getSnapshot()
-    if (this.disposed || snapshot.context?.scope.kind !== 'project') return Promise.resolve()
+    const projectId = conversationProject(snapshot, sessionId)
+    if (this.disposed || projectId === undefined) return Promise.resolve()
     const existing = snapshot.conversations[sessionId]
     const force = options.force === true
     const inFlight = this.conversationLoads.get(sessionId)
@@ -898,7 +921,6 @@ export class CollaborationClient {
       return Promise.resolve()
     }
 
-    const projectId = snapshot.context.scope.projectId
     const operation = this.runConversationLoads(sessionId, projectId, force)
       .finally(() => { this.conversationLoads.delete(sessionId) })
     this.conversationLoads.set(sessionId, operation)
@@ -936,16 +958,15 @@ export class CollaborationClient {
       }
       try {
         const detail = await this.transport.loadConversation(sessionId, this.abortController.signal)
-        const scope = this.getSnapshot().context?.scope
-        if (this.disposed || scope?.kind !== 'project' || scope.projectId !== projectId) return
+        if (this.disposed || conversationProject(this.getSnapshot(), sessionId) !== projectId) return
+        if (detail.access.projectId !== projectId) throw new Error('Conversation response belongs to another project')
         this.store.update((draft) => {
           const current = draft.conversations[sessionId]
           const saving = current?.status === 'ready' && current.saving
           draft.conversations[sessionId] = { status: 'ready', detail, saving }
         })
       } catch (_conversationLoadFailure) {
-        const scope = this.getSnapshot().context?.scope
-        if (this.disposed || scope?.kind !== 'project' || scope.projectId !== projectId) return
+        if (this.disposed || conversationProject(this.getSnapshot(), sessionId) !== projectId) return
         if (this.getSnapshot().conversations[sessionId]?.status !== 'ready') {
           this.store.update((draft) => {
             draft.conversations[sessionId] = { status: 'error', saving: false, error: 'load-failed' }

@@ -5,7 +5,7 @@ import { join, parse } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { applyGrantsToUser } from '../src/apply-grants.ts'
 import { AuditService } from '../src/audit.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ProjectService } from '../src/projects.ts'
@@ -43,7 +43,7 @@ afterEach(async () => { for (const fn of cleanup.reverse()) await fn(); cleanup 
 async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_READINESS_TIMEOUT_MS: '10000', HGW_INSTANCE_PORT_BASE: '43300' })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), HGW_READINESS_TIMEOUT_MS: '10000', HGW_INSTANCE_PORT_BASE: '43300' })
   cfg.dshCommand = [process.execPath, '-e', ECHO_DSH, '{port}']
   const deps = {
     cfg,

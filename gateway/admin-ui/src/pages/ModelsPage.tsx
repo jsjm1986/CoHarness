@@ -1,5 +1,6 @@
 import { ClipboardList, Filter, Pencil, RefreshCw, RotateCcw, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { decimalToMicros, microsToDecimal } from '../../../src/money.ts'
 import {
   getModelAccess,
   listModelRegistrations,
@@ -48,11 +49,14 @@ const REGISTRATION_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 function yuanToMicros(value: string): number {
   const yuan = Number(value)
   if (!Number.isFinite(yuan) || yuan < 0) throw new Error('单价必须是非负数')
-  return Math.round(yuan * 1_000_000)
+  const text = value.trim()
+  const micros = /^\d+(?:\.\d+)?$/u.test(text) ? decimalToMicros(text) : Math.round(yuan * 1_000_000)
+  if (!Number.isSafeInteger(micros)) throw new Error('单价超过可精确保存的范围')
+  return micros
 }
 
 function microsToYuan(value: number): string {
-  return (value / 1_000_000).toFixed(4)
+  return microsToDecimal(value)
 }
 
 function registrationDate(value: string, endOfDay: boolean): number | undefined {
@@ -168,6 +172,7 @@ export function ModelsPage() {
   }
 
   function openGovernanceEditor(model: ModelGovernanceRow) {
+    setError('')
     setEditingModel(model)
     setModelDraft({ ...model })
     setPrices([
@@ -286,6 +291,7 @@ export function ModelsPage() {
       >
         {modelDraft === null ? null : (
           <form id="model-governance-form" onSubmit={event => void submitGovernance(event)}>
+            <ErrorBanner message={error} />
             <div className="modelGovernanceIdentity">
               <strong>{modelDraft.displayName}</strong>
               <span className="codeText">{modelDraft.provider}/{modelDraft.model}</span>
@@ -305,7 +311,7 @@ export function ModelsPage() {
                     className="input"
                     required
                     min="0"
-                    step="0.0001"
+                    step="0.000001"
                     inputMode="decimal"
                     value={prices[index]}
                     onChange={event => setPrices(prices.map((value, current) => current === index ? event.target.value : value))}

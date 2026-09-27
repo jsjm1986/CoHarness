@@ -3,6 +3,11 @@
  * the shared API client, and lets the runtime object layer start the stream
  * controller with its sinks.
  */
+import { createBrowserIdentityFence, type BrowserIdentityFence } from './identity-fence.ts'
+import { sessionAddressApi } from './session-api.ts'
+export { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+export type { ClientSessionAddress, ClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionRuntimeTarget, HostDescription, IApiClient, SessionId } from './api.ts'
 import { ConnectionController, resolveConnectionConfig, type ConnectionConfig, type ConnectionSinks, type ConnectionState } from './connection.ts'
@@ -118,9 +123,16 @@ function targetKey(target: ConnectionRuntimeTarget): string {
  * started handle the runtime pool drives instead of a second unstarted loop.
  */
 interface ConnectionShared {
+  readonly identity?: BrowserIdentityFence
   root: ConnectionHandle | undefined
   readonly handles: Map<string, ConnectionHandle>
   sessionTarget?: ((sessionId: SessionId) => ConnectionRuntimeTarget | undefined) | undefined
+  originalSession?: ((key: SessionId) => SessionId) | undefined
+  mapRemote?: ((endpoint: string, args: Readonly<Record<string, unknown>>, scopeWire?: string) =>
+  Readonly<Record<string, unknown>>) | undefined
+  baseTarget?: ConnectionRuntimeTarget
+  targetListeners?: Set<(target: ConnectionRuntimeTarget) => void>
+  remoteSession?: ((endpoint: string, args: Readonly<Record<string, unknown>>) => SessionId | undefined) | undefined
 }
 
 /**
@@ -131,6 +143,8 @@ interface ConnectionShared {
 export interface ConnectionHandle {
   /** Shared api client (fixture or real, decided at boot from the page URL). */
   readonly api: IApiClient
+  /** Raw per-runtime carrier, for owners that already hold original Host IDs. */
+  readonly wireApi?: IApiClient
   /** Optional Gateway account-preference transport; absent in fixture-only hosts. */
   readonly accountPreferences?: AccountPreferencesTransport
   /** Gateway project Provider transport shared by project settings surfaces. */
@@ -156,7 +170,29 @@ export interface ConnectionHandle {
    */
   readonly forSession?: (sessionId: SessionId) => ConnectionHandle
   /** Register the runtime object's session-to-target resolver. */
-  readonly registerSessionTargetResolver?: (resolve: (sessionId: SessionId) => ConnectionRuntimeTarget | undefined) => () => void
+  readonly registerSessionTargetResolver?: (
+    resolve: (sessionId: SessionId) => ConnectionRuntimeTarget | undefined,
+    remoteSession?: (endpoint: string, args: Readonly<Record<string, unknown>>) => SessionId | undefined,
+    originalSession?: (key: SessionId) => SessionId,
+    mapRemote?: (endpoint: string, args: Readonly<Record<string, unknown>>, scopeWire?: string) => Readonly<Record<string, unknown>>,
+  ) => () => void
+  /** Read this application's explicitly declared Remote Session address, including JSON request parameters. */
+  readonly sessionForRemote?: (endpoint: string, args: Readonly<Record<string, unknown>>) => SessionId | undefined
+  /** Translate declared Remote Session addresses to original wire IDs. */
+  readonly mapRemoteArguments?: (endpoint: string, args: Readonly<Record<string, unknown>>, scopeWire?: string) =>
+  Readonly<Record<string, unknown>>
+  /** Bind the bootstrap carrier to its verified account runtime. */
+  readonly setBaseTarget?: (target: ConnectionRuntimeTarget) => void
+  /** Subscribe to the bootstrap runtime declared by its first HTTP handshake. */
+  readonly onRuntimeTarget?: (listener: (target: ConnectionRuntimeTarget) => void) => () => void
+  /** Pin an application-generated private download or preview URL to this document’s account. */
+  readonly privateResourceUrl?: (value: string) => string
+  /** Confirm the authenticated account observed by the page's account service. */
+  readonly confirmPrincipal?: (id: number) => void
+  /** Withdraw account-owned content and reload after explicit bootstrap authorization loss. */
+  readonly invalidatePrincipal?: () => void
+  /** Dispose account-owned state before this document reloads after an identity change. */
+  readonly onPrincipalChange?: (cleanup: () => void | Promise<void>) => () => void
   /** Request an immediate retry of the current connection generation. */
   reconnect(): void
   /**
@@ -185,7 +221,7 @@ function createConnectionHandle(
   target?: ConnectionRuntimeTarget,
 ): ConnectionHandle {
   const sharedState = shared ?? { root: undefined, handles: new Map<string, ConnectionHandle>() }
-  const ownKey = target === undefined ? 'personal' : targetKey(target)
+  const ownKey = (): string => targetKey(target ?? sharedState.baseTarget ?? { kind: 'personal' })
   let started = false
   let controller: ConnectionController | undefined
   let description: HostDescription | undefined
@@ -214,8 +250,14 @@ function createConnectionHandle(
       }
     }
   }
+  const routedApi = sessionAddressApi(api, (key) => {
+    if (sharedState.originalSession === undefined) throw new Error('Session routing is not ready')
+    const selected = handle.forSession?.(key) ?? handle
+    return { api: selected.wireApi ?? selected.api, sessionId: sharedState.originalSession(key) }
+  })
   const handle: ConnectionHandle = {
-    api,
+    wireApi: api,
+    get api() { return sharedState.originalSession === undefined ? api : routedApi },
     ...(accountPreferences === undefined ? {} : { accountPreferences }),
     ...(projectModelSettings === undefined ? {} : { projectModelSettings }),
     isLoopback: pageLocation === undefined || isLoopbackHostname(pageLocation.hostname),
@@ -236,12 +278,12 @@ function createConnectionHandle(
     rpc,
     forTarget: (next) => {
       const key = targetKey(next)
-      if (key === ownKey) return handle
-      if (key === 'personal') return sharedState.root ?? handle
+      if (key === ownKey()) return handle
+      if (sharedState.root !== undefined && key === targetKey(sharedState.baseTarget ?? { kind: 'personal' })) return sharedState.root
       const existing = sharedState.handles.get(key)
       if (existing !== undefined) return existing
       const child = createConnectionHandle(
-        new WebApiClient(next),
+        new WebApiClient(next, undefined, undefined, sharedState.identity?.socketUrl),
         pageLocation,
         bootstrapRecovery,
         createWebConnectionRpc(undefined, next),
@@ -258,11 +300,38 @@ function createConnectionHandle(
       if (target === undefined) return sharedState.root ?? handle
       return handle.forTarget?.(target) ?? sharedState.root ?? handle
     },
-    registerSessionTargetResolver: (resolve) => {
+    sessionForRemote: (endpoint, args) => sharedState.remoteSession?.(endpoint, args),
+    mapRemoteArguments: (endpoint, args, scopeWire) => sharedState.mapRemote?.(endpoint, args, scopeWire) ?? args,
+    setBaseTarget: (next) => {
+      sharedState.identity?.setRuntimeTarget(next)
+      const changed = sharedState.baseTarget === undefined || targetKey(sharedState.baseTarget) !== targetKey(next)
+      sharedState.baseTarget = next
+      if (changed) for (const listener of sharedState.targetListeners ?? []) listener(next)
+    },
+    onRuntimeTarget: (listener) => {
+      const listeners = sharedState.targetListeners ??= new Set()
+      listeners.add(listener)
+      if (sharedState.baseTarget !== undefined) listener(sharedState.baseTarget)
+      return () => { listeners.delete(listener) }
+    },
+    registerSessionTargetResolver: (resolve, remoteSession, originalSession, mapRemote) => {
       if (sharedState.sessionTarget !== undefined) throw new Error('connection: session target resolver is already registered')
       sharedState.sessionTarget = resolve
-      return () => { if (sharedState.sessionTarget === resolve) sharedState.sessionTarget = undefined }
+      sharedState.remoteSession = remoteSession
+      sharedState.originalSession = originalSession
+      sharedState.mapRemote = mapRemote
+      return () => {
+        if (sharedState.sessionTarget !== resolve) return
+        sharedState.sessionTarget = undefined
+        sharedState.remoteSession = undefined
+        sharedState.originalSession = undefined
+        sharedState.mapRemote = undefined
+      }
     },
+    privateResourceUrl: value => sharedState.identity?.privateUrl(value) ?? value,
+    confirmPrincipal: (id) => { sharedState.identity?.confirm(id) },
+    invalidatePrincipal: () => { sharedState.identity?.invalidate() },
+    onPrincipalChange: cleanup => sharedState.identity?.subscribe(cleanup) ?? (() => {}),
     reconnect() {
       controller?.reconnect()
     },
@@ -272,6 +341,7 @@ function createConnectionHandle(
       controller = new ConnectionController(api, {
         ...sinks,
         onConnected: (next) => {
+          if (target === undefined && next.runtimeTarget !== undefined) handle.setBaseTarget?.(next.runtimeTarget)
           publishDescription(next)
           // A description subscriber may synchronously stop the loop. In that
           // case publishDescription(undefined) has already retracted this
@@ -287,12 +357,16 @@ function createConnectionHandle(
         },
       }, { ...bootstrapRecovery, ...config })
       controller.start()
+      const stopIdentity = sharedState.identity?.subscribe(() => {
+        controller?.stop(); publishDescription(undefined); publishState(undefined)
+      })
       return {
         stop: () => {
+          stopIdentity?.()
           controller?.stop()
           controller = undefined
-          if (target !== undefined && sharedState.handles.get(ownKey) === handle) {
-            sharedState.handles.delete(ownKey)
+          if (target !== undefined && sharedState.handles.get(ownKey()) === handle) {
+            sharedState.handles.delete(ownKey())
           }
           publishDescription(undefined)
           publishState(undefined)
@@ -300,7 +374,7 @@ function createConnectionHandle(
       }
     },
   }
-  if (shared === undefined) sharedState.root = handle
+  if (sharedState.root === undefined) sharedState.root = handle
   return handle
 }
 
@@ -309,7 +383,25 @@ export function apply(ctx: Context): void {
   const fixture = pageLocation !== undefined && new URLSearchParams(pageLocation.search).has('fixture')
   const fixtureClient = fixture ? new FixtureApiClient() : undefined
   const transport = (globalThis as ClientTransportGlobal).__DSH_TRANSPORT__
-  const api: IApiClient = fixtureClient ?? transport?.createApiClient() ?? new WebApiClient()
+  const nativeFetch = globalThis.fetch
+  const identity = fixtureClient === undefined && transport === undefined && pageLocation?.origin !== undefined
+    && /^https?:\/\//u.test(pageLocation.origin)
+    ? createBrowserIdentityFence(nativeFetch, pageLocation.origin, () => { pageLocation.reload() }) : undefined
+  if (identity !== undefined) {
+    globalThis.fetch = identity.fetch
+    ctx.effect(() => () => {
+      identity.dispose()
+      if (globalThis.fetch === identity.fetch) globalThis.fetch = nativeFetch
+    }, 'connection: authenticated document requests')
+  }
+  const api: IApiClient = fixtureClient ?? transport?.createApiClient()
+    ?? new WebApiClient(undefined, undefined, undefined, identity?.socketUrl, (description) => {
+      if (description.executionAuthorityRequired === true && description.runtimeTarget === undefined) {
+        throw new Error('Managed Host did not declare its runtime identity')
+      }
+      if (description.runtimeTarget === undefined) identity?.setRuntimeTarget(undefined)
+      else handle.setBaseTarget?.(description.runtimeTarget)
+    })
   const accountPreferences = fixtureClient === undefined
     ? transport?.createAccountPreferencesTransport?.() ?? createBrowserAccountPreferencesTransport()
     : undefined
@@ -320,13 +412,14 @@ export function apply(ctx: Context): void {
     (globalThis as ClientTransportGlobal).__DSH_CONNECTION_RECOVERY__ as ConnectionConfig | undefined ?? {},
   )
   const rpc = fixtureClient?.rpc ?? createWebConnectionRpc(transport?.fetch)
-  const handle = createConnectionHandle(
+  const handle: ConnectionHandle = createConnectionHandle(
     api,
     pageLocation,
     bootstrapRecovery,
     rpc,
     accountPreferences,
     projectModelSettings,
+    { root: undefined, handles: new Map(), ...(identity === undefined ? {} : { identity }) },
   )
   ctx.provide('connection', handle)
 }

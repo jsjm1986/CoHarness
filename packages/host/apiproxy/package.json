@@ -110,7 +110,14 @@
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
     "@deepseek-ai/dsh-typert-registry": "workspace:^",
     "@deepseek-ai/dsh-util-time": "workspace:^",
-    "@deepseek-ai/libreoffice-kit": "0.0.1"
+    "@deepseek-ai/libreoffice-kit": "0.0.1",
+    "@deepseek-ai/dsh-agent-loop": "workspace:^",
+    "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
+    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
+    "@deepseek-ai/cordis-plugin-include": "workspace:^",
+    "@deepseek-ai/dsh-experimental-agent-team": "workspace:^",
+    "@deepseek-ai/dsh-goal-round-driver": "workspace:^",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:^"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-plugin-manager": {

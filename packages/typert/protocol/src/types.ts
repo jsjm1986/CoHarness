@@ -602,6 +602,13 @@ declare module '@deepseek-ai/cordis' {
 
   interface Events {
     /**
+     * Wrap the resolved method after authorization and all lookups have completed.
+     * @param payload - decoded invocation whose receiver and arguments are ready.
+     * @mode waterfall
+     */
+    'typert-gateway/invoke'(payload: TypertGatewayAuthorizationRequest, next: () => Promise<unknown>): Promise<unknown>
+
+    /**
      * Authorize a validated Remote request before Context or lookup resolution.
      * @param payload - decoded endpoint, service, method, arguments, and signal.
      * @mode serial

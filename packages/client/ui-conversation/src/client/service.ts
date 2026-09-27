@@ -11,6 +11,7 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import { bytesToBase64, randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only imports: a plugin-to-plugin value import is a bundle purity
 // error, so scope resolution goes through the sessions service (scopeOf
@@ -148,7 +149,6 @@ export class ConversationController extends Service implements IConversation {
   private readonly draftAttachments = new Map<DraftAttachmentId, ComposerAttachment>()
   private readonly draftDocuments = new Map<DraftDocumentId, DraftDocumentEntry>()
   private readonly documentStores = new Map<SessionId, SnapshotStore<readonly ComposerDocument[]>>()
-  private readonly userDocs = createUserDocClient()
   private readonly imageUrls = new Map<string, ImageUrlEntry>()
   private readonly imageGenerations = new Map<SessionId, number>()
   private readonly createdImageUrls = new Set<string>()
@@ -449,7 +449,7 @@ export class ConversationController extends Service implements IConversation {
     this.draftDocuments.delete(id)
     this.publishDocuments(sessionId)
     if (entry.ownsUploadedFile && entry.descriptor.docId !== undefined) {
-      void this.userDocs.remove(entry.descriptor.docId).catch(() => {
+      void this.userDocs(entry.sessionId).remove(entry.descriptor.docId).catch(() => {
         // The draft is already gone; a later list/retry can reconcile an orphan.
       })
     }
@@ -743,7 +743,7 @@ export class ConversationController extends Service implements IConversation {
   private async uploadDocument(id: DraftDocumentId, entry: DraftDocumentEntry): Promise<void> {
     if (entry.file === undefined) return
     try {
-      const ref = await this.userDocs.upload(entry.file, entry.controller.signal, (loaded, total) => {
+      const ref = await this.userDocs(entry.sessionId).upload(entry.file, entry.controller.signal, (loaded, total) => {
         const current = this.draftDocuments.get(id)
         if (current !== entry) return
         current.descriptor = { ...current.descriptor, progress: total <= 0 ? 1 : Math.min(1, loaded / total) }
@@ -772,6 +772,19 @@ export class ConversationController extends Service implements IConversation {
       entry.descriptor = { ...entry.descriptor, status: 'failed', progress: 0, error: message }
       this.publishDocuments(entry.sessionId)
     }
+  }
+
+  private userDocs(sessionId: SessionId): ReturnType<typeof createUserDocClient> {
+    const sessions = this.ctx.get('sessions')
+    const target = sessions?.runtimeIdentityFor?.(sessionId)
+    if (sessions?.runtimeIdentityFor !== undefined && target === undefined) throw new Error('Document Session is unavailable')
+    const connection = this.ctx.get('connection') as ConnectionHandle | undefined
+    return createUserDocClient((path) => {
+      const url = new URL(path, 'http://dsh.internal')
+      if (target !== undefined) url.searchParams.set('dshTarget', target.kind === 'personal' ? 'personal' : `project:${target.projectId}`)
+      const addressed = `${url.pathname}${url.search}`
+      return connection?.privateResourceUrl?.(addressed) ?? addressed
+    })
   }
 }
 

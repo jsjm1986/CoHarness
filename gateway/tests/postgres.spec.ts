@@ -5,9 +5,9 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import Database from 'better-sqlite3'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 import type { Notification, Pool } from 'pg'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { createAdminApiHandler } from '../src/admin-api.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { writeProjectModelGovernanceFile } from '../src/apply-model-governance.ts'
@@ -16,6 +16,7 @@ import { PostgresAuditService } from '../src/postgres/audit-service.ts'
 import { PostgresAccountPreferencesService } from '../src/postgres/account-preferences-service.ts'
 import { PostgresAuthService } from '../src/postgres/auth-service.ts'
 import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
+import { ConversationArchiveService } from '../src/postgres/conversation-archive-service.ts'
 import { ConversationRepository } from '../src/postgres/conversation-repository.ts'
 import type { ConversationEvent, ConversationHeader } from '../src/postgres/conversation-repository.ts'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
@@ -171,7 +172,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44], current: 44 })
+      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47], current: 47 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -187,7 +188,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 44 })
+      .toEqual({ applied: [], current: 47 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -1102,6 +1103,66 @@ describePg('PostgreSQL baseline', () => {
     expect(await instances.portOf({ kind: 'user', id: Number(user.rows[0]!.public_id) })).toBe(47100)
   })
 
+  it('distinguishes unavailable owners and assignments from an eligible runtime requiring explicit start', async () => {
+    const slug = `start-eligibility-${randomUUID()}`
+    const organization = (await pool.query<{ id: string }>(
+      "INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Start eligibility') RETURNING id", [slug])).rows[0]!.id
+    await pool.query("INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'start-node')", [organization])
+    const context = await resolvePostgresRuntimeContext(pool, slug, 'start-node')
+    const user = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(organization_id,username,display_name,home_path)
+      VALUES($1,'start-user','Start user','/fixture/start-user') RETURNING id,public_id::text`, [organization])).rows[0]!
+    await pool.query("INSERT INTO harness.memberships(organization_id,user_id,role) VALUES($1,$2,'member')", [organization, user.id])
+    const instances = new PostgresInstanceRepository(context, 47110), target = { kind: 'user' as const, id: Number(user.public_id) }
+    await instances.initialize(true)
+    await instances.markStopped(target, 'manual')
+    for (const intent of ['passive', 'webhook'] as const) {
+      await expect(instances.beginStart(target, Date.now(), Buffer.alloc(32, 1), intent))
+        .rejects.toMatchObject({ code: 'INSTANCE_STOPPED', reason: 'manual' })
+    }
+    const first = await instances.beginStart(target, Date.now(), Buffer.alloc(32, 1), 'explicit')
+    await instances.markReady(target, first)
+    await instances.markStopped(target, 'idle')
+    const second = await instances.beginStart(target, Date.now(), Buffer.alloc(32, 2), 'webhook')
+    expect(second).toBe(first + 1)
+    await instances.markReady(target, second)
+    await instances.markStopped(target, 'manual')
+    const state = async () => (await pool.query(`SELECT generation::text,observed_state,desired_state,stop_reason,runtime_token_hash
+      FROM harness.instances WHERE organization_id=$1 AND user_id=$2`, [organization, user.id])).rows
+    const unavailable = async () => {
+      const before = await state()
+      for (const intent of ['passive', 'explicit', 'webhook'] as const) {
+        await expect(instances.beginStart(target, Date.now(), Buffer.alloc(32, 3), intent))
+          .rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE', reason: 'unavailable' })
+      }
+      expect(await state()).toEqual(before)
+    }
+    await pool.query("UPDATE harness.users SET status='disabled' WHERE id=$1", [user.id])
+    await unavailable()
+    await pool.query("UPDATE harness.users SET status='active',deleted_at=now() WHERE id=$1", [user.id])
+    await unavailable()
+    await pool.query('UPDATE harness.users SET deleted_at=NULL WHERE id=$1', [user.id])
+    await pool.query("UPDATE harness.memberships SET status='disabled' WHERE user_id=$1", [user.id])
+    await unavailable()
+    await pool.query("UPDATE harness.memberships SET status='active' WHERE user_id=$1", [user.id])
+    await pool.query('DELETE FROM harness.instances WHERE organization_id=$1 AND user_id=$2', [organization, user.id])
+    await unavailable()
+    const project = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.projects(organization_id,name,created_by)
+      VALUES($1,'Start project',$2) RETURNING id,public_id::text`, [organization, user.id])).rows[0]!
+    await pool.query(`INSERT INTO harness.project_mounts(organization_id,project_id,node_id,local_path,canonical_path)
+      VALUES($1,$2,$3,'/fixture/project','/fixture/project')`, [organization, project.id, context.nodeId])
+    await instances.initialize(true)
+    const projectTarget = { kind: 'project' as const, id: Number(project.public_id) }
+    await instances.markStopped(projectTarget, 'manual')
+    const projectGeneration = await instances.generationOf(projectTarget)
+    await pool.query("UPDATE harness.projects SET status='archived' WHERE id=$1", [project.id])
+    for (const intent of ['passive', 'explicit', 'webhook'] as const) {
+      await expect(instances.beginStart(projectTarget, Date.now(), Buffer.alloc(32, 4), intent))
+        .rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE', reason: 'unavailable' })
+    }
+    expect(await instances.generationOf(projectTarget)).toBe(projectGeneration)
+    expect(await instances.stateOf(projectTarget)).toBe('stopped')
+  })
+
   it('reuses PostgreSQL node-local port holes without crossing the configured base', async () => {
     const root = await mkdtemp(join(tmpdir(), 'hgw-postgres-port-base-'))
     const suffix = randomUUID().slice(0, 8)
@@ -1128,7 +1189,7 @@ describePg('PostgreSQL baseline', () => {
         nodeId: isolatedNodeId,
         nodeName: `port-base-node-${suffix}`,
       }
-      const cfg = loadConfig({
+      const cfg = testConfig(root, {
         HGW_USERS_ROOT: join(root, 'users'),
         HGW_INSTANCE_PORT_BASE: '47000',
         HGW_ORGANIZATION_SLUG: context.organizationSlug,
@@ -1202,7 +1263,7 @@ describePg('PostgreSQL baseline', () => {
         nodeId: node.rows[0]!.id,
         nodeName: `project-path-node-${suffix}`,
       }
-      const cfg = loadConfig({
+      const cfg = testConfig(root, {
         HGW_USERS_ROOT: join(root, 'users'),
         HGW_STATE_ROOT: join(root, 'state'),
         HGW_PROJECT_RUNTIMES_ROOT: join(root, 'project-runtimes'),
@@ -1295,8 +1356,10 @@ describePg('PostgreSQL baseline', () => {
     }
     const sessions = new ConversationRepository(pool)
     const collaboration = new PostgresCollaborationService(context)
-    const projectService = new PostgresProjectService(context, loadConfig({
-      HGW_USERS_ROOT: `/tmp/collaboration-users-${suffix}`,
+    const root = await mkdtemp(join(tmpdir(), 'hgw-postgres-collaboration-'))
+    onTestFinished(() => rm(root, { recursive: true, force: true }))
+    const projectService = new PostgresProjectService(context, testConfig(root, {
+      HGW_USERS_ROOT: join(root, 'users'),
       HGW_ORGANIZATION_SLUG: 'test',
       HGW_COMPUTE_NODE_NAME: context.nodeName,
     }))
@@ -1945,7 +2008,7 @@ describePg('PostgreSQL baseline', () => {
         SELECT id,'runtime-node' FROM organization`, [slug])
       const context = await resolvePostgresRuntimeContext(pool, slug, 'runtime-node')
       await checkPostgresReadiness(context)
-      const cfg = loadConfig({
+      const cfg = testConfig(root, {
         HGW_USERS_ROOT: join(root, 'users'),
         HGW_STATE_ROOT: join(root, 'state'),
         HGW_USER_PROJECTS_ROOT: join(root, 'managed-projects'),
@@ -2054,8 +2117,11 @@ describePg('PostgreSQL baseline', () => {
       })
       await users.setStatus(member.id, 'disabled')
       expect(await instances.authenticateRuntimeToken(runtimeToken)).toBeNull()
-      await expect(instances.beginStart(memberTarget, Date.now(), Buffer.alloc(32, 2)))
-        .rejects.toThrow(`no instance row for user ${String(member.id)}`)
+      for (const intent of ['passive', 'explicit'] as const) {
+        await expect(instances.beginStart(memberTarget, Date.now(), Buffer.alloc(32, 2), intent))
+          .rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE', reason: 'unavailable' })
+      }
+      expect(await instances.generationOf(memberTarget)).toBe(generation)
       await instances.markStopping(memberTarget)
       await instances.markStopped(memberTarget)
       expect(await instances.stateOf(memberTarget)).toBe('stopped')
@@ -2459,7 +2525,7 @@ describePg('PostgreSQL baseline', () => {
     const ownOrganization = created.rows[0]!.id
     await pool.query(`INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'auto-node')`, [ownOrganization])
     const context = await resolvePostgresRuntimeContext(pool, slug, 'auto-node')
-    const cfg = loadConfig({
+    const cfg = testConfig(directory, {
       HGW_USERS_ROOT: join(directory, 'users'), HGW_STATE_ROOT: join(directory, 'state'),
       HGW_PROJECTS_ROOT: join(directory, 'projects'), HGW_USER_PROJECTS_ROOT: join(directory, 'managed-projects'),
     })
@@ -2729,4 +2795,52 @@ describePg('PostgreSQL baseline', () => {
       expect((await other.acquire(claims({ runtimeId: 7 }), { ...resource, requestId: 'r' })).status).toBe('granted')
     })
   })
+  it('keeps an archive tree intact until its owning runtime acknowledges successful purge', async () => {
+    const slug = `archive-release-${randomUUID()}`
+    const org = (await pool.query<{ id: string }>(`INSERT INTO harness.organizations(slug,display_name)
+      VALUES($1,'Archive release') RETURNING id`, [slug])).rows[0]!.id
+    await pool.query(`INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'archive-node')`, [org])
+    const context = await resolvePostgresRuntimeContext(pool, slug, 'archive-node')
+    const actor = (await pool.query<{ id: string; public_id: string }>(`INSERT INTO harness.users(
+      organization_id,username,display_name,home_path) VALUES($1,'archive-owner','Archive owner','/tmp/archive-owner') RETURNING id,public_id`, [org])).rows[0]!
+    const runtime = { kind: 'user' as const, id: Number(actor.public_id) }
+    const root = randomUUID(), child = randomUUID()
+    const repository = new ConversationRepository(pool)
+    await repository.create({ id: root, organizationId: org, creatorUserId: actor.id, visibility: 'personal', sessionFormatVersion: 5, createdAt: Date.now() })
+    await repository.create({ id: child, organizationId: org, creatorUserId: actor.id, parentSessionId: root, rootSessionId: root,
+      visibility: 'personal', sessionFormatVersion: 5, createdAt: Date.now() })
+    const service = new ConversationArchiveService(context)
+    const snapshot = { rootSessionId: root, runtime, creatorUserId: runtime.id, syncRevision: 1 }
+    await service.syncSnapshot(snapshot)
+    expect(await service.purge(root, runtime.id, 'first-purge')).toBe(true)
+    const count = async () => Number((await pool.query<{ count: string }>(`SELECT count(*) FROM harness.conversation_sessions
+      WHERE organization_id=$1 AND root_session_id=$2`, [org, root])).rows[0]!.count)
+    const command = async () => (await pool.query<{ id: string }>(`SELECT id FROM harness.conversation_archive_commands
+      WHERE organization_id=$1 AND root_session_id=$2 AND status='pending'`, [org, root])).rows[0]!.id
+    expect(await count()).toBe(2)
+    expect(await service.hasPendingCommands(runtime)).toBe(true)
+    expect(await service.hasPendingCommands({ kind: 'project', id: runtime.id })).toBe(false)
+    expect(await service.hasPendingCommands({ kind: 'user', id: runtime.id + 1 })).toBe(false)
+    await expect(service.setState(root, 'archived', runtime.id)).rejects.toThrow('archive-purge-pending')
+    await service.syncSnapshot({ ...snapshot, syncRevision: 100 })
+    expect((await service.detail(root))?.record.syncState).toBe('pending')
+    const first = await command()
+    await service.acknowledgeCommand(first, 100, undefined, { kind: 'user', id: runtime.id + 1 })
+    expect(await count()).toBe(2)
+    await service.acknowledgeCommand(first, 100, 'Stop the active task before purging', runtime)
+    expect(await count()).toBe(2)
+    await service.syncSnapshot({ ...snapshot, syncRevision: 101 })
+    expect((await service.detail(root))?.record).toMatchObject({ syncState: 'conflict', lastSyncError: 'Stop the active task before purging' })
+    expect(await service.purge(root, runtime.id, 'second-purge')).toBe(true)
+    const second = await command()
+    await service.acknowledgeCommand(first, 101, undefined, runtime)
+    expect(await count()).toBe(2)
+    await service.acknowledgeCommand(second, 101, undefined, runtime)
+    expect(await count()).toBe(0)
+    expect((await service.detail(root))?.record).toMatchObject({ state: 'purged', syncState: 'synced' })
+    expect(await service.hasPendingCommands(runtime)).toBe(false)
+    await service.acknowledgeCommand(second, 101, undefined, runtime)
+    expect(await count()).toBe(0)
+  })
+
 })

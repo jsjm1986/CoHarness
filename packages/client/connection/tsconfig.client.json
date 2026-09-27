@@ -19,7 +19,9 @@
     "src/loopback-hostname.ts",
     "src/rpc.ts",
     "src/rpc-stream.ts",
-    "src/rpc-stream-reader.ts"
+    "src/rpc-stream-reader.ts",
+    "src/client/session-api.ts",
+    "src/client/identity-fence.ts"
   ],
   "references": [
     {

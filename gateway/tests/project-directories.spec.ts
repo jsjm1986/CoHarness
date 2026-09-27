@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import {
   assertProjectImportPathAllowed,
   listProjectDirectories,
@@ -22,7 +22,7 @@ function localFixture() {
   for (const path of [usersRoot, projectRuntimesRoot, projectsRoot, userProjectsRoot, gatewayDir, dshRepoRoot]) {
     mkdirSync(path, { recursive: true })
   }
-  const cfg = loadConfig({
+  const cfg = testConfig(root, {
     HGW_USERS_ROOT: usersRoot,
     HGW_STATE_ROOT: gatewayData,
     HGW_PROJECT_RUNTIMES_ROOT: projectRuntimesRoot,
@@ -90,7 +90,7 @@ describe('administrator project directory browser', () => {
     const team = join(firstRoot, 'team')
     for (const path of [firstRoot, secondRoot, outside, team]) mkdirSync(path, { recursive: true })
     symlinkSync(outside, join(firstRoot, 'escape'))
-    const cfg = loadConfig({
+    const cfg = testConfig(root, {
       HGW_LAUNCHER: 'systemd',
       HGW_PROJECT_PATH_ROOTS: `${firstRoot},${secondRoot}`,
       HGW_PROJECTS_ROOT: join(firstRoot, 'admin'),
@@ -125,7 +125,7 @@ describe('administrator project directory browser', () => {
     const root = mkdtempSync(join(tmpdir(), 'hgw-systemd-root-limit-'))
     const roots = Array.from({ length: 1_001 }, (_, index) => join(root, `root-${String(index).padStart(4, '0')}`))
     for (const path of roots) mkdirSync(path)
-    const cfg = loadConfig({
+    const cfg = testConfig(root, {
       HGW_LAUNCHER: 'systemd',
       HGW_PROJECT_PATH_ROOTS: roots[0],
       HGW_PROJECTS_ROOT: join(roots[0]!, 'admin'),

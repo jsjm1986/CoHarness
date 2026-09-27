@@ -26,6 +26,10 @@
 
 控制器与监听器按注册方所在的 scope 分层，形状与 tools 注册表一致：一次注册归档到其注册上下文的 scope，一次读取则把全局层与所有者的 scope 链求并集。因此一个进程级注册表能逐所有者地回答逐所有者的问题——对自身组合未附加任何控制器的所有者，无论其他组合附加了多少，`start()` 都会拒绝并抛出 `background jobs unavailable: no job controller serves this agent (load @deepseek-ai/dsh-tool-jobs in its composition)`；一次结算也只会抵达其所有者所属组合注册的监听器。
 
+会话清理保留会在生产者执行前拒绝新的所属任务。运行中和停止中的任务会拒绝会话空闲释放，直到生产者确认终态。
+
+受管任务在启动生产者前捕获执行身份。同一 Agent 的后续请求不能替换运行中任务的来源或完成归因。
+
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。记录是只以快照形式分发的私有内存状态，其 issue/snapshot 语义由单元规格断言；执行所有权留在 shell 与工具 seam。

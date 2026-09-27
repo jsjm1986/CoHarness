@@ -1,3 +1,4 @@
+import type { ExecutionInheritance, ExecutionScopeId } from '@deepseek-ai/dsh-execution-authority'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -179,6 +180,40 @@ describe('tool-jobs setup', () => {
 })
 
 describe('job_output', () => {
+  it('keeps stream output unconsumed when origin verification fails and includes changes before reading', async () => {
+    const { ctx } = await setup()
+    const owner = await fakeAgent(ctx, 'captured-output')
+    const origin: ExecutionInheritance = { parentSessionId: owner.id,
+      scopeId: '10000000-0000-4000-8000-000000000001' as ExecutionScopeId,
+      inputs: [], unverifiedHistory: true }
+    let current = origin, rejected = true, changed = false
+    const relay = vi.fn(async () => {
+      if (rejected) throw new Error('origin verification unavailable')
+      if (!changed) {
+        changed = true
+        current = { ...origin, scopeId: '10000000-0000-4000-8000-000000000002' as ExecutionScopeId }
+      }
+      return current
+    })
+    ctx.provide('executionAuthority', { capture: () => current,
+      runCaptured: (_agent: Agent, _scope: ExecutionInheritance, action: () => unknown) => action(), relay } as never)
+    let unread = 'original output'
+    const readOutput = vi.fn(() => { const result = unread; unread = ''; return result })
+    const task = producer({ owner, readOutput })
+    const id = ctx.jobs.start(task.spec)
+    try {
+      const refused = await call(ctx, 'job_output', { job_id: id }, owner)
+      expect(refused.isError).toBe(true)
+      expect(readOutput).not.toHaveBeenCalled()
+      rejected = false
+      const output = await call(ctx, 'job_output', { job_id: id }, owner)
+      expect(output.isError).toBe(false)
+      expect(text(output)).toContain('original output')
+      expect(readOutput).toHaveBeenCalledOnce()
+      expect(relay).toHaveBeenCalledTimes(3)
+    } finally { task.settle({ status: 'completed' }); await ctx.fiber.dispose() }
+  })
+
   it('reads a consuming delta with a trailing status line', async () => {
     const { ctx } = await setup()
     const chunks = ['line one\n', '']

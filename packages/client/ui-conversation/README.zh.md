@@ -16,11 +16,13 @@ Hero 本身就是“新建对话”入口——它的编辑器即草稿——因
 
 对话服务提供 `IConversation.attachDocument` 给文档管理器使用：它把已有持久 `docId` 作为就绪的输入框草稿加入对话，不会再次上传。移除管理器加入的文档只释放浏览器草稿元数据，存储中的文档仍可供历史记录和之后的会话使用。
 
-在 composer 中直接选择的文件也使用与文档管理器相同的可续传上传会话，包括有界分片、SHA-256 校验、重试，以及重新选择同一文件后继续上传。
+文档上传、完成后的引用和草稿删除都跟随所寻址 Session 的 runtime。可恢复上传的全部 HTTP 与 XHR 请求携带同一个已验证账号和 runtime，恢复元数据按该归属隔离。Session 所有者失效时，不能回退到页面引导 runtime 的文档存储。
 
-根作用域的 `conversation` 入口声明 `conversation.pane`（允许当前 Session 缺席的对话树），以及可选工作台使用的工具栏、空状态、面板头和侧栏显示偏好 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
+根作用域的 `conversation` 入口声明 `conversation.pane`（允许当前 Session 缺席的对话树），以及可选工作台使用的工具栏、空状态、面板头和侧栏显示偏好 slots。它的 `conversationViewport` Cordis 能力通过 `slots.bindStore()` 与入口共享已声明的根级 store。提供方使用当前 Session 列表和归档列表校验恢复的 Session ID，最多保留四个面板，并协调额外历史窗口而不取消任务。旧布局等待完整身份验证时发布 `pendingIdentity`，在对账完成前拒绝布局编辑，不会把未保存的改动报告为成功。显式 SessionProvider 实例保留各面板独立的标准 props 和 store；卸载工作台贡献后恢复单会话渲染。[工作台包](../ui-workbench/README.zh.md)负责 Workspace 选择器和面板操作。
 
 Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。Client 插件通过 declaration merging 增加类型化 `ChatNodeDataMap` key，在 `ctx.conversationEvents` 上注册 `ConversationNodeDefinition`，再向 `conversation.chat.node` 注册匹配的 keyed renderer；它无须修改会话 fold 或中央 renderer switch。稳定事件 id、append/prepend 回放、Location data 与 renderer 约束见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
+
+审批通过本包声明的链条接管编辑器：`ApprovalPanel` 注册为按选择器路由的 `'conversation.composer'` 配置项（ui-user-questions 模式），在审批等待未决期间取代 InputBar 占据编辑器（琥珀色条、理由标题、来自运行中调用参数的配对命令行、一次性的拒绝／允许）。`contract/slots.ts` 中的 `PendingApproval` 领域面在运行时 `PendingWait` 载体之上拥有 wire 编码——带审计关联的 `ApprovalResponsePayload` 值；广播的 `approval/resolved` 帧使等待落定并恢复编辑器。运行时 manager 会将所有审批或问题等待通过 `SessionSummary.pendingInteraction` 投影出来，未实例化的会话也不例外；`ui-workspace` 负责其侧边栏呈现。未决等待完全离开消息流：问题（ui-user-questions）与审批（ApprovalPanel）都经编辑器接管作答，不再保留只读占位卡。编辑器底行的 Access 席位挂载 `PermissionSelect`，由 host 计算的 `permissions` 投影经标准工具包 `useProjection` 供数（key 缺席即隐藏 chip）；chip 打开 Menu 原语下拉，内置 preset id 通过当前 locale 解析，部署自定义名称保持原文；普通安全预设会立即经输入栏注入的 `command` 回调提交 `/permission <preset>`，而 `danger-full-access` 使用本地化的完全权限标签，选择后先打开页面内的 Modal 风险确认。用户勾选确认项前启用按钮始终不可用；取消、Escape、关闭按钮与点击遮罩都不会提交命令。
 
 会话页头会在标题旁渲染会话作用域的 `'conversation.session.header.actions'` 列表，并在最右侧渲染独立的 `'conversation.session.header.utilities'` 列表。会话上下文和谱系控件保留在 `actions` 中；可选的会话工具不会改变它们的顺序或位置。编辑器链的 currency 包含当前对话 `session`；ui-subagent 会选取 one-shot 或 parent 不可用的已寻址会话，并按原因显示只读文案，而普通 InputBar 会让所有已寻址 child 仅保留 Send，因为继续执行服务不公开逐 Activation 取消操作，`session.cancel` 也会绕过其所有权。
 ```ts type-equiv
@@ -49,15 +51,15 @@ Think 行默认保持折叠。流式摘要通过节流后的横向滚动跟随�
 
 聊天流会将跨重试轮次连续出现的模型重试节点投影为一个稳定的弱化状态行，并用最新一次尝试更新该行；每个重试事件仍保留在运行时快照与会话日志中。前端倒计时以客户端收到事件的时刻为计划延迟的起点，避免 Host 与浏览器的时钟偏差；剩余时间向上取整到秒，且下限为 1 秒。最近一次尚未完成的重试会显示从左到右的文字渐变动画。后续轮次事实用于区分已开始的尝试与在退避期间取消的尝试，Host 的 running 位只控制实时动画；随后该行会显示静态的已完成或已取消标签。normal 策略行显示有限重试上限；always 策略行显示 `∞`。激活该行会显示最近一次重试的精确延迟和失败消息。客户端运行时会在相应重试节点到达前移除每个失败步骤的流式输出尾部；后续某次尝试成功后，该状态仍保持可见。未进入重试的终态失败会在其轮次边界渲染为持久的内联状态，展示安全文案和可选的可操作错误码，但不会提供 Host 无法兑现的操作；AUTH 文案绝不会回显提供方给出的凭据片段，Gateway 会话持久化或授权内部细节会改为本地化重试提示。
 
-审批通过本包声明的链条接管编辑器：`ApprovalPanel` 注册为按选择器路由的 `'conversation.composer'` 配置项（ui-user-questions 模式），在审批等待未决期间取代 InputBar 占据编辑器（琥珀色条、理由标题、来自运行中调用参数的配对命令行、一次性的拒绝／允许）。`contract/slots.ts` 中的 `PendingApproval` 领域面在运行时 `PendingWait` 载体之上拥有 wire 编码——带审计关联的 `ApprovalResponsePayload` 值；广播的 `approval/resolved` 帧使等待落定并恢复编辑器。运行时 manager 会将所有审批或问题等待通过 `SessionSummary.pendingInteraction` 投影出来，未实例化的会话也不例外；`ui-workspace` 负责其侧边栏呈现。未决等待完全离开消息流：问题（ui-user-questions）与审批（ApprovalPanel）都经编辑器接管作答，不再保留只读占位卡。编辑器底行的 Access 席位挂载 `PermissionSelect`，由 host 计算的 `permissions` 投影经标准工具包 `useProjection` 供数（key 缺席即隐藏 chip）；chip 打开 Menu 原语下拉，内置 preset id 通过当前 locale 解析，部署自定义名称保持原文；普通安全预设会立即经输入栏注入的 `command` 回调提交 `/permission <preset>`，而 `danger-full-access` 使用本地化的完全权限标签，选择后先打开页面内的 Modal 风险确认。用户勾选确认项前启用按钮始终不可用；取消、Escape、关闭按钮与点击遮罩都不会提交命令。
-
-`TurnErrorItem` 会把 Gateway 会话持久化和授权内部细节替换为本地化重试提示，并省略 `UNKNOWN` 代码；服务端诊断仍保留在持久日志和 Gateway 日志中。
+`TurnErrorItem` 会把 Gateway 会话持久化和授权内部细节替换为本地化重试提示，并省略 `UNKNOWN` 代码；服务端诊断仍保留在持久日志和 Gateway 日志中。 策略 hook 取消也显示明确停止原因及保留队列的继续方式；普通用户 Stop 不增加错误行。
 
 `TodoDock` 以 `order: 0` 占用 `'conversation.input.dock'` 列表 slot（位于 Goal 与 Queue 之前），作为计划条读取 host 计算的 `todos` 投影（当前计划：其后没有更晚 `turn/start` 的最近一次 `todo/write`）并渲染 `TodoPanel`。面板接收纯列表，列表为空时自我隐藏；列表非空时默认折叠，表头显示标题及以 `·` 连接的各状态计数（如 `1 已完成 · 2 进行中 · 1 待处理`，省略零计数）。dock adapter 拥有 selection，因此面板保持为 props 的纯函数。输入区 composer 链隐藏的一切也会隐藏整个 dock。`todo_write` 工具行属于 [`ui-tool`](../ui-tool/README.zh.md)。
 
 `QueueDock` 是 `order: 20` 的末端 input-dock 条目。队列为空时隐藏；只有一个待处理项时直接渲染该行；存在两个或更多待处理项时，默认收起为 `"<n> 条排队消息"` 表头，其按钮可展开或收起完整列表。表头暴露 `aria-expanded` 和 `aria-controls`；展开后的列表以 180px 为高度上限，并可滚动。存在进行中的编辑或变更时，列表行会保持可见；队列清空后，下一次出现队列时会恢复默认收起状态。普通会话中的每条可见行仍是单行预览，并显示持久图片缩略图，同时提供针对精确单次入队项的编辑、删除和严格 steering 操作；本地 queued 提交回显会在 Host 携带匹配 `rpcId` 的队列项到达前，保持浏览器预览显示在同一个 dock 中。已寻址 subagent 则保留只读行，因为其继续执行传输不提供 Queue 变更。如果严格 steering 输给已关闭的窗口，原单次入队项会留在 Queue 中正常投递；如果驱动器已经认领该项，正常投递就已开始。这两种已收敛的竞态都不显示失败，传输和未知错误仍会显示。
 
-Chat 的事件定义通过持久的 inbox splice 链和当前领取集合识别 next-step steering。Host 带 placement 的 `session/queue` 快照也会携带待处理 steering。QueueDock 会将其过滤掉，ChatView 则把它投影为会话流末尾带复制操作的用户样式气泡；非用户来源的 next-step 项（注入上下文）改以 `context` placement 广播，领取前不在任何界面渲染。与所有用户样式气泡一样，这里不显示 fork。Host 会等携带该 steering 的持久 `user/message` 进入 mux 流之后再退役 steering。客户端运行时接纳该实时事件时，会在发布快照前退役第一个匹配的当前 steering 单次入队项；历史事件无法隐藏后来复用同一 `MessageId` 的单次入队项。气泡交接时因而不会产生空档或重复，会立即从持久节点恢复复制操作与时钟——steering 气泡与 user 气泡一样不带分支操作（[决策](../../../.agents/notes/implemented/simplification/2026-08-06-user-bubbles-drop-the-branch-action.zh.md)）——并能在重连后从同一权威恢复。
+Chat 的事件定义通过持久的 inbox splice 链和当前领取集合识别 next-step steering。
+
+Host 带 placement 的 `session/queue` 快照也会携带待处理 steering。QueueDock 会将其过滤掉，ChatView 则把它投影为会话流末尾带复制操作的用户样式气泡；非用户来源的 next-step 项（注入上下文）改以 `context` placement 广播，领取前不在任何界面渲染。与所有用户样式气泡一样，这里不显示 fork。Host 会等携带该 steering 的持久 `user/message` 进入 mux 流之后再退役 steering。客户端运行时接纳该实时事件时，会在发布快照前退役第一个匹配的当前 steering 单次入队项；历史事件无法隐藏后来复用同一 `MessageId` 的单次入队项。气泡交接时因而不会产生空档或重复，会立即从持久节点恢复复制操作与时钟——steering 气泡与 user 气泡一样不带分支操作（[决策](../../../.agents/notes/implemented/simplification/2026-08-06-user-bubbles-drop-the-branch-action.zh.md)）——并能在重连后从同一权威恢复。
 
 Composer 消息提交会根据所寻址会话的运行状态和 steering 能力解析投递方式。空闲时，Enter 和 Cmd/Ctrl+Enter 都执行普通 Queue 发送。主会话运行期间，由 Host settings 支撑的 `ui-conversation.busyEnter` General Settings 偏好会把普通 Enter 和发送按钮分配为 `Queue`（默认值）或 `Steer`，Cmd/Ctrl+Enter 则执行另一种行为；本地 settings 提供方将其存入 `$DSH_HOME/settings.yaml`，因此该选择会跟随同一个用户 home 跨越 Web 端口。Shift+Enter 仍然换行。草稿为空时，Cmd/Ctrl+Enter 改为按 FIFO 顺序把仍在排队的消息全部插话进运行中的轮次（把 dock 的逐条严格 steer 操作应用于整个队列）；空草稿 + 普通 Enter 仍是无操作。这个整队列手势可用时，文本框 placeholder 会提示该手势；owner 提供的 placeholder 仍然优先。可继续 subagent 在父会话可用时遵循同一投递偏好；one-shot 子会话保持只读。运行中的发送按钮会把可操作的普通消息草稿标记为「排队发送」或「插话发送」；命令、不可用输入和待完成上传仍使用普通「发送消息」标签。`InputActions.submit()` 的其他消费者继续使用 Queue 投递。Composer Steer 复用现有尽力而为的 `session.prompt(mode: 'steer')` 约定：如果当前 next-step 窗口在接纳前关闭，AgentLoop 会把消息接纳为下一条唤醒 Queue 轮次，不显示失败，也不会丢失草稿事务。该持久化边界由[Host settings 支撑的偏好决策](../../../.agents/notes/implemented/bug-fix/2026-08-06-host-backed-web-preferences.zh.md)拥有。
 
@@ -68,6 +70,8 @@ Composer 消息提交会根据所寻址会话的运行状态和 steering 能力�
 图片经粘贴与整页拖放进入：输入栏绑定 document 级拖拽监听（composer-bar slot 为 `kind: 'single'`，同一时刻至多一个 bar 绑定），文件拖拽悬停窗口时显示 `DropOverlay` 原子组件——纯文本拖拽不受影响，锁定或忙碌的 composer 显示禁用遮罩并拒绝 drop。两种手势共用一条对宿主 `imageLimits` 投影的加入预检（数量、单图字节、总字节）：会突破上限的加入整批拒收，立刻弹出点名上限的横幅，完全不进入附件栏。仍然到达的宿主侧拒绝按 `attachment-error` 原因映射为产品文案（`image-labels.ts` 的 `attachmentErrorText`）；用户无法解决的原因折叠为一条带原因码的发送失败文案，非附件错误码保留开发者可读的原文加错误码。已附加的图片在每条发送路径上都是提交信封的一部分：斜杠命令提交要么消费它们（声明 `images` 的 claim 经 hub 的 `commandImages` 管道序列化图片，尝试信号会取消已放弃的编码，再传给 `claim.submit`，仅在成功 outcome 后清除并释放），要么以 `command.imagesUnsupported` 通知拒绝整个提交，草稿与图片原样保留——命令不可能消费了文字却把图片留在原地。
 
 文档草稿存储也接受文档管理器返回的安全目标引用。这些引用指向已经复制完成的文件，因此移除 composer 草稿只释放浏览器元数据，不会删除持久目标文档；发送仍通过普通 `userdoc` 提示路径准入目标 id。
+
+在 composer 中直接选择的文件也使用与文档管理器相同的可续传上传会话，包括有界分片、SHA-256 校验、重试，以及重新选择同一文件后继续上传。
 
 composer 的文档控件通过浏览器附加命令打开文档管理器；conversation 包负责监听该命令，并把返回的目标引用转换为会话作用域的草稿 id。
 

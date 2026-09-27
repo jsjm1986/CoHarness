@@ -699,3 +699,28 @@ describe('CollaborationClient', () => {
     expect(failureClient.getSnapshot().conversations).toEqual({})
   })
 })
+
+it('loads sharing in a project pane from a personal page and sends its explicit project', async () => {
+  const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
+  const key = clientSessionKey({ kind: 'project', projectId: 9 }, 'child' as never)
+  const personal = clientSessionKey({ kind: 'personal' }, 'child' as never)
+  const api = transport({ loadContext: vi.fn().mockResolvedValue(personalContext) })
+  const client = new CollaborationClient(api)
+  try {
+    await client.load()
+    await client.loadConversation(personal)
+    expect(api.loadConversation).not.toHaveBeenCalled()
+    await client.loadConversation(key)
+    expect(api.loadConversation).toHaveBeenCalledWith(key, expect.any(AbortSignal))
+    expect(client.getSnapshot().conversations[key]?.status).toBe('ready')
+    await client.refresh()
+    expect(client.getSnapshot().conversations[key]?.status).toBe('ready')
+    const fetcher = vi.fn().mockResolvedValue(Response.json(detail))
+    const browser = createBrowserCollaborationTransport({ fetch: fetcher, reload: vi.fn() })
+    await browser.loadConversation(key, new AbortController().signal)
+    expect(fetcher).toHaveBeenCalledWith('/account/api/conversations/child?projectId=9', expect.any(Object))
+    await browser.setVisibility(key, 'private', new AbortController().signal)
+    expect(fetcher).toHaveBeenLastCalledWith('/account/api/conversations/child?projectId=9', expect.objectContaining({ method: 'PATCH' }))
+    expect(() => browser.loadConversation(personal, new AbortController().signal)).toThrow('no project sharing')
+  } finally { client.dispose() }
+})

@@ -52,6 +52,10 @@ import type { DocumentsKey } from './locales.ts'
 import css from './DocumentsModal.module.css'
 
 export interface DocumentsModalProps {
+  /** Document destination captured from the addressed composer, independent of the manager's browsing scope. */
+  attachmentScope?: UserDocScope | undefined
+  /** Pin private downloads and previews to the document’s verified account. */
+  privateResourceUrl?: ((url: string) => string) | undefined
   open: boolean
   onClose: () => void
   t: (key: DocumentsKey, params?: Record<string, string>) => string
@@ -411,7 +415,9 @@ function normalizeDirectoryRef(value: {
  * @param props.onAttachDocument - optional callback for adding an existing document to the composer.
  * @returns the manager dialog plus nested delete-confirm and preview dialogs.
  */
-export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode = 'manage', onAttachDocument }) => {
+export const DocumentsModal: FC<DocumentsModalProps> = ({
+  open, onClose, t, mode = 'manage', onAttachDocument, privateResourceUrl, attachmentScope,
+}) => {
   const phone = useMediaQuery('(max-width: 767px)')
   const [documents, setDocuments] = useState<UserDocRef[]>([])
   const [directories, setDirectories] = useState<UserDocDirectoryRef[]>([])
@@ -517,7 +523,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
   const headerCheckRef = useRef<HTMLInputElement>(null)
   const dragDepth = useRef(0)
   const loadGeneration = useRef(0)
-  const userDocs = useRef(createUserDocClient())
+  const userDocs = useRef(createUserDocClient(privateResourceUrl))
   const listingCache = useRef(new Map<string, LegacyListingRecord>())
   const scopeCache = useRef<DocumentsWorkspaceScope | null>(null)
   const overviewCache = useRef<{ readonly key: string; readonly response: UserDocCatalogOverview } | null>(null)
@@ -1977,7 +1983,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
 
   const attachDocument = (doc: UserDocRef) => {
     setError('')
-    if (remoteScopeView) {
+    if (!sameDocumentScope(listingScope(), currentScopeDescriptor())) {
       void copyRemoteDocumentToConversation(doc)
       return
     }
@@ -2009,7 +2015,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     try {
       const response = await userDocs.current.transfer({
         version: 1,
-        source: selectedScope,
+        source: listingScope(),
         target: currentScopeDescriptor(),
         documents: targets.map(document => ({ docId: document.docId })),
       })
@@ -2044,7 +2050,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       setError(t('action.attach.error'))
       return
     }
-    if (remoteScopeView) {
+    if (!sameDocumentScope(listingScope(), currentScopeDescriptor())) {
       await copyRemoteDocumentsToConversation(targets)
       return
     }
@@ -2118,7 +2124,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     setModalError('')
   }
 
-  const currentScopeDescriptor = runtimeScope
+  const currentScopeDescriptor = (): UserDocScope => attachmentScope ?? runtimeScope()
 
   const sourceOptions: SourceOption[] = [
     ...((scope.kind !== 'personal' || scopeView?.scope.kind === 'project') && scopeView?.scope.kind !== 'personal'
@@ -2529,7 +2535,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
     setProgress({ current: 0, total: targets.length, percent: 0 })
     let noticeAfterCopy: string | undefined
     try {
-      const source: UserDocScope = overviewCopyRow?.source ?? scopeView?.scope ?? alternateSource?.scope ?? currentScopeDescriptor()
+      const source: UserDocScope = overviewCopyRow?.source ?? listingScope()
       const resolvedTarget = option.target
       const transferRequest = {
         version: 1,
@@ -2708,8 +2714,9 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
   const remoteScopeView = scopeView !== null || alternateSource !== null
   const selectedScopeUrl = remoteScopeView ? selectedScope : undefined
   const documentContentUrl = (docId: UserDocIdType, inline = false): string => {
-    if (selectedScopeUrl === undefined) return userDocs.current.contentUrl(docId, inline)
-    return userDocs.current.scopedContentUrl(selectedScopeUrl, docId, inline)
+    const url = selectedScopeUrl === undefined ? userDocs.current.contentUrl(docId, inline)
+      : userDocs.current.scopedContentUrl(selectedScopeUrl, docId, inline)
+    return privateResourceUrl?.(url) ?? url
   }
 
   const projectExtra = scope.kind === 'project' ? t('delete.confirm.project.extra') : ''
@@ -4238,6 +4245,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({ open, onClose, t, mode
       {previewDoc && (
         <DocumentPreview
           doc={previewDoc}
+          privateResourceUrl={privateResourceUrl}
           {...((scopeView?.scope ?? alternateSource?.scope) === undefined
             ? {}
             : { scope: scopeView?.scope ?? alternateSource?.scope })}

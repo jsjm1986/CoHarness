@@ -10,10 +10,25 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-agent-presets'
 import type {} from '@deepseek-ai/dsh-userdoc'
 import type { LocalUserDocStore } from '@deepseek-ai/dsh-userdoc-local'
+import { readManagedDataPaths } from '@deepseek-ai/dsh-managed-data'
 import { launchWebScaffold, type WebScaffold } from './scaffold.ts'
 
 let restoreAmbientHome: (() => void) | undefined
 afterEach(() => { restoreAmbientHome?.() })
+
+it('records configured storage roots through the real Web composition without claiming its project source', async () => {
+  const scaffold = await launchWebScaffold({ managedDataInventory: true })
+  try {
+    const paths = readManagedDataPaths(join(scaffold.harnessHome, 'managed-data.jsonl'))
+    for (const owner of ['session-persistence-jsonl', 'attachment-local', 'settings-file', 'credentials-local',
+      'storage-json', 'userdoc-local', 'workspace-changes']) {
+      expect(paths.some(entry => entry.owner === `@deepseek-ai/dsh-${owner}`)).toBe(true)
+    }
+    expect(paths.find(entry => entry.owner === '@deepseek-ai/dsh-session-persistence-jsonl')?.path).toBe(scaffold.persistenceRoot)
+    expect(paths.find(entry => entry.owner === '@deepseek-ai/dsh-workspace-changes')?.path).toBe(join(scaffold.harnessHome, 'workspace-reviews'))
+    expect(paths.some(entry => entry.path === scaffold.workspaceCwd)).toBe(false)
+  } finally { await scaffold.close() }
+})
 
 it('stores documents outside the workspace and leaves ambient documents, locks and legacy uploads untouched', async () => {
   const ambient = await mkdtemp(join(tmpdir(), 'dsh-web-ambient-documents-'))

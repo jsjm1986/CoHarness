@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { SlotRegistry, NavigationController, createSnapshotStore, workspaceResourceAddress, WorkspaceResourceRegistry } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationViewportSnapshot, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
+import { SlotRegistry, NavigationController, clientSessionKey, createSnapshotStore, workspaceResourceAddress, WorkspaceResourceRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationViewport, ConversationViewportSnapshot, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
+import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
+import { ConversationViewportController, createConversationViewportStore } from '@deepseek-ai/dsh-client-ui-conversation/src/client/viewport.ts'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '../src/client/apply.ts'
 import type { WorkbenchCatalog, WorkbenchConversation } from '../src/client/catalog.ts'
@@ -12,9 +14,9 @@ import { apply as nodeApply } from '../src/index.ts'
 
 const A = 'a' as SessionId
 const item: WorkbenchConversation = { sessionId: A, runtime: { kind: 'personal' }, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }
-const catalog: WorkbenchCatalog = { personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [item] }
+const catalog: WorkbenchCatalog = { personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [item] }
 
-async function harness(services: { connection?: unknown; workspaceResources?: unknown } = {}) {
+async function harness(services: { connection?: unknown; workspaceResources?: unknown; viewport?: ConversationViewport } = {}) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry)
   const slots = ctx.get('slots') as SlotRegistry
@@ -36,6 +38,8 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
   const navigation = new NavigationController()
   ctx.effect(() => () => { navigation.dispose() })
   const sessions = {
+    usingRuntime: <T>(_target: SessionRuntimeTarget, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>) =>
+      operation(signal),
     beginNavigation: () => navigation.begin(),
     retain: vi.fn(() => ({
       ready: Promise.resolve({ session: { getSnapshot: () => ({ openState: 'open', openError: null }) } }),
@@ -51,7 +55,7 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
   ctx.provide('sidebarRight', sidebarRight as never)
   ctx.provide('sidebarRightTabs', { register: (spec: never) => { tabTypes.push(spec); return () => {} } } as never)
   ctx.provide('layout', layout as never)
-  ctx.provide('conversationViewport', viewport as never)
+  ctx.provide('conversationViewport', (services.viewport ?? viewport) as never)
   ctx.provide('sessions', sessions as never)
   ctx.provide('workspaces', {} as never)
   if (services.connection !== undefined) ctx.provide('connection', services.connection as never)
@@ -69,7 +73,7 @@ async function harness(services: { connection?: unknown; workspaceResources?: un
     chooseSession(item: WorkbenchConversation, replace: boolean): Promise<unknown>
     createSession(target: WorkbenchConversation['runtime'], replace: boolean): Promise<unknown>
     hydrateCatalog(catalog: WorkbenchCatalog, ids: SessionId[]): Promise<void>
-    markCatalogReady(): void
+    catalogUnavailable(): void
     focusSession(id: SessionId): void
     setMode(mode: 'single' | 'workbench'): void
     listWorkbenches(): readonly unknown[]
@@ -149,8 +153,181 @@ describe('workbench navigation lifecycle', () => {
       await h.actions.hydrateCatalog(catalog, [A, 'missing' as SessionId])
       expect(h.sessions.setBaseRuntimeTarget).toHaveBeenCalledWith(catalog.activeRuntime)
       expect(h.viewport.markCatalogReady).toHaveBeenCalledOnce()
-      h.actions.markCatalogReady()
-      expect(h.viewport.markCatalogReady).toHaveBeenCalledTimes(2)
+      h.actions.catalogUnavailable()
+      expect(h.viewport.markCatalogReady).toHaveBeenCalledOnce()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('resolves an encoded-looking legacy ID by its declared v2 version and does not reapply stale catalogs to live panes', async () => {
+    const h = await harness()
+    const raw = clientSessionKey({ kind: 'project', projectId: 7 }, A)
+    const correct = clientSessionKey({ kind: 'personal' }, raw)
+    const reconcile = vi.fn<(resolve: (id: SessionId, version: 2 | 3) => SessionId | undefined) => void>()
+      .mockImplementation((resolve) => { expect(resolve(raw, 2)).toBe(correct) })
+    const pending = vi.fn(() => true)
+    Object.assign(h.viewport, {
+      sessionKeyVersion: () => 2,
+      needsCatalogRestore: pending,
+      currentWorkbench: () => ({ id: 'w1', name: 'Saved', paneIds: [raw], updatedAt: 1 }),
+      reconcileSessionKeys: reconcile,
+    })
+    Object.assign(h.sessions, { keyFor: (id: SessionId, target: SessionRuntimeTarget) => clientSessionKey(target, id) })
+    const entries: WorkbenchCatalog = { ...catalog, items: [
+      { ...item, sessionId: raw },
+      { ...item, runtime: { kind: 'project', projectId: 7 } },
+    ] }
+    try {
+      await h.actions.hydrateCatalog(entries, [])
+      expect(h.sessions.ensureSession).toHaveBeenCalledExactlyOnceWith({ kind: 'personal' }, raw, expect.any(AbortSignal))
+      expect(reconcile).toHaveBeenCalledOnce()
+      pending.mockReturnValue(false)
+      await h.actions.hydrateCatalog({ ...catalog, items: [] }, [correct])
+      expect(reconcile).toHaveBeenCalledOnce()
+      expect(h.sessions.ensureSession).toHaveBeenCalledOnce()
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it.each(['manual', 'offline', 'revoked', 'missing'] as const)('restores %s outcomes without confusing unavailable runtimes with removed Sessions', async (failure) => {
+    localStorage.clear()
+    const runtime = await SlotTestRuntime.create()
+    const raw = 'same' as SessionId
+    const personal = clientSessionKey({ kind: 'personal' }, raw)
+    const project = clientSessionKey({ kind: 'project', projectId: 7 }, raw)
+    const keyFor = (id: SessionId, target: SessionRuntimeTarget = { kind: 'personal' }) => clientSessionKey(target, id)
+    Object.assign(runtime.sessions, { keyFor })
+    await runtime.sessions.add({ id: personal })
+    const view = new ConversationViewportController(runtime.sessions, createConversationViewportStore().create())
+    localStorage.setItem('dsh.conversation.workbenches.v3.account%3A1', JSON.stringify({
+      version: 3, mode: 'workbench', activeId: 'saved', workbenches: [{
+        id: 'saved', name: 'Saved', paneIds: [personal, project], activePaneId: project, paneRatios: [0.5, 0.5], updatedAt: 1,
+      }],
+    }))
+    view.setPersistenceScope('account:1')
+    view.setEnabled(true)
+    const h = await harness({ viewport: view })
+    Object.assign(h.sessions, { keyFor })
+    h.sessions.ensureSession.mockImplementation(async (target?: SessionRuntimeTarget) => {
+      if (target?.kind === 'personal') return true
+      if (failure === 'missing') return false
+      throw Object.assign(new Error(failure), { status: failure === 'revoked' ? 403 : failure === 'manual' ? 409 : 503 })
+    })
+    const directory: WorkbenchCatalog = { ...catalog, items: [
+      { ...item, sessionId: raw }, { ...item, sessionId: raw, runtime: { kind: 'project', projectId: 7 } },
+    ] }
+    try {
+      await h.actions.hydrateCatalog(directory, [])
+      const retain = failure === 'manual' || failure === 'offline'
+      expect(view.snapshot.getSnapshot().paneIds).toEqual(retain ? [personal, project] : [personal])
+      expect(runtime.sessions.binding(project)).toBeUndefined()
+      expect(h.sessions.createSession).not.toHaveBeenCalled()
+      if (retain) {
+        view.markCatalogReady()
+        expect(view.currentWorkbench().paneIds).toEqual([personal, project])
+        await runtime.sessions.add({ id: project })
+        h.sessions.ensureSession.mockResolvedValue(true)
+        await h.actions.hydrateCatalog(directory, [])
+        expect(view.snapshot.getSnapshot().paneIds).toEqual([personal, project])
+        expect(runtime.sessions.binding(project)).toBeDefined()
+      }
+      view.setPersistenceScope(undefined)
+      expect(view.snapshot.getSnapshot().paneIds).toEqual([])
+    } finally { view.dispose(); await h.ctx.fiber.dispose(); await runtime.dispose(); localStorage.clear() }
+  })
+
+  it('preserves unverified personal metadata during partial and failed catalogs without retaining missing project membership', async () => {
+    localStorage.clear()
+    const runtime = await SlotTestRuntime.create()
+    const raw = 'same' as SessionId
+    const personal = clientSessionKey({ kind: 'personal' }, raw)
+    const project = clientSessionKey({ kind: 'project', projectId: 7 }, raw)
+    const removed = clientSessionKey({ kind: 'project', projectId: 8 }, raw)
+    const keyFor = (id: SessionId, target: SessionRuntimeTarget = { kind: 'personal' }) => clientSessionKey(target, id)
+    Object.assign(runtime.sessions, { keyFor })
+    await runtime.sessions.add({ id: project })
+    localStorage.setItem('dsh.conversation.workbenches.v3.account%3A1', JSON.stringify({
+      version: 3, mode: 'workbench', activeId: 'saved', workbenches: [{
+        id: 'saved', name: 'Saved', paneIds: [personal, project, removed], activePaneId: personal, paneRatios: [1, 1, 1], updatedAt: 1,
+      }],
+    }))
+    const view = new ConversationViewportController(runtime.sessions, createConversationViewportStore().create())
+    view.setPersistenceScope('account:1')
+    view.setEnabled(true)
+    const h = await harness({ viewport: view })
+    Object.assign(h.sessions, { keyFor })
+    const directory: WorkbenchCatalog = { ...catalog, personalComplete: false, items: [
+      { ...item, sessionId: raw, runtime: { kind: 'project', projectId: 7 } },
+    ] }
+    try {
+      h.actions.catalogUnavailable()
+      expect(view.currentWorkbench().paneIds).toEqual([personal, project, removed])
+      expect(view.needsCatalogRestore()).toBe(true)
+      await h.actions.hydrateCatalog(directory, [])
+      expect(view.snapshot.getSnapshot().paneIds).toEqual([personal, project])
+      expect(runtime.sessions.binding(personal)).toBeUndefined()
+      expect(h.sessions.ensureSession).toHaveBeenCalledExactlyOnceWith({ kind: 'project', projectId: 7 }, raw, expect.any(AbortSignal))
+      expect(h.sessions.createSession).not.toHaveBeenCalled()
+      await runtime.sessions.add({ id: personal })
+      await h.actions.hydrateCatalog({ ...directory, personalComplete: true, items: [...directory.items, { ...item, sessionId: raw }] }, [])
+      expect(view.snapshot.getSnapshot().paneIds).toEqual([personal, project])
+      expect(runtime.sessions.binding(personal)).toBeDefined()
+      expect(view.needsCatalogRestore()).toBe(false)
+    } finally { view.dispose(); await h.ctx.fiber.dispose(); await runtime.dispose(); localStorage.clear() }
+  })
+
+  it('keeps a v2 raw ID unresolved while an unavailable personal runtime could own the same ID', async () => {
+    localStorage.clear()
+    const runtime = await SlotTestRuntime.create()
+    Object.assign(runtime.sessions, { keyFor: (id: SessionId, target: SessionRuntimeTarget) => clientSessionKey(target, id) })
+    localStorage.setItem('dsh.conversation.workbenches.v2.account%3A1', JSON.stringify({
+      version: 2, mode: 'workbench', activeId: 'saved', workbenches: [{
+        id: 'saved', name: 'Saved', paneIds: [A], activePaneId: A, paneRatios: [1], updatedAt: 1,
+      }],
+    }))
+    const view = new ConversationViewportController(runtime.sessions, createConversationViewportStore().create())
+    view.setPersistenceScope('account:1')
+    view.setEnabled(true)
+    const h = await harness({ viewport: view })
+    const directory: WorkbenchCatalog = { ...catalog, personalComplete: false, items: [{ ...item, runtime: { kind: 'project', projectId: 7 } }] }
+    try {
+      await h.actions.hydrateCatalog(directory, [])
+      expect(view.sessionKeyVersion()).toBe(2)
+      expect(view.currentWorkbench().paneIds).toEqual([A])
+      expect(view.snapshot.getSnapshot().paneIds).toEqual([])
+      expect(h.sessions.ensureSession).not.toHaveBeenCalled()
+      expect(h.sessions.createSession).not.toHaveBeenCalled()
+      const project = clientSessionKey({ kind: 'project', projectId: 7 }, A)
+      await runtime.sessions.add({ id: project })
+      expect(view.snapshot.getSnapshot().pendingIdentity).toBe(true)
+      expect(view.add(project)).toEqual({ ok: false, reason: 'unknown' })
+      expect(view.replaceActive(project)).toEqual({ ok: false, reason: 'unknown' })
+      await expect(h.actions.chooseSession(directory.items[0]!, false)).resolves.toEqual({ ok: false, reason: 'unknown' })
+      await expect(h.actions.createSession({ kind: 'project', projectId: 7 }, false)).resolves.toEqual({ ok: false, reason: 'unknown' })
+      for (const edit of [
+        () => view.createWorkbench('New'), () => view.duplicateWorkbench('saved', 'Copy'),
+        () => { view.renameWorkbench('saved', 'Changed') }, () => { view.deleteWorkbench('saved') },
+        () => { view.remove(project) }, () => { view.move(project, 'next') }, () => { view.setPaneRatios([1]) },
+      ]) expect(edit).toThrow('identities are not verified')
+      expect(view.currentWorkbench().paneIds).toEqual([A])
+      expect(h.sessions.ensureSession).not.toHaveBeenCalled()
+      expect(h.sessions.createSession).not.toHaveBeenCalled()
+      view.setMode('single')
+      expect(view.snapshot.getSnapshot().mode).toBe('single')
+      view.setMode('workbench')
+      await h.actions.hydrateCatalog({ ...directory, personalComplete: true, items: [item, ...directory.items] }, [])
+      expect(view.sessionKeyVersion()).toBe(3)
+      expect(view.currentWorkbench().paneIds).toEqual([])
+      expect(h.sessions.ensureSession).not.toHaveBeenCalled()
+      expect(view.snapshot.getSnapshot().pendingIdentity).toBeUndefined()
+      expect(view.add(project)).toEqual({ ok: true })
+      expect(view.currentWorkbench().paneIds).toEqual([project])
+    } finally { view.dispose(); await h.ctx.fiber.dispose(); await runtime.dispose(); localStorage.clear() }
+  })
+
+  it.each([true, false, undefined])('only uses a local restoration baseline when the Host explicitly declares independent authority (%s)', async (authority) => {
+    const h = await harness({ connection: { hostDescription: { getSnapshot: () => ({ executionAuthorityRequired: authority }) } } })
+    try {
+      h.actions.catalogUnavailable()
+      expect(h.viewport.markCatalogReady).toHaveBeenCalledTimes(authority === false ? 1 : 0)
     } finally { await h.ctx.fiber.dispose() }
   })
 
@@ -185,7 +362,7 @@ describe('workbench navigation lifecycle', () => {
     await hydration
     await expect(choice).resolves.toEqual({ ok: false, reason: 'unknown' })
     await expect(creation).resolves.toEqual({ ok: false, reason: 'unknown' })
-    h.actions.markCatalogReady()
+    h.actions.catalogUnavailable()
     expect(h.viewport.add).not.toHaveBeenCalled()
     expect(h.viewport.markCatalogReady).not.toHaveBeenCalled()
     expect(h.slots.entries('conversation.workbench.toolbar')).toHaveLength(0)

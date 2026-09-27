@@ -13,6 +13,9 @@
     },
     {
       "path": "../../util/home-paths"
+    },
+    {
+      "path": "../../util/managed-data"
     }
   ]
 }

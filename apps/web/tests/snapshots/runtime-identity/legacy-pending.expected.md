@@ -1,0 +1,10 @@
+- button "Select workbench":
+  - text: Legacy layout
+  - img
+- text: 0/4
+- button "Add conversation" [disabled]:
+  - img
+  - text: Add conversation
+- status:
+  - text: Saved conversation ownership is not verified, so layout edits are disabled. Start any stopped Workspace, then retry the directory.
+  - button "Retry directory"

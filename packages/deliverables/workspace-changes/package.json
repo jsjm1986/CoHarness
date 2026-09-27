@@ -33,7 +33,10 @@
   ],
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:^",
-    "diff": "^9.0.0"
+    "diff": "^9.0.0",
+    "zod": "^4.4.3",
+    "@deepseek-ai/dsh-home-paths": "workspace:^",
+    "@deepseek-ai/dsh-brand": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
@@ -41,7 +44,10 @@
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-subprocess": "workspace:^",
     "@deepseek-ai/dsh-tools": "workspace:^",
-    "@deepseek-ai/dsh-fs": "workspace:^"
+    "@deepseek-ai/dsh-fs": "workspace:^",
+    "@deepseek-ai/dsh-session-persistence": "workspace:^",
+    "@deepseek-ai/dsh-session-projection": "workspace:^",
+    "@deepseek-ai/dsh-managed-data": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
@@ -59,6 +65,9 @@
     "@deepseek-ai/dsh-fs-ssh": "workspace:^",
     "@deepseek-ai/dsh-subprocess-ssh": "workspace:^",
     "@deepseek-ai/dsh-session-projection": "workspace:^",
-    "@deepseek-ai/dsh-sandbox-policy": "workspace:^"
+    "@deepseek-ai/dsh-sandbox-policy": "workspace:^",
+    "@deepseek-ai/dsh-session-persistence": "workspace:^",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:^",
+    "@deepseek-ai/dsh-managed-data": "workspace:^"
   }
 }
