@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
@@ -513,5 +513,68 @@ describe('ModelSelect keyboard walk', () => {
     const rows = screen.getAllByRole('menuitemradio')
     expect(rows.every(row => row.getAttribute('aria-checked') === 'false')).toBe(true)
     expect(document.activeElement).toBe(rows[0])
+  })
+})
+
+describe('ModelSelect mount-load resilience', () => {
+  it('labels a loading trigger instead of the bare fallback', () => {
+    const directory = createSnapshotStore(state({ current: null, status: 'loading' }))
+    render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={vi.fn().mockResolvedValue(true)} t={t} />)
+    const trigger = screen.getByRole('button', { name: '选择模型' })
+    expect(trigger.textContent).toContain('模型加载中…')
+    expect(trigger.textContent).not.toContain('选择模型')
+  })
+
+  it('auto-retries a failed mount-time load with backoff until it succeeds', async () => {
+    vi.useFakeTimers()
+    try {
+      const directory = createSnapshotStore(state({ current: null, status: 'idle' }))
+      let calls = 0
+      const load = vi.fn(() => {
+        calls += 1
+        directory.update((s) => {
+          if (calls <= 3) {
+            s.status = 'error'
+            s.error = 'catalog unavailable'
+          } else {
+            s.status = 'ready'
+            s.current = { provider: 'deepseek-official', model: 'deepseek-v4-flash' }
+          }
+        })
+      })
+      render(<ModelSelect locked={false} available directory={directory} load={load} select={vi.fn().mockResolvedValue(true)} t={t} />)
+      expect(calls).toBe(1)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+      expect(calls).toBe(2)
+      await act(async () => { await vi.advanceTimersByTimeAsync(3_000) })
+      expect(calls).toBe(3)
+      await act(async () => { await vi.advanceTimersByTimeAsync(8_000) })
+      expect(calls).toBe(4)
+      expect(screen.getByRole('button', { name: '选择模型，当前 DeepSeek-V4-Flash，推理等级 High' })).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops retrying after the backoff schedule is exhausted', async () => {
+    vi.useFakeTimers()
+    try {
+      const directory = createSnapshotStore(state({ current: null, status: 'idle' }))
+      let calls = 0
+      const load = vi.fn(() => {
+        calls += 1
+        directory.update((s) => { s.status = 'error'; s.error = 'catalog unavailable' })
+      })
+      render(<ModelSelect locked={false} available directory={directory} load={load} select={vi.fn().mockResolvedValue(true)} t={t} />)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+      await act(async () => { await vi.advanceTimersByTimeAsync(3_000) })
+      await act(async () => { await vi.advanceTimersByTimeAsync(8_000) })
+      expect(calls).toBe(4)
+      await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+      expect(calls).toBe(4)
+      expect(screen.queryByRole('button', { name: /选择模型，当前/ })).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
