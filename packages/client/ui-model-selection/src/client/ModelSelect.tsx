@@ -43,6 +43,13 @@ interface EffortChoice {
 }
 
 /**
+ * Backoff schedule for auto-retrying a failed mount-time load. Without it a
+ * transient `session.models` failure leaves the trigger on the bare fallback
+ * (no model name) until the user opens the menu or the seat remounts.
+ */
+const MOUNT_LOAD_RETRY_DELAYS = [1_000, 3_000, 8_000] as const
+
+/**
  * Render the composer model seat.
  * @param props - owner share (locked) + injected face (shared directory
  * store/verbs) + the standard locale seat.
@@ -71,6 +78,8 @@ export function ModelSelect(
   // instead, so the strip renders only while the latest failure-capable
   // action was a load.
   const lastActionRef = useRef<'load' | 'select'>('load')
+  const retryAttemptRef = useRef(0)
+  const [mountRetryTick, setMountRetryTick] = useState(0)
   const [toast, setToast] = useState<{ seq: number; text: string } | null>(null)
   const toastSeq = useRef(0)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -124,13 +133,31 @@ export function ModelSelect(
     load()
   }
 
-  // Mount-time load resolves the trigger label; every open refreshes.
+  // Mount-time load resolves the trigger label; every open refreshes. A
+  // failed load bumps mountRetryTick to re-run it after the backoff delay.
   useEffect(() => {
-    if (available && presentation !== 'section') {
-      lastActionRef.current = 'load'
-      load()
+    if (!available || presentation === 'section') return
+    lastActionRef.current = 'load'
+    load()
+  }, [available, load, presentation, mountRetryTick])
+
+  // Auto-retry a failed mount-time load with backoff. A load failure is only
+  // surfaced on the store (the injected load is fire-and-forget), and the
+  // trigger must not sit model-less until the user happens to open the menu.
+  // Only the load action retries; a rejected selection owns its toast.
+  useEffect(() => {
+    if (!available || presentation === 'section') return
+    if (state.status === 'ready') {
+      retryAttemptRef.current = 0
+      return
     }
-  }, [available, load, presentation])
+    if (state.status !== 'error' || lastActionRef.current !== 'load') return
+    const attempt = retryAttemptRef.current
+    if (attempt >= MOUNT_LOAD_RETRY_DELAYS.length) return
+    retryAttemptRef.current = attempt + 1
+    const timer = setTimeout(() => { setMountRetryTick(t => t + 1) }, MOUNT_LOAD_RETRY_DELAYS[attempt])
+    return () => { clearTimeout(timer) }
+  }, [available, presentation, state.status, mountRetryTick])
 
   useEffect(() => {
     if (!open) return
@@ -309,7 +336,8 @@ export function ModelSelect(
     void select(selection).then(settleSelection)
   }
 
-  const modelLabel = currentChoice?.model.name ?? t('trigger.fallback')
+  const modelLabel = currentChoice?.model.name
+    ?? (state.status === 'loading' ? t('trigger.loading') : t('trigger.fallback'))
   const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`
   const triggerAria = currentChoice === undefined
     ? t('trigger.selectAria')
