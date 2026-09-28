@@ -112,6 +112,8 @@ export interface Config {
   maxPendingApprovals?: number
   /** Maximum pending run requests owned by one Session. */
   maxPendingApprovalsPerSession?: number
+  /** Maximum wait for a valid Client inspect response in milliseconds. */
+  clientInspectTimeoutMs?: number
 }
 
 type ResolvedConfig = Required<Config>
@@ -130,6 +132,8 @@ export const DEFAULT_DYNAMIC_MAX_SOURCE_BYTES_PER_SESSION = 8 * 1024 * 1024
 export const DEFAULT_DYNAMIC_MAX_PENDING_APPROVALS = 256
 /** Default per-Session pending run-request retention. */
 export const DEFAULT_DYNAMIC_MAX_PENDING_APPROVALS_PER_SESSION = 32
+/** Default wait for a valid Client inspect response. */
+export const DEFAULT_CLIENT_INSPECT_TIMEOUT_MS = 10_000
 
 function positiveLimit(value: number | undefined, fallback: number, label: string): number {
   const resolved = value ?? fallback
@@ -197,6 +201,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
       .min(1)
       .max(Number.MAX_SAFE_INTEGER)
       .default(DEFAULT_DYNAMIC_MAX_PENDING_APPROVALS_PER_SESSION),
+    clientInspectTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_CLIENT_INSPECT_TIMEOUT_MS),
   })
 
   private readonly rootCtx: Context
@@ -226,6 +231,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
       maxSourceBytesPerSession: positiveLimit(config.maxSourceBytesPerSession, DEFAULT_DYNAMIC_MAX_SOURCE_BYTES_PER_SESSION, 'maxSourceBytesPerSession'),
       maxPendingApprovals: positiveLimit(config.maxPendingApprovals, DEFAULT_DYNAMIC_MAX_PENDING_APPROVALS, 'maxPendingApprovals'),
       maxPendingApprovalsPerSession: positiveLimit(config.maxPendingApprovalsPerSession, DEFAULT_DYNAMIC_MAX_PENDING_APPROVALS_PER_SESSION, 'maxPendingApprovalsPerSession'),
+      clientInspectTimeoutMs: positiveLimit(config.clientInspectTimeoutMs, DEFAULT_CLIENT_INSPECT_TIMEOUT_MS, 'clientInspectTimeoutMs'),
     }
     const registryConfig: DynamicCordisRegistryConfig = {
       maxPlugins: this.resolved.maxPlugins,
@@ -237,7 +243,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
       maxPendingApprovalsPerSession: this.resolved.maxPendingApprovalsPerSession,
     }
     this.registry = new DynamicCordisRegistry(registryConfig)
-    this.inspectRegistry = new CordisInspectRegistryService(ctx)
+    this.inspectRegistry = new CordisInspectRegistryService(ctx, this.resolved.clientInspectTimeoutMs)
     ctx.on('agent/disposed', ({ agent }) => {
       for (const plugin of this.registry.ofSession(agent.id)) {
         this.cancelPending(plugin.pluginId, `dynamic plugin owner session "${String(agent.id)}" was disposed`)

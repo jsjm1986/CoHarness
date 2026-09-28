@@ -68,13 +68,14 @@ export function apply(ctx: Context): void {
       'Run a read-only query declared by an Inspect Provider. platform, provider, and method must come from '
       + 'cordis_inspect_list, and input must satisfy that method\'s schema. Use this Tool before writing plugin code '
       + 'to read exact Service methods, Event modes, plugin Config schemas, Tool schemas, theme tokens, or live '
-      + 'Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and '
-      + 'remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service '
-      + 'methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate '
-      + 'the compact signature directory, then query the exact service or event for its structured contract and '
-      + 'referenced types. For Config.listConfigs, query without input to page the live entry directory, then '
-      + 'query the exact entry for its projected JSON Schema. For Slots.listSubTree, query without root to '
-      + 'navigate the compact tree, then query the exact root for its complete registration contract and props.',
+      + 'Slot trees and props. Host queries run locally. A Client query waits for the first valid page response '
+      + 'within the configured timeout; otherwise it reports a Client failure or asks you to reconnect and retry. '
+      + 'This Tool cannot invoke business Service methods or modify the runtime. For Service.listService and '
+      + 'Event.listEvents, query without input to navigate the compact signature directory, then query the exact '
+      + 'service or event for its structured contract and referenced types. For Config.listConfigs, query without '
+      + 'input to page the live entry directory, then query the exact entry for its projected JSON Schema. For '
+      + 'Slots.listSubTree, query without root to navigate the compact tree, then query the exact root for its '
+      + 'complete registration contract and props.',
     parameters: {
       platform: { type: 'string', required: true, enum: ['host', 'client'], description: 'Runtime platform that owns the Provider.' },
       provider: { type: 'string', required: true, description: 'Exact Provider ID returned by cordis_inspect_list.' },

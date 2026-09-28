@@ -65,8 +65,14 @@ The vm sandbox isolates globals but is not a security boundary: Node globals are
 | Field | Default | Meaning |
 |---|---|---|
 | `vmTimeoutMs` | `5000` | Milliseconds allowed for host-half evaluation and activation; synchronous vm work and async completion are both bounded |
+| `clientInspectTimeoutMs` | `10000` | Maximum wait for a valid Client inspect response; an integer from 1 to 2147483647 milliseconds |
 
-One field is all there is: a run request waits for a person, so the round trip has no deadline of its own. Disposal closes admission before retracting definitions, and a definition removed while activation is pending cannot publish a late fiber back into the registry.
+A run request waits for a person, so the round trip has no deadline of its own. Disposal closes admission before retracting definitions, and a definition removed while activation is pending cannot publish a late fiber back into the registry.
+
+<a id="client-inspection"></a>
+### Client inspection
+
+Client queries accept the first valid page response within `clientInspectTimeoutMs`. A failed page does not prevent another page from answering successfully. If no valid result arrives, the query rejects with the first Client failure or output-validation diagnostic; when no page answers, it asks the caller to open or reconnect the Harness page and retry. Cancellation and registry disposal also end pending queries. Reconnecting a page does not replay a missed request, so retry after the connection is restored. Host queries are unaffected by this timeout.
 
 <a id="export-shape"></a>
 ## Export shape

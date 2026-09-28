@@ -56,7 +56,8 @@ Host 提供者将生成的 [API 目录](src/api-catalog.ts)、经 app-boot Confi
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
-- Client 查询需要页面响应或取消。
+- Client 查询需要页面响应，并采用 Host runner 的[有界等待与重试策略](../cordis-host-runner/README.zh.md#client-inspection)。检查不能调用服务方法、配置插件或执行生成代码。
+- `Config.listConfigs` 只遍历 profile 的 Loader 树。Agent preset 的 `plugins` 列表挂载在独立的 preset 树中，所以只出现在 preset 声明里的插件不会被列出，除非 profile 树也挂载了它。
 - 会话所属动态引用仅存在于当前进程，重启后可能不可用。检查不会恢复定义或执行日志中的代码。
 
 <a id="dev-note"></a>

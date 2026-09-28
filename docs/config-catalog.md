@@ -700,6 +700,8 @@ export interface Config {
   maxPendingApprovals?: number
   /** Maximum pending run requests owned by one Session. */
   maxPendingApprovalsPerSession?: number
+  /** Maximum wait for a valid Client inspect response in milliseconds. */
+  clientInspectTimeoutMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-cordis-host-runner -->
