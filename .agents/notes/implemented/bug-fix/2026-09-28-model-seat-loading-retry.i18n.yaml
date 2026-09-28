@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-28-model-seat-loading-retry.md
-2026-09-28-model-seat-loading-retry.md: 3329390edd51d7f6932262a44af91b57682cbbb8
-2026-09-28-model-seat-loading-retry.zh.md: af26c575b004b534a5cdf0924c580fdbdf94f0f9
+2026-09-28-model-seat-loading-retry.md: acfafefe73a1be2a69dd0f57acd2376ee5e4584d
+2026-09-28-model-seat-loading-retry.zh.md: 2a307ca91e7b9956624a1790818a5a3c834e7897
