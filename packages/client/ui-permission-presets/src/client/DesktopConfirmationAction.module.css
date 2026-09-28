@@ -1,10 +1,151 @@
-.target {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-  gap: 0.5rem 1rem;
+/* ── Style A: security-first confirmation dialog ── */
+
+.iconWrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1a3a5c 0%, #0d2137 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+  border: 1px solid #1a3a5c;
+  font-size: 24px;
+  flex-shrink: 0;
 }
 
-.target dd {
-  margin: 0;
+.body {
+  text-align: center;
+}
+
+.desc {
+  font-size: 0.8125rem;
+  color: var(--color-fg-muted, #8b949e);
+  line-height: 1.6;
+  margin: 0 0 18px;
+}
+
+.meta {
+  background: var(--color-canvas-subtle, #0d1117);
+  border: 1px solid var(--color-border-default, #21262d);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 0 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8125rem;
+  min-width: 0;
+}
+
+.metaLabel {
+  color: var(--color-fg-subtle, #484f58);
+  flex-shrink: 0;
+}
+
+.metaValue {
+  color: var(--color-fg-default, #e6edf3);
+  font-weight: 500;
   overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.statusChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: #0d2818;
+  color: #3fb950;
+  border: 1px solid #1a4721;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3fb950;
+  flex-shrink: 0;
+}
+
+.statusChipWarn {
+  background: #2d2000;
+  color: #d29922;
+  border: 1px solid #574a1c;
+}
+
+.statusDotWarn {
+  background: #d29922;
+}
+
+.statusChipErr {
+  background: #2d1117;
+  color: #f85149;
+  border: 1px solid #572c2c;
+}
+
+.statusDotErr {
+  background: #f85149;
+}
+
+.scopeNote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  margin: 0 0 14px;
+}
+
+.scopeNoteOk {
+  background: #0d2818;
+  border: 1px solid #1a4721;
+  color: #3fb950;
+}
+
+.scopeNoteInfo {
+  background: #0d2137;
+  border: 1px solid #1a3a5c;
+  color: #58a6ff;
+}
+
+.scopeNoteIcon {
+  font-size: 0.9375rem;
+  flex-shrink: 0;
+}
+
+.techInfo {
+  font-size: 0.75rem;
+  color: var(--color-accent-fg, #388bfd);
+  cursor: pointer;
+  text-align: left;
+  margin: 0 0 12px;
+}
+
+.techInfo::before {
+  content: '▸ ';
+}
+
+@media (max-width: 480px) {
+  .iconWrap {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+    margin-bottom: 10px;
+  }
+
+  .meta {
+    padding: 10px 12px;
+  }
 }
