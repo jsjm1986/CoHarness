@@ -86,7 +86,8 @@ export type InstallSubject = Extract<PluginSpecInspection, { status: 'accepted' 
 
 /** Why the typed spec was refused before anything installed. */
 export interface InstallInputError {
-  readonly problem: PluginInspectProblem
+  /** The Host's refusal, or `shipped` for a listed bundle the installation supplies. */
+  readonly problem: PluginInspectProblem | 'shipped'
   readonly reason: string
 }
 
@@ -520,8 +521,9 @@ export class PluginManagerController {
     const spec = install.spec.trim()
     if (install.phase === 'checking' || isInstallPending(install.phase) || spec === '') return
     // A name the list already shows is refused at once, before the Host is asked.
-    if (state.packages.some(pkg => pkg.name === spec)) {
-      this.patchInstall({ phase: 'idle', inputError: { problem: 'already-installed', reason: spec } })
+    const listed = state.packages.find(pkg => pkg.name === spec)
+    if (listed !== undefined) {
+      this.patchInstall({ phase: 'idle', inputError: { problem: listed.installed ? 'already-installed' : 'shipped', reason: spec } })
       return
     }
     this.abortInspect()
