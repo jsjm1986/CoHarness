@@ -10,5 +10,5 @@ action restore_dacl started path={{target}}: Restore the requested backup DACL a
 action restore_dacl completed path={{target}}: Restore the requested backup DACL and inheritance protection, preserving owner and SACL.
 action read_restored_dacl started path={{target}}: Read the restored DACL to compare it with the saved record.
 action read_restored_dacl completed path={{target}}: Read the restored DACL to compare it with the saved record.
-verification restore verified path={{target}}: Compare the observed DACL with the recovery record after writing it.
+verification restore verified path={{target}}: Compare the restored own ACEs and protection state with the recovery record.
 summary grant failed path={{target}}: Operation completion records API execution; verification records the observed result. Only rerunning the original confined operation can confirm its failure is resolved.

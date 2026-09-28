@@ -30,7 +30,8 @@
     One or more failing paths. Each is diagnosed together with its ancestors.
 
 .PARAMETER AllowRoot
-    Required with any mutation. Every modified object must be strictly inside this directory.
+    Required with any mutation. Every modified object must be strictly inside this directory,
+    except that -GrantFullControl accepts this directory itself, so a caller can repair its own root.
 
 .PARAMETER Out
     Required with -Fix, -GrantFullControl or -Compact. Receives recovery artifacts
@@ -257,15 +258,16 @@ function Test-DangerousRoot {
 }
 
 function Test-UnderRoot {
-  param([string]$FullPath, [string]$Root)
+  param([string]$FullPath, [string]$Root, [switch]$AllowEqual)
   $r = Get-NormalizedPath $Root
   $c = Get-NormalizedPath $FullPath
+  if ($AllowEqual -and $c -ieq $r) { return $true }
   return $c -ine $r -and $c.StartsWith($r.TrimEnd('\') + '\', [System.StringComparison]::OrdinalIgnoreCase)
 }
 
 function Get-RepairRefusal {
-  param([string]$FullPath, [string]$Root)
-  if (-not (Test-UnderRoot -FullPath $FullPath -Root $Root)) { return "$FullPath is outside -AllowRoot" }
+  param([string]$FullPath, [string]$Root, [switch]$AllowEqual)
+  if (-not (Test-UnderRoot -FullPath $FullPath -Root $Root -AllowEqual:$AllowEqual)) { return "$FullPath is outside -AllowRoot" }
   $danger = Test-DangerousRoot -FullPath $FullPath
   if ($danger) { return "$FullPath is a $danger" }
   # Checking every component also covers a junction used as AllowRoot itself.
@@ -276,6 +278,22 @@ function Get-RepairRefusal {
     }
   }
   return $null
+}
+
+function Get-OwnDaclSddl {
+  param([string]$Sddl)
+  # Inherited ACEs follow their parent: repeating them in a saved DACL forces them
+  # back onto the object on restore and stops matching once the parent re-derives
+  # them. Keep the observed control flags so the result still carries the
+  # object's inheritance protection, and keep every ACE the object owns.
+  $flags = [regex]::Match($Sddl, '^D:([A-Z]*)').Groups[1].Value
+  $aces = @([regex]::Matches($Sddl, '\([^()]*\)') | ForEach-Object { $_.Value } | Where-Object { ($_ -split ';')[1] -notmatch 'ID' })
+  return 'D:{0}{1}' -f $flags, ($aces -join '')
+}
+
+function Get-AceSet {
+  param([string]$Sddl)
+  return @([regex]::Matches($Sddl, '\([^()]*\)') | ForEach-Object { $_.Value } | Sort-Object)
 }
 
 function Save-AclBackup {
@@ -297,8 +315,14 @@ function Save-AclBackup {
   Invoke-ReportedOperation backup $FullPath 'Save the original DACL and an independent recovery command before changing permissions.' files {
     $output = @(icacls $FullPath /save $backup 2>&1)
     if ($LASTEXITCODE -ne 0) { throw "Could not back up the DACL (icacls exit $LASTEXITCODE): $($output -join "`n")" }
-    @{ Path = $FullPath; Dacl = (Get-Acl -LiteralPath $FullPath).GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]::Access) } |
-      ConvertTo-Json | Set-Content -LiteralPath $record -Encoding utf8
+    $backupAcl = Get-Acl -LiteralPath $FullPath
+    $observed = $backupAcl.GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]::Access)
+    @{
+      Path = $FullPath
+      Dacl = Get-OwnDaclSddl -Sddl $observed
+      Protected = $backupAcl.AreAccessRulesProtected
+      Observed = $observed
+    } | ConvertTo-Json | Set-Content -LiteralPath $record -Encoding utf8
     Copy-Item -LiteralPath $PSCommandPath -Destination $restoreScript
     $command | Set-Content -LiteralPath ($backup + '.rollback.txt')
   }
@@ -322,11 +346,19 @@ function Restore-SavedDacl {
   Invoke-ReportedOperation restore_dacl $FullPath 'Restore the requested backup DACL and inheritance protection, preserving owner and SACL.' acl {
     [Dsh.TokenInfo]::SetDacl($FullPath, $saved.Dacl)
   }
-  $actual = Invoke-ReportedOperation read_restored_dacl $FullPath 'Read the restored DACL to compare it with the saved record.' none {
-    (Get-Acl -LiteralPath $FullPath).GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]::Access)
+  $restoredAcl = Invoke-ReportedOperation read_restored_dacl $FullPath 'Read the restored DACL to compare it with the saved record.' none {
+    Get-Acl -LiteralPath $FullPath
   }
-  Write-Report verification restore $FullPath $(if ($actual -eq $saved.Dacl) { 'verified' } else { 'failed' }) 'Compare the observed DACL with the recovery record after writing it.' @{ expectedDacl = $saved.Dacl; actualDacl = $actual }
-  if ($actual -ne $saved.Dacl) { throw 'RESTORE_FAILED the restored DACL differs from the backup' }
+  # Inherited entries follow the parent, so the same object can render a different
+  # full DACL before and after a correct restore. Compare the own ACEs and the
+  # protection state, which the restore owns.
+  $restoredProtected = $restoredAcl.AreAccessRulesProtected
+  $actual = Get-OwnDaclSddl -Sddl $restoredAcl.GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]::Access)
+  $expectedAces = Get-AceSet -Sddl $saved.Dacl
+  $actualAces = Get-AceSet -Sddl $actual
+  $restored = (@($expectedAces) -join "`n") -eq (@($actualAces) -join "`n") -and $restoredProtected -eq [bool]$saved.Protected
+  Write-Report verification restore $FullPath $(if ($restored) { 'verified' } else { 'failed' }) 'Compare the restored own ACEs and protection state with the recovery record.' @{ expectedAces = @($expectedAces); actualAces = @($actualAces); protected = $restoredProtected; expectedProtected = [bool]$saved.Protected }
+  if (-not $restored) { throw 'RESTORE_FAILED the restored DACL differs from the backup' }
   $script:restored++
   Write-Line ('RESTORED {0}' -f $FullPath)
 }
@@ -574,7 +606,8 @@ try {
 
     if ($GrantFullControl) {
       if ($unreadable) { Write-Line 'GRANT_REFUSED the object could not be read; the grant needs an unconfined caller'; Write-Decision grant $full refused 'The ACL is unreadable, so a preserving grant cannot be constructed.'; $refused++; break paths }
-      $refusal = Get-RepairRefusal -FullPath $full -Root $AllowRoot
+      # Granting the caller's own root to itself adds one ACE to that object and never walks to an ancestor.
+      $refusal = Get-RepairRefusal -FullPath $full -Root $AllowRoot -AllowEqual
       if ($refusal) { Write-Line ('GRANT_REFUSED {0}' -f $refusal); Write-Decision grant $full refused $refusal; $refused++; break paths }
       if ($targetFacts.HasWriteDac -and $targetFacts.HasWriteOwner) { Write-Line ('GRANT_SKIPPED {0} already carries WRITE_DAC and WRITE_OWNER' -f $full); Write-Decision grant $full skipped 'Effective WRITE_DAC and WRITE_OWNER are already available; no grant or backup is needed.'; continue }
       if (-not $targetFacts.HasWriteDac) { Write-Line 'GRANT_REFUSED the caller lacks WRITE_DAC; stop for permission-policy review'; Write-Decision grant $full refused 'Effective WRITE_DAC is absent; this caller cannot change the DACL. Stop for permission-policy review; do not elevate a writable script copy.'; $refused++; break paths }
@@ -586,6 +619,8 @@ try {
         [System.Security.Principal.SecurityIdentifier]::new($meSid),
         [System.Security.AccessControl.FileSystemRights]::FullControl,
         [System.Security.AccessControl.AccessControlType]::Allow))
+      # Write own ACEs only: an inherited ACE written back becomes explicit on this object.
+      $grantAcl.SetAccessRuleProtection($grantAcl.AreAccessRulesProtected, $false)
       Invoke-ReportedOperation grant_dacl $full "WRITE_OWNER is missing and WRITE_DAC is available; add a FullControl allow ACE for $meSid while preserving deny ACEs, owner and SACL." acl {
         [Dsh.TokenInfo]::SetDacl($full, $grantAcl.GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]::Access))
       }
@@ -651,27 +686,17 @@ try {
       }
     }
     foreach ($target in $packageTargets) {
-      $before = $target.AclLines
       $after = Get-ObjectFacts -FullPath $target.Object -MeSid $meSid
-      # icacls prefixes only the first ACE with the path, so compare entries
-      # without that prefix when checking for collateral changes.
-      $keepBefore = @($before | ForEach-Object {
-        $line = $_.Trim()
-        if ($line.StartsWith($target.Object, [System.StringComparison]::OrdinalIgnoreCase)) { $line = $line.Substring($target.Object.Length).Trim() }
-        $line
-      } | Where-Object { $_ -notmatch $PACKAGE_SID })
-      $keepAfter = @($after.AclLines | ForEach-Object {
-        $line = $_.Trim()
-        if ($line.StartsWith($target.Object, [System.StringComparison]::OrdinalIgnoreCase)) { $line = $line.Substring($target.Object.Length).Trim() }
-        $line
-      } | Where-Object { $_ -notmatch $PACKAGE_SID })
-      # A package deny can share the removed allow's SID. Preserve it explicitly
-      # even though native listing comparison omits lines naming package SIDs.
-      $expectedAces = @($target.Aces | Where-Object { -not ($_.type -eq 'Allow' -and $_.sid -match $PACKAGE_SID) })
-      $collateral = (($keepBefore -join "`n") -eq ($keepAfter -join "`n")) -and
-        (($expectedAces | ConvertTo-Json -Compress) -eq ($after.Aces | ConvertTo-Json -Compress))
+      # Compare the object's own ACEs as sorted sets: listing order and inherited
+      # entries follow the parent, so neither proves a collateral change.
+      $rowOf = { param($ace) '{0}|{1}|{2}|{3}|{4}' -f $ace.type, $ace.sid, $ace.rights, $ace.inheritance, $ace.propagation }
+      $ownBefore = @($target.Aces | Where-Object { -not $_.inherited } | ForEach-Object { & $rowOf $_ } | Sort-Object)
+      $ownAfter = @($after.Aces | Where-Object { -not $_.inherited } | ForEach-Object { & $rowOf $_ } | Sort-Object)
+      # A package deny can share the removed allow's SID; only allow ACEs were removed.
+      $expectedOwn = @($target.Aces | Where-Object { -not $_.inherited -and -not ($_.type -eq 'Allow' -and $_.sid -match $PACKAGE_SID) } | ForEach-Object { & $rowOf $_ } | Sort-Object)
+      $collateral = (@($expectedOwn) -join "`n") -eq (@($ownAfter) -join "`n")
       $verified = $after.Readable -and $after.Errors.Count -eq 0 -and $after.PackageAces.Count -eq 0 -and $collateral
-      Write-Report verification fix $target.Object $(if ($verified) { 'verified' } else { 'failed' }) 'The removal command completed; verify that package allow ACEs disappeared and other ACL listing entries remained unchanged. On failure, restore this invocation and stop.' @{
+      Write-Report verification fix $target.Object $(if ($verified) { 'verified' } else { 'failed' }) 'The removal command completed; verify that package allow ACEs disappeared and other own ACEs remained unchanged. On failure, restore this invocation and stop.' @{
         remainingPackageAces = $after.PackageAces; otherEntriesUnchanged = $collateral
       }
       if ($verified) {

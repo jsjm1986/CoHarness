@@ -614,6 +614,28 @@ exit $LASTEXITCODE
     expect([parent, child].map(sddlOf)).toEqual(before)
   })
 
+  it('grants when the authorized root is the object itself, so a caller can repair its own workspace root', () => {
+    const root = makeDir('root-is-allow-root')
+    const canonical = runScript(['-Path', root, '-AllowRoot', root, '-Out', outDir, '-GrantFullControl'])
+    expect(canonical.code, canonical.output).toBe(0)
+    expect(reports(canonical)).toContainEqual(containingObject({ kind: 'decision', operation: 'grant', path: root }))
+    for (const spelling of [`${root}\\`, `${root}/`, root.toUpperCase()]) {
+      const run = runScript(['-Path', spelling, '-AllowRoot', root, '-Out', outDir, '-GrantFullControl'])
+      expect(run.code, run.output).toBe(0)
+      expect(reports(run).some(entry => entry.reason.includes('outside -AllowRoot'))).toBe(false)
+    }
+  })
+
+  it('still refuses -Fix when the authorized root is the object itself', () => {
+    const root = makeDir('root-fix-refused')
+    icacls(root, '/grant', `*${PACKAGE_SID}:(OI)(CI)(RX)`)
+    const before = sddlOf(root)
+    const run = runScript(['-Path', root, '-AllowRoot', root, '-Out', outDir, '-Fix'])
+    expect(run.code).toBe(2)
+    expect(reports(run)).toContainEqual(containingObject({ kind: 'decision', status: 'refused', path: root, reason: containingString('outside -AllowRoot') }))
+    expect(sddlOf(root)).toBe(before)
+  })
+
   it('restores explicit sources and inherited entries when final verification fails', () => {
     const parent = makeDir('inherited-rollback')
     const child = join(parent, 'child')
@@ -645,7 +667,8 @@ exit $LASTEXITCODE
     expect(paths.map(sddlOf)).toEqual(before)
   })
 
-  it.each(['-Fix', '-GrantFullControl', '-Restore'])('rejects equivalent spellings of AllowRoot through %s', (mode) => {
+  // -GrantFullControl accepts the object itself, so only the removing modes still reject an equivalent root spelling.
+  it.each(['-Fix', '-Restore'])('rejects equivalent spellings of AllowRoot through %s', (mode) => {
     const target = makeDir(`root-spellings-${mode}`)
     const backups = makeDir(`root-backups-${mode}`)
     icacls(target, '/inheritance:r', '/grant:r', `*${meSid}:(M)`)
