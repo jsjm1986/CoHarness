@@ -83,3 +83,17 @@
 :global([data-viewport='compact']) .sessionLogButton {
   display: none;
 }
+
+/* Confirmation mode: the button switches to a warning tone to signal
+   that the next click will start the actual download. */
+.sessionLogConfirming {
+  background: var(--dsw-alias-interactive-bg-hover, #21262d);
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  border: 1px solid var(--dsw-alias-border-l2, #d29922);
+  font-weight: 500;
+}
+
+.sessionLogConfirming:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-active, #2d333b);
+  color: var(--dsw-alias-label-primary, #e6edf3);
+}
