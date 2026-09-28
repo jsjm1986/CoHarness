@@ -82,18 +82,38 @@ export function DesktopConfirmationAction({ sessionId, connection, t }: DesktopC
         {value !== undefined && value !== null && <Button disabled={!ready || busy || (!value.confirmed && !value.eligible)}
           onClick={() => { void save(value, !value.confirmed) }}>{busy ? t('saving') : t(value.confirmed ? 'withdraw' : 'confirm')}</Button>}
       </>}>
-      <p>{t('description')}</p>
-      {!ready ? <p role="status">{t('disconnected')}</p> : error ? <p role="alert">{t('failed')}</p>
-        : value === undefined ? <p role="status">{t('loading')}</p>
-          : value === null ? <p>{t('unavailable')}</p> : <>
-            <dl className={css.target}>
-              <dt>{t('root')}</dt><dd>{value.rootSessionId}</dd>
-              <dt>{t('node')}</dt><dd>{value.nodeId}</dd>
-              <dt>{t('desktop')}</dt><dd>{value.desktop}</dd>
-              <dt>{t('account')}</dt><dd>{value.userId}</dd>
-            </dl>
-            <p role="status">{t(!value.eligible ? 'ineligible' : value.confirmed ? 'granted' : 'unconfirmed')}</p>
-          </>}
+      <div className={css.body}>
+        <div className={css.iconWrap} aria-hidden>🖥️</div>
+        <p className={css.desc}>{t('description')}</p>
+        {!ready ? <p role="status" className={css.desc}>{t('disconnected')}</p>
+          : error ? <p role="alert" className={css.desc}>{t('failed')}</p>
+            : value === undefined ? <p role="status" className={css.desc}>{t('loading')}</p>
+              : value === null ? <p className={css.desc}>{t('unavailable')}</p> : <>
+                <div className={css.meta}>
+                  <div className={css.metaRow}>
+                    <span className={css.metaLabel}>{t('desktop')}</span>
+                    <span className={css.metaValue}>{value.desktop}</span>
+                  </div>
+                  <div className={css.metaRow}>
+                    <span className={css.metaLabel}>{t('node')}</span>
+                    <span className={css.metaValue}>{value.nodeId}</span>
+                  </div>
+                  <div className={css.metaRow}>
+                    <span className={css.metaLabel}>{t('root')}</span>
+                    <span className={css.metaValue}>{value.rootSessionId}</span>
+                  </div>
+                  <div className={css.metaRow}>
+                    <span className={css.metaLabel}>{t('account')}</span>
+                    <span className={css.metaValue}>{value.userId}</span>
+                  </div>
+                </div>
+                {!value.eligible
+                  ? <div className={`${css.scopeNote} ${css.scopeNoteInfo}`}><span className={css.scopeNoteIcon}>ℹ️</span>{t('ineligible')}</div>
+                  : value.confirmed
+                    ? <div className={`${css.scopeNote} ${css.scopeNoteOk}`}><span className={css.scopeNoteIcon}>✓</span>{t('granted')}</div>
+                    : <div className={`${css.scopeNote} ${css.scopeNoteInfo}`}><span className={css.scopeNoteIcon}>ℹ️</span>{t('unconfirmed')}</div>}
+              </>}
+      </div>
     </Modal>
   </>
 }
