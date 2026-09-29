@@ -1798,6 +1798,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   /** Serializes path ownership and explicit title checks with Workspace mutations. */
   let workspaceCreationChain = Promise.resolve()
   const pendingQuestions = new Map<RpcId, PendingQuestion>()
+  /** Open `events.mux` consumer count — the liveness signal for page-dispatched requests. */
+  let liveEventClients = 0
   const pendingApprovals = new Map<RpcId, PendingApproval>()
   const muxQueues = new Set<MuxSubscription>()
   const imageAdmissionChains = new WeakMap<Agent, Promise<void>>()
@@ -5764,7 +5766,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     events: {
       mux(_request, signal) {
         const captured = captureCollaboration('read')
-        return openStream((async function*(): AsyncGenerator<RpcRequest<MuxFrame>, void, unknown> {
+        liveEventClients += 1
+        const inner = openStream((async function*(): AsyncGenerator<RpcRequest<MuxFrame>, void, unknown> {
           if ('error' in captured) {
             yield frame({ type: 'stream/error', error: captured.error })
             return
@@ -5986,6 +5989,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             cleanup()
           }, authorizeReadBatch<MuxFrame>(authority, fail))
         })())
+        return (async function*(): AsyncGenerator<RpcRequest<MuxFrame>, void, unknown> {
+          try {
+            yield* inner
+          } finally {
+            liveEventClients -= 1
+          }
+        })()
       },
 
       host(_request, signal) {
@@ -6364,6 +6374,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       pending.resolve(payload.answer)
       return { accepted: true }
       /* jscpd:ignore-end */
+    },
+
+    hasLiveClient(): boolean {
+      return liveEventClients > 0
     },
   }
 }

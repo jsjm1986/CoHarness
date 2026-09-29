@@ -46,7 +46,7 @@ list(): CordisInspectProviderView[]
  * @param input - optional lossless JSON input.
  * @param agent - requesting Agent and scope.
  * @param signal - tool-call cancellation.
- * @returns provider JSON data; Client queries time out with the first failure, or reconnect/retry guidance if none was received.
+ * @returns provider JSON data; Client queries fail fast when Gateway has no live Client and retain failure diagnostics on timeout.
  */
 async query( platform: CordisInspectPlatform, providerId: string, methodName: string, input: JsonValue | undefined, agent: Agent, signal: AbortSignal, ): Promise<JsonValue>
 

@@ -4,13 +4,45 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 export const name = 'client-inspect-timeout-fixture'
-export const inject = ['cordisInspect', 'agents', 'llm']
+export const inject = ['cordisInspect', 'agents', 'llm', 'typertGateway']
+
+/**
+ * Register a silent event source and open real Gateway Client streams on demand.
+ * @param {import('@deepseek-ai/cordis').Context} ctx - owner of the source and streams.
+ * @returns opener resolving after readiness, with abort and quiescent close operations.
+ */
+export function registerSilentClientTransport(ctx) {
+  ctx.effect(() => ctx.typertGateway.registerRemoteEvents(async function* (signal) {
+    await new Promise(resolve => {
+      if (signal.aborted) resolve()
+      else signal.addEventListener('abort', resolve, { once: true })
+    })
+  }, { home: '/snapshot-host' }))
+  return async () => {
+    const controller = new AbortController()
+    const stream = await ctx.typertGateway.wireStream.open(
+      '$events', { args: {} }, (async function* () {})(), undefined, controller.signal,
+    )
+    const iterator = stream[Symbol.asyncIterator]()
+    const close = ctx.effect(() => async () => {
+      controller.abort()
+      await iterator.return?.()
+    })
+    const ready = await iterator.next()
+    assert.equal(ready.done, false)
+    assert.equal(ready.value.type, 'ready')
+    assert.equal(ctx.typertGateway.hasLiveClient(), true)
+    return { abort: () => { controller.abort() }, close }
+  }
+}
 
 /**
  * Mirror a Client manifest and deliver only the first query's failure.
  * @param {import('@deepseek-ai/cordis').Context} ctx - isolated snapshot Host.
+ * @returns after the Gateway Client stream is ready.
  */
-export function apply(ctx) {
+export async function apply(ctx) {
+  await registerSilentClientTransport(ctx)()
   const expected = readFileSync(process.env.DSH_SNAPSHOT_FILE, 'utf8').trim().split('\n')
     .map(line => JSON.parse(line))
     .filter(event => event.type === 'tool/result')
@@ -22,6 +54,7 @@ export function apply(ctx) {
   })
   let requests = 0
   ctx.on('llm/stream', (options, next) => {
+    assert.equal(ctx.typertGateway.hasLiveClient(), true)
     assert.deepEqual(
       options.messages.filter(message => message.role === 'tool').map(resultFields),
       expected.slice(0, requests++).map(resultFields),

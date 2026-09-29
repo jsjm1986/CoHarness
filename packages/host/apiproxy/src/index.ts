@@ -125,6 +125,7 @@ export class ApiProxyService extends Service implements ApiProxy {
   readonly events: ApiProxy['events']
   readonly downloads: ApiProxy['downloads']
   readonly respond: ApiProxy['respond']
+  readonly hasLiveClient: ApiProxy['hasLiveClient']
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'apiProxy')
@@ -164,6 +165,7 @@ export class ApiProxyService extends Service implements ApiProxy {
     // createApiProxy returns closures (no `this` capture), so the bind is
     // behavior-neutral.
     this.respond = api.respond.bind(api)
+    this.hasLiveClient = api.hasLiveClient.bind(api)
   }
 }
 

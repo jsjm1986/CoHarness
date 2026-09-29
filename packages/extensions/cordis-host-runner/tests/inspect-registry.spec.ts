@@ -1,4 +1,4 @@
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import type { Fiber } from '@deepseek-ai/cordis'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DynamicCordisRunnerService from '../src/index.ts'
@@ -41,15 +41,15 @@ beforeEach(async () => {
   await mounted
   registry = ctx.cordisInspect
   registry.syncClientManifest([manifest])
-  disposers.push(ctx.on('cordis/inspect-query', (request) => { requests.push(request) }))
-  disposers.push(ctx.on('cordis/inspect-query-resolved', (event) => { resolved.push(event.requestId) }))
+  disposers.push(ctx.on('@deepseek-ai/cordis/inspect-query', (request) => { requests.push(request) }))
+  disposers.push(ctx.on('@deepseek-ai/cordis/inspect-query-resolved', (event) => { resolved.push(event.requestId) }))
 })
 
 afterEach(async () => {
   try {
     for (const controller of controllers) controller.abort()
     await Promise.allSettled(results)
-    await fiber.dispose()
+    await ctx.fiber.dispose()
   } finally {
     for (const dispose of disposers) dispose()
     vi.restoreAllMocks()
@@ -73,7 +73,60 @@ function answer(query: ReturnType<typeof start>) {
   return registry.resolveClientQuery(AGENT_A, query.request.requestId, { ok: true, data: { name: 'theme' } })
 }
 
+/** Minimal apiProxy stand-in: the registry only reads `hasLiveClient()`. */
+class FakeApiProxy extends Service {
+  static inject: string[] = []
+  liveClients = 0
+  constructor(ctx: Context) {
+    super(ctx, 'apiProxy' as never)
+  }
+  hasLiveClient(): boolean {
+    return this.liveClients > 0
+  }
+}
+
+async function connectPage(): Promise<FakeApiProxy> {
+  await ctx.plugin(FakeApiProxy)
+  const proxy = ctx.get('apiProxy' as never) as FakeApiProxy
+  proxy.liveClients = 1
+  return proxy
+}
+
 describe('Client inspect completion', () => {
+  it('returns a result when a Client page is connected', async () => {
+    await connectPage()
+    registry.syncClientManifest([manifest])
+    const query = start()
+    expect(requests).toHaveLength(1)
+    expect(answer(query)).toEqual({ accepted: true })
+    expect(await query.result).toEqual({ value: { name: 'theme' } })
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('does not dispatch a query when no Client page is connected', async () => {
+    await ctx.plugin(FakeApiProxy)
+    const query = start()
+    expect(requests).toEqual([])
+    expect(vi.getTimerCount()).toBe(0)
+    expect(await query.result).toEqual({
+      error: 'Error: Client inspect query Service.listService has no connected Harness page. Open or reconnect the Harness page, then retry.',
+    })
+    expect(registry.list()).toHaveLength(1)
+  })
+
+  it('keeps the response deadline when the Client disconnects after dispatch', async () => {
+    const proxy = await connectPage()
+    const query = start()
+    expect(requests).toHaveLength(1)
+    proxy.liveClients = 0
+    await vi.advanceTimersByTimeAsync(99)
+    expect(query.settled()).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(await query.result).toEqual({ error: timeout + 'Open or reconnect the Harness page, then retry.' })
+    expect(answer(query)).toEqual({ accepted: false })
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('returns the Client catalog failure at the deadline instead of losing it', async () => {
     const query = start()
     expect(registry.resolveClientQuery(AGENT_A, query.request.requestId, {
@@ -178,7 +231,7 @@ describe('Client inspect completion', () => {
   it.each(['timeout', 'disposal'] as const)('contains throwing completion subscribers during %s', async (completion) => {
     const error = new Error('subscriber failed')
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
-    disposers.push(ctx.on('cordis/inspect-query-resolved', () => { throw error }))
+    disposers.push(ctx.on('@deepseek-ai/cordis/inspect-query-resolved', () => { throw error }))
     const queries = [start(), start()]
     if (completion === 'timeout') await vi.advanceTimersByTimeAsync(100)
     else await fiber.dispose()

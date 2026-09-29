@@ -24,8 +24,11 @@
   en: 34813643d79753d6
   zh: d7d4237093510fdd
 /deepseek-ai-dsh-cordis-host-runner/config:
-  en: ab8a88b37b6cd847
-  zh: 51cbe80ca516b791
+  en: d632e6d89988a126
+  zh: 509e6efcc4f20744
+/deepseek-ai-dsh-cordis-host-runner/config/client-inspection:
+  en: 4204585e094bffe6
+  zh: a082d326785e11b8
 /deepseek-ai-dsh-cordis-host-runner/export-shape:
   en: 46e30d04cf525d78
   zh: 6a44b27367a5caa3
