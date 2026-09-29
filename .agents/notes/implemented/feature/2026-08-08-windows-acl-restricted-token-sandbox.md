@@ -18,7 +18,7 @@ The bundled diagnosis skill runs its preserving ACL repairs outside the confined
 
 A repair backs up before mutation and verifies effective access or the resulting ACEs. Failed invocations restore attempted changes in reverse order and remain failures: continuing after a failed grant would remove access without establishing the prerequisite. Inherited package entries are repaired at their explicit sources, preserving inheritance; incomplete or out-of-scope sources prevent mutation. Labels and denies remain untouched because removing them could defeat the backend's confinement or an intentional user policy.
 
-Both extracted and recovery scripts are user-writable, so this workflow never recommends elevating them. Missing unconfined WRITE_DAC stops the workflow for permission-policy review. Automatic recovery can itself fail and cannot survive process termination; reports retain pending recovery commands rather than promising an atomic transaction. The operator keeps those artifacts until verification of the original confined operation succeeds.
+Both extracted and recovery scripts are user-writable, so this workflow never recommends elevating them. Missing unconfined WRITE_DAC stops the workflow for permission-policy review. Automatic recovery can itself fail and cannot survive process termination; reports retain pending recovery commands rather than promising an atomic transaction. Because tool output keeps only its tail, every record is also written to a report file under the output directory and the run ends with a recap line, so the decisions survive truncation. The operator keeps those artifacts until verification of the original confined operation succeeds.
 
 ## How the restriction works (why no new identity)
 

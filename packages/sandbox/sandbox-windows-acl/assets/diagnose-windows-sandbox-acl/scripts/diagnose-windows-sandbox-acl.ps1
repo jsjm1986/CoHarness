@@ -81,7 +81,14 @@ function Write-Report {
   param([string]$Kind, [string]$Operation, [string]$Target, [string]$Status, [string]$Reason, $Details = @{})
   $record = [ordered]@{ kind = $Kind; operation = $Operation; path = $Target; status = $Status; reason = $Reason; details = $Details }
   if ($Kind -eq 'observation' -and $Status -in @('unknown', 'unreadable', 'partial')) { $script:observationFailures++ }
+  $script:reports.Add($record)
   $json = $record | ConvertTo-Json -Depth 12 -Compress
+  # The complete record set also lands in the report file: tool output is truncated to its
+  # tail, so a long run's early records survive only there.
+  if ($null -ne $script:reportWriter) {
+    try { $script:reportWriter.WriteLine($json); $script:reportWriter.Flush() }
+    catch [System.IO.IOException] { $script:reportWriter = $null }
+  }
   [Console]::Out.WriteLine('REPORT ' + $json)
 }
 function Invoke-ReportedOperation {
@@ -382,7 +389,7 @@ function Restore-SavedDacl {
 }
 
 function Get-ObjectFacts {
-  param([string]$FullPath, [string]$MeSid)
+  param([string]$FullPath, [string]$MeSid, [switch]$CompactRecord)
   $facts = [ordered]@{
     Object = $FullPath
     Readable = $false
@@ -450,7 +457,10 @@ function Get-ObjectFacts {
   }
   Write-Report observation inspect_acl $FullPath $(if ($facts.Errors.Count) { 'partial' } else { 'read' }) 'Read the ACL and check effective WRITE_DAC and WRITE_OWNER; observed ACEs alone do not identify which rule caused a denial.' @{
     owner = $facts.Owner; writeDac = $facts.HasWriteDac; writeOwner = $facts.HasWriteOwner
-    aces = $facts.Aces; nativeListing = @($facts.AclLines | ForEach-Object { $_.Trim() } | Where-Object { $_ }); lowLabel = $facts.LowLabel; errors = $facts.Errors
+    # A re-read after a change repeats an ACL this run already recorded: keep the
+    # full ACE list in memory, but do not print it twice.
+    aces = $(if ($CompactRecord) { @() } else { $facts.Aces }); acesOmitted = [bool]$CompactRecord
+    lowLabel = $facts.LowLabel; errors = $facts.Errors
   }
   return $facts
 }
@@ -472,6 +482,9 @@ function Get-Ancestors {
 
 $operations = [System.Collections.Generic.List[object]]::new()
 $recoveries = [System.Collections.Generic.List[object]]::new()
+$reports = [System.Collections.Generic.List[object]]::new()
+$reportPath = $null
+$reportWriter = $null
 $requestedPaths = @()
 $rollbackStatus = 'not-needed'
 $fixed = 0
@@ -492,6 +505,16 @@ try {
   if (-not $AllowRoot) { throw [System.ArgumentException]::new('Every modification requires -AllowRoot') }
   if (-not $Restore -and -not $Out) { throw [System.ArgumentException]::new('A repair requires -Out for its recovery artifacts') }
   if ($Restore -and $Path.Count -ne 1) { throw [System.ArgumentException]::new('-Restore requires exactly one -Path') }
+  if ($Out) {
+    Invoke-ReportedOperation prepare_report $Out 'Create the recovery directory and a new JSONL report that keeps every record, because tool output is truncated to its tail.' files {
+      $directory = [System.IO.Path]::GetFullPath($Out)
+      [System.IO.Directory]::CreateDirectory($directory) | Out-Null
+      $script:reportPath = Join-Path $directory ('acl-report-{0}.jsonl' -f [guid]::NewGuid().ToString('N'))
+      $stream = [System.IO.File]::Open($script:reportPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write)
+      $script:reportWriter = [System.IO.StreamWriter]::new($stream, [System.Text.UTF8Encoding]::new($false))
+      foreach ($record in $script:reports) { $script:reportWriter.WriteLine(($record | ConvertTo-Json -Depth 12 -Compress)) }
+    }
+  }
   $identity = Get-CurrentIdentity
   $meSid = $identity.User.Value
   Invoke-ReportedOperation initialize '' 'Load read-only access checks and DACL-only writes before inspecting permissions.' none { Initialize-NativeApi }
@@ -633,7 +656,7 @@ try {
       Invoke-ReportedOperation grant_dacl $object "WRITE_DAC or WRITE_OWNER is missing; add a FullControl allow ACE for $meSid while preserving deny ACEs, owner and SACL." acl {
         [Dsh.TokenInfo]::SetDacl($object, $grantAcl.GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]::Access))
       }
-      $grantAfter = Get-ObjectFacts -FullPath $object -MeSid $meSid
+      $grantAfter = Get-ObjectFacts -FullPath $object -MeSid $meSid -CompactRecord
       $factsByPath[$object] = $grantAfter
       $verified = $grantAfter.Readable -and $grantAfter.Errors.Count -eq 0 -and $grantAfter.HasWriteDac -and $grantAfter.HasWriteOwner
       Write-Report verification grant $object $(if ($verified) { 'verified' } else { 'failed' }) 'The DACL write completed; recheck effective access before claiming that provisioning can succeed. On failure, restore this invocation and stop.' @{
@@ -682,7 +705,7 @@ try {
     # A package deny can share the removed allow's SID; only allow ACEs were removed.
     foreach ($packagePath in $packageTargets) {
       $fixBefore = $factsByPath[$packagePath]
-      $fixAfter = Get-ObjectFacts -FullPath $packagePath -MeSid $meSid
+      $fixAfter = Get-ObjectFacts -FullPath $packagePath -MeSid $meSid -CompactRecord
       # Compare the object's own ACEs as sorted sets: listing order and inherited
       # entries follow the parent, so neither proves a collateral change.
       $rowOf = { param($ace) '{0}|{1}|{2}|{3}|{4}' -f $ace.type, $ace.sid, $ace.rights, $ace.inheritance, $ace.propagation }
@@ -734,12 +757,31 @@ try {
   [array]::Reverse($pending)
   $repaired = ($fixed + $granted) -gt 0
   $nextAction = if ($rollbackStatus -eq 'failed') { 'restore_pending_then_stop' } elseif ($exitCode -ne 0 -or $observationFailures -gt 0) { 'stop' } elseif ($repaired) { 'verify_original_confined_operation' } else { 'stop' }
-  Write-Line ('SUMMARY FIXED={0} GRANTED={1} REFUSED={2} RESTORED={3}' -f $fixed, $granted, $refused, $restored)
+  # The tool keeps only the tail of stdout. Recapitulate the decisions here so the
+  # records a reader needs survive truncation; the report file holds every record.
+  $recap = [ordered]@{
+    verdicts = @($reports | Where-Object { $_.operation -eq 'classify' } | ForEach-Object {
+      @{ path = $_.path; verdict = $_.status; writeDac = $_.details['writeDac']; writeOwner = $_.details['writeOwner']; packageObjects = $_.details['packageObjects'] }
+    })
+    changes = @($reports | Where-Object { $_.kind -eq 'action' -and $_.details['effect'] -eq 'acl' -and $_.status -eq 'completed' } | ForEach-Object { @{ operation = $_.operation; path = $_.path } })
+    verifications = @($reports | Where-Object { $_.kind -eq 'verification' } | ForEach-Object { @{ operation = $_.operation; path = $_.path; status = $_.status } })
+    refusals = @($reports | Where-Object { $_.kind -eq 'decision' -and $_.status -eq 'refused' } | ForEach-Object { @{ path = $_.path; reason = $_.reason } })
+    scans = @($reports | Where-Object { $_.operation -eq 'subtree_scan' } | ForEach-Object {
+      @{ path = $_.path; visited = $_.details['visited']; packageSources = @($_.details['packageSources']); truncated = $_.details['truncated']; unreadable = $_.details['unreadable'] }
+    })
+    report = $reportPath
+  }
   $status = if ($exitCode -ne 0) { 'failed' } elseif ($observationFailures -gt 0) { 'partial' } else { 'completed' }
   Write-Report summary $mode $currentPath $status 'Operation completion records API execution; verification records the observed result. Only rerunning the original confined operation can confirm its failure is resolved.' @{
     exitCode = $exitCode; fixed = $fixed; granted = $granted; refused = $refused; restored = $restored
     operations = @($operations.ToArray()); recoveries = @($recoveries.ToArray()); automaticRollback = $true; observationFailures = $observationFailures
-    rollback = $rollbackStatus; rollbackCommands = $pending; nextAction = $nextAction; scanTruncated = $scanTruncated
+    rollback = $rollbackStatus; rollbackCommands = $pending; nextAction = $nextAction; scanTruncated = $scanTruncated; report = $reportPath
   }
+  # Last on stdout, after the summary record: whatever the tool truncates, the tail
+  # still carries the decisions, the report path and the counts.
+  Write-Line ('RECAP ' + ($recap | ConvertTo-Json -Depth 8 -Compress))
+  if ($reportPath) { Write-Line ('REPORT_FILE {0}' -f $reportPath) }
+  Write-Line ('SUMMARY FIXED={0} GRANTED={1} REFUSED={2} RESTORED={3}' -f $fixed, $granted, $refused, $restored)
+  if ($reportWriter) { $reportWriter.Dispose() }
 }
 exit $exitCode

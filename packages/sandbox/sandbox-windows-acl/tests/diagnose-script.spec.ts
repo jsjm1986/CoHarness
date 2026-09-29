@@ -204,10 +204,12 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
       expect(normalized(target, aclLines(target))).toEqual(before.filter(line => !line.includes(PACKAGE_SID)))
 
       const files = readdirSync(out)
-      expect(files).toHaveLength(2)
+      // One recovery pair for the change, plus the report file that keeps every record.
+      expect(files).toHaveLength(3)
       const recordFile = files.find(file => file.endsWith('.json'))!
       expect(files).toEqual(expect.arrayContaining([recordFile, `${recordFile}.ps1`]))
       expect(recordFile).toMatch(/^acl-backup-[0-9a-f]{32}\.json$/u)
+      expect(files.filter(file => /^acl-report-[0-9a-f]{32}\.jsonl$/u.test(file))).toHaveLength(1)
       expect(files.some(file => file.endsWith('.txt'))).toBe(false)
       const record = JSON.parse(readFileSync(join(out, recordFile), 'utf8')) as Record<string, unknown>
       expect(Object.keys(record).sort()).toEqual(['Dacl', 'Observed', 'Path', 'Protected'])
@@ -682,7 +684,7 @@ exit $LASTEXITCODE
     }
   })
 
-  it('reports a backup failure without attempting an ACL write', () => {
+  it('reports an unusable output directory without attempting an ACL write', () => {
     const scratch = newScratch()
     try {
       const target = makeDir(scratch, 'backup-failure')
@@ -694,7 +696,7 @@ exit $LASTEXITCODE
       const run = runScript(['-Path', target, '-AllowRoot', scratch, '-Out', outputFile])
       expect(run.code).toBe(1)
       const entries = reports(run)
-      expect(entries).toContainEqual(containingObject({ kind: 'action', operation: 'backup', status: 'failed', details: containingObject({ error: anyValue(String) }) }))
+      expect(entries).toContainEqual(containingObject({ kind: 'action', operation: 'prepare_report', status: 'failed', details: containingObject({ error: anyValue(String) }) }))
       expect(entries.filter(entry => entry.kind === 'action' && entry.details.effect === 'acl')).toEqual([])
       expect(sddlOf(target)).toBe(before)
       expect(readFileSync(outputFile, 'utf8')).toBe('Existing contents')
@@ -720,7 +722,7 @@ function Get-Acl { param([string]$LiteralPath); throw [System.IO.IOException]::n
         details: containingObject({ error: containingString('ACL observation unavailable') }),
       }))
       expect(entries.at(-1)).toMatchObject({ kind: 'summary', status: 'partial', details: containingObject({ observationFailures: anyValue(Number) }) })
-      expect(entries.filter(entry => entry.kind === 'action' && entry.details.effect !== 'none')).toEqual([])
+      expect(entries.filter(entry => entry.kind === 'action' && entry.details.effect === 'acl')).toEqual([])
       expect(sddlOf(target)).toBe(before)
     } finally {
       dispose(scratch)
