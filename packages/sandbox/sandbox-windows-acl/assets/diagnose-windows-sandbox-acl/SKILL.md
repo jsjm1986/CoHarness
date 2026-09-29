@@ -5,7 +5,7 @@ description: 'Use on Windows for unexpected DSH sandbox access denials: workspac
 
 # Diagnose Windows sandbox ACL failures
 
-**Write every approval request in plain words, in the user's language.** The prompt is all the user reads before widening access, so it must stand alone: which folder the script touches, that it adds the signed-in user's full-control entry where a right is missing and removes foreign package entries, that file contents and owners are unchanged, and that the printed recovery command undoes each change. Keep error codes, `WRITE_DAC`/`WRITE_OWNER`, `S-1-15-2-*` SIDs, `icacls`, verdict names and switches out of the request. Ask once, for one command.
+**Write every approval request in plain words, in the user's language.** The prompt is all the user reads before widening access, so it must stand alone: which folder the script touches, that it adds the signed-in user's full-control entry where a right is missing and removes foreign package entries, that file contents and owners are unchanged, and that the printed recovery command undoes each change. Keep error codes, `WRITE_DAC`/`WRITE_OWNER`, `S-1-15-2-*` SIDs, `icacls`, ACL, ACE, verdict names and switches out of the request: write Windows file permissions, not ACL or ACE. Ask once, for one command.
 
 ## One command diagnoses and repairs
 
@@ -22,13 +22,13 @@ Every change is backed up, then verified by re-reading it. `-AllowRoot` bounds a
 exit $LASTEXITCODE
 ```
 
-Substitute full, quoted paths. Keep `-Out` persistent and user-owned, preferably beside the failing workspace inside `-AllowRoot`; never use the skill resource directory, which is deleted when the skill unloads. Pass one path per invocation.
+Substitute full, quoted paths. Keep `-Out` persistent and user-owned, preferably beside the failing workspace; never use the skill resource directory, which is deleted when the skill unloads. Pass one path per invocation.
 
 ## Run it
 
 Repeat the failing operation once confined, then the command above confined too. When sandbox setup itself fails — the error names the workspace root or `SetNamedSecurityInfoW` — every confined call fails before the command runs, so do not retry confined: request approval for that one command and run it unconfined. Unconfined does not elevate the Windows token.
 
-Diagnose unexpected denials of workspace writes, listing, or plainly readable paths; explain expected ones instead: writes outside the workspace, any write in `read-only`, piped grandchild `spawn EPERM`, ConstrainedLanguage errors for .NET/COM/reflection. If approval is refused or unavailable, report the path as undiagnosed and stop.
+Diagnose unexpected denials of workspace writes, listing, or plainly readable paths; explain expected ones instead: writes outside the workspace, any write in `read-only`, piped grandchild `spawn EPERM`, ConstrainedLanguage errors. If approval is refused or unavailable, report the path as undiagnosed and stop.
 
 ## Read the output
 
@@ -48,11 +48,11 @@ Repeat the original failed operation confined. A verified repair is not undone b
 
 **Stop after any failed or refused repair, or failed verification.** The script already restored that invocation's changes; do not repeat it or start another repair, and never remove a deny ACE by hand.
 
-**A stopped run still owes the user a decision.** Name the blocking object and the right or ACE it lacks, what changed and what was rolled back, the recovery commands in order, and the report path. Only the user can lift confinement, so ask them to switch this session to **full access** (Chinese UI: 完全权限) temporarily, and say what that opens: keep working under it, or ask you to keep investigating this ACL problem, since the report already records the mechanism and the evidence. Then ask them to send this session as feedback, quoting the report records that matter, so the unhandled scenario reaches us — only what reaches this conversation travels with it. For example:
+**A stopped run still owes the user a decision.** Name the blocking object and the right or ACE it lacks, what changed and what was rolled back, the recovery commands in order, and the report path. Only the user can lift confinement, so ask them to switch this session to **full access** (Chinese UI: 完全权限) temporarily, and say what that opens: keep working under it, or ask you to keep investigating this file-permission problem, since the report already records the mechanism and the evidence. Then ask them to send this session as feedback, quoting the report records that matter, so the unhandled scenario reaches us — only what reaches this conversation travels with it. For example:
 
-> 这个工作区被 ACL 挡住了：`<对象>` 上 `<缺哪个权限 / 哪条 ACE>`。你可以把本会话切到「完全权限」(full access) 临时继续工作；切完之后既能直接干活，也可以让我继续排查这个 ACL 问题（报告里已经有机制和证据）。也麻烦把这个会话作为反馈发出去，好让我们补上这个场景。
+> 这个工作区被 Windows 文件权限挡住了：`<对象>` 上 `<缺哪个权限 / 哪条权限项>`。你可以把本会话切到「完全权限」(full access) 临时继续工作；切完之后既能直接干活，也可以让我继续排查这个文件权限问题（报告里已经有机制和证据）。也麻烦把这个会话作为反馈发出去，好让我们补上这个场景。
 >
-> This workspace is blocked by an ACL: `<object>` `<missing right / offending ACE>`. Switch this session to full access (完全权限) to keep working meanwhile; then either continue your work or have me keep investigating this ACL problem from the report. Please also send this session as feedback so we can cover the case.
+> This workspace is blocked by Windows file permissions: `<object>` `<missing right / offending entry>`. Switch this session to full access (完全权限) to keep working meanwhile; then either continue your work or have me keep investigating this file-permission problem from the report. Please also send this session as feedback so we can cover the case.
 
 ## Never
 
@@ -60,4 +60,4 @@ Repeat the original failed operation confined. A verified repair is not undone b
 - run the script elevated, through UAC or `runas`;
 - widen `-AllowRoot` to reach an ancestor, or repeat a denied or failed call.
 
-Report in the user's language: analyzed paths, changes and why, verification, recovery commands, next step. Label an authorized unconfined run as such, not as a sandbox repair.
+Report in the user's language: analyzed paths, changes, verification, recovery commands, next step. Label an authorized unconfined run as such, not as a sandbox repair.
