@@ -50,10 +50,10 @@ const FAILED_KEYS = {
  * @param t - the manager's translate seat.
  * @returns the sentence.
  */
-export function managementText(error: { readonly code: ManagementError['code']; readonly diagnostic?: string; readonly incompatible?: readonly { name: string; version: string }[] }, t: Translate): string {
+export function managementText(error: { readonly code: ManagementError['code']; readonly diagnostic?: string; readonly incompatible?: readonly { name: string; version: string }[]; readonly installing?: true }, t: Translate): string {
   if (error.code === 'incompatible-version' && error.incompatible !== undefined && error.incompatible.length > 0) {
     const base = `${t('reasonIncompatibleVersion')}: ${error.incompatible.map(pkg => `${pkg.name}@${pkg.version}`).join(', ')}`
-    return `${base}${t('sentenceSeparator')}${t('reasonReinstallToUpgrade')}`
+    return `${base}${t('sentenceSeparator')}${t(error.installing ? 'reasonIncompatibleInstall' : 'reasonIncompatibleInstalled')}`
   }
   if (error.code !== 'operation-error') return t(CODE_KEYS[error.code])
   return error.diagnostic === undefined || error.diagnostic === '' ? t('reasonOperationError') : error.diagnostic

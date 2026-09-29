@@ -575,7 +575,7 @@ function failureText(failure: InstallState['failure'], t: Translate): string {
   // Blocked scripts the Host could not name leave the person to allow them in the profile's pnpm settings by hand.
   if (failure.kind === 'build-blocked' && !failure.pendingBuilds?.length) return t('installFailureBuildBlockedManual')
   if (failure.kind !== undefined) return t(FAILURE_KIND_KEYS[failure.kind])
-  if (failure.code !== undefined) return managementText({ code: failure.code, diagnostic: failure.reason }, t)
+  if (failure.code !== undefined) return managementText({ code: failure.code, diagnostic: failure.reason, installing: true }, t)
   return failure.reason === '' ? t('installFailureGeneric') : failure.reason
 }
 

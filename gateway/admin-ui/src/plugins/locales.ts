@@ -156,7 +156,8 @@ export const zh = {
   reasonStopProfile: '这个 profile 没有启用 HMR，正在使用的包要停止后用 dsh plugin 卸载',
   reasonBundleInUse: '其他配置仍在使用这个组合包的组件，请先停用它们',
   reasonStaleApproval: '待允许的安装脚本列表已变化，请重新安装以刷新',
-  reasonReinstallToUpgrade: '已安装的插件如需升级，请卸载后重新安装。',
+  reasonIncompatibleInstall: '请安装与当前 DSH 兼容的插件版本。',
+  reasonIncompatibleInstalled: '请卸载后重新安装与当前 DSH 兼容的版本。',
   reasonIncompatibleVersion: '这个包声明的 DSH 版本范围不兼容当前运行时',
   reasonOperationError: 'Host 报告了一个错误',
 } satisfies Record<string, string>
@@ -320,7 +321,8 @@ export const en = {
   reasonStopProfile: 'This profile runs without HMR; stop it and uninstall the package with dsh plugin.',
   reasonBundleInUse: 'Other configuration still uses this bundle\'s components; switch them off first.',
   reasonStaleApproval: 'The pending script approvals changed; install again to refresh them.',
-  reasonReinstallToUpgrade: 'To upgrade an installed plugin, uninstall it and install it again.',
+  reasonIncompatibleInstall: 'Install a plugin version compatible with this DSH.',
+  reasonIncompatibleInstalled: 'Uninstall it and install a version compatible with this DSH.',
   reasonIncompatibleVersion: 'The package declares DSH version ranges incompatible with this runtime',
   reasonOperationError: 'The Host reported an error.',
 } satisfies Record<PluginManagerLocaleKey, string>
