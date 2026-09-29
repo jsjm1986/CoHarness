@@ -368,6 +368,26 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
     }
   }, timeout)
 
+  it('keeps an inherit-only ACE when it grants the missing right', () => {
+    const scratch = newScratch()
+    try {
+      const target = makeDir(scratch, 'inherit-only')
+      icacls(target, '/inheritance:r', '/grant:r', '*S-1-5-11:(M)')
+      icacls(target, '/grant', '*S-1-5-32-545:(OI)(CI)(IO)(F)')
+      const inheritOnlyBefore = aclLines(target).filter(line => line.includes('(IO)'))
+      expect(inheritOnlyBefore).toHaveLength(1)
+
+      const run = runScript(['-Path', target, '-AllowRoot', scratch, '-Out', join(scratch, 'out')])
+      expect(run.code, run.output).toBe(0)
+      expect(run.output).toContain(`GRANTED ${target} SID=${meSid}`)
+      expect(reports(run)).toContainEqual(containingObject({ kind: 'verification', operation: 'grant', path: target, status: 'verified' }))
+      expect(aclLines(target).filter(line => line.includes('(IO)'))).toEqual(inheritOnlyBefore)
+      expect(aclLines(target).join('\n')).toMatch(/\(F\)/u)
+    } finally {
+      dispose(scratch)
+    }
+  }, timeout)
+
   it('preserves a deny that shares the removed package allow SID', () => {
     const scratch = newScratch()
     try {

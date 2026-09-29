@@ -26,7 +26,7 @@ Substitute full, quoted paths. Keep `-Out` persistent and user-owned, preferably
 
 ## Run it
 
-Repeat the failing operation once confined, then the command above confined too. When sandbox setup itself fails — the error names the workspace root or `SetNamedSecurityInfoW` — every confined call fails before the command runs, so do not retry confined: request approval for that one command and run it unconfined. Unconfined does not elevate the Windows token.
+Repeat the failing operation once confined. The script writes permissions, which the confined token cannot do — run it there and it would report the sandbox's own restriction as a missing right — so request approval for that one command and run it unconfined. A confined run of the script is never useful. Unconfined does not elevate the Windows token.
 
 Diagnose unexpected denials of workspace writes, listing, or plainly readable paths; explain expected ones instead: writes outside the workspace, any write in `read-only`, piped grandchild `spawn EPERM`, ConstrainedLanguage errors. If approval is refused or unavailable, report the path as undiagnosed and stop.
 

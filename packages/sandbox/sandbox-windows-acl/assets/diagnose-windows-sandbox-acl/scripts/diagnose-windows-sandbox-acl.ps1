@@ -281,8 +281,12 @@ function Get-SubtreePackageSources {
   $truncated = $false
   $queue = [System.Collections.Generic.Queue[string]]::new()
   # Unreadable directories are skipped, never guessed at: the caller reports the count.
-  try { foreach ($child in [System.IO.Directory]::EnumerateDirectories($Root)) { $queue.Enqueue($child); $enqueued++ } }
-  catch [System.UnauthorizedAccessException] { $failed++ }
+  try {
+    foreach ($child in [System.IO.Directory]::EnumerateDirectories($Root)) {
+      if ($enqueued -ge $Limit) { $truncated = $true; break }
+      $queue.Enqueue($child); $enqueued++
+    }
+  } catch [System.UnauthorizedAccessException] { $failed++ }
   catch [System.IO.IOException] { $failed++ }
   while ($queue.Count -gt 0) {
     if ($visited -ge $Limit) { $truncated = $true; break }
@@ -290,7 +294,7 @@ function Get-SubtreePackageSources {
     $visited++
     if (Test-DangerousRoot -FullPath $current) { continue }
     $item = Get-Item -LiteralPath $current -Force -ErrorAction SilentlyContinue
-    if ($null -eq $item) { continue }
+    if ($null -eq $item) { $failed++; continue }
     if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
     try {
       $acl = Get-Acl -LiteralPath $current
@@ -611,8 +615,8 @@ try {
       if ($scan.truncated) { $script:scanTruncated = $true }
     }
 
-    # Nothing is changed while a package source is out of reach: a repair that cannot
-    # finish would leave the tree half repaired and only then report the refusal.
+    # Nothing is changed while a package source or a grant target is out of reach: a
+    # repair that cannot finish would leave the tree half repaired before refusing.
     foreach ($packagePath in $packageTargets) {
       $refusal = Get-RepairRefusal -FullPath $packagePath -Root $AllowRoot -AllowEqual
       if ($refusal) { Write-Line ('REPAIR_REFUSED {0}' -f $refusal); Write-Decision $mode $packagePath refused $refusal; $refused++; break paths }
@@ -687,7 +691,7 @@ try {
       }
     }
     if ($sources.Count -gt 0) {
-      Write-Report decision remove_package_sources $full selected 'Remove explicit package allow ACEs from their sources, ancestor first. Inherited entries are verified after the source changes; inheritance stays enabled.' @{
+      Write-Report decision remove_package_sources $full selected 'Remove explicit package allow ACEs from their sources, ancestor first, leaving inheritance enabled so inherited copies follow their repaired source.' @{
         sources = @($sources); affectedPaths = @($packageTargets)
       }
     }
