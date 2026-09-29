@@ -339,8 +339,8 @@ describe('the preset list', () => {
       rows: [...READY.rows, { id: 'cordis', trust: 'system', isDefault: false, name: '创造模式' }],
     })
 
-    // The creator entry explains the preference gate instead of opening a draft.
-    expect(screen.getByTitle(en.enablePickerToCreate)).toBeTruthy()
+    // The creator entry is not gated by the picker preference.
+    expect(screen.getByRole('button', { name: en.creatorDraft })).toHaveProperty('disabled', false)
     // The in-use row keeps a non-interactive Default label; other rows name
     // the preference that must be turned on first.
     expect(within(rowFor('standard')).getByTitle(en.selectionOffDefault)).toBeTruthy()

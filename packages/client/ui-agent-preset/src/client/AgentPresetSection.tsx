@@ -240,10 +240,8 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
       <button
         type="button"
         className={css.creatorButton}
-        disabled={!state.authorable || !state.showPicker || state.policySaving}
-        title={!state.showPicker
-          ? t('enablePickerToCreate')
-          : state.authorable ? undefined : t('duplicateUnavailable')}
+        disabled={!state.authorable || state.policySaving}
+        title={state.authorable ? undefined : t('duplicateUnavailable')}
         onClick={() => {
           props.startCreatorDraft?.()
           props.close()

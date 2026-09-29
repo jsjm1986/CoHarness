@@ -21,7 +21,7 @@ export type AgentPresetSettingsKey =
   | 'idRequired' | 'idInvalid' | 'idTaken'
   | 'deleteTitle' | 'deleteDescription' | 'deleteConfirm' | 'deleting'
   | 'showPicker' | 'showPickerBeta' | 'showPickerDescription'
-  | 'enablePickerToSetDefault' | 'enablePickerToCreate'
+  | 'enablePickerToSetDefault'
   | 'readOnly' | 'readOnlyProject' | 'readOnlyAccount' | 'readOnlyOrganization' | 'readOnlyDeployment'
 
 /** English copy. */
@@ -102,7 +102,6 @@ export const en: Record<AgentPresetSettingsKey, string> = {
     + 'When disabled, all new sessions use the default mode (Standard by default; configurable). '
     + 'Only affects new sessions.',
   enablePickerToSetDefault: 'Turn on Agent mode selection to choose a default',
-  enablePickerToCreate: 'Turn on Agent mode selection to start Creator mode',
   readOnly: 'The settings document is read-only in this deployment.',
   readOnlyProject:
     'Agent mode settings are managed by the project owner or an organization administrator.',
@@ -179,7 +178,6 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
     '开启后，新会话可选择标准、PTC、创造、极简及自定义模式；'
     + '关闭后统一使用默认模式（默认为标准模式，可自定义）。仅影响新会话。',
   enablePickerToSetDefault: '请先开启 Agent 模式选择，再设置默认模式',
-  enablePickerToCreate: '请先开启 Agent 模式选择，再启动创造模式',
   readOnly: '当前部署的设置文档为只读。',
   readOnlyProject: 'Agent 模式设置由项目 owner 或组织管理员管理。',
   readOnlyAccount: '此 Agent 模式设置属于当前账户。',

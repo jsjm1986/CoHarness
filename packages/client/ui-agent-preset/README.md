@@ -38,6 +38,8 @@ A session's preset is fixed when the session is created — the host refuses to 
 <a id="the-new-session-chip"></a>
 ## The new-session chip
 
+The *Allow switching Agent modes* preference in Agent presets settings decides whether a mode can be chosen at all: with it off the new-session picker disappears, while the settings cards still choose the saved default that keeps composing new tasks and Creator stays available. Choosing a healthy default also synchronizes the blank session on the current new-task surface. Creator starts a new task using the `cordis` preset.
+
 A second surface, beside the workspace picker on the new-session screen. It sits there rather than in the composer because that is where the choice is still open: a control that spends most of its life disabled belongs on the screen where it still works.
 
 The chip opens on the deployment default and its pick is *staged* — the screen precedes the session it would apply to. The stage reaches a session when one becomes current and is still blank, which covers both the session the workspace connect created and the blank one it reused; riding along on `sessions.create` would miss the second. It is spent on first use, so the next new session opens on the default again, exactly like the workspace picker beside it.
