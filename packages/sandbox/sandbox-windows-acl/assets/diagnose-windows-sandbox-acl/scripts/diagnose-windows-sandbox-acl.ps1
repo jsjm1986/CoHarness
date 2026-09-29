@@ -87,7 +87,13 @@ function Write-Report {
   # tail, so a long run's early records survive only there.
   if ($null -ne $script:reportWriter) {
     try { $script:reportWriter.WriteLine($json); $script:reportWriter.Flush() }
-    catch [System.IO.IOException] { $script:reportWriter = $null }
+    catch [System.IO.IOException] {
+      # stdout keeps only its tail, so this file is the complete record: a write failure
+      # has to reach the caller, on stderr, instead of leaving a silently incomplete file.
+      [Console]::Error.WriteLine('REPORT_IO_FAILED {0}: {1}' -f $script:reportPath, $_.Exception.Message)
+      try { $script:reportWriter.Dispose() } catch { }
+      $script:reportWriter = $null
+    }
   }
   [Console]::Out.WriteLine('REPORT ' + $json)
 }
@@ -565,6 +571,27 @@ try {
     $needsPrecondition = (-not $unreadable) -and
       ((-not $targetFacts.HasWriteDac) -or (-not $targetFacts.HasWriteOwner))
 
+    # A directory the caller cannot provision is the workspace root half the time: the sandbox
+    # reports its own failure there while the conflicting entry sits deeper. Examine that
+    # subtree before the verdict so the classification and its packageObjects describe what
+    # this run will actually repair.
+    $ownsRoot = $full -ieq (Get-NormalizedPath $AllowRoot)
+    if (-not $Restore -and $targetFacts.Errors.Count -eq 0 -and [System.IO.Directory]::Exists($full) -and ($needsPrecondition -or $ownsRoot)) {
+      $scan = Get-SubtreePackageSources -Root $full -Limit $SCAN_LIMIT
+      foreach ($object in $scan.sources) {
+        if ($packageTargets -notcontains $object) { $packageTargets += $object }
+        if (-not $factsByPath.ContainsKey($object)) {
+          $scanned = Get-ObjectFacts -FullPath $object -MeSid $meSid
+          $factsByPath[$scanned.Object] = $scanned
+        }
+      }
+      Write-Report observation subtree_scan $full $(if ($scan.failed -gt 0) { 'partial' } else { 'read' }) 'The caller cannot provision this directory, or it is the authorized root, so explicit package allow ACEs under it were collected in the same run; no reparse point or managed application tree is entered.' @{
+        visited = $scan.visited; packageSources = @($scan.sources); truncated = [bool]$scan.truncated; unreadable = [int]$scan.failed
+      }
+      Write-Line ('SCAN {0} VISITED={1} PACKAGE_SOURCES={2}{3}{4}' -f $full, $scan.visited, @($scan.sources).Count, $(if ($scan.truncated) { ' TRUNCATED' } else { '' }), $(if ($scan.failed -gt 0) { " UNREADABLE=$($scan.failed)" } else { '' }))
+      if ($scan.truncated) { $script:scanTruncated = $true }
+    }
+
     if ($targetFacts.Errors.Count -gt 0) {
       $verdict = 'INCOMPLETE'
       $reason = 'Some observations failed; missing evidence is not evidence that a right is absent or a repair is safe.'
@@ -593,26 +620,6 @@ try {
       Write-Decision $mode $full refused 'Required observations are incomplete; no repair was attempted for this path.'
       $refused++
       break paths
-    }
-
-    # A directory the caller cannot provision is the workspace root half the time: the
-    # sandbox reports its own failure there while the conflicting entry sits deeper.
-    # Examine that subtree in the same run instead of spending a second approval.
-    $ownsRoot = $full -ieq (Get-NormalizedPath $AllowRoot)
-    if ([System.IO.Directory]::Exists($full) -and ($needsPrecondition -or $ownsRoot)) {
-      $scan = Get-SubtreePackageSources -Root $full -Limit $SCAN_LIMIT
-      foreach ($object in $scan.sources) {
-        if ($packageTargets -notcontains $object) { $packageTargets += $object }
-        if (-not $factsByPath.ContainsKey($object)) {
-          $scanned = Get-ObjectFacts -FullPath $object -MeSid $meSid
-          $factsByPath[$scanned.Object] = $scanned
-        }
-      }
-      Write-Report observation subtree_scan $full $(if ($scan.failed -gt 0) { 'partial' } else { 'read' }) 'The caller cannot provision this directory, or it is the authorized root, so explicit package allow ACEs under it were collected in the same run; no reparse point or managed application tree is entered.' @{
-        visited = $scan.visited; packageSources = @($scan.sources); truncated = [bool]$scan.truncated; unreadable = [int]$scan.failed
-      }
-      Write-Line ('SCAN {0} VISITED={1} PACKAGE_SOURCES={2}{3}{4}' -f $full, $scan.visited, @($scan.sources).Count, $(if ($scan.truncated) { ' TRUNCATED' } else { '' }), $(if ($scan.failed -gt 0) { " UNREADABLE=$($scan.failed)" } else { '' }))
-      if ($scan.truncated) { $script:scanTruncated = $true }
     }
 
     # Nothing is changed while a package source or a grant target is out of reach: a

@@ -349,7 +349,13 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
 
       const run = runScript(['-Path', root, '-AllowRoot', root, '-Out', join(scratch, 'out')])
       expect(run.code, run.output).toBe(0)
-      expect(run.output).toContain('VERDICT=PRECONDITION')
+      // The classification describes what this run repairs: the scanned sources are part
+      // of it, not discovered after the verdict was recorded.
+      expect(run.output).toContain('VERDICT=BOTH')
+      expect(reports(run)).toContainEqual(containingObject({
+        kind: 'decision', operation: 'classify', path: root, status: 'BOTH',
+        details: containingObject({ packageObjects: containingArray([deep, leaf]) }),
+      }))
       expect(run.output).toContain(`GRANTED ${root} SID=${meSid}`)
       expect(run.output).toContain(`FIXED ${deep} SID=${PACKAGE_SID}`)
       expect(run.output).toContain(`FIXED ${leaf} SID=${OTHER_PACKAGE_SID}`)
