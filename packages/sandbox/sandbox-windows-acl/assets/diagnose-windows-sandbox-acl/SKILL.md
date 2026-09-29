@@ -5,7 +5,7 @@ description: 'Use on Windows for unexpected DSH sandbox access denials: workspac
 
 # Diagnose Windows sandbox ACL failures
 
-**Write every approval request in plain words, in the user's language.** The approval prompt is all the user reads before widening access, so it must stand alone: which folder the script touches, that it adds the signed-in user's full-control entry where a right is missing and removes foreign package entries, that file contents and owners are unchanged, and that each change can be undone with the printed recovery command. Keep error codes, `WRITE_DAC`/`WRITE_OWNER`, `S-1-15-2-*` SIDs, `icacls`, verdict names and switches out of the request; they belong in the report. Ask once, for one command.
+**Write every approval request in plain words, in the user's language.** The prompt is all the user reads before widening access, so it must stand alone: which folder the script touches, that it adds the signed-in user's full-control entry where a right is missing and removes foreign package entries, that file contents and owners are unchanged, and that the printed recovery command undoes each change. Keep error codes, `WRITE_DAC`/`WRITE_OWNER`, `S-1-15-2-*` SIDs, `icacls`, verdict names and switches out of the request. Ask once, for one command.
 
 ## One command diagnoses and repairs
 
@@ -13,49 +13,46 @@ The script has no modes. `-Path`, `-AllowRoot` and `-Out` read the path and ever
 
 - directories on that chain that lack effective `WRITE_DAC` or `WRITE_OWNER` receive a full-control allow ACE for the signed-in user, because DSH cannot provision its workspace grant without them;
 - explicit AppContainer package allow ACEs (`S-1-15-2-*`, except the well-known groups ending in 1 or 2) are removed at their sources, ancestor first, which also removes those packages' access;
-- when the requested directory is one the sandbox cannot provision — the state its provisioning error reports on the workspace root — or it is the authorized root, explicit package allow ACEs under it are collected in the same run, so a deeper conflicting entry needs no second request. That bounded walk reports `truncated` and unreadable directories; if truncated, pass the still-failing deeper path once more.
+- a directory the sandbox cannot provision — the state its provisioning error reports on the workspace root — or the authorized root itself also has its subtree searched for those ACEs in the same run, so a deeper entry needs no second request. That bounded walk reports `truncated` and unreadable directories; if truncated, pass the still-failing deeper path once more.
 
-Every change is backed up first and verified by re-reading it. `-AllowRoot` bounds all of it: an object is changed only when it is that directory or strictly inside it, so a workspace root can repair itself. Never split this into a diagnostic call and a repair call, never ask twice for one repair, and never pass a mode switch that does not exist.
+Every change is backed up, then verified by re-reading it. `-AllowRoot` bounds all of it: an object is changed only when it is that directory or strictly inside it, so a workspace root can repair itself. Never split this into a diagnostic call and a repair call, never ask twice for one repair, and never pass a mode switch that does not exist.
 
 ```powershell
 & '<skill-directory>\scripts\diagnose-windows-sandbox-acl.ps1' -Path '<failing-path>' -AllowRoot '<authorized-directory>' -Out '<recovery-directory>'
 exit $LASTEXITCODE
 ```
 
-Substitute full, quoted paths. Keep `-Out` persistent and user-owned, preferably beside the failing workspace inside `-AllowRoot`; never use the skill resource directory, which is deleted when the skill unloads. Pass one path per invocation; do not repeat `-Path` or pass a comma-separated string to `pwsh -File`.
-
-## Decide whether diagnosis applies
-
-Diagnose an unexpected denial of workspace writes, listing, or reads the signed-in user should plainly have. Root-only failure and uniform failure are both eligible. Stop and explain expected denials instead: writes outside the workspace, any write in `read-only`, piped grandchild `spawn EPERM`, or ConstrainedLanguage errors for .NET/COM/reflection.
+Substitute full, quoted paths. Keep `-Out` persistent and user-owned, preferably beside the failing workspace inside `-AllowRoot`; never use the skill resource directory, which is deleted when the skill unloads. Pass one path per invocation.
 
 ## Run it
 
-1. Repeat the failing operation once in the current sandbox. If it succeeds, there is nothing to repair.
-2. If it fails, run the command above confined once, if the sandbox starts at all. A writable `-Out` is enough; `read-only` refuses one.
-3. When sandbox setup itself fails — the error names the workspace root or `SetNamedSecurityInfoW` — every confined call fails before your command runs, so do not retry confined. Request approval for that one command and run it unconfined. Unconfined does not elevate the Windows token.
-4. If approval is refused, unavailable, or forbidden by policy, report the path as undiagnosed and stop.
+Repeat the failing operation once confined, then the command above confined too. When sandbox setup itself fails — the error names the workspace root or `SetNamedSecurityInfoW` — every confined call fails before the command runs, so do not retry confined: request approval for that one command and run it unconfined. Unconfined does not elevate the Windows token.
+
+Diagnose unexpected denials of workspace writes, listing, or plainly readable paths; explain expected ones instead: writes outside the workspace, any write in `read-only`, piped grandchild `spawn EPERM`, ConstrainedLanguage errors for .NET/COM/reflection. If approval is refused or unavailable, report the path as undiagnosed and stop.
 
 ## Read the output
 
-The script prints a `REPORT` record for every observation, decision, action, verification and recovery, then a final `RECAP` line, the report path and `SUMMARY FIXED=<n> GRANTED=<n> REFUSED=<n> RESTORED=<n>`. Tool output keeps only its tail, so read the `RECAP` line: it carries the verdicts, changes, verifications, refusals and scans. The complete record set is in the `acl-report-*.jsonl` file whose path the run prints; read specific records when the recap is not enough, and quote what you rely on.
-
-Trust the `verification` records; `completed` actions only confirm API execution. Decide from `details.nextAction`:
+Every record reaches stdout, the `acl-report-*.jsonl` file under `-Out`, and the final `RECAP` line, which carries the verdicts, changes, verifications, refusals and scans. Tool output keeps only its tail, so read the recap first, and read specific records from the report when it is not enough. Trust `verification` records, never `completed` actions. Decide from `details.nextAction`:
 
 | `nextAction` | Meaning |
 |---|---|
 | `verify_original_confined_operation` | Repairs verified; repeat the original operation confined. |
-| `stop` | Nothing was repaired, or a refusal ended the run. Report and stop. |
-| `restore_pending_then_stop` | Rollback was not verified. Run the printed recovery commands in order, then stop. |
+| `stop` | Nothing repaired, or a refusal ended the run. Report and stop. |
+| `restore_pending_then_stop` | Rollback unverified. Run the printed recovery commands in order, then stop. |
 
-A deny ACE's presence alone does not establish causation; the script never removes one. DSH provisions `S-1-4-*` grants and an Everyone `DeleteSubdirectoriesAndFiles` deny: both are expected, not conflicts. A deny that blocks the repair ends the run without a repair — `REPAIR_REFUSED`, or `GRANT_FAILED` — and the script then restores what it attempted. Each change leaves two files in `-Out` (`acl-backup-<id>.json` and its `.ps1`), and the run prints the matching `ROLLBACK` command.
+A deny ACE's presence alone does not establish causation, and the script never removes one; DSH's `S-1-4-*` grants and the Everyone `DeleteSubdirectoriesAndFiles` deny are expected, not conflicts. A deny that blocks the repair ends the run without a repair (`REPAIR_REFUSED`, or `GRANT_FAILED`) after restoring what it attempted. Each change leaves two files in `-Out` (`acl-backup-<id>.json` and its `.ps1`), and the run prints the matching `ROLLBACK` command.
 
-## After a repair
+## After a repair, and when it stops
 
-Repeat the original failed operation in the original confined context. A repair that verified is not undone because the original operation fails for a further reason: continue from the new observations. If a deeper path is still denied, run the same one command on that path — again one call, one approval.
+Repeat the original failed operation confined. A verified repair is not undone because the original operation fails for a further reason: continue from the new observations, and if a deeper path is still denied, run the same one command there — again one call, one approval.
 
-**Stop after any failed or refused repair, or any failed verification.** The script already restored that invocation's attempted changes; do not repeat it or continue to another repair. Restore earlier successful invocations in reverse order with their printed commands, then report.
+**Stop after any failed or refused repair, or failed verification.** The script already restored that invocation's changes; do not repeat it or start another repair, and never remove a deny ACE by hand.
 
-**When the run stops, hand the user a decision, not silence.** Say which object and which ACE or missing right still blocks the operation, what was changed and rolled back, the recovery commands in order, and the report path. Only the user can lift confinement: ask them to switch this session to full access temporarily, saying that confinement is off for it and that this is a workaround, not a repair. Then ask them to send feedback with this session so the unhandled scenario reaches us; only what reaches this conversation travels with it, so quote the report records that matter.
+**A stopped run still owes the user a decision.** Name the blocking object and the right or ACE it lacks, what changed and what was rolled back, the recovery commands in order, and the report path. Only the user can lift confinement, so ask them to switch this session to **full access** (Chinese UI: 完全权限) temporarily, and say what that opens: keep working under it, or ask you to keep investigating this ACL problem, since the report already records the mechanism and the evidence. Then ask them to send this session as feedback, quoting the report records that matter, so the unhandled scenario reaches us — only what reaches this conversation travels with it. For example:
+
+> 这个工作区被 ACL 挡住了：`<对象>` 上 `<缺哪个权限 / 哪条 ACE>`。你可以把本会话切到「完全权限」(full access) 临时继续工作；切完之后既能直接干活，也可以让我继续排查这个 ACL 问题（报告里已经有机制和证据）。也麻烦把这个会话作为反馈发出去，好让我们补上这个场景。
+>
+> This workspace is blocked by an ACL: `<object>` `<missing right / offending ACE>`. Switch this session to full access (完全权限) to keep working meanwhile; then either continue your work or have me keep investigating this ACL problem from the report. Please also send this session as feedback so we can cover the case.
 
 ## Never
 
