@@ -13,7 +13,7 @@ The script has no modes. `-Path`, `-AllowRoot` and `-Out` read the path and ever
 
 - directories on that chain that lack effective `WRITE_DAC` or `WRITE_OWNER` receive a full-control allow ACE for the signed-in user, because DSH cannot provision its workspace grant without them;
 - explicit AppContainer package allow ACEs (`S-1-15-2-*`, except the well-known groups ending in 1 or 2) are removed at their sources, ancestor first, which also removes those packages' access;
-- when the requested directory is one the sandbox cannot provision — the state its provisioning error reports on the workspace root — explicit package allow ACEs anywhere under it are collected in the same run, so a conflicting entry deeper in the tree needs no second request. That walk is bounded and reports `truncated`; if it was truncated, pass the still-failing deeper path once more.
+- when the requested directory is one the sandbox cannot provision — the state its provisioning error reports on the workspace root — or it is the authorized root itself, explicit package allow ACEs anywhere under it are collected in the same run, so a conflicting entry deeper in the tree needs no second request. That walk is bounded and reports `truncated` and any directory it could not read; if it was truncated, pass the still-failing deeper path once more.
 
 Every change is backed up first and then verified by re-reading it. `-AllowRoot` bounds all of it: an object is changed only when it is that directory or strictly inside it, so a workspace root can repair itself. Never split this into a diagnostic call and a repair call, never ask twice for one repair, and never pass a mode switch that does not exist.
 
@@ -49,9 +49,9 @@ Each record has `kind`, `operation`, `path`, `status`, `reason`, `details`. `com
 | `stop` | Nothing was repaired, or a refusal ended the run. Report and stop. |
 | `restore_pending_then_stop` | Rollback was not verified. Run the printed recovery commands in order, then stop. |
 
-A deny ACE's presence alone does not establish causation; the script never removes one. DSH provisions `S-1-4-*` grants and an Everyone `DeleteSubdirectoriesAndFiles` deny: both are expected, not conflicts. A deny that blocks the repair ends the run with `REPAIR_REFUSED` and no change.
+A deny ACE's presence alone does not establish causation; the script never removes one. DSH provisions `S-1-4-*` grants and an Everyone `DeleteSubdirectoriesAndFiles` deny: both are expected, not conflicts. A deny that blocks the repair ends the run without a repair — `REPAIR_REFUSED`, or `GRANT_FAILED` — and the script then restores what it attempted.
 
-Each modified object leaves exactly two files in `-Out`: `acl-backup-<id>.json` (the DACL that object owned before the change) and `acl-backup-<id>.json.ps1` (the script that restores it). The run prints the matching `ROLLBACK pwsh -NoProfile -File ... -Restore ...` command.
+Each change leaves two files in `-Out`: `acl-backup-<id>.json` (the DACL the object owned before that change) and `acl-backup-<id>.json.ps1` (the script that restores it). The run prints the matching `ROLLBACK pwsh -NoProfile -File ... -Restore ...` command.
 
 ## After a repair
 

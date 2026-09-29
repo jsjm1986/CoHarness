@@ -16,10 +16,11 @@
         first, which also removes that package's access to the tree.
 
     A directory the caller cannot provision is the state the sandbox reports on the
-    workspace root, while the conflicting entry often sits deeper. For that case the
-    same run also collects explicit package allow ACEs under the requested directory,
-    so they do not need a second call. The walk is bounded, enters no reparse point or
-    managed application tree, and reports truncation when it stops early.
+    workspace root, while the conflicting entry often sits deeper; the authorized root
+    is examined for the same reason. For either case the same run also collects explicit
+    package allow ACEs under the requested directory, so they do not need a second call.
+    The walk is bounded, enters no reparse point or managed application tree, and reports
+    truncation and unreadable directories instead of claiming a complete walk.
 
     Every observation, change, verification and recovery command is printed as it
     happens, so one run shows the caller the complete set of actions.
@@ -42,7 +43,7 @@
 
 .PARAMETER Out
     Required for a repair. Receives one recovery record and one recovery script
-    per modified object.
+    per change, so an object repaired twice keeps both recovery points.
 
 .PARAMETER Restore
     Restore the DACL recovery record for exactly one -Path instead of repairing.
@@ -269,9 +270,13 @@ function Get-SubtreePackageSources {
   $sources = @()
   $visited = 0
   $enqueued = 0
+  $failed = 0
   $truncated = $false
   $queue = [System.Collections.Generic.Queue[string]]::new()
-  try { foreach ($child in [System.IO.Directory]::EnumerateDirectories($Root)) { $queue.Enqueue($child); $enqueued++ } } catch { }
+  # Unreadable directories are skipped, never guessed at: the caller reports the count.
+  try { foreach ($child in [System.IO.Directory]::EnumerateDirectories($Root)) { $queue.Enqueue($child); $enqueued++ } }
+  catch [System.UnauthorizedAccessException] { $failed++ }
+  catch [System.IO.IOException] { $failed++ }
   while ($queue.Count -gt 0) {
     if ($visited -ge $Limit) { $truncated = $true; break }
     $current = $queue.Dequeue()
@@ -285,15 +290,17 @@ function Get-SubtreePackageSources {
       foreach ($rule in $acl.GetAccessRules($true, $false, [System.Security.Principal.SecurityIdentifier])) {
         if ($rule.AccessControlType -eq 'Allow' -and $rule.IdentityReference.Value -match $PACKAGE_SID) { $sources += $current; break }
       }
-    } catch { }
+    } catch [System.UnauthorizedAccessException] { $failed++ }
+    catch [System.IO.IOException] { $failed++ }
     try {
       foreach ($child in [System.IO.Directory]::EnumerateDirectories($current)) {
         if ($enqueued -ge $Limit) { $truncated = $true; break }
         $queue.Enqueue($child); $enqueued++
       }
-    } catch { }
+    } catch [System.UnauthorizedAccessException] { $failed++ }
+    catch [System.IO.IOException] { $failed++ }
   }
-  return [ordered]@{ sources = @($sources); visited = $visited; truncated = $truncated }
+  return [ordered]@{ sources = @($sources); visited = $visited; truncated = $truncated; failed = $failed }
 }
 
 function Get-OwnDaclSddl {
@@ -574,10 +581,10 @@ try {
           $factsByPath[$scanned.Object] = $scanned
         }
       }
-      Write-Report observation subtree_scan $full read 'The caller cannot provision this directory, so explicit package allow ACEs under it were collected in the same run; no reparse point or managed application tree is entered.' @{
-        visited = $scan.visited; packageSources = @($scan.sources); truncated = [bool]$scan.truncated
+      Write-Report observation subtree_scan $full $(if ($scan.failed -gt 0) { 'partial' } else { 'read' }) 'The caller cannot provision this directory, or it is the authorized root, so explicit package allow ACEs under it were collected in the same run; no reparse point or managed application tree is entered.' @{
+        visited = $scan.visited; packageSources = @($scan.sources); truncated = [bool]$scan.truncated; unreadable = [int]$scan.failed
       }
-      Write-Line ('SCAN {0} VISITED={1} PACKAGE_SOURCES={2}{3}' -f $full, $scan.visited, @($scan.sources).Count, $(if ($scan.truncated) { ' TRUNCATED' } else { '' }))
+      Write-Line ('SCAN {0} VISITED={1} PACKAGE_SOURCES={2}{3}{4}' -f $full, $scan.visited, @($scan.sources).Count, $(if ($scan.truncated) { ' TRUNCATED' } else { '' }), $(if ($scan.failed -gt 0) { " UNREADABLE=$($scan.failed)" } else { '' }))
       if ($scan.truncated) { $script:scanTruncated = $true }
     }
 
@@ -597,10 +604,21 @@ try {
     # from provisioning the workspace grant. One approved run repairs every such
     # directory, including the authorized root itself.
     $grantTargets = @($inspectOrder | Where-Object {
-      [System.IO.Directory]::Exists($_) -and $factsByPath[$_].Readable -and
+      [System.IO.Directory]::Exists($_) -and $factsByPath[$_].Readable -and $factsByPath[$_].Errors.Count -eq 0 -and
       ((-not $factsByPath[$_].HasWriteDac) -or (-not $factsByPath[$_].HasWriteOwner)) -and
       -not (Get-RepairRefusal -FullPath $_ -Root $AllowRoot -AllowEqual)
     })
+    # Writing a DACL needs WRITE_DAC: refuse a target that lacks it before anything is
+    # changed, instead of failing mid-repair and marking a recovery for an object that
+    # the rollback then cannot restore either.
+    foreach ($object in $grantTargets) {
+      if (-not $factsByPath[$object].HasWriteDac) {
+        Write-Line ('REPAIR_REFUSED {0} needs WRITE_DAC; stop for permission-policy review' -f $object)
+        Write-Decision $mode $object refused 'Effective WRITE_DAC is absent; adding the grant requires that right.'
+        $refused++
+        break paths
+      }
+    }
     if ($grantTargets.Count -gt 0) {
       Write-Report decision grant_targets $full selected 'These directories lack effective WRITE_DAC or WRITE_OWNER; each is backed up, then receives a FullControl allow ACE for the current user.' @{ paths = @($grantTargets) }
     }
@@ -635,7 +653,8 @@ try {
     $sources = @($packageTargets | Where-Object {
       @($factsByPath[$_].Aces | Where-Object { $_.type -eq 'Allow' -and $_.sid -match $PACKAGE_SID -and -not $_.inherited }).Count -gt 0
     })
-    [array]::Reverse($sources)
+    # Ancestor first, for chain and scan-discovered sources alike.
+    $sources = @($sources | Sort-Object -Property @{ Expression = { $_.Split([char]92).Count } }, @{ Expression = { $_ } })
     foreach ($source in $sources) {
       if (-not $factsByPath[$source].HasWriteDac) {
         Write-Line ('REPAIR_REFUSED {0} needs WRITE_DAC; stop for permission-policy review' -f $source)

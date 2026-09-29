@@ -366,6 +366,52 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
     }
   }, timeout)
 
+  it('preserves a deny that shares the removed package allow SID', () => {
+    const scratch = newScratch()
+    try {
+      const target = makeDir(scratch, 'shared-sid')
+      // One SID carries both a deny and an allow: only the allow may be removed, and
+      // the own-ACE comparison must not treat the surviving deny as a collateral change.
+      icacls(target, '/deny', `*${PACKAGE_SID}:(WO)`)
+      stamp(target, PACKAGE_SID)
+
+      const run = runScript(['-Path', target, '-AllowRoot', scratch, '-Out', join(scratch, 'out')])
+      expect(run.code, run.output).toBe(0)
+      expect(run.output).toContain(`FIXED ${target} SID=${PACKAGE_SID}`)
+      expect(reports(run)).toContainEqual(containingObject({
+        kind: 'verification', operation: 'fix', path: target,
+        status: 'verified', details: containingObject({ remainingPackageAces: [], otherEntriesUnchanged: true }),
+      }))
+      const lines = aclLines(target).filter(line => line.includes(PACKAGE_SID))
+      expect(lines.filter(line => line.includes('(DENY)'))).toHaveLength(1)
+      expect(lines.filter(line => !line.includes('(DENY)'))).toEqual([])
+    } finally {
+      dispose(scratch)
+    }
+  }, timeout)
+
+  it('refuses an inherited source outside -AllowRoot before touching an in-root explicit entry', () => {
+    const scratch = newScratch()
+    try {
+      const parent = makeDir(scratch, 'outside-inherited')
+      const root = makeDir(parent, 'allowed')
+      const child = makeDir(root, 'child')
+      icacls(parent, '/grant', `*${PACKAGE_SID}:(OI)(CI)(RX)`)
+      stamp(child, OTHER_PACKAGE_SID)
+      const before = [parent, child].map(sddlOf)
+
+      const run = runScript(['-Path', child, '-AllowRoot', root, '-Out', join(scratch, 'out')])
+      expect(run.code, run.output).toBe(2)
+      expect(reports(run)).toContainEqual(containingObject({
+        kind: 'decision', status: 'refused', path: parent, reason: containingString('outside -AllowRoot'),
+      }))
+      expect(reports(run).filter(entry => entry.kind === 'action' && entry.details.effect === 'acl')).toEqual([])
+      expect([parent, child].map(sddlOf)).toEqual(before)
+    } finally {
+      dispose(scratch)
+    }
+  }, timeout)
+
   it('preserves deny ACEs, capability SIDs and the well-known package groups', () => {
     const scratch = newScratch()
     try {
