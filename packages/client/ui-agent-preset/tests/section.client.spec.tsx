@@ -333,21 +333,18 @@ describe('the preset list', () => {
 
     expect(actions.load).toHaveBeenCalledTimes(2)
   })
-  it('gates selection controls on the picker preference when it is off', () => {
+  it('keeps selection controls enabled while the picker preference is off', () => {
     renderSection({
       showPicker: false,
       rows: [...READY.rows, { id: 'cordis', trust: 'system', isDefault: false, name: '创造模式' }],
     })
 
-    // The creator entry is not gated by the picker preference.
+    // Neither the creator entry nor the default picks are gated by the
+    // preference, which only controls the new-session chip.
     expect(screen.getByRole('button', { name: en.creatorDraft })).toHaveProperty('disabled', false)
-    // The in-use row keeps a non-interactive Default label; other rows name
-    // the preference that must be turned on first.
-    expect(within(rowFor('standard')).getByTitle(en.selectionOffDefault)).toBeTruthy()
-    const mine = rowFor('mine')
-    const minePick = within(mine).getByTitle(en.enablePickerToSetDefault)
-    expect(minePick).toHaveProperty('disabled', true)
-    expect(mine.className).toContain('cardSelectionDisabled')
+    expect(within(rowFor('standard')).getByTitle(en.inUse)).toBeTruthy()
+    const minePick = within(rowFor('mine')).getByTitle(en.setDefault)
+    expect(minePick).toHaveProperty('disabled', false)
   })
 
   it('flips the picker preference through the switch', () => {

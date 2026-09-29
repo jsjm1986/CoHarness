@@ -287,9 +287,7 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
             text: presetDisplayText(row, t),
             selectionAction: row.broken !== undefined
               ? t('brokenBadge')
-              : row.isDefault
-                ? t(state.showPicker ? 'inUse' : 'selectionOffDefault')
-                : t(state.showPicker ? 'setDefault' : 'enablePickerToSetDefault'),
+              : t(row.isDefault ? 'inUse' : 'setDefault'),
           }))
         // The custom group is where a preset of one's own will appear, so it
         // stays on screen even while empty: heading plus the creator entry.
@@ -309,9 +307,6 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                         css.card,
                         row.broken !== undefined ? css.cardBroken : undefined,
                         row.isDefault ? css.cardActive : undefined,
-                        !state.showPicker && row.broken === undefined && !row.isDefault
-                          ? css.cardSelectionDisabled
-                          : undefined,
                       ].filter(Boolean).join(' ')}
                     >
                       {/* The card body IS the control: picking a preset is the
@@ -327,7 +322,7 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                         aria-pressed={row.isDefault}
                         disabled={row.isDefault
                         || (row.broken === undefined
-                          && (!state.showPicker || state.policySaving || !state.policyWritable))}
+                          && (state.policySaving || !state.policyWritable))}
                         aria-disabled={row.broken !== undefined}
                         // Without this the name is the whole card read aloud —
                         // title, badge, description, id.
@@ -347,7 +342,7 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                             {row.trust === 'user' ? t('userTrust') : t('builtIn')}
                           </span>
                           {row.isDefault
-                            ? <span className={css.inUse}>{state.showPicker ? t('inUse') : t('selectionOffDefault')}</span>
+                            ? <span className={css.inUse}>{t('inUse')}</span>
                             : null}
                         </span>
                         <CardDescription text={text.description ?? t('noDescription')} />

@@ -13,7 +13,7 @@ export type AgentPresetSettingsKey =
   | 'presetCordisName' | 'presetCordisDescription'
   | 'duplicate' | 'duplicateUnavailable' | 'delete' | 'presetId' | 'presetIdPlaceholder' | 'copyOf'
   | 'displayName' | 'displayNamePlaceholder'
-  | 'inUse' | 'selectionOffDefault' | 'noDescription' | 'builtInGroup' | 'customGroup'
+  | 'inUse' | 'noDescription' | 'builtInGroup' | 'customGroup'
   | 'brokenBadge' | 'brokenNoCopy'
   | 'composition' | 'cancel' | 'close' | 'retry'
   | 'copyTitle' | 'copyIntro' | 'create' | 'creating' | 'creatorDraft'
@@ -21,8 +21,7 @@ export type AgentPresetSettingsKey =
   | 'idRequired' | 'idInvalid' | 'idTaken'
   | 'deleteTitle' | 'deleteDescription' | 'deleteConfirm' | 'deleting'
   | 'showPicker' | 'showPickerBeta' | 'showPickerDescription'
-  | 'enablePickerToSetDefault'
-  | 'readOnly' | 'readOnlyProject' | 'readOnlyAccount' | 'readOnlyOrganization' | 'readOnlyDeployment'
+   | 'readOnly' | 'readOnlyProject' | 'readOnlyAccount' | 'readOnlyOrganization' | 'readOnlyDeployment'
 
 /** English copy. */
 export const en: Record<AgentPresetSettingsKey, string> = {
@@ -66,7 +65,6 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   displayName: 'Name',
   displayNamePlaceholder: 'Shown in the picker; defaults to the identifier',
   inUse: 'In use',
-  selectionOffDefault: 'Default',
   builtInGroup: 'Built-in',
   customGroup: 'Custom',
   noDescription: 'No description.',
@@ -101,7 +99,6 @@ export const en: Record<AgentPresetSettingsKey, string> = {
     'When enabled, new sessions can choose Standard, PTC, Creator, Minimal, and custom modes. '
     + 'When disabled, all new sessions use the default mode (Standard by default; configurable). '
     + 'Only affects new sessions.',
-  enablePickerToSetDefault: 'Turn on Agent mode selection to choose a default',
   readOnly: 'The settings document is read-only in this deployment.',
   readOnlyProject:
     'Agent mode settings are managed by the project owner or an organization administrator.',
@@ -146,7 +143,6 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   displayName: '名称',
   displayNamePlaceholder: '选择器中显示的名字，缺省用标识符',
   inUse: '当前使用',
-  selectionOffDefault: '默认',
   builtInGroup: '内置',
   customGroup: '自定义',
   noDescription: '暂无描述。',
@@ -177,7 +173,6 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   showPickerDescription:
     '开启后，新会话可选择标准、PTC、创造、极简及自定义模式；'
     + '关闭后统一使用默认模式（默认为标准模式，可自定义）。仅影响新会话。',
-  enablePickerToSetDefault: '请先开启 Agent 模式选择，再设置默认模式',
   readOnly: '当前部署的设置文档为只读。',
   readOnlyProject: 'Agent 模式设置由项目 owner 或组织管理员管理。',
   readOnlyAccount: '此 Agent 模式设置属于当前账户。',
