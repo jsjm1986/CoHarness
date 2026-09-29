@@ -55,12 +55,12 @@ Repeat the original failed operation in the original confined context. A repair 
 
 **Stop after any failed or refused repair, or any failed verification.** The script already restored that invocation's attempted changes; do not repeat it or continue to another repair. Restore earlier successful invocations in reverse order with their printed commands, then report.
 
-**When the run stops, hand the user a decision, not silence.** Say which object and which ACE or missing right still blocks the operation, what was changed and rolled back, the recovery commands in order, and the report path. Unblock the user by switching this session to full access temporarily: say that confinement is off for it and that this is a workaround, not a repair. Then ask the user to send feedback with this session so the unhandled scenario reaches us; only what reaches this conversation travels with it, so read the report and quote what matters.
+**When the run stops, hand the user a decision, not silence.** Say which object and which ACE or missing right still blocks the operation, what was changed and rolled back, the recovery commands in order, and the report path. Only the user can lift confinement: ask them to switch this session to full access temporarily, saying that confinement is off for it and that this is a workaround, not a repair. Then ask them to send feedback with this session so the unhandled scenario reaches us; only what reaches this conversation travels with it, so quote the report records that matter.
 
 ## Never
 
 - edit ACLs by hand, change an owner, erase a deny, or replace child permissions recursively;
-- run the script elevated, through UAC or `runas`; it and its recovery copies are user-writable;
+- run the script elevated, through UAC or `runas`;
 - widen `-AllowRoot` to reach an ancestor, or repeat a denied or failed call.
 
 Report in the user's language: analyzed paths, changes and why, verification, recovery commands, next step. Label an authorized unconfined run as such, not as a sandbox repair.
