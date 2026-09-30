@@ -99,7 +99,7 @@ interface RuntimeApiDependencies {
     PostgresCollaborationService,
     'access' | 'claimInteraction' | 'projectForUser' | 'readableSessionIds'
   >
-  archives?: Pick<ConversationArchiveService, 'syncRuntimeSnapshot' | 'acknowledgeCommand'>
+  archives?: Pick<ConversationArchiveService, 'syncRuntimeSnapshot' | 'acknowledgeCommand' | 'hasPendingCommands'>
   principals: GatewayPrincipalSigner
   governance: Pick<GatewayModelGovernanceService, 'resolveOrganizationCredential'>
     & Partial<Pick<GatewayModelGovernanceService, 'resolveManagedCredential'>>
@@ -709,6 +709,8 @@ export function createRuntimeApiHandler(
           send(res, 200, { registered: true })
         } else if (action === 'capture') {
           send(res, 200, await execution.capture(subject, value))
+        } else if (action === 'combine') {
+          send(res, 200, await execution.combine(subject, value))
         } else if (action === 'selection') {
           await execution.selection(subject, assertionFor(req, deps.principals, subject, true, { allowWebhookDispatch: true })!, value)
           res.writeHead(204)
@@ -954,7 +956,10 @@ export function createRuntimeApiHandler(
             && payload.visibility !== 'project' && payload.visibility !== 'private')) {
           throw new Error('invalid session creation request')
         }
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = assertionFor(req, deps.principals, subject, true, { allowWebhookDispatch: true })!
+        if (claims.purpose !== undefined && claims.purpose !== 'webhook-dispatch') {
+          throw new CollaborationDeniedError('forbidden')
+        }
         const membership = await deps.collaboration.projectForUser(subject.target.id, claims.user.id)
         if (membership === null || membership.mode !== 'rw'
           || await internalUserId(deps.context.pool, subject.organizationId, claims.user.id) === null) {
@@ -1074,6 +1079,12 @@ export function createRuntimeApiHandler(
         return true
       }
 
+      if (pathname === '/internal/runtime/archive/pending' && req.method === 'GET') {
+        if (deps.archives === undefined) { send(res, 503, { error: 'conversation-archive-unavailable' }); return true }
+        send(res, 200, { pending: await deps.archives.hasPendingCommands(subject.target) })
+        return true
+      }
+
       if (pathname === '/internal/runtime/archive/snapshot' && req.method === 'POST') {
         if (deps.archives === undefined) {
           send(res, 503, { error: 'conversation-archive-unavailable' })
@@ -1181,10 +1192,11 @@ export function createRuntimeApiHandler(
           || (payload.error !== undefined && typeof payload.error !== 'string')) {
           throw new Error('invalid archive acknowledgement')
         }
-        await deps.archives.acknowledgeCommand(payload.commandId, payload.revision, payload.error as string | undefined, {
+        const acknowledged = await deps.archives.acknowledgeCommand(payload.commandId, payload.revision, payload.error as string | undefined, {
           kind: subject.target.kind,
           id: subject.target.id,
         })
+        if (!acknowledged) { send(res, 409, { error: 'archive-command-not-acknowledged' }); return true }
         send(res, 200, { acknowledged: true })
         return true
       }
@@ -1605,12 +1617,12 @@ export function createRuntimeApiHandler(
         const granted = action === 'heartbeat' || action === 'release' || action === 'confirm-stopped' || action === 'stop'
         if (!queued && !granted) return false
         const address = queued ? 'requestId' : 'grantId'
-        const allowed = ['sessionId', 'desktop', 'ownerSessionIds', address]
+        const allowed = ['sessionId', 'desktop', 'ownerSessionIds', 'scopeId', address]
         if (payload === undefined || Object.keys(payload).some(key => !allowed.includes(key))
           || typeof payload[address] !== 'string' || payload[address].length === 0 || payload[address].length > 256) {
           throw new ExecutionIdentityError(400, 'invalid desktop coordination request')
         }
-        const identity = { sessionId: payload.sessionId, desktop: payload.desktop, ownerSessionIds: payload.ownerSessionIds }
+        const identity = { sessionId: payload.sessionId, desktop: payload.desktop, ownerSessionIds: payload.ownerSessionIds, ...(payload.scopeId === undefined ? {} : { scopeId: payload.scopeId }) }
         const holder = await execution.desktopHolder(subject, identity)
         const resource = { node: deps.context.nodeId, desktop: payload.desktop as string }
         const needsAccess = action === 'acquire' || action === 'status' || action === 'heartbeat'

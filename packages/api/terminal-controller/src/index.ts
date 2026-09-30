@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { environmentForAgent } from '@deepseek-ai/dsh-agent-presets'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
@@ -100,6 +101,7 @@ export class TerminalController extends TypertRemoteService {
   })
 
   private readonly owners = new Map<string, OwnedSession>()
+  private readonly pendingCreations = new Map<SessionId, number>()
   private readonly lifetime = new AbortController()
   private readonly access: TerminalAccess
   private readonly cleanupTasks = new Set<Promise<void>>()
@@ -111,6 +113,9 @@ export class TerminalController extends TypertRemoteService {
   constructor(ctx: Context, private readonly config: Config) {
     super(ctx, 'terminalController', { namespace: 'terminal' })
     this.access = new TerminalAccess(ctx, this.lifetime.signal)
+    ctx.on('agent/idle-release-check', ({ agent }) => this.pendingCreations.has(agent.id)
+      || [...this.owners.values()].some(owner => owner.sessionId === agent.id
+        && (owner.terminals.size > 0 || owner.pending.size > 0 || owner.allocations.size > 0)) ? 'busy' : undefined, { global: true })
     ctx.effect(() => async () => {
       this.lifetime.abort(new Error('Terminal controller disposed'))
       const results = await Promise.allSettled([...this.owners].map(([id, owner]) => this.disposeOwner(id, owner)))
@@ -188,36 +193,49 @@ export class TerminalController extends TypertRemoteService {
    */
   @Remote
   async create(agent: Agent, request: TerminalCreateRequest, signal: AbortSignal): Promise<WebTerminalInfo> {
-    this.lifetime.signal.throwIfAborted()
-    if (!/^[\w-]{1,128}$/u.test(request.id)) throw new Error('Invalid terminal identity')
-    this.dimensions(request.cols, request.rows)
-    using authority = await this.access.authorize(agent.id, signal)
-    const owner = this.owner(agent, authority)
-    owner.lifetime.signal.throwIfAborted()
-    this.requireOpen(owner, request.id)
-    const existing = owner.terminals.get(request.id)
-    if (existing !== undefined) return existing.info
-    const pending = owner.pending.get(request.id)
-    if (pending !== undefined) {
-      const terminal = await pending
-      this.requireOpen(owner, request.id)
-      return terminal.info
-    }
-    if (new Set([...owner.terminals.keys(), ...owner.pending.keys(), ...owner.allocations.keys()]).size >= this.config.maxTerminals) throw new RemoteError('terminal/limit-reached', 'Session terminal limit reached', { limit: this.config.maxTerminals })
-    const allocation = this.spawn(agent, owner, request, AbortSignal.any([signal, this.lifetime.signal, owner.lifetime.signal]))
-    owner.pending.set(request.id, allocation)
+    this.assertSessionAdmitted(agent.id)
+    this.pendingCreations.set(agent.id, (this.pendingCreations.get(agent.id) ?? 0) + 1)
     try {
-      const terminal = await allocation
-      owner.terminals.set(request.id, terminal)
-      owner.allocations.delete(request.id)
-      terminal.monitor(this.config, () => { owner.closedIds.add(request.id) }, () => {
-        owner.terminals.delete(request.id)
-      }, (error) => { this.ctx.logger.error('Browser terminal cleanup failed', error) })
+      this.lifetime.signal.throwIfAborted()
+      if (!/^[\w-]{1,128}$/u.test(request.id)) throw new Error('Invalid terminal identity')
+      this.dimensions(request.cols, request.rows)
+      using authority = await this.access.authorize(agent.id, signal)
+      this.assertSessionAdmitted(agent.id)
+      const owner = this.owner(agent, authority)
+      owner.lifetime.signal.throwIfAborted()
       this.requireOpen(owner, request.id)
-      return terminal.info
+      const existing = owner.terminals.get(request.id)
+      if (existing !== undefined) return existing.info
+      const pending = owner.pending.get(request.id)
+      if (pending !== undefined) {
+        const terminal = await pending
+        this.requireOpen(owner, request.id)
+        return terminal.info
+      }
+      if (new Set([...owner.terminals.keys(), ...owner.pending.keys(), ...owner.allocations.keys()]).size >= this.config.maxTerminals) throw new RemoteError('terminal/limit-reached', 'Session terminal limit reached', { limit: this.config.maxTerminals })
+      const allocation = this.spawn(agent, owner, request, AbortSignal.any([signal, this.lifetime.signal, owner.lifetime.signal]))
+      owner.pending.set(request.id, allocation)
+      try {
+        const terminal = await allocation
+        owner.terminals.set(request.id, terminal)
+        owner.allocations.delete(request.id)
+        terminal.monitor(this.config, () => { owner.closedIds.add(request.id) }, () => {
+          owner.terminals.delete(request.id)
+        }, (error) => { this.ctx.logger.error('Browser terminal cleanup failed', error) })
+        this.requireOpen(owner, request.id)
+        return terminal.info
+      } finally {
+        owner.pending.delete(request.id)
+      }
     } finally {
-      owner.pending.delete(request.id)
+      const count = this.pendingCreations.get(agent.id) as number
+      if (count === 1) this.pendingCreations.delete(agent.id)
+      else this.pendingCreations.set(agent.id, count - 1)
     }
+  }
+
+  private assertSessionAdmitted(id: SessionId): void {
+    if (this.ctx.get('agents')?.isRemoving(id) === true) throw new Error('Session is being removed; no terminal can be created')
   }
 
   /**
@@ -436,8 +454,10 @@ export class TerminalController extends TypertRemoteService {
   }
 
   private execution(agent: Agent): { subprocess: Context['subprocess']; sandboxPolicy: Context['sandboxPolicy'] } {
-    // The Agent context selects execution providers but does not inject consumer services.
-    const subprocess = agent.ctx.get('subprocess')
+    // SSH providers belong to the standing realm, outside the Agent's Cordis ancestry.
+    const subprocess = agent.session.header.sshTarget === undefined
+      ? agent.ctx.get('subprocess')
+      : environmentForAgent(this.ctx, agent, 'subprocess')
     const sandboxPolicy = agent.ctx.get('sandboxPolicy')
     if (subprocess === undefined || sandboxPolicy === undefined) throw new Error('The Session execution environment requires subprocess and sandbox policy providers')
     return { subprocess, sandboxPolicy }

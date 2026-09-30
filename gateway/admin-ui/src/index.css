@@ -346,7 +346,9 @@ a {
 .sectionTitleLine {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   min-width: 0;
+  max-width: 100%;
   gap: 10px;
 }
 
@@ -369,7 +371,7 @@ a {
 .sectionMeta {
   color: var(--text-tertiary);
   font-size: 12px;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .pageActions,
@@ -708,6 +710,36 @@ a {
 
 .formGridThree {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.nodeConfigurationGroup {
+  margin-block: 16px;
+  padding-block: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.nodeConfigurationGroup > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.nodeConfigurationFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+  min-inline-size: 0;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.nodeConfigurationFields .field {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nodeConfigurationFields p {
+  margin: 0;
 }
 
 .formSpanFull {
@@ -2871,8 +2903,7 @@ a {
     left: 0;
     z-index: 10;
     display: grid;
-    /* Six destinations are first-class on mobile. Keeping one compact row is
-       clearer than letting the last item wrap into the fixed footer height. */
+    /* Five primary destinations and the overflow menu fit the reserved footer height. */
     grid-template-columns: repeat(6, minmax(0, 1fr));
     min-height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
     padding: 6px max(8px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px)
@@ -2882,7 +2913,8 @@ a {
     backdrop-filter: blur(18px);
   }
 
-  .mobileNav a {
+  .mobileNav a,
+  .mobileNav > button {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2897,9 +2929,12 @@ a {
     line-height: 16px;
     font-weight: 600;
     text-decoration: none;
+    border: 0;
+    background: transparent;
   }
 
-  .mobileNav a.active {
+  .mobileNav a.active,
+  .mobileNav > button.active {
     background: var(--accent-soft);
     color: var(--accent);
   }
@@ -3378,3 +3413,34 @@ a {
   gap: 10px;
   align-items: center;
 }
+
+.mobileMoreNav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mobileMoreNav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.mobileMoreNav a.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.mobileMoreNav svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.archiveSyncState { display: block; margin-top: 0.25rem; font-size: 0.75rem; }

@@ -21,6 +21,8 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
     alias: [
+      { find: /^@deepseek-ai\/dsh-atomic-write$/, replacement: pkg('packages/util/atomic-write') },
+      { find: /^@deepseek-ai\/dsh-managed-data$/, replacement: pkg('packages/util/managed-data') },
       { find: '@deepseek-ai/dsh-session-format-catalog', replacement: pkg('packages/session/session-format-catalog') },
       { find: '@deepseek-ai/dsh-session-format/surface', replacement: pkg('packages/session/session-format', 'surface.js') },
       { find: /^@deepseek-ai\/dsh-session-format$/, replacement: pkg('packages/session/session-format') },

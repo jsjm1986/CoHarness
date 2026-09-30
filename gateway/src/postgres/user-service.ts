@@ -1,8 +1,8 @@
-import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { UserRow } from '../auth.ts'
 import type { GatewayConfig } from '../config.ts'
 import { hashPassword } from '../password.ts'
+import { prepareUserData } from '../user-data.ts'
 import { transaction } from './database.ts'
 import { allocateInstancePorts } from './port-allocation.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
@@ -76,9 +76,6 @@ export class PostgresUserService {
   }): Promise<UserRow> {
     if (!USERNAME_RE.test(input.username)) throw new Error(`invalid username: ${input.username}`)
     const homePath = join(this.cfg.usersRoot, input.username, 'home')
-    mkdirSync(homePath, { recursive: true })
-    mkdirSync(join(homePath, 'documents'), { recursive: true })
-    mkdirSync(join(this.cfg.usersRoot, input.username, 'dsh'), { recursive: true })
     const passwordHash = await hashPassword(input.password)
     let publicId: number
     try {
@@ -104,6 +101,7 @@ export class PostgresUserService {
         await client.query(`INSERT INTO harness.instances(
           organization_id,user_id,assigned_node_id,port
         ) VALUES($1,$2,$3,$4)`, [this.context.organizationId, row.id, this.context.nodeId, port])
+        prepareUserData(this.cfg, input.username)
         return publicNumber(row.public_id, 'user')
       })
     } catch (error) {

@@ -104,6 +104,12 @@ A provider whose runtime lives outside the harness (Claude Agent SDK, Codex app-
 
 `@deepseek-ai/dsh-subagent/external` holds the shared member machinery: an append-only JSONL binding store (child session ↔ external session plus the pending prompt and consumed cursor), the trailing-user prompt window, and the recovery rule — a settled external answer replays without resending, a provably absent prompt resends once, and an unprovable outcome drops with `EXTERNAL_TURN_OUTCOME_UNKNOWN` rather than risking a duplicate delivery.
 
+`resolveChildExecution` selects workspace and target from the actual Agent’s Session; `externalMemberAgent` refuses model requests without an active owner. External bindings record canonical cwd and target before first launch and reject changes on resume. Corrupt storage or read failure blocks execution instead of becoming an empty store. Legacy bindings without target evidence remain intact but cannot resume automatically.
+
+Idle Session release waits for pending delegation and retained one-shot runs, including their resource disposal after results settle. Continuable materialization and resident children also veto release. Removal reservations reject new delegation, while ordinary stop and cancellation retain their existing behavior.
+
+When a provider acknowledges a turn identity, the shared driver persists it in the pending record before accepting completion. Older records without that identity do not gain inferred proof from matching prompt text.
+
 ### Settlement delivery
 
 When a resident Activation settles, the manager tells the child's durable direct parent, in the parent's own turn stream, that the child produced everything it is going to. Delivery is unconditional for every child whose id a caller actually received: it does not consider whether the child ever sent a message back, because the endings that most need an account — a token ceiling, a model failure, cancellation, teardown — are exactly the ones where the child never got to choose. A materialization rolled back before its first accepted message stays silent, since that caller was told the child was not established. The message carries the epoch's stop reason, its final assistant content when it produced any, and durable source `{ kind: 'subagent-settled', form: 'notice', senderSessionId: <child-id> }` — a different source kind from a child-authored `subagent-report`, so a transcript never credits the child with words the runtime wrote.
@@ -175,6 +181,7 @@ Prefix-stable within a child: the statement never changes during the child's lif
 
 ## Known Limitations and Deferred Work
 
+- Managed launches with `DSH_MANAGED_DATA_MANIFEST` register the shared external-member binding file before data writes. An invalid inventory refuses initialization; [inventory and backup rules](../../util/managed-data/README.md) govern retained roots and deployment approval.
 - **ACP children remain one-shot and are not trace-enumerable** — an ACP run has no local child session in the parent's session corpus. An ACP `prepareContinuable` requires persisting the remote session id in provider-specific descriptor data and a per-child continuation advertisement, since ACP `loadSession` support is negotiated per child rather than established by the method's presence. Remote providers also require a separate Activation ownership contract with equivalent authenticated control and child-first quiescence before they support continuable children.
 - **Adjacent model messaging only** — `sendMessage()` requires an exact live sender; every sender may target a direct continuable child, while only a sender with a resident continuable Activation may target its direct parent. Siblings and deeper descendants are not message targets. Browser and Team prompts use the separate internal Queue adapter, and only `interrupt()` accepts a durable parent-address user authority, because stopping a turn is idempotent and delivers no content.
 - **A direct parent must remain live for child-to-parent delivery** — the service has no durable parent mailbox; a missing parent rejects the message instead of accepting work it cannot wake.

@@ -15,7 +15,7 @@ const archiveRow = {
   project_public_id: null, project_name: null, runtime_kind: 'user', runtime_public_id: '2',
   workspace_path: '/tmp/workspace', workspace_title: 'Workspace', workspace_position: 0,
   state: 'archived', archived_at_ms: '1000', restored_at_ms: null, trashed_at_ms: null, purge_after_ms: null,
-  sync_state: 'synced', child_count: '1', message_count: '4', updated_at_ms: '2000',
+  sync_state: 'synced', last_sync_error: null, child_count: '1', message_count: '4', updated_at_ms: '2000',
 }
 
 const temporaryRoots: string[] = []
@@ -25,6 +25,16 @@ afterEach(async () => {
 })
 
 describe('ConversationArchiveService', () => {
+  it('checks indexed pending commands under the organization and exact runtime identity', async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }).mockResolvedValueOnce({ rows: [] })
+    const service = new ConversationArchiveService({ ...context, pool: { query } as unknown as Pool })
+    expect(await service.hasPendingCommands({ kind: 'user', id: 2 })).toBe(true)
+    expect(await service.hasPendingCommands({ kind: 'project', id: 3 })).toBe(false)
+    expect(query.mock.calls[0]?.[1]).toEqual(['org-1', 'user', 2])
+    expect(query.mock.calls[1]?.[1]).toEqual(['org-1', 'project', 3])
+    expect(query.mock.calls[0]?.[0]).toContain("c.status='pending' LIMIT 1")
+  })
+
   it('projects bounded administrator list rows', async () => {
     const query = vi.fn(async () => ({ rows: [archiveRow], rowCount: 1 }))
     const service = new ConversationArchiveService({ ...context, pool: { query } as unknown as Pool })
@@ -273,7 +283,15 @@ describe('ConversationArchiveService', () => {
     await mkdir(directory)
     const client = {
       query: vi.fn(async (text: string) => {
-        if (text.includes('SELECT state,sync_revision')) return { rows: [{ state: 'archived', sync_revision: '0' }], rowCount: 1 }
+        if (text.includes('SELECT state,sync_revision')) return { rows: [{ state: 'archived', sync_revision: '0', sync_state: 'synced' }], rowCount: 1 }
+        if (text.includes('FOR UPDATE OF a')) return { rows: [{ root_session_id: 'session-1' }], rowCount: 1 }
+        if (text.includes('root_session_id,desired_revision::text,status,action')) {
+          return { rows: [{ root_session_id: 'session-1', desired_revision: '1', status: 'pending', action: 'purge' }], rowCount: 1 }
+        }
+        if (text.includes('SELECT id::text,root_session_id,local_path,attempts')) return {
+          rows: [{ id: 'file-cleanup', root_session_id: 'session-1', local_path: file, attempts: 1 },
+            { id: 'directory-cleanup', root_session_id: 'session-1', local_path: directory, attempts: 1 }], rowCount: 2,
+        }
         if (text.includes('SELECT DISTINCT f.local_path')) return { rows: [{ local_path: file }, { local_path: directory }], rowCount: 2 }
         return { rows: [], rowCount: 0 }
       }),
@@ -282,6 +300,9 @@ describe('ConversationArchiveService', () => {
     const pool = { connect: vi.fn(async () => client), query: client.query } as unknown as Pool
     const service = new ConversationArchiveService({ ...context, pool })
     await expect(service.purge('session-1')).resolves.toBe(true)
+    await expect(stat(file)).resolves.toBeDefined()
+    await expect(service.acknowledgeCommand('command', 1)).resolves.toBe(true)
+    await expect(service.cleanupDue()).resolves.toBe(1)
     await expect(stat(file)).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(stat(directory)).resolves.toBeDefined()
   })

@@ -4,6 +4,8 @@
 
 后台任务注册表约定（`ctx.jobs`）。抽象的 `JobRegistry` 及其词汇类型在同一份约定下为长时间运行的生产方提供共享 id、owner 隔离、读取、取消、等待、通知和清理；进程局部注册表位于 [`dsh-jobs-local`](../jobs-local/README.zh.md)。生产方插件使用其不透明 id namespace 扩展 `JobKindMap`。
 
+运行中或停止中的作业通过 `agent/idle-release-check` 阻止确切所属 Agent 的空闲释放。已完成作业不阻止清理；资源收敛仍由生产者负责。
+
 ## 概述
 
 `dsh-jobs` 让工具可以在 agent（智能体）继续推进时保持长时间工作运行。每项任务都会获得稳定的 `<kind>-N` id，拥有它的 agent 可以读取输出、带超时等待或请求取消。归属范围限定在 agent 会话内，因此其他 agent 无法查看或停止任务；任务完成时会通过会话内通知送达，无需轮询。只有部署提供任务执行能力时，后台任务才能启动。
@@ -28,6 +30,8 @@
 实现还必须兑现约定的生命周期语义：注册的存续期长于生产方 fiber 与控制器 fiber，owner 释放和服务释放会取消仍在运行的工作并等待守约的生产方，结算遵循首次结果优先（一条终止记录、一轮异常受到隔离的监听器通知，然后释放等待方）。
 
 参见[任务类型目录](../../../docs/subsystems/jobs.zh.md)、[运行时 Agent Note](../../../.agents/notes/implemented/architecture/2026-06-20-generic-long-running-tool-runtime.zh.md)和 [seam Agent Note](../../../.agents/notes/implemented/architecture/2026-07-26-job-registry-seam.zh.md)。
+
+受管任务快照包含创建任务时捕获的不可变执行范围。完成消费者保留该来源，面向模型的任务摘要省略授权元数据。
 
 ## 模型体验
 

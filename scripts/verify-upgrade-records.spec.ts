@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { checkInventoryCoverage, checkManifest, checkMatrix } from './verify-upgrade-records.ts'
+import { checkInventoryCoverage, checkManifest, checkMatrix, checkCurrentPackageDispositions } from './verify-upgrade-records.ts'
 
 const SHA = 'a'.repeat(40)
 
@@ -179,7 +179,7 @@ it('the record CLI verifies identities and the exact raw cumulative and incremen
     write(matrixPath, currentMatrix)
     write(manifestPath, currentManifest)
     write('upgrades/plans/UPGRADE-PLAN-fixture.md', '# Fixture plan\n')
-    write('scripts/upstream-sync.json', { syncedTag: 'fixture', syncedCommit: commit, gateReplayRecord: matrixPath })
+    write('scripts/upstream-sync.json', { syncedTag: 'fixture', syncedCommit: commit, gateReplayRecord: matrixPath, packages: { 'core/fixture': { sovereignty: 'tracked' } } })
     write('scripts/verify-upgrade-records.ts', readFileSync(new URL('./verify-upgrade-records.ts', import.meta.url), 'utf8'))
     const run = () => {
       const result = spawnSync(process.execPath, ['--import', pathToFileURL(createRequire(import.meta.url).resolve('tsx/esm')).href, join(root, 'scripts/verify-upgrade-records.ts')], {
@@ -195,6 +195,17 @@ it('the record CLI verifies identities and the exact raw cumulative and incremen
     const duplicateArea = run()
     expect(duplicateArea.status, duplicateArea.output).toBe(1)
     expect(duplicateArea.output).toContain('duplicate area "session-format"')
+    write(matrixPath, currentMatrix)
+    const carriedRow = { ...row, area: 'packages/core/fixture', localSovereignty: 'tracked' }
+    write(matrixPath, { ...currentMatrix, rows: [carriedRow] })
+    const carried = run()
+    expect(carried.status, carried.output).toBe(0)
+    for (const patch of [{ localSovereignty: 'upstreamOnly' }, { targetAssessment: 'not-carried' }, { upstreamOnly: { reason: 'obsolete exclusion' } }]) {
+      write(matrixPath, { ...currentMatrix, rows: [{ ...carriedRow, ...patch }] })
+      const rejected = run()
+      expect(rejected.status, rejected.output).toBe(1)
+      expect(rejected.output).toContain('packages/core/fixture')
+    }
     write(matrixPath, currentMatrix)
     const decisions = currentManifest.decisions as Record<string, unknown>[]
     write(manifestPath, { ...currentManifest, decisions: [...decisions, ...decisions] })
@@ -272,5 +283,19 @@ describe('checkInventoryCoverage', () => {
   it('does not require coverage for upstreamOnly or none commits', () => {
     const only = { commits: inv.commits.filter(c => c.bucket === 'upstreamOnly') }
     expect(() => { checkInventoryCoverage('i.json', only, matrix()) }).not.toThrow()
+  })
+})
+
+describe('active package dispositions', () => {
+  const packages = { 'core/example': { sovereignty: 'adapted' } }
+  it('accepts a carried adaptation without claiming release or external acceptance', () => {
+    expect(() =>{  checkCurrentPackageDispositions('active.json', { rows: [
+      { area: 'packages/core/example', localSovereignty: 'adapted', reviewState: 'pending-cumulative-source-review' },
+    ] }, packages) }).not.toThrow()
+  })
+  it('rejects a stale absence claim for carried source', () => {
+    expect(() =>{  checkCurrentPackageDispositions('active.json', { rows: [
+      { area: 'packages/core/example', localSovereignty: 'adapted', targetAssessment: 'not-carried' },
+    ] }, packages) }).toThrow('is carried')
   })
 })

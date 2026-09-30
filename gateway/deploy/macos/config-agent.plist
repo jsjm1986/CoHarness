@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.maycran.harness-gateway-config</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/ACCOUNT/.local/libexec/harness-gateway/release-control.sh</string>
+    <string>config</string>
+    <string>watch</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/ACCOUNT/harness-gateway-releases</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/ACCOUNT</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>Umask</key>
+  <integer>63</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/ACCOUNT/.config/harness-gateway/config-worker.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ACCOUNT/.config/harness-gateway/config-worker.error.log</string>
+</dict>
+</plist>

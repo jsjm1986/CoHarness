@@ -24,6 +24,7 @@ interface EndpointDraft {
   workspacePath: string
   agentPreset: string
   permissionPreset: string
+  projectVisibility: 'project' | 'private'
   modelProvider: string
   modelId: string
   modelMaxTokens: string
@@ -40,7 +41,7 @@ interface EndpointDraft {
 const EMPTY_DRAFT: EndpointDraft = {
   name: '', source: 'github', events: '', actions: '', repositories: '',
   titleTemplate: '{{event.name}} · {{payload.repository.full_name}}', promptTemplate: '',
-  workspacePath: '', agentPreset: '', permissionPreset: '',
+  workspacePath: '', agentPreset: '', permissionPreset: '', projectVisibility: 'project',
   modelProvider: '', modelId: '', modelMaxTokens: '',
   executionUserId: '', runtimeKind: 'user', runtimePublicId: '',
   intakeLimit: '100', intakeWindowMs: '60000', replayWindowMs: '86400000', maxBodyBytes: '1048576',
@@ -64,7 +65,7 @@ function draftOf(endpoint: AdminWebhookEndpoint): EndpointDraft {
     repositories: endpoint.repositories.join(','),
     titleTemplate: endpoint.titleTemplate, promptTemplate: endpoint.promptTemplate,
     workspacePath: endpoint.workspacePath, agentPreset: endpoint.agentPreset,
-    permissionPreset: endpoint.permissionPreset,
+    permissionPreset: endpoint.permissionPreset, projectVisibility: endpoint.projectVisibility,
     modelProvider: endpoint.modelProvider ?? '', modelId: endpoint.modelId ?? '',
     modelMaxTokens: endpoint.modelMaxTokens === null ? '' : String(endpoint.modelMaxTokens),
     executionUserId: String(endpoint.executionUserId),
@@ -88,7 +89,7 @@ function fieldsOf(draft: EndpointDraft): AdminWebhookEndpointFields {
     events: names(draft.events), actions: names(draft.actions), repositories: names(draft.repositories),
     titleTemplate: draft.titleTemplate.trim(), promptTemplate: draft.promptTemplate,
     workspacePath: draft.workspacePath.trim(), agentPreset: draft.agentPreset.trim(),
-    permissionPreset: draft.permissionPreset.trim(),
+    permissionPreset: draft.permissionPreset.trim(), projectVisibility: draft.projectVisibility,
     modelProvider, modelId, modelMaxTokens: optionalLimit(draft.modelMaxTokens, '模型令牌上限'),
     executionUserId, runtimeKind: draft.runtimeKind, runtimePublicId,
     intakeLimit: limit(draft.intakeLimit, '接收限值'),
@@ -232,34 +233,36 @@ export function WebhooksPage() {
         title="接入端点"
         actions={<>
           <IconButton label="刷新" icon={RefreshCw} onClick={refresh} />
-          <Button icon={Plus} onClick={() => { setEditing({ endpoint: null, draft: EMPTY_DRAFT }) }}>注册端点</Button>
+          <Button icon={Plus} onClick={() => { setError(''); setEditing({ endpoint: null, draft: EMPTY_DRAFT }) }}>注册端点</Button>
         </>}
       >
         {endpoints === null ? <LoadingState label="正在加载 Webhook 端点" /> : endpoints.length === 0 ? (
           <EmptyState title="尚无 Webhook 端点" detail="注册端点后，Provider 投递经签名验证、结构化筛选和持久去重，再派发到绑定的运行时创建会话。" />
         ) : (
-          <table className="dataTable">
-            <thead><tr><th>名称</th><th>来源</th><th>事件筛选</th><th>仓库筛选</th><th>执行账号</th><th>目标运行时</th><th>状态</th><th>操作</th></tr></thead>
-            <tbody>
-              {endpoints.map(endpoint => (
-                <tr key={endpoint.publicId}>
-                  <td>{endpoint.name}</td>
-                  <td><code>{endpoint.provider}/{endpoint.source}</code></td>
-                  <td>{endpoint.events.length === 0 ? '全部' : endpoint.events.join('、')}{endpoint.actions.length === 0 ? '' : `（${endpoint.actions.join('、')}）`}</td>
-                  <td>{endpoint.repositories.length === 0 ? '全部' : endpoint.repositories.join('、')}</td>
-                  <td>{users.find(user => user.id === endpoint.executionUserId)?.username ?? `#${String(endpoint.executionUserId)}`}</td>
-                  <td>{endpoint.runtimeKind === 'user' ? '个人' : '项目'} · {runtimeOwner(endpoint)}</td>
-                  <td><StatusBadge tone={endpoint.enabled ? 'success' : 'neutral'}>{endpoint.enabled ? '已启用' : '已停用'}</StatusBadge></td>
-                  <td>
-                    <IconButton label="投递记录" icon={Inbox} onClick={() => void openDeliveries(endpoint)} />
-                    <IconButton label="编辑" icon={Pencil} onClick={() => { setEditing({ endpoint, draft: draftOf(endpoint) }) }} />
-                    <Button variant="ghost" onClick={() => void toggle(endpoint)} disabled={acting}>{endpoint.enabled ? '停用' : '启用'}</Button>
-                    <IconButton label="删除" icon={Trash2} onClick={() => { setRemoving(endpoint) }} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="tableWrap" role="region" aria-label="Webhook 接入端点，可横向滚动" tabIndex={0}>
+            <table className="dataTable">
+              <thead><tr><th>名称</th><th>来源</th><th>事件筛选</th><th>仓库筛选</th><th>执行账号</th><th>目标运行时</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                {endpoints.map(endpoint => (
+                  <tr key={endpoint.publicId}>
+                    <td>{endpoint.name}</td>
+                    <td><code>{endpoint.provider}/{endpoint.source}</code></td>
+                    <td>{endpoint.events.length === 0 ? '全部' : endpoint.events.join('、')}{endpoint.actions.length === 0 ? '' : `（${endpoint.actions.join('、')}）`}</td>
+                    <td>{endpoint.repositories.length === 0 ? '全部' : endpoint.repositories.join('、')}</td>
+                    <td>{users.find(user => user.id === endpoint.executionUserId)?.username ?? `#${String(endpoint.executionUserId)}`}</td>
+                    <td>{endpoint.runtimeKind === 'user' ? '个人' : '项目'} · {runtimeOwner(endpoint)}</td>
+                    <td><StatusBadge tone={endpoint.enabled ? 'success' : 'neutral'}>{endpoint.enabled ? '已启用' : '已停用'}</StatusBadge></td>
+                    <td>
+                      <IconButton label="投递记录" icon={Inbox} onClick={() => void openDeliveries(endpoint)} />
+                      <IconButton label="编辑" icon={Pencil} onClick={() => { setError(''); setEditing({ endpoint, draft: draftOf(endpoint) }) }} />
+                      <Button variant="ghost" onClick={() => void toggle(endpoint)} disabled={acting}>{endpoint.enabled ? '停用' : '启用'}</Button>
+                      <IconButton label="删除" icon={Trash2} onClick={() => { setRemoving(endpoint) }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Section>
       <Dialog
@@ -275,6 +278,7 @@ export function WebhooksPage() {
       >
         {editing === null ? null : (
           <div className="formGrid">
+            <div className="formSpanFull"><ErrorBanner message={error} /></div>
             <Field label="名称" hint="组织内唯一的管理显示名。"><input className="input" value={editing.draft.name} onChange={event => { patchDraft({ name: event.target.value }) }} /></Field>
             <Field label="来源标识" hint="写入会话来源的部署标识，如 github 组织名。"><input className="input" value={editing.draft.source} onChange={event => { patchDraft({ source: event.target.value }) }} /></Field>
             <Field label="签名密钥" hint={editing.endpoint === null ? 'Provider 端配置的 Webhook Secret。' : '留空保留现有密钥；填写即轮换。'}><input className="input" type="password" value={editing.draft.secret} onChange={event => { patchDraft({ secret: event.target.value }) }} /></Field>
@@ -301,12 +305,20 @@ export function WebhooksPage() {
                 <option value="project">项目运行时</option>
               </select>
             </Field>
-            <Field label="目标运行时" hint="已运行的实例才会接收派发。">
+            <Field label="目标运行时" hint="空闲回收的实例可自动唤醒；手动停止、停用或维护时不派发。">
               <select className="input" value={editing.draft.runtimePublicId} onChange={event => { patchDraft({ runtimePublicId: event.target.value }) }}>
                 <option value="">选择目标</option>
                 {(editing.draft.runtimeKind === 'user' ? users : projects).map(owner => <option key={owner.id} value={String(owner.id)}>{'username' in owner ? owner.username : owner.name}</option>)}
               </select>
             </Field>
+            {editing.draft.runtimeKind === 'project' && (
+              <Field label="新会话可见性" hint="私有会话仅执行账号及管理员可见；项目成员仍受原有读写权限限制。">
+                <select className="input" value={editing.draft.projectVisibility} onChange={event => { patchDraft({ projectVisibility: event.target.value === 'private' ? 'private' : 'project' }) }}>
+                  <option value="project">项目可见</option>
+                  <option value="private">执行账号私有</option>
+                </select>
+              </Field>
+            )}
             <Field label="接收限值" hint="每个窗口内接受的新投递数。"><input className="input" inputMode="numeric" value={editing.draft.intakeLimit} onChange={event => { patchDraft({ intakeLimit: event.target.value }) }} /></Field>
             <Field label="接收窗口（毫秒）"><input className="input" inputMode="numeric" value={editing.draft.intakeWindowMs} onChange={event => { patchDraft({ intakeWindowMs: event.target.value }) }} /></Field>
             <Field label="重放窗口（毫秒）" hint="正文相同的换号投递在该窗口内归并到原始回执。"><input className="input" inputMode="numeric" value={editing.draft.replayWindowMs} onChange={event => { patchDraft({ replayWindowMs: event.target.value }) }} /></Field>
@@ -325,25 +337,27 @@ export function WebhooksPage() {
           <EmptyState title="尚无投递" />
         ) : (
           <>
-            <table className="dataTable">
-              <thead><tr><th>投递标识</th><th>配置代次</th><th>状态</th><th>会话</th><th>接收时间</th><th>操作</th></tr></thead>
-              <tbody>
-                {deliveries.items.map(receipt => (
-                  <tr key={receipt.id}>
-                    <td><code>{receipt.deliveryId}</code></td>
-                    <td>{receipt.configurationRevision}</td>
-                    <td><StatusBadge tone={RECEIPT_TONE[receipt.state]}>{RECEIPT_LABEL[receipt.state]}{receipt.errorCode === null ? '' : `（${receipt.errorCode}）`}</StatusBadge></td>
-                    <td>{receipt.sessionId === null ? '—' : <code>{receipt.sessionId}</code>}</td>
-                    <td>{new Date(receipt.receivedAt).toLocaleString()}</td>
-                    <td>
-                      {receipt.state === 'submitted' || receipt.state === 'ignored' || receipt.state === 'rejected'
-                        ? <Button variant="ghost" onClick={() => void redispatch(receipt)} disabled={acting}>重跑</Button>
-                        : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="tableWrap" role="region" aria-label="Webhook 投递记录，可横向滚动" tabIndex={0}>
+              <table className="dataTable">
+                <thead><tr><th>投递标识</th><th>配置代次</th><th>状态</th><th>会话</th><th>接收时间</th><th>操作</th></tr></thead>
+                <tbody>
+                  {deliveries.items.map(receipt => (
+                    <tr key={receipt.id}>
+                      <td><code>{receipt.deliveryId}</code></td>
+                      <td>{receipt.configurationRevision}</td>
+                      <td><StatusBadge tone={RECEIPT_TONE[receipt.state]}>{RECEIPT_LABEL[receipt.state]}{receipt.errorCode === null ? '' : `（${receipt.errorCode}）`}</StatusBadge></td>
+                      <td>{receipt.sessionId === null ? '—' : <code>{receipt.sessionId}</code>}</td>
+                      <td>{new Date(receipt.receivedAt).toLocaleString()}</td>
+                      <td>
+                        {receipt.state === 'submitted' || receipt.state === 'ignored' || receipt.state === 'rejected'
+                          ? <Button variant="ghost" onClick={() => void redispatch(receipt)} disabled={acting}>重跑</Button>
+                          : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {deliveries.nextCursor === null ? null : <Button onClick={() => void moreDeliveries()} disabled={acting}>加载更多</Button>}
           </>
         )}

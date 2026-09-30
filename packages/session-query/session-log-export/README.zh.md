@@ -17,6 +17,8 @@ Web Session 日志下载控制，使用 `dsh-host-apiproxy` 拥有的 Host 流�
 
 该命令只由 Web bundle 挂载。只有 `/export` 返回成功时，本地 `command/executed` 确认才会在提交命令的浏览器中触发斜杠下载；其他标签页仍会渲染持久命令行，但不会重复执行浏览器副作用。Header 按钮直接调用同一个控制器。两种入口都会先发出 `HEAD` 预检，再把 GET URL 交给浏览器下载管理器，JavaScript 不会缓冲 ZIP；它们共用并发折叠、插件释放时取消预检、准备阶段错误处理、浏览器保存行为和同一个 Modal。
 
+控制器将窗格带 runtime 限定的 Session 键解码为原始 Host ID 和显式 runtime 目标。`HEAD` 预检与浏览器保存使用同一个固定账号的 URL，其他标签页切换账号或作用域不能重定向待执行的下载。
+
 Host 下载端点会在 `readRaw` 前 flush 活动的根 Session，因此斜杠命令触发的 ZIP 会包含启动下载的 `command/run` 与 `command/done` 事件对。冷持久化 Session 不需要 flush。
 
 弹窗报告准备中、开始下载或失败。关闭弹窗不会取消正在进行的下载；该操作随后完成时也不会重新打开弹窗。每个 Session 同时只允许一项下载，重复操作会共用该任务。

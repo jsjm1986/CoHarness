@@ -257,6 +257,40 @@ describe('Client Typert API', () => {
     expect(fallback).not.toHaveBeenCalled()
   })
 
+  it('routes an explicitly declared JSON request through its owning Session transport without rewriting its content', async () => {
+    const call = vi.fn<ConnectionHandle['rpc']['call']>().mockResolvedValue({ ok: true, value: { ref: 'recorded' } })
+    const fallback = vi.fn<ConnectionHandle['rpc']['call']>()
+    const forSession = vi.fn(() => ({ rpc: { call } } as unknown as ConnectionHandle))
+    const sessionForRemote = vi.fn((endpoint: string, args: Readonly<Record<string, unknown>>) => {
+      expect(endpoint).toBe('probe/create')
+      expect(args).toEqual({ request: { sessionId: 'project-session', content: { sessionId: 'user-supplied-text' } } })
+      return 'project-session' as SessionId
+    })
+    const ctx = new Context()
+    await ctx.plugin(TypertRegistry)
+    ctx.provide('connection', { rpc: { call: fallback }, forSession, sessionForRemote } as unknown as ConnectionHandle)
+    await ctx.plugin({ inject, apply })
+    try {
+      await ctx.remote.$mount({ package: '@fixture/json-route', descriptors: [{
+        id: '@fixture/json-route#probe/create', service: 'probe', namespace: 'probe', method: 'create',
+        invocation: { kind: 'direct' },
+        parameters: [{ name: 'request', wire: 'request', source: 'json', codec: {
+          mode: 'strict', typeSymbol: 'SessionRequest',
+          create: () => z.object({ sessionId: z.string(), content: z.object({ sessionId: z.string() }) }),
+        } }],
+        result: { mode: 'strict', typeSymbol: 'Recorded', create: () => z.object({ ref: z.string() }) },
+      }] })
+      const invoke = ctx.remote.probe.create as unknown as (request: unknown) => Promise<unknown>
+      expect(await invoke({ sessionId: 'project-session', content: { sessionId: 'user-supplied-text' } }))
+        .toEqual({ ok: true, value: { ref: 'recorded' } })
+      expect(sessionForRemote).toHaveBeenCalledOnce()
+      expect(forSession).toHaveBeenCalledWith('project-session')
+      expect(call).toHaveBeenCalledWith('/api', 'probe/create',
+        { args: { request: { sessionId: 'project-session', content: { sessionId: 'user-supplied-text' } } } }, expect.any(AbortSignal))
+      expect(fallback).not.toHaveBeenCalled()
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('uses the owning connection when an agent has no separate target transport', async () => {
     const call = vi.fn<ConnectionHandle['rpc']['call']>()
       .mockResolvedValue({ ok: true, value: { ref: 'local-goal' } })
@@ -1172,4 +1206,23 @@ it('routes inactive terminal holds by their explicit Session identity without Ag
     expect(forSession).toHaveBeenCalledWith('inactive-session')
     expect(call).not.toHaveBeenCalled()
   } finally { await ctx.fiber.dispose() }
+})
+
+it('routes an unscoped roster-style call through its actual Agent Context without interpreting its content', async () => {
+  const baseCall = vi.fn<ConnectionHandle['rpc']['call']>().mockResolvedValue({ ok: true, value: 'base' })
+  const targetCall = vi.fn<ConnectionHandle['rpc']['call']>().mockResolvedValue({ ok: true, value: 'project' })
+  const ctx = await bench(baseCall)
+  const scoped = ctx.extend({ fixtureSessionKey: 'project-session' })
+  ctx.typert.contexts.registerClient('agent', {
+    identity: candidate => (candidate as Context & { fixtureSessionKey?: SessionId }).fixtureSessionKey,
+  })
+  const forSession = vi.fn(() => ({ rpc: { call: targetCall } } as unknown as ConnectionHandle))
+  Object.assign(ctx.get('connection') as ConnectionHandle, { forSession })
+  const dispose = await ctx.remote.$mount({ package: '@fixture/roster', descriptors: [maybeDescriptor()] })
+  try {
+    expect(await scoped.remote.probe.maybe('project-session')).toEqual({ ok: true, value: 'project' })
+    expect(forSession).toHaveBeenCalledWith('project-session')
+    expect(targetCall).toHaveBeenCalledWith('/api', 'probe/maybe', { args: { value: 'project-session' } }, expect.any(AbortSignal))
+    expect(await ctx.remote.probe.maybe('project-session')).toEqual({ ok: true, value: 'base' })
+  } finally { await dispose() }
 })

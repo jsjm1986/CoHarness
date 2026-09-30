@@ -83,10 +83,18 @@ async function mockGateway(page: Page, mode: ProjectMode, options: {
   const visibilityBodies: string[] = []
   const conversationReads: string[] = []
   const visibilityBySession = new Map<string, 'project' | 'private'>()
-  await page.route('**/account/api/context', async (route) => {
+  await page.route(/\/api\/host\.describe(?:\?.*)?$/, async (route) => {
+    const response = await route.fetch()
+    const body = await response.json() as {
+      result: { ok: true; value: { runtimeTarget?: { kind: 'project'; projectId: number } } } | { ok: false }
+    }
+    if (body.result.ok) body.result.value.runtimeTarget = { kind: 'project', projectId: 9 }
+    await route.fulfill({ response, json: body })
+  })
+  await page.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
     await route.fulfill({ json: collaborationContext(mode) })
   })
-  await page.route('**/account/api/scope', async (route) => {
+  await page.route(/\/account\/api\/scope(?:\?.*)?$/, async (route) => {
     if (options.scopeReady !== undefined) await options.scopeReady
     await route.fulfill({ status: 204, body: '' })
   })

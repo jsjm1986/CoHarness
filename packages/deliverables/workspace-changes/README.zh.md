@@ -1,5 +1,5 @@
 ---
-description: "用 git 工作树快照和文件工具编辑前后的整文件捕获汇总每个顶层轮次改动的文件，以 workspace/changes Session 事件宣告，并在 Session 存活期间提供摘要和逐文件对比；配置、仓库要求与覆盖规则。"
+description: "用 git 工作树快照和文件工具编辑前后的整文件捕获汇总每个顶层轮次改动的文件，以 workspace/changes Session 事件宣告，并在 Session 释放和 Host 重启后仍提供摘要和逐文件对比；配置、仓库要求与覆盖规则。"
 kind: "package-reference"
 ---
 
@@ -7,9 +7,11 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
+经过鉴权的归档所有者只在会话释放后调用 `removeStored()`，先删除该会话持有的不可变审阅目录，再删除日志。普通释放不会调用它。
+
 ## 概述
 
-本插件汇总每个顶层轮次改动了哪些文件、每个文件的行数，并提供每个所列文件在轮次开始与结束时的内容对比。比较轮次开始和结束时的 git 工作树快照；文件工具编辑的每个文件在首次编辑之前和轮次结束时各复制一份整文件，以此覆盖 git 覆盖不到的文件。没有仓库或没有 git 时，只列文件工具的编辑。Session 日志只收到一条写明轮号的 `workspace/changes` 事件；摘要和对比留在 Host 上，直到 Session 释放。Web 的改动文件卡片渲染它们。
+本插件汇总每个顶层轮次的改动文件，并保存其前后对比。Git 快照覆盖工作树，整文件捕获覆盖此范围之外的文件工具编辑。发布 `workspace/changes` 事件前，插件在 `DSH_HOME/workspace-reviews` 下提交不可变、归属明确 Session 的审阅记录。关闭 Session 或重启 Host 会删除临时数据，但保留历史审阅。Web 卡片打开该历史，普通预览仍读取当前文件。
 
 ## 目录
 
@@ -25,7 +27,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-正式提供的 Web bundle 挂载本插件。在同一执行目标具备配套 `fs`、`subprocess` 提供方以及 git 可执行文件的组合中可以挂载它：
+正式提供的 Web bundle 挂载本插件。在同一执行目标具备配套 `fs`、`subprocess` 提供方、`sessionProjections` 以及 git 可执行文件的组合中可以挂载它：
 
 ```yaml
 - name: '@deepseek-ai/dsh-workspace-changes'
@@ -35,8 +37,10 @@ kind: "package-reference"
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `timeoutMs` | `30000` | 单条 git 命令允许运行的毫秒数，超时则放弃本轮记录 |
-| `outputMaxBytes` | `8388608` | 每条命令保留的 git 输出字节数，diff 列表更大时放弃本轮记录 |
+| `storageRoot` | `DSH_HOME/workspace-reviews` | 私有持久审阅目录；修改时须在写者停止的维护窗口内搬迁已有产物 |
+| `maxReviewBytes` | `67108864` | 每份审阅的最大序列化字节数；同时约束读取、发布及执行前所需的空闲空间 |
+| `timeoutMs` | `30000` | 单条 git 命令允许运行的毫秒数，超时则记录失败并停止本轮 |
+| `outputMaxBytes` | `8388608` | 每条命令保留的 git 输出字节数，diff 列表更大时记录失败并停止本轮 |
 | `maxFiles` | `500` | 单份摘要携带的最大文件数；`total` 仍报告完整数量 |
 | `maxFileBytes` | `2097152` | 文件在文件工具编辑前后被捕获、或从快照读出做对比所允许的最大字节数；更大的文件不提供对比，其中在文件工具编辑前后被捕获的也不带行数 |
 | `diffTimeoutMs` | `100` | 逐行对比允许运行的毫秒数，超时后退化为整文件替换 |
@@ -45,9 +49,9 @@ kind: "package-reference"
 
 在 `write`、`edit` 或有修改作用的 `str_replace_editor` 调用运行之前，记录器把该路径上的文件复制到 Session 的临时目录，每轮每个路径只复制第一次，轮次结束时再复制一次；副本按其字节的 SHA-1 命名，相同内容只存一份。这一步不需要 git。快照覆盖到的路径保留 git 的行数；其余路径由副本提供，也就是匹配忽略模式的文件、仓库之外的文件，以及没有快照时的每一次文件工具编辑，行数来自两份副本的逐行对比，因此同一文件的重复编辑只计一次，文件工具编辑之后的 shell 改动也包含在内。轮次结束时内容没有变化的路径不会列出。超过 `maxFileBytes` 的副本不会保存：该文件列出时带 `oversized`，没有行数；两侧都这么大的路径同样列出，因为没读过的内容永远不能认定为没有改动。只差一个末尾换行的路径对比为两侧相同，而 git 仍会把那一行计入行数。`/tmp` 与平台临时目录下的文件被排除，除非它们位于仓库内。快照覆盖范围之外只通过 shell 命令做出的改动不会被记录。
 
-SSH 工作区的 Git、私有索引、对象目录、主目录与临时路径均属于远端执行目标。存储命令把路径作为独立的 POSIX shell 参数传递。文件工具通过 `fs` 读取受限且校验版本的窗口，将副本保存在 Host 的私有捕获目录中；后续远端编辑不改变历史比较。本机与远端根目录不可互换。正常释放记录器会先删除远端快照，再释放连接；目标不可达可能阻止清理，该失败会明确报告，不能算作成功释放。Host 重启后摘要仍会过期。
+SSH 工作区的 Git、私有索引与快照对象属于远端执行目标，文件捕获使用有界且校验版本的 `fs` 读取。发布公告前，完整对比会复制到 Host 拥有的持久存储中；后续远端编辑或记录器释放不能改变它。远端临时目录仍须在连接释放前清理，目标不可达时会报告清理失败。
 
-每个文件携带持久的 `path`——位于工作目录内时为相对路径，否则为绝对路径——以及用于排序和标签的 `display` 路径：相对路径，仓库内位于工作目录之上的文件为 `../` 路径，家目录下的文件为 `~` 路径，其余为绝对路径。文件按 `display` 的码元顺序排序，因此上级路径和绝对路径排在工作目录自身文件之前。`workspace/changes` 事件只携带轮号；`ctx.workspaceChanges.summary(sessionId, seq)` 返回该序号的事件宣告的摘要，Session 已释放或本 Host 进程从未记录时返回 undefined。`ctx.workspaceChanges.diff(sessionId, seq, index, signal)` 对比该下标所列的文件：从两棵快照树或两份副本得出带三行上下文的 hunk；git 报告为二进制或某一侧含 NUL 字节时返回 `binary`；某一侧超过 `maxFileBytes` 时返回 `oversized`。逐行对比运行超过 `diffTimeoutMs` 时退化为一个替换全部行的 hunk，并标记 `coarse`。因此 Host 重启后重新打开的对话，先前轮次既没有卡片也没有对比。
+每个文件保留记录时的 `path` 和用于排序的 `display` 标签。工作目录内的路径保持相对形式，目录外的标签可使用 `../`、`~` 或绝对路径。`await ctx.workspaceChanges.summary(sessionId, seq)` 通过存活记录器或有界持久事件读取解析公告；`diff(sessionId, seq, index, signal)` 返回原始文件下标对应的已保存文本 hunk、`binary` 或 `oversized` 结果。文本对比保留三行上下文，超时导致的整文件替换标记为 `coarse`。读取校验内容摘要、Session 归属及摘要与对比的下标关系；鉴权 RPC 另行复核 Session 和路径访问权。
 
 -----
 
@@ -57,11 +61,11 @@ SSH 工作区的 Git、私有索引、对象目录、主目录与临时路径均
 <details>
 <summary>实现细节——点击展开</summary>
 
-每个 Session 一个 `TurnRecorder`，串行化其 git 工作。`turn/start` 排入基线：`rev-parse` 每个 Session 只定位一次仓库并创建 Session 的临时对象目录，然后以仓库 index 为种子在临时 index 上执行 `add --all --ignore-errors` 与 `write-tree` 得到 tree id；不可读的文件被跳过并以 git 的退出码 1 报告，快照接受这个退出码。每轮持有自己的状态对象，因此被中断的轮次仍在运行的记录会在下一轮开始后保留自己那一轮的文件。每条命令都带 `GIT_OBJECT_DIRECTORY` 指向临时目录、`GIT_ALTERNATE_OBJECT_DIRECTORIES` 指向仓库的 objects，因此已提交内容从仓库读取，新对象不会落进仓库。每次 `tools/pre-execute` 都等待该队列，因此没有修改能先于其基线发生；同一步骤还排入对 `write`、`edit` 或有修改作用的 `str_replace_editor` 调用所指路径的整文件捕获，因此副本先于编辑，`tool/result` 事件只标记本轮有结果需要记录。`agent/turn-stopping` 在轮内记录：第二次快照、两棵树之间的 `diff-tree -r -M --numstat`、对工作树内已捕获路径的 `check-ignore`、对每个未覆盖路径的第二次复制与逐行对比、追加事件，以及按事件序号保存摘要和每个所列文件两侧的内容来源，即快照树中的路径或一份副本。对比在被请求时计算：`ls-tree -l` 定位快照一侧并取其大小，`cat-file blob` 在 `maxFileBytes` 之内读出，副本从磁盘读取，两侧随后走同一个带超时的逐行对比。`turn/end` 仅在最后一次记录尝试之后仍有工具结果结束时再次记录，这覆盖了中止、失败和被转向的轮次，且不会重复一次失败的尝试；早先记录之后的空列表会取代它。仓库的 index 只读取。
+每个 Session 的 `TurnRecorder` 串行执行基线快照、文件工具捕获与轮次结束记录。Git 使用私有索引和对象目录，仓库对象库仅作为只读 alternate；用户此前未提交的改动不进入本轮 diff。记录器在发布前计算有界对比，写入并同步不可变产物，再将其内容身份追加到 Session 日志。持久审阅目录通过字面路径匹配排除在本机 Git 快照之外，已保存的审阅不会成为新的工作区改动。历史读取既不需要活动 Agent，也不读取当前文件内容。
 
-git 通过选定的 `subprocess` 能力运行，使用净化后的环境、`GIT_CONFIG_COUNT=0`（凭据清理会移除索引配置的键，因此不继承这些环境配置）、`GIT_TERMINAL_PROMPT=0`、`GIT_OPTIONAL_LOCKS=0`、配置的超时与有界输出。任何步骤失败都会放弃本轮记录并给出警告；下一轮重新开始。Session 释放与插件释放会中止排队的工作、忘记摘要并删除临时目录。
+Git 使用选定的 `subprocess` 提供方、净化环境、`GIT_CONFIG_COUNT=0`、`GIT_TERMINAL_PROMPT=0`、`GIT_OPTIONAL_LOCKS=0`、配置的超时与有界输出。记录或存储失败会追加不完整公告，停止受影响轮次，并阻止后续工作，直到新请求通过存储探测。已记录的容量需求必须满足新上限，文件系统必须能够容纳一份达到上限的审阅。已发生的文件效果不会回滚。在未结束轮次中更换记录器后，进一步执行被拒绝，直到新轮次捕获自己的基线。释放操作只删除临时 Git 对象和捕获，不删除持久审阅。
 
-**运行时不变式：** 不发布伴生入口。事件监听归 effect 所有，记录器在其 Session 存活期间同时拥有摘要、快照树与捕获的副本；没有独立观察会与它们分歧。
+**运行时不变式：** 不发布伴生插件。产物读取在返回数据之前检查 Session 归属、内容摘要与文件下标关系；独立扫描会重复此准入检查，却没有观察另一个生产权威来源。
 
 </details>
 
@@ -77,19 +81,20 @@ git 通过选定的 `subprocess` 能力运行，使用净化后的环境、`GIT_
 <a id="model-experience"></a>
 ## 模型体验
 
-无，因为记录器只追加一条仅写日志、只有客户端读取的 `workspace/changes` 事件，不注册任何面向模型的内容。
+间接地，通过代理循环与工具流水线，记录失败会以已记录的错误停止执行。历史比较仅供客户端读取；本包不新增提示词或工具 schema。
 
 #### KV Cache 影响
 
-这里的内容不会进入模型请求，因此不影响提供方缓存复用。
+正常审阅数据不增加模型输入，已记录的录制错误可能改变后续错误上下文。
 
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- 摘要、快照树与捕获的副本只在本 Host 进程内随其 Session 存活；Host 重启后重新打开的对话，先前轮次既没有卡片也没有对比。这是既定行为：Host 已经打不开内容的卡片不显示。
+- 设置 `DSH_MANAGED_DATA_MANIFEST` 的受管启动会在写入数据前登记配置的持久审阅根；本机或 SSH 临时捕获目录不被认领。清单无效时拒绝初始化；保留旧根和部署批准遵循[清单与备份规则](../../util/managed-data/README.zh.md)。
+- 持久审阅存储启用前产生的历史公告可能已无对应内容。UI 会显示历史不可用并提供读取重试，不会用当前文件重建过去的对比。
 - 有两个 git 功能在快照期间仍会写入仓库自己的 git 目录：`core.splitIndex` 会写 `sharedindex.*` 文件，git-lfs 会对改动文件运行 clean 过滤器并把对象存到 `.git/lfs` 下。
-- 需要 git 2.13 或更高版本以支持 `rev-parse --absolute-git-dir`；不支持的仓库格式或其他 git 失败会带着警告放弃本轮，而不是被当成普通目录。
+- 需要 git 2.13 或更高版本以支持 `rev-parse --absolute-git-dir`；不支持的仓库格式或其他 git 失败会停止记录及受影响轮次，不会被当成普通目录。
 - Session 的首次快照会把工作树里所有未跟踪且未被忽略的文件写进 Session 的临时目录；没有 `.gitignore` 却带着大体积构建产物的仓库，在 Session 释放前会占用同等的临时空间。
 - 用户在轮次进行中自己做的编辑会被算到该轮。
 - 不在任何 git 仓库内的工作目录只列文件工具的编辑，卡片里因此没有 shell 改动；Harness home 下的影子仓库暂缓，直到其排除规则能可靠地代替缺失的 `.gitignore`。

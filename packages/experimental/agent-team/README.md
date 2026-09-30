@@ -25,6 +25,8 @@ Every limit must be a positive safe integer. `maxMembers` counts every name ever
 
 The service requires Agent, Session, Session persistence, and continuable-subagent services. A composition without durable Session storage does not activate it.
 
+Pending journal mutations, teammate creation and recovery, mailbox dispatch, and asynchronous acknowledgements retain their affected Session identities through the last awaited checkpoint. Permanent purge refuses those identities until the operation completes, fails, or is cancelled; it cannot close a Session writer while a Team request still owns it.
+
 ## Team identity and roster
 
 Every ordinary runtime root is the implicit Lead of a Team whose `TeamId` equals its `SessionId`; creating a Team is therefore state-free until the first member, message, or task record. A teammate is a named, continuable direct child recorded in that root's Session. Names are lowercase kebab-case, at most 64 characters, and immutable for the Team lifetime. Session ids remain the persistence and authorization identities.

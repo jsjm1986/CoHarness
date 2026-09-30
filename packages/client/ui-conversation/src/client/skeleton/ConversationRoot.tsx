@@ -410,7 +410,7 @@ export function ConversationRoot(props: ConversationRootProps) {
   return (
     <div ref={root} className={css.workbenchRoot} data-workbench="" data-tabbed={tabbed || undefined} data-maximized={maximized !== undefined || undefined}>
       {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed })}
-      {paneIds.length === 0 ? props.renderSlot('conversation.workbench.empty', {}) : (
+      {paneIds.length === 0 ? props.renderSlot('conversation.workbench.empty', { viewport }) : (
         <div className={css.workbenchGrid} data-workbench-grid="">
           {rows.map((row, rowIndex) => {
             const ratioStart = rowIndex * columns
@@ -429,7 +429,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                       onPointerDown={() => { props.onViewportFocus(id) }}
                       onFocusCapture={() => { props.onViewportFocus(id) }}
                     >
-                      <props.SessionProvider sessionId={id}>
+                      <props.SessionProvider sessionId={id} empty={() => <p className={css.workbenchUnavailable} role="status">{props.t('viewport.unavailable')}</p>}>
                         {() => (
                           <>
                             {props.renderSlot('conversation.workbench.pane.header', {

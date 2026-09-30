@@ -29,6 +29,15 @@
     },
     {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../host/apiproxy"
+    },
+    {
+      "path": "../../deliverables/workspace-changes"
     }
   ]
 }

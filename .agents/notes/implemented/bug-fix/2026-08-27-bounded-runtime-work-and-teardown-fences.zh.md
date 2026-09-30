@@ -14,13 +14,15 @@ Gateway 与 SDK 传输、提供方流、持久化写入器和文档 broker 可�
 
 运行时工作从授权开始一直持有 operation reference，直到响应最后一个字节完成，因此 idle 回收不会在活动请求下停止进程。就绪检查使用绑定启动 token、nonce 和精确运行时身份的 HMAC challenge。Settings 注册、客户端会话 scope、动态 Host/Client runner 和子进程所有者会在拆卸前关闭接纳，并等待已启动的工作；迟到的 loader 条目和进程树会获得显式清理。带 revision 的模型 projection 会在使用前刷新并异步重试，因此数据库变更已经提交时，不会仅因文件 projection 暂时不可用就被报告为事务失败。
 
-运行时 lease 的接纳、活动 touch 和 idle 回收共享每个 runtime 的串行队列。若停止操作先赢得竞态，新 lease 会返回可重试拒绝；代理调用方启动新 generation，文档和归档 broker 则在不转发过期端口的情况下失败。idle 回收会通过按 runtime 建立索引的谓词重新检查每个候选项，不再为每个候选项重复扫描完整的 idle 目录；lease 接纳会在按 generation 保存的引用映射之外维护每个 runtime 的 O(1) 汇总。Gateway 关闭时通过固定 worker pool 停止本地 runtime，不会一次为每个进程启动拆卸任务。Gateway 与 SDK 中由计时器驱动的配置会拒绝超过 Node 最大延迟的值。共享 Host fetch 截止时间只在定时器句柄提供 `unref` 时调用它，因此浏览器数字句柄与 Node 超时对象使用相同的取消路径。
+运行时 lease 的接纳、活动 touch 和 idle 回收共享每个 runtime 的串行队列。若停止操作先赢得竞态，新 lease 会返回可重试拒绝；代理调用方仅在允许自动启动时启动新 generation，文档和归档 broker 则在不转发过期端口的情况下失败。idle 回收会通过按 runtime 建立索引的谓词重新检查每个候选项，不再为每个候选项重复扫描完整的 idle 目录；lease 接纳会在按 generation 保存的引用映射之外维护每个 runtime 的 O(1) 汇总。Gateway 关闭时通过固定 worker pool 停止本地 runtime，不会一次为每个进程启动拆卸任务。Gateway 与 SDK 中由计时器驱动的配置会拒绝超过 Node 最大延迟的值。共享 Host fetch 截止时间只在定时器句柄提供 `unref` 时调用它，因此浏览器数字句柄与 Node 超时对象使用相同的取消路径。
 
 JSONL 元数据读取会限制 header 字节数，并同时按重试次数与经过时间限制修订稳定性重试。Zstandard raw、load 与恢复读取会执行解压明文字节总预算；header 探测会按几何增长扩展输入缓冲区，而不是对每个分片重复拼接。
 
 Workspace 归档枚举会先索引持久化 ID、谱系根和保留位置，再匹配已归档会话。运行时归档投影使用带 revision 的批次，并分别限制会话 ID、搜索记录、搜索字节数和每条索引文本；一个谱系跨批次时，最终根会话汇总会保留聚合消息数量，同时不改变文本记录。并发触发会合并为一次后续同步，命令响应会分页并持续取完，dispose 会中止并等待活动请求结束。清理成功后，被删除的会话树会在后续投影前从持久化归档集合移除，因此陈旧 ID 不会造成永久同步失败。Workspace 与 PostgreSQL 归档变更只接受非负安全整数 revision；到达 `Number.MAX_SAFE_INTEGER` 时拒绝变更，而不会发布重复值。个人归档读取器会在同步期间缓存标题，因此后续请求可以把每会话序号下限传给持久化，而不必重新读取所有前缀。Gateway 会话读取会在一个只读 `REPEATABLE READ` 事务内读取会话头、revision 和事件。
 
 运行时归档同步器还会在带 generation 围栏的 LRU 中保留有界的标题、数量和搜索投影；连续的 live 事件会以常量队列工作扩展缓存会话，而序号缺口、标题事件或与异步读取竞争的事件只使对应会话失效，不能发布过期缓存数据。generation token 会随移除或淘汰的会话离开，不会形成无界的伴随映射。仅元数据的 transfer plan 另外携带进程、企业和操作者三级的数量及序列化字节额度；过期和提交会消费同一组索引计数，因此单个操作者不能用很长的文档 ID 占满进程 Map。
+
+在线归档命令投递使用按运行时身份隔离的轻量队列查询，间隔由 `commandPollMs` 配置。没有命令时不读取 Session 日志或发送归档投影；命令到达后复用现有串行同步。下一次探测只在前一次结束后安排，释放会取消并等待探测和同步，跨 Gateway 命令以 PostgreSQL 队列为准。
 
 分离会话尾部缓存通过 `SessionPersistence.readRevision(id)`（并保留 `revision()` 兼容回退）校验，不列出每个持久化会话。第一方 JSONL、SQLite 与 Gateway 提供方会把该服务方法委托给按 id 的 revision 查询；Service Definition 为第三方提供方保留 `listSnapshots()` 回退。因此，缓存命中可以避免扫描目录，同时不削弱冷历史读取前后的 revision 复核。
 
@@ -61,6 +63,8 @@ Host API fetch 载体会在 envelope 和 value schema 解析前，对一元 JSON
 Gateway 推送发送方会在 Token 分类前把 FCM 和 JPush 错误 body 限制为 64 KiB，避免提供方失败保留无界诊断数据。
 
 模型策略投影版本缓存最多保留最近 10,000 个主体/路径条目；淘汰只是性能缓存未命中，只会触发安全重写。
+
+实例存储分别保留人工停止、空闲回收、网关关闭、启动失败和权限刷新的停止原因。自动启动不能覆盖人工停止，即使 Gateway 重建或之后收到后台停止请求也不能；只有已认证的显式启动可以清除该状态。启动认领和就绪发布都核验持久状态，生产启动准入参与维护写者计数。已停止页面提供经授权的主动启动操作，不通过轮询自行唤醒实例。
 
 ## Alternatives considered
 

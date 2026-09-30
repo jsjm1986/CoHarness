@@ -138,13 +138,13 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-scope'))
     await mockDocuments(page)
-    await page.route('**/account/api/context', async (route) => {
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         scope: { kind: 'personal' },
         projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
       } })
     })
-    await page.route('**/api/documents/transfer/list', async (route) => {
+    await page.route(/\/api\/documents\/transfer\/list(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         version: 1,
         scope: { kind: 'project', label: 'Compiler' },
@@ -173,13 +173,13 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-target-upload'))
     await mockDocuments(page)
-    await page.route('**/account/api/context', async (route) => {
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         scope: { kind: 'personal' },
         projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
       } })
     })
-    await page.route('**/api/documents/transfer/list', async (route) => {
+    await page.route(/\/api\/documents\/transfer\/list(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         version: 1,
         scope: { kind: 'project', label: 'Compiler' },
@@ -406,7 +406,7 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-scope-compact'))
     await mockDocuments(page)
-    await page.route('**/account/api/context', async (route) => {
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         scope: { kind: 'personal' },
         projects: [
@@ -415,7 +415,7 @@ describe('web e2e: document manager', () => {
         ],
       } })
     })
-    await page.route('**/api/documents/transfer/list', async (route) => {
+    await page.route(/\/api\/documents\/transfer\/list(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         version: 1,
         scope: { kind: 'project', label: 'Compiler' },
@@ -464,7 +464,7 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-overview-compact'))
     await mockDocuments(page)
-    await page.route('**/account/api/context', async (route) => {
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         scope: { kind: 'personal' },
         projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],

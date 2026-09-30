@@ -2,15 +2,12 @@
  * Persistent-member support: an `LlmAdapter` route that turns each model call
  * into one turn on a durable Claude Agent SDK session, plus the
  * `ExternalMemberTransport` that opens, prompts, recovers, and disposes it.
- * The SDK persists sessions under `~/.claude/projects/`; recovery reads that
- * transcript directly and never issues another prompt.
+ * Bound sessions resume through the SDK. An interrupted request without an
+ * observed SDK result remains unknown; transcript text cannot prove completion.
  *
  * @module @deepseek-ai/dsh-subagent-claude-code/member
  */
 
-import { readFileSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
 import {
   query as officialQuery,
   type Query,
@@ -24,6 +21,7 @@ import {
   externalMemberTurn,
   type ExternalMemberSession,
   type ExternalMemberTransport,
+  type ExternalMemberTransportSource,
   type ExternalPendingPrompt,
   type ExternalRecovery,
   type ExternalTurnBound,
@@ -39,96 +37,18 @@ export const CLAUDE_MEMBER_MODEL = 'claude-code'
 
 /**
  * Options carried from the provider's resolved config into each member turn.
- * The workspace is the provider's configured directory, defaulting to the
- * harness launch directory when unset.
+ * The workspace and executable are resolved for the member Session before each call.
  */
 export interface ClaudeMemberConfig {
+  /** Preinstalled target-local CLI, instead of the bundled SDK executable. */
+  readonly executable?: string
+  /** Remote process environment comes only from deployment settings. */
+  readonly remote?: boolean
   readonly cwd: string
   readonly model?: string
   readonly permissionMode: NonNullable<Parameters<typeof claudeQueryOptions>[0]['permissionMode']>
   readonly env: Record<string, string>
   readonly disposeGraceMs: number
-}
-
-interface ClaudeSessionFileEntry {
-  readonly type?: string
-  readonly message?: {
-    readonly role?: string
-    readonly content?: string | readonly { readonly type?: string; readonly text?: string }[]
-  }
-}
-
-/**
- * Claude Code's project-directory slug under `~/.claude/projects/`: the
- * product flattens every character outside `[a-zA-Z0-9]` to `-`, so
- * separators, drive colons, dots, underscores, and non-ASCII text all fold
- * (`C:\git\cc-plus` reads as `C--git-cc-plus`). The mapping is intentionally
- * lossy — distinct workspaces can share one slug — and recovery accepts that
- * product behavior rather than inventing a decodable scheme.
- * @param cwd - the workspace whose sessions Claude Code files under the slug.
- * @returns the product-encoded project directory name.
- */
-export function projectSlug(cwd: string): string {
-  return cwd.replace(/[^a-zA-Z0-9]/g, '-')
-}
-
-/** Join the text blocks of one session-file message; string content reads as-is. */
-function entryText(entry: ClaudeSessionFileEntry): string {
-  const content = entry.message?.content
-  if (typeof content === 'string') return content
-  if (content === undefined) return ''
-  return content
-    .filter(block => block.type === 'text')
-    .map(block => block.text ?? '')
-    .join('')
-}
-
-/**
- * Read the durable Claude session transcript and prove the state of one
- * issued prompt: a later assistant turn means `result`, no matching user
- * entry means `absent`, and a matched user entry with no later assistant turn
- * means `unknown`.
- * @param cwd - the workspace whose project slug holds the session file.
- * @param sessionId - the external session identity.
- * @param pending - the issued prompt exactly as sent.
- * @returns the provable state.
- */
-export function recoverClaudeSession(
-  cwd: string,
-  sessionId: string,
-  pending: ExternalPendingPrompt,
-): ExternalRecovery {
-  let raw: string
-  try {
-    raw = readFileSync(
-      join(homedir(), '.claude', 'projects', projectSlug(cwd), `${sessionId}.jsonl`),
-      'utf8',
-    )
-  } catch {
-    return { kind: 'unknown' }
-  }
-  const entries: ClaudeSessionFileEntry[] = []
-  for (const line of raw.split('\n')) {
-    if (line === '') continue
-    try {
-      entries.push(JSON.parse(line) as ClaudeSessionFileEntry)
-    } catch {
-      // A torn tail write is ordinary after a crash; the parseable prefix stays authoritative.
-      break
-    }
-  }
-  const promptIndex = entries.findLastIndex(
-    entry => entry.type === 'user' && entryText(entry) === pending.prompt,
-  )
-  if (promptIndex < 0) return { kind: 'absent' }
-  const texts: string[] = []
-  for (let i = promptIndex + 1; i < entries.length; i++) {
-    const entry = entries[i]
-    if (entry === undefined || entry.type !== 'assistant') continue
-    const text = entryText(entry)
-    if (text !== '') texts.push(text)
-  }
-  return texts.length === 0 ? { kind: 'unknown' } : { kind: 'result', text: texts.join('\n') }
 }
 
 /** One open Claude session bound to one member turn or recovery pass. */
@@ -153,6 +73,8 @@ class ClaudeMemberSession implements ExternalMemberSession {
   async *turn(prompt: string, signal: AbortSignal): AsyncIterable<string | ExternalTurnBound | ExternalTurnOutcome> {
     const spec: ClaudeCodeRunSpec = {
       cwd: this.config.cwd,
+      ...this.config.executable === undefined ? {} : { executable: this.config.executable },
+      ...this.config.remote === undefined ? {} : { remote: this.config.remote },
       ...this.config.model === undefined ? {} : { model: this.config.model },
       permissionMode: this.config.permissionMode,
       env: this.config.env,
@@ -212,9 +134,10 @@ class ClaudeMemberSession implements ExternalMemberSession {
     yield result
   }
 
-  recover(pending: ExternalPendingPrompt, _signal: AbortSignal): Promise<ExternalRecovery> {
+  recover(_pending: ExternalPendingPrompt, _signal: AbortSignal): Promise<ExternalRecovery> {
     if (this.externalId === undefined) return Promise.resolve({ kind: 'absent' })
-    return Promise.resolve(recoverClaudeSession(this.config.cwd, this.externalId, pending))
+    // SDK replayed messages contain no durable request-correlated terminal result.
+    return Promise.resolve({ kind: 'unknown' })
   }
 
   async dispose(): Promise<void> {
@@ -250,7 +173,7 @@ export class ClaudeMemberTransport implements ExternalMemberTransport {
 /** LLM adapter owning the member route; each model call becomes one external turn. */
 export class ClaudeMemberAdapter extends LlmAdapter {
   constructor(
-    private readonly transport: ExternalMemberTransport,
+    private readonly transport: ExternalMemberTransportSource,
     private readonly store: ExternalBindingStore,
   ) {
     super()

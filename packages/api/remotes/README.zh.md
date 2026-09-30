@@ -33,6 +33,8 @@ Client 组装挂载生成的 Plugin Manager 命名空间，用于检查 profile�
 
 包内 `clientBundle(..., { hostPhase: true })` 让 Host tsdown 打包 Host 入口，让后续 Client tsdown 只打包 browser 入口。普通 Client 插件仍使用单一 Client project，并在 Client tsdown 阶段一起生成 Node loader 入口和 browser bundle；不得因一个包同时存在 `src/index.ts` 与 `src/client/index.ts` 就复制本包的拆分。
 
+Agent 查找会在异步读取和恢复期间保留会话标识。Host 通过 `onResumed` 持有每个恢复后的工厂句柄；并发查找共用一次创建与所有权交接。永久清理拒绝仍在进行的查找，清理保留期间也拒绝新的查找。
+
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每个贡献都通过 `ctx.remote.$mount()` 挂载为随组装 fiber 撤回的 effect，身份解析是针对实时 Agent 注册表的逐次调用策略。

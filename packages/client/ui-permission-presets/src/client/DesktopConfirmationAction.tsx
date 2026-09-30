@@ -1,5 +1,6 @@
 /** Explicit human confirmation bound to the displayed root, node and desktop. */
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { DesktopConfirmation } from '@deepseek-ai/dsh-api-remotes/client'
@@ -62,7 +63,9 @@ export function DesktopConfirmationAction({ sessionId, connection, t }: DesktopC
     active.current = request
     setBusy(true); setError(false)
     try {
-      const response = await connection.api.desktop.confirm({ sessionId, rootSessionId: target.rootSessionId,
+      const address = parseClientSessionKey(sessionId)
+      const rootSessionId = address === undefined ? target.rootSessionId : clientSessionKey(address.runtime, target.rootSessionId)
+      const response = await connection.api.desktop.confirm({ sessionId, rootSessionId,
         nodeId: target.nodeId, desktop: target.desktop, confirmed }, request.signal)
       if (request.signal.aborted) return
       if (!response.result.ok) throw new Error('desktop confirmation refused')

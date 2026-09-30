@@ -23,10 +23,7 @@ export type {
   WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceOfficePreview, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 
-/** Authenticated Gateway runtime selected by a workbench pane. */
-export type ConnectionRuntimeTarget =
-  | { readonly kind: 'personal' }
-  | { readonly kind: 'project'; readonly projectId: number; readonly projectName?: string }
+export type { ClientRuntimeTarget as ConnectionRuntimeTarget } from '@deepseek-ai/dsh-host-apiproxy/api'
 export type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools/presentation'
 export type {
   RpcRequest, RpcResponse, RpcResult, RpcError, RpcErrorCode,

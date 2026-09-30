@@ -6,6 +6,8 @@
 
 生成描述符标记为 `acceptsUndefined` 的尾部业务参数可以省略。必需参数保持原有位置，包括作用域身份投影。取消信号仍位于声明的最后位置；在省略选项后提供信号时，调用方显式传入 `undefined` 占位。已提供和省略的值仍经过 Host 编解码校验。
 
+Client 调用根据已声明的 Session 地址或调用方 Agent Context 选择传输连接。JSON 参数中的 Session 字段仅由应用声明。地址解码保留无关字符串，并拒绝已声明的 Session 键指向不同 runtime 的请求；无作用域的根调用继续使用引导连接。
+
 ## 概述
 
 为 Host 与 Client 两侧的 Cordis 环境提供 Typert RPC endpoint。Host 入口提供 `ctx.typertGateway`，`@deepseek-ai/dsh-api-gateway/client` 则提供 `ctx.remote`；两者使用同一份生成的 `InvocationDescriptor` 约定，并将业务选择交给 API Remotes。Connection 承载一元调用的请求关联、信任和响应 envelope，Gateway 则拥有多路复用的 Remote 流。
@@ -29,6 +31,8 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 `ctx.remote.$on()` 订阅一条被转发的 Host 事件。它的合法键恰好等于 Host 装配声明的转发选择，listener 类型就是事件所属包自己的 Cordis `Events` 声明，因此不存在会与之漂移的第二份签名。每个订阅归属发起调用的 fiber，并随该 fiber 一起消失。投递是单向的，并按注册顺序进行；抛错的 listener 会被记录并与其余 listener 隔离，绝不影响帧泵。对于动态 Cordis 事件，官方 `cordis/*` 名称与对应的 `@deepseek-ai/cordis/*` 名称属于同一投递组：`$dispatch()` 按全局注册顺序合并两种名称；同一个 listener 同时以两个别名注册时只调用一次；同一精确名称的重复注册仍然独立。`ctx.remote.$dispatch()` 属于载体：持有 Host 帧 sink 的 Client 半把每个解码后的帧交进来，收到无人订阅的事件组即丢弃。消费方只订阅，绝不调用它。
 
 生成的声明合并通过共享的 `TypertClientRemote` 约定提供 TypeScript API。Client 入口不包含 Host 服务或 Host Cordis 接口合并；方法查找和调用使用普通对象与函数，而不使用 JavaScript Proxy。
+
+调用 waterfall 只包装已解析的业务方法。授权与 Agent 查找先完成，防止请求身份包装器把调用人的权限借给冷查找任务。
 
 ## 不变量
 

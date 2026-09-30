@@ -1,0 +1,9 @@
+- dialog "重命名项目":
+  - heading "重命名项目" [level=2]
+  - paragraph: 项目路径和成员权限不会改变。
+  - button "关闭"
+  - alert: "duplicate project name: Taken"
+  - text: 项目名称
+  - textbox "项目名称": Taken
+  - button "取消"
+  - button "保存名称"

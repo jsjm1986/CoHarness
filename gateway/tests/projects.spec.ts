@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writeFileSync }
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { ProjectService } from '../src/projects.ts'
 import { UserService } from '../src/users.ts'
@@ -10,7 +10,7 @@ import { UserService } from '../src/users.ts'
 async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
-  const cfg = loadConfig({
+  const cfg = testConfig(root, {
     HGW_USERS_ROOT: join(root, 'users'),
     HGW_STATE_ROOT: join(root, 'state'),
     HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'),

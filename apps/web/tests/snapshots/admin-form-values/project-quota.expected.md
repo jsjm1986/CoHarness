@@ -1,0 +1,28 @@
+- dialog "配置项目额度":
+  - heading "配置项目额度" [level=2]
+  - paragraph: 额度按自然月统计，在 80% 和 100% 产生告警，但不会阻断模型调用。
+  - button "关闭"
+  - group "额度来源":
+    - text: 额度来源
+    - radio "继承普通成员额度 跟随普通用户角色的默认额度"
+    - strong: 继承普通成员额度
+    - text: 跟随普通用户角色的默认额度
+    - radio "项目独立额度 为此项目单独设置 Token 和成本额度" [checked]
+    - strong: 项目独立额度
+    - text: 为此项目单独设置 Token 和成本额度
+  - group "Token 额度":
+    - text: Token 额度 额度模式
+    - combobox "额度模式":
+      - option "无限制"
+      - option "自定义" [selected]
+    - text: 每月 Token
+    - textbox "每月 Token": "12345"
+  - group "公司成本额度":
+    - text: 公司成本额度 额度模式
+    - combobox "额度模式":
+      - option "无限制"
+      - option "自定义" [selected]
+    - text: 每月人民币元
+    - textbox "每月人民币元": "8.5"
+  - button "取消"
+  - button "保存额度"

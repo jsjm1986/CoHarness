@@ -40,6 +40,8 @@ The producer injects `commands` and `goals`. A custom app mounts their owners pl
 
 The shipped `dsh` base enables the persisted-goal stack and this command; the Web client provides its interactive adapter. The ACP automation app enables the domain and model tools without a command adapter; `goals: false` removes that stack. The UI-less `agent-spine-demo` requires an explicit `goals: {}` so headless one-shot callers do not silently change from one physical turn to a multi-round operation.
 
+Managed goal creation, editing, and resumption attest the live human command before activating further rounds. Objective attachments retain that same execution scope. Status, pause, and clear do not establish execution authority and remain available when the execution chain cannot continue.
+
 ## Invariants
 
 **Runtime invariant:** No companion is published. The command is one registration delegating to the `ctx.goals` domain; goal state is not held here.

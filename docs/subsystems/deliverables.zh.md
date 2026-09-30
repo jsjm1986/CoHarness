@@ -2,7 +2,7 @@
 
 [English](deliverables.md) | 中文
 
-记录一轮交给用户的东西，由 [deliverables 包组](../../packages/deliverables/README.zh.md)拥有：模型通过 `present` 工具声明的文件，记在一个只写日志的 Session 事件里；这一轮改动的文件，由轮开始和轮结束时的 git 工作树快照对比得出，git 覆盖不到的路径则由文件工具每次编辑前后的整文件捕获得出，用一个只写日志的事件宣告，并在 Session 存活期间由 Host 服务连同每个所列文件在轮开始与轮结束时的对比一起提供。它们只由客户端读取，Web [产出物插件](../../packages/client/ui-deliverables/README.zh.md)在轮末渲染两者。工具行为、快照机制和配置见 [`tool-present`](../../packages/deliverables/tool-present/README.zh.md) 与 [`workspace-changes`](../../packages/deliverables/workspace-changes/README.zh.md) 的包 README。
+记录一轮交给用户的东西，由 [deliverables 包组](../../packages/deliverables/README.zh.md)拥有：模型通过 `present` 工具声明的文件，记在一个只写日志的 Session 事件里；这一轮改动的文件，由轮开始和轮结束时的 git 工作树快照对比得出，git 覆盖不到的路径则由文件工具每次编辑前后的整文件捕获得出，用一个只写日志的事件宣告，持久保存，并在 Session 或运行时重启后由 Host 服务连同每个所列文件在轮开始与轮结束时的对比一起提供。它们只由客户端读取，Web [产出物插件](../../packages/client/ui-deliverables/README.zh.md)在轮末渲染两者。工具行为、快照机制和配置见 [`tool-present`](../../packages/deliverables/tool-present/README.zh.md) 与 [`workspace-changes`](../../packages/deliverables/workspace-changes/README.zh.md) 的包 README。
 
 源码：[`packages/deliverables/tool-present/src/types.ts`](../../packages/deliverables/tool-present/src/types.ts)、[`packages/deliverables/workspace-changes/src/types.ts`](../../packages/deliverables/workspace-changes/src/types.ts)
 
@@ -45,8 +45,10 @@ interface WorkspaceChangedFile {
 ## `WorkspaceChangesSummary`：一轮的改动摘要
 
 ```ts type-equiv
-/** Files changed during one top-level turn, kept on the Host until its Session is disposed. */
+/** Historical files changed during one top-level turn. */
 interface WorkspaceChangesSummary {
+  /** Storage failed; file effects may have occurred and the comparison is incomplete. */
+  incomplete?: true
   /** The turn whose file changes this summary describes. */
   turn: number
   /** The Session working directory `path` values are relative to. */
@@ -85,7 +87,7 @@ interface WorkspaceDiffHunk {
 ## `WorkspaceFileDiff`：一个文件的对比
 
 ```ts type-equiv
-/** The comparison of one listed file's turn-start and turn-end contents, computed when asked for. */
+/** The comparison of one listed file's turn-start and turn-end contents, recorded before its announcement. */
 type WorkspaceFileDiff =
   | {
     kind: 'text'
@@ -111,23 +113,32 @@ type WorkspaceFileDiff =
 ## `WorkspaceChanges`：提供摘要与对比的 Host 服务
 
 ```ts type-equiv
-/** Serves the summaries and file comparisons the recorder keeps for live Sessions. */
+/** Serves live and durably recorded historical comparisons. */
 interface WorkspaceChanges {
+  /**
+   * Remove stored reviews for an explicitly purged, released Session.
+   * @param sessionId - identity selected by the authenticated archive owner.
+   * @param signal - purge cancellation.
+   * @returns after its immutable artifacts have been removed.
+   */
+  removeStored(sessionId: SessionId, signal?: AbortSignal): Promise<void>
   /**
    * The summary announced by one `workspace/changes` event.
    * @param sessionId - the Session that appended the event.
    * @param seq - the event's sequence number.
-   * @returns the summary, or undefined once its Session was disposed or when this Host never recorded it.
+   * @param signal - optional cancellation for a persisted read.
+   * @returns the summary, or undefined when no historical record is available.
    */
-  summary(sessionId: SessionId, seq: number): WorkspaceChangesSummary | undefined
+  summary(sessionId: SessionId, seq: number, signal?: AbortSignal):
+    WorkspaceChangesSummary | undefined | Promise<WorkspaceChangesSummary | undefined>
   /**
    * Compare one listed file's contents at turn start and turn end.
    * @param sessionId - the Session that appended the event.
    * @param seq - the event's sequence number.
    * @param index - the file's index in the summary's `files`.
    * @param signal - cancels the reads.
-   * @returns the comparison, or undefined once its Session was disposed, when this Host never recorded it, or when no file has that index.
-   * @throws when a snapshot read fails for a live Session.
+   * @returns the comparison, or undefined when the artifact or file index is unavailable.
+   * @throws when historical data is corrupt or storage cannot be read.
    */
   diff(sessionId: SessionId, seq: number, index: number, signal: AbortSignal): Promise<WorkspaceFileDiff | undefined>
 }
@@ -149,16 +160,25 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.workspaceChanges` — `WorkspaceChanges`
 
-Serves the summaries and file comparisons the recorder keeps for live Sessions.
+Serves live and durably recorded historical comparisons.
 
 ```ts cordis-catalog
+/**
+ * Remove stored reviews for an explicitly purged, released Session.
+ * @param sessionId - identity selected by the authenticated archive owner.
+ * @param signal - purge cancellation.
+ * @returns after its immutable artifacts have been removed.
+ */
+removeStored(sessionId: SessionId, signal?: AbortSignal): Promise<void>
+
 /**
  * The summary announced by one `workspace/changes` event.
  * @param sessionId - the Session that appended the event.
  * @param seq - the event's sequence number.
- * @returns the summary, or undefined once its Session was disposed or when this Host never recorded it.
+ * @param signal - optional cancellation for a persisted read.
+ * @returns the summary, or undefined when no historical record is available.
  */
-summary(sessionId: SessionId, seq: number): WorkspaceChangesSummary | undefined
+summary(sessionId: SessionId, seq: number, signal?: AbortSignal): WorkspaceChangesSummary | undefined | Promise<WorkspaceChangesSummary | undefined>
 
 /**
  * Compare one listed file's contents at turn start and turn end.
@@ -166,8 +186,8 @@ summary(sessionId: SessionId, seq: number): WorkspaceChangesSummary | undefined
  * @param seq - the event's sequence number.
  * @param index - the file's index in the summary's `files`.
  * @param signal - cancels the reads.
- * @returns the comparison, or undefined once its Session was disposed, when this Host never recorded it, or when no file has that index.
- * @throws when a snapshot read fails for a live Session.
+ * @returns the comparison, or undefined when the artifact or file index is unavailable.
+ * @throws when historical data is corrupt or storage cannot be read.
  */
 diff(sessionId: SessionId, seq: number, index: number, signal: AbortSignal): Promise<WorkspaceFileDiff | undefined>
 ```

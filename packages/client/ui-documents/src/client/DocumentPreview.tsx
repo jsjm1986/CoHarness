@@ -6,6 +6,8 @@ import type { DocumentsKey } from './locales.ts'
 import css from './DocumentPreview.module.css'
 
 export interface DocumentPreviewProps {
+  /** Bind authenticated image, iframe and download navigations to their current account. */
+  privateResourceUrl?: ((url: string) => string) | undefined
   doc: UserDocRef
   /** Optional explicit scope when previewing a non-current project. */
   scope?: UserDocScope | undefined
@@ -42,17 +44,19 @@ function classifyMediaType(mediaType: string): 'image' | 'pdf' | 'text' | 'unsup
  * @param props.t - localized documents dictionary.
  * @returns a dialog with image, PDF, text, or a fallback message.
  */
-export const DocumentPreview: FC<DocumentPreviewProps> = ({ doc, scope, maxTextBytes, onClose, t }) => {
+export const DocumentPreview: FC<DocumentPreviewProps> = ({ doc, scope, maxTextBytes, onClose, t, privateResourceUrl }) => {
   const [state, setState] = useState<PreviewState>('loading')
   const [textContent, setTextContent] = useState('')
   const [userDocs] = useState(() => createUserDocClient())
-  const scopedUrl = (inline: boolean): string => {
+  const contentAddress = (inline: boolean): string => {
     if (scope === undefined) return userDocs.contentUrl(doc.docId, inline)
     const scoped = (userDocs as unknown as {
       scopedContentUrl?: (target: UserDocScope, id: UserDocRef['docId'], inline?: boolean) => string
     }).scopedContentUrl
     return typeof scoped === 'function' ? scoped(scope, doc.docId, inline) : userDocs.contentUrl(doc.docId, inline)
   }
+
+  const scopedUrl = (inline: boolean): string => { const url = contentAddress(inline); return privateResourceUrl?.(url) ?? url }
 
   useEffect(() => {
     const type = classifyMediaType(doc.mediaType)
@@ -83,7 +87,7 @@ export const DocumentPreview: FC<DocumentPreviewProps> = ({ doc, scope, maxTextB
         setState(error instanceof ApiResponseTooLargeError ? 'too-large' : 'unsupported')
       })
     return () => { controller.abort() }
-  }, [doc.docId, doc.bytes, doc.mediaType, maxTextBytes, scope, userDocs])
+  }, [doc.docId, doc.bytes, doc.mediaType, maxTextBytes, scope, userDocs, privateResourceUrl])
 
   const contentUrl = scopedUrl(true)
 

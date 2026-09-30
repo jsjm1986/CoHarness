@@ -30,7 +30,8 @@
   "peerDependencies": {
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-session-persistence": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-managed-data": "workspace:^"
   },
   "dependencies": {
     "@deepseek-ai/dsh-llm": "workspace:^",
@@ -47,6 +48,7 @@
     "@deepseek-ai/dsh-session-format-v0-to-v1": "workspace:^",
     "@deepseek-ai/dsh-session-format-v1-to-v2": "workspace:^",
     "@deepseek-ai/dsh-session-persistence": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-managed-data": "workspace:^"
   }
 }

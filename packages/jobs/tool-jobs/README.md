@@ -41,6 +41,8 @@ One host registry may carry several mounts of this plugin — one per agent pres
 
 A default above the cap fails at load.
 
+Managed completion notices retain the job’s original execution scope. Reading a running or stopping job preserves its active origin; terminal output is historical data and does not add earlier participants to an independent new request. Reading data never resumes the producer or transfers its permission to the reader.
+
 ## Invariants
 
 **Runtime invariant:** No companion is published. The tools and notices are registrations over the `ctx.jobs` registry; job records are owned by the mounted registry provider.

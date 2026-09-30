@@ -106,7 +106,7 @@ async function harness(options: HarnessOptions = {}) {
       settled?.commit()
       const unregister = ctx.agents.register(agent)
       await unregister
-      return { agent, dispose: unregister }
+      return { agent, dispose: unregister , tryDisposeIdle: async () => false }
     },
     async resume(_ownerCtx, resumeOptions) {
       // The double replays the durable binding the persisted header carries —
@@ -127,7 +127,7 @@ async function harness(options: HarnessOptions = {}) {
       settled?.commit()
       const unregister = ctx.agents.register(agent)
       await unregister
-      return { agent, dispose: unregister }
+      return { agent, dispose: unregister , tryDisposeIdle: async () => false }
     },
   }
   ctx.agents.setFactory(factory)

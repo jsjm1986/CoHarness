@@ -1,3 +1,5 @@
+import { nodeConfigurationAuthority } from './postgres/node-configuration-authority.ts'
+import { loadManagedNodeEnvironment, NodeConfigurationStore } from './node-config-store.ts'
 import { DesktopAccess } from './desktop-access.ts'
 import { SshAccess } from './ssh-access.ts'
 import { TerminalAccess } from './terminal-access.ts'
@@ -10,7 +12,7 @@ import { createAdminApiHandler } from './admin-api.ts'
 import { PostgresAccountPreferencesService } from './postgres/account-preferences-service.ts'
 import { refreshModelGovernance } from './apply-model-governance.ts'
 import { loadConfig } from './config.ts'
-import { InstanceManager, RuntimeLeaseUnavailableError } from './instances.ts'
+import { InstanceManager, RuntimeLeaseUnavailableError, RuntimeStartBlockedError } from './instances.ts'
 import type { RuntimeTarget } from './instances.ts'
 import { selectLauncher } from './launcher.ts'
 import { PostgresAuditService } from './postgres/audit-service.ts'
@@ -39,6 +41,7 @@ import { PostgresSshTargetService } from './postgres/ssh-target-service.ts'
 import { PostgresMaintenanceService, type WriteGateVerdict } from './postgres/maintenance-service.ts'
 import { PostgresBackupService } from './postgres/backup-service.ts'
 import { createDeploymentCommands } from './deployment-commands.ts'
+import { PostgresDeploymentBackups } from './postgres/deployment-backups.ts'
 import { migrationPlan } from './postgres/database.ts'
 import { PostgresUserService } from './postgres/user-service.ts'
 import { PostgresWebhookDeliveryService } from './postgres/webhook-delivery-service.ts'
@@ -106,9 +109,10 @@ function archiveReadPayload(value: unknown): ConversationArchiveRuntimeRead {
   }
 }
 
-const cfg = loadConfig()
+const effectiveEnvironment = await loadManagedNodeEnvironment(process.env)
+const cfg = loadConfig(effectiveEnvironment)
 if (cfg.releaseId !== undefined) console.log(`[gateway] release ${cfg.releaseId}`)
-const databaseUrl = await databaseUrlFromFile()
+const databaseUrl = await databaseUrlFromFile(effectiveEnvironment)
 const pool = createPostgresPool(databaseUrl)
 const startupAbort = new AbortController()
 const onStartupSignal = (): void => { startupAbort.abort() }
@@ -138,6 +142,14 @@ const context = await (async () => {
     process.removeListener('SIGTERM', onStartupSignal)
   }
 })()
+const maintenance = new PostgresMaintenanceService(context, cfg.nodeStaleMs)
+// Every cached dependency belongs to the data generation observed before loading it.
+const baselineWriteEpoch = await maintenance.currentWriteEpoch()
+async function assertCurrentDataEpoch(): Promise<void> {
+  if (await maintenance.currentWriteEpoch() !== baselineWriteEpoch) {
+    throw new Error('PostgreSQL write epoch advanced past this process; restart onto the restored snapshot')
+  }
+}
 const auth = new PostgresAuthService(context, cfg)
 const users = new PostgresUserService(context, cfg)
 const userPreferences = new PostgresAccountPreferencesService(context, cfg)
@@ -255,20 +267,11 @@ archives.setRuntimeReader(async (runtime, rootSessionId, fromSeq, limit) => {
   }
 })
 const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationPollMs)
-const maintenance = new PostgresMaintenanceService(context, cfg.nodeStaleMs)
+const nodeConfiguration = new NodeConfigurationStore(context, cfg, effectiveEnvironment, nodeConfigurationAuthority(context))
+await nodeConfiguration.initialize()
 const backups = new PostgresBackupService(context)
-const deploymentCommands = createDeploymentCommands(cfg.pgDumpCommand, cfg.pgRestoreCommand)
-const managedPaths = [
-  cfg.principalKeyDir,
-  cfg.runtimeCredentialDir,
-  cfg.organizationModelCredentialKeyFile,
-  cfg.webhookSecretKeyFile,
-  cfg.bootstrapAdminPasswordFile,
-]
-// The write epoch captured at startup fences this process after a restore: a
-// completed restore bumps it, so pre-restore writers keep rejecting their own
-// mutations until an operator restarts them onto the restored snapshot.
-const baselineWriteEpoch = await maintenance.currentWriteEpoch()
+const deploymentCommands = createDeploymentCommands(cfg.pgDumpCommand, cfg.pgRestoreCommand, cfg.psqlCommand)
+
 const MAINTENANCE_GATE_CACHE_MS = 300
 let gateCache: { at: number; verdict: WriteGateVerdict } | undefined
 let observedMaintenanceEpoch = 0n
@@ -293,6 +296,11 @@ const trackWriter = <T>(operation: () => Promise<T>): Promise<T> => {
     .then(operation)
     .finally(() => { writersInFlight -= 1 })
 }
+instances.startAdmission = operation => trackWriter(async () => {
+  const verdict = await refreshMaintenanceGate()
+  if (verdict !== 'open') throw new RuntimeStartBlockedError(verdict)
+  return operation()
+})
 const writerSpan = (res: ServerResponse): void => {
   writersInFlight += 1
   res.once('close', () => { writersInFlight -= 1 })
@@ -333,17 +341,13 @@ const deps: GatewayDeps = {
   terminalManagement: new GatewayTerminalManagement({ users, projects, instances, cfg }, principalKeys.signer, context.nodeId),
   webhookDeliveries,
   webhookEndpoints,
-  webhookIntake: new GatewayWebhookIntake({ cfg, users, projects, instances },
+  webhookIntake: new GatewayWebhookIntake({ cfg, users, instances, collaboration },
     webhookEndpoints, webhookDeliveries, principalKeys.signer),
   accessMonitor,
   maintenance,
+  nodeConfiguration,
   backups,
-  backupWork: {
-    commands: deploymentCommands,
-    databaseUrl,
-    backupDir: cfg.backupDir,
-    managedPaths,
-  },
+  backupWork: new PostgresDeploymentBackups(context, cfg, databaseUrl, deploymentCommands, effectiveEnvironment),
   migrationPlan: () => migrationPlan(pool, cfg.deployMigrationsDir),
   maintenanceGate,
   writerSpan,
@@ -351,14 +355,11 @@ const deps: GatewayDeps = {
     await checkPostgresReadiness(context, signal)
     await accessMonitor.synchronize()
     signal?.throwIfAborted()
-    // A completed restore moved the write epoch past this process's baseline;
-    // report unready so the node drains and restarts onto the restored data.
-    if (await maintenance.currentWriteEpoch() !== baselineWriteEpoch) {
-      throw new Error('PostgreSQL write epoch advanced past this process; restart onto the restored snapshot')
-    }
+    await assertCurrentDataEpoch()
   },
 }
 
+await assertCurrentDataEpoch()
 if (await deps.users.count() === 0) {
   const password = randomBytes(12).toString('base64url')
   await writeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile, password)

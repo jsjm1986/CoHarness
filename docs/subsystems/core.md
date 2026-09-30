@@ -43,6 +43,12 @@ Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index
 interface AgentHandle {
   agent: Agent
   dispose(): Promise<void>
+  /**
+   * Close admission and dispose only when no turn, maintenance task or inbox input remains.
+   * Live children and plugin-owned resources veto release through agent/idle-release-check.
+   * @returns false without changing a busy Agent; true after successful idle disposal.
+   */
+  tryDisposeIdle(): Promise<boolean>
 }
 ```
 
@@ -838,6 +844,28 @@ withoutInitiator<T>(operation: () => T): T
 setFactory(factory: AgentFactory): () => void
 
 /**
+ * Hold Session identities while an owner releases resources and removes durable data.
+ * Existing factory work and overlapping removals refuse the reservation.
+ * @param ids - exact identities whose creation and resource admission must remain closed.
+ * @returns a caller-owned reservation, released after the whole removal operation settles.
+ */
+reserveRemoval(ids: readonly SessionId[]): Disposable
+
+/**
+ * Test the current removal reservation before allocating an Agent-owned resource.
+ * @param id - Session whose caller has already been authenticated.
+ * @returns whether its owner is releasing it for durable deletion.
+ */
+isRemoving(id: SessionId): boolean
+
+/**
+ * Keep an addressed lifecycle request out of concurrent permanent removal.
+ * @param ids - identities used while resolving or preparing an Agent operation.
+ * @returns a caller-owned reservation to retain until the operation settles.
+ */
+reserveUse(ids: readonly SessionId[]): Disposable
+
+/**
  * Create and publish a new agent through the registered factory.
  * Distinct from {@link register} (which records an already-constructed
  * agent): this constructs the agent and its session. Rejects if no factory is
@@ -1036,6 +1064,28 @@ A step or turn errored. The machine reports a failure here even when the error h
  * @mode emit
  */
 'agent/error'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; error: unknown }): void
+```
+
+Types: [Scoped](scope.md)
+
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
+<a id="agentidle-release-check--bail"></a>
+
+#### `agent/idle-release-check` — bail
+
+Synchronously refuse idle disposal while a plugin owns pending work or retained resources. Listeners inspect only resources owned by the exact Agent and return undefined otherwise. Scope-filtered dispatch; global resource registries still match the exact payload Agent.
+
+```ts cordis-catalog
+/**
+ * Synchronously refuse idle disposal while a plugin owns pending work or retained resources.
+ * Listeners inspect only resources owned by the exact Agent and return undefined otherwise.
+ * Scope-filtered dispatch; global resource registries still match the exact payload Agent.
+ * @param payload - the Agent whose lifecycle owner requested idle disposal.
+ * @returns busy when an owned resource must be stopped first.
+ * @mode bail
+ */
+'agent/idle-release-check'(this: Scoped<Agent>, payload: { agent: Agent }): 'busy' | undefined
 ```
 
 Types: [Scoped](scope.md)

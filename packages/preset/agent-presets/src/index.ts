@@ -38,7 +38,9 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { settingsNamespace, type SettingsScope, type default as SettingsService } from '@deepseek-ai/dsh-settings'
-import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
+import { dshHomePath, expandHomePath } from '@deepseek-ai/dsh-home-paths'
+import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
+import { resolve } from 'node:path'
 import { discoverPresets, USER_PRESET_DIR } from './discovery.ts'
 import { copyComposition, deleteComposition, readComposition } from './authoring.ts'
 import { livePresetMounts, mountPreset, serviceForAgent, standingMountFor } from './mount.ts'
@@ -174,6 +176,11 @@ export class AgentPresets extends TypertRemoteService {
     this.resolvedRoots = config.includeUserRoot
       ? [...config.roots, { path: dshHomePath(USER_PRESET_DIR), trust: 'user' }]
       : [...config.roots]
+    for (const root of this.resolvedRoots) {
+      if (root.trust === 'user') registerManagedDataPath({
+        owner: '@deepseek-ai/dsh-agent-presets', kind: 'directory', path: resolve(expandHomePath(root.path)),
+      }, process.env.DSH_MANAGED_DATA_MANIFEST)
+    }
     // Deliberately not `installSettingsSection`: that helper exists to re-judge
     // what a consumer DERIVED from the source — memoized resolutions,
     // registration-level facts — across attach, detach, and change. Nothing

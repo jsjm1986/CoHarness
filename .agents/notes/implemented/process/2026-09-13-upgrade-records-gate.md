@@ -14,6 +14,8 @@ Upgrade work under `upgrades/` is recorded in alignment matrices, manifests, and
 
 `scripts/gen-upstream-commit-inventory.ts` writes `upgrades/alignment/UPSTREAM-COMMIT-INVENTORY-<tag>.json`: every non-merge commit between the synced baseline and a target tag, bucketed by the sovereignty manifest — `carried` (touches a tracked/adapted/replaced package), `newUpstream` (touches a package absent from the manifest entirely), `upstreamOnly`, `owned`, or `none`. The gate cross-checks the inventory against the same-tag matrix: every `carried` or `newUpstream` commit must be claimed by a row's `upstreamCommits` or fall under a row's `commitScope`, so no upstream change that reaches carried code can escape a recorded decision.
 
+The active matrix also agrees with `scripts/upstream-sync.json` on each carried package’s sovereignty and cannot label carried code `not-carried` or `upstreamOnly`. This verifies present source ownership, not functional completion: local tests, browser acceptance and external-provider evidence retain separate states. Frozen historical matrices are not reclassified against today’s tree.
+
 ## Alternatives considered
 
 - Requiring enumerated commits on every row: rejected because area-wide rows cover dozens of commits; `commitScope` claims the path domain once and the inventory check verifies the coverage is real.

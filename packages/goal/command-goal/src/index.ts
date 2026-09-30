@@ -3,6 +3,7 @@
  * @module @deepseek-ai/dsh-command-goal
  */
 
+import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
 import type { Context } from '@deepseek-ai/cordis'
 import { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
@@ -118,7 +119,10 @@ function submitObjectiveAttachments(invocation: CommandInvocation): void {
   if (invocation.attachments.length === 0) return
   invocation.agent.followup(createUserMessage({
     content: [...invocation.attachments, { type: 'text', text: 'Reference images for the goal objective.' }],
-    source: { kind: 'user' },
+    source: { kind: 'user', ...(() => {
+      const scope = executionAuthorityOf(invocation.agent.ctx)?.capture(invocation.agent)
+      return scope === undefined ? {} : { gatewayExecutionScope: scope }
+    })() },
   }))
 }
 
@@ -193,6 +197,13 @@ export function apply(ctx: Context): void {
     name: 'goal',
     description: 'set or view the goal for a long-running task',
     input: { hint: '[<objective>|clear|edit <objective>|pause|resume]', attachments: true },
-    handler: invocation => executeGoalCommand(ctx, invocation),
+    handler: (invocation) => {
+      const command = parseGoalCommand(invocation.rawInput)
+      if (command.kind !== 'create' && command.kind !== 'edit' && command.kind !== 'resume') return executeGoalCommand(ctx, invocation)
+      const authority = executionAuthorityOf(ctx)
+      return authority === undefined ? executeGoalCommand(ctx, invocation)
+        : authority.runRequest(invocation.agent, { command: 'goal', input: invocation.rawInput, attachments: invocation.attachments },
+          () => executeGoalCommand(ctx, invocation))
+    },
   })
 }

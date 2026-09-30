@@ -22,6 +22,9 @@
     },
     {
       "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../context/execution-authority"
     }
   ]
 }

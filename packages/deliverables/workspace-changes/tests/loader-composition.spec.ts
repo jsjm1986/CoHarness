@@ -14,6 +14,7 @@ import Include from '@deepseek-ai/cordis-plugin-include'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import * as WorkspaceChangesPlugin from '@deepseek-ai/dsh-workspace-changes'
 import { changes, endTurn, git, startTurn, toolCall } from './support.ts'
 
@@ -38,8 +39,10 @@ describe('real Loader composition', () => {
     await writeFile(join(root, 'cordis.yml'), [
       "- name: '@deepseek-ai/dsh-session'",
       "- name: '@deepseek-ai/dsh-subprocess-local'",
+      "- name: '@deepseek-ai/dsh-session-projection'",
       isolated ? "- name: 'test:execution-fs'" : "- name: '@deepseek-ai/dsh-fs-local'",
       "- name: '@deepseek-ai/dsh-workspace-changes'",
+      `  config: { storageRoot: ${JSON.stringify(join(root, 'reviews'))} }`,
       '',
     ].join('\n'))
     context = new Context()
@@ -48,6 +51,7 @@ describe('real Loader composition', () => {
     context.loader.builtins.include = Include
     const modules = new Map<string, unknown>([
       ['@deepseek-ai/dsh-session', SessionStore],
+      ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
       ['test:execution-fs', ExecutionFileSystem],
       ['@deepseek-ai/dsh-fs-local', LocalFileSystem],
       ['@deepseek-ai/dsh-subprocess-local', LocalSubprocessRuntime],
@@ -79,7 +83,7 @@ describe('real Loader composition', () => {
     toolCall(session, 1, 'bash', { command: 'x' })
     endTurn(session, 1)
     await context.waterfall('tools/pre-execute', { agent: { session } } as never, () => Promise.resolve(undefined as never))
-    const [recorded, ...rest] = changes(context, session)
+    const [recorded, ...rest] = (await changes(context, session))
     expect(rest).toEqual([])
     expect(recorded).toEqual({
       turn: 1, cwd, total: 1, added: 1, deleted: 0,

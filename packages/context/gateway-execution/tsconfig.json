@@ -70,6 +70,33 @@
     },
     {
       "path": "../../webhook/webhook"
+    },
+    {
+      "path": "../collaboration"
+    },
+    {
+      "path": "../../goal/goal"
+    },
+    {
+      "path": "../../goal/goal-round-driver"
+    },
+    {
+      "path": "../../jobs/jobs-local"
+    },
+    {
+      "path": "../../jobs/tool-jobs"
+    },
+    {
+      "path": "../../experimental/auto-review"
+    },
+    {
+      "path": "../../test-support/llm-replay"
+    },
+    {
+      "path": "../../session/session-format-v4-to-v5"
+    },
+    {
+      "path": "../../session/session-format-v5-to-v6"
     }
   ]
 }

@@ -1,6 +1,6 @@
 /** Strict replay fold for Agent Teams log-only events. */
 
-import type { ExecutionInputId } from '@deepseek-ai/dsh-execution-authority'
+import type { ExecutionInputId, ExecutionScopeId } from '@deepseek-ai/dsh-execution-authority'
 import { z } from 'zod'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -88,6 +88,7 @@ const teamTaskSnapshotSchema = z.object({
 
 const executionScopeSchema = z.object({
   parentSessionId: sessionIdSchema,
+  scopeId: z.uuid().transform(value => value as ExecutionScopeId).optional(),
   inputs: z.array(z.uuid().transform(value => value as ExecutionInputId)).refine(ids => new Set(ids).size === ids.length),
   primaryActorUserId: positiveSafeInteger.optional(),
   unverifiedHistory: z.boolean(),

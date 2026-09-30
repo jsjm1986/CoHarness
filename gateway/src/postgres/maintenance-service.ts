@@ -9,8 +9,13 @@
  * completeRestore} while administrators drive {@link enterMaintenance},
  * {@link exitMaintenance}, and {@link setNodeStatus} from the admin API.
  */
-import type { Queryable } from './database.ts'
+import { transaction, type Queryable } from './database.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
+
+/** Database-wide exclusion shared by data snapshots, restores and maintenance exit. */
+export const DEPLOYMENT_DATA_LOCK = 'coharness:database-and-managed-files'
+/** A restore SQL transaction retains exclusion even if its local command proxy has exited. */
+export const DEPLOYMENT_SQL_LOCK = 'coharness:database-restore-sql'
 
 export type ClusterMode = 'serving' | 'maintenance' | 'restoring'
 export type DeploymentOperationKind = 'enter-maintenance' | 'exit-maintenance' | 'apply' | 'backup' | 'restore' | 'node-status'
@@ -32,9 +37,10 @@ export interface ClusterNodeView {
    * cannot prove it is not writing, so it never counts as quiesced.
    */
   inflightWrites: number
+  /** Instances whose process lifecycle has not confirmed a stopped state. */
+  activeRuntimes: number
   /**
-   * Fresh heartbeat, acknowledged the current maintenance epoch, and zero
-   * in-flight writers.
+   * All instances stopped and the node's Gateway write gate acknowledged.
    */
   quiesced: boolean
 }
@@ -49,9 +55,8 @@ export interface ClusterState {
   updatedAt: string
   nodes: ClusterNodeView[]
   /**
-   * Every node still allowed to write (active or draining) has a fresh
-   * heartbeat and acknowledged the current maintenance epoch. Offline nodes
-   * are declared stopped by an operator and never write.
+   * Every instance is stopped. Active or draining nodes also need a fresh
+   * heartbeat and acknowledgment of the current maintenance epoch.
    */
   writersQuiesced: boolean
 }
@@ -216,11 +221,15 @@ export class PostgresMaintenanceService {
       heartbeat_age_ms: number | null
       maintenance_applied_epoch: string
       inflight_writes: string
+      active_runtimes: number
     }>(
-      `SELECT id,name::text,status,last_heartbeat_at,
-              (EXTRACT(EPOCH FROM (now()-last_heartbeat_at))*1000)::bigint heartbeat_age_ms,
-              maintenance_applied_epoch,inflight_writes
-       FROM harness.compute_nodes WHERE organization_id=$1 ORDER BY name`,
+      `SELECT n.id,n.name::text,n.status,n.last_heartbeat_at,
+              (EXTRACT(EPOCH FROM (now()-n.last_heartbeat_at))*1000)::bigint heartbeat_age_ms,
+              n.maintenance_applied_epoch,n.inflight_writes,
+              (SELECT count(*)::integer FROM harness.instances i
+               WHERE i.organization_id=n.organization_id AND i.assigned_node_id=n.id
+                 AND (i.observed_state<>'stopped' OR i.desired_state<>'stopped')) active_runtimes
+       FROM harness.compute_nodes n WHERE n.organization_id=$1 ORDER BY n.name`,
       [this.context.organizationId],
     )
     const epoch = BigInt(control.maintenance_epoch)
@@ -229,14 +238,12 @@ export class PostgresMaintenanceService {
       const fresh = row.heartbeat_age_ms !== null && row.heartbeat_age_ms <= this.staleHeartbeatMs
       const applied = BigInt(row.maintenance_applied_epoch) >= epoch
       const inflight = Number(row.inflight_writes)
-      // A node that never heartbeated cannot be writing; its gate observes the
-      // maintenance epoch on first use. A stale-heartbeat node might still be
-      // running partitioned and stays a writer until the operator stops it.
-      // A reported inflight count of -1 predates inflight reporting, so that
-      // node can never prove it is drained short of going offline.
+      // Offline and never-started Gateway nodes need no HTTP drain. Their
+      // runtime records must still confirm that every process has stopped.
+      // A stale or pre-reporting Gateway cannot prove its own writes drained.
       const cold = row.last_heartbeat_at === null
-      const nodeQuiesced = row.status === 'offline' || cold || (fresh && applied && inflight === 0)
-      if (row.status !== 'offline' && !nodeQuiesced) quiesced = false
+      const nodeQuiesced = row.active_runtimes === 0 && (row.status === 'offline' || cold || (fresh && applied && inflight === 0))
+      if (!nodeQuiesced) quiesced = false
       return {
         nodeId: row.id,
         name: row.name,
@@ -245,6 +252,7 @@ export class PostgresMaintenanceService {
         heartbeatAgeMs: row.heartbeat_age_ms === null ? null : Number(row.heartbeat_age_ms),
         maintenanceAppliedEpoch: row.maintenance_applied_epoch,
         inflightWrites: inflight,
+        activeRuntimes: row.active_runtimes,
         quiesced: nodeQuiesced,
       }
     })
@@ -295,8 +303,9 @@ export class PostgresMaintenanceService {
     const actorUserId = await this.actorUuid(actor)
     const updated = await this.context.pool.query(
       `UPDATE harness.cluster_control SET mode='serving', reason=NULL, actor_user_id=NULL, entered_at=NULL, updated_at=now()
-       WHERE organization_id=$1 AND mode='maintenance'`,
-      [this.context.organizationId],
+       WHERE organization_id=$1 AND mode='maintenance' AND pg_try_advisory_xact_lock(hashtext($2))
+         AND pg_try_advisory_xact_lock(hashtext($3))`,
+      [this.context.organizationId, DEPLOYMENT_DATA_LOCK, DEPLOYMENT_SQL_LOCK],
     )
     if (updated.rowCount !== 1) {
       const control = await readControl(this.context.pool, this.context.organizationId)
@@ -312,19 +321,22 @@ export class PostgresMaintenanceService {
    * Open a restore window inside maintenance; every live writer must already
    * be quiesced so the restore cannot race a still-writing node.
    * @param backupId - registry row the restore will apply, or null for an operator-supplied dump
+   * @param detail - immutable recovery inputs committed with the restoring fence
    */
-  async beginRestore(actor: number | null, backupId?: string): Promise<ClusterState> {
+  async beginRestore(actor: number | null, backupId?: string, detail: Record<string, unknown> = {}): Promise<ClusterState> {
     const state = await this.state()
     if (state.mode !== 'maintenance') throw new MaintenanceError(409, 'restore-requires-maintenance')
     if (!state.writersQuiesced) throw new MaintenanceError(409, 'writers-not-quiesced')
     const actorUserId = await this.actorUuid(actor)
     const updated = await this.context.pool.query(
-      `UPDATE harness.cluster_control SET mode='restoring', updated_at=now()
-       WHERE organization_id=$1 AND mode='maintenance'`,
-      [this.context.organizationId],
+      `WITH opened AS (
+         UPDATE harness.cluster_control SET mode='restoring', updated_at=now()
+         WHERE organization_id=$1 AND mode='maintenance' RETURNING organization_id
+       ) INSERT INTO harness.deployment_operations(organization_id,kind,status,detail,created_by,started_at)
+         SELECT organization_id,'restore','running',$2,$3,now() FROM opened`,
+      [this.context.organizationId, JSON.stringify({ ...detail, backupId: backupId ?? null, maintenanceEpoch: state.maintenanceEpoch }), actorUserId],
     )
     if (updated.rowCount !== 1) throw new MaintenanceError(409, 'restore-begin-conflict')
-    await this.insertOperation('restore', 'running', actorUserId, { backupId: backupId ?? null })
     return this.state()
   }
 
@@ -336,55 +348,51 @@ export class PostgresMaintenanceService {
    */
   async completeRestore(actor: number | null, backupId: string | undefined, detail: Record<string, unknown>): Promise<ClusterState> {
     const actorUserId = await this.actorUuid(actor)
-    const updated = await this.context.pool.query(
-      `UPDATE harness.cluster_control SET mode='maintenance',
-         write_epoch=GREATEST(write_epoch+1,(EXTRACT(EPOCH FROM now())*1000)::bigint), updated_at=now()
-       WHERE organization_id=$1 AND mode='restoring'`,
-      [this.context.organizationId],
-    )
-    if (updated.rowCount !== 1) throw new MaintenanceError(409, 'restore-complete-conflict')
-    if (backupId !== undefined) {
-      await this.context.pool.query(
-        `UPDATE harness.backup_records SET status='restored', restored_at=now()
-         WHERE organization_id=$1 AND id=$2`,
-        [this.context.organizationId, backupId],
+    await transaction(this.context.pool, async client => {
+      const updated = await client.query<{ maintenance_epoch: string }>(
+        `UPDATE harness.cluster_control SET mode='maintenance',
+           write_epoch=GREATEST(write_epoch+1,(EXTRACT(EPOCH FROM now())*1000)::bigint), updated_at=now()
+         WHERE organization_id=$1 AND mode='restoring' RETURNING maintenance_epoch::text`,
+        [this.context.organizationId],
       )
-    }
-    // The dump rewound the ledger to dump-time: a restore request that was
-    // pending back then resurfaces as pending now. Abort any such resurrected
-    // claim so a later applier cannot pick it up and re-restore.
-    await this.context.pool.query(
-      `UPDATE harness.deployment_operations
-       SET status='aborted', finished_at=now(), error='superseded-by-restore'
-       WHERE organization_id=$1 AND kind='restore' AND status='pending'`,
-      [this.context.organizationId],
-    )
-    await this.insertOperation('restore', 'completed', actorUserId, { backupId: backupId ?? null, ...detail })
+      if (updated.rowCount !== 1) throw new MaintenanceError(409, 'restore-complete-conflict')
+      if (backupId !== undefined) {
+        await client.query(
+          `UPDATE harness.backup_records SET status='restored', restored_at=now()
+           WHERE organization_id=$1 AND id=$2`,
+          [this.context.organizationId, backupId],
+        )
+      }
+      // Another pending request must not replay a snapshot after this switch.
+      await client.query(
+        `UPDATE harness.deployment_operations
+         SET status='aborted', finished_at=now(), error='superseded-by-restore'
+         WHERE organization_id=$1 AND kind='restore' AND status='pending'`,
+        [this.context.organizationId],
+      )
+      await client.query(`UPDATE harness.deployment_operations SET status='completed',finished_at=now()
+        WHERE organization_id=$1 AND kind='restore' AND status='running' AND detail->>'maintenanceEpoch'=$2`,
+      [this.context.organizationId, updated.rows[0]!.maintenance_epoch])
+      await this.insertOperation('restore', 'completed', actorUserId, { backupId: backupId ?? null, ...detail }, undefined, client)
+    })
     return this.state()
   }
 
   /**
-   * Re-assert the restoring window after `restoreDump`: the applier excludes
-   * `cluster_control` from pg_restore, so the row normally survives intact —
-   * this call covers restores run with a custom command line or against an
-   * unpackaged dump where the exclusion was dropped. Reasserting keeps
-   * `completeRestore` able to transition; the write epoch bump there stays
-   * monotonic via `GREATEST` against whatever the dump rewound it to.
+   * Require the restoring window to have survived the database transaction.
+   * A missing fence is a failed restoration, not a state to repair after
+   * writers may already have observed the dump-time serving state.
    */
   async resumeRestoring(): Promise<void> {
-    await this.context.pool.query(
-      `INSERT INTO harness.cluster_control(organization_id,mode,updated_at)
-       VALUES($1,'restoring',now())
-       ON CONFLICT (organization_id) DO UPDATE SET mode='restoring', updated_at=now()`,
-      [this.context.organizationId],
-    )
+    const state = await readControl(this.context.pool, this.context.organizationId)
+    if (state.mode !== 'restoring') throw new MaintenanceError(409, 'restore-fence-lost')
   }
 
-  /** Record a failed restore attempt and return to maintenance so it can retry or exit. */
+  /** Record a failed restore without opening a path back to serving inconsistent data. */
   async failRestore(actor: number | null, error: string): Promise<ClusterState> {
     const actorUserId = await this.actorUuid(actor)
     const updated = await this.context.pool.query(
-      `UPDATE harness.cluster_control SET mode='maintenance', updated_at=now()
+      `UPDATE harness.cluster_control SET updated_at=now()
        WHERE organization_id=$1 AND mode='restoring'`,
       [this.context.organizationId],
     )
@@ -435,10 +443,11 @@ export class PostgresMaintenanceService {
     actorUserId: string | null,
     detail: Record<string, unknown>,
     nodeName?: string,
+    queryable: Queryable = this.context.pool,
   ): Promise<string> {
     const started = status === 'running'
     const finished = status === 'completed' || status === 'failed' || status === 'aborted'
-    const inserted = await this.context.pool.query<{ id: string }>(
+    const inserted = await queryable.query<{ id: string }>(
       `INSERT INTO harness.deployment_operations(organization_id,kind,status,node_name,detail,created_by,started_at,finished_at,error)
        VALUES($1,$2,$3,$6,$4,$5,CASE WHEN $7 THEN now() ELSE NULL END,CASE WHEN $8 THEN now() ELSE NULL END,$9)
        RETURNING id`,

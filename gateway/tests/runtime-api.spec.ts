@@ -121,7 +121,7 @@ function fixture() {
     notifyCompleted: vi.fn(async (_sessionId: string, _eventSeq: number): Promise<void> => {}),
   }
   const archiveSnapshot = vi.fn(async () => [{ id: 'command-1', rootSessionId: 'session-archive', action: 'restore' as const }])
-  const archiveAck = vi.fn(async () => {})
+  const archiveAck = vi.fn(async () => true)
   const deps = {
     context: {
       organizationSlug: ORGANIZATION_SLUG,
@@ -157,7 +157,7 @@ function fixture() {
     principals,
     governance: { resolveOrganizationCredential },
     push,
-    archives: { syncRuntimeSnapshot: archiveSnapshot, acknowledgeCommand: archiveAck },
+    archives: { syncRuntimeSnapshot: archiveSnapshot, acknowledgeCommand: archiveAck, hasPendingCommands: vi.fn(async () => false) },
   } satisfies RuntimeDependencies
   const issuePrincipal = (userId: number, mode: 'ro' | 'rw' = modes.get(userId) ?? 'rw') => principals.issue({
     user: user(userId, userId === ADMIN_ID ? 'admin' : 'user'),
@@ -253,6 +253,56 @@ async function appendFirst(
 }
 
 describe('runtime session creation authorization', () => {
+  it.each(['project', 'private'] as const)('binds a managed webhook root to its execution account and %s visibility', async (visibility) => {
+    const runtime = fixture()
+    const principal = runtime.principals.issueWebhookDispatch({
+      user: user(CREATOR_ID),
+      scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
+      runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+    }, 60_000)
+    const response = await request(runtime.handler, '/internal/runtime/session/create', {
+      principal,
+      body: { visibility, header: { id: 'webhook-root', version: 0, createdAt: CREATED_AT, cwd: '/tmp/shared' } },
+    })
+    expect(response.status).toBe(200)
+    const authorization = (response.body as { authorization: string }).authorization
+    expect(runtime.principals.verifySessionCreation(authorization)).toMatchObject({ creatorUserId: CREATOR_ID, visibility })
+    expect(await appendFirst(runtime, 'webhook-root', authorization)).toMatchObject({ status: 200, body: { result: 'inserted' } })
+    expect(runtime.append).toHaveBeenCalledWith('webhook-root', 'batch-webhook-root', [event], expect.objectContaining({
+      creatorUserId: CREATOR_INTERNAL_ID, projectId: PROJECT_INTERNAL_ID, visibility,
+    }))
+  })
+
+  it('refuses a webhook creator whose project write grant was revoked after the dispatch was signed', async () => {
+    const runtime = fixture()
+    const principal = runtime.principals.issueWebhookDispatch({
+      user: user(CREATOR_ID),
+      scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
+      runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+    }, 60_000)
+    runtime.modes.set(CREATOR_ID, 'ro')
+    const response = await request(runtime.handler, '/internal/runtime/session/create', {
+      principal,
+      body: { visibility: 'private', header: { id: 'revoked-webhook-root', version: 0, createdAt: CREATED_AT } },
+    })
+    expect(response.status).toBe(403)
+    expect(runtime.append).not.toHaveBeenCalled()
+  })
+
+  it.each(['archive-read', 'document-admin', 'terminal-admin', 'plugin-admin'] as const)('does not let a %s assertion create a project conversation', async (purpose) => {
+    const runtime = fixture()
+    const principal = runtime.principals.issue({
+      user: user(ADMIN_ID, 'admin'), purpose,
+      scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
+      runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+    })
+    expect(await request(runtime.handler, '/internal/runtime/session/create', {
+      principal,
+      body: { visibility: 'project', header: { id: 'restricted-root', version: 0, createdAt: CREATED_AT } },
+    })).toMatchObject({ status: 403 })
+    expect(runtime.append).not.toHaveBeenCalled()
+  })
+
   it('materializes a project root signed for the organization slug', async () => {
     const runtime = fixture()
     const authorization = await prepare(runtime, 'session-root', 'private')
@@ -767,6 +817,20 @@ describe('runtime organization credentials', () => {
 })
 
 describe('runtime archive synchronization', () => {
+  it('checks pending commands only for the authenticated runtime and refuses missing authority', async () => {
+    const runtime = fixture(), path = '/internal/runtime/archive/pending'
+    runtime.deps.archives.hasPendingCommands.mockResolvedValueOnce(true)
+    expect(await request(runtime.handler, path, { method: 'GET', body: {} }))
+      .toMatchObject({ status: 200, body: { pending: true } })
+    expect(runtime.deps.archives.hasPendingCommands).toHaveBeenCalledWith({ kind: 'project', id: PROJECT_ID })
+    expect(await request(runtime.handler, path, { method: 'GET', body: {}, token: 'not-authorized' }))
+      .toMatchObject({ status: 401 })
+    expect(runtime.deps.archives.hasPendingCommands).toHaveBeenCalledOnce()
+    const { archives: _archives, ...withoutArchives } = runtime.deps
+    expect(await request(createRuntimeApiHandler(withoutArchives), path, { method: 'GET', body: {} }))
+      .toMatchObject({ status: 503 })
+  })
+
   it('accepts a bounded projection batch and returns pending lifecycle commands', async () => {
     const runtime = fixture()
     const response = await request(runtime.handler, '/internal/runtime/archive/snapshot', {
@@ -791,6 +855,9 @@ describe('runtime archive synchronization', () => {
     })
     expect(ack).toMatchObject({ handled: true, status: 200, body: { acknowledged: true } })
     expect(runtime.archiveAck).toHaveBeenCalledWith('command-1', 5, undefined, { kind: 'project', id: PROJECT_ID })
+    runtime.archiveAck.mockResolvedValueOnce(false)
+    expect(await request(runtime.handler, '/internal/runtime/archive/ack', { body: { commandId: 'wrong-command', revision: 5 } }))
+      .toMatchObject({ status: 409, body: { error: 'archive-command-not-acknowledged' } })
   })
 
   it('rejects malformed retained Workspace metadata at the runtime boundary', async () => {

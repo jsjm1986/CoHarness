@@ -3,17 +3,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { AuthService } from '../src/auth.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { hashPassword } from '../src/password.ts'
 
 async function setup() {
-  const db = openDb(join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite'))
+  const root = mkdtempSync(join(tmpdir(), 'hgw-'))
+  const db = openDb(join(root, 'g.sqlite'))
   const now = Date.now()
   db.prepare(`INSERT INTO users(username, password_hash, home_path, role, must_change_password, created_at, updated_at)
               VALUES('alice', ?, '/tmp/alice', 'user', 0, ?, ?)`)
     .run(await hashPassword('secret-1'), now, now)
-  return { db, auth: new AuthService(db, loadConfig({})) }
+  return { db, auth: new AuthService(db, testConfig(root)) }
 }
 
 describe('AuthService', () => {

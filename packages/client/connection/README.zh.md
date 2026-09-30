@@ -8,6 +8,12 @@
 
 客户端 handle 还暴露可观察的连接状态与立即 `reconnect()` 操作。WebSocket 下行心跳允许连续两次 Pong 丢失后再安排终止，在保持卡顿主机可恢复的同时容忍一次繁忙事件循环。
 
+浏览器 Session 地址携带 runtime 身份，但不改变 Host ID。应用注册唯一地址解析器；`api` 路由已声明的 Session 字段，`wireApi` 仅供持有原始 ID 的 runtime 所有者使用。Remote 路由还接受生成的 Agent lookup 字段及应用声明的 JSON 路径；无关载荷字符串绝不改写。受管 Host 必须先声明 runtime 目标，缓冲帧才会对消费者可见。引导连接属于项目时，显式个人目标仍使用独立连接。
+
+一个页面固定其已验证的 Gateway 账号。fetch 包装仅覆盖同源 `/api` 和 `/account/api/` 请求，携带 `x-dsh-expected-principal-id`；socket 等待首次 HTTP 身份结果后携带 `dshPrincipal` 建连。Gateway 将其与已认证用户比较，并返回 `x-dsh-principal-id`。明确不一致、认证被撤销或引导运行时访问被拒绝时，旧请求先中止，Runtime 所有的 Session 与 slot 状态撤下，然后重载页面。临时连接失败导致身份缺失不会被当成另一个账号。不带预期身份字段的旧客户端继续遵守服务端授权。
+
+解码后的 Host 描述先固定页面的引导 runtime，再开放依赖作用域的请求与 socket。未显式指定 runtime 的请求使用该固定目标，其他标签页更改作用域 cookie 不会重定向它们。应用生成的私有预览及下载 URL 使用 `privateResourceUrl`，让浏览器原生导航携带同样的账号与 runtime 核验；公共链接保持不变。
+
 ## 概述
 
 本包承载浏览器到 Host 的 Remote 调用、精确 Fetch 响应与 connection generation。Client 插件挂载 `ctx.connection`，其中包含当前页面的 loopback 状态、通用 RPC、当前 generation 及其 Host 信息、可观察的恢复状态、立即重连命令，以及单一 generation source 的注册点。source 报告 ready 后 generation 才可见；source 结束、失败、被撤回或显式 stop 都会清空它，再由 `ConnectionController` 执行重试策略。

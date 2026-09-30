@@ -85,7 +85,10 @@
     "@deepseek-ai/dsh-attachment": "workspace:^",
     "@deepseek-ai/dsh-settings": "workspace:^",
     "@deepseek-ai/dsh-execution-authority": "workspace:^",
-    "@deepseek-ai/dsh-permission-presets": "workspace:^"
+    "@deepseek-ai/dsh-permission-presets": "workspace:^",
+    "@deepseek-ai/dsh-fs": "workspace:^",
+    "@deepseek-ai/dsh-subprocess": "workspace:^",
+    "@deepseek-ai/dsh-managed-data": "workspace:^"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-agent-presets": {
@@ -148,6 +151,9 @@
     "@deepseek-ai/dsh-user-approval": "workspace:^",
     "@deepseek-ai/dsh-util-time": "workspace:^",
     "@deepseek-ai/dsh-execution-authority": "workspace:^",
-    "@deepseek-ai/dsh-permission-presets": "workspace:^"
+    "@deepseek-ai/dsh-permission-presets": "workspace:^",
+    "@deepseek-ai/dsh-fs": "workspace:^",
+    "@deepseek-ai/dsh-subprocess": "workspace:^",
+    "@deepseek-ai/dsh-managed-data": "workspace:^"
   }
 }

@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentCarrier } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type { SandboxExecutionPolicy, SandboxMode } from '@deepseek-ai/dsh-sandbox'
 import { SubprocessExecutableNotFoundError, type SubprocessRuntime, type SubprocessTerminalEnvironment, type SubprocessTerminalHandle } from '@deepseek-ai/dsh-subprocess'
@@ -52,6 +53,42 @@ function fixture(overrides: Partial<Config> = {}) {
 }
 
 describe('TerminalController', () => {
+  it('refuses a remote Session without its execution realm instead of allocating on the Host', async () => {
+    const h = fixture()
+    const remote = owner(h.ctx, 'remote-session')
+    Object.assign(remote.session.header, { sshTarget: 7 })
+    await expect(h.controller.create(remote, request, signal())).rejects.toThrow('requires subprocess and sandbox policy')
+    expect(h.subprocess.spawnTerminal).not.toHaveBeenCalled()
+  })
+
+  it('blocks idle release before authorization settles and refuses allocation after removal starts', async () => {
+    const h = fixture(), entered = Promise.withResolvers<undefined>(), allow = Promise.withResolvers<undefined>()
+    await h.ctx.plugin(AgentRegistry)
+    h.ctx.provide('userTerminalAuthorization', { authorize: async () => {
+      entered.resolve(undefined)
+      await allow.promise
+      return { creator: 'alice' as import('../src/authorization.ts').TerminalCreatorId, signal: signal(), retain: () => ({ [Symbol.dispose]() {} }), [Symbol.dispose]() {} }
+    } })
+    const creating = h.controller.create(h.agent, request, signal())
+    await entered.promise
+    expect(h.ctx.bail(agentCarrier(h.agent), 'agent/idle-release-check', { agent: h.agent })).toBe('busy')
+    using _removal = h.ctx.agents.reserveRemoval([h.agent.id])
+    allow.resolve(undefined)
+    await expect(creating).rejects.toThrow('being removed')
+    expect(h.subprocess.spawnTerminal).not.toHaveBeenCalled()
+    expect(h.ctx.bail(agentCarrier(h.agent), 'agent/idle-release-check', { agent: h.agent })).toBeUndefined()
+    await expect(h.controller.create(h.agent, request, signal())).rejects.toThrow('being removed')
+  })
+
+  it('keeps a published terminal busy until close confirms process cleanup', async () => {
+    const h = fixture()
+    await h.controller.create(h.agent, request, signal())
+    expect(h.ctx.bail(agentCarrier(h.agent), 'agent/idle-release-check', { agent: h.agent })).toBe('busy')
+    expect(h.ctx.bail(agentCarrier(owner(h.ctx, 'unrelated')), 'agent/idle-release-check', { agent: owner(h.ctx, 'unrelated') })).toBeUndefined()
+    await h.controller.close(h.agent, id)
+    expect(h.ctx.bail(agentCarrier(h.agent), 'agent/idle-release-check', { agent: h.agent })).toBeUndefined()
+  })
+
   it('resolves execution services from an Agent plugin context without consumer injections', async () => {
     const { ctx, controller } = fixture()
     let agent: Agent | undefined

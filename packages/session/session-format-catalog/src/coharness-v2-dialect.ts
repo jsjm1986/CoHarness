@@ -11,6 +11,7 @@
  */
 
 import { createHash } from 'node:crypto'
+import { assertReleasedEventPayload, assertReleasedSurfaceMetadata } from '@deepseek-ai/dsh-session-format-v0-to-v1'
 import {
   SessionFormatError,
   SessionFormatUnsupportedMigrationError,
@@ -571,6 +572,14 @@ export const coharnessV2ToV3Dialect: SessionFormatMigration = Object.freeze({
   },
 })
 
+/** CoHarness JSONL v2 retains top-level streams until the adjacent v3-to-v4 fold. */
+export const coharnessJsonlV2ToV3Dialect: SessionFormatMigration = Object.freeze({
+  ...coharnessV2ToV3Dialect,
+  createStage(input: SessionFormatMigrationStageInput): SessionFormatMigrationStage {
+    return new CoharnessV2DialectStage(input, true)
+  },
+})
+
 /**
  * The dialect's ordering policy: every admission and rewrite rule delegates to
  * the released v2→v3 primitives, while the dialect itself owns the sequencing
@@ -607,7 +616,7 @@ class CoharnessV2DialectStage implements SessionFormatMigrationStage {
   private lastForeignDeliverySeq: number | undefined
   private lastTime: number
 
-  constructor(input: SessionFormatMigrationStageInput) {
+  constructor(input: SessionFormatMigrationStageInput, private readonly legacyStreams = false) {
     this.input = input
     this.sessionId = input.sourceHeader.id
     this.seeded = input.sourceHeader.isSeeded
@@ -643,7 +652,20 @@ class CoharnessV2DialectStage implements SessionFormatMigrationStage {
     event = dialect.event
     /* Dialect-only types have no released classification; they keep the
      * dialect's ordering and placement but bypass released admission. */
-    if (!dialectOnly) assertEvent(event, 2)
+    const legacyStream = this.legacyStreams && (event.type === 'assistant/chunk'
+      || event.type === 'assistant/message' && !Object.hasOwn(record(event.data, event.type), 'stream'))
+    if (legacyStream) {
+      const data = record(event.data, event.type)
+      const chunk = event.type === 'assistant/chunk' ? record(data['chunk'], 'assistant chunk') : undefined
+      if (chunk?.['type'] === 'usage' && Object.hasOwn(chunk, 'credentialSource')) {
+        if (typeof chunk['credentialSource'] !== 'string') throw new SessionFormatError('usage credentialSource must be a string')
+        const { credentialSource: _source, ...usage } = chunk
+        assertReleasedEventPayload({ ...event, data: { ...data, chunk: usage } }, 1)
+      } else {
+        assertReleasedEventPayload(event, 1)
+      }
+      assertReleasedSurfaceMetadata(event, event.seq, event.type, 'allow-empty-assistant')
+    } else if (!dialectOnly) assertEvent(event, 2)
     this.observeMessageIds(event)
     if (event.type === 'step/start') {
       const data = record(event.data, event.type)
@@ -775,7 +797,12 @@ class CoharnessV2DialectStage implements SessionFormatMigrationStage {
     } else if (this.sourceCut !== undefined && event.seq < this.sourceCut) {
       this.inheritedCut = this.targetSeq
     }
-    const emitted = canonicalizeTransformedEvent(renamePtcEvent(remapEvent(event, targetSeq, this.mapping)))
+    const mapped = renamePtcEvent(remapEvent(event, targetSeq, this.mapping))
+    const { sourceEventSeqs, ...settlement } = mapped
+    // Historical JSONL settlements cite their top-level chunks; the v3-to-v4 fold consumes those citations.
+    const emitted = this.legacyStreams && mapped.type === 'assistant/message' && sourceEventSeqs !== undefined
+      ? { ...canonicalizeTransformedEvent(settlement), sourceEventSeqs }
+      : canonicalizeTransformedEvent(mapped)
     const ledger = this.ledgers.get(event.seq)
     context.emitEvent(ledger === undefined ? emitted : restoreDialectMembers(emitted, ledger))
   }

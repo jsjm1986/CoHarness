@@ -358,7 +358,8 @@ describePg('Gateway execution identities', () => {
     await policies.set({ kind: 'user', id: f.admin.id }, true, '2')
     expect(await status()).toMatchObject({ status: 200, body: { eligible: true, confirmed: false } })
     await pool.query('UPDATE harness.execution_sessions SET unverified_history=true WHERE organization_id=$1 AND session_id=$2', [f.organizationId, id])
-    expect(await status()).toMatchObject({ status: 200, body: { eligible: false, confirmed: false } })
+    expect(await status()).toMatchObject({ status: 200, body: { eligible: true, confirmed: false } })
+    expect((await f.call('desktop-authorize', { ...request, ownerSessionIds: [] })).status).toBe(403)
   })
 
   it('coordinates a root and its live children without a browser assertion and stops on revoked access', async () => {

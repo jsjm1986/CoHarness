@@ -14,6 +14,8 @@ Status: implemented
 
 `scripts/gen-upstream-commit-inventory.ts` 写出 `upgrades/alignment/UPSTREAM-COMMIT-INVENTORY-<tag>.json`：同步 baseline 与目标 tag 之间的每个非合并提交，按 sovereignty 清单分桶——`carried`（触及 tracked/adapted/replaced 包）、`newUpstream`（触及清单完全未收录的包）、`upstreamOnly`、`owned` 或 `none`。门禁将清单与同 tag 矩阵交叉核对：每个 `carried` 或 `newUpstream` 提交必须被某行的 `upstreamCommits` 认领或落入某行 `commitScope`，使任何触及已携带代码的上游变更都无法逃过记录决策。
 
+活动矩阵中每个已携带包的主权分类还必须与 `scripts/upstream-sync.json` 一致，不能把已携带代码标为 `not-carried` 或 `upstreamOnly`。该检查验证当前源码归属，不证明功能完成：本地测试、浏览器验收和外部 Provider 证据仍保留独立状态。冻结的历史矩阵不按今天的工作树重新分类。
+
 ## Alternatives considered
 
 - 要求每行都枚举提交：不采用——领域级行覆盖数十个提交，`commitScope` 一次声明路径域，由清单交叉核对验证覆盖为真。

@@ -99,6 +99,30 @@ function fail(message: string): never {
   throw new Error(`upgrade-records: ${message}`)
 }
 
+/**
+ * Keep the active alignment matrix consistent with the carried-package manifest.
+ * @param path - active matrix path used in diagnostics.
+ * @param matrix - current upgrade record; frozen historical matrices are excluded.
+ * @param packages - the sovereignty manifest's authoritative carried-package entries.
+ */
+export function checkCurrentPackageDispositions(path: string, matrix: unknown, packages: unknown): void {
+  if (!isRecord(matrix) || !Array.isArray(matrix.rows) || !isRecord(packages)) {
+    fail(`${path} requires current matrix rows and carried-package sovereignty`)
+  }
+  for (const candidate of matrix.rows as unknown[]) {
+    if (!isRecord(candidate) || typeof candidate.area !== 'string' || !candidate.area.startsWith('packages/')) continue
+    const key = candidate.area.slice('packages/'.length)
+    const carried = packages[key]
+    if (!isRecord(carried)) continue
+    if (candidate.localSovereignty !== carried.sovereignty) {
+      fail(`${path} ${candidate.area} localSovereignty differs from scripts/upstream-sync.json`)
+    }
+    if (candidate.targetAssessment === 'not-carried' || candidate.upstreamOnly !== undefined) {
+      fail(`${path} ${candidate.area} is carried but claims upstream-only or not-carried`)
+    }
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
@@ -304,13 +328,17 @@ function main(): number {
     syncedTag: string
     syncedCommit: string
     gateReplayRecord?: string
+    packages: unknown
   }
   let checked = 0
   const matrices = new Map<string, unknown>()
   for (const name of recordsIn(ALIGNMENT_DIR, 'UPSTREAM-ALIGNMENT-MATRIX-', '.json')) {
     const rel = `${ALIGNMENT_DIR}/${name}`
     const parsed: unknown = JSON.parse(readFileSync(resolve(root, rel), 'utf8'))
-    if (name === `UPSTREAM-ALIGNMENT-MATRIX-${sync.syncedTag}.json`) requireCurrentSchema(rel, parsed)
+    if (name === `UPSTREAM-ALIGNMENT-MATRIX-${sync.syncedTag}.json`) {
+      requireCurrentSchema(rel, parsed)
+      checkCurrentPackageDispositions(rel, parsed, sync.packages)
+    }
     checkMatrix(rel, parsed)
     checkMatrixFileInventories(rel, parsed)
     matrices.set(name.replace('UPSTREAM-ALIGNMENT-MATRIX-', '').replace('.json', ''), parsed)

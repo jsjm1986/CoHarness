@@ -11,8 +11,13 @@
  * @module @deepseek-ai/dsh-subagent/out-of-process
  */
 
-import { accessSync, constants, statSync } from 'node:fs'
+import { accessSync, constants, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
+import type { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { SessionId } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-subprocess'
+import type {} from '@deepseek-ai/dsh-fs'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SubagentCapabilities, SubagentResult, SubagentRun, SubagentStopReason } from './types.ts'
 
@@ -143,6 +148,57 @@ export function resolveChildCwd(prefix: string, configured: string | undefined, 
     throw new Error(`${prefix}: no working directory for the child — configure \`cwd\` or delegate from a parent session that has one`)
   }
   return assertUsableCwd(prefix, 'parent session cwd', parentCwd)
+}
+
+/** Workspace and subprocess provider resolved in the Session's fixed execution target. */
+export interface ChildExecution {
+  readonly cwd: string
+  readonly target: string
+  readonly remote: boolean
+  readonly subprocess: Context['subprocess']
+}
+
+/**
+ * Find the active member addressed by a loop request; model calls cannot borrow the Host workspace.
+ * @param ctx - provider context in the same runtime.
+ * @param id - exact child Session identity stamped by the loop.
+ * @returns its registered Agent.
+ */
+export function externalMemberAgent(ctx: Context, id: SessionId): Agent {
+  const agent = ctx.get('agents')?.get(id)
+  if (agent === undefined) throw new Error('External member has no active execution owner')
+  return agent
+}
+
+/**
+ * Resolve a child process in the delegating or member Agent's workspace and execution world.
+ * Local execution needs no preset composition; SSH requires its standing realm.
+ * @param ctx - provider context used to locate an SSH standing realm.
+ * @param agent - the actual owner; its immutable header selects the execution target.
+ * @param configured - explicit workspace override, otherwise the Session working directory.
+ * @param signal - admission cancellation, before any external prompt is sent.
+ * @returns canonical workspace and its matching subprocess provider.
+ */
+export async function resolveChildExecution(
+  ctx: Context, agent: Agent, configured: string | undefined, signal: AbortSignal,
+): Promise<ChildExecution> {
+  signal.throwIfAborted()
+  const remote = agent.session.header.sshTarget !== undefined
+  const environmentForAgent = remote ? (await import('@deepseek-ai/dsh-agent-presets')).environmentForAgent : undefined
+  const subprocess = environmentForAgent === undefined ? agent.ctx.get('subprocess') : environmentForAgent(ctx, agent, 'subprocess')
+  if (subprocess === undefined) throw new Error('External member execution target has no subprocess provider')
+  const candidate = configured ?? agent.session.header.cwd
+  if (candidate === undefined) throw new Error('External member requires a Session working directory or an explicit workspace')
+  if (environmentForAgent === undefined) {
+    return { cwd: realpathSync(resolveChildCwd('external member', undefined, candidate)), target: 'local', remote, subprocess }
+  }
+  const fs = environmentForAgent(ctx, agent, 'fs')
+  if (fs === undefined) throw new Error('External member SSH execution target has no filesystem provider')
+  const directory = await fs.resolve(candidate, { signal })
+  if ((await fs.stat(directory, signal))?.type !== 'directory') throw new Error('External member workspace is not a directory on its execution target')
+  const cwd = fs.processPath(directory)
+  signal.throwIfAborted()
+  return { cwd, target: `ssh:${String(agent.session.header.sshTarget)}`, remote, subprocess }
 }
 
 /** Normalize an unknown thrown value to an Error (the catch binding is `unknown`). */

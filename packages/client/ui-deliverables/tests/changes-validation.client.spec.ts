@@ -18,6 +18,9 @@ describe('durable and wire delivery values', () => {
   })
 
   it('accepts explicit comparison states and refuses unsupported flags and malformed hunks', () => {
+    const summary = { turn: 1, files: [], total: 0, added: 0, deleted: 0 }
+    expect(isChangesSummary({ ...summary, incomplete: true })).toBe(true)
+    expect(isChangesSummary({ ...summary, incomplete: 'true' })).toBe(false)
     expect(isChangedFile({ ...file, binary: true, oversized: true })).toBe(true)
     expect(isChangedFile({ ...file, binary: false })).toBe(false)
     expect(isChangedFile({ ...file, oversized: false })).toBe(false)

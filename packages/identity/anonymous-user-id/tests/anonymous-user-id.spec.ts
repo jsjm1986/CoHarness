@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { readManagedDataPaths } from '@deepseek-ai/dsh-managed-data'
 import {
   ANONYMOUS_USER_ID_FILE_NAME,
   getOrCreateAnonymousUserId,
@@ -24,6 +25,37 @@ afterEach(() => {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 describe('getOrCreateAnonymousUserId', () => {
+  it('records identity ownership before persisting and does not duplicate a cached claim', () => {
+    const home = tempHome(), inventory = join(home, 'managed-data.jsonl')
+    const env = { DSH_HOME: home, DSH_MANAGED_DATA_MANIFEST: inventory }
+    const id = getOrCreateAnonymousUserId({ env })
+    expect(readManagedDataPaths(inventory)).toEqual([{ owner: '@deepseek-ai/dsh-anonymous-user-id', kind: 'file', path: join(home, ANONYMOUS_USER_ID_FILE_NAME) }])
+    const before = readFileSync(inventory, 'utf8')
+    expect(getOrCreateAnonymousUserId({ env })).toBe(id)
+    expect(readFileSync(inventory, 'utf8')).toBe(before)
+    writeFileSync(inventory, 'incomplete')
+    expect(getOrCreateAnonymousUserId({ env })).toBe(id)
+    expect(readFileSync(inventory, 'utf8')).toBe('incomplete')
+    expect(() => readManagedDataPaths(inventory)).toThrow('incomplete record')
+    const anotherInventory = join(home, 'another-inventory.jsonl')
+    expect(getOrCreateAnonymousUserId({ env: { ...env, DSH_MANAGED_DATA_MANIFEST: anotherInventory } })).toBe(id)
+    expect(readManagedDataPaths(anotherInventory)[0]!.path).toBe(join(home, ANONYMOUS_USER_ID_FILE_NAME))
+  })
+
+  it('refuses damaged ownership records before creating an identity or admitting a new inventory', () => {
+    const base = tempHome(), home = join(base, 'new-home'), inventory = join(base, 'managed-data.jsonl')
+    const env = { DSH_HOME: home, DSH_MANAGED_DATA_MANIFEST: inventory }
+    writeFileSync(inventory, 'incomplete')
+    expect(() => getOrCreateAnonymousUserId({ env })).toThrow('incomplete record')
+    expect(existsSync(home)).toBe(false)
+    writeFileSync(inventory, '')
+    const id = getOrCreateAnonymousUserId({ env })
+    const changed = join(base, 'changed-inventory.jsonl')
+    writeFileSync(changed, 'incomplete')
+    expect(() => getOrCreateAnonymousUserId({ env: { ...env, DSH_MANAGED_DATA_MANIFEST: changed } })).toThrow('incomplete record')
+    expect(readFileSync(join(home, ANONYMOUS_USER_ID_FILE_NAME), 'utf8')).toBe(`${id}\n`)
+  })
+
   it('creates, persists, and returns a bare UUID line on first use', () => {
     const home = tempHome()
     const id = getOrCreateAnonymousUserId({ env: { DSH_HOME: home } })

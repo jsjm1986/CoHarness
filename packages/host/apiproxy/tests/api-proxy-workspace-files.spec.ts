@@ -846,13 +846,18 @@ describe('workspaceChanges RPC', () => {
     expect((await api.workspaceChanges.diff(request(payload))).result).toMatchObject({ ok: false, error: { code: 'collaboration-forbidden' } })
   })
 
-  it('does not expose disposed snapshots, cancelled reads, or provider diagnostics', async () => {
+  it('does not expose replaced providers, cancelled reads, or provider diagnostics', async () => {
     const { api, ctx, root, session } = await harness()
     const recorded = recorder(root)
     let available = true
-    ctx.provide('workspaceChanges', { summary: () => available ? recorded.summary : undefined, diff: recorded.service.diff })
+    let removeProvider = ctx.provide('workspaceChanges', { summary: () => available ? recorded.summary : undefined, diff: recorded.service.diff })
     const payload = { sessionId: session.id, seq: 3, index: 0 }
-    recorded.service.diff.mockImplementationOnce(async () => { available = false; return recorded.diff })
+    recorded.service.diff.mockImplementationOnce(async () => {
+      available = false
+      removeProvider()
+      removeProvider = ctx.provide('workspaceChanges', { summary: () => available ? recorded.summary : undefined, diff: recorded.service.diff })
+      return recorded.diff
+    })
     expect(expectOk(await api.workspaceChanges.diff(request(payload)))).toBeNull()
     expect(expectOk(await api.workspaceChanges.summary(request(payload)))).toBeNull()
     available = true

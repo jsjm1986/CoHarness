@@ -244,6 +244,16 @@ declare module './types.ts' {
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
+    /**
+     * Synchronously refuse idle disposal while a plugin owns pending work or retained resources.
+     * Listeners inspect only resources owned by the exact Agent and return undefined otherwise.
+     * Scope-filtered dispatch; global resource registries still match the exact payload Agent.
+     * @param payload - the Agent whose lifecycle owner requested idle disposal.
+     * @returns busy when an owned resource must be stopped first.
+     * @mode bail
+     */
+    'agent/idle-release-check'(this: Scoped<Agent>, payload: { agent: Agent }): 'busy' | undefined
+
     // ---- lifecycle ----
     /**
      * An entered agent is ready for per-agent initialization after factory setup.

@@ -168,6 +168,46 @@ describe('ConversationController', () => {
     await b.runtime.dispose()
   })
 
+  it('uploads and removes a draft in its addressed runtime, and refuses an unknown Session owner', async () => {
+    const b = await bench()
+    const urls: Array<{ url: URL; method: string }> = []
+    const target = { kind: 'project' as const, projectId: 41 }
+    Object.assign(b.runtime.sessions, { runtimeIdentityFor: (id: string) => id === 's1' ? target : undefined })
+    b.runtime.ctx.reflect.provide('connection', {
+      privateResourceUrl: (path: string) => {
+        const url = new URL(path, 'http://fixture')
+        url.searchParams.set('dshPrincipal', '7')
+        return `${url.pathname}${url.search}`
+      },
+    })
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(typeof input === 'string' ? input : 'url' in input ? input.url : input.href, 'http://fixture')
+      urls.push({ url, method: init?.method ?? 'GET' })
+      return new Response(init?.method === 'DELETE' ? '' : JSON.stringify({
+        uploadId: '00000000-0000-4000-8000-000000000041', name: 'a.txt', directoryId: '', bytes: 1,
+        fingerprint: 'fingerprint', chunkBytes: 65536, receivedBytes: 1, expiresAt: Date.now() + 1000, state: 'complete',
+        ref: { docId: 'project-document', name: 'a.txt', bytes: 1, mediaType: 'text/plain', modifiedAt: 1, path: '' },
+      }))
+    }))
+    try {
+      const [draft] = b.root.createDraftDocuments(b.session.sessionId, [new File(['x'], 'a.txt')])
+      await vi.waitFor(() => { expect(b.root.documentStore(b.session.sessionId).getSnapshot()[0]?.status).toBe('ready') })
+      b.root.removeDraftDocument(b.session.sessionId, draft!.id)
+      await vi.waitFor(() => { expect(urls).toHaveLength(2) })
+      expect(urls.map(value => value.method)).toEqual(['POST', 'DELETE'])
+      for (const { url } of urls) {
+        expect(url.searchParams.get('dshTarget')).toBe('project:41')
+        expect(url.searchParams.get('dshPrincipal')).toBe('7')
+      }
+      expect(urls[1]!.url.searchParams.get('id')).toBe('project-document')
+      b.root.createDraftDocuments('unknown' as never, [new File(['x'], 'b.txt')])
+      expect(b.root.documentStore('unknown' as never).getSnapshot()[0]).toMatchObject({
+        status: 'failed', error: 'Document Session is unavailable',
+      })
+      expect(urls).toHaveLength(2)
+    } finally { await b.runtime.dispose(); vi.unstubAllGlobals(); globalThis.localStorage?.clear() }
+  })
+
   it('validates every MIME type before allocating previews', async () => {
     const b = await bench()
     const created = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview')

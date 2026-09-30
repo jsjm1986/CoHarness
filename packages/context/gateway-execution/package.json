@@ -43,7 +43,9 @@
     "@deepseek-ai/dsh-jobs": "workspace:^",
     "@deepseek-ai/dsh-session-projection": "workspace:^",
     "@deepseek-ai/dsh-computer-use": "workspace:^",
-    "@deepseek-ai/dsh-webhook": "workspace:^"
+    "@deepseek-ai/dsh-webhook": "workspace:^",
+    "@deepseek-ai/dsh-collaboration": "workspace:^",
+    "@deepseek-ai/dsh-goal": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
@@ -76,7 +78,17 @@
     "@deepseek-ai/dsh-api-terminal-controller": "workspace:^",
     "@deepseek-ai/dsh-subprocess-local": "workspace:^",
     "@deepseek-ai/dsh-subprocess": "workspace:^",
-    "@deepseek-ai/dsh-typert-registry": "workspace:^"
+    "@deepseek-ai/dsh-typert-registry": "workspace:^",
+    "@deepseek-ai/dsh-collaboration": "workspace:^",
+    "@deepseek-ai/dsh-collaboration-gateway": "workspace:^",
+    "@deepseek-ai/dsh-goal": "workspace:^",
+    "@deepseek-ai/dsh-goal-round-driver": "workspace:^",
+    "@deepseek-ai/dsh-jobs-local": "workspace:^",
+    "@deepseek-ai/dsh-tool-jobs": "workspace:^",
+    "@deepseek-ai/dsh-experimental-auto-review": "workspace:^",
+    "@deepseek-ai/dsh-llm-replay": "workspace:^",
+    "@deepseek-ai/dsh-session-format-v4-to-v5": "workspace:^",
+    "@deepseek-ai/dsh-session-format-v5-to-v6": "workspace:^"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:^",
@@ -85,6 +97,12 @@
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-jobs": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-collaboration": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-goal": {
       "optional": true
     }
   }

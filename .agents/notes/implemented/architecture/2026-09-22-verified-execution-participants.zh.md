@@ -10,6 +10,8 @@ Status: implemented
 
 ## 决策
 
+本记录中按 Session 累积授权的生命周期已部分由[当前请求执行范围](2026-09-27-current-request-execution-scopes.zh.md) 替代。不可变输入证明、保留编辑者、实时权限检查和传输独立性继续适用。
+
 [Execution Authority](../../../../packages/context/execution-authority/README.zh.md) 定义输入证明、参与者捕获、委派和当前权限检查。[Gateway Execution](../../../../packages/context/gateway-execution/README.zh.md) 基于 Gateway PostgreSQL 记录实现这些操作。输入和编排消费者因而独立于请求传输，同时保留真正的 [Agent 发起人](2026-07-15-agent-initiator-scope.zh.md)。
 
 Gateway 为当前认证调用者的精确人工输入作证。不透明引用绑定组织、运行时、Session、消息和内容，但不会授予角色。队列替换保留先前编辑者。已接受的问题答案加入经过验证的回答者；普通工具审批表达同意，不会添加执行参与者。展示元数据仍用于转录和模型，但不是授权来源。
@@ -19,6 +21,8 @@ Session 的参与者限制持续累积。发送方在异步创建子任务或投
 执行检查每位保留参与者的当前访问权限。特权操作还要求每位参与者都有相关资格；未知历史身份会阻止 Full 和 Auto 执行。选择特权预设会同时检查选择者和现有参与者，不会制造新输入。[Auto 审查与计费](../bug-fix/2026-09-22-auto-review-execution-attribution.zh.md) 和 [profile 管理](2026-09-22-gateway-profile-management-authority.zh.md) 分别拥有其准入与归因规则。
 
 Gateway Runtime 将应用标记为必须具有执行授权。移除提供者后，该要求仍然保留；提供者缺失会拒绝受管执行。它的 `interactive()` 身份仅在 HTTP 处理仍活动时存在；继承的请求上下文不是后台授权。授权流断开会使待处理许可失效，并取消活动工作。重连允许重新检查，不会重放副作用。独立本机 profile 保留自己的操作者权限，不组合 Gateway 提供者。
+
+消费者跨异步授权比较底层 Cordis 提供方身份。新建追踪代理保留相同的提供方身份；提供方被移除或替换会使待执行操作失效。调用仍使用其追踪接收者，以保留作用域和资源归属。
 
 ## 考虑过的替代方案
 

@@ -31,7 +31,8 @@
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-sidebar"
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-connection"
       ],
       "platform": "web"
     }
@@ -48,7 +49,8 @@
     "@deepseek-ai/dsh-client-ui-conversation": "workspace:^",
     "@deepseek-ai/dsh-client-ui-sidebar": "workspace:^",
     "@deepseek-ai/dsh-client-userdoc-upload": "workspace:^",
-    "@deepseek-ai/dsh-userdoc": "workspace:^"
+    "@deepseek-ai/dsh-userdoc": "workspace:^",
+    "@deepseek-ai/dsh-client-connection": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
@@ -61,7 +63,8 @@
     "@deepseek-ai/dsh-client-userdoc-upload": "workspace:^",
     "@deepseek-ai/dsh-userdoc": "workspace:^",
     "@types/react": "~19.2.7",
-    "react": "^19.3.0"
+    "react": "^19.3.0",
+    "@deepseek-ai/dsh-client-connection": "workspace:^"
   },
   "files": [
     "lib/index.js",

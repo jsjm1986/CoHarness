@@ -11,7 +11,7 @@
  * before-the-fact, while the header only reports what a session already runs.
  */
 
-import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ClientRemote, ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the ctx.remote merge and the forwarded-event key face
@@ -19,7 +19,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the settings shell's SlotMap merge (the 'settings.section' entry).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { AgentPresetLabel } from './AgentPresetLabel.tsx'
 import type { AgentPresetLabelInjected } from './AgentPresetLabel.tsx'
 import { AgentPresetRow } from './AgentPresetRow.tsx'
@@ -131,7 +131,7 @@ export function apply(ctx: ClientContext): void {
   // staged choice belongs to the flow rather than to any one session.
   ctx.inject(['slots', 'conversation', 'sessions', 'workspaces'], (scope: ClientContext) => {
     const seat = new AgentPresetSeatController(scope.remote, (): SeatSessionSummary | undefined => {
-      const state = scope.sessions.list.getSnapshot()
+      const state = (scope.sessions.currentScopeList ?? scope.sessions.list).getSnapshot()
       const summary = state.current === undefined ? undefined : state.byId[state.current]
       return summary === undefined
         ? undefined
@@ -145,17 +145,55 @@ export function apply(ctx: ClientContext): void {
     })
     seatRef = seat
 
-    const seatInjected = (): AgentPresetSeatInjected => ({
-      hooks: { agentPresetSeat: seat.store },
-      load: () => seat.load(),
-      select: (id: string) => seat.select(id),
-      introduced: () => { seat.introduced() },
-    })
+    const panes = new Map<SessionId, { seat: AgentPresetSeatController; labels: AgentPresetSettingsController }>()
+    const pane = (id: SessionId): { seat: AgentPresetSeatController; labels: AgentPresetSettingsController } => {
+      const cached = panes.get(id)
+      if (cached !== undefined) return cached
+      const binding = scope.sessions.binding(id)
+      if (binding === undefined) throw new Error('Preset controls require a retained Session')
+      const remote = { agentPresets: {
+        ...scope.remote.agentPresets,
+        list: async () => {
+          if (scope.sessions.binding(id) !== binding) throw new Error('Preset Session generation was released')
+          const presets = binding.ctx.get('remote.agentPresets') as ClientRemote['agentPresets'] | undefined
+          if (presets === undefined) throw new Error('Preset namespace is unavailable in this runtime')
+          const result = await presets.list()
+          if (scope.sessions.binding(id) !== binding) throw new Error('Preset Session generation was released')
+          return result
+        },
+      } }
+      const owned = {
+        seat: new AgentPresetSeatController(remote, () => {
+          if (scope.sessions.binding(id) !== binding) return undefined
+          const summary = scope.sessions.list.getSnapshot().byId[id]
+          return summary === undefined ? undefined : { id, blank: summary.blank,
+            ...(summary.agentPreset === undefined ? {} : { agentPreset: summary.agentPreset }) }
+        }, (sessionId, preset) => {
+          if (scope.sessions.binding(id) === binding) scope.sessions.noteAgentPreset(sessionId as SessionId, preset)
+        }),
+        labels: new AgentPresetSettingsController(connection.forSession?.(id).api ?? api, remote, ctx.settingsScope.describe()),
+      }
+      panes.set(id, owned)
+      binding.ctx.effect(() => {
+        const stop = scope.sessions.list.subscribe(() => { void owned.seat.apply() })
+        return () => { stop(); if (panes.get(id) === owned) panes.delete(id) }
+      }, 'ui-agent-preset: pane identity')
+      return owned
+    }
+    const seatInjected = (id?: SessionId): AgentPresetSeatInjected => {
+      const selected = id === undefined || scope.sessions.keyFor === undefined ? seat : pane(id).seat
+      return {
+        hooks: { agentPresetSeat: selected.store },
+        load: () => selected.load(),
+        select: (preset: string) => selected.select(preset),
+        introduced: () => { selected.introduced() },
+      }
+    }
 
-    const labelInjected = (): AgentPresetLabelInjected => ({
-      hooks: { agentPresets: controller.store },
-      load: () => controller.load(),
-    })
+    const labelInjected = (id: SessionId): AgentPresetLabelInjected => {
+      const selected = scope.sessions.keyFor === undefined ? controller : pane(id).labels
+      return { hooks: { agentPresets: selected.store }, load: () => selected.load() }
+    }
 
     scope.effect(() => {
       // Connecting a workspace either creates a blank session or reuses one,
@@ -170,6 +208,7 @@ export function apply(ctx: ClientContext): void {
       const settingsMoved = scope.remote.$on('settings/document-updated', (ns) => {
         if (ns !== AGENT_PRESET_SETTINGS_NS) return
         void seat.load()
+        for (const value of panes.values()) { void value.seat.load(); void value.labels.load() }
       })
       // Every tab folds the committed preset into the shared session row; the
       // initiating tab may already have applied the RPC echo, which is idempotent.

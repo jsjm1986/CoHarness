@@ -7,10 +7,12 @@ A service can be a core spine service, a swappable capability seam, or a bundle/
 
 ```mermaid
 flowchart LR
+  pkg_host_apiproxy["host-apiproxy"]
+  svc_hostSessionLifecycle["ctx.hostSessionLifecycle<br/>Host ownership and idle release of Session handles"]
+  pkg_archive_gateway["archive-gateway"]
   pkg_execution_authority["execution-authority"]
   svc_executionAuthority["ctx.executionAuthority<br/>Verified human participants and current execution privileges"]
   pkg_gateway_execution["gateway-execution"]
-  pkg_host_apiproxy["host-apiproxy"]
   pkg_subagent["subagent"]
   pkg_subagent_in_process_driver["subagent-in-process-driver"]
   pkg_experimental_agent_team["experimental-agent-team"]
@@ -315,6 +317,7 @@ flowchart LR
   pkg_gateway_runtime --> svc_gatewayRuntime
   pkg_goal --> svc_goals
   pkg_hmr --> svc_hmr
+  pkg_host_apiproxy --> svc_hostSessionLifecycle
   pkg_invariants --> svc_invariants
   pkg_jobs --> svc_jobs
   pkg_jobs_local --> svc_jobs
@@ -444,6 +447,8 @@ flowchart LR
   svc_gatewayRuntime --> pkg_collaboration_gateway
   svc_gatewayRuntime --> pkg_session_persistence_gateway
   svc_hmr --> pkg_app_boot
+  svc_hostSessionLifecycle --> pkg_archive_gateway
+  svc_hostSessionLifecycle --> pkg_host_apiproxy
   svc_invariants --> pkg_agent
   svc_invariants --> pkg_agent_loop
   svc_invariants --> pkg_scope
@@ -560,6 +565,7 @@ flowchart LR
 
 | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.hostSessionLifecycle` | `core` | [`host-apiproxy`](../packages/host/apiproxy) | - | [`host-apiproxy`](../packages/host/apiproxy), [`archive-gateway`](../packages/context/archive-gateway) | - | The Host retains its factory handles, reserves Session identities during removal, and releases only idle resources before durable archive deletion. |
 | `ctx.executionAuthority` | `seam` | [`execution-authority`](../packages/context/execution-authority) | [`gateway-execution`](../packages/context/gateway-execution) | [`host-apiproxy`](../packages/host/apiproxy), [`subagent`](../packages/subagent/subagent), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver), [`experimental-agent-team`](../packages/experimental/agent-team), [`experimental-auto-review`](../packages/experimental/auto-review) | - | Input transports stamp authenticated participants; delegated work retains their restrictions and privileged operations recheck current grants. |
 | `ctx.pluginManagementAuthorization` | `seam` | [`plugin-manager`](../packages/boot/plugin-manager) | [`gateway-execution`](../packages/context/gateway-execution) | [`plugin-manager`](../packages/boot/plugin-manager), [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | Managed runtimes require current administrator authority before profile and dynamic-plugin operations, including queued changes. |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | Owns module and exact configuration watchers; application mutations share its queue and automatic reloads await the application file lock. |

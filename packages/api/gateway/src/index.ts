@@ -184,7 +184,8 @@ export class TypertGatewayService extends Service implements TypertGateway {
 
     let result: unknown
     try {
-      result = await Reflect.apply(method, receiver, parameters) as unknown
+      result = await this.ctx.waterfall('typert-gateway/invoke', authorization,
+        async () => await Reflect.apply(method, receiver, parameters) as unknown)
     } catch (error) {
       if (request.signal?.aborted === true) throw remoteCancelled(endpoint, error)
       throw error

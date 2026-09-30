@@ -8,13 +8,16 @@
 
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import {
   assertPositiveFinite,
   NO_START_CAPABILITIES,
-  resolveChildCwd,
+  resolveChildExecution,
+  externalMemberAgent,
+  type ChildExecution,
   type ContinuableCreateRequest,
   type ContinuableCreateSpec,
   type ResolvedSubagentStartRequest,
@@ -66,10 +69,11 @@ export interface Config {
    */
   stateDir?: string
   /**
-   * Workspace for persistent member sessions. Member turns have no parent
-   * Agent to inherit one from; defaults to the harness launch directory.
+   * Workspace override for persistent members; omitted uses the member Session working directory.
    */
   memberCwd?: string
+  /** Preinstalled command resolved inside an SSH execution target. */
+  remoteCommand?: string
 }
 
 export const Config: z<Config> = z.object({
@@ -81,6 +85,7 @@ export const Config: z<Config> = z.object({
   disposeGraceMs: z.number().default(DEFAULT_DISPOSE_GRACE_MS),
   stateDir: z.string().min(1),
   memberCwd: z.string().min(1),
+  remoteCommand: z.string().min(1).default('codex'),
 })
 
 type ResolvedConfig = Omit<Required<Config>, 'model' | 'stateDir' | 'memberCwd'>
@@ -102,7 +107,11 @@ class CodexProvider implements SubagentProvider {
         provider: memberRoute,
         model: config.model ?? CODEX_MEMBER_MODEL,
       }
-      this.prepareContinuable = (_request: ContinuableCreateRequest) => Promise.resolve({})
+      this.prepareContinuable = async (request: ContinuableCreateRequest) => {
+        const execution = await resolveChildExecution(ctx, request.parent, config.memberCwd, request.signal)
+        if (execution.remote) await execution.subprocess.resolveExecutable(config.remoteCommand, config.env, request.signal)
+        return {}
+      }
     }
   }
 
@@ -110,20 +119,13 @@ class CodexProvider implements SubagentProvider {
     request: ContinuableCreateRequest,
   ) => Promise<ContinuableCreateSpec>
 
-  start(request: ResolvedSubagentStartRequest) {
-    const parentCwd = request.parent.session.header.cwd
-    if (parentCwd === undefined) {
-      throw new Error(
-        'subagent-codex: no working directory for the child — delegate from a parent session that has one',
-      )
+  async start(request: ResolvedSubagentStartRequest) {
+    if (request.parent.session.header.cwd === undefined) {
+      throw new Error('subagent-codex: no working directory for the child — delegate from a parent session that has one')
     }
-    let cwd: string
+    let execution: ChildExecution
     try {
-      cwd = resolveChildCwd(
-        'subagent-codex',
-        undefined,
-        parentCwd,
-      )
+      execution = await resolveChildExecution(this.ctx, request.parent, undefined, request.signal)
     } catch (error: unknown) {
       if (request.signal.aborted) {
         throw new Error(
@@ -133,12 +135,15 @@ class CodexProvider implements SubagentProvider {
       throw codexStartupFailure(error)
     }
     const spec: CodexRunSpec = {
-      cwd,
+      cwd: execution.cwd,
+      ...execution.remote ? {
+        executable: await execution.subprocess.resolveExecutable(this.config.remoteCommand, this.config.env, request.signal),
+      } : {},
       ...this.config.model === undefined ? {} : { model: this.config.model },
       permissionMode: this.config.permissionMode,
       env: this.config.env,
       disposeGraceMs: this.config.disposeGraceMs,
-      spawn: spawnSpec => this.ctx.subprocess.spawn(spawnSpec),
+      spawn: spawnSpec => execution.subprocess.spawn(spawnSpec),
       onError: (error, stopReason) => {
         this.ctx.logger.warn(
           `subagent-codex "${this.name}": child run failed (${stopReason}): ${error.message}`,
@@ -163,6 +168,7 @@ export function apply(ctx: Context, config: Config): void {
     disposeGraceMs: config.disposeGraceMs as number,
     ...config.stateDir === undefined ? {} : { stateDir: config.stateDir },
     ...config.memberCwd === undefined ? {} : { memberCwd: config.memberCwd },
+    remoteCommand: config.remoteCommand ?? 'codex',
   }
   assertPositiveFinite(
     'subagent-codex',
@@ -181,20 +187,22 @@ export function apply(ctx: Context, config: Config): void {
   const identity = externalMemberIdentity(resolved.providerName, DEFAULT_PROVIDER_NAME, CODEX_MEMBER_ROUTE)
   let memberRoute: string | undefined
   if (llm !== undefined) {
-    const memberConfig: CodexMemberConfig = {
-      cwd: resolved.memberCwd ?? process.cwd(),
-      ...resolved.model === undefined ? {} : { model: resolved.model },
-      permissionMode: resolved.permissionMode,
-      env: resolved.env,
-      disposeGraceMs: resolved.disposeGraceMs,
-    }
     const store = new ExternalBindingStore(
       join(resolved.stateDir ?? join(homedir(), '.dsh', 'external-members'), identity.filename),
     )
-    const transport = new CodexMemberTransport(
-      memberConfig,
-      spec => ctx.subprocess.spawn(spec),
-    )
+    const transport = async (child: SessionId, signal: AbortSignal) => {
+      const execution = await resolveChildExecution(ctx, externalMemberAgent(ctx, child), resolved.memberCwd, signal)
+      store.assertExecution(child, execution)
+      const memberConfig: CodexMemberConfig = {
+        cwd: execution.cwd, remote: execution.remote,
+        ...execution.remote ? {
+          executable: await execution.subprocess.resolveExecutable(resolved.remoteCommand, resolved.env, signal),
+        } : {},
+        ...resolved.model === undefined ? {} : { model: resolved.model },
+        permissionMode: resolved.permissionMode, env: resolved.env, disposeGraceMs: resolved.disposeGraceMs,
+      }
+      return new CodexMemberTransport(memberConfig, spec => execution.subprocess.spawn(spec))
+    }
     ctx.effect(() => {
       const registration = llm.registerAdapter(
         [identity.route],
