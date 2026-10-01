@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-26-project-settings-authority-and-zero-rpc-guards.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-26-project-settings-authority-and-zero-rpc-guards.md
-2026-08-26-project-settings-authority-and-zero-rpc-guards.md: 8bd093d9f5322c9fb194e17c4787f4bcb5658cdb
-2026-08-26-project-settings-authority-and-zero-rpc-guards.zh.md: bc39a000a35e4d555218aef4f343dfb5e7f6a514
+/agent-note-project-settings-authority-and-zero-rpc-write-guards:
+  en: d2fda1e7d8ac6a42
+  zh: 5fc9760fe7ddd8d3
+/agent-note-project-settings-authority-and-zero-rpc-write-guards/problem:
+  en: 4db9050d5e0ef9ed
+  zh: 31e66368de59a96e
+/agent-note-project-settings-authority-and-zero-rpc-write-guards/decision:
+  en: 5078a683994aae57
+  zh: cdd0a8b50e7a0caa
+/agent-note-project-settings-authority-and-zero-rpc-write-guards/alternatives-considered:
+  en: 072a7f4f56720f11
+  zh: 8995d5fdd2db2623
+/agent-note-project-settings-authority-and-zero-rpc-write-guards/consequences:
+  en: c83a21b669b7d0c4
+  zh: 0136574626ba3c4e

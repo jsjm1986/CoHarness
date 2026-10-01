@@ -131,7 +131,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
   const wiring = shell
   const sessionStore = createSnapshotStore<ConversationSnapshot>({
     sessionId, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
-    nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue: [], running: false, composerPhase: 'active', removed: false,
     openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
     promptError: null, blank: false, subagent: null, lastAgentError: null,
@@ -142,10 +142,10 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
     useSession: bindSnapshotSelector(sessionStore),
     useSessions: bindSnapshotSelector(createSnapshotStore({
       ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
-      subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+      subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })),
     useWorkspaces: bindSnapshotSelector(createSnapshotStore({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
     useProjection: (() => undefined),
@@ -164,6 +164,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
       previewUrl: `blob:${id}`,
     })),
     useBusyEnter: bindSnapshotSelector(createSnapshotStore<'queue' | 'steer'>('queue')),
+    useStopShortcut: bindSnapshotSelector(createSnapshotStore<readonly string[]>([])),
     toggleCommandMenu: (selection) => {
       const snapshot = shell.snapshot
       controller.toggleSource('command', {

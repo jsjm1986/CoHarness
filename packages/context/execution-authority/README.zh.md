@@ -50,6 +50,7 @@ kind: "package-reference"
 - [Gateway Runtime](../gateway-runtime/README.zh.md) — 签名请求身份和私有传输。
 - [Agent 发起人范围](../../../.agents/notes/implemented/architecture/2026-07-15-agent-initiator-scope.zh.md) — 在编排入口恢复真正的 Agent。
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -59,6 +60,7 @@ kind: "package-reference"
 
 无；身份引用和服务调用不会改变模型请求内容。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -66,3 +68,13 @@ kind: "package-reference"
 - 消费者必须使用真正的操作拥有者和显式服务方法；导入类型不会认证调用者或委派权限。
 - 捕获的继承资料是提供者验证时使用的限制性输入，不是可转移的凭据或权限授予。
 - 接口不在操作系统层面隔离 Host 代码；部署隔离仍是独立要求。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -34,6 +34,7 @@ import { terminalBlockLabels, type TerminalCardModel } from '../models/terminal-
 import { diffBlockLabels, readBlockLabels, searchBlockLabels, webBlockLabels } from '../models/primitive-labels.ts'
 import type { WebCardModelProps } from '../models/web-card-model.ts'
 import { formatToolBody, type ToolRowState, type ToolRowVariant } from '../models/tool-call-model.ts'
+import { ToolDetails, type ToolDetailsModel } from './ToolDetails.tsx'
 import css from './ToolRow.module.css'
 
 export interface ToolRowProps {
@@ -105,6 +106,12 @@ export interface ToolRowProps {
    * list or fetched-source card when present.
    */
   web?: WebCardModelProps | null | undefined
+  /**
+   * Structured detail body for a recorded result (derived by
+   * `detailsCardModel`/`todoDiffModel`); it replaces the text body with
+   * localized fields, receipts, and change markers when present.
+   */
+  details?: ToolDetailsModel | null | undefined
   state: ToolRowState
   /**
    * Filesystem path from tool args; when set with onOpenFile, the summary
@@ -139,6 +146,7 @@ function leadingFor(state: ToolRowState, icon: ReactNode): ReactNode {
  *  summary already describe a settled row). */
 function stateStatus(state: ToolRowState, t: TranslateNS<'conversation'>): string | null {
   switch (state) {
+    case 'preparing': return t('row.preparing')
     case 'running': return t('row.running')
     case 'error': return t('row.failed')
     case 'stopped': return t('row.stopped')
@@ -166,6 +174,7 @@ export function ToolRow({
   renderMessageImages,
   search,
   web,
+  details,
   state,
   filePath,
   filePathLine,
@@ -182,12 +191,15 @@ export function ToolRow({
   const searchBody = search ?? null
   const webBody = web ?? null
   const askQuestionBody = askQuestion ?? null
+  const detailsBody = details ?? null
   const outputText = output ?? null
-  // A card replaces the text body; a call carries at most one card kind, so the
-  // card props are mutually exclusive. Any of them, or a text body/output,
-  // makes the row expandable.
-  const card = askQuestionBody ?? terminalBody ?? diffBody ?? readBody ?? imageBody ?? searchBody ?? webBody
-  const expandable = bodyRaw != null || outputText !== null || card !== null || openDetails !== undefined
+  // A card or structured detail body replaces the text body; a call carries at
+  // most one card kind, so the card props are mutually exclusive. Any of them,
+  // or a text body/output, makes the row expandable. A preparing call has no
+  // dispatched arguments yet, so nothing it could show exists to expand.
+  const card = askQuestionBody ?? terminalBody ?? diffBody ?? readBody ?? imageBody ?? searchBody ?? webBody ?? detailsBody
+  const expandable = state !== 'preparing'
+    && (bodyRaw != null || outputText !== null || card !== null || openDetails !== undefined)
   const open = expanded && expandable
   const bodyText = useMemo(
     () => open && card === null && bodyRaw != null ? formatToolBody(variant, bodyRaw) : null,
@@ -199,7 +211,8 @@ export function ToolRow({
   // An error row's collapsed summary IS the failure: the first error line in
   // the error color outranks both the args summary and a terminal description.
   const failureLine = state === 'error' ? errorSummary ?? null : null
-  const summaryText = failureLine ?? summary
+  // A detail body's receipt title drops its duplicated status while open.
+  const summaryText = failureLine ?? (open ? detailsBody?.expandedSummary ?? summary : summary)
   // The failure line replaces the summary wholesale, so a suffix derived from
   // the call args has nothing left to sit beside.
   const diffStat = useMemo(() => {
@@ -325,36 +338,38 @@ export function ToolRow({
                       )
                       : webBody !== null
                         ? <WebBlock {...webBody} labels={webBlockLabels(t)} className={css.webBody} />
-                        : (
-                          <>
-                            {variant === 'code' && bodyText !== null && (
-                              <div className={css.bodyScroll}>
-                                <CodeBlock code={bodyText} lang="typescript" copyLabel={t('copy')} copiedLabel={t('copied')} className={css.codeBody} />
-                              </div>
-                            )}
-                            {(cardBody !== null || outputText !== null) && (
-                              <div className={css.ioCard}>
-                                {cardBody !== null && (
-                                  <div className={css.ioSection}>
-                                    <span className={css.ioLabel}>{t('row.input')}</span>
-                                    <span className={css.ioText}>{cardBody}</span>
-                                  </div>
-                                )}
-                                {cardBody !== null && outputText !== null && (
-                                  <span className={css.ioDivider} aria-hidden />
-                                )}
-                                {outputText !== null && (
-                                  <div className={css.ioSection}>
-                                    <span className={css.ioLabel}>{t('row.output')}</span>
-                                    <span className={css.ioText} data-error={state === 'error' || undefined}>
-                                      {outputText}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </>
-                        )}
+                        : detailsBody !== null
+                          ? <ToolDetails model={detailsBody} t={t} onOpenFile={onOpenFile} />
+                          : (
+                            <>
+                              {variant === 'code' && bodyText !== null && (
+                                <div className={css.bodyScroll}>
+                                  <CodeBlock code={bodyText} lang="typescript" copyLabel={t('copy')} copiedLabel={t('copied')} className={css.codeBody} />
+                                </div>
+                              )}
+                              {(cardBody !== null || outputText !== null) && (
+                                <div className={css.ioCard}>
+                                  {cardBody !== null && (
+                                    <div className={css.ioSection}>
+                                      <span className={css.ioLabel}>{t('row.input')}</span>
+                                      <span className={css.ioText}>{cardBody}</span>
+                                    </div>
+                                  )}
+                                  {cardBody !== null && outputText !== null && (
+                                    <span className={css.ioDivider} aria-hidden />
+                                  )}
+                                  {outputText !== null && (
+                                    <div className={css.ioSection}>
+                                      <span className={css.ioLabel}>{t('row.output')}</span>
+                                      <span className={css.ioText} data-error={state === 'error' || undefined}>
+                                        {outputText}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          )}
           {openDetails !== undefined && (
             <button type="button" className={css.inspectButton} onClick={openDetails}>{t('row.openDetails')}</button>
           )}

@@ -110,24 +110,26 @@ describe('CI workflow', () => {
 
   it('keeps portable pools and requires native Windows for selected platform changes', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
+    const masterWorkflow = loadWorkflow('.github/workflows/ci-master.yml')
     if (!isRecord(workflow.jobs)
       || !isRecord(workflow.jobs.windows)
       || !isRecord(workflow.jobs['windows-native'])
-      || !isRecord(workflow.jobs['wine-apt-cache'])
-      || !isRecord(workflow.jobs['serial-windows'])
       || !isRecord(workflow.jobs['node-24'])
       || !isRecord(workflow.jobs['node-24-coverage'])
       || !isRecord(workflow.jobs['node-24-bench'])
       || !isRecord(workflow.jobs['node-24-consumers'])
       || !isRecord(workflow.jobs['pr-scope'])
-      || !isRecord(workflow.jobs['all-checks-passed'])) {
-      throw new TypeError('CI workflow must define pr-scope, windows, windows-native, wine-apt-cache, serial-windows, node-24, node-24-coverage, node-24-bench, node-24-consumers, and all-checks-passed jobs')
+      || !isRecord(workflow.jobs['all-checks-passed'])
+      || !isRecord(masterWorkflow.jobs)
+      || !isRecord(masterWorkflow.jobs['wine-apt-cache'])
+      || !isRecord(masterWorkflow.jobs['serial-windows'])) {
+      throw new TypeError('CI workflow must define pr-scope, windows, windows-native, node-24, node-24-coverage, node-24-bench, node-24-consumers, and all-checks-passed jobs; ci-master must define wine-apt-cache and serial-windows')
     }
 
     const windows = workflow.jobs.windows
     const windowsNative = workflow.jobs['windows-native']
-    const wineAptCache = workflow.jobs['wine-apt-cache']
-    const serialWindows = workflow.jobs['serial-windows']
+    const wineAptCache = masterWorkflow.jobs['wine-apt-cache']
+    const serialWindows = masterWorkflow.jobs['serial-windows']
     const node24 = workflow.jobs['node-24']
     const node24Coverage = workflow.jobs['node-24-coverage']
     const node24Bench = workflow.jobs['node-24-bench']
@@ -313,8 +315,10 @@ describe('CI workflow', () => {
 
   it('exempts push from cancellation, so one master merge does not cancel the running drill', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
-    if (!isRecord(workflow.jobs) || !isRecord(workflow.concurrency)) {
-      throw new TypeError('CI workflow must define jobs and a workflow-level concurrency block')
+    const masterWorkflow = loadWorkflow('.github/workflows/ci-master.yml')
+    if (!isRecord(workflow.jobs) || !isRecord(workflow.concurrency)
+      || !isRecord(masterWorkflow.jobs) || !isRecord(masterWorkflow.concurrency)) {
+      throw new TypeError('CI workflows must define jobs and workflow-level concurrency blocks')
     }
 
     // Cancellation applies to the whole superseded RUN, so this has to be
@@ -323,15 +327,18 @@ describe('CI workflow', () => {
     // a drill takes longer than the interval between master merges. The negated
     // form is load-bearing: `== 'pull_request'` would also stop cancelling
     // workflow_dispatch, and a re-dispatched runner benchmark holds up to 12
-    // larger runners for 15 minutes in this same group on master. The
+    // larger runners for 15 minutes in ci-master's same group on master. The
     // expression is evaluated against the NEWLY TRIGGERED run, so a dispatch on
     // master still cancels a mid-flight drill; the runbook records that bound.
+    // ci-master.yml holds the master-only drills and benchmarks, so it carries
+    // the same push exemption.
     expect(workflow.concurrency['cancel-in-progress']).toBe("${{ github.event_name != 'push' }}")
+    expect(masterWorkflow.concurrency['cancel-in-progress']).toBe("${{ github.event_name != 'push' }}")
 
     // Neither drill may carry a job-level group: it would not exempt the job
     // from run-scoped cancellation.
     for (const name of ['serial-linux-selfhosted', 'serial-windows']) {
-      const job = workflow.jobs[name]
+      const job = masterWorkflow.jobs[name]
       if (!isRecord(job)) throw new TypeError(`${name} must be defined`)
       expect(job.concurrency).toBeUndefined()
       // Both stay master-push-only and require explicit standby enablement.
@@ -340,13 +347,14 @@ describe('CI workflow', () => {
       expect(job.if).toContain("vars.DSH_CI_SELF_HOSTED_STANDBY_ENABLED == 'true'")
     }
 
-    // What bounds the cost of exempting push: a master push carries the cache
-    // seeder, the two drills, the native Windows inventory, and the browser
-    // sweep. Any job reachable on push starts accumulating uncancelled runs, so
-    // the set is pinned here. `windows-native` and `web-snapshot-sweep` were
-    // deliberately added when those two inventories moved off the pull-request
-    // path: they are the compensating post-merge sweeps, and the nightly
-    // schedule covers a quiet master.
+    // What bounds the cost of exempting push: a master push carries the
+    // native Windows inventory and the browser sweep in ci.yml, plus the cache
+    // seeder, the two drills, and the non-PR Python runtime matrix in
+    // ci-master.yml. Any job reachable on push starts accumulating
+    // uncancelled runs, so the set is pinned here. `windows-native` and
+    // `web-snapshot-sweep` were deliberately added when those two inventories
+    // moved off the pull-request path: they are the compensating post-merge
+    // sweeps, and the nightly schedule covers a quiet master.
     //
     // Classification is an exact allowlist of the conditions in use, not a
     // substring match: `github.event_name != 'pull_request'` mentions
@@ -370,17 +378,20 @@ describe('CI workflow', () => {
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark' && vars.DSH_CI_ENTERPRISE_RUNNERS_ENABLED == 'true'",
       "github.event_name == 'workflow_dispatch' && inputs.suite == 'full-audit'",
     ])
-    const pushReachable = Object.entries(workflow.jobs)
-      .filter(([, job]) => {
-        if (!isRecord(job)) return false
-        if (job.if === undefined) return true // unconditional: runs on every event
-        if (job.if === false) return false // `if: false` parses as a boolean
-        if (typeof job.if !== 'string') return true // unrecognized shape: surface it
-        return !NOT_PUSH_REACHABLE.has(job.if.trim())
-      })
-      .map(([name]) => name)
-      .sort()
-    expect(pushReachable).toEqual(['serial-linux-selfhosted', 'serial-windows', 'web-snapshot-sweep', 'windows-native', 'wine-apt-cache'])
+    const pushReachableOf = (loaded: Record<string, unknown>): string[] => (
+      Object.entries(isRecord(loaded.jobs) ? loaded.jobs : {})
+        .filter(([, job]) => {
+          if (!isRecord(job)) return false
+          if (job.if === undefined) return true // unconditional: runs on every event
+          if (job.if === false) return false // `if: false` parses as a boolean
+          if (typeof job.if !== 'string') return true // unrecognized shape: surface it
+          return !NOT_PUSH_REACHABLE.has(job.if.trim())
+        })
+        .map(([name]) => name)
+        .sort()
+    )
+    expect(pushReachableOf(workflow)).toEqual(['web-snapshot-sweep', 'windows-native'])
+    expect(pushReachableOf(masterWorkflow)).toEqual(['python-runtime', 'serial-linux-selfhosted', 'serial-windows', 'wine-apt-cache'])
 
     // The browser sweep is the other compensating post-merge lane. The browser
     // suite only ran on pull requests, and a red pull request stays mergeable,
@@ -403,7 +414,7 @@ describe('CI workflow', () => {
     // cancelling, a re-dispatch would queue ahead of a drill instead of
     // replacing the stale measurement.
     for (const name of ['larger-runner-benchmark', 'consolidated-runner-benchmark']) {
-      const job = workflow.jobs[name]
+      const job = masterWorkflow.jobs[name]
       if (!isRecord(job) || !isRecord(job.strategy)) {
         throw new TypeError(`${name} must define a matrix strategy`)
       }
@@ -749,7 +760,7 @@ describe('Python release workflows', () => {
     }
 
     expect(macosCheck).toContain('scripts/check-macos-deployment-target.py')
-    expect(macosCheck).toContain('"$EXE" "$EXE-spawn-helper"')
+    expect(macosCheck).toContain('"$EXE" "$EXE-rg" "$EXE-spawn-helper"')
   })
 })
 

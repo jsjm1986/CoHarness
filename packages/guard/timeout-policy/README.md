@@ -1,3 +1,8 @@
+---
+description: "Tool-call timeout policy: a tools/execute wrapper that arms a per-tool deadline on exec.signal and returns TOOL_TIMEOUT when it wins"
+kind: "package-reference"
+---
+
 # dsh-tool-call-timeout-policy
 
 English | [中文](README.zh.md)
@@ -8,6 +13,17 @@ Tool-call timeout enforcer: a single `tools/execute` around-dispatch listener th
 
 Use this package to give tool calls their configured cooperative time limits and return a clear timeout error to the model after cancellation settles. Calls that finish in time are unchanged. A tool that ignores or slowly handles cancellation can keep the caller waiting because the package cannot hard-stop downstream work. Each tool supplies its own limit; the package has no configuration and is enabled in the `dsh` base bundle.
 
+## Table of Contents
+
+- [Plugin (namespace: `timeout-policy`)](#plugin-namespace-timeout-policy)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="plugin-namespace-timeout-policy"></a>
 ## Plugin (namespace: `timeout-policy`)
 
 A function/namespace plugin (`name` / `inject` / `apply`), not a service. It registers no tool and takes no config — it consumes `ctx.tools`'s `tools/execute` waterfall (which the `dsh-tools` registry always provides) and reads each dispatched tool's declared `timeoutMs` from the registry (`ctx.tools.get(exec.name)`).
@@ -39,10 +55,12 @@ The derived signal only **notifies**; termination stays with the tool and the ca
 
 Multiple `tools/execute` listeners compose by cordis registration order. Combined with a future retry/sandbox/metrics wrapper, registration order chooses the semantics — "timeout covers the whole retry operation" (timeout registered outer) versus "timeout covers each attempt" (timeout registered inner).
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Each call arms a fresh cooperative deadline read from the tool's own declaration; no cross-call state exists.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Conditional tool result
@@ -63,3 +81,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 - **Cooperative, never a hard kill** — the deadline only notifies via `exec.signal`; a tool that ignores the signal does not stop on timeout (see § Cooperative, not a hard kill).
 - **No blanket budget** — only tools that declare `timeoutMs` on their `ToolDefinition` get a deadline; there is no registry-wide default for undeclared tools (the shipped `bash`/`read`/`write`/`edit` deliberately declare none).
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

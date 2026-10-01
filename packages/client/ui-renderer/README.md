@@ -1,3 +1,8 @@
+---
+description: "Browser UI renderer: React slot bindings, ctx.uiRenderer, and the assembled application root"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-renderer
 
 English | [中文](README.zh.md)
@@ -10,6 +15,15 @@ The client entry also owns the React implementation of slot outlets, session pro
 
 `dsh-client-ui-renderer` mounts the assembled dsh web client GUI: after the complete client plugin roster settles, the boot kernel calls `ctx.uiRenderer.mount(container)`, which hydrates the framework-free boot page and switches to the full React application before the next paint. Business plugins stay plain React components that receive session and workspace data through typed props and never wire subscriptions themselves — the renderer binds the runtime's bare observable sources into selector hooks at the slot outlets. The web shell and the boot kernel are its only direct consumers, so a composition needs it exactly when it wants a React-rendered GUI.
 
+## Table of Contents
+
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side render assembly that registers nothing model-facing.
@@ -22,3 +36,13 @@ None; this package neither assembles nor sends a provider request.
 
 - **The first application frame waits for every client entry** — the boot kernel hands over the mount point only after the loader roster settles. Per-region readiness remains deferred.
 - **Slot rendering has no Suspense integration or per-entry lazy loading** — the complete plugin roster settles before the renderer mounts the root.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

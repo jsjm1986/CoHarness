@@ -734,7 +734,10 @@ export function isRemoteFailure(error: unknown): error is RemoteFailure {
  * carries a real Error and `throw result.error` keeps throw semantics. The code
  * is passed through verbatim without runtime validation: a code outside this
  * Client's merged map still surfaces as-is, so a newer Host stays readable.
+ * Exported so a stand-in for this face folds identically.
+ * @param error - the wire failure `{ code, message, details }` from a `!ok` envelope.
+ * @returns the rebuilt Remote failure.
  */
-function rebuiltFailure(error: { code: string; message: string; details: object }): RemoteFailure {
+export function rebuiltFailure(error: { code: string; message: string; details: object }): RemoteFailure {
   return new RemoteError(error.code as never, error.message, error.details as never)
 }

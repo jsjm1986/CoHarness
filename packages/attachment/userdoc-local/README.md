@@ -1,3 +1,8 @@
+---
+description: "Real-file user document storage below a per-user upload root"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-userdoc-local
 
 English | [中文](README.zh.md)
@@ -17,6 +22,17 @@ Identical in-flight listings share one filesystem scan; a caller's abort only ca
 Use `dsh-userdoc-local` as the local `userDocs` backend that stores documents as ordinary files below one configured root. Uploads stream to a sibling `.part` file and publish atomically through an exclusive hard link, so an occupied target is never replaced; untrusted client names are sanitized and collisions receive a ` (2)` suffix. The default deployment migrates a legacy `uploads` tree on first use. An explicit `maxFileBytes` enforces a finite deployment policy.
 
 
+## Table of Contents
+
+- [Resumable uploads](#resumable-uploads)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="resumable-uploads"></a>
 ## Resumable uploads
 
 The local provider implements the `resumable-v1` upload session used by the Web client. It accepts one request-sized chunk at a time, verifies each chunk with SHA-256, persists a private manifest and partial file below `.upload-sessions/v1/`, and publishes the final file only after a complete SHA-256 verification. A session survives a runtime restart and remains resumable for the configured 24-hour default retention; expired session records and their temporary bytes are removed automatically. The default chunk size is 8 MiB, safely below the public Cloudflare request-body limit, and all upload safety values are configurable through the provider config.
@@ -25,10 +41,12 @@ The local provider implements the `resumable-v1` upload session used by the Web 
 
 The provider records the admission lock owner as a PID in `.admission.lock`. Startup recovers it only when the process probe proves the owner has exited. Concurrent recoverers use a separate recovery lock and re-read ownership before removing the orphan, preserving a replacement writer's lock. Live, malformed or indeterminate owners are not reclaimed. An interrupted recovery's coordination lock requires operator verification; ordinary upload contention retains its 30-second deadline.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Documents are ordinary files below one configured root; the backend holds no index beyond the filesystem tree its specs exercise.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the host prompt-assembly consumer, which owns every model-visible rendering decision for stored files.
@@ -43,3 +61,13 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **Completed-document retention is explicit** — active documents live until deleted; trashed documents are recoverable only for `trashRetentionDays`, after which the provider purges them. Session records, including completed-state metadata, are temporary and are cleaned after the configured upload retention.
 - **`list` walks the tree on every call** — there is no index, so a root holding many thousands of files pays a full scan per listing.
 - **Folder deletion is empty-only** — removing a tree requires moving or deleting its contents first; no recursive delete operation is exposed.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

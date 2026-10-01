@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-24-personal-model-registration-audit.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-personal-model-registration-audit.md
-2026-08-24-personal-model-registration-audit.md: 83ff39021b8ab67e0dd0e74b261a1e5628cb4f37
-2026-08-24-personal-model-registration-audit.zh.md: 2727bf5d4ff3dc483b8f2e53f20cdce405972607
+/agent-note-personal-provider-and-model-registration-audit:
+  en: 9f55127a45f587b4
+  zh: 47cd2a9c8102606f
+/agent-note-personal-provider-and-model-registration-audit/problem:
+  en: 08edff3629fe9b19
+  zh: 0a343576e6225355
+/agent-note-personal-provider-and-model-registration-audit/decision:
+  en: 78bf86ed702cdebe
+  zh: 88c047a4f3f2cd60
+/agent-note-personal-provider-and-model-registration-audit/alternatives-considered:
+  en: ec3ed91f61be0535
+  zh: 5cb48356efdcf115
+/agent-note-personal-provider-and-model-registration-audit/consequences:
+  en: 0b349302d965edf8
+  zh: 735f3717f9922c0a
+/agent-note-personal-provider-and-model-registration-audit/verification:
+  en: 8ad5af11c2fe4a4c
+  zh: cc02493c47bcd3d8

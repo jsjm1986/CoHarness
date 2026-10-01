@@ -818,6 +818,94 @@ describe('WorkspaceRuntime', () => {
     await workspaces.refresh()
     expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-open'])
   })
+
+  it('pins and unpins a session, projects the echoed set, and drops a pin on archive', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('ws', [sid('s-one'), sid('s-two')])] as never[],
+      pinnedSessionIds: [sid('s-one')],
+    }) as never)
+    await workspaces.refresh()
+    expect(workspaces.list.getSnapshot().pinnedSessionIds).toEqual(['s-one'])
+
+    // The unary echo carries the complete Host pin order: pinning a second
+    // session fronts it instead of appending locally.
+    api.onWorkspacePinSession = () => Promise.resolve(ok({ pinnedSessionIds: [sid('s-two'), sid('s-one')] }))
+    await expect(workspaces.pinSession(sid('s-two'))).resolves.toBeUndefined()
+    expect(api.callsOf('workspace.pinSession')).toEqual([{ sessionId: 's-two' }])
+    expect(workspaces.list.getSnapshot().pinnedSessionIds).toEqual(['s-two', 's-one'])
+
+    api.onWorkspaceUnpinSession = () => Promise.resolve(ok({ pinnedSessionIds: [sid('s-one')] }))
+    await expect(workspaces.unpinSession(sid('s-two'))).resolves.toBeUndefined()
+    expect(api.callsOf('workspace.unpinSession')).toEqual([{ sessionId: 's-two' }])
+    expect(workspaces.list.getSnapshot().pinnedSessionIds).toEqual(['s-one'])
+
+    // A Host failure leaves the set untouched and surfaces as a rejection.
+    api.onWorkspacePinSession = () => Promise.resolve(err({
+      code: 'session-archived', message: 'archived rows cannot pin', details: { sessionId: sid('s-one') },
+    }))
+    await expect(workspaces.pinSession(sid('s-one'))).rejects.toThrow(/session pin failed: session-archived/)
+    api.onWorkspaceUnpinSession = () => Promise.resolve(err({
+      code: 'internal', message: 'write failed', details: {},
+    }))
+    await expect(workspaces.unpinSession(sid('s-one'))).rejects.toThrow(/session unpin failed: internal/)
+    expect(workspaces.list.getSnapshot().pinnedSessionIds).toEqual(['s-one'])
+
+    // Archiving a pinned session drops its pin in the same durable write.
+    api.onWorkspaceArchiveSession = () => Promise.resolve(ok({ archivedSessionIds: [sid('s-one')] }))
+    await workspaces.archiveSession(sid('s-one'))
+    expect(workspaces.list.getSnapshot().pinnedSessionIds).toEqual([])
+    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-one'])
+  })
+
+  it('keeps the newest Host pin set when replies, frames, and baselines race', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote(api))
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onWorkspaceList = () => Promise.resolve(ok({ items: [] }) as never)
+    await workspaces.refresh()
+
+    // Two overlapping pin writes: only the latest reply installs.
+    const first = deferred<Awaited<ReturnType<FakeApiClient['onWorkspacePinSession']>>>()
+    api.onWorkspacePinSession = () => first.promise
+    const stale = workspaces.pinSession(sid('s-stale'))
+    api.onWorkspacePinSession = () => Promise.resolve(ok({ pinnedSessionIds: [sid('s-fresh')] }))
+    await workspaces.pinSession(sid('s-fresh'))
+    first.resolve(ok({ pinnedSessionIds: [sid('s-stale')] }))
+    await stale
+    expect(workspaces.list.getSnapshot().pinnedSessionIds).toEqual(['s-fresh'])
+
+    // A pushed pin frame outranks an in-flight unpin reply.
+    const unpinGate = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceUnpinSession']>>>()
+    api.onWorkspaceUnpinSession = () => unpinGate.promise
+    const inert = workspaces.unpinSession(sid('s-fresh'))
+    workspaces.handleHostEnvelope({
+      rpcId: 'frame' as never,
+      payload: { type: 'host/pinned-sessions-changed', pinnedSessionIds: [sid('s-remote')] },
+    } as never)
+    // Frame installs ride the notifier's microtask batch before projecting.
+    await new Promise(resolve => setTimeout(resolve, 0))
+    unpinGate.resolve(ok({ pinnedSessionIds: [] }))
+    await inert
+    expect(workspaces.list.getSnapshot().pinnedSessionIds).toEqual(['s-remote'])
+
+    // A refresh baseline outranks an in-flight pin reply.
+    const pinGate = deferred<Awaited<ReturnType<FakeApiClient['onWorkspacePinSession']>>>()
+    api.onWorkspacePinSession = () => pinGate.promise
+    const superseded = workspaces.pinSession(sid('s-remote-2'))
+    api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [] as never[], pinnedSessionIds: [sid('s-baseline')],
+    }) as never)
+    await workspaces.refresh()
+    expect(workspaces.list.getSnapshot().pinnedSessionIds).toEqual(['s-baseline'])
+    pinGate.resolve(ok({ pinnedSessionIds: [sid('s-remote-2'), sid('s-baseline')] }))
+    await superseded
+    expect(workspaces.list.getSnapshot().pinnedSessionIds).toEqual(['s-baseline'])
+  })
 })
 
 describe('startInitialSelection', () => {

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-25-workbench-html-markdown-previews.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-25-workbench-html-markdown-previews.md
-2026-09-25-workbench-html-markdown-previews.md: 203d44f1237a91be1bd2c1d6ba835209556faab6
-2026-09-25-workbench-html-markdown-previews.zh.md: 1875af69cc77d5c9d536306145d886990ed52ec1
+/agent-note-workbench-file-previews-render-markdown-and-html-on-the-shared-workspace-resource-owner:
+  en: 9c40a5471cc7aa8c
+  zh: 0e6a92714445b89b
+/agent-note-workbench-file-previews-render-markdown-and-html-on-the-shared-workspace-resource-owner/problem:
+  en: 96e2cdac037714cf
+  zh: 62db64f02f0bea50
+/agent-note-workbench-file-previews-render-markdown-and-html-on-the-shared-workspace-resource-owner/decision:
+  en: 14795647cd36e87c
+  zh: f39b3788955e22c6
+/agent-note-workbench-file-previews-render-markdown-and-html-on-the-shared-workspace-resource-owner/alternatives-considered:
+  en: 99864af499e3cf23
+  zh: 36cf921f372a4b8d
+/agent-note-workbench-file-previews-render-markdown-and-html-on-the-shared-workspace-resource-owner/consequences:
+  en: e1f355a4fc969204
+  zh: c37e4fee8247383f

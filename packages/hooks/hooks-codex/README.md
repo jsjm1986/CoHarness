@@ -1,3 +1,8 @@
+---
+description: "Bridge plugin: run a Codex hooks.json hook config on the DeepSeek Harness interception seams"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-hooks-codex
 
 English | [中文](README.zh.md)
@@ -18,6 +23,19 @@ A native cordis plugin could do everything this bridge does, more powerfully; th
 
 `dsh-hooks-codex` runs command hooks from an existing Codex `hooks.json` during agent runs, so prompt and tool gates work without being rewritten. It supports five Codex hook points: session start, prompt submission, before and after tool execution, and stop. Hooks can block prompts or tool calls with model-visible reasons, add conversation context, or force another agent step. Choose this package to reuse Codex command hooks in the harness; use a native plugin for behavior outside this supported subset.
 
+## Table of Contents
+
+- [Config](#config)
+- [Hook points → typed Decisions](#hook-points--typed-decisions)
+- [Context source](#context-source)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 ```ts
@@ -43,6 +61,7 @@ The config is parsed **once** at load. `configPath` is **process-level** — a r
 
 The hooks themselves run in the agent's session workspace: for the agent-scoped points the bridge passes the session's `cwd` as the hook process's working directory, so a hook operates in the user's project tree, not the server launch dir.
 
+<a id="hook-points--typed-decisions"></a>
 ## Hook points → typed Decisions
 
 | Codex hook | Harness point | Mapping |
@@ -59,14 +78,17 @@ Every agent-scoped stdin payload carries `session_id` and `transcript_path`. The
 
 `SessionStart` is awaited during serial `agent/created` initialization, so successful context injection precedes the first request. Creation cancellation or bridge disposal aborts the hook; aborted runs do not inject context. Disposing the bridge drains tracked continuations before returning (`createDetachedRuns` in `dsh-hook-protocol`). Hook and injection failures are logged rather than vetoing creation.
 
+<a id="context-source"></a>
 ## Context source
 
 Injected context carries an explicit `{ kind: 'plugin', plugin: 'hooks-codex' }` source so the durable message is never mistaken for a user prompt.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The bridge translates each canonical interception into a Codex hook invocation and maps the decision back; hook behavior is pinned by specs and no relation is retained between events.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Hook-provided context
@@ -106,3 +128,13 @@ A blocked prompt sends no request and invalidates nothing. Denial, feedback, and
 - **`Stop` is partial:** blocking forces another model turn, but `stop_hook_active` is always `false`, `last_assistant_message` is always `null`, and `{"continue": false}` is not enforced. An unconditionally blocking hook therefore force-continues every step unless it self-limits (`TODO(stop-loop-guard)`).
 - **Common payload and output fields are partial:** every mapped event reports the statically configured `model` and `permission_mode: "default"` instead of current Codex runtime values. `systemMessage` is logged + warned but not surfaced, and `{"continue": false}` is recorded but does not apply Codex's event-specific stop behavior (`TODO(hook-continue-false)`).
 - **Config loading and execution are partial:** one process-level `configPath` is parsed at load; Codex's active user, project, session, system/managed, and plugin layers, trust controls, and inline `config.toml` hook form are not implemented (`TODO(per-session-hook-config)`). Only synchronous `command` handlers run, current metadata such as `statusMessage` and `commandWindows` is ignored, and matching handlers run serially rather than with Codex's concurrent launch semantics.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -1,6 +1,13 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for event-producer-consumer.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/event-producer-consumer.md
-event-producer-consumer.md: fb64ba9b347bbd9a3def840f570c3269ca6ccb45
-event-producer-consumer.zh.md: 8ad0ffbed864dd23358a57c1f2f47214d4a6dfbe
+/:
+  en: 41d772192075e133
+  zh: dda91c6c670cfd9d
+/event-producer-and-consumer-matrix:
+  en: a9a11f1d70dfa192
+  zh: 1edaefefca2dbc00
+/event-producer-and-consumer-matrix/non-harness-or-undeclared-event-strings-seen-in-package-source:
+  en: 96dc0ff1580e5741
+  zh: 385f8ae4506d3b07

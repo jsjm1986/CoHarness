@@ -9,6 +9,13 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'time-context': { kind: 'time-context' } & ContextFormed
+  }
+}
+
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import {
@@ -28,7 +35,7 @@ export const inject = ['agents']
 export interface Config {
   /** Fallback display zone when the open turn has no unique browser zone. Omit to use the process zone. */
   timeZone?: string
-  /** Minimum milliseconds between durable injections in one session. Omit or set to 0 to inject at every eligible step. */
+  /** Minimum milliseconds between durable injections in one session. Defaults to 600000 (10 minutes); 0 injects at every eligible step. */
   refreshIntervalMs?: number
 }
 
@@ -78,8 +85,7 @@ function precedingStepContextTime(agent: Agent, turn: number): number | undefine
   for (const event of [...agent.session.snapshotEvents()].reverse()) {
     if (event.type === 'turn/start' && event.data.turn === turn) return undefined
     if (event.type === 'user/message'
-      && event.data.source.kind === 'plugin'
-      && event.data.source.plugin === name) {
+      && event.data.source.kind === name) {
       return event.time
     }
   }
@@ -91,8 +97,7 @@ function latestInjectionTime(agent: Agent): number | undefined {
   // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   for (const event of [...agent.session.snapshotEvents()].reverse()) {
     if (event.type === 'user/message'
-      && event.data.source.kind === 'plugin'
-      && event.data.source.plugin === name) {
+      && event.data.source.kind === name) {
       return event.time
     }
   }
@@ -131,11 +136,8 @@ function renderText(
 }
 
 /** Reject refresh intervals that cannot represent an exact elapsed-millisecond threshold. */
-function validateRefreshInterval(refreshIntervalMs: number | undefined): void {
-  if (refreshIntervalMs !== undefined && (
-    !Number.isSafeInteger(refreshIntervalMs)
-    || refreshIntervalMs < 0
-  )) {
+function validateRefreshInterval(refreshIntervalMs: number): void {
+  if (!Number.isSafeInteger(refreshIntervalMs) || refreshIntervalMs < 0) {
     throw new TypeError(
       `time-context: refreshIntervalMs must be a non-negative safe integer, got ${String(refreshIntervalMs)}`,
     )
@@ -150,7 +152,7 @@ function validateRefreshInterval(refreshIntervalMs: number | undefined): void {
  */
 export function apply(ctx: Context, config: Config): void {
   const timeZone = config.timeZone
-  const refreshIntervalMs = config.refreshIntervalMs
+  const refreshIntervalMs = config.refreshIntervalMs ?? 600_000
   validateRefreshInterval(refreshIntervalMs)
   let fallbackFormatter: Intl.DateTimeFormat
   try {
@@ -180,7 +182,7 @@ export function apply(ctx: Context, config: Config): void {
     const decision = await next()
     if (decision.kind === 'reject' || signal.aborted) return decision
     const now = Date.now()
-    if (refreshIntervalMs !== undefined && refreshIntervalMs > 0) {
+    if (refreshIntervalMs > 0) {
       const lastInjection = latestInjectionTime(agent)
       if (lastInjection !== undefined
         && now >= lastInjection
@@ -207,7 +209,7 @@ export function apply(ctx: Context, config: Config): void {
         ...decision.messages,
         createUserMessage({
           content: [{ type: 'text', text }],
-          source: { kind: 'plugin', plugin: name, form: 'snapshot', sections: [{ name, text }] },
+          source: { kind: name, form: 'snapshot', sections: [{ name, text }] },
         }),
       ],
     }

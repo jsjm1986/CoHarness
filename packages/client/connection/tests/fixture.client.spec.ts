@@ -698,6 +698,63 @@ describe('createFixtureApi', () => {
     expect(noop.result.value.workspace.updatedAt).toBe(before)
   })
 
+  it('workspace pin/unpin fronts the registry pin set, lists it, and archive drops the pin', async () => {
+    const api = createFixtureApi()
+    const abort = new AbortController()
+    const seen: HostFrame[] = []
+    const consuming = (async () => {
+      for await (const envelope of api.events.host(req({}), abort.signal)) {
+        seen.push(envelope.payload)
+        if (seen.length >= 5) abort.abort()
+      }
+    })()
+    await new Promise(resolve => setTimeout(resolve, 10))
+
+    const ghost = await api.workspace.pinSession(req({ sessionId: sid('fx-void') }))
+    expect(ghost.result).toMatchObject({ ok: false, error: { code: 'session-not-found' } })
+
+    // The echo carries the complete ordered set: a new pin fronts it, while an
+    // already-pinned id resolves as a no-op without reordering or a frame.
+    const first = await api.workspace.pinSession(req({ sessionId: sid('fx-alpha') }))
+    if (!first.result.ok) throw new Error('pin failed')
+    expect(first.result.value.pinnedSessionIds).toEqual(['fx-alpha'])
+    const second = await api.workspace.pinSession(req({ sessionId: sid('fx-gamma') }))
+    if (!second.result.ok) throw new Error('second pin failed')
+    expect(second.result.value.pinnedSessionIds).toEqual(['fx-gamma', 'fx-alpha'])
+    const repinned = await api.workspace.pinSession(req({ sessionId: sid('fx-alpha') }))
+    if (!repinned.result.ok) throw new Error('repin failed')
+    expect(repinned.result.value.pinnedSessionIds).toEqual(['fx-gamma', 'fx-alpha'])
+
+    const listed = await api.workspace.list(req({}))
+    if (!listed.result.ok) throw new Error('list failed')
+    expect(listed.result.value.pinnedSessionIds).toEqual(['fx-gamma', 'fx-alpha'])
+
+    // Archiving drops the session's pin in the same durable write.
+    const archived = await api.workspace.archiveSession(req({ sessionId: sid('fx-alpha') }))
+    if (!archived.result.ok) throw new Error('archive failed')
+    expect(archived.result.value.archivedSessionIds).toEqual(['fx-alpha'])
+    const archivedPin = await api.workspace.pinSession(req({ sessionId: sid('fx-alpha') }))
+    expect(archivedPin.result).toMatchObject({ ok: false, error: { code: 'session-archived' } })
+
+    const unpinned = await api.workspace.unpinSession(req({ sessionId: sid('fx-gamma') }))
+    if (!unpinned.result.ok) throw new Error('unpin failed')
+    expect(unpinned.result.value.pinnedSessionIds).toEqual([])
+    // Unpinning an id that is not pinned stays a silent no-op.
+    const noopUnpin = await api.workspace.unpinSession(req({ sessionId: sid('fx-beta') }))
+    if (!noopUnpin.result.ok) throw new Error('noop unpin failed')
+    expect(noopUnpin.result.value.pinnedSessionIds).toEqual([])
+
+    await consuming
+    // The no-op re-pin and no-op unpin emit nothing between these frames.
+    expect(seen).toEqual([
+      { type: 'host/pinned-sessions-changed', pinnedSessionIds: ['fx-alpha'] },
+      { type: 'host/pinned-sessions-changed', pinnedSessionIds: ['fx-gamma', 'fx-alpha'] },
+      { type: 'host/archived-sessions-changed', archivedSessionIds: ['fx-alpha'], archiveRevision: 1 },
+      { type: 'host/pinned-sessions-changed', pinnedSessionIds: ['fx-gamma'] },
+      { type: 'host/pinned-sessions-changed', pinnedSessionIds: [] },
+    ])
+  })
+
   it('workspace.delete removes only the Workspace row and emits the removal frame', async () => {
     const api = createFixtureApi()
     const abort = new AbortController()

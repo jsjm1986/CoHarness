@@ -2,14 +2,14 @@
 /** Present UI derives statuses and details from durable tool records. */
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
+import type { StartedToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { PresentRow } from '../src/client/PresentRow.tsx'
 import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 type Props = Parameters<typeof PresentRow>[0]
-const running: RunningToolCall = { callId: 'p', name: 'present', argsRaw: '{"files":[{"path":"report.txt"}]}', turn: 1, step: 1, time: 1, subCalls: [], callView: null }
+const running: StartedToolCall = { phase: 'start', callId: 'p', name: 'present', argsRaw: '{"files":[{"path":"report.txt"}]}', turn: 1, step: 1, time: 1, subCalls: [], callView: null }
 const settled: ToolResultNode = { kind: 'tool-result', seq: 2, time: 2, callId: 'p', call: { name: 'present', argsRaw: running.argsRaw }, callTime: 1, content: [{ type: 'text', text: 'Presented report.txt (4 bytes)' }], isError: false, subCalls: [], callView: null, resultView: null }
 function props(block: Props['block'], inspect?: () => void): Props {
   return { block, callId: 'p', toolName: 'present', openFile: vi.fn(), inspect, t: makeTranslate(en) } as Props

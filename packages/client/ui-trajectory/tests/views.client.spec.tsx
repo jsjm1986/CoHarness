@@ -19,7 +19,7 @@ import {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ConversationSnapshot, RequestView,
+  ConversationSnapshot, ConversationViewSnapshotMap, RequestView,
   SessionId, SessionListState, SnapshotStore, WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConvViewProps, ViewTab } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -92,15 +92,17 @@ function historySnapshot(
     runningCalls: [],
     ...inspection,
   }
+  const viewSnapshots: Partial<ConversationViewSnapshotMap> = { trajectory }
   return {
     sessionId: SID,
     views: {
-      get: target => target === 'trajectory' ? trajectory : undefined,
+      get: target => viewSnapshots[target],
     },
     chat: EMPTY_CHAT_SNAPSHOT,
     nodes,
     turnTimings: new Map(),
     turnEnds: new Map(),
+    openTurn: undefined,
     partial: trajectory.partial,
     runningCalls: trajectory.runningCalls,
     pending: [],
@@ -155,13 +157,13 @@ function fakeSession(nodes: ConversationSnapshot['nodes']) {
 /** Empty sessions-list hook; breadcrumbs therefore fall back to the raw id. */
 function emptySessions() {
   const store = createSnapshotStore<SessionListState>(
-    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })
   return bindSnapshotSelector(store)
 }
 
 function emptyWorkspaces() {
   const store = createSnapshotStore<WorkspaceListState>({
-    items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true,
+    items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true,
     recentWorkspaceId: undefined,
   })
   return bindSnapshotSelector(store)
@@ -740,6 +742,7 @@ describe('timeline projection', () => {
     expect(view.container.querySelector('[data-timeline-hover-line]')).toBeTruthy()
     fireEvent.pointerEnter(boundary)
     expect(view.container.querySelector('[data-timeline-hover-line]')).toBeNull()
+    fireEvent.keyDown(boundary, { key: 'Tab' })
     fireEvent.focus(boundary)
     expect(screen.getByRole('tooltip').textContent)
       .toContain('Click to load earlier history')

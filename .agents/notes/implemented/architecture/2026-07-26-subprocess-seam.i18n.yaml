@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-26-subprocess-seam.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-26-subprocess-seam.md
-2026-07-26-subprocess-seam.md: aa7a989a0321760c9bc278df8356a57f4dd0d459
-2026-07-26-subprocess-seam.zh.md: bb9755957f2de35a884d51f1fadc037a7bbbeddd
+/agent-note-the-subprocess-service-is-its-own-seam-under-the-bash-executors-dsh-subprocess-dsh-subprocess-local:
+  en: 657c5f7418560c91
+  zh: 6a4b95f8b261eb26
+/agent-note-the-subprocess-service-is-its-own-seam-under-the-bash-executors-dsh-subprocess-dsh-subprocess-local/problem:
+  en: c8f7056a2d3624ab
+  zh: 83e89e91fad296a0
+/agent-note-the-subprocess-service-is-its-own-seam-under-the-bash-executors-dsh-subprocess-dsh-subprocess-local/decision:
+  en: ef850e3a32bbb356
+  zh: a5674a27daec6deb
+/agent-note-the-subprocess-service-is-its-own-seam-under-the-bash-executors-dsh-subprocess-dsh-subprocess-local/alternatives-considered:
+  en: 884906dba09f9810
+  zh: 3d274740bcec2082
+/agent-note-the-subprocess-service-is-its-own-seam-under-the-bash-executors-dsh-subprocess-dsh-subprocess-local/consequences:
+  en: 848c0feccb0327b4
+  zh: 4dfa48edd999bba1

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-tool-row-file-open-failure.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-tool-row-file-open-failure.md
-2026-08-18-tool-row-file-open-failure.md: e36552395b992e688fad35b3163b92c9f6189e43
-2026-08-18-tool-row-file-open-failure.zh.md: f09c41585a538b408f6258f64583f63c0fa57b0d
+/agent-note-tool-row-file-open-failures-stay-visible:
+  en: 995ed40db206ebe2
+  zh: b87ebd6c6a31e485
+/agent-note-tool-row-file-open-failures-stay-visible/problem:
+  en: a6dd8b438aac0fb8
+  zh: aa81d87b2f62f6db
+/agent-note-tool-row-file-open-failures-stay-visible/decision:
+  en: b4c4fce1543eef20
+  zh: 1196743639eef8c4
+/agent-note-tool-row-file-open-failures-stay-visible/alternatives-considered:
+  en: b9820898d529e5a7
+  zh: 439a528af7dd6848
+/agent-note-tool-row-file-open-failures-stay-visible/consequences:
+  en: f9fd46bf43c7d460
+  zh: 98f25c69b4747cd4
+/agent-note-tool-row-file-open-failures-stay-visible/testing:
+  en: 8d4423e37c434f05
+  zh: f16a851407f0fa16

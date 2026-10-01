@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-24-agent-loop-observable-state-machine.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-24-agent-loop-observable-state-machine.md
-2026-07-24-agent-loop-observable-state-machine.md: 2c9cdd3ac090d2236e8922e06c94b5504570fead
-2026-07-24-agent-loop-observable-state-machine.zh.md: 63ddc8987e5f0957052e3ada9f61288b80713a59
+/agent-note-collapse-agent-loop-events-around-the-observable-state-machine:
+  en: b7998bdbf46a06b1
+  zh: ea7b4e8ef8e3cef5
+/agent-note-collapse-agent-loop-events-around-the-observable-state-machine/problem:
+  en: c55232633eaacf5a
+  zh: a71c538c61234c42
+/agent-note-collapse-agent-loop-events-around-the-observable-state-machine/decision:
+  en: 75a1c677da39192e
+  zh: 81a07f55fce3cbc0
+/agent-note-collapse-agent-loop-events-around-the-observable-state-machine/alternatives-considered:
+  en: 0d61d49e9f5964c2
+  zh: f5e8802c7fe67839
+/agent-note-collapse-agent-loop-events-around-the-observable-state-machine/consequences:
+  en: 675d4ae63174031d
+  zh: 2649109d067352e2
+/agent-note-collapse-agent-loop-events-around-the-observable-state-machine/related:
+  en: 72a311ff448f5ffd
+  zh: c8a2c96caf592af5

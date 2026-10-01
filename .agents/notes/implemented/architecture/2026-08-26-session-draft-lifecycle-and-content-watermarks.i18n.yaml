@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-26-session-draft-lifecycle-and-content-watermarks.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-26-session-draft-lifecycle-and-content-watermarks.md
-2026-08-26-session-draft-lifecycle-and-content-watermarks.md: 2f719299c1241c0ae00decaaf676fb0476410344
-2026-08-26-session-draft-lifecycle-and-content-watermarks.zh.md: f048a84a054c94d339f192c1cb2297169a77be04
+/agent-note-deferred-session-drafts-and-authoritative-content-watermarks:
+  en: 8f37310a316ab0ff
+  zh: 1c1f69596b74b3c1
+/agent-note-deferred-session-drafts-and-authoritative-content-watermarks/problem:
+  en: f5a589d2aa23eb5a
+  zh: 93a2a0dbca39c55f
+/agent-note-deferred-session-drafts-and-authoritative-content-watermarks/decision:
+  en: 9216bd1af2cc23d7
+  zh: ba48b4883ca8a3e2
+/agent-note-deferred-session-drafts-and-authoritative-content-watermarks/alternatives-considered:
+  en: deeecbcbc96b1b0e
+  zh: 76b4eb7d492bda2a
+/agent-note-deferred-session-drafts-and-authoritative-content-watermarks/consequences:
+  en: 0338f8dda82144a2
+  zh: 273f85f21df8272f
+/agent-note-deferred-session-drafts-and-authoritative-content-watermarks/verification:
+  en: 025250725310c693
+  zh: 79ca6fc8dbc7b54f
+/agent-note-deferred-session-drafts-and-authoritative-content-watermarks/related:
+  en: 55966685fe127e74
+  zh: 05f341ae6437ac62

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-12-cold-history-attach-race.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-12-cold-history-attach-race.md
-2026-09-12-cold-history-attach-race.md: 312d89834646b48160450b52250b080790188e00
-2026-09-12-cold-history-attach-race.zh.md: 8801b5ba40287ba49e6a6ee018d6b28446d3f505
+/agent-note-cold-history-reads-recover-through-a-concurrent-attach:
+  en: bd8de0a7ba615678
+  zh: 6a9c8e33ee0d4135
+/agent-note-cold-history-reads-recover-through-a-concurrent-attach/problem:
+  en: c5a9b62a8504244e
+  zh: 38b39a8fa781dd11
+/agent-note-cold-history-reads-recover-through-a-concurrent-attach/decision:
+  en: bc7b4b1d9014b8fb
+  zh: ab73b59e5803130f
+/agent-note-cold-history-reads-recover-through-a-concurrent-attach/alternatives-considered:
+  en: 676e2bf7d4fe5a59
+  zh: 225a9bfd484a848d
+/agent-note-cold-history-reads-recover-through-a-concurrent-attach/consequences:
+  en: da4d054fd7da3615
+  zh: 652df5ea62de0694

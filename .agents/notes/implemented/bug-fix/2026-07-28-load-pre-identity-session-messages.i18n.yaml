@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-load-pre-identity-session-messages.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-28-load-pre-identity-session-messages.md
-2026-07-28-load-pre-identity-session-messages.md: 1aad962ec1d0a723893b1e08a0854cceb9882076
-2026-07-28-load-pre-identity-session-messages.zh.md: 1359594b7ae650cc05c674722321c6e620d9a86a
+/agent-note-load-sessions-persisted-before-message-identity:
+  en: 81074f9e0feb1b17
+  zh: f5a4649a921e3874
+/agent-note-load-sessions-persisted-before-message-identity/problem:
+  en: b7a87e5374cc3dbe
+  zh: 07f031d03d7163f3
+/agent-note-load-sessions-persisted-before-message-identity/decision:
+  en: cf4554ab156b7295
+  zh: beb90b0b2b8d2779
+/agent-note-load-sessions-persisted-before-message-identity/alternatives-considered:
+  en: 2ea9d75becaf9991
+  zh: 1451f68503b149ab
+/agent-note-load-sessions-persisted-before-message-identity/consequences:
+  en: 19ec2026c1395ee9
+  zh: 788f5d7ca5f2463a
+/agent-note-load-sessions-persisted-before-message-identity/related:
+  en: 19b0cd415283bf0c
+  zh: 90b5298d7fe2a8b3

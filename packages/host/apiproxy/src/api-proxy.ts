@@ -68,6 +68,7 @@ import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 import type { Workspace, WorkspaceRecord } from '@deepseek-ai/dsh-workspace'
 import {
   workspaceDomainState, workspaceRecord, WorkspaceId as brandWorkspaceId,
+  WorkspaceActiveSessionError, WorkspaceArchivedSessionPinError,
   WorkspaceMoveInvalidError, WorkspaceOrderInvalidError, WorkspaceUnknownSessionError,
 } from '@deepseek-ai/dsh-workspace'
 // Type-only: brings the `ctx.tools` Context merge into this program (viewFor reads presenters).
@@ -113,7 +114,7 @@ import {
 import type {} from '@deepseek-ai/dsh-session-projection'
 // Type-only: resolves `ctx.get('tasks')` to the background job registry.
 import type {} from '@deepseek-ai/dsh-jobs'
-import type { JobSnapshot } from '@deepseek-ai/dsh-jobs'
+import type { JobView as RegistryJobView } from '@deepseek-ai/dsh-jobs'
 // Type-only: resolves `ctx.get('sessionProjectionCache')` (the cold listing column).
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
 // Type-only edges: resolve the command-change stream and `ctx.get('skills')`.
@@ -173,7 +174,11 @@ import {
   hasApiRemoteSubagentOwner,
   inspectApiRemoteSession,
 } from '@deepseek-ai/dsh-api-remotes'
-import { canOpenNativePath, openNativePath, openNativeTextFile } from './native-path-opener.ts'
+import {
+  canOpenNativePath, nativeFileApplications, nativeFileManager, openNativeFileApplication,
+  openNativePath, openNativeTextFile, revealNativePath,
+  type NativeFileApplication,
+} from './native-path-opener.ts'
 
 /** Page size when history is called without maxMessages. */
 const DEFAULT_MAX_MESSAGES = 50
@@ -923,6 +928,9 @@ function authorizeReadBatch<F extends MuxFrame | HostFrame>(
       if (payload.type === 'host/archived-sessions-changed') {
         for (const id of payload.archivedSessionIds) sessionIds.add(id)
       }
+      if (payload.type === 'host/pinned-sessions-changed') {
+        for (const id of payload.pinnedSessionIds) sessionIds.add(id)
+      }
       if (payload.type === 'host/remote-event' && payload.event === 'agent-preset/selected') {
         sessionIds.add(payload.args[0] as SessionId)
       }
@@ -947,6 +955,9 @@ function authorizeReadBatch<F extends MuxFrame | HostFrame>(
       }
       if (payload.type === 'host/archived-sessions-changed') {
         return [{ ...item, payload: { ...payload, archivedSessionIds: payload.archivedSessionIds.filter(id => allowed.has(id)) } }]
+      }
+      if (payload.type === 'host/pinned-sessions-changed') {
+        return [{ ...item, payload: { ...payload, pinnedSessionIds: payload.pinnedSessionIds.filter(id => allowed.has(id)) } }]
       }
       return [item]
     })
@@ -1001,19 +1012,29 @@ function subscribeSession(
 }
 
 /**
- * Project registry snapshots onto the wire view, dropping the three internal
- * fields {@link JobView} documents as absent.
+ * Project registry snapshots onto the wire view, dropping the internal fields
+ * {@link JobView} documents as absent.
  */
-function jobViews(snapshots: readonly JobSnapshot[]): JobView[] {
-  return snapshots.map(job => ({
+function jobView(job: RegistryJobView): JobView {
+  return {
     id: job.id,
     kind: job.kind,
     label: job.label,
     status: job.status,
+    ...job.progress === undefined ? {} : { progress: job.progress },
     ...job.detail === undefined ? {} : { detail: job.detail },
     startedAt: job.startedAt,
     ...job.finishedAt === undefined ? {} : { finishedAt: job.finishedAt },
-  }))
+    output: {
+      total: job.output.total,
+      earliest: job.output.earliest,
+      ...job.output.spillPaths === undefined ? {} : { spillPaths: [...job.output.spillPaths] },
+    },
+  }
+}
+
+function jobViews(snapshots: readonly RegistryJobView[]): JobView[] {
+  return snapshots.map(jobView)
 }
 
 /**
@@ -1201,6 +1222,12 @@ export interface ApiProxyDefaults {
   cwd: string
   /** Native open-with-default-application; injectable for carrier tests. */
   openPath?: (path: string, signal: AbortSignal) => Promise<void>
+  /** Native reveal-in-file-manager; injectable for carrier tests. */
+  revealPath?: (path: string, signal: AbortSignal) => Promise<void>
+  /** Native open-with-chosen-application; injectable for carrier tests. */
+  openFileApplication?: (path: string, application: string, signal: AbortSignal) => Promise<void>
+  /** OS file-association query; injectable for carrier tests. */
+  fileApplications?: (path: string, signal: AbortSignal) => Promise<readonly NativeFileApplication[]>
   /** Native text-editor handoff; injectable for settings-document tests. */
   openTextFile?: (path: string, signal: AbortSignal) => Promise<void>
   /** Validated DEFLATE level for session-log ZIP entries; defaults to 6. */
@@ -1321,13 +1348,12 @@ function viewFor(
     }
     if (event.type === 'tool/result') {
       const { message, meta } = event.data
-      const [result] = message.content
-      const callId = message.source.callId
+      const callId = message.toolCallId
       const call = argsFor(callId) as { name: string; args: unknown } | undefined
       if (call === undefined) return undefined
       const view = ctx.tools.get(call.name, scope)?.presentResult?.(call.args, {
-        content: result.content,
-        isError: result.isError === true,
+        content: [...message.content],
+        isError: message.isError === true,
         ...meta === undefined ? {} : { meta },
       })
       return view === undefined ? undefined : { for: 'result', view }
@@ -3459,12 +3485,24 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     }
   }
 
-  /** Open one Host-resolved path with its default application. */
+  /**
+   * Open one Host-resolved path: default application, an explicit
+   * file-association id, or the file-manager reveal. `openNativeFileApplication`
+   * re-checks the id against the file's current handlers, so a stale menu row
+   * fails at the executor rather than silently opening the default.
+   */
   function openPath(
     request: RpcRequest<unknown>, path: string, signal: AbortSignal,
+    action: 'open' | 'reveal' | undefined, application: string | undefined,
   ): Promise<RpcResponse<{ opened: true }>> {
-    const open = defaults.openPath
-      ?? ((target: string, openSignal: AbortSignal) => openNativePath(target, openSignal))
+    const injected = defaults.openFileApplication
+    const open = action === 'reveal'
+      ? defaults.revealPath ?? ((target: string, openSignal: AbortSignal) => revealNativePath(target, openSignal))
+      : application !== undefined
+        ? injected !== undefined
+          ? (target: string, openSignal: AbortSignal) => injected(target, application, openSignal)
+          : (target: string, openSignal: AbortSignal) => openNativeFileApplication(target, application, openSignal)
+        : defaults.openPath ?? ((target: string, openSignal: AbortSignal) => openNativePath(target, openSignal))
     return openTarget(request, path, signal, open)
   }
 
@@ -4913,6 +4951,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               ctx.workspaceRegistry.archivedSessionIds,
               captured.authority,
             ),
+            pinnedSessionIds: await readableSessionList(
+              ctx.workspaceRegistry.pinnedSessionIds,
+              captured.authority,
+            ),
             archiveRevision: ctx.workspaceRegistry.archiveRevision,
           })
         } catch (error: unknown) {
@@ -5085,14 +5127,24 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       async archiveSession(request) {
-        const { sessionId } = request.payload
+        const { sessionId, stopActivity } = request.payload
         const authorized = await authorizeSession(sessionId, 'write')
         if ('error' in authorized) return err(request, authorized.error)
         try {
-          await ctx.workspaceRegistry.archiveSession(sessionId)
+          await ctx.workspaceRegistry.archiveSession(
+            sessionId,
+            stopActivity === true ? { stopActivity: true } : {},
+          )
         } catch (error: unknown) {
-          // Only the registry's unknown-session rejection is the business
-          // code; storage/durability failures propagate as internal errors.
+          // Only the registry's domain rejections are business codes;
+          // storage/durability failures propagate as internal errors.
+          if (error instanceof WorkspaceActiveSessionError) {
+            return err(request, {
+              code: 'session-active',
+              message: error.message,
+              details: { sessionId, activity: error.activity },
+            })
+          }
           if (!(error instanceof WorkspaceUnknownSessionError)) throw error
           return err(request, {
             code: 'session-not-found',
@@ -5120,7 +5172,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // Idempotent like the registry operation: an id that is not archived
         // (a lost race with another surface) resolves as a no-op returning the
         // current set, not as an error.
-        await ctx.workspaceRegistry.restoreSession(sessionId)
+        await ctx.workspaceRegistry.unarchiveSession(sessionId)
         try {
           return ok(request, {
             archivedSessionIds: await readableSessionList(
@@ -5132,6 +5184,122 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         } catch (error: unknown) {
           return err(request, collaborationRefusal(error, 'read', sessionId))
         }
+      },
+
+      async pinSession(request) {
+        const { sessionId } = request.payload
+        const authorized = await authorizeSession(sessionId, 'write')
+        if ('error' in authorized) return err(request, authorized.error)
+        try {
+          await ctx.workspaceRegistry.pinSession(sessionId)
+        } catch (error: unknown) {
+          if (error instanceof WorkspaceUnknownSessionError) {
+            return err(request, {
+              code: 'session-not-found',
+              message: error.message,
+              details: { sessionId },
+            })
+          }
+          if (error instanceof WorkspaceArchivedSessionPinError) {
+            return err(request, { code: 'session-archived', message: error.message, details: { sessionId } })
+          }
+          throw error
+        }
+        try {
+          return ok(request, {
+            pinnedSessionIds: await readableSessionList(
+              ctx.workspaceRegistry.pinnedSessionIds,
+              authorized.authority,
+            ),
+          })
+        } catch (error: unknown) {
+          return err(request, collaborationRefusal(error, 'read', sessionId))
+        }
+      },
+
+      async unpinSession(request) {
+        const { sessionId } = request.payload
+        const authorized = await authorizeSession(sessionId, 'write')
+        if ('error' in authorized) return err(request, authorized.error)
+        await ctx.workspaceRegistry.unpinSession(sessionId)
+        try {
+          return ok(request, {
+            pinnedSessionIds: await readableSessionList(
+              ctx.workspaceRegistry.pinnedSessionIds,
+              authorized.authority,
+            ),
+          })
+        } catch (error: unknown) {
+          return err(request, collaborationRefusal(error, 'read', sessionId))
+        }
+      },
+    },
+
+    jobs: {
+      async output(request) {
+        const { sessionId, jobId, from } = request.payload
+        if (sessionId === undefined) {
+          // An unowned job is observable by any authenticated principal.
+          const captured = captureCollaboration('read')
+          if ('error' in captured) return err(request, captured.error)
+        } else {
+          const authorized = await authorizeSession(sessionId, 'read')
+          if ('error' in authorized) return err(request, authorized.error)
+        }
+        const jobs = ctx.get('jobs')
+        if (jobs === undefined) {
+          return err(request, { code: 'internal', message: 'no job registry is composed', details: {} })
+        }
+        try {
+          const job = jobs.get(jobId, sessionId)
+          const read = jobs.readAt(jobId, from ?? job.output.earliest, sessionId)
+          return ok(request, {
+            job: jobView(job),
+            output: {
+              total: job.output.total,
+              earliest: job.output.earliest,
+              ...job.output.spillPaths === undefined ? {} : { spillPaths: [...job.output.spillPaths] },
+            },
+            chunks: read.chunks.map(chunk => ({ ...chunk })),
+            next: read.next,
+            ...read.lossy ? { lossy: true as const } : {},
+          })
+        } catch (error: unknown) {
+          // `unknown job` and `belongs to another session` both mean this
+          // session's list carries no row under that id; the client renders
+          // one story. The schema bounds `from`, so the registry's offset
+          // rejection cannot reach here.
+          return err(request, {
+            code: 'job-not-found',
+            message: error instanceof Error ? error.message : String(error),
+            details: sessionId === undefined ? { jobId } : { sessionId, jobId },
+          })
+        }
+      },
+
+      async kill(request) {
+        const { sessionId, jobId } = request.payload
+        const authorized = await authorizeSession(sessionId, 'write')
+        if ('error' in authorized) return err(request, authorized.error)
+        const jobs = ctx.get('jobs')
+        if (jobs === undefined) {
+          return err(request, { code: 'internal', message: 'no job registry is composed', details: {} })
+        }
+        try {
+          jobs.get(jobId, sessionId)
+        } catch (error: unknown) {
+          return err(request, {
+            code: 'job-not-found',
+            message: error instanceof Error ? error.message : String(error),
+            details: { sessionId, jobId },
+          })
+        }
+        // Same synchronous span as the lookup, so nothing can remove the job
+        // in between — and a producer-cancel throw propagates per the
+        // registry contract (job state unchanged) instead of masquerading as
+        // job-not-found.
+        const outcome = jobs.kill(jobId, sessionId, 'cancelled by the user')
+        return ok(request, { outcome })
       },
     },
 
@@ -5161,6 +5329,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           attachedSessions,
           home: homedir(),
           canOpenPath: !projectScope && canOpenPaths(),
+          fileManager: !projectScope && canOpenPaths() ? nativeFileManager() : null,
           executionAuthorityRequired: ctx.get('executionAuthorityRequired') === true,
           ...(ctx.get('fs') === undefined ? {} : { workspaceFiles: {
             maxBytes: defaults.workspaceFileMaxBytes ?? DEFAULT_WORKSPACE_FILE_MAX_BYTES,
@@ -5262,7 +5431,32 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       async openPath(request, signal) {
         const authorized = authorizePersonalConfiguration()
         if (authorized.error !== undefined) return err(request, authorized.error)
-        return openPath(request, request.payload.path, signal)
+        return openPath(request, request.payload.path, signal, request.payload.action, request.payload.application)
+      },
+
+      async fileApplications(request, signal) {
+        const authorized = authorizePersonalConfiguration()
+        if (authorized.error !== undefined) return err(request, authorized.error)
+        try {
+          if (!canOpenPaths()) return ok(request, { applications: [] })
+          const applications = defaults.fileApplications !== undefined
+            ? await defaults.fileApplications(request.payload.path, signal)
+            : await nativeFileApplications(request.payload.path, signal)
+          return ok(request, { applications: [...applications] })
+        } catch (error: unknown) {
+          if (signal.aborted) {
+            return err(request, {
+              code: 'cancelled',
+              message: 'file application query was aborted',
+              details: {},
+            })
+          }
+          return err(request, {
+            code: 'internal',
+            message: `file application query failed: ${error instanceof Error ? error.message : String(error)}`,
+            details: {},
+          })
+        }
       },
     },
 
@@ -5289,7 +5483,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           // unless the deployment has no opener to hand it to.
           const directory = dirname(preset.path)
           if (!canOpenPaths()) return ok(request, { opened: false as const, path: directory })
-          return await openPath(request, directory, signal)
+          return await openPath(request, directory, signal, undefined, undefined)
         } catch (error: unknown) {
           return err(request, presetError(agentPreset, error))
         }
@@ -5648,7 +5842,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
 
           const pushJobs = (session: Session): void => {
-            const views = jobs === undefined ? [] : jobViews(jobs.list(ctx.agents.get(session.id)))
+            const views = jobs === undefined ? [] : jobViews(jobs.list(session.id))
             if (views.length > 0) {
               queue.push(frame({ type: 'session/jobs', sessionId: session.id, jobs: views }))
             }
@@ -5721,10 +5915,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 }
               })
             }),
-            ...jobs === undefined ? [] : [jobs.onJobsChanged((owner) => {
+            ...jobs === undefined ? [] : [jobs.events.subscribe({ owners: 'all' }, (event) => {
+              const owner = event.type === 'output' ? event.owner : event.job.owner
               if (owner !== undefined) {
-                publishFor(owner.id, () => {
-                  queue.push(frame({ type: 'session/jobs', sessionId: owner.id, jobs: jobViews(jobs.list(owner)) }))
+                publishFor(owner, () => {
+                  queue.push(frame({ type: 'session/jobs', sessionId: owner, jobs: jobViews(jobs.list(owner)) }))
                 })
                 return
               }
@@ -5733,7 +5928,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                   queue.push(frame({
                     type: 'session/jobs',
                     sessionId: session.id,
-                    jobs: jobViews(jobs.list(ctx.agents.get(session.id))),
+                    jobs: jobViews(jobs.list(session.id)),
                   }))
                 })
               }
@@ -5825,6 +6020,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           let committedWorkspaceOrder: WorkspaceId[] = []
           let archivedSessionIds = ctx.workspaceRegistry.archivedSessionIds
           let archiveRevision = ctx.workspaceRegistry.archiveRevision
+          let pinnedSessionIds = ctx.workspaceRegistry.pinnedSessionIds
           const initializationPublications: Array<() => void> = []
           let initializing = true
           const fail = createReadStreamFailure(queue, streamErrorFrame)
@@ -5866,6 +6062,17 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 type: 'host/archived-sessions-changed',
                 archivedSessionIds: await readableSessionList(sessionIds, authority),
                 archiveRevision: revision,
+              }))
+            } catch (error: unknown) {
+              fail(error)
+            }
+          }
+
+          const pushPinned = async (sessionIds: readonly SessionId[]): Promise<void> => {
+            try {
+              queue.push(frame({
+                type: 'host/pinned-sessions-changed',
+                pinnedSessionIds: await readableSessionList(sessionIds, authority),
               }))
             } catch (error: unknown) {
               fail(error)
@@ -5946,6 +6153,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                     archivedSessionIds = state.archivedSessionIds
                     archiveRevision = state.archiveRevision
                     void pushArchived(state.archivedSessionIds, state.archiveRevision)
+                  }
+                  if (state.pinnedSessionIds.length !== pinnedSessionIds.length
+                    || state.pinnedSessionIds.some((id, index) => id !== pinnedSessionIds[index])) {
+                    pinnedSessionIds = state.pinnedSessionIds
+                    void pushPinned(state.pinnedSessionIds)
                   }
                   return
                 }

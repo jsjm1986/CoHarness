@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-18-cold-queue-mutation-recovery.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-18-cold-queue-mutation-recovery.md
-2026-09-18-cold-queue-mutation-recovery.md: b0f39a63478108fc0ccb980339bcba199a4f546f
-2026-09-18-cold-queue-mutation-recovery.zh.md: 8f0a101183928efcb8a8f55595f20850fb90dd5b
+/agent-note-resume-cold-sessions-for-inbox-commands:
+  en: ba746ebb9146f62a
+  zh: 7896f3673a767034
+/agent-note-resume-cold-sessions-for-inbox-commands/problem:
+  en: d6e7ac30f14e9f1c
+  zh: fb89fc066306fd3e
+/agent-note-resume-cold-sessions-for-inbox-commands/decision:
+  en: 62eeda6d724cca45
+  zh: c454c0a41e09a8f3
+/agent-note-resume-cold-sessions-for-inbox-commands/verification:
+  en: e47665c2d818079b
+  zh: 420ba0eb4d5ecbd6
+/agent-note-resume-cold-sessions-for-inbox-commands/alternatives-considered:
+  en: bd59031aac363fd5
+  zh: 4d97a9e423bf169b
+/agent-note-resume-cold-sessions-for-inbox-commands/consequences:
+  en: 3b71e5720f74d62f
+  zh: c7c2f67720b2c9f9

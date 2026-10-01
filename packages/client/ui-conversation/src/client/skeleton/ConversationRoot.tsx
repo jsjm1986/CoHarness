@@ -242,7 +242,7 @@ export function ConversationPane({
   // on the fallback alone would leave Question/Approval panels at the content
   // end off-screen when the user is not pinned to the floor.
   const composerSeat = (
-    <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="">
+    <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="" data-conversation-region="composer">
       {composer}
     </div>
   )
@@ -306,7 +306,7 @@ export function ConversationPane({
   return (
     <div ref={rootRef} className={clsx(css.root, workbench && css.workbenchPane)} data-phase={phase} style={widthStyle}>
       {renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
-      <div className={css.scrollRegion}>
+      <div className={css.scrollRegion} data-conversation-session={sessionId} data-conversation-region="chat">
         <div className={css.scrollBody} data-conversation-scroll="">
           {renderSlot('conversation.session', { compact })}
           {composerSeat}

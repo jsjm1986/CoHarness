@@ -310,6 +310,43 @@ describe('bounded Gateway responses', () => {
   })
 })
 
+it('answers connection/authenticate on Headers or Node records before any cookie exists', async () => {
+  const { credential, issue } = fixture()
+  const root = await mkdtemp(join(tmpdir(), 'gateway-authenticate-'))
+  const credentialPath = join(root, 'credential.json')
+  await writeFile(credentialPath, JSON.stringify(credential))
+  process.env.DSH_GATEWAY_CREDENTIAL_FILE = credentialPath
+  const ctx = new Context()
+  ctx.provide('connection', {} as never)
+  await ctx.plugin(GatewayRuntime)
+  const admin = { id: 9, username: 'admin', displayName: 'Admin', role: 'admin' as const }
+  try {
+    // A Fetch Headers instance and a Node record carry the assertion equally.
+    expect(ctx.bail('connection/authenticate', {
+      headers: new Headers([[GATEWAY_PRINCIPAL_HEADER, issue()]]),
+      method: 'GET', url: '/', kind: 'index',
+    })).toBe('allow')
+    expect(ctx.bail('connection/authenticate', {
+      headers: { [GATEWAY_PRINCIPAL_HEADER]: issue() },
+      method: 'GET', url: '/api/events.mux', kind: 'upgrade',
+    })).toBe('allow')
+    // Absent, forged, and non-string headers all deny.
+    expect(ctx.bail('connection/authenticate', {
+      headers: new Headers(), kind: 'index',
+    })).toBe('deny')
+    expect(ctx.bail('connection/authenticate', {
+      headers: { [GATEWAY_PRINCIPAL_HEADER]: 'forged' }, kind: 'http',
+    })).toBe('deny')
+    // A purpose assertion never admits the index or an upgrade carrier.
+    const bounded = issue({ purpose: 'terminal-admin', user: admin })
+    for (const kind of ['index', 'upgrade'] as const) {
+      expect(ctx.bail('connection/authenticate', {
+        headers: { [GATEWAY_PRINCIPAL_HEADER]: bounded }, kind,
+      })).toBe('deny')
+    }
+  } finally { await ctx.fiber.dispose(); await rm(root, { recursive: true, force: true }) }
+})
+
 it('confines signed terminal management to metadata and termination HTTP endpoints', async () => {
   const { credential, issue } = fixture()
   const root = await mkdtemp(join(tmpdir(), 'terminal-management-'))

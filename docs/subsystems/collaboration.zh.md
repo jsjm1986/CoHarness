@@ -55,7 +55,9 @@ interface GatewayPrincipalClaims {
 
 Gateway 通过继承的文件描述符或 systemd credential 文件向运行时交付一份私有凭据。bearer token 用于认证 loopback 内部 API 调用，公钥用于验证浏览器 principal；两者都不属于浏览器配置。
 
-Connection 载体在浏览器信任检查后、任何 RPC 或 stream handler 运行前，用 `connection/request` waterfall 包裹每次已接受的 `/api` HTTP 分发与事件流 WebSocket opening。认证和请求上下文监听器读取进入时不可变的 header，并且必须调用 `next()`，以保留后续监听器与分发。
+Connection 载体在浏览器信任检查后、任何 RPC 或 stream handler 运行前，用 `connection/request` waterfall 包裹每次已接受的 `/api` HTTP 分发、通用 RPC 通道调用与事件流 WebSocket opening。认证和请求上下文监听器读取进入时不可变的 header，并且必须调用 `next()`，以保留后续监听器与分发。
+
+在该 waterfall 之前，准入先运行 `connection/authenticate(request)`——一个同步 bail，第一个已定义应答生效：`'allow'` 无浏览器凭据即放行，`'deny'` 即使存在已签发 Cookie 或存活启动令牌也拒绝，`undefined` 回退到启动令牌交换与 Cookie。请求携带 `kind: 'index' | 'http' | 'upgrade'` 及 header 与可选 method/url 事实，provider 据此区分 index、`/api`、通用通道与 upgrade 开启。Host/Origin 围栏永远先行，声明 `loopback` 的子树从不询问 provider。provider 必须自行证明身份——看到请求头绝不是放行依据；GatewayRuntime 是已发布的 provider，在任何 Cookie 存在之前验证代理签发的 `x-dsh-gateway-principal`。principal 的再次校验与请求局部传播仍归 `connection/request` 所有。
 
 ```ts type-equiv
 /** One accepted HTTP request or WebSocket opening entering the Connection carrier. */

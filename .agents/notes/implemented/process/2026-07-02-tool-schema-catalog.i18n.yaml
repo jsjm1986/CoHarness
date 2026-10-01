@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-02-tool-schema-catalog.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-02-tool-schema-catalog.md
-2026-07-02-tool-schema-catalog.md: 21192b8caff386058008eed1417ef78c678190f7
-2026-07-02-tool-schema-catalog.zh.md: 756f279b1a8ebd08efd92c6cf8abfd5a70a9dcdb
+/agent-note-generated-tool-schema-catalog-boot-and-harvest:
+  en: 7cc7f58030e4549c
+  zh: 6dd1bc3fd68a14a9
+/agent-note-generated-tool-schema-catalog-boot-and-harvest/problem:
+  en: 8e5a83f8019857bd
+  zh: b5ab5e9f19cd5ea1
+/agent-note-generated-tool-schema-catalog-boot-and-harvest/decision:
+  en: cab5a4ef6abd7407
+  zh: ef38249a11d412ec
+/agent-note-generated-tool-schema-catalog-boot-and-harvest/decision/why-boot-not-parse-the-crux:
+  en: f712f1f93033cb0e
+  zh: 6d3e6b347ee0be70
+/agent-note-generated-tool-schema-catalog-boot-and-harvest/decision/restoring-nothing-silently-omitted:
+  en: b2de3d543cb96cf3
+  zh: ce0ab804e59a77ce
+/agent-note-generated-tool-schema-catalog-boot-and-harvest/decision/a-hand-maintained-boot-manifest-is-the-irreducible-policy:
+  en: 11346149e85423bd
+  zh: 45ec7db9fcbc9bb4
+/agent-note-generated-tool-schema-catalog-boot-and-harvest/decision/scope:
+  en: 20bb0d7db803b21d
+  zh: 11b679b0a803dfba
+/agent-note-generated-tool-schema-catalog-boot-and-harvest/decision/a-plain-json-fence:
+  en: 3dc6e0d74d34163c
+  zh: 9155d545d231a57e
+/agent-note-generated-tool-schema-catalog-boot-and-harvest/alternatives-considered:
+  en: 10a0f598f1e6121a
+  zh: fca69592e9b3e8b5
+/agent-note-generated-tool-schema-catalog-boot-and-harvest/consequences:
+  en: 28ecdf99ed7d3608
+  zh: 552f409a39df7365

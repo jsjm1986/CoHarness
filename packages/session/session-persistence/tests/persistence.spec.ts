@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore, {
+  SESSION_FORMAT_VERSION,
   Session,
   SessionId,
   SessionLogOffset,
@@ -708,12 +709,14 @@ describe('PersistenceCoordinator session preparations', () => {
     await ctx.plugin(SessionStore)
     const backend = new ControlledBackend()
     const id = SessionId('legacy-ptc-read')
-    const legacyMessage: UserMessage = {
+    // The stored fixture carries the retired plugin attribution verbatim; the
+    // coordinator normalizes the legacy producer name on read.
+    const legacyMessage = {
       id: MessageId('legacy-ptc-message'),
       role: 'user',
       content: [{ type: 'text', text: 'hi' }],
       source: { kind: 'plugin', plugin: 'tools-code-mode' },
-    }
+    } as unknown as UserMessage
     backend.store.set(id, {
       meta: { ...meta(id), agentPreset: 'code' },
       events: [
@@ -927,7 +930,7 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const suffix = await coordinator.readFrom(id, SessionLogOffset(1))
-      expect(suffix.meta.version).toBe(6)
+      expect(suffix.meta.version).toBe(SESSION_FORMAT_VERSION)
       expect(suffix.events.map(event => event.type)).toEqual([
         'step/start', 'system/message', 'user/message', 'assistant/message', 'step/end', 'turn/end',
       ])
@@ -946,8 +949,9 @@ describe('PersistenceCoordinator session preparations', () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const medium = new ControlledBackend()
-    // v4→v6 changes only the header version, so the coordinator can publish a
-    // current-version successor in place with an identical body.
+    // v4→current changes only the header version for an already-current body,
+    // so the coordinator can publish a current-version successor in place with
+    // an identical body.
     const storedFor = (id: string): { meta: SessionHeader; events: SessionEvent[] } => ({
       meta: { ...meta(id), version: 4 } as unknown as SessionHeader,
       events: [
@@ -989,13 +993,13 @@ describe('PersistenceCoordinator session preparations', () => {
     try {
       // The sequential readFrom path publishes the successor through its prefix read.
       const suffix = await coordinator.readFrom(readId, SessionLogOffset(0))
-      expect(suffix.meta.version).toBe(6)
+      expect(suffix.meta.version).toBe(SESSION_FORMAT_VERSION)
       expect(suffix.events.map(event => event.type)).toEqual(['turn/start', 'user/message', 'turn/end'])
-      expect(medium.store.get(readId)?.meta.version).toBe(6)
+      expect(medium.store.get(readId)?.meta.version).toBe(SESSION_FORMAT_VERSION)
       // The cold load path publishes through its preparation pass.
       const loaded = await coordinator.load(loadId)
-      expect(loaded.meta.version).toBe(6)
-      expect(medium.store.get(loadId)?.meta.version).toBe(6)
+      expect(loaded.meta.version).toBe(SESSION_FORMAT_VERSION)
+      expect(medium.store.get(loadId)?.meta.version).toBe(SESSION_FORMAT_VERSION)
       expect(migrateStored).toHaveBeenCalledTimes(2)
       // Re-running a load over the already-published log is a no-op.
       await coordinator.load(readId)
@@ -1024,7 +1028,7 @@ describe('PersistenceCoordinator session preparations', () => {
     }, { inject: ['sessions'] }))
     try {
       const loaded = await coordinator.load(id)
-      expect(loaded.meta.version).toBe(6)
+      expect(loaded.meta.version).toBe(SESSION_FORMAT_VERSION)
       expect(backend.store.get(id)?.meta.version).toBe(2)
 
       const resumed = ctx.sessions.create(id, { seed: loaded.events, meta: loaded.meta })

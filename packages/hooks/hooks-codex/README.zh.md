@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-hooks-codex
 
 [English](README.md) | 中文
@@ -18,6 +23,19 @@
 
 `dsh-hooks-codex` 在 agent（智能体）运行期间执行现有 Codex `hooks.json` 中的 command 钩子，让提示词与工具把关逻辑无需重写即可生效。它支持 5 个 Codex hook 点：会话开始、提示词提交、工具执行前后以及停止。钩子可以用模型可见的原因阻塞提示词或工具调用、添加对话上下文，或强制 agent 再执行一步。需要在 harness 中复用 Codex command 钩子时选择本包；超出这一受支持子集的行为应使用原生插件。
 
+## 目录
+
+- [配置](#config)
+- [Hook 点 → 类型化 Decision](#hook-points--typed-decisions)
+- [上下文源](#context-source)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## 配置
 
 ```ts
@@ -43,6 +61,7 @@ const config: Config = {
 
 hook 本身会在 agent（智能体）的会话工作区中运行：对 agent scope 点，桥接会将会话 `cwd` 作为 hook 进程工作目录，因此 hook 作用于用户项目树，而非服务器启动目录。
 
+<a id="hook-points--typed-decisions"></a>
 ## Hook 点 → 类型化 Decision
 
 | Codex hook | Harness 点 | 映射 |
@@ -59,14 +78,18 @@ hook 本身会在 agent（智能体）的会话工作区中运行：对 agent sc
 
 串行 `agent/created` 初始化会等待 `SessionStart`，因此成功注入的上下文先于首个请求。创建取消或桥接卸载会中止 hook；已中止的运行不再注入上下文。桥接卸载会在返回前排空已跟踪的 continuation（使用 `dsh-hook-protocol` 中的 `createDetachedRuns`）。Hook 和注入失败会被记录，而不会否决创建。
 
+<a id="context-source"></a>
 ## 上下文源
 
 注入上下文携带显式 `{ kind: 'plugin', plugin: 'hooks-codex' }` 来源，因此持久消息绝不会被误认为用户提示词。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。桥接层把每次规范化拦截翻译为一次 Codex 钩子调用并把决定映射回来；钩子行为由规格固定，事件之间不保留关系。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### Hook 提供的上下文
@@ -97,6 +120,7 @@ hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记�
 
 已阻塞提示词不发送请求，不会导致失效。拒绝、反馈与强制 continuation 上下文会追加在可复用前缀之后，不改写前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **不支持的 hook 事件（Codex 当前 10 项中的 5 项）：** `PermissionRequest`、`PreCompact`、`PostCompact`、`SubagentStart` 和 `SubagentStop`。这些事件的配置会在解析期间静默丢弃。比较基线是 Codex [官方 hook 参考](https://learn.chatgpt.com/docs/hooks)。
@@ -106,3 +130,13 @@ hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记�
 - **`Stop` 只支持部分功能：** 阻塞会强制另一个模型轮次，但 `stop_hook_active` 始终为 `false`，`last_assistant_message` 始终为 `null`，且不会强制执行 `{"continue": false}`。因此，无条件阻塞 hook 会在每个步骤中强制 continuation，除非它自我限制（`TODO(stop-loop-guard)`）。
 - **通用 payload 与输出字段只支持部分功能：** 每个已映射事件都报告静态配置的 `model` 与 `permission_mode: "default"`，而非当前 Codex 运行时值。`systemMessage` 会被记录并触发警告，但不呈现，`{"continue": false}` 会被记录但不会应用 Codex 事件特定停止行为（`TODO(hook-continue-false)`）。
 - **配置加载与执行只支持部分功能：** 一个进程级 `configPath` 会在加载时解析；尚未实现 Codex 的活动用户层、项目层、会话层、系统／托管层和插件层、信任控制与内联 `config.toml` hook 形式（`TODO(per-session-hook-config)`）。只运行同步 `command` handler，忽略 `statusMessage` 与 `commandWindows` 等当前元数据，匹配 handler 串行运行，而非使用 Codex 的并发启动语义。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

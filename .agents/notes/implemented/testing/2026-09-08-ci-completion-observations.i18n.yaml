@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-08-ci-completion-observations.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-08-ci-completion-observations.md
-2026-09-08-ci-completion-observations.md: 384995cb6cdcc2e682ed90ca5d8d8886e6b5229d
-2026-09-08-ci-completion-observations.zh.md: ffb1e73be00dc5a70b6b695a2097908020273731
+/agent-note-ci-fixture-completion-and-isolation:
+  en: f5c180b0aad40b22
+  zh: 89af7791bfbed707
+/agent-note-ci-fixture-completion-and-isolation/problem:
+  en: b7350054dcefd411
+  zh: 61fd5b508f804ca1
+/agent-note-ci-fixture-completion-and-isolation/decision:
+  en: 5c5733f20a3526c9
+  zh: 4c3fecf2d6402cce
+/agent-note-ci-fixture-completion-and-isolation/decision/built-client-import-classification:
+  en: 5fdb8f05c97cc43c
+  zh: 3c67e8d6c4102221
+/agent-note-ci-fixture-completion-and-isolation/alternatives-considered:
+  en: 569976702b273da6
+  zh: 3a5e5faba0074398
+/agent-note-ci-fixture-completion-and-isolation/consequences:
+  en: 168df70afdad308d
+  zh: 0e77a4741fa8024b

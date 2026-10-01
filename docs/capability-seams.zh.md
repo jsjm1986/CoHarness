@@ -146,7 +146,7 @@ flowchart LR
   svc_userQuestions["ctx.userQuestions<br/>Human question/answer seam"]
   pkg_plan_mode["plan-mode"]
   svc_planMode["ctx.planMode<br/>Plan collaboration state"]
-  pkg_agent_presets["agent-presets"]
+  pkg_agent_preset_registry["agent-preset-registry"]
   svc_agentPresets["ctx.agentPresets<br/>Per-session agent composition"]
   pkg_commands["commands"]
   svc_commands["ctx.commands<br/>Human command registry"]
@@ -156,8 +156,10 @@ flowchart LR
   svc_sessionProjectionCache["ctx.sessionProjectionCache<br/>Persisted projection cache"]
   pkg_skill["skill"]
   svc_skills["ctx.skills<br/>Skill provider registry"]
+  pkg_sandbox_windows_acl["sandbox-windows-acl"]
   pkg_skill_badge["skill-badge"]
   pkg_skill_filesystem["skill-filesystem"]
+  pkg_skill_office["skill-office"]
   svc_agents["ctx.agents<br/>Agent service"]
   pkg_acp["acp"]
   pkg_agent_default_model["agent-default-model"]
@@ -229,6 +231,7 @@ flowchart LR
   svc_jobs["ctx.jobs<br/>Background job registry"]
   pkg_jobs_local["jobs-local"]
   pkg_tool_jobs["tool-jobs"]
+  pkg_api_job_controller["api-job-controller"]
   pkg_web["web"]
   svc_web["ctx.web<br/>Web access provider registry"]
   pkg_web_search_exa["web-search-exa"]
@@ -266,7 +269,7 @@ flowchart LR
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
   pkg_agent_loop --> svc_agentLoop
-  pkg_agent_presets --> svc_agentPresets
+  pkg_agent_preset_registry --> svc_agentPresets
   pkg_agent_team --> svc_agentTeams
   pkg_api_gateway --> svc_typertGateway
   pkg_api_terminal_controller --> svc_terminalController
@@ -345,6 +348,7 @@ flowchart LR
   pkg_sandbox_local --> svc_sandbox
   pkg_sandbox_policy --> svc_sandboxPolicy
   pkg_sandbox_ssh --> svc_sandbox
+  pkg_sandbox_windows_acl --> svc_skills
   pkg_session --> svc_sessions
   pkg_session_persistence --> svc_sessionPersistence
   pkg_session_persistence_gateway --> svc_sessionPersistence
@@ -367,6 +371,7 @@ flowchart LR
   pkg_skill --> svc_skills
   pkg_skill_badge --> svc_skills
   pkg_skill_filesystem --> svc_skills
+  pkg_skill_office --> svc_skills
   pkg_spill --> svc_spillStore
   pkg_spill_local --> svc_spillStore
   pkg_ssh --> svc_ssh
@@ -450,8 +455,10 @@ flowchart LR
   svc_invariants --> pkg_agent_loop
   svc_invariants --> pkg_scope
   svc_invariants --> pkg_session
+  svc_jobs --> pkg_api_job_controller
   svc_jobs --> pkg_tool_bash
   svc_jobs --> pkg_tool_jobs
+  svc_jobs --> pkg_tool_pwsh
   svc_jobs --> pkg_tool_subagent
   svc_jobs --> pkg_tool_terminal
   svc_llm --> pkg_agent_loop
@@ -604,11 +611,11 @@ flowchart LR
 | `ctx.tools` | `core` | [`tools`](../packages/core/tools) | - | [`agent-loop`](../packages/core/agent-loop), [`tool-ask-user`](../packages/interaction/tool-ask-user), [`tool-bash`](../packages/shell/tool-bash), [`tool-cordis`](../packages/extensions/tool-cordis), [`tool-fs`](../packages/fs/tool-fs), [`tool-terminal`](../packages/terminal/tool-terminal), [`tool-skill`](../packages/skill/tool-skill), [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-todo`](../packages/todo/tool-todo), [`tool-web`](../packages/web/tool-web) | - | 注册能力，负责 PTC mode 传输，并让调用依次经过策略前处理、单调守卫、环绕分派、策略后处理和最终结果观测。 |
 | `ctx.userQuestions` | `seam` | [`user-questions`](../packages/interaction/user-questions) | - | [`tool-ask-user`](../packages/interaction/tool-ask-user) | - | UI 前端提供当前生效的人工回答提供方；tool-ask-user 在提供方无关的 ask() promise 上暂停工具调用。 |
 | `ctx.planMode` | `core` | [`plan-mode`](../packages/plan/plan-mode) | - | - | - | 折叠已记录的计划／模式状态，在轮次边界刷新用户选择，渲染由部署方拥有的指导信息，注册 /plan，并在状态转换期间保持计划退出 schema 稳定。 |
-| `ctx.agentPresets` | `core` | [`agent-presets`](../packages/preset/agent-presets) | - | - | - | 在受信任根目录与用户创作根目录上发现 preset 目录，并在创建期把一份 preset cordis.yml 挂载到 agent 作用域之下，拒绝始终未激活或向根服务 realm 发布服务的行。 |
+| `ctx.agentPresets` | `core` | `agent-preset-registry` | - | - | - | 急切挂载 YAML 声明的 preset 修订，把 Agent 与冷读者绑定到作用域化贡献，并在最后一个使用者释放前保留已退役修订。 |
 | `ctx.commands` | `core` | [`commands`](../packages/interaction/commands) | - | - | - | 插件注册直接面向人的命令，而不会把调用发送给模型。 |
 | `ctx.sessionProjections` | `core` | [`session-projection`](../packages/session/session-projection) | - | [`tool-todo`](../packages/todo/tool-todo), [`session-title`](../packages/session/session-title), [`host-apiproxy`](../packages/host/apiproxy) | - | 各领域注册由状态驱动的折叠单元；主动驱动过程维护每个会话的水位状态，api-proxy 提供基线并推送发生变化的值。 |
 | `ctx.sessionProjectionCache` | `core` | [`session-projection-cache`](../packages/session/session-projection-cache) | - | [`host-apiproxy`](../packages/host/apiproxy) | - | 按会话持久保存投影单元状态的检查点（节流检查点，以及轮次／结束／分离时的必选检查点），并提供冷读取阶梯：缓存行加持久化尾部回放，因此列表读取永远不需要加载完整日志。 |
-| `ctx.skills` | `seam` | [`skill`](../packages/skill/skill) | [`skill-badge`](../packages/skill/skill-badge), [`skill-filesystem`](../packages/skill/skill-filesystem) | [`tool-skill`](../packages/skill/tool-skill) | - | 合并提供方的 skill（技能）目录；tool-skill 渲染会话前缀目录，并加载完整的 skill 正文。 |
+| `ctx.skills` | `seam` | [`skill`](../packages/skill/skill) | [`sandbox-windows-acl`](../packages/sandbox/sandbox-windows-acl), [`skill-badge`](../packages/skill/skill-badge), [`skill-filesystem`](../packages/skill/skill-filesystem), [`skill-office`](../packages/skill/skill-office) | [`tool-skill`](../packages/skill/tool-skill) | - | 合并提供方的 skill（技能）目录；tool-skill 渲染会话前缀目录，并加载完整的 skill 正文。 |
 | `ctx.agents` | `core` | [`agent`](../packages/core/agent) | - | [`agent-loop`](../packages/core/agent-loop), [`acp`](../packages/acp/acp), `subagent-inprocess` | - | 拥有实时 Agent 句柄、创建／恢复工厂 seam，以及进程本地的发起方传播。 |
 | `ctx.agentDefaultModel` | `core` | [`agent-default-model`](../packages/core/agent-default-model) | - | [`headless`](../packages/bundle/headless), [`host-apiproxy`](../packages/host/apiproxy) | - | 通过 settings 分层默认 `ModelSelection`，让直接入口与 Host 支撑的 Agent 入口共享同一个状态所有者。 |
 | `ctx.agentLoop` | `bundle` | [`agent-loop`](../packages/core/agent-loop) | - | [`agent-spine-demo`](../packages/examples/agent-spine-demo) | - | 唯一的具体循环插件；扩展包依赖 dsh-agent 的事件和服务，而不依赖此包。 |
@@ -632,7 +639,7 @@ flowchart LR
 | `ctx.subagents` | `seam` | [`subagent`](../packages/subagent/subagent) | [`subagent-spawn-in-process`](../packages/subagent/subagent-spawn-in-process), [`subagent-fork-in-process`](../packages/subagent/subagent-fork-in-process), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code), [`subagent-dsh-sdk`](../packages/subagent/subagent-dsh-sdk) | [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-subagent-control`](../packages/subagent/tool-subagent-control), [`tool-ralph`](../packages/workflow/tool-ralph) | - | 提供方实现传输；该服务还负责可选的、基于 Activation 的延续编排，tool-subagent 选择一次性或可延续委派，tool-subagent-control 传递后续消息，而 tool-ralph 要求一条全新的结构化输出路由。 |
 | `ctx.subagentModelSelection` | `core` | [`tool-subagent`](../packages/subagent/tool-subagent) | - | [`tool-subagent`](../packages/subagent/tool-subagent) | - | 该设置服务校验并快照委派工具使用的宿主 allowlist，仅在显式启用模型选择支持时生效；发布的组合默认保持关闭。 |
 | `ctx.agentTeams` | `core` | `agent-team` | - | `tool-agent-team` | - | 负责隐式 Root roster、持久 peer mailbox、共享任务 DAG 与 continuable child 生命周期；tool-agent-team 提供作用域化模型策略和控制工具。 |
-| `ctx.jobs` | `seam` | [`jobs`](../packages/jobs/jobs) | [`jobs-local`](../packages/jobs/jobs-local) | [`tool-bash`](../packages/shell/tool-bash), [`tool-terminal`](../packages/terminal/tool-terminal), [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-jobs`](../packages/jobs/tool-jobs) | - | 生产方（后台 bash、PTY 发送和 subagent 委派）登记正在运行的工作；tool-jobs 是面向模型的控制器，用于读取、列出和终止这些工作；jobs-local 是进程本地注册表。 |
+| `ctx.jobs` | `seam` | [`jobs`](../packages/jobs/jobs) | [`jobs-local`](../packages/jobs/jobs-local) | [`tool-bash`](../packages/shell/tool-bash), [`tool-pwsh`](../packages/shell/tool-pwsh), [`tool-terminal`](../packages/terminal/tool-terminal), [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-jobs`](../packages/jobs/tool-jobs), `api-job-controller` | - | 生产方（后台 bash/pwsh、PTY 发送和 subagent 委派）登记正在运行的工作；声明记录的作业还会向非消费观察者流出原始输出；tool-jobs 是面向模型的控制器，用于读取、列出和终止这些工作；jobs-local 是进程本地注册表。 |
 | `ctx.web` | `seam` | [`web`](../packages/web/web) | [`web-search-exa`](../packages/web/web-search-exa), [`web-search-perplexity`](../packages/web/web-search-perplexity), [`web-search-deepseek`](../packages/web/web-search-deepseek), [`web-fetch-http`](../packages/web/web-fetch-http) | [`tool-web`](../packages/web/tool-web) | - | 搜索和抓取提供方注册到同一个 ctx.web seam；tool-web 负责稳定的面向模型名称。 |
 | `ctx.spillStore` | `seam` | [`spill`](../packages/spill/spill) | [`spill-local`](../packages/spill/spill-local) | [`spill-policy`](../packages/spill/spill-policy) | - | 后端保存过大的工具文本，并返回面向模型的定位信息和取回提示；spill-policy 是 tools/post-execute 消费方，负责决定何时 spill。 |
 | `ctx.directoryPicker` | `seam` | `directory-picker` | `directory-picker-native`, `directory-picker-browse` | `apiproxy` | - | 带判别标记的交互能力：原生后端在 Host 显示设备上打开一个操作系统选择器，浏览后端为应用内浏览器提供列表与创建原语；双端后端通过其浏览器侧填充 ui-workspace 目录流程的 slot（不通过协议发布）。 |

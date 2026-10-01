@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # interaction/：人机协作平面
 
 [English](README.md) | 中文

@@ -11,7 +11,8 @@ import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ConversationSnapshot, RunningToolCall, SessionId, SessionListState, ToolResultNode, WorkspaceListState,
+  ConversationSnapshot, RunningToolCall, SessionId, SessionListState, StartedToolCall, ToolResultNode,
+  WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -62,8 +63,8 @@ const resultTerminal = (over?: Partial<Extract<ToolResultView, { card: 'terminal
   card: 'terminal', output: 'a.ts  b.ts\nc.ts  d.ts\n', exitCode: 0, ...over,
 })
 
-const running = (over?: Partial<RunningToolCall>): RunningToolCall => ({
-  callId: 'c1', name: 'bash', argsRaw: ARGS,
+const running = (over?: Partial<StartedToolCall>): StartedToolCall => ({
+  phase: 'start', callId: 'c1', name: 'bash', argsRaw: ARGS,
   turn: 1, step: 1, time: 1_000, callView: callTerminal(), subCalls: [], ...over,
 })
 
@@ -298,8 +299,9 @@ describe('terminalCardModel', () => {
 })
 
 describe('chat row terminal body', () => {
-  const ownerProps = (block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName: 'bash', block, openFile: vi.fn(), t,
+  const ownerProps = (block: StartedToolCall | ToolResultNode): GenericToolCardProps => ({
+    callId: 'c1', toolName: 'bash', openFile: vi.fn(), t,
+    ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
   })
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -406,7 +408,7 @@ describe('BashRow terminal card', () => {
     archivedById: {},
     current: undefined,
     phase: 'ready',
-    subagentsByParent: {}, jobsBySession: {},
+    subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })
 
@@ -523,18 +525,18 @@ describe('DetailsPanel Output section', () => {
     const chat = createChatStore().create()
     if (selection !== null) chat.actions.select(selection)
     const sessions = createSnapshotStore<SessionListState>(cwd === undefined
-      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined }
+      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }
       : {
         ids: [SID],
         byId: { [SID]: { id: SID, displayTitle: 'r', running: false, blank: false, updatedAt: 0, cwd } },
         archivedById: {},
         current: SID,
         phase: 'ready',
-        subagentsByParent: {}, jobsBySession: {},
+        subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
         currentAddress: undefined,
       })
     const workspaces = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })
     return render(
@@ -566,7 +568,7 @@ describe('DetailsPanel Output section', () => {
     return {
       sessionId: SID, views: EMPTY_CONVERSATION_VIEWS,
       chat: over.chat ?? toolChatSnapshot(nodes, runningCalls),
-      nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+      nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
       pending: [], queue: [], running: false, composerPhase: 'active', removed: false,
       openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
       promptError: null, blank: false, subagent: null, lastAgentError: null, ...over,
@@ -729,10 +731,10 @@ describe('DetailsPanel Output section', () => {
         useSessions={bindSnapshotSelector(createSnapshotStore<SessionListState>(
           {
             ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
-            subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+            subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
           }))}
         useWorkspaces={bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({
-          items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+          items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
           baselinesReady: true, recentWorkspaceId: undefined,
         }))}
         useInput={(() => { throw new Error('unused') })}

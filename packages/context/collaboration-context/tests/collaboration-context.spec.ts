@@ -70,8 +70,7 @@ describe('collaboration context', () => {
     expect(decision.messages[0]?.content).toEqual([{ type: 'text', text: renderParticipantNotice(PARTICIPANT) }])
     expect(decision.messages[1]).toBe(first)
     expect(decision.messages[2]?.source).toMatchObject({
-      kind: 'plugin',
-      plugin: 'collaboration-context',
+      kind: 'collaboration-context',
       form: 'notice',
       participantMessageId: second.id,
       participant: PARTICIPANT,

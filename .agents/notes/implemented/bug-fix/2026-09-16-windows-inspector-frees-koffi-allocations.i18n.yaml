@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-16-windows-inspector-frees-koffi-allocations.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-16-windows-inspector-frees-koffi-allocations.md
-2026-09-16-windows-inspector-frees-koffi-allocations.md: 5f5c16459297b2491a27246b7b00dcd9c0a10627
-2026-09-16-windows-inspector-frees-koffi-allocations.zh.md: 3d6ffca5348ece673eb83006a8f4a8b64db02269
+/agent-note-windows-inspector-frees-its-koffi-allocations:
+  en: 3408314f4d3193cb
+  zh: 3abd24cdab0528b0
+/agent-note-windows-inspector-frees-its-koffi-allocations/problem:
+  en: f39520e2af6ffe88
+  zh: 138358733ba052a2
+/agent-note-windows-inspector-frees-its-koffi-allocations/decision:
+  en: 2184f4df90eaf65e
+  zh: db1d0a29acb64bfc
+/agent-note-windows-inspector-frees-its-koffi-allocations/alternatives-considered:
+  en: 71df1401816b49e6
+  zh: 6d41d9ee824901b0
+/agent-note-windows-inspector-frees-its-koffi-allocations/consequences:
+  en: ad7c12a820bd6f5d
+  zh: 821cfcdafb1334ae
+/agent-note-windows-inspector-frees-its-koffi-allocations/verification:
+  en: c2fab168855e4e0b
+  zh: 9d48d289fb3f3c20

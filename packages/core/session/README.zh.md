@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # dsh-session
 
 [English](README.md) | 中文
@@ -10,6 +15,16 @@
 
 `dsh-session` 在仅追加的会话日志中记录每个模型可见事实，并从该记录派生模型历史。消费方可以检查、回放、fork 和刷新会话，同时保留历史事件；压缩（compaction）会在活跃对话中隐藏被取代的条目，但不会删除它们。除非添加持久化后端，否则会话仅保留在内存中；持久性检查点会等待配置的后端。agent 需要可重建的会话记录时请选择本包；它本身不调用模型。
 
+## 目录
+
+- [服务：`SessionStore`（ctx 键：`sessions`）](#service-sessionstore-ctx-key-sessions)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="service-sessionstore-ctx-key-sessions"></a>
 ## 服务：`SessionStore`（ctx 键：`sessions`）
 
 创建并持有事件溯源的 `Session` 实例。这里有意不实现持久化：插件订阅 `session/event`，在 `session/flush` 时刷新，并可镜像成对的 `session/created`／`session/disposed` 生命周期。
@@ -119,6 +134,8 @@
 - 回放／fork：`create(id, { seed })` 校验并冻结连续的当前格式日志，再重建 surface；请求头必须包含提供方／模型，assistant 消息必须包含提供方／模型来源。持久化层在构造该当前格式 seed 前负责读取兼容性处理。`fork(source, boundary?, childSessionId?)` 选择已完成轮次前缀并记录谱系。
 - 压缩：`dsh-compaction-basic` 为摘要检查点追加一个替换用 `user/message`，而 `dsh-compaction-tool-result-pruner` 追加仅修改内容的 `tool/result` 替换。工具配对边界策略及其缓存归 [`dsh-compaction` seam](../../compaction/compaction/README.zh.md) 所有；此包拥有有序 surface 成员关系、替换校验与 `replaceGeneration`。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 派生消息历史
@@ -165,6 +182,7 @@
 
 <a id="known-limitations-and-deferred-work"></a>
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 这些限制说明何时需要特别关心会话存储。它们是当前包约束，不是任务清单。
@@ -173,3 +191,13 @@
 - **`fork()` 仅在实时会话的稳定边界处切分**：所选前缀结束时不得有开放轮次，且源会话必须位于存储中；[fork API](../../../.agents/notes/implemented/feature/2026-06-30-session-store-fork-api.zh.md) 不支持对已持久化但未加载的会话进行 fork。
 - **`SESSION_FORMAT_VERSION` 为 `3`**：当前读取器拒绝已退役的 `header.system`，并校验 `system/message` 载荷与受保护头节点的重写。持久化 provider 会通过相邻 format 软件包迁移受支持的 v0/v1/v2 历史 generation，然后再构造当前 `Session`；v2 请求头中的系统提示会提升为持久化的 `system/message` surface 节点，旧 generation 保持不可变。Assistant 结算事件可携带紧凑且无损的流，失败 attempt 单独记录。更新的版本会以说明方向的错误拒绝。不认识的事件类型同样被拒绝，除非信封带 `ignorable` 标记；版本机制由 [Session format 软件包](../../session/session-format/README.zh.md)负责。
 - **`TurnEndReasonMap` 不含 ACP（Agent Client Protocol）命名的 `refusal`／`max_turn_requests` 变体**：受生产方约束；只有当适配器或循环首次产生这些变体时才加入。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

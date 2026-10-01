@@ -20,6 +20,7 @@ flowchart TD
   toolBody["Registered tool execute() body"]
   fsGate["<code>fs/write-intent</code> or <code>fs/edit-intent</code><br/>tool-fs mutations only"]
   owned["Tool-owned session events<br/><code>todo/write</code>, <code>fs/observed</code>, <code>hook/invoked</code>, <code>hook/result</code>, <code>tool/ptc-dispatch</code>"]
+  project["ToolDefinition.projectContent<br/>execution-prepared text and images"]
   post["<code>tools/post-execute</code> waterfall<br/>accept, block, replace, add context"]
   normalized["Registry outer normalization<br/>pipeline/result snapshot throws become isError"]
   finalize["ToolDefinition.finalizeContent<br/>last content-only invariant"]
@@ -41,13 +42,15 @@ flowchart TD
   approval -->|allowed-once| guards
   approval -->|rejected, cancelled, unavailable| denied
   approval -.->|throw| normalized
-  denied --> post
+  denied --> project
   pre -.->|throw| normalized
   toolBody --> fsGate
   fsGate --> toolBody
   toolBody --> owned
   toolBody --> around
-  around --> post
+  around --> project
+  project --> post
+  project -.->|throw| normalized
   around -.->|wrapper throws| normalized
   post -.->|throw| normalized
   post --> finalize

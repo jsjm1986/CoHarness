@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for 2026-09-30-web-job-output-and-kill.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-30-web-job-output-and-kill.md
+/agent-note-web-job-output-and-human-kill-cursor-reads-over-session-jobs-never-a-second-roster:
+  en: e5d382b515d0c459
+  zh: bbbcc9835ca0521e
+/agent-note-web-job-output-and-human-kill-cursor-reads-over-session-jobs-never-a-second-roster/problem:
+  en: c818aaf042f7658d
+  zh: b9b1f8a92497989a
+/agent-note-web-job-output-and-human-kill-cursor-reads-over-session-jobs-never-a-second-roster/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-web-job-output-and-human-kill-cursor-reads-over-session-jobs-never-a-second-roster/decision/two-unary-rpcs-on-the-existing-carrier:
+  en: 7e7731a4da957bcc
+  zh: 979d5c07bdc5e429
+/agent-note-web-job-output-and-human-kill-cursor-reads-over-session-jobs-never-a-second-roster/decision/client-observation-a-ref-counted-poll-not-a-stream:
+  en: 06d6465dc09f97d6
+  zh: a3696f776fc57bda
+/agent-note-web-job-output-and-human-kill-cursor-reads-over-session-jobs-never-a-second-roster/decision/the-list-control:
+  en: 6939b8caf2d54f93
+  zh: e43cd301b79ed307
+/agent-note-web-job-output-and-human-kill-cursor-reads-over-session-jobs-never-a-second-roster/alternatives-considered:
+  en: 8f9c1f68d205b4f1
+  zh: ee596096e9c8007d
+/agent-note-web-job-output-and-human-kill-cursor-reads-over-session-jobs-never-a-second-roster/testing:
+  en: dfde78434ec2e5e7
+  zh: 91ce1755e664cfd2
+/agent-note-web-job-output-and-human-kill-cursor-reads-over-session-jobs-never-a-second-roster/consequences:
+  en: 2530ef488f34a0e3
+  zh: aca664780c12c9f5

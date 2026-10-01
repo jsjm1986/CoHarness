@@ -19,7 +19,7 @@ export type {
   SettingsApi, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsSecretView, SettingsWritableReason,
   CredentialsApi, CredentialView, ConfigurableProviderView, DiscoveredModelView, LlmApi,
   SubagentsApi, SubagentAddress, SubagentCatalog, SubagentListEntry, SubagentPromptContentPart, SubagentPromptReceipt,
-  JobView,
+  JobView, JobsApi, JobChannel, JobKillValue, JobOutputChunk, JobOutputCoords, JobOutputValue,
   WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceOfficePreview, WorkspaceFileEntry, WorkspaceFileStat, WorkspaceFileTextPage,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 

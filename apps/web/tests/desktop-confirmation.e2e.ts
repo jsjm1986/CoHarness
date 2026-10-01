@@ -66,7 +66,7 @@ describe('web e2e: explicit root desktop confirmation', () => {
     if (scaffold === undefined) throw new Error('Desktop scaffold unavailable')
     onTestFailed(() => saveFailureShot(page, 'web-desktop-confirmation'))
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.getByRole('button', { name: 'Desktop access', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Desktop confirmation', exact: true })
     await dialog.getByText('acceptance-node', { exact: true }).waitFor()

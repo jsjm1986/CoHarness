@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-message-feedback-web-surface.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-11-message-feedback-web-surface.md
-2026-08-11-message-feedback-web-surface.md: 3d5a8db749f6e7d5f73fab066f81ad58cb2a1be2
-2026-08-11-message-feedback-web-surface.zh.md: 0cd8315772328d3a77136c3021925dbc3288986e
+/agent-note-web-surface-for-message-feedback:
+  en: 375e44cb1f5d5c10
+  zh: 34041efc7df580b0
+/agent-note-web-surface-for-message-feedback/problem:
+  en: a1bc7fd36544aa42
+  zh: 598b4c19c3441f24
+/agent-note-web-surface-for-message-feedback/decision:
+  en: 95d482d9e68aa2e5
+  zh: 2824d3c53fe4479d
+/agent-note-web-surface-for-message-feedback/alternatives-considered:
+  en: 2a81e23acccb5c93
+  zh: 205a6f9ed62ab878
+/agent-note-web-surface-for-message-feedback/consequences:
+  en: 72dc6507fb94a053
+  zh: 6bc7de248326ff0c

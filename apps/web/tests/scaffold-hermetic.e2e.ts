@@ -175,7 +175,7 @@ it('recovers document admission through the shipped provider restart and HTTP ro
     if (provider === undefined) throw new Error('the composition mounts no local document provider')
     await provider.restart()
     await scaffold.ctx.loader.await()
-    const response = await fetch(new URL('/api/documents', scaffold.baseUrl))
+    const response = await scaffold.hostFetch('/api/documents')
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ documents: [] })
     await expect(readFile(lockPath)).rejects.toMatchObject({ code: 'ENOENT' })

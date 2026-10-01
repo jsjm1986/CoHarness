@@ -30,7 +30,7 @@ describe('web e2e: authorized Office preview', () => {
     await workspace.attachSession(history)
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
   }, 120_000)
   afterAll(async () => { try { await browser?.close() } finally { await scaffold?.close() } })
 

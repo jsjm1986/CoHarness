@@ -31,7 +31,7 @@ function listStore() {
     archivedById: {},
     current: undefined,
     phase: 'ready',
-    subagentsByParent: {}, jobsBySession: {},
+    subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })
 }
@@ -61,7 +61,7 @@ describe('Tool presentation tails', () => {
       content: [], isError: false, callView: null, resultView: null, subCalls: [],
     }
     const props: GenericToolCardProps = {
-      callId: 'c5', toolName: 'todo_write', block: settled, openFile: vi.fn(), t,
+      callId: 'c5', toolName: 'todo_write', phase: 'result', block: settled, openFile: vi.fn(), t,
     }
     const view = render(<GenericToolCard {...props} />)
     expect(view.container.querySelector('[data-variant="others"] svg')).not.toBeNull()
@@ -84,7 +84,7 @@ describe('Tool presentation tails', () => {
 
   it('BashRow carries data-state for running and StateDots for error/stopped', () => {
     const running: RunningToolCall = {
-      callId: 'c1', name: 'bash', argsRaw: '{"command":"ls","description":"List"}',
+      phase: 'start', callId: 'c1', name: 'bash', argsRaw: '{"command":"ls","description":"List"}',
       turn: 1, step: 1, time: 1_000, callView: null, subCalls: [],
     }
     const errorResult: ToolResultNode = {

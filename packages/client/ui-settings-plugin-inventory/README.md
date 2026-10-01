@@ -1,3 +1,8 @@
+---
+description: "Read-only Cordis Loader inventory tab in Web Plugins settings"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings-plugin-inventory
 
 English | [中文](README.zh.md)
@@ -12,10 +17,21 @@ Page synchronization status comes directly from `ClientEntries` through a framew
 
 The **Plugin list** tab lets Web users inspect plugins without changing their configuration. It lists agent presets, then the global inventory; groups open on demand or during a search. Cards retain the package name as the primary title, identify instances by stable entry id, and expose enablement, source details, runtime status, disabled conditions, and discovery failures; preset-provided global entries name their presets. Search covers both groups and points to matches in other presets. The tab handles loading, empty, no-match, failure, and retry states without exposing transport details, and still shows the global inventory without a preset roster.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The tab renders one lazy `pluginInventory.list` Remote read on first mount; it owns no inventory state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side inventory projection that registers nothing model-facing.
@@ -28,3 +44,13 @@ None; this package neither assembles nor sends a provider request.
 
 - **One snapshot per Settings mount or retry** — the tab does not subscribe to Loader changes or automatically refetch after reconnect; switching tabs preserves the current snapshot, while reopening Settings obtains a new one.
 - **Read-only inventory** — the optional preset projection adds composition origin but Host plugin mutation remains unavailable from this tab.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

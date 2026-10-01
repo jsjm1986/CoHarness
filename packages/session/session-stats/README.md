@@ -1,3 +1,8 @@
+---
+description: "Whole-log conversation counts and wall times projection (sessionStats) for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-stats
 
 English | [中文](README.zh.md)
@@ -8,6 +13,18 @@ Function plugin registering the `sessionStats` projection unit: whole-log conver
 
 This package gives clients whole-session turn and step counts plus LLM, tool, first-token, and decode wall times through the public `sessionStats` value. The figures come from the complete durable log, so paging and compaction do not change them. Use it when a client must display consistent conversation statistics across reloads and reduced history. When whole-session statistics are unavailable, clients can use window-scoped counting instead.
 
+## Table of Contents
+
+- [Fold semantics](#fold-semantics)
+- [Composition](#composition)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="fold-semantics"></a>
 ## Fold semantics
 
 - `steps` counts `step/end` events. The agent loop appends exactly one per entered step, in a `finally`, so completed, failed, cancelled, and max-tokens steps all count. Counting assembled assistant messages instead would overcount max-tokens usage-host messages (empty content, excluded from the surface) and undercount cancelled steps (aborted before the message assembles).
@@ -18,6 +35,7 @@ This package gives clients whole-session turn and step counts plus LLM, tool, fi
 - `toolMs` sums `tool/call` → `tool/result` pairs matched by callId; unresolved calls are dropped at `turn/end` (results land within their turn).
 - Every field is 0 until its first contributing event. A composed registry always serves the key, so clients read the value, never key presence.
 
+<a id="composition"></a>
 ## Composition
 
 ```yaml
@@ -27,10 +45,12 @@ This package gives clients whole-session turn and step counts plus LLM, tool, fi
 
 Injects `sessionProjections` — the plugin's whole purpose; in assemblies without the registry the fiber stays pending and nothing registers.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The unit is a pure fold over the durable log served through the projection seam; no state is owned outside that fold.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the sessionStats unit folds already-logged step boundaries into a client-facing read model and registers nothing model-facing.
@@ -45,3 +65,13 @@ None; the package never assembles or sends provider requests.
 - **A cancelled step is counted but untimed** — no assistant message assembles, so its partial stream time enters no wall-time figure, matching the window fold's untimed interrupted node; a max-tokens usage-host message conversely contributes model time the surface does not show.
 - **Counts are log-scoped, not surface-scoped** — steps whose messages were later compacted away stay counted; the figures describe the whole session, not the current model-visible surface.
 - **Mounted only in the web-app bundle** — other assemblies serve no `sessionStats` key, and their consumers fall back to window-scoped counting (the web stats strip's fallback path).
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

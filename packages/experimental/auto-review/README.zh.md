@@ -81,6 +81,7 @@ Reviewer 从当前 Session surface 与待执行调用重建五个分区：固定
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -112,6 +113,7 @@ Reviewer 拒绝时使用 `Auto review rejected tool "<name>"; its body was not e
 
 拒绝追加普通工具结果，不改写更早的上下文，也不隐藏既有模型可见信息。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

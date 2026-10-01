@@ -1,3 +1,8 @@
+---
+description: "The browser side of the dsh web GUI: shell boot, browser-host communication, shared UI services, and feature plugins. Authoring rules live in AGENTS.md; the host half is `host/`. All except `test-runtime` are **product** packages named `@deepseek-ai/dsh-client-<name>`."
+kind: "package-group"
+---
+
 # client/ — web-GUI browser half
 
 English | [中文](README.zh.md)

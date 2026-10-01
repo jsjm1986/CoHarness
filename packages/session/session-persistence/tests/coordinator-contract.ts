@@ -424,7 +424,7 @@ export function runCoordinatorContract(name: string, makeFixture: () => Promise<
           content: [{ type: 'text', text: 'original' }], source: { kind: 'user' },
         }), { surfaceOp: 'append' })
         expect(() => {
-          ;(ev.data as { content: { type: 'text'; text: string }[] }).content[0]!.text = 'HACKED'
+          (ev.data.content[0] as { text: string }).text = 'HACKED'
         }).toThrow(TypeError)
         session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
         await ctx.sessions.flush(session)
@@ -818,7 +818,7 @@ export function runCoordinatorContract(name: string, makeFixture: () => Promise<
         // the queued op runs: the snapshot taken at call time must shield the copy.
         events.push({ type: 'turn/start', seq: SessionSeq(6), time: 99, data: { turn: 2 } })
         if (userMsg?.type === 'user/message') {
-          (userMsg.data as { content: unknown[] }).content = [{ type: 'text', text: 'MUTATED' }]
+          Object.assign(userMsg.data, { content: [{ type: 'text', text: 'MUTATED' }] })
         }
         await p
         const loaded = await ctx.sessionPersistence.load(m.id)
@@ -1499,7 +1499,7 @@ export function runCoordinatorContract(name: string, makeFixture: () => Promise<
         await ctx.sessionPersistence.append(m.id, oneTurnLog())
         const failure = await ctx.sessionPersistence.load(m.id).then(() => undefined, (error: unknown) => error as Error)
         expect(failure?.name).toBe('SessionFormatUnsupportedError')
-        expect(failure?.message).toMatch(/older than the supported v6.*no upgrade path/)
+        expect(failure?.message).toMatch(/older than the supported v7.*no upgrade path/)
       } finally {
         await fiber.dispose()
         await fix.cleanup()

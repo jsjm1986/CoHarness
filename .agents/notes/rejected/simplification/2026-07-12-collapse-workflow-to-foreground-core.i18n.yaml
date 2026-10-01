@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-12-collapse-workflow-to-foreground-core.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/rejected/simplification/2026-07-12-collapse-workflow-to-foreground-core.md
-2026-07-12-collapse-workflow-to-foreground-core.md: 506a71593f6d81a23b2e3e1dc0b5a0e620f30ac3
-2026-07-12-collapse-workflow-to-foreground-core.zh.md: 4d15df5513e9a1bdb7105fac83b67d94a60d708f
+/agent-note-collapse-workflows-to-the-exercised-foreground-core:
+  en: ff814039b8e609c5
+  zh: b66c3fc34481ca95
+/agent-note-collapse-workflows-to-the-exercised-foreground-core/problem:
+  en: 6509131ffb482912
+  zh: fa083f514f3b7c44
+/agent-note-collapse-workflows-to-the-exercised-foreground-core/proposal:
+  en: 5e120a461db661c4
+  zh: e520ddc12835045a
+/agent-note-collapse-workflows-to-the-exercised-foreground-core/alternatives-considered:
+  en: 95d6fd03841363ed
+  zh: e4feb385a155e3eb
+/agent-note-collapse-workflows-to-the-exercised-foreground-core/acceptance-criteria:
+  en: 2f282489b68ca2b4
+  zh: e34aee4981250928
+/agent-note-collapse-workflows-to-the-exercised-foreground-core/risks:
+  en: 0a0ae15784d894fc
+  zh: 856dfa87f8f6b29d

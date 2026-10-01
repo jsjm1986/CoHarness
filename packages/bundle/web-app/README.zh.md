@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-bundle"
+---
+
 # `@deepseek-ai/dsh-web-app`
 
 [English](README.md) | 中文
@@ -8,14 +13,28 @@ dsh 浏览器表层组合包。[`cordis.patch.yml`](cordis.patch.yml) 叠加在 
 
 运行 `dsh --profile web`，打开提供聊天、模型与设置管理以及会话历史的交互式浏览器 GUI。它使用与其他 dsh 表层相同的模型访问、工具与安全默认值。启动时会打印带认证信息的 URL，通常还会在默认浏览器中打开；SSH 会话和 `--no-open` 会保留该 URL，供你手动打开。你可以更改端口并允许额外主机，但不能绑定所有网络接口。需要在浏览器中交互式工作时选择本包；一次性的命令行任务应使用 `dsh-headless`。
 
+## 目录
+
+- [模型重试默认值](#model-retry-defaults)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="model-retry-defaults"></a>
 ## 模型重试默认值
 
 Web 使用共享的有界 normal 默认值，在首次请求后最多再重试五次符合条件的失败。`deepseek-official` 与由 settings 新增的 pi-ai 路由在省略 `retryPolicy` 时使用该默认值；显式提供方策略仍然优先。Web 不再增加重试专用的组合覆盖，因此非 Web profile 的省略行为与之相同。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。补丁层插入 host 与 client 行，其插件各自拥有自身关系；web-runtime 粘合层只解析静态入口点，不持有可观测状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### Harness 源码与 Web 表层上下文
@@ -32,6 +51,7 @@ Web 使用共享的有界 normal 默认值，在首次请求后最多再重试�
 
 源码与 Web 段落位于第一方可复用指令之后。工具与配置一致时，不同 checkout 路径或本地端口不会改变前置前缀；不保证提供方复用缓存。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **前端 dist 必须已构建**：对 dist 的 `require.resolve` 在激活时明确报错并给出构建提示；没有从源码直接服务的回退路径。
@@ -39,3 +59,13 @@ Web 使用共享的有界 normal 默认值，在首次请求后最多再重试�
 - **只观测交接启动**：平台 opener 接受 spawn 后即结束观察，但 Windows 会等待其短生命周期 PowerShell launcher 退出；之后的浏览器退出不会上报，已打印 URL 仍是手动访问的回退路径。
 - **SSH 转发持有浏览器 URL**：打印出的规范 URL 指向远端宿主机 loopback 端点；自动交接会被跳过，SSH 客户端或编辑器必须暴露并打开其本地转发地址。
 - **浏览器命令覆盖只能来自启动环境**：被发现的 `.env` 不得设置 `BROWSER`；只有继承值可以抵达会读取该变量的 opener 路径，避免 checkout 为自动交接选择可执行文件。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

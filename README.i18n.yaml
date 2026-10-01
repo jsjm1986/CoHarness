@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write README.md
-README.md: 6c8539509b5e69ad54a095e95b9fd9f6ee449be8
-README.zh.md: 9ab1fd2b621bfa99cad6045350ab964c79ca7499
+/coharness:
+  en: 6ec8d5e05ed84e04
+  zh: 6e31de68db791e4d
+/coharness/collaboration-philosophy:
+  en: c78aaabd5b8124a7
+  zh: f96a4b358896eabc
+/coharness/who-it-is-for:
+  en: 6fc64c7e3a438acc
+  zh: cc01c4a4228707ab
+/coharness/choose-a-setup:
+  en: 5e8943db6caab41c
+  zh: f6a94c30000abd84
+/coharness/start-as-a-personal-user:
+  en: 530b265113d9bc00
+  zh: 68b29d48cd339c8e
+/coharness/use-it-as-a-team:
+  en: 1443194b727ab071
+  zh: c04eee99f1c38af2
+/coharness/what-it-provides:
+  en: e28de1e719960e73
+  zh: a7a41e02383eb059
+/coharness/dsh-relationship-and-naming:
+  en: 94dc0ea69abec0f9
+  zh: 4fa48c2d2c4b0c81
+/coharness/run-locally:
+  en: a5ad02c0b011404f
+  zh: f593f9ab38f2db80
+/coharness/run-locally/from-source:
+  en: e56587562eeef7fe
+  zh: c8201e8bf3f33231
+/coharness/run-locally/deploy-the-multi-user-gateway:
+  en: c45bf0001f70c1c6
+  zh: 92aa11cd54460745
+/coharness/repository-map:
+  en: ad9fedf4ac8d66a9
+  zh: e0eb2920d9839fe9
+/coharness/development-and-verification:
+  en: 757ee20111333769
+  zh: e43dcb5d894d32fe
+/coharness/status-and-compatibility:
+  en: abc3503fc336a48a
+  zh: 1aafe5a78475233f
+/coharness/contributing-and-support:
+  en: a70fb89dd2ea80b8
+  zh: 0063fa2216aa35e0
+/coharness/license-and-attribution:
+  en: f493868fcc82810c
+  zh: 542ec5e4c70614ce

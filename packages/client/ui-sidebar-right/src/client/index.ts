@@ -20,6 +20,9 @@
  * guide registers through those stages unmodified, exactly as a type shipped
  * from another package does — `ui-sidebar-browser` and workspace file preview use this lifecycle.
  */
+import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
+import { observeSidebarFocus } from './focus.ts'
+import { registerSidebarShortcuts } from './shortcuts.ts'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { parseWorkspaceResourceAddress, workspaceResourceAddress, sessionPersistenceKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -36,7 +39,8 @@ import { GuideBody, type GuideInjected } from './tabs/guide/GuideBody.tsx'
 import { GuideTitle } from './tabs/guide/GuideTitle.tsx'
 import { ExpandButton, BlankExpandButton } from './shell/ExpandButton.tsx'
 import { RightbarSeat, type SidebarRightInjected } from './shell/SidebarRight.tsx'
-import { RightbarRoot } from './shell/RightbarRoot.tsx'
+import { RightbarRoot, type RightbarRootInjected } from './shell/RightbarRoot.tsx'
+import { SidebarSessionViews } from './session-views.ts'
 import { createSidebarRightController, type SidebarRightController } from './service.ts'
 import { SidebarRightTabRegistry } from './tab-registry.ts'
 import { createSidebarRightStore } from './stores.ts'
@@ -46,6 +50,7 @@ import { guideTabInfoFactory, tabInfoFactory } from './tab-info.ts'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { defaultSeed } from './contract/seed.ts'
 
+export type { SidebarRightTarget } from './focus.ts'
 export type { RightbarSeatProps, SidebarRightInjected, SidebarRightPresentation } from './shell/SidebarRight.tsx'
 export type { GuideBodyProps, GuideInjected } from './tabs/guide/GuideBody.tsx'
 export type { ExpandButtonProps } from './shell/ExpandButton.tsx'
@@ -68,7 +73,7 @@ export type {
 } from './contract/params.ts'
 // The layout ids and rectangle the navigation face takes, so a caller needs no import from the kit.
 export type { FloatRect, PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
-export type { PinResource, SidebarRightNavigator, TabOccurrence } from './tab-domain.ts'
+export type { PinResource, SidebarRightNavigator, TabOccurrence, SidebarRightOccurrenceId } from './tab-domain.ts'
 export type { SidebarRightKey } from './locales.ts'
 export type { OpenContentIntent } from './stores.ts'
 export type { SidebarRightOpenTab } from './tab-inventory.ts'
@@ -81,7 +86,7 @@ declare module '@deepseek-ai/dsh-client-runtime/client' {
 }
 
 /** Required browser services: the slot registry, the frame's panel actions, copy, and the resource model. */
-export const inject = ['slots', 'layout', 'locale', 'sessions', 'workspaceResources', 'connection', 'projectUiPolicy']
+export const inject = ['slots', 'layout', 'locale', 'sessions', 'workspaceResources', 'connection', 'projectUiPolicy', 'shortcuts']
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -110,6 +115,11 @@ export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
   const t = ctx.locale.bind(NS)
   const tabs = new SidebarRightTabRegistry(ctx)
+  // Independently retained Session views keep their mounted subtrees across
+  // selection changes; the root below drives `select` through the frame's
+  // target prop so a pinned `targetSessionId` wins over current selection.
+  const views = new SidebarSessionViews(ctx.sessions)
+  ctx.effect(() => () => { views.dispose() }, 'ui-sidebar-right: retained Session views')
   const validateResource = (sessionId: SessionId, address: string): void => {
     const target = parseWorkspaceResourceAddress(address) ?? parseToolAddress(address)
     const owner = target?.sessionId ?? tabs.get(tabs.claim(address).kind)?.resourceSession?.(address)
@@ -150,6 +160,10 @@ export function apply(ctx: ClientContext): void {
   }, 'ui-sidebar-right: service faces')
 
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-sidebar-right: dictionaries')
+  ctx.effect(() => registerSidebarShortcuts(ctx.shortcuts, controller, t, () => {
+    void ctx.shortcuts.closeWindow().catch((error: unknown) => { console.error('Window close failed', error) })
+  }), 'ui-sidebar-right: shortcuts')
+  if (typeof document !== 'undefined') ctx.effect(() => observeSidebarFocus(document), 'ui-sidebar-right: focus')
 
   ctx.effect(() => {
     const handle = createSidebarRightStore(() => defaultSeed(tabs), false)
@@ -211,8 +225,13 @@ export function apply(ctx: ClientContext): void {
         else layout.closeRightbar()
       },
       bindService: binding => controller.bind(binding),
+      splitPane: (paneId) => { controller.split(paneId) },
+      toggleFullscreen: () => { const target = controller.commandTarget(); if (target !== undefined) controller.toggleFullscreen(target) },
       openTab: (kind, options) => { controller.openTab(kind, options) },
-      hooks: { tabTypes: { subscribe: listener => tabs.subscribe(listener), getSnapshot: () => tabs.entries() } },
+      hooks: {
+        shortcuts: ctx.shortcuts.catalog,
+        tabTypes: { subscribe: listener => tabs.subscribe(listener), getSnapshot: () => tabs.entries() },
+      },
     }
 
     const disposeTypes = [tabs.register(guideDefinition(t)), tabs.register({
@@ -238,6 +257,11 @@ export function apply(ctx: ClientContext): void {
       yield ctx.slots.register({
         name: 'rightbar',
         children: { 'rightbar.session': { kind: 'single', scope: 'session' } },
+        inject: (): RightbarRootInjected => ({
+          hooks: { views: views.source },
+          mountView: reference => views.mount(reference),
+          selectView: (sessionId) => { views.select(sessionId) },
+        }),
       }, RightbarRoot)
       yield ctx.slots.register({
         name: 'rightbar.session',
@@ -267,20 +291,23 @@ export function apply(ctx: ClientContext): void {
       name: 'conversation.session.header.corner',
       locale: NS,
       store,
-      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) } }),
+      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
     }, ExpandButton))
     const disposeBlankExpand = ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
       name: 'conversation.input.left', id: 'auxiliary-sidebar', locale: NS, store,
-      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) } }),
+      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
     }, BlankExpandButton))
     const disposeMobileExpand = ctx.slots.inject('shell.mobile.header.actions', () => ctx.slots.register({
       name: 'shell.mobile.header.actions', id: 'auxiliary-sidebar', locale: NS, store,
-      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) } }),
+      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
     }, ExpandButton))
     // Stage two for the guide: it declares the chain child it hosts and reads
     // the registry's entry boxes, which an ordinary type has no reason to do.
     const guideInjected: GuideInjected = {
-      hooks: { guideEntries: { subscribe: listener => tabs.subscribe(listener), getSnapshot: () => tabs.guide() } },
+      hooks: {
+        shortcuts: ctx.shortcuts.catalog,
+        guideEntries: { subscribe: listener => tabs.subscribe(listener), getSnapshot: () => tabs.guide() },
+      },
     }
     const disposeGuide = ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
       name: 'sidebar.right.pane.tab',

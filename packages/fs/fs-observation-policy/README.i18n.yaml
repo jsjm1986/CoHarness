@@ -1,6 +1,55 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs-observation-policy/README.md
-README.md: b275877d76fb7a37d1ab0cd4a379e1fae9553e9f
-README.zh.md: 178eebc00ebb34e7c10b76d670677228b30e85f6
+/:
+  en: f8283c0673f80721
+  zh: 61495d48365178df
+/deepseek-ai-dsh-fs-observation-policy:
+  en: 8ac0a946e1479d5a
+  zh: 3bd44d1d3c5173f7
+/deepseek-ai-dsh-fs-observation-policy/summary:
+  en: e74517566c1827b2
+  zh: 803c6ddf5cbd3842
+/deepseek-ai-dsh-fs-observation-policy/table-of-contents:
+  en: c8c5e9a9d8171949
+  zh: 0b8a2372b4864de2
+/deepseek-ai-dsh-fs-observation-policy/the-four-layer-split:
+  en: 5324dee004f36e04
+  zh: 3ce97a51073123dc
+/deepseek-ai-dsh-fs-observation-policy/how-the-gate-participates:
+  en: fe95ddbfa428a5a3
+  zh: 9d397213137f4443
+/deepseek-ai-dsh-fs-observation-policy/observed-state-is-the-prior-observation-record-freshness-is-provider-cas:
+  en: 6b5915453150b9ea
+  zh: 32d6405a132a3a8a
+/deepseek-ai-dsh-fs-observation-policy/single-slot-first-wins:
+  en: 1906c4f7513a3919
+  zh: 651defa389c4ad56
+/deepseek-ai-dsh-fs-observation-policy/no-method-coupling:
+  en: af441cba192752a4
+  zh: f9920c3eb4acacaf
+/deepseek-ai-dsh-fs-observation-policy/invariants:
+  en: 6a3bbb829dc55072
+  zh: a3929032e2e80dd0
+/deepseek-ai-dsh-fs-observation-policy/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-fs-observation-policy/model-experience/filesystem-tool-outcome:
+  en: ee1f02dc1bb69955
+  zh: 9ba9205a9b15d132
+/deepseek-ai-dsh-fs-observation-policy/model-experience/filesystem-tool-outcome/what-the-model-sees:
+  en: d4ec7d7b302845c8
+  zh: 6e412aa23798524e
+/deepseek-ai-dsh-fs-observation-policy/model-experience/filesystem-tool-outcome/token-effect:
+  en: 425ccc7dafa6218d
+  zh: d2c1a29955a60e3d
+/deepseek-ai-dsh-fs-observation-policy/model-experience/filesystem-tool-outcome/kv-cache-effect:
+  en: 2fbf2175168e8244
+  zh: afc7da8783b348c6
+/deepseek-ai-dsh-fs-observation-policy/known-limitations-and-deferred-work:
+  en: 213a6298e195c249
+  zh: ad3f34df72692f05
+/deepseek-ai-dsh-fs-observation-policy/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

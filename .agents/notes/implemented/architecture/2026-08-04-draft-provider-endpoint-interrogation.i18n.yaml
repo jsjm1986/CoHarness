@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-04-draft-provider-endpoint-interrogation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-04-draft-provider-endpoint-interrogation.md
-2026-08-04-draft-provider-endpoint-interrogation.md: b92efb41a3b3de36b1836abc39d0431f12595d7e
-2026-08-04-draft-provider-endpoint-interrogation.zh.md: 36447f938a9a44a72140194681d3884aa9669bcf
+/agent-note-interrogating-a-draft-provider-endpoint:
+  en: a465a218bbc2f74e
+  zh: 60d1eae3c79337a0
+/agent-note-interrogating-a-draft-provider-endpoint/problem:
+  en: beeda6eb5abe07fc
+  zh: 097e4a34533a465c
+/agent-note-interrogating-a-draft-provider-endpoint/decision:
+  en: 6f9a9689e67d2e3d
+  zh: 074501b792e0c960
+/agent-note-interrogating-a-draft-provider-endpoint/decision/why-not-pi-ai-s-own-refresh-machinery:
+  en: 61d217b3fc3862ce
+  zh: 214f15cbfe0c6fa8
+/agent-note-interrogating-a-draft-provider-endpoint/alternatives-considered:
+  en: 80fb50023662aab8
+  zh: 0df48899b6e50696
+/agent-note-interrogating-a-draft-provider-endpoint/consequences:
+  en: 35ca62846ef627e4
+  zh: 290d42f0d8e4e20a
+/agent-note-interrogating-a-draft-provider-endpoint/testing:
+  en: 2421f617a7125424
+  zh: 1932260411de959e

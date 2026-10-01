@@ -14,6 +14,8 @@ import { commitSessionNavigation, type ClientContext, type SessionId } from '@de
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from './contract/slots.ts'
+import { pinOrderAccounts, pinOrderSource } from './pin-order.ts'
+import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './shortcuts.ts'
 import { createWorkspaceViewStore } from './stores.ts'
 import { WorkspaceBrowser } from './WorkspaceBrowser.tsx'
 import { WorkspacePicker } from './WorkspacePicker.tsx'
@@ -44,7 +46,7 @@ const NS = 'workspace'
  * provides a waitable service. apply therefore depends on each slot
  * declaration through `slots.inject()` instead of assuming order.
  */
-export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'connection', 'conversationViewport']
+export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'connection', 'conversationViewport', 'shortcuts']
 
 /**
  * Register the browser and picker once their slot declarations are on the
@@ -90,6 +92,30 @@ export function apply(ctx: ClientContext): void {
       ctx.sessions.open(sessionId)
     })
   }
+  // Fork resolves only after the child opens so callers can classify the
+  // host's fork refusal; the pointer menu swallows it, the command reports it.
+  const forkSession = (sessionId: SessionId): Promise<SessionId> => {
+    const navigation = AbortSignal.any([ctx.sessions.beginNavigation(), lifetime.signal])
+    return ctx.sessions.fork({ sessionId, increaseTitle: true })
+      .then(async (childId) => {
+        await openSession(childId, navigation)
+        return childId
+      })
+  }
+  const shortcutControls = createWorkspaceShortcutControls()
+  installWorkspaceShortcuts(ctx, {
+    startSession: () => { ctx.workspaces.startSession() },
+    forkSession,
+  }, shortcutControls, (sessionId) => {
+    ctx.workspaces.archiveSession(sessionId).catch((reason: unknown) => {
+      console.warn('session archive rejected:', reason)
+    })
+  })
+  // One viewing-store instance, created here: the browser declares the
+  // handle and the pin callback fronts the same instance's saved orders.
+  const viewHandle = createWorkspaceViewStore()
+  const viewInstance = viewHandle.create()
+  const viewStore: typeof viewHandle = { ...viewHandle, create: () => viewInstance }
   const browserInjected = (): WorkspaceBrowserInjected => ({
     // Explicit group actions keep their target; unscoped New Session inherits
     // the current Session Workspace before the recent-Workspace fallback.
@@ -102,12 +128,9 @@ export function apply(ctx: ClientContext): void {
       if (!result.ok) throw new Error(result.error.message)
     }),
     forkSession: (sessionId) => {
-      const navigation = AbortSignal.any([ctx.sessions.beginNavigation(), lifetime.signal])
-      ctx.sessions.fork({ sessionId, increaseTitle: true })
-        .then(childId => openSession(childId, navigation))
-        .catch(() => {
-          // Fork or child-rename failure keeps the current selection.
-        })
+      forkSession(sessionId).catch(() => {
+        // Fork or child-rename failure keeps the current selection.
+      })
     },
     renameWorkspace: async (workspaceId, title) => { await ctx.workspaces.rename(workspaceId, title) },
     deleteWorkspace: async (workspaceId) => { await ctx.workspaces.delete(workspaceId) },
@@ -115,16 +138,43 @@ export function apply(ctx: ClientContext): void {
       await ctx.workspaces.insertBefore(workspaceId, beforeWorkspaceId)
     },
     archiveSession: async (sessionId) => { await ctx.workspaces.archiveSession(sessionId) },
+    pinSession: (sessionId) => {
+      ctx.workspaces.pinSession(sessionId).then(() => {
+        // Front the Session in the saved orders of the accounts it leads;
+        // the pin-set echo partitions the rendered rows independently.
+        const { items, pinnedSessionIds, archivedSessionIds } = ctx.workspaces.list.getSnapshot()
+        viewInstance.actions.pinSessionOrder(
+          sessionId,
+          pinOrderAccounts(items, sessionId),
+          pinOrderSource(items, ctx.sessions.list.getSnapshot(), { pinnedSessionIds, archivedSessionIds }),
+        )
+      }).catch(() => {
+        shortcutControls.pinFailed('pin')
+      })
+    },
+    unpinSession: (sessionId) => {
+      ctx.workspaces.unpinSession(sessionId).catch(() => {
+        shortcutControls.pinFailed('unpin')
+      })
+    },
+    dismissPinError: shortcutControls.dismissPinError,
     insertSessionBefore: async (workspaceId, sessionId, beforeSessionId) => {
       await ctx.workspaces.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     },
     createWorkspace: input => ctx.workspaces.create(input),
     listDirectory: (path, signal) => ctx.workspaces.listDirectory(path, signal),
+    requestSearch: shortcutControls.search,
+    requestAddWorkspace: shortcutControls.add,
+    closeAddWorkspace: shortcutControls.closeAdd,
+    setDirectoryBusy: shortcutControls.directoryBusy,
+    dismissForkError: shortcutControls.dismissForkError,
     hooks: {
       directoryFlow: browserFlowSource,
       hostDescription,
       viewport: viewport?.snapshot ?? { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [] }), subscribe: () => () => {} },
       currentSessions: ctx.sessions.currentScopeList ?? ctx.sessions.list,
+      workspaceShortcuts: shortcutControls.state,
+      shortcuts: ctx.shortcuts.catalog,
     },
   })
   const pickerInjected = (): WorkspacePickerInjected => ({
@@ -141,7 +191,7 @@ export function apply(ctx: ClientContext): void {
         'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' },
         'sidebar.workspaces.workbench': { kind: 'single', scope: 'root' },
       },
-      store: createWorkspaceViewStore(),
+      store: viewStore,
       inject: browserInjected,
       locale: NS,
     },

@@ -1,3 +1,8 @@
+---
+description: "The ACP group exposes harness agents to programmatic clients over the Agent Client Protocol. It is an interoperability transport, not a presentation or human-interaction layer; the matching out-of-process subagent *client* lives in `subagent/subagent-acp` because it implements the subagent provider interface."
+kind: "package-group"
+---
+
 # acp/ — Agent Client Protocol automation
 
 English | [中文](README.zh.md)

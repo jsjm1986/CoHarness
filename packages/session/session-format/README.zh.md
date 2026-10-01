@@ -15,10 +15,21 @@ kind: "package-library"
 
 `dsh-session-format` 让持久化代码可以直接还原当前会话，或在只消费一次物理行的同时组合唯一的相邻迁移序列。一次还原会让调用方拥有的已解析值流经有状态 Stage，不复制或冻结中间产物。物理分帧、压缩、不可变 generation 命名、排他发布和 Cordis 生命周期行为不属于本库。
 
+## 目录
+
+- [所有权与安全性](#ownership-and-safety)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
 ## 概述
 
 `dsh-session-format` 让持久化代码可以直接还原当前会话，或在只消费一次物理行的同时组合唯一的相邻迁移序列。一次还原会让调用方拥有的已解析值流经有状态 Stage，不复制或冻结中间产物。物理分帧、压缩、不可变 generation 命名、排他发布和 Cordis 生命周期行为不属于本库。
 
+<a id="ownership-and-safety"></a>
 ## 所有权与安全性
 
 - 新版本会在解码事件体前拒绝。
@@ -29,10 +40,13 @@ kind: "package-library"
 
 catalog 是纯值操作。JSONL、Gateway 和 SQLite adapter 仍分别负责原始 bytes、损坏尾部恢复、备份和原子发布。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。纯迁移库：链从格式目录确定性地编译，转换产生新代而不改动来源。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 会话还原
@@ -49,6 +63,17 @@ catalog 是纯值操作。JSONL、Gateway 和 SQLite adapter 仍分别负责原�
 
 没有直接影响。迁移若改变当前历史，可能改变由请求重建逻辑拥有的缓存身份。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - v3 之前的边会归一化历史事件词汇（旧版消息载荷、`start`/`end` replace 键），逻辑 catalog 额外把声明的 CoHarness v2 数据库方言（turn 级 surface 事件、header 携带的 prompt）归一化到发布版 v2→v3 stage 上。各 provider 仍独立负责物理 codec 和发布规则。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

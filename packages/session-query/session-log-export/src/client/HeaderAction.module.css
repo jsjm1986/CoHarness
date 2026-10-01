@@ -89,7 +89,7 @@
 .sessionLogConfirming {
   background: var(--dsw-alias-interactive-bg-hover, #21262d);
   color: var(--dsw-alias-label-primary, #e6edf3);
-  border: 1px solid var(--dsw-alias-border-l2, #d29922);
+  border: 1px solid var(--dsw-alias-state-warn-primary, #d29922);
   font-weight: 500;
 }
 

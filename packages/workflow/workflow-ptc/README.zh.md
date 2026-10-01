@@ -115,6 +115,7 @@ Host 分别跟踪待完成的提供方启动与已发布子 agent。共享中止
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -146,6 +147,7 @@ Host 分别跟踪待完成的提供方启动与已发布子 agent。共享中止
 
 仅追加；新增可见内容位于可复用请求前缀之后。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

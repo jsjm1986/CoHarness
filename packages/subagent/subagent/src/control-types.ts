@@ -10,6 +10,8 @@ import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+// Type-only: the Workspace registry's archive-admission family map this runtime merges `subagent` into.
+import type {} from '@deepseek-ai/dsh-workspace/types'
 /**
  * One entry of a {@link listChildren} result, ordered by header `createdAt`
  * with ties broken on id. Only a candidate whose durable header has
@@ -136,6 +138,13 @@ export interface SubagentInterruptReceipt {
  * Failure details the control surface answers with. Catalog reads, prompts,
  * and interrupts share this vocabulary with the Client Remote result.
  */
+declare module '@deepseek-ai/dsh-workspace/types' {
+  interface SessionActivityKindMap {
+    /** A subagent session delegated from this session (at any depth) is inside a turn. */
+    subagent: true
+  }
+}
+
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
     /** A browser-supplied zone is neither UTC nor a canonical IANA name. */

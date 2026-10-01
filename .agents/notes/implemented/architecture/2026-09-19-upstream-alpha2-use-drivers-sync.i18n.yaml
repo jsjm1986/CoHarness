@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-19-upstream-alpha2-use-drivers-sync.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-19-upstream-alpha2-use-drivers-sync.md
-2026-09-19-upstream-alpha2-use-drivers-sync.md: ebf4a0ce23c566754b0f2555a7ffb273cbb4438f
-2026-09-19-upstream-alpha2-use-drivers-sync.zh.md: 31b8b828b07c159e58d0ca82dbb3b8c3c3cf9ba8
+/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync:
+  en: ef6e56e883d66a68
+  zh: 4cf3d4c090b5f3da
+/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync/problem:
+  en: 73e71975572d16f6
+  zh: 67d5ac71c2943d76
+/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync/decision:
+  en: e5fd9990670fe1f1
+  zh: 38a68a0819c18c92
+/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync/alternatives-considered:
+  en: b1229269f3aa4874
+  zh: 934361e10904363d
+/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync/consequences:
+  en: 071aac35b80ad129
+  zh: e72b954c5803c33c
+/agent-note-upstream-alpha-2-use-driver-mcp-and-invariant-companion-sync/verification:
+  en: c66029ebbaa49444
+  zh: 598540cb1e7458d9

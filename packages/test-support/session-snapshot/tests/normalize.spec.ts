@@ -718,7 +718,7 @@ describe('normalizeSessionSnapshot', () => {
           message: {
             id: 'v2-to-v3-system-590b72aa4994fd6d3c6e61bb4bf5bf2f80bae0bc7564d388378ba4f51b816fd6',
             role: 'system',
-            source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
+            source: { kind: 'system-prompt' },
             content: [],
           },
         },
@@ -1163,6 +1163,23 @@ describe('scrubSystemPrompts', () => {
 })
 
 describe('scrubToolSchemas', () => {
+  it('retains historical tool names when developer messages reference declarations', () => {
+    const header = JSON.stringify({ type: 'request/header', data: { header: { tools: [
+      { name: 'search', description: 'Full schema', parameters: {} },
+      { name: 'fetch', description: 'Fetch schema', parameters: {} },
+    ] } } })
+    const update = JSON.stringify({ type: 'developer/message', data: {
+      headerSeq: 0, message: { content: [{ type: 'tool-addition', toolName: 'fetch' }] },
+    } })
+    const out = scrubToolSchemas(`${header}\n${update}\n`)
+    expect(JSON.parse(out.split('\n')[0]!)).toEqual({
+      type: 'request/header', data: { header: { tools: ['search', 'fetch'] } },
+    })
+    expect(out.split('\n')[1]).toBe(update)
+    expect(out).not.toContain('Full schema')
+    expect(scrubToolSchemas(out)).toBe(out)
+  })
+
   it('scrubs only tool-schema payloads while keeping prompts verbatim', () => {
     const header = JSON.stringify({
       type: 'request/header', seq: 1, time: 2,

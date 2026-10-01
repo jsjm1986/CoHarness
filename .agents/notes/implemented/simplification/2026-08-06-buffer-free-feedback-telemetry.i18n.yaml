@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-buffer-free-feedback-telemetry.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-06-buffer-free-feedback-telemetry.md
-2026-08-06-buffer-free-feedback-telemetry.md: a17ad586fbf94c1622a29dc158050a308147a206
-2026-08-06-buffer-free-feedback-telemetry.zh.md: 3e0a7985568f579bf671b99a38865c8827449e44
+/agent-note-buffer-free-feedback-telemetry:
+  en: 94ef99c2db6a034f
+  zh: 416a1d809863ee68
+/agent-note-buffer-free-feedback-telemetry/problem:
+  en: ae2cdd680d8ce2f8
+  zh: 77826b347f6042e3
+/agent-note-buffer-free-feedback-telemetry/decision:
+  en: 648ac7bc59dd0d91
+  zh: c0c2af61372b705b
+/agent-note-buffer-free-feedback-telemetry/alternatives-considered:
+  en: 9f3924e9bb0f0fca
+  zh: fdcd77de83fd174b
+/agent-note-buffer-free-feedback-telemetry/consequences:
+  en: 446d6aaf70412827
+  zh: f8759e3a6571e8b8

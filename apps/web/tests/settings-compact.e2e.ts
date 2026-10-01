@@ -55,7 +55,7 @@ describe('web e2e: compact settings overlay', () => {
     })
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-settings-compact'))
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: '打开侧边栏' }).click()
     await page.getByRole('button', { name: '设置', exact: true }).click()
@@ -163,7 +163,7 @@ describe('web e2e: compact settings overlay', () => {
       isMobile: true,
     })
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: '打开侧边栏' }).click()
     await page.getByRole('button', { name: '设置', exact: true }).click()

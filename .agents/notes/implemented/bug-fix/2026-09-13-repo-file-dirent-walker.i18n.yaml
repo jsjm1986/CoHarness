@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-13-repo-file-dirent-walker.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-13-repo-file-dirent-walker.md
-2026-09-13-repo-file-dirent-walker.md: d9983d4f891112cb3be4c3610363fa7c5da95ca5
-2026-09-13-repo-file-dirent-walker.zh.md: bfca31d0966f65b536bd356384b2fa1f080f6ae1
+/agent-note-stable-repository-file-discovery-on-node-24:
+  en: 0303ad146259cb73
+  zh: 9b450de9627d171e
+/agent-note-stable-repository-file-discovery-on-node-24/problem:
+  en: 44fbaa8eeb602616
+  zh: 15c3bb68d08375a6
+/agent-note-stable-repository-file-discovery-on-node-24/decision:
+  en: c377b5a0aa4ea879
+  zh: b396ec98c560f7c8
+/agent-note-stable-repository-file-discovery-on-node-24/consequences:
+  en: b5dcfbcc27365fcc
+  zh: 44778b5eb90541e8
+/agent-note-stable-repository-file-discovery-on-node-24/alternatives-considered:
+  en: 0f44ca0d811ae016
+  zh: 72cdc77232f71332
+/agent-note-stable-repository-file-discovery-on-node-24/verification:
+  en: 3fde961dc70921e4
+  zh: 37cfd6fb02525280

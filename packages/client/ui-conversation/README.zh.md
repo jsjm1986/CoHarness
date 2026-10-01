@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-conversation
 
 [English](README.md) | 中文
@@ -63,6 +68,8 @@ Composer 消息提交会根据所寻址会话的运行状态和 steering 能力�
 
 普通会话运行期间，草稿为空或 owner block 使输入不可用时，主指针操作保持为 Stop。可提交的文字、图片或文档会把同一位置切换为已配置投递方式的 Send；清空或成功提交草稿后恢复 Stop。可继续 subagent 则保留相互独立的 Send 与 Stop 操作。[运行中 Send 决策](../../../.agents/notes/implemented/bug-fix/2026-09-22-busy-send-follows-enter-setting.zh.md)将按钮标签和投递方式绑定到同一个实时偏好。
 
+在聚焦的 Chat 或 Composer 内连续两次独立按下 Escape 可停止当前运行中的 turn，并保留排队消息。间隔来自 shortcuts 服务的 `stopSequenceMs` 配置（默认 500 ms）。菜单、审批、modal、terminal、嵌入网页、输入法组合、重复按键、输入区域变化、Session 或 turn 切换都会中断该序列。该快捷键使用与 Stop 按钮相同的会话作用域取消路径。本插件将 Stop 以及不可编辑的 send／newline／queue／steer、斜杠菜单与引用菜单手势注册为 `input` 展示组的固定动作；该注册为可编辑快捷键保留独占的纯 Escape，并向 Stop 按钮的悬停与键盘聚焦 tooltip 提供 `Esc Esc` 序列展示。
+
 逐会话 UI 状态中的选择与活跃视图位于已声明的聊天 store（`stores.ts` `createChatStore`）中；InputHub 拥有输入区状态机，并将草稿镜像到该 store 以便持久化。apply 将同一个 store handle 传给严格限定于会话的子树和聊天视图注册，因此每个会话内共享一个实例，框架拥有其生命周期。工具详情从辅助标签所有者接收明确的调用地址。组件保持纯粹：框架标准工具包提供 `useSession`／`sessionId`、全局 `useSessions`／`useWorkspaces`，以及输入状态机的 `useInput`／`inputActions`；store 表层与 inject factory 提供其余状态和回调。
 
 图片经粘贴与整页拖放进入：输入栏绑定 document 级拖拽监听（composer-bar slot 为 `kind: 'single'`，同一时刻至多一个 bar 绑定），文件拖拽悬停窗口时显示 `DropOverlay` 原子组件——纯文本拖拽不受影响，锁定或忙碌的 composer 显示禁用遮罩并拒绝 drop。两种手势共用一条对宿主 `imageLimits` 投影的加入预检（数量、单图字节、总字节）：会突破上限的加入整批拒收，立刻弹出点名上限的横幅，完全不进入附件栏。仍然到达的宿主侧拒绝按 `attachment-error` 原因映射为产品文案（`image-labels.ts` 的 `attachmentErrorText`）；用户无法解决的原因折叠为一条带原因码的发送失败文案，非附件错误码保留开发者可读的原文加错误码。已附加的图片在每条发送路径上都是提交信封的一部分：斜杠命令提交要么消费它们（声明 `images` 的 claim 经 hub 的 `commandImages` 管道序列化图片，尝试信号会取消已放弃的编码，再传给 `claim.submit`，仅在成功 outcome 后清除并释放），要么以 `command.imagesUnsupported` 通知拒绝整个提交，草稿与图片原样保留——命令不可能消费了文字却把图片留在原地。
@@ -87,14 +94,28 @@ Access 控件还会根据会话所属连接应用[当前账户资格规则](../u
 
 `ui-conversation` 拥有与 target 无关的 Conversation 组装和共享浏览器 shell。它消费 Session Controller 的 `SessionEventLikeEntry` feed，通过 `ctx.uiConversation` 暴露不依赖 React 的注册表与逐 Session binding，并通过 `ctx.uiSession` 提供 `useConversation`、`useInput` 和 `inputActions` 标准 props。它还拥有按会话的持久化图片 URL 缓存：`ctx.uiConversation.imageUrl(sessionId, attachment)` 为每个附件解析一个经会话授权的浏览器 URL，并随 Session binding 释放而撤销，因此所有 Conversation target 共享一次 `session.attachment` 读取。Chat 等具体 target 位于独立包，由各自包注册 Definition、快照 builder、View 和 renderer。
 
+## 目录
+
+- [设置权限](#settings-authority)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="settings-authority"></a>
 ## 设置权限
 
 忙碌状态下的 Enter 偏好以及对话显示偏好都属于账户级 settings 字段。即使处于项目作用域，它们的设置行也会使用账户 transport；在取得可写视图前拒绝变更，提供方限制以内联状态显示，最新写入失败时采用恢复后的值。宽度和字号写入使用数值，并与 Enter 偏好共用同一个账户 revision 栅栏，因此一个字段不会污染另一个字段的写入状态。policy 与显示控制器会随 conversation 插件释放自己的 scope 订阅，因此 HMR 与销毁不会留下设置监听器。显示设置行的紧凑变体填充工作台侧栏面板声明的 `conversation.workbench.display` 孔位，并绑定同一控制器与账户作用域。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。会话节点、轮次与 composer 状态由运行时与 Host seam 投影；本包贡献渲染它们的视图与控制器。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为本包渲染浏览器状态，并通过 Session Controller API 发送用户确认提交的输入，而不构造模型请求。
@@ -103,6 +124,7 @@ Access 控件还会根据会话所属连接应用[当前账户资格规则](../u
 
 无；Conversation 组装和浏览器输入状态不会改变提供方侧的 prompt cache。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **单轮次用量采用 fail-closed**——只有已加载窗口包含完整生命周期且每个已开始 attempt 都有安全、精确用量时，完成轮次才显示 disclosure；缺失 bucket 或矛盾总量会隐藏该 disclosure。
@@ -116,3 +138,13 @@ Access 控件还会根据会话所属连接应用[当前账户资格规则](../u
 - **TodoPanel 将过长条目截成单行省略号**：figma 条没有换行或展开入口，完整文本无法在行内读完。
 - **Queue 编辑仅支持文本**：包含非文本块的行仍显示扁平化预览，但由于内联编辑器无法保留这些块，其编辑控件会被禁用。文本行进入编辑模式后，删除和严格 steering 操作会被保存和取消取代；Enter 保存，Escape 取消。
 - **Queue 严格 steering 会保留完整消息**：agent 运行期间，steering 操作会以原子方式把所寻址的 Queue 单次入队项转移到当前 next-step 窗口。包含混合内容的行仍可使用此操作，因为它会转发不可变消息，而非文本投影。带 placement 的 Host 快照会在会话流末尾渲染待处理 steering，直到已消费的 `user/message` 折叠进持久 transcript（文本记录），因此立即展示、重连和回放共享同一个线性权威。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

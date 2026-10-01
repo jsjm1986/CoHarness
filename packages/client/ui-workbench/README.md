@@ -1,3 +1,8 @@
+---
+description: "Cordis multi-session Workspace workbench UI"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-workbench
 
 English | [中文](README.zh.md)
@@ -13,16 +18,31 @@ Use `dsh-client-ui-workbench` to present up to four existing Workspace sessions 
 
 Cross-runtime loading and creation share the current navigation intent. Selecting another pane, switching presentation or named layouts, or unloading the plugin prevents older responses from replacing the active pane. A completed Host creation remains in the catalog even when its navigation was superseded.
 
+## Table of Contents
+
+- [Composition](#composition)
+- [View state](#view-state)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="composition"></a>
 ## Composition
 
-`apply()` waits for `conversationViewport` and registers the workbench controls through `ctx.slots.inject()`. The sidebar panel lists the staged panes with focus and close actions, offers Add and equalize-ratios actions bound to the same chooser store and viewport capability, exits back to single-session mode, and declares the `conversation.workbench.display` hole that ui-conversation fills with a compact display-preferences row. The provider owns a bounded Session stage set; removing this plugin releases additional history windows and leaves the ordinary current-session view available. The Gateway supplies an ACL-filtered account catalog, while each selected project runtime receives its own target-aware transport and principal assertion. In cloud Web, `workspace/resource-open` asks a preview consumer to accept an explicitly targeted file. The toolbar browses direct Workspace directories and opens files in the shared right sidebar, bound to the initiating Session and runtime. The tab uses shared resource metadata and version-guarded `workspaceFiles.read` pages, with bounded Base64 windows for binary files. Hidden tabs release content readers while the sidebar retains resource metadata; closing a tab releases its occurrence. Changed files require reload, transient reconnects retain content, and access denial hides it. Local loopback uses `host.openPath` only when the owning connection advertises native opening. No Session JSONL, persistence format, or Collaboration authorization semantics change.
+`apply()` waits for `conversationViewport` and registers the workbench controls through `ctx.slots.inject()`. The sidebar panel lists the staged panes with focus and close actions, offers Add and equalize-ratios actions bound to the same chooser store and viewport capability, exits back to single-session mode, and declares the `conversation.workbench.display` hole that ui-conversation fills with a compact display-preferences row. The provider owns a bounded Session stage set; removing this plugin releases additional history windows and leaves the ordinary current-session view available. The Gateway supplies an ACL-filtered account catalog, while each selected project runtime receives its own target-aware transport and principal assertion. In cloud Web, `workspace/resource-open` asks a preview consumer to accept an explicitly targeted file. The toolbar browses direct Workspace directories and opens files in the shared right sidebar, bound to the initiating Session and runtime. The tab subscribes to resource metadata through the injected `keyedHooks.workspaceResource` source; each preview receives a plain `WorkspacePreviewResource` face — immutable `{status, value, error, accessDenied}` metadata plus bound `reload`/`revoke` callbacks — and never holds the registry. It reads version-guarded `workspaceFiles.read` pages, with bounded Base64 windows for binary files. Hidden tabs keep no subscription or content reader; closing a tab releases its occurrence. Changed files require reload, transient reconnects retain content, and access denial hides it. Local loopback uses `host.openPath` only when the owning connection advertises native opening. No Session JSONL, persistence format, or Collaboration authorization semantics change.
 
 Markdown file links open the existing authorized file tab at the requested first line. Reopening another line of the same file updates navigation without creating a second resource. Link destinations do not change filesystem permissions.
 
-The file tab picks a preview body by extension. Markdown files (`md`, `markdown`) accumulate the same version-guarded text pages and render through `MarkdownText` without wrapping. HTML files (`html`, `htm`) read the complete source through version-guarded `workspaceFiles.readBytes` windows, then package directly declared relative `.js` classic scripts, `.css` stylesheets, and recognized image files read through the same authorized Session and runtime target. Dependency reads resolve inside the Session workspace with a fixed 4 MiB per-asset, 32 MiB total, and 64-asset bound; external, root-relative, module, and CSS-traversed references are never read. The packaged document runs in an opaque Blob iframe with exactly `sandbox="allow-scripts"`; replacing or unmounting the preview revokes the Blob URL. Invalid UTF-8, read failures, or exceeded limits fail the preview instead of publishing a partial package. PDF and Office files keep their document bodies; other files keep text or the bounded Base64 window.
+The file tab picks a preview body by extension. Markdown files (`md`, `markdown`) accumulate the same version-guarded text pages and render through `MarkdownText` without wrapping. HTML files (`html`, `htm`) read the complete source as Base64 through `readFileBytes` in [`preview-readers.ts`](src/client/preview-readers.ts) — version-guarded `workspaceFiles.readBytes` windows bounded by the caller's complete-file limit — and `workspaceFileBytes` in [`html/read-relative.ts`](src/client/html/read-relative.ts) decodes it for packaging, which collects directly declared relative `.js` classic scripts, `.css` stylesheets, and recognized image files through the same authorized Session and runtime target. Dependency reads resolve inside the Session workspace with a fixed 4 MiB per-asset, 32 MiB total, and 64-asset bound enforced in [`html/pack.ts`](src/client/html/pack.ts); external, root-relative, module, and CSS-traversed references are never read. The packaged document runs in an opaque Blob iframe with exactly `sandbox="allow-scripts"`; replacing or unmounting the preview revokes the Blob URL. Invalid UTF-8, read failures, or exceeded limits fail the preview instead of publishing a partial package. PDF and remaining Office files keep their document bodies; other files keep text or the bounded Base64 window.
 
-Office files request authorized conversion through the same file tab. PDF.js renders visible pages in an owned Worker, with selectable text and missing-font notices. Hidden bodies release content and workers while the tab retains its page preference. Source changes require reload; revocation clears content immediately. Ordinary PDF reads retain the Workspace byte-window limit; converter limits govern Office inputs and outputs. See [document conversion](../../../docs/subsystems/office-to-pdf.md) for engine and adaptation rules.
+Spreadsheet files (`xlsx`, `xls`, `csv`, `tsv`) read complete authorized Base64 through the same bounded `readFileBytes` path — capped by the configured `excelMaxBytes` — and render read-only through a lazily loaded workbook viewer instead of requesting conversion. A disposable Worker parses the workbook under configured byte, cell-area, and timeout limits and preserves formulas with their cached results without recalculation; charts, images, shapes, and conditional formatting are reported as unsupported preview features. Parser limits come from the plugin `Config` (`excelMaxBytes`, `excelMaxCells`, `excelTimeoutMs`). The source version, reload, revocation, and hidden-tab lifecycle match the other file previews: late or stale reads are discarded and access denial clears content immediately.
 
+Remaining Office files request authorized conversion through the same file tab. PDF.js renders visible pages in an owned Worker, with selectable text and missing-font notices. Hidden bodies release content and workers while the tab retains its page preference. Source changes require reload; revocation clears content immediately. Ordinary PDF reads retain the Workspace byte-window limit; converter limits govern Office inputs and outputs. See [document conversion](../../../docs/subsystems/office-to-pdf.md) for engine and adaptation rules.
+
+<a id="view-state"></a>
 ## View state
 
 The conversation viewport stores mode, named layouts, Session ids, active panes, and manual ratios in one versioned `dsh.conversation.workbenches.v2.<principal>` record. The principal comes from verified Gateway identity or an explicit independent-Host declaration. Identity loss clears in-memory layouts and releases staged panes; another account cannot restore their names or selections. Session visibility is rechecked before staging. Legacy unscoped records can migrate only for the independent local operator after catalog validation; Gateway does not infer their owner. A duplicate id focuses its existing pane; a fifth id is refused without replacing an existing pane.
@@ -31,10 +51,12 @@ Desktop uses equal or ratio-adjusted columns, with two rows when four columns ca
 
 The conversation chooser excludes archived roots and inactive blank drafts. Personal rows use the same `workspace.list.archivedSessionIds` snapshot as the sidebar; project rows exclude archive-index entries, and opening a target rechecks its live Workspace archive set. An account catalog response is authoritative and is never supplemented with excluded local rows.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Pane selection, order, and ratios are component state over the `conversationViewport` capability; sessions remain owned by the runtime.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as browser-only pane controls register nothing model-facing; the existing conversation submission path owns all model-visible content.
@@ -48,4 +70,14 @@ None; the package never assembles or sends provider requests.
 - The workbench is limited to four root Sessions and does not yet expose nested split trees or cross-session context sharing.
 - The catalog is metadata-only and loads conversation history lazily when a pane is selected; it does not preload every project runtime.
 - The browser-local view state is not synchronized between devices or browser profiles.
-- File tabs provide bounded text, Markdown, HTML, and image previews, with a Base64 fallback for other binary files. HTML packaging covers only directly declared relative classic scripts, stylesheets, and image `src` references; `srcset`, module imports, CSS `url()`/`@import`, and runtime `fetch` do not read Workspace files. Office conversion, an editor, and uploads through the tab are not implemented.
+- File tabs provide bounded text, Markdown, HTML, and image previews, with a Base64 fallback for other binary files. HTML packaging covers only directly declared relative classic scripts, stylesheets, and image `src` references; `srcset`, module imports, CSS `url()`/`@import`, and runtime `fetch` do not read Workspace files. Spreadsheet previews are read-only and omit workbook features the parser cannot preserve, such as charts, images, shapes, and conditional formatting; `doc`, `docx`, `ppt`, and `pptx` still rely on the conversion path. An editor and uploads through the tab are not implemented.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

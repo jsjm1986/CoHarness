@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-plugin-settings-tabs.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-11-plugin-settings-tabs.md
-2026-08-11-plugin-settings-tabs.md: 96e4c48926c835bcc3e6b5bf2d59126a999fbb2b
-2026-08-11-plugin-settings-tabs.zh.md: fa8f4626408316fd1afbfa1ab4b4cab14d69c538
+/agent-note-feature-owned-tabs-in-plugins-settings:
+  en: 3f9fa1fed84134f0
+  zh: f262db1b947cda4b
+/agent-note-feature-owned-tabs-in-plugins-settings/problem:
+  en: 29f5534283bebfb3
+  zh: 88b2a69c40e802dc
+/agent-note-feature-owned-tabs-in-plugins-settings/decision:
+  en: ecdf9ac1cce789e8
+  zh: 3edcc24c8c310364
+/agent-note-feature-owned-tabs-in-plugins-settings/alternatives-considered:
+  en: 368ae4382bfc7f48
+  zh: d3ca033641796e40
+/agent-note-feature-owned-tabs-in-plugins-settings/consequences:
+  en: e67a7411df56192f
+  zh: 60181f94e3ec8d62

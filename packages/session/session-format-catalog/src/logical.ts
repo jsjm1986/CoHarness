@@ -37,7 +37,8 @@ import {
 } from '@deepseek-ai/dsh-session-format-v2-to-v3'
 import { assertReleasedV4Header, assertV4EventAdmission, sessionFormatV3ToV4 } from '@deepseek-ai/dsh-session-format-v3-to-v4'
 import { assertReleasedV5Header, sessionFormatV4ToV5 } from '@deepseek-ai/dsh-session-format-v4-to-v5'
-import { assertReleasedV6Header, restoreReleasedV6Artifact, sessionFormatV5ToV6 } from '@deepseek-ai/dsh-session-format-v5-to-v6'
+import { assertReleasedV6Header, sessionFormatV5ToV6 } from '@deepseek-ai/dsh-session-format-v5-to-v6'
+import { assertReleasedV7Header, restoreReleasedV7Artifact, sessionFormatV6ToV7 } from '@deepseek-ai/dsh-session-format-v6-to-v7'
 import { coharnessV0ToV1Dialect } from './coharness-v0-dialect.ts'
 import { coharnessV1ToV2Dialect } from './coharness-v1-dialect.ts'
 import { coharnessV2ToV3Dialect } from './coharness-v2-dialect.ts'
@@ -131,9 +132,12 @@ function assertLogicalHeader(header: SessionFormatHeader): void {
     case 6:
       assertReleasedV6Header(header)
       return
+    case 7:
+      assertReleasedV7Header(header)
+      return
     default:
       throw new SessionFormatUnsupportedMigrationError(
-        `stored Session uses newer format v${version}; this build writes v6`,
+        `stored Session uses newer format v${version}; this build writes v7`,
       )
   }
 }
@@ -144,7 +148,7 @@ function assertLogicalHeader(header: SessionFormatHeader): void {
  * rows run v4 admission (the v5/v6 codecs delegate to the v4 decoder), and
  * earlier generations rely on their migration stage's own source validation.
  * Payload validation of the migrated output runs once in `finish` through
- * `restoreReleasedV6Artifact`.
+ * `restoreReleasedV7Artifact`.
  */
 function logicalEventAdmission(version: number): (event: SessionFormatEvent) => void {
   switch (version) {
@@ -203,7 +207,7 @@ function errorDetail(error: unknown): string {
 
 /** The compiled logical chain shares released validation; the v0, v1, and v2 edges add dialect admission. */
 const logicalChain = createSessionFormatChain({
-  currentVersion: 6,
+  currentVersion: 7,
   migrations: [
     coharnessV0ToV1Dialect,
     coharnessV1ToV2Dialect,
@@ -211,9 +215,10 @@ const logicalChain = createSessionFormatChain({
     sessionFormatV3ToV4,
     sessionFormatV4ToV5,
     sessionFormatV5ToV6,
+    sessionFormatV6ToV7,
   ],
   restoreCurrentHeader(header) {
-    assertReleasedV6Header(header)
+    assertReleasedV7Header(header)
     validateInstalledCurrentSessionHeader(header)
     return header
   },
@@ -341,7 +346,7 @@ export const sessionLogicalFormatCatalog = {
         finished = true
         const cut = stream.finish()
         try {
-          const restored = restoreReleasedV6Artifact({
+          const restored = restoreReleasedV7Artifact({
             header: stream.header,
             inheritedEventCount: cut,
             events: collected,

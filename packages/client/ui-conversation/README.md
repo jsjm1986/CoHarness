@@ -1,3 +1,8 @@
+---
+description: "Conversation domain: skeleton, ordered chat flow, account-backed composer/display preferences, and details host"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-conversation
 
 English | [中文](README.zh.md)
@@ -63,6 +68,8 @@ Composer message submission resolves delivery from the addressed session's runni
 
 An ordinary running composer keeps Stop as its primary pointer action while its draft is empty or an owner block makes input unavailable. Actionable text, images, or documents switch the same seat to the configured Send delivery; clearing or successfully submitting the draft restores Stop. Continuable subagents retain independent Send and Stop actions. The [busy Send decision](../../../.agents/notes/implemented/bug-fix/2026-09-22-busy-send-follows-enter-setting.md) keeps the button label and delivery tied to one live preference.
 
+Two independent Escape presses in the focused Chat or Composer stop its current running turn and preserve queued messages. The interval comes from the shortcuts service's `stopSequenceMs` configuration (500 ms by default). A menu, approval, modal, terminal, embedded webpage, composition, repeated key, changed input region, Session or turn breaks the sequence. The shortcut uses the same scoped cancellation as the Stop button. The plugin registers Stop as a fixed action in the `input` display group alongside the non-editable send/newline/queue/steer, slash-menu, and mention-menu gestures; the registration reserves plain Escape against editable shortcuts and supplies the `Esc Esc` sequence shown in the Stop button's hover and keyboard-focus tooltip.
+
 Per-session UI state for selection and the active view lives in the declared chat store (`stores.ts` `createChatStore`); the InputHub owns the composer state machine and mirrors its draft into that store for persistence. Apply passes one store handle to the strict session subtree and chat view registrations, so each session shares one instance and the framework owns its lifecycle. Tool details receive their explicit call address from the auxiliary tab owner. Components are pure: the framework standard kit supplies `useSession`/`sessionId`, global `useSessions`/`useWorkspaces`, and the input machine's `useInput`/`inputActions`; store faces and inject factories supply the remaining state and callbacks.
 
 Image intake accepts paste and whole-page drop: the bar binds document-level drag listeners (the composer-bar slot is `kind: 'single'`, so at most one bar binds them) and shows the `DropOverlay` atom while a file drag is over the window — text drags pass through untouched, and a locked or busy composer shows the blocked overlay and refuses the drop. Both gestures feed one intake pre-check against the host's `imageLimits` projection (count, per-image bytes, aggregate bytes): an addition that would break a limit is refused as a whole batch with an immediate banner naming the limit, and never enters the rail. Host-side rejections that arrive anyway surface as product copy mapped from the `attachment-error` reason (`image-labels.ts` `attachmentErrorText`); reasons the user cannot act on fold into one send-failed line carrying the reason code, and non-attachment error codes keep their developer-facing message plus code. Attached images are part of the submission envelope on every send path: a slash-command submit either consumes them (a claim declaring `images` has them serialized through the hub's `commandImages` plumbing, with the attempt signal cancelling abandoned encoding, passed to `claim.submit`, and cleared plus released only on a success outcome) or refuses the whole submission with the `command.imagesUnsupported` notice while draft and images stay in place — a command can never consume the text and strand the images.
@@ -89,14 +96,27 @@ Unsent text, attachments, and active submission attempts retain their exact Clie
 
 `ui-conversation` owns target-neutral Conversation assembly and the shared browser shell. It consumes Session Controller `SessionEventLikeEntry` feeds, exposes React-free registries and per-Session bindings through `ctx.uiConversation`, and contributes the `useConversation`, `useInput`, and `inputActions` standard props through `ctx.uiSession`. It also owns the per-session durable image URL cache: `ctx.uiConversation.imageUrl(sessionId, attachment)` resolves one session-authorized browser URL per attachment and revokes it with the Session binding, so every Conversation target shares one `session.attachment` read. Concrete targets such as Chat are separate packages that register their own Definitions, snapshot builders, Views, and renderers.
 
+## Table of Contents
+
+- [Settings authority](#settings-authority)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="settings-authority"></a>
 ## Settings authority
 
 The busy-state Enter preference and transcript display preferences are account-owned settings fields. Their rows use the account transport while a project is active, refuse changes until a ready writable view exists, show provider restrictions inline, and adopt the recovered value after a failed latest write. Width and font-size writes are numeric and share the same account revision fence as the Enter preference, so one field cannot poison another field's write state. The policy and display controller release their scope subscriptions with the conversation plugin, so HMR and teardown do not retain settings listeners. A compact variant of the display row fills the `conversation.workbench.display` hole that the workbench sidebar panel declares, bound to the same controller and account scope.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Conversation nodes, turns, and composer state are projected by the runtime and Host seams; the package contributes the views and controllers that render them.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this package renders browser state and sends user-admitted inputs through Session Controller APIs without constructing model requests.
@@ -118,3 +138,13 @@ None; Conversation assembly and browser input state do not alter provider-side p
 - **TodoPanel truncates long item text to one ellipsized line** — the figma strip has no wrap or expand affordance; full text is not readable inline.
 - **Queue edit is text-only** — rows containing non-text blocks still show a flattened preview, but their edit control is disabled because the inline editor cannot preserve those blocks. A text row's edit mode replaces delete and strict steer with save and cancel; Enter saves and Escape cancels.
 - **Queue strict steer preserves complete messages** — while the Agent is running, the steer action atomically transfers the addressed Queue occurrence into the current next-step window. Mixed-content rows remain eligible because the action forwards the immutable message instead of the text projection. The placement-aware Host snapshot renders pending steering at the conversation tail until the consumed `user/message` folds into the durable transcript, so immediate display, reconnect, and replay share one linear authority.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

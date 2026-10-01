@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-doc-site-carries-its-images.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-06-doc-site-carries-its-images.md
-2026-08-06-doc-site-carries-its-images.md: 4078a9b6251cf67456590ae25602a9f288c88dc1
-2026-08-06-doc-site-carries-its-images.zh.md: 4ab90f9736dae95090b0d805f6fbe5d4846c7a0c
+/agent-note-the-documentation-site-carries-its-own-images:
+  en: 08c3f344e1cbef9f
+  zh: 621fcea857e1d58d
+/agent-note-the-documentation-site-carries-its-own-images/problem:
+  en: 5595be1677b81324
+  zh: 5649dddd04cc2e30
+/agent-note-the-documentation-site-carries-its-own-images/decision:
+  en: 0b9120da9896f55b
+  zh: 322077b98881675f
+/agent-note-the-documentation-site-carries-its-own-images/alternatives-considered:
+  en: 607f901284903f5c
+  zh: 7db7dd20e1263866
+/agent-note-the-documentation-site-carries-its-own-images/consequences:
+  en: 3814754cca9d007b
+  zh: 48de50f0cc087477
+/agent-note-the-documentation-site-carries-its-own-images/testing:
+  en: 64eedec4381d2ddd
+  zh: 9ad0e82c73602a47

@@ -146,8 +146,8 @@ export class GatewayExecution extends ExecutionAuthority {
       }
       ctx.on('agent/status', () => { track(settle()) })
       ctx.on('agent/disposed', ({ agent }) => { track(policy.settled(agent).then(settle)) })
-      ctx.inject(['jobs'], (jobCtx) => { jobCtx.jobs.onJobsChanged(() => {
-        track(settle())
+      ctx.inject(['jobs'], (jobCtx) => { jobCtx.jobs.events.subscribe({ owners: 'all' }, (event) => {
+        if (event.type !== 'output') track(settle())
       }) })
       ctx.effect(() => () => policy.dispose(), 'gateway-execution: desktop workflows')
     }
@@ -204,7 +204,9 @@ export class GatewayExecution extends ExecutionAuthority {
       if (status === 'idle' && this.activeJobs(agent).length === 0) { this.required.delete(agent); this.grants.delete(agent) }
     })
     ctx.inject(['jobs'], (jobCtx) => {
-      jobCtx.jobs.onJobsChanged((agent) => {
+      jobCtx.jobs.events.subscribe({ owners: 'all' }, (event) => {
+        const ownerId = event.type === 'output' ? event.owner : event.job.owner
+        const agent = ownerId === undefined ? undefined : ctx.agents.get(ownerId)
         if (agent?.status === 'idle' && this.activeJobs(agent).length === 0) {
           this.required.delete(agent)
           this.grants.delete(agent)
@@ -557,7 +559,7 @@ export class GatewayExecution extends ExecutionAuthority {
   }
 
   private activeJobs(agent: Agent) {
-    return this.dependencies.ctx.get('jobs')?.list(agent).filter(job => job.ownerSession === agent.id
+    return this.dependencies.ctx.get('jobs')?.list(agent.id).filter(job => job.owner === agent.id
       && (job.status === 'running' || job.status === 'stopping')) ?? []
   }
 
@@ -593,8 +595,8 @@ export class GatewayExecution extends ExecutionAuthority {
             agent.cancel({ kind: 'hook', reason })
             const jobs = this.dependencies.ctx.get('jobs')
             const waiting = jobs === undefined ? [] : this.activeJobs(agent).map(async (job) => {
-              jobs.kill(job.id, agent, reason)
-              const settled = await jobs.wait(job.id, this.jobStopTimeoutMs, agent)
+              jobs.kill(job.id, agent.id, reason)
+              const settled = await jobs.wait(job.id, this.jobStopTimeoutMs, agent.id)
               if (settled.status === 'running' || settled.status === 'stopping') throw new Error(`Revoked job ${job.id} has not released its resources.`)
             })
             const settled = await Promise.allSettled([agent.whenIdle(), ...waiting])

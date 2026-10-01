@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # `@deepseek-ai/dsh-file-reference-local`
 
 [English](README.md) | 中文
@@ -10,6 +15,17 @@
 
 agent（智能体）及宿主 UI 可以用各 agent 本地工作区中经过排序的路径补全 `@file` mention；有界发现让大型仓库也能保持响应迅速。结果会在工具活动后刷新且不会阻塞补全，并且始终不会跟随目录符号链接。当 `read` 可用时，模型还会收到关于如何理解引用路径的稳定指引。当 `read` 使用 Harness 宿主文件系统时选择本包；远程或虚拟命名空间需要与之匹配的发现能力。
 
+## 目录
+
+- [配置](#configuration)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="configuration"></a>
 ## 配置
 
 | 配置键 | 默认值 | 契约 |
@@ -20,10 +36,13 @@ agent（智能体）及宿主 UI 可以用各 agent 本地工作区中经过排�
 
 所有数值都必须是正的安全整数。排除名称必须是非空基名，且不能包含 `/` 或 `\`。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每 agent 索引是按需从文件系统重建的有界缓存；文件系统仍是唯一权威。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### `read` 可用时的文件引用指引
@@ -46,8 +65,19 @@ Tokens prefixed with @ are workspace paths the user explicitly referenced, relat
 
 该稳定句子会加入系统提示词前缀。挂载或移除此提供方，或者改变 `read` 是否可见，都会改变该前缀；查询、候选项和索引陈旧标记不会改变前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **宿主本地命名空间**：提供方扫描 Harness 宿主的文件系统，因此远程或虚拟 `read` 实现需要使用命名空间与该工具一致的提供方。
 - **有界的提示性索引**：超大型工作区可能省略 `maxEntries` 之后的路径；被排除或无法读取的子目录不会出现。工作区根目录无法读取时会拒绝索引，使下一次查询可以重试，而不是发布错误的空结果。
 - **没有忽略文件语义**：`.gitignore` 和其他项目忽略文件不会影响发现；系统只排除已配置的目录基名。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

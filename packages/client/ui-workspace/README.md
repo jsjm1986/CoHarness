@@ -1,3 +1,8 @@
+---
+description: "Workspace picker plugin: one WorkspacePicker registered into the sidebar and empty-state workspace slots"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-workspace
 
 English | [中文](README.zh.md)
@@ -30,12 +35,23 @@ Session selection loads history before changing the current view. Failed loading
 
 ## Summary
 
-This package lets users browse grouped or flat Session lists, choose a Workspace for a new Session, and manage Workspaces and Sessions through add, rename, reorder, search, fork, archive, and Workspace deletion. Pending interactions appear as warning dots, active scheduled tasks as alarm markers, and subagent-origin Sessions remain hidden. Canonically distinct folder paths remain separate Workspaces. Adding a Workspace requires a composed directory picker; without one, the add action is unavailable.
+This package lets users browse grouped or flat Session lists, choose a Workspace for a new Session, and manage Workspaces and Sessions through add, rename, reorder, search, fork, archive, and Workspace deletion. Pending interactions appear as warning dots, active scheduled tasks as alarm markers, and subagent-origin Sessions remain hidden. Canonically distinct folder paths remain separate Workspaces. Adding a Workspace requires a composed directory picker; without one, the add action is unavailable. The keyboard reference binds the same row and Session actions to shortcuts from the [shortcut service](../shortcuts/README.md).
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Workspace and Session lists render from runtime mirrors and Host calls; the browser owns no workspace data.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -50,3 +66,13 @@ None; this package neither assembles nor sends a provider request.
 - **No Session deletion control** — sessions can be archived here and restored through the Archived sessions Settings page ([`ui-settings-unarchive-sessions`](../ui-settings-unarchive-sessions/README.md)); Workspace registration deletion does not delete Sessions.
 - **Pending user interaction is not aggregated into collapsed groups** — a waiting row inside a collapsed group lights no group-header indicator and becomes visible only after that group is expanded.
 - **Native folder selection depends on the local Host carrier** — under the `-native` composition, in-process or remote browser deployments cannot open a local operating-system dialog; platform failures are shown in a retryable modal. Remote-capable picking is the `-browse` composition's in-app flow.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

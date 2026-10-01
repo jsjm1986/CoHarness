@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-29-ask-question-web-presentation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-29-ask-question-web-presentation.md
-2026-07-29-ask-question-web-presentation.md: fd6c326ccadc83cb9d2edc0151dd94984f2bca8b
-2026-07-29-ask-question-web-presentation.zh.md: c26fe91c91280c3f5596a30a3e3483ed1fa784b4
+/agent-note-ask-question-web-presentation:
+  en: 2902035d87a2fb92
+  zh: 450c3dc5a44c6be7
+/agent-note-ask-question-web-presentation/problem:
+  en: 1f04f3ce65097692
+  zh: a4dd625f87ffe3ba
+/agent-note-ask-question-web-presentation/decision:
+  en: 5e2d292ad97f77f7
+  zh: e1b0659f304d0f67
+/agent-note-ask-question-web-presentation/alternatives-considered:
+  en: 7852514be9ecf052
+  zh: 965e36e690548597
+/agent-note-ask-question-web-presentation/consequences:
+  en: 8685711c087d5ab2
+  zh: 767f87fea1065a68
+/agent-note-ask-question-web-presentation/verification:
+  en: 54884827c1ddb9b2
+  zh: 9e5bbe136bb76e61

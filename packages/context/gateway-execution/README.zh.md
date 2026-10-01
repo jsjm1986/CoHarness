@@ -70,6 +70,7 @@ Gateway 数据库需要[执行身份迁移 030](../../../gateway/deploy/postgres
 - [Auto 审查授权与归因](../../../.agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.zh.md) — 审查器准入与计费归属。
 - [当前账户权限 UI](../../client/ui-permission-presets/README.zh.md) — 账户资格的展示。
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -79,6 +80,7 @@ Gateway 数据库需要[执行身份迁移 030](../../../gateway/deploy/postgres
 
 无；授权引用保留在模型请求内容之外，不改变其前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -88,3 +90,13 @@ Gateway 数据库需要[执行身份迁移 030](../../../gateway/deploy/postgres
 - 提供者和 PostgreSQL 测试证明身份与权限检查；全部恢复、委派和已部署 Web 路径的完整组装验收仍须单独完成。
 - 已验证参与者集合可以授权操作，但不会隔离可信 Host 插件，也不会撤销取消前已经完成的副作用。
 - 未登记到 Jobs 注册表的工作及非受管外部进程，需要单独审查取消与隔离。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

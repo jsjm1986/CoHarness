@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-09-headless-direct-core-entry-point.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-09-headless-direct-core-entry-point.md
-2026-08-09-headless-direct-core-entry-point.md: ce1347f1e2d4b1bcfc1819900cb30c4f2f1f6097
-2026-08-09-headless-direct-core-entry-point.zh.md: e1eae6bceb6dbda65c422248e1b207493357cc6c
+/agent-note-headless-is-a-direct-core-entry-point:
+  en: afff105fdbd912be
+  zh: 3c33a6bb4b77407b
+/agent-note-headless-is-a-direct-core-entry-point/problem:
+  en: adb62b75950d4ef7
+  zh: 0984e102a589c2d3
+/agent-note-headless-is-a-direct-core-entry-point/decision:
+  en: cad0c0719f4902ab
+  zh: 3b9e84337ad59d4b
+/agent-note-headless-is-a-direct-core-entry-point/verification:
+  en: 104bada46a6da0ff
+  zh: 58d41268ca71300a
+/agent-note-headless-is-a-direct-core-entry-point/alternatives-considered:
+  en: e848cf3d16223439
+  zh: 95c1e27fae227c78
+/agent-note-headless-is-a-direct-core-entry-point/consequences:
+  en: b701383d2d9e7c90
+  zh: 04116f4a2b32716e

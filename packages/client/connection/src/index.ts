@@ -10,16 +10,23 @@ import {
   toFetchHandler,
 } from '@deepseek-ai/dsh-host-apiproxy'
 import { API_PATH, HOST_EVENTS_PATH, MUX_EVENTS_PATH } from './api-path.ts'
+import type { ConnectionAuthenticationRequest } from './rpc.ts'
 import { bridge, DEFAULT_MAX_REQUEST_BODY_BYTES } from './http-bridge.ts'
-import { assertTrustedAuthority, isTrustedApiRequest } from './api-request-trust.ts'
+import { assertTrustedAuthority } from './api-request-trust.ts'
+import { BrowserAuth } from './browser-auth.ts'
 import { HostConnectionService } from './rpc-host.ts'
 import { rejectWebSocketUpgrade, WebSocketDownlinks } from './websocket-downlink.ts'
 
 export type {
+  ConnectionAuthenticationRequest,
+  ConnectionIndexRequest,
+  ConnectionIndexResponse,
+  ConnectionRequestRejection,
   ConnectionRpcAuthority,
   ConnectionRpcEndpointMatcher,
   ConnectionRpcHandler,
   ConnectionRpcHandlerOptions,
+  ConnectionTrustRequest,
   HostConnectionRpc,
 } from './rpc.ts'
 export type {
@@ -50,6 +57,23 @@ declare module '@deepseek-ai/cordis' {
      * @mode waterfall
      */
     'connection/request'(request: ConnectionRequestBoundary, next: () => Promise<void>): Promise<void>
+    /**
+     * Authenticate one index, `/api`, or upgrade request through a deployment
+     * provider. The first defined answer replaces the direct-browser token
+     * exchange and cookie entirely: `'allow'` admits the request without
+     * minting a runtime cookie, `'deny'` refuses it even when a cookie or
+     * launch token is present, and `undefined` defers to the direct-browser
+     * flow. `loopback` subtrees and endpoints keep their declared machine
+     * fence and never consult this event. A listener must only allow requests
+     * whose credentials it verified itself — a header seen but not verified
+     * is not an identity.
+     * @param request - request headers, method, URL, and arrival carrier.
+     * @mode bail
+     * @returns the provider's admission decision, or undefined to defer.
+     */
+    'connection/authenticate'(
+      request: ConnectionAuthenticationRequest,
+    ): 'allow' | 'deny' | undefined
   }
 }
 
@@ -77,7 +101,7 @@ function assertImageBodyCapacity(ctx: Context, maxRequestBodyBytes: number): voi
 }
 
 /** Services required before providing Connection; API Proxy is an optional `/api` fallback. */
-export const inject = ['webServer']
+export const inject = ['credentials']
 
 /** Plugin config: the deployment's non-loopback serving authorities. */
 export interface ConnectionConfig {
@@ -105,6 +129,8 @@ export interface ConnectionConfig {
    * that is not a bare, canonical authority fails the plugin load.
    */
   trustedHosts?: string[]
+  /** Absolute browser-session lifetime in days. Default: 30. */
+  cookieMaxAgeDays?: number
   /** Maximum buffered JSON body for every `/api` request. */
   maxRequestBodyBytes?: number
   /**
@@ -134,6 +160,7 @@ export const Config: z<ConnectionConfig> = z.object({
     generationReadyTimeoutMs: 15_000,
   }),
   trustedHosts: z.array(String).default([]),
+  cookieMaxAgeDays: z.natural().min(1).default(30),
   maxRequestBodyBytes: z.natural().min(1).default(DEFAULT_MAX_REQUEST_BODY_BYTES),
   historyPageTargetBytes: z.natural().min(1).default(DEFAULT_HISTORY_PAGE_TARGET_BYTES),
   websocketHeartbeatIntervalMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(30_000),
@@ -146,10 +173,11 @@ export const Config: z<ConnectionConfig> = z.object({
  * privileged — `settings.describe` returns every exposed namespace's
  * configuration and `credentials.describe` reports whether an arbitrary
  * environment-variable name is configured and where from, which is
- * reconnaissance no anonymous caller should have. `trustedHosts` is a
- * DNS-rebinding fence, explicitly not authentication, so the whole
- * configuration plane stays loopback-same-origin until a real authentication
- * layer exists. `llm.discoverModels` belongs to that plane on both counts: it
+ * reconnaissance no anonymous caller should have. Browser-session
+ * authentication covers the whole `/api` surface, and the configuration
+ * plane additionally stays loopback-same-origin so a borrowed browser
+ * cookie cannot reach it from the LAN. `llm.discoverModels` belongs to that
+ * plane on both counts: it
  * carries a draft credential, and it makes the HOST issue a GET to a URL the
  * caller chose and reports back the status or the parsed body — an anonymous
  * LAN caller would have a probe for whatever the host can reach and the
@@ -196,17 +224,21 @@ const PRIVILEGED_METHODS = new Set([
 ])
 
 /**
- * Mounts the API gateway under the browser transport prefix. Every request on
- * the prefix passes the browser-trust fence first (DNS-rebinding and
- * cross-site defense — [api-request-trust](./api-request-trust.ts));
- * privileged methods additionally pass it with an empty trust list, which
- * pins them to loopback.
+ * Provides carrier-neutral RPC and Fetch registries. When `webServer` is
+ * present, the plugin also mounts the `/api` browser transport. Every request
+ * on the prefix passes the browser-trust fence first (DNS-rebinding and
+ * cross-site defense — [api-request-trust](./api-request-trust.ts)) and the
+ * browser-session cookie ([browser-auth](./browser-auth.ts)); registered
+ * `loopback` subtrees and endpoints keep their own machine-caller fence, and
+ * privileged methods additionally pass the fence with an empty trust list,
+ * which pins them to loopback.
  * @param ctx - Host plugin context.
  * @param config - resolved plugin config (schema defaults applied).
  */
-export function apply(ctx: Context, config?: ConnectionConfig): void {
+export async function apply(ctx: Context, config?: ConnectionConfig): Promise<void> {
   // The Loader resolves schema defaults; hand-built test contexts may pass none.
   const trustedHosts = config?.trustedHosts ?? []
+  const cookieMaxAgeDays = config?.cookieMaxAgeDays ?? 30
   const maxRequestBodyBytes = config?.maxRequestBodyBytes ?? DEFAULT_MAX_REQUEST_BODY_BYTES
   const historyPageTargetBytes =
     config?.historyPageTargetBytes ?? DEFAULT_HISTORY_PAGE_TARGET_BYTES
@@ -226,62 +258,70 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
   // Config boundary: a malformed entry fails the load loudly here rather than
   // silently authorizing its hostname prefix at request time.
   for (const entry of trustedHosts) assertTrustedAuthority(entry)
-  if (ctx.get('apiProxy') !== undefined) assertImageBodyCapacity(ctx, maxRequestBodyBytes)
-  const connection = new HostConnectionService(ctx, trustedHosts)
-  ctx.on('webserver/index-inject', (table: IndexInjection[]) => {
-    table.push({ kind: 'global', name: '__DSH_CONNECTION_RECOVERY__', value: recovery })
-  })
+  assertImageBodyCapacity(ctx, maxRequestBodyBytes)
+  const connection = new HostConnectionService(
+    ctx,
+    trustedHosts,
+    await BrowserAuth.create(ctx.root, ctx.credentials, cookieMaxAgeDays),
+  )
   // Construct the Fetch carrier once per resident ApiProxy. Rebuilding its
   // route tables on every request adds avoidable allocations on the hot path;
   // a WeakMap still lets HMR replace the proxy without retaining the old one.
   const fetchHandlers = new WeakMap<object, ReturnType<typeof toFetchHandler>>()
-  const fetchHandler = connection.createSharedFetchHandler(API_PATH, {
-    async fetch(request) {
-      const pathname = new URL(request.url).pathname
-      if (request.method === 'GET' && (pathname === MUX_EVENTS_PATH || pathname === HOST_EVENTS_PATH)) {
-        return new Response('upgrade required', {
-          status: 426,
-          headers: { connection: 'Upgrade', upgrade: 'websocket' },
+  ctx.inject(['webServer'], (webCtx) => {
+    assertImageBodyCapacity(webCtx, maxRequestBodyBytes)
+    webCtx.on('webserver/index-inject', (table: IndexInjection[]) => {
+      table.push({ kind: 'global', name: '__DSH_CONNECTION_RECOVERY__', value: recovery })
+    })
+    const fetchHandler = connection.createSharedFetchHandler(API_PATH, {
+      async fetch(request) {
+        const pathname = new URL(request.url).pathname
+        if (request.method === 'GET' && (pathname === MUX_EVENTS_PATH || pathname === HOST_EVENTS_PATH)) {
+          return new Response('upgrade required', {
+            status: 426,
+            headers: { connection: 'Upgrade', upgrade: 'websocket' },
+          })
+        }
+        const apiProxy = ctx.get('apiProxy')
+        if (apiProxy === undefined) return new Response('not found', { status: 404 })
+        // Keep the inner Fetch parser on the same budget as the outer node:http
+        // bridge. Otherwise a valid aggregate image body would be buffered by
+        // the bridge and then rejected by the inner parser's smaller default.
+        let carrier = fetchHandlers.get(apiProxy)
+        if (carrier === undefined) {
+          carrier = toFetchHandler(apiProxy, {
+            historyPageTargetBytes,
+            requestBodyMaxBytes: maxRequestBodyBytes,
+          })
+          fetchHandlers.set(apiProxy, carrier)
+        }
+        return carrier.fetch(request)
+      },
+    }, { loopbackEndpoints: PRIVILEGED_METHODS })
+    const route: WebRoute = {
+      kind: 'prefix',
+      path: API_PATH,
+      handler: async (req, res) => {
+        const rejection = connection.requestRejection(req, 'http')
+        if (rejection !== undefined) {
+          res.writeHead(rejection)
+          res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
+          return
+        }
+        await webCtx.waterfall('connection/request', {
+          kind: 'http',
+          headers: req.headers,
+          ...(req.method === undefined ? {} : { method: req.method }),
+          pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
+        }, async () => {
+          if (await connection.dispatchHttp(req, res)) return
+          await bridge(req, res, fetchHandler, maxRequestBodyBytes)
         })
-      }
-      const apiProxy = ctx.get('apiProxy')
-      if (apiProxy === undefined) return new Response('not found', { status: 404 })
-      // Keep the inner Fetch parser on the same budget as the outer node:http
-      // bridge. Otherwise a valid aggregate image body would be buffered by
-      // the bridge and then rejected by the inner parser's smaller default.
-      let carrier = fetchHandlers.get(apiProxy)
-      if (carrier === undefined) {
-        carrier = toFetchHandler(apiProxy, {
-          historyPageTargetBytes,
-          requestBodyMaxBytes: maxRequestBodyBytes,
-        })
-        fetchHandlers.set(apiProxy, carrier)
-      }
-      return carrier.fetch(request)
-    },
-  }, { loopbackEndpoints: PRIVILEGED_METHODS })
-  const route: WebRoute = {
-    kind: 'prefix',
-    path: API_PATH,
-    handler: async (req, res) => {
-      if (!isTrustedApiRequest(req, trustedHosts)) {
-        res.writeHead(403)
-        res.end('forbidden')
-        return
-      }
-      await ctx.waterfall('connection/request', {
-        kind: 'http',
-        headers: req.headers,
-        ...(req.method === undefined ? {} : { method: req.method }),
-        pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
-      }, async () => {
-        if (await connection.dispatchHttp(req, res)) return
-        await bridge(req, res, fetchHandler, maxRequestBodyBytes)
-      })
-    },
-  }
-  ctx.effect(() => ctx.webServer.register(route), 'client-connection: /api route')
-  ctx.inject(['apiProxy'], (apiCtx) => {
+      },
+    }
+    webCtx.effect(() => webCtx.webServer.register(route), 'client-connection: /api route')
+  })
+  ctx.inject(['apiProxy', 'webServer'], (apiCtx) => {
     assertImageBodyCapacity(apiCtx, maxRequestBodyBytes)
     const downlinks = new WebSocketDownlinks(apiCtx.apiProxy, websocketHeartbeatIntervalMs)
     const registerDownlink = (
@@ -291,7 +331,7 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
       apiCtx.effect(() => apiCtx.webServer.registerUpgrade({
         path,
         handler: (req, socket, head) => {
-          if (!isTrustedApiRequest(req, trustedHosts)) {
+          if (connection.requestRejection(req, 'upgrade') !== undefined) {
             rejectWebSocketUpgrade(socket)
             return
           }
@@ -309,6 +349,9 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
     apiCtx.effect(() => () => downlinks.close(), 'client-connection: WebSocket downlinks')
     registerDownlink(MUX_EVENTS_PATH, (req, socket, head) => { downlinks.handleMux(req, socket, head) })
     registerDownlink(HOST_EVENTS_PATH, (req, socket, head) => { downlinks.handleHost(req, socket, head) })
+  })
+  ctx.inject(['attachments'], (attachmentCtx) => {
+    assertImageBodyCapacity(attachmentCtx, maxRequestBodyBytes)
   })
 }
 

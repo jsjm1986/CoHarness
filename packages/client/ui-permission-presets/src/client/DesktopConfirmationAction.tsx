@@ -108,10 +108,10 @@ export function DesktopConfirmationAction({ sessionId, connection, t }: DesktopC
                   </div>
                 </div>
                 {!value.eligible
-                  ? <div className={`${css.scopeNote} ${css.scopeNoteInfo}`}><span className={css.scopeNoteIcon}>ℹ️</span>{t('ineligible')}</div>
+                  ? <div className={`${css.scopeNote} ${css.scopeNoteInfo}`}><span className={css.scopeNoteIcon} aria-hidden />{t('ineligible')}</div>
                   : value.confirmed
-                    ? <div className={`${css.scopeNote} ${css.scopeNoteOk}`}><span className={css.scopeNoteIcon}>✓</span>{t('granted')}</div>
-                    : <div className={`${css.scopeNote} ${css.scopeNoteInfo}`}><span className={css.scopeNoteIcon}>ℹ️</span>{t('unconfirmed')}</div>}
+                    ? <div className={`${css.scopeNote} ${css.scopeNoteOk}`}><span className={css.scopeNoteIcon} aria-hidden />{t('granted')}</div>
+                    : <div className={`${css.scopeNote} ${css.scopeNoteInfo}`}><span className={css.scopeNoteIcon} aria-hidden />{t('unconfirmed')}</div>}
               </>}
       </div>
     </Modal>

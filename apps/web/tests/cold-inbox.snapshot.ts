@@ -23,7 +23,7 @@ it.each([0, 200])('serves a cold pending queue after %s turns without activating
       JSON.stringify({ type: 'turn/end', data: { turn: turns + 1, reason: { kind: 'cancelled' } } }),
       '',
     ].join('\n'), 'cold-inbox')
-    const response = await fetch(`${scaffold.baseUrl}/api/session.history`, {
+    const response = await scaffold.hostFetch('/api/session.history', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ type: 'client-request', rpcId: 'cold-inbox-history', method: 'session.history', payload: { sessionId: id, maxMessages: 1 } }),
     })

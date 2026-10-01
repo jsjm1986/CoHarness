@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # dsh-agent-presets
 
 [English](README.md) | 中文
@@ -10,6 +15,21 @@
 
 使用 `dsh-agent-presets` 为每个会话提供某个 preset 的 `agent.cordis.yml` 所指定的工具、提示词段落与 skill（技能）。一个进程可以运行使用不同 preset 的会话，同时保持它们的状态相互隔离。preset 名单合并随附定义、已配置根目录与用户根目录，会报告 preset 无法启动的原因，也能通过复制现有 preset 创建本地 preset。部署与用户都可选择默认值、以及新会话表层是否提供选择；只有空会话可以切换 preset。请将每个自行编写的 preset 视为受信任配置，因为它会授予其所选插件的能力。
 
+## 目录
+
+- [服务：`AgentPresets`（ctx 键：`agentPresets`）](#service-agentpresets-ctx-key-agentpresets)
+- [创作](#authoring)
+- [配置](#config)
+- [挂载会拒绝什么](#what-a-mount-rejects)
+- [preset 文件是输入，不是持久化目标](#a-preset-file-is-an-input-never-a-persistence-target)
+- [信任](#trust)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="service-agentpresets-ctx-key-agentpresets"></a>
 ## 服务：`AgentPresets`（ctx 键：`agentPresets`）
 
 发现过程不做缓存：`list()` 与 `resolve()` 每次调用都重新读取各个根目录，因此进程运行期间新写的 preset 立即可见，被删除的 preset 也会在下一次读取时消失。发现过程同时负责 preset 的**健康**：组装文件缺失或不可加载（YAML 无法解析——用加载器自己的方言检查，含 `!!js`——或不是由具名插件行组成的列表）的目录会作为携带 `broken` 原因的行列出而不是被跳过，因为被跳过的目录仍在磁盘上占着它的 id，而各个界面却没有任何可删的东西。目录名不是可用 preset id（`[a-z0-9][a-z0-9-]*`）的目录才被直接跳过：复制永远不可能占用那种名字。
@@ -56,6 +76,7 @@ subagent 的子 agent 通过 `composeFrom()` 加入其父方的常驻组装，�
 
 "仅限尚未产出任何内容的 agent"是一条产品规则而非机制约束：在对话进行中调换工具，会留下新组装无法执行的、已被记录的工具调用。该规则由网关在传输层执行（[`dsh-apiproxy`](../../host/apiproxy/README.zh.md) 返回 `agent-preset-locked`），因为会话历史在那里才拿得到。
 
+<a id="authoring"></a>
 ## 创作
 
 创作即复制。新 preset 是某个既有 preset 的整目录副本——组装、元数据、skill 目录、附带资产——落在首个 `user` 根目录之下；输入只有两个由服务对照自身根目录解析的 id 加一个可选显示名，因此调用方从不提供组装文本，一次复制不会授予 roster 尚未携带的任何能力。创建之后的一切都发生在 preset 自己的文件里。`copy()` 在任何内容落盘之前拒绝三种情况：
@@ -87,6 +108,7 @@ description: 仅提供持久 bash 与 str_replace_editor 的双工具编码 Agen
 
 任何读取失败都退化为「没有元信息」——缺失、格式错误、类型不对、内容为空，含义相同，选择器回退到 id。展示不是能力：名字坏掉的 preset 依然能挂载。
 
+<a id="config"></a>
 ## 配置
 
 | 字段 | 默认值 | 含义 |
@@ -121,6 +143,7 @@ agent-presets:
 
 `modeSelectionEnabled`（base 为 `true`）决定未指名的会话是否查询已保存的 `default`：为 `false` 时，每个未指名会话的有效默认值都是 `config.default`，已保存的值被搁置、待该标志恢复时再生效。名册同时报告这个答案的两半——标志本身，以及已解析好的 `isDefault`——因此没有 settings 访问权的客户端也能与有访问权的表层保持一致。无论开关如何，运行中的会话都保持其组装；该标志只是把选择从新会话表层上移除。
 
+<a id="what-a-mount-rejects"></a>
 ## 挂载会拒绝什么
 
 直接挂载的子树不会出现在 `ctx.loader.entries()` 中，因此没有任何启动审计能覆盖它。`mount()` 因此自行校验结果可用，并拒绝三种情况。
@@ -133,16 +156,20 @@ agent-presets:
 
 最后一条规则由本包的运行时不变量在每次服务通知时复查，因为从定时器或异步续体中发布的行会绕过一次性审计。
 
+<a id="a-preset-file-is-an-input-never-a-persistence-target"></a>
 ## preset 文件是输入，不是持久化目标
 
 只要 Loader 认为配置变了，它就会把树写回源文件——而一个行释放自己的 fiber 就足以让它这么认为：该 entry 被标记 `disabled`，随即触发写回。若继承该行为，一个会话的运行时状态就会被烧进所有会话共享的文件里：YAML 往返会抹掉注释，而对随附的只读 preset，`writeFile` 还会在 `setTimeout` 内抛出无人接管的 rejection。
 
 因此被挂载的子树把 `write()` 覆写为空操作。本包不写任何组装；创作组装是另一件独立且显式的操作。
 
+<a id="trust"></a>
 ## 信任
 
 preset 就是组装，因此一个 preset 的权限恰好等于它所引用的插件。`user` preset——无论由人还是由 agent 写出——与 shell 访问权限同级；`trust` 字段的存在是为了让消费方呈现这一差异，而不是用来强制隔离。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 间接地，经由 preset 常驻组装安装的插件：这些插件拥有该 preset 向加入它的 agent 呈现的每个工具 schema、提示词段落与 skill。
@@ -151,6 +178,7 @@ preset 就是组装，因此一个 preset 的权限恰好等于它所引用的�
 
 在一个 agent 的整个生命周期内保持前缀稳定：组装只装入一次，发生在 agent 发布之前、因而也在它的首个请求之前，且在 agent 运行期间不再重新读取。为新会话选择不同的 preset，只会为该会话建立不同的前缀，无法让任何已在运行的会话失去缓存复用。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **位于可写根目录之外的 preset 可被发现却无法删除** —— `remove()` 拒绝任何不在**第一个** `user` 根目录下的 preset，因此一个既配置了自有可写根、又保留 `includeUserRoot` 的部署，会列出并挂载 harness home 下的 preset，却对每次删除回答「它不在可写 preset 根目录之下」。roster 按设计只有一个可写根；只想要自有根的部署应设置 `includeUserRoot: false`。
@@ -161,3 +189,13 @@ preset 就是组装，因此一个 preset 的权限恰好等于它所引用的�
 - **健康检查已安装模块但不执行 import** —— 发现过程证明组装能以加载器方言解析、由具名行组成，并能从 harness／preset 根解析启用的包或文件说明符。会抛错或等待缺失服务的插件仍在挂载时失败，并回滚会话创建。
 - **副本是会漂移的快照** —— 升级部署不会更新随附 preset 的副本，本层也没有表达「standard 加一处改动」的 patch 语义（那是 bundle 层 `cordis.patch.yml` 的能力）；随附集合自己也接受同样的代价——`cordis` 与 `ptc` 就是 `standard` 的完整副本——换来整份组装在一个文件里可读。
 - **根目录扫描不做监听** —— 每次读取都实际访问文件系统，这让名单保持新鲜，但每次 `list()` 会对每个根目录产生一次 `readdir`。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-05-agent-teams.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-agent-teams.md
-2026-08-05-agent-teams.md: d37777a0cca467edcec5d38999aee53aaf14dc36
-2026-08-05-agent-teams.zh.md: 91571bd28aa44a21bebe1ef9cfc8434c2e8850a3
+/agent-note-durable-agent-teams-over-continuable-children:
+  en: c914d8148bfc4bf9
+  zh: a8115f87c0ac6cae
+/agent-note-durable-agent-teams-over-continuable-children/problem:
+  en: e44e7b011dcbaaee
+  zh: 5916b60412aad6c7
+/agent-note-durable-agent-teams-over-continuable-children/decision:
+  en: 1c5546c040010ce6
+  zh: d6771b3dc1953df3
+/agent-note-durable-agent-teams-over-continuable-children/provisioning-and-recovery:
+  en: 085846d0078c0898
+  zh: 40b2ca3ae6864451
+/agent-note-durable-agent-teams-over-continuable-children/mailbox-and-task-transactions:
+  en: 5b2f346c45d2cfe2
+  zh: 2ee31c4864e556d5
+/agent-note-durable-agent-teams-over-continuable-children/shared-checkout-boundary:
+  en: 3969de3b44e412c8
+  zh: 12be5854816cb808
+/agent-note-durable-agent-teams-over-continuable-children/alternatives-considered:
+  en: 82477565fc9b4b0b
+  zh: 8edfc79c85c04031
+/agent-note-durable-agent-teams-over-continuable-children/testing:
+  en: 1a9d8540b4621ab5
+  zh: 9d87ba6143bdc970
+/agent-note-durable-agent-teams-over-continuable-children/consequences:
+  en: 3f3f55af7b4367b6
+  zh: e83d3615327545d2

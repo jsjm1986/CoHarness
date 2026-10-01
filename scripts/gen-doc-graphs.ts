@@ -17,6 +17,14 @@ import {
   graphNodeId as nodeId,
   type PackageGraphNode,
 } from './package-graph.ts'
+import { rewriteTranslationLinkLocales } from './translation-links.ts'
+import {
+  generatedRegions,
+  parseTranslationPairingManifest,
+  renderGeneratedRegion,
+  spliceGeneratedRegion,
+  translationPairSourcePredicate,
+} from './translation-pairing.ts'
 import { TypeScriptProject } from './ts-project.ts'
 
 const root = resolve(import.meta.dirname, '..')
@@ -31,7 +39,7 @@ interface ServiceRole {
   key: string
   pkg: string
   title: string
-  mode: 'core' | 'seam' | 'bundle'
+  mode: 'core' | 'seam' | 'bundle' | 'service'
   implementations?: string[]
   consumers?: string[]
   companions?: string[]
@@ -330,6 +338,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     consumers: ['llm-pi-ai'],
     note: 'Flows are registered by the plugin that knows how to obtain one credential and keyed by the record they write; the seam owns the conversation and the one-attempt-per-key lifecycle, never the protocol.',
   },
+
   {
     key: 'sessionTelemetry',
     pkg: 'session-telemetry',
@@ -443,10 +452,10 @@ const SERVICE_ROLES: ServiceRole[] = [
   },
   {
     key: 'agentPresets',
-    pkg: 'agent-presets',
+    pkg: 'agent-preset-registry',
     title: 'Per-session agent composition',
     mode: 'core',
-    note: 'Discovers preset directories over trusted and user-authored roots and mounts one preset cordis.yml under an agent scope during creation, rejecting a row that never activates or that publishes into the root service realm.',
+    note: 'Eagerly mounts YAML-declared preset revisions, binds Agents and cold readers to scoped contributions, and retains retired revisions until their last user releases them.',
   },
   {
     key: 'commands',
@@ -476,7 +485,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'skill',
     title: 'Skill provider registry',
     mode: 'seam',
-    implementations: ['skill-badge', 'skill-filesystem'],
+    implementations: ['sandbox-windows-acl', 'skill-badge', 'skill-filesystem', 'skill-office'],
     consumers: ['tool-skill'],
     note: 'Merges provider skill catalogs; tool-skill renders the session-prefix catalog and loads complete skill bodies.',
   },
@@ -683,8 +692,8 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Background job registry',
     mode: 'seam',
     implementations: ['jobs-local'],
-    consumers: ['tool-bash', 'tool-terminal', 'tool-subagent', 'tool-jobs'],
-    note: 'Producers (background bash, PTY sends, and subagent delegations) register running work; tool-jobs is the model-facing controller that reads, lists, and kills it; jobs-local is the process-local registry.',
+    consumers: ['tool-bash', 'tool-pwsh', 'tool-terminal', 'tool-subagent', 'tool-jobs', 'api-job-controller'],
+    note: 'Producers (background bash/pwsh, PTY sends, and subagent delegations) register running work; record-declaring jobs additionally stream raw output for non-consuming observers; tool-jobs is the model-facing controller that reads, lists, and kills it; jobs-local is the process-local registry.',
   },
   {
     key: 'web',
@@ -854,7 +863,7 @@ function renderCapabilitySeams(pkgs: Pkg[], services: readonly ServiceEntry[]): 
   const addEdge = (from: string, to: string): void => { edges.add(`  ${from} --> ${to}`) }
   const lines = generatedHeader('Capability Seams And Core Services')
   lines.push(
-    'A service can be a core spine service, a swappable capability seam, or a bundle/composition point. The graph shows the package that owns the service declaration, known implementation packages, and packages that consume the service directly.',
+    'A service can be a core spine service, a swappable capability seam, a bundle/composition point, or a standalone service. The graph shows the package that owns the service declaration, known implementation packages, and packages that consume the service directly.',
     '',
     '```mermaid',
     'flowchart LR',
@@ -1440,13 +1449,13 @@ function renderEventRelations(pkgs: Pkg[], events: readonly EventEntry[]): strin
   lines.push(
     'This matrix shows which packages dispatch each declared event and which packages listen to it. Events are many-to-many, so the dense relation data is presented as a table rather than one large graph. Receiver and event-name types also cover contained dispatch sites that deliberately bypass `ctx.emit`, such as subagent lifecycle containment. Official `cordis/*` compatibility events may originate in loaded plugins outside this repository, so their dispatcher rows identify that external source.',
     '',
-    '| Event | Mode | Declared in | Dispatchers | Listeners |',
-    '| --- | --- | --- | --- | --- |',
   )
+  const rows = ['| Event | Mode | Declared in | Dispatchers | Listeners |', '| --- | --- | --- | --- | --- |']
   for (const event of [...events].sort((a, b) => a.name.localeCompare(b.name))) {
     const relation = relations.get(event.name) ?? { dispatchers: new Map<string, Set<string>>(), listeners: new Set<string>() }
-    lines.push(`| \`${event.name}\` | \`${event.mode}\` | ${sourceLink(event.source)} | ${relationPackages(relation.dispatchers, pkgsByShort)} | ${listenerPackages(relation.listeners, pkgsByShort)} |`)
+    rows.push(`| \`${event.name}\` | \`${event.mode}\` | ${sourceLink(event.source)} | ${relationPackages(relation.dispatchers, pkgsByShort)} | ${listenerPackages(relation.listeners, pkgsByShort)} |`)
   }
+  lines.push(renderGeneratedRegion('event-producer-consumer:events', rows.join('\n')))
   // Every declared event needs a dispatcher: zero means dead vocabulary or an
   // unrecognized semantic dispatch form. Listener-free extension points remain
   // valid. Client-declared events are exempt: the relation scan seeds the HOST
@@ -1468,12 +1477,18 @@ function renderEventRelations(pkgs: Pkg[], events: readonly EventEntry[]): strin
   const declared = new Set(events.map(event => event.name))
   const extra = [...relations.keys()].filter(event => !declared.has(event)).sort()
   if (extra.length > 0) {
-    lines.push('', '## Non-harness or undeclared event strings seen in package source', '', '| Event string | Dispatchers | Listeners |', '| --- | --- | --- |')
+    const extraRows = ['| Event string | Dispatchers | Listeners |', '| --- | --- | --- |']
     for (const event of extra) {
       const relation = relations.get(event)
       if (!relation) continue
-      lines.push(`| \`${event}\` | ${relationPackages(relation.dispatchers, pkgsByShort)} | ${listenerPackages(relation.listeners, pkgsByShort)} |`)
+      extraRows.push(`| \`${event}\` | ${relationPackages(relation.dispatchers, pkgsByShort)} | ${listenerPackages(relation.listeners, pkgsByShort)} |`)
     }
+    lines.push(
+      '',
+      '## Non-harness or undeclared event strings seen in package source',
+      '',
+      renderGeneratedRegion('event-producer-consumer:undeclared', extraRows.join('\n')),
+    )
   }
   lines.push('', ...maintenanceFooter(maintenance))
   return lines.join('\n')
@@ -1568,7 +1583,7 @@ function renderToolPipeline(): string {
   const maintenance = 'curated Mermaid flow; exact tool schemas and event signatures live in generated catalogs'
   return [
     ...generatedHeader('Tool Execution Pipeline'),
-    'This graph shows where policy, hooks, sandboxing, filesystem guards, result rewriting, final-outcome observation, and UI rendering run without changing the loop. The `tools/pre-execute` waterfall runs first, monotonic guards run next, and the `tools/execute` and `tools/post-execute` waterfalls follow; the three waterfalls may transform a call. Definition-owned `finalizeContent` and `tools/result` run afterward.',
+    'This graph shows where policy, hooks, sandboxing, filesystem guards, result rewriting, final-outcome observation, and UI rendering run without changing the loop. The `tools/pre-execute` waterfall runs first, monotonic guards run next, and the `tools/execute` and `tools/post-execute` waterfalls follow; the three waterfalls may transform a call. Definition-owned `projectContent` installs prepared content before post-execute; `finalizeContent` and `tools/result` run afterward.',
     '',
     '```mermaid',
     'flowchart TD',
@@ -1583,6 +1598,7 @@ function renderToolPipeline(): string {
     '  toolBody["Registered tool execute() body"]',
     `  fsGate["${mermaidCode('fs/write-intent')} or ${mermaidCode('fs/edit-intent')}<br/>tool-fs mutations only"]`,
     `  owned["Tool-owned session events<br/>${mermaidCode('todo/write')}, ${mermaidCode('fs/observed')}, ${mermaidCode('hook/invoked')}, ${mermaidCode('hook/result')}, ${mermaidCode('tool/ptc-dispatch')}"]`,
+    '  project["ToolDefinition.projectContent<br/>execution-prepared text and images"]',
     `  post["${mermaidCode('tools/post-execute')} waterfall<br/>accept, block, replace, add context"]`,
     '  normalized["Registry outer normalization<br/>pipeline/result snapshot throws become isError"]',
     '  finalize["ToolDefinition.finalizeContent<br/>last content-only invariant"]',
@@ -1604,13 +1620,15 @@ function renderToolPipeline(): string {
     '  approval -->|allowed-once| guards',
     '  approval -->|rejected, cancelled, unavailable| denied',
     '  approval -.->|throw| normalized',
-    '  denied --> post',
+    '  denied --> project',
     '  pre -.->|throw| normalized',
     '  toolBody --> fsGate',
     '  fsGate --> toolBody',
     '  toolBody --> owned',
     '  toolBody --> around',
-    '  around --> post',
+    '  around --> project',
+    '  project --> post',
+    '  project -.->|throw| normalized',
     '  around -.->|wrapper throws| normalized',
     '  post -.->|throw| normalized',
     '  post --> finalize',
@@ -1639,7 +1657,29 @@ function renderDocs(): GraphDoc[] {
     { rel: 'docs/tool-execution-pipeline.md', content: renderToolPipeline() },
   ]
   docs.unshift({ rel: 'docs/graph-atlas.md', content: renderIndex(docs) })
+  const events = docs.find(doc => doc.rel === 'docs/event-producer-consumer.md')
+  if (events !== undefined) docs.push(spliceChineseRegions(events))
   return docs
+}
+
+/**
+ * Splice a generated page's regions into its authored Chinese counterpart,
+ * localizing paired-document links; the surrounding Chinese prose stays authored.
+ */
+function spliceChineseRegions(doc: GraphDoc): GraphDoc {
+  const rel = doc.rel.replace(/\.md$/, '.zh.md')
+  const context = {
+    repoRoot: root,
+    sourcePath: rel,
+    isTranslationPairSource: translationPairSourcePredicate(parseTranslationPairingManifest(
+      readFileSync(resolve(root, 'scripts/translation-pairing.manifest.json'), 'utf8'),
+    )),
+  }
+  let content = readFileSync(resolve(root, rel), 'utf8')
+  for (const region of generatedRegions(doc.content)) {
+    content = spliceGeneratedRegion(content, rewriteTranslationLinkLocales(region.text, context).content)
+  }
+  return { rel, content }
 }
 
 function renderIndex(docs: GraphDoc[]): string {

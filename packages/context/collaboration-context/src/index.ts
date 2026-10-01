@@ -18,12 +18,17 @@ export const inject = ['agents']
 
 /** Package-owned source fields tying one notice to its following participant message. */
 export interface CollaborationNoticeSource {
-  readonly kind: 'plugin'
-  readonly plugin: typeof name
+  readonly kind: 'collaboration-context'
   readonly form: 'notice'
   readonly summary: string
   readonly participantMessageId: string
   readonly participant: CollaborationParticipant
+}
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'collaboration-context': CollaborationNoticeSource
+  }
 }
 
 /** Add one durable attribution notice immediately before every project participant message. */
@@ -38,8 +43,7 @@ export function apply(ctx: Context): void {
         if (participant === undefined) return [message]
         const text = renderParticipantNotice(participant)
         const source: CollaborationNoticeSource = {
-          kind: 'plugin',
-          plugin: name,
+          kind: 'collaboration-context',
           form: 'notice',
           summary: participantNoticeSummary(participant),
           participantMessageId: message.id,

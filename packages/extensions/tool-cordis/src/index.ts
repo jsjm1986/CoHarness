@@ -10,6 +10,12 @@ import {
 } from '@deepseek-ai/dsh-cordis-host-runner'
 import type { DynamicCordisReference } from '@deepseek-ai/dsh-cordis-host-runner'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'tool-cordis': { kind: 'tool-cordis' } & ContextFormed
+  }
+}
 import type { JsonValue } from '@deepseek-ai/dsh-session'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -20,7 +26,6 @@ import {
   presentInspectListCall, presentInspectQueryCall, presentInspectSelfCall,
 } from './present.ts'
 import { CORDIS_SYSTEM_PROMPT } from './prompt.ts'
-import { hostInspectProviders } from './providers.ts'
 
 export const name = 'tool-cordis'
 export const inject = ['tools', 'systemPrompt', 'dynamicCordisRunner', 'cordisInspect']
@@ -31,13 +36,12 @@ function requireAgent(exec: ToolExecution): Agent {
 }
 
 /** Register read-only Cordis tools and explicit `@pluginId` inspection context.
+ * The Host inspect providers register once per process through
+ * `@deepseek-ai/dsh-tool-cordis/host`; these tools read that shared set.
  * @param ctx - Agent-scoped registration context.
  */
 export function apply(ctx: Context): void {
   ctx.systemPrompt.section({ name: 'tool:cordis', order: ctx.systemPrompt.getSectionOrder('TOOL_CORDIS'), text: CORDIS_SYSTEM_PROMPT })
-  for (const provider of hostInspectProviders(ctx)) {
-    ctx.effect(() => ctx.cordisInspect.register(provider), `tool-cordis: inspect ${provider.manifest.id}`)
-  }
 
   ctx.tools.register(defineTool({
     name: 'cordis_inspect_list',
@@ -61,15 +65,16 @@ export function apply(ctx: Context): void {
   ctx.tools.register(defineTool({
     name: 'cordis_inspect_query',
     description:
-      'Run a read-only query explicitly declared by an Inspect Provider. platform, provider, and method must come '
-      + 'from cordis_inspect_list, and input must satisfy that method\'s schema. Use this Tool before writing plugin code '
-      + 'to read exact Service methods, Event modes, Builtin signatures, Tool schemas, theme tokens, or live Slot '
-      + 'trees and props. Host queries run locally. A Client query waits for the first valid page response and '
+      'Run a read-only query declared by an Inspect Provider. platform, provider, and method must come from '
+      + 'cordis_inspect_list, and input must satisfy that method\'s schema. Use this Tool before writing plugin code '
+      + 'to read exact Service methods, Event modes, plugin Config schemas, Tool schemas, theme tokens, or live '
+      + 'Slot trees and props. Host queries run locally. A Client query waits for the first valid page response and '
       + 'remains pending until a page answers or the Tool is cancelled. This Tool cannot invoke business Service '
       + 'methods or modify the runtime. For Service.listService and Event.listEvents, query without input to navigate '
       + 'the compact signature directory, then query the exact service or event for its structured contract and '
-      + 'referenced types. For Slots.listSubTree, query without root to navigate the compact tree, then query the '
-      + 'exact root for its complete registration contract and props.',
+      + 'referenced types. For Config.listConfigs, query without input to page the live entry directory, then '
+      + 'query the exact entry for its projected JSON Schema. For Slots.listSubTree, query without root to '
+      + 'navigate the compact tree, then query the exact root for its complete registration contract and props.',
     parameters: {
       platform: { type: 'string', required: true, enum: ['host', 'client'], description: 'Runtime platform that owns the Provider.' },
       provider: { type: 'string', required: true, description: 'Exact Provider ID returned by cordis_inspect_list.' },
@@ -159,7 +164,7 @@ export function apply(ctx: Context): void {
           type: 'text',
           text: reference === undefined ? renderUnavailableReference(id) : renderReference(reference),
         }],
-        source: { kind: 'plugin', plugin: name, form: 'instructions' },
+        source: { kind: name, form: 'instructions' },
       })
     })
     return { kind: 'enter', messages: [...decision.messages, ...contexts] }

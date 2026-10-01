@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-direct-deepseek-vision-input.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-direct-deepseek-vision-input.md
-2026-08-19-direct-deepseek-vision-input.md: e40a4947ffebcd3abf1bff1fa9762cb478a68595
-2026-08-19-direct-deepseek-vision-input.zh.md: d9182ff1e064dc17b5d8227768d7f7b4922d88e5
+/agent-note-direct-deepseek-vision-input:
+  en: 1a5a1fcdc2aec2a4
+  zh: 3211787facb11617
+/agent-note-direct-deepseek-vision-input/problem:
+  en: da52c68de516f600
+  zh: 7760c2579e3efaf1
+/agent-note-direct-deepseek-vision-input/decision:
+  en: 865aa90c30dc36a5
+  zh: 894595086ca4fc7d
+/agent-note-direct-deepseek-vision-input/alternatives-considered:
+  en: 8f281fc8d43b82c8
+  zh: 51742edc23e95555
+/agent-note-direct-deepseek-vision-input/verification:
+  en: 08e804d1343b4e6e
+  zh: b81e8cbb94038d41
+/agent-note-direct-deepseek-vision-input/consequences:
+  en: 3a47e932b648c96a
+  zh: cc0e4f43492a0045

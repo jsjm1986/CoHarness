@@ -104,4 +104,18 @@ export interface IWorkspaces {
    * @param sessionId - archived session to restore.
    */
   unarchiveSession(sessionId: SessionId): Promise<void>
+  /**
+   * Pin a session so it leads its grouping-surface section in Host pin
+   * order (most recently pinned first). The returned complete pin set
+   * re-orders every grouping surface on resolution.
+   * @param sessionId - session to pin.
+   */
+  pinSession(sessionId: SessionId): Promise<void>
+  /**
+   * Drop a session from the registry-global pin set, restoring it to the
+   * ordinary part of every grouping-surface section. Idempotent: an id
+   * that is not pinned resolves as a no-op.
+   * @param sessionId - pinned session to unpin.
+   */
+  unpinSession(sessionId: SessionId): Promise<void>
 }

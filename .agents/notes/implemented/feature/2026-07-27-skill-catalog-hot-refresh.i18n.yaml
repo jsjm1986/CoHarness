@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-skill-catalog-hot-refresh.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-skill-catalog-hot-refresh.md
-2026-07-27-skill-catalog-hot-refresh.md: fcca04e685c258eb927319c4f999160a1a0d3699
-2026-07-27-skill-catalog-hot-refresh.zh.md: a7d060a3c683dde789f07403e3f55a9f2c6643c4
+/agent-note-skill-catalog-hot-refresh:
+  en: eeb2d5e6949cb6b7
+  zh: 67621d79746ea5f3
+/agent-note-skill-catalog-hot-refresh/problem:
+  en: 130ae203aa047092
+  zh: fe9254a523a98bfd
+/agent-note-skill-catalog-hot-refresh/decision:
+  en: 0f646b14e95111e2
+  zh: 2c26fb9c94352a08
+/agent-note-skill-catalog-hot-refresh/verification:
+  en: 5e6556b68f77835b
+  zh: ff58f2f7aad404ca
+/agent-note-skill-catalog-hot-refresh/alternatives-considered:
+  en: 3f6dc920e4d1ca82
+  zh: 52be0c96fdaaa8f7
+/agent-note-skill-catalog-hot-refresh/consequences:
+  en: 0c962dcd94cb8a00
+  zh: 29b286ce55bf9ca3

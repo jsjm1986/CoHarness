@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-01-alpha23-dependency-gates.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-01-alpha23-dependency-gates.md
-2026-09-01-alpha23-dependency-gates.md: 6d58d4966f974cea0605d96472857b3521ef2c3f
-2026-09-01-alpha23-dependency-gates.zh.md: 7bcc663b5cfcf5220d1a1771e6eda4930bee7d8e
+/agent-note-dependency-ownership-and-dual-release-install-gates:
+  en: 27584ca369460dfd
+  zh: d82d2d5e36a1d0c7
+/agent-note-dependency-ownership-and-dual-release-install-gates/problem:
+  en: 3768c9824df77dc8
+  zh: f9e863c7b18f43ec
+/agent-note-dependency-ownership-and-dual-release-install-gates/decision:
+  en: b10212eae68799ad
+  zh: 5d3f8e45b8a0c1c5
+/agent-note-dependency-ownership-and-dual-release-install-gates/alternatives-considered:
+  en: 667526b4f3771e86
+  zh: 3d5fbed06aca6a61
+/agent-note-dependency-ownership-and-dual-release-install-gates/consequences:
+  en: c09f0f1629f071dc
+  zh: 90d91ffdd8896041
+/agent-note-dependency-ownership-and-dual-release-install-gates/testing:
+  en: 45cb127ceb3db5de
+  zh: b3bd1778179c614f

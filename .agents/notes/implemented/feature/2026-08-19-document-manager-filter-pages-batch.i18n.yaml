@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-document-manager-filter-pages-batch.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-document-manager-filter-pages-batch.md
-2026-08-19-document-manager-filter-pages-batch.md: 6b1740b75cd119ef097bbaaf697b8d744a219db0
-2026-08-19-document-manager-filter-pages-batch.zh.md: 3fdd33fc6f798499e586e4849e72b9dbaeed4823
+/agent-note-document-manager-filter-pages-and-batch-delete:
+  en: 1daf9a2ee968c55a
+  zh: d7443c40ee8096af
+/agent-note-document-manager-filter-pages-and-batch-delete/problem:
+  en: 89d1b3a0b3ac4f3a
+  zh: 71f7623473496b41
+/agent-note-document-manager-filter-pages-and-batch-delete/decision:
+  en: ade78beb73934a9c
+  zh: a10c5814d20146c8
+/agent-note-document-manager-filter-pages-and-batch-delete/design:
+  en: 868c4f1d462b4610
+  zh: 15136378d834e03f
+/agent-note-document-manager-filter-pages-and-batch-delete/alternatives-considered:
+  en: 50a58cfaf6f6e1fd
+  zh: 51aa4910d6d51f56
+/agent-note-document-manager-filter-pages-and-batch-delete/consequences:
+  en: f00085b3bee55d3f
+  zh: 5bd81e77d66ec1b4

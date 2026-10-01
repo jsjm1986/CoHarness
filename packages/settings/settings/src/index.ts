@@ -1094,9 +1094,12 @@ export function installSettingsSection<T>(
   entry: T,
   hooks: SettingsSectionHooks<T>,
 ): void {
-  ctx.inject(['settings'], (sctx) => {
-    sctx.settings.installSection(ctx, ns, schema, entry, hooks)
-  })
+  ctx.effect(() => {
+    const fiber = ctx.inject(['settings'], (sctx) => {
+      sctx.settings.installSection(ctx, ns, schema, entry, hooks)
+    })
+    return fiber.dispose
+  }, `settings.install(${ns})`)
 }
 
 export default SettingsProvider

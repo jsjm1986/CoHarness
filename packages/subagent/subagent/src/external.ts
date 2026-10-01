@@ -16,7 +16,7 @@
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { dirname } from 'node:path'
-import type { Message, MessageId, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
+import type { MessageId, RequestMessage, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 
 /**
@@ -290,7 +290,7 @@ export class ExternalBindingStore {
  * @returns the window to send, or `undefined` when nothing is unconsumed.
  */
 export function externalPromptWindow(
-  messages: readonly Message[],
+  messages: readonly RequestMessage[],
   consumedMessageId: MessageId | undefined,
 ): ExternalPromptWindow | undefined {
   let floor = 0
@@ -333,7 +333,7 @@ export function externalPromptWindow(
  * @returns raw chunks for the adapter's `stream`.
  */
 export async function* externalMemberTurn(
-  options: { readonly sessionId?: SessionId; readonly messages: readonly Message[]; readonly signal?: AbortSignal },
+  options: { readonly sessionId?: SessionId; readonly messages: readonly RequestMessage[]; readonly signal?: AbortSignal },
   store: ExternalBindingStore,
   transport: ExternalMemberTransport,
 ): AsyncIterable<StreamChunk> {

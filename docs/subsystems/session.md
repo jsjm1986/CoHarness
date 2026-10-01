@@ -11,8 +11,8 @@ Source: [`packages/core/session/src/types.ts`](../../packages/core/session/src/t
 The append-only event types. Merge-extensible: a plugin declares extra event types via declaration merging — e.g. the [compaction seam](compaction.md) adds `compaction/start` / `compaction/summary` / `compaction/end`, and `@deepseek-ai/dsh-hook-protocol` adds log-only `hook/invoked` / `hook/result` records for a hook bridge. Like `compaction/*`, these are NOT `SurfaceEventType`s (no `surfaceOp`). The generated [persistence log event catalog](../persistence-catalog.md) enumerates every member — core and merged — with its payload, surface badge, and declaration site.
 
 ```ts type-equiv
-/** A user-role specialization of the one shared message representation. */
-interface UserMessage extends Message {
+/** A user-role specialization of the shared message representation. */
+interface UserMessage extends MessageBase {
   readonly role: 'user'
 }
 ```
@@ -53,7 +53,27 @@ interface SessionEventMap {
    * project their `content` verbatim; `source` tells them apart.
    */
   'user/message': UserMessage
-  /** Rendered system prompt on the model-visible surface. */
+  /** An incremental agent session change admitted at the named turn and step. */
+  'developer/message': {
+    turn: number
+    step: number
+    message: DeveloperMessage
+    /** Earlier request/header defining every tool addition; required exactly when additions are present. */
+    headerSeq?: SessionSeq
+  }
+  /**
+   * The rendered system prompt on the model-visible surface. The loop appends
+   * the first one as surface node 0 before the step's first `user/message`.
+   * A prepared in-history route can append nonempty changes in a continuing
+   * series. An incapable route or new series normalizes text to the first system
+   * node. Normalization empties nonempty later nodes, then rewrites the head if
+   * needed, through logged per-node replacements. An empty rendering always
+   * clears all active system nodes, leaving no older instructions model-visible.
+   * Empty later nodes are dormant and project to no message; an empty head with
+   * no active later node records "no system prompt". Restored nonempty text follows
+   * the same route and series rule; empty nodes never restore older text.
+   */
+
   'system/message': { turn: number; step: number; message: SystemMessage }
   /**
    * Assembled assistant message for one step (derived history uses this).
@@ -101,7 +121,7 @@ interface SessionEventMap {
     message: ToolResultMessage
     /**
      * Optional failure identity and raw user-facing reason, outside model content;
-     * allowed only when the tool-result block has `isError: true`.
+     * allowed only when the message has `isError: true`.
      */
     error?: { name: string; code: string; reason?: string }
     meta?: JsonValue
@@ -115,7 +135,7 @@ interface SessionEventMap {
   'request/header': {
     header: EpochHeader
     reason: RequestHeaderReason
-    /** A changed header also begins a distinct model-message series. */
+    /** This request begins a distinct model-message series, independently of the header reason. */
     startsSeries?: true
   }
   /**
@@ -124,19 +144,23 @@ interface SessionEventMap {
    */
   'request/context': RequestContext
   /**
-   * Marks the end of a constructor seed. Events before it have smaller seq
-   * values and came from the seed (resume, fork, or replay); this lifecycle
-   * produced none of them. This log-only event is the durable projection of
-   * {@link Session.firstLiveSeq}. Its payload is empty — position and `time`
-   * carry the meaning.
+   * Separates inherited or restored history from later lifecycle-owned work.
+   * This log-only marker need not be at {@link Session.firstLiveSeq}: a fork
+   * seed can already contain its tagged marker and child-owned synthetic
+   * closers before construction.
+
    *
-   * Locate the LAST one in stored history. A seed already ending in one is not
-   * re-marked, so reopening an untouched session does not grow its log per
-   * pickup and the event need not be at the current `firstLiveSeq`.
+   * A fresh fork child owns one `{ inherited: true }` marker at its exact
+   * inherited-prefix cut, even when that prefix ends in an ancestor marker.
+   * `buildForkSeed` appends that marker before any synthetic closers; the
+   * `Session` constructor supplies it when given only the inherited prefix.
+   * The last tagged marker is the current Session's cut; untagged markers
+   * keep ordinary restore and replay lifecycle boundaries.
+
    *
-   * `Session`'s constructor is the only legitimate writer. The invariant
-   * companion deliberately constrains nothing here, so a plugin appending one
-   * would silently classify every live bracket before it as seed history.
+   * Only the `Session` constructor and `buildForkSeed` may create this marker.
+   * The invariant companion deliberately constrains nothing here, so a plugin
+   * appending one would silently classify every live bracket before it as seed history.
    *
    * An owner of a standalone open/close bracket (`compaction/start` …
    * `compaction/end`) reads it because seed history and live work are otherwise
@@ -194,6 +218,10 @@ interface EpochHeader {
   adapterDefaults?: LlmCallConfigAdapterDefaults
   /** Assembled tool schemas; absent for a tool-less request. */
   tools?: ToolSchema[]
+  /** Retired request text; system prompts belong to system/message events.
+   * @persistenceReserved
+   */
+  system?: never
 }
 ```
 
@@ -301,6 +329,7 @@ The four message-producing types (`SurfaceEventType` — `system/message`, `user
  */
 type SurfaceEventType =
   | 'system/message'
+  | 'developer/message'
   | 'user/message'
   | 'assistant/message'
   | 'tool/result'
@@ -463,28 +492,27 @@ declare class Session {
   /** The session identity, derived from its durable header's single copy. */
   get id(): SessionId;
   /**
-     * The first seq appended IN THIS PROCESS: the length of the constructor
-     * seed (0 without one). Events with smaller seq values entered through
-     * construction — replay, fork, or resume — and were never published on the
-     * `session/event` firehose (constructor seeds do not emit), so consumers
-     * that replay the log as a publication substitute (telemetry adoption)
-     * start here. Distinct from {@link inheritedEventCount}, the DURABLE
-     * fork-lineage cut: a resumed session's constructor seed is its full stored
-     * log, while the inherited count keeps the original fork value — this field is the
-     * in-process construction fact.
+     * The constructor seed length (0 without one), before any marker appended
+     * during construction. Seed events never publish on `session/event`; a
+     * marker appended before the store attaches occupies this seq without
+     * publishing either, so consumers that replay the log as a publication
+     * substitute (telemetry adoption) start here. Otherwise this seq is
+     * available for the next append.
      *
-     * Not persisted itself: a seeded session projects it into the log as the
-     * `session/end-seed` event, which is what a consumer reading STORED history
-     * reads. Locate the LAST such event, not necessarily one at this seq — a
-     * seed already ending in one is not re-marked, so reopening an untouched
-     * session leaves that event at a smaller seq than `firstLiveSeq`. Prefer
-     * this field in-process: it is exact before the marker reaches storage.
-     *
-     * When this lifecycle appends the marker, it occupies this seq before the
-     * store attaches and therefore does not publish either. Otherwise this seq
-     * holds an ordinary published write.
+     * This in-process offset is not persisted. A fork seed can already contain
+     * the child's inherited marker and synthetic closers, so its child-owned
+     * history starts at {@link inheritedEventCount}, before this offset. A
+     * resumed Session's seed contains its full stored log, while its inherited
+     * count keeps the durable fork cut. Consumers needing complete canonical
+     * history start at seq 0.
      */
   readonly firstLiveSeq: SessionLogOffset;
+  /**
+     * First event produced for this object lifecycle. A new fork includes its
+     * child-owned seed marker and closers; a restored Session starts after its
+     * complete stored prefix. This in-process capture offset is not persisted.
+     */
+  readonly firstLifecycleSeq: SessionLogOffset;
   /**
      * Create a detached session by validating and snapshotting borrowed seed
      * events and storage metadata.
@@ -630,6 +658,12 @@ declare class Session {
      */
   requestContext(): RequestContext | undefined;
   /**
+     * Fold unseen committed events into capability-independent tool history.
+     * Initial access reconstructs inherited history; later reads consume only new events.
+     * @returns an immutable snapshot for LLM request projection, including historical addition definitions.
+     */
+  toolHistory(): ToolHistory;
+  /**
      * Derive the LLM message history by walking the ordered sequences of
      * message-producing events maintained by `surfaceOp` markers. The
      * surface is the single source of derived history: every message-producing
@@ -709,6 +743,13 @@ interface TurnEndReasonMap {
    * emits this marker, and the events recorded before the crash remain intact.
    */
   interrupted: { kind: 'interrupted' }
+  /**
+   * Fork-seed construction closed a turn that was still open at the fork
+   * boundary in the source session. Only fork seeds carry this marker — the
+   * loop never emits it — and the source events before the boundary remain
+   * intact in the child.
+   */
+  forked: { kind: 'forked' }
 }
 ```
 
@@ -878,10 +919,12 @@ get(id: SessionId): Session | undefined
 list(): Session[]
 
 /**
- * Create a live child session from a stable prefix of a live source.
+ * Create a live child session from an exact prefix of a live source.
  * `boundary` is an inclusive source event seq; omitted means the source's
- * current last event. The selected slice may end with a between-turn event
- * but must not end inside an open turn.
+ * current last event. An open tail receives synthetic tool results and
+ * step/turn closers with the forked cause. Closed steps and turns remain
+ * unchanged, including any failed tool calls already missing results.
+ * `inheritedEventCount` counts only copied source events, excluding these closers.
  *
  * @param source - Live source session object or id.
  * @param boundary - Inclusive source event seq to fork through; omitted means

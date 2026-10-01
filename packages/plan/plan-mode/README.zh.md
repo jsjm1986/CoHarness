@@ -124,7 +124,6 @@ agent 完成计划后，会以 markdown 形式、从标题开头书写计划并�
 
 -----
 
-<a id="model-experience"></a>
 ## 模型体验
 
 ### Plan 策略系统提示词
@@ -175,6 +174,7 @@ You are in plan mode. Explore and design before presenting the complete plan thr
 
 模式转换不改变工具目录；plan 参数与评审结果按常规方式扩展对话。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -201,3 +201,5 @@ You are in plan mode. Explore and design before presenting the complete plan thr
 设计说明拒绝了通用命名模式注册表，因为产品只交付了 `plan`；未来的协作状态只应在出现两个具体用例后建立共享 seam，任何抽取都必须保持 `plan/mode` 的仅记日志折叠、边界追加与经评审的退出不变。
 
 </details>
+
+<a id="model-experience"></a>

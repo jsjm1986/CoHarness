@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-02-fs-per-session-cwd.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-02-fs-per-session-cwd.md
-2026-07-02-fs-per-session-cwd.md: 23c9f414590df8c79109e46f24af031b765b8f58
-2026-07-02-fs-per-session-cwd.zh.md: 6a8ffb357d43bdd61c09a2766e9977d4ad33b128
+/agent-note-resolve-filesystem-paths-against-the-caller-s-session-cwd:
+  en: 5569aa7c1a739a51
+  zh: fad6a6183599e445
+/agent-note-resolve-filesystem-paths-against-the-caller-s-session-cwd/problem:
+  en: 3b75b024637cc89b
+  zh: 249455e5387e0d0d
+/agent-note-resolve-filesystem-paths-against-the-caller-s-session-cwd/decision:
+  en: 74ceba22f169ed8b
+  zh: 57275479ae90fbfe
+/agent-note-resolve-filesystem-paths-against-the-caller-s-session-cwd/alternatives-considered:
+  en: 6119e2aff3b6be5a
+  zh: 76136ef5249c23eb
+/agent-note-resolve-filesystem-paths-against-the-caller-s-session-cwd/alternatives-considered/why-the-caller-supplies-the-cwd-not-the-provider:
+  en: 5da48db29532205f
+  zh: 02b2b72addc4d6bd
+/agent-note-resolve-filesystem-paths-against-the-caller-s-session-cwd/consequences:
+  en: 776564452aa7193e
+  zh: 2c56ea6ab0554ab7

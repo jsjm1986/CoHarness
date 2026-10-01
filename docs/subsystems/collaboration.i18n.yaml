@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for collaboration.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/collaboration.md
-collaboration.md: 54fa2368b3bf1a0728df44fe94202f786c57bb9c
-collaboration.zh.md: 2166feb8b8f6edb21a0050c30daeaf6845b7a7fd
+/project-collaboration:
+  en: 4d3acd672679a1d4
+  zh: 25864f324572c4e1
+/project-collaboration/runtime-identity:
+  en: ef0667134d842acb
+  zh: bc54d466476d63fe
+/project-collaboration/private-runtime-channel:
+  en: 543110a65c55b59e
+  zh: d1269f25ec085ff4
+/project-collaboration/root-conversation-acl:
+  en: 807b12b75bb64cc4
+  zh: 7516997efdac34c3
+/project-collaboration/captured-authority:
+  en: a999b432eb85096f
+  zh: f801344ca4ab61fa
+/project-collaboration/execution-participants:
+  en: bdf8c2b5296d409e
+  zh: 1f3e5d0a3bfa8b01

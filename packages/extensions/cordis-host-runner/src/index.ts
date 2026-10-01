@@ -15,6 +15,11 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { JsonValue } from '@deepseek-ai/dsh-session/types'
 import { TypertLookupFailure, TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import { authorizeDynamicHostExecution } from './authorization.ts'
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'cordis-host-runner': { kind: 'cordis-host-runner' }
+  }
+}
 import { isPlugin, normalizeHandler } from './guard.ts'
 import { CordisInspectRegistryService } from './inspect-registry.ts'
 import { missingServices, startHostHalf } from './lifecycle.ts'
@@ -1329,7 +1334,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     }
     agent.steer(createUserMessage({
       content: [{ type: 'text', text }],
-      source: { kind: 'plugin', plugin: 'cordis-host-runner' },
+      source: { kind: 'cordis-host-runner' },
     }))
   }
 
@@ -1349,7 +1354,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
           + `entryAbdicated: ${failure.abdicated}\n`
           + 'Use cordis_inspect_self to read this Package and explain the Client failure. Runtime changes require an authorized programmatic or user action.',
       }],
-      source: { kind: 'plugin', plugin: 'cordis-host-runner' },
+      source: { kind: 'cordis-host-runner' },
     }))
   }
 
@@ -1374,7 +1379,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
           + 'Runtime changes require an authorized programmatic or user action. If the handler needs a Service, either declare '
           + 'that Service in the returned Plugin inject list or read it with ctx.get(name) and handle undefined.',
       }],
-      source: { kind: 'plugin', plugin: 'cordis-host-runner' },
+      source: { kind: 'cordis-host-runner' },
     }))
   }
 
@@ -1398,7 +1403,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
           + 'The Plugin remains running. Use cordis_inspect_self to read this Package and explain the rejected operation. '
           + 'Runtime changes require an authorized programmatic or user action.',
       }],
-      source: { kind: 'plugin', plugin: 'cordis-host-runner' },
+      source: { kind: 'cordis-host-runner' },
     }))
   }
   /* jscpd:ignore-end */
@@ -1438,7 +1443,7 @@ export class DynamicCordisRunnerService extends TypertRemoteService {
     if (agents?.get(agent.id) !== agent) return
     agent.inject(createUserMessage({
       content: [{ type: 'text', text }],
-      source: { kind: 'plugin', plugin: 'cordis-host-runner' },
+      source: { kind: 'cordis-host-runner' },
     }))
   }
 

@@ -33,8 +33,8 @@ export { conversationContextKey } from './contract/conversation.ts'
 export type {
   AssistantLiveChunkEvent,
   ChatConversationViewNode, ConversationContextReader, ConversationEventInput,
-  ConversationLocationData, ConversationLocationDataScope, ConversationLocationDataStore,
-  ConversationStepDataMap,
+  ConversationLocationData, ConversationLocationDataScope, ConversationLocationDataSource,
+  ConversationLocationDataStore, ConversationStepDataMap,
   ConversationLocation, ConversationMatch, ConversationMatchResult,
   ConversationNodeContext, ConversationNodeDefinition, ConversationPreviousContext,
   ConversationPublication, ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewBuilder,
@@ -103,7 +103,8 @@ export type {
   SessionBinding, SessionListState, SessionProvideContribution, SessionProvideDescriptor, SessionSummary,
 } from './sessions/service.ts'
 export type { SessionListPhase, SessionSearchResultItem, SubagentCatalogSnapshot } from './sessions/manager.ts'
-export type { SubagentAddress, JobView } from '@deepseek-ai/dsh-client-connection/client'
+export type { SubagentAddress, JobView, JobOutputChunk, JobOutputCoords, JobOutputValue } from '@deepseek-ai/dsh-client-connection/client'
+export type { ObservedJob } from './sessions/manager.ts'
 export type { WorkspaceListPhase } from './workspaces/manager.ts'
 export type { WorkspaceListState } from './workspaces/service.ts'
 export type {
@@ -129,7 +130,7 @@ export type {
   ContextMessageNode, ConversationNode, ConversationSnapshot, HistoryDetailState, HistoryNavigationItem, HistoryNavigationSnapshot,
   HistoryNavigationState, HistoryWindowMode,
   ModelRetryNode, PendingSubmission, PendingSubmissionImage, PendingSubmissionPlacement, QueuedMessage,
-  LegacyConversationSlice, PartialAssistant, RunningToolCall,
+  LegacyConversationSlice, PartialAssistant, PreparingToolCall, RunningToolCall, StartedToolCall,
   SteeringMessageNode, TodoItem, ToolCallBlock, ToolResultNode, TurnErrorNode, TurnMaxTokensNode,
   UnknownSurfaceNode, UserMessageNode,
 } from './sessions/conversation.ts'

@@ -1,3 +1,8 @@
+---
+description: "In-process fork subagent backend: runs a child agent seeded with a prefix of the parent's log"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-subagent-fork-in-process
 
 English | [中文](README.zh.md)
@@ -8,6 +13,19 @@ The fork provider creates an in-process child seeded with the parent's completed
 
 `dsh-subagent-fork-in-process` is an in-process subagent backend that seeds each child with the parent's completed conversation turns: the child sees every finished turn and none of the in-flight one, so follow-up work builds on the conversation without duplicating it. A delegation tool reaches it under the `fork` provider name, and its behavior matches the spawn backend except for the session seed. Choose it when a subtask continues this conversation; choose spawn when the child must stand alone. The seed is a one-time snapshot taken at fork time: later parent turns never reach the child.
 
+## Table of Contents
+
+- [Seed boundary](#seed-boundary)
+- [Start and capabilities](#start-and-capabilities)
+- [Config](#config)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="seed-boundary"></a>
 ## Seed boundary
 
 The parent's current tool-calling turn is still open when a subagent starts: its log contains the assistant tool call but not the matching tool result or `turn/end`. Copying that raw log would give the child an invalid, unbalanced session.
@@ -16,12 +34,14 @@ Fork therefore computes the contiguous prefix ending at the last `turn/end`. The
 
 The seed transfers conversation history only. The child still receives a fresh flat registration scope; it does not inherit the parent's tool restrictions or authority.
 
+<a id="start-and-capabilities"></a>
 ## Start and capabilities
 
 `start(request)` passes the completed-turn seed to [`startInProcessRun`](../subagent-in-process-driver/README.md) and awaits child publication. The shared driver owns cancellation, depth, customization, result reading, and disposal.
 
 Fork advertises `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: true }`, identical to spawn.
 
+<a id="config"></a>
 ## Config
 
 | Key | Meaning |
@@ -29,10 +49,12 @@ Fork advertises `{ outputSchema: true, depthLimit: true, toolFilter: true, perso
 | `providerName` | Registry name on `ctx.subagents` (default `fork`). |
 See [`dsh-subagent-spawn-in-process`](../subagent-spawn-in-process/README.md) for the run lifecycle, model inheritance, and depth tracking — all shared.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. All run mechanics live in the shared in-process driver; the provider contributes only the seeded-session fork entry.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Child-agent history and envelope
@@ -67,3 +89,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 - **The seed is a one-time snapshot** — the child sees the parent's completed turns as of the fork and nothing the parent logs afterwards; there is no live context sharing.
 - **Fork lifecycle policy differs by composition** — the base bundle and the ACP/headless examples bind the fork delegation tool to `backgroundMode: one-shot`, while the Web app agent presets (`ptc`, `cordis`, `standard`) select `continuable`. Both keep the inherited prefix eligible for reuse because parent and child messaging definitions match byte for byte; explicit persona, tool filtering, generated-SDK, or route changes can still break equality. Rationale: [the cache-preserving fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md).
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

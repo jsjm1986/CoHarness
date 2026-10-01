@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-skill
 
 [English](README.md) | 中文
@@ -12,6 +17,20 @@
 
 使用本包可让 agent（智能体）和用户通过一个目录访问从本地目录、嵌入式插件数据或远程服务收集的可复用任务专项指令。它会以可预测的方式裁决重名项、验证条目、在来源不可用时保留可用结果，并按需加载所选 skill 的完整指令。当组合需要多个来源或非文件系统来源的 skill 时，请挂载本包；本包自身不含 skill 内容，因此本地发现需搭配 `dsh-skill-filesystem`，模型访问需搭配 `dsh-tool-skill`。
 
+## 目录
+
+- [服务：`SkillRegistry`（ctx 键：`skills`）](#service-skillregistry-ctx-key-skills)
+- [提供方约定](#provider-contract)
+- [运行时 skill](#runtime-skills)
+- [消费方边界](#consumer-boundary)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="service-skillregistry-ctx-key-skills"></a>
 ## 服务：`SkillRegistry`（ctx 键：`skills`）
 
 ### 公开 API
@@ -49,6 +68,7 @@
 
 `isModelInvocable(skill)` 和 `isUserInvocable(skill)` 分别直接读取对应的正向字段。`ctx.skills.get()` 仍是受信且与策略无关的加载原语，因此每个面向用户或模型的消费方都必须先执行与自身接口匹配的判定，再暴露或加载 skill。
 
+<a id="provider-contract"></a>
 ## 提供方约定
 
 提供方工厂同步运行，并接收一项注册作用域内的控制能力。注册失败或释放时，`control.signal` 会中止；仅当该精确注册仍处于活动状态时，`control.invalidate()` 才会清除已完成目录，因此延迟回调无法影响同名替代项。不可变提供方可以忽略该控制能力。远程设置、身份验证和发现应在提供方的 `list(options)` 调用中完成，该调用会被等待。返回数组是完整发现的简写形式；若提供方已收集到可用候选项，却无法建立权威观测，则返回 `{ candidates, complete: false }`。提供方对象、查找选项、候选项和定义都以只读方式借用，而不是克隆或重新绑定。提供方应遵守 `options.signal`；取消后，注册表也会停止等待不协作的发现或加载。
@@ -59,18 +79,23 @@
 
 定义仍采用渐进式加载。`get()` 每次调用都会向胜出提供方请求正文，而不是在此注册表中缓存正文。若返回定义的名称不同于所选候选项，系统会拒绝该陈旧选择，并由注册表在内部使该精确提供方失效，以便下一次快照重新发现其目录。
 
+<a id="runtime-skills"></a>
 ## 运行时 skill
 
 `ctx.skills.register(...)` 是嵌入式运行时 skill 的便利接口。运行时 skill 使用 rank `250`：项目提供方可覆盖它们，它们则覆盖已发布本地提供方的自定义根目录和用户根目录。运行时定义和嵌套资源元数据均以只读方式借用；服务只物化一个顶层定义，以补入省略的调用策略和 `provider` 默认值。运行时贡献内的注册使用先到先得，因此重复贡献无法通过其 disposer 移除当前生效的贡献。
 
+<a id="consumer-boundary"></a>
 ## 消费方边界
 
 注册表不渲染模型指引，也不注册面向模型的工具。[`@deepseek-ai/dsh-tool-skill`](../tool-skill) 消费 `ctx.skills` 以提供持久会话目录和 `skill` 工具，因此提供方仍与模型接口独立。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。注册表是提供方注册之上带 effect 作用域释放的贡献表；它不拥有 skill 内容。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 通过 `dsh-tool-skill` 间接影响模型；该包将提供方摘要渲染到持久的初始目录或替换目录消息中，并将加载的指令正文渲染到已保留的工具结果中。
@@ -79,9 +104,20 @@
 
 不直接影响提示词。指定的消费方负责持久初始目录，以及失效后的仅追加式目录替换。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **失效由提供方驱动**：注册表没有 TTL，无法推断任意远程来源是否已发生变化；每个可变提供方都必须保留其注册作用域内的 `invalidate()` 能力，并由自身的观测机制调用它。
 - **提供方依次查询**：一个响应取消但速度缓慢的提供方会延迟之后注册的所有提供方；取消会停止调用方等待，但无法终止不响应取消的提供方持续运行的工作。
 - **不保留不完整观测**：被拒绝的提供方会被省略，显式提供的候选项也仅在当前查找中可用；注册表既不负责上一份可用目录，也不负责逐提供方诊断。
 - **重名项的裁决采用先到先得**：系统会记录并隐藏层内较晚出现的低优先级候选项，较近的层会静默遮蔽较远的层；不提供检查全部被遮蔽定义的 API。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

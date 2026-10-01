@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-feedback-command.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-28-feedback-command.md
-2026-07-28-feedback-command.md: 386992d99886c2e22f8a458bcd9e1a2319b1a9bb
-2026-07-28-feedback-command.zh.md: e2543d80813f8c7dea71bac0826b363f7faa0b53
+/agent-note-feedback-command:
+  en: 151544a6d2afe2e3
+  zh: c3acf2fdf5ae5d92
+/agent-note-feedback-command/problem:
+  en: 24fe4124ead4a264
+  zh: ba4b10c0df37a2e3
+/agent-note-feedback-command/decision:
+  en: c14f242ae2370b8e
+  zh: d4079e7e04b7a28f
+/agent-note-feedback-command/decision/why-feedback-owns-an-event:
+  en: f5946d2f1da6fc5e
+  zh: 93c4841d4cfde550
+/agent-note-feedback-command/decision/why-the-model-never-sees-it:
+  en: 4b29c65ce2d78961
+  zh: 0d4aeff1a930884b
+/agent-note-feedback-command/decision/verbatim-text:
+  en: 53051bb28485f0d0
+  zh: 5b139c0e731da106
+/agent-note-feedback-command/decision/a-new-group:
+  en: 11bcdadd54d37cf8
+  zh: c02fcd4844755f09
+/agent-note-feedback-command/alternatives-considered:
+  en: 95a35ce9cf22ae6d
+  zh: 1978218707724e2f
+/agent-note-feedback-command/consequences:
+  en: 05fcc1ed2a938e5e
+  zh: fe554958d93cc159

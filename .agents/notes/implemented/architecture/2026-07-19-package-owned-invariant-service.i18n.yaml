@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-19-package-owned-invariant-service.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-19-package-owned-invariant-service.md
-2026-07-19-package-owned-invariant-service.md: f1918ec1d31f9d91538b6b92070d98217567c5c5
-2026-07-19-package-owned-invariant-service.zh.md: 81e8e0361e2ebe4d34dae1c064f928fb57c49b8a
+/agent-note-package-owned-invariant-service-contract:
+  en: 0a37654b8cc4e4eb
+  zh: 62ba34df507c2429
+/agent-note-package-owned-invariant-service-contract/problem:
+  en: 27762a54ba09ac75
+  zh: 9ccc4a3770730949
+/agent-note-package-owned-invariant-service-contract/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-package-owned-invariant-service-contract/decision/one-registry-service-package-owned-contributions:
+  en: bc819baf46ac5e6c
+  zh: c5758d901d981c18
+/agent-note-package-owned-invariant-service-contract/decision/configuration-and-selection:
+  en: 3783a62babf739be
+  zh: ad1780fece28a9b3
+/agent-note-package-owned-invariant-service-contract/decision/registration-and-failure-ownership:
+  en: e6472f04c83c2d14
+  zh: fcc76d9b17d011c4
+/agent-note-package-owned-invariant-service-contract/decision/initial-stateful-companions-and-exhaustive-ownership:
+  en: 3702fac909b493c2
+  zh: 687ae3ac4b6a157d
+/agent-note-package-owned-invariant-service-contract/decision/scoped-event-semantic-map:
+  en: 6996c68a8192dd36
+  zh: 3b93da5dbda1330f
+/agent-note-package-owned-invariant-service-contract/decision/example-composition-and-sdk-output:
+  en: fda0b980a100f65d
+  zh: d8368534a1e56ff5
+/agent-note-package-owned-invariant-service-contract/testing:
+  en: 58ecc8de8ef37a60
+  zh: db6b7d6eb374f068
+/agent-note-package-owned-invariant-service-contract/alternatives-considered:
+  en: 9594b030d883f1b9
+  zh: 31acfdd564a9b998
+/agent-note-package-owned-invariant-service-contract/consequences:
+  en: 93b2d859580632aa
+  zh: e1cb9fdb54b35165

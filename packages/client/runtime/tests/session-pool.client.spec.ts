@@ -271,20 +271,20 @@ describe('SessionRuntimePool Workspace resources', () => {
     const request = { runtimeTarget: target, sessionId, path: 'a.txt', address: workspaceResourceAddress(sessionId, 'a.txt') }
     const release = registry.pin(request)
     const source = registry.source(request)
-    await vi.waitFor(() => { expect(source.get().status).toBe('live') })
+    await vi.waitFor(() => { expect(source.getSnapshot().status).toBe('live') })
 
     sinks.onHostEnvelope?.({ rpcId: 'frame-1' as never, payload: { type: 'host/workspace-file-changed', sessionId, path: 'a.txt', present: true, version: 'v9' } })
-    expect(source.get()).toMatchObject({ value: { changed: true } })
+    expect(source.getSnapshot()).toMatchObject({ value: { changed: true } })
 
     sinks.onStateChange?.('reconnecting')
-    expect(source.get().status).toBe('failed')
+    expect(source.getSnapshot().status).toBe('failed')
 
     sinks.onConnected?.(description())
-    await vi.waitFor(() => { expect(source.get()).toMatchObject({ status: 'live' }) })
+    await vi.waitFor(() => { expect(source.getSnapshot()).toMatchObject({ status: 'live' }) })
 
     sinks.onFailure?.({ kind: 'rpc', error: { code: 'collaboration-forbidden', message: 'denied', details: { sessionId, action: 'read', reason: 'not-member' } } })
-    expect(source.get()).toMatchObject({ status: 'failed', error: { code: 'access-revoked' } })
-    expect(source.get().value).toBeUndefined()
+    expect(source.getSnapshot()).toMatchObject({ status: 'failed', error: { code: 'access-revoked' } })
+    expect(source.getSnapshot().value).toBeUndefined()
     release()
   })
 

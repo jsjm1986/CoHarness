@@ -1,3 +1,8 @@
+---
+description: "Wire consumer layer: HTTP-up/WebSocket-down client, ConnectionController dual streams with reconnect, and fixture api"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-connection
 
 English | [中文](README.zh.md)
@@ -12,6 +17,19 @@ The client handle also exposes an observable connection state and an immediate `
 
 The package carries browser-to-Host Remote calls, exact Fetch responses, and connection generations. The Client plugin mounts `ctx.connection` with current-page loopback state, generic RPC, the active generation and its Host facts, observable recovery state, an immediate reconnect command, and the registration point for one generation source. A generation becomes visible when its source reports ready; source completion, failure, withdrawal, or an explicit stop clears it before `ConnectionController` applies its retry policy.
 
+## Table of Contents
+
+- [Host configuration](#host-configuration)
+- [/api browser-trust fence](#api-browser-trust-fence)
+- [`/api` WebSocket downlinks](#api-websocket-downlinks)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="host-configuration"></a>
 ## Host configuration
 
 `historyPageTargetBytes` accepts a positive integer and sets the target size of each complete uncompressed history RPC `server-response` JSON body in UTF-8 bytes. It defaults to 131072 bytes. Because pagination preserves complete append-origin message groups, one indivisible group may exceed the target. Fetch history responses still pack remaining `assistant/chunk` runs and round-trip optional `omittedSpans` from `detail: 'conversation'`; the [two-tier conversation history decision](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md) owns the download gears.
@@ -20,10 +38,12 @@ The shared unary carrier reads successful JSON responses through a 16 MiB byte b
 
 The browser connection also exposes optional Gateway transports for account preferences and project-owned model settings. Account preference requests are same-origin, revision-fenced, and value-safe; they cover locale, theme, busy-Enter, transcript width, and transcript font size. Project model requests cover the project Provider descriptor, encrypted-credential state, endpoint discovery, and mutation responses without putting a key value in a response. A host that does not provide these routes leaves the transports absent, so callers show an explicit unavailable state instead of falling back to another account's settings.
 
+<a id="api-browser-trust-fence"></a>
 ## /api browser-trust fence
 
-The node half guards every entry under `/api` before bridging or upgrading (`src/api-request-trust.ts`). Every request — browser-marked or not — must present a `Host` that is a loopback authority or matches a `trustedHosts` entry: exact on `host:port` entries, any port on port-less entries, both sides compared through WHATWG normalization (DNS-rebinding defense). There is deliberately no shortcut for unmarked HTTP requests: over plain HTTP a browser attaches neither `Origin` nor Fetch-Metadata to image and navigation reads, so an unmarked request may still be a rebound browser read with a readable response, and Host is the one header rebinding cannot forge; a browser WebSocket handshake carries `Origin` and passes the same comparison. Non-browser clients pass the same fence via loopback, deployment-derived LAN IP literals, or a declared authority. When markers are present, an attached `Origin` must equal the Host authority, and an explicit `sec-fetch-site: cross-site` marker is refused. A `trustedHosts` entry that is not a bare, canonical `host[:port]` authority — one WHATWG parsing reads back exactly as written — fails the plugin load loudly: parsing would otherwise quietly authorize the hostname inside `harness.internal/path`, or broaden a dangling-colon or zero-padded port to an any-port grant. HTTP failures answer plain 403 before any RPC dispatch; upgrade failures reject the handshake before any event stream starts. Non-loopback compositions must trust their serving authorities explicitly: the Web runtime derives LAN IP literals from an all-interfaces server config, while `trustedHosts` in cordis.yml and the CLI's `--trusted-host` flag declare named authorities. `dsh web --host 0.0.0.0` is intentionally unsupported until remote access has an authentication layer. The fence is a reachability policy, not authentication; the Web carrier provides no authentication layer. Decision record: [the api browser-trust boundary Agent Note](../../../.agents/notes/implemented/architecture/2026-07-28-api-browser-trust-boundary.md).
+The node half guards every entry under `/api` before bridging or upgrading (`src/api-request-trust.ts`). Every request — browser-marked or not — must present a `Host` that is a loopback authority or matches a `trustedHosts` entry: exact on `host:port` entries, any port on port-less entries, both sides compared through WHATWG normalization (DNS-rebinding defense). There is deliberately no shortcut for unmarked HTTP requests: over plain HTTP a browser attaches neither `Origin` nor Fetch-Metadata to image and navigation reads, so an unmarked request may still be a rebound browser read with a readable response, and Host is the one header rebinding cannot forge; a browser WebSocket handshake carries `Origin` and passes the same comparison. Non-browser clients pass the same fence via loopback, deployment-derived LAN IP literals, or a declared authority. When markers are present, an attached `Origin` must equal the Host authority, and an explicit `sec-fetch-site: cross-site` marker is refused. A `trustedHosts` entry that is not a bare, canonical `host[:port]` authority — one WHATWG parsing reads back exactly as written — fails the plugin load loudly: parsing would otherwise quietly authorize the hostname inside `harness.internal/path`, or broaden a dangling-colon or zero-padded port to an any-port grant. HTTP failures answer plain 403 before any RPC dispatch; upgrade failures reject the handshake before any event stream starts. Non-loopback compositions must trust their serving authorities explicitly: the Web runtime derives LAN IP literals from an all-interfaces server config, while `trustedHosts` in cordis.yml and the CLI's `--trusted-host` flag declare named authorities. `dsh web --host 0.0.0.0` is intentionally unsupported until remote access has an authentication layer. The fence is a reachability policy, not authentication; authentication runs behind it. `connection.requestRejection` then asks a `connection/authenticate` provider listener first — its first defined answer decides: `'allow'` admits without a browser credential, `'deny'` refuses even a minted cookie or live launch token, and `undefined` falls back to the authority-bound cookie minted by the `?token` exchange on the index route. The same order guards `/api`, generic RPC channels, WebSocket upgrades, and — through `connection.authorizeIndex` — the index itself before `frontend-static` serves it. A provider admit still passes this fence. Registered `loopback` subtrees and endpoints keep their declared machine fence as the complete admission and never consult the provider. Decision records: [the api browser-trust boundary Agent Note](../../../.agents/notes/implemented/architecture/2026-07-28-api-browser-trust-boundary.md) and [the browser-session authentication Agent Note](../../../.agents/notes/implemented/architecture/2026-10-01-browser-auth-web-transport.md).
 
+<a id="api-websocket-downlinks"></a>
 ## `/api` WebSocket downlinks
 
 The Host sends a WebSocket Ping control frame to every open downlink at `websocketHeartbeatIntervalMs` (30 seconds by default). Browsers answer with Pong at the protocol layer; these frames never enter the application stream and the timer is stopped during disposal.
@@ -34,10 +54,12 @@ Each browser downlink keeps a head-indexed queue capped at 1,024 frames and 8 Mi
 
 `connection/request` is the Host-side waterfall around every request accepted by the browser-trust fence. It receives the entry-time Node request headers and a `kind` of `http` or `upgrade`, then completes before RPC dispatch or event-stream opening. Authentication and request-context listeners must treat the headers as immutable and call `next()` so independent plugins compose; returning without delegation prevents later listeners and the carrier handler from running.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Connection state is generation-scoped and re-established from each host handshake; consumers observe the same published values, leaving no second relation that can diverge.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the wire consumer layer moves already-composed messages between browser and host; nothing here reaches a model request.
@@ -51,3 +73,13 @@ None; this package neither assembles nor sends a provider request.
 - **History availability follows the Host** — this carrier only transports the bounded `session.history` response; whether a deployment can read a cold log without resuming an Agent belongs to the Host persistence provider.
 - **The `/api` bridge buffers each request body in memory** — `maxRequestBodyBytes` (default 288 MiB, sized for the default 200 MiB aggregate image limit after base64 expansion plus envelope headroom) is therefore also the per-request resident bound; a streaming body path would be needed to lower it without shrinking the image limits.
 - The outer bridge and inner Fetch parser use the same `maxRequestBodyBytes` value, so an admitted image envelope is not rejected a second time by a smaller parser default.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

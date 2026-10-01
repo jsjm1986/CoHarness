@@ -27,17 +27,20 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/dsh-skill": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/dsh-skill": "workspace:*",
+    "@deepseek-ai/cordis": "workspace:~"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-skill": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
-    "@deepseek-ai/cordis-plugin-include": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/cordis-plugin-include": "workspace:~",
+    "@deepseek-ai/cordis-plugin-loader": "workspace:~",
+    "@deepseek-ai/dsh-attachment-local": "workspace:*",
+    "@deepseek-ai/dsh-loader-smoke": "workspace:*",
+    "@deepseek-ai/dsh-skill": "workspace:*"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:^",
-    "yaml": "^2.4.2"
+    "yaml": "^2.4.2",
+    "@deepseek-ai/libreoffice-kit": "^0.1.1",
+    "@deepseek-ai/schemastery": "workspace:~"
   }
 }

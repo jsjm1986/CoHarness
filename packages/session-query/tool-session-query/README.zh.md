@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-session-query
 
 [English](README.md) | 中文
@@ -8,6 +13,17 @@
 
 使用 `dsh-tool-session-query` 可让模型搜索既往会话、检查事件匹配、追踪会话或事件关系，并读取精确事件数据。它的五个只读工具返回无游标文本；只有目标会话的 `cwd` 与调用方完全匹配时才允许跨会话访问，没有 `cwd` 的调用方只能检查自己。搜索会排除调用方会话，并在达到部署结果上限时要求模型缩小查询。本包是 opt-in；启用后，每次模型请求都会增加固定指引与五个工具 schema。
 
+## 目录
+
+- [配置](#configuration)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="configuration"></a>
 ## 配置
 
 | 键 | 默认值 | 含义 |
@@ -23,10 +39,13 @@
 
 该包刻意不执行字节或字符截断，也不导入 spill 后端。需要限制内联输出的部署应挂载 `@deepseek-ai/dsh-spill-policy`，它可在执行后替换已渲染文本，同时保留完整结果。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。这些工具是 `ctx.sessionQuery` 之上的注册；语料状态留在查询 seam 之后。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 系统提示词
@@ -77,8 +96,19 @@ Use session_search to find relevant work from prior sessions, or session_event_s
 
 仅追加的结果文本位于可重用请求前缀之后，不会使较早的缓存条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 搜索最多返回部署上限，匹配更多时会请模型缩小查询；不提供延续 token。
 - 工作区身份使用保守的字符串精确 `cwd` 相等性，因此符号链接等价的路径不共享权限。
 - 未挂载通用 spill 策略的自定义组合会以内联方式接收完整跟踪和事件载荷。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

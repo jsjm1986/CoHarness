@@ -160,7 +160,10 @@ describe.skipIf(!builtArtifactsExist)('dsh Web profile best-effort startup', () 
     let events = ''
     try {
       const startup = await waitForStartup(child.stdout, child.stderr, child)
-      const page = await fetch(new URL('/', startup.url))
+      const auth = await fetch(startup.url, { redirect: 'manual' })
+      const cookie = auth.headers.get('set-cookie')?.split(';', 1)[0]
+      if (cookie === undefined) throw new Error('Web authentication response did not set a cookie')
+      const page = await fetch(new URL('/', startup.url), { headers: { cookie } })
       expect(page.status).toBe(200)
       const html = await page.text()
       expect(html).toContain('<div id="root"></div>')
@@ -235,9 +238,7 @@ describe.skipIf(!builtArtifactsExist)('dsh Web profile best-effort startup', () 
       expect(result.timedOut).toBe(false)
       expect(result.signal).toBeUndefined()
       expect(result.exitCode).toBe(1)
-      // The URL line publishes on Loader settlement; the required-entry
-      // audit runs after settlement and still fails the process.
-      expect(result.stdout).toContain('dsh web: http://')
+      expect(result.stdout).not.toContain('dsh web: http://')
       expect(result.stderr).toContain('startup failed:')
       expect(result.stderr).toContain(`${id} (required)`)
       expect(result.stderr).toContain(diagnostic)
@@ -296,7 +297,7 @@ describe.skipIf(!builtArtifactsExist)('dsh Web profile best-effort startup', () 
       expect(result.stderr).toContain('Failed plugins (1):')
       expect(result.stderr).toContain('  webserver (required)\n    Package: @deepseek-ai/dsh-host-webserver')
       expect(result.stderr).toContain('Plugins waiting for services (')
-      expect(result.stderr).toMatch(/connection \(required\) +webServer, webRuntime/u)
+      expect(result.stderr).toMatch(/connection \(required\) +webRuntime/u)
       expect(result.stderr).toContain('at Server.setupListenHandle')
       const summary = result.stderr.split(/\n\n(?:Full diagnostics:|dsh: warning:)/u)[0]!
       expect(summary.match(/EADDRINUSE/gu)).toHaveLength(1)

@@ -1,3 +1,8 @@
+---
+description: "Human-facing slash command for persisted same-session goals"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-command-goal
 
 English | [中文](README.zh.md)
@@ -8,6 +13,18 @@ Human-facing `/goal` control over [`ctx.goals`](../goal/README.md). The plugin r
 
 `dsh-command-goal` gives users the `/goal` command to create, edit, pause, resume, clear, and inspect the current goal directly in an interactive UI. Commands and their direct output stay in the UI and do not enter model requests. Accepted changes persist, and ordered image or file attachments on a create or edit become one ordinary user message that later goal rounds can read. Use this package in interactive deployments with a command adapter; headless and automation apps without one do not need it.
 
+## Table of Contents
+
+- [Command contract](#command-contract)
+- [Composition](#composition)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="command-contract"></a>
 ## Command contract
 
 | Input | Result |
@@ -25,6 +42,7 @@ The command declares `input.images`, so composer image attachments may accompany
 
 Expected domain rejections become stable direct command errors without exposing branded ids or revisions. Unexpected implementation failures still reject dispatch so adapters can report them as command failures. Generic command text and output remain live UI state; `dsh-goal` persists every accepted mutation through its own durable `goal/change` event.
 
+<a id="composition"></a>
 ## Composition
 
 The producer injects `commands` and `goals`. A custom app mounts their owners plus this plugin; automatic continuation remains an independent choice:
@@ -40,10 +58,12 @@ The producer injects `commands` and `goals`. A custom app mounts their owners pl
 
 The shipped `dsh` base enables the persisted-goal stack and this command; the Web client provides its interactive adapter. The ACP automation app enables the domain and model tools without a command adapter; `goals: false` removes that stack. The UI-less `agent-spine-demo` requires an explicit `goals: {}` so headless one-shot callers do not silently change from one physical turn to a multi-round operation.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The command is one registration delegating to the `ctx.goals` domain; goal state is not held here.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Human `/goal` control
@@ -66,3 +86,13 @@ Command discovery, mutations, and direct output do not affect the cache. Later c
 - **No per-command round-cap argument** — `defaultMaxGoalRounds` remains deployment config, while a direct human request may ask the model to edit `max_goal_rounds` through the separately authorized goal tool.
 - **No continuous status widget** — bare `/goal` is the portable observation API; adapter-specific badges and reconnectable command output remain future UI work.
 - **Web command adapter only in the shipped apps** — headless, ACP automation, and JSON-RPC adapters do not consume `ctx.commands`. Ordinary prompts can still authorize model-facing goal tools when those are composed.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -15,6 +15,17 @@ kind: "package-reference"
 
 这是一个可选的浏览器插件，在会话头部渲染当前 Session 的活动 Schedule 提醒。它读取完整的 `schedule` projection，不发 RPC，也不执行 mutation。浏览器派生排序、本地时间、状态与相对时间；这些呈现值不会进入持久状态。
 
+## 目录
+
+- [实现](#implementation)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="implementation"></a>
 ## 实现
 
 | 文件 | 职责 |
@@ -26,10 +37,13 @@ kind: "package-reference"
 
 组件通过 `useSession` 与 `useProjection('schedule')` 读取数据，不直接检查 Host 服务。定位复用共享的 `useAnchoredPosition` 与 `useDismissOnOutsidePointer` 原语，包含 portal 弹层的 ref。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。提醒状态由 Host schedule 插件及其会话帧拥有；此界面只在会话已报告活动提醒时渲染触发器。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为本包只为人类渲染已经完成的客户端 projection，从不改变提示词、消息、schema、流或工具结果。
@@ -38,8 +52,19 @@ kind: "package-reference"
 
 无；本包从不组装或发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 - 目录只读；Schedule 创建与取消仍由模型／工具操作负责。
 - 本地时间与相对时间跟随查看方浏览器的 locale、时区与时钟。
 - 只显示活动记录；交付历史仍保存在 transcript 中。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

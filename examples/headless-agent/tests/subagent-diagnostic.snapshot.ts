@@ -52,7 +52,7 @@ async function seedDescriptorlessChild(root: string, cwd: string): Promise<void>
       data: {
         turn: 1,
         step: 1,
-        message: createSystemMessage('Seeded parent system prompt.', '@deepseek-ai/dsh-system-prompt'),
+        message: createSystemMessage('Seeded parent system prompt.'),
       },
       surfaceOp: 'append',
     },

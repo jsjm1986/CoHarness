@@ -34,7 +34,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:^",
+    "@deepseek-ai/schemastery": "workspace:~",
     "ws": "^8.21.3"
   },
   "files": [
@@ -43,28 +43,30 @@
     "lib/types/**/*.d.ts"
   ],
   "peerDependencies": {
-    "@deepseek-ai/dsh-util-crypto": "workspace:^",
-    "@deepseek-ai/dsh-timeout": "workspace:^",
-    "@deepseek-ai/dsh-host-webserver": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-attachment": "workspace:^",
-    "@deepseek-ai/dsh-host-apiproxy": "workspace:^",
-    "@deepseek-ai/dsh-commands": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^"
+    "@deepseek-ai/dsh-credentials": "workspace:*",
+    "@deepseek-ai/dsh-util-crypto": "workspace:*",
+    "@deepseek-ai/dsh-timeout": "workspace:*",
+    "@deepseek-ai/dsh-host-webserver": "workspace:*",
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-attachment": "workspace:*",
+    "@deepseek-ai/dsh-host-apiproxy": "workspace:*",
+    "@deepseek-ai/dsh-commands": "workspace:*",
+    "@deepseek-ai/dsh-llm": "workspace:*",
+    "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-timeout": "workspace:^",
-    "@deepseek-ai/dsh-host-webserver": "workspace:^",
-    "@deepseek-ai/dsh-util-crypto": "workspace:^",
+    "@deepseek-ai/dsh-credentials": "workspace:*",
+    "@deepseek-ai/dsh-timeout": "workspace:*",
+    "@deepseek-ai/dsh-host-webserver": "workspace:*",
+    "@deepseek-ai/dsh-util-crypto": "workspace:*",
     "@types/ws": "^8.18.1",
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-attachment": "workspace:^",
-    "@deepseek-ai/dsh-host-apiproxy": "workspace:^",
-    "@deepseek-ai/dsh-commands": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-attachment": "workspace:*",
+    "@deepseek-ai/dsh-host-apiproxy": "workspace:*",
+    "@deepseek-ai/dsh-commands": "workspace:*",
+    "@deepseek-ai/dsh-llm": "workspace:*",
+    "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*"
   }
 }

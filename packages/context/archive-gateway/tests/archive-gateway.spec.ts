@@ -1,7 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Context } from '@deepseek-ai/cordis'
-import { SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionId, SessionSeq, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import type { ArchivedSessionEntry, WorkspaceArchiveSnapshot } from '@deepseek-ai/dsh-workspace'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { GoalId } from '@deepseek-ai/dsh-goal'
 import { describe, expect, it, vi } from 'vitest'
 import * as ArchiveGateway from '../src/index.ts'
 
@@ -35,18 +37,25 @@ function event(type: SessionEvent['type'], seq: number, text: string): SessionEv
   } as SessionEvent
 }
 
-function injectedEvent(seq: number, text: string, kind: 'plugin' | 'goal' = 'plugin'): SessionEvent {
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'injection': { kind: 'injection' }
+  }
+}
+
+function injectedEvent(seq: number, text: string, kind: 'injection' | 'goal' = 'injection'): SessionEvent {
   return {
     type: 'user/message',
-    seq,
+    seq: SessionSeq(seq),
     time: seq + 1,
-    data: {
+    data: createUserMessage({
       content: [{ type: 'text', text }],
-      source: kind === 'plugin'
-        ? { kind: 'plugin', plugin: 'injection' }
-        : { kind: 'goal', goalId: 'goal-1', revision: 1, round: 1 },
-    },
-  } as SessionEvent
+      source: kind === 'injection'
+        ? { kind: 'injection' }
+        : { kind: 'goal', goalId: GoalId('goal-1'), revision: 1, round: 1 },
+    }),
+    surfaceOp: 'append' as const,
+  }
 }
 
 function archivedEntry(id: SessionId, createdAt: number, rootSessionId = id): ArchivedSessionEntry {
@@ -514,7 +523,7 @@ describe('archive-gateway synchronization', () => {
     let revision = 1
     let archived = true
     let stored = true
-    const restoreSession = vi.fn(async () => {
+    const unarchiveSession = vi.fn(async () => {
       archived = false
       revision++
     })
@@ -537,7 +546,7 @@ describe('archive-gateway synchronization', () => {
       archiveSnapshot: () => ({ revision, archivedSessionIds: archived ? [root] : [] }),
       archivedEntries: async () => archived ? [entry] : [],
       get archivedSessionIds() { return archived ? [root] : [] },
-      restoreSession,
+      unarchiveSession,
     } as never)
     ctx.provide('sessionPersistence', {
       list: async () => stored ? [{ header: entry.header }] : [],
@@ -549,7 +558,7 @@ describe('archive-gateway synchronization', () => {
       expect(request.mock.calls.filter(([path]) => path.endsWith('/snapshot'))).toHaveLength(2)
     })
     expect(remove).toHaveBeenCalledWith(root)
-    expect(restoreSession).toHaveBeenCalledWith(root)
+    expect(unarchiveSession).toHaveBeenCalledWith(root)
     expect(request.mock.calls.filter(([path]) => path.endsWith('/ack'))).toHaveLength(1)
     const finalSnapshot = request.mock.calls.filter(([path]) => path.endsWith('/snapshot')).at(-1)
     expect(JSON.parse(requestBody(finalSnapshot?.[1]))).toMatchObject({ revision: 2, archivedSessionIds: [] })

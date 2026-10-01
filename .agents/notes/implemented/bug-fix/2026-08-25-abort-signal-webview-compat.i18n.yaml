@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-abort-signal-webview-compat.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-abort-signal-webview-compat.md
-2026-08-25-abort-signal-webview-compat.md: f6937d5896d1ffa3843c898861c1bbc9446494d1
-2026-08-25-abort-signal-webview-compat.zh.md: 89caaa2eda124d70fd8ccf955e0c2898ea29a37d
+/agent-note-web-boot-supplies-abortsignal-static-factory-compatibility:
+  en: 26c3a3b05166895c
+  zh: 8e9172ae40d4e7d6
+/agent-note-web-boot-supplies-abortsignal-static-factory-compatibility/problem:
+  en: abf9414844b8b0fc
+  zh: 67ffdc4c2a86a39b
+/agent-note-web-boot-supplies-abortsignal-static-factory-compatibility/decision:
+  en: 1435d285eee1f276
+  zh: 783627edf274bbd6
+/agent-note-web-boot-supplies-abortsignal-static-factory-compatibility/alternatives-considered:
+  en: 85d34f6b8e4a34e1
+  zh: c5d32f5f456da92b
+/agent-note-web-boot-supplies-abortsignal-static-factory-compatibility/consequences:
+  en: 34aef622c7937417
+  zh: ede7ad452dae418e

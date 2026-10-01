@@ -9,13 +9,22 @@
   ],
   "references": [
     {
+      "path": "../../attachment/attachment"
+    },
+    {
       "path": "../../core/session"
     },
     {
       "path": "../../core/tools"
     },
     {
+      "path": "../../fs/fs"
+    },
+    {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../llm/token-meter"
     },
     {
       "path": "../spill"

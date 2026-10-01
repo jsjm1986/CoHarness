@@ -24,13 +24,13 @@ describe('native path opener', () => {
   it('opens with macOS open(1)', async () => {
     const run = vi.fn<PathOpenerRunner>(async () => ({ stdout: '', stderr: '' }))
     await openNativePath('/Users/test/file.txt', signal(), { platform: 'darwin', run })
-    expect(run).toHaveBeenCalledWith('open', ['/Users/test/file.txt'], expect.any(AbortSignal))
+    expect(run).toHaveBeenCalledWith('open', ['/Users/test/file.txt'], expect.any(AbortSignal), 'hidden')
   })
 
   it('bypasses macOS file associations for text documents', async () => {
     const run = vi.fn<PathOpenerRunner>(async () => ({ stdout: '', stderr: '' }))
     await openNativeTextFile('/Users/test/settings.yaml', signal(), { platform: 'darwin', run })
-    expect(run).toHaveBeenCalledWith('open', ['-t', '/Users/test/settings.yaml'], expect.any(AbortSignal))
+    expect(run).toHaveBeenCalledWith('open', ['-t', '/Users/test/settings.yaml'], expect.any(AbortSignal), 'hidden')
   })
 
   it('uses the Linux desktop association for text documents', async () => {
@@ -38,7 +38,7 @@ describe('native path opener', () => {
     await openNativeTextFile('/tmp/settings.yaml', signal(), {
       platform: 'linux', osRelease: '6.8.0-generic', env: {}, run,
     })
-    expect(run).toHaveBeenCalledWith('xdg-open', ['/tmp/settings.yaml'], expect.any(AbortSignal))
+    expect(run).toHaveBeenCalledWith('xdg-open', ['/tmp/settings.yaml'], expect.any(AbortSignal), 'hidden')
   })
 
   it.each([
@@ -54,15 +54,12 @@ describe('native path opener', () => {
       platform: 'linux', osRelease, env, run,
     })
     expect(run.mock.calls).toEqual([
-      ['wslpath', ['-w', '/home/test user/settings.yaml'], requestSignal],
+      ['wslpath', ['-w', '/home/test user/settings.yaml'], requestSignal, 'hidden'],
       [
-        'powershell.exe',
-        [
-          '-NoProfile',
-          '-Command',
-          "Invoke-Item -LiteralPath '\\\\wsl.localhost\\Ubuntu\\home\\test user\\settings.yaml'",
-        ],
+        'explorer.exe',
+        ['file://wsl.localhost/Ubuntu/home/test%20user/settings.yaml'],
         requestSignal,
+        'visible',
       ],
     ])
   })
@@ -87,23 +84,25 @@ describe('native path opener', () => {
     expect(run).toHaveBeenCalledOnce()
   })
 
-  it('opens with Windows Invoke-Item and escapes single quotes', async () => {
+  it('opens a Windows file URI through Explorer', async () => {
     const run = vi.fn<PathOpenerRunner>(async () => ({ stdout: '', stderr: '' }))
     await openNativePath("C:\\work\\o'reilly.txt", signal(), { platform: 'win32', run })
     expect(run).toHaveBeenCalledWith(
-      'powershell.exe',
-      ['-NoProfile', '-Command', "Invoke-Item -LiteralPath 'C:\\work\\o''reilly.txt'"],
+      'explorer.exe',
+      ["file:///C:/work/o'reilly.txt"],
       expect.any(AbortSignal),
+      'visible',
     )
   })
 
-  it('uses the Windows desktop association for text documents', async () => {
+  it('opens Windows text documents through the Explorer file URI', async () => {
     const run = vi.fn<PathOpenerRunner>(async () => ({ stdout: '', stderr: '' }))
     await openNativeTextFile('C:\\work\\settings.yaml', signal(), { platform: 'win32', run })
     expect(run).toHaveBeenCalledWith(
-      'powershell.exe',
-      ['-NoProfile', '-Command', "Invoke-Item -LiteralPath 'C:\\work\\settings.yaml'"],
+      'explorer.exe',
+      ['file:///C:/work/settings.yaml'],
       expect.any(AbortSignal),
+      'visible',
     )
   })
 
@@ -113,7 +112,7 @@ describe('native path opener', () => {
       platform: 'linux', osRelease: '6.8.0-generic',
       env: { WSL_DISTRO_NAME: '', WSL_INTEROP: '' }, run,
     })
-    expect(run).toHaveBeenCalledWith('xdg-open', ['/tmp/a.txt'], expect.any(AbortSignal))
+    expect(run).toHaveBeenCalledWith('xdg-open', ['/tmp/a.txt'], expect.any(AbortSignal), 'hidden')
   })
 
   it('rejects unsupported platforms', async () => {
@@ -127,7 +126,7 @@ describe('native path opener', () => {
       osRelease: '6.8.0-generic', env: {}, run,
     })
     const expected = process.platform === 'win32'
-      ? 'powershell.exe'
+      ? 'explorer.exe'
       : process.platform === 'linux'
         ? 'xdg-open'
         : 'open'
@@ -253,13 +252,14 @@ describe('browser-renderable documents', () => {
     })
     expect(bare).toEqual([['xdg-open', '/w/page.html']])
 
-    // Windows names no browser without the UserChoice registry.
+    // Windows names no browser without the UserChoice registry; Explorer owns it.
     const win: string[][] = []
     await openNativePath('C:\\w\\page.html', new AbortController().signal, {
       platform: 'win32',
       run: async (command, args) => { win.push([command, ...args]); return { stdout: '', stderr: '' } },
     })
-    expect(win[0]?.[0]).toBe('powershell.exe')
+    expect(win[0]?.[0]).toBe('explorer.exe')
+    expect(win[0]?.[1]).toBe('file:///C:/w/page.html')
   })
 
   it('hands browser-renderable WSL paths to the Windows desktop', async () => {
@@ -278,12 +278,7 @@ describe('browser-renderable documents', () => {
     })
     expect(calls).toEqual([
       ['wslpath', '-w', '/home/test/page.html'],
-      [
-        'powershell.exe',
-        '-NoProfile',
-        '-Command',
-        "Invoke-Item -LiteralPath 'C:\\workspace\\page.html'",
-      ],
+      ['explorer.exe', 'file:///C:/workspace/page.html'],
     ])
   })
 })

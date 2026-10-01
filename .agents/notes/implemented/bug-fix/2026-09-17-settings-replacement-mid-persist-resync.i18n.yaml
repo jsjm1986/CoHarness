@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-settings-replacement-mid-persist-resync.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-settings-replacement-mid-persist-resync.md
-2026-09-17-settings-replacement-mid-persist-resync.md: 93465bff1005887ba0c1d17962630616aea9599e
-2026-09-17-settings-replacement-mid-persist-resync.zh.md: c874b4046ad3c058ab3bbf8b8ee691fa382103ba
+/agent-note-mid-persist-namespace-replacement-re-resolves-under-the-new-owner:
+  en: e4e7d42727f4c14e
+  zh: bc77f98defbc5cd5
+/agent-note-mid-persist-namespace-replacement-re-resolves-under-the-new-owner/problem:
+  en: 815e1e4bc379c758
+  zh: c0a194a07ce3d607
+/agent-note-mid-persist-namespace-replacement-re-resolves-under-the-new-owner/decision:
+  en: 11cc1ede280c8c8f
+  zh: 0acccaf7278261e3
+/agent-note-mid-persist-namespace-replacement-re-resolves-under-the-new-owner/alternatives-considered:
+  en: 5f5169f0c295de04
+  zh: bd079e6c72d9be4d
+/agent-note-mid-persist-namespace-replacement-re-resolves-under-the-new-owner/consequences:
+  en: 8e0b79f701d7a130
+  zh: d475f8aa9294be55
+/agent-note-mid-persist-namespace-replacement-re-resolves-under-the-new-owner/verification:
+  en: 9ccf59fc4c3a2935
+  zh: 6024bc0def6cfc1b

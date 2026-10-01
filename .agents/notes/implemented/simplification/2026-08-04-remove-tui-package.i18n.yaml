@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-04-remove-tui-package.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-04-remove-tui-package.md
-2026-08-04-remove-tui-package.md: 2834ec10aa86a3dcf612a1fe9067732ca93d921f
-2026-08-04-remove-tui-package.zh.md: 6532bb690a14e4d0e877a6e1cd049800369aaf6c
+/agent-note-remove-the-tui-package:
+  en: b0c9a96d78e61713
+  zh: 57f7d17cc6216af3
+/agent-note-remove-the-tui-package/problem:
+  en: 6d39570c258f4240
+  zh: 40b340158bd84e4f
+/agent-note-remove-the-tui-package/decision:
+  en: 6d7ad773140f24a1
+  zh: 59dccbd62bafc9c8
+/agent-note-remove-the-tui-package/verification:
+  en: 072df99ba6d1fb6f
+  zh: fd4d5447bd589950
+/agent-note-remove-the-tui-package/alternatives-considered:
+  en: a45eff453ad089be
+  zh: cdde8bfadfd12d53
+/agent-note-remove-the-tui-package/consequences:
+  en: f798a40b93ddd98a
+  zh: bd967b297ca0510f

@@ -15,6 +15,17 @@ Each row keeps the full prompt, shows Scheduled or Overdue, formats repeating in
 
 This optional browser plugin renders the current Session's active Schedule reminders in the conversation header. It reads the complete `schedule` projection and performs no RPC or mutation. The browser derives ordering, local time, status, and relative time; those presentation values never enter durable state.
 
+## Table of Contents
+
+- [Implementation](#implementation)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="implementation"></a>
 ## Implementation
 
 | File | Role |
@@ -26,10 +37,12 @@ This optional browser plugin renders the current Session's active Schedule remin
 
 The component consumes `useSession` and `useProjection('schedule')`; it does not inspect Host services directly. Placement uses the shared `useAnchoredPosition` and `useDismissOnOutsidePointer` primitives, including the portaled panel reference.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Reminder state is owned by the Host schedule plugin and its session frames; this surface renders the trigger only when a session already reports active reminders.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this package renders a completed client projection for a human and never changes prompts, messages, schemas, streams, or tool results.
@@ -43,3 +56,13 @@ None; the package never assembles or sends provider requests.
 - The catalog is read-only; Schedule creation and cancellation remain model/tool operations.
 - Local and relative times follow the viewing browser's locale, time zone, and clock.
 - Only active records are shown; delivery history remains in the transcript.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -19,7 +19,7 @@ export type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
 export type ToolRowVariant = 'search' | 'read' | 'bash' | 'write' | 'edit' | 'code' | 'others'
 
 /** Row state semantic; colors self-supplied via StateDot (design gives none). */
-export type ToolRowState = 'running' | 'ok' | 'error' | 'stopped'
+export type ToolRowState = 'preparing' | 'running' | 'ok' | 'error' | 'stopped'
 
 /** Locale-neutral structured fact consumed only by the user-facing Tool row. */
 export interface AutoReviewDenial {
@@ -27,7 +27,7 @@ export interface AutoReviewDenial {
   reason: string | null
 }
 
-type ToolTitleKey = Extract<LocaleKeysOf<'conversation'>, `tool.title.${string}`>
+type ToolTitleKey = Extract<LocaleKeysOf<'conversation'>, `tool.title.${string}` | 'ask.rowTitle' | 'todo.rowTitle'>
 
 /** Locale key per generic row variant. */
 export const VARIANT_TITLE_KEYS = {
@@ -83,6 +83,45 @@ const TOOL_TITLE_KEYS: Record<string, ToolTitleKey> = {
   cordis_undefine: 'tool.title.removeCordis',
   pwsh: 'tool.title.pwsh',
   read_image: 'tool.title.readImage',
+  todo_write: 'todo.rowTitle',
+  ask_user_question: 'ask.rowTitle',
+  create_goal: 'tool.title.createGoal',
+  get_goal: 'tool.title.getGoal',
+  update_goal: 'tool.title.updateGoal',
+  schedule_create: 'tool.title.createSchedule',
+  schedule_list: 'tool.title.listSchedules',
+  schedule_delete: 'tool.title.deleteSchedule',
+  schedule_update: 'tool.title.updateSchedule',
+  cordis_inspect_list: 'tool.title.inspectProviders',
+  cordis_inspect_query: 'tool.title.queryRuntime',
+  cordis_inspect_self: 'tool.title.inspectPlugins',
+  workflow: 'tool.title.workflow',
+  ralph: 'tool.title.ralph',
+  session_event_read: 'tool.title.readEvent',
+  session_event_search: 'tool.title.searchEvents',
+  session_event_trace: 'tool.title.traceEvent',
+  session_search: 'tool.title.searchSessions',
+  session_trace: 'tool.title.traceSession',
+  list_subagent_models: 'tool.title.listModels',
+  subagent: 'tool.title.subagent',
+  list_agents: 'tool.title.listAgents',
+  send_message: 'tool.title.sendMessage',
+  interrupt_agent: 'tool.title.interruptAgent',
+  job_list: 'tool.title.listJobs',
+  job_output: 'tool.title.readJob',
+  job_kill: 'tool.title.killJob',
+  terminal_open: 'tool.title.openTerminal',
+  terminal_read: 'tool.title.readTerminal',
+  terminal_list: 'tool.title.listTerminals',
+  terminal_signal: 'tool.title.signalTerminal',
+  terminal_close: 'tool.title.closeTerminal',
+  lsp: 'tool.title.lsp',
+  spawn_teammate: 'tool.title.spawnTeammate',
+  team_task_create: 'tool.title.createTeamTask',
+  team_task_get: 'tool.title.getTeamTask',
+  team_task_update: 'tool.title.updateTeamTask',
+  team_task_list: 'tool.title.listTeamTasks',
+  wait_agent: 'tool.title.waitAgent',
 }
 
 /**
@@ -92,6 +131,15 @@ const TOOL_TITLE_KEYS: Record<string, ToolTitleKey> = {
  */
 export function classifyTool(toolName: string): ToolRowVariant {
   return TOOL_VARIANTS[toolName] ?? 'others'
+}
+
+/**
+ * Select a tool-owned or generic title without reading arguments.
+ * @param toolName - wire tool name.
+ * @returns the localized title key.
+ */
+export function toolTitleKey(toolName: string): ToolTitleKey {
+  return TOOL_TITLE_KEYS[toolName] ?? VARIANT_TITLE_KEYS[classifyTool(toolName)]
 }
 
 /** Everything ToolRow needs, derived once from the frozen slice. */
@@ -250,18 +298,21 @@ export function formatToolBody(variant: ToolRowVariant, argsRaw: string): string
 export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: string, home?: string): ToolRowModel {
   const variant = classifyTool(toolName)
   const done = 'kind' in block
-  const argsRaw = (done ? block.call?.argsRaw : block.argsRaw) ?? ''
-  const state: ToolRowState = !done ? 'running'
+  // Preparing calls carry no dispatched arguments: null, distinct from an
+  // empty-string payload on a started or window-truncated call.
+  const argsRaw = done ? block.call?.argsRaw ?? '' : block.phase === 'start' ? block.argsRaw : null
+  const state: ToolRowState = !done
+    ? (block.phase === 'preparing' ? 'preparing' : 'running')
     : block.error?.code === 'interrupted' ? 'stopped'
       : block.isError ? 'error' : 'ok'
-  const base = argsRaw === ''
-    ? block.callId
-    : abbreviateHomePath(relativizeToCwd(deriveSummary(variant, argsRaw), cwd), home)
-  const toolTitleKey = TOOL_TITLE_KEYS[toolName]
+  const base = argsRaw === null ? ''
+    : argsRaw === '' ? block.callId
+      : abbreviateHomePath(relativizeToCwd(deriveSummary(variant, argsRaw), cwd), home)
+  const toolKey = TOOL_TITLE_KEYS[toolName]
   // Others keeps the static generic title; the real tool name rides the
   // mutable summary slot unless the tool owns a specific title.
-  const summary = variant === 'others' && toolName !== '' && toolTitleKey === undefined
-    ? `${toolName} · ${base}`
+  const summary = variant === 'others' && toolName !== '' && toolKey === undefined
+    ? [toolName, base].filter(Boolean).join(' · ')
     : base
   // The empty string is "no text" for both derived result fields: a settled
   // call with blank content has nothing to expand, and a blank first line
@@ -270,10 +321,10 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
   const errorSummary = state === 'error' && output !== null ? firstLine(output) : null
   return {
     variant,
-    titleKey: toolTitleKey ?? VARIANT_TITLE_KEYS[variant],
+    titleKey: toolKey ?? VARIANT_TITLE_KEYS[variant],
     summary,
-    filePath: deriveFilePath(variant, argsRaw),
-    bodyRaw: argsRaw === '' ? null : argsRaw,
+    filePath: argsRaw === null ? undefined : deriveFilePath(variant, argsRaw),
+    bodyRaw: argsRaw === null || argsRaw === '' ? null : argsRaw,
     output,
     errorSummary,
     autoReviewDenial: deriveAutoReviewDenial(block),

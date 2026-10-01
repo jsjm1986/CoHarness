@@ -1,3 +1,8 @@
+---
+description: "Model-facing todo_write tool over the DeepSeek Harness event-sourced session log"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-todo
 
 English | [中文](README.zh.md)
@@ -8,45 +13,68 @@ The model-facing `todo_write` tool: the agent's whole task list, replaced wholes
 
 `dsh-tool-todo` gives the agent a structured task list to plan with: break multi-step work into concrete tasks, mark the task you are working on, and check tasks off as they finish. The list survives across turns and reopened sessions, so the agent and the UI always see the latest plan. One configuration flag decides whether several tasks may be in progress at once, for agents that run work in parallel. Use it wherever an agent should keep a visible task list; each update replaces the whole list, and only the owning agent session can change it.
 
+## Table of Contents
+
+- [What it does](#what-it-does)
+- [Single owner](#single-owner)
+- [Configuration](#configuration)
+- [Validation](#validation)
+- [Rendering](#rendering)
+- [Session projection](#session-projection)
+- [Export shape](#export-shape)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="what-it-does"></a>
 ## What it does
 
 Registers one tool, `todo_write(todos: [{ content, status }])`, on `ctx.tools`. The model sends the ENTIRE list every call — there are no partial updates or per-item edits. Each call appends a `todo/write` event (the full list snapshot) to the calling agent's session log via `agent.session.append('todo/write', { todos })`; the current list is the most recent such event (last-write-wins on replay).
 
 `status` is one of `pending`, `in_progress`, or `completed`.
 
+<a id="single-owner"></a>
 ## Single owner
 
 The list belongs to the ONE agent session that called the tool. There is no subagent/shared/swarm scope: a non-agent caller (no `exec.agent`) has nowhere to write the list and is rejected. This is a deliberate scope limit — see the Agent Note.
 
+<a id="configuration"></a>
 ## Configuration
 
 `allowParallelInProgress` is required: every composition must choose whether several todos may be `in_progress` at once. It is a deployment choice, not a fixed rule: whether concurrent active tasks are legitimate depends on runtime concurrency the tool cannot observe. Use `true` for agents that may fan out work and `false` to enforce the single-active discipline.
 
 The flag moves the model-facing instruction and the accepted input together — `true` asks the model to mark every actively worked task and accepts any number, `false` asks for exactly one and rejects a call marking more with `Error: invalid todos: at most one task may be in_progress (got <n>)`. The durable-log invariant does NOT follow it: a log written while parallel work was allowed must still replay after a deployment tightens the policy, so the invariant stays silent on the active count.
 
+<a id="validation"></a>
 ## Validation
 
 Beyond the schema's type/required/enum checks, `execute` rejects an empty or duplicate `content`, and any item key beyond `content`/`status` — an extended item shape (ids, nesting) fails loud instead of silently flattening, keeping the logged snapshot equal to what the model believes it wrote. How many tasks may be `in_progress` at once is the deployment's call (§ Configuration): a composition that chooses `true` permits parallel work (concurrent subagents, background commands) to mark several tasks simultaneously. Ordering and the discipline of keeping the list current are left to the model via the tool description.
 
+<a id="rendering"></a>
 ## Rendering
 
 The canonical result is `{ todos, counts: { pending, inProgress, completed } }`; its Native renderer returns the compact update acknowledgement. The tool also writes the full `todo/write` session event. UIs subscribe to the event stream and render that durable list themselves: the [web client](../../client/ui-conversation) shows a plan strip plus a dedicated tool row off the standing plan — latest `todo/write` with no later `turn/start` ([display](../../../.agents/notes/implemented/feature/2026-07-23-web-todo-display.md), [lifetime](../../../.agents/notes/implemented/feature/2026-07-28-todo-plan-clears-on-next-turn.md)).
 
+<a id="session-projection"></a>
 ## Session projection
 
 When the composition mounts `ctx.sessionProjections` ([`@deepseek-ai/dsh-session-projection`](../../session/session-projection/README.md)), this package registers the `todos` projection unit under an injected child: `init` = `null` (no write yet), `apply` = take the whole list from each `todo/write` and clear to `null` on each `turn/start` (standing plan; `turn/end` keeps the finished checklist; every other event returns the same state reference), `view` = identity, `stateVersion` = 2. The key merges into `SessionProjectionMap` here (via the Service Definition package's `/types` outlet); the framework drives the unit and carriers serve the value on the history tail page and the `session/projection` push frame. Compositions without the registry are unaffected. Lifetime rationale: [todo plan clears on next turn](../../../.agents/notes/implemented/feature/2026-07-28-todo-plan-clears-on-next-turn.md).
 
+<a id="export-shape"></a>
 ## Export shape
 
 A function/namespace plugin: it exports `name` / `inject` / `apply` and NO default. A stray `export default` would collapse the module via the Loader's `unwrapExports` and drop `inject` (see [docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md)).
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Tool schema
 
 #### What the model sees
 
-The model sees the generated [`todo_write` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-todo): an object with one required `todos` array of `{ content, status }` items, where `status` is `pending`, `in_progress`, or `completed`. The description is the composed whole-list instruction whose active-status clause follows `allowParallelInProgress`.
+The model sees the generated [`todo_write` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-todo): an object with one required `todos` array of `{ content, status }` items, where `status` is `pending`, `in_progress`, or `completed`. The `todos` description states that each call replaces the whole list; the tool description's active-status clause follows `allowParallelInProgress`.
 
 #### Token effect
 
@@ -75,3 +103,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **Single-owner scope only** — the list belongs to the one calling agent session; subagent/shared/swarm scopes are a deliberate cut (see § Single owner), and a non-agent caller is rejected.
 - **The item shape is deliberately minimal** — `content` plus three-state `status`; whole-list replacement needs no stable id, priority, or active-form fields.
 - **Whole-list replacement is the only operation** — no partial updates, no read-back tool; the model must resend the entire list each call.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

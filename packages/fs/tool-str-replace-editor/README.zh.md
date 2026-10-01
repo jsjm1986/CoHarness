@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-str-replace-editor
 
 [English](README.md) | 中文
@@ -8,6 +13,18 @@
 
 `dsh-tool-str-replace-editor` 提供基于 `ctx.fs` 的独立面向模型 `str_replace_editor` 工具：`view` 显示带行号的文件内容或浅层目录列表，`create` 创建新文件，`str_replace` 应用唯一的字面量替换，`insert` 在选定的边界处插入行。它可以与持久 Bash、一次性 Bash、沙箱 Bash 或其他终端接口组合。修改操作遵守与 fs 家族其余部分相同的编辑前读取策略与沙箱围栏，具体由所挂载的后端与策略插件强制执行。当部署需要 Claude Code 风格、使用绝对路径的单一编辑器工具时选择它；`dsh-tool-fs` 包提供替代的 `read`/`write`/`edit` 套件。
 
+## 目录
+
+- [配置](#config)
+- [工具](#tool)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## 配置
 
 | 键 | 默认值 | 含义 |
@@ -15,14 +32,18 @@
 | `maxOutputChars` | `16000` | 文件和目录查看结果保留的前缀字符数。 |
 | `description` | 编辑器命令指南 | 面向模型的工具描述。 |
 
+<a id="tool"></a>
 ## 工具
 
 schema 提供针对绝对路径的 `view`、`create`、`str_replace` 与 `insert`。文件查看使用从 1 开始的行号，并保留内容中的制表符，因此显示的文本仍可作为有效的字面量替换输入；目录查看忽略隐藏、依赖与 Python 缓存条目并下探两层。`view`、`str_replace` 或 `insert` 发生元数据未命中时，工具会在返回 `FS_NOT_FOUND` 前记录确认缺失，因此后续 `create` 可以通过已挂载策略的防护创建流程恢复外部删除的路径；缺失状态绝不会授权 `str_replace` 或 `insert`。替换要求字面量唯一匹配，错误只使用公开的 `old_str` 词汇。插入遵循所选的零基插入边界，不会隐式补尾换行。修改操作会保留请求编辑范围之外的制表符。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。编辑器把模型调用适配到 `ctx.fs` 上；所有文件状态属于已挂载提供方。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 工具 schema
@@ -53,8 +74,19 @@ schema 提供针对绝对路径的 `view`、`create`、`str_replace` 与 `insert
 
 工具结果以追加方式位于可复用请求前缀之后。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 操作面向 UTF-8 文本，不支持二进制文件。
 - `str_replace` 刻意拒绝零匹配或多匹配，且没有 `replace_all` 参数。
 - 每个修改操作都会经过 `fs/write-intent` 或 `fs/edit-intent`，解析当前会话的沙箱策略，并交由挂载的文件系统与策略插件实施约束。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

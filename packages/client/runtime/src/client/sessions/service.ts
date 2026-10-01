@@ -24,7 +24,7 @@ import { createScope, scopeIdentityOf, scopeOf as scopeTagOf } from '../scope.ts
 import type { ConversationRuntime } from './conversation-assembler.ts'
 import { SessionManager } from './manager.ts'
 import type { SessionRemotes } from './remotes.ts'
-import type { SessionListPhase, SessionSearchResultItem, SubagentCatalogSnapshot } from './manager.ts'
+import type { ObservedJob, SessionListPhase, SessionSearchResultItem, SubagentCatalogSnapshot } from './manager.ts'
 import type { PendingInteractionStatus } from './pending.ts'
 import { SessionProvideChannel } from './provide.ts'
 import type { Session } from './session.ts'
@@ -105,6 +105,8 @@ export interface SessionListState {
    * for a session without tasks — so consumers read absence, never a sentinel.
    */
   jobsBySession: Readonly<Record<SessionId, readonly JobView[]>>
+  /** Live output observation per expanded job row; an absent key means unobserved. */
+  observedJobs: Readonly<Record<string, ObservedJob>>
   /** Current session's catalog-derived address, absent on ordinary navigation. */
   currentAddress: SubagentAddress | undefined
 }
@@ -408,7 +410,7 @@ export class SessionRuntime implements ISessions {
     )
     this.list = createSnapshotStore<SessionListState>({
       ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending',
-      subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+      subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })
     // The manager owns wire truth; the store is its projection. Manager
     // notifications are already microtask-batched.
@@ -592,6 +594,14 @@ export class SessionRuntime implements ISessions {
    */
   refreshSubagents(parentSessionId: SessionId): Promise<void> {
     return this.manager.refreshSubagents(parentSessionId)
+  }
+
+  observeJob(sessionId: SessionId | undefined, jobId: JobView['id']): () => void {
+    return this.manager.observeJob(sessionId, jobId)
+  }
+
+  killJob(sessionId: SessionId, jobId: JobView['id']): Promise<boolean> {
+    return this.manager.killJob(sessionId, jobId)
   }
 
   noteAgentPreset(sessionId: SessionId, agentPreset: string): void {
@@ -959,7 +969,7 @@ export class SessionRuntime implements ISessions {
   /** Project the manager's list snapshot into the store (title derivation is display-only). */
   private projectList(): void {
     const {
-      items, current, phase, subagentsByParent, jobsBySession, currentAddress,
+      items, current, phase, subagentsByParent, jobsBySession, observedJobs, currentAddress,
     } = this.manager.getListSnapshot()
     const ids: SessionId[] = []
     const byId: Record<SessionId, SessionSummary> = {}
@@ -1036,8 +1046,10 @@ export class SessionRuntime implements ISessions {
         ...(currentAddress === undefined ? {} : { subagentAddress: currentAddress }),
       })
     }
-    this.list.set({ ids, byId, archivedById: NO_ARCHIVED_SUMMARIES, current, phase, subagentsByParent, jobsBySession, currentAddress })
-
+    this.list.set({
+      ids, byId, archivedById: NO_ARCHIVED_SUMMARIES, current, phase, subagentsByParent,
+      jobsBySession, observedJobs, currentAddress,
+    })
   }
 
   /**

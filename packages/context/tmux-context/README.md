@@ -1,3 +1,8 @@
+---
+description: "Opt-in durable per-step context with this agent's tmux pane and window location"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tmux-context
 
 English | [中文](README.zh.md)
@@ -8,6 +13,19 @@ Opt-in durable context naming the tmux session, window, and pane this agent proc
 
 `dsh-tmux-context` lets the model identify the tmux session, window, pane, and pane-tree layout containing its agent process. It adds a durable, source-attributed reading on the first step of a turn only when that location changed. Terminals that merely inherit tmux environment variables without running in the named pane add nothing; failed queries also add nothing and do not fail the turn. This package is opt-in and is not included in the shipped Web or headless profiles.
 
+## Table of Contents
+
+- [Config](#config)
+- [How it reads tmux](#how-it-reads-tmux)
+- [Timing semantics](#timing-semantics)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 ```yaml
@@ -19,6 +37,7 @@ Opt-in durable context naming the tmux session, window, and pane this agent proc
 
 `refreshIntervalMs` must be a non-negative safe integer. Omission or `0` injects whenever the tmux state changed since the last injection. A positive value additionally suppresses injections that fall within that many milliseconds of the latest one.
 
+<a id="how-it-reads-tmux"></a>
 ## How it reads tmux
 
 The plugin prepends an `agent/pre-step` listener that runs only on the first step of each turn. When due, it runs one read-only command through the `ctx.shell` executor service:
@@ -35,14 +54,17 @@ exec tmux display-message -t "$TMUX_PANE" -p '<format>'
 
 State is pulled on every eligible turn — a moved, renamed, or re-laid-out pane is picked up without any tmux hook or background process. The plugin re-injects only when the rendered tmux state differs from its last injection, so an unchanged location adds nothing.
 
+<a id="timing-semantics"></a>
 ## Timing semantics
 
 The plugin prepends an `agent/pre-step` listener. When an injection is due and the downstream decision enters the proposed step, it prepends one sourced `UserMessage` to the returned batch. AgentLoop records that context after `step/start` with source `{ kind: 'plugin', plugin: 'tmux-context' }`. Change suppression and interval scheduling scan the raw durable session events for the latest injection of this source, so the schedule survives compaction and resumed processes without process-local cache state; sessions schedule independently. A downstream pre-step listener that rejects or fails prevents the reading from being recorded.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Pane facts are sampled fresh from tmux on each turn; nothing is retained between samples.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Preparation-time tmux location
@@ -74,3 +96,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **Layout, not size** — pane/window pixel dimensions are omitted; only the layout tree and active flags are reported.
 - **Tab-delimited fields** — a tmux window name containing the literal two-character sequence `\t` would mis-split the reading and be skipped as malformed; ordinary names are unaffected.
 - **tty-based pane detection** — the process is considered "in tmux" only when its controlling terminal matches `$TMUX_PANE`'s `#{pane_tty}`. This deliberately excludes terminals that inherited `$TMUX`/`$TMUX_PANE` from a tmux ancestor (e.g. a VS Code integrated terminal). `ps -o tty=` is POSIX; the check is a no-op wherever it or `#{pane_tty}` is unavailable.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

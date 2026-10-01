@@ -1,3 +1,8 @@
+---
+description: "Model-facing subagent delegation tool over the ctx.subagents seam"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-subagent
 
 English | [中文](README.zh.md)
@@ -8,6 +13,18 @@ The model-facing delegation tool over one configured `ctx.subagents` provider. C
 
 Use this package to give an agent a named tool that delegates work to a configured child-agent backend. In `one-shot` mode, calls wait for the child by default; in `continuable` mode, they start a persistent child in the background and return an id for later messages. Supported backends can also expose approved child LLM providers, models, and reasoning effort for selection. Each instance can set child persona, tool access, and depth limits, while failed runs return errors instead of partial success.
 
+## Table of Contents
+
+- [Provider selection and lifecycle](#provider-selection-and-lifecycle)
+- [Config](#config)
+- [Concurrency](#concurrency)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="provider-selection-and-lifecycle"></a>
 ## Provider selection and lifecycle
 
 Each plugin instance binds one `provider` to one `toolName`; the model receives no provider selector. Load another distinctly named instance to expose another transport. The tool registers only while its provider exists, avoiding sibling load-order and provider-reload dependencies. Its description follows `provider.inheritsParentContext`: fresh children require standalone prompts, while forked children already see completed parent turns.
@@ -20,6 +37,7 @@ A foreground call passes the execution signal through startup and execution, awa
 
 The `subagent-model-selection` settings section is project-owned. Project managers may change only `enabled` and `allowedModels`; the Host validates them atomically, including rejection of an enabled empty allowlist. This preference does not override runtime model authorization.
 
+<a id="config"></a>
 ## Config
 
 | Key | Meaning |
@@ -34,12 +52,14 @@ The `subagent-model-selection` settings section is project-owned. Project manage
 | `toolFilter` | Per-child global-tool restriction; requires `toolFilter` capability. |
 | `maxDepth` | Absolute delegation-depth cap (`0` forbids delegation); omission reads the current Host `subagent.maxDepth` setting, initially `1`, at each delegation. A numeric cap requires the `depthLimit` capability and fails the mount without it. `'provider-managed'` sends no cap for an out-of-process provider whose budget belongs to the child harness. The tool stays visible at the cap; each attempted start checks the calling agent's current depth and returns an errored tool result when rejected. |
 
+<a id="concurrency"></a>
 ## Concurrency
 
 Standing presets with `modelSelectionSettings` await Agent-scoped tool installation during serial `agent/created` initialization. An installation conflict rejects creation and rolls back the unpublished Agent and Session; it cannot admit first-turn input with incomplete tools.
 
 Foreground and background calls are concurrency-safe: sibling delegations in one assistant message overlap under the loop's rolling pool (`maxParallelToolCalls`), and results still commit in model order. Children work in their own sessions and a run never mutates the parent session; the one-shot background form's one parent-owned write — registering a Task — is a synchronous, commutative insertion that tolerates concurrent dispatch, so overlapping background calls acquire their job ids in dispatch-race order. Coordinating sibling workspace effects belongs to the model, exactly as it already does for background and continuable children. See the [parallel subagent Agent Note](../../../.agents/notes/implemented/feature/2026-08-09-parallel-subagent-delegations.md) and the [parallel tool-call Agent Note](../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.md).
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Tool schema
@@ -123,3 +143,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **Background runs expose no result through this tool** — a one-shot task's final output is collected through the generic task surface, and a continuable child's output stays in its own session, read by its subagent id. The settlement notice states how that child ended and carries any final assistant message, but it is not this call's return value and cannot be awaited here.
 - **Duplicate names across waiting one-shot instances are detected late** (`TODO(subagent-dup-toolname)`) — continuable instances reserve their prompt-section name during plugin application, but preventing provider-registration rollback for waiting one-shot instances requires a registry of intended names.
 - **Child policy is fixed per instance** — another model, persona, tool filter, or depth cap requires another distinctly named tool.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

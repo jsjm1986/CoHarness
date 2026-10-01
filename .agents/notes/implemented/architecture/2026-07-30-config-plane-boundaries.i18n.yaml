@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-config-plane-boundaries.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-30-config-plane-boundaries.md
-2026-07-30-config-plane-boundaries.md: aab0d7a80c2732b33637ec721a9ab7c1b50fce3f
-2026-07-30-config-plane-boundaries.zh.md: 7e01aad93947266362cec31fdeab18524ea14cd9
+/agent-note-what-the-configuration-plane-exposes-and-who-may-overwrite-what:
+  en: 9951856882b247b7
+  zh: 64587e7a5ce09bba
+/agent-note-what-the-configuration-plane-exposes-and-who-may-overwrite-what/problem:
+  en: 52e0c3c9dfff679b
+  zh: f29eb421db6f0db0
+/agent-note-what-the-configuration-plane-exposes-and-who-may-overwrite-what/decision:
+  en: ec28b1f0a3195eeb
+  zh: 8fe2e884b6dfaf77
+/agent-note-what-the-configuration-plane-exposes-and-who-may-overwrite-what/alternatives-considered:
+  en: 35d3177495ce2a41
+  zh: 1a730986c28302e8
+/agent-note-what-the-configuration-plane-exposes-and-who-may-overwrite-what/consequences:
+  en: ca4b017e922807a8
+  zh: 3523d5514363ed4c

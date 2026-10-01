@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-message-feedback
 
 [English](README.md) | 中文
@@ -14,10 +19,22 @@
 
 消息控件继续在 Host 拥有的 sidecar 中保存可编辑评分与备注。单独输入 `/feedback` 会打开独立的 Session 弹窗，收集分类与可选说明；`/feedback <text>` 保留命令确认结果。弹窗通过 `sessionFeedback.record` 提交，追加一条仅写日志的 `feedback/record`，并可能按部署的遥测策略触发 Session 日志投递。两条路径均不启动模型回合。提交被拒绝时保留草稿供修正，成功后显示确认。草稿按 Session 隔离，在对应作用域结束时丢弃；迟到响应不能重新打开它。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。Host 拥有持久反馈；客户端控制器管理可销毁的读取、草稿和提交状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为消息评分仍保存在 sidecar 中，Session 意见仅写日志；两者均不进入模型上下文。
@@ -26,8 +43,19 @@
 
 无；反馈变更不改变模型可见的历史。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **备注大小是 Host 策略** —— 部署方配置 `maxNoteBytes`（Web bundle 中为 8192），超长备注由 Host 以 `note-too-large` 拒绝。编辑器不预先校验该上限，因此超长备注在保存时才失败，而不是在输入过程中。
 - **无跨标签页推送** —— 另一个标签页的评分要等到重连或下一次冲突响应才可见，不会立即出现；该 sidecar 不发布实时帧。
 - **仅限对话视图** —— trajectory 与 waterfall 视图不渲染反馈控件，尽管它们的助手节点现在也带有相同的 `messageId`。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/fs-sandbox/README.md
-README.md: a1493c3c9b1dd344928f0bcde4a7d4d6def19cad
-README.zh.md: 100887ce41b7ad75392b7571ae6d27b6787a8305
+/:
+  en: b6a3a9697c7d7b0c
+  zh: 61495d48365178df
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend:
+  en: 495db0c703fd8ec5
+  zh: 9f10c7fd693b19f3
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/summary:
+  en: ae186a7675a9332b
+  zh: 323e9043c1d90a83
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/table-of-contents:
+  en: 12fa5a4542da54d6
+  zh: 40d28c6e41b894c3
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/the-fence:
+  en: 874a8f3d89ce0050
+  zh: 0534642931826037
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/threat-model-a-policy-fence-not-a-kernel-boundary:
+  en: 0c4e06dc921f2eca
+  zh: 96a421755cb42696
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/invariants:
+  en: e1789848d76d3017
+  zh: 4b2ea8b8a0d665cc
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/model-experience/filesystem-policy-and-refusals:
+  en: 36178638b7ce9cf8
+  zh: 929c8292023f3541
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/model-experience/filesystem-policy-and-refusals/what-the-model-sees:
+  en: 388c39763c12dfe6
+  zh: bc3be0faeff618cd
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/model-experience/filesystem-policy-and-refusals/token-effect:
+  en: fd86bc3fc7106117
+  zh: 1b9eb71e5aba714b
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/model-experience/filesystem-policy-and-refusals/kv-cache-effect:
+  en: a4ca227f2f83edec
+  zh: de05cf2c21271b6b
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/known-limitations-and-deferred-work:
+  en: 1b75c63ff527c148
+  zh: baad86edab3efc0d
+/dsh-fs-sandbox-the-sandbox-enforcing-filesystem-backend/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

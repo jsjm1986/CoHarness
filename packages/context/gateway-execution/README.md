@@ -88,3 +88,13 @@ None; authorization references remain outside model request content and do not a
 - Provider and PostgreSQL tests establish identity and permission checks; complete assembled acceptance of every restored, delegated, and deployed Web path remains separate.
 - A verified participant set authorizes operations but does not confine trusted Host plugins or undo effects completed before cancellation.
 - Work outside the Jobs registry and unmanaged external processes require their own cancellation and isolation review.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -36,6 +36,7 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include, { type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import Group from '@deepseek-ai/cordis-plugin-group'
 import { scrubModelRequestBulk, stabilizeFixtureMessageIds } from '@deepseek-ai/dsh-session-snapshot'
+import type {} from '@deepseek-ai/dsh-client-connection'
 import { assertSessionFixtureVersion, parseSessionFixtureName, parseSnapshotManifest, redactSessionSnapshotIds, sessionFixtureFiles, sessionFixtureName } from '@deepseek-ai/dsh-session-snapshot'
 import {
   auditStartupEntries,
@@ -154,6 +155,17 @@ export interface WebScaffold {
   mode: WebSnapshotMode
   /** Browser-facing origin for the bound test server. */
   baseUrl: string
+  /**
+   * `baseUrl` carrying this process's launch token. The first navigation to it
+   * mints the browser-session cookie; a page may then reach `baseUrl` paths
+   * directly.
+   */
+  authenticatedUrl: string
+  /**
+   * Node-side fetch against the bound server with the browser session cookie
+   * attached; connects over loopback so remote authorities stay resolvable.
+   */
+  hostFetch(path: string, init?: RequestInit): Promise<Response>
   /** Settled root context (the in-process readiness barrier; headless event subscription is its sanctioned use). */
   ctx: Context
   /** Temp project directory sessions run in (shell/fs tool cwd). */
@@ -526,6 +538,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
   const originalCwd = process.cwd()
   const ctx = new Context()
   let port = 0
+  let authenticatedUrl = ''
+  let cookieHeader = ''
   let replayHandle: ReplayHandle | undefined
   try {
     process.chdir(workspaceCwd)
@@ -547,7 +561,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       return {
         packageName: manifest.name,
         packageDir,
-        patchPath: join(packageDir, 'cordis.patch.yml'),
+        patchPaths: [join(packageDir, 'cordis.patch.yml')],
         patches: [],
       }
     }))
@@ -557,6 +571,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       layers: extraLayers,
       patchPath: join(profileDir, 'cordis.patch.yml'),
       patches: [],
+      skippedBundles: [],
     }
     await healProfilesModuleFallback({ installAnchor: INSTALL_ANCHOR, home: harnessHome, profile })
     await mkdir(profileDir, { recursive: true })
@@ -593,6 +608,27 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       throw new Error('web e2e scaffold: webServer service missing after settled boot')
     }
     port = boundPort
+    // The browser authenticates by loading the tokenized URL; Node-side
+    // requests reuse the minted cookie. authorizeIndex runs in-process so the
+    // exchange also works for remote authorities Node cannot resolve.
+    authenticatedUrl = ctx.connection.authenticatedUrl(`http://${browserHost}:${port}`)
+    const exchange = new URL(ctx.connection.authenticatedUrl(`http://127.0.0.1:${String(port)}`))
+    let setCookie: string | undefined
+    const authorized = ctx.connection.authorizeIndex({
+      method: 'GET',
+      url: `${exchange.pathname}${exchange.search}`,
+      headers: { host: exchange.host },
+    }, {
+      writeHead(_status, headers) { setCookie = headers?.['set-cookie'] },
+      end() {},
+    })
+    if (authorized || setCookie === undefined) {
+      throw new Error('web e2e scaffold: browser token exchange did not return a session cookie')
+    }
+    cookieHeader = setCookie.split(';', 1)[0] ?? ''
+    if (cookieHeader.length === 0) {
+      throw new Error('web e2e scaffold: browser token exchange returned an empty session cookie')
+    }
 
     // Fill the open llm seam on the settled root ctx. Ordinary keyless modes
     // disable llm-deepseek; the first-run lane keeps it mounted but has no
@@ -661,10 +697,20 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     if (process.cwd() !== originalCwd) process.chdir(originalCwd)
   }
 
+  const baseUrl = `http://${browserHost}:${port}`
   return {
     harnessHome,
     mode,
-    baseUrl: `http://${browserHost}:${port}`,
+    baseUrl,
+    authenticatedUrl,
+    hostFetch(path: string, init: RequestInit = {}): Promise<Response> {
+      const target = new URL(path, baseUrl)
+      const headers = new Headers(init.headers)
+      headers.set('cookie', cookieHeader)
+      // *.localhost authorities resolve in Chromium but not in Node; the
+      // session cookie binds the loopback authority this request actually uses.
+      return fetch(`http://127.0.0.1:${String(port)}${target.pathname}${target.search}`, { ...init, headers })
+    },
     ctx,
     workspaceCwd,
     persistenceRoot,

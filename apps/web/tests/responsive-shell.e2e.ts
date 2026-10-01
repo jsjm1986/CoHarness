@@ -50,7 +50,7 @@ describe('web e2e: responsive shell modes', () => {
   async function openAt(width: number, height: number): Promise<Page> {
     const opened = await browser.newPage({ viewport: { width, height }, locale: 'en-US' })
     tripwire = watchConsole(opened)
-    await opened.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await opened.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await opened.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     return opened
   }

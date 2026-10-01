@@ -78,6 +78,7 @@ Alpha 迁移边会拒绝冻结清单之外的所有事件类型，包括带有 `
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -95,6 +96,7 @@ Alpha 迁移边会拒绝冻结清单之外的所有事件类型，包括带有 `
 
 对规范 v0 历史没有直接影响。有限 normalizer 会在生成当前包装层与确定性标识时保留模型可见内容。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-10-incremental-coverage-gate.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-10-incremental-coverage-gate.md
-2026-09-10-incremental-coverage-gate.md: 6c0bf0ac3123ae5234ba2dca762f000fbd789411
-2026-09-10-incremental-coverage-gate.zh.md: 04fa16ea81837074cba98cdef66fc2af048c0bd7
+/agent-note-incremental-coverage-gate:
+  en: 23055c76a28f8850
+  zh: b3e9d6398aaabdbe
+/agent-note-incremental-coverage-gate/problem:
+  en: d016e05183227cbd
+  zh: 6b9b7373be61fb64
+/agent-note-incremental-coverage-gate/decision:
+  en: 21006bbfd570743d
+  zh: adcf4f9b0c60ca4a
+/agent-note-incremental-coverage-gate/alternatives-considered:
+  en: bbc3f1eddba4fbee
+  zh: 16806f00b08ef4cf
+/agent-note-incremental-coverage-gate/consequences:
+  en: 0cc4d64fdf83289c
+  zh: 20b3fddb142cc125
+/agent-note-incremental-coverage-gate/tests:
+  en: 40b3d9c49ec83845
+  zh: 864af0e274d04dbf

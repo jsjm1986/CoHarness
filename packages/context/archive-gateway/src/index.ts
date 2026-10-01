@@ -681,7 +681,7 @@ async function removeTree(
   }
   for (const header of tree) await ctx.sessionPersistence.remove(header.id)
   for (const header of tree) {
-    if (registry.archivedSessionIds.includes(header.id)) await registry.restoreSession(header.id)
+    if (registry.archivedSessionIds.includes(header.id)) await registry.unarchiveSession(header.id)
   }
   headerCache.invalidate()
 }
@@ -697,7 +697,7 @@ async function mutateTree(
     const sessionId = header.id
     if (rootOf(String(sessionId), parents, roots) !== rootSessionId) continue
     if (action === 'restore') {
-      if (registry.archivedSessionIds.includes(sessionId)) await registry.restoreSession(sessionId)
+      if (registry.archivedSessionIds.includes(sessionId)) await registry.unarchiveSession(sessionId)
     } else {
       await registry.archiveSession(sessionId)
     }

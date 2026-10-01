@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-24-project-default-model-access.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-project-default-model-access.md
-2026-08-24-project-default-model-access.md: 929df7edc2b0e5e46e4bf91c8e208498d357f72e
-2026-08-24-project-default-model-access.zh.md: fa78a72bb595b16891f6508beca7792ca17a80d7
+/agent-note-project-default-model-authorization:
+  en: 39ccd6763e7347eb
+  zh: a8da882c94b76e89
+/agent-note-project-default-model-authorization/problem:
+  en: 67ac840e7ed576b0
+  zh: 8002277ad1a0af70
+/agent-note-project-default-model-authorization/decision:
+  en: 646e75b19caa9a6c
+  zh: 883d979218678863
+/agent-note-project-default-model-authorization/alternatives-considered:
+  en: 04612bb8b75383aa
+  zh: 20273934b361b676
+/agent-note-project-default-model-authorization/consequences:
+  en: fa351724e4e54328
+  zh: b72fa720fdd0e0b4
+/agent-note-project-default-model-authorization/verification:
+  en: b23dc4a07af42ae6
+  zh: 9089d6ecb0db8c28

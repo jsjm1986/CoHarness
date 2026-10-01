@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-15-document-content-identity-bytes.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-15-document-content-identity-bytes.md
-2026-09-15-document-content-identity-bytes.md: 39289fff4de923119351bb63bdb36f9012ac035c
-2026-09-15-document-content-identity-bytes.zh.md: d569e2ad773f6243cbbefca21ec21df6de84f6af
+/agent-note-document-content-serves-identity-bytes:
+  en: 9e4b1010f9cb5e9c
+  zh: 0aa082e1a9debff7
+/agent-note-document-content-serves-identity-bytes/problem:
+  en: b5b5457a3fb136cf
+  zh: 6ae2cbdfc2239176
+/agent-note-document-content-serves-identity-bytes/decision:
+  en: bc629a2f521c37b1
+  zh: 369ae55c7b2e4aaf
+/agent-note-document-content-serves-identity-bytes/alternatives-considered:
+  en: e9e91299c1583a4b
+  zh: 54a7488b3c4b7ab5
+/agent-note-document-content-serves-identity-bytes/consequences:
+  en: 02921048879b9909
+  zh: 3eff21d8ea0e7501
+/agent-note-document-content-serves-identity-bytes/verification:
+  en: a4e83800e897e642
+  zh: efe1e6888adc6330

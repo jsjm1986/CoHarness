@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-20-drop-bash-output-spill-files.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/rejected/simplification/2026-06-20-drop-bash-output-spill-files.md
-2026-06-20-drop-bash-output-spill-files.md: 55bd0dff02f5a09ceb5e557bbe6ddcf36f7791fe
-2026-06-20-drop-bash-output-spill-files.zh.md: e06d4426fc894dc816e4561e429d20daa7f77423
+/agent-note-drop-bash-full-output-spill-files:
+  en: 794e7f2e99481d55
+  zh: 575efbc4a3a29cd1
+/agent-note-drop-bash-full-output-spill-files/problem:
+  en: 9d9e1f7348ecb0c9
+  zh: 6bbe98dc66b5f5c5
+/agent-note-drop-bash-full-output-spill-files/proposal:
+  en: 63c5579c344f9313
+  zh: 57c2152b83c13c67
+/agent-note-drop-bash-full-output-spill-files/acceptance-criteria:
+  en: c19c7a6ae49a14df
+  zh: d738802365fbdf77
+/agent-note-drop-bash-full-output-spill-files/what-we-give-up:
+  en: b5d63f915adc45ef
+  zh: 57b67958b40aea13

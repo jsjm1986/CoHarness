@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-20-auto-review-denial-presentation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-20-auto-review-denial-presentation.md
-2026-09-20-auto-review-denial-presentation.md: 25a589aa9bfbcf804a4024fdffdfdc94c86bc163
-2026-09-20-auto-review-denial-presentation.zh.md: 2e944d19804a073c5992679c59f8a4f97302982d
+/agent-note-present-auto-review-denials-through-the-generic-tool-row:
+  en: 55b0e0d54836c74f
+  zh: 3a3c5083c213dc5b
+/agent-note-present-auto-review-denials-through-the-generic-tool-row/problem:
+  en: 230cb96950effc7f
+  zh: 4713fb82d913d42b
+/agent-note-present-auto-review-denials-through-the-generic-tool-row/decision:
+  en: c473365f294955ba
+  zh: 1a2a00759bd966c2
+/agent-note-present-auto-review-denials-through-the-generic-tool-row/alternatives-considered:
+  en: 72fe3456fb158af5
+  zh: f0c4a5705266bce3
+/agent-note-present-auto-review-denials-through-the-generic-tool-row/consequences:
+  en: b6a06cdd5554a44d
+  zh: f8a016049f1be135
+/agent-note-present-auto-review-denials-through-the-generic-tool-row/testing:
+  en: 3940310fff0feb2e
+  zh: 08906f97a916b0ef

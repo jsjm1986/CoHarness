@@ -12,9 +12,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { PanelActions } from './service.ts'
+import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { AppFrame } from './AppFrame.tsx'
 import { createLayoutStore } from './stores.ts'
 import { en, zh, type LayoutKey } from './locales.ts'
+import { en as shortcutEn, zh as shortcutZh } from './shortcut-locales.ts'
 import { LayoutController } from './service.ts'
 import { ThemePresenter } from './theme-presenter.ts'
 
@@ -37,6 +39,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Shell chrome copy (compact drawer toggle, overlay dismissal). */
     layout: LayoutKey
+    /** Sidebar command labels. */
+    'shortcuts.layout': keyof typeof shortcutZh
   }
 
   interface SlotMap {
@@ -146,7 +150,7 @@ export interface MobileHeaderActionOwnerProps {}
 const NS = 'layout'
 
 /** Required services (cordis fiber inject — the loader passes all module exports as an object plugin). */
-export const inject = ['slots', 'theme', 'locale']
+export const inject = ['slots', 'theme', 'locale', 'shortcuts']
 
 /**
  * Client plugin body: provide ctx.layout, then one register() call — AppFrame
@@ -156,10 +160,24 @@ export const inject = ['slots', 'theme', 'locale']
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-layout: dictionaries')
+  ctx.effect(() => ctx.locale.register('shortcuts.layout', { zh: shortcutZh, en: shortcutEn }), 'ui-layout: command labels')
+  const shortcutT = ctx.locale.bind('shortcuts.layout')
 
   const layout = new LayoutController()
   ctx.effect(() => {
     const disposeService = ctx.reflect.provide('layout', layout)
+    const disposeShortcut = ctx.shortcuts.register({
+      id: 'sidebar.left.toggle' as ShortcutCommandId, label: () => shortcutT('toggle'), aliases: ['sidebar', 'toggle left sidebar'],
+      defaults: {
+        'desktop:macos': { code: 'KeyB', modifiers: ['primary'] },
+        'desktop:windows': { code: 'KeyB', modifiers: ['primary'] },
+        'desktop:linux': { code: 'KeyB', modifiers: ['primary'] },
+        'web:macos': { code: 'KeyB', modifiers: ['primary', 'alt'] },
+        'web:windows': { code: 'KeyB', modifiers: ['primary', 'alt'] },
+      },
+      regions: ['page', 'editable'], modals: [],
+      resolve: () => ({ status: 'handled', run: () => { layout.toggleSidebar() } }),
+    })
     const disposeRegistration = ctx.slots.register({
       name: 'root',
       locale: NS,
@@ -181,6 +199,7 @@ export function apply(ctx: ClientContext): void {
       },
     }, AppFrame)
     return () => {
+      disposeShortcut()
       disposeRegistration()
       // provide()'s disposer settles asynchronously; teardown is synchronous fire-and-forget.
       void disposeService()

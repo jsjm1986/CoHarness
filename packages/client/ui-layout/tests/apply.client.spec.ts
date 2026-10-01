@@ -28,6 +28,7 @@ async function bench() {
   // seam for persistence; model this bench as a remote, memory-only browser.
   ctx.provide('locale', new LocaleRuntime(ctx))
   ctx.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
+  ctx.provide('shortcuts', { register: vi.fn(() => () => {}) } as never)
   // ui-theme's Appearance row binds a durable scope through these two.
   ctx.provide('remote', { $on: () => () => {} } as never)
   ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
@@ -38,7 +39,7 @@ async function bench() {
 
 describe('ui-layout client apply', () => {
   it('declares its service dependencies', () => {
-    expect(inject).toEqual(['slots', 'theme', 'locale'])
+    expect(inject).toEqual(['slots', 'theme', 'locale', 'shortcuts'])
   })
 
   it('provides ctx.layout and registers AppFrame with the shell child declarations', async () => {

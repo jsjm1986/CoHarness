@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-02-knip-generated-typert-dependencies.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-02-knip-generated-typert-dependencies.md
-2026-09-02-knip-generated-typert-dependencies.md: 76e195ed74f17a357c0507c91e803e5096546ca3
-2026-09-02-knip-generated-typert-dependencies.zh.md: db7577257e092caab1202aa6ae9083c561066416
+/agent-note-knip-accounts-for-generated-typert-runtime-dependencies:
+  en: 7e3bd796fa4a6ab4
+  zh: f88ae3d45c922931
+/agent-note-knip-accounts-for-generated-typert-runtime-dependencies/problem:
+  en: 0bd4d99898f4132c
+  zh: ed5f9d5f75480cdf
+/agent-note-knip-accounts-for-generated-typert-runtime-dependencies/decision:
+  en: 26401354b75b8f8b
+  zh: fa63dcda9873c7db
+/agent-note-knip-accounts-for-generated-typert-runtime-dependencies/verification:
+  en: 1eed61b20d93551f
+  zh: 0034f4385fe35a7f
+/agent-note-knip-accounts-for-generated-typert-runtime-dependencies/alternatives-considered:
+  en: aa2e61d8980c9c95
+  zh: 5391b8245921a31d
+/agent-note-knip-accounts-for-generated-typert-runtime-dependencies/consequences:
+  en: 82eda0f91121c41d
+  zh: d46fd16e6f88a20f

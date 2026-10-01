@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-03-hmr-initial-scan-boot-deadlock.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-03-hmr-initial-scan-boot-deadlock.md
-2026-08-03-hmr-initial-scan-boot-deadlock.md: 500c6b9e08e2094d410cc3df55b1f40bb6340882
-2026-08-03-hmr-initial-scan-boot-deadlock.zh.md: 4ed7ccf0ed147ec8c3f095fc5627e74b9a712e1f
+/agent-note-hmr-s-initial-scan-deadlocked-a-failing-boot-into-a-silent-exit-13:
+  en: 252e1815bc67fd3a
+  zh: 9a116a8f356c495c
+/agent-note-hmr-s-initial-scan-deadlocked-a-failing-boot-into-a-silent-exit-13/problem:
+  en: 13befe2738e06155
+  zh: fe6306dd0a38b6d7
+/agent-note-hmr-s-initial-scan-deadlocked-a-failing-boot-into-a-silent-exit-13/decision:
+  en: 162e139cfc86b9b3
+  zh: d3b1182996a4575f
+/agent-note-hmr-s-initial-scan-deadlocked-a-failing-boot-into-a-silent-exit-13/alternatives-considered:
+  en: cf5b4a94102eacfe
+  zh: accc5097d52f5a14
+/agent-note-hmr-s-initial-scan-deadlocked-a-failing-boot-into-a-silent-exit-13/consequences:
+  en: 4bc216fc30d65d14
+  zh: 24436fe26faf24b9
+/agent-note-hmr-s-initial-scan-deadlocked-a-failing-boot-into-a-silent-exit-13/testing:
+  en: bb6495d18025ff0b
+  zh: 286b53cbb1b799a9

@@ -584,10 +584,11 @@ export class SystemPrompt extends Service {
     const knownNames = new Set<string>()
     for (const provider of providers) {
       const result = provider(context)
-      const schemas = result.schemas.map(({ name, description, parameters }): ToolSchema => ({
+      const schemas = result.schemas.map(({ name, description, parameters, deferLoading }): ToolSchema => ({
         name,
         description,
         parameters: structuredClone(parameters),
+        ...deferLoading === undefined ? {} : { deferLoading },
       }))
       const acceptedKnownNames = result.knownNames ?? schemas.map(tool => tool.name)
       collected.push(...schemas)

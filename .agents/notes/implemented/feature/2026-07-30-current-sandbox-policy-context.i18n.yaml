@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-current-sandbox-policy-context.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-current-sandbox-policy-context.md
-2026-07-30-current-sandbox-policy-context.md: b4c657ba52ff26e2e295e3635201424a155738d0
-2026-07-30-current-sandbox-policy-context.zh.md: 6ded323020f5f618bb9f88d0e08829f521f34264
+/agent-note-current-sandbox-policy-context:
+  en: d69dfbb1460e202c
+  zh: 39ff2da82d516c40
+/agent-note-current-sandbox-policy-context/problem:
+  en: 566ef9e5d9199bbb
+  zh: c10adc01123cb37b
+/agent-note-current-sandbox-policy-context/decision:
+  en: 58213015cf73f9fb
+  zh: b075265020447221
+/agent-note-current-sandbox-policy-context/wording-evidence:
+  en: 03de865ba4a4d7cd
+  zh: a98d839d3bd5c578
+/agent-note-current-sandbox-policy-context/alternatives-considered:
+  en: 1da7e550d128cd4e
+  zh: bffac3a5a05cc9f6
+/agent-note-current-sandbox-policy-context/consequences:
+  en: 6d727531e9f498ea
+  zh: 5b6accd1b6986a35

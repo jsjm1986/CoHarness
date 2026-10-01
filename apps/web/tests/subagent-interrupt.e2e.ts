@@ -24,8 +24,8 @@ const WAKING = 'And add one concrete example.'
 type RpcResult<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } }
 
 /** POST one unary RPC through the real HTTP carrier and unwrap its result. */
-async function rpc<T>(baseUrl: string, method: string, payload: unknown): Promise<RpcResult<T>> {
-  const response = await fetch(`${baseUrl}/api/${method}`, {
+async function rpc<T>(scaffold: WebScaffold, method: string, payload: unknown): Promise<RpcResult<T>> {
+  const response = await scaffold.hostFetch(`/api/${method}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -92,7 +92,7 @@ describe.skipIf(MODE === 'record')('web e2e: subagents/interruptByParent over th
     })
 
     // A live parent Agent through the real API; no workspace or browser.
-    const created = await rpc<{ sessionId: string }>(scaffold.baseUrl, 'session.create', {
+    const created = await rpc<{ sessionId: string }>(scaffold, 'session.create', {
       cwd: scaffold.workspaceCwd,
     })
     if (!created.ok) throw new Error(`session.create failed: ${created.error.code}`)
@@ -122,7 +122,7 @@ describe.skipIf(MODE === 'record')('web e2e: subagents/interruptByParent over th
 
   it('parks a queued follow-up on interrupt and resumes it FIFO on a waking send', async () => {
     // Queue the follow-up while the turn is still open, then interrupt.
-    const queued = await rpc<{ messageId: string }>(scaffold.baseUrl, 'subagents/prompt', {
+    const queued = await rpc<{ messageId: string }>(scaffold, 'subagents/prompt', {
       args: {
         request: {
           requestId: randomUUID(),
@@ -137,7 +137,7 @@ describe.skipIf(MODE === 'record')('web e2e: subagents/interruptByParent over th
     expect(queued).toMatchObject({ ok: true })
 
     const settled = scaffold.whenTurnSettled()
-    const interrupted = await rpc<{ accepted: true }>(scaffold.baseUrl, 'subagents/interruptByParent', {
+    const interrupted = await rpc<{ accepted: true }>(scaffold, 'subagents/interruptByParent', {
       args: {
         parentSessionId: parentId,
         childSessionId: childId,
@@ -161,7 +161,7 @@ describe.skipIf(MODE === 'record')('web e2e: subagents/interruptByParent over th
 
     // Only an explicit waking send resumes the parked queue, FIFO, then the
     // child runs both turns to completion and settles.
-    const waking = await rpc<{ messageId: string }>(scaffold.baseUrl, 'subagents/prompt', {
+    const waking = await rpc<{ messageId: string }>(scaffold, 'subagents/prompt', {
       args: {
         request: {
           requestId: randomUUID(),

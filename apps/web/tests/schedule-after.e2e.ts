@@ -7,7 +7,7 @@ import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { AgentHandle } from '@deepseek-ai/dsh-agent'
 import { ToolCallId, createUserMessage, LlmAdapter } from '@deepseek-ai/dsh-llm'
-import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import {
   ScheduleId,
@@ -26,6 +26,12 @@ import {
   type WebScaffold,
 } from './scaffold.ts'
 import { connectFreshWorkspace, conversationContextKey, saveFailureShot } from './support.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'schedule-web-e2e': { kind: 'schedule-web-e2e' } & ContextFormed
+  }
+}
 
 const MODE = webSnapshotMode()
 const OVERLAY = fileURLToPath(new URL('../../../examples/web-schedule/cordis.yml', import.meta.url))
@@ -167,7 +173,7 @@ function requestText(options: GenerateOptions): string {
 /** Require one assembled request to preserve the reminder-content trust boundary. */
 function expectReminderFraming(options: GenerateOptions): void {
   const reminder = options.messages.find(message => (
-    message.source.kind === 'plugin' && message.source.plugin === 'schedule'
+    message.source?.kind === 'schedule'
   ))
   expect(reminder?.role).toBe('user')
   const text = reminder?.content.find(block => block.type === 'text')?.text
@@ -235,7 +241,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
     })
     await page.addInitScript(() => { localStorage.setItem('dsh.locale', 'en') })
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
     expect(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone))
@@ -336,7 +342,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
     })
     atHandle.agent.followup(createUserMessage({
       content: [{ type: 'text', text: 'Prepare the reminder test session.' }],
-      source: { kind: 'plugin', plugin: 'schedule-web-e2e' },
+      source: { kind: 'schedule-web-e2e' },
     }))
     await atHandle.agent.whenIdle()
     expect(atAdapter.requests).toHaveLength(1)
@@ -424,8 +430,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
 
     const batch = everyHandle.agent.session.snapshotEvents().find(event => (
       event.type === 'user/message'
-      && event.data.source.kind === 'plugin'
-      && event.data.source.plugin === 'schedule'
+      && event.data.source.kind === 'schedule'
       && event.data.content.some(block => block.type === 'text'
         && block.text.startsWith('[SCHEDULE REMINDER BATCH]'))
     ))

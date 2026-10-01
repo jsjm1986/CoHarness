@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-27-bounded-runtime-work-and-teardown-fences.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-27-bounded-runtime-work-and-teardown-fences.md
-2026-08-27-bounded-runtime-work-and-teardown-fences.md: 211d1f7433681ce215e42126986eebb34c85eedb
-2026-08-27-bounded-runtime-work-and-teardown-fences.zh.md: 04e958ea563f3fa6c3635d8b45d7fde2d6a64df5
+/agent-note-bounded-runtime-work-and-teardown-fences:
+  en: e30e46d5c7b78799
+  zh: 51896390fbc15bf3
+/agent-note-bounded-runtime-work-and-teardown-fences/problem:
+  en: 8955a97c1ebed9d3
+  zh: 658a6c2d0c641201
+/agent-note-bounded-runtime-work-and-teardown-fences/decision:
+  en: 0d7af84a7b2ce223
+  zh: 1a75e59b1bf04ef3
+/agent-note-bounded-runtime-work-and-teardown-fences/alternatives-considered:
+  en: bbfefca43a2322c2
+  zh: 2465b82e26e6ad85
+/agent-note-bounded-runtime-work-and-teardown-fences/consequences:
+  en: a35525cad13977cf
+  zh: 8804e16b92c3d748
+/agent-note-bounded-runtime-work-and-teardown-fences/verification:
+  en: ac8c6c11acfeee60
+  zh: bc63e214aee1e417

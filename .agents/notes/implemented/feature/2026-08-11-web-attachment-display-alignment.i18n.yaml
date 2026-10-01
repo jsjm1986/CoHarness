@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-web-attachment-display-alignment.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-11-web-attachment-display-alignment.md
-2026-08-11-web-attachment-display-alignment.md: dd3816661792b882a2ce77cf8b03cc5e4ad9965e
-2026-08-11-web-attachment-display-alignment.zh.md: 522527a4463684667a06c14623fb5620d3bf84b4
+/agent-note-web-attachment-display-aligns-with-deepseek-chat-via-attachment-atoms:
+  en: 2aca610b3a2aaf68
+  zh: e5d7ab1eef7d3796
+/agent-note-web-attachment-display-aligns-with-deepseek-chat-via-attachment-atoms/problem:
+  en: 958712a761d1d430
+  zh: 0db181b4b9c53f60
+/agent-note-web-attachment-display-aligns-with-deepseek-chat-via-attachment-atoms/decision:
+  en: 174d6f0255359e67
+  zh: 8e0cf1f58e74a0cc
+/agent-note-web-attachment-display-aligns-with-deepseek-chat-via-attachment-atoms/alternatives-considered:
+  en: 3072a127e41ba444
+  zh: 587ab69b731b2ad7
+/agent-note-web-attachment-display-aligns-with-deepseek-chat-via-attachment-atoms/consequences:
+  en: 5a9621d3f549d31e
+  zh: bc6e52601fb5cce5

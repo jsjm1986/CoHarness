@@ -88,11 +88,10 @@ export interface CreateAgentOptions {
   /** Exact fork-inherited prefix length when the session metadata sets `isSeeded`. */
   readonly inheritedEventCount?: SessionLogOffset
   /**
-   * Initial replay/fork history. A fork supplies a balanced completed-turn
-   * prefix of the parent's log. The complete seed must be contiguous from seq
-   * 0, carry only lossless-JSON data, and contain no open turn/step or dangling
-   * tool call. The factory passes it to the session's durable
-   * validator/snapshot boundary before publication.
+   * Initial replay/fork history, contiguous from seq 0 with lossless-JSON data.
+   * A fork supplies an exact parent prefix, its inherited marker, and closers
+   * for the open tail. Previously closed steps and turns remain unchanged.
+   * The factory validates and snapshots the seed before publication.
    */
   readonly seed?: readonly SessionEvent[]
   /** Per-agent options (model, …). */

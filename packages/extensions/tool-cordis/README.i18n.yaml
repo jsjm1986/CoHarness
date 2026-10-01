@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/tool-cordis/README.md
-README.md: 43a5f611e970e8166755eb83fcf3d72fa5cde263
-README.zh.md: a1ac05b25aa2738456e29e18431da3276d154267
+/:
+  en: 5170a9c6ec52b2a4
+  zh: 61495d48365178df
+/deepseek-ai-dsh-tool-cordis:
+  en: ea2c0ac7e7932a08
+  zh: 5562e6f26d700b64
+/deepseek-ai-dsh-tool-cordis/summary:
+  en: dc0b3e308b10aee5
+  zh: cd403ff9b865193d
+/deepseek-ai-dsh-tool-cordis/table-of-contents:
+  en: c2fe3eed0f712674
+  zh: 332c554d6a14857b
+/deepseek-ai-dsh-tool-cordis/usage:
+  en: fb16627d8a30828c
+  zh: bbd29b3caab5f636
+/deepseek-ai-dsh-tool-cordis/implementation:
+  en: d0607a15c8c1687e
+  zh: 71bd09b2b7ca5f67
+/deepseek-ai-dsh-tool-cordis/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-tool-cordis/model-experience/runtime-inspection:
+  en: 72ffb7cae674c31a
+  zh: 85674f298a78592a
+/deepseek-ai-dsh-tool-cordis/model-experience/runtime-inspection/what-the-model-sees:
+  en: bd67395804947203
+  zh: 1bfbf8be61b5f32c
+/deepseek-ai-dsh-tool-cordis/model-experience/runtime-inspection/token-effect:
+  en: 4406623ad09f758e
+  zh: 5e64ccda46d9a34a
+/deepseek-ai-dsh-tool-cordis/model-experience/runtime-inspection/kv-cache-effect:
+  en: 43abb93ad04cf078
+  zh: c410f6dbfc877abe
+/deepseek-ai-dsh-tool-cordis/known-limitations-and-deferred-work:
+  en: 88868111435b65f3
+  zh: 5788cd6e80e75315
+/deepseek-ai-dsh-tool-cordis/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-typert-loader
 
 [English](README.md) | 中文
@@ -14,10 +19,22 @@
 
 挂载 `dsh-typert-loader` 后，Loader 组合中每个挂载的包都会自动把其生成的 Typert 反射与 schema factory 贡献给运行时注册表——并在包或本插件卸载时自动撤销。没有该导出的包会被跳过，因此在任何 Loader 组合中挂载它都是安全的。显式 `packages` 用于覆盖嵌套在另一 Loader 配置项之下的插件，这些插件的 fiber 不携带可解析的包说明符。它是仅支持 Node 的插件，需要配置树解析锚点才能解析包。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。插件在加载时把生成的贡献注册到 `ctx.typert`；产物数据由注册表拥有。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为 loader 集成只注册生成的产物；任何模型可见投影均由消费方负责。
@@ -26,7 +43,18 @@
 
 无直接影响；注册变更只有通过读取注册表的消费方才会影响请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 发现机制只会导入宿主侧产物；若要为客户端运行时添加等价的发现机制，需要先有独立的组合所有者。
 - Loader 配置项会自动发现。嵌套插件或非 Loader 插件需要显式加入 `packages`，或由其所有者直接负责调用 `ctx.typert.register()`。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,0 +1,10 @@
+/* Centered load state for the eager chunk: the heavier ExcelBody.module.css belongs to the lazy chunk. */
+.loading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 16px;
+  color: var(--dsw-alias-label-secondary);
+}

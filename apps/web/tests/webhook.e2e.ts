@@ -94,7 +94,7 @@ describe('webhook composed delivery', () => {
     const page = await newEnglishPage(browser)
     onTestFailed(() => saveFailureShot(page, 'webhook-composed'))
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.getByText(reply, { exact: true }).waitFor()
     await page.locator('[data-turn-process="1"]').click()
     await page.locator('[data-context-summary]').filter({ hasText: 'github webhook handled by review' }).click()

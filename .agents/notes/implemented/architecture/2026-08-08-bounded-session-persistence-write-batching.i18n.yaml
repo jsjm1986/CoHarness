@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-bounded-session-persistence-write-batching.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-08-bounded-session-persistence-write-batching.md
-2026-08-08-bounded-session-persistence-write-batching.md: 234a1ca33abad7d9c3a9ea6bc36599be423e1b69
-2026-08-08-bounded-session-persistence-write-batching.zh.md: 21a9515e52d58bfdbc42a0183f655b5f17325c75
+/agent-note-bounded-session-persistence-write-batching:
+  en: 3a29d85e12f3af35
+  zh: 913d2cfa356dc055
+/agent-note-bounded-session-persistence-write-batching/problem:
+  en: 9115ce350d737c3b
+  zh: 52914195bb4f91c5
+/agent-note-bounded-session-persistence-write-batching/problem/quantified-baseline:
+  en: f21c2d885d231ebb
+  zh: 2ce440e45d5d4773
+/agent-note-bounded-session-persistence-write-batching/decision:
+  en: bdd85ad42ab7547c
+  zh: 2eec2dceae883399
+/agent-note-bounded-session-persistence-write-batching/alternatives-considered:
+  en: 833c370fee7b16db
+  zh: d5f5b1e12f31fcb5
+/agent-note-bounded-session-persistence-write-batching/verification:
+  en: 3792d33334dab97b
+  zh: 932290aecbf559c3
+/agent-note-bounded-session-persistence-write-batching/consequences:
+  en: 69fad522e7b3e32f
+  zh: 29786e3496c61bb1

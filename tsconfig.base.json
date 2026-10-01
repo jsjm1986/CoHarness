@@ -186,6 +186,7 @@
       "@deepseek-ai/dsh-client-hmr": ["./packages/client/hmr/src"],
       "@deepseek-ai/dsh-client-hmr/invariant": ["./packages/client/hmr/src/invariant.ts"],
       "@deepseek-ai/dsh-client-locale": ["./packages/client/locale/src"],
+      "@deepseek-ai/dsh-client-shortcuts": ["./packages/client/shortcuts/src"],
       "@deepseek-ai/dsh-client-modules": ["./packages/client/modules/src"],
       "@deepseek-ai/dsh-client-modules/invariant": ["./packages/client/modules/src/invariant.ts"],
       "@deepseek-ai/dsh-client-runtime": ["./packages/client/runtime/src"],
@@ -223,6 +224,7 @@
       "@deepseek-ai/dsh-client-ui-settings-plugin-inventory": ["./packages/client/ui-settings-plugin-inventory/src"],
       "@deepseek-ai/dsh-client-ui-settings-plugins": ["./packages/client/ui-settings-plugins/src"],
       "@deepseek-ai/dsh-client-ui-settings-unarchive-sessions": ["./packages/client/ui-settings-unarchive-sessions/src"],
+      "@deepseek-ai/dsh-client-ui-shortcuts": ["./packages/client/ui-shortcuts/src"],
       "@deepseek-ai/dsh-client-ui-sidebar-right": ["./packages/client/ui-sidebar-right/src"],
       "@deepseek-ai/dsh-client-ui-sidebar-right/client": ["./packages/client/ui-sidebar-right/src/client"],
       "@deepseek-ai/dsh-client-ui-sidebar-terminal": ["./packages/client/ui-sidebar-terminal/src"],
@@ -247,7 +249,6 @@
       "@deepseek-ai/dsh-experimental-agent-team": ["./packages/experimental/agent-team/src"],
       "@deepseek-ai/dsh-experimental-agent-team/invariant": ["./packages/experimental/agent-team/src/invariant.ts"],
       "@deepseek-ai/dsh-experimental-agent-team-profile": ["./packages/experimental/agent-team-profile/src"],
-      "@deepseek-ai/dsh-experimental-agent-team-web-profile": ["./packages/experimental/agent-team-web-profile/src"],
       "@deepseek-ai/dsh-experimental-client-ui-agent-team": ["./packages/experimental/client-ui-agent-team/src"],
       "@deepseek-ai/dsh-experimental-ptc-runtime-python": ["./packages/experimental/ptc-runtime-python/src"],
       "@deepseek-ai/dsh-experimental-tool-agent-team": ["./packages/experimental/tool-agent-team/src"],
@@ -281,6 +282,14 @@
       "@deepseek-ai/dsh-tool-present/types": ["./packages/deliverables/tool-present/src/types.ts"],
       "@deepseek-ai/dsh-workspace-changes/types": ["./packages/deliverables/workspace-changes/src/types.ts"],
       "@deepseek-ai/dsh-office-to-pdf/types": ["./packages/document/office-to-pdf/src/types.ts"],
+      "@deepseek-ai/dsh-util-code-language": ["./packages/util/code-language/src"],
+      "@deepseek-ai/dsh-util-workspace-path": ["./packages/util/workspace-path/src/index.ts"],
+      "@deepseek-ai/dsh-client-ui-jobs/client": ["./packages/client/ui-jobs/src/client/index.ts"],
+      "@deepseek-ai/dsh-client-shortcuts/client": ["./packages/client/shortcuts/src/client/index.ts"],
+      "@deepseek-ai/dsh-client-shortcuts/protocol": ["./packages/client/shortcuts/src/protocol.ts"],
+      "@deepseek-ai/dsh-client-ui-shortcuts/client": ["./packages/client/ui-shortcuts/src/client/index.ts"],
+      "@deepseek-ai/dsh-tool-cordis/host": ["./packages/extensions/tool-cordis/src/host.ts"],
+      "@deepseek-ai/dsh-token-meter/estimate": ["./packages/llm/token-meter/src/estimate.ts"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp-app": ["./packages/bundle/acp-app/src"],
@@ -354,6 +363,7 @@
       "@deepseek-ai/dsh-lazy-require": ["./packages/util/lazy-require/src"],
       "@deepseek-ai/dsh-llm": ["./packages/llm/llm/src"],
       "@deepseek-ai/dsh-llm-deepseek": ["./packages/llm/llm-deepseek/src"],
+      "@deepseek-ai/dsh-llm-deepseek-api-key": ["./packages/llm/llm-deepseek-api-key/src"],
       "@deepseek-ai/dsh-llm-mock-server": ["./packages/test-support/llm-mock-server/src"],
       "@deepseek-ai/dsh-llm-pi-ai": ["./packages/llm/llm-pi-ai/src"],
       "@deepseek-ai/dsh-llm-replay": ["./packages/test-support/llm-replay/src"],
@@ -381,6 +391,7 @@
       "@deepseek-ai/dsh-ptc-runtime-node": ["./packages/ptc-runtime/ptc-runtime-node/src"],
       "@deepseek-ai/dsh-pwsh-sandbox": ["./packages/shell/pwsh-sandbox/src"],
       "@deepseek-ai/dsh-repeat-tool-reminder": ["./packages/guard/repeat-tool-reminder/src"],
+      "@deepseek-ai/dsh-remote-mock": ["./packages/test-support/remote-mock/src"],
       "@deepseek-ai/dsh-sandbox": ["./packages/sandbox/sandbox/src"],
       "@deepseek-ai/dsh-sandbox-local": ["./packages/sandbox/sandbox-local/src"],
       "@deepseek-ai/dsh-sandbox-policy": ["./packages/sandbox/sandbox-policy/src"],
@@ -402,6 +413,7 @@
       "@deepseek-ai/dsh-session-format-v3-to-v4": ["./packages/session/session-format-v3-to-v4/src"],
       "@deepseek-ai/dsh-session-format-v4-to-v5": ["./packages/session/session-format-v4-to-v5/src"],
       "@deepseek-ai/dsh-session-format-v5-to-v6": ["./packages/session/session-format-v5-to-v6/src"],
+      "@deepseek-ai/dsh-session-format-v6-to-v7": ["./packages/session/session-format-v6-to-v7/src"],
       "@deepseek-ai/dsh-session-log-deepseek": ["./packages/session/session-log-deepseek/src"],
       "@deepseek-ai/dsh-session-log-deepseek/invariant": ["./packages/session/session-log-deepseek/src/invariant.ts"],
       "@deepseek-ai/dsh-session-log-export": ["./packages/session-query/session-log-export/src"],
@@ -487,6 +499,7 @@
       "@deepseek-ai/dsh-tool-web": ["./packages/web/tool-web/src"],
       "@deepseek-ai/dsh-tool-workflow": ["./packages/workflow/tool-workflow/src"],
       "@deepseek-ai/dsh-tool-workflow/invariant": ["./packages/workflow/tool-workflow/src/invariant.ts"],
+      "@deepseek-ai/dsh-tool-workspace-dependencies": ["./packages/skill/tool-workspace-dependencies/src"],
       "@deepseek-ai/dsh-tools": ["./packages/core/tools/src"],
       "@deepseek-ai/dsh-tools/invariant": ["./packages/core/tools/src/invariant.ts"],
       "@deepseek-ai/dsh-user-approval": ["./packages/interaction/user-approval/src"],
@@ -511,7 +524,6 @@
       "@deepseek-ai/dsh-workspace-changes": ["./packages/deliverables/workspace-changes/src"],
       "@deepseek-ai/dsh-workspace-dependencies": ["./packages/boot/workspace-dependencies/src"]
       // END generated package aliases
-
     }
   }
 }

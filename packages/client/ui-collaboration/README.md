@@ -1,3 +1,8 @@
+---
+description: "Project scope, shared-conversation visibility, and read-only collaboration UI"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-collaboration
 
 English | [中文](README.zh.md)
@@ -9,6 +14,17 @@ Gateway collaboration UI for the Web client. One plugin owns the account-context
 Use `dsh-client-ui-collaboration` for Gateway collaboration UI in the Web client: an account scope selector, staged root-conversation visibility, a conversation sharing menu, and a read-only project composer policy. One plugin contributes these through existing Client slots and session-create waterfall events, so shared project conversations work without a separate account surface.
 
 
+## Table of Contents
+
+- [User interface contract](#user-interface-contract)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="user-interface-contract"></a>
 ## User interface contract
 
 - `sidebar.footer.action` shows the active personal or project runtime, accessible memberships, `ro`/`rw` mode, and the next root conversation's `project` or `private` visibility. Changing runtime scope persists through `/account/api/scope` and reloads the page so every Host connection targets the selected runtime.
@@ -22,10 +38,12 @@ Use `dsh-client-ui-collaboration` for Gateway collaboration UI in the Web client
 
 Account context also publishes the current account's Full and Auto choice qualifications into the existing runtime UI policy. Refresh starts by withdrawing verification; a failed request keeps display context but does not retain permission eligibility. Connection reset aborts and discards the previous context request. Consumers combine that account value with their own connection's deployment facts, following the [permission UI rules](../ui-permission-presets/README.md).
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Collaboration truth lives on the Gateway behind authenticated endpoints; the plugin stages only request-scoped selections and composer policy in the page.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through host collaboration consumers, which own authorization and participant attribution for the state the browser UI selects.
@@ -39,3 +57,13 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **Full reload on scope change** — personal and project runtimes use independent Host connections and process state, so switching does not preserve the current page draft. While the Gateway prepares the target runtime, the client shows a non-dismissible status layer with the target name, startup stage, and elapsed wait; the reload still occurs after the scope mutation succeeds.
 - **Gateway-only transport** — failed or absent `/account/api/context` hides the collaboration controls and leaves the ordinary personal Web UI available.
 - **Browser-staged creation visibility** — the next-conversation choice defaults to project-visible after a page load; it is not stored as an account preference.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

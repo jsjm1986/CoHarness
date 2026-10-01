@@ -24,7 +24,7 @@ import type {
 } from './service.ts'
 import { SessionRuntime as Runtime } from './service.ts'
 import type { SessionFace } from '../contract/session.ts'
-import type { SubagentAddress } from '@deepseek-ai/dsh-api-remotes/client'
+import type { JobView, SubagentAddress } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionSearchResultItem } from './manager.ts'
 import type { RpcResult } from '@deepseek-ai/dsh-api-remotes/client'
 import { WorkspaceResourceError, workspaceResourceProvider } from '../workspace-resources.ts'
@@ -100,7 +100,7 @@ export class SessionRuntimePool implements ISessions {
     }
     this.list = createSnapshotStore<SessionListState>({
       ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'pending',
-      subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+      subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })
     this.currentScopeList = base.list
     this.subscribeEntry(baseEntry)
@@ -155,6 +155,7 @@ export class SessionRuntimePool implements ISessions {
     const archivedById: Record<SessionId, SessionSummary> = {}
     const subagentsByParent: SessionListState['subagentsByParent'] = {}
     const jobsBySession: SessionListState['jobsBySession'] = {}
+    const observedJobs: SessionListState['observedJobs'] = {}
     for (const entry of this.entries.values()) {
       const state = entry.runtime.list.getSnapshot()
       const archived = this.archivedByTarget.get(entry.key) ?? new Set<SessionId>()
@@ -175,6 +176,7 @@ export class SessionRuntimePool implements ISessions {
       }
       Object.assign(subagentsByParent, state.subagentsByParent)
       Object.assign(jobsBySession, state.jobsBySession)
+      Object.assign(observedJobs, state.observedJobs)
     }
     const current = this.activeSession !== undefined && byId[this.activeSession] !== undefined
       ? this.activeSession
@@ -190,7 +192,7 @@ export class SessionRuntimePool implements ISessions {
     this.list.set({
       ids, byId, archivedById, current: current !== undefined && byId[current] !== undefined ? current : undefined,
       phase: this.base.list.getSnapshot().phase,
-      subagentsByParent, jobsBySession,
+      subagentsByParent, jobsBySession, observedJobs,
       currentAddress: owner?.runtime.list.getSnapshot().currentAddress,
     })
   }
@@ -625,6 +627,19 @@ export class SessionRuntimePool implements ISessions {
    */
   refreshSubagents(parent: SessionId): Promise<void> {
     return this.sessionOwners.get(parent)?.runtime.refreshSubagents(parent) ?? Promise.resolve()
+  }
+
+  observeJob(sessionId: SessionId | undefined, jobId: JobView['id']): () => void {
+    // Unowned jobs answer on the base runtime; an owned job whose owner is not
+    // yet indexed also resolves there — the fenced read then answers
+    // job-not-found instead of dead-ending the observation.
+    const runtime = (sessionId === undefined ? undefined : this.sessionOwners.get(sessionId)?.runtime) ?? this.base
+    return runtime.observeJob(sessionId, jobId)
+  }
+
+  killJob(sessionId: SessionId, jobId: JobView['id']): Promise<boolean> {
+    const runtime = this.sessionOwners.get(sessionId)?.runtime ?? this.base
+    return runtime.killJob(sessionId, jobId)
   }
   /** Record the preset observed for one Session.
    * @param id - Session identity.

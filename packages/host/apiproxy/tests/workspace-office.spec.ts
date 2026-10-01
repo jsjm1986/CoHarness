@@ -29,7 +29,12 @@ async function harness({ mounted = true, bytes = 4 }: { mounted?: boolean; bytes
     await writeFile(outputPath, pdf)
     return { backend: 'native', missingFonts: ['Absent Serif'] }
   })
-  kit.create.mockReset().mockImplementation(async () => ({ backend: 'native', render, dispose: async () => {} }))
+  kit.create.mockReset().mockImplementation(async () => ({
+    backend: 'native', render, dispose: async () => {},
+    renderImages: vi.fn<Converter['renderImages']>().mockRejectedValue(new Error('Unexpected Converter.renderImages call')),
+    convert: vi.fn<Converter['convert']>().mockRejectedValue(new Error('Unexpected Converter.convert call')),
+    recalculate: vi.fn<Converter['recalculate']>().mockRejectedValue(new Error('Unexpected Converter.recalculate call')),
+  }))
   if (mounted) await ctx.plugin(OfficeToPdf, { maxInputBytes: 32, maxSourceBytes: 32 })
   const id = SessionId('office-reader')
   ctx.sessions.create(id, { meta: { cwd: root } })

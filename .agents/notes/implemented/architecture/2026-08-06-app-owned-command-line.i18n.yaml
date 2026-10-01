@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-app-owned-command-line.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-06-app-owned-command-line.md
-2026-08-06-app-owned-command-line.md: c60f37a198a5036214376ebad9f5fe74e33ca6f3
-2026-08-06-app-owned-command-line.zh.md: 93c80f17e2a4eafd26daceaa091bd444c2fe7ecd
+/agent-note-apps-own-their-command-line-through-ctx-cmdlineargs:
+  en: df38fa31444adc13
+  zh: 506473dae15adf44
+/agent-note-apps-own-their-command-line-through-ctx-cmdlineargs/problem:
+  en: 3b3283bb6fe6b0ce
+  zh: de48ab5a86573772
+/agent-note-apps-own-their-command-line-through-ctx-cmdlineargs/decision:
+  en: ad78b2120aff52dc
+  zh: c2183fe79e87e3ba
+/agent-note-apps-own-their-command-line-through-ctx-cmdlineargs/why-loader-owns-the-ordering:
+  en: 699e7be01c6e547a
+  zh: 0a184178649dbb9d
+/agent-note-apps-own-their-command-line-through-ctx-cmdlineargs/alternatives-considered:
+  en: bba525326757bab7
+  zh: 1d00fdeb1a6f61d6
+/agent-note-apps-own-their-command-line-through-ctx-cmdlineargs/consequences:
+  en: f26cc6bf71a8b4da
+  zh: 82a640576d7563b2

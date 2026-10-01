@@ -1,6 +1,6 @@
 /** Contributes workbench controls without importing the conversation renderer. */
-import { WorkspaceResourceError, commitSessionNavigation, parseWorkspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
-import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
+import { WorkspaceResourceError, commitSessionNavigation, parseWorkspaceResourceAddress, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
+import type { WorkspaceResourceOpenRequest, WorkspaceResourceSource } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientContext, ConversationViewport, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -18,10 +18,11 @@ import { en as pdfEn, zh as pdfZh } from './pdf/locales.ts'
 import { en as officeEn, zh as officeZh } from './office/locales.ts'
 import { en as markdownEn, zh as markdownZh } from './markdown/locales.ts'
 import { en as htmlEn, zh as htmlZh } from './html/locales.ts'
+import { en as excelEn, zh as excelZh } from './excel/locales.ts'
+import { Config } from '../config.ts'
 import { createReadHtmlRelative } from './html/read-relative.ts'
 import { packHtml } from './html/pack.ts'
 import { createHtmlDocument } from './html/bootstrap.ts'
-import { FontNotice } from './office/FontNotice.tsx'
 import { en, NS, zh } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -54,6 +55,7 @@ type WorkbenchViewport = ConversationViewport & {
 export function apply(ctx: ClientContext): void {
   const viewport = controller(ctx)
   const connection = ctx.get('connection') as ConnectionHandle | undefined
+  const config = Config((globalThis as { __DSH_WORKBENCH_CONFIG__?: unknown }).__DSH_WORKBENCH_CONFIG__ ?? {})
   const chooser = createWorkbenchStore()
   const lifetime = new AbortController()
   let disposed = false
@@ -64,6 +66,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('sidebarOffice', { zh: officeZh, en: officeEn }))
   ctx.effect(() => ctx.locale.register('sidebarMarkdown', { zh: markdownZh, en: markdownEn }))
   ctx.effect(() => ctx.locale.register('sidebarHtml', { zh: htmlZh, en: htmlEn }))
+  ctx.effect(() => ctx.locale.register('sidebarExcel', { zh: excelZh, en: excelEn }), 'ui-workbench: excel dictionaries')
   const openResource = (request: WorkspaceResourceOpenRequest): void => {
     const target = ctx.sessions.runtimeTargetFor?.(request.sessionId) ?? { kind: 'base' as const }
     if (target.kind !== request.runtimeTarget.kind || (target.kind === 'project' && request.runtimeTarget.kind === 'project' && target.projectId !== request.runtimeTarget.projectId)) {
@@ -82,18 +85,37 @@ export function apply(ctx: ClientContext): void {
   }), 'ui-workbench: workspace file tab')
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
     name: 'sidebar.right.pane.tab', key: 'workspace-file', locale: NS,
-    inject: sessionId => ({
-      ...createWorkspacePreviewReaders(connection),
-      pdfT: ctx.locale.bind('sidebarPdf'),
-      officeT: ctx.locale.bind('sidebarOffice'),
-      markdownT: ctx.locale.bind('sidebarMarkdown'),
-      htmlT: ctx.locale.bind('sidebarHtml'),
-      resources: ctx.workspaceResources,
-      renderHtml: async (data, read, request, lifetime, signal) =>
-        createHtmlDocument(await packHtml(data, createReadHtmlRelative(read, request, lifetime), signal)),
-      fontNotice: FontNotice,
-      runtimeTarget: () => ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const },
-    }),
+    inject: (sessionId) => {
+      const runtimeTarget = () => ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const }
+      const sourceFor = (address: string): WorkspaceResourceSource | undefined => {
+        // The empty key is a hidden tab: no source, no subscription.
+        if (address === '') return undefined
+        const parsed = parseWorkspaceResourceAddress(address)
+        if (parsed === undefined || parsed.sessionId !== sessionId) return undefined
+        return ctx.workspaceResources.source({
+          sessionId, path: parsed.path,
+          address: workspaceResourceAddress(sessionId, parsed.path),
+          runtimeTarget: runtimeTarget(),
+        })
+      }
+      return {
+        ...createWorkspacePreviewReaders(connection),
+        pdfT: ctx.locale.bind('sidebarPdf'),
+        officeT: ctx.locale.bind('sidebarOffice'),
+        markdownT: ctx.locale.bind('sidebarMarkdown'),
+        htmlT: ctx.locale.bind('sidebarHtml'),
+        excelT: ctx.locale.bind('sidebarExcel'),
+        excelLimits: config.excel,
+        keyedHooks: { workspaceResource: sourceFor },
+        reloadResource: request => ctx.workspaceResources.source(request).reload(),
+        revokeResource: (request, message) => {
+          ctx.workspaceResources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', message))
+        },
+        renderHtml: async (data, read, request, lifetime, signal) =>
+          createHtmlDocument(await packHtml(data, createReadHtmlRelative(read, request, lifetime), signal)),
+        runtimeTarget,
+      }
+    },
   }, WorkspaceFileTab))
   ctx.on('workspace/resource-open', (request) => {
     if (ctx.get('workspaceResources')?.hasProvider(request.runtimeTarget) !== true || connection === undefined) return

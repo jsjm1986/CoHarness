@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-subagent-acp
 
 [English](README.md) | 中文
@@ -8,6 +13,22 @@ ACP（Agent Client Protocol）提供方会在全新的子进程中运行每个 s
 
 使用本包可将任务委派给运行在全新子进程中的 ACP 兼容 agent；子 agent 拥有独立的运行时、会话、模型和工具。每次运行只共享选定的工作目录，通过 ACP 发送任务，并返回子 agent 的最终答案或安全错误；中间消息和工具流量不会进入父级对话。权限提示由配置的策略自动应答，无需人工介入。当委派需要进程隔离或需要使用非 Harness ACP agent 时选择本包；当子 agent 必须共享父级能力时，选择进程内后端。
 
+## 目录
+
+- [启动与所有权](#start-and-ownership)
+- [能力与上下文](#capabilities-and-context)
+- [配置](#configuration)
+- [持续成员（`resume`）](#persistent-members-resume)
+- [结束原因映射](#stop-reason-mapping)
+- [进程边界](#process-boundary)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="start-and-ownership"></a>
 ## 启动与所有权
 
 `start(request)` 先解析子 agent 的工作目录，再依次执行 `spawn` → ACP `initialize` → `newSession`，然后才兑现。因此，兑现表示远程会话已就绪，所有权也已转移给调用方。spawn 失败、初始化失败、新建会话失败或因发布前取消而失败时，会等待子进程清理后再拒绝；清理失败会保留在拒绝结果中，而不会声称进程已完全停稳。工作目录解析失败则会在尚未 spawn 任何进程时拒绝。
@@ -20,10 +41,12 @@ ACP（Agent Client Protocol）提供方会在全新的子进程中运行每个 s
 
 `dispose()` 是幂等的。它会移除信号监听器，在可行时请求 ACP 取消，然后使用该 seam 定义的操作运行本后端自有的拆卸阶梯（`disposeAcpChild`）：先关闭 stdin 并等待 `disposeEofGraceMs` 让子进程协作式完全停稳，再触发句柄的 `terminate()` 升级（SIGTERM、spawn 宽限期、SIGKILL——Windows 直接强制终止），并等待子进程责任方给出受管进程范围的退出证明。协作式退出观察失败后，仍会执行终止和最终等待。单次观察失败会原样保留；两次等待都失败时会聚合错误。仅凭命令结果已拒绝，不能证明受管进程范围已完全停稳。每次运行都使用全新进程；尚未实现进程池。
 
+<a id="capabilities-and-context"></a>
 ## 能力与上下文
 
 ACP 不声明任何启动时能力，因为当前进程无法强制执行远程子 agent 的深度、工具过滤、persona 或结构化输出运行时。它也报告 `inheritsParentContext: false`：远程会话从全新状态开始，唯一源自父级的输入是上述工作区 cwd；对话上下文不会跨越进程边界。
 
+<a id="configuration"></a>
 ## 配置
 
 | 键 | 默认值 | 含义 |
@@ -52,6 +75,7 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
       DEEPSEEK_API_KEY: !!js process.env.DEEPSEEK_API_KEY
 ```
 
+<a id="persistent-members-resume"></a>
 ## 持续成员（`resume`）
 
 设置 `resume: true` 后提供方声明 `prepareContinuable`，`ctx.subagents.startContinuable` 即可接受它——包括 Team roster 的提供方选择通道。成员子级是由 continuation 管理器拥有的普通进程内 Agent（耐用身份、inbox、持久化、重启）；本包只提供模型路由：每次成员模型调用 spawn 一个 ACP 子进程，挂载成员的耐用 ACP 会话（已绑定时 `session/load`，首轮 `session/new`），发出一次提示词，然后处置进程。
@@ -60,6 +84,7 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 
 未设置 `resume` 时提供方保持仅一次性能力——没有 `prepareContinuable`，可继续启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
 
+<a id="stop-reason-mapping"></a>
 ## 结束原因映射
 
 | ACP | Harness |
@@ -70,16 +95,20 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 | `cancelled` | `aborted` |
 | `max_turn_requests` 或未知值 | `error` |
 
+<a id="process-boundary"></a>
 ## 进程边界
 
 子进程经由 [`dsh-subprocess`](../../subprocess/subprocess/README.zh.md) seam spawn：共享的凭据清除先移除疑似凭据的环境变量和环境中已有的 `DSH_*` 名称，显式 `config.env` 值在清除之后合并（有意转发的 `DEEPSEEK_API_KEY` 会保留下来，`DSH_PERMISSION_MODE` 这类 `DSH_*` 部署事实也以同样的方式到达子进程——清除只丢弃其陈旧的同名环境值），stderr 会继承到父进程自身的流，dispose 则先应用本插件的 EOF 时间窗，再由子进程责任方执行 SIGTERM→SIGKILL 升级并等待受管进程范围退出。提供方负责说明其进程约束和观察能力的限制。ACP 协议格式（wire format）是真正的序列化边界；同进程 subagent 值不会为防御目的而克隆。
 
 本包没有默认导出。否则 Cordis loader 的解包会隐藏具名 `inject` 元数据；见[事故复盘（postmortem）0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每次运行通过 ACP 有线驱动一个子方；子方的运行时拥有其会话，提供方只持有进行中的客户端。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 子 agent 请求
@@ -110,6 +139,7 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 
 仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **每次运行使用全新进程**：持久进程池属于后续优化（见 [seam Agent Note](../../../.agents/notes/implemented/feature/2026-06-21-subagent-capability-seam.zh.md)）。
@@ -117,3 +147,13 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 - **不支持可选启动时能力**：该提供方无法在远程进程内应用本地 harness 的 `outputSchema`、深度上限、工具过滤器或 persona，因此不会声明这些能力；服务会拒绝需要它们的请求。
 - **只收集已提交的 `agent_message_chunk` 文本**：自动化服务器把推理（reasoning）、工具活动、计划和其他 trace 数据保留在子 agent 会话日志中，不通过 ACP 发出。
 - **权限提示自动回答**（`permission: allow | reject`）：不会把子 agent 的 `session/request_permission` 呈现给人。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

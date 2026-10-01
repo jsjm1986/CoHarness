@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import {
-  IconCodeOutline16, IconInspectOutline12, StateDot,
+  IconCodeOutline16, IconInspectOutline12,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
@@ -11,6 +11,7 @@ import { cordisToolViewKey } from './run-card-index.ts'
 import type { CordisRunCardFace } from './slots.ts'
 import { cordisVisibleStatus, type CordisVisibleStatus } from './status.ts'
 import type { CordisKey } from './locales.ts'
+import { CordisPreparingRow } from './CordisPreparingRow.tsx'
 import css from './CordisRunRow.module.css'
 
 /** Full Run-card props including its declared Package business-view child slot. */
@@ -32,10 +33,17 @@ const READING_LABELS = {
 } as const satisfies Record<RunReading, CordisKey>
 
 /** Render one activation result and, when eligible, its Package-owned view. */
-export function CordisRunRow({
+export function CordisRunRow(props: CordisRunRowProps) {
+  if (props.phase === 'preparing') return <CordisPreparingRow {...props}
+    icon={<IconCodeOutline16 size={14} />} title={props.t('row.runTitle')}
+    className={css.card} rowClassName={css.row} titleClassName={css.title} />
+  return <StartedCordisRunRow {...props} />
+}
+
+function StartedCordisRunRow({
   callId, block, inspect, renderSlot, useInventory, useLoaded, useRunCards, useActiveRuns,
   onObserveRunCard, t,
-}: CordisRunRowProps) {
+}: Exclude<CordisRunRowProps, { phase: 'preparing' }>) {
   const card = cordisRunCard(block)
   const inventory = useInventory(snapshot => snapshot)
   const loaded = useLoaded(snapshot => snapshot)
@@ -94,11 +102,7 @@ export function CordisRunRow({
     >
       <div className={css.row}>
         <span className={css.icon}>
-          {card.state === 'error'
-            ? <StateDot state="error" />
-            : card.state === 'stopped'
-              ? <StateDot state="warning" />
-              : <IconCodeOutline16 size={14} />}
+          <IconCodeOutline16 size={14} />
         </span>
         <span className={css.title}>{t(card.mode === 'update' ? 'row.updateTitle' : 'row.runTitle')}</span>
         <span className={css.separator} aria-hidden />

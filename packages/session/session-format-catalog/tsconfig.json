@@ -40,6 +40,9 @@
     },
     {
       "path": "../session-format-v5-to-v6"
+    },
+    {
+      "path": "../session-format-v6-to-v7"
     }
   ]
 }

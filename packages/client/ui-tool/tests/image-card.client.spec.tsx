@@ -17,7 +17,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  RunningToolCall, SessionId, SessionListState, ToolResultNode,
+  RunningToolCall, SessionId, SessionListState, StartedToolCall, ToolResultNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { MessageImagesOwnerProps, RenderMessageImages } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
@@ -54,8 +54,8 @@ const withImage = (attachment: unknown) => [
   { type: 'image', attachment },
 ]
 
-const running = (over?: Partial<RunningToolCall>): RunningToolCall => ({
-  callId: 'c1', name: 'read_image', argsRaw: ARGS,
+const running = (over?: Partial<StartedToolCall>): StartedToolCall => ({
+  phase: 'start', callId: 'c1', name: 'read_image', argsRaw: ARGS,
   turn: 1, step: 1, time: 1_000, callView: null, subCalls: [], ...over,
 })
 
@@ -265,7 +265,7 @@ describe('ReadImageRow keyed toolview', () => {
     archivedById: {},
     current: SID,
     phase: 'ready',
-    subagentsByParent: {}, jobsBySession: {},
+    subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })
 

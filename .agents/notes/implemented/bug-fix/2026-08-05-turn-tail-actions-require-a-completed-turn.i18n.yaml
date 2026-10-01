@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-05-turn-tail-actions-require-a-completed-turn.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-05-turn-tail-actions-require-a-completed-turn.md
-2026-08-05-turn-tail-actions-require-a-completed-turn.md: 44a890c955089096204a5b2a2833905c9ef9f7ed
-2026-08-05-turn-tail-actions-require-a-completed-turn.zh.md: 71eb7acc42e3c03065891a92c2ce82ce12e2cda0
+/agent-note-turn-tail-iconactions-require-a-completed-turn:
+  en: 67dae946350c556d
+  zh: ad8ca679c73e5dbb
+/agent-note-turn-tail-iconactions-require-a-completed-turn/problem:
+  en: 4bb5d9deebcfa8cf
+  zh: ada97ad2967947de
+/agent-note-turn-tail-iconactions-require-a-completed-turn/decision:
+  en: bd648edd9d45196e
+  zh: 7d30097d3bfb1f36
+/agent-note-turn-tail-iconactions-require-a-completed-turn/alternatives-considered:
+  en: 72009b4855cc9dc7
+  zh: a156ad1eb607a967
+/agent-note-turn-tail-iconactions-require-a-completed-turn/consequences:
+  en: ea1d382e5b1c7f5b
+  zh: b9e7091b55b92846

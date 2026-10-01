@@ -148,7 +148,7 @@ function hasAssistantText(events: readonly SessionEvent[], text: string): boolea
 
 /** Caller-supplied user message texts in log order (runtime-context snapshots excluded). */
 function userTexts(events: readonly SessionEvent[]): string[] {
-  return events.flatMap(event => event.type === 'user/message' && event.data.source.kind !== 'plugin'
+  return events.flatMap(event => event.type === 'user/message' && event.data.source.kind !== 'runtime-context'
     ? event.data.content.flatMap(block => block.type === 'text'
       && !block.text.startsWith('Your parent agent id is ')
       ? [block.text]
@@ -2485,7 +2485,7 @@ describe('continuable review regressions', () => {
   })
 
   it.each([
-    { label: 'plugin', source: { kind: 'plugin' as const, plugin: 'tool-jobs' } },
+    { label: 'plugin', source: { kind: 'tool-jobs' as const } },
     { label: 'non-plugin', source: { kind: 'team-message', teamId: 't-1' } as never },
   ])('keeps an idle child resident while its Inbox holds $label injected context', async ({ source }) => {
     const release = Promise.withResolvers<undefined>()
@@ -2519,7 +2519,7 @@ describe('continuable review regressions', () => {
     // a driver, so residency must survive until that turn claims the message.
     const steered = createUserMessage({
       content: message('Cordis Host handler failed'),
-      source: { kind: 'plugin', plugin: 'cordis-host-runner' },
+      source: { kind: 'cordis-host-runner' },
     })
     child.steer(steered)
     ctx.subagents.interrupt(started.childId, { kind: 'user', parentSessionId: parent.id })

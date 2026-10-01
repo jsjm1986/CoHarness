@@ -174,6 +174,7 @@ V2 `session-log-deepseek/delivery-accepted` 若携带 `data.sessionFormatVersion
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -191,6 +192,7 @@ V2 `session-log-deepseek/delivery-accepted` 若携带 `data.sessionFormatVersion
 
 迁移边保留历史请求含义与模型配置；它不保证提供方缓存命中，也不保证与原生 V3 录制字节相同。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>

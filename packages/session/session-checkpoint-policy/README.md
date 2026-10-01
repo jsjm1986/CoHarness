@@ -1,3 +1,8 @@
+---
+description: "Semantic session durability checkpoints before model requests and tool side effects"
+kind: "package-reference"
+---
+
 # dsh-session-checkpoint-policy
 
 English | [中文](README.zh.md)
@@ -8,6 +13,17 @@ Semantic durability policy for persisted agents. It checkpoints the event-source
 
 Use this package with a session persistence backend to make work durable before a model request, before a top-level tool can cause external effects, and before the next agent step begins. After each checkpoint, work can resume after a crash from stored requests, tool calls, responses, and results without loss. Checkpoint failures are fail-closed: a model adapter or top-level tool body does not run until the durable write succeeds. The package has no configuration and adds no prompt or tool schema; unfinished Assistant streams remain transient, and interrupted tool calls recover with an unknown outcome instead of an automatic retry.
 
+## Table of Contents
+
+- [Plugin (namespace: `session-checkpoint-policy`)](#plugin-namespace-session-checkpoint-policy)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="plugin-namespace-session-checkpoint-policy"></a>
 ## Plugin (namespace: `session-checkpoint-policy`)
 
 This zero-config function plugin consumes `ctx.sessions`, `ctx.llm`, `ctx.tools`, and the presence of `ctx.sessionPersistence`. Load it beside one persistence backend:
@@ -26,10 +42,12 @@ The policy wraps `llm/stream` lazily, so the downstream stream is not constructe
 
 Checkpoint rejection is fail-closed at the model and tool boundaries: neither the adapter nor the top-level tool body runs. A step-boundary rejection fails the turn before another request starts. Concurrent tool checkpoints share the session store's serialized persistence drain and cannot duplicate sequence numbers.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The policy triggers checkpoints on the owning session at defined boundaries; it stores no checkpoint data itself.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Interrupted calls
@@ -51,3 +69,13 @@ The repair result is appended after the reusable prefix, so it does not invalida
 - The policy durably records execution intent, not generic exactly-once effects. Side-effecting tools should forward `exec.callId` as an idempotency key when their provider supports one.
 - Streaming `assistant/chunk` events have no per-chunk checkpoint. Bounded background batches normally persist them before the next semantic checkpoint, but a hard crash may lose the current in-memory batch or outstanding write.
 - A persisted call without a result cannot prove whether its external effect completed. Recovery therefore records an unknown outcome instead of retrying automatically.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

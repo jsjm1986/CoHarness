@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-stats
 
 [English](README.md) | 中文
@@ -8,6 +13,18 @@
 
 本包通过公开的 `sessionStats` 值，为客户端提供全会话轮次与步骤计数，以及 LLM、工具、首 token 和解码墙钟时间。这些数字来自完整的持久日志，因此分页与压缩不会改变它们。当客户端必须在重新加载或缩减历史记录后显示一致的会话统计时，请使用本包。全会话统计不可用时，客户端可改用窗口口径计数。
 
+## 目录
+
+- [折叠语义](#fold-semantics)
+- [组合](#composition)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知局限与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="fold-semantics"></a>
 ## 折叠语义
 
 - `steps` 统计 `step/end` 事件。agent loop 对每个进入的步在 `finally` 中恰好追加一条，因此完成、失败、取消、max-tokens 的步全部计入。若改按已组装的 assistant 消息计数，则会多算 max-tokens 的 usage 宿主消息（空内容、被排除在 surface 之外），并少算被取消的步（在消息组装前已中止）。
@@ -18,6 +35,7 @@
 - `toolMs` 按 callId 配对累加 `tool/call` → `tool/result`；未解决的调用在 `turn/end` 时丢弃（结果总在其轮内落地）。
 - 每个字段在首个贡献事件之前均为 0。已装配的 registry 恒提供该键，客户端读取值本身，而非键的存在性。
 
+<a id="composition"></a>
 ## 组合
 
 ```yaml
@@ -27,9 +45,11 @@
 
 注入 `sessionProjections`——这是插件的全部用途；在没有 registry 的装配中 fiber 保持挂起，不注册任何内容。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该单元是经投影 seam 提供的对持久日志的纯折叠；除该折叠外不拥有状态。
+
 
 ## 模型体验
 
@@ -39,9 +59,22 @@
 
 无；本包从不组装或发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知局限与延后工作
 
 - **步数统计的是已发生的工作，而非可见输出**——在产生任何可见内容前就失败的步仍以 `step/end` 关闭并计入；被崩溃打断的步在会话重新加载后计入，届时崩溃恢复为其补写合成的 `step/end`（dsh-session 的 `interruptedTurnClosers`）。
 - **被取消的步计数但不计时**——没有组装出 assistant 消息，其部分流式时间不进入任何墙钟数字，与窗口折叠的无计时 interrupted 节点一致；反之 max-tokens 的 usage 宿主消息贡献 surface 上看不到的模型时间。
 - **计数是日志口径，不是 surface 口径**——消息后来被压缩掉的步仍然计入；数字描述整个会话，而非当前模型可见 surface。
 - **仅挂载于 web-app bundle**——其他装配不提供 `sessionStats` 键，其消费者回退到窗口口径计数（Web 统计条的回退路径）。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>
+
+<a id="model-experience"></a>

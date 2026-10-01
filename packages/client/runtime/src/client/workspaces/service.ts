@@ -77,6 +77,12 @@ export interface WorkspaceListState {
    * build their own transient Set.
    */
   archivedSessionIds: readonly SessionId[]
+  /**
+   * Registry-global pin set in Host pin order (most recently pinned first):
+   * pinned sessions lead their grouping-surface section. Same plain-array
+   * posture as `archivedSessionIds`.
+   */
+  pinnedSessionIds: readonly SessionId[]
   /** Versioned archive snapshot revision, when supplied by the Host. */
   archiveRevision?: number
   state: 'idle' | 'loading' | 'error'
@@ -125,7 +131,7 @@ export class WorkspaceRuntime implements IWorkspaces {
   constructor(ctx: Context, private readonly api: IApiClient, private readonly sessions: SessionsPort) {
     this.manager = new WorkspaceManager(api)
     this.list = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'pending', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'pending', error: null,
       archiveRevision: 0,
       baselinesReady: false, recentWorkspaceId: undefined,
     })
@@ -428,6 +434,30 @@ export class WorkspaceRuntime implements IWorkspaces {
   }
 
   /**
+   * Pin a session so it leads its grouping-surface section in Host pin
+   * order. The echoed pin set re-orders every grouping surface; a
+   * superseded echo (a later pin request, a pushed pin frame, or a refresh
+   * baseline) installs nothing.
+   * @param sessionId - session to pin.
+   */
+  async pinSession(sessionId: SessionId): Promise<void> {
+    const result = await this.manager.pinSession(sessionId)
+    if (!result.ok) throw new Error(`session pin failed: ${result.error.code}: ${result.error.message}`)
+  }
+
+  /**
+   * Drop a session from the registry-global pin set, restoring it to the
+   * ordinary part of every grouping-surface section. Idempotent: an id
+   * that is not pinned resolves as a no-op, and a superseded echo installs
+   * nothing — the same race posture as {@link pinSession}.
+   * @param sessionId - pinned session to unpin.
+   */
+  async unpinSession(sessionId: SessionId): Promise<void> {
+    const result = await this.manager.unpinSession(sessionId)
+    if (!result.ok) throw new Error(`session unpin failed: ${result.error.code}: ${result.error.message}`)
+  }
+
+  /**
    * Move a session within its Workspace's manual order (DOM-insertBefore-like).
    * @param workspaceId - owning workspace.
    * @param sessionId - accounted session to move.
@@ -485,6 +515,7 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.list.set({
       items: workspace.items,
       archivedSessionIds: workspace.archivedSessionIds,
+      pinnedSessionIds: workspace.pinnedSessionIds,
       ...(workspace.archiveRevision === undefined ? {} : { archiveRevision: workspace.archiveRevision }),
       state: workspace.state,
       phase: workspace.phase,

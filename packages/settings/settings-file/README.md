@@ -1,3 +1,8 @@
+---
+description: "File-backed settings provider (settings.yaml) for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-settings-file
 
 English | [中文](README.zh.md)
@@ -8,6 +13,18 @@ File-backed settings provider. One YAML or JSON document carries every namespace
 
 `dsh-settings-file` keeps every namespace's user settings in one YAML or JSON document, by default `settings.yaml` under the harness home: users can edit the document directly — changes take effect live — or write through the service, which merges concurrent edits safely. YAML writes preserve comments, anchors, and formatting on every untouched node, and a section owned by a plugin that is not loaded is never dropped. Boot fails loud on an invalid document; a live reload that fails keeps the last good sections and warns rather than taking the process down.
 
+## Table of Contents
+
+- [Config](#config)
+- [Behavior](#behavior)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 | Field | Meaning | Default |
@@ -19,6 +36,7 @@ File-backed settings provider. One YAML or JSON document carries every namespace
 
 Defaulting is one explicit `resolveSpec(config)` step; an unsupported extension fails at load.
 
+<a id="behavior"></a>
 ## Behavior
 
 - **Boot fails loud, reload keeps last-good.** An existing-but-invalid document fails plugin load; once live, an unreadable or unparsable edit warns and keeps the last good sections. A missing document resolves every namespace from defaults and `base`; deleting it publishes the same empty state.
@@ -33,10 +51,12 @@ Defaulting is one explicit `resolveSpec(config)` step; an unsupported extension 
 - **Self-write suppression by content.** The provider caches the last good text; a watcher event whose content equals the cache (its own write included) is a no-op.
 - **Host configuration adapters receive the resolved path.** `ctx.settings.documentPath` is the absolute `resolveSpec()` filename, including a custom YAML/JSON path; `prepareDocument()` preserves an existing file or exclusively creates an absent empty file with owner-only permissions before the Host opens it. The browser receives only an availability flag, never reconstructs `$DSH_HOME`, and never submits a filesystem target.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The document on disk is the single authority: updates re-read it under a writer lock before writing back, and external edits republish, so no second durable copy exists to diverge.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the consumers of `ctx.settings`, which own any model-facing behavior fed by a stored value; the file provider only stores and publishes namespace sections and registers nothing model-facing itself.
@@ -51,3 +71,13 @@ No direct invalidation; the consuming plugin owns any request-prefix changes.
 - **A missed watcher event stays unseen until the next signal** — reads never re-stat the file, so a change the watcher fails to report is only folded in by the next event, the next write, or a restart.
 - **Comment preservation is YAML-only and map-shaped** — JSON documents re-serialize without comments (JSON has none), and comments inside a changed array (or attached inline to a changed scalar value) go with the value they described.
 - **No value indirection** — sections hold literal values; `${env:VAR}`-style references for secrets are a deferred seam-level feature.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

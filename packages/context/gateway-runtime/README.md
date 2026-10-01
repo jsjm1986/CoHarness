@@ -1,3 +1,8 @@
+---
+description: "Authenticated Gateway request context and internal runtime transport for DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-gateway-runtime
 
 English | [中文](README.zh.md)
@@ -9,9 +14,21 @@ Authenticated request context and private loopback transport for a Harness runti
 Use `dsh-gateway-runtime` for the authenticated request context and private loopback transport of a Gateway-launched Harness runtime. A launch credential binds the process to one organization and one personal or project runtime identity and verifies short-lived browser principals for other collaboration packages.
 
 
+## Table of Contents
+
+- [Runtime contract](#runtime-contract)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="runtime-contract"></a>
 ## Runtime contract
 
 - The launch credential is read from exactly one of `DSH_GATEWAY_CREDENTIAL_FD` or `DSH_GATEWAY_CREDENTIAL_FILE`. It contains a loopback-only Gateway origin, runtime bearer token, runtime generation, organization, and Ed25519 public key.
+- The runtime registers the `connection/authenticate` provider, so Connection admits a verified principal to the index, `/api`, generic channels, and event streams ahead of the browser token exchange and cookie; a gateway-launched process never admits a browser credential alone. A purpose-bound assertion is confined to HTTP operations and never serves the index or opens an event stream — the pinned purposes (`terminal-admin`, `plugin-admin`, `webhook-dispatch`) reach only their declared POST routes.
 - The `connection/request` listener requires `x-dsh-gateway-principal`, verifies its signature, lifetime, organization, scope, runtime identity, and generation, then exposes it through request-local `current()` / `requireCurrent()` access.
 - `interactive()` exposes that principal only while an authenticated HTTP operation remains active. `current()` identifies the originating authenticated dispatch and can follow its asynchronous context; it does not grant detached work interactive authority.
 - `request()` accepts only absolute `/internal/runtime/` paths on the credential's loopback origin, adds the private bearer token, and forwards a browser principal only when the caller explicitly requests it.
@@ -25,10 +42,12 @@ The `plugin-admin` purpose permits only declared profile-management HTTP methods
 
 The plugin marks its application with `executionAuthorityRequired`. That requirement remains until the application is disposed, including when an authorization provider unloads. [Gateway Execution](../gateway-execution/README.md) owns execution, permission-preset and profile-management policy. It uses this package's verified interactive caller and private transport, or the actual Agent's durable participant references for delegated and restored work.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The launch credential binds a fixed process identity, checked during request admission; the package has no independent projection against which to compare that identity.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the request context authenticates Host operations and contributes no model input.
@@ -42,3 +61,13 @@ None; the package never assembles or sends provider requests.
 - **Gateway-launched runtimes only** — loading the plugin without a valid private launch credential fails startup.
 - **Request context is not execution authority** — a retained `current()` principal identifies its originating dispatch. Background, delegated and restored work must use [Execution Authority](../execution-authority/README.md); an earlier request cannot establish current privilege.
 - **Short-lived assertions** — the shipped Gateway defaults `HGW_PRINCIPAL_ASSERTION_TTL_MS` to 30 seconds. A verified principal freezes its project scope mode until `expiresAt`; Session Consumers use `ctx.collaboration` for current membership and ACL decisions. The [Gateway](../../../gateway/README.md) owns proxy expiry and access invalidation.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # guard/ — 循环卫生 guard 家族
 
 [English](README.md) | 中文

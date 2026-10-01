@@ -11,16 +11,15 @@ on:
       - unlabeled
       - closed
       - reopened
+      - typed
+      - untyped
       - field_added
       - field_removed
   pull_request:
     types:
       - opened
       - edited
-      - synchronize
       - reopened
-      - labeled
-      - unlabeled
       - review_requested
   pull_request_review:
     types:
@@ -47,6 +46,7 @@ jobs:
       || github.event.pull_request.user.login == 'dependabot[bot]'))
       && (github.event_name != 'pull_request_review'
       || (github.event.action == 'submitted' && github.event.review.state == 'changes_requested'))
+      && (github.event_name != 'pull_request' || github.event.action != 'edited' || github.event.changes.body != null)
     runs-on: ubuntu-latest
     steps:
       - name: Check out trusted policy

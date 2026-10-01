@@ -1,3 +1,8 @@
+---
+description: "Local-filesystem implementation of the DeepSeek Harness filesystem seam (ctx.fs)"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-fs-local
 
 English | [中文](README.zh.md)
@@ -16,6 +21,17 @@ await ctx.plugin(LocalFileSystem, { cwd: process.cwd() })
 
 Use `dsh-fs-local` to read, list, atomically write, and edit files on the host filesystem. Relative paths resolve from a configurable base directory, while absolute paths and parent traversal remain unrestricted. Paths and symlinks that reach the same file share one identity. Writes preserve file permissions, and optional version guards reject stale overwrites. Choose this package for direct host access; use `fs-sandbox` for confined mutations.
 
+## Table of Contents
+
+- [Behavior](#behavior)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="behavior"></a>
 ## Behavior
 
 - **`resolve(path, opts?)`** — a relative `path` resolves against `opts.cwd` when the caller supplies one (the model-facing tools pass the calling agent's session cwd — see [the per-session cwd Agent Note](../../../.agents/notes/implemented/architecture/2026-07-02-fs-per-session-cwd.md)), else `config.cwd` (default `process.cwd()`); an absolute `path` ignores both. `opts.signal` is checked before and after local resolution, while a remote sibling backend may use it to abort its round-trip. The `targetKey` is the file's `realpath`, so two input paths reaching the same file through symlinks share one identity, and writes/edits land on the link target (preserving the link). A not-yet-existing path uses the realpathed parent directory plus basename when the parent exists; only an unresolvable parent falls back to the absolute path. `displayPath` is the absolute (un-resolved) path. On POSIX, `symlink/..` traverses the symlink target’s parent; a missing directory before `..` is rejected. Windows retains native drive-relative resolution.
@@ -29,10 +45,12 @@ Use `dsh-fs-local` to read, list, atomically write, and edit files on the host f
 
 The package-root SDK API is the default/named `LocalFileSystem` class plus `Config`. Raw I/O lives in `src/fsio.ts` (Cordis-free, independently unit-tested); `src/index.ts` is the thin service wiring.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Each primitive delegates to the host filesystem, which is the sole authority; the provider keeps no shadow state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through `dsh-tool-fs`, which renders this provider's line-windowed UTF-8 content, mutation acknowledgements, and exact provider messages in capped retained results while versions, atomic-write mechanics, and directory metadata remain internal.
@@ -51,3 +69,13 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **The per-target mutation lock is in-process only** — guarded create still uses an atomic no-replace publication across processes, but replacement writers in another process are caught only when the optional version guard observes their metadata change; they are never serialized.
 - **Guarded creation requires hard-link support** — filesystems or mounts that reject hard-link publication cannot serve `createIfAbsent`; the provider preserves the missing target and reports `FS_IO_ERROR`.
 - **Post-commit cleanup is best effort** — a successful publication remains successful if removal of its owner-only staging directory fails, leaving private residue for later operator cleanup.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

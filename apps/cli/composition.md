@@ -180,7 +180,7 @@ flowchart LR
   cfg --> plugin_dsh_base_agent_loop
   plugin_dsh_base_fs_sandbox["fs-sandbox<br/>@deepseek-ai/dsh-fs-sandbox"]
   cfg --> plugin_dsh_base_fs_sandbox
-  plugin_dsh_base_llm_deepseek["llm-deepseek<br/>@deepseek-ai/dsh-llm-deepseek"]
+  plugin_dsh_base_llm_deepseek["llm-deepseek<br/>@deepseek-ai/dsh-llm-deepseek-api-key"]
   cfg --> plugin_dsh_base_llm_deepseek
 ```
 
@@ -272,7 +272,7 @@ flowchart LR
 | `system-prompt` | `@deepseek-ai/dsh-system-prompt` |
 | `agent-loop` | `@deepseek-ai/dsh-agent-loop` |
 | `fs-sandbox` | `@deepseek-ai/dsh-fs-sandbox` |
-| `llm-deepseek` | `@deepseek-ai/dsh-llm-deepseek` |
+| `llm-deepseek` | `@deepseek-ai/dsh-llm-deepseek-api-key` |
 
 Source config: [`packages/bundle/base/cordis.patch.yml`](../../packages/bundle/base/cordis.patch.yml).
 

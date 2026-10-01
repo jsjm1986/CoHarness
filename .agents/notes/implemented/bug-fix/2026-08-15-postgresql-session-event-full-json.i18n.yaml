@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-15-postgresql-session-event-full-json.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-15-postgresql-session-event-full-json.md
-2026-08-15-postgresql-session-event-full-json.md: 862d39f132bd451283da7fb1e8f05e8d403ed89f
-2026-08-15-postgresql-session-event-full-json.zh.md: 6c93d22d63c8da14e633f3649e4caf15bf8e39b9
+/agent-note-store-postgresql-session-events-as-full-json:
+  en: 8c15741642846c78
+  zh: a3cc8598e1bf86e5
+/agent-note-store-postgresql-session-events-as-full-json/problem:
+  en: 56670089521670c4
+  zh: b43d26f66cf70c52
+/agent-note-store-postgresql-session-events-as-full-json/decision:
+  en: 27c98666ed5ac10f
+  zh: ae321d97acdfe61c
+/agent-note-store-postgresql-session-events-as-full-json/alternatives-considered:
+  en: 6bb19cbb11c2a721
+  zh: 52fe8d3756ec7b6f
+/agent-note-store-postgresql-session-events-as-full-json/consequences:
+  en: 5b2472ac35902f1b
+  zh: 6b0b62cdf29b129c

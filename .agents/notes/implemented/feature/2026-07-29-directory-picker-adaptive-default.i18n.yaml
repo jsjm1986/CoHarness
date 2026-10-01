@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-29-directory-picker-adaptive-default.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-29-directory-picker-adaptive-default.md
-2026-07-29-directory-picker-adaptive-default.md: 7ff6529bb8e445f63343b1019ac520f56b19d5e4
-2026-07-29-directory-picker-adaptive-default.zh.md: ba2bb4424416557b119accc7df14fab4c94ddebf
+/agent-note-adaptive-default-for-the-directory-picker-interaction:
+  en: e02bced6761bd7fc
+  zh: 53db8706ddd2f980
+/agent-note-adaptive-default-for-the-directory-picker-interaction/problem:
+  en: 43896069b9047201
+  zh: 4fcf702754b5a6f1
+/agent-note-adaptive-default-for-the-directory-picker-interaction/decision:
+  en: 4e5f36dd24ae177a
+  zh: 36ac7707f2cde930
+/agent-note-adaptive-default-for-the-directory-picker-interaction/alternatives-considered:
+  en: d8962ac06541bb79
+  zh: 2ec79794da381516
+/agent-note-adaptive-default-for-the-directory-picker-interaction/consequences:
+  en: 28d2e70a641b1c35
+  zh: e659131f944d7c6e

@@ -687,6 +687,8 @@ export interface ComposerBarInjected {
    * order stays constant).
    */
   hooks: {
+    /** Effective stop-sequence key labels while the shortcuts service is composed; empty otherwise. */
+    stopShortcut: ObservableSnapshot<readonly string[]>
     /** Account preference used by Enter and the primary Send button. */
     busyEnter: ObservableSnapshot<BusyEnterBehavior>
     /** Latest surfaced notice (null after none; seq keys re-render of repeats). */

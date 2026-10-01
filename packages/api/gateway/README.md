@@ -1,3 +1,8 @@
+---
+description: "Typert Remote Host dispatcher and Client API endpoint"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-api-gateway
 
 English | [中文](README.zh.md)
@@ -10,6 +15,18 @@ Trailing business parameters marked `acceptsUndefined` by the generated descript
 
 Two-sided Typert RPC endpoint for Host and Client Cordis environments. The Host entry provides `ctx.typertGateway`, while `@deepseek-ai/dsh-api-gateway/client` provides `ctx.remote`; both consume the same generated `InvocationDescriptor` contract and leave business selection to API Remotes. Connection carries unary request correlation, trust, and response envelopes, while Gateway owns multiplexed Remote streams.
 
+## Table of Contents
+
+- [Host service: `TypertGatewayService` (ctx key: `typertGateway`)](#host-service-typertgatewayservice-ctx-key-typertgateway)
+- [Client service: `ClientRemote` (ctx key: `remote`)](#client-service-clientremote-ctx-key-remote)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="host-service-typertgatewayservice-ctx-key-typertgateway"></a>
 ## Host service: `TypertGatewayService` (ctx key: `typertGateway`)
 
 `ctx.typertGateway.invoke()` resolves the current descriptor and Cordis Service for each call, validates exact named arguments, resolves registered object or Context identities, invokes the public business method, and validates its result. Business Services extend `TypertRemoteService` and mark methods with `@Remote` or `@RemoteScope` from [`dsh-typert-protocol`](../../typert/protocol/README.md); `bindTypertRemote()` remains available when another base class owns inheritance.
@@ -20,6 +37,7 @@ The Host entry registers a trusted-host interceptor on Connection's shared `/api
 
 A cancellation-aware Remote method declares `signal: AbortSignal` as its final Host parameter. The signal is descriptor metadata rather than a wire argument: Connection supplies it to the Gateway, and the Gateway injects it after decoded business parameters. SRC recognizes the reserved final name, while strict generation additionally requires the global `AbortSignal` type.
 
+<a id="client-service-clientremote-ctx-key-remote"></a>
 ## Client service: `ClientRemote` (ctx key: `remote`)
 
 `ctx.remote.$mount()` validates and registers a generated Host-for-Client contribution, then installs concrete direct and scoped methods for the calling Cordis fiber. Each namespace is a traced `remote.<namespace>` child Service and unloads after its last method is withdrawn. A newly created namespace remains unavailable to injecting fibers until every method in that mounted contribution is installed; a failed batch rolls back without activating dependents. Duplicate endpoints, namespace collisions, and descriptors without strict generated codecs fail before methods become callable.
@@ -30,10 +48,12 @@ Each call validates positional inputs, constructs the descriptor's exact named `
 
 Generated declaration merges provide the TypeScript API through the shared `TypertClientRemote` contract. The Client entry contains no Host Service or Host Cordis interface merge, and method lookup and invocation use ordinary objects and functions rather than a JavaScript Proxy.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Each invocation resolves the live descriptor, business Service, and codecs at call time; the gateway keeps no per-endpoint state that could diverge from the registered contributions.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package dispatches application calls and registers no prompt, tool, or session event.
@@ -50,3 +70,13 @@ No direct effect; invoked business Services own any model-visible result.
 - The package dispatches unary methods only. Incremental Session data uses a separate named-stream protocol over the same Connection.
 - Lookup resolvers are configured per key; an individual Remote parameter or endpoint cannot currently select a live-only policy under the same `agent`/`session` key.
 - Forwarded events reach `$on` exactly as the Host emitted them: no payload projection or redaction, no Scope-bound subscription, and no replay after a reconnect.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

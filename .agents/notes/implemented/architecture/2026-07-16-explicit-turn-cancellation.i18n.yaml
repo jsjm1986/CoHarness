@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-16-explicit-turn-cancellation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-16-explicit-turn-cancellation.md
-2026-07-16-explicit-turn-cancellation.md: 86faad9929d3eb5b00e66bb1c46a2e35b135d954
-2026-07-16-explicit-turn-cancellation.zh.md: acf56e0629668a227324045ffd0521619dc45f33
+/agent-note-explicit-turn-cancellation-capability:
+  en: 729ed6291e9d4d2c
+  zh: 32ae526ef41199da
+/agent-note-explicit-turn-cancellation-capability/problem:
+  en: 0a7826345be2a509
+  zh: 430fccb5c4d6a5e2
+/agent-note-explicit-turn-cancellation-capability/decision:
+  en: d2db1bf9f68f0f54
+  zh: eb41911a9e879acf
+/agent-note-explicit-turn-cancellation-capability/verification:
+  en: ef4d45aa727a1f8f
+  zh: e9574668c1df6877
+/agent-note-explicit-turn-cancellation-capability/alternatives-considered:
+  en: bf69bbf7eb280306
+  zh: a434a0ecb5008b2b
+/agent-note-explicit-turn-cancellation-capability/consequences:
+  en: 1066aff1aec4ed01
+  zh: 31d6a60496e2e730

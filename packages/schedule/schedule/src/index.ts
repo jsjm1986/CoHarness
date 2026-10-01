@@ -7,6 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-session-projection'
+import { installScheduleArchiveAdmission } from './archive-admission.ts'
 import { scheduleProjectionDefinition } from './projection.ts'
 import { ScheduleRuntime } from './runtime.ts'
 import { registerScheduleTools } from './tools.ts'
@@ -44,8 +45,10 @@ export function apply(ctx: Context): void {
     projectionCtx.sessionProjections.register(scheduleProjectionDefinition)
   })
 
-  const runtimes = new Map<Agent, OwnerCleanup>()
+  const runtimes = new Map<Agent, { runtime: ScheduleRuntime; cleanup: OwnerCleanup }>()
   let stopping = false
+
+  installScheduleArchiveAdmission(ctx, (agent) => { runtimes.get(agent)?.runtime.requestDrive() })
 
   ctx.effect(() => {
     const stopCreated = ctx.on('agent/created', ({ agent }) => {
@@ -66,17 +69,17 @@ export function apply(ctx: Context): void {
           try {
             await runtime.dispose()
           } finally {
-            if (runtimes.get(agent) === cleanup) runtimes.delete(agent)
+            if (runtimes.get(agent)?.cleanup === cleanup) runtimes.delete(agent)
           }
         }
       }, 'schedule.runtime()')
-      runtimes.set(agent, cleanup)
+      runtimes.set(agent, { runtime, cleanup })
     })
 
     return async () => {
       stopping = true
       stopCreated()
-      const cleanups = [...runtimes.values()]
+      const cleanups = [...runtimes.values()].map(entry => entry.cleanup)
       runtimes.clear()
       await Promise.allSettled(cleanups.map(cleanup => Promise.resolve(cleanup())))
     }

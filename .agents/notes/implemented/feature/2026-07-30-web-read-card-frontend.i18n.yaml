@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-web-read-card-frontend.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-web-read-card-frontend.md
-2026-07-30-web-read-card-frontend.md: ee03e966ce4475625dace7fb4f4bcee9dc4fa9c8
-2026-07-30-web-read-card-frontend.zh.md: 6c26e4f2c3747b142a62c2f490994cac6c56dd99
+/agent-note-web-read-card-frontend-the-read-tool-s-line-window-renders-line-numbered-and-highlighted:
+  en: 4fc6fb4efd3b0005
+  zh: 45a32d03be06727a
+/agent-note-web-read-card-frontend-the-read-tool-s-line-window-renders-line-numbered-and-highlighted/problem:
+  en: 15bb78ca454be906
+  zh: ea8b61ce4ed39603
+/agent-note-web-read-card-frontend-the-read-tool-s-line-window-renders-line-numbered-and-highlighted/decision:
+  en: e1cdb400805c57a1
+  zh: 6d865e15eab76200
+/agent-note-web-read-card-frontend-the-read-tool-s-line-window-renders-line-numbered-and-highlighted/alternatives-considered:
+  en: eefe96942eaff5cd
+  zh: 85059172c538c5e4
+/agent-note-web-read-card-frontend-the-read-tool-s-line-window-renders-line-numbered-and-highlighted/consequences:
+  en: 2a1069b41f595ca2
+  zh: 3877adc99187fcaa
+/agent-note-web-read-card-frontend-the-read-tool-s-line-window-renders-line-numbered-and-highlighted/testing:
+  en: a22f61efdf36479b
+  zh: e9e963e1e1eed792
+/agent-note-web-read-card-frontend-the-read-tool-s-line-window-renders-line-numbered-and-highlighted/related:
+  en: 348ced41daafe380
+  zh: 937354c8cfd699a8

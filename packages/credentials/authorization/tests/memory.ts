@@ -20,6 +20,11 @@ import type {
 export class MemoryCredentials extends CredentialProvider {
   private readonly records = new Map<CredentialKey, CredentialRecord>()
 
+  /** Test gate invoked before a mutation enters its exclusive section. */
+  gateModify?: () => Promise<void>
+  /** Test gate invoked after a mutation is admitted, before the record lands. */
+  gateWrite?: () => Promise<void>
+
   protected override resolveOwned(_ref: CredentialRef): Promise<ResolvedCredential | undefined> {
     return Promise.resolve(undefined)
   }
@@ -55,9 +60,11 @@ export class MemoryCredentials extends CredentialProvider {
     key: CredentialKey,
     mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>,
   ): Promise<CredentialRecord | undefined> {
+    await this.gateModify?.()
     const current = this.records.get(key)
     const next = await mutate(current)
     if (next === undefined) return current
+    await this.gateWrite?.()
     this.records.set(key, next)
     this.ctx.emit('credentials/record-updated', key)
     return next

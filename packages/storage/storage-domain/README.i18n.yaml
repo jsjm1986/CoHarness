@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/storage/storage-domain/README.md
-README.md: 997299f52b17895f30b179c3813113760c5bfb60
-README.zh.md: 1c1ffb6b4b3c13f73bec94f5ce023e652b73f461
+/:
+  en: 949830b05f285668
+  zh: 61495d48365178df
+/deepseek-ai-dsh-storage-domain:
+  en: 79872310f2a2fb19
+  zh: e04941af86c07ad4
+/deepseek-ai-dsh-storage-domain/summary:
+  en: 2b76bd793d7b8f28
+  zh: 3fe5c99abf1bd05e
+/deepseek-ai-dsh-storage-domain/table-of-contents:
+  en: f655f2e399ab5001
+  zh: 34ac0e01b970b5d8
+/deepseek-ai-dsh-storage-domain/configuration:
+  en: 39c318df85fc72f2
+  zh: ae29c54069e6f430
+/deepseek-ai-dsh-storage-domain/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-storage-domain/model-experience/durable-domain-state:
+  en: 57b8c561d80ab712
+  zh: 3246a498fe289ad8
+/deepseek-ai-dsh-storage-domain/model-experience/durable-domain-state/what-the-model-sees:
+  en: d265b549d349bb70
+  zh: 8c8293c21e9aa8b1
+/deepseek-ai-dsh-storage-domain/model-experience/durable-domain-state/token-effect:
+  en: 2d6ab1c549d3f683
+  zh: c0f264de06587598
+/deepseek-ai-dsh-storage-domain/model-experience/durable-domain-state/kv-cache-effect:
+  en: 0e7d1c06d17c542f
+  zh: 9a540a928a590df0
+/deepseek-ai-dsh-storage-domain/known-limitations-and-deferred-work:
+  en: f8f99f31bf02fc37
+  zh: 0511bee21f8eba86
+/deepseek-ai-dsh-storage-domain/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

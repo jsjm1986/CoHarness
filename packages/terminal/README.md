@@ -1,3 +1,8 @@
+---
+description: "`PTY` stands for **Pseudo-Terminal**（伪终端）. This capability provides persistent, owner-scoped terminal sessions for workflows that require state across tool calls or interactive stdin. PTY complements the one-shot bash and filesystem tools; it does not replace their stronger per-operation contracts."
+kind: "package-group"
+---
+
 # terminal/ — persistent PTY capability family
 
 English | [中文](README.zh.md)

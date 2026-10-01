@@ -31,6 +31,7 @@ const DUPLICATE_SAFE_PACKAGES: readonly string[] = [
   '@deepseek-ai/dsh-brand',
   '@deepseek-ai/dsh-lazy-require',
   '@deepseek-ai/dsh-typert-protocol',
+  '@deepseek-ai/dsh-util-code-language',
   '@deepseek-ai/dsh-util-crypto',
   '@deepseek-ai/dsh-util-values',
 ]
@@ -42,6 +43,7 @@ const DUPLICATE_SAFE_PACKAGES: readonly string[] = [
  * prominent heading in the pull request description.
  */
 const SAFE_HOST_DEPENDENCY_EXPORTS = {
+  '@deepseek-ai/dsh-credentials': ['credentialKey'],
   '@deepseek-ai/dsh-deque': ['Deque'],
   '@deepseek-ai/dsh-llm': ['callConfigEquals'],
   '@deepseek-ai/dsh-timeout': ['MAX_TIMER_DELAY_MS'],
@@ -54,7 +56,6 @@ const PEER_REQUIRED_HOST_EXPORTS = {
   '@deepseek-ai/dsh-commands/brand': ['CommandDefinitionId'],
   '@deepseek-ai/dsh-host-apiproxy': ['DEFAULT_HISTORY_PAGE_TARGET_BYTES', 'toFetchHandler'],
   '@deepseek-ai/dsh-host-apiproxy/api': ['RpcId', 'clientRequestSchema', 'serverRequestJson'],
-  '@deepseek-ai/dsh-llm': ['MessageId', 'freezeMessage'],
   '@deepseek-ai/dsh-scope': ['scopeOf', 'scopeTarget'],
   '@deepseek-ai/dsh-session-format/surface': ['SESSION_SURFACE_EVENT_TYPES'],
   '@deepseek-ai/dsh-settings': ['settingsNamespace'],

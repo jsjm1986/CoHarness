@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-model-governance-byok.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-model-governance-byok.md
-2026-08-17-model-governance-byok.md: ebbcb6a9793d45580f40c385a1e661ce617a31f7
-2026-08-17-model-governance-byok.zh.md: 71f2105b6d5af52aa17430983011e1497a27c249
+/agent-note-model-governance-default-deny-and-user-declared-byok-route-authorization:
+  en: be0146efb43c6a00
+  zh: d01577911bb39e8d
+/agent-note-model-governance-default-deny-and-user-declared-byok-route-authorization/problem:
+  en: 408cc44665148803
+  zh: 347e88c613868fb8
+/agent-note-model-governance-default-deny-and-user-declared-byok-route-authorization/decision:
+  en: 394f00582b19c893
+  zh: c30435d0690fa792
+/agent-note-model-governance-default-deny-and-user-declared-byok-route-authorization/mechanism:
+  en: ae5fc335f1b415ec
+  zh: 7a48962a3b30f358
+/agent-note-model-governance-default-deny-and-user-declared-byok-route-authorization/alternatives-considered:
+  en: 7180860462397932
+  zh: c4cdd1e973b941a6
+/agent-note-model-governance-default-deny-and-user-declared-byok-route-authorization/related-files:
+  en: d45dbf249183db60
+  zh: 08f58d9cfa3d0013
+/agent-note-model-governance-default-deny-and-user-declared-byok-route-authorization/consequences:
+  en: 2055b4400302cbdf
+  zh: a97e445cc3ff261a

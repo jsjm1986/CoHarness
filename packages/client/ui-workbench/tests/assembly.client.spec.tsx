@@ -15,6 +15,7 @@ usePinnedBrowserLanguages('zh-CN')
 
 const A = 'pane-a' as SessionId
 const B = 'pane-b' as SessionId
+const EMPTY_CATALOG: readonly never[] = []
 
 class ResizeObserverStub {
   observe(): void {}
@@ -42,6 +43,10 @@ describe('assembled workbench', () => {
     runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn() })
     runtime.provide('workspaceResources', new WorkspaceResourceRegistry())
     runtime.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
+    runtime.provide('shortcuts', {
+      register: vi.fn(() => () => {}),
+      catalog: { getSnapshot: () => EMPTY_CATALOG, subscribe: () => () => {} },
+    })
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)
@@ -110,6 +115,10 @@ describe('assembled workbench sidebar panel', () => {
     runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn() })
     runtime.provide('workspaceResources', new WorkspaceResourceRegistry())
     runtime.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
+    runtime.provide('shortcuts', {
+      register: vi.fn(() => () => {}),
+      catalog: { getSnapshot: () => EMPTY_CATALOG, subscribe: () => () => {} },
+    })
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)

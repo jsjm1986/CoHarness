@@ -1,6 +1,49 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-npm-release-sequences.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-10-npm-release-sequences.md
-2026-08-10-npm-release-sequences.md: e3ca8524772ff5a48efe1f2449333e06d6fa686a
-2026-08-10-npm-release-sequences.zh.md: 08a05a24a4c3a8e1cc211e6dd43216e7d3228dba
+/agent-note-private-npm-publication-as-three-independent-sequences:
+  en: 176f873a6b094838
+  zh: 9baeba69cbaea9cf
+/agent-note-private-npm-publication-as-three-independent-sequences/problem:
+  en: 5bdcfb3352994384
+  zh: 7afba51e3828d5b9
+/agent-note-private-npm-publication-as-three-independent-sequences/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-private-npm-publication-as-three-independent-sequences/decision/three-independent-sequences:
+  en: 63ca920de98c130f
+  zh: 5499aff736c83097
+/agent-note-private-npm-publication-as-three-independent-sequences/decision/versions-land-in-the-repository-from-a-local-command-ci-only-checks-and-uploads:
+  en: 8bcfeab50c225fdb
+  zh: 5756aa77571e611a
+/agent-note-private-npm-publication-as-three-independent-sequences/decision/vendor-publish-what-changed-and-let-tags-be-the-ledger:
+  en: 7f578bb18f7f8693
+  zh: 49f25210f7c1a61f
+/agent-note-private-npm-publication-as-three-independent-sequences/decision/publication-runs-only-on-github-and-the-registry-decides-what-goes-out:
+  en: b37223ed00b54d12
+  zh: 10df0b6abb8eee01
+/agent-note-private-npm-publication-as-three-independent-sequences/decision/workspace-internal-references-use-the-workspace-protocol:
+  en: 1329bbcdb35b6da5
+  zh: 41288c28b97819e1
+/agent-note-private-npm-publication-as-three-independent-sequences/decision/an-optional-dependency-is-never-loaded-at-module-scope:
+  en: 6b8b7699650bd99e
+  zh: e9e751584136ae98
+/agent-note-private-npm-publication-as-three-independent-sequences/decision/release-family-objects:
+  en: e8bb80d936e2cbbd
+  zh: bc4ae297e98a5446
+/agent-note-private-npm-publication-as-three-independent-sequences/decision/workflow-shape-pack-everything-at-once-then-publish-as-one-set:
+  en: 001dbe6f598c8bef
+  zh: 74b90fff8446433c
+/agent-note-private-npm-publication-as-three-independent-sequences/decision/repository-changes-this-carried:
+  en: 80c2319db5e9e31a
+  zh: d4f5d7551f725550
+/agent-note-private-npm-publication-as-three-independent-sequences/decision/relationship-to-the-earlier-proposal:
+  en: aa7e2c50cc1986f0
+  zh: 74b253625a41cd27
+/agent-note-private-npm-publication-as-three-independent-sequences/alternatives-considered:
+  en: 80580916e7ddaace
+  zh: 5c2d3aaea620cb31
+/agent-note-private-npm-publication-as-three-independent-sequences/consequences:
+  en: 7e68ae555fe83e2c
+  zh: 229b5954c8b125a7

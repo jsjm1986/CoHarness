@@ -6,7 +6,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   AgentContext, ConversationSnapshot, ISessions, ObservableSnapshot, ProjectionsFace, SessionFace, SessionId,
   SessionListState, SessionProvideDescriptor, SessionSearchResultItem, SessionSummary, SnapshotStore,
-  SubagentAddress, SessionReference, SessionTarget, SessionRetainOptions, SessionRetainInfo,
+  SubagentAddress, SessionReference, SessionTarget, SessionRetainOptions, SessionRetainInfo, JobView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 // The double reports the wire schema's own search bound, like the production
 // service — a transport-varying limit would be a fiction no client can see.
@@ -201,7 +201,7 @@ export class TestSessions implements ISessions {
   /** Calls observed on the service-level face, newest last. */
   readonly calls: {
     method: 'open' | 'openSubagent' | 'setSubagentCatalogOpen' | 'refreshSubagents' | 'setAdditionalStaged'
-      | 'clear' | 'search' | 'fork'
+      | 'clear' | 'search' | 'fork' | 'observeJob' | 'killJob'
     args: unknown[]
   }[] = []
 
@@ -219,7 +219,7 @@ export class TestSessions implements ISessions {
     rootCtx.effect(() => () => { this.navigation.dispose() })
     this.list = createSnapshotStore<SessionListState>({
       ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
-      subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+      subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })
     this.channel = new SessionProvideChannel({
       rebuildBundles: () => {
@@ -526,6 +526,18 @@ export class TestSessions implements ISessions {
   refreshSubagents(parentSessionId: SessionId): Promise<void> {
     this.calls.push({ method: 'refreshSubagents', args: [parentSessionId] })
     return Promise.resolve()
+  }
+
+  /** Record the observation start; fixture callers publish `observedJobs` rows explicitly. */
+  observeJob(sessionId: SessionId | undefined, jobId: JobView['id']): () => void {
+    this.calls.push({ method: 'observeJob', args: [sessionId, jobId] })
+    return () => {}
+  }
+
+  /** Record the kill request; the row's outcome stays fixture-driven. */
+  killJob(sessionId: SessionId, jobId: JobView['id']): Promise<boolean> {
+    this.calls.push({ method: 'killJob', args: [sessionId, jobId] })
+    return Promise.resolve(true)
   }
 
   /** Apply a confirmed preset switch into the fixture list, as production does. */

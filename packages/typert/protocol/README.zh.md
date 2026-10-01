@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-typert-protocol
 
 [English](README.md) | 中文
@@ -8,6 +13,18 @@
 
 借助 `dsh-typert-protocol`，业务包可以向 Remote 客户端暴露 Host 方法：用 `@Remote`（作用域接收者用 `@RemoteScope`）标记方法，把服务绑定到 wire 命名空间，并通过可合并扩展的协议映射把 Host 对象与作用域 Context 关联到 wire identity。生成产物、Host Gateway 与 Client API 消费同一套调用描述符、编解码器与提供方约定。调用持有的值把清理责任交给 Gateway，不另增引用计数。本包不注册任何 Cordis 服务，也不运行 TypeScript 分析。
 
+## 目录
+
+- [Remote 声明](#remote-declarations)
+- [Typert 协议](#typert-protocol)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="remote-declarations"></a>
 ## Remote 声明
 
 - `@Remote` 将公开实例方法标记为可在其注册的 Cordis 服务上直接调用。
@@ -20,6 +37,7 @@
 
 装饰器初始化器将标记保存在以服务原型为键的模块私有 `WeakMap` 中。它们不会在构造函数上添加符号，也不会添加原型属性、参数元数据或运行时反射字段。`TypertRemoteService` 会暴露与显式辅助函数相同的公开只读 `typertRemote` 绑定。
 
+<a id="typert-protocol"></a>
 ## Typert 协议
 
 业务包扩展 `TypertLookupMap` 和 `TypertContextMap`，以关联宿主对象或作用域 Context 与其协议身份。生成的产物扩展 `TypertRemoteMap`、`TypertRemoteScopeMap` 和 `TypertRemoteNamespaceMap`，使客户端导入后仅暴露选定的 Remote 方法。`InvocationDescriptor` 是供注册表、网关和客户端 Remote 使用的共享运行时形式。
@@ -28,10 +46,13 @@ Host 装配以转发给消费端的 Host 事件扩展 `TypertRemoteEventSelectio
 
 查找包与 Context 包同时负责该约定的两侧：声明合并提供静态关联，运行时提供方则向 `ctx.typert` 注册身份解析。查找提供方或宿主 Context 提供方提供稳定声明与默认解析器，宿主组合可以另行配置同步或异步解析器；策略拒绝可用 `TypertLookupFailure` 携带由边界适配器拥有的失败值。严格编解码器携带生成的 schema；`src-json` 编解码器标识约束更弱的源码启动路径。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。纯声明与编解码库，无服务注册；其契约由类型层使用与编解码规格强制。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为与编译器无关的 Remote 协议声明不注册任何面向模型的内容。
@@ -40,7 +61,18 @@ Host 装配以转发给消费端的 Host 事件扩展 `TypertRemoteEventSelectio
 
 无直接影响；声明的约定只有在装配将其放入请求时才会触及请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 装饰器标记仅包含方法名，以及直接调用或 Context 调用模式。参数、结果、查找和 schema 反射需要 Typert 构建流水线。
 - Remote 装饰器只接受具有字符串名称的公开、非静态实例方法。SRC 执行无法表示重载签名，以及包含解构参数、默认参数或剩余参数的方法签名。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

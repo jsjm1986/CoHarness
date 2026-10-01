@@ -10,6 +10,7 @@ type ZodIssue = zCore.core.$ZodIssue
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { SessionActivity } from '@deepseek-ai/dsh-workspace/types'
 
 /**
  * Message correlation id: the initiator mints it on a request; a response
@@ -38,6 +39,14 @@ export interface RpcErrorDetailsMap {
     reason: 'not-member' | 'conversation-not-found' | 'forbidden' | 'visibility-locked' | 'gateway-unavailable'
   }
   'session-not-found': { sessionId: SessionId }
+  /**
+   * Archiving was refused because the session still has running work;
+   * `activity` names the families the providers reported, so a caller can
+   * retry with `stopActivity` after telling the user what will stop.
+   */
+  'session-active': { sessionId: SessionId; activity: readonly SessionActivity[] }
+  /** Pinning was refused because the session is archived; unarchive first. */
+  'session-archived': { sessionId: SessionId }
   /**
    * Cold resume found the session's write lease held by another live Host
    * process; the caller should surface the contention instead of retrying.
@@ -116,6 +125,12 @@ export interface RpcErrorDetailsMap {
   'subagent-not-resumable': { childSessionId: SessionId }
   'subagent-unauthorized': { childSessionId: SessionId }
   'subagent-delivery-unavailable': { childSessionId: SessionId }
+  /**
+   * The session's job list no longer carries a row under that id — unknown to
+   * the registry or owned by another session read through the same fence, so
+   * the client renders one story.
+   */
+  'job-not-found': { sessionId?: SessionId; jobId: string }
   'internal': {}
 }
 

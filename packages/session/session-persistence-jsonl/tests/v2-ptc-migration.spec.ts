@@ -53,7 +53,7 @@ const imageMessage = {
   ],
 }
 const currentImageMessage = {
-  ...imageMessage, source: { ...imageMessage.source, plugin: 'tools-ptc' },
+  ...imageMessage, source: { kind: 'ptc-mode', form: 'notice', summary: 'Image from tools-code-mode' },
 }
 const dispatch = {
   rootCallId: toolCall.id, parentCallId: toolCall.id, subCallId: 'tools-code-mode:child-call',
@@ -117,21 +117,21 @@ describe('JSONL V2 PTC publication and restore', () => {
     }
   })
 
-  it('publishes V4 without changing V2 bytes and preserves restored IDs, roles, content, and replay state', async () => {
+  it('publishes V7 without changing V2 bytes and preserves restored IDs, roles, content, and replay state', async () => {
     if (root === undefined || ctx === undefined) throw new Error('persistence fixture is not initialized')
     const id = SessionId('tools-code-mode:session')
     const header = { type: 'session', version: 2, id, createdAt: 1000, isSeeded: false, delegationDepth: 0 }
     const events = releasedV2Events()
     const source = Buffer.from([header, ...events].map(row => JSON.stringify(row)).join('\n') + '\n')
     const predecessor = generationLogPath(root, undefined, id, 2, 'none')
-    const successor = join(dirname(predecessor), 'session.v6.jsonl')
+    const successor = join(dirname(predecessor), 'session.v7.jsonl')
     await mkdir(dirname(predecessor), { recursive: true })
     await writeFile(predecessor, source)
     const sourceStat = await stat(predecessor)
 
     const reader = await ctx.sessionPersistence.open(id, 'read')
     try {
-      expect(reader.header).toEqual({ version: 6, id, createdAt: 1000, isSeeded: false, delegationDepth: 0 })
+      expect(reader.header).toEqual({ version: 7, id, createdAt: 1000, isSeeded: false, delegationDepth: 0 })
       expect((await reader.read()).events.map(event => event.type)).toEqual([
         'turn/start', 'step/start', 'system/message', 'user/message', 'assistant/message', 'tool/call',
         'tool/ptc-dispatch-start', 'tool/ptc-dispatch', 'tool/result', 'agent/inbox/spliced',
@@ -153,7 +153,7 @@ describe('JSONL V2 PTC publication and restore', () => {
     const published = await readFile(successor)
     const [publishedHeader, ...publishedEvents] = published.toString('utf8').trimEnd().split('\n')
       .map((row): unknown => JSON.parse(row))
-    expect(publishedHeader).toEqual({ ...header, version: 6 })
+    expect(publishedHeader).toEqual({ ...header, version: 7 })
     const expectedEvents: SessionFormatEvent[] = events.map(event => ({ ...event, seq: event.seq < 2 ? event.seq : event.seq + 1 }))
     expectedEvents[5] = { ...expectedEvents[5], type: 'tool/ptc-dispatch-start' } as SessionFormatEvent
     expectedEvents[6] = { ...expectedEvents[6], type: 'tool/ptc-dispatch' } as SessionFormatEvent
@@ -163,11 +163,21 @@ describe('JSONL V2 PTC publication and restore', () => {
     expectedEvents[9] = { ...expectedEvents[9], data: currentImageMessage } as SessionFormatEvent
     expectedEvents[10] = { ...expectedEvents[10], data: {
       ...(events[10]?.data as Record<string, unknown>), messageSeqs: [3],
+      messages: [{ ...titleMessage, source: { kind: 'dsh-session-title-llm' } }],
+    } } as SessionFormatEvent
+    const liftedToolMessage = {
+      id: 'tools-code-mode:result', role: 'tool',
+      source: { kind: 'tool', callId: toolCall.id },
+      toolCallId: toolCall.id, isError: false,
+      content: [{ type: 'text', text: 'tools-code-mode: image attached; tool/code-dispatch' }],
+    }
+    expectedEvents[7] = { ...expectedEvents[7], data: {
+      turn: 1, step: 1, message: liftedToolMessage,
     } } as SessionFormatEvent
     const systemMessage = {
       id: 'v2-to-v3-system-' + createHash('sha256')
         .update(JSON.stringify(['session-format-v2-to-v3', id, 1, 'step/start'])).digest('hex'),
-      role: 'system', source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' }, content: [],
+      role: 'system', source: { kind: 'system-prompt' }, content: [],
     }
     expectedEvents.splice(2, 0, {
       type: 'system/message', seq: 2, time: 1002, surfaceOp: 'append',
@@ -186,10 +196,10 @@ describe('JSONL V2 PTC publication and restore', () => {
       expect(restored.events).toEqual(expectedEvents)
       const session = Session.fromRestore(id, restored.events, reloaded.header, reloaded.inheritedEventCount, restored.eventState)
       const messages = session.deriveMessages()
-      expect(messages).toEqual([userMessage, assistantMessage, toolMessage, currentImageMessage])
+      expect(messages).toEqual([userMessage, assistantMessage, liftedToolMessage, currentImageMessage])
       // Provider-neutral input evidence: no provider converter is a declared dependency here.
       expect(messages.map(({ id, role, content }) => ({ id, role, content }))).toEqual(
-        [userMessage, assistantMessage, toolMessage, imageMessage].map(({ id, role, content }) => ({ id, role, content })),
+        [userMessage, assistantMessage, liftedToolMessage, imageMessage].map(({ id, role, content }) => ({ id, role, content })),
       )
       expect(messages[1]?.source).toEqual(assistantMessage.source)
       expect(messages[2]?.source).toEqual({ kind: 'tool', callId: 'tools-code-mode:root-call' })
@@ -201,6 +211,6 @@ describe('JSONL V2 PTC publication and restore', () => {
     expect(await stat(predecessor)).toMatchObject({ dev: sourceStat.dev, ino: sourceStat.ino })
     expect(await readFile(successor)).toEqual(published)
     expect((await readdir(dirname(predecessor))).filter(name => name.endsWith('.jsonl')).sort())
-      .toEqual(['session.v2.jsonl', 'session.v6.jsonl'])
+      .toEqual(['session.v2.jsonl', 'session.v7.jsonl'])
   })
 })

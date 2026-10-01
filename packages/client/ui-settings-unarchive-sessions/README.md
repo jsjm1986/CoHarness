@@ -1,3 +1,8 @@
+---
+description: "Archived-session settings page: the registry-global archive set with one Unarchive action per row"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings-unarchive-sessions
 
 English | [中文](README.zh.md)
@@ -10,10 +15,21 @@ Rows are derived from the registry-global archive set joined with the loaded Ses
 
 The **Archived sessions** Settings page restores sessions hidden from every grouping surface. It lists the archive set newest-first with each session's owning Workspace (or the ungrouped label) and last activity, searches by title or Workspace, and restores one session per row through the shared Workspace command. Restoring a session returns it to its recorded Workspace position, or to the ungrouped sessions when it belongs to none.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The page registers one localized `settings.section` contribution and its locale namespace; it emits no Cordis events and owns no cross-plugin mutable relation.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -26,3 +42,13 @@ None; this package neither assembles nor sends a provider request.
 
 - **Archived sessions without a loaded summary are unaddressable** — the page derives its rows by joining the archive set with the Session list, so a member the list does not carry has no row and no Unarchive action even though the archive set still holds it; a set whose members are all in that state reports itself as unrestorable rather than empty.
 - **The page lists sessions only; it offers no session deletion** — archives are reversible through this page, while deleting a session record remains a separate capability.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

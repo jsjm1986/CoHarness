@@ -84,15 +84,21 @@ export function apply(ctx: ClientContext): void {
       const description = transport.hostDescription.getSnapshot()
       return { name: '', available: target.kind === 'base' && transport.isLoopback
         && description?.executionAuthorityRequired === false && description.canOpenPath,
-      fileManager: 'directory' as const }
+      fileManager: description?.fileManager ?? null }
     }
-    const opener = new PresentedOpenController(desktop, async (path, action, signal) => {
+    const opener = new PresentedOpenController(desktop, async (path, action, application, signal) => {
       const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
       if (cwd === undefined) throw new Error('Session workspace is unavailable')
       const absolute = resolveWorkspacePath(cwd, path)
-      const parent = absolute.replace(/[^\\/]+$/u, '')
-      const result = await transport.api.host.openPath({ path: action === 'reveal' ? parent : absolute }, signal)
+      const result = await transport.api.host.openPath(
+        application === undefined ? { path: absolute, action } : { path: absolute, action, application }, signal)
       if (!result.result.ok) throw new Error(result.result.error.code)
+    }, async (path, signal) => {
+      const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
+      if (cwd === undefined) throw new Error('Session workspace is unavailable')
+      const result = await transport.api.host.fileApplications({ path: resolveWorkspacePath(cwd, path) }, signal)
+      if (!result.result.ok) throw new Error(result.result.error.code)
+      return result.result.value.applications
     })
     scope.effect(() => transport.hostDescription.subscribe(() => { opener.resetHost() }), 'ui-deliverables: desktop capability')
     const owned = { summaries, diffs, opener }
@@ -116,13 +122,18 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
     name: 'conversation.chat.turnTail', select: selectDeliverables, locale: NS,
     inject: (sessionId): DeliverablesInjected => {
-      const { summaries, opener } = forSession(sessionId)
+      const { summaries, diffs, opener } = forSession(sessionId)
       return {
-        hooks: { presentedOpen: opener.state, presentedHost: opener.host, changesSummary: summaries.state },
+        hooks: {
+          presentedOpen: opener.state, presentedHost: opener.host, presentedApps: opener.apps,
+          changesSummary: summaries.state, changesDiff: diffs.state,
+        },
         reloadPresentedHost: () => opener.loadHost(),
         loadChangesSummary: (id, seq) => summaries.load(id, seq),
-        openPresented: (id, seq, index, action, path) => opener.open(id, seq, index, action, path),
-        openChanged: (id, seq, index, path) => opener.openChanged(id, seq, index, path),
+        loadChangesDiff: (id, seq, index) => diffs.load(id, seq, index),
+        loadPresentedApps: (key, path) => { opener.loadApplications(key, path) },
+        openPresented: (id, seq, index, action, path, application) => opener.open(id, seq, index, action, path, application),
+        openChanged: (id, seq, index, path, application) => opener.openChanged(id, seq, index, path, application),
         openChangesReview: (coordinates, index) => {
           if (coordinates.sessionId !== sessionId) throw new Error('Review navigation belongs to another Session')
           ctx.sidebarRight.openSessionResource(sessionId, changesReviewAddress(coordinates), { params: { index } })

@@ -1,3 +1,8 @@
+---
+description: "The Schedule family owns reminders whose durable state lives in the original Session log. A process-local owner waits only while that Session has a live root Agent; cold Sessions resume overdue work when they become live again and never imply an external notification channel."
+kind: "package-group"
+---
+
 # schedule/ — Session-local reminders
 
 English | [中文](README.zh.md)

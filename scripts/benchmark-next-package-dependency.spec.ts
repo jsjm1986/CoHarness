@@ -43,14 +43,14 @@ describe('next package benchmark graph', () => {
       name: '@f/probe',
       version: '1.0.0',
       peerDependencies: {
-        '@deepseek-ai/cordis': 'workspace:^',
-        '@f/runtime': 'workspace:^',
-        '@f/types': 'workspace:^',
+        '@deepseek-ai/cordis': 'workspace:~',
+        '@f/runtime': 'workspace:~',
+        '@f/types': 'workspace:~',
       },
       devDependencies: {
-        '@deepseek-ai/cordis': 'workspace:^',
-        '@f/runtime': 'workspace:^',
-        '@f/types': 'workspace:^',
+        '@deepseek-ai/cordis': 'workspace:~',
+        '@f/runtime': 'workspace:~',
+        '@f/types': 'workspace:~',
       },
     }
     const facts: PackageDependencyFacts = {
@@ -90,8 +90,8 @@ describe('next package benchmark graph', () => {
 
     expect(index.get('@f/probe')?.get('1.0.0')).toMatchObject({
       peerDependencies: {
-        '@deepseek-ai/cordis': '^4.0.1',
-        '@f/runtime': '^2.0.0',
+        '@deepseek-ai/cordis': '~4.0.1',
+        '@f/runtime': '~2.0.0',
       },
     })
     expect(index.get('@f/probe')?.get('1.0.0')?.dependencies).toBeUndefined()

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-30-acp-stdio-teardown-listener-cleanup.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-30-acp-stdio-teardown-listener-cleanup.md
-2026-08-30-acp-stdio-teardown-listener-cleanup.md: 44c61025204eaf5495260390bc9ee9d68fd3e966
-2026-08-30-acp-stdio-teardown-listener-cleanup.zh.md: 493da0d75454af3d017060330b0df335840cb496
+/agent-note-close-acp-stdio-transports-during-teardown:
+  en: c384f93dcf54741f
+  zh: 1ded3da7a1f45b51
+/agent-note-close-acp-stdio-transports-during-teardown/problem:
+  en: 6c38f2d7ed74f0a4
+  zh: 3b2e7cee1e27e7c2
+/agent-note-close-acp-stdio-transports-during-teardown/decision:
+  en: 28f98e0430167857
+  zh: 205a319e26f99b4d
+/agent-note-close-acp-stdio-transports-during-teardown/verification:
+  en: 9731d45b0fbf58ff
+  zh: 8ea4c2b51c30f4b0
+/agent-note-close-acp-stdio-transports-during-teardown/alternatives-considered:
+  en: b14468a5dc880120
+  zh: 0dd946866ea5cba9
+/agent-note-close-acp-stdio-transports-during-teardown/consequences:
+  en: 29a16da52ce9ea90
+  zh: a450f21a284e45f9

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-minimal-preset-owns-rl-composition.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-10-minimal-preset-owns-rl-composition.md
-2026-08-10-minimal-preset-owns-rl-composition.md: 65d24f9a03eedffac34f0c0141a8e2f643a48b7b
-2026-08-10-minimal-preset-owns-rl-composition.zh.md: 983fea50dfd4a262204b68937d07910c69018614
+/agent-note-the-minimal-preset-owns-the-complete-rl-agent-composition:
+  en: ed6d681e78d09f9d
+  zh: 0ce6a74b5734aac8
+/agent-note-the-minimal-preset-owns-the-complete-rl-agent-composition/problem:
+  en: 36dd7a2be36adea1
+  zh: c1d3ab4b569f0eeb
+/agent-note-the-minimal-preset-owns-the-complete-rl-agent-composition/decision:
+  en: ed22ddbbfb6a8747
+  zh: 99f8d765534c07a2
+/agent-note-the-minimal-preset-owns-the-complete-rl-agent-composition/verification:
+  en: f7e58283baa58cee
+  zh: 429a0dba0ad47edd
+/agent-note-the-minimal-preset-owns-the-complete-rl-agent-composition/alternatives-considered:
+  en: cff54c31e9b053fd
+  zh: 5702e24febb58321
+/agent-note-the-minimal-preset-owns-the-complete-rl-agent-composition/consequences:
+  en: baf18acd19232b20
+  zh: e4504b3e61e3bb3e

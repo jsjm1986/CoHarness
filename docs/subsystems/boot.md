@@ -82,6 +82,21 @@ Manage profile files and apply their declared reload lifecycle.
  */
 async authorize(): Promise<void>
 
+/** Read exact plugin-version exemptions saved in this profile.
+ * @returns Accepted package-name@version keys with the runtime versions they may run on, and any
+ * record or file problem the reader rejected, which the caller reports instead of failing.
+ */
+@Remote async listVersionExemptions(): Promise<{ exemptions: Record<string, string[]>; warnings: string[] }>
+
+/** Grant or revoke one exact plugin/runtime exemption and reevaluate live plugins.
+ * @param packageVersion Exact manifest package name followed by @ and its version; never an installation spec or alias.
+ * @param runtimeVersion Exact current DSH version for grants; revocation may name a previous runtime.
+ * @param enabled Whether to grant rather than revoke the exemption.
+ * @param acceptRisk Required true for grants after the user accepts possible crashes and data loss.
+ * @returns Saved and runtime outcomes. Startup-only profiles require restart.
+ */
+@Remote async setVersionExemption(packageVersion: string, runtimeVersion: string, enabled: boolean, acceptRisk?: boolean): Promise<ChangeResult>
+
 /** Read current plugins, including why a row cannot be changed through the profile patch.
  * @returns Current runtime entries with persistent patch targets.
  */
@@ -89,17 +104,23 @@ async authorize(): Promise<void>
 
 /** Read the profile's installed bundles, the bundles this dsh installation supplies, and the selected names that are not bundles.
  * A dependency without a bundle patch is listed, as a `not-bundle` problem, only while it is selected.
- * @returns Package versions, one-liners, rows, activation selections, whether the installation offers the
- * bundle, and removal availability.
+ * @returns Package versions, manifest descriptions, rows, optional display metadata, activation selections,
+ * whether the installation offers the bundle, and removal availability.
  */
 @Remote async listBundles(): Promise<BundleInfo[]>
 
+/** Read the registries this manager asks: the configured first one, its fallbacks in order, and what pnpm's own configuration names.
+ * @returns The registries in pnpm's comparison form; null is the one pnpm's own configuration names, `resolved` as pnpm reads it now.
+ */
+@Remote async registries(): Promise<PluginRegistries>
+
 /** Read what a spec names before installing it.
  * @param spec One package spec: a registry name, an absolute path, a git address, or a tarball.
+ * @param options The registry asked first.
  * @param signal Ends a registry lookup early.
  * @returns The package the spec names, or why it is refused.
  */
-@Remote async inspect(spec: string, signal?: AbortSignal): Promise<PluginSpecInspection>
+@Remote async inspect(spec: string, options?: InspectOptions, signal?: AbortSignal): Promise<PluginSpecInspection>
 
 /** Persist a plugin entry's desired enablement and apply it on live profiles.
  * @param id Loader entry identity returned by listPlugins.
@@ -116,14 +137,16 @@ async authorize(): Promise<void>
 @Remote async setBundleEnabled(name: string, enabled: boolean): Promise<ChangeResult>
 
 /**
- * Install a package using the same pnpm implementation as dsh plugin. A run
+ * Install a package using the same pnpm implementation as dsh plugin. GitHub
+ * repositories get a connection check bounded by githubConnectionTimeoutMs before pnpm starts;
+ * only network failures or timeouts stop installation, while pnpm owns authentication and transport fallback. A run
  * that fails, is cancelled, or adds a package without a bundle patch restores
  * `package.json` and `pnpm-lock.yaml` as they were; downloaded files can stay.
  * @param spec One package spec, including local paths relative to the invocation directory.
- * @param options Whether to activate the installed bundle (defaults to true), the request id a cancellation names, and
- * the pending build scripts to allow for this profile before pnpm runs.
+ * @param options Whether to activate the installed bundle (defaults to true), the request id a cancellation names,
+ * the pending build scripts to allow for this profile before pnpm runs, and the registry asked first.
  * @param signal Cancellation from the calling tool or Remote transport.
- * @returns Package-manager diagnostics and observed activation outcome.
+ * @returns Package-manager diagnostics, the registries asked, and the observed activation outcome.
  */
 @Remote async installBundle(spec: string, options?: InstallBundleOptions, signal?: AbortSignal): Promise<ChangeResult>
 
@@ -135,9 +158,16 @@ async authorize(): Promise<void>
  */
 @Remote({ mode: 'stream' }) async * installBundleStream( spec: string, options: InstallBundleOptions & { requestId: PluginInstallRequestId }, signal: AbortSignal, ): AsyncIterable<PluginInstallFrame>
 
+/** Recover the result of an active installation without cancelling it.
+ * @param requestId The id supplied when installation started.
+ * @returns The installation's outcome after it settles, or null if no active request has that id.
+ * Completed results are not retained; null establishes neither success nor cancellation.
+ */
+@Remote async waitForInstall(requestId: PluginInstallRequestId): Promise<ChangeResult | null>
+
 /** Stop an installation this manager owns and wait until its files are back.
  * @param requestId The id the installation was started with.
- * @returns `cancelled` once pnpm exited and the files are restored, `too-late` once the bundle is being
+ * @returns `cancelled` once the Git check or pnpm exited and the files are restored, `too-late` once the bundle is being
  * applied, `not-running` for any other id.
  */
 @Remote async cancelInstall(requestId: PluginInstallRequestId): Promise<PluginInstallCancellation>
@@ -159,6 +189,27 @@ Source: [`packages/boot/plugin-manager/src/index.ts`](../../packages/boot/plugin
 Current profile facts; scheduling and mutation belong to their callers.
 
 Source: [`packages/boot/app-boot/src/profile-context.ts`](../../packages/boot/app-boot/src/profile-context.ts)
+
+<a id="app-boot-events"></a>
+
+### `app-boot/*` events
+
+<a id="app-bootconfig-reload--emit"></a>
+
+#### `app-boot/config-reload` — emit
+
+Profile patches were reconciled into the running Loader tree: every entry update settled and no new inactive entry was introduced. Carries no diff; listeners re-read Loader entries.
+
+```ts cordis-catalog
+/**
+ * Profile patches were reconciled into the running Loader tree: every entry update settled and no new
+ * inactive entry was introduced. Carries no diff; listeners re-read Loader entries.
+ * @mode emit
+ */
+'app-boot/config-reload'(): void
+```
+
+Source: [`packages/boot/app-boot/src/index.ts`](../../packages/boot/app-boot/src/index.ts)
 
 <a id="hmr-events"></a>
 
@@ -240,13 +291,15 @@ Source: [`packages/boot/plugin-manager/src/types.ts`](../../packages/boot/plugin
 
 #### `plugin-manager/install-state` — emit
 
-An installation moved between its Host phases.
+An installation moved between its Host phases. `installing` is announced once when the run is queued, without an attempt, and once per registry the installation asks, with the attempt's registry and position; `cancelling` and `applying` once.
 
 ```ts cordis-catalog
 /**
- * An installation moved between its Host phases.
+ * An installation moved between its Host phases. `installing` is announced once when the run is queued,
+ * without an attempt, and once per registry the installation asks, with the attempt's registry and
+ * position; `cancelling` and `applying` once.
  * @mode emit
- * @param progress - the installation's request id and phase.
+ * @param progress - the installation's request id and phase, with the attempt while installing.
  */
 'plugin-manager/install-state'(progress: PluginInstallProgress): void
 ```

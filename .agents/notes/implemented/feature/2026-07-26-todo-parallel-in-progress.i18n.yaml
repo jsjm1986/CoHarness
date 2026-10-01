@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-26-todo-parallel-in-progress.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-26-todo-parallel-in-progress.md
-2026-07-26-todo-parallel-in-progress.md: 3d7b80e94762f8ca24b716c42619bf20d9a13608
-2026-07-26-todo-parallel-in-progress.zh.md: f6c94e7f41ca607e78f312b129de18142b4249c2
+/agent-note-allow-several-in-progress-todos-at-once:
+  en: 86f0b8cf54b13083
+  zh: 1e109cbca059a94a
+/agent-note-allow-several-in-progress-todos-at-once/problem:
+  en: 47b102fcbac74571
+  zh: 6f05da234b6e5c6f
+/agent-note-allow-several-in-progress-todos-at-once/decision:
+  en: 2fce1e1744061c14
+  zh: 68944026441cc419
+/agent-note-allow-several-in-progress-todos-at-once/why-guidance-not-a-parallelism-aware-invariant:
+  en: 205bb70cc904ff85
+  zh: 7009b4fc545e308d
+/agent-note-allow-several-in-progress-todos-at-once/the-policy-is-a-deployment-choice:
+  en: 24888cc853975452
+  zh: 76b11a7081dda40b
+/agent-note-allow-several-in-progress-todos-at-once/alternatives-considered:
+  en: eef0379f0e442d87
+  zh: a0b4a9e2e45517f3
+/agent-note-allow-several-in-progress-todos-at-once/the-display-surfaces-are-part-of-the-change:
+  en: a2579fdf133b971c
+  zh: 95eb1f01a2815cc2
+/agent-note-allow-several-in-progress-todos-at-once/deferred:
+  en: 33da7233fe3770f5
+  zh: 84e364ecf398da86
+/agent-note-allow-several-in-progress-todos-at-once/consequences:
+  en: e78ebdffe12265af
+  zh: c8ec91b5a5a3cf13

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-hover-popup-pointer-grace.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-30-hover-popup-pointer-grace.md
-2026-07-30-hover-popup-pointer-grace.md: 302592a2e9de8e749ef2450e8877a3ccbffd15d5
-2026-07-30-hover-popup-pointer-grace.zh.md: 4020a6f1f7ab52b6340a07f4c099906a7353a8a5
+/agent-note-hover-popup-pointer-grace:
+  en: ae77d638ced9c7f1
+  zh: c717334d465a8a49
+/agent-note-hover-popup-pointer-grace/problem:
+  en: 6f03e85cffc58bbd
+  zh: dd27b21a9bdd8615
+/agent-note-hover-popup-pointer-grace/decision:
+  en: 565928ff10b1fe3b
+  zh: f48cc5fcdffce178
+/agent-note-hover-popup-pointer-grace/alternatives-considered:
+  en: 54c029b6f25ebf07
+  zh: 0fade1abc0b33dea
+/agent-note-hover-popup-pointer-grace/consequences:
+  en: 8a86075cef3faf4e
+  zh: e685f21b9e01aa12
+/agent-note-hover-popup-pointer-grace/testing:
+  en: 822cb627f42cf66c
+  zh: c95193fb5344d68f

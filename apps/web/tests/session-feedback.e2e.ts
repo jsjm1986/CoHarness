@@ -36,7 +36,7 @@ describe('web e2e: Session feedback dialog', () => {
     if (scaffold === undefined) throw new Error('Web scaffold unavailable')
     onTestFailed(() => saveFailureShot(page, 'web-e2e-session-feedback'))
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.getByText('DONE', { exact: true }).waitFor()
     const input = page.locator('textarea').first()
     await input.fill('/feedback')

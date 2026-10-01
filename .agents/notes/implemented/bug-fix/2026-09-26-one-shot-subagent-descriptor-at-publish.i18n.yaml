@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-26-one-shot-subagent-descriptor-at-publish.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-26-one-shot-subagent-descriptor-at-publish.md
-2026-09-26-one-shot-subagent-descriptor-at-publish.md: 8f4b54bde09472bde41cc2accb8c1393654df7ca
-2026-09-26-one-shot-subagent-descriptor-at-publish.zh.md: f93b5e5c34b89e2ede2fe06bcfd85521198a0a5a
+/agent-note-agent-teams-classify-subagent-children-by-durable-session-origin:
+  en: 7308629724e71894
+  zh: f33518c99a5f7129
+/agent-note-agent-teams-classify-subagent-children-by-durable-session-origin/problem:
+  en: 646121405342c9e2
+  zh: dc453994cccd772f
+/agent-note-agent-teams-classify-subagent-children-by-durable-session-origin/decision:
+  en: 17d9d114b2ade1ca
+  zh: 85b38464a327597a
+/agent-note-agent-teams-classify-subagent-children-by-durable-session-origin/alternatives-considered:
+  en: 3f11963659024351
+  zh: b62a634e5aa507ff
+/agent-note-agent-teams-classify-subagent-children-by-durable-session-origin/consequences:
+  en: 4e999d91372d64b4
+  zh: 9c26b5a47f189e06

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-29-deepseek-request-metadata-opt-in.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-29-deepseek-request-metadata-opt-in.md
-2026-08-29-deepseek-request-metadata-opt-in.md: f59e5f4c0a07a9f99185bbe942371f9cd52562d1
-2026-08-29-deepseek-request-metadata-opt-in.zh.md: ccf6cb89b9ac8c2bd119159ab82de1f8c836ef02
+/agent-note-deepseek-request-metadata-uses-opt-in-extension-providers:
+  en: 051f7ebedc180d45
+  zh: 647e35e7f7f55245
+/agent-note-deepseek-request-metadata-uses-opt-in-extension-providers/problem:
+  en: dc6467fe384b98ca
+  zh: 142ef6cc7cc29c1a
+/agent-note-deepseek-request-metadata-uses-opt-in-extension-providers/decision:
+  en: ef42863a88070c00
+  zh: 9d6987b13777685c
+/agent-note-deepseek-request-metadata-uses-opt-in-extension-providers/alternatives-considered:
+  en: af1dcfe848234b7b
+  zh: 4404c6f4bec93a87
+/agent-note-deepseek-request-metadata-uses-opt-in-extension-providers/consequences:
+  en: 46e50412269646b6
+  zh: 0bfc523dcb471f09

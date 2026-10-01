@@ -1,12 +1,21 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { NavigationController, SlotRegistry, type AddPaneResult, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import {
+  NavigationController, SlotRegistry,
+  type AddPaneResult, type SessionId, type SessionListState, type SessionSummary,
+  type WorkspaceView,
+} from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { WorkspaceBrowser } from '../src/client/WorkspaceBrowser.tsx'
 import { WorkspacePicker } from '../src/client/WorkspacePicker.tsx'
 import { apply as nodeApply } from '../src/index.ts'
+import { UNGROUPED_KEY } from '../src/client/tree.ts'
+import { FLAT_SESSION_ORDER_KEY, createWorkspaceViewStore } from '../src/client/stores.ts'
+
+// A snapshot must keep one identity between changes (uSES polls it).
+const EMPTY_CATALOG: readonly never[] = []
 
 async function bench() {
   const ctx = new Context()
@@ -31,10 +40,25 @@ async function bench() {
   const renameSession = vi.fn(async (title: string) => ({ ok: true, value: { title, seq: 1 } }))
   const binding = vi.fn((_id: string) => ({ session: { rename: renameSession } }))
   const fork = vi.fn(async () => 'forked' as never)
+  const workspaceList = {
+    items: [] as WorkspaceView[],
+    archivedSessionIds: [] as SessionId[],
+    pinnedSessionIds: [] as SessionId[],
+  }
+  const pinSession = vi.fn(async (sessionId: SessionId) => {
+    workspaceList.pinnedSessionIds = [sessionId, ...workspaceList.pinnedSessionIds]
+  })
+  const unpinSession = vi.fn(async (sessionId: SessionId) => {
+    workspaceList.pinnedSessionIds = workspaceList.pinnedSessionIds.filter(id => id !== sessionId)
+  })
   ctx.provide('workspaces', {
-    create, startSession, rename, insertSessionBefore,
-    list: { getSnapshot: () => ({ archivedSessionIds: [] }) },
+    create, startSession, rename, insertSessionBefore, pinSession, unpinSession,
+    list: { getSnapshot: () => workspaceList },
   } as never)
+  const sessionList: SessionListState = {
+    ids: [], byId: {}, archivedById: {}, current: undefined,
+    phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+  }
   const retain = vi.fn(() => ({
     ready: Promise.resolve({ session: { getSnapshot: () => ({ openState: 'open', openError: null }) } }),
     release: vi.fn(),
@@ -43,12 +67,19 @@ async function bench() {
     id: string, _options: unknown,
     operation: (reference: { binding: ReturnType<typeof binding> }) => Promise<void>,
   ) => operation({ binding: binding(id) }))
-  ctx.provide('sessions', { open, clear, beginNavigation, search, searchResultLimit: 20, binding, using, retain, fork } as never)
+  ctx.provide('sessions', {
+    open, clear, beginNavigation, search, searchResultLimit: 20, binding, using, retain, fork,
+    list: { getSnapshot: () => sessionList },
+  } as never)
   const viewportState = { mode: 'single' as 'single' | 'workbench' }
   const replaceActive = vi.fn<(_id: SessionId) => AddPaneResult>(() => ({ ok: true }))
   ctx.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: viewportState.mode, paneIds: [], paneRatios: [] }), subscribe: () => () => {} }, replaceActive, setMode: vi.fn() } as never)
   ctx.provide('connection', {
     hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
+  } as never)
+  ctx.provide('shortcuts', {
+    register: vi.fn(() => () => {}),
+    catalog: { getSnapshot: () => EMPTY_CATALOG, subscribe: () => () => {} },
   } as never)
   const locale = new LocaleRuntime(ctx)
   // These specs assert the shipped Chinese copy. There is no jsdom `window`
@@ -59,7 +90,7 @@ async function bench() {
   return {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, startSession, rename,
     insertSessionBefore, open, clear, search, renameSession, binding, fork,
-    viewportState, replaceActive,
+    viewportState, replaceActive, workspaceList, sessionList, pinSession, unpinSession,
   }
 }
 
@@ -71,9 +102,19 @@ function declare(slots: SlotRegistry, ...names: HoleName[]): () => void {
   return slots.register({ name: 'root', children } as never, () => null)
 }
 
+const sid = (id: string) => id as SessionId
+const summary = (id: string, updatedAt: number): SessionSummary => ({
+  id: sid(id), displayTitle: id, running: false, blank: false, updatedAt,
+})
+const workspace = (id: string, sessionIds: readonly string[]): WorkspaceView => ({
+  workspaceId: id as WorkspaceView['workspaceId'], path: `/projects/${id}`, title: id,
+  sessionIds: sessionIds.map(sid), createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+})
+type ViewInstance = ReturnType<ReturnType<typeof createWorkspaceViewStore>['create']>
+
 describe('ui-workspace apply', () => {
   it('declares the services it drives', () => {
-    expect(inject).toEqual(['slots', 'sessions', 'workspaces', 'locale', 'connection', 'conversationViewport'])
+    expect(inject).toEqual(['slots', 'sessions', 'workspaces', 'locale', 'connection', 'conversationViewport', 'shortcuts'])
   })
 
   it('registers browser and pickers for declarations arriving before or after apply', async () => {
@@ -152,6 +193,81 @@ describe('ui-workspace apply', () => {
     const picker = (b.slots.entries('conversation.hero.workspace')[0]!.inject as () => WorkspacePickerInjected)()
     await picker.createWorkspace({ path: '/tmp/project' })
     expect(b.create).toHaveBeenCalledWith({ path: '/tmp/project' })
+  })
+
+  it('fronts a pinned session in its group and flat saved orders and reports write failures', async () => {
+    const b = await bench()
+    // Workspace alpha owns s1/s2 (s1 listed last); s3 is ungrouped.
+    b.workspaceList.items = [workspace('alpha', ['s2', 's1'])]
+    b.sessionList.ids = [sid('s1'), sid('s2'), sid('s3')]
+    b.sessionList.byId = { [sid('s1')]: summary('s1', 10), [sid('s2')]: summary('s2', 20), [sid('s3')]: summary('s3', 30) }
+    declare(b.slots, 'sidebar.workspaces')
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+
+    const entry = b.slots.entries('sidebar.workspaces')[0]!
+    const browser = (entry.inject as () => WorkspaceBrowserInjected)()
+    const view = (entry.store as unknown as { create(): ViewInstance }).create()
+
+    browser.pinSession(sid('s1'))
+    expect(b.pinSession).toHaveBeenCalledWith('s1')
+    await vi.waitFor(() => {
+      // The pinned session leads its Workspace and the flat account; Ungrouped
+      // reconciles unchanged.
+      expect(view.getSnapshot().sessionOrderByAccount).toEqual({
+        alpha: ['s1', 's2'],
+        [UNGROUPED_KEY]: ['s3'],
+        [FLAT_SESSION_ORDER_KEY]: ['s1', 's3', 's2'],
+      })
+    })
+
+    // Unpinning is Host state only: saved positions stay.
+    browser.unpinSession(sid('s1'))
+    await vi.waitFor(() => { expect(b.unpinSession).toHaveBeenCalledWith('s1') })
+    expect(view.getSnapshot().sessionOrderByAccount.alpha).toEqual(['s1', 's2'])
+    expect(browser.hooks.workspaceShortcuts.getSnapshot().pinError).toBeNull()
+
+    // Rejected writes surface on the pin-error channel and touch no order.
+    b.pinSession.mockRejectedValueOnce(new Error('wire down'))
+    browser.pinSession(sid('s2'))
+    await vi.waitFor(() => {
+      expect(browser.hooks.workspaceShortcuts.getSnapshot().pinError).toMatchObject({ kind: 'pin' })
+    })
+    browser.dismissPinError()
+    expect(browser.hooks.workspaceShortcuts.getSnapshot().pinError).toBeNull()
+    b.unpinSession.mockRejectedValueOnce(new Error('wire down'))
+    browser.unpinSession(sid('s1'))
+    await vi.waitFor(() => {
+      expect(browser.hooks.workspaceShortcuts.getSnapshot().pinError).toMatchObject({ kind: 'unpin' })
+    })
+    expect(view.getSnapshot().sessionOrderByAccount.alpha).toEqual(['s1', 's2'])
+  })
+
+  it('a pin completing after its Workspace vanished reconciles only live accounts', async () => {
+    const b = await bench()
+    b.workspaceList.items = [workspace('alpha', ['s1', 's2'])]
+    b.sessionList.ids = [sid('s1'), sid('s2'), sid('s3')]
+    b.sessionList.byId = { [sid('s1')]: summary('s1', 10), [sid('s2')]: summary('s2', 20), [sid('s3')]: summary('s3', 30) }
+    declare(b.slots, 'sidebar.workspaces')
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const entry = b.slots.entries('sidebar.workspaces')[0]!
+    const browser = (entry.inject as () => WorkspaceBrowserInjected)()
+    const view = (entry.store as unknown as { create(): ViewInstance }).create()
+    view.actions.setSessionOrder('alpha', ['s2', 's1'])
+
+    // The Workspace disappears while the pin is in flight; the write lands on
+    // the memberships that are live at completion (s1 is now ungrouped).
+    let resolvePin: () => void = () => {}
+    b.pinSession.mockImplementationOnce(() => new Promise<void>((resolve) => { resolvePin = resolve }))
+    browser.pinSession(sid('s1'))
+    b.workspaceList.items = []
+    b.workspaceList.pinnedSessionIds = [sid('s1')]
+    resolvePin()
+    await vi.waitFor(() => {
+      expect(view.getSnapshot().sessionOrderByAccount[FLAT_SESSION_ORDER_KEY]).toEqual(['s1', 's3', 's2'])
+    })
+    const orders = view.getSnapshot().sessionOrderByAccount
+    expect(orders[UNGROUPED_KEY]).toEqual(['s1', 's2', 's3'])
+    expect(orders.alpha).toBeUndefined()
   })
 
   it('declares the two directory-flow holes and reports their occupancy per surface', async () => {

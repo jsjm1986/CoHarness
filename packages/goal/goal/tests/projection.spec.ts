@@ -13,6 +13,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentStatus } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
@@ -20,6 +21,12 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import GoalService, { GoalId, applyGoalProjection, foldGoal, goalProjectionDefinition } from '@deepseek-ai/dsh-goal'
 import type { GoalProjection, GoalProjectionState, GoalRef } from '@deepseek-ai/dsh-goal'
 import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'test': { kind: 'test' } & ContextFormed
+  }
+}
 
 interface Bench {
   ctx: Context
@@ -134,8 +141,9 @@ describe('goal projection unit', () => {
 
     bench.agent.inbox.prepend('next-step', createUserMessage({
       content: [{ type: 'text', text: 'unrelated pending context' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     }))
+
 
     expect(bench.tailValues().goal).toBeNull()
     expect(foldGoal(bench.session.snapshotEvents()).goal).toBeUndefined()

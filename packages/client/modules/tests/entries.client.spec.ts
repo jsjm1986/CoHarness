@@ -17,11 +17,11 @@ afterEach(async () => {
 })
 
 const row = (id: string, rev = 'r0', extra: Partial<WebBootEntry> = {}): WebBootEntry => ({
-  id, rev, url: `/plugins/??${id}/client.js&rev=${rev}`, ...extra,
+  id, rev, url: `plugins/??${id}/client.js&rev=${rev}`, ...extra,
 })
 const graph = (...entries: WebBootEntry[]): WebBootGraph => ({
   rev: JSON.stringify(entries), entries,
-  batches: entries.length === 0 ? [] : [{ phase: 'application', url: '/batch', rev: 'batch', entries: entries.map(row => row.id) }],
+  batches: entries.length === 0 ? [] : [{ phase: 'application', url: 'batch', rev: 'batch', entries: entries.map(row => row.id) }],
 })
 const deferred = () => {
   let resolve!: () => void
@@ -42,7 +42,7 @@ async function bench(initial: WebBootGraph, factories: Record<string, ClientBund
     boot: initial, staticModules: {},
     loadBundle: async (url) => {
       fetched.push(url)
-      const ids = url === '/batch' ? initial.entries.map(row => row.id).filter(id => id !== 'bootstrap') : [url.split('??')[1]!.split('/client.js')[0]!]
+      const ids = url === 'batch' ? initial.entries.map(row => row.id).filter(id => id !== 'bootstrap') : [url.split('??')[1]!.split('/client.js')[0]!]
       const registrations = ids.map(id => ({ id, factory: factories[id]! }))
       await arrival(url)
       for (const registration of registrations) target.load(registration)
@@ -293,7 +293,7 @@ it('stops an obsolete multi-entry application after awaiting removal', async () 
   const latest = b.modules.entries.sync(graph())
   cleanup.resolve()
   await Promise.all([first, latest])
-  expect(b.fetched).toEqual(['/batch'])
+  expect(b.fetched).toEqual(['batch'])
 })
 
 
@@ -404,7 +404,7 @@ it('coalesces an overlapping graph snapshot with the same rebuilt artifact', asy
   const syncing = b.modules.entries.sync(graph(row('a', 'r1')))
   download.resolve()
   await Promise.all([rebuilding, syncing])
-  expect(b.fetched).toEqual(['/batch', row('a', 'r1').url])
+  expect(b.fetched).toEqual(['batch', row('a', 'r1').url])
   expect(effects).toEqual({ mounted: 2, disposed: 1, hits: 0 })
 })
 
@@ -472,7 +472,7 @@ it.each(['graph', 'rebuilt'])('preserves bootstrap and dependent fibers when a %
   expect([...b.ctx.loader.entries()].map(entry => entry.fiber)).toEqual(fibers)
   expect(await b.modules.import('bootstrap')).toBe(exports)
   expect(effects).toEqual({ mounted: 1, disposed: 0, hits: 0 })
-  expect(b.fetched).toEqual(['/batch'])
+  expect(b.fetched).toEqual(['batch'])
 })
 
 it('discards a failed arrival target when an uncreated entry receives a newer graph', async () => {
@@ -483,7 +483,9 @@ it('discards a failed arrival target when an uncreated entry receives a newer gr
   expect(b.modules.entries.state.getSnapshot().failures[0]?.message).toContain('offline r1')
   b.arrival(async () => {})
   await b.modules.entries.sync(graph(row('a', 'r2')))
-  expect(b.fetched).toEqual([row('a').url, row('a', 'r1').url, row('a', 'r2').url])
+  // A transport failure retries the same bundle URL once before the target is
+  // discarded, so the failed r1 arrival appears twice.
+  expect(b.fetched).toEqual([row('a').url, row('a', 'r1').url, row('a', 'r1').url, row('a', 'r2').url])
 })
 
 it('uses the latest desired revision when a rebuild queues before entry creation', async () => {

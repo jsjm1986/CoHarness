@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-02-bounded-duplication-baseline.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-02-bounded-duplication-baseline.md
-2026-09-02-bounded-duplication-baseline.md: 40c842e1b33de7690676f44c59b0884bf767bb1f
-2026-09-02-bounded-duplication-baseline.zh.md: fb07a4b5f9e6817a1dd3eec3609cd07ea323855d
+/agent-note-bound-the-existing-duplication-baseline:
+  en: 3c38f2f0a1d89f98
+  zh: 8c757a8450876ea3
+/agent-note-bound-the-existing-duplication-baseline/problem:
+  en: a8b9e86b5c16415e
+  zh: cd1987e5e72d5276
+/agent-note-bound-the-existing-duplication-baseline/decision:
+  en: 281be075f49a25f6
+  zh: 069497e66a2b8e22
+/agent-note-bound-the-existing-duplication-baseline/alternatives-considered:
+  en: 7e76271810e1d643
+  zh: 846a7c170e797e8c
+/agent-note-bound-the-existing-duplication-baseline/consequences:
+  en: 4d091fdfb54432c8
+  zh: b3621ada43b7dbd5
+/agent-note-bound-the-existing-duplication-baseline/testing:
+  en: dc2c68b7724f2542
+  zh: 6fc29609507775c2

@@ -100,12 +100,18 @@ async function gateway() {
 class UnusedShell extends Shell {
   override get sandboxMode() { return 'workspace-write' as const }
   resolve(): never { throw new Error('fixture does not run shell commands') }
-  run(): never { throw new Error('fixture does not run shell commands') }
-  start(): never { throw new Error('fixture does not run shell commands') }
+  execute(): never { throw new Error('fixture does not run shell commands') }
 }
 
 class Connection extends HostConnectionService {
-  constructor(ctx: Context) { super(ctx, []) }
+  constructor(ctx: Context) {
+    // The fixture emits connection/request waterfalls only; no HTTP admission runs.
+    super(ctx, [], {
+      isAuthenticated: () => true,
+      authorizeIndex: () => true,
+      authenticatedUrl: (url: string) => url,
+    } as never)
+  }
 }
 
 class ScriptedModel extends LlmAdapter {

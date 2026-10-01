@@ -14,7 +14,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/pr
 import { tmpdir } from 'node:os'
 import { basename, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFailed } from 'vitest'
 import {
   snapshotChildEnvironment,
   assertPersistedSessionVersion,
@@ -316,11 +316,10 @@ function assembledRuntimeContexts(log: PersistedLog): string[] {
   return log.content.trimEnd().split('\n').flatMap((line) => {
     const event = JSON.parse(line) as {
       type?: string
-      data?: { source?: { kind?: string; plugin?: string }; content?: Array<{ type?: string; text?: unknown }> }
+      data?: { source?: { kind?: string }; content?: Array<{ type?: string; text?: unknown }> }
     }
     if (event.type !== 'user/message'
-      || event.data?.source?.kind !== 'plugin'
-      || event.data.source.plugin !== '@deepseek-ai/dsh-system-prompt') return []
+      || event.data?.source?.kind !== 'runtime-context') return []
     return event.data.content?.flatMap(block => block.type === 'text' && typeof block.text === 'string' ? [block.text] : []) ?? []
   })
 }
@@ -839,12 +838,39 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
         assertions.dshSdkChild !== undefined,
       )
       const actualContext = contextOf(ordered, cwd)
+      onTestFailed(async () => {
+        const evidence = await mkdtemp(join(tmpdir(), `dsh-sdk-snapshot-${scenario.name}-actual-`))
+        await Promise.all(ordered.map((log, index) => writeFile(
+          join(evidence, `session${index === 0 ? '' : `.${index}`}.actual.jsonl`),
+          log.content,
+        )))
+        await writeFile(join(evidence, 'request-headers.actual.json'), `${JSON.stringify({
+          scenario: scenario.key,
+          composition: scenario.manifest.composition,
+          headerClass: scenario.manifest.header.class,
+          pin: headerPin(scenario).key,
+          requests: ordered.map(log => ({
+            headers: normalizedHeaders(log.content, actualContext),
+            systemPrompts: normalizedSystemPrompts(log.content, actualContext),
+            toolSchemas: normalizedToolSchemas(log.content, actualContext),
+          })),
+        }, null, 2)}\n`)
+        await writeFile(
+          join(evidence, 'notifications.actual.jsonl'),
+          normalizeNotifications(notifications, actualContext),
+        )
+        const finalResult = results.at(-1)
+        if (finalResult !== undefined) {
+          await writeFile(join(evidence, 'result.actual.json'), normalizeResult(finalResult, actualContext))
+        }
+        console.error(`SDK snapshot evidence: ${evidence}`)
+      })
       if (scenario.name === 'subagent-activation-limit') {
         expect(ordered).toHaveLength(2)
         const denied = records(ordered[0]!.content).find(record => record.type === 'tool/result'
           && JSON.stringify(record).includes('call_over_capacity'))
         expect(denied).toMatchObject({ data: {
-          message: { content: [{ isError: true, content: [{ type: 'text', text: expect.stringContaining('subagent limit reached (active child limit: 1)') }] }] },
+          message: { isError: true, content: [{ type: 'text', text: expect.stringContaining('subagent limit reached (active child limit: 1)') }] },
         } })
       }
       if (scenario.name === 'tool-error-details') {

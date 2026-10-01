@@ -23,6 +23,7 @@
  * contract and the same occupant.
  */
 import type { HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
+import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { HostObservable, PropsHooks, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pull the owner SlotMap merges into programs that resolve the
 // runtime shares below.
@@ -32,6 +33,7 @@ import type {
   ConversationViewportSnapshot, DirectoryListing, SessionId, SessionListState, SessionSearchResultItem, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { createWorkspaceViewStore } from '../stores.ts'
+import type { WorkspaceShortcutState } from '../shortcuts.ts'
 
 /**
  * Owner share of the directory-flow holes: the complete conversation between
@@ -111,6 +113,10 @@ export type WorkspaceBrowserInjected = {
     currentSessions: HostObservable<SessionListState>
     /** Current generation's Host description, bound by the slot renderer. */
     hostDescription: HostDescriptionSource
+    /** Browser-owned opening requests published by workspace commands. */
+    workspaceShortcuts: HostObservable<WorkspaceShortcutState>
+    /** Registered editable-command catalog rows for key labels and aria. */
+    shortcuts: HostObservable<readonly ShortcutCatalogEntry[]>
   }
   /**
    * Start a New Session in a Workspace: reuse-or-create its blank session and
@@ -150,6 +156,14 @@ export type WorkspaceBrowserInjected = {
    */
   archiveSession: (sessionId: SessionId) => Promise<void>
   /**
+   * Pin a Session so it leads its section: Host write plus the local order
+   * fronting. A rejection leaves the order unchanged and raises the pin
+   * notice channel.
+   */
+  pinSession: (sessionId: SessionId) => void
+  /** Drop a Session from the pin set; a rejection raises the unpin notice. */
+  unpinSession: (sessionId: SessionId) => void
+  /**
    * Reorder a session inside its Workspace account (DOM-insertBefore
    * semantics: omitted anchor appends to the end). The view refreshes from
    * the Host response/changed frame; failures leave the order unchanged.
@@ -159,6 +173,18 @@ export type WorkspaceBrowserInjected = {
   createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
   /** List one host directory level for workspace document management. */
   listDirectory?: ((path?: string, signal?: AbortSignal) => Promise<DirectoryListing>) | undefined
+  /** Open the browser search and focus its input. */
+  requestSearch: () => void
+  /** Request the existing directory picker. */
+  requestAddWorkspace: () => void
+  /** Consume the directory-picker opening request. */
+  closeAddWorkspace: () => void
+  /** Publish directory interaction occupancy for command availability. */
+  setDirectoryBusy: (busy: boolean) => void
+  /** Dismiss the command-driven fork-failure notification. */
+  dismissForkError: () => void
+  /** Dismiss the pin/unpin failure notification. */
+  dismissPinError: () => void
 }
 
 /** Full browser props: shell owner share + viewing store + injected actions + the locale seat. */

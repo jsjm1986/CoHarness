@@ -146,6 +146,7 @@ stagehand_act, stagehand_observe, and stagehand_extract use the separately confi
 
 静态工具目录保留其前缀。浏览器结果追加到主 Session 历史；原生推理请求上下文由 Stagehand 管理。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓工作
 
 <a id="known-limitations-and-deferred-work"></a>

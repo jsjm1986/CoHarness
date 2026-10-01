@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-12-cloud-workspace-file-resources.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-12-cloud-workspace-file-resources.md
-2026-09-12-cloud-workspace-file-resources.md: 50df39519ed1696458fa4f7ddf13cf832d4e329c
-2026-09-12-cloud-workspace-file-resources.zh.md: d6de7cb68c4229624b7880cdd9cce436001a14d7
+/agent-note-cloud-workspace-file-resources-use-relative-read-only-rpcs:
+  en: 6c3f0548de02aff9
+  zh: 4626b24327e1a821
+/agent-note-cloud-workspace-file-resources-use-relative-read-only-rpcs/problem:
+  en: b8e518b85cac27ec
+  zh: 73d7c551534c0537
+/agent-note-cloud-workspace-file-resources-use-relative-read-only-rpcs/decision:
+  en: 1d06b6c317843d03
+  zh: 8717631d66c8a34e
+/agent-note-cloud-workspace-file-resources-use-relative-read-only-rpcs/alternatives-considered:
+  en: 95ed226b4d747cf7
+  zh: 342a130c47a82be7
+/agent-note-cloud-workspace-file-resources-use-relative-read-only-rpcs/consequences:
+  en: c9ccf21e5df26249
+  zh: 23116d0f12711fb4

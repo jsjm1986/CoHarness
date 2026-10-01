@@ -1,3 +1,8 @@
+---
+description: "Pure React atoms for the dsh web UI: controls, icons, markdown, and JSON inspectors (zero cordis)"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-client-ui-primitives
 
 English | [中文](README.zh.md)
@@ -10,14 +15,35 @@ Pure React atoms (zero cordis): StateDot, DisclosureRow, ic_ds_* icons, Button/P
 
 Use `dsh-client-ui-primitives` to build web-client controls and render agent output with shared React UI. It includes standard controls, icons, anchored overlays, and renderers for Markdown with TeX, terminal output, file reads, diffs, search, web retrieval, and JSON. The renderers handle untrusted model output by dropping raw HTML, restricting links, and parsing ANSI escape sequences. The components import no Cordis runtime; callers supply localized labels, and theme-facing colors use `--dsw-*` design tokens.
 
+## Table of Contents
+
+- [Hover cards](#hover-cards)
+- [Toast](#toast)
+- [Markdown rendering](#markdown-rendering)
+- [Terminal output](#terminal-output)
+- [Read rendering](#read-rendering)
+- [Diff rendering](#diff-rendering)
+- [Search results](#search-results)
+- [Web retrieval](#web-retrieval)
+- [Compatibility](#compatibility)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="hover-cards"></a>
 ## Hover cards
 
 `HoverCard` keeps its portaled preview reachable across the anchor gap with a pointer-leave grace. A consumer may also pass `copyText`: the card then exposes button semantics for pointer and keyboard activation, includes that value after the `copyLabel` prefix in its accessible name, writes the exact value through the package clipboard helper, and temporarily replaces its content with `copiedLabel` only after the host accepts the write. A non-collapsed text selection intersecting the card suppresses pointer-click activation, while success feedback retains the original card height and clears when the card closes or after one second. `copyLabel` and `copiedLabel` are label props because this zero-cordis atom cannot read the application locale; omitting `copyText` preserves the read/select-only card. Historical rationale: [the archived hover-card copy note](../../../.agents/notes/archived/feature/2026-07-31-hover-card-click-copy.md).
 
+<a id="toast"></a>
 ## Toast
 
 `Toast` is the transient top banner: it slides in, holds at full opacity for three seconds, fades over one second, then calls `onDone` so the owner can unmount it. It renders `role="alert"` with an optional leading icon slot and takes its copy as a required prop (zero-cordis: the owner localizes). It body-portals with `pointer-events: none`, sits 120px from the viewport top, and centers horizontally over the optional `anchor` element (re-measured on window resizes) — the composer passes its card so the banner centers over the chat column rather than the whole window — falling back to the viewport center without one. Re-showing the same message requires a remount — owners key the element by a per-show sequence so an identical repeated message restarts the hold-and-fade cycle instead of silently reusing the faded banner. Under `prefers-reduced-motion: reduce` the slide-in is dropped and only the delayed fade remains. It layers above the ui-attachment image lightbox so a failure reported during a preview stays readable.
 
+<a id="markdown-rendering"></a>
 ## Markdown rendering
 
 `MarkdownText` renders GFM and `$…$`, `$$…$$`, `\(…\)`, and `\[…\]` TeX math from untrusted assistant output through React elements, with math typeset by KaTeX and trusted commands disabled; block-level same-line `$$…$$` is display math, including `\tag{}`. A narrow micromark extension lets asterisk strong emphasis ending in punctuation close before adjacent CJK text, where prose normally omits the whitespace CommonMark requires; single-asterisk emphasis, non-CJK adjacency, escapes, code, and math retain upstream parsing. It omits raw HTML, keeps unsupported links inert and gives HTTP(S) links safe external-link attributes, and renders absolute HTTP(S) images without a referrer; relative paths, absolute local paths, `file:` URLs, and unsupported schemes retain their alt text. A remote image that later fails to load falls back to its authored alt text, or its original destination when alt is empty, and a changed source gets a fresh image instance. Inline code whose complete value is an absolute HTTP(S) URL keeps its code styling and gains the same safe external anchor; commands, partial URLs, other schemes, and fenced code remain inert. An optional `fileMentions` resolver lets the owning view link inline code that names a real file: the token keeps code styling and gains a button wired to the resolved opener, with the resolver's accessible label and full-path `title`. The renderer never guesses at what looks like a path — an unresolved token stays inert, mentions apply to settled renders only (the streaming cache must not bake in handlers that could go stale), and a token inside an anchor stays inert because a button cannot nest there. While a reply streams, `MarkdownText` parses incrementally: all but the trailing two blocks freeze as cached React elements and only the source tail behind them re-parses per chunk, so per-chunk work tracks the tail instead of the whole reply ([mechanism and DOM-parity contract](../../../.agents/notes/implemented/architecture/2026-08-06-web-markdown-incremental-ast-renderer.md)). `MessageText` remains the literal-text primitive for user-authored content. `extractMarkdownPlainText` removes Markdown presentation markup for compact labels while preserving raw HTML as literal text. Element spacing, responsive images, tables, links, and inline code use the same `--dsw-alias-markdown-*` / `--dsw-font-markdown-*` tokens as deepsuite `@deepseek/md`. Fenced blocks render through `CodeBlock` (language banner, copy control, shiki for the registered grammars). On compact viewports, the code, read, search, terminal, diff, web, and JSON cards use a single dense chrome row or inset while copy and disclosure controls retain their 44px touch target; long content remains internally scrollable and empty fenced bodies do not reserve a blank code gutter.
@@ -26,38 +52,46 @@ Use `dsh-client-ui-primitives` to build web-client controls and render agent out
 
 `MarkdownText` also accepts `variant="compact"` for secondary text such as reasoning. It keeps the same complete, sanitized Markdown and incremental parser, with tighter heading, list, code and table spacing. Code banners stay in normal flow so they cannot cover a containing disclosure’s sticky collapse control.
 
+<a id="terminal-output"></a>
 ## Terminal output
 
 `TerminalBlock` renders a shell command as a terminal surface: one prompt row per line of the command (the shortened `cwd` label on the first row only, since the view knows one working directory and a `cd` moves later lines elsewhere, then that line), the command's output, a status pill for a non-zero exit code or a terminating signal, and a copy control that writes the raw `output` prop. A run-state `StateDot` marks the call once, on the first row, out of flow in a gutter the card reserves as its own left padding, so the dot sits inside the card box yet left of the prompt text. It reaches three of `StateDot`'s states — the chase while `running`, red for the same exit status that renders the pill, green otherwise — so a card states whether its command is still running rather than leaving that to be inferred from the presence of output; it carries one visually hidden text label because `StateDot` is `aria-hidden`. One dot regardless of line count is deliberate: the exit status is the whole call's, so a dot per line would claim a per-line outcome the view does not carry. Command text is `white-space: pre`, so repeated spaces, tabs, and an indented continuation render verbatim while the row stays single-line and ellipsizes. ANSI escape sequences are parsed with `anser` (bundled into this package's browser artifact) into React spans; cursor movements replay into a per-line column buffer before inert controls are stripped, since carriage return and backspace only MOVE the cursor: `100%` + CR + `OK` alone shows `OK0%`, while the `\x1b[K` a spinner writes with its redraw erases the tail so `100%\r\x1b[KOK` shows `OK`. Erase-in-line is honored in all three parameter forms, the cursor advances by terminal columns (8-column tab stops, two for emoji and CJK, none for a combining mark), and SGR state is normalized per cell as a terminal stores it, threading across lines and closing at the state the line ended in; basic-16 foreground colors map onto `--dsw-*` tokens, while 256-palette and truecolor values pass through as literal rgb. Output keeps `white-space: pre` with horizontal scrolling, so column-aligned output holds its alignment instead of soft-wrapping, and collapses to a head slice plus a tail slice past `maxLines` (default 16) behind an expand button. Rationale: [the web terminal card note](../../../.agents/notes/implemented/feature/2026-07-28-web-terminal-card.md).
 
 `running` keeps any received output visible while retaining the running indicator; an empty running command shows only its prompt. Copy becomes available after settlement. An explicit `exitCode: null` displays the localized no-exit-code status and never indicates success; a signal takes precedence. The omitted exit-code case retains its existing presentation.
 
+<a id="read-rendering"></a>
 ## Read rendering
 
 `ReadBlock` renders a returned file window as a line-numbered, syntax-highlighted code surface: a bold path (or presenter-supplied title) banner with a copy control, then the content lines with their file line numbers in a gutter (a windowed read keeps the file's own numbering, so a read past an offset starts above 1). A `totalLines` exceeding the window count draws a `showing N of M` note, and the body collapses to a head slice plus a tail slice past `maxLines` (default 16, the TerminalBlock split arithmetic) behind an expand button. Highlighting runs through the same shiki path as `CodeBlock` and is deferred until the block first enters the viewport. Rationale: [the web read card note](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card.md).
 
+<a id="diff-rendering"></a>
 ## Diff rendering
 
 `DiffBlock` renders file changes with neutral shared context and separate removed (`- `, error token) and added (`+ `, success token) rows. Its bounded comparison keeps three context lines around each change; when the 256-edit budget is exceeded, it displays the complete old and new fragments as a replacement. The `└ +A -R · N file(s)` footer counts the displayed additions and removals independently of collapse state. A create (`oldText: null`) has no removed side. Each file has a bold path header, and `⋯` separates further hunks of the same file. Lines retain indentation with horizontal scrolling; past `maxLines` (default 16), the body shows head and tail slices with an expand control. Copy includes the complete prefixed diff with neutral context and path headers. Geometry and clipboard placement follow [the web diff card note](../../../.agents/notes/implemented/feature/2026-07-30-web-diff-card.md); the [bounded comparison and terminal status note](../../../.agents/notes/implemented/bug-fix/2026-09-22-bounded-diff-and-terminal-state.md) records the comparison and status decisions.
 
 `diffTotals` supplies collapsed summaries with the same bounded comparison and line-terminator rule as the expanded card.
 
+<a id="search-results"></a>
 ## Search results
 
 `SearchBlock` renders a completed search, one component for both kinds (discriminated by `kind`). A `matches` (grep) shows each file as a bold path header with its `lineNumber: line` rows, the per-file group collapsible; a `paths` (glob) shows a flat path list. Both flatten to one row list the height cap slices head/tail over (default 16, the TerminalBlock split arithmetic), and neither soft-wraps — a long match line or path scrolls horizontally instead of folding. The banner summary folds the pre-cap total in when the tool capped the result (`显示 X / 共 N 处匹配 · K 个文件` for grep, `显示 X / 共 N 个路径` for glob), so the card never presents a capped result as complete; a copy control writes the whole structured result regardless of the cap or which groups are collapsed. Geometry mirrors CodeBlock/TerminalBlock. Rationale: [the web search card note](../../../.agents/notes/implemented/feature/2026-07-30-web-search-card.md).
 
+<a id="web-retrieval"></a>
 ## Web retrieval
 
 `WebBlock` renders a completed web retrieval, one component for both kinds of the `web` render intent (discriminated by `kind`). A `search` shows an optional provider answer (through `MarkdownText`) above an ordered citation list: each source is a safe external link labelled by its title, or its hostname, falling back to the raw URL when the URL does not parse or has no hostname (a `file:`/`data:` URL) so a label is never blank; its snippet and publication date render below it. Only http(s) URLs become anchors (`target`/`rel` set) — the http(s) subset of the allowlist `MarkdownText` applies to untrusted links (it also permits `mailto:`, excluded here); any other URL renders as plain text. The whole list renders in one fixed-height scroll container (`max-height: 320px`, `overflow-y: auto`), so a list taller than that scrolls vertically in place instead of growing the card; `<li value>` pins each source's citation number, contiguous from 1, rather than leaving it to the `<ol>`'s implicit count. When a search legitimately returns no answer and no sources, the card shows an explicit empty-state note rather than a blank `<ol>` (the chat row does not surface the raw result content). A `fetch` shows a compact summary: the linked final URL and its HTTP status. Both mark a capped retrieval. Rationale: [the web result card note](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.md) and [the source scroll note](../../../.agents/notes/implemented/feature/2026-08-03-web-search-source-scroll.md).
 
+<a id="compatibility"></a>
 ## Compatibility
 
 `useMediaQuery` shares one native listener per query and falls back to `addListener`/`removeListener` for older WebViews. `holdInert` uses native `HTMLElement.inert` when available and also keeps `aria-hidden` plus tab stops safe while an overlay owns the page. Theme styles define a `100vh` viewport fallback before the layout plugin publishes its visual-viewport height. `relativeTime` buckets a dated moment into a compact unit-plus-magnitude pair so every surface dating a session agrees; the words stay in each plugin's own dictionary.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Pure React atoms own no runtime state; their rendering contract is asserted by unit specs.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -74,3 +108,13 @@ None; this package neither assembles nor sends a provider request.
 - **No `Active` StateDot variant** — the supported states are done, warning, ongoing, and error.
 - **User-facing copy localizes through label props, defaulting to the original Chinese literals** — the atoms are zero-cordis and cannot reach `ctx.locale`, so `HoverCard` (`copyLabel`/`copiedLabel`), `TerminalBlock` (`labels`), `JsonTree` (`labels`), `CodeBlock` (`copyLabel`/`copiedLabel`), `MarkdownText` (`codeLabels`), `JsonBlock` (`truncatedLabel`), `ConnectionBanner` (`label`), and `Modal` (`closeLabel`) take their copy as optional props. Localized plugins pass dictionary-driven labels from their own `t` seat; a consumer that passes nothing gets those defaults. `WebBlock` does not yet follow this pattern: its source-list and fetch truncation notes and its empty-search note stay inline Chinese, pending the same label-prop treatment.
 - **`TerminalBlock` is not a terminal emulator** — it renders settled or still-running command output, not an interactive session: SGR color and attributes are honored, and so are the in-line cursor movements a progress line uses — carriage return, backspace, erase-in-line, tab stops and character width. Absolute cursor positioning, screen clearing, and alternate-screen sequences are stripped. Basic-16 magenta and cyan have no token equivalent and stay literal rgb.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

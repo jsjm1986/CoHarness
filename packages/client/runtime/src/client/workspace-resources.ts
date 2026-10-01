@@ -32,7 +32,7 @@ export type WorkspaceResourceState =
 /** A source supports React's external-store subscription without content caching. */
 export interface WorkspaceResourceSource {
   /** Read the same snapshot object until the resource changes. */
-  get(this: void): WorkspaceResourceState
+  getSnapshot(this: void): WorkspaceResourceState
   /** Retain this resource while observing updates. @param listener - update callback. @returns idempotent release. */
   subscribe(this: void, listener: () => void): () => void
   /** Reload metadata explicitly. @returns completion after the snapshot is published. */
@@ -210,7 +210,7 @@ export class WorkspaceResourceRegistry {
     if (existing !== undefined) return existing.source
     const lookup = (): ResourceRecord | undefined => this.targets.get(key)?.records.get(request.address)
     const source: WorkspaceResourceSource = {
-      get: () => lookup()?.state ?? (this.targets.has(key) ? EMPTY : UNAVAILABLE),
+      getSnapshot: () => lookup()?.state ?? (this.targets.has(key) ? EMPTY : UNAVAILABLE),
       subscribe: (listener) => {
         const record = this.retain(key, request.address, source)
         if (record === undefined) return () => {}

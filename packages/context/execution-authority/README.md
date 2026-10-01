@@ -66,3 +66,13 @@ None; identity references and service calls do not alter model request content.
 - Consumers must use the real operation owner and the explicit service methods; importing the types does not authenticate a caller or delegate permissions.
 - Captured inheritance is restrictive input to provider verification, not a transferable credential or permission grant.
 - The interface does not confine Host code at the operating-system level. Deployment isolation remains independently required.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

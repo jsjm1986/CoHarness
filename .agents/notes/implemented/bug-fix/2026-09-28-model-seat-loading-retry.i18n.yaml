@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-28-model-seat-loading-retry.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-28-model-seat-loading-retry.md
-2026-09-28-model-seat-loading-retry.md: acfafefe73a1be2a69dd0f57acd2376ee5e4584d
-2026-09-28-model-seat-loading-retry.zh.md: 2a307ca91e7b9956624a1790818a5a3c834e7897
+/agent-note-model-seat-auto-retries-a-failed-mount-time-load:
+  en: 21f1e78639476bc0
+  zh: c216d5c731dfca9d
+/agent-note-model-seat-auto-retries-a-failed-mount-time-load/problem:
+  en: ec0d1c13b94a2466
+  zh: aa5b4c0848575ae6
+/agent-note-model-seat-auto-retries-a-failed-mount-time-load/decision:
+  en: e9d1da69e5f3160f
+  zh: c180caea86a24ee7
+/agent-note-model-seat-auto-retries-a-failed-mount-time-load/alternatives-considered:
+  en: 60166af28f187def
+  zh: efb31ba9d9647200
+/agent-note-model-seat-auto-retries-a-failed-mount-time-load/consequences:
+  en: 1b8cb88879c3ff57
+  zh: 1f6e3724f28d3a14
+/agent-note-model-seat-auto-retries-a-failed-mount-time-load/testing:
+  en: e334e87582601c18
+  zh: 725efa77bf09f6a0

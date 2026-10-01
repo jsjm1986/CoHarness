@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-22-project-ui-remote-acl.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-22-project-ui-remote-acl.md
-2026-08-22-project-ui-remote-acl.md: 383688798c1d77bb40a96d4c4ea9c469841b860f
-2026-08-22-project-ui-remote-acl.zh.md: 912baa1677e00f817a7046c4ba530370e432d516
+/agent-note-project-ui-remotes-use-session-scoped-acls:
+  en: f2c734036083d769
+  zh: 856fe5858480973c
+/agent-note-project-ui-remotes-use-session-scoped-acls/problem:
+  en: 746518154f355073
+  zh: 51820e2504b70a27
+/agent-note-project-ui-remotes-use-session-scoped-acls/decision:
+  en: 5e63ad2398d104bb
+  zh: cda311261fb8cc0c
+/agent-note-project-ui-remotes-use-session-scoped-acls/alternatives-considered:
+  en: 285a370e06965263
+  zh: 355861c72694984a
+/agent-note-project-ui-remotes-use-session-scoped-acls/consequences:
+  en: 19e14456b85a57df
+  zh: a49fdb1a00627b47
+/agent-note-project-ui-remotes-use-session-scoped-acls/testing:
+  en: f97241346a746707
+  zh: 1f599c6ebb95f452

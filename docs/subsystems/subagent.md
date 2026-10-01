@@ -302,7 +302,7 @@ interface SubagentResult {
    * are skipped. Without a non-empty message, the output is its accumulated
    * assistant text stream, or `[]` when the child produced neither.
    */
-  readonly output: ContentBlock[]
+  readonly output: readonly ContentBlock[]
   /**
    * The structured result after a requested `outputSchema` was successfully
    * satisfied. Requesting a schema does not guarantee presence: a provider can

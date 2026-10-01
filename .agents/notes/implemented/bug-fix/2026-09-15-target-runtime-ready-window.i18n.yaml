@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-15-target-runtime-ready-window.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-15-target-runtime-ready-window.md
-2026-09-15-target-runtime-ready-window.md: 7bd7cb6434607a0b9b7f00627545210e71991891
-2026-09-15-target-runtime-ready-window.zh.md: 737c0cdafeebe10c165f94a127c128644d30e54b
+/agent-note-target-runtime-readiness-waits-out-transient-reconnects:
+  en: 6201e296dc2ee4d6
+  zh: b9a4ba5006325a0d
+/agent-note-target-runtime-readiness-waits-out-transient-reconnects/problem:
+  en: 6a2c984d2d3a7146
+  zh: 7c2055c3208bd198
+/agent-note-target-runtime-readiness-waits-out-transient-reconnects/decision:
+  en: cef182f6518b0a9a
+  zh: 2ec3dc2d8210e76e
+/agent-note-target-runtime-readiness-waits-out-transient-reconnects/alternatives-considered:
+  en: 8e13277546b85021
+  zh: 41c7c49aea8a820e
+/agent-note-target-runtime-readiness-waits-out-transient-reconnects/consequences:
+  en: b803446d4067ddaa
+  zh: 5bac2c565c53910a
+/agent-note-target-runtime-readiness-waits-out-transient-reconnects/verification:
+  en: 0f91abdd55f552a3
+  zh: b194fa6ec37d9a5e

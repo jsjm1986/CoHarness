@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-web-skill-tool-row.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-06-web-skill-tool-row.md
-2026-08-06-web-skill-tool-row.md: 04e8ffcd6e506142b569e60458af144233810bbd
-2026-08-06-web-skill-tool-row.zh.md: c68ddea1d44e3b071deafc9450f6a2d09023cd80
+/agent-note-web-skill-tool-row:
+  en: ef45626e3dd360e4
+  zh: 8d4fba1a6ff0b1f1
+/agent-note-web-skill-tool-row/problem:
+  en: b37a7e5de3e5045e
+  zh: bd3c92df27a84282
+/agent-note-web-skill-tool-row/decision:
+  en: dff0d9d3a0334b7d
+  zh: f9d98cbd86d5cd02
+/agent-note-web-skill-tool-row/alternatives-considered:
+  en: 3b5645d2a96ee5ef
+  zh: 7bf7784982c187a7
+/agent-note-web-skill-tool-row/consequences:
+  en: e65bef2992ef8c52
+  zh: 7e947e61bc204a15

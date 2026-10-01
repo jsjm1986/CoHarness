@@ -1,3 +1,8 @@
+---
+description: "Replay-aware token measurement service (ctx.tokenMeter) for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-token-meter
 
 English | [中文](README.zh.md)
@@ -8,10 +13,25 @@ Replay-aware token measurement through the singleton `ctx.tokenMeter` service. I
 
 Use `ctx.tokenMeter` to estimate a session's current request and context pressure or price one message. Measurements replay the durable session log under the current model route and execution environment without making model calls. When session projections are available, consumers can read `tokenUsage`, `contextPressure`, and `contextBreakdown`; text and routes without image pricing use an approximate fixed heuristic, declared visual-token pricing applies when available, and files are priced as current model-visible handle text when the LLM service is mounted. Provider-reported usage is reused only for an identical request envelope; the package adds no model-visible content and makes no loop decisions.
 
+## Table of Contents
+
+- [Configuration](#configuration)
+- [Measurement contract](#measurement-contract)
+- [Session projections](#session-projections)
+- [Composition](#composition)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="configuration"></a>
 ## Configuration
 
 The estimator has no settings. It intentionally uses one fixed heuristic: four characters per token plus structural overhead for roles, blocks, and request-envelope fields. Any key is rejected; model capacity belongs to the adapter that owns an exact provider/model route and is available through `ctx.llm.resolveModelInfo().context`.
 
+<a id="measurement-contract"></a>
 ## Measurement contract
 
 `ctx.tokenMeter` directly exposes two operations:
@@ -27,6 +47,7 @@ The fold tracks full request-header snapshots, step boundaries, surface appends 
 
 Usage accounting sums disjoint input, cache-read, cache-write, and output buckets; reasoning is not added again. Every successful call records an assistant anchor, including content-less calls. An explicit empty `sourceEventSeqs` list means a known empty provider stream, while an absent legacy list conservatively treats the durable assistant output as provider output.
 
+<a id="session-projections"></a>
 ## Session projections
 
 When the composition provides `ctx.sessionProjections`, token-meter registers three units through an optional child fiber.
@@ -51,6 +72,7 @@ This is deliberate. An occupancy percentage is a user-facing reference figure, n
 
 The [Agent Note](../../../.agents/notes/implemented/architecture/2026-07-29-projected-token-usage-and-request-context.md) records the rejected atomic-pair comparison. Consumers that need an exact same-boundary figure should call `measure()` at their own request boundary rather than read this projection.
 
+<a id="composition"></a>
 ## Composition
 
 ```yaml
@@ -60,10 +82,12 @@ The [Agent Note](../../../.agents/notes/implemented/architecture/2026-07-29-proj
 
 Both plugins have usable defaults. The meter remains independent of model routing and optional compaction. A deployment configures capacity on its LLM adapter and compaction policy on `dsh-compaction-basic`.
 
+<a id="invariants"></a>
 ## Invariants
 
 No runtime invariant companion is published: the meter derives estimates from durable events and current request context without an independent authority for comparison.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through consumers such as `dsh-compaction-basic`; the service itself adds no prompt, message, schema, tool, or model call.
@@ -78,3 +102,13 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **Every measurement clones the current surface** — coherent immutable snapshots make reads O(surface), including below-threshold pressure checks.
 - **Provider usage is only reusable for an identical canonical envelope** — prompt, prefix, tools, provider, model, or call-config changes deliberately fall back to full heuristic estimation.
 - **Missing legacy source seqs are handled conservatively** — assistant messages without `sourceEventSeqs` cannot distinguish provider output from listener rewrites, so the fold avoids claiming a known empty or exact chunk stream.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

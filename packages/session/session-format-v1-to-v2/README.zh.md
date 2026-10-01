@@ -82,6 +82,7 @@ v2 物理 header 要求 `isSeeded`，且不存储数值切点。编解码器从�
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -99,6 +100,7 @@ v2 物理 header 要求 `isSeeded`，且不存储数值切点。编解码器从�
 
 还原后的模型 message 序列保持不变，因此迁移本身不会改变请求前缀的缓存身份。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

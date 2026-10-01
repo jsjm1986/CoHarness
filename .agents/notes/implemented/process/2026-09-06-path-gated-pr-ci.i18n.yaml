@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-06-path-gated-pr-ci.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-06-path-gated-pr-ci.md
-2026-09-06-path-gated-pr-ci.md: 5c564d8f3b0e155554340dfed89aacb439ff7f2e
-2026-09-06-path-gated-pr-ci.zh.md: 9b03c818b14f00f299ba18820fbc008f613e28b2
+/agent-note-path-gated-pull-request-ci-lanes:
+  en: 9a8cd154fce39753
+  zh: bd68de26e93fb243
+/agent-note-path-gated-pull-request-ci-lanes/problem:
+  en: f012de201881d797
+  zh: a40d59e12e0eff99
+/agent-note-path-gated-pull-request-ci-lanes/decision:
+  en: 8a6d70bc1dbc4615
+  zh: f12134b04d3ca3c5
+/agent-note-path-gated-pull-request-ci-lanes/alternatives-considered:
+  en: 79de8a4f66265e51
+  zh: 13ca76a974a7585a
+/agent-note-path-gated-pull-request-ci-lanes/consequences:
+  en: abe83b71cb15dbe5
+  zh: 241cf380fccc10c0
+/agent-note-path-gated-pull-request-ci-lanes/testing:
+  en: a3fd875967e40597
+  zh: 880349dff503dc20

@@ -1,6 +1,61 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/subagent/subagent-fork-in-process/README.md
-README.md: 388564e6afa9868250e1de495212ef38e99882c9
-README.zh.md: ddf70ca825d8fcc1063594f47bde7a8a9d3c106e
+/:
+  en: d09b04d646a7ea8f
+  zh: 61495d48365178df
+/deepseek-ai-dsh-subagent-fork-in-process:
+  en: 78ad21b51021b1f7
+  zh: be32d3539eb90fe0
+/deepseek-ai-dsh-subagent-fork-in-process/summary:
+  en: 97309f84ffe50ba9
+  zh: ce4121b0823b7c7f
+/deepseek-ai-dsh-subagent-fork-in-process/table-of-contents:
+  en: b2273e9d3f5e78ec
+  zh: 9f35b5d030a85140
+/deepseek-ai-dsh-subagent-fork-in-process/seed-boundary:
+  en: a45b8642a6058b79
+  zh: e082ced9e794a3e9
+/deepseek-ai-dsh-subagent-fork-in-process/start-and-capabilities:
+  en: 54668e1e3106fdcc
+  zh: e5c5608cdad163b5
+/deepseek-ai-dsh-subagent-fork-in-process/config:
+  en: b4d3e2be6f8f2729
+  zh: 9fac8886acaaf330
+/deepseek-ai-dsh-subagent-fork-in-process/invariants:
+  en: 78ac3c871736c441
+  zh: fe400b922b57cb77
+/deepseek-ai-dsh-subagent-fork-in-process/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-subagent-fork-in-process/model-experience/child-agent-history-and-envelope:
+  en: 91a5bd22001586e9
+  zh: 456e5bf20881a70d
+/deepseek-ai-dsh-subagent-fork-in-process/model-experience/child-agent-history-and-envelope/what-the-model-sees:
+  en: fe88f3e65bb01009
+  zh: 64e05acfe80e81f3
+/deepseek-ai-dsh-subagent-fork-in-process/model-experience/child-agent-history-and-envelope/token-effect:
+  en: db9ae2edb5ee28ce
+  zh: 5a342ffa3e7a7b40
+/deepseek-ai-dsh-subagent-fork-in-process/model-experience/child-agent-history-and-envelope/kv-cache-effect:
+  en: 63138e06a9c24fa0
+  zh: dca65fe91ff3534b
+/deepseek-ai-dsh-subagent-fork-in-process/model-experience/parent-tool-result-indirectly:
+  en: 75d061c2151624a7
+  zh: 71e58e020b60ff90
+/deepseek-ai-dsh-subagent-fork-in-process/model-experience/parent-tool-result-indirectly/what-the-model-sees:
+  en: 0521a7cac72c880d
+  zh: 6ac7c5f25c7d55f6
+/deepseek-ai-dsh-subagent-fork-in-process/model-experience/parent-tool-result-indirectly/token-effect:
+  en: 8c81bab3c5d6a38a
+  zh: 44c798432a4bfdfb
+/deepseek-ai-dsh-subagent-fork-in-process/model-experience/parent-tool-result-indirectly/kv-cache-effect:
+  en: f5d5f97a153f7c70
+  zh: afc7da8783b348c6
+/deepseek-ai-dsh-subagent-fork-in-process/known-limitations-and-deferred-work:
+  en: 4686d82c237797b9
+  zh: 36909b2a56140bb6
+/deepseek-ai-dsh-subagent-fork-in-process/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

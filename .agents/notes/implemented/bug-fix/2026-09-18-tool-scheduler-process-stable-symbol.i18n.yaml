@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-18-tool-scheduler-process-stable-symbol.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-18-tool-scheduler-process-stable-symbol.md
-2026-09-18-tool-scheduler-process-stable-symbol.md: ccb70c33aefd9aaf97845f1f808797a88bd6dfaf
-2026-09-18-tool-scheduler-process-stable-symbol.zh.md: a7d397634ad3edc80dda9e6954c124f2f166636a
+/agent-note-process-stable-tool-scheduler-symbol:
+  en: e84f91245fa28535
+  zh: 6ee3067b7cf40156
+/agent-note-process-stable-tool-scheduler-symbol/problem:
+  en: c1b20f2eea7010cc
+  zh: 186a57bd09ed6c96
+/agent-note-process-stable-tool-scheduler-symbol/decision:
+  en: e67fa3c90a20e4b2
+  zh: 4008fdc077a4d205
+/agent-note-process-stable-tool-scheduler-symbol/alternatives-considered:
+  en: 3840b19730e3cc6f
+  zh: 58d8d9e59dee92cf
+/agent-note-process-stable-tool-scheduler-symbol/consequences:
+  en: 803637ed7916d547
+  zh: 87f4bed4db26ef98
+/agent-note-process-stable-tool-scheduler-symbol/testing:
+  en: 416ce3dd078a0479
+  zh: 70d8e291f402c58e

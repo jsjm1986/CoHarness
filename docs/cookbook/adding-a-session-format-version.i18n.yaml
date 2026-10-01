@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for adding-a-session-format-version.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/adding-a-session-format-version.md
-adding-a-session-format-version.md: 2d4597b56431dd1629ad1461e9737473b7aaf4be
-adding-a-session-format-version.zh.md: 4fe2f79f9004741762f2827dde181fbe1fb801e9
+/cookbook-adding-a-session-log-format-version:
+  en: 71132d61e41cb40b
+  zh: 0b56ed8893bf8d0a
+/cookbook-adding-a-session-log-format-version/summary:
+  en: 76b76c19e0889ab3
+  zh: 1ddc1afa5c2333f0
+/cookbook-adding-a-session-log-format-version/table-of-contents:
+  en: e906cb221e1e711e
+  zh: 298c74364f18275b
+/cookbook-adding-a-session-log-format-version/1-choose-the-version-and-release-base:
+  en: f59fe9c0b07b39af
+  zh: 0b97be25e8701726
+/cookbook-adding-a-session-log-format-version/2-add-an-identity-edge:
+  en: 77c9c26d94fb33ca
+  zh: 313c54c45cfc7dbc
+/cookbook-adding-a-session-log-format-version/3-implement-per-artifact-stages-and-validation:
+  en: 9c758d4a6425b8fd
+  zh: c5cd3675225f3d5e
+/cookbook-adding-a-session-log-format-version/4-update-current-version-consumers:
+  en: 5924d16e4bc26b6f
+  zh: 89b5658c59d04795
+/cookbook-adding-a-session-log-format-version/5-create-snapshot-successors:
+  en: 4ae3f3c69af8b662
+  zh: 5df76483c49a4b30
+/cookbook-adding-a-session-log-format-version/6-validate-the-integrated-result:
+  en: 8ff3f0262f0dbfec
+  zh: 017a95d9f7c80f86
+/cookbook-adding-a-session-log-format-version/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

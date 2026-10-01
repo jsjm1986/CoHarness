@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-client-ui-slots
 
 [English](README.md) | 中文
@@ -27,10 +32,22 @@ store 家族（输入 `defineStore` 规范／输出 `StoreHandle<T, A>`）为 st
 
 `dsh-client-ui-slots` 让 Web 客户端插件定义并组合带类型检查的 UI 区域。普通 Slots 提供 parent-owned 扩展位置；Component Factory 提供带调用方所选局部 Component 的可复用装配。两套 API 都从声明合并类型推导 scoped state、injection、locale 与 child-render props，并在插件加载期间报告冲突 definition。客户端需要渲染时，将这个不依赖 React 的包与 `ui-renderer` 配合使用。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。注册表核心是纯组合机制，其 register/dispose 语义由单元规格强制；它不拥有领域状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该包是浏览器端 UI 接线层，不注册任何面向模型的内容。
@@ -39,7 +56,18 @@ store 家族（输入 `defineStore` 规范／输出 `StoreHandle<T, A>`）为 st
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **`isLive` 会线性扫描所有记录**：在 UI 插件的注册规模（数十项）下没有问题；如果账本变得频繁访问，再使用条目→记录反向引用改进。
 - **`__renders` 幻象锚点在 `PropsRenderSlots` 上可见**：这是与类型链设计的 `__accepts` 相同且已接受的噪声；泛型方法签名在 key 联合之间比较宽松，因此必须依靠逆变标记强制执行「组件 key 集合 ⊆ children 声明」。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

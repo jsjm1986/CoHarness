@@ -175,7 +175,7 @@ async function launchScrollWorld(options: ScrollWorldOptions): Promise<ScrollWor
     scaffold.ctx.on('agent/assistant-stream', ({ frame }) => { assistantFrames.push(frame) })
     page = await newEnglishPage(browser, 900)
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     // Session-list bootstrap can replace the controlled search state. Wait
     // for the seeded baseline before openSeed starts the lazy content query

@@ -9,6 +9,7 @@ describe('Session surface wire vocabulary', () => {
   it('enumerates exactly the message-producing event types', () => {
     expect([...SESSION_SURFACE_EVENT_TYPES].sort()).toEqual([
       'assistant/message',
+      'developer/message',
       'system/message',
       'tool/result',
       'user/message',
@@ -18,6 +19,7 @@ describe('Session surface wire vocabulary', () => {
   it.each([
     ['system/message', true],
     ['user/message', true],
+    ['developer/message', true],
     ['assistant/message', true],
     ['tool/result', true],
     ['turn/start', false],

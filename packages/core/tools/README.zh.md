@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # dsh-tools
 
 [English](README.md) | 中文
@@ -8,6 +13,16 @@
 
 使用 `dsh-tools` 可向模型公开类型化能力、校验调用、执行允许／拒绝／询问策略，并在普通工具失败时返回最终结果而不中止当前轮次。通过 `mode` 选择原生 Function Calling（函数调用）、[PTC mode](#ptc-mode) 或两者；单个 agent（智能体）可用 `presentAs` 覆盖默认值。工具作者使用 `defineTool` 声明类型化参数与输出、协作式超时、并行安全属性和可选 UI 展示。模型会看到每个获准工具声明的名称、描述与参数 schema；按 agent 设置的限制可缩小该可见集合。
 
+## 目录
+
+- [服务：`ToolRuntime`（ctx 键：`tools`）](#service-toolruntime-ctx-key-tools)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="service-toolruntime-ctx-key-tools"></a>
 ## 服务：`ToolRuntime`（ctx 键：`tools`）
 
 ### 配置
@@ -137,6 +152,8 @@ ctx.tools.register(defineTool({
 
 agent loop 将连续的 `parallel` 调用归入有界滚动池，并把每个 `exclusive` 调用视为顺序屏障。只有分发／主体会重叠；策略、持久结果和上下文仍保持模型顺序。PTC mode 绑定通过桥接层自己的池复用同一套分类。[并行工具调用 Agent Note](../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.zh.md) 规定已交付声明及其原理。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 普通工具 schema
@@ -197,6 +214,7 @@ The available tools:
 
 仅追加；新的可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **并发策略不是事件门禁**：`executionMode()` 直接读取已解析的工具定义；插件只能在自身拥有的定义上声明分类器。
@@ -206,3 +224,13 @@ The available tools:
 - **PTC mode 的 SDK 语言由当前加载的运行时决定，且呈现方式按 agent 而非按工具**：`mode: code`/`both` 会拒绝组装提示词，除非 `ctx.ptcRuntime.language` 有已注册的 SDK 渲染器（TypeScript 或 Python）；作用域限制／遮蔽与 `presentAs` 会选择每个 agent 的可见绑定及其形态，但在同一个 agent 内不能让一个工具仅使用 Native，而另一个仅使用 Code。
 - **PTC mode 中间值只存在于执行局部，且没有字节上限**：这些规范的类型化值无法从会话回放重建，并可能耗尽进程或 worker 内存；只有外层 `run_code` 输出受 worker 可配置的硬上限约束。每个子调用的持久日志副本则确实有上限：`tools/ptc-dispatch-log` waterfall 允许 spill 策略把过大的 `tool/ptc-dispatch` 内容替换为预览加定位符（[原理](../../../.agents/notes/implemented/feature/2026-07-26-ptc-dispatch-log-spill.zh.md)）。
 - **每次运行都会获得全新的 `run_code` 状态**：MVP 不采用持久 REPL 风格内核（跨调用状态不会出现在日志中）；参见 [PTC mode Agent Note](../../../.agents/notes/implemented/feature/2026-06-15-ptc.zh.md)。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

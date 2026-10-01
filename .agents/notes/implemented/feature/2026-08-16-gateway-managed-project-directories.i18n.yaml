@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-16-gateway-managed-project-directories.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-gateway-managed-project-directories.md
-2026-08-16-gateway-managed-project-directories.md: 69bafabd95f6cf3b8632337577f703fb82e0bf1f
-2026-08-16-gateway-managed-project-directories.zh.md: a5f57e4911ee308252d6fbb772c1a184f2361686
+/agent-note-gateway-managed-project-directories:
+  en: 8e5b0d5763b11d7b
+  zh: 0245d7aa4eb1ba59
+/agent-note-gateway-managed-project-directories/problem:
+  en: 251feb1ef028c9d3
+  zh: 2e8c8b2b977290d5
+/agent-note-gateway-managed-project-directories/decision:
+  en: 031d14e0c44e1e6f
+  zh: 92ef290aeb2307b6
+/agent-note-gateway-managed-project-directories/verification:
+  en: 148558af02bb784e
+  zh: ce612504805009c9
+/agent-note-gateway-managed-project-directories/alternatives-considered:
+  en: 90a7fef38e7b0748
+  zh: 9da3d133446e32d2
+/agent-note-gateway-managed-project-directories/consequences:
+  en: 3559ee0987c022bb
+  zh: b316ea4543c9d275

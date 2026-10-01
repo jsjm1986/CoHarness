@@ -466,7 +466,7 @@ describe('JsonlSessionPersistence: default Zstandard encoding', () => {
             turn: 1, step: 1,
             message: {
               id: 'v2-to-v3-system-fc06c3f7720f3bc94ea7a2b7fadde6a5b100c6ab6ca342d2222bd017184a0b67',
-              role: 'system', source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' }, content: [],
+              role: 'system', source: { kind: 'system-prompt' }, content: [],
             },
           },
         },

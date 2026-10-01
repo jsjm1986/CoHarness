@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for conversation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/conversation.md
-conversation.md: 12e0a63d70d7484c1e3459477ddc5b6b4fd10f0b
-conversation.zh.md: 01ce0c9e6d1fba4e254d6eb22c6699f31c9fa60a
+/conversation-assembly:
+  en: b884067f36f802cc
+  zh: f04273c1ffaf7fe0
+/conversation-assembly/data-model-and-ownership:
+  en: 5a609ae8fae8e3fe
+  zh: 4919260f89922090
+/conversation-assembly/target-activation:
+  en: d8f63d2102f50d3a
+  zh: ec9ade7cbe56eb51
+/conversation-assembly/replayable-event-families:
+  en: 879d652d2954cbc9
+  zh: e82bf4c5af2573b5
+/conversation-assembly/definition-and-typed-chat-payload:
+  en: 3007d2ab42c29238
+  zh: 3328267dec7ad31d
+/conversation-assembly/predecessor-reads:
+  en: da849b3b5da81da8
+  zh: 37a647a439bc24b1
+/conversation-assembly/window-update-paths:
+  en: 1e22169d3d7b8ff1
+  zh: 669d03d2148e9a46
+/conversation-assembly/verification-obligations:
+  en: 8520b16ceb9a57ba
+  zh: 60648e3856878ecb

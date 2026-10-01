@@ -31,7 +31,7 @@ describe('verify-plugin-surfaces', () => {
       '@deepseek-ai/dsh-directory-guard',
       '@deepseek-ai/dsh-model-governance',
     ])
-    expect(facts.dynamicClientPackages.length).toBe(55)
+    expect(facts.dynamicClientPackages.length).toBe(57)
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-workbench')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-open-in-app')
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-cordis')

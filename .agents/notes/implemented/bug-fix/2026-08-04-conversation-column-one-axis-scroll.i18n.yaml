@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-04-conversation-column-one-axis-scroll.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-04-conversation-column-one-axis-scroll.md
-2026-08-04-conversation-column-one-axis-scroll.md: 9a487c506a75033d0854f08e95da24704309003d
-2026-08-04-conversation-column-one-axis-scroll.zh.md: b86f86f55757dff4fddab4c4e2ac64fa7c19fe59
+/agent-note-the-conversation-column-scrolls-on-one-axis:
+  en: 5a4ab096900367c1
+  zh: 2f5728778f9876fd
+/agent-note-the-conversation-column-scrolls-on-one-axis/problem:
+  en: f4ef334f5c084d6a
+  zh: 05ff6dbf6b42011d
+/agent-note-the-conversation-column-scrolls-on-one-axis/decision:
+  en: 51fca0e3394c5363
+  zh: 14f055f65d165dcb
+/agent-note-the-conversation-column-scrolls-on-one-axis/alternatives-considered:
+  en: bcc487cb424f16e0
+  zh: 495ee9a92afd53bb
+/agent-note-the-conversation-column-scrolls-on-one-axis/testing:
+  en: f0e1de50a919e6fd
+  zh: 9a56464eff87b81a
+/agent-note-the-conversation-column-scrolls-on-one-axis/consequences:
+  en: 80a66167215088cd
+  zh: 0511ff94a8ac7d63

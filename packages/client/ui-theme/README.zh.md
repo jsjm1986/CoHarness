@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-theme
 
 [English](README.md) | 中文
@@ -20,14 +25,28 @@
 
 `dsh-client-ui-theme` 让 Web GUI 用户在设置中选择 `light`、`dark` 或 `system`，并把会话正文字号设为 12 至 17 px。回环客户端把两个值存入 `ui-theme` 设置命名空间，本地提供方默认将其持久化到 `$DSH_HOME/settings.yaml`。插件通过 `prefers-color-scheme` 解析 `system` 并发布不可变的 `ThemeSnapshot`；ui-layout 把每份快照应用到文档。本包还提供 `--dsw-*` token 样式表，并注入同步引导，使所选调色板与字号在外壳加载前生效。第三方主题可通过 `ctx.theme` 注册别名 token 覆盖。
 
+## 目录
+
+- [设置权限与兼容性](#settings-authority-and-compatibility)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="settings-authority-and-compatibility"></a>
 ## 设置权限与兼容性
 
 外观控件显示账户偏好；项目策略可以强制当前界面使用浅色或深色方案。账户级 scope 在报告 `loading`、`writable: false` 或写入处于 `saving` 时禁用选择；项目和提供方限制会在行内显示，服务在取得可写账户视图前也会拒绝直接调用 `setTheme`。主题监听器同时支持 `addEventListener` 与旧版 `addListener` MediaQueryList 实现。设计样式表提供 `100vh` 视口回退，客户端可视视口测量就绪后覆盖该值；token-contract 测试会检查所有 `--ds-*` 与 `--dsw-*` 引用均有 CSS 声明，视口高度这一运行时变量是明确例外。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该偏好的持久归属是 Host settings namespace；`ThemeRuntime` 只保留已解析快照，其针对推送变更与重连的行为由单元规格断言。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。
@@ -36,7 +55,18 @@
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **第三方主题是表层，不是产品**：注册主题意味着覆盖同名别名变量；目前不会验证一组覆盖是否完整。
 - **token 样式表是颜色值的唯一权威来源**：会有意不补入 cssdesign 中缺失的值（例如设计中的 #4176E6 标签页蓝色）；一律采用最接近的语义 token。设计负责人批准的新增值是例外：须在同一变更中以一个静态尺度层级与一个语义别名的形式进入（`--dsw-static-blue-900` / `--dsw-alias-label-primary-bluish`）。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

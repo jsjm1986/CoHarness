@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
+import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { ApiProxy, HostFrame, MuxFrame } from '../src/api/index.ts'
 import type { ResponseValue } from '../src/api/rpc-map.ts'
 import type { ClientResponse, RpcMessage, RpcReceipt, RpcRequest } from '../src/api/rpc.ts'
@@ -178,13 +179,21 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
         return { rpcId: request.rpcId, result: { ok: true, value: { events: [], hasMore: false } } }
       },
     },
+    jobs: {
+      async output(request) {
+        return { rpcId: request.rpcId, result: { ok: false, error: { code: 'internal' as const, message: 'stub', details: {} } } }
+      },
+      async kill(request) {
+        return { rpcId: request.rpcId, result: { ok: false, error: { code: 'internal' as const, message: 'stub', details: {} } } }
+      },
+    },
     host: {
       async describe(request) {
         return {
           rpcId: request.rpcId,
           result: {
             ok: true,
-            value: { version: 'v', cwd: '/w', attachedSessions: 0, home: '/h', canOpenPath: true },
+            value: { version: 'v', cwd: '/w', attachedSessions: 0, home: '/h', canOpenPath: true, fileManager: 'directory' as const },
           },
         }
       },
@@ -200,10 +209,13 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       async openPath(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { opened: true as const } } }
       },
+      async fileApplications(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { applications: [{ id: 'app.one', name: 'One', default: true, icon: null }] } } }
+      },
     },
     workspace: {
       async list(request) {
-        return { rpcId: request.rpcId, result: { ok: true, value: { items: [], archivedSessionIds: [] } } }
+        return { rpcId: request.rpcId, result: { ok: true, value: { items: [], archivedSessionIds: [], pinnedSessionIds: [] } } }
       },
       async create(request) {
         return {
@@ -234,6 +246,12 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       },
       async unarchiveSession(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { archivedSessionIds: [] } } }
+      },
+      async pinSession(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { pinnedSessionIds: [request.payload.sessionId] } } }
+      },
+      async unpinSession(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { pinnedSessionIds: [] } } }
       },
     },
     workspaceChanges: {
@@ -390,7 +408,7 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     const events = [0, 1, 2].map(seq => ({ event: {
       type: 'user/message' as const, seq: SessionSeq(seq), time: seq,
       surfaceOp: 'append' as const,
-      data: { id: `message-${seq}`, role: 'user' as const, source: { kind: 'user' as const }, content: [{ type: 'text' as const, text: 'x'.repeat(500) }] },
+      data: { id: MessageId(`00000000-0000-4000-8000-${String(seq).padStart(12, '0')}`), role: 'user' as const, source: { kind: 'user' as const }, content: [{ type: 'text' as const, text: 'x'.repeat(500) }] },
     } })) as ResponseValue<'session.history'>['events']
     api.sessions.history = async request => ({ rpcId: request.rpcId, result: { ok: true, value: { events, hasMore: false } } })
     const client = new InProcessApiClient(toFetchHandler(api, { historyPageTargetBytes: 400 }))
@@ -525,6 +543,22 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     const response = await client(api).host.openPath({ path: '/tmp/a.txt' })
     expect(opened).toBe('/tmp/a.txt')
     expect(response.result).toEqual({ ok: true, value: { opened: true } })
+  })
+
+  it('round-trips host.openPath action/application and host.fileApplications through the wire form', async () => {
+    const api = fakeApi()
+    let chosen: { path: string; action?: string; application?: string } | undefined
+    api.host.openPath = async (request) => {
+      chosen = request.payload
+      return { rpcId: request.rpcId, result: { ok: true, value: { opened: true as const } } }
+    }
+    const c = client(api)
+    expect((await c.host.openPath({ path: '/tmp/a.txt', action: 'reveal' })).result.ok).toBe(true)
+    expect(chosen).toEqual({ path: '/tmp/a.txt', action: 'reveal' })
+    expect((await c.host.openPath({ path: '/tmp/a.txt', action: 'open', application: 'app.one' })).result.ok).toBe(true)
+    expect(chosen).toEqual({ path: '/tmp/a.txt', action: 'open', application: 'app.one' })
+    const served = await c.host.fileApplications({ path: '/tmp/a.txt' })
+    expect(served.result).toEqual({ ok: true, value: { applications: [{ id: 'app.one', name: 'One', default: true, icon: null }] } })
   })
 
   it('round-trips skill.list through the wire form', async () => {

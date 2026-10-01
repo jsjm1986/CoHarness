@@ -37,7 +37,14 @@ jobs:
           private-key: ${{ secrets.DSH_ISSUE_APP_PRIVATE_KEY }}
           owner: jsjm1986
           repositories: CoHarness
+      - name: Determine policy eligibility
+        id: preflight
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: node .github/issue-management/policy.mjs pr-preflight
+      # Re-read current state even after an exempt preflight; never replace a failure with an edit skip.
       - name: Validate pull request
+        if: ${{ steps.preflight.outputs.legacy-automated != 'true' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: node .github/issue-management/policy.mjs pr

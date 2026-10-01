@@ -10,5 +10,9 @@
   "exclude": [
     "**/*.legacy.*"
   ],
-  "references": []
+  "references": [
+    {
+      "path": "../../util/code-language"
+    }
+  ]
 }

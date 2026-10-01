@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-08-interactive-side-sessions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-07-08-interactive-side-sessions.md
-2026-07-08-interactive-side-sessions.md: 653f77b931fe1149aad9e15b82f40fe3272f5469
-2026-07-08-interactive-side-sessions.zh.md: 55300fbad297b27e18a9e0213d4f45bc7fc08070
+/agent-note-interactive-side-sessions-and-merge-back:
+  en: a200e33a65a4f530
+  zh: 47d02d3736310892
+/agent-note-interactive-side-sessions-and-merge-back/problem:
+  en: 6e12726692b02e3b
+  zh: 59d7ccf6c8a5aebe
+/agent-note-interactive-side-sessions-and-merge-back/proposal:
+  en: cdd5676f16eb24ed
+  zh: 1ff8456596105b93
+/agent-note-interactive-side-sessions-and-merge-back/alternatives-considered:
+  en: de50cab213a61b91
+  zh: 85b912193092dfe2
+/agent-note-interactive-side-sessions-and-merge-back/acceptance-criteria:
+  en: b8cff73a055bf7a3
+  zh: 3dfd5172e522c598
+/agent-note-interactive-side-sessions-and-merge-back/risks:
+  en: 86f12d62580d8d98
+  zh: 8c39be21a1e3958f

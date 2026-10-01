@@ -80,10 +80,32 @@ function waitForReadyLine(child: ChildProcess): Promise<string> {
   })
 }
 
+const authenticatedCookies = new Map<string, Promise<{ origin: string; cookie: string }>>()
+
+/** Exchange a printed process token once for Node-side HTTP probes. */
+function authenticatedWeb(launchUrl: string): Promise<{ origin: string; cookie: string }> {
+  const existing = authenticatedCookies.get(launchUrl)
+  if (existing !== undefined) return existing
+  const exchange = (async () => {
+    const response = await fetch(launchUrl, { redirect: 'manual' })
+    const setCookie = response.headers.get('set-cookie')
+    if (response.status !== 303 || setCookie === null) {
+      throw new Error(`dsh web authentication returned HTTP ${String(response.status)}`)
+    }
+    return {
+      origin: new URL(launchUrl).origin,
+      cookie: setCookie.split(';', 1)[0]!,
+    }
+  })()
+  authenticatedCookies.set(launchUrl, exchange)
+  return exchange
+}
+
 async function rpc<T>(baseUrl: string, method: string, payload: unknown): Promise<T> {
-  const response = await fetch(`${baseUrl}/api/${method}`, {
+  const authenticated = await authenticatedWeb(baseUrl)
+  const response = await fetch(`${authenticated.origin}/api/${method}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', cookie: authenticated.cookie },
     body: JSON.stringify({
       type: 'client-request',
       rpcId: `smoke-${method}`,

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-26-snapshot-session-identity-binding-order.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-26-snapshot-session-identity-binding-order.md
-2026-09-26-snapshot-session-identity-binding-order.md: ffce2df508f1157517068235c71858b19ddb1133
-2026-09-26-snapshot-session-identity-binding-order.zh.md: f797e5304c3f17aeeb122068b7fbb2fea6668472
+/agent-note-snapshot-session-identity-binding-order:
+  en: a750a66fbe525037
+  zh: e112a6451ea96719
+/agent-note-snapshot-session-identity-binding-order/problem:
+  en: 36e846e10d0e11f0
+  zh: f9ae51a4fc74ea27
+/agent-note-snapshot-session-identity-binding-order/decision:
+  en: 89bdb42303013c44
+  zh: b367a2632cd77399
+/agent-note-snapshot-session-identity-binding-order/alternatives-considered:
+  en: cc54da09eeb7abac
+  zh: 83f76c4322dbd656
+/agent-note-snapshot-session-identity-binding-order/consequences:
+  en: 60d0a210fcd0916a
+  zh: b1bef3e7c70c9ec5
+/agent-note-snapshot-session-identity-binding-order/related:
+  en: 04784cf4870b7051
+  zh: 72b73f038448793c

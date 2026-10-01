@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # dsh-sandbox-policy：沙箱策略归属位置（`ctx.sandboxPolicy`）
 
 [English](README.md) | 中文
@@ -8,15 +13,30 @@
 
 使用本包可以让每次受限的 bash、文件系统和终端调用遵循同一份文件操作策略。部署方选择默认模式和回退工作区根目录，每个会话则可以独立切换模式。会话选择可跨重启保留，所有强制执行能力在一次调用中使用相同的模式和工作区。每次模型请求前，模型都会收到有效策略和工作区说明，但不会收到已挂载能力的清单。
 
+## 目录
+
+- [为何需要共享归属位置](#why-a-shared-home)
+- [配置](#config)
+- [接口](#api)
+- [逐会话存储](#the-per-session-store)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="why-a-shared-home"></a>
 ## 为何需要共享归属位置
 
 文件系统工具、一次性 bash 命令和终端会话可以用不同组合强制执行同一套模式词汇。如果各自解析 `mode` + `workspaceRoot`，就可能漂移成分裂世界，正是[沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)所警告的情况。每个强制执行后端都会消费归属方解析出的完整策略，而当前上下文只说明该策略对于任何受 DSH 文件沙箱强制执行的可用操作有何含义。[跨家族 fs 沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.zh.md)记录了共享策略决策。
 
+<a id="config"></a>
 ## 配置
 
 - `mode`：部署默认 `SandboxMode`（`read-only`／`workspace-write`／`danger-full-access`），加载时验证。默认为 `read-only`（故障安全）。
 - `workspaceRoot`：无 agent（智能体）的调用或没有 cwd 的会话在 `workspace-write` 下可写入的回退目录。默认为 `process.cwd()`；无论显式配置还是采用默认值，都会解析为其绝对文件系统标识。普通 agent 调用改用其会话头中不可变的 `cwd`。
 
+<a id="api"></a>
 ## 接口
 
 - `ctx.sandboxPolicy.resolve({ session?, mode? })`：解析一项完整的逐调用策略。显式批准的模式优先于会话最后一条 `sandbox/mode` 事件，后者又优先于 `defaultMode`；会话不可变的 `cwd` 会先按文件系统语义规范化，再成为 `workspaceRoot`，否则使用配置的回退值。规范化先于词法归一化，因此 `symlink/..` 与进程工作目录解析保持一致。
@@ -28,10 +48,13 @@
 
 可选的 `./invariant` 配套组件会拒绝伪造的持久 `sandbox/mode` 事件，只要其值不在该封闭词汇中；Session 与其配套组件负责相关存储与核心执行封闭规则。agent loop（智能体循环）会将组装后的完整运行时上下文快照记录为一条带来源的 `user/message`，因此无需内存中的「上次告知」镜像，也能重建确切的策略输入。
 
+<a id="the-per-session-store"></a>
 ## 逐会话存储
 
 运行时切换是在对应会话日志中追加的一条 `sandbox/mode` 事件。`effective = explicit grant ?? fold(events) ?? deployment default`，因此覆盖会通过回放跨重启保留，两个会话也绝不会看到彼此状态。工作区标识无需另一条事件：创建时记录的不可变 `SessionHeader.cwd` 是该会话每次调用使用的根。该事件仍只进入日志；在下一次请求前，归属方会将当前事实贡献给完整运行时上下文快照。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 当前文件沙箱策略
@@ -66,8 +89,19 @@ Current DSH file policy: danger-full-access. The DSH file sandbox does not restr
 
 模式切换时，稳定的系统提示词仍逐字节相同。变化后的完整上下文快照会追加到保留的历史之后，从而保留此前已缓存的前缀；后续未变化的请求会复用该保留快照。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **每个会话只有一个主要工作区根目录**：策略解析 `SessionHeader.cwd`；额外可写根目录不属于 `SandboxExecutionPolicy`。
 - **仅限文件操作模式**：`SandboxMode` 管控文件操作；网络和进程策略不在其词汇中，因此这里没有限制它们的旋钮。
 - **有意概述临时区域**：强制执行后端会授予不同的平台临时区域，这些区域在策略解析后才会选定，因此无法在当前上下文中如实枚举。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

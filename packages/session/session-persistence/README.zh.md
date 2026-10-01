@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-persistence
 
 [English](README.md) | 中文
@@ -10,6 +15,20 @@
 
 本包让应用通过后端无关的 API 持久存储并恢复会话事件日志。读者可以创建、打开、检查、列出、追加、读取、刷新和关闭已存储会话，同时保持连续且仅追加的历史记录。只有完成 flush 才构成持久性屏障；读取方不会收到撕裂尾部或无效记录，并且每个后端实例内每个会话只允许一个写入方。若希望每个会话使用一份压缩日志，可选用随产品交付的 [JSONL 后端](../session-persistence-jsonl/README.zh.md)；也可以实现具备相同可观察保证的其他后端。
 
+## 目录
+
+- [服务 API（`ctx.sessionPersistence`）](#service-api-ctxsessionpersistence)
+- [每个后端必须遵守的不变量](#invariants-every-backend-must-honor)
+- [写入协调器](#the-write-coordinator)
+- [元数据与位置类型](#metadata-and-location-types)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="service-api-ctxsessionpersistence"></a>
 ## 服务 API（`ctx.sessionPersistence`）
 
 `create`/`open` 返回每会话的 `SessionHandle`——规范通道：带 `read`/`write` 访问级、offset/length 读取、append、按 handle 的 `flush`，以及幂等的 `close`/`AsyncDisposable`。写 handle 声明单写者所有权；第二个写者以 `SESSION_ALREADY_OWNED` 拒绝，读 handle 的 `append`/`flush` 以 `SESSION_READ_ONLY` 拒绝。`create` 是延迟实体化：会话在创建后即可被本进程的 `stat`/`list`/`open` 观察到，但直到第一次 `append` 或 `flush` 才产生持久工件；关闭仍为 pending 的写 handle 会撤销预留。`createHandle`/`openHandleAsync`/`openHandle` 作为旧所有权 seam 保留，直到 Provider 与 Consumer 完成迁移。
@@ -41,6 +60,7 @@
 | `reserveDraft(request): Promise<SessionDraftReservation \| undefined>` | 可在 Agent 创建前为浏览器草稿预留身份。Gateway 提供方返回按 scope 限定的 canonical Session id 和有期限 lease；本地提供方返回 `undefined`。请求只含 id、cwd、可见性和 preset 元数据。 |
 | `heartbeatDraft(request): Promise<void>` / `releaseDraft(request): Promise<void>` | 续期或释放提供方拥有的草稿 lease。两个操作都是幂等的，绝不持久化 prompt 文本或凭据。 |
 
+<a id="invariants-every-backend-must-honor"></a>
 ## 每个后端必须遵守的不变量
 
 - **仅追加；崩溃轮次会被关闭，而非截断。** 已 flush 事件绝不重写。崩溃可留下未关闭最终轮次，其事件真实且可能很大；`load` 保留它们，并持久追加合成 closer（为每个未获回答的 assistant 调用添加一个带风险分类错误的 `tool/result`，再添加 `step/end?`+`turn/end {interrupted}`），以平衡日志，并确保重新载入的历史仍是有效的提供方 transcript（文本记录）。只丢弃从未完整写入的撕裂尾部碎片。
@@ -48,6 +68,7 @@
 - **JSON 可序列化数据。**`append` 通过共享单遍无损 JSON 边界实体化每个直接/回放批次。活动 `Session` 事件已深度冻结，但写入协调器仍将每个事件复制到持久化自有缓冲区。
 - **持久性。**`append` 只在批次持久后返回。
 
+<a id="the-write-coordinator"></a>
 ## 写入协调器
 
 `PersistenceCoordinator` 负责每 id 状态和串行化、每个活动会话各自的有界写入 controller、延迟实体化、崩溃尾部修复、会话接管和完全停稳的 dispose。浏览器草稿会把策略和边界事件保留在内存中，首个非空消息才以原子方式实体化完整前缀；命令／goal／plan 状态事件会实体化为隐藏的 command-only 记录；未实体化草稿在 dispose 时丢弃缓冲。第一方后端组合一个协调器，实现小型 `PersistenceBackend` 存储钩子接口，并委托其有状态方法。因此 JSONL 和 SQLite 共享生命周期正确性，同时保留不同存储原语；见[协调器 Agent Note](../../../.agents/notes/implemented/architecture/2026-06-18-shared-persistence-write-coordinator.zh.md)、[flush controller 简化](../../../.agents/notes/implemented/simplification/2026-07-23-collapse-persistence-flush-state.zh.md)和[有界批处理决策](../../../.agents/notes/implemented/architecture/2026-08-08-bounded-session-persistence-write-batching.zh.md)。
@@ -77,14 +98,18 @@
 
 协调器断言已存储 id，并在修复或活动会话接管前比较已存储/活动会话 cwd。其 `inspect()` 路径取得新鲜后端值的所有权，只验证和冻结一次，并在不调用 `commitRepair` 的情况下最多保留配置数量的未发布 Session。只有保留源的修订值仍等于 `readStoredRevision` 时，系统才会复用或修复它；否则协调器会重新读取。该新鲜性校验不会增加跨进程写入排他。持久日志在一次读取与复核往返内保持不变时，修订值重试才能收敛；持续的外部写入可能延迟 `load`、`inspect` 或 `prepare`。`tornMarker` 完全不透明：协调器只测试 `!== undefined`，并将其原样往返给 `commitRepair`，绝不检查值（JSONL 后端使用待截断字节偏移，SQLite 后端使用待删除 seq）。第三方后端可以不用协调器直接实现抽象服务，但必须提供相同的非修改式检查和可信轻量快照修订。详见[写入协调器 Agent Note](../../../.agents/notes/implemented/architecture/2026-06-18-shared-persistence-write-coordinator.zh.md)。
 
+<a id="metadata-and-location-types"></a>
 ## 元数据与位置类型
 
 从 `dsh-session` 重新导出：`SessionHeader`（不可变会话元数据：`version`、`id`、`createdAt`、`cwd?`、`parentSession?`、`seedLength?`、`origin?`、`delegationDepth?`、`draft?`）。后端提供 `SessionPersistenceSnapshot.content` 时，它携带供冷列表投影使用的 `blank`、`visibleContentSeq` 和 `lastPromptAt`。`SessionLocation` 是 `{ readonly kind: string; readonly path: string }`；其 path 是绝对后端目标，不证明产物已存在或包含未 flush 轮次。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。写协调器的每会话控制器是私有串行化状态；持久事实是已存储日志，批处理、修复与收养由协调器规格断言。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 恢复的对话历史
@@ -101,8 +126,19 @@ seam 不添加提示词或 schema。恢复会将已存储的表层事件还原�
 
 持久化不修改当前请求前缀。只有当重建历史、当前 envelope 与模型路由匹配时，恢复 loop 才能重用提供方缓存；崩溃修复结果仅追加，不重写较早历史。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **无删除或保留接口**：剪枝已存储会话是带外后端维护。
 - **`list()` 无分页且无过滤**：它返回每个已存储会话的 header；适合本地存储，大规模时无索引。
 - **修复时合成 closer 是唯一崩溃方案**：后端必须在 load 时合成 `tool/result`/`step/end`/`turn/end` closer；没有继续中断轮次而不先关闭它的部分轮次恢复。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

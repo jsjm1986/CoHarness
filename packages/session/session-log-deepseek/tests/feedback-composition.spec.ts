@@ -14,7 +14,7 @@ import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import MessageFeedback from '@deepseek-ai/dsh-message-feedback'
 import { recordFeedback } from '@deepseek-ai/dsh-command-feedback'
 import LlmRuntime, { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
-import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek'
+import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek-api-key'
 import DeepSeekLlmApiExtensions from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
 import { startMockLlmServer, type MockLlmServer } from '@deepseek-ai/dsh-llm-mock-server'
 import * as SessionLogDeepSeek from '../src/index.ts'
@@ -47,7 +47,7 @@ it('uploads freeform feedback and message put/edit/delete through the unchanged 
     ['@deepseek-ai/dsh-storage-domain', StorageDomain],
     ['@deepseek-ai/dsh-message-feedback', MessageFeedback],
     ['@deepseek-ai/dsh-llm', LlmRuntime],
-    ['@deepseek-ai/dsh-llm-deepseek', LlmDeepSeek],
+    ['@deepseek-ai/dsh-llm-deepseek-api-key', LlmDeepSeek],
     ['@deepseek-ai/dsh-deepseek-llm-api-extensions', DeepSeekLlmApiExtensions],
     ['@deepseek-ai/dsh-session-log-deepseek', SessionLogDeepSeek],
   ])
@@ -57,7 +57,7 @@ it('uploads freeform feedback and message put/edit/delete through the unchanged 
     '@deepseek-ai/dsh-storage-json': { root: join(root, 'storage') },
     '@deepseek-ai/dsh-storage-domain': { backend: 'json' },
     '@deepseek-ai/dsh-message-feedback': { maxNoteBytes: 1024 },
-    '@deepseek-ai/dsh-llm-deepseek': { protocol: 'chat-completions', baseURL: server.baseURL },
+    '@deepseek-ai/dsh-llm-deepseek-api-key': { baseURL: server.baseURL },
     '@deepseek-ai/dsh-session-log-deepseek': { enabled: true },
   }
   await writeFile(config, JSON.stringify([...modules.keys()].map(name => ({
@@ -132,11 +132,11 @@ it('uploads freeform feedback and message put/edit/delete through the unchanged 
     expect(session.deriveMessages()).toEqual(messages)
     expect(await ctx.messageFeedback.list({ sessionId: session.id })).toEqual({ ok: true, value: { items: [] } })
     for (const wire of server.requests) {
-      expect(wire.path).toBe('/chat/completions')
+      expect(wire.path).toBe('/v1/messages')
       expect(wire.body).not.toHaveProperty('dsh_feedback')
       expect(wire.body).toMatchObject({ model: 'deepseek-v4-flash', messages: [
-        { role: 'user', content: 'Question' },
-        { role: 'assistant', content: 'Answer' },
+        { role: 'user', content: [{ type: 'text', text: 'Question' }] },
+        { role: 'assistant', content: [{ type: 'text', text: 'Answer' }] },
       ] })
     }
     await ctx.sessions.flush(session)

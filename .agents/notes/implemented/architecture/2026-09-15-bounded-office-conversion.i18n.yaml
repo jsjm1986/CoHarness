@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-15-bounded-office-conversion.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-15-bounded-office-conversion.md
-2026-09-15-bounded-office-conversion.md: 55f7cf9105b821519cf4abf098efd91e432670f0
-2026-09-15-bounded-office-conversion.zh.md: 24fa4f32f1d924be6a792dc8c09a9dc72d5b159b
+/agent-note-bounded-shared-office-conversion:
+  en: 10c171aa2a5ab0c2
+  zh: 13e8e134e3a68e98
+/agent-note-bounded-shared-office-conversion/problem:
+  en: b305613daff5a763
+  zh: 1aba13289664f65c
+/agent-note-bounded-shared-office-conversion/decision:
+  en: cd0c51c30361cf8f
+  zh: 3127dce52b59bbae
+/agent-note-bounded-shared-office-conversion/alternatives-considered:
+  en: 9d5cfb7fa5f66bd6
+  zh: 4f4133daa2f02f43
+/agent-note-bounded-shared-office-conversion/consequences:
+  en: c2800ff56c8f89d1
+  zh: 3b3710072b59c443

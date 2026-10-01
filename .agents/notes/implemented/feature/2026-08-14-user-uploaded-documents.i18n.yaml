@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-user-uploaded-documents.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-user-uploaded-documents.md
-2026-08-14-user-uploaded-documents.md: e461ef59dbf59ac15337ce4e15f0fce61b2d53d6
-2026-08-14-user-uploaded-documents.zh.md: eb5e9a836e70af34d71ddbcbac0f9bda3b21e26e
+/agent-note-user-uploaded-documents-as-real-files:
+  en: 1fe56e514dc3d4d2
+  zh: 97df8771121cef1a
+/agent-note-user-uploaded-documents-as-real-files/problem:
+  en: ca5d896b1b6f88cd
+  zh: 5dec12710e8a25d0
+/agent-note-user-uploaded-documents-as-real-files/decision:
+  en: 08464cfd06c52f4c
+  zh: 0de43a7f38af338e
+/agent-note-user-uploaded-documents-as-real-files/decision/host-transport-and-prompt-admission:
+  en: 5836b103f52f8e68
+  zh: 54eb81501dfbfc3b
+/agent-note-user-uploaded-documents-as-real-files/decision/browser-intake:
+  en: fd2c100c3f656346
+  zh: ad81944636487c51
+/agent-note-user-uploaded-documents-as-real-files/decision/containment:
+  en: 6b4780fc41440183
+  zh: 91a867a4f945f6ab
+/agent-note-user-uploaded-documents-as-real-files/alternatives-considered:
+  en: 49444790323abbc9
+  zh: 40ae60570351251b
+/agent-note-user-uploaded-documents-as-real-files/consequences:
+  en: 623563efa31e2359
+  zh: a760bcee0258e700
+/agent-note-user-uploaded-documents-as-real-files/testing:
+  en: e6f49710d5ca3732
+  zh: 9a9288e17bfdbb8c
+/agent-note-user-uploaded-documents-as-real-files/operational-limits:
+  en: b30cdb511dcbdb61
+  zh: 465c3dc23ae4ed4b

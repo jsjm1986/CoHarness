@@ -241,10 +241,32 @@
 
 .cardFoot {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 2px;
   padding: 6px 10px;
   border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.cardHelp {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto;
+}
+
+.helpButton {
+  padding: 5px 6px;
+  min-height: 28px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.helpButton:hover,
+.helpButton:focus-visible {
+  color: var(--dsw-alias-label-primary);
 }
 
 /* Icon-only actions: the label rides `title` so the row stays quiet until

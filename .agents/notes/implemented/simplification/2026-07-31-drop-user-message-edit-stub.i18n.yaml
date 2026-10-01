@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-drop-user-message-edit-stub.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-31-drop-user-message-edit-stub.md
-2026-07-31-drop-user-message-edit-stub.md: 5a34be1dd285f4aced9e6cfb2e324b20ec734bed
-2026-07-31-drop-user-message-edit-stub.zh.md: 288f2bda5d41cf0a331f69f134c8cf1e61a801ef
+/agent-note-drop-the-user-message-edit-stub:
+  en: e37ccd0ce04d4f20
+  zh: 9ceeb01739a8006e
+/agent-note-drop-the-user-message-edit-stub/problem:
+  en: 9f9f25e1d2dbe86d
+  zh: b399233857c4f894
+/agent-note-drop-the-user-message-edit-stub/decision:
+  en: b1a3127c348da736
+  zh: a44e7c08e036558b
+/agent-note-drop-the-user-message-edit-stub/alternatives-considered:
+  en: 5e2175d83a85d037
+  zh: 98e10b9dbf8d6d31
+/agent-note-drop-the-user-message-edit-stub/consequences:
+  en: 7d16c7f82c71b955
+  zh: 31d6720e18d11005

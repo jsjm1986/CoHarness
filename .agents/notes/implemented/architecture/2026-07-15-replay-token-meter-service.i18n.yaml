@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-15-replay-token-meter-service.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-15-replay-token-meter-service.md
-2026-07-15-replay-token-meter-service.md: 54065baca8dc36472a0eab2e45b9a0dd915f626d
-2026-07-15-replay-token-meter-service.zh.md: 34fe6c74078d33b40a2d289d2470221ef61256e7
+/agent-note-replay-token-meter-service:
+  en: 9d44a7f825a8fec3
+  zh: f4034b78cc95371d
+/agent-note-replay-token-meter-service/problem:
+  en: 112dcf92e7aba266
+  zh: 508674dcbf6a9aae
+/agent-note-replay-token-meter-service/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-replay-token-meter-service/decision/one-concrete-llm-family-service:
+  en: 40f9d01a476629fa
+  zh: 11cfad3adfc6454c
+/agent-note-replay-token-meter-service/decision/per-session-replay-folds:
+  en: 18c33916d74362cc
+  zh: e89694905faf9372
+/agent-note-replay-token-meter-service/decision/compact-basic-consumes-but-does-not-own-measurement:
+  en: fca80aaa39c4cbaa
+  zh: 302e1bbcd8d1df68
+/agent-note-replay-token-meter-service/testing:
+  en: 7fad67573f9b1850
+  zh: 5e3269c9ad4feffa
+/agent-note-replay-token-meter-service/alternatives-considered:
+  en: 0eec106edd66c197
+  zh: e3b4df677f775471
+/agent-note-replay-token-meter-service/consequences:
+  en: 68b7627ebd81ce1c
+  zh: ba70279cc9051708

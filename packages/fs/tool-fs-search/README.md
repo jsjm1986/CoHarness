@@ -1,3 +1,8 @@
+---
+description: "Model-facing filesystem discovery tools (glob, grep) backed by the packaged ripgrep binary (@vscode/ripgrep)"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-fs-search
 
 English | [中文](README.zh.md)
@@ -18,10 +23,26 @@ Why spawn-backed: local workspace discovery is naturally a process-backed `rg` w
 
 Use `dsh-tool-fs-search` to give models `glob` file discovery and `grep` content search over a local workspace. Searches need no host `rg` installation or filesystem provider, return workdir-relative results, and include hidden and ignored files while excluding VCS metadata. Configurable caps bound inline output; with an optional spill store, capped results remain fully recoverable. Choose the sibling `dsh-tool-fs` package for reading, writing, or editing files.
 
+## Table of Contents
+
+- [Deployment requirement: no host rg, co-located workdir/filesystem](#deployment-requirement-no-host-rg-co-located-workdirfilesystem)
+- [Config](#config)
+- [Tools](#tools)
+- [Two budgets, two artifacts](#two-budgets-two-artifacts)
+- [Errors](#errors)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="deployment-requirement-no-host-rg-co-located-workdirfilesystem"></a>
 ## Deployment requirement: no host rg, co-located workdir/filesystem
 
 Node deployments receive the `@vscode/ripgrep` platform package on supported macOS, Linux, and Windows x64/arm64 targets. Python SDK Linux and macOS wheels copy the target-native binary beside the single-file runtime as `<runtime>-rg`; `deepseek_harness_runtime.bundled_runtime_path()` rejects an incomplete wheel before launch. No carrier requires a host `rg` install. Returned paths are displayed relative to the resolved workdir (the calling agent's session cwd when present, else `process.cwd()`) and are follow-up-readable with `read` only when that workdir and the filesystem root are the same workspace. That co-location requirement carries no runtime cross-service validation; remote or virtual filesystem search waits for a shared workspace contract or a provider-specific search backend.
 
+<a id="config"></a>
 ## Config
 
 `sampleOverCapGlobResults` is required and has no fallback; deployments choose the over-cap ordering contract explicitly. The remaining keys are optional search caps with the defaults below.
@@ -37,6 +58,7 @@ Node deployments receive the `@vscode/ripgrep` platform package on supported mac
 | `graceMs` | `3000` | Positive terminate-escalation grace the subprocess seam grants past `timeoutMs` before the search fails as `SEARCH_ABORTED`; it cannot exceed [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.md). |
 | `stderrMaxBytes` | `65536` | Diagnostic-tail budget for `rg` stderr, captured through the subprocess seam's collect disposition; a lossy read keeps only the tail (marked `[stderr truncated]`). |
 
+<a id="tools"></a>
 ## Tools
 
 | Tool | Arguments | Behavior |
@@ -46,36 +68,34 @@ Node deployments receive the `@vscode/ripgrep` platform package on supported mac
 
 Routine budgets stay out of the model-facing schema (no `head_limit`/`offset`/`case_insensitive`/output modes): a model that needs surrounding context reads the matched file with `read`; one that needs later results follows the returned spill locator's retrieval hint.
 
+<a id="two-budgets-two-artifacts"></a>
 ## Two budgets, two artifacts
 
 Raw `rg` stdout and stderr are internal transport details. Each search requests collect-mode budgets from the subprocess seam — complete stdout within `rawOutputMaxBytes` and a `stderrMaxBytes` diagnostic tail — with no spill files on either stream (the tool never reads a raw spill path). If the seam still reports a lossy stdout read, the search fails with `SEARCH_RAW_OUTPUT_OVERFLOW` and tells the model to narrow the query; a lossy stderr read only marks the diagnostic excerpt `[stderr truncated]`. A successful `glob` keeps the displayed search root and every acquired path in `{ root, paths }`; when sampling is enabled, `root` lets the Native renderer group an explicit relative or absolute search path by entries beneath that root rather than by its workdir prefix. `grep` keeps every acquired `{ path, lineNumber, line }` in `{ matches }`. Inline item and per-line preview caps apply only in the Native renderer. For a direct surface call with more logical results than the inline cap, post-policy best-effort saves the complete formatted preview through `ctx.spillStore.saveText()` and replaces only presentation with the configured page plus locator. Nested Code dispatches skip that spill because their full canonical value does not enter model context. Missing/failed spill keeps the inline page and reports that the complete result could not be saved—never an `isError`.
 
+<a id="errors"></a>
 ## Errors
 
 Search failures carry the package-owned `SearchError` (a `HarnessError` subclass), surfaced as `{ name, code }` on `isError` results: `SEARCH_INVALID_PATTERN` (ripgrep rejected the regex/glob), `SEARCH_FAILED` (a failed `rg` launch, inaccessible target, signal kill, malformed `--json` output), `SEARCH_RAW_OUTPUT_OVERFLOW` (raw output over `rawOutputMaxBytes`, or still lossy after the requested stdout capture budget), and `SEARCH_ABORTED` (cooperative tool timeout or caller cancellation). ripgrep exit semantics are tool-owned: exit 0 is success with results, exit 1 is a successful empty search (`No files found` / `No matches found`), and only other exits are failures. Model argument mistakes (blank pattern, a list-valued `include`) stay ordinary tool argument errors.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Each call spawns one ripgrep process through `ctx.subprocess` and returns its output; no index or process state survives the call.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### System prompt
 
 #### What the model sees
 
-At assembly time, each section checks `ctx.tools.get(name, scope)` and renders only while its tool is visible. The grep paragraph includes its read follow-up sentence only while read is visible. The original text and section order stay unchanged for the same supported tool set, including PTC capabilities behind `run_code`. This scope-dependent text selection applies to system-prompt sections. Tool schema descriptions remain registration-time text; in particular, the grep schema still recommends read even in a scope that hides read. Scope-dependent schema wording is not implemented.
+At assembly time, each section checks `ctx.tools.get(name, scope)` and renders only while its tool is visible. The grep paragraph includes its read follow-up sentence only while read is visible. The original text and section order stay unchanged for the same supported tool set, including PTC capabilities behind `run_code`. This scope-dependent text selection applies to system-prompt sections. Tool schema descriptions remain registration-time text and do not name other tools.
 
-##### Glob guidance with `sampleOverCapGlobResults: true`
-
-```markdown
-Use the glob tool — not shell find — to discover files by path pattern. A pattern with no "/" matches basenames at any depth, so "*" matches every file in the tree rather than its top level. Results are files only, never directories, and include hidden and ignored files: a result that fits comes back in modification-time order, while a larger one is sampled across top-level entries, so it spans the tree instead of one subtree.
-```
-
-##### Glob guidance with `sampleOverCapGlobResults: false`
+##### Glob guidance
 
 ```markdown
-Use the glob tool — not shell find — to discover files by path pattern. A pattern with no "/" matches basenames at any depth, so "*" matches every file in the tree rather than its top level. Results are files only, never directories, and include hidden and ignored files: a result that fits comes back in modification-time order, while a larger one keeps the modification-time-ordered head.
+Use the glob tool — not shell find — to discover files by path pattern.
 ```
 
 ##### Grep guidance
@@ -140,3 +160,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **The packaged binary is fixed at dependency version** — Node deployments use the version selected by `@vscode/ripgrep`; Python single-file runtimes copy that target-native version into the required `-rg` sidecar. An unsupported platform or a corrupted installation fails with `SEARCH_FAILED`, while the Python runtime package rejects a missing sidecar before launch. Remote or virtual filesystems need a co-located workspace or another search consumer.
 - **The schemas expose one bounded page** — offset pagination, case-mode switches, alternate output modes, and provider-backed discovery remain outside this package; capped complete output requires a spill backend.
 - **Sampling, when enabled, groups by first path segment beneath the search root only** — an over-cap `glob` page balances across those top-level entries, so a result concentrated deeper (one busy directory inside an otherwise even tree) is still shown unevenly below that level; recursive balancing is deferred.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

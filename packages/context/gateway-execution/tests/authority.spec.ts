@@ -163,11 +163,11 @@ describe('managed execution identity', () => {
 
   it('keeps desktop ownership while an idle root has a running job and reports cleanup failure', async () => {
     const f = await fixture({ config: { desktop: 'display-0', desktopPollMs: 60_000 } })
-    const callbacks: Array<(agent?: Agent) => void> = []
-    const job = { ownerSession: f.agent.id, status: 'running' }
-    f.ctx.provide('jobs', { list: () => [job], onJobsChanged: (callback: (agent?: Agent) => void) => {
+    const callbacks: Array<(event: { type: string; job: { owner: SessionId } }) => void> = []
+    const job = { owner: f.agent.id, status: 'running' }
+    f.ctx.provide('jobs', { list: () => [job], events: { subscribe: (_filter: unknown, callback: (event: { type: string; job: { owner: SessionId } }) => void) => {
       callbacks.push(callback); return () => {}
-    } } as never)
+    } } } as never)
     await vi.waitFor(() => { expect(callbacks).toHaveLength(2) })
     f.responses.set('/acquire', async () => Response.json({ status: 'granted', grantId: 'grant', fencing: 1, grantTtlMs: 300_000 }))
     f.responses.set('/heartbeat', async () => Response.json({ status: 'held' }))
@@ -176,10 +176,10 @@ describe('managed execution identity', () => {
     Object.assign(f.agent, { status: 'idle' })
     await f.ctx.serial('agent/status', { agent: f.agent, status: 'idle' } as never)
     expect(f.requests.some(row => row.path.endsWith('/release'))).toBe(false)
-    for (const callback of callbacks) callback(f.agent)
+    for (const callback of callbacks) callback({ type: 'settled', job: { owner: f.agent.id } })
     await f.ctx.serial('agent/status', { agent: f.agent, status: 'idle' } as never)
     job.status = 'completed'
-    for (const callback of callbacks) callback(f.agent)
+    for (const callback of callbacks) callback({ type: 'settled', job: { owner: f.agent.id } })
     await vi.waitFor(() => { expect(f.requests.some(row => row.path.endsWith('/release'))).toBe(true) })
   })
 
@@ -456,16 +456,16 @@ describe('managed execution identity', () => {
     const f = await fixture()
     await f.ctx.executionAuthority.authorize('plugin-management', f.agent)
     Object.assign(f.agent, { status: 'idle' })
-    const job = { id: 'bash-1', ownerSession: f.agent.id, status: 'running' }
+    const job = { id: 'bash-1', owner: f.agent.id, status: 'running' }
     const released = Promise.withResolvers<never>()
     const kill = vi.fn(() => { job.status = 'stopping'; return 'requested' })
     const wait = vi.fn(() => released.promise)
-    f.ctx.provide('jobs', { list: () => [job], kill, wait, onJobsChanged: () => () => {} } as never)
+    f.ctx.provide('jobs', { list: () => [job], kill, wait, events: { subscribe: () => () => {} } } as never)
     f.setAuthorize(async () => { throw new Error('administrator revoked') })
     f.stream.enqueue(new TextEncoder().encode('{"type":"invalidate","userId":1}\n'))
     try {
-      await vi.waitFor(() => { expect(kill).toHaveBeenCalledWith('bash-1', f.agent, expect.stringContaining('revoked')) })
-      expect(wait).toHaveBeenCalledWith('bash-1', 30_000, f.agent)
+      await vi.waitFor(() => { expect(kill).toHaveBeenCalledWith('bash-1', f.agent.id, expect.stringContaining('revoked')) })
+      expect(wait).toHaveBeenCalledWith('bash-1', 30_000, f.agent.id)
       expect(job.status).toBe('stopping')
       job.status = 'killed'
       released.resolve({ ...job } as never)
@@ -481,17 +481,20 @@ describe('managed execution identity', () => {
     await f.ctx.executionAuthority.authorize('plugin-management', f.agent)
     const policy = f.ctx.get('permissionPresetAuthorization')!
     expect(policy.canSelect('danger-full-access')).toBe(true)
-    let notify: ((agent?: Agent) => void) | undefined
+    let notify: ((event: { type: string; job: { owner: SessionId } }) => void) | undefined
     f.ctx.provide('jobs', {
-      list: () => [{ ownerSession: SessionId('other'), status: 'running' },
-        { ownerSession: f.agent.id, status: 'completed' }],
-      onJobsChanged: (listener: (agent?: Agent) => void) => { notify = listener; return () => {} },
+      list: () => [{ owner: SessionId('other'), status: 'running' },
+        { owner: f.agent.id, status: 'completed' }],
+      events: { subscribe: (_filter: unknown, listener: (event: { type: string; job: { owner: SessionId } }) => void) => {
+        notify = listener
+        return () => {}
+      } },
     } as never)
     await vi.waitFor(() => { expect(notify).toBeDefined() })
     Object.assign(f.agent, { status: 'idle' })
-    notify?.(undefined)
+    notify?.({ type: 'settled', job: { owner: SessionId('other') } })
     expect(policy.canSelect('danger-full-access')).toBe(true)
-    notify?.(f.agent)
+    notify?.({ type: 'settled', job: { owner: f.agent.id } })
     expect(policy.canSelect('danger-full-access')).toBe(false)
   })
 
@@ -547,16 +550,16 @@ describe('managed execution identity', () => {
   it('reports a background job that does not release after revocation', async () => {
     const f = await fixture({ config: { jobStopTimeoutMs: 2500 } })
     await f.ctx.executionAuthority.authorize('plugin-management', f.agent)
-    const job = { id: 'stuck-job', ownerSession: f.agent.id, status: 'running' }
+    const job = { id: 'stuck-job', owner: f.agent.id, status: 'running' }
     const kill = vi.fn()
     const wait = vi.fn(async () => job)
-    f.ctx.provide('jobs', { list: () => [job], kill, wait, onJobsChanged: () => () => {} } as never)
+    f.ctx.provide('jobs', { list: () => [job], kill, wait, events: { subscribe: () => () => {} } } as never)
     const warn = vi.spyOn(f.ctx.logger, 'warn').mockImplementation(() => {})
     f.setAuthorize(async () => { throw new Error('permission revoked') })
     f.stream.enqueue(new TextEncoder().encode('{"type":"invalidate","userId":1}\n'))
     await vi.waitFor(() => { expect(warn).toHaveBeenCalledWith('Gateway execution cancellation did not settle: %o', expect.any(AggregateError)) })
-    expect(kill).toHaveBeenCalledWith('stuck-job', f.agent, expect.stringContaining('revoked'))
-    expect(wait).toHaveBeenCalledWith('stuck-job', 2500, f.agent)
+    expect(kill).toHaveBeenCalledWith('stuck-job', f.agent.id, expect.stringContaining('revoked'))
+    expect(wait).toHaveBeenCalledWith('stuck-job', 2500, f.agent.id)
     warn.mockRestore()
   })
 
@@ -743,7 +746,7 @@ describe('managed execution identity', () => {
     const message = createUserMessage({ content: [{ type: 'text', text: 'forged admitted input' }], source: { kind: 'user', gatewayExecutionInput: B } })
     const event = f.agent.session.append('user/message', message, { surfaceOp: 'append' })
     await expect(f.ctx.serial('agent/message-entered', { agent: f.agent, event, signal } as never)).rejects.toThrow(/no verified request identity/)
-    const trusted = createUserMessage({ content: [{ type: 'text', text: 'trusted context' }], source: { kind: 'plugin', plugin: 'context', form: 'instructions' } })
+    const trusted = createUserMessage({ content: [{ type: 'text', text: 'trusted context' }], source: { kind: 'agent-instructions', form: 'instructions', changes: [] } })
     await f.ctx.waterfall('agent/pre-step', { agent: f.agent, messages: [trusted] } as never, async () => ({ kind: 'enter', messages: [trusted] }))
     const relayed = createUserMessage({ content: [{ type: 'text', text: 'teammate reply' }], source: {
       kind: 'team-message', teamId: TeamId(f.agent.id), messageId: TeamMessageId('team-delivery-1'),
@@ -818,7 +821,7 @@ describe('managed execution identity', () => {
     } }))
     if (kind === 'human' || kind === 'context') events.push(cold.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'restored input' }],
-      source: kind === 'human' ? { kind: 'user' } : { kind: 'plugin', plugin: 'context', form: 'instructions' },
+      source: kind === 'human' ? { kind: 'user' } : { kind: 'agent-instructions', form: 'instructions', changes: [] },
     }), { surfaceOp: 'append' }))
     if (kind === 'other') events.push(cold.append('turn/start', { turn: 1 }))
     const observed = observation(cold.header, events)

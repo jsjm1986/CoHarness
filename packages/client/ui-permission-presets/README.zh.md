@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-permission-presets
 
 [English](README.md) | 中文
@@ -12,6 +17,18 @@
 
 为当前 Web 会话或未来会话选择权限预设。通用设置行只更改之后创建会话所用的默认值；composer 与 `/permission` 选择器切换当前会话。默认 Web 提供仅可查看、工作区内修改与完全权限。显式加载实验 Auto integration 后，当前会话选择器会增加带 `EXP` 标记的 Auto review。通过可见选项选择完全权限或 Auto 时，需要分别确认对应风险；完整的 `/permission <preset>` 命令直接执行。宿主通过 Session 投影确认每次变更。
 
+## 目录
+
+- [账户资格](#account-qualifications)
+- [桌面确认](#desktop-confirmation)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="account-qualifications"></a>
 ## 账户资格
 
 当前会话控件与 General 默认值行将现有账户上下文资格，与所属连接的 `host.describe.executionAuthorityRequired` 标记结合。只有显式 `false` 表示独立本机运行；缺少 Host 信息、账户刷新、验证失败或断连时，Full 和 Auto 都不可用。受管账户选择 Full 需要管理员资格，选择 Auto 需要明确的 Auto 资格。Host 目录保持不变。
@@ -20,14 +37,18 @@
 
 Auto 必须逐会话主动启用，不属于新会话默认 schema。默认值控制器还会拒绝 Auto，并从陈旧或嵌入的选项表中排除它。浏览器资格检查负责呈现和提交反馈，真正的授权由 Host 与 Gateway 强制执行。
 
+<a id="desktop-confirmation"></a>
 ## 桌面确认
 
 受管会话的输入区通过所属运行时连接打开个人桌面确认框。保存前显示当前根会话、节点、桌面和账号。确认涵盖该根会话的活动子 Agent，不涵盖另一根会话或历史分支；每位参与者分别确认。服务端核验当前资格并拒绝陈旧目标。断连和会话切换会丢弃待处理响应，保存失败后必须重新读取状态。确认或撤回不会启动模型回合，Full access、Auto 和工具审批也不能代替此确认。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该行绑定一个 Host 拥有的 Settings 描述符，preset 数据留在 host 权限域中；没有包拥有的持久内容可供比较。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 间接影响。它的两个界面写入权限事实：设置行使未来会话带着全量值旋钮事件启动，而 `/permission` 选择器追加选中的当前会话预设。沙箱与审批消费方各自解析自己的旋钮事件；选择 `auto` 还会启用宿主 Auto integration 的独立逐调用 reviewer。
@@ -36,6 +57,17 @@ Auto 必须逐会话主动启用，不属于新会话默认 schema。默认值�
 
 无直接失效；请求前缀的变化由旋钮消费方自行承担。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **Settings 行仅在 Web 中可用**：非 Web 客户端仍可通过 `/permission` 切换当前会话，但不会获得这项浏览器贡献。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

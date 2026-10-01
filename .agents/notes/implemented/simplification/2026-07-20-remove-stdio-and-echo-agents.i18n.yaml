@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-20-remove-stdio-and-echo-agents.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-20-remove-stdio-and-echo-agents.md
-2026-07-20-remove-stdio-and-echo-agents.md: 61e6cb31f35010546d13d6300f3e7c0fa3c1856e
-2026-07-20-remove-stdio-and-echo-agents.zh.md: 59825b64969ff5cab71678565306caced53a80d0
+/agent-note-remove-the-stdio-and-echo-agents:
+  en: 26c068618d1ea2b4
+  zh: 60a33c2b49a57c00
+/agent-note-remove-the-stdio-and-echo-agents/problem:
+  en: 81dbe191a1b516c5
+  zh: 7e3bc5d87f4a7621
+/agent-note-remove-the-stdio-and-echo-agents/decision:
+  en: 608dc6ea568586a8
+  zh: 0ca1d3cf8600092f
+/agent-note-remove-the-stdio-and-echo-agents/verification:
+  en: 6fb807d6098e95e1
+  zh: 4979af2b8cf4b3e6
+/agent-note-remove-the-stdio-and-echo-agents/alternatives-considered:
+  en: 789591ccd2add756
+  zh: 8febd541e51b17f6
+/agent-note-remove-the-stdio-and-echo-agents/consequences:
+  en: e78e58fc3c3d1195
+  zh: 59e8126551f24d0c

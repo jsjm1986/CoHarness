@@ -1,3 +1,8 @@
+---
+description: "Out-of-process SDK subagent backend: drives a child DeepSeek Harness runtime subprocess over stdio JSON-RPC through the TypeScript SDK client"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-subagent-dsh-sdk
 
 English | [中文](README.zh.md)
@@ -8,6 +13,21 @@ The SDK provider runs each subagent as a complete DeepSeek Harness runtime in a 
 
 `dsh-subagent-dsh-sdk` runs each delegated task in a fresh DeepSeek Harness subprocess with its own profile, session, model route, and tools. The parent provides the task and working directory, while each child uses its configured runtime and remains isolated from the parent conversation. The parent receives the child's final assistant text or a safe error; intermediate messages and tool traffic stay inside the child process. Choose this backend when delegation needs a complete Harness runtime rather than shared in-process state, and accept the cost of starting a new process for every run.
 
+## Table of Contents
+
+- [Start and ownership](#start-and-ownership)
+- [Stop-reason mapping](#stop-reason-mapping)
+- [Capabilities and context](#capabilities-and-context)
+- [Configuration](#configuration)
+- [Process boundary](#process-boundary)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="start-and-ownership"></a>
 ## Start and ownership
 
 `start(request)` resolves the child's working directory, spawns the runtime through `DeepSeekHarness`, and completes the `initialize` handshake (with the configured `provider`/`model` route and optional `maxTokens` output cap) before it fulfills. Fulfillment therefore means the child runtime is ready and ownership has transferred to the caller. A spawn, handshake, or pre-publication cancellation failure rejects only after the subprocess has been reaped; a working-directory resolution failure rejects before anything is spawned.
@@ -18,14 +38,17 @@ The returned run id is minted in the parent namespace; the child runtime's sessi
 
 `dispose()` is idempotent: it settles the result locally as `aborted` (there is no wire-level prompt cancel), then closes the runtime — a bounded protocol `shutdown` request followed by the shared stdin-EOF → SIGTERM → SIGKILL ladder to actual exit.
 
+<a id="stop-reason-mapping"></a>
 ## Stop-reason mapping
 
 The SDK client returns an owned child activity rather than a prompt result. The provider reads the last durable `turn/end` inside that activity and maps it into the seam vocabulary: `completed` → `completed`, `max-tokens` → `max-tokens`, `blocked` → `refusal`, `aborted` → `aborted` (a child-side `disposed` cause adds a `child-disposed` diagnostic); everything else — `error`, `interrupted`, a future variant, or an activity with no turn — maps to `error`, carrying a fixed safe diagnostic where one applies, so an unclean stop is never reported as success. Transport-level failures after publication flatten to `stopReason: 'error'` with a diagnostic through the `onError` diagnostic sink (wired to `ctx.logger.warn`); the seam contract forbids `result` rejecting.
 
+<a id="capabilities-and-context"></a>
 ## Capabilities and context
 
 The provider advertises no start-time capabilities (`outputSchema`/`depthLimit`/`toolFilter`/`persona` all false) and `inheritsParentContext: false`: the child is a fresh runtime in another process, and the only parent-derived input is the workspace cwd. `dsh-tool-subagent` deployments over this provider set `maxDepth: 'provider-managed'` — the child harness owns its own recursion budget.
 
+<a id="configuration"></a>
 ## Configuration
 
 | Key | Default | Meaning |
@@ -57,16 +80,19 @@ The provider advertises no start-time capabilities (`outputSchema`/`depthLimit`/
   config: { provider: dsh-sdk, toolName: subagent, maxDepth: 'provider-managed' }
 ```
 
+<a id="process-boundary"></a>
 ## Process boundary
 
 The child environment is the [`dsh-subprocess`](../../subprocess/README.md) seam's `scrubbedParentEnv()` base — ambient credential-shaped and `DSH_*` names dropped — with explicit `config.env` values merged after the scrub. The child is spawned by the SDK client rather than through `ctx.subprocess` (the subprocess README's documented exception for SDK-managed transports), which is why this backend applies the scrub itself. The JSON-RPC wire is the real serialization boundary.
 
 The package has no default export. Cordis loader unwrapping would otherwise hide the named `inject` metadata; see [postmortem 0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md).
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The child is a full peer runtime owning its composition and session; the provider drives it over stdio JSON-RPC and keeps no mirrored state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Child-agent request
@@ -103,3 +129,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **No optional start-time capabilities** — the parent cannot enforce `outputSchema`, depth, tool filters, or persona inside the child process; configure the child's own `cordis.yml` instead.
 - **The child's transcript stays in the child's own session root** — the parent log records only the delegation tool call/result (the seam's child-isolation rule); the streamed `session.event` channel is consumed for output extraction, not bridged into the parent log.
 - **Local child processes only** — the resolved cwd is a local path; a remote runtime would need its own backend.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

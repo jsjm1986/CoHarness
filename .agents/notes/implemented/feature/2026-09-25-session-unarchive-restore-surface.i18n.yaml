@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-25-session-unarchive-restore-surface.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-25-session-unarchive-restore-surface.md
-2026-09-25-session-unarchive-restore-surface.md: 52eec34de27a683fa181a23fc89ed9671bb7d218
-2026-09-25-session-unarchive-restore-surface.zh.md: 0078db9d4e5d75741154b12d689b14af7f40511b
+/agent-note-session-unarchive-wire-inverse-and-the-archived-sessions-settings-page:
+  en: 1360d8cd4d23308e
+  zh: 4d61895fa647b496
+/agent-note-session-unarchive-wire-inverse-and-the-archived-sessions-settings-page/problem:
+  en: e83cd8e7247f76da
+  zh: 1241cec540f1bd18
+/agent-note-session-unarchive-wire-inverse-and-the-archived-sessions-settings-page/decision:
+  en: ab8a2fdde8c6bed6
+  zh: bf11da224d366174
+/agent-note-session-unarchive-wire-inverse-and-the-archived-sessions-settings-page/alternatives-considered:
+  en: ca01c6787ee17a9c
+  zh: d3a84083234a170f
+/agent-note-session-unarchive-wire-inverse-and-the-archived-sessions-settings-page/consequences:
+  en: ce6a639c165b0f01
+  zh: 9848339517f0370d

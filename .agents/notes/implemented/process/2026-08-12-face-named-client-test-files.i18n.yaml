@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-12-face-named-client-test-files.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-12-face-named-client-test-files.md
-2026-08-12-face-named-client-test-files.md: e83ebe4fda25218d96bab546af025b59064ca18f
-2026-08-12-face-named-client-test-files.zh.md: 7062c67f9c98d87f480e119df807955c1a10820a
+/agent-note-face-named-client-test-files:
+  en: d94ea46f9bc0e1ab
+  zh: 3267575d395679f8
+/agent-note-face-named-client-test-files/problem:
+  en: 31e6f09a3028c82a
+  zh: 4c0e17a7c80f0aa5
+/agent-note-face-named-client-test-files/decision:
+  en: 199d26a9df075356
+  zh: a384a36459b37667
+/agent-note-face-named-client-test-files/renamed-in-this-change:
+  en: f7aff9cbdcf7cc99
+  zh: 60e9f7008bbbe6e6
+/agent-note-face-named-client-test-files/alternatives-considered:
+  en: 096318d82978a283
+  zh: 6b5d1ba12feebf9d
+/agent-note-face-named-client-test-files/consequences:
+  en: 6e6249eeef4fe43a
+  zh: f3f2d18a588e72a0

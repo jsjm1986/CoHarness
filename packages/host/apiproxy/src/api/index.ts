@@ -13,6 +13,7 @@ import type { WorkspaceChangesApi } from './workspace-changes.ts'
 import type { AgentPresetsApi } from './agent-presets.ts'
 import type { SkillsApi } from './skills.ts'
 import type { SubagentsApi } from './subagents.ts'
+import type { JobsApi } from './jobs.ts'
 import type { EventsApi } from './events.ts'
 import type { SettingsApi } from './settings.ts'
 import type { CredentialsApi } from './credentials.ts'
@@ -25,6 +26,7 @@ export interface ApiProxy {
   desktop: DesktopApi
   sessions: SessionsApi
   subagents: SubagentsApi
+  jobs: JobsApi
   host: HostApi
   workspace: WorkspaceApi
   workspaceFiles: WorkspaceFilesApi
@@ -59,7 +61,7 @@ export type {
   SubagentPromptContentPart, SubagentPromptReceipt,
 } from '@deepseek-ai/dsh-subagent/client'
 export type { SubagentsApi } from './subagents.ts'
-export type { JobView } from './jobs.ts'
+export type { JobChannel, JobKillValue, JobOutputChunk, JobOutputCoords, JobOutputValue, JobsApi, JobView } from './jobs.ts'
 export type { WorkspaceApi, WorkspaceId, WorkspaceView } from './workspace.ts'
 export type {
   WorkspaceFileByteWindow,

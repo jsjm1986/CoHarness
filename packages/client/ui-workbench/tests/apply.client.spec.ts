@@ -8,7 +8,8 @@ import { apply, inject } from '../src/client/apply.ts'
 import type { WorkbenchCatalog, WorkbenchConversation } from '../src/client/catalog.ts'
 import { createWorkspacePreviewReaders } from '../src/client/preview-readers.ts'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import { apply as nodeApply } from '../src/index.ts'
+import { Config, apply as nodeApply } from '../src/index.ts'
+import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
 
 const A = 'a' as SessionId
 const item: WorkbenchConversation = { sessionId: A, runtime: { kind: 'personal' }, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }
@@ -382,7 +383,7 @@ describe('workspace file serving', () => {
         runtimeTarget(): SessionRuntimeTarget
         renderHtml(
           data: Uint8Array,
-          read: (request: unknown, signal: AbortSignal) => Promise<{ data: Uint8Array; version: string }>,
+          read: (request: unknown, signal: AbortSignal) => Promise<{ bytes: string; version: string }>,
           request: unknown, lifetime: AbortSignal, signal: AbortSignal,
         ): Promise<string>
       })(A)
@@ -391,7 +392,7 @@ describe('workspace file serving', () => {
       expect(face.runtimeTarget()).toEqual({ kind: 'project', projectId: 7 })
       Object.assign(h.sessions, { runtimeTargetFor: undefined })
       expect(face.runtimeTarget()).toEqual({ kind: 'base' })
-      const read = vi.fn(async () => ({ data: new Uint8Array([1, 2, 3]), version: 'v1' }))
+      const read = vi.fn(async () => ({ bytes: btoa('\x01\x02\x03'), version: 'v1' }))
       const html = await face.renderHtml(
         new TextEncoder().encode('<p><img src="icon.png"></p>'), read,
         openRequest, new AbortController().signal, new AbortController().signal,
@@ -421,7 +422,15 @@ describe('workspace file serving', () => {
 })
 
 describe('ui-workbench node half', () => {
-  it('the node apply is an inert loader seat', () => {
-    expect(() => { nodeApply() }).not.toThrow()
+  it('embeds validated spreadsheet limits into browser index pages', async () => {
+    const ctx = new Context()
+    const table: IndexInjection[] = []
+    ctx.on('webserver/index-inject', (rows) => { table.push(...rows) })
+    const fiber = ctx.plugin({ apply: (scope) => { nodeApply(scope, Config({})) } })
+    try {
+      await fiber.await()
+      ctx.emit('webserver/index-inject', table)
+      expect(table).toEqual([{ kind: 'global', name: '__DSH_WORKBENCH_CONFIG__', value: Config({}) }])
+    } finally { await fiber.dispose() }
   })
 })

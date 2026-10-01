@@ -1,3 +1,8 @@
+---
+description: "Web ask_user_question feature: host tool mount plus composer-takeover question UI"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-user-questions
 
 English | [中文](README.zh.md)
@@ -18,10 +23,21 @@ The composer honors the owning pane’s `active` flag: newly arriving free-text 
 
 When an agent asks a question in the Web client, this package replaces the chat composer with an interactive question surface. Users can move through questions, choose one or multiple options, enter custom answers, skip items, and submit one structured answer batch. Single-choice selections advance immediately, while drafts survive Session navigation for the lifetime of the page. A single question with a supported presentation intent can use a dedicated surface, including the plan-review card with `Request changes` and `Approve` actions.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Rendering is one composer-slot contribution; the question lifecycle and tool belong to `dsh-tool-ask-user` and the interaction seam.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through `dsh-tool-ask-user`, whose model-visible schema and answer rendering this package presents in the Web client.
@@ -34,3 +50,13 @@ No direct invalidation; `dsh-tool-ask-user` owns the model-visible tool call and
 
 - **Unsubmitted drafts are not durable** — reconnect resync or a full page reload restores the host-owned pending request with the same rpcId, but a composer unmount resets local option and custom-text drafts.
 - **One request owns the composer at a time** — later pending requests remain in the session snapshot and become visible after the earlier request resolves.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

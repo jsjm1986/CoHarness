@@ -1,7 +1,10 @@
 /** Locale bundles for the agent-preset settings row, hero chip, header label, and management section. */
 
+import { guideEn, guideZh, type PresetGuideKey } from './guide-locales.ts'
+
 /** Locale keys these surfaces render. */
 export type AgentPresetSettingsKey =
+  | PresetGuideKey
   | 'title' | 'description' | 'managedByProject' | 'managedByAccount' | 'managedByOrganization' | 'managedByDeployment' | 'loading' | 'error' | 'userTrust' | 'seatHint' | 'headerHint'
   | 'nav' | 'sectionIntro' | 'projectFilesystem' | 'builtIn' | 'setDefault' | 'view'
   | 'presetStandardName' | 'presetStandardDescription'
@@ -23,6 +26,7 @@ export type AgentPresetSettingsKey =
 
 /** English copy. */
 export const en: Record<AgentPresetSettingsKey, string> = {
+  ...guideEn,
   title: 'Agent preset',
   description: 'Applies to sessions you start from now on. Running sessions keep the preset they began with.',
   managedByProject: 'The project owner or an organization administrator manages the default for new project sessions.',
@@ -109,6 +113,7 @@ export const en: Record<AgentPresetSettingsKey, string> = {
 
 /** Simplified Chinese copy. */
 export const zh: Record<AgentPresetSettingsKey, string> = {
+  ...guideZh,
   title: 'Agent 预设',
   description: '对此后新建的会话生效。运行中的会话保持它开始时的预设。',
   managedByProject: '项目 owner 或组织管理员管理项目中新会话使用的默认预设。',

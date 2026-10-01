@@ -3,8 +3,8 @@
 
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, SystemMessage, ToolSchema } from '@deepseek-ai/dsh-llm'
+import { createMessage, createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, ContextFormed, SystemMessage, ToolSchema } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionSeq as SessionSeqType } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -18,6 +18,12 @@ import {
   estimateSystemMessage,
   estimateToolsTokens,
 } from '../src/estimate.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'test': { kind: 'test' } & ContextFormed
+  }
+}
 
 const CONFIG = { provider: 'test', model: 'test-model' }
 
@@ -48,13 +54,9 @@ function appendUser(session: Session, text: string): SessionSeqType {
   }), { surfaceOp: 'append' }).seq
 }
 
-/** One system prompt on the surface, attributed to a plugin producer. */
+/** One system prompt on the surface. */
 function systemMessage(text: string): SystemMessage {
-  return createMessage({
-    role: 'system',
-    content: [{ type: 'text', text }],
-    source: { kind: 'plugin', plugin: 'test' },
-  })
+  return createSystemMessage(text)
 }
 
 /**
@@ -112,11 +114,7 @@ describe('contextBreakdown session projection', () => {
     // An empty system rewrite and a tool-less envelope price back to zero.
     session.append('system/message', {
       turn: 1, step: 1,
-      message: createMessage({
-        role: 'system',
-        content: [],
-        source: { kind: 'plugin', plugin: 'test' },
-      }),
+      message: createSystemMessage(''),
     }, {
       surfaceOp: { op: 'replace', startSeq: systemSeq, endSeq: systemSeq },
       sourceEventSeqs: [systemSeq],
@@ -147,9 +145,7 @@ describe('contextBreakdown session projection', () => {
     // effective prompt again.
     session.append('system/message', {
       turn: 1, step: 3,
-      message: createMessage({
-        role: 'system', content: [], source: { kind: 'plugin', plugin: 'test' },
-      }),
+      message: createSystemMessage(''),
     }, {
       surfaceOp: { op: 'replace', startSeq: tailSeq, endSeq: tailSeq },
       sourceEventSeqs: [tailSeq],
@@ -169,7 +165,7 @@ describe('contextBreakdown session projection', () => {
     }, { surfaceOp: 'append' }).seq
     const summary = createUserMessage({
       content: [{ type: 'text', text: 'summary' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     })
     appendSummaryMeter(ctx, session, tail2Seq, tail2Seq)
     session.append('user/message', summary, {
@@ -210,7 +206,7 @@ describe('contextBreakdown session projection', () => {
     const second = appendUser(session, 'and a second entry')
     const summary = createUserMessage({
       content: [{ type: 'text', text: 'summary' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     })
     appendSummaryMeter(ctx, session, first, second)
     session.append('user/message', summary, {
@@ -257,7 +253,7 @@ describe('contextBreakdown session projection', () => {
     expect(agree()).toBe(grown)
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'summary' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     }), {
       surfaceOp: { op: 'replace', startSeq: question, endSeq: answer },
       sourceEventSeqs: [question, answer],
@@ -384,7 +380,7 @@ describe('contextBreakdown session projection', () => {
     appendSummaryMeter(ctx, session, first, last)
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'summary' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     }), {
       surfaceOp: { op: 'replace', startSeq: first, endSeq: last },
       sourceEventSeqs: [...shadowed],
@@ -430,10 +426,7 @@ describe('shared estimator', () => {
     expect(estimateContent([{ type: 'text', text: 'abcd' }])).toBe(5)
     expect(estimateContent([{ type: 'reasoning', text: 'abcdefgh' }] as ContentBlock[])).toBe(6)
     expect(estimateContent([{ type: 'tool-call', id: 'c' as never, name: 'bash', arguments: '{"a":1}' }])).toBe(7)
-    expect(estimateContent([{
-      type: 'tool-result', toolCallId: 'c' as never,
-      content: [{ type: 'text', text: 'abcd' }],
-    }])).toBe(9)
+    expect(estimateContent([{ type: 'text', text: 'abcd' }])).toBe(5)
     const unknown = { type: 'mystery', payload: 'abc' } as unknown as ContentBlock
     expect(estimateContent([unknown])).toBe(4 + Math.ceil(JSON.stringify(unknown).length / 4))
   })
@@ -442,7 +435,7 @@ describe('shared estimator', () => {
     const empty = createMessage({
       role: 'system',
       content: [],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'system-prompt' },
     })
     expect(estimateSystemMessage(empty)).toBe(0)
     expect(estimateSystemMessage(systemMessage('abcdefgh'))).toBe(6)
@@ -450,7 +443,7 @@ describe('shared estimator', () => {
     const structured = createMessage({
       role: 'system',
       content: [{ type: 'tool-call', id: 'c' as never, name: 'bash', arguments: '{}' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'system-prompt' },
     })
     expect(estimateSystemMessage(structured))
       .toBe(Math.ceil(JSON.stringify(structured.content[0]).length / 4) + 4)

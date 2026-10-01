@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for web-styling.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/web-styling.md
-web-styling.md: f92d13b54a8ac24b2195b19693c1f398068b721e
-web-styling.zh.md: ffba92fa323fc9677496c4a4e15823d9aa6e345f
+/web-ui-style-reference:
+  en: aab8007f4e9287d7
+  zh: 158960e753f32a91
+/web-ui-style-reference/ownership:
+  en: c544f3f3c66d036a
+  zh: e45976a585cb9c86
+/web-ui-style-reference/component-rules:
+  en: 365bff686fe433c8
+  zh: 22c18ea2b6576829
+/web-ui-style-reference/responsive-layout:
+  en: aa74ba47c5cc4867
+  zh: 92ad3a56b201af7c
+/web-ui-style-reference/changing-the-system:
+  en: ca70c6f962c290c8
+  zh: 800d8289116c1535

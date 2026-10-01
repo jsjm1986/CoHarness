@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-official-plugin-compatibility-baseline.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-18-official-plugin-compatibility-baseline.md
-2026-08-18-official-plugin-compatibility-baseline.md: e5640f72890771504249f9825239534431ab9868
-2026-08-18-official-plugin-compatibility-baseline.zh.md: bc99f432df88b3313f48f20c0b0f2785d47e767a
+/agent-note-official-rc-7-plugin-compatibility-baseline:
+  en: b23d9fd7b11755d3
+  zh: 848112242f51033f
+/agent-note-official-rc-7-plugin-compatibility-baseline/problem:
+  en: 4f8624694bc66a2b
+  zh: 2ccce4aac1d33459
+/agent-note-official-rc-7-plugin-compatibility-baseline/decision:
+  en: b8b479b478fc5ffb
+  zh: d0eafb45be2af1c1
+/agent-note-official-rc-7-plugin-compatibility-baseline/verification:
+  en: 7be8546db925b6b8
+  zh: 96548a7be8ec2bf7
+/agent-note-official-rc-7-plugin-compatibility-baseline/alternatives-considered:
+  en: 57af8590172dd9d6
+  zh: f02e9c40cf0c191d
+/agent-note-official-rc-7-plugin-compatibility-baseline/consequences:
+  en: 7b1528ef6484d1eb
+  zh: dc5b0978c92cd55d

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # dsh-credentials
 
 [English](README.md) | 中文
@@ -16,6 +21,18 @@
 
 `dsh-credentials` 通过让 settings 与 `cordis.yml` 引用 `DEEPSEEK_API_KEY` 等密钥名称，使机密值留在配置之外。它还存储持久化的按插件组织的凭据记录，包括授权 grant 与提供方环境值。轮换后的已存储密钥会作用于下一次请求，无需重启或修改配置。配置界面可以报告密钥或记录是否已设置、来自哪里及能否写入，而不会暴露值。空密钥值视为不存在，而空记录仍表示一项有意存储的凭据。
 
+## 目录
+
+- [两个键空间，两个问题](#two-key-spaces-two-questions)
+- [接口](#surface)
+- [提供方](#providers)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="two-key-spaces-two-questions"></a>
 ## 两个键空间，两个问题
 
 `CredentialRef` 回答的是*这个环境变量名背后是什么*，分层覆盖进程环境、托管存储与 `.env` 文件。以上全部描述的都是这一半。
@@ -26,6 +43,7 @@
 
 <a id="surface"></a>
 
+<a id="surface"></a>
 ## 接口
 
 ```ts
@@ -58,10 +76,13 @@ await ctx.credentials.deleteRecord(key)                  // no-op when absent
 
 `set`/`unset` 的遮蔽规则有意采用明确报错的方式：当只读来源（本地提供方中即当前进程环境）正在提供该引用时，写入会表面成功而解析仍返回遮蔽值——seam 选择直接拒绝，并通过 `describe().writable` 让界面提前把该引用渲染为只读。
 
+<a id="providers"></a>
 ## 提供方
 
 [`dsh-credentials-local`](../credentials-local/README.zh.md) 把继承的进程环境叠加在其受管 `$DSH_HOME/.credentials.yaml` 文档之上，并以启动器的项目和用户 `.env` 层作为后备。该 seam 的接口为 keyring、辅助命令和 KMS 后端提供方预留了扩展空间；远端设置提供方永远不必携带机密。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 经由消费方适配器间接生效：适配器解析每个凭据引用，并拥有值所授权的全部模型可见用途。
@@ -70,9 +91,20 @@ await ctx.credentials.deleteRecord(key)                  // no-op when absent
 
 无直接失效；解析出的值绝不进入请求前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **引用不提供枚举**——seam 只回答被问到的引用；配置界面从 settings schema 得知引用集合，对这一半做 `list()` 没有当前消费方。记录出于上文的理由则可枚举。
 - **引用限定为环境变量形状**——单一扁平的 POSIX 标识符命名空间，因为引用同时就是它借以解析的环境变量名。记录使用更丰富的 `<owner>/<id>` 寻址。
 - **进程环境变化不可见**——不可能为其发事件；界面只能在自身导航时重新读取 `describe()`。
 - **记录的拥有者就是它的 scope，而没有任何环节核验该 scope 是否已挂载**——seam 存下被交予的内容，并报告它存了什么。识别孤儿是调用方在 `listRecords()` 与拥有该 scope 的注册表之间做的连接；seam 自身没有可供核对的注册表。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-07-document-workbench-visual-hierarchy.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-07-document-workbench-visual-hierarchy.md
-2026-09-07-document-workbench-visual-hierarchy.md: 42b707f1a98687f3fe5cb4926706f7307ef0e586
-2026-09-07-document-workbench-visual-hierarchy.zh.md: 41b56614cbc7e9bfd564b20e596f0abc64d4de06
+/agent-note-document-workbench-visual-hierarchy:
+  en: 590fadc1d7d0f288
+  zh: db89bb4a8b442560
+/agent-note-document-workbench-visual-hierarchy/problem:
+  en: 6be7c52ecdbd5a36
+  zh: 6747a35e340e9319
+/agent-note-document-workbench-visual-hierarchy/decision:
+  en: 2a355a8f2e692587
+  zh: 03e5ac34298c4871
+/agent-note-document-workbench-visual-hierarchy/alternatives-considered:
+  en: 48819d189b707bad
+  zh: 4fe03823751d579a
+/agent-note-document-workbench-visual-hierarchy/consequences:
+  en: ce3d24de9abd0860
+  zh: 67be3fa9782d4d0c
+/agent-note-document-workbench-visual-hierarchy/verification:
+  en: 957abb0f59ee650a
+  zh: 59f3bca8fce3935f

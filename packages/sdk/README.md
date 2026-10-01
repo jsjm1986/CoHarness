@@ -1,3 +1,8 @@
+---
+description: "This group contains the protocol stack for driving a Harness runtime from another process. Callers supply the runtime executable and its `cordis.yml`; this group does not create, configure, build, or launch developer projects. The TypeScript SDK decision owns the client contract, and the toolchain removal owns the product boundary."
+kind: "package-group"
+---
+
 # sdk/ — drive Harness runtimes from another process
 
 English | [中文](README.zh.md)

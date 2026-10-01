@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings-general
 
 [English](README.md) | 中文
@@ -14,10 +19,22 @@
 
 使用本包可为 dsh Web 客户端提供 Settings 面板、连接恢复控件、由功能包贡献的导航，以及依次进行的首次运行引导。用户可以从侧边栏打开面板、立即重试失败的连接，并在宿主为回环浏览器提供本地配置文件时访问该文件。各功能包提供自己的设置行、分区和引导步骤；本包提供共享的界面展示，但不添加引导文案或「通用」分区的内置行。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该外壳投影由注册方贡献的 `settings.section` 与 `settings.onboarding` 台账；持久值留在 Host settings namespace 中。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。
@@ -26,6 +43,17 @@
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 「通用」分区没有内置行；每一行仅在其所属功能插件挂载时出现。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

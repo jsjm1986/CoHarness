@@ -1,3 +1,8 @@
+---
+description: "Log-backed session title service and provider registry for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-title
 
 English | [中文](README.zh.md)
@@ -10,6 +15,18 @@ Only text blocks from human `user/message` events are eligible, and a text openi
 
 Use `dsh-session-title` to give each session a client-visible title from the first eligible human message, an optional asynchronous generator, or an explicit user rename. Accepted titles persist through replay, resume, and paging but never enter model input. Automatic generation never delays the main agent response, and newer title requests supersede older work. Choose the package when clients need durable titles with configurable length limits and a deliberate `refresh()` path for regenerating them.
 
+## Table of Contents
+
+- [Service: `SessionTitleService` (ctx key: `sessionTitle`)](#service-sessiontitleservice-ctx-key-sessiontitle)
+- [Configuration](#configuration)
+- [Provider contract](#provider-contract)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="service-sessiontitleservice-ctx-key-sessiontitle"></a>
 ## Service: `SessionTitleService` (ctx key: `sessionTitle`)
 
 - `get(session)` folds the latest accepted title from a live or replayed log.
@@ -21,6 +38,7 @@ Automatic work never delays the main agent response. A provider starts only afte
 
 Forks inherit title events in their seed unchanged. The first-prompt cadence does not automatically retitle a child; the all-messages cadence may append a new revision after the child receives a later human prompt.
 
+<a id="configuration"></a>
 ## Configuration
 
 All limits are required; the library supplies no defaults.
@@ -31,12 +49,14 @@ All limits are required; the library supplies no defaults.
 | `fallbackMaxBytes` | Positive maximum UTF-8 bytes in the fallback; must not exceed `maxTitleBytes`. |
 | `maxTitleBytes` | Positive maximum UTF-8 bytes accepted from any source. |
 
+<a id="provider-contract"></a>
 ## Provider contract
 
 A provider supplies a branded stable id, automatic mode (`first-prompt` or `all-prompts`), and `generate(request)`. The request carries the live session, all eligible messages through one fixed revision, the current logged main-request route when available, and cancellation. The result identifies a non-empty title, unique ordered source-message seqs from that request, and the optional provider/model route used to generate it. The service normalizes and validates the result before it becomes durable.
 
 See the [session-title data structures](../../../docs/subsystems/session-title.md) and [implemented decision](../../../.agents/notes/implemented/feature/2026-07-21-log-backed-session-titles.md).
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Session title state
@@ -57,3 +77,13 @@ None for the main request; title events do not change its reconstructed content 
 
 - Title deletion (unpinning back to automatic titles without an explicit `refresh`), search, and list indexing are outside this service.
 - The provider registry deliberately accepts at most one implementation, so a deployment cannot compose competing title strategies without writing one provider that owns their precedence.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

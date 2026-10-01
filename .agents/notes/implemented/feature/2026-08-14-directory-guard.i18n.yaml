@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-directory-guard.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-directory-guard.md
-2026-08-14-directory-guard.md: bcf9b78fc1be7731aa5ba92bd906c26fac24d2c2
-2026-08-14-directory-guard.zh.md: bcde896496c06deb8b4b1f11909adc9625660bf1
+/agent-note-dsh-directory-guard-in-instance-directory-permission-gate:
+  en: 5c74062001353601
+  zh: 4c109cc48b84e04b
+/agent-note-dsh-directory-guard-in-instance-directory-permission-gate/problem:
+  en: 57425cbd2bbf0f06
+  zh: 5fdbc781301b9330
+/agent-note-dsh-directory-guard-in-instance-directory-permission-gate/decision:
+  en: 855cbed2756e13e7
+  zh: 72c5a6bfbf3ee627
+/agent-note-dsh-directory-guard-in-instance-directory-permission-gate/boundary:
+  en: 3eec144a0ea76fa5
+  zh: 8d2360179e45a1c7
+/agent-note-dsh-directory-guard-in-instance-directory-permission-gate/alternatives-considered:
+  en: c8f1287d97c90c37
+  zh: 216f2dfc91acd29c
+/agent-note-dsh-directory-guard-in-instance-directory-permission-gate/consequences:
+  en: d42d643cde28ed01
+  zh: f5e39dccf9355450
+/agent-note-dsh-directory-guard-in-instance-directory-permission-gate/testing:
+  en: d90086edd0dc4c98
+  zh: 647ecd524a81b7a2

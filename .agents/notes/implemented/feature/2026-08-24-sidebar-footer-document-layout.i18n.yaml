@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-24-sidebar-footer-document-layout.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-sidebar-footer-document-layout.md
-2026-08-24-sidebar-footer-document-layout.md: b0134e3e8747fe55081211acdb78d1b87eb4eed4
-2026-08-24-sidebar-footer-document-layout.zh.md: 8e89da7cf859b2a9a490e2f49af94ddb46ce138c
+/agent-note-sidebar-footer-and-document-layout-hierarchy:
+  en: a8725d3992eb13bd
+  zh: 3668feb048809324
+/agent-note-sidebar-footer-and-document-layout-hierarchy/problem:
+  en: 4362cbc5b6920d2d
+  zh: 543a6d8d3dc038cd
+/agent-note-sidebar-footer-and-document-layout-hierarchy/decision:
+  en: 4f1f2e4c6089c2f7
+  zh: 025379255a40e426
+/agent-note-sidebar-footer-and-document-layout-hierarchy/alternatives-considered:
+  en: ba6cbed57e407133
+  zh: a2540f68b00aaa46
+/agent-note-sidebar-footer-and-document-layout-hierarchy/consequences:
+  en: 26afb807762d0935
+  zh: 4cc691874aec8d0b
+/agent-note-sidebar-footer-and-document-layout-hierarchy/verification:
+  en: 6f94f9405da35144
+  zh: 8bc860e78148bbf5

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings-plugin-inventory
 
 [English](README.md) | 中文
@@ -12,10 +17,22 @@ Web 设置中的只读**插件列表**标签页。浏览器插件注册一个 id
 
 **插件列表**标签页让 Web 用户查看插件，而不改变其配置。它先列 agent（智能体）预设分组，再列全局清单；分组按需展开，搜索期间保持展开。卡片保留包名作为主标题，以稳定的条目 id 标识实例，并展示启停状态、出处、运行状态、禁用条件与发现失败；由预设提供的全局条目会列出对应预设。搜索覆盖两个分组，并指出其他预设中的匹配。标签页处理加载、空结果、无匹配、失败与重试状态，且不暴露传输细节；没有预设 roster 时仍会展示全局清单。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该标签页在首次挂载时渲染一次惰性 `pluginInventory.list` Remote 读取；它不拥有清单状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该包是浏览器端清单投影，不注册任何面向模型的内容。
@@ -24,7 +41,18 @@ Web 设置中的只读**插件列表**标签页。浏览器插件注册一个 id
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **每次 Settings 挂载或重试只读取一份快照** —— 标签页不订阅 Loader 变化，也不会在重连后自动重新读取；切换标签页会保留当前快照，重新打开 Settings 则会取得新快照。
 - **只读清单** —— 可选的 preset 投影会提供组装来源，但标签页不提供 Host 插件修改控件。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # util/：底层共享工具
 
 [English](README.md) | 中文

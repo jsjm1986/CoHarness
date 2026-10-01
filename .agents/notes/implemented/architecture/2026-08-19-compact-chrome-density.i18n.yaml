@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-compact-chrome-density.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-compact-chrome-density.md
-2026-08-19-compact-chrome-density.md: 4f41ff30022ba2f375500bd3d542d12da8c62f52
-2026-08-19-compact-chrome-density.zh.md: 8354903f9999f116c6692928aef9efae15a4eb1e
+/agent-note-compact-chrome-density-for-phone-viewports:
+  en: 5f8d0c311065a828
+  zh: 68795bc2ef993caa
+/agent-note-compact-chrome-density-for-phone-viewports/problem:
+  en: 6fd081ba1d5b84d1
+  zh: 9ba4fa979d0719c1
+/agent-note-compact-chrome-density-for-phone-viewports/decision:
+  en: 6d792fa209098ab1
+  zh: bc579b7ced18595c
+/agent-note-compact-chrome-density-for-phone-viewports/alternatives-considered:
+  en: e2307ab04ba6614c
+  zh: 9b5c5229b5b22b78
+/agent-note-compact-chrome-density-for-phone-viewports/consequences:
+  en: e766ca70aeebe155
+  zh: 150af8fe95959d13

@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-16-sidebar-browser.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-16-sidebar-browser.md
-2026-09-16-sidebar-browser.md: 3fa4e1dbb70dee97dbe6052d925271d093f2877c
-2026-09-16-sidebar-browser.zh.md: 69d78dbf2b959d660c9397c7bf7634547a109a9e
+/agent-note-sandboxed-sidebar-browser:
+  en: eae586a5966353a5
+  zh: ca3a7283e3fae594
+/agent-note-sandboxed-sidebar-browser/problem:
+  en: 5236141e90e42b81
+  zh: 1af6306b20797603
+/agent-note-sandboxed-sidebar-browser/decision:
+  en: 09f4b310b6353806
+  zh: 5da881fbde10a66f
+/agent-note-sandboxed-sidebar-browser/web-navigation-states:
+  en: fc6e0b11b4e5e64b
+  zh: db1053ba73c9173a
+/agent-note-sandboxed-sidebar-browser/deferred-electron-carrier:
+  en: e0ac3ff11ddddf84
+  zh: 41f09092fea5c17b
+/agent-note-sandboxed-sidebar-browser/alternatives-considered:
+  en: 7cdad08823b00504
+  zh: 7c82a5f286d09624
+/agent-note-sandboxed-sidebar-browser/verification:
+  en: c73275e912a6c12d
+  zh: 0a6d718cff124d96
+/agent-note-sandboxed-sidebar-browser/consequences:
+  en: 92c1e25634dbcc79
+  zh: b5f78f2ccf91618d

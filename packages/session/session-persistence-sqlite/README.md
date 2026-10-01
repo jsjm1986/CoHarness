@@ -1,3 +1,8 @@
+---
+description: "SQLite durable session persistence with physical chunk-row packing"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-persistence-sqlite
 
 English | [中文](README.zh.md)
@@ -11,6 +16,18 @@ An opt-in SQLite `SessionPersistence` provider. It stores eligible `assistant/ch
 Use `dsh-session-persistence-sqlite` as an opt-in SQLite `SessionPersistence` provider: eligible `assistant/chunk` runs store in packed physical rows with selective Zstandard compression and delta-encoded source-event sequences, restoring the exact logical `SessionEvent[]`. No shipped composition selects it; a deployment mounts it explicitly with a database path.
 
 
+## Table of Contents
+
+- [Storage model](#storage-model)
+- [Schema compatibility](#schema-compatibility)
+- [Configuration (schemastery)](#configuration-schemastery)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="storage-model"></a>
 ## Storage model
 
 Schema 20 uses an integer internal session key plus the stable external `session_key`; the composite `events(session_id, seq)` primary-key index remains the physical lookup. CoHarness-only `session_extensions` stores the draft marker, and `event_extensions` stores logical `ignorable` markers, so neither meaning is overloaded onto the packed-row discriminator. Scalar rows store one logical event. Packed rows use `text-chunks`, `reasoning-chunks`, or `tool-call-chunks` as the physical `type`; `seq` and `time` identify the first represented event, and `data` holds the shared packed-chunk payload. Packed rows set `is_packed=1`; scalar rows set `is_packed=0`, with an optional `event_extensions` row for a logical ignorable event. These tags are storage records, not `SessionEventMap` members.
@@ -23,6 +40,7 @@ Each append holds `BEGIN IMMEDIATE`, validates the bounded physical tail, packs 
 
 Full reads scan physical rows in first-logical-sequence order. A reverse pass finds the last valid `turn/end` without retaining decoded copies of every physical row; the forward pass decodes and validates one physical row at a time into the returned logical event array. `readFrom(id, fromSeq)` examines packed predecessors only within the maximum row span and anchors the suffix at the earliest one that may contain `fromSeq`; this includes an event range that starts inside a packed row, detects overlapping physical corruption, and does not parse unrelated earlier scalar rows. A malformed packed row is all-or-nothing: committed corruption rejects, while a torn final row is deleted from its physical base during mutating recovery. Repair re-reads the tail under the write lock and rejects a stale marker before deleting anything. Packed `data` that exceeds the schema byte limit rejects before JSON parsing.
 
+<a id="schema-compatibility"></a>
 ## Schema compatibility
 
 A pristine database initializes directly at schema 20. Older schemas, foreign application identities, non-pristine unversioned databases, and incompatible schema objects reject at open; the runtime never upgrades a file implicitly. Use the offline tools while the process is stopped:
@@ -37,6 +55,7 @@ The input is read-only, the output must be a distinct new file, and each tool ve
 
 Session headers from format v0/v1 are a separate logical migration: the first body read updates only the metadata row to v2 in a write transaction and leaves all event rows untouched. Database schema upgrades remain offline and explicit.
 
+<a id="configuration-schemastery"></a>
 ## Configuration (schemastery)
 
 ```ts
@@ -53,6 +72,7 @@ interface Config {
 
 `journalMode` defaults to `wal`, `busyTimeoutMs` defaults to `5,000`, `preparedSessionCacheSize` defaults to `5`, `writeBatchMaxDelayMs` defaults to `200`, `maxPendingEvents` defaults to `100,000`, and `maxPendingBytes` defaults to `64 MiB`. The timeout bounds each synchronous SQLite lock wait. Because SQLite may return `SQLITE_BUSY` immediately while changing journal mode, cold open yields between attempts and starts no further attempt after an open-relative retry cutoff. An in-progress synchronous SQLite call may finish after that cutoff. The provider disables trusted schemas and memory-mapped I/O on every connection, then reads both settings back. The selected journal mode is also read back and must match; in-memory databases explicitly accept SQLite's `memory` result. After selecting the journal, the provider pins `synchronous=FULL` and verifies it so SQLite build defaults cannot weaken committed-append durability. On POSIX, the database parent and file must be owned by the current user, the parent must not be group/world-writable, and the file must have no group/world permissions. Symbolic links and non-regular files reject. Windows also rejects symbolic links and non-regular files, but deployments remain responsible for restricting the directory and file ACLs to the harness user. Path and ownership failures reject plugin initialization. Node SQLite loads lazily on the first persistence operation; the import suppresses only Node 22's exact SQLite `ExperimentalWarning`. Store-identity and schema failures reject that operation before data is exposed or mutated.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Resumed conversation history
@@ -80,3 +100,13 @@ Physical packing does not mutate request prefixes. Provider cache reuse depends 
 - **No deletion or background historical compaction** — normal appends are insert-only.
 
 **Runtime invariant:** No companion is published. Physical packing is observable only by database round-trip and row-count checks, not a continuous in-process relation.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

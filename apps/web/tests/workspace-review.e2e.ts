@@ -81,7 +81,7 @@ describe('web e2e: delivered files and historical review', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-workspace-review'))
     const tripwire = watchConsole(page)
     const summaryResponse = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/workspaceChanges.summary'))
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     const summaryWire: unknown = await (await summaryResponse).json()
     expect(summaryWire, JSON.stringify(summaryWire)).toMatchObject({ result: { ok: true, value: { files: [{ path: 'review.txt' }] } } })
     await page.getByText('The review file is ready.', { exact: true }).waitFor()

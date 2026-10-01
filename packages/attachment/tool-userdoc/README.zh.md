@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-userdoc
 
 [English](README.md) | 中文
@@ -9,10 +14,24 @@
 使用 `dsh-tool-userdoc` 让代理获得面向个人文档工作区的 `userdoc_list` 与 `userdoc_read` 工具。代理可以列出文件夹并读取文档文本，使用的是与浏览器文档管理器相同的存储，无需单独的检索通道。本包只注册工具与提示词指引，不改变 agent 循环、存储提供方或文档 HTTP 路由。
 
 
+## 目录
+
+- [安装](#installation)
+- [工具](#tools)
+- [配置](#configuration)
+- [扩展点](#extension-points)
+- [模型体验](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="installation"></a>
 ## 安装
 
 将此函数插件挂载到已经提供 `ctx.userDocs`、`ctx.tools` 和 `ctx.systemPrompt` 的 Agent preset。随附 Web 的 `standard`、`ptc` 与 `cordis` preset 都包含该行；最小 preset 可以省略它，使个人文档不进入其工具目录。
 
+<a id="tools"></a>
 ## 工具
 
 `userdoc_list` 以有界元数据行返回个人文档。可选的 `query` 对文档名称或根相对 id 做不区分大小写的匹配；`directory` 把结果限制在根相对文件夹内；`offset` 与 `limit` 用于继续较大的结果。输出包含文档 id、显示名称、文件夹、字节数、媒体类型和修改时间，但绝不包含主机绝对路径。
@@ -25,6 +44,7 @@
 
 该包导出 `USERDOC_NOT_TEXT_CODE`、`USERDOC_PERSONAL_SCOPE_UNAVAILABLE_CODE`、`USERDOC_TOOL_NO_AGENT_CODE` 和 `USERDOC_TOOL_FAILED_CODE`，调用方可以据此路由错误而无需解析消息。
 
+<a id="configuration"></a>
 ## 配置
 
 | 键 | 默认值 | 含义 |
@@ -37,9 +57,11 @@
 
 这些值是部署配置，不由模型控制。格式化之后的完整结果仍然有界，包括多字节名称和文档内容。
 
+<a id="extension-points"></a>
 ## 扩展点
 
 该包是现有 `UserDocStore` 接缝的 Consumer。未来的项目范围或远程实现应新增独立的文档来源 Service Definition 与 Provider，负责解析已认证的作用域，然后复用此处的工具职责，不暴露 Gateway URL 或主机路径。浏览器管理仍由 `@deepseek-ai/dsh-host-userdoc-http` 与 `@deepseek-ai/dsh-client-ui-documents` 负责。
+
 
 ## 模型体验
 
@@ -91,6 +113,7 @@ Personal documents are a persistent user-owned workspace. When a user refers to 
 
 每次调用与结果都是可复用提示词前缀之后的追加式工具往返；后续的列取或读取不会使更早的 KV-cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
 - 此 Consumer 只暴露当前运行时的个人存储；从共享项目运行时读取私有文档需要单独的已认证 Gateway Provider 与明确的隐私策略。
@@ -99,3 +122,15 @@ Personal documents are a persistent user-owned workspace. When a user refers to 
 - 该包只读。保存、编辑、版本管理和本机打开需要独立的模型侧或 Host Consumer，并各自定义审批与并发约定。
 
 **运行时不变式：** 不发布伴生入口。本包只拥有工具与提示词注册；执行结果与存储约束由其所属接缝验证。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>
+
+<a id="model-experience"></a>

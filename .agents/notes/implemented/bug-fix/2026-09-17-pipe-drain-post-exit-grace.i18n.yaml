@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-pipe-drain-post-exit-grace.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-pipe-drain-post-exit-grace.md
-2026-09-17-pipe-drain-post-exit-grace.md: e19fc488180d52ab33ddd1971b8ae62cc1f154a8
-2026-09-17-pipe-drain-post-exit-grace.zh.md: 31fbde0ce89fb46b66dae049b12d3fad778b6e8e
+/agent-note-pipe-drain-is-bounded-after-the-child-exits:
+  en: 1fd5af54cb0a605a
+  zh: 624c714f36f86946
+/agent-note-pipe-drain-is-bounded-after-the-child-exits/problem:
+  en: 38482b03cf7ce1b6
+  zh: 266c5d5143bebfae
+/agent-note-pipe-drain-is-bounded-after-the-child-exits/decision:
+  en: bc23706564f91cce
+  zh: f2289cd4e1f3efad
+/agent-note-pipe-drain-is-bounded-after-the-child-exits/alternatives-considered:
+  en: 38422130f142a173
+  zh: 4b89b9826202cce1
+/agent-note-pipe-drain-is-bounded-after-the-child-exits/consequences:
+  en: fdd5d3c009820a94
+  zh: f7b97c830887de67
+/agent-note-pipe-drain-is-bounded-after-the-child-exits/verification:
+  en: 0b15455ec754b8fe
+  zh: 09f9ffa451a66915

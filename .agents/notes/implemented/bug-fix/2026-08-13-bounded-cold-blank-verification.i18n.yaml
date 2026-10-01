@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-13-bounded-cold-blank-verification.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-13-bounded-cold-blank-verification.md
-2026-08-13-bounded-cold-blank-verification.md: 6904cabc9b1ec7944a455f6a56ad9a531e7ad8f7
-2026-08-13-bounded-cold-blank-verification.zh.md: a5a0ba79b3620b3baa1dfb3f642b9198ef34c0e4
+/agent-note-bound-cold-blank-session-verification:
+  en: 9beebe09717933c5
+  zh: b1ba1b3af8ec4f2b
+/agent-note-bound-cold-blank-session-verification/problem:
+  en: 2322409feac31cda
+  zh: 5a97062e95fdcadd
+/agent-note-bound-cold-blank-session-verification/decision:
+  en: 240f6072e4d4d0ed
+  zh: cf0ab9d97c9aa3b0
+/agent-note-bound-cold-blank-session-verification/alternatives-considered:
+  en: 1b807881da4de6bb
+  zh: f99635636c233e15
+/agent-note-bound-cold-blank-session-verification/consequences:
+  en: 0facdc401423f1b0
+  zh: 40b7307bebb1b654

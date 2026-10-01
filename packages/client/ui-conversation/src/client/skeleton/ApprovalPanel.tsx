@@ -21,7 +21,9 @@ import css from './ApprovalPanel.module.css'
 
 /** Extract the shell command from an approval's paired running call (bash-family args carry `command`); undefined hides the line. */
 export function commandOf(call: RunningToolCall | undefined): string | undefined {
-  if (call === undefined) return undefined
+  // A preparing call's arguments are still streaming; the paired command line
+  // appears only once the dispatched call exists.
+  if (call === undefined || call.phase !== 'start') return undefined
   try {
     const args = JSON.parse(call.argsRaw) as Record<string, unknown>
     return typeof args.command === 'string' ? args.command : undefined

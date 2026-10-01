@@ -22,10 +22,18 @@ import type {
 import type { CommandContribution, CommandDecoration, CommandUiContract } from './contract.ts'
 import type { CommandDescriptor } from './directory.ts'
 import { CommandDirectory } from './directory.ts'
+import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import { PopupSelectController } from './popup.ts'
 import { builtinRowFace, sectionRows } from './presentation.ts'
 import { claimToken } from './resolution.ts'
 import type { TokenSegment } from './popup.ts'
+
+declare module '@deepseek-ai/dsh-client-runtime/client' {
+  interface SessionReferenceSourceMap {
+    /** A command-catalog fetch waiting for initial history and its RPC result. */
+    commandCatalog: true
+  }
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -56,79 +64,6 @@ interface LiveState {
   readonly popups: Map<SessionId, PopupSelectController<ClientSessionContext>>
 }
 
-/** One fuzzy match with its stable source position. */
-interface RankedCandidate {
-  readonly candidate: InputTriggerCandidate
-  readonly index: number
-  readonly prefix: boolean
-  readonly score: number
-}
-
-/** Extra weight for command-name starts and separator boundaries. */
-function boundaryBonus(name: string, index: number): number {
-  return index === 0 || name.charAt(index - 1) === '-' || name.charAt(index - 1) === '_' ? 8 : 0
-}
-
-/**
- * Score the strongest ordered-subsequence alignment in O(name × query).
- * Boundary and adjacent matches earn weight; skipped and leading characters
- * cost weight.
- */
-function fuzzyScore(name: string, query: string): number | undefined {
-  if (query === '') return 0
-  if (query.length > name.length) return undefined
-  const noMatch = Number.NEGATIVE_INFINITY
-  let previous = Array<number>(name.length).fill(noMatch)
-  for (let index = 0; index < name.length; index++) {
-    if (name.charAt(index) === query.charAt(0)) previous[index] = 1 + boundaryBonus(name, index) - index
-  }
-  for (let queryIndex = 1; queryIndex < query.length; queryIndex++) {
-    const current = Array<number>(name.length).fill(noMatch)
-    let bestGapped = noMatch
-    for (let index = 0; index < name.length; index++) {
-      const gappedIndex = index - 2
-      if (gappedIndex >= 0) {
-        const prior = previous[gappedIndex] ?? noMatch
-        if (prior !== noMatch) bestGapped = Math.max(bestGapped, prior + gappedIndex)
-      }
-      if (name.charAt(index) !== query.charAt(queryIndex)) continue
-      const bonus = 1 + boundaryBonus(name, index)
-      const adjacent = index > 0 ? previous[index - 1] ?? noMatch : noMatch
-      if (adjacent !== noMatch) current[index] = adjacent + bonus + 4
-      if (bestGapped !== noMatch) current[index] = Math.max(current[index] ?? noMatch, bestGapped + bonus + 1 - index)
-    }
-    previous = current
-  }
-  let best = noMatch
-  for (const score of previous) best = Math.max(best, score)
-  return best === noMatch ? undefined : best
-}
-
-/** Case-insensitive fuzzy filtering with stable ordering for equal matches. */
-function fuzzyCandidates(candidates: readonly InputTriggerCandidate[], rawQuery: string): readonly InputTriggerCandidate[] {
-  const query = rawQuery.toLowerCase()
-  if (query === '') return candidates
-  const ranked: RankedCandidate[] = []
-  candidates.forEach((candidate, index) => {
-    const name = candidate.name.toLowerCase()
-    const label = candidate.label?.toLowerCase()
-    const nameScore = fuzzyScore(name, query)
-    const labelScore = label === undefined ? undefined : fuzzyScore(label, query)
-    const score = Math.max(nameScore ?? Number.NEGATIVE_INFINITY, labelScore ?? Number.NEGATIVE_INFINITY)
-    if (score !== Number.NEGATIVE_INFINITY) {
-      ranked.push({
-        candidate,
-        index,
-        prefix: name.startsWith(query) || label?.startsWith(query) === true,
-        score,
-      })
-    }
-  })
-  ranked.sort((left, right) =>
-    Number(right.prefix) - Number(left.prefix) || right.score - left.score || left.index - right.index)
-  return ranked.map(match => match.candidate)
-}
-
 /** Command surface: session-keyed directory + '/' source + contribution registry + per-session popups. */
 export class CommandUiRuntime extends Service implements CommandUiContract {
   static inject = ['inputTriggers', 'sessions', 'remote', 'remote.commands']
@@ -148,10 +83,20 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     if (locale === undefined) throw new Error('ui-commands: locale service unavailable')
     this.t = locale.bind('command')
     this.directory = new CommandDirectory(async (sessionId) => {
-      if (this.sessions().subagentAddress(sessionId) !== undefined) return []
-      const result = await ctx.remote.commands.list(sessionId)
-      if (!result.ok) throw new Error(`command.list failed: ${result.error.code}: ${result.error.message}`)
-      return result.value
+      const sessions = this.sessions()
+      if (sessions.subagentAddress(sessionId) !== undefined) return []
+      if (sessions.binding(sessionId) === undefined) {
+        throw new Error(`command catalog requires a retained session "${sessionId}"`)
+      }
+      return sessions.using(sessionId, { source: 'commandCatalog' }, async (reference) => {
+        const state = reference.binding.session.getSnapshot()
+        if (state.openState !== 'open') {
+          throw new Error(state.openError?.message ?? `session "${sessionId}" is not open`, { cause: state.openError })
+        }
+        const result = await ctx.remote.commands.list(sessionId)
+        if (!result.ok) throw new Error(`command.list failed: ${result.error.code}: ${result.error.message}`)
+        return result.value
+      })
     })
     const inputTriggers = ctx.get('inputTriggers')
     if (inputTriggers === undefined) throw new Error('ui-commands: slash service unavailable')
@@ -283,7 +228,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
       })
     }
     const visible = rows.filter(c => req.position === 'leading' || c.hint === undefined)
-    return req.query === '' ? sectionRows(visible, this.t) : fuzzyCandidates(visible, req.query)
+    return req.query === '' ? sectionRows(visible, this.t) : rankByName(visible, req.query)
   }
 
   /** Decision table, menu column: contribution/decorated-host → popup; host input → claim; host bare → detached execute. */

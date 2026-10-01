@@ -41,7 +41,7 @@ kind: "package-reference"
 <details>
 <summary>实现内幕——点击展开</summary>
 
-插件经标准 slot/inject 通货把分体按钮注册到 `conversation.session.header.utilities`，并以一个 effect 注册 `open-in-app` 词典。一个页面生命周期的 controller（[`src/client/controller.ts`](src/client/controller.ts)）拥有每页一次的可用性读取、持久化选择的 snapshot store 与启动 POST；组件经 inject 的 `hooks` 隔间接收两个 store，因此所有会话头部共享同一份事实。路由路径与 wire 载荷类型从主机包的浏览器安全子路径 `@deepseek-ai/dsh-host-open-in-app/shared` 内联。飞行中的启动由 ref 守卫——启动期间的重复点击与菜单选择被整体忽略（否则会持久化一个该手势从未打开的选择）——busy/error 视觉由围绕 `launch` promise 的定时器驱动。节点半边是一个空 `apply`，让插件出现在主机侧的插件名册上。
+插件经标准 slot/inject 通货把分体按钮注册到 `conversation.session.header.utilities`，并以一个 effect 注册 `open-in-app` 词典。一个页面生命周期的 controller（[`src/client/controller.ts`](src/client/controller.ts)）拥有每页一次的可用性读取、持久化选择的 snapshot store 与启动 POST；组件经 inject 的 `hooks` 隔间接收两个 store，因此所有会话头部共享同一份事实。文档相对的路由形式与 wire 载荷类型从主机包的浏览器安全子路径 `@deepseek-ai/dsh-host-open-in-app/shared` 内联。飞行中的启动由 ref 守卫——启动期间的重复点击与菜单选择被整体忽略（否则会持久化一个该手势从未打开的选择）——busy/error 视觉由围绕 `launch` promise 的定时器驱动。节点半边是一个空 `apply`，让插件出现在主机侧的插件名册上。
 
 </details>
 
@@ -56,6 +56,9 @@ kind: "package-reference"
 
 -----
 
+
+**运行时不变量：** 不发布 companion。插件注册一个词典 effect 与一个头部 slot 条目，HMR 安全测试已证明其可处置；可用性与选择存于 controller 的 snapshot store，没有可能分叉的第二份副本。
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -65,6 +68,7 @@ kind: "package-reference"
 
 无；本包从不组装或发送 provider 请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -81,5 +85,3 @@ kind: "package-reference"
 功能层面的各项决定，包括拆分为主机包与本表面包，记录在[转正 Agent Note](../../../.agents/notes/implemented/architecture/2026-09-08-upstream-alpha2-selective-sync.zh.md)。
 
 </details>
-
-**运行时不变量：** 不发布 companion。插件注册一个词典 effect 与一个头部 slot 条目，HMR 安全测试已证明其可处置；可用性与选择存于 controller 的 snapshot store，没有可能分叉的第二份副本。

@@ -11,14 +11,15 @@
  * @module @deepseek-ai/dsh-subagent-in-process-driver
  */
 
-import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import { foldConsumedWork } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
-import { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
-import type { SessionEvent, SessionLogOffset as SessionLogOffsetType, TurnEndReason } from '@deepseek-ai/dsh-session'
+import { SessionLogOffset } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, SessionId, SessionLogOffset as SessionLogOffsetType, TurnEndReason } from '@deepseek-ai/dsh-session'
 import { createUserMessage, MessageId, type ContentBlock } from '@deepseek-ai/dsh-llm'
+import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import {
   appendDelegatedPolicyOverrides,
   applyChildComposition,
@@ -110,7 +111,7 @@ export async function startInProcessRun(
   const parent = request.parent
   const childDepth = resolveChildDepth(parent, request.maxDepth)
 
-  const childId = SessionId(randomUUID())
+  const childId = brandString<SessionId>(randomUUID())
   const seed = options.seed
   const activationBoundary = SessionLogOffset(seed?.length ?? 0)
 
@@ -232,7 +233,7 @@ function readResult(
   // `error` through `toStopReason(undefined)`, which never overstates success.
   const lastEnd = foldConsumedWork(own).end
   // The seam's canonical selection rule; a partial answer survives cancel and truncation.
-  const output: ContentBlock[] = finalAssistantOutput(own) ?? []
+  const output: readonly ContentBlock[] = finalAssistantOutput(own) ?? []
   const recorded = toStopReason(lastEnd?.data.reason)
   // Disposal can tear the owner down before the loop records its ordinary
   // `aborted` end, yielding `disposed` instead.

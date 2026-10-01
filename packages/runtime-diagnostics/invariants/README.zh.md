@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # dsh-invariants
 
 [English](README.md) | 中文
@@ -8,6 +13,19 @@
 
 `dsh-invariants` 在 DeepSeek Harness 组合中运行包自有的运行时检查——不变量：任何包都可以发布一个 `./invariant` 配套入口，在组合运行期间验证其自身的持久关系（权威事件流与可变快照）。检查自动运行，失败的检查会报告归因到拥有被违反关系的包的 `InvariantError`。需要带全局开关与包名过滤器的自检诊断时选择它；标准 agent（智能体）组合已挂载它及四个核心配套入口，而单独加载服务不会安装任何检查。
 
+## 目录
+
+- [服务：`InvariantRegistry`（`ctx.invariants`）](#service-invariantregistry-ctxinvariants)
+- [包配套入口](#package-companions)
+- [组合](#composition)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="service-invariantregistry-ctxinvariants"></a>
 ## 服务：`InvariantRegistry`（`ctx.invariants`）
 
 ```ts
@@ -30,6 +48,7 @@ interface Config {
 
 在每个组合中，Session 自身负责不可变且在对外接口层面有效的日志存储：它对每个候选项制作一份无损 JSON 快照，验证引用的源事件是否齐全以及位置替换是否合法，将 `tool/result` 替换限制为一个当前结果的 `content`，深度冻结已接受记录，并通过不可变数组快照公开日志。`dsh-session` 不变量配套入口检查 Session 不负责的其余跨记录规则。
 
+<a id="package-companions"></a>
 ## 包配套入口
 
 发布和注册覆盖全部包；但不会为了覆盖全部包而人为编造运行时断言。只有当包拥有可观察事件关系或相关可变数据关系时，配套入口才安装检查。确认必需方法、插件名称、注入、effect 或固定纯函数结果属于类型、加载或单元测试关注点，而非运行时不变量。
@@ -53,6 +72,7 @@ interface Config {
 
 `pnpm run verify-package-invariants` 发现全部工作区包。它拒绝生成标记、未说明的空 installer、省略或忽略 reporter 的非空 installer、错误注册名称，以及不完整的导出、发布、依赖、TypeScript 引用或 bundle 接线。该源码规则是最低归属检查；聚焦测试证明每个可执行配套入口的语义。
 
+<a id="composition"></a>
 ## 组合
 
 ```ts
@@ -74,10 +94,13 @@ ctx.plugin(SessionInvariant)
 
 每个普通 Vitest 拓扑都挂载显式启用的服务和当前测试包的配套入口。聚焦套件覆盖可执行配套入口的合法与违规观测，一个穷尽拓扑则挂载全部配套入口，以证明注册和 dispose 接线。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。本包是评估其他包配套入口的注册表；它自身不断言产品域关系。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。作为观察者，本包验证请求但从不改写其上下文。
@@ -86,8 +109,19 @@ ctx.plugin(SessionInvariant)
 
 检查只观察已组装的请求与持久状态，不修改请求内容，因此提供方缓存复用与底层组合产生的结果完全一致。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 请求重建覆盖 loop 在冻结前显式标记的请求；直接一次性 LLM（大语言模型）调用即使由调用方冻结或附加会话 id，仍不在该标记约定内。
 - 仅实时生命周期配套入口无法重建自身重新加载前开始的操作。标准组合和测试组合会在相应操作开始前挂载它们。
 - 正则表达式过滤器在服务生命周期内固定；更改它们需要执行普通 Cordis 插件重新加载。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

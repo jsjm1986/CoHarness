@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-experimental-package-name-prefix.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-experimental-package-name-prefix.md
-2026-08-19-experimental-package-name-prefix.md: 3420fa20a0dd9519af5684142fc8f3e70f2ed779
-2026-08-19-experimental-package-name-prefix.zh.md: b7e7d073157eab272baed4ffb75f987a685f53d7
+/agent-note-mark-experimental-packages-in-npm-names:
+  en: 723e4f3f029d420e
+  zh: d0aeb4facf612547
+/agent-note-mark-experimental-packages-in-npm-names/problem:
+  en: e40a585177378dcc
+  zh: d925dee2fcacd936
+/agent-note-mark-experimental-packages-in-npm-names/decision:
+  en: e010e94efa429d24
+  zh: 96e644312b980780
+/agent-note-mark-experimental-packages-in-npm-names/alternatives-considered:
+  en: 306efc6a093492c0
+  zh: 24128651e3ceb89b
+/agent-note-mark-experimental-packages-in-npm-names/consequences:
+  en: b01a9e59699e68a1
+  zh: 79f29dd1fd435413

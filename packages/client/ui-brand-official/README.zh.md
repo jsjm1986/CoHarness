@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-brand-official
 
 [English](README.md) | 中文
@@ -10,10 +15,22 @@
 
 本包让以 `official` profile 构建的客户端在侧栏显示 DeepSeek Harness 标志与名称。其他构建 profile 保留外壳的鱼形标志与本地构建标签，会话首屏则始终使用动画鱼。品牌为 DeepSeek Harness 的部署应选择本包；使用其他品牌的部署应提供替代品牌包。本包不保留运行时状态，也不影响模型请求。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。插件在构建标志下以静态占位内容填充品牌 slot，除此之外不注册任何内容；它不拥有可变状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为本包只贡献浏览器呈现；这里没有任何内容进入模型请求。
@@ -22,7 +39,18 @@
 
 无；本包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **本包只提供一组 occupant** —— 其他呈现应由占用相同 slot 的另一个 Cordis 包提供。
 - **浏览器标题相互独立** —— `DSH_CLIENT_TITLE` 在构建期选择标题文字，而不经过 UI slot。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

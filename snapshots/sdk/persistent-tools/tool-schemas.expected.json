@@ -24,6 +24,7 @@
         "properties": {
           "files": {
             "type": "array",
+            "description": "Usually the 1-2 most important deliverables; at most 4 per call.",
             "items": {
               "type": "object",
               "additionalProperties": false,

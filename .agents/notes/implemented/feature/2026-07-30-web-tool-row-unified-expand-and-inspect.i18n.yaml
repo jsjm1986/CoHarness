@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-web-tool-row-unified-expand-and-inspect.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-web-tool-row-unified-expand-and-inspect.md
-2026-07-30-web-tool-row-unified-expand-and-inspect.md: 2223f8fbfa40b95fe7eca5a3e19d7fec08468103
-2026-07-30-web-tool-row-unified-expand-and-inspect.zh.md: e7582534c5a59e4fac14953ace12c5f80ae29c4a
+/agent-note-web-tool-row-unified-expand-and-trajectory-inspect:
+  en: d8c3dfa0bed52069
+  zh: 555c04ab1cd3d503
+/agent-note-web-tool-row-unified-expand-and-trajectory-inspect/problem:
+  en: d84f0a9eedd06dbb
+  zh: 794a6700decf11de
+/agent-note-web-tool-row-unified-expand-and-trajectory-inspect/decision:
+  en: 9929177dddbcee7d
+  zh: fad4b4576c9c3664
+/agent-note-web-tool-row-unified-expand-and-trajectory-inspect/alternatives-considered:
+  en: a13a61ad439f8864
+  zh: 0ba3314e91107af1
+/agent-note-web-tool-row-unified-expand-and-trajectory-inspect/consequences:
+  en: 8b20ded0b4966a32
+  zh: f2b3b0d36f5e6b08

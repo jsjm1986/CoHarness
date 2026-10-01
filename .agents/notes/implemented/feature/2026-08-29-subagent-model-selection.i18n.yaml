@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-29-subagent-model-selection.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-29-subagent-model-selection.md
-2026-08-29-subagent-model-selection.md: cae37b8b0ec2222f89f5dd96856fcbf16c1d564d
-2026-08-29-subagent-model-selection.zh.md: 27b7a358000a38eac2a03eceb9563a40a9031549
+/agent-note-authorize-selectable-child-model-routes-at-session-start:
+  en: 9052cecb9a216a84
+  zh: 4e4183738f8e8597
+/agent-note-authorize-selectable-child-model-routes-at-session-start/problem:
+  en: 691bfa78ccf7d6c7
+  zh: 2621a632e1aabdfc
+/agent-note-authorize-selectable-child-model-routes-at-session-start/decision:
+  en: e6b8e0f8f126ef20
+  zh: 685fb626062824e1
+/agent-note-authorize-selectable-child-model-routes-at-session-start/alternatives-considered:
+  en: 1f5163761908e458
+  zh: 00a9cedc68674bcb
+/agent-note-authorize-selectable-child-model-routes-at-session-start/consequences:
+  en: a0e38ed4a8db9df1
+  zh: 0cbf8c69215e7810
+/agent-note-authorize-selectable-child-model-routes-at-session-start/testing:
+  en: bd2fecb1b24e36ab
+  zh: a47a06b7e599e754

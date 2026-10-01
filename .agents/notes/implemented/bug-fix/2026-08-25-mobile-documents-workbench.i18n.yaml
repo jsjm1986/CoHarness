@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-mobile-documents-workbench.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-mobile-documents-workbench.md
-2026-08-25-mobile-documents-workbench.md: 07b42bd688ed1fd449a623d2bd29b5db02a89995
-2026-08-25-mobile-documents-workbench.zh.md: d4b1e174d64c225d98a01d3aff90ac5d2b054501
+/agent-note-compact-document-workbench-uses-task-focused-sheets:
+  en: d5abcf68e0b5d401
+  zh: 26036bdb45b415b4
+/agent-note-compact-document-workbench-uses-task-focused-sheets/problem:
+  en: dee8c13261c8eae0
+  zh: 51e24d524df99da8
+/agent-note-compact-document-workbench-uses-task-focused-sheets/decision:
+  en: 2a45381922a79292
+  zh: cd2a2e4ba3259706
+/agent-note-compact-document-workbench-uses-task-focused-sheets/alternatives-considered:
+  en: 9bd178cd269fc666
+  zh: 34c2552bb0bd08a1
+/agent-note-compact-document-workbench-uses-task-focused-sheets/consequences:
+  en: 91e0e0dd24079f1f
+  zh: 053c5862c642df77
+/agent-note-compact-document-workbench-uses-task-focused-sheets/verification:
+  en: 348d89c3b8d7f4b1
+  zh: 9e8e91f7f5f6a933

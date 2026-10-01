@@ -1,3 +1,8 @@
+---
+description: "ACP automation server app: agent spine + JSONL persistence + ACP transport, with a JSON-RPC stdio bin"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-acp-demo
 
 English | [中文](README.zh.md)
@@ -9,6 +14,19 @@ ACP automation server app: the default agent spine, client-created agents throug
 Use `dsh-acp-demo` as the ACP automation server app: the default agent spine, client-created agents through `dsh-acp`, JSONL persistence, and semantic checkpointing behind one JSON-RPC stdio bin. Programmatic clients create fresh sessions; the package mounts no human UI.
 
 
+## Table of Contents
+
+- [Composition](#composition)
+- [Config](#config)
+- [Bin](#bin)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="composition"></a>
 ## Composition
 
 | Plugin | Role |
@@ -21,6 +39,7 @@ Use `dsh-acp-demo` as the ACP automation server app: the default agent spine, cl
 
 The app does not install commands, user interaction, session navigation, configuration pickers, or a stdout logger. It owns these plugins through one ordered effect so the query service is ready before ACP accepts work and ACP sessions quiesce before checkpointing and persistence detach. Leaf configurations supply LLM, executor, sandbox, approval, filesystem, and model-facing tool plugins.
 
+<a id="config"></a>
 ## Config
 
 | Key | Default | Routed to |
@@ -44,14 +63,17 @@ The app does not install commands, user interaction, session navigation, configu
 
 The shipped [`examples/acp-agent/cordis.yml`](../../../examples/acp-agent/cordis.yml) adds the DeepSeek adapter, sandboxed bash and filesystem providers, one-shot approval policy, compaction, subagents, workflows, hooks, and model-facing tools. The app supplies the derived session-query index, while the model-facing query consumer remains an explicit leaf opt-in. Snapshot overlays replace only nondeterministic providers or policy values.
 
+<a id="bin"></a>
 ## Bin
 
 `dsh-acp-demo [--config path-to-cordis.yml]` (short form `-c`; default `./cordis.yml`) loads the gitignored `.env`, except in replay mode; `DSH_SNAPSHOT=replay` selects the sibling `cordis.snapshot.yml`; stdin EOF disposes the context and flushes sessions before exit. Loader's installed optional `node-addon-require-builtin` peer resolves bare plugin specifiers for the built bin under plain Node. Diagnostics use stderr because stdout is the ACP wire.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The demo wires existing plugins behind one bin; session state belongs to the composed runtime and the ACP server package.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through dsh-agent-spine-demo and dsh-acp, which own request composition for the bundle.
@@ -65,3 +87,13 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **JSONL persistence is fixed** — a different backend requires another composition.
 - **Sibling plugins can corrupt stdout** — the app cannot prevent another entry from writing non-protocol bytes.
 - **Fresh automation sessions only** — resume and human interaction belong to other entry points.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

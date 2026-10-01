@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-plan-review-presentation-intent.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-plan-review-presentation-intent.md
-2026-07-30-plan-review-presentation-intent.md: 5bbd1ffc974563589449d43a761039fb4dc84b03
-2026-07-30-plan-review-presentation-intent.zh.md: cd0b8c407523eb0a811eb76878962f932f3dcec9
+/agent-note-plan-review-as-a-decision-not-a-question:
+  en: f9c583ef67fb09fc
+  zh: dce52aa262ead18b
+/agent-note-plan-review-as-a-decision-not-a-question/problem:
+  en: 3d1cc26206377ce8
+  zh: 5c93f241b58bd2e1
+/agent-note-plan-review-as-a-decision-not-a-question/decision:
+  en: 7218193c85e40f43
+  zh: 68d5cf2441b7857d
+/agent-note-plan-review-as-a-decision-not-a-question/alternatives-considered:
+  en: 638027612778609b
+  zh: 4240d0233cb4a325
+/agent-note-plan-review-as-a-decision-not-a-question/consequences:
+  en: aef697eaf0e2e8d5
+  zh: e60faf3d29531115
+/agent-note-plan-review-as-a-decision-not-a-question/testing:
+  en: 0f868665aabee1d5
+  zh: f9386d4a7a50546f

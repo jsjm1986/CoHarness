@@ -34,7 +34,7 @@ class MockCompletionHandler(BaseHTTPRequestHandler):
         self.end_headers()
         text = "SDK runtime reached the configured HTTP model endpoint."
         events = [
-            {"type": "message_start", "message": {"id": "smoke", "model": "sdk-smoke-model", "usage": {"input_tokens": 7, "output_tokens": 0}}},
+            {"type": "message_start", "message": {"id": "sdk-smoke", "model": "sdk-smoke-model", "usage": {"input_tokens": 7, "output_tokens": 0}}},
             {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
             {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": text}},
             {"type": "content_block_stop", "index": 0},
@@ -55,7 +55,7 @@ def run_smoke(repo_root: Path, keep_sessions: bool) -> None:
     session_root = dsh_home / "sessions"
     runtime_entry = repo_root / "apps/cli/src/bin.ts"
     server = ThreadingHTTPServer(("127.0.0.1", 0), MockCompletionHandler)
-    thread = threading.Thread(target=server.serve_forever, name="mock-openai-compatible-server", daemon=True)
+    thread = threading.Thread(target=server.serve_forever, name="mock-messages-server", daemon=True)
     thread.start()
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
 
@@ -97,6 +97,7 @@ def run_smoke(repo_root: Path, keep_sessions: bool) -> None:
         assert "configured HTTP model endpoint" in result.final_response
         assert len(MockCompletionHandler.requests) == 1
         request = MockCompletionHandler.requests[0]
+        print(json.dumps(request, ensure_ascii=False, indent=2)[:4000])
         assert request["path"] == "/v1/messages"
         assert request["api_key"] == "sdk-smoke-key"
         assert request["body"]["model"] == "sdk-smoke-model"

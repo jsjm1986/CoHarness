@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-30-extensible-client-locale.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-30-extensible-client-locale.md
-2026-08-30-extensible-client-locale.md: ba5bae368a7a2330da70c54647bc1e549aae0405
-2026-08-30-extensible-client-locale.zh.md: f98431971ebd268ef0d0aed3a4b1320a4918d67c
+/agent-note-let-client-language-packs-extend-the-locale-catalog:
+  en: b1dacedc409f15fe
+  zh: c0eb7a9a0eb3b0b3
+/agent-note-let-client-language-packs-extend-the-locale-catalog/problem:
+  en: a5d504e8c7405deb
+  zh: 7120a3c841d56654
+/agent-note-let-client-language-packs-extend-the-locale-catalog/decision:
+  en: bec246f1a6640182
+  zh: 8f9e7bad02799ad8
+/agent-note-let-client-language-packs-extend-the-locale-catalog/alternatives-considered:
+  en: 291d3772adc81541
+  zh: f5389a181f916a7d
+/agent-note-let-client-language-packs-extend-the-locale-catalog/consequences:
+  en: 2b31c4d259b7f3ec
+  zh: 8961b7c0a8ff2d09
+/agent-note-let-client-language-packs-extend-the-locale-catalog/testing:
+  en: 3b4f2e6efcd80ea5
+  zh: d5af564454df2d55

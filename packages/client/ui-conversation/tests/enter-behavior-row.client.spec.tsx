@@ -16,13 +16,13 @@ afterEach(() => {
 
 function emptySessions() {
   return bindSnapshotSelector(createSnapshotStore<SessionListState>({
-    ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+    ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   }))
 }
 
 function emptyWorkspaces() {
   return bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({
-    items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+    items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
     baselinesReady: true, recentWorkspaceId: undefined,
   }))
 }

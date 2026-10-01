@@ -29,7 +29,7 @@ kind: "package-reference"
 
 调用方通过 `ctx.officeToPdf.convert()` 提交已授权源的标识、版本、可选字节数、延迟的有界读取、Office 扩展名和调度优先级。源版本变化会拒绝转换。结果包含调用方拥有的 PDF 字节、缺失字体、缓存键和转换 generation；配置替换后 generation 随之改变。取消以原因为拒绝值，转换失败使用 `OfficeToPdfError`。
 
-此 provider 依赖独立发布的 [`@deepseek-ai/libreoffice-kit`](https://github.com/deepseek-harness/libreoffice-kit/tree/main/packages/entry) npm API，kit 版本为 `0.0.1`。应用打包选择 kit 的 `optionalDependencies` 中声明的匹配原生包；目标没有声明原生包时选择 WASM。已声明的原生引擎缺失时拒绝打包，不会选择 WASM。[平台引擎决策](../../../.agents/notes/implemented/architecture/2026-09-15-platform-office-engines.zh.md)定义安装与打包策略；[发布归属决策](../../../.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.zh.md)定义独立 kit 与 Harness 各自的职责。
+此 provider 依赖独立发布的 [`@deepseek-ai/libreoffice-kit`](https://github.com/deepseek-harness/libreoffice-kit/tree/main/packages/entry) npm API，kit 版本为 `0.1.1`。应用打包选择 kit 的 `optionalDependencies` 中声明的匹配原生包；目标没有声明原生包时选择 WASM。已声明的原生引擎缺失时拒绝打包，不会选择 WASM。[平台引擎决策](../../../.agents/notes/implemented/architecture/2026-09-15-platform-office-engines.zh.md)定义安装与打包策略；[发布归属决策](../../../.agents/notes/implemented/architecture/2026-09-14-independent-libreoffice-kit.zh.md)定义独立 kit 与 Harness 各自的职责。
 
 Linux WASM 部署需要 kit 默认目录或 `fontDirectories` 中存在可用字体；没有字体的镜像会以 `unavailable` 失败。发行版的 DejaVu、Noto CJK 等字体包可提供拉丁文字及中日韩渲染支持。仅安装引擎并不能证明具备文档渲染能力。
 
@@ -80,6 +80,7 @@ ApiProxy 文件读取器负责请求授权与取消；转换器负责已准入�
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -89,6 +90,7 @@ ApiProxy 文件读取器负责请求授权与取消；转换器负责已准入�
 
 无；转换不会构造或修改模型请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 <a id="known-limitations-and-deferred-work"></a>

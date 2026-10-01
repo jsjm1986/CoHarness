@@ -1,3 +1,8 @@
+---
+description: "Agent-scoped durable after, at, and fixed-rate reminders over the session event log"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-schedule
 
 English | [中文](README.zh.md)
@@ -8,6 +13,20 @@ English | [中文](README.zh.md)
 
 Schedule lets you ask the model for durable reminders that return as ordinary follow-up messages in the same conversation. Create one-time reminders for a delay or absolute time, repeat them at fixed intervals, list pending reminders, and cancel them. Reminders survive restarts, but delivery requires a live root agent: closed sessions keep reminders overdue until resumed. Delivery never uses email, SMS, push, or browser notifications. Enable the Schedule overlay to expose the reminder tools and active-reminder catalog; sidebar alarms are best-effort indicators of known active reminders, not proof that reminder delivery is currently running.
 
+## Table of Contents
+
+- [Composition](#composition)
+- [Durable state](#durable-state)
+- [Absolute-time input](#absolute-time-input)
+- [Management tools](#management-tools)
+- [Delivery lifecycle](#delivery-lifecycle)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="composition"></a>
 ## Composition
 
 Load this function plugin after `ctx.sessions`, `ctx.agents`, `ctx.tools`, `ctx.sessionPersistence`, and the persistence listener that implements Session flushes. Static injection makes a missing persistence service a composition error. The plugin listens only to later `agent/created` events, installs on runtime roots, and registers all tools through the exact `agent.ctx`. Agents that already existed when the plugin loaded and runtime children do not receive Schedule.
@@ -16,6 +35,7 @@ Time-context is not a Schedule dependency. A composition may mount `@deepseek-ai
 
 Every operation that reads or decides from the Schedule fold first awaits `ctx.sessions.flush(session)`. A missing, rejected, or detached persistence path returns `persistence_uncertain`; it never turns an unconfirmed live suffix into a list or not-found answer. A successful create or actual delete also awaits a post-append barrier before confirming the mutation.
 
+<a id="durable-state"></a>
 ## Durable state
 
 The package owns the strict version-1 `schedule/change` create, delete, and dispatch union. Every create record contains a stable Session-local `ScheduleId`, the trimmed prompt, and a four-digit-year RFC 3339 UTC `scheduledAt`. An `after` record also stores `afterSeconds`; an `at` record stores no copy of its submitted offset, local calendar fields, or interpreting zone; an `every` record stores `everySeconds` and treats `scheduledAt` as the earliest creation-anchor-aligned occurrence not yet dispatched. Delete and one-shot dispatch carry only the id. Every dispatch adds `acceptedAt`, from which replay advances directly to the first anchor-aligned target after that decision time.
@@ -24,12 +44,14 @@ Replay rejects unknown versions, extra fields, reused ids, mismatched one-shot o
 
 When the optional session-projection registry is present, Schedule registers a `schedule` projection. Its `init(header, inheritedEventCount)` receives the Session's exact inherited cut from the registry, and its checkpoint carries `{ inheritedEventCount, active, seenIds }`, so host reads, projection frames, cold restore, and the optional Web catalog share the same owned-suffix transition authority. The browser catalog is supplied by [`dsh-client-ui-schedule`](../../client/ui-schedule/README.md) and is enabled only by the Web Schedule overlay.
 
+<a id="absolute-time-input"></a>
 ## Absolute-time input
 
 The `at` selector is either a strict `YYYY-MM-DDTHH:mm:ss[.S|.SS|.SSS](Z|±HH:MM)` string or `{ date: "YYYY-MM-DD", time: "HH:mm:ss[.S|.SS|.SSS]", time_zone: string }`. The string identifies an instant through `Z` or its numeric offset. The local form always requires explicit `UTC` or a valid IANA Area/Location zone. Missing `time_zone`, offset-free strings, extra keys, normalized calendar dates, invalid offsets, and non-future targets are rejected.
 
 Schedule owns deterministic calendar normalization. Local times inside a daylight-saving gap are rejected. An overlap chooses its first, earlier instant. A successful create retains only canonical UTC `scheduledAt`; no Schedule path reads the browser, Session header, model time-context, connection, or process time zone.
 
+<a id="management-tools"></a>
 ## Management tools
 
 The generated [tool catalog](../../../docs/tool-catalog.md) owns the argument and output schemas for `schedule_create`, `schedule_list`, and `schedule_delete`. Their canonical values use camelCase record fields even though model input uses `after_seconds` and `time_zone`.
@@ -40,6 +62,7 @@ Every successful management preflight also asks the live owner to recompute. Thi
 
 The closed version-1 domain error codes are `invalid_prompt`, `invalid_selector`, `invalid_rule`, `invalid_time_zone`, `not_future`, `time_out_of_range`, `frequency_too_high`, `corrupt_schedule_log`, `persistence_uncertain`, and `internal_error`. Diagnostics are stable and do not expose backend exceptions. Rendered content is deterministic JSON of the canonical value; generic tool-result policy remains responsible for any model-facing spill behavior.
 
+<a id="delivery-lifecycle"></a>
 ## Delivery lifecycle
 
 The live owner derives the earliest target from the durable fold. It splits waits longer than the Node timer range and rereads the wall clock after every wake, so a rollback cannot fire early and a forward jump makes the record overdue. Due one-shots have priority and enter one later turn at a time. When no one-shot is due, all overdue Every records form one batch in target and creation order.
@@ -50,6 +73,7 @@ The follow-up opens a normal later turn after the Agent becomes fully idle; it n
 
 Framing or synchronous follow-up failure writes no dispatch. An append failure faults that owner because the message may already be queued; a barrier rejection leaves dispatch pending for a later ordinary preflight. Agent or plugin disposal cancels timers, stops new work, and awaits in-flight preflights and idle waits without deleting durable records.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Scoped management tools
@@ -121,3 +145,13 @@ The batch appends after existing history and preserves its reusable prefix. Its 
 - **Latest-only catch-up** — an overdue Every record contributes only its latest due occurrence, so Schedule never replays a missed backlog.
 - **Narrow crash duplicate window** — a crash after synchronous follow-up admission but before the dispatch checkpoint can repeat the reminder; the package does not claim model completion, user acknowledgement, or exactly-once effects.
 - **Load-order boundary** — the plugin does not scan or adopt Agents that were already live when it loaded.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+The plugin answers the Workspace registry's archive admission ([seam](../../workspace/workspace/README.md)) for the Session it is asked about. A reminder is armed only while its owning Session's root Agent is live — delivery is session-local — so only a live root Agent's Session answers: `workspace/session-activity` reports that Session's active reminders as the `schedule` family, one item per record with its stored id and its prompt as label, read from the maintained `schedule` projection state rather than a historical fold, and prepends the family to `next()` so other providers keep their entries; `workspace/session-stop` joins the exact owner's serialized Schedule queue — behind a management write or due dispatch still in flight — then appends a durable `delete` change per active record, so nothing stays armed to dispatch into the archived Session after an unarchive. A Session with no live root Agent, no active reminder, or no `sessionProjections` service reports nothing and has nothing to stop.
+
+</details>

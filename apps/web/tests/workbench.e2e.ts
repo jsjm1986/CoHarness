@@ -85,7 +85,7 @@ describe('web: Cordis Workspace workbench', () => {
     page.on('websocket', (socket) => { sockets.push(socket.url()) })
     const tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'workbench'))
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     const toolbar = page.locator('[data-workbench-toolbar]')
     await toolbar.waitFor({ timeout: 30_000 })
     // The conversation viewport boots in single-session mode; entering the

@@ -49,6 +49,9 @@ kind: "package-reference"
 
 这是 Service Definition 包。`@deepseek-ai/dsh-tool-ask-user` 等 Consumer 依赖此服务；Web Client 通过 Remote Events 贡献带 Agent scope 的回答者。循环保持不变：工具调用等待 waterfall 结果，该结果随后恢复正常的 agent loop（智能体循环）。
 
+
+**运行时不变式：** 不发布伴生入口。answerer waterfall 按请求解析并把结果直接返回调用方；该 seam 不发布独立的请求／回答审计流。
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -58,13 +61,13 @@ kind: "package-reference"
 
 不会直接使 KV Cache 失效；请求前缀的任何变更均由上述消费方负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
 
 - **带 Agent scope 的 Web 回答**：Remote Events 仅在请求带有存活 Agent scope 时路由随产品交付的 Web 回答者；agentless 调用方需要本地未限定 scope 的 waterfall listener。
 - **词汇仅包含问题表单形态**：可供选择的选项加可选的自定义文本；更丰富的交互形态（文件选择器、diff 预览确认）尚无 seam 词汇。
-
 
 <a id="dev-note"></a>
 ### 开发备注
@@ -77,5 +80,3 @@ kind: "package-reference"
 计划审批中可选的 `callId` 标识已记录的工具调用，供文档导航使用，不改变回答及其校验。
 
 </details>
-
-**运行时不变式：** 不发布伴生入口。answerer waterfall 按请求解析并把结果直接返回调用方；该 seam 不发布独立的请求／回答审计流。

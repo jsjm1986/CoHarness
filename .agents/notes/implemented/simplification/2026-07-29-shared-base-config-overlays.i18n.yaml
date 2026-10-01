@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-29-shared-base-config-overlays.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-29-shared-base-config-overlays.md
-2026-07-29-shared-base-config-overlays.md: 5a916b4df7bad5008a9e5e4812cb0031854df7b2
-2026-07-29-shared-base-config-overlays.zh.md: ca66c9d5b7c25f97de05c0c8e2fc58f8320a1974
+/agent-note-one-shared-base-config-with-per-surface-overlays:
+  en: d7b2f4682e52c7f9
+  zh: de7ed5e6afcbc249
+/agent-note-one-shared-base-config-with-per-surface-overlays/problem:
+  en: 1e7eebcc900f92d2
+  zh: 1c0309cdf63c77d6
+/agent-note-one-shared-base-config-with-per-surface-overlays/decision:
+  en: d5bc06cecc598d8a
+  zh: 8a4f59f69c3857fb
+/agent-note-one-shared-base-config-with-per-surface-overlays/alternatives-considered:
+  en: 689d5fa769d0b72c
+  zh: 2e4369cb4eb9fca5
+/agent-note-one-shared-base-config-with-per-surface-overlays/consequences:
+  en: babfcf0d6186bce5
+  zh: 383ac37e0fd65db5
+/agent-note-one-shared-base-config-with-per-surface-overlays/verification:
+  en: 4d7540c9f7c173b9
+  zh: 89287c1209c8e501

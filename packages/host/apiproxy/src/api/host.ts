@@ -42,7 +42,9 @@ export interface HostApi {
    * no explicit default (the adapter falls back internally);
    * attachedSessions = count of currently attached sessions (those with a live agent);
    * home = the host account home directory (Web display abbreviation on POSIX);
-   * canOpenPath = whether this deployment can hand a path to a user-visible native desktop.
+   * canOpenPath = whether this deployment can hand a path to a user-visible native desktop;
+   * fileManager = the serving desktop's file-manager action when the host knows
+   * it (null on a platform without a manager); absence is unknown.
    */
   describe(request: RpcRequest<{}>): Promise<RpcResponse<{
     version: string
@@ -52,6 +54,7 @@ export interface HostApi {
     attachedSessions: number
     home: string
     canOpenPath: boolean
+    fileManager?: 'finder' | 'explorer' | 'directory' | null
     /** Explicit deployment identity; absence is unknown, never proof of independent local access. */
     executionAuthorityRequired?: boolean
     /** Present only when a filesystem provider serves read-only Workspace resources. */
@@ -91,12 +94,34 @@ export interface HostApi {
 
   /**
    * Open a filesystem path with the operating system's default application
-   * (Finder / Explorer / xdg-open hand-off). The browser carrier's
-   * prefix-wide trust fence covers this privileged method like every other
-   * `/api` request.
+   * (Finder / Explorer / xdg-open hand-off). `action: 'reveal'` selects the
+   * file in its manager instead, and `application` picks one registered
+   * handler from `fileApplications` — an id the file no longer offers fails
+   * with `internal`. The browser carrier's prefix-wide trust fence covers
+   * this privileged method like every other `/api` request.
    */
   openPath(
-    request: RpcRequest<{ path: string }>,
+    request: RpcRequest<{ path: string; action?: 'open' | 'reveal'; application?: string }>,
     signal: AbortSignal,
   ): Promise<RpcResponse<{ opened: true }>>
+
+  /**
+   * List the OS-registered applications able to open one file path.
+   * @returns current file handlers in system order; empty when the serving
+   * platform has no association query or native opening is unavailable.
+   */
+  fileApplications(
+    request: RpcRequest<{ path: string }>,
+    signal: AbortSignal,
+  ): Promise<RpcResponse<{ applications: HostFileApplication[] }>>
+}
+
+/** One OS-registered application able to open a file, in wire form. */
+export interface HostFileApplication {
+  /** OS application identifier; revalidate against a fresh query before opening. */
+  readonly id: string
+  readonly name: string
+  readonly default: boolean
+  /** PNG or SVG data URL, or null when the desktop supplies no icon. */
+  readonly icon: string | null
 }

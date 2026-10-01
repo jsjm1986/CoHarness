@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 
-import type { RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
+import type { StartedToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { classifyTool, formatToolBody, resultText, toolRowModel } from '../src/client/tool/models/tool-call-model.ts'
@@ -18,7 +18,8 @@ afterEach(() => {
 // Mirrors the real lookup chain (conversation namespace, then common).
 const t: GenericToolCardProps['t'] = makeTranslate(zh, commonZh)
 
-const running = (over?: Partial<RunningToolCall>): RunningToolCall => ({
+const running = (over?: Partial<StartedToolCall>): StartedToolCall => ({
+  phase: 'start',
   callId: 'c1', name: 'bash', argsRaw: '{"command":"ls -la","description":"List files"}',
   turn: 1, step: 1, time: 1_000, callView: null, subCalls: [], ...over,
 })
@@ -445,8 +446,9 @@ describe('ToolRow', () => {
 })
 
 describe('GenericToolCard', () => {
-  const props = (toolName: string, block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName, block, openFile: vi.fn(), t,
+  const props = (toolName: string, block: StartedToolCall | ToolResultNode): GenericToolCardProps => ({
+    callId: 'c1', toolName, openFile: vi.fn(), t,
+    ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
   })
 
   it('renders the classified variant row from the frozen slice', () => {
@@ -458,7 +460,7 @@ describe('GenericToolCard', () => {
 
   it('unknown tools land on the others variant titled Tool call', () => {
     const view = render(
-      <GenericToolCard {...props('todo_write', running({ name: 'todo_write', argsRaw: '{"note":"x"}' }))} />,
+      <GenericToolCard {...props('unknown_tool', running({ name: 'unknown_tool', argsRaw: '{"note":"x"}' }))} />,
     )
     expect(view.getByText('工具调用')).toBeTruthy()
     expect(view.container.querySelector('[data-variant="others"]')).not.toBeNull()

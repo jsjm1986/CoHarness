@@ -93,7 +93,7 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-workspace-files'))
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     const toolbar = page.locator('[data-workbench-toolbar]')
     await toolbar.waitFor({ timeout: 30_000 })
     await toolbar.getByRole('button', { name: 'Select workbench' }).click()

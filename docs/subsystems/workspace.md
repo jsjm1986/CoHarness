@@ -34,13 +34,13 @@ interface Workspace {
   readonly id: WorkspaceId
 
   /**
-   * Canonical directory path returned by the runtime filesystem at create
+   * Canonical directory path: the `fs.realpath` of the path given at create
    * time (trailing slashes, `..`, and symlinks all resolved). Never rewritten
    * afterwards, even when the directory disappears (see {@link status}).
    */
   readonly path: string
 
-  /** Display title. Defaults to `basename(path)` at create; duplicates are allowed. */
+  /** Display title. Defaults to the final path segment, or a filesystem root's own spelling; duplicates are allowed. */
   readonly title: string
 
   /** ISO-8601 creation instant, stamped at create and never rewritten. */
@@ -120,6 +120,52 @@ Ownership truth is the record's ordered `sessionIds`, never derived from session
 `WorkspaceRegistry` ([signatures](#ctxworkspaceregistry--workspaceregistry)) owns registration and resolution. `create(path, title?)` canonicalizes the path, rejects a nonexistent path (`FS_NOT_FOUND`) or a non-directory, returns the existing entity unchanged when the canonical path is already owned, and otherwise creates a record with `title ?? basename(path)` prepended to the durable registry order; display titles may repeat. `get(id)` and the ordered `list()` are synchronous cache reads; `resolveByPath(path)` applies the same provider-owned path identity without creating. `delete(id)` removes only the registration, order entry, and session account — the directory, user files, live sessions, and persisted logs are never touched, so those sessions become Ungrouped ([decision](../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.md)); unknown ids return `false`. Create and delete persist a pending-mutation marker before their two writes (record + order) can diverge; startup resolves exactly the marked mutation — by deleting the marked table row, which completes an interrupted delete and rolls back an interrupted create (the registration is re-creatable, so rollback is the safe direction) — and an unmarked order/table mismatch fails loud as corruption.
 
 Sessions get their cwd at create time from whoever creates them, not from this registry — the API gateway resolves a new session's cwd from the chosen workspace's `path` (falling back to an explicit or default cwd), creates the session so the cwd lands in its immutable [`SessionHeader`](persistence.md#sessionheader--metadata-beside-the-log), then calls `attachSession`, which re-validates that stored header cwd against the workspace path. On the first successful start, the registry bootstraps history from persisted headers alone (`id`, `cwd`, `createdAt` — never event bodies), grouping sessions with a valid canonical cwd into per-directory workspaces, newest first; the initialized marker is written last so an interrupted bootstrap resumes safely. The bootstrap is one-time: cwd-less legacy sessions stay Ungrouped, and sessions created afterwards join a workspace only through `attachSession`.
+
+## Default Workspace initialization
+
+`initializeDefault(resolveDirectory)` owns automatic creation eligibility: the caller supplies a directory resolver, and the registry registers only while no Workspace, archived Session, live Session, or stored header exists. A missing directory is created recursively before registration; the initial title derives from the requested directory's own final segment rather than the canonical one, so a symlink at that path does not retitle the Workspace after its target. Repeated requests reuse the durable identity, and deleting that registration permanently disables automatic creation.
+
+## Session pinning
+
+`pinSession(sessionId)` and `unpinSession(sessionId)` maintain the registry-global `pinnedSessionIds` account, most recently pinned first. Pinning requires a known, unarchived Session — an archived id rejects with `WorkspaceArchivedSessionPinError` (the api-proxy reports `session-archived`); unpinning an id that is not pinned succeeds without changing the set. Archiving removes the Session's pin in the same durable write, and unarchiving does not restore it. Both api-proxy RPCs return the complete pinned account to the caller.
+
+## Archive admission
+
+Archiving is a registry-global durable set, and the registry refuses to hide running work behind it. The rule is a capability seam over two Host events the package declares and dispatches ([events](#workspace-events)): `workspace/session-activity` (waterfall) asks the composed providers what still runs for a Session, and `workspace/session-stop` (parallel) asks them to stop it. Each provider registers on the root like any listener, so the package knows no job or subagent vocabulary; the families are keys of a merge-extensible map.
+
+```ts type-equiv
+/**
+ * Activity families a `workspace/session-activity` listener may report.
+ * `turn` is this package's own family, declared inline because the Agent
+ * registry cannot merge it (a Workspace reference from the Agent program
+ * would close a project cycle); every other provider merges its own key from
+ * a module both its Host and Client faces import, so a consumer that renders
+ * the families sees exactly the keys its program compiled and falls through
+ * to a generic description for any other. The shipped providers merge `job`
+ * (the job registry seam), `subagent` (the Subagent runtime), and `schedule`
+ * (the Schedule plugin).
+ */
+interface SessionActivityKindMap {
+  /** The session's own Agent is inside a turn, including one waiting for an approval or an answer. */
+  turn: true
+}
+```
+
+`SessionActivityKind` is `keyof SessionActivityKindMap`, so a program that compiled no provider sees only `turn`. The shipped keys live in client-importable type modules: `job` in the job registry seam's `view.ts`, `subagent` in the Subagent runtime's `control-types.ts`, `schedule` in the Schedule plugin's `types.ts`; `turn` is declared inline on the map itself and installed by the registry's own `archive-admission.ts` because this repo's session-persistence → format-catalog chain makes workspace transitively reachable from the Agent program and an Agent → Workspace import would close a project-reference cycle. A provider answers the waterfall by prepending its `SessionActivity` entries to the result of `next()`; the registry's innermost callback returns an empty list, so a composition without providers archives freely.
+
+```ts type-equiv
+/**
+ * One reason a session counts as active for archive admission. Families with
+ * per-item identity list their items so a caller can name what must stop.
+ */
+interface SessionActivity {
+  readonly kind: SessionActivityKind
+  /** Active items of the family; absent for a family without per-item identity (`turn`). */
+  readonly items?: readonly SessionActivityItem[]
+}
+```
+
+`SessionActivityItem` carries the family-specific `id` (a session, job, or schedule id) and an optional display `label`. `archiveSession(sessionId)` asks the waterfall once, after the existence check, and rejects a non-empty answer with `WorkspaceActiveSessionError` (`sessionId`, `activity`) without writing; the api-proxy maps it to the `session-active` error, whose details carry the same two fields. `archiveSession(sessionId, { stopActivity: true })` — the `ArchiveSessionOptions` field the transport request exposes as `stopActivity` — skips the check, writes the archive, then dispatches `workspace/session-stop`; a rejecting provider is logged and the archive stays, and the stopped work is never awaited to settlement. An already archived id neither asks nor stops. The registry's own `agent/pre-step` listener rejects a step proposed for an archived Session or a subagent descendant of one — the write-first order plus the gate means every wake a stop induces is already blocked. The shipped providers and what they stop are documented with the [registry package](../../packages/workspace/workspace/README.md#api-behavior); the decision record is the [archive-stops-running-work Agent Note](../../.agents/notes/implemented/feature/2026-09-21-archive-stops-running-session-work.md).
 
 ## Consumers
 
@@ -294,11 +340,25 @@ Durable workspace registry. Startup waits for `sessionPersistence` and `fs`, bui
  * canonical path return the existing entity without changing its title.
  * A newly created workspace is prepended to the durable registry order.
  * Different canonical paths may share a display title.
- * @param path - Existing directory to own, in any path spelling.
+ * @param path - Existing directory to own, in a fully qualified path spelling.
  * @param title - Display title used only when a new record is created.
  * @returns the existing or newly durable workspace.
  */
 async create(path: string, title?: string): Promise<Workspace>
+
+/**
+ * Initialize the default Workspace only while both the registry and Session
+ * history are empty. Repeated requests reuse its durable identity; deleting
+ * that registration permanently disables automatic creation.
+ * @param resolveDirectory - resolve the absolute directory; called only for
+ * eligible creation, inside the registry mutation queue. Missing directories
+ * are created recursively before registration, and the initial title is the
+ * requested directory's own final segment — not the canonical one, so a
+ * symlink at that path does not retitle the Workspace after its target.
+ * After resolution, caller cancellation does not roll back creation or registration.
+ * @returns the initialized Workspace, or undefined when automatic creation is ineligible.
+ */
+initializeDefault(resolveDirectory: () => Promise<string>): Promise<Workspace | undefined>
 
 /**
  * Look up a workspace by id.
@@ -349,23 +409,60 @@ async archivedEntries(): Promise<readonly ArchivedSessionEntry[]>
 /**
  * Archive one session durably. The session must exist (live or in session
  * persistence); its workspace accounting — or lack of one — is irrelevant.
- * An already archived id resolves without writing.
+ * Without `stopActivity` the session must also be inactive: the
+ * `workspace/session-activity` waterfall is asked once, and any reported
+ * activity rejects with {@link WorkspaceActiveSessionError} before anything
+ * is written. With `stopActivity` the archive is written without an
+ * activity check, and the `workspace/session-stop` providers are then asked
+ * to stop the session's work: the durable archive set is what a provider's
+ * `agent/pre-step` gate reads, so every wake the stops induce is already
+ * blocked. Archiving drops the session's pin in the same durable write
+ * (pinning and archival are mutually exclusive) and bumps the archive
+ * revision the Gateway carrier synchronizes on. An already archived id
+ * resolves without writing, asking, or stopping.
  * @param sessionId - The session to archive.
- * @returns resolution after durability.
+ * @param options - Whether running work is stopped instead of refusing.
+ * @returns resolution after durability and, with `stopActivity`, after every stop request was issued.
  */
-archiveSession(sessionId: SessionId): Promise<void>
+archiveSession(sessionId: SessionId, options: ArchiveSessionOptions = {}): Promise<void>
 
 /**
- * Restore one archived session to its retained Workspace accounting slot.
- * @param sessionId - session to restore.
+ * Unarchive one session durably by dropping it from the registry-global
+ * archive set; the accounting slot was never touched, so the session
+ * returns to its recorded position. Unarchiving runs no session-existence
+ * check because removing an id cannot introduce an unknown one, so an
+ * entry whose session is gone still resolves. An id that is not archived
+ * resolves without writing. Each committed write bumps the archive
+ * revision and republishes the snapshot.
+ * @param sessionId - The session to unarchive.
+ * @returns resolution after durability.
  */
-restoreSession(sessionId: SessionId): Promise<void>
+unarchiveSession(sessionId: SessionId): Promise<void>
+
+/**
+ * Pin one session durably, prepending it to the registry-global pin set.
+ * The session must exist (live or in session persistence) and must not be
+ * archived. An already pinned id resolves without writing or reordering.
+ * @param sessionId - The session to pin.
+ * @returns resolution after durability.
+ */
+pinSession(sessionId: SessionId): Promise<void>
+
+/**
+ * Unpin one session durably by dropping it from the registry-global pin
+ * set. Unpinning runs no session-existence check because removing an id
+ * cannot introduce an unknown one, so an entry whose session is gone still
+ * resolves. An id that is not pinned resolves without writing.
+ * @param sessionId - The session to unpin.
+ * @returns resolution after durability.
+ */
+unpinSession(sessionId: SessionId): Promise<void>
 
 /**
  * Resolve by canonical directory path without creating or mutating a
  * workspace. A missing path rejects during provider resolution; an existing unowned
  * directory returns `undefined`.
- * @param path - Existing directory path in any spelling.
+ * @param path - Existing directory path in a fully qualified spelling.
  * @returns the workspace owning the canonical path, when one exists.
  */
 async resolveByPath(path: string): Promise<Workspace | undefined>
@@ -392,6 +489,54 @@ Complete archive snapshot after a durable archive or restore mutation.
  * @mode emit
  */
 'workspace/archive-changed': (snapshot: WorkspaceArchiveSnapshot) => void
+```
+
+Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/workspace/src/index.ts)
+
+<a id="workspacesession-activity--waterfall"></a>
+
+#### `workspace/session-activity` — waterfall
+
+Ask the composed providers what still runs for a session before it is archived. A listener prepends its own SessionActivity entries to the result of `next()`; the registry's innermost callback returns an empty list, so a composition without providers archives freely. Any non-empty result refuses the archive without a write.
+
+```ts cordis-catalog
+/**
+ * Ask the composed providers what still runs for a session before it is
+ * archived. A listener prepends its own {@link SessionActivity} entries to
+ * the result of `next()`; the registry's innermost callback returns an
+ * empty list, so a composition without providers archives freely. Any
+ * non-empty result refuses the archive without a write.
+ * @param request - the session about to be archived.
+ * @param next - delegate to the remaining providers.
+ * @mode waterfall
+ */
+'workspace/session-activity'( request: SessionActivityRequest, next: () => Promise<readonly SessionActivity[]>, ): Promise<readonly SessionActivity[]>
+```
+
+Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/workspace/src/index.ts)
+
+<a id="workspacesession-stop--parallel"></a>
+
+#### `workspace/session-stop` — parallel
+
+Stop a session's running work because the caller archived it with `stopActivity`; the archive set is durable when this dispatches. Each provider stops its own families — cancelling a turn, its subagent descendants, owned jobs, or active schedules — through the same cancel paths the user's own stop actions use, so the session log ends every open turn regularly and a later unarchive can continue the conversation. Listeners issue their stop requests without waiting for running work to settle; a listener may await its own durability barrier. A rejection is logged by the registry and does not undo the archive.
+
+```ts cordis-catalog
+/**
+ * Stop a session's running work because the caller archived it with
+ * `stopActivity`; the archive set is durable when this dispatches. Each
+ * provider stops its own families — cancelling a turn, its subagent
+ * descendants, owned jobs, or active schedules — through the same cancel
+ * paths the user's own stop actions use, so the session log ends every
+ * open turn regularly and a later unarchive can continue the
+ * conversation. Listeners issue their stop requests without waiting for
+ * running work to settle; a listener may await its own durability
+ * barrier. A rejection is logged by the registry and does not undo the
+ * archive.
+ * @param request - the session being archived.
+ * @mode parallel
+ */
+'workspace/session-stop'(request: SessionActivityRequest): Promise<void> | void
 ```
 
 Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/workspace/src/index.ts)

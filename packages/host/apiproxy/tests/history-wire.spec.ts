@@ -184,7 +184,7 @@ function conversation(): HistoryValue {
           id: messageId(10),
           role: 'user',
           content: [{ type: 'text', text: '<context_checkpoint>summary</context_checkpoint>' }],
-          source: { kind: 'plugin', plugin: 'compact' },
+          source: { kind: 'compact-checkpoint', compactionId: 'compact-1' as never },
         },
         surfaceOp: { op: 'replace', startSeq: SessionSeq(1), endSeq: SessionSeq(6) },
         sourceEventSeqs: [SessionSeq(1), SessionSeq(6), SessionSeq(9)],

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-deliverables
 
 [English](README.md) | 中文
@@ -6,6 +11,18 @@
 
 Web 轮次末尾展示已记录的工作区变化与显式文件交付。每个变更文件行在共享右侧栏打开历史比较；交付卡片通过现有授权工作区预览打开当前文件。没有这两类事件的轮次保留成功修改文件的标签。收尾正文中的精确路径或唯一文件名链接到产出或交付的文件。Host 侧贡献文件引用指引。
 
+## 目录
+
+- [历史审阅与当前文件](#historical-review-and-current-files)
+- [不变量](#invariants)
+- [延伸探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="historical-review-and-current-files"></a>
 ## 历史审阅与当前文件
 
 [工作区记录器](../../deliverables/workspace-changes/README.zh.md)通过 `workspace/changes` 通知摘要；[present 工具](../../deliverables/tool-present/README.zh.md)记录 `deliverables/presented`。`deliverablesDefinition` 将这些事件折叠为轮次数据，不扫描对话历史。修改位置回退保留对声明 diff 或 edit 渲染意图的工具的支持。
@@ -14,18 +31,22 @@ Review 每次显示一个文件，支持统一或并排差异、换行、创建�
 
 读取使用会话所属运行节点连接及 ApiProxy 授权。Host 在异步读取前后检查会话权限与记录路径。客户端读取器属于被持有的会话，连接替换时清除缓存结果，释放时取消请求。审阅资源必须声明与侧栏相同的会话。隐藏标签不会主动读取比较。
 
-交付卡片保留文件说明，提供预览、默认应用和所在目录操作。原生操作要求 Host 明确声明独立本机模式、基础运行节点、loopback 访问及可用桌面打开器。Gateway 用户获得授权预览，不获得服务端桌面访问。目录操作打开所在文件夹，不承诺平台特定的文件选中效果。
+交付卡片保留文件说明，提供预览、默认应用、已注册应用和文件管理器操作。菜单在每次打开时重新查询 `host.fileApplications`，交付之后才安装的处理器也会出现；Host 会按当前处理器复核所选 id，过期的行会失败，而不是静默改用默认应用打开。原生操作要求 Host 明确声明独立本机模式、基础运行节点、loopback 访问及可用桌面打开器。Gateway 用户获得授权预览，不获得服务端桌面访问。管理器操作在 macOS/Windows 上选中该文件，在没有选中接口的 Linux 上打开所在文件夹。
 
+<a id="invariants"></a>
 ## 不变量
 
 未发布配套入口：UI 投影持久事件与授权读取结果；记录器及资源服务负责文件关系。
 
 
+<a id="further-exploration"></a>
 ## 延伸探索
 
 - [授权审阅决定](../../../.agents/notes/implemented/architecture/2026-09-23-authorized-workspace-review.zh.md)
 - [工作区资源](../../../.agents/notes/implemented/feature/2026-09-12-cloud-workspace-file-resources.zh.md)
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 文件引用指引
@@ -42,8 +63,19 @@ Web 插件挂载期间提供一段固定指引。摘要与比较数据不进入�
 
 指引在插件生命周期内不变，可跨轮次复用。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - 历史比较只保留到 Host 记录器释放。比较不可用后，会话事件仍然持久存在。
 - 行内代码匹配接受精确路径和无歧义的文件名，不猜测路径后缀或仅在正文中出现的文件。
 - 记录器当前捕获本机执行。远端执行需要使用相同远端文件系统与子进程目标的记录器。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

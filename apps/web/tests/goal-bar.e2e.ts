@@ -30,6 +30,9 @@ describe('web e2e: goal bar clear convergence', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
+    // The tokenized entry mints the session cookie and redirects without
+    // the query, so the fixture flag needs a second navigation.
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.goto(`${scaffold.baseUrl}?fixture`, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)

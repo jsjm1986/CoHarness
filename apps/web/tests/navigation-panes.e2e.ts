@@ -116,7 +116,7 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     const sessionBaseline = baselineResponse(page, 'session.list')
     const workspaceBaseline = baselineResponse(page, 'workspace.list')
     const [, sessionResponse, workspaceResponse] = await Promise.all([
-      page.goto(scaffold.baseUrl, { waitUntil: 'load' }),
+      page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' }),
       sessionBaseline,
       workspaceBaseline,
     ])
@@ -341,7 +341,7 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     const observerSessionBaseline = baselineResponse(observer, 'session.list')
     const observerWorkspaceBaseline = baselineResponse(observer, 'workspace.list')
     const [, observerSessionResponse, observerWorkspaceResponse] = await Promise.all([
-      observer.goto(scaffold.baseUrl, { waitUntil: 'load' }),
+      observer.goto(scaffold.authenticatedUrl, { waitUntil: 'load' }),
       observerSessionBaseline,
       observerWorkspaceBaseline,
     ])

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-bash
 
 [English](README.md) | 中文
@@ -14,6 +19,21 @@
 
 `dsh-tool-bash` 让 agent（智能体）运行一次性 `bash` 命令，并接收 stdout、stderr 与退出标记。每次调用都使用全新 shell，因此 cwd、变量和函数不会保留；`run_in_background` 可启动长时间运行的工作，agent 能用 `job_output` 检查、用 `job_kill` 停止。命令会收到受管 `DSH_*` 环境；沙箱拒绝后，可携带更宽的 `sandbox_permissions`、一句 `justification` 并经用户批准重试一次。非零退出会作为结果报告，因此由 agent 决定如何响应；请使用 `dsh-bash-local` 或 `dsh-bash-sandbox` 等执行器，并加载 `dsh-shell-env`。
 
+## 目录
+
+- [工具](#tools)
+- [UI 展示](#ui-presentation)
+- [工具仅使用具名参数构建请求](#the-tool-builds-its-request-from-named-args-only)
+- [权限与升权](#permissions-and-escalation)
+- [逐会话模式切换](#per-session-mode-switching)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="tools"></a>
 ## 工具
 
 ### `bash`
@@ -40,28 +60,35 @@
 
 当 `run_in_background` 为 true 时，此插件会在 spawn 前预检 `ctx.jobs.start()`，把调用方 agent 注册为持有者，并将返回的 `ShellProcess` 句柄适配为通用的取消／完成／增量输出钩子。任务运行时负责 job id、跨会话隔离、完成通知、等待和 dispose（资源释放）清理；此插件只把 bash 退出／沙箱事实映射为任务输出和结果详情。`enableRunInBackground: false` 会移除该参数，并在执行时拒绝强制后台调用。
 
+<a id="ui-presentation"></a>
 ## UI 展示
 
 工具持有自己的 `presentCall`/`presentResult` 渲染意图。前台调用是终端卡片，包含命令、说明、cwd、输出和解析后的退出状态。由于卡片以独立的 pill 展示退出状态，解析所消耗的 `[exit code: N]` / `[killed by signal: …]` 标记会从输出中移除；其他所有标记（截断、超时、沙箱）都保留在输出中。后台启动只返回 job id，因此使用通用执行卡片；通用 `job_*` 工具持有各自的卡片。这些 presenter 是纯函数，可安全回放。
 
+<a id="the-tool-builds-its-request-from-named-args-only"></a>
 ## 工具仅使用具名参数构建请求
 
 `ShellExecRequest` 携带可选的 `stdoutMaxBytes`、`stdin`、普通 `env` 和托管 `dshEnv`，供可信进程内插件及此工具的环境注册表使用。模型侧工具不公开 `stdoutMaxBytes`、`stdin` 或 `env`：它使用具名的命令／工作目录／超时／信号／沙箱字段，加上从注册表收集的 `dshEnv` 来构建请求。额外模型键会被忽略，无法替换托管值。Shell 语法可以提供等价的命令级行为，而本地执行器会清除环境中的凭据和陈旧 `DSH_*` 值。参见 [stdin/env Agent Note](../../../.agents/notes/implemented/architecture/2026-06-30-bash-stdin-env-trusted-plugin-api.zh.md)。
 
+<a id="permissions-and-escalation"></a>
 ## 权限与升权
 
 除非启用沙箱的执行器（[`dsh-bash-sandbox`](../bash-sandbox/)）限制命令，否则命令以执行器的完整权限运行。仅拒绝型沙箱会把拒绝作为结果事实报告，并在此渲染为拒绝标记；逐调用的允许／拒绝／询问策略由 `tools/pre-execute` waterfall（瀑布式事件）负责（参见 docs/architecture.md）。
 
 需要升权的 bash 调用会在执行前解析 `ctx.approval`。`allowed-once` 只对该次调用应用请求模式；审批被拒、取消、不可用或缺少审批上下文时，命令完全不会执行，并返回不同的错误。发生真实拒绝后，模型可以在同一轮次中使用满足需要的最窄模式和理由重试同一命令一次；审批提示本身就是征求同意的步骤。升权绝不能预先推测，禁用或拒绝审批即为最终结果。重复指定调用的生效模式无需审批即可执行，更窄目标则在执行前失败。其理由见 [沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)。
 
+<a id="per-session-mode-switching"></a>
 ## 逐会话模式切换
 
 对于启用沙箱的执行器，每次调用依次按单次升权、会话覆盖、执行器默认值解析模式。未启用沙箱以及没有 agent 的调用不携带会话覆盖。策略归属方贡献当前且不区分具体能力的常驻模式；拒绝结果仍负责特定于该操作的有效模式与重试引导。参见 [`dsh-shell` 折叠计算](../shell/README.zh.md)和[沙箱切换约定](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。工具把模型调用适配到 `ctx.shell` 执行器与 `ctx.jobs` 运行时上；进程与 job 状态由那些服务拥有。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 系统提示词
@@ -112,7 +139,8 @@ renderer 输出依数据而定的 stdout 尾部，再输出可选的 `[stderr]` 
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
 
-### 后台任务上下文与结果
+<a id="running-long-commands-in-the-background"></a>
+### 后台任务上下文与结果 <a id="running-long-commands-in-the-background"></a>
 
 #### 模型看到什么
 
@@ -140,8 +168,19 @@ renderer 输出依数据而定的 stdout 尾部，再输出可选的 `[stderr]` 
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **回放退出状态 pill 从结果文本解析**：如果输出最后一行恰好精确为 `[exit code: N]` / `[killed by signal: …]`，会话回放将显示错误的 pill，并且该行会从卡片正文中丢失，因为解析会把它当作自己消耗的标记；这是仅影响展示的已知残留问题。
 - **`bash` 工具不采用 `timeout-policy` 预算**：根据[工具调用 timeout-policy Agent Note](../../../.agents/notes/implemented/architecture/2026-07-07-tool-call-timeout-policy.zh.md)，它保留由执行器持有的 `BASH_TIMEOUT` 路径。
 - **后台进程没有执行器超时**：工作不再需要时，调用方必须使用 `job_kill`，或依赖持有者／服务的 dispose。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -144,9 +144,9 @@ export const deliverablesDefinition: ConversationNodeDefinition<DeliverablesStat
       return { ...context.state, calls }
     }
     if (match.event.type !== 'tool/result') return context.state
-    const result = match.event.data.message.content[0]
+    const result = match.event.data.message
     if (result.isError === true) return context.state
-    const callId = String(match.event.data.message.source.callId)
+    const callId = String(result.toolCallId)
     const additions = producedPaths(context.state.calls.get(callId) ?? null)
       .map(path => ({ seq: match.event.seq, path }))
     return additions.length === 0

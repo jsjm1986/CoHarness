@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-12-composer-overlay-seat-width-compensation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-12-composer-overlay-seat-width-compensation.md
-2026-08-12-composer-overlay-seat-width-compensation.md: 0ec4d1272ac1adab5b724dccf44f567e15cc3368
-2026-08-12-composer-overlay-seat-width-compensation.zh.md: e4a56e5bfa5db65cfb68fb9da48c055678434c44
+/agent-note-the-overlay-composer-seat-compensates-for-the-bar-instead-of-reserving-a-gutter:
+  en: 80a1043dee23c0ba
+  zh: c8dfbabf50825896
+/agent-note-the-overlay-composer-seat-compensates-for-the-bar-instead-of-reserving-a-gutter/problem:
+  en: 0a3eba2a3b2973a2
+  zh: 585d85c0cd45e3ac
+/agent-note-the-overlay-composer-seat-compensates-for-the-bar-instead-of-reserving-a-gutter/decision:
+  en: 0c147f05d0d969ff
+  zh: 9f8a1a20b2ca5d7d
+/agent-note-the-overlay-composer-seat-compensates-for-the-bar-instead-of-reserving-a-gutter/alternatives-considered:
+  en: 5c966f94d1f4df22
+  zh: 1aad1636813582d1
+/agent-note-the-overlay-composer-seat-compensates-for-the-bar-instead-of-reserving-a-gutter/consequences:
+  en: b78e6042d1e93abd
+  zh: 6e9da2409da9d295
+/agent-note-the-overlay-composer-seat-compensates-for-the-bar-instead-of-reserving-a-gutter/testing:
+  en: 742262db346dc131
+  zh: c7f293f276d7f702

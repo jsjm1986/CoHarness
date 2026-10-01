@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-使用 `present` 声明交付 Session 文件系统可访问的最终文件，包括通过 shell 命令创建的文件。Web 客户端预览当前源文件，并在获准的独立桌面上提供本机打开操作。工具记录路径和可选说明，不复制文件内容。
+使用 `present` 声明交付Session 文件系统可访问的最终文件，包括通过 shell 命令创建的文件。用户使用默认应用打开当前源文件。工具记录路径和可选说明，不复制文件内容。
 
 ## 目录
 
@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-基础 bundle 为使用它的 profile 挂载本插件。创建文件后，以 `files: [{ path, description? }]` 调用 `present`。文件必须是 Session 文件系统可访问的普通文件。相对路径按 Session 工作目录解析；绝对路径可以指向工作区外的文件，包括 `/tmp` 或 Downloads。文件缺失、为目录、最终路径为符号链接或提供方拒绝访问时，调用失败。Shell 沙箱私有 `/tmp` 中的文件需要先写入 Session 文件系统可访问的位置。
+`standard`、`ptc` 与 `cordis` Agent preset 挂载本插件。创建文件后，以 `files: [{ path, description? }]` 调用 `present`。文件必须是 Session 文件系统可访问的普通文件。相对路径按 Session 工作目录解析；绝对路径可以指向工作区外的文件，包括 `/tmp` 或 Downloads。文件缺失、为目录、最终路径为符号链接或提供方拒绝访问时，调用失败。Shell 沙箱私有 `/tmp` 中的文件需要先写入 Session 文件系统可访问的位置。
 
 在 Agent 的 Cordis 组合中挂载，并提供 `tools`、`fs` 和 `turnBoundary` Session 投影：
 
@@ -64,7 +64,8 @@ kind: "package-reference"
 
 - [文件系统子系统](../../../docs/subsystems/filesystem.zh.md)——提供方路径与错误。
 - [Web 交付](../../client/ui-deliverables/README.zh.md)——源文件打开与卡片。
-- [交付决策](../../../.agents/notes/implemented/architecture/2026-09-23-authorized-workspace-review.zh.md)——Session 归属与读取端必须识别的事件。
+- 交付决策——Session 归属与读取端必须识别的事件。
+
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -73,7 +74,7 @@ kind: "package-reference"
 
 #### 模型看到的内容
 
-[present schema](../../../docs/tool-catalog.zh.md#present)要求已有且可访问的文件：“Declare existing files accessible through the Session filesystem as final deliverables. When a file you create or update is an output the user asked to receive, you must call present after writing it and before your final response, including files created through Bash or code execution. Mentioning its path in your reply does not replace this call. The files must already exist. The user opens the current source files; their contents are not copied or preserved.” 每个文件的结果为 `Presented <path>`；程序结果和持久事件包含路径及可选说明。
+[present schema](../../../docs/tool-catalog.zh.md#present)要求已有且可访问的文件：“Declare existing files as final deliverables for the user. Use it when the user needs a separate file, especially Office documents, spreadsheets, and slide decks; prefer your final response when that suffices. The user opens the current files; their contents are not copied.” `files` 参数要求选择 1-2 个最重要的交付物，每次调用最多 4 个。每个文件的结果为 `Presented <path>`；程序结果和持久事件包含路径及可选说明。
 
 #### Token 影响
 
@@ -83,6 +84,7 @@ kind: "package-reference"
 
 工具 schema 在挂载期间保持静态。交付结果文本扩展对话，不重写提示词前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

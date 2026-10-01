@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # bundle/ — profile 插件组合包
 
 [English](README.md) | 中文

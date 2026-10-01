@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # schedule/：仅限 Session 内的提醒
 
 [English](README.md) | 中文

@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/file-reference-local/README.md
-README.md: 3144c64946a48272cab72104e00a4d949e0bef81
-README.zh.md: 916f53c7e834bf992e77e74acf90286bfd80cd54
+/:
+  en: c81ff98d67d4e26b
+  zh: 61495d48365178df
+/deepseek-ai-dsh-file-reference-local:
+  en: 9d332a6973ceebe9
+  zh: ebfbf50266501646
+/deepseek-ai-dsh-file-reference-local/summary:
+  en: 74449d8df9ec0f95
+  zh: e32b383ddddbfdbf
+/deepseek-ai-dsh-file-reference-local/table-of-contents:
+  en: 2b4e10d97d6c4a97
+  zh: 2ea1f84ce67384ee
+/deepseek-ai-dsh-file-reference-local/configuration:
+  en: 608a282387965386
+  zh: 2bfe78c172d3235e
+/deepseek-ai-dsh-file-reference-local/invariants:
+  en: 4201dd926ecacb79
+  zh: 8b338e1e77e8a435
+/deepseek-ai-dsh-file-reference-local/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-file-reference-local/model-experience/file-reference-guidance-when-read-is-available:
+  en: 9a457db92875eedb
+  zh: 3b6d3fd974c8a91a
+/deepseek-ai-dsh-file-reference-local/model-experience/file-reference-guidance-when-read-is-available/what-the-model-sees:
+  en: a8efdbf46dfc65d6
+  zh: a8e578eec71c9d98
+/deepseek-ai-dsh-file-reference-local/model-experience/file-reference-guidance-when-read-is-available/what-the-model-sees/file-reference-instruction:
+  en: 840f6256a44e78ba
+  zh: ebc00f948c48b635
+/deepseek-ai-dsh-file-reference-local/model-experience/file-reference-guidance-when-read-is-available/token-effect:
+  en: 912448c13f2b2f35
+  zh: 013de25c1511bd65
+/deepseek-ai-dsh-file-reference-local/model-experience/file-reference-guidance-when-read-is-available/kv-cache-effect:
+  en: 1c3ebc786f362851
+  zh: e3c4e850201c3764
+/deepseek-ai-dsh-file-reference-local/known-limitations-and-deferred-work:
+  en: ad2899fb284df80e
+  zh: 2c01b76ce5a7847f
+/deepseek-ai-dsh-file-reference-local/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

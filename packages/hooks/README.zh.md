@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # hooks/ — 钩子桥接与共享协议
 
 [English](README.md) | 中文

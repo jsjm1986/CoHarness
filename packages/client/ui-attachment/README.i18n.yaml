@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-attachment/README.md
-README.md: 69b47b6d2b94f5e03eb06650fcc130dfdda3e250
-README.zh.md: 57327fe7cfb9a391b90c692fc89b6bacede928b4
+/:
+  en: 0900fa7c5409e305
+  zh: 61495d48365178df
+/deepseek-ai-dsh-client-ui-attachment:
+  en: 02f40635b0daf4ba
+  zh: 01c6f3653b2858e4
+/deepseek-ai-dsh-client-ui-attachment/summary:
+  en: f36aa7a85597dd66
+  zh: f7e87849791fe89a
+/deepseek-ai-dsh-client-ui-attachment/table-of-contents:
+  en: c247cff12ca87f62
+  zh: 2c62c9b41a1434d6
+/deepseek-ai-dsh-client-ui-attachment/attachment-rail:
+  en: af1d6ab2acd4e7f5
+  zh: df91389ca20ab7bb
+/deepseek-ai-dsh-client-ui-attachment/message-images-and-the-lightbox:
+  en: cb9029bd7f520849
+  zh: 78770ab7fc334780
+/deepseek-ai-dsh-client-ui-attachment/drop-overlay:
+  en: 5d5fe9086d26516a
+  zh: e9c862da2997d78f
+/deepseek-ai-dsh-client-ui-attachment/invariants:
+  en: cc6ec68477d593c7
+  zh: 87f866104772295e
+/deepseek-ai-dsh-client-ui-attachment/model-experience:
+  en: 25566605d7b38667
+  zh: 927d3ea272893296
+/deepseek-ai-dsh-client-ui-attachment/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: 2026c1566df4f78c
+/deepseek-ai-dsh-client-ui-attachment/known-limitations-and-deferred-work:
+  en: ec7eb6d54ecb1f5a
+  zh: 75ddfdd7e9fb17af
+/deepseek-ai-dsh-client-ui-attachment/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

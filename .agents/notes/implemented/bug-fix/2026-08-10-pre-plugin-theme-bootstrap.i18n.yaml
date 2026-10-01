@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-pre-plugin-theme-bootstrap.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-10-pre-plugin-theme-bootstrap.md
-2026-08-10-pre-plugin-theme-bootstrap.md: 7f5c57316d7dd022b08918459282a6f6128eb93b
-2026-08-10-pre-plugin-theme-bootstrap.zh.md: 258a6ce415f2fb4b6c425b62f71d7f249e3523b9
+/agent-note-pre-plugin-theme-bootstrap:
+  en: 0cbdfb9980a5aa18
+  zh: adc22ce2822b1ee7
+/agent-note-pre-plugin-theme-bootstrap/problem:
+  en: a5c7724b54d2258f
+  zh: 8b925de2afd5e65b
+/agent-note-pre-plugin-theme-bootstrap/decision:
+  en: b0c2508b20a96b06
+  zh: 9ae91743566f10f1
+/agent-note-pre-plugin-theme-bootstrap/verification:
+  en: 475e2c056fdc4f35
+  zh: f5f3c9f5c5040678
+/agent-note-pre-plugin-theme-bootstrap/alternatives-considered:
+  en: e8e4b2a183493492
+  zh: 3146bcac216d4910
+/agent-note-pre-plugin-theme-bootstrap/consequences:
+  en: a6da54a2beaab561
+  zh: 9f4ec5ec04fab034

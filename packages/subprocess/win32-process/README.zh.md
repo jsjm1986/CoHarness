@@ -49,6 +49,9 @@ g++ -std=c++20 -municode -O2 -o abi-probe.exe verify/abi-probe.cpp && ./abi-prob
 
 Koffi 的 `STARTUPINFOW` 与 `PROCESS_INFORMATION` 定义还会在模块加载时断言各自的 64 位大小。该探针还固定指针与句柄宽度、Unicode 环境标志，以及用于判断完全停稳的基础 Job accounting record 大小与 `ActiveProcesses` 偏移；其余已记录偏移和常量也由该探针提供证据。
 
+
+**运行时不变式：** 不发布伴生入口。操作只持有调用内的原生句柄。
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -66,6 +69,7 @@ Koffi 的 `STARTUPINFOW` 与 `PROCESS_INFORMATION` 定义还会在模块加载�
 
 本包不贡献稳定请求前缀，因此不会使模型 KV Cache 失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -77,7 +81,6 @@ Koffi 的 `STARTUPINFOW` 与 `PROCESS_INFORMATION` 定义还会在模块加载�
 - **创建到分配之间的中断** — 目标以 suspended 状态启动，不能在 Job 分配前执行，但 runner 若在进程创建到分配之间的极窄区间被外力终止，可能留下 suspended target。本包不声明原子 Job 附加保证。
 - **header 证据限定架构** — 已提交的 ABI probe 与布局常量覆盖仓库当前 64 位 Windows 目标。支持新的指针宽度或不兼容 Windows ABI 前，必须先更新 probe。
 
-
 <a id="dev-note"></a>
 ### 开发备注
 
@@ -87,5 +90,3 @@ Koffi 的 `STARTUPINFOW` 与 `PROCESS_INFORMATION` 定义还会在模块加载�
 无。
 
 </details>
-
-**运行时不变式：** 不发布伴生入口。操作只持有调用内的原生句柄。

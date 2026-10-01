@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-18-markdown-cross-link-lint.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-06-18-markdown-cross-link-lint.md
-2026-06-18-markdown-cross-link-lint.md: 37e0a41c08e068d6b3128300f078c8e417f1f337
-2026-06-18-markdown-cross-link-lint.zh.md: 56a1c9e90debe06d313fd5aaf03f771b60327dcb
+/agent-note-markdown-cross-link-validity-linting:
+  en: 3fab0bd6669d7358
+  zh: 6ce27df42615a16f
+/agent-note-markdown-cross-link-validity-linting/problem:
+  en: 3d935f837997379d
+  zh: 280bcd8fee96d1f5
+/agent-note-markdown-cross-link-validity-linting/decision:
+  en: 6e87bb64dd706fd8
+  zh: 67309e5bcb3d0db7
+/agent-note-markdown-cross-link-validity-linting/alternatives-considered:
+  en: be48d50c8d53dd53
+  zh: 6108ed02cd3a176e
+/agent-note-markdown-cross-link-validity-linting/consequences:
+  en: 06c2dedee514f5bd
+  zh: a0156f4a412e99a4

@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-03-web-search-source-scroll.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-03-web-search-source-scroll.md
-2026-08-03-web-search-source-scroll.md: 6fe532e2a2989e834b926cf48d531ae60a32f58b
-2026-08-03-web-search-source-scroll.zh.md: 12bc6d3decb3c13ea759a9f25322b94e45db1322
+/agent-note-web-search-source-card-scrolls-instead-of-collapsing:
+  en: 93c152369a439c76
+  zh: 384f57a1f101d64d
+/agent-note-web-search-source-card-scrolls-instead-of-collapsing/problem:
+  en: 4b2c88ed417fb6e4
+  zh: 8856865c2365ed99
+/agent-note-web-search-source-card-scrolls-instead-of-collapsing/decision:
+  en: 28ef223b4115571b
+  zh: 4da1a66265df1657
+/agent-note-web-search-source-card-scrolls-instead-of-collapsing/alternatives-considered:
+  en: 3cdd03c8a56cfddf
+  zh: 1bd093f88b11f113
+/agent-note-web-search-source-card-scrolls-instead-of-collapsing/consequences:
+  en: 53e06db5de93375f
+  zh: 761bc176190ff803
+/agent-note-web-search-source-card-scrolls-instead-of-collapsing/testing:
+  en: 7f384fa8a1f9df9d
+  zh: d11a8d4fc291bc68
+/agent-note-web-search-source-card-scrolls-instead-of-collapsing/related:
+  en: a162193e685b88c8
+  zh: b600913eb1c9a38a

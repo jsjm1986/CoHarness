@@ -1044,11 +1044,16 @@
     {
       "doc": "docs/subsystems/jobs.md",
       "symbol": "JobKindMap",
+      "source": "packages/jobs/jobs/src/view.ts"
+    },
+    {
+      "doc": "docs/subsystems/jobs.md",
+      "symbol": "JobSpec",
       "source": "packages/jobs/jobs/src/types.ts"
     },
     {
       "doc": "docs/subsystems/jobs.md",
-      "symbol": "JobStart",
+      "symbol": "JobHandle",
       "source": "packages/jobs/jobs/src/types.ts"
     },
     {
@@ -1063,12 +1068,42 @@
     },
     {
       "doc": "docs/subsystems/jobs.md",
-      "symbol": "JobSnapshot",
+      "symbol": "JobOutputSource",
       "source": "packages/jobs/jobs/src/types.ts"
     },
     {
       "doc": "docs/subsystems/jobs.md",
+      "symbol": "JobSourceRead",
+      "source": "packages/jobs/jobs/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jobs.md",
+      "symbol": "JobChunk",
+      "source": "packages/jobs/jobs/src/view.ts"
+    },
+    {
+      "doc": "docs/subsystems/jobs.md",
+      "symbol": "JobOutputRead",
+      "source": "packages/jobs/jobs/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jobs.md",
+      "symbol": "JobView",
+      "source": "packages/jobs/jobs/src/view.ts"
+    },
+    {
+      "doc": "docs/subsystems/jobs.md",
       "symbol": "JobRead",
+      "source": "packages/jobs/jobs/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jobs.md",
+      "symbol": "JobEvent",
+      "source": "packages/jobs/jobs/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/jobs.md",
+      "symbol": "JobEventFilter",
       "source": "packages/jobs/jobs/src/types.ts"
     },
     {
@@ -1804,6 +1839,16 @@
     {
       "doc": "docs/subsystems/workspace.md",
       "symbol": "Workspace",
+      "source": "packages/workspace/workspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/workspace.md",
+      "symbol": "SessionActivityKindMap",
+      "source": "packages/workspace/workspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/workspace.md",
+      "symbol": "SessionActivity",
       "source": "packages/workspace/workspace/src/types.ts"
     },
     {

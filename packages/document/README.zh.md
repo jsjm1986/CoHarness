@@ -7,7 +7,7 @@ kind: "package-group"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 在宿主上将已授权的 Office 文件转换为可复用的 PDF。共享服务使用 LibreOffice kit 执行转换。声明了原生引擎的目标使用原生引擎，其余目标使用 Node WASM。
 

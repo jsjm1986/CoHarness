@@ -74,6 +74,7 @@ git 通过选定的 `subprocess` 能力运行，使用净化后的环境、`GIT_
 - [子进程能力](../../subprocess/README.zh.md)——git 运行所经过的接缝。
 - [本轮改动文件卡片决策](../../../.agents/notes/implemented/architecture/2026-09-23-authorized-workspace-review.zh.md)——快照设计、覆盖规则、暂缓的影子仓库与被否决的备选方案。
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -83,6 +84,7 @@ git 通过选定的 `subprocess` 能力运行，使用净化后的环境、`GIT_
 
 这里的内容不会进入模型请求，因此不影响提供方缓存复用。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-22-fork-child-replay-seed-boundary.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-06-22-fork-child-replay-seed-boundary.md
-2026-06-22-fork-child-replay-seed-boundary.md: 5afe2d5433a9367b62ede880649962f8a514740b
-2026-06-22-fork-child-replay-seed-boundary.zh.md: 1c4a7ae9df08f216fcfe09676f349acf12f8d483
+/agent-note-persist-the-seed-boundary-so-fork-child-replay-routes-correctly:
+  en: 623d6e42cbc7d999
+  zh: bd85cac27bd094ac
+/agent-note-persist-the-seed-boundary-so-fork-child-replay-routes-correctly/problem:
+  en: a22f4ebdf71e7212
+  zh: 504bc31a7cd2318f
+/agent-note-persist-the-seed-boundary-so-fork-child-replay-routes-correctly/decision:
+  en: 2e273b3d97cc13ad
+  zh: db6d90f9262af86b
+/agent-note-persist-the-seed-boundary-so-fork-child-replay-routes-correctly/decision/1-lineage-metadata-and-an-exact-body-owned-cut:
+  en: 10a5e1b4883c1ab5
+  zh: 1737e49f73b58946
+/agent-note-persist-the-seed-boundary-so-fork-child-replay-routes-correctly/decision/2-both-persistence-backends-round-trip-it:
+  en: 2d157c791ba5abfe
+  zh: c1b69d3a98a0beea
+/agent-note-persist-the-seed-boundary-so-fork-child-replay-routes-correctly/decision/3-replay-derives-a-child-script-after-the-boundary:
+  en: 81979f7a732f8a9b
+  zh: 861f57a201cc45c0
+/agent-note-persist-the-seed-boundary-so-fork-child-replay-routes-correctly/alternatives-considered:
+  en: fcb084326749b838
+  zh: eab5c2ec201a3172
+/agent-note-persist-the-seed-boundary-so-fork-child-replay-routes-correctly/consequences:
+  en: 5761b3a2d1959c71
+  zh: ab0fb5f951c529b1

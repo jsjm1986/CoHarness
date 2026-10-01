@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-library"
+---
+
 # dsh-home-paths
 
 [English](README.md) | 中文
@@ -8,6 +13,16 @@ DeepSeek Harness 用户数据的共享文件系统路径辅助工具。
 
 `@deepseek-ai/dsh-home-paths` 让包作者能够解析统一的 DeepSeek Harness 数据根目录，并由它派生子路径。显式路径优先于 `$DSH_HOME`，后者优先于 `~/.dsh`；空白环境变量会被忽略。其公开辅助函数可以在不暴露机器绝对路径的情况下显示根目录，仅展开单独或当前用户的波浪号形式，并规范化最终路径段尚不存在的监听目标。请把它作为库依赖直接使用，不要通过 `cordis.yml` 加载。
 
+## 目录
+
+- [DSH 主目录](#dsh-home)
+- [监听路径](#watch-paths)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="dsh-home"></a>
 ## DSH 主目录
 
 `resolveDshHome()` 解析 DeepSeek Harness 的单根主目录。优先级从高到低为：显式配置的路径、`$DSH_HOME`、`~/.dsh`。harness 将所有用户数据保存在同一根目录下。
@@ -22,6 +37,7 @@ DeepSeek Harness 用户数据的共享文件系统路径辅助工具。
 
 `expandHomePath()` 使用操作系统主目录展开 `~`、`~/...` 和 Windows 风格的 `~\...` 前缀。它会保留非波浪号路径和 `~user/...` 原样不变。
 
+<a id="watch-paths"></a>
 ## 监听路径
 
 `canonicalizeWatchPath()` 为原生文件系统 watcher 提供一种稳定的目标路径表示。它通过 `fs.realpath()` 解析层级最深的现有祖先路径，再拼回缺失的后缀，因此即使文件或目录尚未创建也仍可监听。尤其是，Windows 8.3 别名不能与原生 watcher 后端发出的长路径混用。
@@ -30,7 +46,18 @@ DeepSeek Harness 用户数据的共享文件系统路径辅助工具。
 
 **运行时不变式：** 不发布伴生入口。这个纯工具包不持有事件流或可变运行时数据；其解析规则和值代数由单元测试保障。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **展开范围刻意保持狭窄**：只有单独的 `~`、`~/...` 和 `~\...` 使用当前操作系统主目录；`~alice/...` 等指定用户的形式、环境变量和 shell 表达式保持不变。
 - **规范化会读取，但绝不修改**：`canonicalizeWatchPath()` 会执行 `realpath` 探测，并传播除路径不存在以外的错误；调用方仍负责目录创建、权限，以及对结果路径应用信任策略。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

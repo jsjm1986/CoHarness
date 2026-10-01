@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-user-questions
 
 [English](README.md) | 中文
@@ -18,10 +23,22 @@ Web 提问功能插件：其浏览器侧把 `question` 条目注册到会话拥�
 
 当 agent（智能体）在 Web 客户端中提问时，本包会用交互式提问界面接管聊天编辑器。用户可以在问题之间导航、选择一个或多个选项、输入自定义答案、跳过问题，并提交一批结构化答案。选择单选项后会立即前进，而草稿会在当前页面的生命周期内跨会话导航保留。若唯一的问题声明了受支持的呈现意图，则可使用专用界面，包括带 `Request changes` 和 `Approve` 操作的 plan-review 卡片。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。渲染是一次 composer-slot 贡献；问题生命周期与工具属于 `dsh-tool-ask-user` 和交互 seam。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 间接影响模型体验：本包在 Web 客户端呈现 `dsh-tool-ask-user` 所拥有的模型可见 schema 与答案渲染。
@@ -30,7 +47,18 @@ Web 提问功能插件：其浏览器侧把 `question` 条目注册到会话拥�
 
 不会直接失效；模型可见的工具调用与结果由 `dsh-tool-ask-user` 拥有。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **未提交的草稿不持久**：重新连接再同步或完整刷新页面时，会恢复主机拥有且 rpcId 相同的待处理请求，但编辑器卸载会重置本地选项和自定义文本草稿。
 - **每次只有一个请求拥有编辑器**：后续待处理请求仍留在会话快照中，并在较早请求落定后显示。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

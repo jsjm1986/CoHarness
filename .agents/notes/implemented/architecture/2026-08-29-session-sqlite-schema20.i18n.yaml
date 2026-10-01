@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-29-session-sqlite-schema20.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-29-session-sqlite-schema20.md
-2026-08-29-session-sqlite-schema20.md: afe23452b51ea1e69d4a37dd0e3487157b32744a
-2026-08-29-session-sqlite-schema20.zh.md: 0ced19fb0ca946469d1f5890e4d920c0a73d33ab
+/agent-note-use-a-coharness-sqlite-schema-20-with-explicit-extensions:
+  en: aafd8dd24e00b294
+  zh: e2e7873ed4215c9f
+/agent-note-use-a-coharness-sqlite-schema-20-with-explicit-extensions/problem:
+  en: 161dda68da0f33f4
+  zh: 536cce024cdd7369
+/agent-note-use-a-coharness-sqlite-schema-20-with-explicit-extensions/decision:
+  en: 82760b876d81e8c2
+  zh: 9563b271bde3cc7a
+/agent-note-use-a-coharness-sqlite-schema-20-with-explicit-extensions/alternatives-considered:
+  en: cfda63946cc12828
+  zh: 41785ce2b7b2da6a
+/agent-note-use-a-coharness-sqlite-schema-20-with-explicit-extensions/consequences:
+  en: e99b605511cf45b6
+  zh: c897188fb11292ad
+/agent-note-use-a-coharness-sqlite-schema-20-with-explicit-extensions/testing:
+  en: 4a0370353a67bd25
+  zh: 8e02b2826568cad6

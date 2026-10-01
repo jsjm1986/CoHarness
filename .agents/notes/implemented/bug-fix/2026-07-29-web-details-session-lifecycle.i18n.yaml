@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-29-web-details-session-lifecycle.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-29-web-details-session-lifecycle.md
-2026-07-29-web-details-session-lifecycle.md: 41b89fc059a02e56f53b27e5a5b48fb9488b93d7
-2026-07-29-web-details-session-lifecycle.zh.md: af0565bf78b17ab91861b260537f4c70ef43f4f9
+/agent-note-web-details-follow-the-current-session-lifecycle:
+  en: 0bfaf3a215cddf4f
+  zh: bfb9c6ee03f08656
+/agent-note-web-details-follow-the-current-session-lifecycle/problem:
+  en: cbe59f932f6dcc62
+  zh: 4a7f91782a353220
+/agent-note-web-details-follow-the-current-session-lifecycle/decision:
+  en: 3dbabf4aa3fbfeb0
+  zh: c16ce884e846c70d
+/agent-note-web-details-follow-the-current-session-lifecycle/alternatives-considered:
+  en: a6da1807882cffea
+  zh: a74f6d2b6623faac
+/agent-note-web-details-follow-the-current-session-lifecycle/consequences:
+  en: 15c82d9c31f8184f
+  zh: febcce2e715eb60d

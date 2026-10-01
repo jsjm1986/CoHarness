@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/userdoc-context/README.md
-README.md: 29f123e23b23606d62ced94e1f15bb5042dc4324
-README.zh.md: c39840ebedd4c58a05929181d6f81fe585fa5aaf
+/:
+  en: af80c5285c7ca4e8
+  zh: 61495d48365178df
+/deepseek-ai-dsh-userdoc-context:
+  en: 1d05045fd8bd6f3e
+  zh: 5e236fa213bb1956
+/deepseek-ai-dsh-userdoc-context/summary:
+  en: 1e0f755a376cb4db
+  zh: 31685f2beb619ecf
+/deepseek-ai-dsh-userdoc-context/table-of-contents:
+  en: 016ccb39eca14827
+  zh: 6218206968360256
+/deepseek-ai-dsh-userdoc-context/public-api:
+  en: 5c46651810b1a9ed
+  zh: 4a3e4fcce01bdc32
+/deepseek-ai-dsh-userdoc-context/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-userdoc-context/model-experience/admitted-document-context:
+  en: d559fc055892fd4b
+  zh: 11296a4fa0555d51
+/deepseek-ai-dsh-userdoc-context/model-experience/admitted-document-context/what-the-model-sees:
+  en: bcfd3530a46764ee
+  zh: 8f9225c4aa8232b5
+/deepseek-ai-dsh-userdoc-context/model-experience/admitted-document-context/what-the-model-sees/inline-representation:
+  en: 6da24c69db085666
+  zh: b9dce6699d5bd244
+/deepseek-ai-dsh-userdoc-context/model-experience/admitted-document-context/what-the-model-sees/path-representation:
+  en: 243ab5a00eef5aae
+  zh: eb220fc3fa49f3f3
+/deepseek-ai-dsh-userdoc-context/model-experience/admitted-document-context/token-effect:
+  en: 94363571e63a7e6f
+  zh: d70ba0723e6b9ea5
+/deepseek-ai-dsh-userdoc-context/model-experience/admitted-document-context/kv-cache-effect:
+  en: 7d477b59750afb75
+  zh: 3133b97c1e31ce31
+/deepseek-ai-dsh-userdoc-context/known-limitations-and-deferred-work:
+  en: 211953ff8508a36b
+  zh: 121f581f2b48330a
+/deepseek-ai-dsh-userdoc-context/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

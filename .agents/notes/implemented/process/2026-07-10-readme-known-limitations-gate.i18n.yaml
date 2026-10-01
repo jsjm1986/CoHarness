@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-10-readme-known-limitations-gate.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-10-readme-known-limitations-gate.md
-2026-07-10-readme-known-limitations-gate.md: 2ca1168d795692730d17b6ab23dd113e8be277e5
-2026-07-10-readme-known-limitations-gate.zh.md: cabb368af5b3e35ffcb8713b2c96fdb767f6237d
+/agent-note-a-gated-known-limitations-section-in-every-package-readme:
+  en: bbb461453dd8b2c0
+  zh: 536c81ea490f68c8
+/agent-note-a-gated-known-limitations-section-in-every-package-readme/problem:
+  en: 808ac69776b6073a
+  zh: f73ed7517a86251f
+/agent-note-a-gated-known-limitations-section-in-every-package-readme/decision:
+  en: 5b8b784afc52b5ca
+  zh: a03aa5248e69636e
+/agent-note-a-gated-known-limitations-section-in-every-package-readme/alternatives-considered:
+  en: 4d6514b97ba8e407
+  zh: c222dc74da800945
+/agent-note-a-gated-known-limitations-section-in-every-package-readme/consequences:
+  en: 76fd13d59815e97c
+  zh: c13529960ac0d31c

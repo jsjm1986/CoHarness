@@ -48,7 +48,7 @@ describe('web e2e: resident question composer round trip', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     // Fresh world: connect a Workspace so the composer scenarios start live.
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
@@ -80,6 +80,8 @@ describe('web e2e: resident question composer round trip', () => {
     const selectedRow = page.locator('[role="treeitem"][aria-selected="true"]')
     await expect.poll(() => selectedRow.locator('[data-state="warning"]').count(), { timeout: 10_000 }).toBe(1)
     await expect.poll(() => selectedRow.getByText('Waiting for answer', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
+    await expect.poll(() => selectedRow.getByText('Answer', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
+    expect(await selectedRow.getByText('now', { exact: true }).count()).toBe(0)
 
     if (MODE !== 'record') {
       // This golden owns the stable question surface; the answered-state
@@ -151,11 +153,10 @@ describe('web e2e: resident question composer round trip', () => {
     }
     // World state: the tool result carries the chosen answer, and DONE lands.
     const results = sessionEvents.filter(e => e.type === 'tool/result')
-    const answerText = results.flatMap(event => event.data.message.content.flatMap(block =>
-      block.type === 'tool-result'
-        ? block.content.filter(item => item.type === 'text').map(item => item.text)
-        : [],
-    )).at(-1)
+    const answerText = results.flatMap(event => event.data.message.content
+      .filter(item => item.type === 'text')
+      .map(item => item.text),
+    ).at(-1)
     expect(JSON.parse(answerText ?? '')).toEqual({
       answers: [{ id: 'color', selected: ['Blue'], custom: 'Include accessibility notes' }],
     })

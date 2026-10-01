@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-23-ssh-execution-providers.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-ssh-execution-providers.md
-2026-09-23-ssh-execution-providers.md: 8f5cc5553429f6928815eb224418b402fc8d90f5
-2026-09-23-ssh-execution-providers.zh.md: 12d0767f4fdf2890c3636b071d70b8778f890b86
+/agent-note-ssh-execution-providers:
+  en: 96bda94763275721
+  zh: 2e3f9a535241ee48
+/agent-note-ssh-execution-providers/problem:
+  en: d764e40027d5a2bb
+  zh: ded34aceb2947078
+/agent-note-ssh-execution-providers/decision:
+  en: 70a73e5372a7c922
+  zh: 14a05941740326bf
+/agent-note-ssh-execution-providers/alternatives-considered:
+  en: 37b3e831026e16a6
+  zh: d594f9272656ca60
+/agent-note-ssh-execution-providers/consequences:
+  en: 9a4ca27318b0629a
+  zh: 6e3ab6594098f879
+/agent-note-ssh-execution-providers/verification:
+  en: e7f2e6f6babc418e
+  zh: bb43191d108d8b04

@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-18-shared-persistence-write-coordinator.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-18-shared-persistence-write-coordinator.md
-2026-06-18-shared-persistence-write-coordinator.md: 286bbb7d5cd3720109db0d0abc0bb72ddbfcbdcd
-2026-06-18-shared-persistence-write-coordinator.zh.md: 70db616b0a71826c648072228fff936ad423ad8f
+/agent-note-shared-persistence-write-coordinator:
+  en: e455ed2e38e75942
+  zh: 60d111c5938da5da
+/agent-note-shared-persistence-write-coordinator/problem:
+  en: 103e71b9afb95768
+  zh: 4accbc2c70417b24
+/agent-note-shared-persistence-write-coordinator/decision:
+  en: 08d9ba28b1632856
+  zh: c78a2fdb210c4d22
+/agent-note-shared-persistence-write-coordinator/decision/the-hook-interface-persistencebackend-tornmarker:
+  en: d035f5096368e52b
+  zh: 4cbd7f78f601d3e9
+/agent-note-shared-persistence-write-coordinator/decision/the-opaque-torn-marker:
+  en: afe2566686b9867c
+  zh: f0e08ab35a8a29c3
+/agent-note-shared-persistence-write-coordinator/testing:
+  en: 08ee70deaf1e28b4
+  zh: f5976cd5dfbb4746
+/agent-note-shared-persistence-write-coordinator/alternatives-considered:
+  en: 47b2479888e51ef0
+  zh: d78c9ef9b830020b
+/agent-note-shared-persistence-write-coordinator/consequences:
+  en: 23b45b43f7e5629f
+  zh: f6c8a81d21d7b34b

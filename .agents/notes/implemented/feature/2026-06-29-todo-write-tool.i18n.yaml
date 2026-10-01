@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-29-todo-write-tool.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-29-todo-write-tool.md
-2026-06-29-todo-write-tool.md: 74af8a66ea86a474533b9c53d6431f7e0026192c
-2026-06-29-todo-write-tool.zh.md: 223268ee1e9d330df3299651a594b7b2ed08e1ce
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state:
+  en: 2a67af6ba272f57d
+  zh: a434fd835cecabea
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/problem:
+  en: fe2d630f475aede1
+  zh: 3c2c61c3f66a99c4
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/decision:
+  en: fb2bb24ed13f9bf4
+  zh: 3e2957313426d298
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/decision/whole-list-replace-three-state-status:
+  en: 1069ba324279ecbe
+  zh: 9d57a6e2c8ee1227
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/decision/state-on-the-session-log-not-a-service:
+  en: 65650343a3b7f990
+  zh: f483a04bdb477ee5
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/decision/not-a-surface-event:
+  en: c36a41c4aefb08fa
+  zh: f2b3df796a0586c9
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/decision/dropped-vs-claude-code-v1-activeform-id-priority:
+  en: 9740b76ed3355eda
+  zh: 79e1248e006ff18b
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/decision/single-owner-no-swarm-machinery-yagni:
+  en: f14c998fbee56e02
+  zh: 4c1f3f3c0aa85b12
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/decision/validation-the-cheap-middle:
+  en: c8fcc55b41ad211b
+  zh: 6f7e62513053b642
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/why-no-cordis-catalog-entry-no-mode:
+  en: 5f446af48107848a
+  zh: 148d7889c0e0630e
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/testing:
+  en: c90513c8247435fa
+  zh: 60abcfb65a596d4f
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/alternatives-considered:
+  en: ff3a0a9f4af8ca84
+  zh: c5f1da1d0f7f89bd
+/agent-note-the-todo-write-tool-model-task-list-as-event-sourced-session-state/consequences:
+  en: 889ceddc5f50a0cd
+  zh: 2d3d8344e805e6e4

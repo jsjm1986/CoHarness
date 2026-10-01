@@ -482,33 +482,19 @@ describe('connection client apply', () => {
       expect(pooled.forSession!('s1' as SessionId)).toBe(pooled)
       expect(pooled.forSession!('other' as SessionId)).toBe(handle)
 
-      const original = globalThis.fetch
-      globalThis.fetch = (input: URL | RequestInfo, init?: RequestInit) => {
-        void input
-        const request = JSON.parse(init?.body as string) as { rpcId: string }
-        return Promise.resolve(Response.json({
-          type: 'server-response',
-          rpcId: request.rpcId,
-          result: { ok: true, value: {
-            version: '0.0.0-test', cwd: '/tmp', attachedSessions: 0, home: '/tmp', canOpenPath: false,
-          } },
-        }))
-      }
-      try {
-        const loop = pooled.start({})
-        await vi.waitFor(() => { expect(pooled.state.getSnapshot()).toBe('connected') })
-        expect(pooled.hostDescription.getSnapshot()?.version).toBe('0.0.0-test')
-        // The session-addressed lookup keeps returning the live started handle.
-        expect(handle.forSession!('s1' as SessionId)).toBe(pooled)
-        loop.stop()
-        expect(pooled.state.getSnapshot()).toBeUndefined()
-        expect(pooled.hostDescription.getSnapshot()).toBeUndefined()
-        // A stopped target is evicted: the next resolution mints a fresh handle.
-        expect(handle.forSession!('s1' as SessionId)).not.toBe(pooled)
-        expect(handle.forSession!('s1' as SessionId).state.getSnapshot()).toBeUndefined()
-      } finally {
-        globalThis.fetch = original
-      }
+      // A pooled handle in a fixture page shares the fixture carrier: `?fixture`
+      // composition means there is no server for the target to reach.
+      const loop = pooled.start({})
+      await vi.waitFor(() => { expect(pooled.state.getSnapshot()).toBe('connected') })
+      expect(pooled.hostDescription.getSnapshot()?.version).toBe('0.0.0-fixture')
+      // The session-addressed lookup keeps returning the live started handle.
+      expect(handle.forSession!('s1' as SessionId)).toBe(pooled)
+      loop.stop()
+      expect(pooled.state.getSnapshot()).toBeUndefined()
+      expect(pooled.hostDescription.getSnapshot()).toBeUndefined()
+      // A stopped target is evicted: the next resolution mints a fresh handle.
+      expect(handle.forSession!('s1' as SessionId)).not.toBe(pooled)
+      expect(handle.forSession!('s1' as SessionId).state.getSnapshot()).toBeUndefined()
     } finally {
       release()
     }

@@ -55,7 +55,9 @@ Each root-conversation authorization and readable-session filter queries the Gat
 
 The Gateway launches a runtime with one private credential delivered through an inherited file descriptor or a systemd credential file. The bearer token authenticates loopback internal API calls, while the public key verifies browser principals; neither value belongs in browser configuration.
 
-The Connection carrier wraps every accepted `/api` HTTP dispatch and event-stream WebSocket opening in the `connection/request` waterfall after its browser-trust check and before any RPC or stream handler runs. Authentication and request-context listeners inspect the immutable-at-entry headers and must call `next()` to preserve later listeners and dispatch.
+The Connection carrier wraps every accepted `/api` HTTP dispatch, generic RPC channel call, and event-stream WebSocket opening in the `connection/request` waterfall after its browser-trust check and before any RPC or stream handler runs. Authentication and request-context listeners inspect the immutable-at-entry headers and must call `next()` to preserve later listeners and dispatch.
+
+Ahead of the waterfall, admission runs `connection/authenticate(request)` — a synchronous bail whose first defined answer decides: `'allow'` admits without a browser credential, `'deny'` refuses even a minted cookie or live launch token, and `undefined` falls back to the launch-token exchange and cookie. The request carries `kind: 'index' | 'http' | 'upgrade'` plus headers and optional method/url facts, so providers distinguish index, `/api`, generic channels, and upgrade openings. The Host/Origin fence always precedes it, and registered `loopback` subtrees never consult it. A provider must prove identity itself — observing a header is never an admission; GatewayRuntime is the shipped provider, verifying the proxy's signed `x-dsh-gateway-principal` before any cookie exists. `connection/request` still owns principal re-verification and request-local propagation.
 
 ```ts type-equiv
 /** One accepted HTTP request or WebSocket opening entering the Connection carrier. */

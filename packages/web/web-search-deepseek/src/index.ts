@@ -13,14 +13,12 @@ import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-sett
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-web'
-import { MAX_WEB_RESPONSE_MAX_BYTES } from '@deepseek-ai/dsh-web'
 import {
   DeepSeekSearchProvider,
   DEEPSEEK_DEFAULT_API_VERSION,
   DEEPSEEK_DEFAULT_BASE_URL,
   DEEPSEEK_DEFAULT_MAX_TOKENS,
   DEEPSEEK_DEFAULT_MAX_USES,
-  DEEPSEEK_DEFAULT_MAX_RESPONSE_BYTES,
   DEEPSEEK_DEFAULT_MODEL,
 } from './provider.ts'
 import type { DeepSeekSearchProviderOptions } from './provider.ts'
@@ -31,7 +29,6 @@ export {
   DEEPSEEK_DEFAULT_BASE_URL,
   DEEPSEEK_DEFAULT_MAX_TOKENS,
   DEEPSEEK_DEFAULT_MAX_USES,
-  DEEPSEEK_DEFAULT_MAX_RESPONSE_BYTES,
   DEEPSEEK_DEFAULT_MODEL,
   DEEPSEEK_PROVIDER_ID,
 } from './provider.ts'
@@ -61,8 +58,6 @@ export interface Config {
   maxTokens?: number
   /** Maximum `web_search` server-tool uses per request. Defaults to 5. */
   maxUses?: number
-  /** Maximum UTF-8 bytes retained from one success or error response (up to 256 MiB). */
-  maxResponseBytes?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -76,7 +71,6 @@ export const Config: z<Config> = z.object({
   apiVersion: z.string().default(DEEPSEEK_DEFAULT_API_VERSION),
   maxTokens: z.number().step(1).min(1).default(DEEPSEEK_DEFAULT_MAX_TOKENS),
   maxUses: z.number().step(1).min(1).default(DEEPSEEK_DEFAULT_MAX_USES),
-  maxResponseBytes: z.number().step(1).min(1).max(MAX_WEB_RESPONSE_MAX_BYTES).default(DEEPSEEK_DEFAULT_MAX_RESPONSE_BYTES),
 })
 
 /**
@@ -120,7 +114,6 @@ function resolveOptions(ctx: Context, config: Config): DeepSeekSearchProviderOpt
     apiVersion: config.apiVersion ?? DEEPSEEK_DEFAULT_API_VERSION,
     maxTokens: config.maxTokens ?? DEEPSEEK_DEFAULT_MAX_TOKENS,
     maxUses: config.maxUses ?? DEEPSEEK_DEFAULT_MAX_USES,
-    maxResponseBytes: config.maxResponseBytes ?? DEEPSEEK_DEFAULT_MAX_RESPONSE_BYTES,
     recordRequest: (request) => {
       ctx.get('agents')?.currentInitiator()?.session.append(
         'web/deepseek-search-llm-request',
@@ -136,7 +129,7 @@ export function apply(ctx: Context, config: Config): void {
   installSettingsSection(ctx, WEB_SEARCH_DEEPSEEK_SETTINGS_NAMESPACE, Config, config, {
     owner: 'project',
     projectWrite: 'manager',
-    projectWritePaths: [['baseURL'], ['model'], ['apiVersion'], ['maxTokens'], ['maxUses'], ['maxResponseBytes']],
+    projectWritePaths: [['baseURL'], ['model'], ['apiVersion'], ['maxTokens'], ['maxUses']],
     setSource: (source) => {
       current = source
     },

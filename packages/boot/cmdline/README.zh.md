@@ -114,7 +114,6 @@ kind: "package-library"
 
 -----
 
-<a id="model-experience"></a>
 ## 模型体验
 
 无。本包在任何会话存在之前解析进程自身的命令行；所有模型可见的影响都由配置行产生。
@@ -123,6 +122,7 @@ kind: "package-library"
 
 无；本包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -147,3 +147,5 @@ kind: "package-library"
 `parseCmdline` 是 commander 适配器，而不是命令行框架：help、version 与错误输出遵循 commander 的格式，退出／输出路由也假定 commander 的控制流模型。改用其他解析器需要它自己的路由与错误处理；`cmdlineArgs` 服务约定中没有任何内容依赖 commander。
 
 </details>
+
+<a id="model-experience"></a>

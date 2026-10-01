@@ -30,7 +30,7 @@ const SID = 's1' as SessionId
 function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled?: boolean }) {
   const session = createSnapshotStore<ConversationSnapshot>({
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
-    nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue: [], running: over?.running ?? false, composerPhase: 'active',
     removed: over?.disabled ?? false, openState: 'open', openError: null, hasMore: false,
     loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
@@ -41,10 +41,10 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
     useSession: bindSnapshotSelector(session),
     useSessions: bindSnapshotSelector(createSnapshotStore({
       ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
-      subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+      subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })),
     useWorkspaces: bindSnapshotSelector(createSnapshotStore({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
     useProjection: (() => undefined),
@@ -63,6 +63,7 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
       previewUrl: `blob:${id}`,
     })),
     useBusyEnter: bindSnapshotSelector(createSnapshotStore<'queue' | 'steer'>('queue')),
+    useStopShortcut: bindSnapshotSelector(createSnapshotStore<readonly string[]>([])),
     toggleCommandMenu: vi.fn(),
     useNotices: bindSnapshotSelector(shell.notices),
     useLexicon: bindSnapshotSelector(shell.lexicon),

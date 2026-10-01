@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-23-deliverables-events.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-09-23-deliverables-events.md
-2026-09-23-deliverables-events.md: af0a266d7e032a4fd4d673054b45d0132095fbb1
-2026-09-23-deliverables-events.zh.md: a4a4892c454e21aaa11cfedf0277ffbebb4e815e
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-09-23-deliverables-events:
+  en: 9211b145cde925ad
+  zh: 6a0375f012d026b7
+/2026-09-23-deliverables-events/summary:
+  en: 9759828ea2c05bea
+  zh: 53ff0744e0ff49a0
+/2026-09-23-deliverables-events/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-09-23-deliverables-events/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-09-23-deliverables-events/compatibility:
+  en: a3d1635f0e2fc75a
+  zh: e6d1d074f94db2bc
+/2026-09-23-deliverables-events/verification:
+  en: 9c85c3f0940b5e43
+  zh: a9f54c452b709cfc
+/2026-09-23-deliverables-events/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

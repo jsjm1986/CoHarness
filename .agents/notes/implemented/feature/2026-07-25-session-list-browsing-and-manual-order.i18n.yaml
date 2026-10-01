@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-25-session-list-browsing-and-manual-order.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-25-session-list-browsing-and-manual-order.md
-2026-07-25-session-list-browsing-and-manual-order.md: 52a0fe0c94106cb4178c57e737b1c9a3f458f803
-2026-07-25-session-list-browsing-and-manual-order.zh.md: d2e24ef5d4bb83cf4f3fa0a2476a85daf3b141c8
+/agent-note-session-list-browsing-and-manual-workspace-order:
+  en: dff365d761dbe6a7
+  zh: a21f2249ce59be4c
+/agent-note-session-list-browsing-and-manual-workspace-order/problem:
+  en: e635f3c93d05767d
+  zh: 677cbf55a255e2b2
+/agent-note-session-list-browsing-and-manual-workspace-order/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-session-list-browsing-and-manual-workspace-order/decision/flat-rows-and-viewing-state:
+  en: a863bdc3c7f04849
+  zh: da22dc6441540da6
+/agent-note-session-list-browsing-and-manual-workspace-order/decision/row-interactions:
+  en: 7af6afff098b61e4
+  zh: 9f966b5f9ed9fb60
+/agent-note-session-list-browsing-and-manual-workspace-order/decision/workspace-rename:
+  en: 8140c49345e556f8
+  zh: 1aa6e3c23fda9b51
+/agent-note-session-list-browsing-and-manual-workspace-order/decision/manual-order-insertsessionbefore-replaces-activity-pinning:
+  en: 5bc46d615c2a7693
+  zh: 1fac909122e3550d
+/agent-note-session-list-browsing-and-manual-workspace-order/decision/shell-region-split:
+  en: 7aced6ac81b64777
+  zh: e442d4390e767620
+/agent-note-session-list-browsing-and-manual-workspace-order/alternatives-considered:
+  en: e4dfabbae3cfe7e7
+  zh: 69e5727232f2b1aa
+/agent-note-session-list-browsing-and-manual-workspace-order/consequences:
+  en: 2e4f85b579644b8f
+  zh: 6894e617083b7a34
+/agent-note-session-list-browsing-and-manual-workspace-order/testing:
+  en: 84e57437a9fc6865
+  zh: 89ed42b1fa2d273b

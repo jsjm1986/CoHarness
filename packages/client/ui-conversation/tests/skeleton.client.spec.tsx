@@ -72,14 +72,14 @@ function workspace(id = 'w1'): WorkspaceView {
 }
 
 const workspaceState = (items: readonly WorkspaceView[]): WorkspaceListState => ({
-  items, archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+  items, archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
   baselinesReady: true, recentWorkspaceId: undefined,
 })
 
 function conversationSnapshot(overrides: Partial<ConversationSnapshot> = {}): ConversationSnapshot {
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
-    nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue: [], running: false, composerPhase: 'active', removed: false,
     openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
     promptError: null, blank: false, subagent: null, lastAgentError: null,
@@ -122,7 +122,7 @@ function mount(
     byId: { [root]: rootRow, ...listed && { [SID]: childRow } },
     archivedById: {},
     current: SID,
-    phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+    phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   })
   const workspaces = createSnapshotStore<WorkspaceListState>(workspaceState(workspaceRows))
   const session = createSnapshotStore<ConversationSnapshot>(snapshot)
@@ -222,6 +222,7 @@ function mount(
           retryDocument={() => {}}
           draftImages={() => []}
           useBusyEnter={bindSnapshotSelector(createSnapshotStore<'queue' | 'steer'>('queue'))}
+          useStopShortcut={bindSnapshotSelector(createSnapshotStore<readonly string[]>([]))}
           toggleCommandMenu={vi.fn()}
           useNotices={bindSnapshotSelector(wiring.notices)}
           useLexicon={bindSnapshotSelector(wiring.lexicon)}

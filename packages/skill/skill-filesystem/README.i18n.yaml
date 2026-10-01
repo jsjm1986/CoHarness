@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/skill/skill-filesystem/README.md
-README.md: 6424d9d7108b87f0974d1e2523039cf185b290fa
-README.zh.md: 27aa443a61b782d7303bf55f89d3d464d707c81f
+/:
+  en: 88f372ab5e279e8d
+  zh: 61495d48365178df
+/deepseek-ai-dsh-skill-filesystem:
+  en: 84af472915a3af38
+  zh: 5a466a56eb96e4e3
+/deepseek-ai-dsh-skill-filesystem/summary:
+  en: ef659bb1fd748f41
+  zh: 9d40999be52526f5
+/deepseek-ai-dsh-skill-filesystem/table-of-contents:
+  en: 04c49f86717a561b
+  zh: c490bd7c5736caf2
+/deepseek-ai-dsh-skill-filesystem/plugin:
+  en: 08de86bb75a5340c
+  zh: 79ab8ae84101b26f
+/deepseek-ai-dsh-skill-filesystem/plugin/config:
+  en: 2ef062c58b0878c7
+  zh: 44720f7433a45031
+/deepseek-ai-dsh-skill-filesystem/discovery:
+  en: 7f53e1f86fe10fa4
+  zh: 7fa8a707b6a7c358
+/deepseek-ai-dsh-skill-filesystem/catalog-change-detection:
+  en: 4837f3d492fe8684
+  zh: 40b892c923341287
+/deepseek-ai-dsh-skill-filesystem/skill-format:
+  en: 4a860a0b2f49b87a
+  zh: 6539d80893648823
+/deepseek-ai-dsh-skill-filesystem/invariants:
+  en: 122fd695b3994e4c
+  zh: 3761fef8cbc09184
+/deepseek-ai-dsh-skill-filesystem/model-experience:
+  en: 2276cca067cd120a
+  zh: 9986d49d39228243
+/deepseek-ai-dsh-skill-filesystem/model-experience/kv-cache-effect:
+  en: 14ddbda337682082
+  zh: 4dff574bcfd2e855
+/deepseek-ai-dsh-skill-filesystem/known-limitations-and-deferred-work:
+  en: 9c1dd330fc9022dd
+  zh: b1f8458cdf290bb6
+/deepseek-ai-dsh-skill-filesystem/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

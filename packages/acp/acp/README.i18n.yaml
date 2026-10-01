@@ -1,6 +1,64 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/acp/acp/README.md
-README.md: 440f1a7e2cc9fdd3b7dcd99d2f150c31ed299da5
-README.zh.md: dafc74e5f1200f020245f9d64294cc3f2fc08f6d
+/:
+  en: d5a44c19ba7e490b
+  zh: 61495d48365178df
+/deepseek-ai-dsh-acp:
+  en: dd6058a34e7a8689
+  zh: 446ee2b96bf849bf
+/deepseek-ai-dsh-acp/summary:
+  en: 59aff9dea7a075b1
+  zh: c0f5734c5fd09126
+/deepseek-ai-dsh-acp/table-of-contents:
+  en: 1ffc3046d6905c60
+  zh: 4dfca668d149c9ea
+/deepseek-ai-dsh-acp/plugin:
+  en: cba12b7a95665bfa
+  zh: 1258f7e07a210b72
+/deepseek-ai-dsh-acp/protocol-contract:
+  en: 60a091b78c432e40
+  zh: 10fe00fddcb0b347
+/deepseek-ai-dsh-acp/lifecycle:
+  en: 1a8c422d40c7b677
+  zh: 6856049fded20a51
+/deepseek-ai-dsh-acp/running:
+  en: b6faf4e611cc6866
+  zh: b58574b5668295d1
+/deepseek-ai-dsh-acp/invariants:
+  en: cc2f010b74d6aee9
+  zh: 2b9ca8b65d6c7d25
+/deepseek-ai-dsh-acp/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-acp/model-experience/prompt-content:
+  en: 7fca865c9895801f
+  zh: 78a0ab12c0bb0499
+/deepseek-ai-dsh-acp/model-experience/prompt-content/what-the-model-sees:
+  en: e3adbb072da5ff1d
+  zh: 0af2105dd9e171d3
+/deepseek-ai-dsh-acp/model-experience/prompt-content/token-effect:
+  en: 93b8f76c67bef353
+  zh: 354fa2dca0804f72
+/deepseek-ai-dsh-acp/model-experience/prompt-content/kv-cache-effect:
+  en: 54946b64b26a3171
+  zh: 09550292ccfb36b0
+/deepseek-ai-dsh-acp/model-experience/permission-decisions:
+  en: 2e6d83c846a3a5e1
+  zh: 8d4339c26f3d8f68
+/deepseek-ai-dsh-acp/model-experience/permission-decisions/what-the-model-sees:
+  en: 87b55e04137085c3
+  zh: cdba4acf2e38b872
+/deepseek-ai-dsh-acp/model-experience/permission-decisions/token-effect:
+  en: bd0ded535cbedb19
+  zh: 47bcaa76827f88f2
+/deepseek-ai-dsh-acp/model-experience/permission-decisions/kv-cache-effect:
+  en: 83120763a07c4b72
+  zh: 3f2dd7053fbb62fa
+/deepseek-ai-dsh-acp/known-limitations-and-deferred-work:
+  en: bf7a51db76e849d8
+  zh: 0a5920519696b674
+/deepseek-ai-dsh-acp/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

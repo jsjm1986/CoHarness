@@ -1,6 +1,70 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/runtime/README.md
-README.md: 916ea7f8b097ddc406b33eb7743bd442e896e90b
-README.zh.md: 926af63afdd3a393250220652cb274404b55b504
+/:
+  en: d263c68503f0be45
+  zh: 61495d48365178df
+/deepseek-ai-dsh-client-runtime:
+  en: a322d8859111c0ce
+  zh: dab9b1d3f67022cb
+/deepseek-ai-dsh-client-runtime/summary:
+  en: 153df193e733af10
+  zh: a65fe81e387c717d
+/deepseek-ai-dsh-client-runtime/table-of-contents:
+  en: c7fb097b715bc683
+  zh: d260bc12061f7dca
+/deepseek-ai-dsh-client-runtime/permission-qualification:
+  en: b97d5db5069cb63d
+  zh: de13327130c7a78d
+/deepseek-ai-dsh-client-runtime/workspace-file-resources:
+  en: 2b848b1f20f5afdd
+  zh: 28e22e02198a5959
+/deepseek-ai-dsh-client-runtime/slot-declaration-injection:
+  en: d09f86355b89e9a4
+  zh: a00a28e4d51ca12d
+/deepseek-ai-dsh-client-runtime/session-ownership:
+  en: 480f1b6ac309a94c
+  zh: 36cefaf8f4ad981a
+/deepseek-ai-dsh-client-runtime/workspace-and-session-lists:
+  en: 07d178dee583d33f
+  zh: 2620fba4321ea6a9
+/deepseek-ai-dsh-client-runtime/new-session-and-the-blank-mirror:
+  en: 15263a6c55bcb785
+  zh: 74fe5d15534e17ea
+/deepseek-ai-dsh-client-runtime/pending-queue-projection:
+  en: 73fa30b55ba1f5fc
+  zh: 8dd827c7e7a142f4
+/deepseek-ai-dsh-client-runtime/conversation-assembly:
+  en: 6350a42de847df08
+  zh: a91cb2e6c7791cea
+/deepseek-ai-dsh-client-runtime/trajectory-request-data:
+  en: 1a4fe6e625fc5d45
+  zh: f7764e9e60515564
+/deepseek-ai-dsh-client-runtime/ptc-mode-child-call-tree:
+  en: ef8677c504234d1e
+  zh: f55f099d83b5f29c
+/deepseek-ai-dsh-client-runtime/session-title-projection:
+  en: 86212eead7b05fe6
+  zh: f91633b0ff856b97
+/deepseek-ai-dsh-client-runtime/model-retry-projection:
+  en: e472dc78fced7c60
+  zh: d2896b4efcbb0d61
+/deepseek-ai-dsh-client-runtime/session-forking:
+  en: a0e4ab2c701ce8a9
+  zh: c481733cab9fb623
+/deepseek-ai-dsh-client-runtime/session-model-selection:
+  en: 0a6c40b5fd403b6d
+  zh: eadde76ddfd09358
+/deepseek-ai-dsh-client-runtime/model-experience:
+  en: bf831f42c8076152
+  zh: e45befdc3c65eae7
+/deepseek-ai-dsh-client-runtime/model-experience/kv-cache-effect:
+  en: 0d01056201d6e191
+  zh: 1904b410339d290a
+/deepseek-ai-dsh-client-runtime/known-limitations-and-deferred-work:
+  en: 603150ef8ca837d3
+  zh: af79fedbfd266873
+/deepseek-ai-dsh-client-runtime/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

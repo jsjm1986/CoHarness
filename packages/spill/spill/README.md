@@ -1,3 +1,8 @@
+---
+description: "Abstract spill storage seam (ctx.spillStore) for the DeepSeek Harness — save oversized tool text and return a retrieval locator"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-spill
 
 English | [中文](README.zh.md)
@@ -18,6 +23,18 @@ The split mirrors the shell/fs seams. A future remote or virtual backend (e.g. a
 
 `dsh-spill` lets plugins and tools save oversized text through the public `ctx.spillStore` API and receive an opaque locator, exact byte count, and retrieval guidance. Choose it when full results must remain retrievable without filling model context. Configure `dsh-spill-local` for local persistence, and add `dsh-spill-policy` when oversized tool results should become bounded previews. The API does not offer retention, replacement, retrieval, or search operations. A save rejects on storage failure, leaving the caller to keep the content inline or fail.
 
+## Table of Contents
+
+- [Service API (`ctx.spillStore`)](#service-api-ctxspillstore)
+- [Vocabulary](#vocabulary)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="service-api-ctxspillstore"></a>
 ## Service API (`ctx.spillStore`)
 
 | Member | Semantics |
@@ -26,16 +43,19 @@ The split mirrors the shell/fs seams. A future remote or virtual backend (e.g. a
 
 Storage is grouped by the request's `owner` session as a save-time namespace; the backend chooses its own private representation and may derive names from — never trust as a path — the caller's `suggestedName`. The seam owns storage only: NO retention policy (that is [`@deepseek-ai/dsh-output-retention`](../../util/output-retention)), NO tool-result replacement (that is `@deepseek-ai/dsh-spill-policy`), NO retrieval/search API (the backend's `retrievalHint` tells the model what to do with the locator).
 
+<a id="vocabulary"></a>
 ## Vocabulary
 
 `SaveTextSpill` (owner, source, suggestedName, content) is the request; `SpillRef` (locator, bytes, retrievalHint) is the result. `SpillLocator` is [branded](../../util/brand) and rendered to the model as an opaque string — a local path for `dsh-spill-local`, but a future backend may return a URI, key, or command token without changing policy/tool consumers. `SpillOwner.sessionId` is the save-time storage namespace: forked sessions inherit existing locators from the seeded log without copying or re-owning them, and new spills after the fork use the child session id. `SpillSource` records the producing `toolName`, `callId`, and `label` for backend naming and inspection, not access control. See `src/types.ts` for the full contracts.
 
 See the [tool output spill Agent Note](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) for the design rationale, including why creation belongs to the runtime spill seam rather than the model-facing `write` tool.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The seam declares the locator and retrieval-hint contract; backends own storage.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through spill consumers, which render the backend's locator and retrieval guidance to the model.
@@ -48,3 +68,13 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 - **The seam has no retrieval or deletion API** — consumers can only render the backend's locator and guidance; lifecycle and access semantics remain backend-specific.
 - **Storage is not access control** — `SpillOwner` namespaces writes but does not authorize reads of a locator; each backend and retrieval consumer must enforce its own boundary.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

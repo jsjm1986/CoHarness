@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-postgresql-jsonb-gateway-baseline.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-postgresql-jsonb-gateway-baseline.md
-2026-08-14-postgresql-jsonb-gateway-baseline.md: 9acd89e9c67d01e128cc91e5c2a5f84f6d5c8f0a
-2026-08-14-postgresql-jsonb-gateway-baseline.zh.md: b46c83a309d461f07c3a06e62a72e422bac36460
+/agent-note-postgresql-jsonb-gateway-baseline:
+  en: abba41a344d756ac
+  zh: 7ee56b3ea39ddd7e
+/agent-note-postgresql-jsonb-gateway-baseline/problem:
+  en: a4560bea94bf7e80
+  zh: e35b101e385743d0
+/agent-note-postgresql-jsonb-gateway-baseline/decision:
+  en: 456dfca6d148dda7
+  zh: bf5bc12333ce9540
+/agent-note-postgresql-jsonb-gateway-baseline/testing:
+  en: da2a84b79d00e5ff
+  zh: e4d167ac5134b30a
+/agent-note-postgresql-jsonb-gateway-baseline/alternatives-considered:
+  en: 9c869934b9dac93a
+  zh: 54291cd37fe7e82e
+/agent-note-postgresql-jsonb-gateway-baseline/consequences:
+  en: adc0a5dacaa5565f
+  zh: 7fcf2f8cb92288d1

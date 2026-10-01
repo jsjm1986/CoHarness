@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-29-preset-module-health.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-29-preset-module-health.md
-2026-08-29-preset-module-health.md: ed855909ede1fb5492cb53414e1dc8a0339113eb
-2026-08-29-preset-module-health.zh.md: fe3eecb06fa66b6520360463a6532c1ab5173a6a
+/agent-note-detect-unresolved-preset-modules-during-discovery:
+  en: cf380f760a4b2563
+  zh: f7b11d406d043b6e
+/agent-note-detect-unresolved-preset-modules-during-discovery/problem:
+  en: 7a9ab8b12ade4c47
+  zh: db44c5a96c08f40b
+/agent-note-detect-unresolved-preset-modules-during-discovery/decision:
+  en: 85e28941880778ae
+  zh: a9ace223b454d193
+/agent-note-detect-unresolved-preset-modules-during-discovery/alternatives-considered:
+  en: 5a742fe1bb7b7916
+  zh: f7268fc9b0504f85
+/agent-note-detect-unresolved-preset-modules-during-discovery/consequences:
+  en: 537e753d5ac266e1
+  zh: 79dd161681fb7cf8
+/agent-note-detect-unresolved-preset-modules-during-discovery/testing:
+  en: ab9338cb3da24745
+  zh: ef7d34c36736bd3d

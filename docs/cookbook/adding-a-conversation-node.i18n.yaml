@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for adding-a-conversation-node.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/adding-a-conversation-node.md
-adding-a-conversation-node.md: c1965dc8a3081eebb8c1026ac53d2f7b8964edb7
-adding-a-conversation-node.zh.md: 2986f695b351cd17637d7ff99112c38042950692
+/add-a-web-client-conversation-node:
+  en: d2f6f37cff9221e8
+  zh: 716a138a43859569
+/add-a-web-client-conversation-node/1-design-a-replayable-event-family:
+  en: 595ed3cc02048bab
+  zh: b89a3216d70055fc
+/add-a-web-client-conversation-node/2-implement-the-definition-and-typed-chat-payload:
+  en: af5123516abc69fa
+  zh: 57d1a1bd006bbf03
+/add-a-web-client-conversation-node/3-query-an-earlier-business-context-only-at-start:
+  en: 0f46347cc684b45b
+  zh: bf1fb60485d3030b
+/add-a-web-client-conversation-node/4-understand-the-three-ingestion-paths:
+  en: 0ccd7c98a2fe008e
+  zh: 0ecf0d250f0da710
+/add-a-web-client-conversation-node/5-verify-replay-pagination-and-rendering:
+  en: 8bf986c002bb9f0a
+  zh: c25819e35d645c12

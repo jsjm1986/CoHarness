@@ -1,0 +1,338 @@
+{
+  "schemaVersion": 3,
+  "reviewDate": "2026-10-06",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "previousTag": "dsh-v0.1.6-alpha.2",
+    "previousCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+    "targetTags": [
+      { "tag": "dsh-v0.1.7-alpha.1", "commit": "c36a83ff6bb95e3f82cf79f9be7c724270a8aa61" },
+      { "tag": "dsh-v0.1.7-alpha.2", "commit": "00102833dfaee1da9f48a3a8eae9d34005a75218" },
+      { "tag": "dsh-v0.1.7-rc.1", "commit": "46a7f68b0922371ce7144b668b90e377d8e799f4" },
+      { "tag": "dsh-v0.1.7-rc.2", "commit": "477b4f420553e8a52c2fbccc464d7561b239c443" },
+      { "tag": "dsh-v0.2.0-rc.1", "commit": "4878cdabd87d4041bdaff61d04c966883b9fd07a" }
+    ]
+  },
+  "baseline": {
+    "commit": "ceb9acb9e7e7911301516900948eb9635218aec1",
+    "branch": "fix/session-log-confirm"
+  },
+  "targetVersion": "0.2.0-rc.1.coharness.1",
+  "versionStatus": "proposed-release-families-unverified",
+  "status": "implementation-in-progress",
+  "plan": "upgrades/plans/UPGRADE-PLAN-dsh-v0.2.0-rc.1.md",
+  "alignment": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json",
+  "auditEvidence": [
+    "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.0-rc.1.md",
+    "upgrades/alignment/UPSTREAM-FIX-AUDIT-HOST-dsh-v0.2.0-rc.1.md",
+    "upgrades/alignment/UPSTREAM-FIX-AUDIT-CLIENT-dsh-v0.2.0-rc.1.md",
+    "upgrades/alignment/UPSTREAM-COMMIT-INVENTORY-dsh-v0.2.0-rc.1.json"
+  ],
+  "verification": [
+    {
+      "phase": "P0",
+      "command": "pnpm exec tsx scripts/verify-upstream-sovereignty.ts",
+      "exitCode": 0,
+      "note": "46 tracked, 221 adapted, 35 owned, 2 replaced, 46 upstream-only package(s) conform to dsh-v0.2.0-rc.1"
+    },
+    {
+      "phase": "P0",
+      "command": "pnpm exec tsx scripts/verify-upgrade-records.ts",
+      "exitCode": 0,
+      "note": "359-row matrix partitions 7106 cumulative paths; 702 carried and 1 newUpstream inventory commits claimed; 30 gate replays re-reviewed"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "foundation",
+      "status": "adapt",
+      "localOwner": "vendor, Typert and workspace build owners",
+      "commitScope": [
+        "vendor/",
+        "patches/",
+        "native/",
+        "packages/typert",
+        "packages/util/code-language",
+        "packages/util/workspace-path",
+        "packages/test-support/remote-mock",
+        "packages/skill/tool-workspace-dependencies",
+        "tsconfig.base.json",
+        "tsconfig.client.json",
+        "tsconfig.host.json",
+        "vitest.config.ts",
+        "vitest.e2e.config.ts",
+        "vitest.snapshot.config.ts",
+        "tsdown.config.ts",
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Cordis/cosmokit three-way vendor merge with Volatile/VolatileSnapshot support; logged local vendor patches re-applied or retired; new upstream gates (module-graph, scoped-events, client-packages, cordis-config, constraints) adopted; typecheck and build green.",
+      "phases": ["P1"],
+      "evidence": "Cross-audit verified vendored Cordis lacks Volatile support — upstream .volatile() consumers compile-fail without it; P1 is the blocking foundation."
+    },
+    {
+      "id": "merge-clean-sweep",
+      "status": "adapt",
+      "localOwner": "capability owners",
+      "commitScope": [
+        "packages/sandbox",
+        "packages/lsp",
+        "packages/storage",
+        "packages/fs",
+        "packages/web",
+        "packages/compaction",
+        "packages/util",
+        "packages/guard",
+        "packages/todo",
+        "packages/plan",
+        "packages/workflow",
+        "packages/document",
+        "packages/attachment",
+        "packages/deliverables",
+        "packages/feedback",
+        "packages/identity",
+        "packages/session-query",
+        "packages/runtime-diagnostics",
+        "packages/test-support",
+        "packages/examples",
+        "packages/support",
+        "packages/browser-use",
+        "packages/ptc-runtime",
+        "packages/goal",
+        "packages/ssh",
+        "packages/skill"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "46 byte-identical tracked packages replace wholesale; adapted packages merge per-file with fix-audit spot checks; focused tests per touched capability.",
+      "phases": ["P2"]
+    },
+    {
+      "id": "llm-lane",
+      "status": "adapt",
+      "localOwner": "LLM capability owners",
+      "commitScope": [
+        "packages/llm"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "llm-deepseek splits into a pure library plus the llm-deepseek-api-key routing package; chat-completions and the `protocol` settings key migrate with production bundle rows updated in the same change; pi-ai stream patches registered; retry and token-meter improvements ported; llm-deepseek-account stays upstreamOnly.",
+      "phases": ["P3"]
+    },
+    {
+      "id": "session-core",
+      "status": "adapt",
+      "localOwner": "Agent, Session, Jobs, Schedule and persistence owners",
+      "commitScope": [
+        "packages/core",
+        "packages/session",
+        "packages/jobs",
+        "packages/schedule",
+        "packages/context",
+        "packages/subprocess",
+        "packages/terminal"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Agent-loop KV-cache keepalive, dynamic tools, tool-schedule recovery and ToolCallRecovery ported; developer/message, forked, tool-role streaming, attachments and plugin:<name> source kind absorbed as a new adjacent v6→v7 migration edge; persistence identity/cache changes; maxInlineBytes→maxInlineTokens migrates production yml in the same change; adjacent-migration and immutable-generation invariants hold; both SDKs updated.",
+      "phases": ["P4"]
+    },
+    {
+      "id": "session-format-shadowing",
+      "status": "reject",
+      "localOwner": "Session format owners",
+      "commitScope": [
+        "packages/session/session-format-v3-to-v4"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "requiredVerification": "upstreamShadowed sovereignty keeps the gate honest; the upstream same-key package is never file-merged; v6→v7 edge lands under session-core.",
+      "phases": ["P4"],
+      "evidence": "Locked owner decision: the fork retains its v6 generation and absorbs upstream V4 event semantics event-by-event."
+    },
+    {
+      "id": "jobs-ring-rewrite",
+      "status": "adapt",
+      "localOwner": "Jobs and apiproxy owners",
+      "commitScope": [
+        "packages/jobs",
+        "packages/api/job-controller",
+        "packages/host/apiproxy"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Ring-buffer output semantics (JobChunk, lossy, spillPath, owner: SessionId, read-only JobView) adopted as an independent milestone; remote surface folds into host/apiproxy — no standalone api/job-controller package; durable semantics, wire protocol, completion reporting, bounded reads, and multi-runtime isolation verified.",
+      "phases": ["P4"]
+    },
+    {
+      "id": "bash-justification-strict",
+      "status": "reject",
+      "localOwner": "Sandbox escalation governance",
+      "noUpstreamCommitReason": "Upstream relaxed empty justification for non-escalation commands; CoHarness keeps the stricter non-empty requirement — recorded as an intentional fork deviation.",
+      "reviewState": "implemented-local-tests-passing",
+      "phases": ["P4"]
+    },
+    {
+      "id": "job-wake-bound",
+      "status": "reject",
+      "localOwner": "Jobs and agent-loop owners",
+      "noUpstreamCommitReason": "Upstream made maxConsecutiveWakes unbounded; CoHarness keeps a bounded wake budget and raises it from 3 to 10 — multi-tenant protection stays.",
+      "reviewState": "implemented-local-tests-passing",
+      "phases": ["P4"]
+    },
+    {
+      "id": "composition",
+      "status": "adapt",
+      "localOwner": "Composition, settings, preset and remote owners",
+      "commitScope": [
+        "packages/api",
+        "packages/typert",
+        "packages/boot",
+        "packages/bundle",
+        "packages/settings",
+        "packages/preset",
+        "packages/credentials",
+        "packages/host",
+        "packages/interaction",
+        "packages/self-modification"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "plugin-manager +3281 lines absorbed preserving authorization/protectedModules injection and gateway NDJSON caps; api/remotes rewritten first as the pruning bottleneck; bundles prune account/telemetry/voice rows while keeping the fork dsh-settings-file row (semantic collision: same row id, different service); settings model retained with selective absorption.",
+      "phases": ["P5"]
+    },
+    {
+      "id": "preset-two-package",
+      "status": "adapt",
+      "localOwner": "Preset and webhook owners",
+      "commitScope": [
+        "packages/preset/agent-presets",
+        "packages/preset/agent-preset",
+        "packages/preset/agent-preset-registry"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Migrate to the upstream two-package structure re-hung on the fork remote/authoring layer; preserve derivePatches hooks, Typert Remote contract, realm split, settings namespace and composition inventory; webhook, subagent, apiproxy, ui-agent-preset and web-app bundle consumers rewire in the same phase.",
+      "phases": ["P5"],
+      "evidence": "Locked owner decision: an independent revertible P5 milestone, not a routine port."
+    },
+    {
+      "id": "settings-governance",
+      "status": "reject",
+      "localOwner": "Settings owners",
+      "commitScope": [
+        "packages/settings"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "requiredVerification": "Fork settings model retained; upstream capabilities (schema projection etc.) absorbed selectively without moving settingsScope governance, owner/project-write semantics, or revision fencing.",
+      "phases": ["P5"],
+      "evidence": "Locked owner decision: settings-file stays owned; upstream removed its own settings-file package."
+    },
+    {
+      "id": "client-web",
+      "status": "adapt",
+      "localOwner": "Client and web UI owners",
+      "commitScope": [
+        "packages/client"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Adopted upstream UI packages rewritten per-package onto client/runtime (no session-controller adapter) and settingsScope (no configForms adapter); right-rail preview stack, queue/deliverables/feedback, connection state, density, ui-tool rendering, agent-team UI, ui-primitives selection, and the five ui-settings sections mapped onto fork surfaces.",
+      "phases": ["P6"]
+    },
+    {
+      "id": "fortune-sheet-xlsx",
+      "status": "required",
+      "localOwner": "Document preview owners",
+      "commitScope": [
+        "packages/document"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Fortune Sheet XLSX renderer adopted with its patch maintenance; office-to-PDF retained for other office types.",
+      "phases": ["P6"],
+      "evidence": "Locked owner decision over keeping the office-to-PDF path for spreadsheets."
+    },
+    {
+      "id": "developer-tools-default-off",
+      "status": "reject",
+      "localOwner": "Client settings owners",
+      "noUpstreamCommitReason": "Upstream enables developer tools by default; CoHarness keeps them gated off for product users — an intentional product-policy deviation.",
+      "reviewState": "implemented-local-tests-passing",
+      "phases": ["P6"]
+    },
+    {
+      "id": "apps-intent-audit",
+      "status": "adapt",
+      "localOwner": "apps/web and apps/cli owners",
+      "commitScope": [
+        "apps/web",
+        "apps/cli",
+        "apps/android-shell"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "Full commit-intent audits: 184 apps/web fix commits and the cli lane classified in the fix-audit evidence; per-bug reproduce-or-refute against the rewritten local surfaces.",
+      "phases": ["P7"]
+    },
+    {
+      "id": "experimental",
+      "status": "adapt",
+      "localOwner": "Experimental capability owners",
+      "commitScope": [
+        "packages/experimental",
+        "packages/acp",
+        "packages/subagent",
+        "packages/hooks"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "agent-team full lane including the web-profile fold into agent-team-profile; computer-use plus the new shim surface; mcp, acp and subagent surfaces reviewed against fork contracts.",
+      "phases": ["P8"]
+    },
+    {
+      "id": "closeout",
+      "status": "adapt",
+      "localOwner": "SDK, docs, snapshot and release owners",
+      "commitScope": [
+        "python",
+        "docs",
+        "website",
+        "snapshots",
+        ".github",
+        "scripts",
+        ".agents",
+        "README.md",
+        "THIRD_PARTY_NOTICES.md"
+      ],
+      "reviewState": "pending-cumulative-source-review",
+      "requiredVerification": "TypeScript and Python SDK surfaces synchronized for session/loop/event changes; catalogs and docs regenerated; snapshots re-recorded; all gates green; production deployment and full business smoke through the real Web UI and provider path.",
+      "phases": ["P9"]
+    },
+    {
+      "id": "exclusion-ledger",
+      "status": "reject",
+      "localOwner": "Product scope owners",
+      "commitScope": [
+        "apps/desktop",
+        "apps/desktop-host",
+        "packages/api/account-controller",
+        "packages/api/session-controller",
+        "packages/boot/config-editor",
+        "packages/client/product-analytics",
+        "packages/client/shortcuts",
+        "packages/client/ui-settings-account",
+        "packages/client/ui-shortcuts",
+        "packages/credentials/deepseek-account",
+        "packages/credentials/deepseek-account-platform",
+        "packages/experimental/api-speech-to-text",
+        "packages/experimental/client-ui-voice-input",
+        "packages/experimental/schedule-bundle",
+        "packages/experimental/speech-to-text",
+        "packages/experimental/speech-to-text-sensevoice",
+        "packages/experimental/voice-input-bundle",
+        "packages/host/product-telemetry-otel",
+        "packages/llm/llm-deepseek-account",
+        "packages/telemetry/otel",
+        "packages/client/file-upload",
+        "packages/client/ui-sidebar-files",
+        "packages/client/store"
+      ],
+      "reviewState": "implemented-local-tests-passing",
+      "requiredVerification": "Every excluded lane records an upstreamOnly reason in scripts/upstream-sync.json; pruning points verified against zero reverse dependencies; account/telemetry/voice/shortcut/desktop surfaces stay out of the Web-first product.",
+      "phases": ["P0"],
+      "evidence": "Locked owner decisions: desktop, account chain, product telemetry, voice chain, shortcuts, and session-controller are excluded; client/store is replaced by import remapping onto client/runtime."
+    }
+  ]
+}

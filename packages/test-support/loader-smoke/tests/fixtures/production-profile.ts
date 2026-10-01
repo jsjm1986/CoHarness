@@ -45,7 +45,7 @@ function overlayModuleLayers(path: string, patches: readonly PatchOptions[]): Pr
   return [...packages].map(([name, packageDir], index) => ({
     packageName: `test-overlay:${index}:${name}`,
     packageDir,
-    patchPath: path,
+    patchPaths: [path],
     patches: [],
   }))
 }

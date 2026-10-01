@@ -1,6 +1,85 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-19-gui-layering-and-rpc-protocol.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-19-gui-layering-and-rpc-protocol.md
-2026-07-19-gui-layering-and-rpc-protocol.md: a583049ef77e6afb67bc356aac9b86dbab747f61
-2026-07-19-gui-layering-and-rpc-protocol.zh.md: aaabcd3af1d26d83a566eee9457dcd1f5a723445
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier:
+  en: 3aa887c11ba378d8
+  zh: f852735594afaf17
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/problem:
+  en: f0895b3213146fb6
+  zh: 0c0953088d598fd4
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/decision:
+  en: a15c7c13f167e5ac
+  zh: a15c7c13f167e5ac
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/decision/layering:
+  en: db34c38757045526
+  zh: 1b5d6fd607a7f338
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/decision/layering/layer-roles:
+  en: 1f2f75b0efb5f191
+  zh: d2a371f9259e1071
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/decision/layering/naming-rule:
+  en: 4b546e79b08b2854
+  zh: c7f9976203794093
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/decision/layering/how-to-integrate-a-new-application-operational-checklist:
+  en: 50bd48740806fd01
+  zh: cc69ee5a389fbeee
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/message-protocol:
+  en: e82e7e04517dadbb
+  zh: 4ab7eeb12392c38e
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/message-protocol/wire-full-forms-a-four-member-named-discriminated-union-api-rpc-ts:
+  en: db8571042389f2cf
+  zh: 8dbd28641eb9f2fb
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/message-protocol/signature-narrow-forms-and-carrier-completion:
+  en: 9dc9b3de5b912682
+  zh: 26edb1e04457e88f
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/message-protocol/rpcreceipt-the-carrier-receipt:
+  en: 789a1cae194e08db
+  zh: f6249c26f8f39597
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-type-system-signatures-are-the-source-of-truth:
+  en: 33dbc4bc27e88d55
+  zh: 88db14ebe8b54e96
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-type-system-signatures-are-the-source-of-truth/rpcmethodmap-and-derived-generics-api-rpc-map-ts:
+  en: 32e42c51d1684ba5
+  zh: df66ccaabcf34334
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-type-system-signatures-are-the-source-of-truth/the-error-model-rpcerrordetailsmap:
+  en: e1f4281cb9e66933
+  zh: df7c4a371ca5ccf5
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-type-system-signatures-are-the-source-of-truth/bidirectional-zod-validation-and-anchoring:
+  en: c3a34f588f545b18
+  zh: c2575ca8645870b6
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-contract-face-apiproxy:
+  en: 840157b8eb5a3b97
+  zh: f8a02cf5be681f11
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-contract-face-apiproxy/the-unary-method-table:
+  en: 40898de060fc6d17
+  zh: 74bc4cb38ea047b5
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-contract-face-apiproxy/frames-server-client-named-unions:
+  en: 279d883e3cbe131f
+  zh: 2b4b5a3f48527a44
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-contract-face-apiproxy/session-semantics-impl-side-commitments:
+  en: fbee31dc346b7955
+  zh: 376aae25dd84f634
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-client-carrier-the-abstractapiclient-class-family-fetch-client-ts:
+  en: c419ade5a44e4762
+  zh: a1b034e8ecad3b6c
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-client-carrier-the-abstractapiclient-class-family-fetch-client-ts/iapiclient-the-caller-view:
+  en: 3ec40b45389fb3cc
+  zh: ecebe9083cf24c2d
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-client-carrier-the-abstractapiclient-class-family-fetch-client-ts/protocol-paths-held-by-the-base-class:
+  en: 4a84924e42892ff5
+  zh: 6b88096c27355f8b
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-client-carrier-the-abstractapiclient-class-family-fetch-client-ts/the-instance-level-envelope-observation-aspect:
+  en: f1d3f3cb0077168c
+  zh: 3c6cfe5270e96f59
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/the-client-carrier-the-abstractapiclient-class-family-fetch-client-ts/the-subclass-table-transport-carriage:
+  en: cf7da1efb9303757
+  zh: 3f747c62408431f1
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/how-to-extend-operational-checklists:
+  en: a96230e2508958f4
+  zh: 2ada1cf1cd276c64
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/consequences:
+  en: 3cd523c69fa75b64
+  zh: a4736f5912ba5e84
+/agent-note-gui-layering-and-the-rpc-protocol-host-client-layering-by-capability-provider-the-four-quadrant-message-model-and-the-fetch-carrier/alternatives-considered:
+  en: b418d8692273348c
+  zh: bed5bd6991e07459

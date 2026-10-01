@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-high-cache-hit-decimal-display.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-high-cache-hit-decimal-display.md
-2026-08-19-high-cache-hit-decimal-display.md: 952d838fdf330175915e13ef767fd80d145506b2
-2026-08-19-high-cache-hit-decimal-display.zh.md: ba33bd8a265211c8514fda4babda5ba94ed02884
+/agent-note-high-cache-hit-decimal-display:
+  en: 3b50cb7e702db756
+  zh: 76a9c847745a6f36
+/agent-note-high-cache-hit-decimal-display/problem:
+  en: 0cf9d5952d75ee9d
+  zh: a3736f8a44a407f5
+/agent-note-high-cache-hit-decimal-display/decision:
+  en: be8308ce2de5c94f
+  zh: f7b3b621e43ed41a
+/agent-note-high-cache-hit-decimal-display/ownership-and-lifecycle:
+  en: 1173d9e87f5ef4db
+  zh: 8cee4510f5eebc1a
+/agent-note-high-cache-hit-decimal-display/verification:
+  en: a7467196b76c78de
+  zh: 4d72f0436f31aef0
+/agent-note-high-cache-hit-decimal-display/alternatives-considered:
+  en: e59951947c69b8ed
+  zh: 9792c825ca78e291
+/agent-note-high-cache-hit-decimal-display/consequences:
+  en: f51d04ca43ad47a7
+  zh: 285ab9c1bdd86793

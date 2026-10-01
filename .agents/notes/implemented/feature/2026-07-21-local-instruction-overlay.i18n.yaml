@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-21-local-instruction-overlay.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-21-local-instruction-overlay.md
-2026-07-21-local-instruction-overlay.md: 9706285f4e699bfb6db9591f9850e4f95f1d2a15
-2026-07-21-local-instruction-overlay.zh.md: b375455dcb1f7e5c157907501f342cbd29a51667
+/agent-note-default-local-instruction-overlay:
+  en: a09e91cb76a675be
+  zh: 11004852467f90a6
+/agent-note-default-local-instruction-overlay/problem:
+  en: 1c70d2fd1a30883e
+  zh: f682c3c51116f21a
+/agent-note-default-local-instruction-overlay/decision:
+  en: 3e56584c07f33768
+  zh: fa0f6b927909deac
+/agent-note-default-local-instruction-overlay/independent-scopes-per-candidate:
+  en: c5faa48991a5501e
+  zh: a1318b68e33a79fd
+/agent-note-default-local-instruction-overlay/alternatives-considered:
+  en: 5f788ea1a176e5b9
+  zh: dc4c08f400be9234
+/agent-note-default-local-instruction-overlay/consequences:
+  en: 9667a6934cff3149
+  zh: 23829a58267edb66

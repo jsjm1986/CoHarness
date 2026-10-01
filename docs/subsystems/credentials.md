@@ -63,6 +63,10 @@ interface ReadOnlyCredentialLayer {
 }
 ```
 
+## Authorization sessions
+
+A flow's `run()` receives an `AuthorizationSession` carrying the chosen method, the withdrawal signal, the notice/prompt surface, and `commit(mutate)` — the only write the seam accepts as this attempt's credential commit. `commit` serializes through the credential provider's `modifyRecord` on the flow's own key. Admission and success are distinct: a mutation declined with `undefined` returns the current record without writing; a replacement that passes the last checkpoint is past withdrawal and must finish in storage — it reports `authorized`, or fails the attempt with the storage error — while a queued or mid-mutation write is refused on withdrawal. The caller's outcome can settle `cancelled` promptly while the key stays reserved until the flow and its queued commit work quiesce; `authorization/settled` fires once, after that release.
+
 ## Change commits
 
 `credentials/reference-updated (ref)` fires after a committed change to a provider-managed source — a `set`, an `unset`, or an external edit observed in storage. Ambient process-environment changes are not observable and never emit. Consumers do not need the event (they re-resolve per operation); it exists for configuration surfaces refreshing a "configured" badge.

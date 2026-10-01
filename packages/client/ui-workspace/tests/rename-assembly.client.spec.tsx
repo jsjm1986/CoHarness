@@ -25,6 +25,8 @@ import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 usePinnedBrowserLanguages('zh-CN')
 
 const SID = 's1' as SessionId
+// A snapshot must keep one identity between changes (uSES polls it).
+const EMPTY_CATALOG: readonly never[] = []
 
 afterEach(cleanup)
 beforeEach(() => { localStorage.clear() })
@@ -38,6 +40,10 @@ async function createRuntime(): Promise<SlotTestRuntime> {
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.provide('locale', locale)
   runtime.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [] }), subscribe: () => () => {} } } as never)
+  runtime.provide('shortcuts', {
+    register: vi.fn(() => () => {}),
+    catalog: { getSnapshot: () => EMPTY_CATALOG, subscribe: () => () => {} },
+  })
   runtime.slots.installLocale(locale)
   return runtime
 }

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-20-agent-instructions-spec-merge-resurrection.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-20-agent-instructions-spec-merge-resurrection.md
-2026-09-20-agent-instructions-spec-merge-resurrection.md: 5e76418d684e31f0057f8a350b5a56a5923da794
-2026-09-20-agent-instructions-spec-merge-resurrection.zh.md: 5f0cd95a2f1f63e1c7bec41dd967bdf45f9daaed
+/agent-note-restore-agent-instructions-spec-after-merge-resurrection:
+  en: e48c46e30a6bc1bc
+  zh: b7fb7f962b016572
+/agent-note-restore-agent-instructions-spec-after-merge-resurrection/problem:
+  en: 388937b19c56b33d
+  zh: 58f77409d1920842
+/agent-note-restore-agent-instructions-spec-after-merge-resurrection/decision:
+  en: 86847c8e3c73a4b9
+  zh: e7dd850c56e7ce58
+/agent-note-restore-agent-instructions-spec-after-merge-resurrection/alternatives-considered:
+  en: 24dc09c52153f3fb
+  zh: a648ec2154d14081
+/agent-note-restore-agent-instructions-spec-after-merge-resurrection/consequences:
+  en: 6344db175914f47d
+  zh: e751dd9662ebc04f
+/agent-note-restore-agent-instructions-spec-after-merge-resurrection/testing:
+  en: 9e9da78d13ba27cb
+  zh: e0b8ef86bbc4d7fc

@@ -18,10 +18,9 @@ function checkpointId(
   if (event.type !== 'user/message') return undefined
   const source = event.data.source as unknown as {
     readonly kind?: unknown
-    readonly plugin?: unknown
     readonly compactionId?: unknown
   }
-  return source.kind === 'plugin' && source.plugin === 'compact'
+  return source.kind === 'compact-checkpoint'
     && typeof source.compactionId === 'string' && source.compactionId !== ''
     ? source.compactionId
     : undefined

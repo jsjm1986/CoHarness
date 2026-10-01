@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from deepseek_harness import DeepSeekHarness, HarnessClient, HarnessConfig, Notification, SdkProtocolError
+from deepseek_harness import DeepSeekHarness, HarnessClient, HarnessConfig, Notification, RunResult, SdkProtocolError
+from deepseek_harness.errors import JsonRpcError
 
 
 def test_high_level_sdk_runs_turn_and_collects_final_response(tmp_path: Path) -> None:
@@ -42,6 +43,77 @@ for line in sys.stdin:
         print(json.dumps({"jsonrpc": "2.0", "method": "session.event", "params": {"sessionId": params["sessionId"], "event": {"type": "agent/inbox/spliced", "data": {"target": "next-turn", "start": 0, "inserted": [{"id": "message-1"}]}}}}), flush=True)
         print(json.dumps({"jsonrpc": "2.0", "method": "session.status", "params": {"sessionId": params["sessionId"], "status": "running"}}), flush=True)
         print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": {"messageId": "message-1"}}), flush=True)
+        print(json.dumps({
+            "jsonrpc": "2.0",
+            "method": "session.event",
+            "params": {
+                "sessionId": params["sessionId"],
+                "event": {
+                    "type": "tool/result",
+                    "data": {
+                        "turn": 1,
+                        "step": 1,
+                        "message": {
+                            "source": {"kind": "tool", "callId": "native-call"},
+                            "content": [{
+                                "type": "tool-result",
+                                "toolCallId": "native-call",
+                                "content": [{"type": "text", "text": "Error: blocked by policy"}],
+                                "isError": True,
+                            }],
+                            "role": "user",
+                            "id": "native-result",
+                        },
+                        "error": {
+                            "name": "AutoReviewDeniedError",
+                            "code": "AUTO_REVIEW_DENIED",
+                            "reason": " native raw\\nreason ",
+                        },
+                    },
+                },
+            },
+        }), flush=True)
+        print(json.dumps({
+            "jsonrpc": "2.0",
+            "method": "session.event",
+            "params": {
+                "sessionId": params["sessionId"],
+                "event": {
+                    "type": "tool/ptc-dispatch-start",
+                    "data": {
+                        "rootCallId": "run-code-call",
+                        "parentCallId": "run-code-call",
+                        "subCallId": "run-code-call:ptc:1",
+                        "name": "bash",
+                        "arguments": {"command": "git push --force"},
+                    },
+                },
+            },
+        }), flush=True)
+        print(json.dumps({
+            "jsonrpc": "2.0",
+            "method": "session.event",
+            "params": {
+                "sessionId": params["sessionId"],
+                "event": {
+                    "type": "tool/ptc-dispatch",
+                    "data": {
+                        "rootCallId": "run-code-call",
+                        "parentCallId": "run-code-call",
+                        "subCallId": "run-code-call:ptc:1",
+                        "name": "bash",
+                        "arguments": {"command": "git push --force"},
+                        "isError": True,
+                        "content": [{"type": "text", "text": "Error: blocked by policy"}],
+                        "error": {
+                            "name": "AutoReviewDeniedError",
+                            "code": "AUTO_REVIEW_DENIED",
+                            "reason": " ptc raw\\nreason ",
+                        },
+                    },
+                },
+            },
+        }), flush=True)
         print(json.dumps({"jsonrpc": "2.0", "method": "session.event", "params": {
             "sessionId": params["sessionId"], "event": {"type": "gateway/execution", "data": {
                 "kind": "accepted", "state": {"revision": "1", "inputs": ["00000000-0000-4000-8000-000000000001"],
@@ -109,6 +181,7 @@ for line in sys.stdin:
 
     with DeepSeekHarness(
         model="deepseek-v4-flash",
+        reasoning_effort="max",
         max_tokens=4096,
         cwd=str(tmp_path),
         _launch_args=(sys.executable, str(script)),
@@ -142,6 +215,27 @@ for line in sys.stdin:
     }
     assert result.finish_reason == "max-tokens"
     assert result.events[-1]["type"] == "turn/end"
+    projected_errors = [
+        event["data"]["error"]
+        for event in result.events
+        if event["type"] in {"tool/result", "tool/ptc-dispatch"}
+    ]
+    assert projected_errors == [
+        {
+            "name": "AutoReviewDeniedError",
+            "code": "AUTO_REVIEW_DENIED",
+            "reason": " native raw\nreason ",
+        },
+        {
+            "name": "AutoReviewDeniedError",
+            "code": "AUTO_REVIEW_DENIED",
+            "reason": " ptc raw\nreason ",
+        },
+    ]
+    ptc_events = [event for event in result.events if event["type"].startswith("tool/ptc-dispatch")]
+    assert [event["type"] for event in ptc_events] == ["tool/ptc-dispatch-start", "tool/ptc-dispatch"]
+    for event in ptc_events:
+        assert not {"description", "parameters", "schema"}.intersection(event["data"])
     dumped_env = json.loads(env_dump.read_text())
     assert dumped_env["DEEPSEEK_API_KEY"] == "env-key"
     assert dumped_env["DEEPSEEK_BASE_URL"] == "http://127.0.0.1:4321"
@@ -149,6 +243,7 @@ for line in sys.stdin:
         "cwd": str(tmp_path),
         "provider": "deepseek-official",
         "model": "deepseek-v4-flash",
+        "reasoningEffort": "max",
         "maxTokens": 4096,
     }
 
@@ -533,6 +628,15 @@ def test_client_keeps_unmatched_notifications_available_globally_while_subscribe
 def test_session_subscription_keeps_descendant_relationships_across_subscriptions() -> None:
     client = HarnessClient()
     with client.subscribe_session_notifications("main") as first:
+        unknown_child = {
+            "type": "subagent/catalog", "seq": 0, "time": 1,
+            "data": {"version": 1, "childId": "unreadable-child", "childCreatedAt": 1, "mode": "unknown"},
+        }
+        client._handle_message({
+            "jsonrpc": "2.0", "method": "session.event",
+            "params": {"sessionId": "main", "event": unknown_child},
+        })
+        assert first.next().payload == {"sessionId": "main", "event": unknown_child}
         client._handle_message({
             "jsonrpc": "2.0",
             "method": "subagent.started",
@@ -843,6 +947,51 @@ for line in sys.stdin:
     assert client._proc is None
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "upstream dsh-v0.2.0-rc.1 close() waits shutdown_timeout_seconds for EOF "
+        "quiescence after a completed shutdown response; this SDK terminates the "
+        "runtime immediately, so the post-shutdown marker is never written"
+    ),
+)
+def test_client_close_allows_eof_quiescence_after_shutdown_response(tmp_path: Path) -> None:
+    script = tmp_path / "fake_runtime.py"
+    marker = tmp_path / "quiesced.txt"
+    script.write_text(
+        """
+import json
+import os
+from pathlib import Path
+import sys
+import time
+
+for line in sys.stdin:
+    msg = json.loads(line)
+    if msg.get("method") == "initialize":
+        print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": {"serverInfo": {"name": "fake-dsh"}}}), flush=True)
+    elif msg.get("method") == "shutdown":
+        print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": {}}), flush=True)
+
+time.sleep(0.05)
+Path(os.environ["QUIESCED_MARKER"]).write_text("quiesced")
+""".strip()
+    )
+
+    client = HarnessClient(
+        HarnessConfig(
+            env={"QUIESCED_MARKER": str(marker)},
+            shutdown_timeout_seconds=1,
+        ),
+        _launch_args=(sys.executable, str(script)),
+    )
+    client.start()
+    client.initialize(provider="deepseek-official", cwd="/workspace", model="dsagent")
+    client.close()
+
+    assert marker.read_text() == "quiesced"
+
+
 def test_initialize_failure_reaps_started_runtime(tmp_path: Path) -> None:
     script = tmp_path / "rejecting_runtime.py"
     script.write_text(
@@ -853,6 +1002,7 @@ import sys
 for line in sys.stdin:
     msg = json.loads(line)
     if msg.get("method") == "initialize":
+        print("initialize diagnostic", file=sys.stderr, flush=True)
         print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "error": {"code": -32000, "message": "bad initialize"}}), flush=True)
     elif msg.get("method") == "shutdown":
         print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": {}}), flush=True)
@@ -865,9 +1015,10 @@ for line in sys.stdin:
     proc = client._proc
     assert proc is not None
 
-    with pytest.raises(Exception, match="bad initialize"):
+    with pytest.raises(JsonRpcError, match="bad initialize") as excinfo:
         client.initialize(provider="deepseek-official", cwd=".", model="dsagent")
 
+    assert excinfo.value.code == -32000
     assert proc.wait(timeout=1) is not None
     assert client._proc is None
 
@@ -882,9 +1033,26 @@ def test_public_signatures_omit_unsupported_wire_parameters() -> None:
     assert "profile" not in inspect.signature(Session.run).parameters
     assert "system_prompt" not in DeepSeekHarnessConfig.__dataclass_fields__
     assert "max_tokens" in DeepSeekHarnessConfig.__dataclass_fields__
+    assert "reasoning_effort" in DeepSeekHarnessConfig.__dataclass_fields__
     assert "max_tokens" in inspect.signature(HarnessClient.initialize).parameters
+    assert "reasoning_effort" in inspect.signature(HarnessClient.initialize).parameters
     assert "client_name" not in HarnessConfig.__dataclass_fields__
     assert "client_version" not in HarnessConfig.__dataclass_fields__
+    assert {"dsh_bin", "profile", "patches", "dsh_home"} <= set(
+        DeepSeekHarnessConfig.__dataclass_fields__
+    )
+    assert {"dsh_bin", "profile", "patches", "dsh_home"} <= set(
+        HarnessConfig.__dataclass_fields__
+    )
+    assert "initialize_timeout_seconds" in DeepSeekHarnessConfig.__dataclass_fields__
+    assert "initialize_timeout_seconds" in HarnessConfig.__dataclass_fields__
+    assert DeepSeekHarnessConfig().initialize_timeout_seconds == 30.0
+    assert HarnessConfig().initialize_timeout_seconds == 30.0
+    for removed in ("cordis", "session_root", "runtime_bin", "bridge_bin", "launch_args_override"):
+        assert removed not in DeepSeekHarnessConfig.__dataclass_fields__
+        assert removed not in HarnessConfig.__dataclass_fields__
+    assert "_launch_args" not in HarnessConfig.__dataclass_fields__
+    assert "session_root" not in RunResult.__dataclass_fields__
 
 
 def test_client_close_is_idempotent_before_and_after_start(tmp_path: Path) -> None:

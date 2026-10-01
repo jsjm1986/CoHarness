@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-05-per-agent-tool-presentation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-per-agent-tool-presentation.md
-2026-08-05-per-agent-tool-presentation.md: 8beae621805da45fa2011058c51c04889855df26
-2026-08-05-per-agent-tool-presentation.zh.md: 52c9f614d2c9eb680bee0fa1c2bb54f69b2828d7
+/agent-note-per-agent-tool-presentation-and-the-ptc-preset:
+  en: deb477d63b591874
+  zh: 702420c634ca0143
+/agent-note-per-agent-tool-presentation-and-the-ptc-preset/problem:
+  en: defc890b3d5e2855
+  zh: 31918c427885e7da
+/agent-note-per-agent-tool-presentation-and-the-ptc-preset/decision:
+  en: 29cee9448a7fa962
+  zh: e0cd5da050659feb
+/agent-note-per-agent-tool-presentation-and-the-ptc-preset/alternatives-considered:
+  en: cc6d2c5f7cc70e34
+  zh: 50f5b9414179bc0a
+/agent-note-per-agent-tool-presentation-and-the-ptc-preset/consequences:
+  en: 51d28493d012cb27
+  zh: ddc4820ce0fbcc07

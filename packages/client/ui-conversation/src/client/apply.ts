@@ -4,7 +4,7 @@ import { findToolCall } from './tool-node-reader.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import { resolveSlotLabel, type BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  resolveWorkspacePath, workspacePathForResource, workspaceResourceAddress, type ISessions, type SessionId,
+  createSnapshotStore, resolveWorkspacePath, workspacePathForResource, workspaceResourceAddress, type ISessions, type SessionId,
   permissionAvailabilitySource, permissionUnavailableReason, commitSessionNavigation,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
@@ -44,6 +44,8 @@ import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { queueDockEntry } from './queue/QueueDock.tsx'
 import { ConversationPane, ConversationRoot } from './skeleton/ConversationRoot.tsx'
 import { ConversationViewportController, createConversationViewportStore } from './viewport.ts'
+import type { ShortcutCommandId, ShortcutFixedCommand } from '@deepseek-ai/dsh-client-shortcuts/client'
+import { installStopShortcut } from './stop-shortcut.ts'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
 import { DetailsPanel } from './skeleton/DetailsPanel.tsx'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
@@ -241,6 +243,45 @@ export function apply(ctx: Context): void {
   // way: this package must not import the plugins that would know.
   const composerBlocks = new ComposerBlockRegistry()
 
+  // Fixed input commands: the shortcuts catalog's non-editable rows plus the
+  // double-Escape cancellation. When no composition carries the shortcuts
+  // service the scope never runs and the composer keeps its local arbitration.
+  const stop = (sessionId: SessionId): void => {
+    scopedConversation(sessions, sessionId).cancel().catch(() => {
+      // Stop failure is published through Session promptError.
+    })
+  }
+  const stopShortcut = createSnapshotStore<readonly string[]>([])
+  ctx.inject(['shortcuts'], (scope) => {
+    const fixedInputs: readonly ShortcutFixedCommand[] = [
+      { id: 'fixed.send' as ShortcutCommandId, label: () => t('input.send'), keys: ['Enter'],
+        bindings: [{ code: 'Enter', modifiers: [] }], group: 'input' },
+      { id: 'fixed.newline' as ShortcutCommandId, label: () => t('shortcut.newline'),
+        keys: scope.shortcuts.describeBinding({ code: 'Enter', modifiers: ['shift'] }).keys,
+        bindings: [{ code: 'Enter', modifiers: ['shift'] }], group: 'input' },
+      { id: 'fixed.complementary' as ShortcutCommandId, label: () => t('shortcut.complementary'),
+        keys: scope.shortcuts.describeBinding({ code: 'Enter', modifiers: ['primary'] }).keys,
+        bindings: [{ code: 'Enter', modifiers: ['control'] }, { code: 'Enter', modifiers: ['meta'] }], group: 'input' },
+      { id: 'fixed.slash' as ShortcutCommandId, label: () => t('shortcut.slash'), keys: ['/'],
+        bindings: [{ code: 'Slash', modifiers: [] }], group: 'input' },
+      { id: 'fixed.mention' as ShortcutCommandId, label: () => t('shortcut.mention'), keys: ['@'],
+        bindings: [{ code: 'Digit2', modifiers: ['shift'] }], group: 'input' },
+    ]
+    for (const command of fixedInputs) {
+      scope.effect(() => scope.shortcuts.registerFixed(command), `ui-conversation: ${command.id}`)
+    }
+    scope.effect(() => installStopShortcut(scope.shortcuts, sessions, stop), 'ui-conversation: fixed stop input')
+    scope.effect(() => {
+      const command: ShortcutFixedCommand = {
+        id: 'response.stop' as ShortcutCommandId, label: () => t('input.stop'), keys: ['Esc', 'Esc'],
+        bindings: [{ code: 'Escape', modifiers: [] }], group: 'input',
+      }
+      const dispose = scope.shortcuts.registerFixed(command)
+      stopShortcut.set(command.keys)
+      return () => { stopShortcut.set([]); dispose() }
+    }, 'ui-conversation: fixed stop reference')
+  })
+
   // The input machine feeds every session-scope slot
   // component through the standard provide channel — the 'input' hook plus
   // the two public actions. Materialization is the shell creation trigger
@@ -407,6 +448,7 @@ export function apply(ctx: Context): void {
           stop: undefined,
           command: undefined,
           hooks: {
+            stopShortcut,
             busyEnter: submissionPolicy.busyEnter,
             notices: ABSENT_NOTICES,
             lexicon: ABSENT_LEXICON,
@@ -474,11 +516,7 @@ export function apply(ctx: Context): void {
               span: { ...selection, draftRev: snapshot.draftRev },
             })
           },
-        stop: () => {
-          scopedConversation(sessions, sessionId).cancel().catch(() => {
-            // Stop failure surfaces via snapshot.promptError; nothing to restore.
-          })
-        },
+        stop: () => { stop(sessionId) },
         command: async (line) => {
           const permission = /^\/permission\s+(\S+)\s*$/.exec(line)?.[1]
           if (permission !== undefined
@@ -489,6 +527,7 @@ export function apply(ctx: Context): void {
           return result.ok && result.value.matched
         },
         hooks: {
+          stopShortcut,
           busyEnter: submissionPolicy.busyEnter,
           notices: shell.notices,
           lexicon: shell.lexicon,

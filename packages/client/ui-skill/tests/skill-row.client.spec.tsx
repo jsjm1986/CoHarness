@@ -35,6 +35,7 @@ function settled(over: Partial<ToolResultNode> = {}): ToolResultNode {
 
 function running(argsRaw = '{"name":"dsh-manage-issues"}'): RunningToolCall {
   return {
+    phase: 'start',
     callId: 'call-skill', name: 'skill', argsRaw, turn: 1, step: 1, time: 2_000, callView: null, subCalls: [],
   }
 }

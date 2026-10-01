@@ -1,3 +1,8 @@
+---
+description: "Tool registry and execution pipeline for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # dsh-tools
 
 English | [中文](README.zh.md)
@@ -8,6 +13,16 @@ Tool registry and execution pipeline. Tool plugins register their schemas and ex
 
 Use `dsh-tools` to expose typed capabilities to models, validate calls, enforce allow/deny/ask policy, and return finalized results without ending a turn on ordinary tool failures. Choose native Function Calling, [PTC mode](#ptc-mode), or both with `mode`; an agent can override the default through `presentAs`. Tool authors use `defineTool` to declare typed parameters and outputs, cooperative timeouts, parallel-safety, and optional UI presentation. Models see each permitted tool's declared name, description, and parameter schema; per-agent restrictions can narrow that visible set.
 
+## Table of Contents
+
+- [Service: `ToolRuntime` (ctx key: `tools`)](#service-toolruntime-ctx-key-tools)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="service-toolruntime-ctx-key-tools"></a>
 ## Service: `ToolRuntime` (ctx key: `tools`)
 
 ### Config
@@ -135,6 +150,7 @@ Under `ptc` — not `both` — the transport is also the only entry the model ma
 
 The agent loop groups consecutive `parallel` calls into a bounded rolling pool and treats each `exclusive` call as an ordering barrier. Only dispatch/body overlaps; policy, durable results, and context retain model order. PTC mode bindings reuse the same classification through the bridge's own pool. The [parallel tool-call Agent Note](../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.md) owns the shipped declarations and rationale.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Normal tool schemas
@@ -204,3 +220,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **PTC mode's SDK language follows the one loaded runtime, and a presentation is per agent rather than per tool** — `mode: code`/`both` rejects prompt assembly unless `ctx.ptcRuntime.language` has a registered SDK renderer (TypeScript or Python); scoped restrictions/shadows and `presentAs` choose each agent's visible bindings and their form, but within one agent no tool can be native-only while another is code-only.
 - **PTC mode intermediate values are execution-local and unbounded by bytes** — the canonical typed values cannot be reconstructed from session replay and may exhaust process or worker memory; only the outer `run_code` output has the worker's configurable hard cap. The durable log copy of each sub-call IS bounded: the `tools/ptc-dispatch-log` waterfall lets the spill policy replace an oversized `tool/ptc-dispatch` content with a preview + locator ([rationale](../../../.agents/notes/implemented/feature/2026-07-26-ptc-dispatch-log-spill.md)).
 - **`run_code` state is fresh per run** — a persistent REPL-style kernel is rejected for the MVP (cross-call state would be invisible to the log); see [the PTC mode Agent Note](../../../.agents/notes/implemented/feature/2026-06-15-ptc.md).
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

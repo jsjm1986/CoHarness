@@ -10,7 +10,10 @@ const experimentalName = '@deepseek-ai/dsh-experimental-isolation-probe'
 
 it('boots the default Web profile without experimental Host modules, mounted plugins, or Client entries', async (test) => {
   await withDefaultWeb(test, async ({ url, request }) => {
-    const page = await webGet(url, test.signal)
+    const auth = await webGet(url, test.signal)
+    const cookie = auth.headers['set-cookie']?.[0]?.split(';', 1)[0]
+    expect(cookie).toBeDefined()
+    const page = await webGet(new URL('/', url), test.signal, { cookie: cookie! })
     expect(page.status).toBe(200)
     const html = page.text
     const rawBoot = /globalThis\["__DSH_BOOT__"\] = ([\s\S]*?)<\/script>/u.exec(html)?.[1]

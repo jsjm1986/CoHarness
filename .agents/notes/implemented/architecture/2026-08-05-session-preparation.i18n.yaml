@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-05-session-preparation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-05-session-preparation.md
-2026-08-05-session-preparation.md: 50f1ea38e671c6aa7b0f4adaf2fecbf83decc23c
-2026-08-05-session-preparation.zh.md: cd918d126b56b081bcc1b6aa43a10d662668102d
+/agent-note-reusable-session-preparation-before-publication:
+  en: 1b8f087c3349d687
+  zh: 34a5feb9e19b9a30
+/agent-note-reusable-session-preparation-before-publication/problem:
+  en: 038d89fb5ebe2b18
+  zh: 93437a2af54aba88
+/agent-note-reusable-session-preparation-before-publication/decision:
+  en: 9022ab3834ff8b6b
+  zh: 48236ada35f23803
+/agent-note-reusable-session-preparation-before-publication/persisted-preparation-lifecycle:
+  en: 8ee267e4f25a497b
+  zh: 6d7c1657d286b00a
+/agent-note-reusable-session-preparation-before-publication/history-and-resume-reuse:
+  en: 89b4e53123941bc0
+  zh: 3559dd3f2aa570ea
+/agent-note-reusable-session-preparation-before-publication/boundaries:
+  en: a481bc9edbe44d63
+  zh: 2e5acea0e97ee408
+/agent-note-reusable-session-preparation-before-publication/verification:
+  en: f54b352daa461d00
+  zh: a2d7a1b7c5f30abd
+/agent-note-reusable-session-preparation-before-publication/alternatives-considered:
+  en: bfa0b3a07c36fd02
+  zh: 6d28c2073936def7
+/agent-note-reusable-session-preparation-before-publication/consequences:
+  en: 60c77dff029b1f8d
+  zh: 0892a45a602f6984

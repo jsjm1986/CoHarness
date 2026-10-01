@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-persistence-jsonl
 
 [English](README.md) | 中文
@@ -8,6 +13,21 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 
 `dsh-session-persistence-jsonl` 把每个会话存为当前的仅追加 JSONL 日志，并保留不可变的历史格式 generation——默认以带校验和的 Zstandard 帧存储，禁用压缩时以换行分隔的原始文本行存储。它通过持久化句柄提供当前逻辑 `SessionEvent` 流，因此格式迁移、压缩、历史解码与崩溃恢复仍是存储内部细节。当消费方需要按会话的磁盘文件时选择它；选择 `compression: 'none'` 后日志可作为纯文本按行读取。根目录是唯一必填配置；持久性、延迟实体化、[受支持的历史格式迁移](../session-format-catalog/README.zh.md)与撕裂尾部崩溃恢复都随后端提供。
 
+## 目录
+
+- [磁盘布局](#on-disk-layout)
+- [配置](#config)
+- [物理编码](#physical-encoding)
+- [持久性与崩溃语义](#durability-and-crash-semantics)
+- [写入路径](#write-path)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="on-disk-layout"></a>
 ## 磁盘布局
 
 ```
@@ -24,6 +44,7 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 - 项目目录保留规范化 cwd 的可读形式，便于导航，并限制在文件系统组件上限内。分隔符替换和截断刻意有损，因此规范化相同的 cwd 字符串共享项目目录；会话 id 仍选择不同会话目录。在不区分大小写的文件系统上，只有文件系统规范化将两种写法解析到同一 transcript（文本记录）时，身份验证才接受备选路径写法。配置根仍由部署控制：可以是项目本地、共享、临时或集中式。[项目会话目录决策](../../../.agents/notes/implemented/architecture/2026-07-24-project-session-directories.zh.md) 记录这项取舍。
 - 会话 id 是未验证的带品牌类型的字符串，因此在使用前单射转义为一个安全路径段（无遍历、无冲突）。结果目录保留给其他会话自有产物；发现只读取固定 transcript 文件名。
 
+<a id="config"></a>
 ## 配置
 
 | 键 | 类型 | 说明 |
@@ -33,12 +54,14 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 
 `locate(meta)` 返回已解析项目/会话目录内固定 transcript 的 `{ kind: 'jsonl', path }`。它不执行文件系统 I/O：可以在目录或文件存在前返回目标，现有文件也只包含最近一次 flush 完成的前缀。
 
+<a id="physical-encoding"></a>
 ## 物理编码
 
 默认产物是独立 [Zstandard frame](../../../.agents/notes/implemented/architecture/2026-07-19-zstandard-jsonl-session-logs.zh.md) 的标准拼接：一个仅包含 header 行的带 checksum frame，后跟每个持久 append 批次一个带 checksum frame。后端使用 Node 内置 Zstandard API 和默认压缩级别，不提供级别开关。列表只读取并验证 header frame。`compression: 'none'` 在原始表示中保留相同逻辑行。
 
 一个根只属于一种编码。启动发现和定向查找会拒绝相反 suffix，错误会命名不兼容产物，并指示调用方选择匹配 mode 或独立根。平铺 `<project>/<id>.jsonl*` 产物也会被拒绝，而不是忽略。格式迁移会保留已配置编码；不支持压缩转换、混合根回退或双写。
 
+<a id="durability-and-crash-semantics"></a>
 ## 持久性与崩溃语义
 
 - **绑定存储身份。** 查找要求可读项目目录中只有一个匹配会话目录，然后验证 header id 等于请求 id，且 header id/cwd 派生所选 transcript 路径。列表应用同一路径检查，并拒绝重复 id。身份失败发生在修复或 append 前。
@@ -49,16 +72,19 @@ JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`d
 - **连续 seq。**`append` 拒绝第一个 `seq` 不继续已存储日志的批次，并拒绝无法 JSON 序列化的 `event.data`，同时命名违规事件类型。
 - **轻量修订。**`revision(id, signal?)` 只解析指定产物，并使用 device、inode、size 和纳秒时间戳标识它，不解析日志；`listSnapshots(signal?)` 对每个已发现产物使用同一身份。该标识会在 append、修复、替换或存储变更后改变。完整前缀读取要求读取字节前后的身份一致，`readStoredRevision()` 也使用同一身份校验保留的 preparation。快照列表通过产物发现原样转发该信号，并在每个 `stat` 前后检查取消；由于文件系统 `stat` 不可中断，取消会等待活动调用完成，然后在不启动另一次调用的情况下拒绝。
 
+<a id="write-path"></a>
 ## 写入路径
 
 插件将冻结的会话事件复制到每个活动会话各自的写句柄。活动事件的批处理窗口是 seam 内部调度策略而非配置项：句柄内的批处理窗口把活动缓冲区合并为一次持久化追加，`session/flush` 或 dispose 会排空当前与待处理批次。每会话游标防止恢复后的会话重新 append 已存储事件，插件加载时会为活动会话设置初始状态。所属后端实例串行化单会话操作；dispose（资源释放）会在拆卸前排空每个保留的写句柄。每个逻辑事件都会保留：批处理只让单个压缩帧或一次原始 JSONL fsync 承载更多记录。
 
 明文正文按有界字节窗口扫描，保留解码后的事件，不构建完整原始文件缓冲区。读取之间检查取消，revision 变化时重试。后继 generation 写完临时文件后重新校验源 revision；源发生变化或消失时拒绝发布。后继 generation 按有界批次编码，在事件和写入之间检查取消。压缩读取和逻辑 preparation 仍保留完整输入或事件数组。
 
+<a id="invariants"></a>
 ## 不变量
 
 不发布运行时不变式伴生插件：存储协调器保证代次不可变和追加顺序，持久化测试直接核对文件；此提供方不保留独立的领域索引。
 
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 恢复的对话历史
@@ -75,7 +101,7 @@ JSONL 存储不会向实时请求提供提示词或 schema。加载会恢复已�
 
 JSONL 存储不修改实时请求前缀。只有重建历史、当前 envelope 与模型路由匹配时，恢复 loop 才能重用提供方缓存；崩溃修复结果仅追加。
 
-## 已知限制与暂缓事项
+## 已知限制与暂缓事项 <a id="known-limitations-and-deferred-work"></a>
 
 - **只加载已配置编码和 catalog 中的 generation**：此 backend 会把发布版 v0/v1/v2/v3/v4 artifact 迁移到当前 v5，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
 - **平铺文件存储布局不加载**：加载前使用独立根，或将预发布产物移入项目/会话目录布局。
@@ -83,3 +109,13 @@ JSONL 存储不修改实时请求前缀。只有重建历史、当前 envelope �
 - **不删除会话文件**：日志在 `root` 下累积，直到外部移除（seam 无删除接口）。
 - **每会话一个活动 writer**：写句柄在整个生命期持有 `<root>/.locks/<id>.lock` 上的内核租约（POSIX 非阻塞 `flock`；Windows 命名内核信号量），因此第二个后端实例或进程写打开同一会话时以 `SessionAlreadyOwnedError` 失败，直到所有者释放或其进程退出。活着但卡死的持有者会一直阻塞到进程退出——删除锁文件是 POSIX 上的显式放弃手段——且咨询式 `flock` 在 NFSv3 上不可靠，此类根目录上的排他会退化为仅进程内。初始同 id 发布仍通过 POSIX 无覆盖硬链接或 Windows 无替换 write-through rename 保持冲突安全。
 - **POSIX 实体化需要硬链接支持**：第一次 append 使用 `link()`，使同 id 竞态失败，而不覆盖已提交日志；Windows 使用无替换 write-through rename。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

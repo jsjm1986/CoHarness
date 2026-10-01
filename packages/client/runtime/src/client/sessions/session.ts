@@ -1573,6 +1573,7 @@ export class Session implements SessionFace {
       nodes: legacy.nodes,
       turnTimings: legacy.turnTimings,
       turnEnds: legacy.turnEnds,
+      openTurn: this.conversation.openTurn(),
       partial: legacy.partial,
       runningCalls: legacy.runningCalls,
       pending: this.pendingCache.value,

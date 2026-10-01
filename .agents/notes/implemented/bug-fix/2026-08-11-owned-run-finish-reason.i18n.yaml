@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-owned-run-finish-reason.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-11-owned-run-finish-reason.md
-2026-08-11-owned-run-finish-reason.md: 87a158c7fedc8c6447306c489ba9f969d95dc412
-2026-08-11-owned-run-finish-reason.zh.md: 926a0d14c45168c5ec6ebd9f3493d4c2b3fe3c1c
+/agent-note-owned-run-finish-reason-reporting:
+  en: 7a20d78462157056
+  zh: 47bcfa4d028b29c4
+/agent-note-owned-run-finish-reason-reporting/problem:
+  en: 83b2c588948ecb7c
+  zh: f75280d106627ebf
+/agent-note-owned-run-finish-reason-reporting/decision:
+  en: 69351fec6516ab90
+  zh: 323c62d192291a8f
+/agent-note-owned-run-finish-reason-reporting/alternatives-considered:
+  en: c31e7e17d8f57f51
+  zh: 94ecfdbc68320f5e
+/agent-note-owned-run-finish-reason-reporting/verification:
+  en: 05a1bfc7f96f3d33
+  zh: 223b2005377c57a9
+/agent-note-owned-run-finish-reason-reporting/consequences:
+  en: 5ed611e3f35edcb6
+  zh: 76fe9bf1709d6ca5

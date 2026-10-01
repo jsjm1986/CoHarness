@@ -1,6 +1,85 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/agent-loop/README.md
-README.md: bfcd7792a252b397d4ba634cda4c0987393d6e52
-README.zh.md: 31ad72c5151007f54d2af1b730b7d42d6b1499ac
+/:
+  en: c66a79e8f336e414
+  zh: 61495d48365178df
+/dsh-agent-loop:
+  en: eebd202789b4b805
+  zh: 97ffee36c7f0b514
+/dsh-agent-loop/summary:
+  en: 9256331cd3baf930
+  zh: 02b4c10cf3286eb3
+/dsh-agent-loop/table-of-contents:
+  en: 492c43d796a84e64
+  zh: dc6603d84e74247d
+/dsh-agent-loop/service-agentloop-ctx-key-agentloop:
+  en: 84ddef3e30b22560
+  zh: 324d4a65ec82c114
+/dsh-agent-loop/service-agentloop-ctx-key-agentloop/public-api:
+  en: 01d2756821246165
+  zh: 8895a2cc4ba47164
+/dsh-agent-loop/service-agentloop-ctx-key-agentloop/injected-services:
+  en: 174543e4b0f52e85
+  zh: d0c1371fbc538db0
+/dsh-agent-loop/service-agentloop-ctx-key-agentloop/invariant-companion:
+  en: 7b52e0070b9779d6
+  zh: 53f53725ef9a9298
+/dsh-agent-loop/service-agentloop-ctx-key-agentloop/configuration-schemastery:
+  en: c757ba891d021ae0
+  zh: 6adb6753afe1f6d1
+/dsh-agent-loop/service-agentloop-ctx-key-agentloop/internal-concrete-driver:
+  en: 9285fb4b6d055d0e
+  zh: 1a3708ab53d1e17c
+/dsh-agent-loop/service-agentloop-ctx-key-agentloop/loop-lifecycle-agent-ts:
+  en: b27bbabb34a140ac
+  zh: f91ef8e2ef970750
+/dsh-agent-loop/service-agentloop-ctx-key-agentloop/what-belongs-to-plugins:
+  en: b9711dce401ecc07
+  zh: 2655676c1a5e413f
+/dsh-agent-loop/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/dsh-agent-loop/model-experience/complete-conversation-request:
+  en: 5507d83eb979c737
+  zh: 0ffde85d627b3933
+/dsh-agent-loop/model-experience/complete-conversation-request/what-the-model-sees:
+  en: 6a60e889b0f19e33
+  zh: f45bd9b2b843ca7a
+/dsh-agent-loop/model-experience/complete-conversation-request/token-effect:
+  en: ad93d8d61968a25d
+  zh: 268ff858b0fa96e8
+/dsh-agent-loop/model-experience/complete-conversation-request/kv-cache-effect:
+  en: bd51295dd5cbcc84
+  zh: 7073efb591470fab
+/dsh-agent-loop/model-experience/retained-message-history:
+  en: 50d33d852dec1e28
+  zh: ec15695304f25f38
+/dsh-agent-loop/model-experience/retained-message-history/what-the-model-sees:
+  en: 0a36273eff0815fd
+  zh: 1aa1e856d8b1afc9
+/dsh-agent-loop/model-experience/retained-message-history/token-effect:
+  en: 91552b9cbef55638
+  zh: 6e835a66d984f62d
+/dsh-agent-loop/model-experience/retained-message-history/kv-cache-effect:
+  en: 2b82cd95e6335e91
+  zh: 2275f0c808427bf1
+/dsh-agent-loop/model-experience/undispatched-calls-after-cancellation:
+  en: a7afa95628111dd8
+  zh: 1d72925e9915f75f
+/dsh-agent-loop/model-experience/undispatched-calls-after-cancellation/what-the-model-sees:
+  en: e3c07034229f15ed
+  zh: b0ee0507606b34ce
+/dsh-agent-loop/model-experience/undispatched-calls-after-cancellation/token-effect:
+  en: 7c139b3584615343
+  zh: 02d5d8239b502b06
+/dsh-agent-loop/model-experience/undispatched-calls-after-cancellation/kv-cache-effect:
+  en: 1750eea3cc5bf2d8
+  zh: cd3dfe31be5dedec
+/dsh-agent-loop/known-limitations-and-deferred-work:
+  en: f22f810de2ed5afb
+  zh: 7ac5dffc1d3bb165
+/dsh-agent-loop/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

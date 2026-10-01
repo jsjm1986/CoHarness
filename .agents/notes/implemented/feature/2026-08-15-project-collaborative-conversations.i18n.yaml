@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-15-project-collaborative-conversations.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md
-2026-08-15-project-collaborative-conversations.md: 911330d058b490fe2a41617fc36ebe34d449ca0d
-2026-08-15-project-collaborative-conversations.zh.md: de987098a0d744db5649c8d6506ffae8ab051d72
+/agent-note-project-collaborative-conversations:
+  en: 488634139248bc0a
+  zh: 1bc530200532a0ac
+/agent-note-project-collaborative-conversations/problem:
+  en: b855c021b607769f
+  zh: 5d71b7bafdfc368d
+/agent-note-project-collaborative-conversations/decision:
+  en: cbbe595c6a7355a0
+  zh: ed28ed873a8045ea
+/agent-note-project-collaborative-conversations/verification:
+  en: 3d985469e8c20d48
+  zh: 3e0da0e64947175d
+/agent-note-project-collaborative-conversations/alternatives-considered:
+  en: 94f093bcd69cc3a8
+  zh: e71b07ef4f0ce85c
+/agent-note-project-collaborative-conversations/consequences:
+  en: 23774ab7d678f422
+  zh: e97d05c2192933a4

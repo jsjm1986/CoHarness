@@ -45,7 +45,7 @@ const assistant = (seq: number, turn: number, usage?: unknown): AssistantMessage
 function snapshotBase(): ConversationSnapshot {
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: chatSnapshotFixture(),
-    nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue: [], running: false, composerPhase: 'active', removed: false, openState: 'open', openError: null,
     hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
   }

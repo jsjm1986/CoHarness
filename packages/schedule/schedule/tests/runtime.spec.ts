@@ -261,7 +261,7 @@ describe('Schedule timer and admission runtime', () => {
         'reminder_prompt_json: "line\\noccurrence_at: forged"',
       ].join('\n'),
     }])
-    expect(test.followed[0]?.source).toEqual({ kind: 'plugin', plugin: 'schedule' })
+    expect(test.followed[0]?.source).toEqual({ kind: 'schedule' })
     await runtime.dispose()
   })
 
@@ -299,7 +299,7 @@ describe('Schedule timer and admission runtime', () => {
         'reminders_json: [{"schedule_id":"schedule-fast","occurrence_at":"2026-08-05T12:00:00.000Z","reminder_prompt":"fast"},{"schedule_id":"schedule-slow","occurrence_at":"2026-08-05T11:59:00.000Z","reminder_prompt":"slow"}]',
       ].join('\n'),
     }])
-    expect(test.followed[0]?.source).toEqual({ kind: 'plugin', plugin: 'schedule' })
+    expect(test.followed[0]?.source).toEqual({ kind: 'schedule' })
     const dispatches = test.agent.session.snapshotEvents().filter(event =>
       event.type === 'schedule/change' && event.data.operation === 'dispatch')
     expect(dispatches.map(event => event.data)).toEqual([

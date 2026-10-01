@@ -58,7 +58,7 @@ kind: "package-reference"
 
 ### 可能出什么问题
 
-没有拥有者 agent 会话的调用会以 `pwsh requires an owning agent session` 失败，没有 pwsh 方言 PTY 后端的组合会激活该工具，但首次调用以 `no PTY backend registered for "shell"` 失败。模型重定义 `prompt` 函数会移除就绪标记，shell 随后在静默层级而非标记快路径上结算。命令内的原始 ESC 字符会在执行前被 PSReadLine 消费，不受支持。超时或取消会关闭不确定的 shell、丢弃结果并报告重置。
+没有拥有者 agent 会话的调用会以 `pwsh requires an owning agent session` 失败，没有 pwsh 方言 PTY 后端的组合会激活该工具，但首次调用以 `no PTY backend registered for "shell"` 失败。模型重定义 `prompt` 函数会移除就绪标记，shell 随后在静默层级而非标记快路径上结算。命令内的原始 ESC 字符会在执行前被 PSReadLine 消费，不受支持。超时或取消会关闭不确定的 shell、丢弃结果并报告重置。清理完成后，ToolRuntime 发布 `Error: tool call aborted`，错误码为 `ABORTED`；取消原因不作为命令输出渲染。排队期间被取消的调用不发送命令。
 
 -----
 
@@ -107,6 +107,7 @@ kind: "package-reference"
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -138,6 +139,7 @@ kind: "package-reference"
 
 仅追加的工具结果位于可复用请求前缀之后。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

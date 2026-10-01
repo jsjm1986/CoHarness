@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-02-win32-in-process-folder-dialog.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-02-win32-in-process-folder-dialog.md
-2026-08-02-win32-in-process-folder-dialog.md: ef9232051d0ff6e3e752f08a68e9f04ce3c32ad6
-2026-08-02-win32-in-process-folder-dialog.zh.md: d2bab277ca078b6943b720d7dcbfce4e8a548270
+/agent-note-win32-folder-picker-moves-to-koffi-in-a-child-process:
+  en: b813974a8e59402e
+  zh: 4f92f61a4fb2b5ed
+/agent-note-win32-folder-picker-moves-to-koffi-in-a-child-process/problem:
+  en: e72fbc54fcbd648b
+  zh: 7430fe6511900804
+/agent-note-win32-folder-picker-moves-to-koffi-in-a-child-process/decision:
+  en: bce8c47e1f1d7925
+  zh: 262941083b2328df
+/agent-note-win32-folder-picker-moves-to-koffi-in-a-child-process/alternatives-considered:
+  en: 94ed86eb593542a4
+  zh: 94a1c1a4c3871f01
+/agent-note-win32-folder-picker-moves-to-koffi-in-a-child-process/consequences:
+  en: d22c05a939ed7b7e
+  zh: 5ce9d65152d20345

@@ -43,7 +43,7 @@ const SID = 's1' as SessionId
 function snapshotOf(overrides: Partial<ConversationSnapshot> = {}): ConversationSnapshot {
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
-    nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue: [], running: false, composerPhase: 'active', removed: false,
     openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
     promptError: null, blank: false, subagent: null, lastAgentError: null,
@@ -179,10 +179,10 @@ function bench(over?: BenchOptions) {
     useSession: bindSnapshotSelector(session),
     useSessions: bindSnapshotSelector(createSnapshotStore({
       ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
-      subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+      subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })),
     useWorkspaces: bindSnapshotSelector(createSnapshotStore({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
     useProjection: ((key: string, selector?: (v: unknown) => unknown) =>
@@ -202,6 +202,7 @@ function bench(over?: BenchOptions) {
       return attachment === undefined ? [] : [attachment]
     }),
     useBusyEnter: bindSnapshotSelector(busyEnter),
+    useStopShortcut: bindSnapshotSelector(createSnapshotStore<readonly string[]>([])),
     toggleCommandMenu: over?.toggleCommandMenu ?? vi.fn(),
     useNotices: bindSnapshotSelector(shell.notices),
     useLexicon: bindSnapshotSelector(shell.lexicon),

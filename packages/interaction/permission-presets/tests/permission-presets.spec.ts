@@ -120,7 +120,7 @@ describe('PermissionPresetService', () => {
     const fiber = await mountAuto(ctx)
     expect(ctx.permissionPresets.names).toEqual(['workspace-write', 'danger-full-access', AUTO_PRESET])
     expect(ctx.permissionPresets.resolve(AUTO_PRESET)).toEqual({
-      sandbox: 'danger-full-access', approval: 'never',
+      sandbox: 'danger-full-access', approval: 'ask',
     })
     expect(ctx.permissionPresets.optionOf(AUTO_PRESET)).toEqual({
       value: AUTO_PRESET,
@@ -150,13 +150,12 @@ describe('PermissionPresetService', () => {
     expect(session.snapshotEvents().map(event => [event.type, event.data])).toEqual([
       ['permission/preset', { preset: AUTO_PRESET, origin: 'selection' }],
       ['sandbox/mode', { mode: 'danger-full-access' }],
-      ['approval/policy', { policy: 'never' }],
     ])
     expect(ctx.permissionPresets.current(session)).toBe(AUTO_PRESET)
 
     ctx.permissionPresets.set(session, AUTO_PRESET)
     expect(admissions).toBe(2)
-    expect(session.snapshotEvents()).toHaveLength(3)
+    expect(session.snapshotEvents()).toHaveLength(2)
   })
 
   it('leaves the session untouched when dynamic admission rejects a selection', async () => {
@@ -171,7 +170,7 @@ describe('PermissionPresetService', () => {
     expect(session.snapshotEvents()).toEqual([])
   })
 
-  it('records shared-bundle Auto and Full access switches by preset identity only', async () => {
+  it('switches between Auto and Full access through identity and approval policy', async () => {
     const config = { presets: {
       'read-only': { sandbox: 'read-only', approval: 'ask' },
       'workspace-write': { sandbox: 'workspace-write', approval: 'ask' },
@@ -186,13 +185,18 @@ describe('PermissionPresetService', () => {
     ctx.permissionPresets.set(session, 'danger-full-access')
     expect(session.snapshotEvents().slice(baselineLength).map(event => [event.type, event.data])).toEqual([
       ['permission/preset', { preset: 'danger-full-access', origin: 'selection' }],
+      ['approval/policy', { policy: 'never' }],
     ])
     expect(ctx.permissionPresets.current(session)).toBe('danger-full-access')
 
     ctx.permissionPresets.set(session, AUTO_PRESET)
-    expect(session.snapshotEvents().slice(baselineLength + 1).map(event => [event.type, event.data])).toEqual([
+    expect(session.snapshotEvents().slice(baselineLength + 2).map(event => [event.type, event.data])).toEqual([
       ['permission/preset', { preset: AUTO_PRESET, origin: 'selection' }],
+      ['approval/policy', { policy: 'ask' }],
     ])
+    expect(ctx.permissionPresets.current(session)).toBe(AUTO_PRESET)
+
+    session.append('approval/policy', { policy: 'never' })
     expect(ctx.permissionPresets.current(session)).toBe(AUTO_PRESET)
   })
 

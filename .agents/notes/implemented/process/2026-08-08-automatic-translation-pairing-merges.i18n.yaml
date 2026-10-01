@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-automatic-translation-pairing-merges.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-08-automatic-translation-pairing-merges.md
-2026-08-08-automatic-translation-pairing-merges.md: ac4e0c11290abfd48d0f3caf037062aa2fe36c4d
-2026-08-08-automatic-translation-pairing-merges.zh.md: 820ebdbe8c20988c4e917704db2f1994ae830fad
+/agent-note-automatically-compose-translation-pairing-records:
+  en: ecf5a26a95fa0acc
+  zh: 76dd60e779a88ca4
+/agent-note-automatically-compose-translation-pairing-records/problem:
+  en: e5884e254db43f31
+  zh: c7d3009559bd922b
+/agent-note-automatically-compose-translation-pairing-records/decision:
+  en: 03bc6a4d8846ed5e
+  zh: 00a5d7a06fd967ad
+/agent-note-automatically-compose-translation-pairing-records/failure-contract:
+  en: b79f08b0f950f350
+  zh: fbae2654e35ea24f
+/agent-note-automatically-compose-translation-pairing-records/verification:
+  en: dcf9e60a16e28a65
+  zh: 717245ae3e609c74
+/agent-note-automatically-compose-translation-pairing-records/alternatives-considered:
+  en: af4186b2b3f2b192
+  zh: 3130cc343822fc66
+/agent-note-automatically-compose-translation-pairing-records/consequences:
+  en: bcbfe65429360856
+  zh: 231a09db5c780201

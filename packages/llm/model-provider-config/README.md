@@ -1,3 +1,8 @@
+---
+description: "Organization-managed model Provider configuration Service Definition for DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-model-provider-config
 
 English | [中文](README.zh.md)
@@ -11,6 +16,15 @@ Organization route ids use the deployment-reserved `org-*` namespace. Project ro
 Use `dsh-model-provider-config` as the Service Definition for organization- and project-managed model Providers. A Provider publishes an immutable route snapshot on `ctx.modelProviderConfig` and emits `model-provider-config/updated` after each committed revision; adapter Consumers register those routes without copying them into user settings.
 
 
+## Table of Contents
+
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through LLM adapter Consumers that expose enabled organization models for selection and execution.
@@ -22,3 +36,13 @@ No direct effect. A Consumer-selected model or Provider change can select an ind
 ## Known Limitations and Deferred Work
 
 - **No persistence or transport** — deployments must mount a Provider that owns projection loading, revision ordering, and credential-reference delivery.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

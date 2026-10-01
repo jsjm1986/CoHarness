@@ -1,3 +1,8 @@
+---
+description: "Model selection: the /model popupSelect over session.models / session.selectModel"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-model-selection
 
 English | [中文](README.zh.md)
@@ -22,10 +27,21 @@ The `/client` exports are the plugin body (`apply`/`inject`), `ModelDirectoryRes
 
 The Web GUI lets users switch the model and reasoning effort for an existing session through either the `/model` popup or the composer's model control. Both surfaces present the same provider-grouped choices, and the selected model determines the available effort names and default. A complete selection applies to the next request; a running step keeps the model and effort it started with. If no adapter can serve the session's route, the composer remains disabled until routing becomes available.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Both surfaces share one host-backed `ModelDirectory` per session; selection and effort state remain owned by that resolver and the session.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the `session.selectModel` selection both entries submit: the Host snapshots the complete `ModelSelection` at the next prompt-assembly boundary and owns the model-visible effect, while a running step keeps its assembled selection.
@@ -39,3 +55,13 @@ Switching the route can reduce or invalidate provider-side cache reuse for subse
 - **No create-time or addressed-subagent selection** — both entries require an existing ordinary session's Agent; there is no draft-phase model choice to fold into session creation, and subagent continuation deliberately exposes no independent model-selection contract.
 - **Directory names are presentation-only** — selection and persistence use provider/model/effort ids; a provider whose catalog or exact-model metadata lookup fails lists as an unselectable failure row until reload.
 - **No arbitrary effort input** — the composer offers only the exact model's adapter-advertised levels; an adapter without reasoning metadata leaves the Effort row absent.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

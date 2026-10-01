@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-03-fs-tool-error-remedy.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-03-fs-tool-error-remedy.md
-2026-08-03-fs-tool-error-remedy.md: 66d47b750afdd43c4e2b830e73e21a3341f26c4b
-2026-08-03-fs-tool-error-remedy.zh.md: efa3062f65fe458cd44fadef074583c1b15a3365
+/agent-note-guarded-mutation-errors-append-the-recovery-instruction-at-the-model-boundary:
+  en: 23dbe100021b0c91
+  zh: 5f2bdcdc24117775
+/agent-note-guarded-mutation-errors-append-the-recovery-instruction-at-the-model-boundary/problem:
+  en: 91557d24227911a8
+  zh: 4bfaaf915b49c1bd
+/agent-note-guarded-mutation-errors-append-the-recovery-instruction-at-the-model-boundary/decision:
+  en: da1b7a87bf7256b7
+  zh: 1c833452205499d0
+/agent-note-guarded-mutation-errors-append-the-recovery-instruction-at-the-model-boundary/alternatives-considered:
+  en: 4eb3f2a8156d324e
+  zh: 50ab28422e692c80
+/agent-note-guarded-mutation-errors-append-the-recovery-instruction-at-the-model-boundary/consequences:
+  en: f7739309179c6271
+  zh: f127cc3a833579a1

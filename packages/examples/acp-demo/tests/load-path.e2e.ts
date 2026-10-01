@@ -53,7 +53,7 @@ const CORDIS_YML = `
 - id: spill-policy
   name: '@deepseek-ai/dsh-spill-policy'
   config:
-    maxInlineBytes: 50000
+    maxInlineTokens: 12500
 `
 
 interface Spawned {

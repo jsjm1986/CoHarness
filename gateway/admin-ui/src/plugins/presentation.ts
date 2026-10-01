@@ -13,9 +13,6 @@ const BUILTIN_COPY = new Map<string, { title: PluginManagerLocaleKey; descriptio
   ['@deepseek-ai/dsh-experimental-agent-team-profile', {
     title: 'builtinAgentTeamTitle', description: 'builtinAgentTeamDescription', beta: true,
   }],
-  ['@deepseek-ai/dsh-experimental-agent-team-web-profile', {
-    title: 'builtinAgentTeamWebTitle', description: 'builtinAgentTeamWebDescription', beta: true,
-  }],
   ['@deepseek-ai/dsh-experimental-auto-review', {
     title: 'builtinAutoReviewTitle', description: 'builtinAutoReviewDescription', beta: true,
   }],

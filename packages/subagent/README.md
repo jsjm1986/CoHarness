@@ -1,3 +1,8 @@
+---
+description: "This family lets an agent delegate work to child agents. Multiple named providers may coexist in one context."
+kind: "package-group"
+---
+
 # subagent/ — subagent capability family
 
 English | [中文](README.zh.md)

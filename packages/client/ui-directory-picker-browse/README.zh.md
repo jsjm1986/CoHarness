@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-directory-picker-browse
 
 [English](README.md) | 中文
@@ -14,10 +19,22 @@ node 半边是一个空 `apply`：它的存在只为让插件出现在 host 的 
 
 本包提供 Web GUI 的应用内目录浏览表面：一个「选择工作区目录」对话框，通过本地宿主列出、导航并创建文件夹，不涉及任何操作系统选择框。它填充 `ui-workspace` 声明的两个目录流程槽位，用一行 cordis.yml 组合出浏览拾取交互的客户端一侧。当浏览器为远程或进程内、没有本地操作系统选择器时选择它；本地部署可优先选择 [`-native`](../ui-directory-picker-native/README.zh.md) 表面。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每次列出与创建都通过 `ctx.workspaces` 委托给 Host 目录选择器后端；对话框只持有瞬态交互状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为目录浏览器属于浏览器界面；本包中的任何内容都不会进入模型请求。
@@ -26,7 +43,18 @@ node 半边是一个空 `apply`：它的存在只为让插件出现在 host 的 
 
 无；本包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **无搜索、无多选、无重命名或删除** —— 对话框只负责列出与创建目录；到达目标靠导航、编辑路径，或用前缀过滤最后一栏。
 - **隐藏条目的过滤在客户端** —— Host 始终列出隐藏条目并加标记，因此开关只改变对话框渲染什么。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

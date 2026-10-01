@@ -19,8 +19,8 @@ describe('authorization invariant companion', () => {
       key: KEY,
       label: 'ChatGPT (Codex)',
       methods: [{ id: 'oauth', label: 'Sign in' }],
-      run: () => ctx.credentials
-        .modifyRecord(KEY, () => Promise.resolve({ kind: 'grant', payload: {} }))
+      run: session => session
+        .commit(() => Promise.resolve({ kind: 'grant', payload: {} }))
         .then(() => undefined),
     })
 

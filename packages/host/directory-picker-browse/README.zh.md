@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-host-directory-picker-browse
 
 [English](README.md) | 中文
@@ -12,10 +17,22 @@
 
 无法触达 OS 选择器的用户仍能通过 `dsh-host-directory-picker-browse` 选择工作区目录：它基于 Node 标准库提供单层目录列举与子目录创建，宿主屏幕上不渲染任何东西——因此它能服务原生后端无法触及的远程客户端。列举只返回目录、按名称排序，跟随指向目录的符号链接，并携带宿主判定的 `hidden` 标志；创建不递归，且把名称校验为单个路径段。一行组合配置还会用应用内**选择工作区目录**对话框填满工作区流程的目录扩展位。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。列出与创建是按调用应答的无状态 stdlib 操作；后端不保留会话状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。GUI 宿主的目录选择后端不注册任何面向模型的内容。
@@ -24,8 +41,19 @@
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **不读取 Windows 隐藏属性**——Node 的 dirent 不暴露 `FILE_ATTRIBUTE_HIDDEN`，因此在所有平台上 `hidden` 都意味着点前缀，直到原生探测值得付出相应成本为止。
 - **不枚举盘符根**——Windows 上祖先链止于盘符根；跨盘依赖浏览器 UI 的路径输入入口，而不是这里的枚举原语。
 - **授权文件栅栏只限定 UX 范围**——`workspace.create` 仍接受任意路径。browse 栅栏只约束应用内目录对话框与已有工作区点选；安全边界仍是 [dsh-directory-guard](../../../plugins/dsh-directory-guard/README.zh.md) 以及 Linux 上的 systemd 挂载命名空间。没有授权文件（或没有有效 path）时，列举仍从操作系统家目录起覆盖整盘。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

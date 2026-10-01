@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-20-agent-note-classification.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-06-20-agent-note-classification.md
-2026-06-20-agent-note-classification.md: edb65a772c81b818bf3811c9f3f64ed1a6497647
-2026-06-20-agent-note-classification.zh.md: 554a43daea13c9bc331694f669328d0e05315523
+/agent-note-classify-agent-notes-by-kind-via-path-encoded-subdirectories:
+  en: 5075db7e28191187
+  zh: 55113b141e222f49
+/agent-note-classify-agent-notes-by-kind-via-path-encoded-subdirectories/problem:
+  en: f8de45c89b70b0de
+  zh: e8e0691786932421
+/agent-note-classify-agent-notes-by-kind-via-path-encoded-subdirectories/decision:
+  en: b5456d0c34870a49
+  zh: a84da1d784451046
+/agent-note-classify-agent-notes-by-kind-via-path-encoded-subdirectories/decision/the-closed-set-of-six-classes:
+  en: 6ac348f6377427fd
+  zh: 6fe1e2f594f64ae7
+/agent-note-classify-agent-notes-by-kind-via-path-encoded-subdirectories/decision/two-gates:
+  en: 50fd35c19061797d
+  zh: 7901ca67f0c466bc
+/agent-note-classify-agent-notes-by-kind-via-path-encoded-subdirectories/alternatives-considered:
+  en: 26cc766f2adedaaf
+  zh: 699f03dba492fbd6
+/agent-note-classify-agent-notes-by-kind-via-path-encoded-subdirectories/consequences:
+  en: 7b42f1145db0d4b9
+  zh: 561d7c95b177ea83

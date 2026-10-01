@@ -23,6 +23,8 @@ import {
 import {
   workspaceArchiveSessionRequestSchema, workspaceArchiveSessionValueSchema,
   workspaceUnarchiveSessionRequestSchema, workspaceUnarchiveSessionValueSchema,
+  workspacePinSessionRequestSchema, workspacePinSessionValueSchema,
+  workspaceUnpinSessionRequestSchema, workspaceUnpinSessionValueSchema,
   workspaceCreateRequestSchema, workspaceCreateValueSchema, workspaceIdSchema,
   workspaceDeleteRequestSchema, workspaceDeleteValueSchema,
   workspaceInsertBeforeRequestSchema, workspaceInsertBeforeValueSchema,
@@ -35,6 +37,10 @@ import { agentPresetOpenDocumentValueSchema } from '../src/api/agent-presets.sch
 import { hostFrameSchema, muxFrameSchema, askUserQuestionItemSchema } from '../src/api/events.schema.ts'
 import { approvalRequestIdSchema, approvalResponsePayloadSchema } from '../src/api/approvals.schema.ts'
 import { askUserQuestionAnswerSchema, questionResponsePayloadSchema } from '../src/api/questions.schema.ts'
+import {
+  jobsKillRequestSchema, jobsKillValueSchema,
+  jobsOutputRequestSchema, jobsOutputValueSchema,
+} from '../src/api/jobs.schema.ts'
 
 describe('RpcId', () => {
   it('brands a raw string at zero runtime cost', () => {
@@ -366,11 +372,11 @@ describe('host domain schemas', () => {
   it('validates describe request/value', () => {
     expect(hostDescribeRequestSchema.parse({})).toEqual({})
     const value = hostDescribeValueSchema.parse({
-      version: '1', cwd: '/x', provider: 'p', model: 'm', attachedSessions: 2, home: '/h', canOpenPath: true,
+      version: '1', cwd: '/x', provider: 'p', model: 'm', attachedSessions: 2, home: '/h', canOpenPath: true, fileManager: 'finder',
     })
-    expect(value).toMatchObject({ provider: 'p', model: 'm', attachedSessions: 2, canOpenPath: true })
+    expect(value).toMatchObject({ provider: 'p', model: 'm', attachedSessions: 2, canOpenPath: true, fileManager: 'finder' })
     expect(hostDescribeValueSchema.parse({
-      version: '1', cwd: '/x', attachedSessions: 0, home: '/h', canOpenPath: false,
+      version: '1', cwd: '/x', attachedSessions: 0, home: '/h', canOpenPath: false, fileManager: null,
     }).provider).toBeUndefined()
     expect(() => hostDescribeValueSchema.parse({
       version: '1', cwd: '/x', attachedSessions: 0,
@@ -413,8 +419,10 @@ describe('workspace domain schemas', () => {
     expect(workspaceViewSchema.parse(view).sessionIds).toEqual(['s1'])
     expect(() => workspaceViewSchema.parse({ ...view, sessionIds: 's1' })).toThrow()
     expect(workspaceListRequestSchema.parse({})).toEqual({})
-    expect(workspaceListValueSchema.parse({ items: [view], archivedSessionIds: ['s1'] }).items).toHaveLength(1)
-    expect(() => workspaceListValueSchema.parse({ items: [view] })).toThrow()
+    expect(workspaceListValueSchema.parse({
+      items: [view], archivedSessionIds: ['s1'], pinnedSessionIds: ['s1'],
+    }).items).toHaveLength(1)
+    expect(() => workspaceListValueSchema.parse({ items: [view], archivedSessionIds: [] })).toThrow()
   })
 
   it('archiveSession request/value carry the id and the full updated set', () => {
@@ -431,6 +439,19 @@ describe('workspace domain schemas', () => {
     expect(workspaceUnarchiveSessionValueSchema.parse({ archivedSessionIds: [] }).archivedSessionIds)
       .toEqual([])
     expect(() => workspaceUnarchiveSessionValueSchema.parse({ archivedSessionIds: 's1' })).toThrow()
+  })
+
+  it('pinSession/unpinSession carry the id and the complete ordered pin set', () => {
+    expect(workspacePinSessionRequestSchema.parse({ sessionId: 's1' }).sessionId).toBe('s1')
+    expect(() => workspacePinSessionRequestSchema.parse({})).toThrow()
+    expect(workspacePinSessionValueSchema.parse({ pinnedSessionIds: ['s1', 's2'] }).pinnedSessionIds)
+      .toEqual(['s1', 's2'])
+    expect(() => workspacePinSessionValueSchema.parse({ pinnedSessionIds: 's1' })).toThrow()
+    expect(workspaceUnpinSessionRequestSchema.parse({ sessionId: 's1' }).sessionId).toBe('s1')
+    expect(() => workspaceUnpinSessionRequestSchema.parse({})).toThrow()
+    expect(workspaceUnpinSessionValueSchema.parse({ pinnedSessionIds: [] }).pinnedSessionIds)
+      .toEqual([])
+    expect(() => workspaceUnpinSessionValueSchema.parse({ pinnedSessionIds: 's1' })).toThrow()
   })
 
   it('insertSessionBefore accepts an anchored and an anchorless move', () => {
@@ -473,6 +494,46 @@ describe('workspace domain schemas', () => {
   })
 })
 
+describe('jobs domain schemas', () => {
+  const job = {
+    id: 'bash-1', kind: 'bash', label: 'pnpm build', status: 'running', startedAt: 5,
+    output: { total: 9, earliest: 0, spillPaths: ['/tmp/spill-1'] },
+  }
+
+  it('validates the output request: fenced job, optional session, absolute cursor', () => {
+    expect(jobsOutputRequestSchema.parse({ jobId: 'bash-1' })).toEqual({ jobId: 'bash-1' })
+    expect(jobsOutputRequestSchema.parse({ sessionId: 's1', jobId: 'bash-1', from: 4 }).from).toBe(4)
+    expect(() => jobsOutputRequestSchema.parse({})).toThrow()
+    expect(() => jobsOutputRequestSchema.parse({ jobId: '' })).toThrow()
+    expect(() => jobsOutputRequestSchema.parse({ jobId: 'bash-1', from: -1 })).toThrow()
+  })
+
+  it('validates the output value: view, coords, chunks, resume cursor, loss marker', () => {
+    const value = jobsOutputValueSchema.parse({
+      job, output: { total: 9, earliest: 2 },
+      chunks: [{ at: 2, text: 'a', channel: 'stdout' }, { at: 4, text: 'b', gapBefore: true }],
+      next: 9, lossy: true,
+    })
+    expect(value.chunks[1]?.gapBefore).toBe(true)
+    expect(jobsOutputValueSchema.parse({ job, output: job.output, chunks: [], next: 0 }).lossy)
+      .toBeUndefined()
+    expect(() => jobsOutputValueSchema.parse({
+      job, output: job.output, chunks: [{ at: 0, text: 'x', channel: 'nope' }], next: 0,
+    })).toThrow()
+    expect(() => jobsOutputValueSchema.parse({
+      job, output: job.output, chunks: [], next: 1.5,
+    })).toThrow()
+  })
+
+  it('validates the kill request/value pair: session is required, outcome is closed', () => {
+    expect(jobsKillRequestSchema.parse({ sessionId: 's1', jobId: 'bash-1' }).jobId).toBe('bash-1')
+    expect(() => jobsKillRequestSchema.parse({ jobId: 'bash-1' })).toThrow()
+    expect(jobsKillValueSchema.parse({ outcome: 'requested' }).outcome).toBe('requested')
+    expect(jobsKillValueSchema.parse({ outcome: 'already-finished' }).outcome).toBe('already-finished')
+    expect(() => jobsKillValueSchema.parse({ outcome: 'denied' })).toThrow()
+  })
+})
+
 describe('skills domain schemas', () => {
   it('validates the list request/value pair', () => {
     expect(skillListRequestSchema.parse({ sessionId: 's1' })).toEqual({ sessionId: 's1' })
@@ -512,8 +573,8 @@ describe('events frame schemas', () => {
       { type: 'session/projection', sessionId: 's', key: 'todos', value: [{ content: 'x', status: 'pending' }], seq: 7 },
       { type: 'session/jobs', sessionId: 's', jobs: [] },
       { type: 'session/jobs', sessionId: 's', jobs: [
-        { id: 'bash-1', kind: 'bash', label: 'pnpm run build', status: 'running', startedAt: 5 },
-        { id: 'pty-send-2', kind: 'pty-send', label: 'send keys', status: 'failed', detail: 'exit code: 3', startedAt: 5, finishedAt: 9 },
+        { id: 'bash-1', kind: 'bash', label: 'pnpm run build', status: 'running', startedAt: 5, output: { total: 0, earliest: 0 } },
+        { id: 'pty-send-2', kind: 'pty-send', label: 'send keys', status: 'failed', detail: 'exit code: 3', startedAt: 5, finishedAt: 9, output: { total: 12, earliest: 0, spillPaths: ['/tmp/o'] } },
       ] },
       { type: 'stream/error', error: { code: 'internal', message: 'm', details: {} } },
     ]
@@ -530,12 +591,13 @@ describe('events frame schemas', () => {
       { type: 'session/projection', sessionId: 's', key: 'todos', value: null, seq: 0.5 },
       // A producer kind stays an open string, but the closed status set and
       // the identity/label bounds are the carrier's own wire contract.
-      { type: 'session/jobs', sessionId: 's', jobs: [{ id: '', kind: 'bash', label: 'l', status: 'running', startedAt: 0 }] },
-      { type: 'session/jobs', sessionId: 's', jobs: [{ id: 'bash-1', kind: '', label: 'l', status: 'running', startedAt: 0 }] },
-      { type: 'session/jobs', sessionId: 's', jobs: [{ id: 'bash-1', kind: 'bash', label: '', status: 'running', startedAt: 0 }] },
-      { type: 'session/jobs', sessionId: 's', jobs: [{ id: 'bash-1', kind: 'bash', label: 'l', status: 'pending', startedAt: 0 }] },
-      { type: 'session/jobs', sessionId: 's', jobs: [{ id: 'bash-1', kind: 'bash', label: 'l', status: 'running', startedAt: -1 }] },
-      { type: 'session/jobs', sessionId: 's', jobs: [{ id: 'bash-1', kind: 'bash', label: 'l', status: 'completed', startedAt: 0, finishedAt: 0.5 }] },
+      { type: 'session/jobs', sessionId: 's', jobs: [{ id: '', kind: 'bash', label: 'l', status: 'running', startedAt: 0, output: { total: 0, earliest: 0 } }] },
+      { type: 'session/jobs', sessionId: 's', jobs: [{ id: 'bash-1', kind: '', label: 'l', status: 'running', startedAt: 0, output: { total: 0, earliest: 0 } }] },
+      { type: 'session/jobs', sessionId: 's', jobs: [{ id: 'bash-1', kind: 'bash', label: '', status: 'running', startedAt: 0, output: { total: 0, earliest: 0 } }] },
+      { type: 'session/jobs', sessionId: 's', jobs: [{ id: 'bash-1', kind: 'bash', label: 'l', status: 'pending', startedAt: 0, output: { total: 0, earliest: 0 } }] },
+      { type: 'session/jobs', sessionId: 's', jobs: [{ id: 'bash-1', kind: 'bash', label: 'l', status: 'running', startedAt: -1, output: { total: 0, earliest: 0 } }] },
+      { type: 'session/jobs', sessionId: 's', jobs: [{ id: 'bash-1', kind: 'bash', label: 'l', status: 'completed', startedAt: 0, finishedAt: 0.5, output: { total: 0, earliest: 0 } }] },
+      { type: 'session/jobs', sessionId: 's', jobs: [{ id: 'bash-1', kind: 'bash', label: 'l', status: 'running', startedAt: 0 }] },
     ]) expect(() => muxFrameSchema.parse(invalid)).toThrow()
     expect(askUserQuestionItemSchema.parse({ id: 'q', question: 'Q?' }).id).toBe('q')
   })
@@ -584,6 +646,9 @@ describe('events frame schemas', () => {
         createdAt: '0', updatedAt: '0',
       } },
       { type: 'host/workspace-removed', workspaceId: 'w' },
+      { type: 'host/workspace-order-changed', workspaceIds: ['w'] },
+      { type: 'host/archived-sessions-changed', archivedSessionIds: ['s'], archiveRevision: 1 },
+      { type: 'host/pinned-sessions-changed', pinnedSessionIds: ['s'] },
       { type: 'host/remote-event', event: 'commands/change', args: [] },
       { type: 'host/remote-event', event: 'settings/document-updated', args: ['ns', 3] },
       { type: 'host/remote-event', event: 'agent-preset/selected', args: ['s', 'minimal'] },

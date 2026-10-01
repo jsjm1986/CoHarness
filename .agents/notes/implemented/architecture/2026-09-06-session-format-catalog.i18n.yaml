@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-06-session-format-catalog.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-06-session-format-catalog.md
-2026-09-06-session-format-catalog.md: d3d899718a64ec37dc10b446ece1d90bcb3a67c0
-2026-09-06-session-format-catalog.zh.md: efa80136fdb3184185afc340c21106f1238f34dd
+/agent-note-session-migration-uses-one-adjacent-catalog:
+  en: 79c5d18b79fe89db
+  zh: 228a981d0eb0ba42
+/agent-note-session-migration-uses-one-adjacent-catalog/problem:
+  en: 36d4f2a61c67c4c9
+  zh: 82dc083d22af3240
+/agent-note-session-migration-uses-one-adjacent-catalog/decision:
+  en: 9639d6a3c106441a
+  zh: 6deed8c3eae07218
+/agent-note-session-migration-uses-one-adjacent-catalog/alternatives-considered:
+  en: 9e3c38e957eaa7a8
+  zh: 2d5094847c3c9d3f
+/agent-note-session-migration-uses-one-adjacent-catalog/consequences:
+  en: 2862c931363407d2
+  zh: 6b270cdccc2f6543
+/agent-note-session-migration-uses-one-adjacent-catalog/verification:
+  en: 3fa8c0cf4ebe72b9
+  zh: b2ef6459a9478ec5

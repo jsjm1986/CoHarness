@@ -33,7 +33,7 @@ export type {
   ModelCatalogFailure, ModelCatalogModel, ModelProviderGroup, ModelReasoning,
   MessageId, ModelReasoningEffort, ModelSelection, QueueAction, QueuedInboxItem, SessionModels,
   SubagentsApi, SubagentAddress, SubagentCatalog, SubagentListEntry, SubagentPromptContentPart, SubagentPromptReceipt,
-  JobView,
+  JobView, JobsApi, JobChannel, JobKillValue, JobOutputChunk, JobOutputCoords, JobOutputValue,
   RpcRequest, RpcResponse, RpcResult, RpcError, RpcErrorCode,
   ClientRequest, ServerResponse, ServerRequest, ClientResponse, RpcMessage, RpcReceipt,
   HostDescription, IApiClient, ConnectionRuntimeTarget, SessionDraftId, SessionId, SessionEvent, ContentBlock, StreamChunk,
@@ -52,7 +52,7 @@ export {
 export type { ConnectionFailure } from './connection.ts'
 export { ApiTransportError } from './api.ts'
 export type { ConnectionConfig, ConnectionSinks, ConnectionState }
-export type { ClientConnectionRpc } from '../rpc.ts'
+export type { ClientConnectionRpc, ConnectionRpcResult } from '../rpc.ts'
 export type { RpcFetch } from './rpc.ts'
 export type {
   AccountPreferenceMutation, AccountPreferenceNamespace, AccountPreferencesTransport, AccountPreferencesView,
@@ -90,10 +90,19 @@ export const inject: string[] = []
  * can provide their own API, RPC, and bundle transports.
  */
 export interface ClientTransportHooks {
-  /** Build the API carrier, including its downstream event streams. */
-  createApiClient(): IApiClient
-  /** Transport for generic unary RPC channels. */
-  fetch: RpcFetch
+  /**
+   * Build the API carrier, including its downstream event streams; unused in
+   * fixture mode. Absent members fall back to the browser HTTP carrier.
+   */
+  createApiClient?(): IApiClient
+  /**
+   * Already decoded logical RPC carrier. When present it replaces the HTTP
+   * caller outright: no envelopes and no `fetch` (an in-process Host such as
+   * a test mock plugs in here).
+   */
+  rpc?: ClientConnectionRpc
+  /** Transport for generic unary RPC channels; unused when `rpc` is present. */
+  fetch?: RpcFetch
   /** Optional account-preference carrier for embedded hosts. */
   createAccountPreferencesTransport?(): AccountPreferencesTransport
   /** Optional project-Provider carrier for embedded hosts. */
@@ -105,6 +114,23 @@ export interface ClientTransportHooks {
 interface ClientTransportGlobal {
   __DSH_TRANSPORT__?: ClientTransportHooks
   __DSH_CONNECTION_RECOVERY__?: unknown
+}
+
+/** Browser location fields used to classify loopback authority and detect fixture mode. */
+export interface ConnectionLocation {
+  readonly hostname: string
+  /** Page query; `?fixture` selects the in-page fixture carrier. */
+  readonly search?: string
+}
+
+/** Instance-local inputs for installing a Connection service. */
+export interface ConnectionInstallOptions {
+  /** Explicit physical carrier; omit for the browser HTTP carrier. */
+  readonly transport?: ClientTransportHooks
+  /** Reconnect timing overrides; omitted fields use controller defaults. */
+  readonly recovery?: ConnectionConfig
+  /** Page location; omit for a non-browser composition. */
+  readonly location?: ConnectionLocation
 }
 
 function targetKey(target: ConnectionRuntimeTarget): string {
@@ -171,18 +197,63 @@ export interface ConnectionHandle {
 }
 
 /**
- * Client plugin body: pick the api by page mode and provide ctx.connection.
- * @param ctx - client cordis context.
+ * The carriers one page composition uses for the root handle and every pooled
+ * target handle derived from it: an explicit transport (or the fixture)
+ * supplies the api and RPC faces; an unset composition uses the browser HTTP
+ * carrier per target.
+ */
+interface ConnectionCarrier {
+  readonly api: IApiClient
+  readonly rpc: ClientConnectionRpc
+  readonly transport: ClientTransportHooks | undefined
+  readonly fixture: FixtureApiClient | undefined
+}
+
+/**
+ * Resolve the carrier of one runtime target under the page's composition.
+ * @param target - runtime target the handle will serve.
+ * @returns api and RPC faces for that target.
+ */
+function carrierOf(carrier: ConnectionCarrier, target: ConnectionRuntimeTarget | undefined): Pick<ConnectionCarrier, 'api' | 'rpc'> {
+  if (carrier.fixture !== undefined) return { api: carrier.fixture, rpc: carrier.fixture.rpc }
+  const transport = carrier.transport
+  if (transport !== undefined) {
+    return {
+      // A transport without its own api builder (fetch/rpc only) still gets the
+      // per-target browser carrier; one with an in-process api shares it.
+      api: transport.createApiClient?.() ?? new WebApiClient(target),
+      rpc: transport.rpc ?? createWebConnectionRpc(transport.fetch, target),
+    }
+  }
+  return {
+    api: new WebApiClient(target),
+    rpc: createWebConnectionRpc(undefined, target),
+  }
+}
+
+/**
+ * Build the handle body shared by the root connection and pooled target handles.
+ * @param api - target's API carrier.
+ * @param pageLocation - page location used for loopback classification.
+ * @param bootstrapRecovery - page-level recovery timings.
+ * @param rpc - target's logical RPC carrier.
+ * @param accountPreferences - account-preference transport when the carrier supplies one.
+ * @param projectModelSettings - project-Provider transport when the carrier supplies one.
+ * @param shared - pool state shared across derived handles.
+ * @param target - the handle's runtime target (absent for the personal root).
+ * @param carrier - the page composition used for derived target handles.
+ * @returns the provided connection service.
  */
 function createConnectionHandle(
   api: IApiClient,
-  pageLocation: Location | undefined,
+  pageLocation: ConnectionLocation | undefined,
   bootstrapRecovery: Required<ConnectionConfig>,
   rpc: ClientConnectionRpc,
   accountPreferences?: AccountPreferencesTransport,
   projectModelSettings?: ProjectModelSettingsTransport,
   shared?: ConnectionShared,
   target?: ConnectionRuntimeTarget,
+  carrier?: ConnectionCarrier,
 ): ConnectionHandle {
   const sharedState = shared ?? { root: undefined, handles: new Map<string, ConnectionHandle>() }
   const ownKey = target === undefined ? 'personal' : targetKey(target)
@@ -240,15 +311,18 @@ function createConnectionHandle(
       if (key === 'personal') return sharedState.root ?? handle
       const existing = sharedState.handles.get(key)
       if (existing !== undefined) return existing
+      const composition = carrier ?? { api, rpc, transport: undefined, fixture: undefined }
+      const faces = carrierOf(composition, next)
       const child = createConnectionHandle(
-        new WebApiClient(next),
+        faces.api,
         pageLocation,
         bootstrapRecovery,
-        createWebConnectionRpc(undefined, next),
+        faces.rpc,
         undefined,
         undefined,
         sharedState,
         next,
+        composition,
       )
       sharedState.handles.set(key, child)
       return child
@@ -304,22 +378,30 @@ function createConnectionHandle(
   return handle
 }
 
-export function apply(ctx: Context): void {
-  const pageLocation = typeof location === 'undefined' ? undefined : location
-  const fixture = pageLocation !== undefined && new URLSearchParams(pageLocation.search).has('fixture')
+/**
+ * Install one Context-owned Connection service from explicit composition
+ * inputs: the page `?fixture` query picks the in-page fixture, an explicit
+ * transport supplies the api/RPC carriers (each member falling back to the
+ * browser HTTP carrier), and the recovery override becomes the bootstrap
+ * timing every later `start` merges over.
+ * @param ctx - client Cordis context.
+ * @param options - physical carrier, reconnect timing, and page location.
+ */
+export function installConnection(ctx: Context, options: ConnectionInstallOptions = {}): void {
+  const pageLocation = options.location
+  const transport = options.transport
+  const fixture = pageLocation?.search !== undefined && new URLSearchParams(pageLocation.search).has('fixture')
   const fixtureClient = fixture ? new FixtureApiClient() : undefined
-  const transport = (globalThis as ClientTransportGlobal).__DSH_TRANSPORT__
-  const api: IApiClient = fixtureClient ?? transport?.createApiClient() ?? new WebApiClient()
+  const api: IApiClient = fixtureClient ?? transport?.createApiClient?.() ?? new WebApiClient()
   const accountPreferences = fixtureClient === undefined
     ? transport?.createAccountPreferencesTransport?.() ?? createBrowserAccountPreferencesTransport()
     : undefined
   const projectModelSettings = fixtureClient === undefined
     ? transport?.createProjectModelSettingsTransport?.() ?? createBrowserProjectModelSettingsTransport()
     : undefined
-  const bootstrapRecovery = resolveConnectionConfig(
-    (globalThis as ClientTransportGlobal).__DSH_CONNECTION_RECOVERY__ as ConnectionConfig | undefined ?? {},
-  )
-  const rpc = fixtureClient?.rpc ?? createWebConnectionRpc(transport?.fetch)
+  const bootstrapRecovery = resolveConnectionConfig(options.recovery ?? {})
+  const rpc = fixtureClient?.rpc ?? transport?.rpc ?? createWebConnectionRpc(transport?.fetch)
+  const carrier: ConnectionCarrier = { api, rpc, transport, fixture: fixtureClient }
   const handle = createConnectionHandle(
     api,
     pageLocation,
@@ -327,8 +409,27 @@ export function apply(ctx: Context): void {
     rpc,
     accountPreferences,
     projectModelSettings,
+    undefined,
+    undefined,
+    carrier,
   )
   ctx.provide('connection', handle)
+}
+
+/**
+ * Client plugin body: read the page composition and install its Connection service.
+ * @param ctx - client Cordis context.
+ */
+export function apply(ctx: Context): void {
+  const globals = globalThis as ClientTransportGlobal
+  const pageLocation = typeof location === 'undefined' ? undefined : location
+  const transport = globals.__DSH_TRANSPORT__
+  const recovery = globals.__DSH_CONNECTION_RECOVERY__ as ConnectionConfig | undefined
+  installConnection(ctx, {
+    ...(transport === undefined ? {} : { transport }),
+    ...(recovery === undefined ? {} : { recovery }),
+    ...(pageLocation === undefined ? {} : { location: pageLocation }),
+  })
 }
 
 export { ConnectionRpcStreamInterrupted } from '../rpc-stream.ts'

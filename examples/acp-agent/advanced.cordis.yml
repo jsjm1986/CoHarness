@@ -25,5 +25,7 @@
             name: '@deepseek-ai/dsh-ptc-runtime-node'
           - id: cordis-host-runner
             name: '@deepseek-ai/dsh-cordis-host-runner'
+          - id: cordis-inspect-providers
+            name: '@deepseek-ai/dsh-tool-cordis/host'
           - id: tool-cordis
             name: '@deepseek-ai/dsh-tool-cordis'

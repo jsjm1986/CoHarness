@@ -71,6 +71,11 @@ async function boot() {
   ctx.provide('locale', locale as never)
   ctx.provide('layout', layout as never)
   ctx.provide('workspaceResources', resources as never)
+  ctx.provide('shortcuts', {
+    runtime: 'web',
+    register: vi.fn(() => () => {}),
+    catalog: createSnapshotStore<readonly never[]>([]),
+  } as never)
   const sessions = {
     retain: vi.fn(() => ({ release: vi.fn() })),
     list: createSnapshotStore<{ current: SessionId | undefined; byId: Record<string, { id: SessionId }> }>({
@@ -158,7 +163,12 @@ describe('ui-sidebar-right apply', () => {
     const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
     const instance = handle.create()
     instance.clearPersisted()
-    const release = injected.bindService({ sessionId: SESSION, actions: instance.actions, surfaces: {}, canSplitPane: () => true })
+    const release = injected.bindService({
+      sessionId: SESSION, actions: instance.actions, surfaces: {},
+      closeWithFocus: (_paneId, close) => { close() },
+      openWithFocus: (open) => { open() },
+      canSplitPane: () => true,
+    })
     injected.openTab('guide', { revealIfOpened: false })
     const surface = instance.getSnapshot().bySession[SESSION]
     expect(surface?.layout.expanded).toBe(true)
@@ -293,7 +303,12 @@ describe('ui-sidebar-right apply', () => {
     const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
     // Minted under the session key, so the instance is adopted and the teardown releases it.
     const instance = handle.create(SESSION)
-    injected.bindService({ sessionId: SESSION, actions: instance.actions, surfaces: {}, canSplitPane: () => true })
+    injected.bindService({
+      sessionId: SESSION, actions: instance.actions, surfaces: {},
+      closeWithFocus: (_paneId, close) => { close() },
+      openWithFocus: (open) => { open() },
+      canSplitPane: () => true,
+    })
     injected.openTab('guide')
     const surface = instance.getSnapshot().bySession[SESSION]
     const guide = Object.values(surface?.layout.tabs ?? {})[0]

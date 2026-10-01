@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-workflow
 
 [English](README.md) | 中文
@@ -12,6 +17,18 @@
 
 运行一段纯 JavaScript 编排脚本，将工作扇出给 subagent，并返回脚本的最终 JSON 值。脚本可以使用 `agent()`、`parallel()`、`pipeline()`、`phase()` 和 `log()`；模型通常通过 `workflow` 工具访问它们。每次运行都归调用方所有，将每个子 agent（智能体）归属于调用它的 agent，在失败或取消时以结果兑现而不拒绝，并在 dispose（资源释放）期间等待脚本与子 agent 清理完成。调用方必须提供执行引擎，因此可以更换隔离策略而不改变可见行为。
 
+## 目录
+
+- [服务与运行契约](#service-and-run-contract)
+- [事件](#events)
+- [失败纪律](#failure-discipline)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="service-and-run-contract"></a>
 ## 服务与运行契约
 
 `WorkflowEngine.start(request): WorkflowRun` 会同步完成足够多的校验，在运行创建前拒绝格式错误的 meta 块、无法解析的脚本、不可用的提供方路由或不受支持的单次运行限制。返回后，`WorkflowRun.result` 绝不拒绝：执行失败以 `stopReason: 'error'` 兑现，取消则在引擎有限的宽限时间内以 `cancelled` 兑现。
@@ -22,6 +39,7 @@
 
 `WorkflowRun` 公开 `{ id, meta, result, cancel(reason?), dispose() }`。`WorkflowResult` 包含 `{ value, stopReason, error?, agentsStarted }`；`value` 是普通 JSON 数据或 `null`。
 
+<a id="events"></a>
 ## 事件
 
 工作流事件只供观察。它们携带 `WorkflowRunInfo`（`id` 加 `meta`），而不是活动运行，因此监听器无法取得取消或 dispose 权限。
@@ -32,6 +50,7 @@
 
 同进程事件 payload 是以不可变方式借用的值。每个监听器都独立隔离：同步抛出异常或返回的 promise 被拒绝时，只会记录日志，不会阻塞同级监听器或改变执行。
 
+<a id="failure-discipline"></a>
 ## 失败纪律
 
 `WorkflowError` 携带一个代码和 `fatal` 标志。致命错误总会逸出 `parallel()` 和 `pipeline()`，而不会变成普通的逐项 `null`：
@@ -46,6 +65,8 @@
 
 子 agent 若以非完成的结束原因正常兑现，并不属于基础设施异常：`agent()` 返回 `null`，使脚本可以处理普通的子 agent 失败。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 间接地，通过其消费方 `dsh-tool-workflow` 与一个工作流引擎，由它们渲染父级工具结果与子 agent 请求。
@@ -54,6 +75,7 @@
 
 不会直接导致失效；请求前缀的任何变化均由上述消费方与引擎负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **仅支持前台收集**：调用方负责一个活动运行并等待它；后台启动／轮询、spill 句柄和分离收集均暂缓处理。
@@ -63,3 +85,13 @@
 - **运行由持有方负责，不由服务跟踪**：卸载引擎不会发现独立的活动句柄；每个消费方都必须 dispose 自己启动的运行。
 
 暂缓实现的工作流接口见[动态工作流 Agent Note（agent 决策记录）](../../../.agents/notes/implemented/feature/2026-07-05-dynamic-workflows.zh.md)。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

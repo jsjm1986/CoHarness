@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-telemetry/README.md
-README.md: 9e48649cf3e5d7bed691334954ed70f1366291da
-README.zh.md: 681e270ea9826a833661cf473f1f37d6550cab01
+/:
+  en: d489cb1940c65bc1
+  zh: 0a51af1cad6486b4
+/deepseek-ai-dsh-session-telemetry:
+  en: b7c73f75717d87c0
+  zh: d0575dde9b4711f3
+/deepseek-ai-dsh-session-telemetry/summary:
+  en: 2ee6fcb4e68f6c9b
+  zh: 8ddc8d1f3c645757
+/deepseek-ai-dsh-session-telemetry/table-of-contents:
+  en: 006d1eb9806568c2
+  zh: 838dfe64ab238e67
+/deepseek-ai-dsh-session-telemetry/the-backend-contract:
+  en: 668727b59e621c23
+  zh: d457e127f4afcac1
+/deepseek-ai-dsh-session-telemetry/the-sharing-disclosure:
+  en: d1f5aa73ffb5c87b
+  zh: c59312f095000b73
+/deepseek-ai-dsh-session-telemetry/capture-points:
+  en: 2ffd863b79d15f95
+  zh: a0217f2da860ab35
+/deepseek-ai-dsh-session-telemetry/the-redact-waterfall:
+  en: 5440eaa95fdde67a
+  zh: 4eb8fd4c1c790017
+/deepseek-ai-dsh-session-telemetry/the-handoff-cursor:
+  en: 65683170166adf9a
+  zh: 1ee739f338b79202
+/deepseek-ai-dsh-session-telemetry/the-fixed-chunk-projection:
+  en: 27e7b1bb37f7ec74
+  zh: 23a437e77e1e2d44
+/deepseek-ai-dsh-session-telemetry/the-logical-record:
+  en: 472603e55bcec63c
+  zh: 50ade4f094427cc2
+/deepseek-ai-dsh-session-telemetry/invariants:
+  en: f027028933534807
+  zh: 6767439b2d1cdcf2
+/deepseek-ai-dsh-session-telemetry/model-experience:
+  en: 6a6b429828997572
+  zh: bde61df9dab8f840
+/deepseek-ai-dsh-session-telemetry/model-experience/kv-cache-effect:
+  en: 7593cf5d0d2cedd6
+  zh: ae5eece628147ab8
+/deepseek-ai-dsh-session-telemetry/known-limitations-and-deferred-work:
+  en: 6644a0dff8f602cf
+  zh: cbfa2592fd2823b9
+/deepseek-ai-dsh-session-telemetry/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

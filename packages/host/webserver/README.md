@@ -1,3 +1,8 @@
+---
+description: "Web route-registration plugin: HTTP and upgrade routes, structured index injections, and static dist fallback; knows no harness concepts"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-host-webserver
 
 English | [中文](README.zh.md)
@@ -16,6 +21,15 @@ A `script-preload` row adds an advisory classic-script preload to the head. Its 
 
 Browsers reach the web GUI over HTTP through `dsh-host-webserver`: a `node:http` server where other plugins register named routes, upgrade routes, index startup inputs, and one fallback handler. It knows no harness concepts and serves no files — the `/api` bridge, plugin bundles, the HMR event stream, and the SPA dist belong to the plugins that register them. Route matching is fixed: exact over the whole table, then longest prefix, then the fallback handler. It serves browsers only; Electron loads dist over `file://` and carries fetch over an IPC bridge.
 
+## Table of Contents
+
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the HTTP carrier bridges browser and API handler and registers nothing model-facing.
@@ -28,3 +42,13 @@ None; this package neither assembles nor sends a provider request.
 
 - **No TLS, auth, or origin policy** — binding a non-loopback address exposes the server to that network; deployment hardening (or fronting it with a real reverse proxy) is deliberately out of scope for the dev-facing v1.
 - **Socket options are fixed** — config selects the bind host and port, while backlog and other socket settings remain internal until a deployment needs them.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

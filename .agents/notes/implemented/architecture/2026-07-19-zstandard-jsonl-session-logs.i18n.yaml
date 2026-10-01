@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-19-zstandard-jsonl-session-logs.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-19-zstandard-jsonl-session-logs.md
-2026-07-19-zstandard-jsonl-session-logs.md: 93fc20f931c75552352834b9340e7d38680d4254
-2026-07-19-zstandard-jsonl-session-logs.zh.md: d58f89430ab91de6beabba83c2a31f43e4a7d275
+/agent-note-zstandard-jsonl-session-logs:
+  en: b46a6b48493de93e
+  zh: 0e394abf1d11fd43
+/agent-note-zstandard-jsonl-session-logs/problem:
+  en: b40626f90873cbc7
+  zh: 6015eccef64c5dc6
+/agent-note-zstandard-jsonl-session-logs/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-zstandard-jsonl-session-logs/decision/configuration-and-suffix-ownership:
+  en: 1094736aa811cb6b
+  zh: 4c45dec6f862e2c7
+/agent-note-zstandard-jsonl-session-logs/decision/frame-and-write-path:
+  en: da213ed32dfa6000
+  zh: a0f3cd11684dbdc9
+/agent-note-zstandard-jsonl-session-logs/decision/read-listing-and-crash-recovery:
+  en: 91f416a519d124a7
+  zh: 06b15e6b3e95342c
+/agent-note-zstandard-jsonl-session-logs/decision/consumers-and-verification:
+  en: 6d9d16d610b80e55
+  zh: efa083ffaa7301e0
+/agent-note-zstandard-jsonl-session-logs/alternatives-considered:
+  en: c5f447029fb644f7
+  zh: 5b84162e87bc6c86
+/agent-note-zstandard-jsonl-session-logs/consequences:
+  en: e73cb5279d6b6b3d
+  zh: a0b91a6d0354af43

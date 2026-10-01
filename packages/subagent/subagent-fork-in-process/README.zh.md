@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-subagent-fork-in-process
 
 [English](README.md) | 中文
@@ -8,6 +13,19 @@ fork 提供方会创建一个进程内子 agent（智能体），并以父 agent
 
 `dsh-subagent-fork-in-process` 是一个进程内 subagent 后端：它以父级已完成的对话轮次作为每个子 agent 的初始内容——子 agent 能看到所有已完成轮次，但看不到进行中的轮次，因此后续工作可以在对话基础上继续，而无需重复提供对话内容。委派工具以 `fork` 提供方名称找到它，其行为与 spawn 后端一致，唯一差异是会话初始内容。当子任务延续当前对话时选择它；当子 agent 必须独立运行时选择 spawn。初始内容是 fork 时的一次性快照：此后父级记录的任何内容都不会到达子 agent。
 
+## 目录
+
+- [初始内容边界](#seed-boundary)
+- [启动与能力](#start-and-capabilities)
+- [配置](#config)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="seed-boundary"></a>
 ## 初始内容边界
 
 subagent 启动时，父 agent 当前的工具调用轮次仍未结束：其日志包含 assistant 工具调用，但尚无匹配的工具结果或 `turn/end`。直接复制这份原始日志会给子 agent 一个无效且不平衡的会话。
@@ -16,12 +34,14 @@ subagent 启动时，父 agent 当前的工具调用轮次仍未结束：其日�
 
 初始内容只传递对话历史。子 agent 仍会获得全新的扁平注册作用域；它不继承父 agent 的工具限制或权限。
 
+<a id="start-and-capabilities"></a>
 ## 启动与能力
 
 `start(request)` 将已完成轮次的初始内容传给 [`startInProcessRun`](../subagent-in-process-driver/README.zh.md)，并等待子 agent 发布。共享驱动器负责取消、深度、定制、结果读取和 dispose（资源释放）。
 
 fork 声明 `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: true }`，与 spawn 相同。
 
+<a id="config"></a>
 ## 配置
 
 | 键 | 含义 |
@@ -29,10 +49,13 @@ fork 声明 `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: 
 | `providerName` | `ctx.subagents` 上的注册表名称（默认 `fork`）。 |
 运行生命周期、模型继承与深度跟踪均为共享行为，见 [`dsh-subagent-spawn-in-process`](../subagent-spawn-in-process/README.zh.md)。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。所有运行机制位于共享的进程内驱动器中；提供方只贡献带种子会话的 fork 入口。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 子 agent 历史与包络
@@ -63,7 +86,18 @@ fork 会把保留的已完成历史复制到子 agent 的请求中，子 agent �
 
 仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **初始内容是一次性快照**：子 agent 只能看到 fork 时父 agent 已完成的轮次，看不到父 agent 此后记录的任何内容；不会实时共享上下文。
 - **fork 生命周期策略因组合而异**：基础组合包与 ACP/headless 示例把 fork 委派工具绑定为 `backgroundMode: one-shot`，而 Web 应用的 agent preset（`ptc`、`cordis`、`standard`）选择 `continuable`。两者都让继承前缀保持可复用，因为父子双方的消息工具定义逐字节一致；显式的 persona、工具过滤、生成 SDK 或路由变化仍可能破坏这种一致性。理由见 [缓存保持型 fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.zh.md)。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-library"
+---
+
 # `@deepseek-ai/dsh-loader-smoke`
 
 [English](README.md) | 中文
@@ -16,10 +21,22 @@
 
 使用 `dsh-loader-smoke` 可从应用 fixture（测试前置数据）的真实可执行文件及其 `cordis.yml` 启动应用，并在隔离的临时目录中捕获输出和完成清理。`runFixtureTurn` 通过已配置的根 agent 驱动一项任务，并返回最终 assistant 文本与 token 用量。测试可以选择零构建的源码执行或已构建包执行，使本地和 CI 冒烟测试分别采用对应环境预期的消费路径。这个支持层库面向测试作者，不用于产品集成。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。测试支持启动器，选择 source 或 built 模式；它不拥有产品状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为测试 harness 仅提交调用方测试的普通用户任务，并将提示词与工具组装交由已加载的树负责。
@@ -28,8 +45,19 @@
 
 除已加载树本身的影响外，无其他影响；该 helper 既不更改请求前缀，也不跨运行保留状态。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **构建模式需要事先构建**：配置还必须能够通过 `examples/node_modules` 向上解析每个命名包。
 - **捕获的 stdout 和 stderr 仅受 execa 默认 100 MB `maxBuffer` 约束**：失控子进程会在该上限处被终止，而不是在冒烟测试自选的预算处。
 - **超时只终止直接子进程**：有故障的 fixture（测试前置数据）spawn 的进程树可能比冒烟测试存活更久，需要外部清理。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

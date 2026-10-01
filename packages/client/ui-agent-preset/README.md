@@ -1,3 +1,8 @@
+---
+description: "Agent-preset surfaces: the default for later sessions, this session's seat, and the composition editor"
+kind: "package-reference"
+---
+
 # dsh-client-ui-agent-preset
 
 English | [中文](README.zh.md)
@@ -8,10 +13,27 @@ The agent-preset surfaces: a General-settings row choosing which [preset](../../
 
 Use this package to choose the agent preset for a new Web GUI session, see the active preset in the session header, and manage available presets in Settings. The Agent mode picker is shown by default; Settings can hide it without changing running or historical sessions, and while it is hidden new sessions compose from the deployment default with the saved default parked until the picker returns. A preset fixes at session creation, so changing the selection or default affects only later sessions. If the deployment provides no presets, these controls stay hidden and every session uses the host composition.
 
+## Table of Contents
+
+- [Why it is a new-session preference](#why-it-is-a-new-session-preference)
+- [The new-session chip](#the-new-session-chip)
+- [The session-header label](#the-session-header-label)
+- [What it reads and writes](#what-it-reads-and-writes)
+- [The management section](#the-management-section)
+- [When the surfaces are absent](#when-the-surfaces-are-absent)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="why-it-is-a-new-session-preference"></a>
 ## Why it is a new-session preference
 
 A session's preset is fixed when the session is created — the host refuses to adopt an existing session under a different one, because that session's history was produced under the first preset's tools. So this row cannot be a live switch, and it says so: changing it applies to sessions started afterwards while running sessions keep the composition they began with.
 
+<a id="the-new-session-chip"></a>
 ## The new-session chip
 
 A second surface, beside the workspace picker on the new-session screen. It sits there rather than in the composer because that is where the choice is still open: a control that spends most of its life disabled belongs on the screen where it still works.
@@ -20,10 +42,12 @@ The chip opens on the deployment default and its pick is *staged* — the screen
 
 A session that has started is refused rather than queued: the host answers `agent-preset-locked`, and the stage is dropped instead of waiting for a session that will never accept it.
 
+<a id="the-session-header-label"></a>
 ## The session-header label
 
 A third surface, beside the session title: the preset THIS session runs, as static chrome. A control there would promise a switch the host refuses outright. It reads the preset from the session's own summary and resolves the display name against the same roster the General row reads. Forwarded `agent-preset/selected` owner events fold committed blank-session switches into that shared summary in every tab; the initiating tab may already have applied the RPC echo, and the merge is idempotent.
 
+<a id="what-it-reads-and-writes"></a>
 ## What it reads and writes
 
 Options and the current default both come from one `agentPreset.list` call. The roster already reports which id a session with no explicit choice gets, so the row needs no settings-schema introspection; the write targets the `agent-presets` settings namespace's `default` field, which is what the host resolves at creation.
@@ -34,6 +58,7 @@ Preset files publish one unlocalized `name` and `description`, which Web uses fo
 
 The row re-reads on `settings/document-updated` for its own namespace and on `connection/reset`: the roster is a live directory and the default is a settings field, so an external edit or a reconnect can both move it.
 
+<a id="the-management-section"></a>
 ## The management section
 
 A fourth surface, its own settings page (`settings.section` id `agent-presets`, ordered after Models — choosing a model is routine, composing an agent is the deployment-shaping act behind it): the roster as cards, a copy dialog as the only way a preset is created, and a read-only viewer over the shipped compositions.
@@ -45,6 +70,8 @@ The browser edits no composition text. Editing YAML in a web textarea was a weak
 A preset publishes its own description, of any length, and the grid sizes every card row alike — so an unbounded description would set the height of the whole roster. Cards clamp it to four lines and offer the rest in a tooltip, attached only while the text is actually cut off. The clamp is CSS, so the whole description stays in the accessibility tree whatever the card shows.
 
 A shipped preset opens in the read-only viewer. It is the known-good composition a copy starts from, so reading it is the point; it offers no location and no delete — its install is overwritten by upgrades and is not the user's to manage. The intro carries the guidance a create button used to imply: duplicate an existing preset and make it yours, or let the agent draft one in Creator mode.
+
+A known shipped preset also carries its own help: "Mode details" and "How to use" open a read-only reader with curated explanation and example tasks for `standard`, `ptc`, `minimal`, and `cordis`. Help never changes the selection — it exists so a user can choose between shipped modes without starting a session to find out. Custom presets own their capability claims, so the buttons appear only on shipped rows.
 
 Beside copying sits the conversational entry: when the roster carries the self-referential `cordis` preset, a dashed add-card (the Models page's affordance) stages it and starts a new session — the section closes the settings panel through the shell's owner-prop `close` and the new-session chip's own applier composes the blank session the workspace flow produces. The seat keeps a late roster load from regressing the display: staged pick first, then the composition the current session already carries, then the deployment default.
 
@@ -58,14 +85,17 @@ Setting the default writes the `agent-presets` settings namespace, which the hos
 
 `agentPreset.read`, `copy`, `openDocument`, and `remove` are loopback-pinned ([`dsh-client-connection`](../connection/README.md)): a composition names the plugins a session runs, so reading one is reconnaissance, and the rest manage the roster and drive the host desktop. `agentPreset.list` is not — it carries ids, trust, display metadata, and the path-free capability and policy flags (`authorable`, `modeSelectionEnabled`), and a LAN client's picker needs it.
 
+<a id="when-the-surfaces-are-absent"></a>
 ## When the surfaces are absent
 
 A deployment that composes no presets answers with an empty roster, and the row, the chip, the label, and the section all render nothing — every session then shares the host composition, and there is nothing to choose between or manage. A deployment that configures no writable root answers `authorable: false`, and the section stays a read-only browser: the shipped compositions still open in the viewer, but every copy action is disabled with the reason as its tooltip rather than offering a dialog whose create always fails. A roster answering `modeSelectionEnabled: false` hides the chip and the General row — the section keeps managing the roster with its selection affordances disabled, and the header label still reports what each session was created with.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The surfaces read and mutate the Host-owned preset roster through settings and remote calls; the plugin contributes slot occupants and keeps no preset data of its own.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the preset a later session is composed from; the preset it selects owns every model-facing effect.
@@ -79,3 +109,13 @@ No direct invalidation. Changing picker visibility or the default does not alter
 - **A preset without metadata is listed by id** — display text is optional, and a copy given no name deliberately falls back to its directory name rather than presenting itself identically to its source.
 - **A revealed path is display text, not a link** — where the host has no desktop opener the row shows the directory to copy by hand; the browser cannot open a host filesystem location itself.
 - **Composition edits are invisible to the page** — the files are edited outside the browser and nothing on the wire announces a file change, so the roster re-reads on its own actions, `settings/document-updated`, and `connection/reset`, not on every disk edit.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

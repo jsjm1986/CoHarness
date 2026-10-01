@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-tool
 
 [English](README.md) | 中文
@@ -12,6 +17,18 @@ Client 工具展示插件。`ui-conversation` 通过 `conversation.chat.node` �
 
 `dsh-client-ui-tool` 是 dsh Web 客户端的 Client 工具展示插件：它渲染对话中的每一次工具调用。`ui-conversation` 通过 `conversation.chat.node` 的匹配 key 分发每个已排序的 `tool-call` Conversation Node；本包渲染其中的 root 及其 PTC dispatch 子调用，并把每个原子调用通过 keyed slot `tool.call.toolview` 分发。没有注册的工具名称使用通用卡片。业务 UI 包只注册 wire 工具名称和原子视图——它们不配对会话事件、不重建 transcript（文本记录），也不拥有 root/subcall 拓扑，因为运行时仍对 call/result 配对、生命周期与递归 `subCalls` 投影拥有最终决定权。
 
+## 目录
+
+- [渲染约定](#rendering-contract)
+- [原子工具视图](#atomic-tool-views)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="rendering-contract"></a>
 ## 渲染约定
 
 `ToolCallTree` 接收一个已经包含递归 `subCalls` 的 root `ToolCallBlock`、selection 状态、会话 `cwd`，以及用于打开文件和检查调用的 Host 回调。它递归遍历标准调用块，让 root 与任意深度的 child 经过同一条原子分发路径，不订阅独立的 parent-to-children map。
@@ -32,6 +49,7 @@ keyed `read_image` 行从已落定调用持久化的 `meta.path` 与原始结果
 
 通用行保留原始参数载荷，只在用户展开可展开行时格式化。这样大体积的文件修改或代码参数不会在折叠列表构造期间产生额外格式化副本，展开后的正文仍保持原有格式。
 
+<a id="atomic-tool-views"></a>
 ## 原子工具视图
 
 拥有该视图的业务包将其 wire 工具名称注册进 `tool.call.toolview`：
@@ -48,12 +66,17 @@ owner 载荷为 `ToolCallOwnerProps`：`callId`、`toolName`、冻结的 `block`
 
 本包当前拥有 generic fallback，以及 shell/pwsh、read、write/edit、grep/glob、web、todo、question 和 Code Dispatch 的内置展示。`ui-skill` 展示了业务包自行拥有的 `skill` 注册项。
 
+记录型结果的工具——goal、schedule、Cordis 检查、workflow/ralph、session-query、subagent/team、job、terminal-session 与 LSP 调用——共用 `DetailsRow`：把成功的单文本结果投影为紧凑的 `ToolDetails` 列表（本地化字段、徽标、回执与文件位置）。记录格式未知、损坏、混有非文本块或已 spill 的结果保留通用 Input/Output 正文，不会隐藏任何诊断文本。`todo_write` 渲染已记录清单本身；当已加载窗口中存在前一条持久 `todo/write` 时，相对它标记新增/更新/移除项；`todoToolview` 通过 `conversationEvents`/`conversationViews` 注册该索引（`tool-todo-history`），prepend 更早历史时也会回填 baseline。详情侧栏在原始输出 fallback 之前渲染同一份结构化正文，保证紧凑卡片与侧栏对同一结果的内容判断一致。
+
 各类卡片的上限与 fallback 规则仍由对应的 [terminal](../../../.agents/notes/implemented/feature/2026-07-28-web-terminal-card.zh.md)、[diff](../../../.agents/notes/implemented/feature/2026-07-30-web-diff-card.zh.md)、[read](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card-frontend.zh.md)、[search](../../../.agents/notes/implemented/feature/2026-07-30-web-search-card.zh.md) 和 [web](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.zh.md) Agent Note 负责。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。调用/结果配对、生命周期与 `subCalls` 投影在 Runtime 中保持权威；本包渲染分发的块并注册工具视图 slot。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该包是浏览器端工具展示层，只渲染已记录的工具调用，不改变模型上下文。
@@ -62,8 +85,19 @@ owner 载荷为 `ToolCallOwnerProps`：`callId`、`toolName`、冻结的 `block`
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 - Host 不把 `run_code` 暴露为 PTC mode 程序 binding，因此生产事件只产生一层分发；递归的运行时/UI 约定支持嵌套。
 - 第一方工具视图集中在本包，可以通过 keyed slot 独立迁移到各自所属的业务包。
 - 工具文案复用 `ui-conversation` locale namespace。ask-user 的问题配对是尽力而为；有歧义或混合载荷时保持通用展示，确保不丢弃诊断块。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

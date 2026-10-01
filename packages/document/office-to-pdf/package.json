@@ -32,16 +32,16 @@
     "lib/types/**/*.d.ts"
   ],
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:~"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
-    "@deepseek-ai/cordis-plugin-include": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/cordis-plugin-loader": "workspace:~",
+    "@deepseek-ai/cordis-plugin-include": "workspace:~"
   },
   "dependencies": {
-    "@deepseek-ai/libreoffice-kit": "0.0.1",
-    "@deepseek-ai/schemastery": "workspace:^",
-    "@deepseek-ai/dsh-brand": "workspace:^"
+    "@deepseek-ai/libreoffice-kit": "^0.1.1",
+    "@deepseek-ai/schemastery": "workspace:~",
+    "@deepseek-ai/dsh-brand": "workspace:*"
   }
 }

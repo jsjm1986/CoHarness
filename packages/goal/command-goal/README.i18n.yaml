@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/goal/command-goal/README.md
-README.md: 06f08ffbd3b6e755856546c7e256a38b4903083e
-README.zh.md: 7401521a65907d46e9ddda1832cc84132492e79f
+/:
+  en: 9348af20fbb99ee4
+  zh: 61495d48365178df
+/deepseek-ai-dsh-command-goal:
+  en: 48fe92c7b369d45b
+  zh: f6b65fe60ac42a1b
+/deepseek-ai-dsh-command-goal/summary:
+  en: 85dbb8e93f0ec6cb
+  zh: f0c8cc348b276933
+/deepseek-ai-dsh-command-goal/table-of-contents:
+  en: 4d62f9e8ea69364d
+  zh: 1eaf0b84f9f926b5
+/deepseek-ai-dsh-command-goal/command-contract:
+  en: 91d27a62c7468b9a
+  zh: 72800d7ea781c076
+/deepseek-ai-dsh-command-goal/composition:
+  en: 979b88be8d972735
+  zh: 0f66b9c7ec93c267
+/deepseek-ai-dsh-command-goal/invariants:
+  en: 412b6af5f143cf19
+  zh: c1ed7d9f43a118f2
+/deepseek-ai-dsh-command-goal/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-command-goal/model-experience/human-goal-control:
+  en: b542d90272a9b64e
+  zh: 9f8bfb4ca7784428
+/deepseek-ai-dsh-command-goal/model-experience/human-goal-control/what-the-model-sees:
+  en: a4c7a3d502c58794
+  zh: a47ab70d7aa4f0a4
+/deepseek-ai-dsh-command-goal/model-experience/human-goal-control/token-effect:
+  en: 1c48e9c98cee51b0
+  zh: 63b2f981bdaf6ca4
+/deepseek-ai-dsh-command-goal/model-experience/human-goal-control/kv-cache-effect:
+  en: 15426cc075dc65d7
+  zh: d952295e514f3a6e
+/deepseek-ai-dsh-command-goal/known-limitations-and-deferred-work:
+  en: d1a4bd9cd854dbb8
+  zh: 2d26bf8ddf243a40
+/deepseek-ai-dsh-command-goal/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

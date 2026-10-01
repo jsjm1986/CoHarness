@@ -1,3 +1,8 @@
+---
+description: "Loader integration for generated Typert package contributions"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-typert-loader
 
 English | [中文](README.zh.md)
@@ -14,10 +19,21 @@ Packages without the export are skipped. Package resolution and imported manifes
 
 With `dsh-typert-loader` mounted, every package that mounts in a Loader composition automatically contributes its generated Typert reflection and schema factories to the runtime registry — and withdraws them when the package or the plugin unmounts. Packages without the generated export are skipped, so adding the plugin to any composition is safe. An explicit `packages` list covers plugins nested behind another Loader entry, whose fibers carry no resolvable package specifier. It is a Node-only plugin and needs the config-tree resolution anchor to resolve packages.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The plugin registers generated contributions with `ctx.typert` at load; artifact data is owned by the registry.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as loader integration only registers generated artifacts; consumers own any model-visible projection.
@@ -30,3 +46,13 @@ No direct effect; registration changes reach a request only through a consumer t
 
 - Discovery imports only the host face; client runtimes need a separate composition owner before equivalent discovery is added.
 - Loader entries are discovered automatically. Nested or non-Loader plugins require an explicit `packages` entry or direct `ctx.typert.register()` ownership.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

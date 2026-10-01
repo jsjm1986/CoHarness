@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-persistence-sqlite
 
 [English](README.md) | 中文
@@ -11,6 +16,18 @@
 使用 `dsh-session-persistence-sqlite` 作为可选的 SQLite `SessionPersistence` 提供方：符合条件的 `assistant/chunk` 段以打包物理行存储，大负载选择性 Zstandard 压缩、源事件序号增量编码，并还原出完全一致的逻辑 `SessionEvent[]`。出厂组合均不选用；部署方需显式挂载并提供数据库路径。
 
 
+## 目录
+
+- [存储模型](#storage-model)
+- [Schema 兼容性](#schema-compatibility)
+- [配置（schemastery）](#configuration-schemastery)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="storage-model"></a>
 ## 存储模型
 
 Schema 20 使用整数内部会话键和稳定的外部 `session_key`；复合主键索引 `events(session_id, seq)` 仍负责物理查找。CoHarness 专用的 `session_extensions` 保存草稿标记，`event_extensions` 保存逻辑 `ignorable` 标记，因此两种含义不会复用打包行判别字段。标量行存储一个逻辑事件。打包行把 `text-chunks`、`reasoning-chunks` 或 `tool-call-chunks` 用作物理 `type`；`seq` 与 `time` 标识所表示的第一个事件，`data` 保存共享的分片打包 payload。打包行设置 `is_packed=1`；标量行设置 `is_packed=0`，逻辑可忽略事件另有一行 `event_extensions`。这些标签属于存储记录，而不是 `SessionEventMap` 成员。
@@ -23,6 +40,7 @@ Schema 20 在本包内拥有 codec，不导入其他持久化格式中可变的�
 
 完整读取按首个逻辑序列号的顺序扫描物理行。反向扫描会定位最后一个有效 `turn/end`，但不会保留每个物理行的解码副本；正向扫描则逐行解码并校验，写入最终返回的逻辑事件数组。`readFrom(id, fromSeq)` 只检查最大行跨度内的打包前驱，并把后缀锚定在可能包含 `fromSeq` 的最早前驱；这样既可包含从打包行内部开始的事件范围，也能检测相互重叠的物理损坏，而不会解析无关的更早标量行。畸形打包行按全有或全无处理：已提交区域中的损坏会拒绝读取，最终撕裂行则在可变恢复期间从其物理起点删除。修复会在持有写锁时重新读取尾部，并在删除任何数据前拒绝陈旧 marker。打包 `data` 超出 schema 字节上限时，会在解析 JSON 前拒绝。
 
+<a id="schema-compatibility"></a>
 ## Schema 兼容性
 
 全新数据库直接初始化为 schema 20。旧 schema、外部 application identity、非空未版本化数据库以及不兼容 schema 对象会在打开时拒绝；运行时不会隐式升级文件。停止进程后使用离线工具：
@@ -37,6 +55,7 @@ pnpm run migrate:session-sqlite-v18-to-v20 -- --input old.db --verify-only
 
 格式 v0/v1 的 Session header 属于独立的逻辑迁移：首次读取 body 时，在写事务中只将元数据行更新为 v2，事件行保持不变。数据库 schema 升级仍必须离线、显式执行。
 
+<a id="configuration-schemastery"></a>
 ## 配置（schemastery）
 
 ```ts
@@ -53,6 +72,8 @@ interface Config {
 
 `journalMode` 默认为 `wal`，`busyTimeoutMs` 默认为 `5,000`，`preparedSessionCacheSize` 默认为 `5`，`writeBatchMaxDelayMs` 默认为 `200`，`maxPendingEvents` 默认为 `100,000`，`maxPendingBytes` 默认为 `64 MiB`。该超时限制每次同步 SQLite 锁等待的时长。SQLite 在切换 journal mode 时可能立即返回 `SQLITE_BUSY`，因此冷打开会在尝试之间让出执行，并在从打开时开始计算的重试截止点后不再发起新尝试。正在执行的同步 SQLite 调用可能在该截止点之后才完成。提供方会在每个连接上禁用可信 schema 与内存映射 I/O，然后读回这两项设置。提供方还会读回所选 journal mode 并要求它匹配；内存数据库显式接受 SQLite 返回的 `memory`。选择 journal 后，提供方会把 `synchronous` 固定为 `FULL` 并验证该设置，避免 SQLite 构建默认值削弱已提交追加的持久性。在 POSIX 上，数据库父目录和文件必须归当前用户所有，父目录不得允许组或其他用户写入，文件不得授予组或其他用户任何权限。符号链接和非普通文件会被拒绝。Windows 同样拒绝符号链接与非普通文件，但部署方仍负责把目录和文件 ACL 限制给 harness 用户。路径与所有权错误会拒绝插件初始化。Node SQLite 在第一次持久化操作时才加载；导入时只抑制 Node 22 精确的 SQLite `ExperimentalWarning`。存储身份与 schema 错误会在暴露或变更数据前拒绝该操作。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 恢复的对话历史
@@ -71,6 +92,7 @@ interface Config {
 
 **运行时不变式：** 不发布伴生入口。物理打包只能通过数据库往返与行数检查观察，并非持续的进程内关系。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **过渡性的 SQLite 专用设计**——这一以效率为重点的实现参考了 [morlay/session-persistence-rdb](https://github.com/morlay/session-persistence-rdb)。支持多种后端与可配置 schema 的统一关系数据库设计尚待后续完善；schema 20 是当前 CoHarness 格式，后续变更必须再次通过离线迁移。
@@ -80,3 +102,13 @@ interface Config {
 - **繁忙等待会阻塞事件循环**——SQLite 会在同步 `DatabaseSync` 调用内等待；只有繁忙的 journal-mode 切换会在两次尝试之间让出执行，而且从打开时计算的截止点只阻止新尝试，不会中断正在执行的调用。
 - **外部 SQL 读取方必须理解物理标签**——受支持的消费方通过本提供方读取，而不是把每个 `events.type` 都当作逻辑事件类型。
 - **没有删除或后台历史压缩**——普通追加只做插入。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

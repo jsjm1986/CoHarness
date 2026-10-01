@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-api-remotes
 
 [English](README.md) | 中文
@@ -16,12 +21,25 @@ Client 组装挂载生成的 Plugin Manager 命名空间，用于检查 profile�
 
 为本应用选定的 Host Remote 能力提供双侧 BFF。Host 入口拥有转发事件名单并向 API Gateway 注册应用事件 source；Client 入口以运行时值形式导入生成的 `/remote` 产物，通过 `ctx.remote.$mount()` 挂载每项贡献，并重新导出对应的声明合并。Client 业务包依赖该外观，而不依赖 Gateway 实现或单独的 Remote 运行时入口。
 
+## 目录
+
+- [转发的 Host 事件](#forwarded-host-events)
+- [构建边界](#build-boundary)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="forwarded-host-events"></a>
 ## 转发的 Host 事件
 
 `src/remote-events.ts` 持有 `API_REMOTE_FORWARDED_EVENTS`——本应用原样转发给消费端的 Host cordis 事件名单（无投影、无脱敏、wire 名称不改写），它同时就是 `ctx.remote.$on` 的合法键集；只含类型的 `src/types.ts` 派生其选择面。六组动态 Cordis 事件同时包含官方 `cordis/*` 名称和 fork 的 `@deepseek-ai/cordis/*` 名称。Host 仍转发其实际收到的精确名称；Gateway Client 将每对名称视为同一投递组。其余事件仍只需在数组中增加一个条目：类型投影、消费端键面与 Host 转发循环全部由它派生。
 
 监听器签名不在此处重写。名单内每条事件的 cordis `Events` 声明都住在其 owner 包 client-safe 的 `./types` 出口（`dsh-agent-presets`、`dsh-commands`、`dsh-cordis-host-runner`、`dsh-credentials`、`dsh-llm`、`dsh-settings`），本包两个 face 都把那些声明纳入编译面，因此「原样转发」是构造性成立的，不需要另立证明。Host face 还额外把名单断言给 `TypertForwardableEvent`：未声明的事件名、绑定 AgentScope 的事件、以及形状不是单向的事件都会在此被拒绝。
 
+<a id="build-boundary"></a>
 ## 构建边界
 
 仓库中的普通包只属于一个 TypeScript face：Host 包登记在根 `tsconfig.host.json`，Client 包登记在根 `tsconfig.client.json`。`api-remotes` 是唯一刻意拆分的特例，因为它的 Host 入口要参与 Host Typert 图，而 `src/client/index.ts` 必须等 Host tsdown 生成业务包的 `/remote` 声明后才能编译。
@@ -33,10 +51,13 @@ Client 组装挂载生成的 Plugin Manager 命名空间，用于检查 profile�
 
 包内 `clientBundle(..., { hostPhase: true })` 让 Host tsdown 打包 Host 入口，让后续 Client tsdown 只打包 browser 入口。普通 Client 插件仍使用单一 Client project，并在 Client tsdown 阶段一起生成 Node loader 入口和 browser bundle；不得因一个包同时存在 `src/index.ts` 与 `src/client/index.ts` 就复制本包的拆分。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每个贡献都通过 `ctx.remote.$mount()` 挂载为随组装 fiber 撤回的 effect，身份解析是针对实时 Agent 注册表的逐次调用策略。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为该 BFF 只选择 Remote 应用方法和转发事件，不注册任何模型接口。
@@ -45,8 +66,19 @@ Client 组装挂载生成的 Plugin Manager 命名空间，用于检查 profile�
 
 无直接影响；其触发的任何模型可见行为均由已挂载的 Host 能力负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 能力集合由构建时显式导入的值固定确定；Client 不会在运行时发现 Host 中已启用的服务或 Remote 定义。
 - 若要增加能力，必须显式导入相应的 `/remote` 值并在此组合中挂载。
 - 在剩余 BFF 配置迁移到 `api-remotes` 之前，标准 Web Host 仍从旧 API Proxy 提供恢复默认值与 Agent scope 设置。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

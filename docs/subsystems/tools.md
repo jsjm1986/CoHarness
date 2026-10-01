@@ -39,6 +39,16 @@ interface ToolDefinition extends ToolSchema {
    */
   execute(args: unknown, exec: ToolRunContext): Promise<unknown>
   /**
+   * Install execution-prepared content before `tools/post-execute` policies.
+   * The callback is captured when the call starts and runs once for a
+   * normalized outcome entering post-execute. Policy replacements remain
+   * authoritative; pipeline failures that bypass post-execute skip projection.
+   * @param exec - immutable execution identity and arguments.
+   * @param result - normalized result before post-execute policy.
+   * @returns replacement content, or undefined to preserve the renderer output.
+   */
+  projectContent?(exec: Readonly<ToolExecution>, result: Readonly<ToolExecutionResult>): ContentBlock[] | undefined
+  /**
    * Synchronous last-mile transform for model-facing content. The registry
    * snapshots this callback when execution starts and invokes it exactly once
    * for every normalized outcome, including pipeline failures that bypass
@@ -393,14 +403,15 @@ interface ToolErrorInfo {
  * model-facing reason and optional structured error identity; `cancel` selects
  * the canonical cancellation result without presenting a policy denial; `ask`
  * runs only after an approval service returns `allowed-once` and otherwise
- * denies. Input rewriting is excluded because arguments are already logged and
+ * denies; its `reason` is the audited approval reason and its optional
+ * `displayReason` is the localized prompt text. Input rewriting is excluded because arguments are already logged and
  * presented.
  */
 type PreToolDecision =
   | { kind: 'allow' }
   | { kind: 'deny'; reason: string; info?: ToolErrorInfo }
   | { kind: 'cancel' }
-  | { kind: 'ask'; reason?: string }
+  | { kind: 'ask'; reason?: string; displayReason?: { readonly en: string; readonly [locale: string]: string } }
 ```
 
 ```ts type-equiv

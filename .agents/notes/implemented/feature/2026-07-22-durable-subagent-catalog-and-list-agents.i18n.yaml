@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-22-durable-subagent-catalog-and-list-agents.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-22-durable-subagent-catalog-and-list-agents.md
-2026-07-22-durable-subagent-catalog-and-list-agents.md: a13f3c0a9a90805ce709915ae1801cb493cd92fc
-2026-07-22-durable-subagent-catalog-and-list-agents.zh.md: 8ca077957e6c5b0ce1b7d2d6b4f7165885ee6872
+/agent-note-durable-subagent-catalog-and-list-agents:
+  en: 46c037587724ec5d
+  zh: 7ec2ae63a50f9c1c
+/agent-note-durable-subagent-catalog-and-list-agents/problem:
+  en: d5acf53d1045e98d
+  zh: 94db27f4c5a89810
+/agent-note-durable-subagent-catalog-and-list-agents/decision:
+  en: 9bff2370e522b77b
+  zh: 39fb4b4d93078790
+/agent-note-durable-subagent-catalog-and-list-agents/decision/enumeration-decision:
+  en: ccef1671fcfb0eec
+  zh: 56d16b260c16a728
+/agent-note-durable-subagent-catalog-and-list-agents/decision/list-agents-contract:
+  en: ff3f3a487e66767a
+  zh: 643f6f815b8e885d
+/agent-note-durable-subagent-catalog-and-list-agents/alternatives-considered:
+  en: 7fb54d71bd3f9d66
+  zh: 1c5f8e7e3a7be1de
+/agent-note-durable-subagent-catalog-and-list-agents/testing:
+  en: 77c1bd5cd32006ef
+  zh: e11a511d5e56ef72
+/agent-note-durable-subagent-catalog-and-list-agents/consequences:
+  en: b92727b297e17794
+  zh: e4418ec6abf079c3

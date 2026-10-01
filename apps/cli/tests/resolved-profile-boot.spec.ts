@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { createLaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 import {
-  boot, composeEntries, createProfileResolutionGeneration, healIsolatedProfileModuleFallback,
+  boot, composeEntries, createRuntimeResolution, healIsolatedProfileModuleFallback,
   PluginPackages, type Profile,
 } from '@deepseek-ai/dsh-app-boot'
 import { installProxyFromEnvironment } from '@deepseek-ai/dsh-http-proxy'
@@ -18,7 +18,7 @@ vi.mock('@deepseek-ai/dsh-app-boot', async (importOriginal) => {
   return {
     ...actual,
     boot: vi.fn(),
-    createProfileResolutionGeneration: vi.fn(actual.createProfileResolutionGeneration),
+    createRuntimeResolution: vi.fn(actual.createRuntimeResolution),
     healIsolatedProfileModuleFallback: vi.fn(actual.healIsolatedProfileModuleFallback),
     installFailLoud: vi.fn(),
   }
@@ -62,10 +62,10 @@ describe('runProfile with an application-owned profile', () => {
       await setup?.(ctx)
       throw failure
     })
-    if (stage === 'composition') vi.mocked(createProfileResolutionGeneration).mockRejectedValueOnce(failure)
+    if (stage === 'composition') vi.mocked(createRuntimeResolution).mockRejectedValueOnce(failure)
     const profile: Profile = {
       name: 'desktop', dir: home, patchPath: join(home, 'cordis.patch.yml'),
-      patches: [], layers: [],
+      patches: [], layers: [], skippedBundles: [],
     }
     try {
       const application = runProfile({
@@ -131,10 +131,10 @@ describe('runProfile with an application-owned profile', () => {
     writeFileSync(overlay, '- id: target\n  config: { overlay: true, priority: overlay }\n')
     writeFileSync(join(home, 'cordis.yml'), '- id: stale\n')
     const profile: Profile = {
-      name: 'desktop', dir: home, patchPath: profilePatch,
+      name: 'desktop', dir: home, patchPath: profilePatch, skippedBundles: [],
       patches: [{ id: 'target', config: { profile: true, priority: 'profile' } }],
       layers: [{
-        packageName: 'test-bundle', packageDir: home, patchPath: join(home, 'bundle.yml'),
+        packageName: 'test-bundle', packageDir: home, patchPaths: [join(home, 'bundle.yml')],
         patches: [{ insert: [
           { id: 'target', name: 'target', config: { bundle: true, priority: 'bundle' } },
           { id: 'session-telemetry-otel', name: 'telemetry' },
@@ -154,11 +154,11 @@ describe('runProfile with an application-owned profile', () => {
       } else {
         expect(healIsolatedProfileModuleFallback).not.toHaveBeenCalled()
       }
-      const generation = vi.mocked(createProfileResolutionGeneration).mock.settledResults
+      const resolution = vi.mocked(createRuntimeResolution).mock.settledResults
         .find(result => result.type === 'fulfilled')?.value
-      expect(generation?.profileDir).toBe(home)
+      expect(resolution?.profileDir).toBe(home)
       expect(plugin).toHaveBeenCalledWith(PluginPackages, mode === 'link' ? {} : {
-        generation,
+        resolution,
         behavior: mode === 'dual' ? 'verify' : 'enforce',
       })
       expect(existsSync(join(home, 'profiles/node_modules'))).toBe(false)

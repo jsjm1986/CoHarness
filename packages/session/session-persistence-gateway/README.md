@@ -1,3 +1,8 @@
+---
+description: "Gateway PostgreSQL session persistence provider for DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-persistence-gateway
 
 English | [中文](README.zh.md)
@@ -9,6 +14,17 @@ Gateway PostgreSQL `SessionPersistence` provider for shared project runtimes. Th
 Use `dsh-session-persistence-gateway` as the Gateway PostgreSQL `SessionPersistence` provider for shared project runtimes: stored headers and events, revisions, idempotent append batches, and crash-repair commits move through the authenticated internal Gateway API under the standard `PersistenceCoordinator` lifecycle.
 
 
+## Table of Contents
+
+- [Persistence contract](#persistence-contract)
+- [Configuration](#configuration)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="persistence-contract"></a>
 ## Persistence contract
 
 - Project runtime composition disables `session-persistence-jsonl` and mounts this provider. Personal runtimes retain their ordinary persistence provider.
@@ -21,6 +37,7 @@ Use `dsh-session-persistence-gateway` as the Gateway PostgreSQL `SessionPersiste
 - `readHeader(id, signal?)` and `readRevision(id, signal?)` use indexed metadata endpoints. `readPage(id, request, signal?)` uses the PostgreSQL `(session_id, seq)` keyset query, returns at most 512 KiB/2,000 events/50 groups per page, and binds its continuation cursor to the source revision. `readHistoryIndex(id, maxItems?, signal?)` reads turn boundaries and bounded search previews without selecting event payloads. The provider preserves typed page failures and never sends a full detached history through the Gateway page route.
 - Legacy v0/v1 body reads issue an optional `POST /internal/runtime/session/migrate` with `sessionId`, `sourceRevision`, `targetHeader`, and an idempotent `migrationId`. A deployed server must compare the source revision and update the metadata transactionally; a 404 keeps the normalized in-memory fallback for older Gateway deployments.
 
+<a id="configuration"></a>
 ## Configuration
 
 - `preparedSessionCacheSize` — positive number of cold preparations retained by the coordinator; default `5`.
@@ -29,6 +46,7 @@ Use `dsh-session-persistence-gateway` as the Gateway PostgreSQL `SessionPersiste
 - `maxPendingBytes` — maximum UTF-8 JSON bytes retained by one live session's write controller; default `48 MiB`, leaving envelope headroom below the Gateway's 64 MiB request ceiling.
 - `requestTimeoutMs` — positive deadline for one internal Gateway request; default `30000`.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Resumed shared conversation history
@@ -52,3 +70,13 @@ The provider does not rewrite valid history. Resume can reuse provider cache whe
 - **Bounded request lifetime** — an internal call exceeding `requestTimeoutMs` fails; the coordinator retains its ordinary retry/recovery responsibility rather than treating a timed-out write as absent.
 
 **Runtime invariant:** No companion is published. Backend correctness is covered by the shared persistence contract.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

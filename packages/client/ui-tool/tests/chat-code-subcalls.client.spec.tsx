@@ -57,8 +57,8 @@ const codeResult = (seq: number, callId: string): ToolResultNode => ({
 })
 
 const runningCode = (callId: string): RunningToolCall => ({
-  callId, name: 'run_code', argsRaw: RUN_CODE_ARGS, turn: 9, step: 0, time: 9_000, callView: null,
-  subCalls: [],
+  phase: 'start', callId, name: 'run_code', argsRaw: RUN_CODE_ARGS, turn: 9, step: 0, time: 9_000,
+  callView: null, subCalls: [],
 })
 
 const subCall = (
@@ -82,7 +82,7 @@ function snapshotWith(
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS,
     chat: toolChatSnapshot(nestedNodes, nestedRunningCalls),
-    nodes: nestedNodes, turnTimings: new Map(), turnEnds: new Map(), partial: null,
+    nodes: nestedNodes, turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null,
     runningCalls: nestedRunningCalls,
     pending: [], queue: [], running: runningCalls.length > 0, composerPhase: 'active', removed: false,
     openState: 'open', openError: null,
@@ -114,7 +114,7 @@ async function bench(snapshot: ConversationSnapshot) {
     byId: { [SID]: { id: SID, title: 'S', displayTitle: 'S', running: false, blank: false, updatedAt: 1 } },
     archivedById: {},
     current: SID,
-    phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+    phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   })
   const scoped = { send: vi.fn(async () => {}), cancel: vi.fn(async () => {}) }
   const layout = { openDetails: vi.fn(), closeDetails: vi.fn() }
@@ -151,7 +151,7 @@ async function bench(snapshot: ConversationSnapshot) {
   ctx.provide('sessions', sessionsFake)
   const workspaces = {
     list: createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     }),
     startSession: vi.fn(),
@@ -303,7 +303,7 @@ describe('run_code sub-calls through the real chat machinery', () => {
   it('a started-but-unsettled sub-call renders the running state exactly like a native in-flight row', async () => {
     const parent = 'call-live'
     const runningSub: ToolCallBlock = {
-      callId: `${parent}:ptc:1`, name: 'grep', argsRaw: '{"pattern":"todo"}',
+      phase: 'start', callId: `${parent}:ptc:1`, name: 'grep', argsRaw: '{"pattern":"todo"}',
       turn: 0, step: 0, time: 21_000, callView: null, subCalls: [],
     }
     const b = await bench(snapshotWith([], [runningSub], [runningCode(parent)]))

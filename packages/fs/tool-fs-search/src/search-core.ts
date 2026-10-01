@@ -165,6 +165,10 @@ let rgPathPromise: Promise<string> | undefined
  * at the call boundary keeps a missing or corrupt binary at the first search
  * call as `SEARCH_FAILED`, rather than failing the Loader composition.
  *
+ * Under Electron the package resolves inside `app.asar`, which the OS cannot
+ * execute, so the same path under `app.asar.unpacked` (where packaging puts
+ * native binaries) is returned instead.
+ *
  * @returns the packaged binary's absolute path; the memoized promise rejects
  *   when the platform package cannot be resolved.
  */
@@ -175,7 +179,10 @@ export function resolveRgPath(): Promise<string> {
       ? join(executable.dir, `${executable.name}-rg.exe`)
       : `${process.execPath}-rg`
     if ('pkg' in process && existsSync(executableSidecar)) return executableSidecar
-    return (await import('@vscode/ripgrep')).rgPath
+    const dependency = (await import('@vscode/ripgrep')).rgPath
+    return process.versions.electron === undefined
+      ? dependency
+      : dependency.replace(/\.asar(?=[\\/])/u, '.asar.unpacked')
   })
   return rgPathPromise
 }

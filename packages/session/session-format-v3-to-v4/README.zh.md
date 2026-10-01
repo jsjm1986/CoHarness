@@ -7,7 +7,7 @@ kind: "package-library"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 将已发布的 V3 会话恢复为 V4：把 `assistant/chunk` 流折叠进其结算 `assistant/message` 或 `assistant/attempt` 事件。本页是该相邻边的唯一规格：转换、保留与拒绝的内容，以及单独的原生 V4 准入。本库重映射密集事件序号与所有受审计的序号引用；持久化通过静态 catalog 消费它，本库不读写文件。
 
@@ -76,8 +76,19 @@ V4 codec 复用 V3 物理封帧。原生 V4 读取拒绝 `assistant/chunk` 行�
 
 该边保留历史请求含义；不保证提供商缓存命中或字节一致的 V4 记录。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 - **仅 CoHarness 的边** — 上游以 V3 为现行格式；V4 仅存于本分叉。下游产物无法被上游构建重新打开。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

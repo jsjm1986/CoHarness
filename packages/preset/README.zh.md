@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # preset/：按会话组装 agent
 
 [English](README.md) | 中文

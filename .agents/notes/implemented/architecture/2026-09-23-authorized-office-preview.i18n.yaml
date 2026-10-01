@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-23-authorized-office-preview.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-authorized-office-preview.md
-2026-09-23-authorized-office-preview.md: 6a3ff0feb428218fe035f791e450c46f2d72246c
-2026-09-23-authorized-office-preview.zh.md: 4f19fc8c28b62cb0e9645eb9b723c1f2f0fd30b0
+/agent-note-office-preview-on-the-existing-authorized-workspace-resource:
+  en: 6c6a4df25c61312e
+  zh: 3303f27daa6bdab0
+/agent-note-office-preview-on-the-existing-authorized-workspace-resource/problem:
+  en: 3bdbeb0929981fad
+  zh: d2c6b1245c002c6d
+/agent-note-office-preview-on-the-existing-authorized-workspace-resource/decision:
+  en: 75258e9f8db5094d
+  zh: 3fa078db730bef86
+/agent-note-office-preview-on-the-existing-authorized-workspace-resource/alternatives-considered:
+  en: 89723008b74bd89e
+  zh: 2f73a07ceeff1562
+/agent-note-office-preview-on-the-existing-authorized-workspace-resource/related-decisions:
+  en: cf673adfd10ccb4f
+  zh: 3fcdfeedb39d38de
+/agent-note-office-preview-on-the-existing-authorized-workspace-resource/consequences:
+  en: 1d512717ef5c5902
+  zh: 21e771a7824b3cbe

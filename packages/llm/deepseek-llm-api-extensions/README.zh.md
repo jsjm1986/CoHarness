@@ -33,10 +33,13 @@ kind: "package-reference"
 
 <a id="model-experience"></a>
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。贡献是序列化每个请求时应用的已校验声明；注册表不持有逐请求关系。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 通过 `@deepseek-ai/dsh-llm-deepseek` 间接生效；该包在模型的 `messages`、系统提示词与工具 schema 之外发送已注册字段。
@@ -45,13 +48,13 @@ kind: "package-reference"
 
 无；注册表字段是模型不可见的提供方元数据，不改变已序列化的模型输入前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
 
 - **仅限 DeepSeek 官方请求**——该注册表刻意不提供提供方无关的路由，也不集成 pi-ai 适配器。
 - **不约定字段顺序**——JSON 对象成员顺序取决于注册准备顺序，但接收方按名称寻址字段。
-
 
 <a id="dev-note"></a>
 ### 开发备注

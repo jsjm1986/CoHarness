@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-06-macos-x64-python-runtime.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-06-macos-x64-python-runtime.md
-2026-09-06-macos-x64-python-runtime.md: 9404c55f93202353e33925e0884f192204ffc237
-2026-09-06-macos-x64-python-runtime.zh.md: f1e85e8628ec37a9da24590ace5ee4748f0a86bb
+/agent-note-python-runtime-publishes-a-native-macos-x64-wheel:
+  en: b19dc0e613ab11fc
+  zh: 7881ac29eb86e6d0
+/agent-note-python-runtime-publishes-a-native-macos-x64-wheel/problem:
+  en: 3ba5de03b517bb33
+  zh: 872c8166fe4604e6
+/agent-note-python-runtime-publishes-a-native-macos-x64-wheel/decision:
+  en: e4ce18bc171ce8b0
+  zh: 4e1695e3c7954951
+/agent-note-python-runtime-publishes-a-native-macos-x64-wheel/alternatives-considered:
+  en: 99fec084a3f24a9a
+  zh: 5b2cb972f7fb149e
+/agent-note-python-runtime-publishes-a-native-macos-x64-wheel/consequences:
+  en: 9748a8682cffcf53
+  zh: c3c046b049d755c1
+/agent-note-python-runtime-publishes-a-native-macos-x64-wheel/verification:
+  en: a32373fc6e75a6c0
+  zh: 8e114b2709986730

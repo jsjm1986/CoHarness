@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-gateway-document-scope-loopback-leak.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-gateway-document-scope-loopback-leak.md
-2026-08-25-gateway-document-scope-loopback-leak.md: f5692dd55c9a7fce837f202b7977755d9d6c3bf1
-2026-08-25-gateway-document-scope-loopback-leak.zh.md: f0e1f0215b78405ca9236f0eccd05d615bc0519f
+/agent-note-gateway-owned-document-scope-listing:
+  en: ae70238d326a5332
+  zh: 2b85dd1649a35670
+/agent-note-gateway-owned-document-scope-listing/problem:
+  en: b4318bbbe0e4c433
+  zh: 1c3cd94250bdeec7
+/agent-note-gateway-owned-document-scope-listing/decision:
+  en: 973773cce0b2d573
+  zh: 9e1415888eb4e876
+/agent-note-gateway-owned-document-scope-listing/alternatives-considered:
+  en: 1ab1f376283d4998
+  zh: d960b5964d46d602
+/agent-note-gateway-owned-document-scope-listing/consequences:
+  en: 47a7372f266b81aa
+  zh: 5c20e52cdd197070
+/agent-note-gateway-owned-document-scope-listing/testing:
+  en: 8ad46dbf16713357
+  zh: 5399fec484e98f8b
+/agent-note-gateway-owned-document-scope-listing/related:
+  en: ca333a83ef4bdd1c
+  zh: 0e359b8b57e07e01

@@ -13,8 +13,8 @@ import {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type {
-  ConversationEventInput, ConversationLocationDataStore, ConversationMatch, ConversationNodeDefinition,
-  ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewDefinition,
+  ConversationEventInput, ConversationLocationDataSource, ConversationLocationDataStore, ConversationMatch,
+  ConversationNodeDefinition, ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewDefinition,
   ConversationViewNode, ToolResultNode, TurnLocation,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply as applyLocale, inject as localeInject } from '@deepseek-ai/dsh-client-locale/client'
@@ -28,6 +28,7 @@ import {
 import type { SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { Deliverables, DeliverablesTail, selectDeliverables, type DeliverablesInjected } from '../src/client/Deliverables.tsx'
 import { ChangesSummaryStore } from '../src/client/changes-summary.ts'
+import { ChangesDiffStore } from '../src/client/changes-diff.ts'
 import { PresentedOpenController } from '../src/client/present-open.ts'
 import type { ReviewInjected } from '../src/client/ReviewTab.tsx'
 import { changesSummaryUrl, changesDiffUrl, changesReviewAddress, type ChangesSummary } from '../src/changes.ts'
@@ -42,11 +43,23 @@ afterEach(() => {
 
 class TestTurnDataStore implements ConversationLocationDataStore<ConversationTurnDataMap> {
   private readonly values = new Map<string, unknown>()
+  private readonly sources = new Map<string, ConversationLocationDataSource<unknown>>()
 
   get<Key extends Extract<keyof ConversationTurnDataMap, string>>(
     key: Key,
   ): Readonly<ConversationTurnDataMap[Key]> | undefined {
     return this.values.get(key) as Readonly<ConversationTurnDataMap[Key]> | undefined
+  }
+
+  source<Key extends Extract<keyof ConversationTurnDataMap, string>>(
+    key: Key,
+  ): ConversationLocationDataSource<Readonly<ConversationTurnDataMap[Key]> | undefined> {
+    let source = this.sources.get(key)
+    if (source === undefined) {
+      source = { getSnapshot: () => this.get(key), subscribe: () => () => {} }
+      this.sources.set(key, source)
+    }
+    return source as ConversationLocationDataSource<Readonly<ConversationTurnDataMap[Key]> | undefined>
   }
 
   set<Key extends Extract<keyof ConversationTurnDataMap, string>>(
@@ -139,8 +152,10 @@ function result(seq: number, callId: string, isError = false, turn = 1): Convers
     turn,
     step: 1,
     message: {
-      source: { type: 'tool-result', callId },
-      content: [{ type: 'tool-result', content: [], isError }],
+      source: { kind: 'tool', callId },
+      toolCallId: callId,
+      isError,
+      content: [{ type: 'tool-result', toolCallId: callId, content: [], isError }],
     },
   })
 }
@@ -460,8 +475,19 @@ describe('plugin registration', () => {
     const summary = vi.fn().mockResolvedValue({ result: { ok: true, value: { turn: 1, files: [], total: 0, added: 0, deleted: 0 } } })
     const diff = vi.fn().mockResolvedValue({ result: { ok: true, value: { kind: 'binary', path: 'a.bin', display: 'a.bin' } } })
     const openPath = vi.fn().mockResolvedValue({ result: { ok: true, value: null } })
-    const hostDescription = createSnapshotStore<{ executionAuthorityRequired?: boolean; canOpenPath?: boolean } | undefined>(undefined)
-    const connection = { api: { settings: {}, host: { openPath }, workspaceChanges: { summary, diff } }, hostDescription, isLoopback: true }
+    const fileApplications = vi.fn().mockResolvedValue({ result: { ok: true, value: { applications: [
+      { id: 'com.editor.zed', name: 'Zed', default: false, icon: null },
+      { id: 'com.apple.TextEdit', name: 'TextEdit', default: true, icon: null },
+    ] } } })
+    const hostDescription = createSnapshotStore<{
+      executionAuthorityRequired?: boolean
+      canOpenPath?: boolean
+      fileManager?: 'finder' | 'explorer' | 'directory' | null
+    } | undefined>(undefined)
+    const connection = {
+      api: { settings: {}, host: { openPath, fileApplications }, workspaceChanges: { summary, diff } },
+      hostDescription, isLoopback: true,
+    }
     const list = createSnapshotStore({ byId: { [sessionId]: { cwd: '/work' } } })
     ctx.provide('connection', connection as never)
     ctx.provide('sessions', { scope: () => ctx, list } as never)
@@ -503,9 +529,16 @@ describe('plugin registration', () => {
       await face.reloadPresentedHost()
       expect(tab.hooks.presentedHost.getSnapshot()).toMatchObject({ available: true })
       await face.openPresented(sessionId, 1, 0, 'open', 'report.txt')
-      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt' }, expect.any(AbortSignal))
+      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt', action: 'open' }, expect.any(AbortSignal))
       await face.openPresented(sessionId, 1, 0, 'reveal', 'report.txt')
-      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/' }, expect.any(AbortSignal))
+      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt', action: 'reveal' }, expect.any(AbortSignal))
+      const key = '/api/present.open?sessionId=local-review&seq=1&index=0'
+      face.loadPresentedApps(key, 'report.txt')
+      await vi.waitFor(() => { expect(face.hooks.presentedApps.getSnapshot()[key]).toMatchObject({ loading: false, failed: false }) })
+      expect(fileApplications).toHaveBeenLastCalledWith({ path: '/work/report.txt' }, expect.any(AbortSignal))
+      expect(face.hooks.presentedApps.getSnapshot()[key]?.applications).toHaveLength(2)
+      await face.openPresented(sessionId, 1, 0, 'open', 'report.txt', 'com.editor.zed')
+      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt', action: 'open', application: 'com.editor.zed' }, expect.any(AbortSignal))
       await tab.openChanged(sessionId, 1, 0, '/work/report.txt')
       await face.openChanged(sessionId, 1, 0, '/work/report.txt')
       openPath.mockResolvedValueOnce({ result: { ok: false, error: { code: 'forbidden' } } })
@@ -586,17 +619,23 @@ describe('plugin registration', () => {
   })
 })
 
-function openProps(controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))) {
+function openProps(controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))) {
   controller.host.set({ name: 'desktop', available: true, fileManager: 'finder' })
-  const sessions: SessionListState = { current: undefined, currentAddress: undefined, ids: [], byId: {}, archivedById: {}, phase: 'ready', subagentsByParent: {}, jobsBySession: {} }
+  const diffs = new ChangesDiffStore((url, signal) => fetch(url, { signal }))
+  const sessions: SessionListState = { current: undefined, currentAddress: undefined, ids: [], byId: {}, archivedById: {}, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {} }
   return {
     useSessions: <T,>(select: (state: SessionListState) => T): T => select(sessions),
     reloadPresentedHost: vi.fn(() => controller.loadHost()),
     useChangesSummary: <T,>(select: (state: ReturnType<typeof summaries.state.getSnapshot>) => T): T =>
       select(summaries.state.getSnapshot()),
     loadChangesSummary: vi.fn((...args: Parameters<ChangesSummaryStore['load']>) => summaries.load(...args)),
+    useChangesDiff: <T,>(select: (state: ReturnType<typeof diffs.state.getSnapshot>) => T): T => select(diffs.state.getSnapshot()),
+    loadChangesDiff: vi.fn((...args: Parameters<ChangesDiffStore['load']>) => diffs.load(...args)),
     usePresentedHost: <T,>(select: (state: ReturnType<typeof controller.host.getSnapshot>) => T): T =>
       select(controller.host.getSnapshot()),
+    usePresentedApps: <T,>(select: (state: ReturnType<typeof controller.apps.getSnapshot>) => T): T =>
+      select(controller.apps.getSnapshot()),
+    loadPresentedApps: vi.fn((...args: Parameters<PresentedOpenController['loadApplications']>) => { controller.loadApplications(...args) }),
     openPresented: vi.fn((...args: Parameters<PresentedOpenController['open']>) => controller.open(...args)),
     openChanged: vi.fn((...args: Parameters<PresentedOpenController['openChanged']>) => controller.openChanged(...args)),
     openChangesReview: vi.fn<DeliverablesInjected['openChangesReview']>(),
@@ -657,7 +696,7 @@ describe('ChangedFiles card', () => {
   }
 
   function renderCard(
-    controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), locale = en, matched = { changes, presented: [] as never[] }, summaries = servedStore(),
+    controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), locale = en, matched = { changes, presented: [] as never[] }, summaries = servedStore(),
   ) {
     const props = openProps(controller, summaries)
     props.openChanged.mockResolvedValue(undefined)
@@ -675,7 +714,7 @@ describe('ChangedFiles card', () => {
       return new Response('gone', { status: 404 })
     })
     vi.stubGlobal('fetch', fetchMock)
-    const { props, view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), en, { changes, presented: [] as never[] }, summaries)
+    const { props, view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), en, { changes, presented: [] as never[] }, summaries)
     expect(view.container.querySelector('[data-changed-files]')).toBeNull()
     expect(props.loadChangesSummary).toHaveBeenCalledWith('child-session', 5)
     await vi.waitFor(() => { expect(summaries.state.getSnapshot()[changesSummaryUrl(SessionId('child-session'), 5)]).toEqual(served) })
@@ -706,7 +745,7 @@ describe('ChangedFiles card', () => {
 
   it('sums the header from the Host totals, not from the capped list', () => {
     const capped = servedStore({ turn: 1, files: files.slice(0, 1), total: 2, added: 50, deleted: 20 })
-    const { view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), en, { changes, presented: [] as never[] }, capped)
+    const { view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), en, { changes, presented: [] as never[] }, capped)
     expect(view.getByText('Edited 2 files')).toBeTruthy()
     expect(view.getByText('+50')).toBeTruthy()
     expect(view.getByText('-20')).toBeTruthy()
@@ -739,17 +778,19 @@ describe('ChangedFiles card', () => {
     expect(summaries.state.getSnapshot()).toEqual({})
   })
 
-  it('summarizes the turn, folds after three rows, and opens the review from the header and each row', () => {
+  it('summarizes the turn, folds after four rows, and opens the review from the header and each row', () => {
     const { props, openFile, view } = renderCard()
     const card = view.container.querySelector('[data-changed-files]')
     if (!(card instanceof HTMLElement)) throw new Error('changed-files card missing')
     expect(within(card).getByText('Edited 11 files')).toBeTruthy()
     expect(within(card).getByText('+1,232')).toBeTruthy()
     expect(within(card).getByText('-326')).toBeTruthy()
-    expect(within(card).getAllByRole('listitem')).toHaveLength(3)
-    expect(within(card).getByText('config/design-token')).toBeTruthy()
+    expect(within(card).getByText('Preview in sidebar')).toBeTruthy()
+    expect(within(card).getAllByRole('listitem')).toHaveLength(4)
+    expect(within(within(card).getByRole('button', { name: 'View changes to config/design-token' })).getByText('config/design-token')).toBeTruthy()
     expect(within(card).getByText('+42')).toBeTruthy()
-    expect(within(card).queryByText('src/index.ts')).toBeNull()
+    expect(within(within(card).getByRole('button', { name: 'View changes to src/index.ts' })).getByText('src/index.ts')).toBeTruthy()
+    expect(within(card).queryByText('~/.zshrc')).toBeNull()
     fireEvent.click(within(card).getByRole('button', { name: 'View changes to config/feature-flags.json' }))
     expect(props.openChangesReview).toHaveBeenLastCalledWith({ sessionId: 'child-session', seq: 5, turn: 1 }, 1)
     expect(props.openChanged).not.toHaveBeenCalled()
@@ -762,18 +803,19 @@ describe('ChangedFiles card', () => {
     fireEvent.click(expand)
     expect(within(card).getAllByRole('listitem')).toHaveLength(5)
     expect(within(card).getByText('binary')).toBeTruthy()
-    expect(within(card).getByRole('button', { name: 'View changes to ~/.zshrc' }).getAttribute('title')).toBe('/home/u/.zshrc')
+    expect(within(card).getByRole('button', { name: 'View changes to ~/.zshrc' }).getAttribute('title')).toBeNull()
+    expect(within(card).getByRole('button', { name: 'View changes to ~/.zshrc', description: '/home/u/.zshrc' })).toBeTruthy()
     fireEvent.click(within(card).getByRole('button', { name: 'View changes to ~/.zshrc' }))
     expect(props.openChangesReview).toHaveBeenLastCalledWith({ sessionId: 'child-session', seq: 5, turn: 1 }, 4)
     const collapse = within(card).getByRole('button', { name: 'Collapse changed files' })
     expect(collapse.getAttribute('aria-expanded')).toBe('true')
     expect(card.lastElementChild).toBe(collapse)
     fireEvent.click(collapse)
-    expect(within(card).getAllByRole('listitem')).toHaveLength(3)
+    expect(within(card).getAllByRole('listitem')).toHaveLength(4)
   })
 
   it('opens the review the same way without a desktop', () => {
-    const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {})
+    const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => [])
     const { openFile, props, view } = renderCard(controller, zh)
     controller.host.set('error')
     view.rerender(<Deliverables {...props} matched={{ changes, presented: [] }} openFile={openFile} sessionId={SessionId('child-session')} t={makeTranslate(zh)} />)
@@ -791,7 +833,7 @@ describe('ChangedFiles card', () => {
   })
 
   it('keeps every count in place whatever the native-open gestures of the review tab are doing', () => {
-    const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {})
+    const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => [])
     controller.state.set({
       '/api/changes.open?sessionId=child-session&seq=5&index=0': 'opening',
       '/api/changes.open?sessionId=child-session&seq=5&index=1': 'error',
@@ -807,7 +849,7 @@ describe('ChangedFiles card', () => {
 
   it('renders without a fold for three files or fewer and beside delivery cards', () => {
     const short = servedStore({ turn: 1, files: [...files.slice(0, 1), changedFile('huge.bin', 0, 0, { oversized: true })], total: 2, added: 185, deleted: 43 })
-    const { view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), en, { changes, presented: [{ path: 'report.pdf', seq: 6, index: 0 }] as never[] }, short)
+    const { view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), en, { changes, presented: [{ path: 'report.pdf', seq: 6, index: 0 }] as never[] }, short)
     expect(view.getByText('Edited 2 files')).toBeTruthy()
     expect(view.getByText('too large')).toBeTruthy()
     expect(view.queryByRole('button', { name: /Show all|Collapse changed/ })).toBeNull()
@@ -870,7 +912,7 @@ describe('delivery card interactions', () => {
     expect(preview).toHaveBeenLastCalledWith('report-0.docx')
     fireEvent.click(view.getByRole('button', { name: 'More file actions for report-0.docx' }))
     fireEvent.click(view.getByRole('menuitem', { name: 'Open in default app' }))
-    expect(props.openPresented).toHaveBeenCalledWith('child-session', 2, 0, 'open', 'report-0.docx')
+    expect(props.openPresented).toHaveBeenCalledWith('child-session', 2, 0, 'open', 'report-0.docx', undefined)
     fireEvent.click(view.getByRole('button', { name: 'Collapse delivered files' }))
     expect(view.container.querySelectorAll('[data-presented-file]')).toHaveLength(4)
     expect(view.container.querySelector('[data-changed-files]')).toBeNull()
@@ -896,8 +938,8 @@ it.each([{}, { turn: '1', callId: 'bad', files: [] },
   const matched = selectDeliverables(owner)!
   const summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))
   summaries.state.set({ [changesSummaryUrl(SessionId('session'), 5)]: { turn: 1, files: [{ path: 'a.txt', display: 'a.txt', added: 1, deleted: 0 }], total: 1, added: 1, deleted: 0 } })
-  const view = render(<Deliverables {...openProps(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), summaries)} matched={matched} openFile={owner.openFile} sessionId={SessionId('session')} t={makeTranslate(en)} />)
-  expect(view.getByText('Edited 1 files')).toBeTruthy()
+  const view = render(<Deliverables {...openProps(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), summaries)} matched={matched} openFile={owner.openFile} sessionId={SessionId('session')} t={makeTranslate(en)} />)
+  expect(view.getByText('Edited a.txt')).toBeTruthy()
   expect(view.queryByText('Deliverables')).toBeNull()
 })
 
@@ -936,7 +978,7 @@ it('lets one delivered file span the complete row without an expansion control',
 
 
 it.each(['opening', 'opened', 'error'] as const)('shows the %s state and permits retries after failure', (phase) => {
-  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {})
+  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => [])
   controller.state.set({ '/api/present.open?sessionId=session&seq=2&index=0': phase })
   const props = openProps(controller)
   const view = render(<Deliverables {...props} matched={{ changes: null, presented: [
@@ -948,7 +990,7 @@ it.each(['opening', 'opened', 'error'] as const)('shows the %s state and permits
 
 
 it('explains a missing desktop and retries failed Host metadata', () => {
-  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {})
+  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => [])
   const props = openProps(controller)
   const matched = { changes: null, presented: [{ path: 'file.txt', seq: 2, index: 0 }] }
   controller.host.set('error')
@@ -963,7 +1005,7 @@ it('explains a missing desktop and retries failed Host metadata', () => {
 
 
 it('loads desktop information once the tail renders and not again while it is known', () => {
-  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {})
+  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => [])
   const props = openProps(controller)
   controller.host.set(null)
   props.reloadPresentedHost.mockResolvedValue(undefined)

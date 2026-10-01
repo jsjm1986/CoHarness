@@ -1,3 +1,8 @@
+---
+description: "Repeat-tool-call guard plugin: advisory reminders when an agent loops on identical tool calls"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-repeat-tool-reminder
 
 English | [中文](README.zh.md)
@@ -8,6 +13,19 @@ An advisory loop-breaker, not a model-facing tool: it never appears in the tool 
 
 This package helps a model escape loops in which it calls the same tool with identical arguments without making progress. At configured repeat counts, it asks the model to inspect the previous result and change approach or finish. The reminder is advisory: it never blocks or delays a legitimate repeated call. Repeats are tracked separately for each agent and cleared by a new user message. The `dsh` base bundle enables the package with reminders at 3, 5, and 8 repeats.
 
+## Table of Contents
+
+- [Config](#config)
+- [Chain semantics](#chain-semantics)
+- [Reminder delivery](#reminder-delivery)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 ```yaml
@@ -24,6 +42,7 @@ This package helps a model escape loops in which it calls the same tool with ide
 
 `include`/`exclude` entries support `*` wildcards and are predicates over whatever tools exist at call time, not references to registry entries — a pattern matching no currently registered tool is NOT an error (`exclude: [mcp_*]` stays valid in a deployment that loads no MCP tools), unlike `toolOrder`'s referent check.
 
+<a id="chain-semantics"></a>
 ## Chain semantics
 
 The chain key is `(tool name, canonical arguments)` — canonicalization is a deep key-sort plus `JSON.stringify`, so argument objects differing only in property order count as identical. A call identical to the previous tracked call increments the agent's consecutive counter; a different tracked call resets it to 1.
@@ -34,14 +53,17 @@ The chain key is `(tool name, canonical arguments)` — canonicalization is a de
 - **Per-agent keying.** The tool registry is context-level and subagents interleave through the same waterfall, so a `WeakMap<Agent, Chain>` keys each chain by the live agent object; one agent's repetition never trips another's reminder. A user prompt (`agent/pre-step`) resets the submitting agent's chain, and object lifetime bounds the weak entry without a disposal listener.
 - **In-memory only.** A session resumed from persistence starts with a fresh chain — the guard is a heuristic nudge, not a logged invariant, later reminders are the accepted cost.
 
+<a id="reminder-delivery"></a>
 ## Reminder delivery
 
 Reminders ride the post-execute decision's `additionalContexts` (source `{kind: 'plugin', plugin: 'repeat-tool-reminder'}`), never a `content` replacement: the `tool/result` event stays the tool's own output for audit. The loop buffers the context and appends it as an injected `user/message` after the step's tool results, which the session renders as a plain synthetic user message — so the reminder is model-visible, source-attributed, and reconstructable from the session log with no new session event. The guard always delegates via `next()` and prepends its reminder to the downstream decision's context array (both variants — a blocked call still gets the nudge); every entry retains its own source and metadata.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Run counters are advisory bookkeeping derived from the live call stream and reset with it; the injected reminder is the only observable output.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### First-threshold context message
@@ -96,3 +118,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **No subagent chain-sharing** — chains stay isolated per agent; a parent and its subagent repeating the same call never combine.
 - **Legitimate idempotent polling still draws nudges** past the thresholds — the pressure valves are `thresholds`/`exclude` config.
 - **Past the highest threshold a chain goes silent** — reminders fire only at exact configured counts, never beyond them.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

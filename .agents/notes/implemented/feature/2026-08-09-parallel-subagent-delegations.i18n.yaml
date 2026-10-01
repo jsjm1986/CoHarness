@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-09-parallel-subagent-delegations.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-09-parallel-subagent-delegations.md
-2026-08-09-parallel-subagent-delegations.md: 0ff2e50a3887acdad79a533eeef206f11ca41ce6
-2026-08-09-parallel-subagent-delegations.zh.md: 2e3a7a610677afb1119369a2cc7d04b1cac457b6
+/agent-note-parallel-subagent-delegations:
+  en: ffc96e394221ada8
+  zh: 1e6991233c27a71f
+/agent-note-parallel-subagent-delegations/problem:
+  en: ca7efd395ffa2289
+  zh: 92e2a21a31ff817b
+/agent-note-parallel-subagent-delegations/decision:
+  en: 6e8a772ff6d5eace
+  zh: 9f1595578242703c
+/agent-note-parallel-subagent-delegations/testing:
+  en: e3ed3fccaa79b388
+  zh: abd7ccd431d1dcfa
+/agent-note-parallel-subagent-delegations/alternatives-considered:
+  en: 6baaba4da109a043
+  zh: 4f15ff501160b7f8
+/agent-note-parallel-subagent-delegations/consequences:
+  en: bf1e2843cd9bcd84
+  zh: 1bbe7763641fd437

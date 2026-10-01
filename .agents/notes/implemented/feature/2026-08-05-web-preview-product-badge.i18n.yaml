@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-05-web-preview-product-badge.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-web-preview-product-badge.md
-2026-08-05-web-preview-product-badge.md: c20dedf8caa497d17a577cf46261c6a24c09a1ce
-2026-08-05-web-preview-product-badge.zh.md: 415a7cb3eb02030ef5481f4eba9110b56547ce64
+/agent-note-web-preview-product-badge:
+  en: bdabfdf00d16f32a
+  zh: e6448e8ab99aa933
+/agent-note-web-preview-product-badge/problem:
+  en: 1f70ee26ce0b5211
+  zh: 04c6f269ba93b6a0
+/agent-note-web-preview-product-badge/decision:
+  en: 720b11d71127faed
+  zh: a5d1238601924c66
+/agent-note-web-preview-product-badge/alternatives-considered:
+  en: a7e101f8e02cc22a
+  zh: 3094be72b3ed945d
+/agent-note-web-preview-product-badge/consequences:
+  en: 2fcb9f298eafed22
+  zh: 863a39a6a5ebea30
+/agent-note-web-preview-product-badge/testing:
+  en: 7846dc8abeea2ca4
+  zh: c4bd8b84bfc8a9b7

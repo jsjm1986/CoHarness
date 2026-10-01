@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-21-profile-resolution-ambient-source-plane.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-21-profile-resolution-ambient-source-plane.md
-2026-09-21-profile-resolution-ambient-source-plane.md: 7a696f6a9a2a89d0519f0f109bb2507a8a9ff4c3
-2026-09-21-profile-resolution-ambient-source-plane.zh.md: 3c8e640fda59648514931422e2294c56fe7c1f37
+/agent-note-profile-resolution-prefers-ambient-typescript-source-results:
+  en: 7f99b03cd74703fa
+  zh: afc150c049cb830f
+/agent-note-profile-resolution-prefers-ambient-typescript-source-results/problem:
+  en: 0f83fe852dfcdd3e
+  zh: 64c9e4e01cea0fae
+/agent-note-profile-resolution-prefers-ambient-typescript-source-results/decision:
+  en: 84cc7052122da82c
+  zh: 024a6586c73e95ef
+/agent-note-profile-resolution-prefers-ambient-typescript-source-results/alternatives-considered:
+  en: 13b5040029eab284
+  zh: c38d295ad8fa2d95
+/agent-note-profile-resolution-prefers-ambient-typescript-source-results/consequences:
+  en: dfb4e89ee7df8448
+  zh: 2ec98487b3c1f4fa

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-skill
 
 [English](README.md) | 中文
@@ -10,6 +15,18 @@
 
 agent 可以在会话期间发现并加载 skill。在首次请求前，如果存在模型可调用 skill 且 `skill` 工具可见，agent 会收到一份持久目录，列出可用 skill 的名称与有长度上限的描述，并可用 `skill` 工具加载完整指令。用户可以用 `/name` 调用某个用户可调用的 skill，把相同的指令注入该步骤。目录变更会追加一份完整替换，其中空目录会停用旧名称；可配置 `catalogDescriptionMaxLength` 来限制每条描述的长度。
 
+## 目录
+
+- [目录生命周期](#catalog-lifecycle)
+- [工具：`skill`](#tool-skill)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="catalog-lifecycle"></a>
 ## 目录生命周期
 
 每次符合条件的 `agent/pre-step`，该插件都会使用调用会话的 cwd 调用 `ctx.skills.snapshot()`，将 pre-step 中止信号转发到发现流程，应用 `skill` 工具的精确可见性，并按顺序渲染 `name` 和 `description` 条目。如果先前不存在目录且该视图非空，插件会向下游 `enter` 决策添加初始的持久用户角色 `<system-reminder>`。目录消息只包含这些摘要；skill 正文、路径、来源、提供方和 `whenToUse` 提示仍位于目录之外。
@@ -20,6 +37,7 @@ agent 可以在会话期间发现并加载 skill。在首次请求前，如果�
 
 `catalogDescriptionMaxLength` 控制规范化后的目录描述，渲染时会对其执行 XML 转义。其默认值是 `500`，且必须是不小于 `3` 的整数，以便为截断省略号保留空间。[skill 目录热刷新 Agent Note](../../../.agents/notes/implemented/feature/2026-07-27-skill-catalog-hot-refresh.zh.md) 负责定义持久初始目录和替换目录的生命周期。
 
+<a id="tool-skill"></a>
 ## 工具：`skill`
 
 | 参数 | 类型 | 说明 |
@@ -34,10 +52,13 @@ agent 可以在会话期间发现并加载 skill。在首次请求前，如果�
 
 工具执行不会添加合成上下文消息。新加载的结果已作为工具结果记录，并在下一个模型步骤可用，无需重复正文。只有目录投影会添加替换摘要。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。工具与目录读取 `ctx.skills` 注册表；提供方注册与内容留在 seam 之后。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 会话目录
@@ -167,6 +188,7 @@ Load referenced resources only as needed.
 
 仅追加；注入落在该步骤的消息批次中、可重用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **目录省略 `whenToUse`、来源和提供方元数据**：路由只基于名称和有长度上限的描述；`whenToUse` 仍是提供方元数据，加载后的包装层也不渲染它。
@@ -175,3 +197,13 @@ Load referenced resources only as needed.
 - **加载是一次性文本**：远程提供方缓慢或 skill 正文很大时，不提供部分内容、流式输出或缓存内容句柄。
 - **目录替换采用全量列表**：一个名称或描述发生变化，就会追加当前所有可见摘要；这样能显式停用陈旧名称，但 token 成本与目录大小成正比。
 - **正文不做版本化**：仅修改正文不会改变目录 digest，也不会通知模型；后续工具调用会读取提供方的当前内容，而先前工具结果仍是历史事实。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

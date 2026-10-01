@@ -150,13 +150,15 @@ export type InputBarProps = ComposerBarProps
 export const InputBar = memo(function InputBar({
   useSession, useInput, inputActions, keyboard, addImages, addDocuments, removeImage, removeDocument, retryDocument, draftImages,
   toggleCommandMenu, stop, command, t,
-  renderSlot, useBusyEnter, useNotices, useLexicon, useMenuLauncher, useDocuments, usePermissionCatalog, usePermissionAvailability,
+  renderSlot, useBusyEnter, useNotices, useLexicon, useMenuLauncher, useDocuments,
+  usePermissionCatalog, usePermissionAvailability, useStopShortcut,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
   workspacePickerOpen = false, onRequestWorkspace,
   placeholder, accessory, overlay, leftItems, rightItems, footer, active = true, compact = false,
 }: InputBarProps) {
   const input = useInput(s => s)
   const busyEnter = useBusyEnter(value => value)
+  const stopKeys = useStopShortcut(keys => keys)
   const viewportPhone = useMediaQuery('(max-width: 767px)')
   const phone = compact || viewportPhone
   const notice = useNotices(s => s)
@@ -1029,7 +1031,7 @@ export const InputBar = memo(function InputBar({
             })}
             <ContextMeter useProjection={useProjection} t={t} />
             {interruptible && (
-              <Tooltip label={t('input.stop')} side="top" delayMs={500} disabled={stop === undefined}>
+              <Tooltip label={t('input.stop')} shortcutKeys={stopKeys} side="top" delayMs={500} disabled={stop === undefined}>
                 <button
                   type="button"
                   className={css.primary}
@@ -1044,7 +1046,7 @@ export const InputBar = memo(function InputBar({
                 </button>
               </Tooltip>
             )}
-            <Tooltip label={primaryLabel} side="top" delayMs={500} disabled={primaryDisabled}>
+            <Tooltip label={primaryLabel} shortcutKeys={primaryStops ? stopKeys : undefined} side="top" delayMs={500} disabled={primaryDisabled}>
               <button
                 type="button"
                 className={css.primary}

@@ -1,3 +1,8 @@
+---
+description: "Session-projection seam: the merge-extensible projection type table, the provider contract, and the ctx.sessionProjections registry serving whole current values of log-derived per-session state"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-projection
 
 English | [中文](README.zh.md)
@@ -8,6 +13,19 @@ Session-projection Service Definition and drive registry. It owns `ctx.sessionPr
 
 Use `dsh-session-projection` when clients need current per-session state—such as todos, goals, or conversation statistics—without replaying the raw event log. Domains define synchronous projections from committed session events, and clients receive complete, schema-validated JSON values through snapshots and change notifications. Snapshots identify the last event reflected by every returned value, so carriers can pair state with the matching history cut. Projection state can be checkpointed for faster cold reads, while host-only projections remain private to the host.
 
+## Table of Contents
+
+- [Service: `SessionProjectionRegistry` (ctx key: `sessionProjections`)](#service-sessionprojectionregistry-ctx-key-sessionprojections)
+- [Contract](#contract)
+- [Role](#role)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="service-sessionprojectionregistry-ctx-key-sessionprojections"></a>
 ## Service: `SessionProjectionRegistry` (ctx key: `sessionProjections`)
 
 ### Public API
@@ -24,6 +42,7 @@ Use `dsh-session-projection` when clients need current per-session state—such 
 - `SessionProjectionStateMap` — the merge-extensible host fold-state table. Every client-visible key appears in both tables; host-only keys appear only here.
 - `ProjectionDefinition<K, S>` — `{ key, stateSchema, init(header, inheritedEventCount), apply(state, event), wire?, stateVersion }`: a synchronous state-driven computation unit. `init` receives the immutable header and the Session's exact fork-inherited cut (a `SessionLogOffset`) and must not infer that cut from `firstLiveSeq` or `session/end-seed`. `wire` supplies `viewSchema` and `view`; omitting it makes the unit host-only.
 
+<a id="contract"></a>
 ## Contract
 
 - **The framework drives, the domain computes.** The registry subscribes to `session/event` once; every committed event passes every unit's `apply` eagerly. Domains hold no subscriptions. Cells (`{state, observedSeq}` per unit per session, WeakMap-keyed) build lazily — a unit registered after events flowed, or a read of a session predating the registration, folds `init` over the in-memory log on first touch.
@@ -34,14 +53,17 @@ Use `dsh-session-projection` when clients need current per-session state—such 
 - **No wire vocabulary here.** The registry exposes only the change feed and the snapshot read face; carriers (api-proxy) mint their own frames (`session/projection`) and blocks from them.
 - **Optional capability.** Domain plugins register under `ctx.inject(['sessionProjections'], …)` so headless assemblies without the registry stay unaffected; carriers use `ctx.get('sessionProjections')` and omit their block/frames entirely when the registry is absent.
 
+<a id="role"></a>
 ## Role
 
 This package owns the Service Definition and drive roles of the capability seam: domain host plugins (e.g. `dsh-tool-todo`) contribute units, carriers (`dsh-host-apiproxy`) consume the snapshot and change feed, and neither knows the other.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Registered units are pure folds driven over committed events; drive state is itself derived from the same log.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the projection registry serves client-facing read models of already-logged session state and registers nothing model-facing.
@@ -57,3 +79,13 @@ None; projections never assemble or send provider requests.
 - **Eager drive touches every unit per event** — cheap by construction (whole-value rule, same-reference gate), but a hot path would justify per-unit event-type prefilters, addable without contract change.
 - **Registry cells live in memory only** — a restart rebuilds by folding the log on first touch; compositions that mount `dsh-session-projection-cache` seed that fold from persisted rows instead.
 - **Synchronous unit discipline is only partially mechanical** — `wire.viewSchema.parse` rejects a Promise-returning view, but an `apply` that blocks or reads torn non-session state is a review concern; the invariant companion documents why no runtime check exists.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

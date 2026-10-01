@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-telemetry-default-off.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-10-telemetry-default-off.md
-2026-08-10-telemetry-default-off.md: 3f56817c9c23ec55f2173b66fa915ab05646b2a7
-2026-08-10-telemetry-default-off.zh.md: ea89ea94dfea3106886e555e172ad8a6ab39305b
+/agent-note-sessiontelemetrybackend-requires-explicit-opt-in:
+  en: 111d9e4262d803e5
+  zh: 2cc14310639a9356
+/agent-note-sessiontelemetrybackend-requires-explicit-opt-in/problem:
+  en: 5e121db95d7b3d83
+  zh: 0eb8ec3badb95de1
+/agent-note-sessiontelemetrybackend-requires-explicit-opt-in/decision:
+  en: 0101e9f6a7ef7dfc
+  zh: 8e54cbde4c976c79
+/agent-note-sessiontelemetrybackend-requires-explicit-opt-in/alternatives-considered:
+  en: 53fbaab0e682c9ad
+  zh: 36f69d53d418d22c
+/agent-note-sessiontelemetrybackend-requires-explicit-opt-in/consequences:
+  en: ee1bdab5a4a8b8d9
+  zh: 6d5261d473db8ace

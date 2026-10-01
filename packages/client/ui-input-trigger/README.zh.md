@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-input-trigger
 
 [English](README.md) | 中文
@@ -18,10 +23,22 @@ MenuView 把菜单 store 渲染进 `conversation.input.overlay` slot（列表类
 
 当用户在 Web GUI 的光标处键入 `/` 或 `@` 时，本包会为斜杠命令、文件引用和会话引用打开分组菜单。它支持键盘和指针选择，包括下钻候选项，以及在当前选区上打开单个候选分组的 launcher。pick 会触发命令流程或插入引用，具体结果由消费方输入表面处理。本包只影响浏览器呈现；它既不组装也不发送模型请求。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。触发源名册是由 HMR 安全性规格证明的 effect 所属注册集合；仲裁是逐请求的控制器状态，没有持久关系。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。触发流水线只是浏览器呈现——pick 产出命令声明与引用插入，其模型可见后果由消费方宿主与输入状态机包负责。
@@ -30,8 +47,19 @@ MenuView 把菜单 store 渲染进 `conversation.input.overlay` slot（列表类
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **只有全局 source 层**：会话 scope 的 source 注册（逐会话遮蔽、类 ScopedLayers 机制）已有设计但未启用；台账记录着触发条件（出现真实的逐会话 source 需求）。
 - **扩展图标只影响显示**：内置的 `file`、`folder`、`session` 值使用共享图标；source 也可以提供共享图标组件，任意字符串仍按文本兼容。
 - **overlay 的 SlotMap 合并归属与 slot 所有权分离**：唯一的 `conversation.input.overlay` 合并放在本包，而 ui-conversation 负责其锚点、children 声明和生命周期，因为依赖方向是 ui-conversation → ui-input-trigger。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

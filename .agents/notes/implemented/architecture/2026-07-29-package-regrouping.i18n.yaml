@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-29-package-regrouping.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-29-package-regrouping.md
-2026-07-29-package-regrouping.md: 7cc040de4c8b982ad604b6e1c758640bcf0c053b
-2026-07-29-package-regrouping.zh.md: e1f85fc27ce05343be270ee7fa796de69fcac5ef
+/agent-note-regroup-packages-by-measured-clustering:
+  en: 23ae7573326701c7
+  zh: c4535a92a47a0cb9
+/agent-note-regroup-packages-by-measured-clustering/problem:
+  en: e2c532c0acb28d91
+  zh: 2d9edd17e40a2b77
+/agent-note-regroup-packages-by-measured-clustering/decision:
+  en: 76fcf072cca1daab
+  zh: c7ff536fa66a5c6c
+/agent-note-regroup-packages-by-measured-clustering/later-naming-decisions:
+  en: 51178e552b92e140
+  zh: dc2b36efa29dfbb3
+/agent-note-regroup-packages-by-measured-clustering/what-the-move-touched:
+  en: b87a2568acac6e5d
+  zh: a8f7f233cd3803bb
+/agent-note-regroup-packages-by-measured-clustering/alternatives-considered:
+  en: 81751321c08276fc
+  zh: cd01b03e92b4de2d
+/agent-note-regroup-packages-by-measured-clustering/consequences:
+  en: 1911469d55704f9a
+  zh: 1950333ed7e5d6a6

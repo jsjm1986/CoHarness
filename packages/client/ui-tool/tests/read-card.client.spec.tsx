@@ -16,7 +16,8 @@ import {
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type {
-  ConversationSnapshot, RunningToolCall, SessionId, SessionListState, ToolResultNode, WorkspaceListState,
+  ConversationSnapshot, RunningToolCall, SessionId, SessionListState, StartedToolCall, ToolResultNode,
+  WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ToolResultView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -59,8 +60,8 @@ const resultRead = (over?: Partial<Extract<ToolResultView, { card: 'read' }>>): 
   card: 'read', path: 'src/a.ts', offset: 41, lines: sampleLines, totalLines: 180, lang: 'ts', ...over,
 })
 
-const running = (over?: Partial<RunningToolCall>): RunningToolCall => ({
-  callId: 'c1', name: 'read', argsRaw: ARGS,
+const running = (over?: Partial<StartedToolCall>): StartedToolCall => ({
+  phase: 'start', callId: 'c1', name: 'read', argsRaw: ARGS,
   turn: 1, step: 1, time: 1_000, callView: { card: 'generic', title: 'Read src/a.ts', kind: 'read' }, subCalls: [], ...over,
 })
 
@@ -160,8 +161,9 @@ describe('readCallLine', () => {
 })
 
 describe('GenericToolCard read body', () => {
-  const ownerProps = (block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName: 'web_fetch', block, openFile: vi.fn(), t,
+  const ownerProps = (block: StartedToolCall | ToolResultNode): GenericToolCardProps => ({
+    callId: 'c1', toolName: 'web_fetch', openFile: vi.fn(), t,
+    ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
   })
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -185,7 +187,7 @@ describe('GenericToolCard read body', () => {
 
   it('a non-read tool renders the bare row with no read card', () => {
     const view = render(<GenericToolCard {...({
-      callId: 'c1', toolName: 'echo', block: settled({
+      callId: 'c1', toolName: 'echo', phase: 'result' as const, block: settled({
         call: { name: 'echo', argsRaw: '{"text":"x"}' }, callView: null, resultView: null,
       }), openFile: vi.fn(), t,
     })} />)
@@ -206,7 +208,7 @@ describe('ReadRow keyed toolview', () => {
     archivedById: {},
     current: SID,
     phase: 'ready',
-    subagentsByParent: {}, jobsBySession: {},
+    subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })
 
@@ -297,18 +299,18 @@ describe('DetailsPanel Output section (read)', () => {
     const chat = createChatStore().create()
     if (selection !== null) chat.actions.select(selection)
     const sessions = createSnapshotStore<SessionListState>(cwd === undefined
-      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined }
+      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }
       : {
         ids: [SID],
         byId: { [SID]: { id: SID, displayTitle: 'r', running: false, blank: false, updatedAt: 0, cwd } },
         archivedById: {},
         current: SID,
         phase: 'ready',
-        subagentsByParent: {}, jobsBySession: {},
+        subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
         currentAddress: undefined,
       })
     const workspaces = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })
     return render(
@@ -346,7 +348,7 @@ describe('DetailsPanel Output section (read)', () => {
     return {
       sessionId: SID, views: EMPTY_CONVERSATION_VIEWS,
       chat: over.chat ?? toolChatSnapshot(nodes, runningCalls),
-      nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+      nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
       pending: [], queue: [], running: false, composerPhase: 'active', removed: false,
       openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
       promptError: null, blank: false, subagent: null, lastAgentError: null, ...over,

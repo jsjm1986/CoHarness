@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-continuable-subagent-policy-inheritance.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-10-continuable-subagent-policy-inheritance.md
-2026-08-10-continuable-subagent-policy-inheritance.md: e567c0557be45ba9e0e0515d742bd6f99a5f10e7
-2026-08-10-continuable-subagent-policy-inheritance.zh.md: 5c9cc677e9154d5b14214979283c00fd28a4c2df
+/agent-note-continuable-subagent-policy-inheritance-the-durable-child-log-owns-the-delegation-time-snapshot:
+  en: 532a1dd25b20ea6b
+  zh: 295d1935fa2640cd
+/agent-note-continuable-subagent-policy-inheritance-the-durable-child-log-owns-the-delegation-time-snapshot/problem:
+  en: 1823a8f0c825e84b
+  zh: 6407dbf345208c4b
+/agent-note-continuable-subagent-policy-inheritance-the-durable-child-log-owns-the-delegation-time-snapshot/decision:
+  en: 827ad766fd914a83
+  zh: 8e7987ccf13b179c
+/agent-note-continuable-subagent-policy-inheritance-the-durable-child-log-owns-the-delegation-time-snapshot/alternatives-considered:
+  en: eb4d4e4389bcc7fd
+  zh: f49f3a8c1f68c54c
+/agent-note-continuable-subagent-policy-inheritance-the-durable-child-log-owns-the-delegation-time-snapshot/consequences:
+  en: c819ca906a74de86
+  zh: a642d1a1eea9e887

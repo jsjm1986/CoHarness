@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-postgresql-gateway-runtime-cutover.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-postgresql-gateway-runtime-cutover.md
-2026-08-14-postgresql-gateway-runtime-cutover.md: 9eebbcd3e4788ab20e73f9cd2cd6c702bbbaa167
-2026-08-14-postgresql-gateway-runtime-cutover.zh.md: 7c38dd6bb22d2e72c126a0df24aad381e0daf615
+/agent-note-postgresql-gateway-runtime-cutover:
+  en: b7507c59c3426026
+  zh: 7b18e59f05c1bf0e
+/agent-note-postgresql-gateway-runtime-cutover/problem:
+  en: 092987e65fbf8c9f
+  zh: ce71201295671116
+/agent-note-postgresql-gateway-runtime-cutover/decision:
+  en: 31cc1e0688a306fe
+  zh: f89d330c8fdd1227
+/agent-note-postgresql-gateway-runtime-cutover/verification:
+  en: 6834e06b6d989e50
+  zh: e60cd849aee76e30
+/agent-note-postgresql-gateway-runtime-cutover/alternatives-considered:
+  en: 2c3628ff829145bd
+  zh: 298d665be12c05be
+/agent-note-postgresql-gateway-runtime-cutover/consequences:
+  en: b805823c4d6a22c3
+  zh: 6d46aa95c0374cd7

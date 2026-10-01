@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-skill-filesystem
 
 [English](README.md) | 中文
@@ -10,6 +15,20 @@
 
 agent（智能体）可以使用来自仓库、自定义目录或用户 agent 配置的本地 skill（技能）：把 skill 编写为任一被扫描根目录下的目录 bundle（内含 `SKILL.md`）或平铺 `<name>.md` 文件，它就会出现在会话目录中。该提供方发现项目、自定义与用户根目录，解析每个 skill 的 YAML frontmatter，并监视这些目录，因此新增、改名或删除的 skill 无需重启即可到达 agent。当 skill 存放在磁盘上时选择它——注册表（`dsh-skill`）接受任意提供方，其他提供方可以从别处提供 skill。
 
+## 目录
+
+- [插件](#plugin)
+- [发现](#discovery)
+- [目录变更检测](#catalog-change-detection)
+- [skill 格式](#skill-format)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="plugin"></a>
 ## 插件
 
 需要 `ctx.skills`（`inject: ['skills']`）。
@@ -30,6 +49,7 @@ agent（智能体）可以使用来自仓库、自定义目录或用户 agent �
 | `watchMaxProjects` | `128` | watcher LRU 中保留的不同项目根数量上限。 |
 | `watchFollowSymlinks` | `true` | 监视现有根时跟随符号链接。 |
 
+<a id="discovery"></a>
 ## 发现
 
 默认根按该提供方的 rank 顺序解析：
@@ -46,6 +66,7 @@ agent（智能体）可以使用来自仓库、自定义目录或用户 agent �
 
 当 `ctx.fs` 可用时，发现通过 `ctx.fs.listDir` 列出根，通过 `ctx.fs.readText` 读取 skill 文件，并通过文件系统服务探测 `.git`。完整 skill 加载会将查找中止信号转发给文件系统元数据和内容读取。如果没有文件系统服务，提供方回退到可中止的 Node 文件系统 I/O，使最小本地上下文仍能加载 skill。已确认缺失的路径属于有效空状态；遇到格式错误或非文本条目时，提供方会发出警告并跳过；意外的发现或读取失败会使注册表快照不完整，系统不会因此用看似发生删除的结果替换上一份可用模型目录。
 
+<a id="catalog-change-detection"></a>
 ## 目录变更检测
 
 现有 skill 根由 Chokidar 监视。打开原生 watcher 前，提供方会对现有根或祖先执行 realpath 解析，并拼回下一个缺失路径段；当 `watchFollowSymlinks` 为 false 且根本身是符号链接时，提供方不会展开最后这一级链接，使 Chokidar 能够强制执行配置边界。发现与诊断仍保留配置路径，从而避免 Windows 在 libuv 内部混用 8.3 别名与长格式事件路径。提供方会观察直属 bundle 目录的添加／移除、平铺 Markdown 文件的添加／移除，以及直接 `SKILL.md` 的添加／移除／变更；`change` 事件用于重新发现 `name`、`description` 等目录 frontmatter。`references`、`scripts`、`assets` 或其他 bundle 资源下的变更不会使目录失效。同一微任务批次内送达的事件会合并为一次提供方失效。
@@ -54,6 +75,7 @@ agent（智能体）可以使用来自仓库、自定义目录或用户 agent �
 
 如果第一方文件系统 `write` 和 `edit` 工具的目标可能影响受监视的 skill 条目，它们还会通过 `fs/observed` 同步使提供方失效。这条快速路径让模型的下一个步骤无需等待宿主 watcher，即可观察到自身的文件系统变更。外部 IDE、Git、shell 和进程产生的变更依赖 Chokidar 或缺失路径探测。现有根的 watcher 会保持持久状态直至 effect 释放，使 Chokidar 能够接管异步原生错误事件；watcher 启动或运行时失败会被记录并触发重试。发现过程仍会扫描可读根目录，并返回其候选项供直接加载，但会将观测标记为不完整，因此不会缓存，也不会作为权威模型目录发布。effect 释放会关闭所有 watcher，并收束延迟回调。
 
+<a id="skill-format"></a>
 ## skill 格式
 
 skill 可以是单层目录 bundle（`<name>/SKILL.md`），也可以是平铺 Markdown 文件（`<name>.md`）。刻意不支持发现嵌套的 `**/SKILL.md`。Frontmatter 使用 `yaml` 包解析为开放的 YAML 对象；该提供方解析必填的 `name` 和 `description`，以及可选的 `whenToUse`、`metadata`、`disable-model-invocation` 和 `user-invocable`。名称必须使用 kebab-case。
@@ -62,10 +84,13 @@ skill 可以是单层目录 bundle（`<name>/SKILL.md`），也可以是平铺 M
 
 目录与正文具有独立的生命周期。发现阶段解析 frontmatter 以生成概述。每次 `skill(name)` 加载都会重新读取并解析当前文件，因此正文编辑不需要 hash、修订号、缓存失效或主动通知模型。若在发现与加载之间更改 frontmatter 中的名称，系统会拒绝陈旧名称并使提供方失效；下一次目录观察会发布新名称。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。skill 从文件系统发现，文件系统仍是唯一的目录权威；提供方不保留可供比较的第二索引。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 通过 `dsh-tool-skill` 间接影响模型；它把该提供方的可调用名称和有长度上限的描述渲染到初始目录或替换目录中，并把所选的当前指令正文与资源基底指引渲染到已保留工具历史中；路径、提供方 rank 与已禁用 skill 仍被隐藏。
@@ -74,6 +99,7 @@ skill 可以是单层目录 bundle（`<name>/SKILL.md`），也可以是平铺 M
 
 watcher 触发的失效可促使上述消费方在现有请求历史中追加替换目录。仅涉及正文的编辑不会改变目录 digest。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **发现深度为一层**：只识别 `<root>/<name>/SKILL.md` 和 `<root>/<name>.md`；忽略嵌套 skill 树和包 manifest（元数据清单）。
@@ -81,3 +107,13 @@ watcher 触发的失效可促使上述消费方在现有请求历史中追加替
 - **格式错误的条目会随警告消失**：模型目录不会收到每个 skill 的诊断，无法区分缺失的 skill 与无效的 skill；意外 I/O 失败则会保留最后一份可用目录。
 - **缺失根观察每次轮询一个路径段**：启动时不存在的根会使用 `fs.watchFile` 按 `watchPollIntervalMs` 轮询，直至 Chokidar 可以附加；这以有界检测延迟换取跨 IDE、Git 和 shell 工作流的可靠创建检测。
 - **无正文修订协议**：已加载的正文是普通的已保留工具历史；后续文件编辑会影响后续调用，但既不会改写旧结果，也不会通知正文已发生变化。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

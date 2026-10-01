@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-12-simplify-session-log-representation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-12-simplify-session-log-representation.md
-2026-07-12-simplify-session-log-representation.md: 3efb531d3c0822d7444d1270eac4da2617c12447
-2026-07-12-simplify-session-log-representation.zh.md: 8c05ac6512a8aa8e7fefc56ba410bc81dc3be277
+/agent-note-simplify-session-log-representation:
+  en: 67c93363e7893b94
+  zh: 1496ef038a039cd6
+/agent-note-simplify-session-log-representation/problem:
+  en: 50f04ea89b92c954
+  zh: 080148fc1f41b307
+/agent-note-simplify-session-log-representation/decision:
+  en: 47fdc1866b21c0e5
+  zh: f91e19d4d25f9ef2
+/agent-note-simplify-session-log-representation/alternatives-considered:
+  en: 050be4d3e6617732
+  zh: e95acfd5f78ab9f0
+/agent-note-simplify-session-log-representation/verification:
+  en: 6199037b805a42fc
+  zh: e3f980acec3a5e72
+/agent-note-simplify-session-log-representation/consequences:
+  en: da70819bb8654170
+  zh: a24f17149847c23b

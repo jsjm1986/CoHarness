@@ -9,6 +9,7 @@ import FileSettingsProvider from '@deepseek-ai/dsh-settings-file'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { AssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
 import type { Api, Model, OpenAICompletionsCompat, Provider } from '@earendil-works/pi-ai'
@@ -19,6 +20,12 @@ import { buildProvider, supportedProtocols } from '../src/provider.ts'
 import { memoryAuth } from './auth-double.ts'
 import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'test': { kind: 'test' } & ContextFormed
+  }
+}
 
 const homes: string[] = []
 
@@ -94,7 +101,7 @@ describe('hand-declared providers', () => {
       model: 'acme-large',
       messages: [createUserMessage({
         content: [{ type: 'text', text: 'hi' }],
-        source: { kind: 'plugin', plugin: 'test' },
+        source: { kind: 'test' },
       })],
     })
 

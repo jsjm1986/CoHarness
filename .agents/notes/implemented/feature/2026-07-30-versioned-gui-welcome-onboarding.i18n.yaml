@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-versioned-gui-welcome-onboarding.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-versioned-gui-welcome-onboarding.md
-2026-07-30-versioned-gui-welcome-onboarding.md: dd1d41cf60012b68743647eb036c6d5e3e23befc
-2026-07-30-versioned-gui-welcome-onboarding.zh.md: 4f5652e1eaa188b7b145e6caa95d0302f49951f0
+/agent-note-versioned-gui-welcome-onboarding:
+  en: af429494db1476a8
+  zh: dcc399405b9fce47
+/agent-note-versioned-gui-welcome-onboarding/problem:
+  en: 03ffb1985a15938f
+  zh: e743e86ad0a83df7
+/agent-note-versioned-gui-welcome-onboarding/decision:
+  en: 84ea97652cb9772c
+  zh: c491942afc80855b
+/agent-note-versioned-gui-welcome-onboarding/alternatives-considered:
+  en: e9f2f301e1d1a496
+  zh: eb946c923831bf4d
+/agent-note-versioned-gui-welcome-onboarding/consequences:
+  en: aaaa1bebea792e73
+  zh: 93216f31d344fb91

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # host/ — Web GUI 宿主侧
 
 [English](README.md) | 中文

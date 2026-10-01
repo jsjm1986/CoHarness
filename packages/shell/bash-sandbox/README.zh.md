@@ -116,6 +116,7 @@ kind: "package-reference"
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -161,6 +162,7 @@ kind: "package-reference"
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

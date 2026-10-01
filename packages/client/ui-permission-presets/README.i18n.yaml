@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-permission-presets/README.md
-README.md: 732deac6bb530f173f669e80727c5dffe0c48aa7
-README.zh.md: d2f7a7f8fdd03365373af58343647a3e6dd8d728
+/:
+  en: 8702a2f18b13e5e2
+  zh: 61495d48365178df
+/deepseek-ai-dsh-client-ui-permission-presets:
+  en: 10f5fe6f2af0a1bf
+  zh: 475b98efbdfa626e
+/deepseek-ai-dsh-client-ui-permission-presets/summary:
+  en: 2591adc4721c0564
+  zh: 311292f58621adb6
+/deepseek-ai-dsh-client-ui-permission-presets/table-of-contents:
+  en: 3f565202d87c79ce
+  zh: bec700d3e2c14557
+/deepseek-ai-dsh-client-ui-permission-presets/account-qualifications:
+  en: 7bda231e023c163f
+  zh: 06a8e993cc427d65
+/deepseek-ai-dsh-client-ui-permission-presets/desktop-confirmation:
+  en: 4e2d614a72d5e1a8
+  zh: 932079b4d57dc749
+/deepseek-ai-dsh-client-ui-permission-presets/invariants:
+  en: 5c0ed8a74d52246a
+  zh: bff84c515dc57a71
+/deepseek-ai-dsh-client-ui-permission-presets/model-experience:
+  en: 114f37b90a58cffa
+  zh: dc99a48a72c975e6
+/deepseek-ai-dsh-client-ui-permission-presets/model-experience/kv-cache-effect:
+  en: f25206808c8d84c5
+  zh: ce0f9ec542a45978
+/deepseek-ai-dsh-client-ui-permission-presets/known-limitations-and-deferred-work:
+  en: 9308f7d8b24ff94d
+  zh: c134c8b9a5f8d3db
+/deepseek-ai-dsh-client-ui-permission-presets/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

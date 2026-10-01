@@ -9,7 +9,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {
-  RpcResult, SessionId, SubagentAddress,
+  JobView, RpcResult, SessionId, SubagentAddress,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionRuntimeTarget } from '@deepseek-ai/dsh-client-connection/client'
 import type { HostObservable, SessionMaybeProvideInfo, SessionProvideInfo } from '@deepseek-ai/dsh-client-ui-slots'
@@ -130,6 +130,24 @@ export interface ISessions {
    * @returns completion of the current or newly started refresh.
    */
   refreshSubagents(parentSessionId: SessionId): Promise<void>
+  /**
+   * Observe one background job's live output under `list.observedJobs`;
+   * reference-counted, so overlapping viewers share one read channel. The
+   * roster row itself keeps converging through `session/jobs` frames.
+   * @param sessionId - owning session used for the fenced read; undefined for an unowned job.
+   * @param jobId - job to observe.
+   * @returns release for this observer's reference; the last release stops the channel.
+   */
+  observeJob(sessionId: SessionId | undefined, jobId: JobView['id']): () => void
+  /**
+   * Kill one background job on a human's behalf. Pure passthrough — the row's
+   * terminal state converges through `session/jobs`, and the caller owns
+   * error presentation.
+   * @param sessionId - session whose job list carries the job.
+   * @param jobId - the job row's registry id.
+   * @returns whether the registry admitted the request.
+   */
+  killJob(sessionId: SessionId, jobId: JobView['id']): Promise<boolean>
 
   /**
    * Record the composition one session now runs. The agent-preset seat calls

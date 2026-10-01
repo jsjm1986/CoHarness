@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-09-deprecate-synchronous-session-event-reads.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.md
-2026-09-09-deprecate-synchronous-session-event-reads.md: 98f85555f1139cb87a7b2b9f24764e1ca962e484
-2026-09-09-deprecate-synchronous-session-event-reads.zh.md: 25ca75e5116d7c7b769929bdf349ef5bd09a1d95
+/agent-note-deprecate-synchronous-reads-of-arbitrary-session-events:
+  en: c8011fa4e61dea2f
+  zh: afb60a2e5d39f6dc
+/agent-note-deprecate-synchronous-reads-of-arbitrary-session-events/problem:
+  en: 95224617f6a308be
+  zh: 1d4187bb1e50efb4
+/agent-note-deprecate-synchronous-reads-of-arbitrary-session-events/decision:
+  en: 29d7cb4415f01a29
+  zh: a414d90693e7150e
+/agent-note-deprecate-synchronous-reads-of-arbitrary-session-events/decision/state-needed-after-resume:
+  en: e393309432e87d21
+  zh: e1de0efa07abfdba
+/agent-note-deprecate-synchronous-reads-of-arbitrary-session-events/decision/operations-that-require-complete-history:
+  en: 38653e50be5bd235
+  zh: a2e4dead2ad61124
+/agent-note-deprecate-synchronous-reads-of-arbitrary-session-events/alternatives-considered:
+  en: 82d983c9c1110797
+  zh: 2f491c4bb559b4f2
+/agent-note-deprecate-synchronous-reads-of-arbitrary-session-events/consequences:
+  en: eadd46697f6ad6bf
+  zh: 38de0e9a72c027e9
+/agent-note-deprecate-synchronous-reads-of-arbitrary-session-events/related-decisions:
+  en: 590b8961c6c057ea
+  zh: bd7c88e8e6ae28ba

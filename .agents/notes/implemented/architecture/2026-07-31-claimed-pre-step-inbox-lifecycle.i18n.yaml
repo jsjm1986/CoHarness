@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-claimed-pre-step-inbox-lifecycle.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-31-claimed-pre-step-inbox-lifecycle.md
-2026-07-31-claimed-pre-step-inbox-lifecycle.md: cab7a503489dfad4db7848a0f57b3cab437bb9ed
-2026-07-31-claimed-pre-step-inbox-lifecycle.zh.md: d19ded955c09360544b522f38fc47a9f91336a1a
+/agent-note-claim-inbox-input-before-one-pre-step-decision:
+  en: 4ee4c56f27c9bf27
+  zh: 72321b4c735e106f
+/agent-note-claim-inbox-input-before-one-pre-step-decision/problem:
+  en: f2a920b8770c2f99
+  zh: 1c111f175131714e
+/agent-note-claim-inbox-input-before-one-pre-step-decision/decision:
+  en: aa358fbf236488eb
+  zh: 2fe19914090bbc43
+/agent-note-claim-inbox-input-before-one-pre-step-decision/alternatives-considered:
+  en: 03496db1c0547f71
+  zh: c0932cfcb5d5d93b
+/agent-note-claim-inbox-input-before-one-pre-step-decision/verification:
+  en: 6597cb40a2bc1e2c
+  zh: 5285df887befa544
+/agent-note-claim-inbox-input-before-one-pre-step-decision/consequences:
+  en: ba68c3ce7ed64bcc
+  zh: 8fe29186526b258a

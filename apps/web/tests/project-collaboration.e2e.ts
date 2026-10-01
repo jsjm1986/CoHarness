@@ -107,7 +107,7 @@ async function mockGateway(page: Page, mode: ProjectMode, options: {
 }
 
 async function openSeededSession(page: Page, scaffold: WebScaffold): Promise<void> {
-  await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+  await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
   await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   const searchButton = page.getByRole('button', { name: 'Search sessions' })
   if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
@@ -294,7 +294,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     tripwire = watchConsole(page)
     await mockGateway(page, 'rw')
     onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-collaboration-scope-mobile'))
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
 
     await page.getByRole('button', { name: 'Open sidebar' }).click()
@@ -373,7 +373,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     tripwire = watchConsole(page)
     const gateway = await mockGateway(page, 'rw')
     onTestFailed(() => saveFailureShot(page!, 'web-e2e-project-collaboration-private-create'))
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
 
     const scope = page.getByRole('button', { name: 'Switch personal or project scope' })

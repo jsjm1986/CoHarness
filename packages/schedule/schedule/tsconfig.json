@@ -36,6 +36,9 @@
       "path": "../../util/brand"
     },
     {
+      "path": "../../workspace/workspace"
+    },
+    {
       "path": "../../../vendor/cordis"
     },
     {

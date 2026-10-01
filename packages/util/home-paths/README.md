@@ -1,3 +1,8 @@
+---
+description: "Shared filesystem path helpers for the DeepSeek Harness"
+kind: "package-library"
+---
+
 # dsh-home-paths
 
 English | [中文](README.zh.md)
@@ -8,6 +13,16 @@ Shared filesystem path helpers for DeepSeek Harness user data.
 
 `@deepseek-ai/dsh-home-paths` lets package authors resolve one DeepSeek Harness data root and derive child paths from it. An explicit path wins over `$DSH_HOME`, which wins over `~/.dsh`; blank environment values are ignored. Its public helpers can render the root without revealing an absolute machine path, expand only bare or current-user tilde forms, and canonicalize watch targets whose final components do not yet exist. Use it as a direct library dependency, not through `cordis.yml`.
 
+## Table of Contents
+
+- [DSH home](#dsh-home)
+- [Watch paths](#watch-paths)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="dsh-home"></a>
 ## DSH home
 
 `resolveDshHome()` resolves the single-root DeepSeek Harness home. Precedence, highest first: an explicit configured path, `$DSH_HOME`, then `~/.dsh`. The harness keeps all user data under one root.
@@ -22,6 +37,7 @@ Shared filesystem path helpers for DeepSeek Harness user data.
 
 `expandHomePath()` expands `~`, `~/...`, and Windows-style `~\...` prefixes against the operating-system home directory. It leaves non-tilde paths and `~user/...` untouched.
 
+<a id="watch-paths"></a>
 ## Watch paths
 
 `canonicalizeWatchPath()` gives a native filesystem watcher one stable spelling of its target. It resolves the deepest existing ancestor through `fs.realpath()` and restores any missing suffix, so a file or directory may still be watched before it is created. In particular, Windows 8.3 aliases cannot be mixed with the long paths emitted by the native watcher backend.
@@ -30,7 +46,18 @@ This package is intentionally small and harness-dep-free so product packages can
 
 **Runtime invariant:** No companion is published. This pure utility owns no event stream or mutable runtime data; its resolution rules and value algebra are enforced by unit tests.
 
+<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
 - **Expansion is deliberately narrow** — only bare `~`, `~/...`, and `~\...` use the current operating-system home; named-user forms such as `~alice/...`, environment variables, and shell expressions remain unchanged.
 - **Canonicalization reads but never mutates** — `canonicalizeWatchPath()` performs `realpath` probes and propagates errors other than absence; callers still own directory creation, permissions, and trust policy for the resulting path.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

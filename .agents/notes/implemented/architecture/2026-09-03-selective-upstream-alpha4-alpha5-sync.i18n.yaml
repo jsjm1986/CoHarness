@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-03-selective-upstream-alpha4-alpha5-sync.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-03-selective-upstream-alpha4-alpha5-sync.md
-2026-09-03-selective-upstream-alpha4-alpha5-sync.md: 637d82fd0bf26355a7ca9f4ad255cb6fd59f1def
-2026-09-03-selective-upstream-alpha4-alpha5-sync.zh.md: 559552596d9ae36afb6ef0bf9bccd25cdf7be3b1
+/agent-note-selective-upstream-alpha-4-and-alpha-5-integration:
+  en: fea70f1eecb7e66b
+  zh: 5bbed5dd553feca5
+/agent-note-selective-upstream-alpha-4-and-alpha-5-integration/problem:
+  en: 2115e41cbc4a512d
+  zh: 28db629c0ee9c301
+/agent-note-selective-upstream-alpha-4-and-alpha-5-integration/decision:
+  en: ea8e645326eeae8a
+  zh: 87be11b377a0cbde
+/agent-note-selective-upstream-alpha-4-and-alpha-5-integration/verification:
+  en: 14ac0f51ed1addd4
+  zh: 55e6513ee3a5e0ec
+/agent-note-selective-upstream-alpha-4-and-alpha-5-integration/alternatives-considered:
+  en: 48ff70665bc9ad70
+  zh: d9e42765d77da10e
+/agent-note-selective-upstream-alpha-4-and-alpha-5-integration/consequences:
+  en: aa97ddc867496f0f
+  zh: 98f046ec77e2fb0a

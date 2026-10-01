@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-project-scope-plugin-inventory-remote.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-project-scope-plugin-inventory-remote.md
-2026-08-17-project-scope-plugin-inventory-remote.md: 52940317a9ca7416ffcdef22e88d4e6ad1f105a5
-2026-08-17-project-scope-plugin-inventory-remote.zh.md: 32a6c8beed5ab81092a69ffd7af4a6b9f328c8a3
+/agent-note-project-scope-remote-classification-for-plugin-surfaces:
+  en: 0f399c749a3650db
+  zh: 89b338f5f97bfdb3
+/agent-note-project-scope-remote-classification-for-plugin-surfaces/problem:
+  en: 57531cca9106e9b1
+  zh: 52311287a9c33e5e
+/agent-note-project-scope-remote-classification-for-plugin-surfaces/decision:
+  en: 3f1c251d4010149a
+  zh: 95bd538bb4262b89
+/agent-note-project-scope-remote-classification-for-plugin-surfaces/alternatives-considered:
+  en: 47f5ae9f92d80b99
+  zh: 79072ac18acd716b
+/agent-note-project-scope-remote-classification-for-plugin-surfaces/consequences:
+  en: a0a4213ae42942dc
+  zh: 110db152782159b1

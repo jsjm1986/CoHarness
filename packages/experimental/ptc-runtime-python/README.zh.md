@@ -96,6 +96,7 @@ kind: "package-reference"
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -105,6 +106,7 @@ kind: "package-reference"
 
 无直接失效；指定的消费方拥有任何请求前缀变化。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

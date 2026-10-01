@@ -16,8 +16,8 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
-  ConnectionIndicator, handleDialogKeyDown, IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
-  IconPersonalizationOutline16, IconSettingsOutline16, holdInert,
+  ConnectionIndicator, IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
+  IconPersonalizationOutline16, IconSettingsOutline16, holdInert, useModalLayer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConnectionIndicatorState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { onSettingsNavigation } from '@deepseek-ai/dsh-client-runtime/client'
@@ -70,25 +70,8 @@ function SettingsPanel({ rows, renderSlot, t, activeId, onSelect, onClose, setti
   const active = rows.find(r => r.id === activeId)?.id ?? rows[0]?.id
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement | null>(null)
-  const closeRef = useRef(onClose)
-  closeRef.current = onClose
   const navRefs = useRef(new Map<string, HTMLButtonElement>())
-
-  useEffect(() => {
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const onKeyDown = (event: KeyboardEvent): void => {
-      handleDialogKeyDown(event, panelRef.current, () => { closeRef.current() })
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      if (previous !== null && previous.isConnected) previous.focus({ preventScroll: true })
-    }
-  }, [])
-
-  // Baseline focus management: entering the dialog lands on the close button.
-  const closeButton = useRef<HTMLButtonElement | null>(null)
-  useEffect(() => { closeButton.current?.focus({ preventScroll: true }) }, [])
+  useModalLayer(panelRef, true, onClose)
 
   useEffect(() => {
     if (active === undefined) return
@@ -111,9 +94,10 @@ function SettingsPanel({ rows, renderSlot, t, activeId, onSelect, onClose, setti
   return createPortal((
     <div className={css.overlay} role="presentation">
       <div className={css.mask} aria-hidden="true" onClick={onClose} />
-      <div ref={panelRef} className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+      <div ref={panelRef} className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} data-shortcut-modal="settings">
         <nav className={css.nav}>
-          <div className={css.navTitle} id={titleId}>{renderSlot('settings.header', {})}</div>
+          <div className={css.navTitle} id={titleId} tabIndex={-1}
+            data-modal-autofocus={active === undefined ? '' : undefined}>{renderSlot('settings.header', {})}</div>
           <div className={css.navList}>
             {rows.map(row => (
               <button
@@ -140,7 +124,7 @@ function SettingsPanel({ rows, renderSlot, t, activeId, onSelect, onClose, setti
         <div className={css.content}>
           <div className={css.header}>
             <div className={css.actions}>{renderSlot('settings.action', {})}</div>
-            <button ref={closeButton} type="button" className={css.close} onClick={onClose}>
+            <button type="button" className={css.close} onClick={onClose}>
               <IconCloseOutline16 size={14} />
               <span className={css.hiddenLabel}>{renderSlot('settings.close', {})}</span>
             </button>
@@ -166,33 +150,20 @@ function SettingsPanel({ rows, renderSlot, t, activeId, onSelect, onClose, setti
 export function SettingsRoot(props: SettingsRootComponentProps) {
   const {
     wide, reconnect, useConnectionState, useSections, useOnboardingSteps, useSessions, renderSlot, t,
+    useStore, actions,
   } = props
-  const [open, setOpen] = useState(false)
-  const [activeId, setActiveId] = useState<string | undefined>(undefined)
-  const [navigationScope, setNavigationScope] = useState<{ scope?: 'personal' | 'project'; projectId?: number }>({})
+  const { open, activeId, navigationScope } = useStore(state => state)
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
   const [showRecovery, setShowRecovery] = useState(false)
-  const triggerButton = useRef<HTMLButtonElement | null>(null)
-  const wasOpen = useRef(open)
-  const close = useCallback(() => {
-    setOpen(false)
-    setActiveId(undefined)
-    setNavigationScope({})
-  }, [])
-  const openSection = useCallback((id: string) => {
-    setActiveId(id)
-    setNavigationScope({})
-    setOpen(true)
-  }, [])
+  const close = useCallback(() => { actions.close() }, [actions])
+  const openSection = useCallback((id: string) => { actions.openSection(id) }, [actions])
 
   useEffect(() => onSettingsNavigation((request) => {
-    setActiveId(request.section)
-    setNavigationScope({
+    actions.navigate(request.section, {
       ...request.scope === undefined ? {} : { scope: request.scope },
       ...request.projectId === undefined ? {} : { projectId: request.projectId },
     })
-    setOpen(true)
-  }), [])
+  }), [actions])
 
   // The ledger tick keeps the nav rows fresh: registrants re-register with
   // freshly localized text on locale change, and the trigger/header/close
@@ -223,13 +194,6 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
     return () => { window.clearTimeout(timeout) }
   }, [connectionState])
 
-  // Restore focus after the dialog close commit, when the portaled panel no
-  // longer owns the active element.
-  useEffect(() => {
-    if (wasOpen.current && !open) triggerButton.current?.focus({ preventScroll: true })
-    wasOpen.current = open
-  }, [open])
-
   useEffect(() => {
     if (onboardingActive) return
     setCompletedOnboarding(new Set())
@@ -246,12 +210,11 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
     <>
       <div className={clsx(css.triggerRow, !wide && css.railRow)}>
         <button
-          ref={triggerButton}
           type="button"
           className={clsx(css.trigger, !wide && css.rail)}
           aria-haspopup="dialog"
           aria-expanded={open}
-          onClick={() => { setNavigationScope({}); setOpen(true) }}
+          onClick={() => { actions.open() }}
         >
           {renderSlot('settings.trigger', { wide })}
         </button>
@@ -279,7 +242,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
           renderSlot={renderSlot}
           t={t}
           activeId={activeId}
-          onSelect={setActiveId}
+          onSelect={actions.select}
           onClose={close}
           {...navigationScope.scope === undefined ? {} : { settingsScope: navigationScope.scope }}
           {...navigationScope.projectId === undefined ? {} : { projectId: navigationScope.projectId }}

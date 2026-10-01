@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-collaboration
 
 [English](README.md) | 中文
@@ -9,6 +14,17 @@ Web 客户端的 Gateway 协作 UI。一个插件通过已有 Client slot 与会
 使用 `dsh-client-ui-collaboration` 获得 Web 客户端的 Gateway 协作 UI：账户上下文选择器、分阶段的根会话可见性、会话共享菜单与只读项目创作区策略。一个插件经既有 Client 槽位与会话创建瀑布事件贡献这些能力，共享项目会话无需独立账户界面即可工作。
 
 
+## 目录
+
+- [用户界面约定](#user-interface-contract)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="user-interface-contract"></a>
 ## 用户界面约定
 
 - `sidebar.footer.action` 显示当前个人或项目运行时、可访问成员身份、`ro`/`rw` 模式，以及下一条根对话的 `project` 或 `private` 可见性。更改运行时 scope 会通过 `/account/api/scope` 持久化并刷新页面，使每条 Host 连接都指向所选运行时。
@@ -22,10 +38,13 @@ Web 客户端的 Gateway 协作 UI。一个插件通过已有 Client slot 与会
 
 账户上下文还会把当前账户选择 Full 和 Auto 的资格发布到现有运行时 UI 策略。刷新开始时撤销验证状态；请求失败可保留展示上下文，但不会保留权限资格。连接重置会取消并丢弃上一代上下文请求。消费者将该账户值与自身连接的部署信息结合，遵循[权限 UI 规则](../ui-permission-presets/README.zh.md)。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。协作事实位于 Gateway 上经认证的端点之后；插件只在页面中暂存请求作用域的选择与 composer 策略。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 经由宿主协作消费方间接产生影响；浏览器 UI 所选状态的授权与参与者归属由该消费方负责。
@@ -34,8 +53,19 @@ Web 客户端的 Gateway 协作 UI。一个插件通过已有 Client slot 与会
 
 无直接失效；消费方负责请求前缀的任何变化。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **切换 scope 时整页刷新** — 个人和项目运行时使用独立 Host 连接与进程状态，因此切换不会保留当前页面草稿。Gateway 准备目标运行时期间，客户端会显示不可关闭的状态层，告知目标空间、启动阶段和已等待时间；scope mutation 成功后仍会执行整页刷新。
 - **仅支持 Gateway 传输** — `/account/api/context` 缺失或失败时会隐藏协作控件，并保留普通个人 Web UI。
 - **浏览器暂存创建可见性** — 页面加载后，下一条对话的选择默认恢复为项目公开；它不是账户偏好设置。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

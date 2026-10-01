@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-coharness-browser-branding.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-23-coharness-browser-branding.md
-2026-08-23-coharness-browser-branding.md: 36f8a27183b24f499781a8cef1c50f2ffa50f2e9
-2026-08-23-coharness-browser-branding.zh.md: 26d477f365284914d083dd2b0e3306789e409926
+/agent-note-coharness-browser-branding:
+  en: 16ff1cb8b8cb3a65
+  zh: c0e18fa4100897b3
+/agent-note-coharness-browser-branding/problem:
+  en: 5c59443943cd10bc
+  zh: 5b83780a66e10e8a
+/agent-note-coharness-browser-branding/decision:
+  en: 22bb5dbcbc42b5eb
+  zh: 0a2539b1e386e04a
+/agent-note-coharness-browser-branding/verification:
+  en: 58e6f30faaa8322f
+  zh: 2e6e23354dc28e57
+/agent-note-coharness-browser-branding/alternatives-considered:
+  en: ad689c9c77e105b4
+  zh: 41178a7e700b1a4d
+/agent-note-coharness-browser-branding/consequences:
+  en: 93cd9199d5ac59c1
+  zh: 05b4bf8591c7ddd7

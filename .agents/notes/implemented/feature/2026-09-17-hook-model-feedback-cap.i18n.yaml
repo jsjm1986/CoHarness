@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-hook-model-feedback-cap.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-17-hook-model-feedback-cap.md
-2026-09-17-hook-model-feedback-cap.md: af46cffdf5b44038ccc6b44c9664f60c47131df5
-2026-09-17-hook-model-feedback-cap.zh.md: e8b995598f2476b4a903adda3add6583d2a5694e
+/agent-note-hook-authored-model-text-is-capped-by-config:
+  en: 36cf3bca92fcf7f9
+  zh: 06f081ffb6516510
+/agent-note-hook-authored-model-text-is-capped-by-config/problem:
+  en: 708a293a3fc11628
+  zh: 5d57e53c4b0bfe84
+/agent-note-hook-authored-model-text-is-capped-by-config/decision:
+  en: 15462c0af0f6b8a0
+  zh: cf80a14ce36ded4b
+/agent-note-hook-authored-model-text-is-capped-by-config/alternatives-considered:
+  en: 3f60c54bf8aefc31
+  zh: 5ae6afc2eac0e8db
+/agent-note-hook-authored-model-text-is-capped-by-config/consequences:
+  en: b15eb18509785e9e
+  zh: 4ad3d90d841922fd
+/agent-note-hook-authored-model-text-is-capped-by-config/verification:
+  en: 6b9a185f4f9f3656
+  zh: d50acc8a19ea1102

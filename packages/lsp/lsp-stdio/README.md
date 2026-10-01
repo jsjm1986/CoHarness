@@ -1,3 +1,8 @@
+---
+description: "Generic stdio language-server provider for the DeepSeek Harness LSP capability seam (ctx.lsp) — spawns configured servers, translates JSON-RPC, and serves transient-open goToDefinition/findReferences/goToImplementation/hover queries in the host filesystem namespace"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-lsp-stdio
 
 English | [中文](README.zh.md)
@@ -10,6 +15,20 @@ Namespace plugin (`name` / `inject` / `Config` / `apply`, no default export).
 
 Use `dsh-lsp-stdio` to give agents definitions, references, implementations, and hover from explicitly configured local language servers. It maps file extensions to language identifiers, starts one server per workspace on demand, and reads each queried file afresh without retaining document state between queries. Language-server processes and source reads share the mounted filesystem and subprocess environment. The package does not install servers or provide a sandbox: deployments supply commands, mappings, and any required confinement. Queries are serialized per server and workspace, while different workspaces can run in parallel.
 
+## Table of Contents
+
+- [What it does](#what-it-does)
+- [Configuration](#configuration)
+- [Protocol behavior](#protocol-behavior)
+- [Security boundary](#security-boundary)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="what-it-does"></a>
 ## What it does
 
 - Resolves every server-local setting before registration; an invalid mapping or registration conflict rolls back earlier entries, so a failed load leaves no provider routes.
@@ -20,6 +39,7 @@ Use `dsh-lsp-stdio` to give agents definitions, references, implementations, and
 - Resolves the server executable, cwd, process, and protocol streams through `ctx.subprocess`; `initialize.processId` is `null` because another machine or PID namespace must not monitor the harness process.
 - Uses `ctx.fs` canonical containment, file URIs, and streamed text validation, but emits no `fs/observed`: only the LSP result is model-visible, so a query does not satisfy read-before-write policy.
 
+<a id="configuration"></a>
 ## Configuration
 
 The `servers` record key is the stable provider id reserved on `ctx.lsp`; each value has this shape:
@@ -40,18 +60,22 @@ The `servers` record key is the stable provider id reserved on `ctx.lsp`; each v
 
 `servers` must contain at least one entry, and every id must be non-empty. Timer budgets must be positive integers no greater than Node's `2_147_483_647` ms timer limit. All executables resolve at load after credential scrubbing; a bad later entry prevents every provider from registering. Processes launch lazily on the first matching query.
 
+<a id="protocol-behavior"></a>
 ## Protocol behavior
 
 Initialization advertises `general.positionEncodings: ['utf-16']`, `workspace: { workspaceFolders: true, configuration: true }`, `textDocument.hover.contentFormat: ['markdown', 'plaintext']`, and `linkSupport: true` for definition and implementation, with no dynamic registration. The server's returned capabilities are authoritative: an unsupported operation, or synchronization without transient open/close, fails the query. An omitted server `positionEncoding` defaults to `utf-16`; any other value is a protocol error. The client answers `workspace/configuration` from static config, accepts lifecycle bookkeeping requests, and rejects `workspace/applyEdit` — it never applies edits or runs commands. Navigation maps `Location` directly and `LocationLink` from `targetUri` + `targetSelectionRange`; hover normalization takes valid `MarkupContent.value`, preserves string `MarkedString`s, renders language-tagged values as fenced code, and joins arrays with one blank line. Missing results, malformed ranges or positions, and malformed hover encodings fail as structured `LSP_MALFORMED_RESPONSE` errors.
 
+<a id="security-boundary"></a>
 ## Security boundary
 
 The provider trusts its configured server and claims no sandbox confinement. It delegates canonical identity, containment, regular-file streaming, UTF-8 validation, and file-URI encoding to `ctx.fs`; it rejects missing, non-regular, non-UTF-8, oversized, or canonically out-of-workspace query sources before server startup. Containment is evaluated before the stream opens and does not promise stable-handle identity across concurrent path replacement. Result locations may be external, but an external path cannot become a query source. A deployment must mount filesystem and subprocess providers for the same execution world; split-world composition is invalid.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Each registered provider owns one language-server child through `ctx.subprocess`; lifecycle and isolation are covered by provider specs and the plugin keeps no cross-server state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through `dsh-tool-lsp`, which surfaces this provider's normalized results while this host contributes no prompt or schema itself.
@@ -66,3 +90,13 @@ No direct invalidation; `dsh-tool-lsp` owns request-prefix changes.
 - **Transient-open compatibility floor** — servers whose synchronization omits open/close (or advertise `None`) are unsupported even if closed-document queries would work; the pinned TypeScript e2e establishes one compatibility floor, not a cross-language claim.
 - **Per-server/workspace serialization latency** — parallel agents sharing one server and workspace queue behind one process; long-lived workspace processes consume memory until disposal.
 - **A hard-killed harness orphans language servers** — `initialize.processId: null` removes server-side client-PID monitoring, so servers are cleaned only by graceful service disposal; a SIGKILL'd harness leaves them running until they exit on their own.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -18,6 +18,9 @@
       "path": "../runtime"
     },
     {
+      "path": "../shortcuts/tsconfig.client.json"
+    },
+    {
       "path": "../ui-conversation"
     },
     {

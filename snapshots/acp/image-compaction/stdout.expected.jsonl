@@ -3,6 +3,6 @@
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"agent_message_chunk","messageId":"{{message:4}}","content":{"type":"text","text":"Received six dashboard frames; ready to discuss."}}}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"usage_update","used":"{{usedTokens}}","size":11600}}}
 {"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn"}}
-{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"agent_message_chunk","messageId":"{{message:7}}","content":{"type":"text","text":"DONE"}}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"agent_message_chunk","messageId":"{{message:6}}","content":{"type":"text","text":"Six identical 1x1 dashboard reference screenshots were shared and acknowledged."}}}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"{{session:1}}","update":{"sessionUpdate":"usage_update","used":"{{usedTokens}}","size":11600}}}
 {"jsonrpc":"2.0","id":4,"result":{"stopReason":"end_turn"}}

@@ -127,6 +127,7 @@ ctx.systemPrompt.variable('cwd', ({ agent }) => agent?.session.header.cwd)
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -164,6 +165,7 @@ schema token 在每次请求中重复。限制工具会为该 agent 移除其全
 
 只要可见 schema 集合、渲染与顺序不变，前缀就保持稳定。注册、限制或重排序可能从第一个变化的 schema token 起使复用失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -174,7 +176,6 @@ schema token 在每次请求中重复。限制工具会为该 agent 移除其全
 - **部署方编写的提示词文本只来自配置／组合**：此插件拥有全局 persona 前缀与后缀默认值；创建方插件可以注册 agent 作用域的遮蔽项；其他段来自拥有相应事实的插件。不存在终端用户提示词编辑 API。
 - **插值文本不支持行内转义语法**：整段需要保留字面花括号时，使用 `interpolate: false`。
 - **`toolOrder` 配置错误在提示词组装（首轮）时出现，而不是启动时**：只有形状违规会在配置加载时抛出。
-
 
 <a id="dev-note"></a>
 ### 开发备注

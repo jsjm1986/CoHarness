@@ -123,7 +123,7 @@ export function AskQuestionRow({ toolName, block, inspect, openDetails, t }: Ask
   // failed shape, and the abort keeps the shared stopped (amber) semantics of
   // any other interrupted tool call.
   const code = 'kind' in block ? block.error?.code : undefined
-  const argsRaw = ('kind' in block ? block.call?.argsRaw : block.argsRaw) ?? ''
+  const argsRaw = ('kind' in block ? block.call?.argsRaw : 'argsRaw' in block ? block.argsRaw : '') ?? ''
   let summary = model.summary
   let state = model.state
   let questionCard: AskQuestionCardModel | null = null

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-trajectory
 
 [English](README.md) | 中文
@@ -18,10 +23,22 @@ Trajectory 的 next-step 消息分类器折叠持久的 inbox splice 链和当�
 
 Trajectory 标签页让你以按轮次组织的事件记录表和交互式时间概览检查 agent（智能体）活动。它对用户、助手、工具、嵌套子工具和压缩（compaction）记录分组，标示轮次与步骤边界，并为所选记录打开检查器，显示 token 用量、耗时、输入、输出、计时、图片和附件摘要。较长历史打开时定位于当前尾部，按需加载更早页面，并且只渲染可见行。流式输出期间，视图会跟随尾部，直到你向上滚动；进行中的记录只显示开始标记，不会虚构耗时。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该台账渲染会话的权威事件日志；选择、检视与滚动状态是展示层本地的。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。
@@ -30,6 +47,17 @@ Trajectory 标签页让你以按轮次组织的事件记录表和交互式时间
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **进行中时，Time 保持空白**：`partial` 与 `runningCalls` 行会显示运行状态，但不会虚构耗时，因此 Overview 区域只渲染开始标记，而不会杜撰实时跨度。记录选择与时间线选择位于 Trajectory 内部，不提供锚点深链接。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/scope/README.md
-README.md: 729baa9585dfcd0d30a134c19b89a83dbae0f9d4
-README.zh.md: 294a5147b9a88183ce23e83d3c90051a253ff509
+/:
+  en: dd74e2393045b7bb
+  zh: 0a51af1cad6486b4
+/dsh-scope:
+  en: e3fcdb002a598c45
+  zh: b63a5b5fb6278ba8
+/dsh-scope/summary:
+  en: f645dd571d3c8ca7
+  zh: 781b83572498adf1
+/dsh-scope/table-of-contents:
+  en: f36c2311c07b8e06
+  zh: 5393d18d55f55e72
+/dsh-scope/public-api:
+  en: 9c001f35bfb3d390
+  zh: e050c68fe8ad674c
+/dsh-scope/design-contract:
+  en: 08158385c97e27a5
+  zh: 8b8c85d0b0d7b9b3
+/dsh-scope/known-limitations-and-deferred-work:
+  en: 25ebf9c3f79f0c30
+  zh: 3bacbe23f561c0fb
+/dsh-scope/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

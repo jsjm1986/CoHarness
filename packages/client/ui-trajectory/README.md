@@ -1,3 +1,8 @@
+---
+description: "Trajectory event ledger with an interactive timing overview: pure-consumer plugin registering into the conversation ViewMap (no service)"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-trajectory
 
 English | [中文](README.zh.md)
@@ -18,10 +23,21 @@ Trajectory's next-step message classifier folds a persistent inbox splice chain 
 
 The Trajectory tab lets you inspect agent activity as a turn-aware ledger and interactive timing overview. It groups User, Assistant, Tool, nested Subtool, and compaction records, marks turn and step boundaries, and opens a record inspector for token usage, duration, input, output, timing, images, and attachment summaries. Long histories open at the current tail, load older pages on demand, and render only visible rows. During streaming, the view follows the tail until you scroll upward, and in-flight records show a start marker without inventing elapsed time.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The ledger renders the session's authoritative event log; selection, inspection, and scroll state are presentation-local.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -33,3 +49,13 @@ None; this package neither assembles nor sends a provider request.
 ## Known Limitations and Deferred Work
 
 - **In-flight Time stays blank** — `partial` and `runningCalls` rows show their running state without a fabricated duration, so the Overview renders a start marker rather than inventing a live span. Record and timeline selection are local to Trajectory, with no anchor deep links.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

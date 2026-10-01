@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for persistence.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/persistence.md
-persistence.md: 175772265920c8c8de79e9d9ae0581b31e92464f
-persistence.zh.md: 9571d94871bfba84ecc5a5ecf433283419e7c29b
+/session-persistence:
+  en: 41bb07bee6956883
+  zh: 57918168715e6d12
+/session-persistence/the-flush-checkpoint:
+  en: b584900f26439474
+  zh: be5d77b6191e81c8
+/session-persistence/crash-recovery-preserves-an-interrupted-turn:
+  en: fda89f12c17d9f3d
+  zh: 4998c5da0cd7a6c2
+/session-persistence/sessionlocation-optional-per-session-artifact-target:
+  en: 092ed10419372177
+  zh: 592ff7daa4527779
+/session-persistence/sessionheader-metadata-beside-the-log:
+  en: 5795ae03d2d163cd
+  zh: a46ceeb22cfbb6a1
+/session-persistence/format-refusal-logs-a-build-cannot-faithfully-read:
+  en: 004ee3848ba5e4c6
+  zh: ab326a0249d8d8cf
+/session-persistence/createsessionoptions-seeding-and-metadata:
+  en: d4049ec5a8f9c160
+  zh: 41da7a641733da06
+/session-persistence/sessionstoragemetadata-logical-header-and-inherited-cut:
+  en: 3bb21a8fab62c776
+  zh: 775726f90c3471b0
+/session-persistence/sessionrawartifact-verbatim-stored-artifact-text:
+  en: 4e4ce94ec461d8a1
+  zh: 53f3173c329c3f02
+/session-persistence/preparation-and-restoration-ownership:
+  en: db2a071b7d6d55bd
+  zh: 8530bc359bb39bf5
+/session-persistence/detached-stored-log-suffixes:
+  en: 50107d1358764441
+  zh: bfc6a5fc4ef8e5a8
+/session-persistence/lightweight-source-revisions:
+  en: 24b528c566513840
+  zh: 3f6a56cfa392e072
+/session-persistence/the-backends:
+  en: bf1657c77ca217c3
+  zh: 51efe42603f19c30

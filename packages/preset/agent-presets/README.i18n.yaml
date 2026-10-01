@@ -1,6 +1,70 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/preset/agent-presets/README.md
-README.md: ec5047b55880d8787559fb95f3aa64f84dbb817d
-README.zh.md: 00813699b1d904badbe645ff7cb738a1d3fd78e4
+/:
+  en: d5ac01c9c587f150
+  zh: 61495d48365178df
+/dsh-agent-presets:
+  en: 529661f239e40e37
+  zh: 36b50f4c19989d22
+/dsh-agent-presets/summary:
+  en: 1d5594413a16070c
+  zh: 4ddf6cd3339e71e3
+/dsh-agent-presets/table-of-contents:
+  en: 2d61db45444313f1
+  zh: 5feefd8b1f07dd5a
+/dsh-agent-presets/service-agentpresets-ctx-key-agentpresets:
+  en: 7f4404257ca850e6
+  zh: d24056ec7adf0f8f
+/dsh-agent-presets/service-agentpresets-ctx-key-agentpresets/where-to-call-mount:
+  en: 5aee6aca527a4c9a
+  zh: ed02ffb5115d8fae
+/dsh-agent-presets/service-agentpresets-ctx-key-agentpresets/composing-a-child-agent:
+  en: c7195bbd639635a5
+  zh: 8a9182f195cd9135
+/dsh-agent-presets/service-agentpresets-ctx-key-agentpresets/which-preset-a-session-runs:
+  en: ca677d5d932668e2
+  zh: fcc7a2dd7374dfbf
+/dsh-agent-presets/service-agentpresets-ctx-key-agentpresets/switching-a-blank-agent:
+  en: d2fd1dd92f99a0d6
+  zh: 249c67cb7d97064c
+/dsh-agent-presets/authoring:
+  en: c9f723cff2a1c834
+  zh: bd730f123adae597
+/dsh-agent-presets/authoring/how-a-preset-s-rows-resolve:
+  en: 80b1c417654357db
+  zh: f535d3ce17038d13
+/dsh-agent-presets/authoring/display-metadata:
+  en: 44da4feeefc3f8aa
+  zh: 8e5469c588c4ce76
+/dsh-agent-presets/config:
+  en: 1c37c5acdd6c947a
+  zh: 13480dcc2bbdeb68
+/dsh-agent-presets/config/the-writable-root-is-this-package-s-the-shipped-root-is-the-app-s:
+  en: c7ef46a1f29be812
+  zh: 8939e06da4dde8dd
+/dsh-agent-presets/config/the-default-preset-and-picker-visibility-are-settings:
+  en: 515d7ac2de3c4de5
+  zh: a79b58a0c8da623e
+/dsh-agent-presets/what-a-mount-rejects:
+  en: 6e04c72816f0b81d
+  zh: 279e60997bf09480
+/dsh-agent-presets/a-preset-file-is-an-input-never-a-persistence-target:
+  en: 45fb7f549ed28713
+  zh: 3304c389f7c59d60
+/dsh-agent-presets/trust:
+  en: 52c4013bde89d654
+  zh: 96ec65f542a34f50
+/dsh-agent-presets/model-experience:
+  en: 07ca03c481bc35f3
+  zh: e64e2305ac5f8d54
+/dsh-agent-presets/model-experience/kv-cache-effect:
+  en: adc2966aced4becb
+  zh: a80008797d5a4313
+/dsh-agent-presets/known-limitations-and-deferred-work:
+  en: 0e647ba9346dfcdd
+  zh: 7024e7769a3e1178
+/dsh-agent-presets/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

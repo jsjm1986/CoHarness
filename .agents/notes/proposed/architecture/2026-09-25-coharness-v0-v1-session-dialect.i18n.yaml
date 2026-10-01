@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-25-coharness-v0-v1-session-dialect.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-09-25-coharness-v0-v1-session-dialect.md
-2026-09-25-coharness-v0-v1-session-dialect.md: e513e56ddec9cea6e1225af803e24fe30f60028a
-2026-09-25-coharness-v0-v1-session-dialect.zh.md: 4973a82b1af7255f253ca134b723b8148ed8d361
+/agent-note-coharness-v0-v1-session-dialect-admission:
+  en: 97db0662b3a9740c
+  zh: 78a4236ce2be7063
+/agent-note-coharness-v0-v1-session-dialect-admission/problem:
+  en: 3dc52158fcf27cc2
+  zh: 26eee492be5fb571
+/agent-note-coharness-v0-v1-session-dialect-admission/proposal:
+  en: fa5715cf1e5b55bd
+  zh: ace580b9534f265d
+/agent-note-coharness-v0-v1-session-dialect-admission/alternatives-considered:
+  en: c9357bd5e7e36786
+  zh: 039f248c8a756360
+/agent-note-coharness-v0-v1-session-dialect-admission/acceptance-criteria:
+  en: 8e312d0661aeb19c
+  zh: 80efe266965a71f6
+/agent-note-coharness-v0-v1-session-dialect-admission/risks:
+  en: 469a695346d150a2
+  zh: 3af8e26098739a87
+/agent-note-coharness-v0-v1-session-dialect-admission/consequences:
+  en: dd5bc3fd9b0c0bc2
+  zh: f99d32c00c8a578c
+/agent-note-coharness-v0-v1-session-dialect-admission/verification:
+  en: 2d5770b9678af75a
+  zh: 4e20d6269f74a6c9

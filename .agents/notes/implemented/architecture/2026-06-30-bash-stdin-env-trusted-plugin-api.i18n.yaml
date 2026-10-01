@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-30-bash-stdin-env-trusted-plugin-api.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-30-bash-stdin-env-trusted-plugin-api.md
-2026-06-30-bash-stdin-env-trusted-plugin-api.md: 41be63fff598587ee9b873cf7edf51da788bc02a
-2026-06-30-bash-stdin-env-trusted-plugin-api.zh.md: 60721539d9d37857e145e289bb262482588139bf
+/agent-note-stdin-extra-env-on-the-bash-seam:
+  en: 38af6a14bc3b1ff3
+  zh: 853c8280a549f038
+/agent-note-stdin-extra-env-on-the-bash-seam/problem:
+  en: 2e5d26b3b1202a73
+  zh: ada477abb2875def
+/agent-note-stdin-extra-env-on-the-bash-seam/decision:
+  en: e8839c1f644960ed
+  zh: 2828c463d83093b3
+/agent-note-stdin-extra-env-on-the-bash-seam/alternatives-considered:
+  en: b5e5a444adb97ef3
+  zh: af370347f577c954
+/agent-note-stdin-extra-env-on-the-bash-seam/consequences:
+  en: 79bb374533d58a25
+  zh: efe1420b58a74a4f

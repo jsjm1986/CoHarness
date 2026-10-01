@@ -16,6 +16,9 @@
       "path": "../gateway-runtime"
     },
     {
+      "path": "../../goal/goal"
+    },
+    {
       "path": "../../core/session"
     },
     {

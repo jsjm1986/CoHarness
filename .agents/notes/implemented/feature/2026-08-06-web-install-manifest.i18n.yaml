@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-web-install-manifest.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-06-web-install-manifest.md
-2026-08-06-web-install-manifest.md: 9efddc03afb1f869db7e06e6f215dd64eb3d7553
-2026-08-06-web-install-manifest.zh.md: a27bd46a052ac4f81e0ea05086ceb5c8ad720296
+/agent-note-web-install-manifest-metadata:
+  en: 887fcbd60e1e6588
+  zh: 62b51a0798bf7300
+/agent-note-web-install-manifest-metadata/problem:
+  en: cad43dd0495d5bc4
+  zh: 0717d4dc01d85ccc
+/agent-note-web-install-manifest-metadata/decision:
+  en: dc27f32135e93713
+  zh: 6a0d16f168d3b1ec
+/agent-note-web-install-manifest-metadata/verification:
+  en: 727691a59cbd4048
+  zh: d41553b7e1f307a7
+/agent-note-web-install-manifest-metadata/alternatives-considered:
+  en: 9606e6bd6c5135ff
+  zh: 5ab36cf03cf202a4
+/agent-note-web-install-manifest-metadata/consequences:
+  en: 25deb9c5b504ccce
+  zh: 50972ba3d5d933ec

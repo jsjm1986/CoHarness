@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-26-ptc-dispatch-ui-foundation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-26-ptc-dispatch-ui-foundation.md
-2026-07-26-ptc-dispatch-ui-foundation.md: 6383247ff9e3257bc69574580f50de17b99ca521
-2026-07-26-ptc-dispatch-ui-foundation.zh.md: e17ba0a1364a68e9733314b4c1fc3cd3726095c8
+/agent-note-ptc-mode-ui-foundation-run-code-description-and-native-parity-dispatch-logging:
+  en: 9572c03510702315
+  zh: a6868e3baf2f12b9
+/agent-note-ptc-mode-ui-foundation-run-code-description-and-native-parity-dispatch-logging/problem:
+  en: 73cfa64eea30cea9
+  zh: 68443391a6764031
+/agent-note-ptc-mode-ui-foundation-run-code-description-and-native-parity-dispatch-logging/decision:
+  en: f09162a67326d849
+  zh: a3d89e4e57a65b86
+/agent-note-ptc-mode-ui-foundation-run-code-description-and-native-parity-dispatch-logging/alternatives-considered:
+  en: 004c11c2be428c76
+  zh: ae7ddc9a01fafff2
+/agent-note-ptc-mode-ui-foundation-run-code-description-and-native-parity-dispatch-logging/consequences:
+  en: 7a8d961378f6296b
+  zh: 1d430524274395d9

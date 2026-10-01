@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-13-public-vendor-and-native-sequences.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-13-public-vendor-and-native-sequences.md
-2026-08-13-public-vendor-and-native-sequences.md: ada7c3bcbe5feb288d67fe8e7ee7204dda6b4597
-2026-08-13-public-vendor-and-native-sequences.zh.md: ba9381dda94c09424d9218d3982bfdb128225e5d
+/agent-note-npm-access-per-release-sequence-the-vendored-framework-and-the-native-packages-publish-publicly:
+  en: 926c5b5f014421e1
+  zh: d1c12ba29b992107
+/agent-note-npm-access-per-release-sequence-the-vendored-framework-and-the-native-packages-publish-publicly/problem:
+  en: d3ec12a96e188bbf
+  zh: d7218bd59de5bb0b
+/agent-note-npm-access-per-release-sequence-the-vendored-framework-and-the-native-packages-publish-publicly/decision:
+  en: a4a09ab895141938
+  zh: 3d8d19a15e78070e
+/agent-note-npm-access-per-release-sequence-the-vendored-framework-and-the-native-packages-publish-publicly/alternatives-considered:
+  en: 5e731cad64b34582
+  zh: d8a787114904fd6d
+/agent-note-npm-access-per-release-sequence-the-vendored-framework-and-the-native-packages-publish-publicly/consequences:
+  en: 45d5157b62c0199b
+  zh: cd7f9f150de696bb

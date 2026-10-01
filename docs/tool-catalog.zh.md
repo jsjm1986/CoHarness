@@ -25,9 +25,9 @@
 | `@deepseek-ai/dsh-tool-ask-user` | `ask_user_question` | `ctx.tools`、`ctx.userQuestions` | `tool/call`、`tool/result after a UI/provider answers the question` | - | ask_user_question 会暂停工具调用，直到当前 UI 提供方返回人类答案。 |
 | `@deepseek-ai/dsh-tools` | `run_code` | `ctx.tools`、`ctx.ptcRuntime (execution time)`、`ctx.systemPrompt` | `tool/call`、`one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call`、`tool/result` | - | 在 `mode: ptc`／`mode: both` 下，它由工具注册表所有，作为可过滤能力层之外的保留传输机制（参见 PTC mode Agent Note）。在 `ptc` 下，它是注册表对协议格式（wire format）的唯一贡献；其他可见能力在使用已加载运行时语言生成的 SDK 章节中声明。程序通过 binding 调用这些能力，调用按照原生并发约定调度：启动顺序和策略遵循提交顺序，并发安全的函数体最多重叠执行 `maxParallelSubCalls` 个。调用会重新进入完整且受守卫保护的工具流水线，并将每个嵌套执行关联到此外层结果。 |
 | `@deepseek-ai/dsh-plan-mode` | `exit_plan_mode` | `ctx.tools`、`ctx.systemPrompt`、`ctx.userQuestions (execution time, opportunistic)` | `tool/call`、`plan/mode inactive on an approved review`、`tool/result` | - | 规划未激活时，exit_plan_mode 仍保留在面向模型的 schema 中，这样状态转换不会在规划策略变更之外额外造成工具目录变动。其执行路径会拒绝规划模式之外的调用；在规划模式下，它通过用户交互 seam 提交计划（批准／根据反馈继续规划），批准后会在步骤边界记录规划模式已停用。 |
-| `@deepseek-ai/dsh-tool-bash` | `bash` | `ctx.tools`、`ctx.shell`、`ctx.systemPrompt`、`ctx.shellEnv`、`ctx.jobs at call time for run_in_background` | `tool/call`、`tool/result` | - | bash 工具是 bash 执行器 seam 面向模型的消费方。使用 `run_in_background` 的运行会注册到通用 `ctx.jobs` 运行时，并通过 `job_*` 工具（来自 `@deepseek-ai/dsh-tool-jobs`）收集／停止；禁用 `enableRunInBackground` 配置（默认为 true）后，该参数会被完全移除。 |
+| `@deepseek-ai/dsh-tool-bash` | `bash` | `ctx.tools`、`ctx.shell`、`ctx.systemPrompt`、`ctx.shellEnv`、`ctx.jobs for run_in_background and the job-backed foreground path` | `tool/call`、`tool/result` | - | bash 工具是 bash 执行器 seam 面向模型的消费方。组合中有 job 注册表时，每次调用一启动就注册到通用 `ctx.jobs` 运行时，并通过 `job_*` 工具（来自 `@deepseek-ai/dsh-tool-jobs`）收集／停止；没有注册表或 `enableRunInBackground: false` 时，工具注册不带 `run_in_background` 参数的纯前台 schema。 |
 | `@deepseek-ai/dsh-tool-present` | `present` | `ctx.tools`, `ctx.fs`, `ctx.sessionProjections` | `tool/call`, `deliverables/presented 在成功的最终结果之后`, `tool/result` | - | 交付归调用方 Session 所有；Web ui-deliverables 提供源文件打开与卡片。 |
-| `@deepseek-ai/dsh-tool-pwsh` | `pwsh` | `ctx.tools`、`ctx.shell`、`ctx.systemPrompt`、`ctx.shellEnv`、`ctx.jobs at call time for run_in_background` | `tool/call`、`tool/result` | - | pwsh 工具是 Windows 组合中 bash 执行器 seam 的 PowerShell 方言消费方（由 `@deepseek-ai/dsh-pwsh-local` 等 PowerShell 执行器为 `ctx.shell` 提供后端）；除沙箱接口外，它逐项对应 bash 工具调用。使用 `run_in_background` 的运行会注册到通用 `ctx.jobs` 运行时，并通过 `job_*` 工具收集／停止；托管的 `DSH_*` 环境来自 `@deepseek-ai/dsh-shell-env`。每次调用都在新进程中运行，不使用持久 PTY 会话。路径采用原生 `C:\...` 形式，变量采用 `$env:NAME`。 |
+| `@deepseek-ai/dsh-tool-pwsh` | `pwsh` | `ctx.tools`、`ctx.shell`、`ctx.systemPrompt`、`ctx.shellEnv`、`ctx.jobs for run_in_background and the job-backed foreground path` | `tool/call`、`tool/result` | - | pwsh 工具是 Windows 组合中 bash 执行器 seam 的 PowerShell 方言消费方（由 `@deepseek-ai/dsh-pwsh-local` 等 PowerShell 执行器为 `ctx.shell` 提供后端）；除沙箱接口外，它逐项对应 bash 工具调用。使用 `run_in_background` 的运行会注册到通用 `ctx.jobs` 运行时，并通过 `job_*` 工具收集／停止；托管的 `DSH_*` 环境来自 `@deepseek-ai/dsh-shell-env`。每次调用都在新进程中运行，不使用持久 PTY 会话。路径采用原生 `C:\...` 形式，变量采用 `$env:NAME`。 |
 | `@deepseek-ai/dsh-tool-cordis` | `cordis_inspect_list`、`cordis_inspect_query`、`cordis_inspect_self` | `ctx.tools`、`ctx.systemPrompt`、`ctx.dynamicCordisRunner`、`ctx.cordisInspect` | `tool/call`、`tool/result`、`user/message (@pluginId context)` | - | 只读发现 Host 与 Client API，并检视会话拥有的现有 Cordis Package。Creator 模式将这些工具与经过授权的 Plugin Manager 操作组合，以持久修改 profile。该工具集不能定义、激活、停止或移除动态 Package；历史卡片和显式 @pluginId 引用仍可读取。见[退役决策](../.agents/notes/implemented/simplification/2026-09-22-retire-dynamic-cordis-model-tools.zh.md)。 |
 | `@deepseek-ai/dsh-tool-bash-persistent` | `bash` | `ctx.tools`、`ctx.terminals`、`an owning Agent at execution time` | `tool/call`、`PTY shell state`、`tool/result` | - | 一个按所有者隔离的持久 bash 工具；部署组合提供 PTY 后端，并可覆盖面向模型的环境描述。 |
 | `@deepseek-ai/dsh-tool-pwsh-persistent` | `pwsh` | `ctx.tools`、`ctx.terminals`、`an owning Agent at execution time` | `tool/call`、`PTY shell state`、`tool/result` | - | 一个按所有者隔离的持久 pwsh 工具，持久 bash 工具的 Windows 对应物；部署组合提供 pwsh 方言的 PTY 后端，并可覆盖面向模型的环境描述。 |
@@ -48,6 +48,7 @@
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | `followup_task`、`interrupt_agent`、`list_agents`、`send_message`、`spawn_teammate`、`team_task_create`、`team_task_get`、`team_task_list`、`team_task_update`、`wait_agent` | `ctx.tools`、`ctx.systemPrompt`、`ctx.agentTeams`、`an exact live Team member Agent` | `tool/call`、`team/member`、`team/message/queued`、`team/message/delivered`、`team/task`、`tool/result` | - | 这 10 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
+| `@deepseek-ai/dsh-tool-workspace-dependencies` | `load_workspace_dependencies` | `ctx.tools` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`、`web_search` | `ctx.tools`、`ctx.web`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。 |
 
 <a id="deepseek-aidsh-plugin-manager"></a>
@@ -56,7 +57,7 @@
 
 ### `plugin_manager`
 
-列出当前 profile 中的插件或组合包，启用或禁用它们，安装组合包或移除已安装的组合包。每项操作都要求 danger-full-access 权限或本次调用的批准。批准不改变会话权限模式。变更影响该 profile 的所有会话。先列出条目以获取准确标识。包安装可能运行已获批准的构建脚本。支持热更新的 profile 立即应用变更；仅启动时加载的 profile 需要重启。
+列出当前 profile 中的插件或组合包，启用或禁用它们，安装组合包或移除已安装的组合包。每项操作都要求 danger-full-access 权限或本次调用的批准。批准不改变会话权限模式。变更影响该 profile 的所有会话。先列出条目以获取准确标识。包安装可能运行已获批准的构建脚本。支持热更新的 profile 立即应用变更；仅启动时加载的 profile 需要重启。不兼容的 DSH peer 依赖会阻止安装与激活。版本豁免有崩溃与数据丢失风险：授予前必须警告用户，并就确切的插件版本与运行时版本取得明确许可。
 
 ```json
 {
@@ -71,7 +72,9 @@
         "set_plugin",
         "set_bundle",
         "install_bundle",
-        "remove_bundle"
+        "remove_bundle",
+        "list_version_exemptions",
+        "set_version_exemption"
       ]
     },
     "target": {
@@ -80,7 +83,15 @@
     },
     "enabled": {
       "type": "boolean",
-      "description": "Required for set operations; defaults to true for installation."
+      "description": "Required for set operations; defaults to true for installation. For set_version_exemption, true grants and false revokes."
+    },
+    "runtimeVersion": {
+      "type": "string",
+      "description": "For set_version_exemption: exact DSH version from list_version_exemptions. Target must be the manifest package-name@version, not an alias or version range."
+    },
+    "acceptRisk": {
+      "type": "boolean",
+      "description": "For granting an exemption: true only after warning the user about possible crashes and data loss and receiving explicit permission for this exact plugin/runtime pair. General installation permission is not enough."
     },
     "approvedBuilds": {
       "type": "array",
@@ -88,6 +99,10 @@
       "items": {
         "type": "string"
       }
+    },
+    "registry": {
+      "type": "string",
+      "description": "For install_bundle: the npm registry URL asked first, when the user names one; otherwise the configured registry is asked, and its configured fallbacks while a registry is unreachable."
     },
     "offset": {
       "type": "number",
@@ -541,7 +556,7 @@ ask_user_question 会暂停工具调用，直到当前 UI 提供方返回人类�
     },
     "justification": {
       "type": "string",
-      "description": "Reason this complete program needs wider access, shown to the user for approval."
+      "description": "Reason this complete program needs wider access, shown to the user for approval. Use the language of the user’s current request."
     }
   },
   "required": [
@@ -604,7 +619,7 @@ ask_user_question 会暂停工具调用，直到当前 UI 提供方返回人类�
     },
     "timeoutMs": {
       "type": "number",
-      "description": "Timeout in milliseconds. The executor applies its configured default and cap, and kills the command on expiry."
+      "description": "Timeout in milliseconds. The executor applies its configured default and cap; on expiry the command moves to the background as a job instead of being killed."
     },
     "workdir": {
       "type": "string",
@@ -624,7 +639,7 @@ ask_user_question 会暂停工具调用，直到当前 UI 提供方返回人类�
 
 来源：[`packages/shell/tool-bash/src/index.ts`](../packages/shell/tool-bash/src/index.ts)
 
-bash 工具是 bash 执行器 seam 面向模型的消费方。使用 `run_in_background` 的运行会注册到通用 `ctx.jobs` 运行时，并通过 `job_*` 工具（来自 `@deepseek-ai/dsh-tool-jobs`）收集／停止；禁用 `enableRunInBackground` 配置（默认为 true）后，该参数会被完全移除。
+bash 工具是 bash 执行器 seam 面向模型的消费方。组合中有 job 注册表时，每次调用一启动就注册到通用 `ctx.jobs` 运行时，并通过 `job_*` 工具（来自 `@deepseek-ai/dsh-tool-jobs`）收集／停止；没有注册表或 `enableRunInBackground: false` 时，工具注册不带 `run_in_background` 参数的纯前台 schema。
 
 <a id="deepseek-aidsh-tool-present"></a>
 
@@ -640,6 +655,7 @@ bash 工具是 bash 执行器 seam 面向模型的消费方。使用 `run_in_bac
   "properties": {
     "files": {
       "type": "array",
+      "description": "Usually the 1-2 most important deliverables; at most 4 per call.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -691,7 +707,7 @@ bash 工具是 bash 执行器 seam 面向模型的消费方。使用 `run_in_bac
     },
     "timeoutMs": {
       "type": "number",
-      "description": "Timeout in milliseconds. The executor applies its configured default and cap, and kills the command on expiry."
+      "description": "Timeout in milliseconds. The executor applies its configured default and cap; on expiry the command moves to the background as a job instead of being killed."
     },
     "workdir": {
       "type": "string",
@@ -732,7 +748,7 @@ pwsh 工具是 Windows 组合中 bash 执行器 seam 的 PowerShell 方言消费
 
 ### `cordis_inspect_query`
 
-执行 Inspect Provider 显式声明的只读查询。platform、provider 和 method 必须来自 cordis_inspect_list，input 必须符合该方法的 schema。编写插件代码前用本 Tool 读取精确 Service 方法、Event mode、Builtin 签名、Tool schema、主题 token，或实时 Slot 树及 props。Host 查询在本地执行；Client 查询等待首个有效页面响应，在页面回答或 Tool 被取消前保持 pending。本 Tool 不能调用业务 Service 方法或修改运行时。查询 Service.listService 和 Event.listEvents 时，先不传 input 浏览紧凑签名目录，再查询精确 service 或 event 获取结构化约定和引用类型。查询 Slots.listSubTree 时，先不传 root 浏览紧凑树，再查询精确 root 获取完整注册约定和 props。
+执行 Inspect Provider 显式声明的只读查询。platform、provider 和 method 必须来自 cordis_inspect_list，input 必须符合该方法的 schema。编写插件代码前用本 Tool 读取精确 Service 方法、Event mode、插件 Config schema、Tool schema、主题 token，或实时 Slot 树及 props。Host 查询在本地执行；Client 查询等待首个有效页面响应，在页面回答或 Tool 被取消前保持 pending。本 Tool 不能调用业务 Service 方法或修改运行时。查询 Service.listService 和 Event.listEvents 时，先不传 input 浏览紧凑签名目录，再查询精确 service 或 event 获取结构化约定和引用类型。查询 Config.listConfigs 时，先不传 input 翻页浏览实时条目目录，再查询精确条目获取其投影 JSON Schema。查询 Slots.listSubTree 时，先不传 root 浏览紧凑树，再查询精确 root 获取完整注册约定和 props。
 
 ```json
 {
@@ -972,7 +988,7 @@ pwsh 工具是 Windows 组合中 bash 执行器 seam 的 PowerShell 方言消费
     },
     "old_string": {
       "type": "string",
-      "description": "Literal text to replace. Must match exactly."
+      "description": "Literal text to replace."
     },
     "new_string": {
       "type": "string",
@@ -1421,7 +1437,7 @@ userdoc_list 和 userdoc_read 是只读的个人范围工具。它们消费当�
     },
     "action": {
       "type": "string",
-      "description": "edit | pause | resume | complete | blocked",
+      "description": "edit, pause, and resume require a direct top-level human request. complete and blocked are also allowed during an automatic continuation of this goal; blocked is rejected before the configured minimum round count.",
       "enum": [
         "edit",
         "pause",
@@ -1440,7 +1456,7 @@ userdoc_list 和 userdoc_read 是只读的个人范围工具。它们消费当�
     },
     "blocked_reason": {
       "type": "string",
-      "description": "Concrete blocking condition; required only with action blocked."
+      "description": "Required only with action blocked: the concrete condition that persisted across rounds and blocks progress."
     }
   },
   "required": [
@@ -2008,7 +2024,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `job_kill`
 
-根据 job id 请求取消正在运行的后台任务。此调用立即返回；任务的工作真正停止后，会以 killed 状态结算。
+请求取消正在运行的后台任务。
 
 ```json
 {
@@ -2046,7 +2062,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `job_output`
 
-读取后台任务。流式任务只返回自上次读取以来的输出；最终输出任务会在结算后返回结果。每个响应都以 `[status: ...]` 结尾。读取默认不阻塞；设置 `wait: true` 后，最长等待到配置的上限。
+读取后台任务：流式任务返回自上次读取以来的输出，已完成的最终输出任务返回其结果。
 
 ```json
 {
@@ -2058,11 +2074,11 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
     },
     "wait": {
       "type": "boolean",
-      "description": "Block until the job reaches a terminal status or the timeout expires. A timed-out wait returns [status: running] and leaves the job alive."
+      "description": "Block until the job finishes or the timeout expires; a timed-out wait leaves the job running. Defaults to false."
     },
     "timeout_ms": {
       "type": "number",
-      "description": "Max wait in milliseconds (only meaningful with wait: true). Defaults to the configured wait timeout; capped by the configured maximum."
+      "description": "Max wait in milliseconds with wait: true. Defaults to and is capped by configuration."
     }
   },
   "required": [
@@ -2450,18 +2466,14 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 
 运行用于大规模编排 subagent 的 JavaScript 工作流脚本。当工作会分散到许多相互独立的部分时，请使用此工具，例如审查大量文件、执行迁移、开展多角度研究或对发现进行对抗式验证；此时应将编排写成脚本，而不是逐轮委派。
 
-工作流的身份通过 `meta` 参数以 JSON 形式传入：必填的 `name`（简短 kebab-case）和 `description` 字符串，以及可选的 `whenToUse` 字符串和 `phases` 数组（`{title, detail?, provider?, model?}`）。`script` 参数只能是纯 JavaScript **函数体**，不能是 TypeScript，也不能包含 `export const meta` 语句；meta 是参数而非代码。脚本支持顶层 await；请以 `return <value>` 结尾，该值必须可以 JSON 序列化，并作为此工具的结果。
-
 脚本函数体提供以下钩子：
 
-- `agent(prompt, opts?): Promise<any>`：运行一个 subagent 直至完成。不提供 `opts.schema` 时，解析为子级最终文本；提供 `opts.schema` 时，它必须是以对象为根、且**只能**使用 type/properties/required/additionalProperties/items/enum/const/oneOf 的 JSON Schema，不支持 pattern/format/数值边界，此时解析为通过校验的对象。子级失败时解析为 `null`，可使用 `.filter(Boolean)` 过滤。其他选项包括 `label`（显示名称）、`phase`（进度组），以及相互独立的 `provider`／`model` LLM（大语言模型）目标覆盖项，两者可单独提供。其他任何选项（`effort`／`isolation`／`agentType`）都会明确报错。
-- `pipeline(items, ...stages): Promise<any[]>`：让每个条目分别经过各阶段，阶段之间**没有**屏障；多阶段工作优先使用它。每个阶段接收 `(prev, item, index)`。普通的阶段异常会将该**条目**变为 `null`，并跳过它的剩余阶段。
+- `agent(prompt, opts?): Promise<any>`：运行一个 subagent 直至完成。不提供 `opts.schema` 时，解析为子级最终文本；提供 `opts.schema` 时，它必须是以对象为根、且**只能**使用 type/properties/required/additionalProperties/items/enum/const/oneOf 的 JSON Schema，此时解析为通过校验的对象。子级失败时解析为 `null`，可使用 `.filter(Boolean)` 过滤。其他选项包括 `label`（显示名称）、`phase`（进度组），以及相互独立的 `provider`／`model` LLM（大语言模型）目标覆盖项。
+- `pipeline(items, ...stages): Promise<any[]>`：让每个条目分别经过各阶段，阶段之间**没有**屏障；多阶段工作优先使用它。每个阶段接收 `(prev, item, index)`。阶段异常会将该**条目**变为 `null`，并跳过它的剩余阶段。
 - `parallel(thunks): Promise<any[]>`：并发运行零参数函数并等待**全部**完成。它会形成屏障，仅当某个阶段确实需要汇总全部先前结果时使用。抛出异常的 thunk 解析为 `null`。
 - `phase(title)`：开始一个进度阶段；`log(message)`：说明进度；`args`：工具调用的 `args` 输入，原样提供。
 
-如果误用钩子（参数错误、未知选项、不受支持的 schema、触发上限），抛出的错误**总会**终止脚本，绝不会退化为单个条目的 `null`。
-
-约束：并发上限和 agent 总数上限均会生效；不提供文件系统、网络、定时器或 Node.js API。具体工作由 agent 完成，脚本只负责编排。该运行在前台执行：整个脚本完成后，调用才会返回。
+如果误用钩子（参数错误、未知选项、不受支持的 schema、触发上限），整个脚本会终止，而不会产生 `null`。脚本没有文件系统、网络、定时器或 Node.js API；具体工作由 agent 完成。
 
 ```json
 {
@@ -2469,11 +2481,11 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
   "properties": {
     "script": {
       "type": "string",
-      "description": "The plain-JS workflow script body (top-level await allowed; NO `export const meta` statement; end with `return <json-value>`)."
+      "description": "The plain JavaScript body, not TypeScript and without an `export const meta` statement; top-level await is allowed. End with `return <value>`; the JSON-serializable value is this tool's result."
     },
     "meta": {
       "type": "object",
-      "description": "The workflow identity block (plain JSON — never code).",
+      "description": "The workflow identity as plain JSON, not code.",
       "additionalProperties": true,
       "properties": {
         "name": {
@@ -2527,6 +2539,10 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
       "type": "object",
       "description": "Optional JSON input exposed to the script as the `args` global (wrap a bare list as a field, e.g. {\"files\": [...]}).",
       "additionalProperties": true
+    },
+    "run_in_background": {
+      "type": "boolean",
+      "description": "Run as a background job: return a job id immediately instead of waiting; the return value arrives with the completion notice."
     }
   },
   "required": [
@@ -2537,6 +2553,23 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 ```
 
 来源：[`packages/workflow/tool-workflow/src/index.ts`](../packages/workflow/tool-workflow/src/index.ts)
+
+<a id="deepseek-aidsh-tool-workspace-dependencies"></a>
+
+## `@deepseek-ai/dsh-tool-workspace-dependencies`
+
+### `load_workspace_dependencies`
+
+获取捆绑的 Python 与库目录的绝对路径，以及捆绑 Python 发行版的版本。当 payload 提供 Node.js 与 pnpm 路径时会一并返回。Python 包含 numpy、pandas、python-docx、python-pptx、openpyxl、Pillow、lxml 与 XlsxWriter。除非用户或工作区指令另行选择环境，否则 Office 文件使用这些库。当返回 Node.js 与 pnpm 路径时，使用该 Node 可执行文件与 pnpm 脚本路径运行 pnpm。此工具不改变 PATH 或包管理器设置。
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+来源：[`packages/skill/tool-workspace-dependencies/src/index.ts`](../packages/skill/tool-workspace-dependencies/src/index.ts)
 
 <a id="deepseek-aidsh-tool-web"></a>
 
@@ -2573,7 +2606,7 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
   "properties": {
     "queries": {
       "type": "array",
-      "description": "Required search queries; accepts 1–4 items and merges their results.",
+      "description": "1–4 search queries; their results are merged.",
       "items": {
         "type": "string"
       }

@@ -1,3 +1,8 @@
+---
+description: "Settings domain base plugin: the settings-namespace scope service and the canonical settings slot-type contract"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings
 
 English | [中文](README.zh.md)
@@ -10,14 +15,27 @@ The plugin injects `connection` and `remote` and owns the one `settings.describe
 
 This package lets web-client features expose editable preferences backed by the Host settings document without implementing their own transport or schema handling. Each feature gets namespace-scoped reads and writes, atomic multi-field updates, schema validation, and protection against silently overwriting concurrent changes. It also provides the standard extension points for settings chrome, pages, header actions, plugin tabs, and onboarding while rendering no interface itself. Any preference-owning feature can use it without depending on a presentation package; a separate package provides the settings shell.
 
+## Table of Contents
+
+- [Write authority](#write-authority)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="write-authority"></a>
 ## Write authority
 
 Project-scoped mirrors expose the effective project value and carry per-namespace ownership metadata. A namespace marked `projectWrite: manager` is writable for the project owner or organization administrator; all other project namespaces set `writable: false` with an owner-specific `writableReason`. Provider read-only mode uses `provider`. Account-owned locale, theme, busy-Enter, transcript width, and transcript font-size scopes use the account preference transport even while a project is active, with a Host fallback only when the account route is explicitly unsupported. A scope refuses mutations while its first view is loading or when the authority is read-only, so these states produce zero mutation RPCs. Each accepted write publishes `saving`, folds a successful response into the shared mirror, and records `error` after recovery on a rejected or failed latest write; feature rows render those states and do not persist a blocked choice.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The schema service rehydrates and validates Host-owned documents and the scope transport forwards each namespace section; the layer owns no preference values.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -30,3 +48,13 @@ None; this package neither assembles nor sends a provider request.
 
 - **A failed or refused settings describe stays unavailable** — the binder always uses Host persistence; a throw or non-ok `settings.describe` publishes `unavailable` so plugin cards hide instead of hanging on `loading`. The Host privileged-method fence still requires a loopback `Host` header; a gateway that rewrites `Host`/`Origin` to the instance loopback is what makes a public page succeed. `settings.openDocument` remains a loopback-page action because it opens a file on the host desktop.
 - **Atomic writes are Host-only** — account preference scopes retain their scalar transport. Host `mutate` shares the namespace queue and rejects the entire mutation on validation or revision failure; independent namespaces are separate transactions.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

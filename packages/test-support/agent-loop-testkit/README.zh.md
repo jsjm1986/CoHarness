@@ -105,6 +105,7 @@ harness 不会挂载任何 LLM（大语言模型）适配器。若测试发送�
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -114,6 +115,7 @@ harness 不会挂载任何 LLM（大语言模型）适配器。若测试发送�
 
 无；本包自身不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

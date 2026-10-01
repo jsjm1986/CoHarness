@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-remove-cli-demo.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-08-remove-cli-demo.md
-2026-08-08-remove-cli-demo.md: a34243bad27b220b254beb5eba36a20fb6e12307
-2026-08-08-remove-cli-demo.zh.md: e70248d6375adb6127c7cb131bcedc7feb83e96f
+/agent-note-remove-the-separate-cli-demo:
+  en: 06f25eadb3aa6991
+  zh: 6eb9b96c21bab2b6
+/agent-note-remove-the-separate-cli-demo/problem:
+  en: b2d031abfb320aa4
+  zh: 9a9928a348e360a0
+/agent-note-remove-the-separate-cli-demo/decision:
+  en: 9a55be84c8511faa
+  zh: cea720928f03642c
+/agent-note-remove-the-separate-cli-demo/alternatives-considered:
+  en: ce585b6453ab8fcd
+  zh: dcae573d1947b59f
+/agent-note-remove-the-separate-cli-demo/consequences:
+  en: 7f29c1a025624c9c
+  zh: 714abc125455aafb
+/agent-note-remove-the-separate-cli-demo/verification:
+  en: 5688049ee217e4b9
+  zh: 1097d14e8163f4e3

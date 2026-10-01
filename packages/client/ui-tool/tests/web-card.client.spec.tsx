@@ -14,7 +14,7 @@ import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ConversationSnapshot, RunningToolCall, SessionId, SessionListState, ToolResultNode, WorkspaceListState,
+  ConversationSnapshot, SessionId, SessionListState, StartedToolCall, ToolResultNode, WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ToolResultView } from '@deepseek-ai/dsh-api-remotes/client'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
@@ -57,8 +57,8 @@ const resultFetch = (over?: Partial<Extract<ToolResultView, { card: 'web'; kind:
   card: 'web', kind: 'fetch', url: 'https://example.com/page', statusCode: 200, truncated: false, ...over,
 })
 
-const runningSearch = (over?: Partial<RunningToolCall>): RunningToolCall => ({
-  callId: 'c1', name: 'web_search', argsRaw: SEARCH_ARGS,
+const runningSearch = (over?: Partial<StartedToolCall>): StartedToolCall => ({
+  phase: 'start', callId: 'c1', name: 'web_search', argsRaw: SEARCH_ARGS,
   turn: 1, step: 1, time: 1_000, callView: { card: 'generic', title: 'Search', kind: 'search' }, subCalls: [], ...over,
 })
 
@@ -126,13 +126,14 @@ describe('webCardModel', () => {
 })
 
 describe('chat row web body', () => {
-  const ownerProps = (block: RunningToolCall | ToolResultNode, toolName: string): ToolCallOwnerProps => ({
-    callId: block.callId, toolName, block, openFile: vi.fn(),
+  const ownerProps = (block: StartedToolCall | ToolResultNode, toolName: string): ToolCallOwnerProps => ({
+    callId: block.callId, toolName, openFile: vi.fn(),
+    ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
   })
   // WebRow reads only toolName/block off the full runtime share plus the locale
   // seat; the standard kit is unused, so the cast supplies the owner slice and
   // `t` alone (as BashRow's tests do for the terminal card).
-  const rowProps = (block: RunningToolCall | ToolResultNode, toolName: string): Parameters<typeof WebRow>[0] =>
+  const rowProps = (block: StartedToolCall | ToolResultNode, toolName: string): Parameters<typeof WebRow>[0] =>
     ({ ...ownerProps(block, toolName), t } as unknown as Parameters<typeof WebRow>[0])
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -213,10 +214,10 @@ describe('DetailsPanel web Output section', () => {
     if (selection !== null) chat.actions.select(selection)
     const sessions = createSnapshotStore<SessionListState>({
       ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
-      subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+      subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })
     const workspaces = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })
     return render(
@@ -254,7 +255,7 @@ describe('DetailsPanel web Output section', () => {
     return {
       sessionId: SID, views: EMPTY_CONVERSATION_VIEWS,
       chat: over.chat ?? toolChatSnapshot(nodes, runningCalls),
-      nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+      nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
       pending: [], queue: [], running: false, composerPhase: 'active', removed: false,
       openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
       promptError: null, blank: false, subagent: null, lastAgentError: null, ...over,

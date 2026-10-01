@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-list-agents-residency-vocabulary.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-06-list-agents-residency-vocabulary.md
-2026-08-06-list-agents-residency-vocabulary.md: 01fff958921465909f5cd300dc355fdac6ec0772
-2026-08-06-list-agents-residency-vocabulary.zh.md: f0819626009bc9f1201898248e51474c91650f05
+/agent-note-list-agents-uses-ready-for-resumable-children:
+  en: 17a3098110968152
+  zh: 38891849c674b61f
+/agent-note-list-agents-uses-ready-for-resumable-children/problem:
+  en: 1cf4485aabb40d37
+  zh: 6a88c1e7205ef29a
+/agent-note-list-agents-uses-ready-for-resumable-children/decision:
+  en: cd09a70f76912a51
+  zh: a50b48e3297d0d6b
+/agent-note-list-agents-uses-ready-for-resumable-children/alternatives-considered:
+  en: 85e8f3d34be403b8
+  zh: 3319ee62069ff49b
+/agent-note-list-agents-uses-ready-for-resumable-children/consequences:
+  en: 9c2b0e6ac8f42e5d
+  zh: 5e0d9e77c4538c5d

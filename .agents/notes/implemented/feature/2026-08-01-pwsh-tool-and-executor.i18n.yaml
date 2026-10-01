@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-01-pwsh-tool-and-executor.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-01-pwsh-tool-and-executor.md
-2026-08-01-pwsh-tool-and-executor.md: 2b7265f9d323b2803079264950a020408b832ab2
-2026-08-01-pwsh-tool-and-executor.zh.md: 21ab2d326156ba8c06ab1a34a896f4e63d9a7be5
+/agent-note-powershell-executor-and-pwsh-tool:
+  en: 39d13d8e3b09474d
+  zh: ffc9b575c55f2ede
+/agent-note-powershell-executor-and-pwsh-tool/problem:
+  en: c6938d3f7a2a7eab
+  zh: 4311fa7eb5fb592c
+/agent-note-powershell-executor-and-pwsh-tool/decision:
+  en: 38564c06f8ed4abb
+  zh: 675e077c0943f7a7
+/agent-note-powershell-executor-and-pwsh-tool/alternatives-considered:
+  en: 92308ed010e9a190
+  zh: 2321df173699c3c7
+/agent-note-powershell-executor-and-pwsh-tool/consequences:
+  en: a695c057179809d1
+  zh: 793beb09b8b93601

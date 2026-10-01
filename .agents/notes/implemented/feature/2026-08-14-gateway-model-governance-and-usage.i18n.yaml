@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-gateway-model-governance-and-usage.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-gateway-model-governance-and-usage.md
-2026-08-14-gateway-model-governance-and-usage.md: 67b13b00aed968f4c69a0ab50737c5606036fcd3
-2026-08-14-gateway-model-governance-and-usage.zh.md: e2e3eb9bdd5abe30b98e24986be6c67d45a3e733
+/agent-note-gateway-model-governance-and-usage-accounting:
+  en: 9615f71e2a9df8f8
+  zh: 4bf94e13a6af0635
+/agent-note-gateway-model-governance-and-usage-accounting/problem:
+  en: cc14d2cb0d071619
+  zh: 5b583fa5277f46ac
+/agent-note-gateway-model-governance-and-usage-accounting/decision:
+  en: 92736927957f0b2d
+  zh: 2e7a81631141618a
+/agent-note-gateway-model-governance-and-usage-accounting/testing:
+  en: d0a68e2fe9d2c94e
+  zh: 17324c8446bae452
+/agent-note-gateway-model-governance-and-usage-accounting/alternatives-considered:
+  en: d135c0e28aff8ce0
+  zh: 3aee31b8577c8f25
+/agent-note-gateway-model-governance-and-usage-accounting/consequences:
+  en: 2e0ccdffd7fb5352
+  zh: 60b4ea0f9e925d76

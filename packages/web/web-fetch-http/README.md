@@ -1,3 +1,8 @@
+---
+description: "Anonymous public HTTP(S) fetch provider for the DeepSeek Harness web capability seam (ctx.web)"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-web-fetch-http
 
 English | [中文](README.zh.md)
@@ -10,6 +15,19 @@ This is an **implementation** package: it registers a provider into `ctx.web`, i
 
 With `dsh-web-fetch-http`, the harness can fetch public HTTP(S) pages through the web service (`ctx.web`) and get their status code plus bounded, decoded content without sending credentials. Choose it when a composition needs safe retrieval with URL validation, public-address resolution, connection pinning, same-origin redirects, byte and character caps, and an explicit product `User-Agent`. It returns non-2xx responses as results rather than errors, and rejects non-public destinations, binary data, and unsupported content types. The model-facing `web_fetch` tool lives in `dsh-tool-web`, which renders this provider's bodies.
 
+## Table of Contents
+
+- [Responsibility split](#responsibility-split)
+- [Transport hygiene](#transport-hygiene)
+- [Config](#config)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="responsibility-split"></a>
 ## Responsibility split
 
 The provider owns **safe resource retrieval**: URL validation, HTTP transport, redirect policy, a resource-backstop timeout, abort propagation, byte caps, charset decoding, content-type classification, and binary rejection. `@deepseek-ai/dsh-tool-web` owns **presentation** (HTML→markdown, truncation formatting). A non-2xx HTTP response is a *result* (status code + decoded body), not an error; `WebError` is reserved for failures to safely retrieve or represent the resource.
@@ -18,6 +36,7 @@ The provider's `timeoutMs` is a resource backstop for direct `ctx.web.fetch()` c
 
 A shipping web-tool deployment sets the provider backstop above the tool budget, so model calls normally return `TOOL_TIMEOUT`. If the outer deadline reaches the provider first, the provider reports `WEB_ABORTED` and the outer policy replaces it with `TOOL_TIMEOUT`. `WEB_FETCH_TIMEOUT` therefore identifies a direct service caller whose provider budget elapsed.
 
+<a id="transport-hygiene"></a>
 ## Transport hygiene
 
 - Accepts only `http:` and `https:` URLs; rejects credentials in URLs (`WEB_BLOCKED_URL`) and over-long/malformed URLs (`WEB_INVALID_URL`).
@@ -29,6 +48,7 @@ A shipping web-tool deployment sets the provider backstop above the tool budget,
 - Resolves every hostname before connecting and rejects loopback, private, link-local, multicast, and other non-public addresses (`WEB_BLOCKED_URL`). The validated address set is pinned for the request so a DNS rebinding response cannot switch the connection to a private destination.
 - Honors the centralized outbound proxy policy ([`dsh-http-proxy`](../../util/http-proxy/README.md)): `proxyRouteFor(url)` runs before resolution, and a proxied route tunnels through the policy dispatcher with origin DNS resolving proxy-side, so local resolution and pinning are skipped. A non-public IP literal still takes the validated path and is refused rather than handed to the proxy.
 
+<a id="config"></a>
 ## Config
 
 | Key | Default | Meaning |
@@ -42,10 +62,12 @@ A shipping web-tool deployment sets the provider backstop above the tool budget,
 
 The numeric limits are validated at plugin construction: every cap except `maxRedirects` must be a positive finite number, and `maxRedirects` must be a non-negative integer. An invalid value throws rather than silently constructing a provider with nonsensical limits.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Each call performs one bounded anonymous fetch and returns decoded content; no connection or cache state is retained.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through `dsh-tool-web`, which renders this provider's `maxBodyChars`-bounded decoded text or markdown-shaped HTML under its fetch-result wrapper while redirects, headers, and transport limits remain hidden.
@@ -59,3 +81,13 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **Public-network policy is deliberately strict** — destinations that resolve to any non-public address are rejected, and all same-origin redirect hops are resolved and checked again. Deployments that need private services must provide a separate, explicitly reviewed provider rather than weakening this policy.
 - **Only textual content decodes** — html/xhtml and `text/*`-plus-JSON/XML families; a missing `Content-Type` or any binary type throws `WEB_UNSUPPORTED_CONTENT_TYPE`, and text-extractable PDF decoding is named deferred work.
 - **Charset comes only from the `Content-Type` header** (UTF-8 default) — an HTML `<meta charset>` declaration is ignored, and a declared-but-unrecognized charset label throws rather than falling back.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

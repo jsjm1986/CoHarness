@@ -64,7 +64,9 @@ export type {
   RpcRequest, RpcResponse, RpcResult, SessionAssistantStreamBaseline, SessionAssistantStreamFrame,
   SessionDraftId, SessionId, SessionModels, SessionSearchItem,
   SessionSummary, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsWritableReason, SkillEntry, StreamChunk,
-  SubagentAddress, SubagentCatalog, SubagentPromptContentPart, JobView, ToolCallView, ToolEventView, ToolResultView,
+  SubagentAddress, SubagentCatalog, SubagentPromptContentPart,
+  JobView, JobsApi, JobChannel, JobKillValue, JobOutputChunk, JobOutputCoords, JobOutputValue,
+  ToolCallView, ToolEventView, ToolResultView,
   WorkspaceId, WorkspaceView, WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceOfficePreview, WorkspaceFileEntry,
   WorkspaceFileStat, WorkspaceFileTextPage,
 } from '@deepseek-ai/dsh-client-connection/client'

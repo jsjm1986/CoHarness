@@ -57,7 +57,7 @@ describe('web e2e: Workspace history-first entry', () => {
       ...(compact ? { hasTouch: true, isMobile: true } : {}),
     })
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByText('DONE', { exact: true }).waitFor({ timeout: 30_000 })
     await page.getByRole('button', { name: 'Select model, current DeepSeek-V4-Flash', exact: true }).waitFor()
@@ -175,7 +175,7 @@ describe('web e2e: Workspace history-first entry', () => {
     const page = await compactContext.newPage()
     const tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-workspace-history-entry-compact'))
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByText('DONE', { exact: true }).waitFor({ timeout: 30_000 })
     expect(await page.getByText('Into the Unknown', { exact: true }).count()).toBe(0)

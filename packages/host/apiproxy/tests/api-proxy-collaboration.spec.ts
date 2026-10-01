@@ -116,6 +116,7 @@ async function harness(
   ctx.provide('workspaceRegistry', (workspaceRegistry ?? {
     list: () => [],
     archivedSessionIds: [],
+    pinnedSessionIds: [],
   }) as never)
   if (options.directoryPicker !== undefined) {
     ctx.provide('directoryPicker', options.directoryPicker as never)
@@ -520,6 +521,7 @@ describe('project collaboration streams', () => {
       list: () => [...workspaces.values()],
       get: (id: string) => workspaces.get(id),
       archivedSessionIds: [],
+      pinnedSessionIds: [],
     })
     ctx.sessions.create(visibleId)
     ctx.sessions.create(privateId)
@@ -594,6 +596,34 @@ describe('project collaboration streams', () => {
         payload: {
           type: 'host/archived-sessions-changed',
           archivedSessionIds: [visibleId],
+        },
+      },
+    })
+
+    // The pin snapshot carries the same read filtering.
+    const pinned = stream.next()
+    ctx.emit('domain/changed', {
+      domain: 'workspace',
+      table: '',
+      operation: 'put',
+      key: '',
+      value: {
+        initialized: true,
+        workspaceIds: [visibleWorkspace.id],
+        archivedSessionIds: [privateId, visibleId],
+        pinnedSessionIds: [privateId, visibleId],
+      },
+    })
+    let pinnedFrame = await pinned
+    while (pinnedFrame.done === false && pinnedFrame.value.payload.type !== 'host/pinned-sessions-changed') {
+      pinnedFrame = await stream.next()
+    }
+    expect(pinnedFrame).toMatchObject({
+      done: false,
+      value: {
+        payload: {
+          type: 'host/pinned-sessions-changed',
+          pinnedSessionIds: [visibleId],
         },
       },
     })
@@ -864,6 +894,7 @@ describe('project collaboration read ACL', () => {
     const { ctx, api } = await harness(base, {
       list: () => [workspace],
       archivedSessionIds: [childId, privateId],
+      pinnedSessionIds: [privateId, childId],
     })
     const root = ctx.sessions.create(rootId, { meta: { cwd: PROJECT_DIR } })
     ctx.sessions.create(childId, { meta: { cwd: PROJECT_DIR, parentSession: rootId } })
@@ -893,6 +924,7 @@ describe('project collaboration read ACL', () => {
     expect(expectOk(await api.workspace.list(request({})))).toMatchObject({
       items: [{ workspaceId: 'workspace-1', sessionIds: [rootId] }],
       archivedSessionIds: [childId],
+      pinnedSessionIds: [childId],
     })
     expect(expectOk(await api.sessions.search(
       request({ query: 'root' }),
@@ -1057,6 +1089,7 @@ describe('read-write project scope containment', () => {
     const registry = {
       list: () => [inside, outside],
       archivedSessionIds: [],
+      pinnedSessionIds: [],
       resolveByPath: async () => inside,
       create: async () => { throw new Error('unexpected create') },
       get: (workspaceId: string) => workspaceId === inside.id

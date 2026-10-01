@@ -108,7 +108,6 @@ kind: "package-reference"
 
 -----
 
-<a id="model-experience"></a>
 ## 模型体验
 
 ### 间接消费方
@@ -125,6 +124,7 @@ kind: "package-reference"
 
 不会直接失效；请求前缀变更由 `@deepseek-ai/dsh-tool-terminal` 负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -150,3 +150,5 @@ kind: "package-reference"
 - 声明式自动启动功能需要通过尚未发布的 agent 设置组合而成。
 
 </details>
+
+<a id="model-experience"></a>

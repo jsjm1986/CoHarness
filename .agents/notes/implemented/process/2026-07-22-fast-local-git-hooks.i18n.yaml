@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-22-fast-local-git-hooks.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-22-fast-local-git-hooks.md
-2026-07-22-fast-local-git-hooks.md: ad187c5cfd021ca76ad5f569a17fb12c82dcf4e7
-2026-07-22-fast-local-git-hooks.zh.md: f38de6cc80c0f1ad853f8607ffae21ea22271093
+/agent-note-fast-local-git-hooks:
+  en: 738698be98f442c4
+  zh: 88ce548a00466a8f
+/agent-note-fast-local-git-hooks/problem:
+  en: 3c13a51a10190c83
+  zh: 8df1386fbb750d7e
+/agent-note-fast-local-git-hooks/decision:
+  en: c27a613bd2141788
+  zh: 54892e39272a19c6
+/agent-note-fast-local-git-hooks/supersedes:
+  en: bbb9266f3bcc5d01
+  zh: 33a8347a2ea24dd9
+/agent-note-fast-local-git-hooks/alternatives-considered:
+  en: 15d63bbd6ef1e430
+  zh: f98a1277416e6950
+/agent-note-fast-local-git-hooks/consequences:
+  en: eb9fb6b3defeea28
+  zh: 93d73624093ff2f7

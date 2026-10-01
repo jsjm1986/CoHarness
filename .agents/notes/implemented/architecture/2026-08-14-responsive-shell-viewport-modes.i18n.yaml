@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-responsive-shell-viewport-modes.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-responsive-shell-viewport-modes.md
-2026-08-14-responsive-shell-viewport-modes.md: f3095f7f22fdb05ec7cceee400e0198dc5e23f8d
-2026-08-14-responsive-shell-viewport-modes.zh.md: 6a11885d444c43bac95b3807d06f1258651eb841
+/agent-note-responsive-shell-viewport-modes-and-metric-tokens:
+  en: 6f08a2979aae8b98
+  zh: 0b27d6f295bda779
+/agent-note-responsive-shell-viewport-modes-and-metric-tokens/problem:
+  en: eb9d483effc81247
+  zh: e8ff4b8fe2491680
+/agent-note-responsive-shell-viewport-modes-and-metric-tokens/decision:
+  en: d8d6d6523fd4b0c7
+  zh: 4474bd052f150e43
+/agent-note-responsive-shell-viewport-modes-and-metric-tokens/alternatives-considered:
+  en: 731a57507aac1562
+  zh: 1ddecaa2738afbe8
+/agent-note-responsive-shell-viewport-modes-and-metric-tokens/consequences:
+  en: 523502801747d319
+  zh: 203d9357d0c97099
+/agent-note-responsive-shell-viewport-modes-and-metric-tokens/testing:
+  en: 907519ad6266471a
+  zh: d17503ba98036143

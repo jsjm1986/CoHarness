@@ -1,3 +1,8 @@
+---
+description: "The services and plugins through which a human collaborates with a running agent — questions, approvals, permission presets, commands. These are **product** packages: real interfaces a person drives."
+kind: "package-group"
+---
+
 # interaction/ — the human-collaboration plane
 
 English | [中文](README.zh.md)

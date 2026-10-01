@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # `@deepseek-ai/dsh-llm-retry`
 
 [English](README.md) | 中文
@@ -32,6 +37,16 @@
 
 挂载 `@deepseek-ai/dsh-llm-retry`，可在持久 agent 步骤边界重试失败的模型请求。提供方的 `retryPolicy` 设置可选择有界的 normal mode 重试或无上限的 always mode 重试；计划的尝试会在退避前写入会话日志，取消后历史仍保持一致。重试会在同一个打开的轮次内重跑失败步骤，而直接 `ctx.llm.stream()` 调用仍只尝试一次。每次重试都会产生另一次提供方请求计费，always mode 会持续到成功、取消或释放。
 
+## 目录
+
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 模型请求恢复
@@ -48,6 +63,7 @@
 
 重建的请求保留此前前缀，有资格按该提供方规则复用提供方缓存。非表层重试事件不改变缓存标识。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **agent 轮次是唯一重试边界**：直接 `ctx.llm.stream()` 消费方仍只尝试一次，因为原始流无法持久地区分各次尝试已经发出的分片。
@@ -55,3 +71,13 @@
 - **有限插件预算可叠加**：normal mode 只统计已配置 code 和确切提供方策略，上下文溢出压缩（compaction）则拥有独立预算。任何重叠策略都必须定义注册顺序行为。
 - **恢复策略按 waterfall 顺序组合**：always mode 会先接受下游重试，再应用自己的回退。后续策略如果忽略取消且永不结算，也会阻止回退、轮次完全停稳和插件 dispose 完成。
 - **`llm/retry` 记录调度，不是完成**：后续步骤与轮次事件用于确立成功、耗尽或取消。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

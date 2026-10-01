@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/typert/loader/README.md
-README.md: 82bd3ad7c6e4b5cb1e23d0066a7401dc31538ac8
-README.zh.md: 37d4151900359dfeaa109b4faa95bd753b1a56e7
+/:
+  en: f3a2507c14c39ab5
+  zh: 61495d48365178df
+/deepseek-ai-dsh-typert-loader:
+  en: c2f2f9e63601521c
+  zh: 865a771922f0002b
+/deepseek-ai-dsh-typert-loader/summary:
+  en: be19cf069f29d225
+  zh: d2e50148ebe20bcc
+/deepseek-ai-dsh-typert-loader/table-of-contents:
+  en: b59e55619aaa595f
+  zh: a35cee05e12c8f29
+/deepseek-ai-dsh-typert-loader/invariants:
+  en: eed648ed7431bf21
+  zh: eac4494cb15bb4f9
+/deepseek-ai-dsh-typert-loader/model-experience:
+  en: d3555a846d0b19a6
+  zh: eb4815fbd81a3561
+/deepseek-ai-dsh-typert-loader/model-experience/kv-cache-effect:
+  en: f8a0ad3d0fc0eb32
+  zh: 7c3837e620b4d0d3
+/deepseek-ai-dsh-typert-loader/known-limitations-and-deferred-work:
+  en: fd2d78865bc346d6
+  zh: 020f1f819212e2bf
+/deepseek-ai-dsh-typert-loader/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

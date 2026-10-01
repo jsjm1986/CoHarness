@@ -56,6 +56,9 @@ kind: "package-reference"
 
 普通 Web profile 已经拥有 `ctx.webServer`。把另一个 `dsh-host-webserver` 和此适配器挂载到仅隔离 `webServer` 的 group 内；适配器仍会继承凭据与 `webhookRuntime`。[Webhook 子系统参考](../../../docs/subsystems/webhook.zh.md)区分此可选本机监听器与受管 Gateway 接收。交付的 profile 不启用此路由。
 
+
+**运行时不变式：** 不发布伴生入口。authentication 与 input validation 在对应 HTTP 操作中完成；route/disposer 对称性由 `dsh-host-webserver` 负责。
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -65,6 +68,7 @@ kind: "package-reference"
 
 相互独立。身份验证与 HTTP 分发不触碰模型请求；任何新会话前缀都属于消费它的规则与运行时。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -73,7 +77,6 @@ kind: "package-reference"
 - **仅通用 payload 验证**：规则负责验证自己消费的 GitHub 事件字段。
 - **不向提供方确认下游工作**：`202` 先于任意规则调用与会话创建。
 - **不支持表单编码**：GitHub 必须发送 `application/json`；`application/x-www-form-urlencoded` 会被拒绝。
-
 
 <a id="dev-note"></a>
 ### 开发备注
@@ -84,5 +87,3 @@ kind: "package-reference"
 无。
 
 </details>
-
-**运行时不变式：** 不发布伴生入口。authentication 与 input validation 在对应 HTTP 操作中完成；route/disposer 对称性由 `dsh-host-webserver` 负责。

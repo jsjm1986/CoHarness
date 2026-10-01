@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-gateway-runtime-browser-handoff.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-gateway-runtime-browser-handoff.md
-2026-08-25-gateway-runtime-browser-handoff.md: a436b9619e5999cfb54f4e97799305dc283bba2a
-2026-08-25-gateway-runtime-browser-handoff.zh.md: 7580b333698ce54f31798aec3e2e45cce30c0054
+/agent-note-gateway-managed-runtimes-suppress-browser-handoff:
+  en: 90e6deea915f6bd2
+  zh: 4a513f2f647a564a
+/agent-note-gateway-managed-runtimes-suppress-browser-handoff/problem:
+  en: 473985e591ab0c3b
+  zh: cf43d11df4947432
+/agent-note-gateway-managed-runtimes-suppress-browser-handoff/decision:
+  en: a584312cd0399a84
+  zh: 9e6c1e6b58031289
+/agent-note-gateway-managed-runtimes-suppress-browser-handoff/alternatives-considered:
+  en: 3f3e646959404f4c
+  zh: 646d2fad049320bf
+/agent-note-gateway-managed-runtimes-suppress-browser-handoff/consequences:
+  en: 2a8e386a745cc657
+  zh: 775a02f480b7e170
+/agent-note-gateway-managed-runtimes-suppress-browser-handoff/testing:
+  en: 12783e5dc3aa2e43
+  zh: 538582a1d711c4a3

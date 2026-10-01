@@ -6,6 +6,7 @@ export const NS = 'skill'
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
   'row.title': 'Skill',
+  'row.preparing': '准备加载技能',
   'row.running': '正在加载 skill',
   'row.failed': 'skill 加载失败',
   'row.stopped': 'skill 加载已中止',
@@ -20,6 +21,7 @@ export type SkillKey = keyof typeof zh
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
   'row.title': 'Skill',
+  'row.preparing': 'Preparing to load a skill',
   'row.running': 'Loading skill',
   'row.failed': 'Skill load failed',
   'row.stopped': 'Skill load stopped',

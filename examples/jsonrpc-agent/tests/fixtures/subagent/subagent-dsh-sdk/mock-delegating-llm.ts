@@ -25,12 +25,11 @@ class MockDelegatingAdapter extends LlmAdapter {
   }
 
   async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    const toolResultText = options.messages.at(-1)?.content
-      .filter(block => block.type === 'tool-result')
-      .flatMap(block => block.content)
+    const last = options.messages.at(-1)
+    const toolResultText = last?.role !== 'tool' ? '' : last.content
       .filter(block => block.type === 'text')
       .map(block => block.text)
-      .join('') ?? ''
+      .join('')
 
     if (toolResultText.length === 0) {
       const selectedRoute = process.env.DSH_TEST_CHILD_DEFAULT_ROUTE === '1'

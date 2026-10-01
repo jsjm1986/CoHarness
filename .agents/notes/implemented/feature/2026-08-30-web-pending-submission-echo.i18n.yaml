@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-30-web-pending-submission-echo.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-30-web-pending-submission-echo.md
-2026-08-30-web-pending-submission-echo.md: d415f80932afe2ef50716ab1447ebbabee9015e3
-2026-08-30-web-pending-submission-echo.zh.md: 5524ff940b65fba083fa80685e61368d46b50ccf
+/agent-note-web-pending-submission-echoes-converge-by-request-identity:
+  en: 58c20a3e86da97b6
+  zh: 0e61e11bd332cfaa
+/agent-note-web-pending-submission-echoes-converge-by-request-identity/problem:
+  en: a718e8dfc2a5537c
+  zh: 350ccef02c1c9f3b
+/agent-note-web-pending-submission-echoes-converge-by-request-identity/decision:
+  en: 7a0d20ab52b55986
+  zh: 00318e62a9591168
+/agent-note-web-pending-submission-echoes-converge-by-request-identity/verification:
+  en: 9c4b72a2ea3e7368
+  zh: fb97b7956bf5f076
+/agent-note-web-pending-submission-echoes-converge-by-request-identity/alternatives-considered:
+  en: 18cf26cd0868fe0b
+  zh: 86c25b1fd16c4435
+/agent-note-web-pending-submission-echoes-converge-by-request-identity/consequences:
+  en: 5ae729ec531f1095
+  zh: 78d8013637950f2d

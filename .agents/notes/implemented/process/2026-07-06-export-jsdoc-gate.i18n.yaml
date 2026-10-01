@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-06-export-jsdoc-gate.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-06-export-jsdoc-gate.md
-2026-07-06-export-jsdoc-gate.md: 5f594cf279c07c41a96a124f1d25dbf880543718
-2026-07-06-export-jsdoc-gate.zh.md: a45c7909008a50764e5d73f6ae5943a7850e0573
+/agent-note-export-jsdoc-gate:
+  en: f6e098c4938b3b2c
+  zh: d0179571b4c58dc1
+/agent-note-export-jsdoc-gate/problem:
+  en: 5adbb97ec51311f4
+  zh: 7c8b9e64e9cf2acc
+/agent-note-export-jsdoc-gate/decision:
+  en: 8bb15cabaa7738d6
+  zh: c38ae1f6f2c6605f
+/agent-note-export-jsdoc-gate/alternatives-considered:
+  en: a5b2cc307be68dbb
+  zh: 27adf13b8fe196fb
+/agent-note-export-jsdoc-gate/consequences:
+  en: 0494364bd88d565c
+  zh: ef15bb856b5ad264

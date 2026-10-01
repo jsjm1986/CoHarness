@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-01-web-elevation-stroke-shadows.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-01-web-elevation-stroke-shadows.md
-2026-09-01-web-elevation-stroke-shadows.md: 2bc3105203b63c87aaf39e3d68780650b163dcca
-2026-09-01-web-elevation-stroke-shadows.zh.md: bda3ee27af03d20937253fa23968afd0cd7d39c7
+/agent-note-web-elevation-hairline-stroke-drawn-in-shadow:
+  en: 9f747a913695101c
+  zh: 7cc5d51a7e0e5da6
+/agent-note-web-elevation-hairline-stroke-drawn-in-shadow/problem:
+  en: 6668f36bf031e853
+  zh: 28893d535034d6d8
+/agent-note-web-elevation-hairline-stroke-drawn-in-shadow/decision:
+  en: 1fa7a025395c61e1
+  zh: 85c6244b856c8f0f
+/agent-note-web-elevation-hairline-stroke-drawn-in-shadow/alternatives-considered:
+  en: b07eae0623551064
+  zh: dacaca9d28f58420
+/agent-note-web-elevation-hairline-stroke-drawn-in-shadow/consequences:
+  en: ff61d4bc87330b6e
+  zh: cf4598f62bdea9f2

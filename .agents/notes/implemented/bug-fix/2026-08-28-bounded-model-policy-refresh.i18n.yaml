@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-28-bounded-model-policy-refresh.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-28-bounded-model-policy-refresh.md
-2026-08-28-bounded-model-policy-refresh.md: 90e1b668ea1e875bf961223ef02a40ee95d8424a
-2026-08-28-bounded-model-policy-refresh.zh.md: 04dcbb78149eb4346d2b6081409d3f11b5b3c18a
+/agent-note-bound-bulk-model-policy-refreshes:
+  en: ee47d527b8f49f1c
+  zh: b8ba88c222fa8249
+/agent-note-bound-bulk-model-policy-refreshes/problem:
+  en: 11d31a4bef3345ac
+  zh: 863ad2d36e7694b4
+/agent-note-bound-bulk-model-policy-refreshes/decision:
+  en: c9d9c40b986b34a6
+  zh: ce2b35d89d1140dd
+/agent-note-bound-bulk-model-policy-refreshes/alternatives-considered:
+  en: 3d32d75c8194b745
+  zh: d4e0b57916297d44
+/agent-note-bound-bulk-model-policy-refreshes/consequences:
+  en: b0be79bbed13e2c4
+  zh: 49aece94b7d34932
+/agent-note-bound-bulk-model-policy-refreshes/verification:
+  en: 83833e03a9ffaf58
+  zh: e544c68a694e9dcf

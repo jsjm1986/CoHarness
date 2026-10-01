@@ -5,6 +5,8 @@
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type {} from '@deepseek-ai/dsh-session/types'
+// Type-only: the Workspace registry's archive-admission family map this package merges `schedule` into.
+import type {} from '@deepseek-ai/dsh-workspace/types'
 
 /** Stable reminder identity that is unique and never reused within one session. */
 export type ScheduleId = Branded<'ScheduleId'>
@@ -217,5 +219,12 @@ declare module '@deepseek-ai/dsh-session/types' {
      * session-local transition stream before accepting a candidate event.
      */
     'schedule/change': ScheduleChange
+  }
+}
+
+declare module '@deepseek-ai/dsh-workspace/types' {
+  interface SessionActivityKindMap {
+    /** An active reminder is armed on this session's live root Agent. */
+    schedule: true
   }
 }

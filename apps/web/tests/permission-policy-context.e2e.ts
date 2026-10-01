@@ -34,8 +34,7 @@ const PRESET_LABELS = ['Read Only', 'Full access', 'Workspace Write'] as const
 function runtimeContexts(events: readonly SessionEvent[]): string[] {
   return events.flatMap((event) => {
     if (event.type !== 'user/message'
-      || event.data.source.kind !== 'plugin'
-      || event.data.source.plugin !== '@deepseek-ai/dsh-system-prompt') return []
+      || event.data.source.kind !== 'runtime-context') return []
     return event.data.content.flatMap(block => block.type === 'text' ? [block.text] : [])
   })
 }
@@ -71,7 +70,7 @@ describe('web e2e: current sandbox policy reaches the model before tools', () =>
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
   }, 120_000)

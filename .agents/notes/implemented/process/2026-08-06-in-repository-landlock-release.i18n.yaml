@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-in-repository-landlock-release.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-06-in-repository-landlock-release.md
-2026-08-06-in-repository-landlock-release.md: 82b21cc0c30338ad11583797f011794b8dbcc90c
-2026-08-06-in-repository-landlock-release.zh.md: 554967fbce454fc9a45b54d735f485006f9dee51
+/agent-note-in-repository-landlock-release:
+  en: 4376b58c8e9f8073
+  zh: aa453cc7060dd935
+/agent-note-in-repository-landlock-release/problem:
+  en: e5ec75942af555d7
+  zh: 42ea79d430d08472
+/agent-note-in-repository-landlock-release/decision:
+  en: dfb680a997c93895
+  zh: c9ef290d7fea125b
+/agent-note-in-repository-landlock-release/alternatives-considered:
+  en: e018e1e934c95eec
+  zh: e2234990997c364e
+/agent-note-in-repository-landlock-release/consequences:
+  en: 65aa310ce5d23487
+  zh: b91c04833456577c

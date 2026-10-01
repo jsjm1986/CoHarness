@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-26-ci-failover-runbook.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-26-ci-failover-runbook.md
-2026-07-26-ci-failover-runbook.md: c39cd262b5aaa71294d2d7a27b6ebb0646bc589e
-2026-07-26-ci-failover-runbook.zh.md: edf07a43520ec7fb0f678e8512a25f222b4827e9
+/agent-note-ci-failover-runbook-hosted-pools-in-house-pool:
+  en: 677b522817e84e2f
+  zh: f8518a7033b0fd54
+/agent-note-ci-failover-runbook-hosted-pools-in-house-pool/problem:
+  en: 326b1014d9d09137
+  zh: 02b37a8a65136a92
+/agent-note-ci-failover-runbook-hosted-pools-in-house-pool/decision:
+  en: f8b6ea72f4f08a4b
+  zh: 727d1297e1c1741b
+/agent-note-ci-failover-runbook-hosted-pools-in-house-pool/decision/what-the-in-house-pool-is:
+  en: a73518bd612a280f
+  zh: c601f06775e63cab
+/agent-note-ci-failover-runbook-hosted-pools-in-house-pool/decision/what-the-in-house-pool-is/windows-pool:
+  en: aee2015925c76128
+  zh: f4c1ce294ba3ec58
+/agent-note-ci-failover-runbook-hosted-pools-in-house-pool/decision/switch-any-repository-writer-1-minute-no-merge:
+  en: d2429760a98cde20
+  zh: 28125ef4177bdc46
+/agent-note-ci-failover-runbook-hosted-pools-in-house-pool/capacity-during-failover:
+  en: 7f29af77fa9e307a
+  zh: c80b106f75b6d235
+/agent-note-ci-failover-runbook-hosted-pools-in-house-pool/capacity-during-failover/switch-back:
+  en: 4eeb170484efbad0
+  zh: 335d77a5b19a65d3
+/agent-note-ci-failover-runbook-hosted-pools-in-house-pool/capacity-during-failover/trust-boundary:
+  en: becf55bac84c7d52
+  zh: 808559f141e15c39
+/agent-note-ci-failover-runbook-hosted-pools-in-house-pool/alternatives-considered:
+  en: e6bc6d1b5aeabaa4
+  zh: e96c888c658a9a10
+/agent-note-ci-failover-runbook-hosted-pools-in-house-pool/consequences:
+  en: 87abf0a91ebfe2c8
+  zh: 787149de43f4cb03

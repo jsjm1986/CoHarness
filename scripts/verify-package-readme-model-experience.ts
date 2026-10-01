@@ -36,6 +36,8 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
   'packages/util/http-proxy': 'Transport policy only: it changes how bytes reach the network and registers no prompt, schema, or result text.',
   'packages/util/launch-environment': 'The package only resolves host environment values; model-facing consumers own any rendered use.',
   'packages/util/values': 'The package only validates, snapshots, compares, freezes, or rejects caller-owned values; consumers own every model-facing use.',
+  'packages/util/code-language': 'The package only maps a filename suffix to a syntax-highlighting language id; the read consumer owns the persisted hint.',
+  'packages/util/workspace-path': 'The package only formats Workspace paths for browser UI; it never constructs model input.',
 }
 
 /**
@@ -76,7 +78,6 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/ptc-runtime/ptc-runtime-node': { kind: 'indirect', reason: 'The worker backend delegates model rendering to PTC in dsh-tools.' },
   'packages/experimental/ptc-runtime-python': { kind: 'indirect', reason: 'The experimental CPython subprocess backend delegates model rendering to PTC in dsh-tools.' },
   'packages/experimental/browser-use-runtime': { kind: 'indirect', reason: 'Browser providers call the library to own resources and expose upstream MCP tools.' },
-  'packages/experimental/agent-team-web-profile': { kind: 'indirect', reason: 'The Web bundle only mounts the Team UI; the Host-side Agent Teams profile owns the model-facing Team tools.' },
   'packages/experimental/client-ui-agent-team': { kind: 'none', reason: 'The browser roster and task controls register no model-facing input; Team tools live in the Host-side package.' },
   'packages/browser-use/browser-use': { kind: 'none', reason: 'The registry only reserves a provider name; providers own browser tools and Session resources.' },
   'packages/computer-use/computer-use': { kind: 'none', reason: 'The registry only reserves provider names; providers own all model-facing tools and guidance.' },
@@ -97,6 +98,9 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/api/remotes': { kind: 'none', reason: 'The Remote BFF selects business methods and identity policy; selected services own any model-visible effect.' },
   'packages/client/runtime': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-workbench': { kind: 'none', reason: 'Browser-only pane controls; the existing conversation submission path owns all model-visible content.' },
+  'packages/client/shortcuts': { kind: 'none', reason: 'Browser-side keyboard command routing registers no prompt, schema, or result text.' },
+  'packages/client/ui-shortcuts': { kind: 'none', reason: 'Browser-side shortcut settings UI registers nothing model-facing.' },
+  'packages/test-support/remote-mock': { kind: 'none', reason: 'Test-side wire mock; none of its traffic enters a model request.' },
   'packages/client/ui-layout': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-sidebar': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-brand-official': { kind: 'none', reason: 'Browser-side presentation occupants; registers nothing model-facing.' },
@@ -104,8 +108,8 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-message-feedback': { kind: 'none', reason: 'Browser controls over message-feedback sidecars and log-only Session remarks; neither enters model context.' },
   'packages/client/ui-tool': { kind: 'none', reason: 'Browser-side Tool presentation layer; renders logged calls without changing model context.' },
   'packages/client/ui-jobs': { kind: 'none', reason: 'Browser-side read-only projection of ctx.jobs records; dsh-tool-jobs owns the model-facing behavior.' },
+  'packages/client/ui-schedule': { kind: 'none', reason: 'Browser-side catalog, editing, and deletion of Host Schedule records; dsh-schedule owns the model-facing tools and delivery.' },
   'packages/client/ui-workflow-run': { kind: 'none', reason: 'Browser-side UI plugin layer; renders durable workflow records without changing model context.' },
-  'packages/client/ui-schedule': { kind: 'none', reason: 'Browser-side read-only projection of active Schedule records; dsh-schedule owns the model-facing tools and delivery.' },
   'packages/client/ui-input-trigger': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-reference': { kind: 'indirect', reason: 'Browser-side reference selection delegates file guidance and session snapshot preparation to Host-owned providers.' },
   'packages/client/ui-commands': { kind: 'indirect', reason: 'The dispatch paths trigger the host command.execute RPC; each command handler\'s host package owns any model-visible effect.' },

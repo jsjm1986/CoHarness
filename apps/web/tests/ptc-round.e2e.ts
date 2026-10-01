@@ -46,7 +46,7 @@ describe('web e2e: PTC round renders nested sub-calls', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     // Fresh world: connect a Workspace so the composer scenarios start live.
     await connectFreshWorkspace(page, scaffold.workspaceCwd)

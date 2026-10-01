@@ -53,7 +53,7 @@ it('marks explicit unknown authority and leaves verified or plugin input unchang
   }), { surfaceOp: 'append' })
   expect(projection.apply(initial, verified)).toBe(initial)
   const context = session.append('user/message', createUserMessage({
-    content: [{ type: 'text', text: 'trusted context' }], source: { kind: 'plugin', plugin: 'context', form: 'instructions' },
+    content: [{ type: 'text', text: 'trusted context' }], source: { kind: 'agent-instructions', form: 'instructions', changes: [] },
   }), { surfaceOp: 'append' })
   expect(projection.apply(initial, context)).toBe(initial)
   const unknownState = session.append('gateway/execution', { kind: 'accepted', state: { ...accepted, unverifiedHistory: true } })

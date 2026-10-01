@@ -1,3 +1,8 @@
+---
+description: "Storage hub (ctx.storage): named backend registry plus mounted data-form facilities for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-storage
 
 English | [中文](README.zh.md)
@@ -8,16 +13,29 @@ Storage hub (`ctx.storage`) for non-session data: a named backend registry plus 
 
 Use `dsh-storage` to keep typed application data durable without adding it to session history. Mount it with a supported storage medium and domain configuration, then callers can access records through the public `ctx.storageDomain` API. Choose it for workspace records, session sidecars, or other application state that must survive restarts without becoming session events. It is available only to host code and has no model-visible effect; compositions that do not need such data can omit it.
 
+## Table of Contents
+
+- [Shape](#shape)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="shape"></a>
 ## Shape
 
 - `ctx.storage.backend` — name → backend table. Multiple backends stay mounted side by side (`json`, `sqlite`); which backend serves a consumer is that consumer's configuration (the domain layer's route table), never a hub-global choice. `register()` returns the disposer; duplicate names and unknown lookups fail loud.
 - `ctx.storage.mount(form, facility)` / `ctx.storage.form(form)` — data-form mounting. `StorageForms` is merge-extensible; the domain layer merges `domain` and is reached as `ctx.storage.domain`.
 - A backend owns one medium and exposes the data-shape facets it supports. `kv` is the current facet; `src/backend.ts` owns its exact contract.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The hub is a named registry of backends and mounted data forms; it performs no IO and owns no records.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Backend and form registrations
@@ -38,3 +56,13 @@ Independent of live requests: the hub never touches a request prefix, so it cann
 
 - **`kv` is the only data shape** — backends currently have one facet to implement.
 - **Forms resolve lazily** — reading `ctx.storage.domain` before the domain plugin mounts throws `form-not-mounted`; assemblies order plugins accordingly (misconfiguration fails loud rather than silently deferring).
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

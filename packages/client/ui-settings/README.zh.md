@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings
 
 [English](README.md) | 中文
@@ -11,14 +16,28 @@
 
 本包使 Web 客户端功能能够公开由宿主设置文档支持的可编辑偏好设置，而无需自行实现传输或 schema 处理。每项功能都可按命名空间读写、原子更新多个字段、校验 schema，并避免静默覆盖并发更改。它还为设置界面框架、页面、标题栏操作、插件标签页和引导流程提供标准扩展点，但自身不渲染任何界面。任何持有偏好设置的功能都可在不依赖呈现包的情况下使用它；设置外壳由单独的包提供。
 
+## 目录
+
+- [写入权限](#write-authority)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="write-authority"></a>
 ## 写入权限
 
 项目空间的镜像会暴露当前有效值以及每个 namespace 的所有权元数据。标记为 `projectWrite: manager` 的 namespace 可由项目 owner 或组织管理员写入；其他项目 namespace 会以 `writable: false` 和对应所有者的 `writableReason` 标记只读，设置提供方只读时使用 `provider`。语言、主题、忙碌 Enter、对话宽度和字号等账户级 scope 即使处于项目空间，也会使用账户偏好 transport；只有账户路由明确不支持时才回退到 Host。scope 在首次视图仍处于 loading 或当前权限只读时拒绝 mutation，因此这些状态不会产生任何 mutation RPC。每次接受的写入会发布 `saving`，成功应答折入共享镜像；最新写入被拒绝或失败后先恢复再记录 `error`。功能行渲染这些状态，不会持久化被阻止的选择。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。schema 服务对 Host 拥有的文档执行水合与校验，scope 传输层转发各 namespace 分节；该层不拥有偏好值。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。
@@ -27,7 +46,18 @@
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **失败或被拒绝的 settings.describe 保持 unavailable**：binder 一律使用 Host 持久化；`settings.describe` 抛错或非 ok 会发布 `unavailable`，插件卡片隐藏而不是停在 `loading`。Host 特权方法栅栏仍要求回环 `Host` 头；网关把 `Host`/`Origin` 改写成实例回环后，公网页才能成功。`settings.openDocument` 仍只在 loopback 页面出现，因为它打开的是宿主桌面上的文件。
 - **原子写入仅限 Host**：账户偏好 scope 保留标量 transport。Host `mutate` 共用命名空间队列，校验或 revision 失败会拒绝整个 mutation；不同命名空间使用独立事务。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-request-image-payload-bound.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-request-image-payload-bound.md
-2026-08-18-request-image-payload-bound.md: 0ec4594888db6157fb8cfd3e7bdb231b842d53c1
-2026-08-18-request-image-payload-bound.zh.md: 7cdf6bb768251cb792b6d590fafa094646e77ada
+/agent-note-request-level-image-payload-bound:
+  en: c01638abfb789407
+  zh: 40702374aec12585
+/agent-note-request-level-image-payload-bound/problem:
+  en: 69af7a8f4fb3e7bc
+  zh: f6b7ad07eb88f5fe
+/agent-note-request-level-image-payload-bound/decision:
+  en: 639b496b28c6f69e
+  zh: 35c7b541a29d0c88
+/agent-note-request-level-image-payload-bound/offload-is-conversion-not-history:
+  en: d2ec242be6349eac
+  zh: c4334c405a2f9e1f
+/agent-note-request-level-image-payload-bound/alternatives-considered:
+  en: c97c2164b4922e43
+  zh: 35072f3e04445ff7
+/agent-note-request-level-image-payload-bound/related:
+  en: e7883d6981f0e4ad
+  zh: 55546943862619e2
+/agent-note-request-level-image-payload-bound/consequences:
+  en: a00b3bb6c1dad005
+  zh: 480a77fac9501150

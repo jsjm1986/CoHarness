@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-25-workspace-ui-product-flow.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.md
-2026-07-25-workspace-ui-product-flow.md: 9053d7a9911d36537c0b5c7e0efd9508e4cda932
-2026-07-25-workspace-ui-product-flow.zh.md: ecf34822d50dfd01363e56089375076428b68172
+/agent-note-workspace-ui-complete-product-flow:
+  en: e80ce264d0f70943
+  zh: 528e4338b8b93357
+/agent-note-workspace-ui-complete-product-flow/problem:
+  en: 388a775a4ad2ee06
+  zh: 0397c0431deaa713
+/agent-note-workspace-ui-complete-product-flow/decision:
+  en: a15c7c13f167e5ac
+  zh: a15c7c13f167e5ac
+/agent-note-workspace-ui-complete-product-flow/decision/host-and-persistent-data:
+  en: 38c5be86d15a9adc
+  zh: 46f9ef5dc41f2356
+/agent-note-workspace-ui-complete-product-flow/decision/client-object-model:
+  en: 8b5196b83fbcbab9
+  zh: 3cf19274c3cdb1c3
+/agent-note-workspace-ui-complete-product-flow/decision/user-flow:
+  en: 7443317ccd2886eb
+  zh: 6ab5523793dde7ac
+/agent-note-workspace-ui-complete-product-flow/decision/first-send-and-recovery:
+  en: ae05e8dacf4aa1b0
+  zh: 2e26c74b55c92b9c
+/agent-note-workspace-ui-complete-product-flow/decision/sidebar-and-ordering:
+  en: 8b4d314dee1f693d
+  zh: 3e16412e0da27ed4
+/agent-note-workspace-ui-complete-product-flow/decision/react-and-slot-boundaries:
+  en: 723fc673e2d7aeea
+  zh: 599713db140e1215
+/agent-note-workspace-ui-complete-product-flow/alternatives-considered:
+  en: eaf8485c6abd23fc
+  zh: 9b103098b3e0a97e
+/agent-note-workspace-ui-complete-product-flow/verification:
+  en: 80ea07bdbdccc666
+  zh: 167c5474ca633eb8
+/agent-note-workspace-ui-complete-product-flow/consequences:
+  en: d0addca866b533ec
+  zh: 892dcaae81dcdd1f

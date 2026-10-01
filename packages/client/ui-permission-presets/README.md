@@ -1,3 +1,8 @@
+---
+description: "Permission surfaces: a new-session default in General settings and a current-session /permission popup over the permissions projection"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-permission-presets
 
 English | [中文](README.zh.md)
@@ -12,6 +17,18 @@ The `/client` exports are the plugin body (`apply`/`inject`).
 
 Choose permission presets for the current Web session or future sessions. General settings changes only the future default; the composer and `/permission` pickers switch the current session. Default Web offers Read Only, Workspace Write, and Full access. Explicitly loading the experimental Auto integration adds Auto review with an `EXP` badge to current-session pickers. Visible Full access and Auto selections require their own risk acknowledgement; a complete `/permission <preset>` command executes directly. The host confirms each change through the Session projection.
 
+## Table of Contents
+
+- [Account qualifications](#account-qualifications)
+- [Desktop confirmation](#desktop-confirmation)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="account-qualifications"></a>
 ## Account qualifications
 
 The current-session controls and General default row combine the existing account-context qualification with the owning connection's `host.describe.executionAuthorityRequired` flag. Only explicit `false` means independent local operation; missing Host facts, account refresh, failed verification, or disconnection leave Full and Auto unavailable. Managed accounts need administrator qualification for Full and explicit Auto eligibility for Auto. The Host catalog remains unchanged.
@@ -20,14 +37,17 @@ Unavailable choices retain their explanation. A selected but unavailable Auto mo
 
 Auto is a per-session opt-in and is absent from the new-session default schema. The default controller additionally refuses Auto and ignores it in stale or embedded option tables. Browser qualification is presentation and admission feedback; the Host and Gateway enforce the actual authorization.
 
+<a id="desktop-confirmation"></a>
 ## Desktop confirmation
 
 The managed Session composer opens a personal desktop confirmation dialog through its own runtime connection. It displays the live root Session, node, desktop and account before saving. Confirmation covers that root's live descendants, not another root or historical forks; every participant confirms separately. The server owns current qualification and rejects stale targets. Disconnects and Session changes discard pending responses, and a failed save requires a fresh status read. Confirming or withdrawing does not start a model turn. Full access, Auto and tool approval cannot provide this confirmation.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The row binds one Host-owned Settings descriptor and preset data stays in the host permission domain; nothing package-owned persists to compare.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the permission facts its two surfaces write: the Settings row causes a future session to start with whole-value knob events, while the `/permission` picker appends the selected current-session preset. Sandbox and approval consumers resolve their own knob events; selecting `auto` additionally activates the host Auto integration's independent per-call reviewer.
@@ -39,3 +59,13 @@ No direct invalidation; the knob consumers own any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 - **The Settings row is Web-only** — non-Web clients may still switch the current session through `/permission`, but do not receive this browser contribution.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

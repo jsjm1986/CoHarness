@@ -41,7 +41,7 @@ async function seedInterruptedSession(root: string, cwd: string): Promise<string
       data: {
         turn: 1,
         step: 1,
-        message: createSystemMessage('Seeded system prompt.', '@deepseek-ai/dsh-system-prompt'),
+        message: createSystemMessage('Seeded system prompt.'),
       },
       surfaceOp: 'append',
     },

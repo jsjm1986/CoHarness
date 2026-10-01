@@ -273,7 +273,7 @@ const listState = (overrides: Partial<SessionListState> = {}): SessionListState 
   current: PARENT_ID,
   phase: 'ready',
   subagentsByParent: {},
-  jobsBySession: {},
+  jobsBySession: {}, observedJobs: {},
   currentAddress: undefined,
   ...overrides,
 })

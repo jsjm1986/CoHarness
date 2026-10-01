@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-04-declaring-a-provider-from-the-models-page.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-04-declaring-a-provider-from-the-models-page.md
-2026-08-04-declaring-a-provider-from-the-models-page.md: ad4c6695b2caabd7270694bdbb6e5b3d24c50081
-2026-08-04-declaring-a-provider-from-the-models-page.zh.md: 2ca26e4b601b51b34598b8ce8bb59f31f83b58a2
+/agent-note-declaring-a-provider-from-the-models-page:
+  en: f479577e0553744d
+  zh: 8254a463da8fde17
+/agent-note-declaring-a-provider-from-the-models-page/problem:
+  en: ab82420bf72b5823
+  zh: b1ca5aa6e75b7d52
+/agent-note-declaring-a-provider-from-the-models-page/decision:
+  en: bfa1e7954ce4c979
+  zh: fdc5769677b41f14
+/agent-note-declaring-a-provider-from-the-models-page/alternatives-considered:
+  en: 8cd5158191422016
+  zh: fec4eeded266b17f
+/agent-note-declaring-a-provider-from-the-models-page/consequences:
+  en: e109c13b5d354d8d
+  zh: 0d3ee21668834709
+/agent-note-declaring-a-provider-from-the-models-page/testing:
+  en: dea302fa5290f7ee
+  zh: 5666542e9158380e

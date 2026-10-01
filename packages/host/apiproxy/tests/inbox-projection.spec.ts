@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import { inboxProjectionDefinition as projection } from '../src/inbox-projection.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'test': { kind: 'test' } & ContextFormed
+  }
+}
 
 const header: SessionHeader = { version: SESSION_FORMAT_VERSION, id: SessionId('inbox-projection'), createdAt: 1, isSeeded: false }
 const message = createUserMessage({ content: [{ type: 'text', text: 'queued' }], source: { kind: 'user' } })
@@ -44,7 +51,7 @@ describe('cold inbox projection', () => {
 
 it('retains RPC attribution and separates injected next-step context from human steering', () => {
   const attributed = { ...message, source: { kind: 'user' as const, rpcId: 'receipt' as import('../src/api/rpc.ts').RpcId } }
-  const context = createUserMessage({ content: [{ type: 'text', text: 'context' }], source: { kind: 'plugin', plugin: 'test' } })
+  const context = createUserMessage({ content: [{ type: 'text', text: 'context' }], source: { kind: 'test' } })
   const state = projection.apply(projection.init(header, SessionLogOffset(0)), {
     type: 'agent/inbox/spliced', seq: SessionSeq(0), time: 1,
     data: { target: 'next-step', start: 0, inserted: [attributed, context] },

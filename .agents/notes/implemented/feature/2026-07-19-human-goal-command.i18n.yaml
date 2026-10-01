@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-19-human-goal-command.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-19-human-goal-command.md
-2026-07-19-human-goal-command.md: 7ed104eef1a48879a6e93af707c6ea9d8f97190c
-2026-07-19-human-goal-command.zh.md: 523ac0b6956a7ad7a2428e187b2d0f8f99bd1120
+/agent-note-human-goal-command:
+  en: 11637ac913d1fd7b
+  zh: 4168c3c2ac4f481b
+/agent-note-human-goal-command/problem:
+  en: 09258e0b0dbfe562
+  zh: cf81d8968b1afe50
+/agent-note-human-goal-command/decision:
+  en: 9fca2826748e7c05
+  zh: d4945842810c4e88
+/agent-note-human-goal-command/decision/grammar-and-lifecycle-verbs:
+  en: ca8d2bc3da430a18
+  zh: bed3a900011d68f9
+/agent-note-human-goal-command/decision/output-and-failure-boundary:
+  en: 8a3907cd50be73d5
+  zh: 2361247a4d592bcc
+/agent-note-human-goal-command/decision/app-composition:
+  en: e874b0a369261c6d
+  zh: 434d2a0ec5c88494
+/agent-note-human-goal-command/testing:
+  en: d79bf869b53e1b86
+  zh: ac5755363f53cde0
+/agent-note-human-goal-command/alternatives-considered:
+  en: 3a1301a89926764d
+  zh: 95b88ed3c094e732
+/agent-note-human-goal-command/consequences:
+  en: 6335beb02edad4ca
+  zh: 1c587c0f3070b492
+/agent-note-human-goal-command/known-limitations-and-deferred-work:
+  en: 50bb7a0997463e40
+  zh: dcde48a9bc7f1964

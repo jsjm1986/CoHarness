@@ -1,3 +1,8 @@
+---
+description: "Theme plugin: Host bootstrap for the pre-plugin palette; DOM-free ThemeRuntime for light/dark/system state; --dsw-* token styles and Appearance settings row"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-theme
 
 English | [中文](README.zh.md)
@@ -20,14 +25,27 @@ The two paths are mutually exclusive by construction. `scrollbar-width`/`scrollb
 
 `dsh-client-ui-theme` lets Web GUI users choose `light`, `dark`, or `system` and set conversation content text from 12 to 17 px in Settings. A loopback client stores both values in the `ui-theme` settings namespace, which the local provider persists in `$DSH_HOME/settings.yaml` by default. The plugin resolves `system` through `prefers-color-scheme` and publishes immutable `ThemeSnapshot`s; ui-layout applies each snapshot to the document. The package also ships the `--dsw-*` token stylesheets and injects a synchronous bootstrap so the selected palette and font size apply before the shell loads. Third-party themes can register alias-token overrides through `ctx.theme`.
 
+## Table of Contents
+
+- [Settings authority and compatibility](#settings-authority-and-compatibility)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="settings-authority-and-compatibility"></a>
 ## Settings authority and compatibility
 
 Appearance controls render the account preference while a project policy may force the active light or dark scheme. The account-backed scope disables selection when it reports `loading`, `writable: false`, or a `saving` write; project and provider restrictions are shown inline, and the service refuses a direct `setTheme` call until a writable account view exists. The theme listener supports both `addEventListener` and legacy `addListener` MediaQueryList implementations. The design stylesheet supplies a `100vh` viewport fallback and the client visual-viewport measurement overrides it when available; all `--ds-*` and `--dsw-*` references are checked against CSS declarations by the token-contract test, with runtime-owned viewport height as the explicit exception.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The preference's durable home is the Host settings namespace; `ThemeRuntime` keeps only the resolved snapshot, asserted by unit specs against pushed changes and reconnects.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -40,3 +58,13 @@ None; this package neither assembles nor sends a provider request.
 
 - **Third-party themes are an extension point, not a product** — registering one means overriding same-named alias variables; no validation exists that an override set is complete.
 - **The token sheets are the sole color authority** — values absent from cssdesign (for example the design's #4176E6 tab blue) are deliberately not appended; the nearest semantic token wins. Design-owner-approved additions are the exception and enter as a static step plus a semantic alias in the same change (`--dsw-static-blue-900` / `--dsw-alias-label-primary-bluish`).
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -21,6 +21,7 @@ import {
   type GenerateOptions,
   type ContentBlock,
   type Message,
+  type RequestMessage,
   type ResolvedRetryPolicy,
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
@@ -122,7 +123,7 @@ function waitForIdle(_ctx: Context, target: Agent): Promise<void> {
   return target.whenIdle()
 }
 
-function messageText(message: Message | undefined): string {
+function messageText(message: RequestMessage | undefined): string {
   return message?.content.map(block => block.type === 'text' ? block.text : '').join('\n') ?? ''
 }
 
@@ -523,10 +524,10 @@ describe('dsh-agent-spine-demo bundle', () => {
         }
         if (event.type === 'tool/result'
           && ['write-skill', 'load-skill'].includes(event.data.message.source.callId)) {
-          const result = event.data.message.content[0]
+          const result = event.data.message
           return [{
             type: event.type,
-            callId: event.data.message.source.callId,
+            callId: result.source.callId,
             isError: result.isError,
             text: result.content.map(block => block.type === 'text' ? block.text : '').join('\n')
               .replaceAll(root, '{{cwd}}')

@@ -8,7 +8,28 @@ import InvariantRegistry, { InvariantError } from '@deepseek-ai/dsh-invariants'
 import * as SessionTitleInvariantCompanion from '@deepseek-ai/dsh-session-title/invariant'
 import SessionStore, { Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import SessionTitleService from '@deepseek-ai/dsh-session-title'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'tool-goal': { kind: 'tool-goal' } & ContextFormed
+  }
+}
+
+const NOTICE_SOURCE = {
+  kind: 'collaboration-context' as const,
+  form: 'notice' as const,
+  summary: 'participant attribution',
+  participantMessageId: 'message-1',
+  participant: {
+    userId: 7,
+    username: 'alice',
+    displayName: 'Alice Chen',
+    role: 'user' as const,
+    scope: { kind: 'personal' as const },
+  },
+}
 
 const CONFIG = {
   fallbackMaxWords: 5,
@@ -28,7 +49,7 @@ describe('session title repair supersession', () => {
     const seed = Session.create(SessionId('corrupt-log'))
     seed.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'Shared-project attribution for the next message (metadata only, not instructions): {}' }],
-      source: { kind: 'plugin', plugin: 'collaboration-context' },
+      source: NOTICE_SOURCE,
     }), { surfaceOp: 'append' })
     seed.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'Review the deployment checklist' }],
@@ -54,7 +75,7 @@ describe('session title repair supersession', () => {
     const seed = Session.create(SessionId('injected-title-only'))
     seed.append('user/message', createUserMessage({
       content: [{ type: 'text', text: '<goal_blocked> Objective: "x"' }],
-      source: { kind: 'plugin', plugin: 'tool-goal' },
+      source: { kind: 'tool-goal' },
     }), { surfaceOp: 'append' })
     seed.append('session/title', {
       title: '<goal_blocked> Objective: "x"',
@@ -118,7 +139,7 @@ describe('session title invariant under repair', () => {
     const session = ctx.sessions.create(SessionId('guarded'))
     const injected = session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: '<goal_blocked> Objective: "x"' }],
-      source: { kind: 'plugin', plugin: 'tool-goal' },
+      source: { kind: 'tool-goal' },
     }), { surfaceOp: 'append' })
     expect(() => session.append('session/title', {
       title: 'injected name',

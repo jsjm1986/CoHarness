@@ -58,7 +58,7 @@ function imageRow(id: string, attachmentId: string, text = ''): QueuedMessage {
 function snapshotWith(queue: QueuedMessage[]): ConversationSnapshot {
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
-    nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue, running: true, composerPhase: 'active', removed: false, openState: 'open', openError: null,
     hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
     pendingSubmissions: [],

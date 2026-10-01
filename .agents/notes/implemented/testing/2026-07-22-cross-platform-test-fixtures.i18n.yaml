@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-22-cross-platform-test-fixtures.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-07-22-cross-platform-test-fixtures.md
-2026-07-22-cross-platform-test-fixtures.md: 9114481543d6cae1661cbed70868eddb2faa09fc
-2026-07-22-cross-platform-test-fixtures.zh.md: 710ec5887f02b5c3c71d69f16ab726323501ac92
+/agent-note-keep-supported-platform-tests-semantic:
+  en: f4f206f73de14d14
+  zh: ebb8866297933077
+/agent-note-keep-supported-platform-tests-semantic/problem:
+  en: 15308dafce780c18
+  zh: 892a43fc721bfb21
+/agent-note-keep-supported-platform-tests-semantic/decision:
+  en: 66f85caf088fbb37
+  zh: 6c1a6e443d2308bd
+/agent-note-keep-supported-platform-tests-semantic/alternatives-considered:
+  en: 05b9fcce63bebb82
+  zh: 66db6d7dea6dfb84
+/agent-note-keep-supported-platform-tests-semantic/consequences:
+  en: ada7714dadf4fc2b
+  zh: c7d6c85a6fadfc20

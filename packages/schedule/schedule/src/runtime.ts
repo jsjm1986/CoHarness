@@ -6,6 +6,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'schedule': { kind: 'schedule' } & ContextFormed
+  }
+}
 import type { EveryScheduleRecord, OneShotScheduleRecord } from './types.ts'
 import {
   foldScheduleEvents,
@@ -268,7 +274,7 @@ export class ScheduleRuntime {
             : renderEveryReminderBatchFraming(decision.reminders)
           const message = createUserMessage({
             content: [{ type: 'text', text }],
-            source: { kind: 'plugin', plugin: 'schedule' },
+            source: { kind: 'schedule' },
           })
           this.agent.followup(message)
         } catch (error: unknown) {

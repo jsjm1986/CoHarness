@@ -1,3 +1,8 @@
+---
+description: "Plugins settings section with feature-owned tabs and configurable host-plane plugin cards"
+kind: "package-reference"
+---
+
 # dsh-client-ui-settings-plugins
 
 English | [中文](README.zh.md)
@@ -8,6 +13,19 @@ The **Plugins** settings section and its **Plugin configuration** tab. The secti
 
 Use the **Built-in plugins** settings section to inspect the plugins this deployment ships, and the **Official** group of the sidebar's Plugins page to configure the host-plane plugins that expose settings. Each configuration page shows which values the user overrode, lets them reset those to deployment defaults, keeps edits local until save, and drops them when the page is left. If the configuration changed after the page loaded, the save is rejected instead of overwriting the newer values.
 
+## Table of Contents
+
+- [What appears here](#what-appears-here)
+- [Extension point](#extension-point)
+- [Writes](#writes)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="what-appears-here"></a>
 ## What appears here
 
 The configurable tab reads which settings namespaces the Host serves and dispatches one slot key per namespace, so what renders is the intersection of two ledgers: the namespaces a live Host plugin registered, and the cards registered under those keys. A served namespace no card claims renders nothing — another surface owns it, or this deployment ships no browser half for it — and a card whose namespace this deployment does not serve is never dispatched, so an uncomposed plugin leaves no trace and does not hold the tab back from its empty line. The empty line waits for the Host's first answer, so an unanswered read never reads as "this deployment configures no plugin". Cards appear in the order they registered, which is stable for the cards one package installs together and not stable across plugins: apply order between packages is unconstrained.
@@ -18,10 +36,12 @@ In a project scope these cards expose only namespaces whose Host registration de
 
 The model-selection card starts disabled, joins live routes with removable saved routes, and saves its switch and allowlist atomically at the draft revision. A changed revision requires discarding the stale draft. Catalog failures preserve choices; reconnects clear target-specific drafts. Settings affect newly composed Sessions and never grant access beyond runtime model governance.
 
+<a id="extension-point"></a>
 ## Extension point
 
 The section declares `settings.plugins.tab`, a root list slot whose labels become ordered tabs. It keeps a tab mounted after its first selection, so local drafts and read-only snapshots survive tab switches. The package registers its own `configurable` contribution, which declares the nested `settings.plugin.item` slot — keyed on the settings namespace a card edits. A plugin that ships a browser half registers its own card under its own namespace and owns every part of it: chrome, controls, and copy. Keying on the namespace is what lets a plugin distributed outside this repository appear here — it registers the namespace on the Host and the card in the browser, and the tab pairs the two without learning what the namespace means. Tabs follow the contribution's `order`; cards follow registration order.
 
+<a id="writes"></a>
 ## Writes
 
 A card stages what the user types and writes it only when they save. Each control renders staged text, so what is on screen is exactly what a save would store; **Discard** drops the drafts, and a card holding unsaved edits says so on its header even while collapsed. A reset stages the composed default rather than writing immediately, and a draft the field does not accept blocks the save instead of being dropped.
@@ -32,10 +52,12 @@ A key can also be written from another surface — the Models page addresses the
 
 A field's presence in the raw user layer — not its value — is what marks it overridden; a reset clears that field so it re-inherits the composition layer. Secret-role fields never ride a response, so a key control starts blank, reports only whether one is configured, and writes through the credentials domain rather than the settings section; a blank draft writes nothing and keeps the stored key. A replacement requires its own successful write response: the presence of an older key cannot acknowledge it. Credential reads reject superseded responses even when the reference is unchanged.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Plugin configuration values live in the Host plugin settings namespaces; the section contributes tab chrome and per-field bindings over that remote document.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side settings surface that registers no model surface.
@@ -50,3 +72,13 @@ None; this package neither assembles nor sends a provider request.
 - **A card still needs a browser bundle** — the browser half must be a `dsh.client` package built in the client module system's lazy-CJS factory format, and the `clientBundle` preset that emits it lives in `packages/client/tsdown.client.ts` rather than a published package, so a plugin outside this repository has to reproduce that build itself. The bundle-purity gate also forbids importing this package's card chrome or form model as values, so such a card owns its own staging and revision fencing.
 - **The served namespaces re-read on two signals only** — the wire announces settings-document commits and connection resets, not registrations, so a namespace whose owner registers after the tab's read joins the list on the next document commit or reconnect.
 - **The shell card follows the composed executor** — the POSIX and PowerShell executor families share the `bash` namespace because a host composes exactly one of them, so the served schema differs by platform (PowerShell adds `pwshPath`) even though the card edits the same two fields on both, and a deployment composing neither shows no card.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-23-web-assistant-markdown.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-23-web-assistant-markdown.md
-2026-07-23-web-assistant-markdown.md: 0ad74546b9a54d5eadfc3e7991efa4e0d9b7bc77
-2026-07-23-web-assistant-markdown.zh.md: 9349847228b10c13ecead4374ad2fc9210f5e9f1
+/agent-note-safe-assistant-markdown-in-the-web-conversation:
+  en: 72e6aeab6ff39576
+  zh: ef2935dbc82c8b14
+/agent-note-safe-assistant-markdown-in-the-web-conversation/problem:
+  en: 16a8eacecc7a11c5
+  zh: 48c2878bffe136ea
+/agent-note-safe-assistant-markdown-in-the-web-conversation/decision:
+  en: 2f699561815552c9
+  zh: 00450a74fb4b0ae8
+/agent-note-safe-assistant-markdown-in-the-web-conversation/untrusted-output-policy:
+  en: a2a74008e44ce25d
+  zh: 2e8689fe2adde85c
+/agent-note-safe-assistant-markdown-in-the-web-conversation/alternatives-considered:
+  en: b81dacd33bf3b7f0
+  zh: 90d36082c9154fb7
+/agent-note-safe-assistant-markdown-in-the-web-conversation/consequences:
+  en: 2252c9f5dc007db9
+  zh: bab31e659f5fe5de

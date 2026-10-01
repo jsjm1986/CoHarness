@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/brand/README.md
-README.md: 7b18336522e47426f57238be370e00fac587568e
-README.zh.md: d225e00b0e864689544f93a486b0537f53083a05
+/:
+  en: 82a95499ab0a7126
+  zh: 0a51af1cad6486b4
+/dsh-brand:
+  en: 29527f65f8600b8f
+  zh: c7d15eb2c34aa284
+/dsh-brand/summary:
+  en: a6ee5719ee74cc75
+  zh: 329397be6f7228be
+/dsh-brand/table-of-contents:
+  en: 5bb1dbf8f9acc227
+  zh: 6dbdb536a96b3e3c
+/dsh-brand/what-branded-is:
+  en: 5401b98afc0006c4
+  zh: 248e706ff0d2ef5a
+/dsh-brand/what-branded-is/branding-a-number:
+  en: c307e0f31a7ccc91
+  zh: f46205d01113f97d
+/dsh-brand/policy-brand-values-that-cross-package-boundaries:
+  en: 98084fcfa3b239f2
+  zh: da1805d18192394f
+/dsh-brand/dev-note:
+  en: 5de1d6304e00c58f
+  zh: 8d8225361cfa29e5

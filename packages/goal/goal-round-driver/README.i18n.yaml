@@ -1,6 +1,49 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/goal/goal-round-driver/README.md
-README.md: e58396f5fb01215381fd0cd1fabacef8c985258d
-README.zh.md: 560d3f23d9b85420aa8542374110508ba4a51447
+/:
+  en: 11beef229412d456
+  zh: 61495d48365178df
+/deepseek-ai-dsh-goal-round-driver:
+  en: 23b3326d04fd491b
+  zh: e5dad1c765ccd16d
+/deepseek-ai-dsh-goal-round-driver/summary:
+  en: 3eb8adb73b51242d
+  zh: 2cebd67cf56289ea
+/deepseek-ai-dsh-goal-round-driver/table-of-contents:
+  en: ac74eb2ad738b847
+  zh: 9c8eaf0b897e509b
+/deepseek-ai-dsh-goal-round-driver/composition:
+  en: 7c6de570764e4f8f
+  zh: 13851a10b39bed1e
+/deepseek-ai-dsh-goal-round-driver/round-contract:
+  en: 07f96a4397d2d341
+  zh: 98469b10ff3feffd
+/deepseek-ai-dsh-goal-round-driver/idle-checkpoint:
+  en: 0348b507220b1525
+  zh: a4b1c30b78ae4e93
+/deepseek-ai-dsh-goal-round-driver/lifecycle-and-durability:
+  en: 82545d39d18cc3a7
+  zh: 7873286d01ee68ba
+/deepseek-ai-dsh-goal-round-driver/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-goal-round-driver/model-experience/goal-round-prompt:
+  en: 4d07e0f4df39dd39
+  zh: b4b4b1a1ac49133d
+/deepseek-ai-dsh-goal-round-driver/model-experience/goal-round-prompt/what-the-model-sees:
+  en: 627dbb55e83ea545
+  zh: f7961cb0d8cee632
+/deepseek-ai-dsh-goal-round-driver/model-experience/goal-round-prompt/token-effect:
+  en: d754ed8cc26fc2a5
+  zh: 75aad6a5759b1fec
+/deepseek-ai-dsh-goal-round-driver/model-experience/goal-round-prompt/kv-cache-effect:
+  en: 261db0e11125cb5c
+  zh: 0bf267d7c82b50ed
+/deepseek-ai-dsh-goal-round-driver/known-limitations-and-deferred-work:
+  en: 032b51d70f469423
+  zh: 6aab7f6cbbfdb1cb
+/deepseek-ai-dsh-goal-round-driver/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

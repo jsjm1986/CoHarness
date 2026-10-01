@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-05-durable-web-schedule.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-durable-web-schedule.md
-2026-08-05-durable-web-schedule.md: 1effefa0a0a813d28de2220bc23e52919a66613a
-2026-08-05-durable-web-schedule.zh.md: bb74144d9514630d26d4521c1229121db7a3b563
+/agent-note-durable-session-local-reminders:
+  en: c40fc2bc6dd1b469
+  zh: c3932a1c8c60579b
+/agent-note-durable-session-local-reminders/problem:
+  en: 75d2d50c48475d22
+  zh: 293c507e9e516f29
+/agent-note-durable-session-local-reminders/decision:
+  en: 858629f359470172
+  zh: a29c79a54bebb82f
+/agent-note-durable-session-local-reminders/decision/session-log-authority-and-tools:
+  en: 08cd17874864611b
+  zh: efb7e046b9ebdfda
+/agent-note-durable-session-local-reminders/decision/explicit-absolute-time-boundary:
+  en: 2e1fe906d42245aa
+  zh: bd21d4a2dd7d8afc
+/agent-note-durable-session-local-reminders/decision/bounded-fixed-rate-semantics:
+  en: 316e7c04220d9554
+  zh: 05a61a98546d8a7f
+/agent-note-durable-session-local-reminders/decision/live-delivery-lifecycle:
+  en: e69281749cf18500
+  zh: 9ce38e39e486f2d6
+/agent-note-durable-session-local-reminders/alternatives-considered:
+  en: d86b5e8b0380c22a
+  zh: e6b6fce158608b08
+/agent-note-durable-session-local-reminders/verification:
+  en: 53037dfb9363e422
+  zh: 705819753caa441b
+/agent-note-durable-session-local-reminders/consequences:
+  en: 00bc8df274746704
+  zh: 0fc997be4ca5ad0b

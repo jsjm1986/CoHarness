@@ -1,6 +1,79 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/workflow/tool-ralph/README.md
-README.md: 077c35f5cf434d9e7110340fd9f240494330ea79
-README.zh.md: 8e9be361443f9016d1a6d945e63c275b67a0bd9a
+/:
+  en: 74abcdc4591e2a0f
+  zh: 61495d48365178df
+/deepseek-ai-dsh-tool-ralph:
+  en: 69af186dd744d3e5
+  zh: e0eb681eba191664
+/deepseek-ai-dsh-tool-ralph/summary:
+  en: 9821960147153443
+  zh: 0b24aab94a5dc12b
+/deepseek-ai-dsh-tool-ralph/table-of-contents:
+  en: 9d4f983f5d4a2999
+  zh: 8ce6e8c69fa786fe
+/deepseek-ai-dsh-tool-ralph/contract:
+  en: 48a7b02dd9b100ba
+  zh: 1a2ed70d317dc99b
+/deepseek-ai-dsh-tool-ralph/lifecycle-and-cancellation:
+  en: e625c5ac5fba0d09
+  zh: ee246e3eaaed74ff
+/deepseek-ai-dsh-tool-ralph/render-intent:
+  en: 0219bf65dad2fcfa
+  zh: 24be3a069dbc8d1b
+/deepseek-ai-dsh-tool-ralph/config:
+  en: 6bbe60ec763c9596
+  zh: ac2aa1eabac4d2d1
+/deepseek-ai-dsh-tool-ralph/invariants:
+  en: dd15278b0e148376
+  zh: d173717d51883cca
+/deepseek-ai-dsh-tool-ralph/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-tool-ralph/model-experience/system-prompt:
+  en: cf78b9dd5596495f
+  zh: bd44560f8c2435e8
+/deepseek-ai-dsh-tool-ralph/model-experience/system-prompt/what-the-model-sees:
+  en: bcfb20c5be49c2c4
+  zh: c666f686a648fc0f
+/deepseek-ai-dsh-tool-ralph/model-experience/system-prompt/what-the-model-sees/ralph-guidance:
+  en: 4ee32d69a7ae2aba
+  zh: bdf2035f010ab56a
+/deepseek-ai-dsh-tool-ralph/model-experience/system-prompt/token-effect:
+  en: dab67480bfde6224
+  zh: 85bbf18da3767aa7
+/deepseek-ai-dsh-tool-ralph/model-experience/system-prompt/kv-cache-effect:
+  en: 13e7c6007bf6b5dc
+  zh: 2b0da8b6dc00aa5e
+/deepseek-ai-dsh-tool-ralph/model-experience/tool-schema:
+  en: e4c7376d4f29dbd5
+  zh: 6b7a9eaf69c9ea53
+/deepseek-ai-dsh-tool-ralph/model-experience/tool-schema/what-the-model-sees:
+  en: d3e219e3f0e507ed
+  zh: daf8093ed21eb9cf
+/deepseek-ai-dsh-tool-ralph/model-experience/tool-schema/token-effect:
+  en: 0af719618f9f99d2
+  zh: a719a4e5df1406a4
+/deepseek-ai-dsh-tool-ralph/model-experience/tool-schema/kv-cache-effect:
+  en: 79a20d1db0f4a32e
+  zh: c72a19d9a6c0bff3
+/deepseek-ai-dsh-tool-ralph/model-experience/child-requests-and-parent-result:
+  en: 55181fb745ab8135
+  zh: ebeea6a8748986d2
+/deepseek-ai-dsh-tool-ralph/model-experience/child-requests-and-parent-result/what-the-model-sees:
+  en: 788029304e88ea74
+  zh: 0e0281c7cc393dff
+/deepseek-ai-dsh-tool-ralph/model-experience/child-requests-and-parent-result/token-effect:
+  en: ab2d30ed91979cbc
+  zh: bb074b02c4b05e4f
+/deepseek-ai-dsh-tool-ralph/model-experience/child-requests-and-parent-result/kv-cache-effect:
+  en: 8f28959dc87d1f2f
+  zh: c99a4bc103053a37
+/deepseek-ai-dsh-tool-ralph/known-limitations-and-deferred-work:
+  en: eb93358ca1dd6ee8
+  zh: c7734149896a0c63
+/deepseek-ai-dsh-tool-ralph/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

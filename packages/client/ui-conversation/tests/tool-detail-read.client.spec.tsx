@@ -15,7 +15,7 @@ const SID = 'detail-session' as SessionId
 function props(readCall: DetailsSlotProps['readCall']): DetailsSlotProps {
   const snapshot: ConversationSnapshot = {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
-    nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue: [], running: false, composerPhase: 'active', removed: false, openState: 'open', openError: null,
     hasMore: true, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
   }
@@ -27,8 +27,8 @@ function props(readCall: DetailsSlotProps['readCall']): DetailsSlotProps {
     ),
     SessionProvider: ({ children }) => children(SID),
     useSession: bindSnapshotSelector(createSnapshotStore(snapshot)),
-    useSessions: bindSnapshotSelector(createSnapshotStore<SessionListState>({ ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })),
-    useWorkspaces: bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({ items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined })),
+    useSessions: bindSnapshotSelector(createSnapshotStore<SessionListState>({ ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })),
+    useWorkspaces: bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({ items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined })),
     useProjection: () => undefined,
     useInput: () => { throw new Error('unused') },
     inputActions: {

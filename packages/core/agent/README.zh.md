@@ -133,6 +133,7 @@ await handle.agent.whenIdle()
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -164,6 +165,7 @@ await handle.agent.whenIdle()
 
 切换提示追加在先前历史之后，因此保留该前缀；路由变更可能使新的提供方或模型无法复用此前缀。改变提示词段、工具定义或请求监听器的 setup 或 reload，可能从第一个受影响的请求 token 起使复用失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

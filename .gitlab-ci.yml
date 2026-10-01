@@ -61,7 +61,7 @@ sdk-wheel:
       fi
     - |
       if [ "$PLATFORM" = macos-arm64 ]; then
-        python3 scripts/check-macos-deployment-target.py "$EXE" "$EXE-spawn-helper"
+        python3 scripts/check-macos-deployment-target.py "$EXE" "$EXE-rg" "$EXE-spawn-helper"
       fi
   artifacts:
     paths: [release/$PLATFORM/*.whl]

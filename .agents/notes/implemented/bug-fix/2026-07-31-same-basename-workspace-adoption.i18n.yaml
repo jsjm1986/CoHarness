@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-same-basename-workspace-adoption.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-31-same-basename-workspace-adoption.md
-2026-07-31-same-basename-workspace-adoption.md: a634972448d8a3fea3d08c5713602cec0584a44e
-2026-07-31-same-basename-workspace-adoption.zh.md: 82be4aee3b3da2e9fb02783f1cd9bf470802cae0
+/agent-note-same-basename-workspace-adoption:
+  en: ae449bc942719a49
+  zh: 593b0b0571ad322f
+/agent-note-same-basename-workspace-adoption/problem:
+  en: 298e897b60c88111
+  zh: f6e1f919a0ad56db
+/agent-note-same-basename-workspace-adoption/decision:
+  en: d37243b3ca9b5c38
+  zh: e92f1d9afc22c09d
+/agent-note-same-basename-workspace-adoption/verification:
+  en: ef8dc8e56a267107
+  zh: 8df6333a2eb228c2
+/agent-note-same-basename-workspace-adoption/alternatives-considered:
+  en: b601f9e9c00618bc
+  zh: ef141bbaea19b176
+/agent-note-same-basename-workspace-adoption/consequences:
+  en: 62440c928b0cf415
+  zh: 43cb9b62c0f288bf

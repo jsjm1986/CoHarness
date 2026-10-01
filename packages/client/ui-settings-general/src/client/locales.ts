@@ -18,6 +18,7 @@ export const zh = {
   'connection.connected': '连接成功',
   'connection.reconnect': '连接异常，点击立即重连',
   'connection.restart': '连接中断，正在重试，点击立即重连',
+  'shortcut.open': '打开设置',
 } satisfies Record<string, string>
 
 /** The settings namespace key union. */
@@ -41,4 +42,5 @@ export const en = {
   'connection.connected': 'Connected',
   'connection.reconnect': 'Disconnected, reconnect now',
   'connection.restart': 'Reconnecting, reconnect now',
+  'shortcut.open': 'Open settings',
 } satisfies Record<SettingsKey, string>

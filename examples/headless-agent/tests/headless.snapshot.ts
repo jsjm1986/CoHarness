@@ -19,6 +19,7 @@ import {
   type NormalizeContext,
 } from '@deepseek-ai/dsh-session-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
+import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import {
   decompressZstdFrame,
   scanZstdFrames,
@@ -34,7 +35,7 @@ const advancedCorpusDir = join(snapshotsDir, '../../../../snapshots/session/adva
 const advancedScenarioDir = join(snapshotsDir, 'advanced-toolchain')
 const advancedStreamExpected = join(advancedScenarioDir, 'stream-json.expected.jsonl')
 const ptyScenarioDir = join(snapshotsDir, 'pty-tools')
-const ptySessionFixture = join(ptyScenarioDir, 'session.v6.jsonl')
+const ptySessionFixture = join(ptyScenarioDir, `session.v${String(SESSION_FORMAT_VERSION)}.jsonl`)
 const ptyStreamExpected = join(ptyScenarioDir, 'stream-json.expected.jsonl')
 const ptyConfigPath = fileURLToPath(new URL('../pty.cordis.snapshot.yml', import.meta.url))
 const goalScenarioDir = join(snapshotsDir, 'goal-tools')
@@ -44,7 +45,7 @@ const retryConfigPath = fileURLToPath(new URL('../retry.cordis.snapshot.yml', im
 const malformedProviderScenarioDir = join(snapshotsDir, 'malformed-provider')
 const malformedProviderConfigPath = fileURLToPath(new URL('../malformed-provider.cordis.snapshot.yml', import.meta.url))
 const compactionScenarioDir = join(snapshotsDir, 'compaction-recovery')
-const compactionSessionFixture = join(compactionScenarioDir, 'session.v6.jsonl')
+const compactionSessionFixture = join(compactionScenarioDir, `session.v${String(SESSION_FORMAT_VERSION)}.jsonl`)
 const compactionStreamExpected = join(compactionScenarioDir, 'stream-json.expected.jsonl')
 const compactionConfigPath = fileURLToPath(new URL('../compaction.cordis.snapshot.yml', import.meta.url))
 const credentialsScenarioDir = join(snapshotsDir, 'missing-credential')
@@ -1066,8 +1067,7 @@ describe('headless stream-json snapshots', () => {
         })
         const probeData = probeResult?.data as JsonObject | undefined
         const probeMessage = probeData?.message as JsonObject | undefined
-        const probeContent = probeMessage?.content as JsonObject[] | undefined
-        expect(probeContent?.[0]?.isError).toBe(true)
+        expect(probeMessage?.isError).toBe(true)
         expect((probeData?.error as JsonObject | undefined)?.code).toBe('GOAL_NOT_FOUND')
         const goalChanges = records.filter(record => record.type === 'goal/change')
         expect(goalChanges).toHaveLength(1)
@@ -1135,8 +1135,8 @@ describe('headless stream-json snapshots', () => {
         const parentResultData = parentResult?.data as JsonObject | undefined
         const parentMessage = parentResultData?.message as JsonObject | undefined
         const parentContent = parentMessage?.content as JsonObject[] | undefined
-        expect(parentContent?.[0]?.isError).toBe(false)
-        expect(JSON.stringify(parentContent?.[0]?.content)).toContain('reported completion after 2 rounds')
+        expect(parentMessage?.isError).toBe(false)
+        expect(JSON.stringify(parentContent)).toContain('reported completion after 2 rounds')
 
         const childRecords = children.map(child => parseJsonl(child.content))
         const childPrompts = childRecords.map((records) => {

@@ -1,3 +1,8 @@
+---
+description: "Private content-addressed DSH_HOME attachment storage"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-attachment-local
 
 English | [中文](README.zh.md)
@@ -16,10 +21,21 @@ The instance compression limiter keeps queued transformations in a head-indexed 
 
 Store images and generic file attachments durably below `DSH_HOME` on the machine running DSH. Images are validated, normalized for model requests, and cached per route; generic files are preserved byte-for-byte without admission limits. Identical bytes are stored once even when uploads use different display names, reads verify file length and content, and admitted images remain readable if limits later tighten. The shipped `dsh` composition uses this package without configuration. Objects remain local to one machine and are never deleted automatically.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Published objects are immutable files addressed by content hash, and the staged atomic-publish path is asserted by filesystem-level specs; the provider keeps no mutable index of its own.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through request descriptors. A mapped execution filesystem lets the model see each image's identity, dimensions, media type, read-only process path, writable-copy extension, and normalization warning alongside the request bytes. Generic files project as text handles naming their identity and read-only process path; when no mapping exists, the handle states that the execution environment cannot read the file.
@@ -34,3 +50,13 @@ Normalization and request projection are deterministic. An unchanged attachment 
 - The local backend assumes the host and provider adapter share this filesystem service.
 - Animated GIF sources keep only their first frame; animation is outside the version-one image contract.
 - The normalization and request encoders are pinned by the installed sharp/libvips build; an encoder or transform-version upgrade re-addresses future normalized attachments or request variants while existing objects stay valid.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

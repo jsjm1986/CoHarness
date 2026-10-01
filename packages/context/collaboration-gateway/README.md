@@ -1,3 +1,8 @@
+---
+description: "Gateway-backed project collaboration provider for DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-collaboration-gateway
 
 English | [中文](README.zh.md)
@@ -9,6 +14,17 @@ Gateway-backed provider for the `dsh-collaboration` Service Definition. It deriv
 Use `dsh-collaboration-gateway` as the Gateway-backed provider for the `dsh-collaboration` Service Definition. It derives the participant from `dsh-gateway-runtime`, delegates membership and root-conversation ACL decisions to authenticated internal Gateway endpoints, and validates every returned field before publishing to Consumers.
 
 
+## Table of Contents
+
+- [Runtime contract](#runtime-contract)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="runtime-contract"></a>
 ## Runtime contract
 
 - `capture()` freezes the current verified principal into an authority whose participant, expiry, and provider lifetime remain stable for the request or stream operation.
@@ -17,10 +33,12 @@ Use `dsh-collaboration-gateway` as the Gateway-backed provider for the `dsh-coll
 - Project root creation requires `rw` membership and runs under the requested visibility. Personal creation passes through without project metadata.
 - Disposing the provider aborts its lifetime signal and makes every captured authority fail closed before another request.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Participant and ACL answers are validated per request against authenticated Gateway endpoints; no account state is held locally.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through dsh-collaboration-context, which owns model-visible participant attribution for the operations this provider authorizes.
@@ -34,3 +52,13 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **Gateway availability is authoritative** — a project operation is denied when the internal authorization request fails or returns invalid JSON; there is no stale local ACL cache.
 - **Per-operation authorization traffic** — session actions and visibility filtering may issue loopback requests; batching exists only for readable session ids.
 - **No offline project mode** — project runtimes cannot continue collaboration authorization after the Gateway or provider becomes unavailable.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

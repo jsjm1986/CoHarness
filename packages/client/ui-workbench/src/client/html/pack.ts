@@ -10,8 +10,10 @@ import { decodeText } from './bytes.ts'
  */
 export type ReadHtmlRelative = (reference: string, signal: AbortSignal) => Promise<Uint8Array<ArrayBuffer>>
 
-const MAX_ASSET_BYTES = 4 * 1024 * 1024
-const MAX_TOTAL_BYTES = 32 * 1024 * 1024
+/** Per-asset collection bound enforced by the resource reader and the package check. */
+export const MAX_ASSET_BYTES = 4 * 1024 * 1024
+/** Combined package bound covering the root document and every packed asset. */
+export const MAX_TOTAL_BYTES = 32 * 1024 * 1024
 const MAX_ASSETS = 64
 
 /** Blob MIME for an image's filename suffix; the suffix selects the type because browsers refuse extensionless SVG. */

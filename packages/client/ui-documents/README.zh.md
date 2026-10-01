@@ -1,3 +1,8 @@
+---
+description: "CoHarness Web UI 的工作区文档管理器。"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-documents
 
 CoHarness Web UI 的工作区文档管理器。整理、预览、上传、移动、下载、删除，并将已存储文档加入对话输入框。
@@ -11,10 +16,24 @@ CoHarness Web UI 的工作区文档管理器。整理、预览、上传、移动
 使用 `dsh-client-ui-documents` 作为 Web UI 的工作区文档管理器：组织文件夹、预览、上传、移动、下载、删除，并把已存文档插入会话输入框。文档选择器在打开时锁定目标会话，对话框打开期间切换面板不会把文档送错创作区。
 
 
+## 目录
+
+- [安装](#installation)
+- [使用方法](#usage)
+- [范围隔离](#scope-isolation)
+- [许可证](#license)
+- [模型体验](#model-experience)
+- [已知限制与待办](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="installation"></a>
 ## 安装
 
 本包是 `@deepseek-ai/dsh-client-ui-documents` 功能包的一部分，由 web-app profile 自动加载。
 
+<a id="usage"></a>
 ## 使用方法
 
 插件在侧边栏底部（工作区切换按钮旁）添加一个**文档**按钮。窄栏只显示图标和工具提示；展开侧边栏时图标旁显示「文档」。点击后打开当前工作区（个人或项目）的管理弹窗。
@@ -41,6 +60,7 @@ composer 中的文档控件会打开同一个管理器，因此从输入栏发�
 
 桌面端和移动端使用同一套可续传上传协议。小文件使用一个分片；更大的文件拆成 8 MiB 分片，并校验每个分片及最终文件的 SHA-256。网络中断不会丢弃已经完成的分片；运行时保留会话期间，重新选择同一文件即可继续。浏览器只保存不透明的会话元数据，不保存文档字节。
 
+<a id="scope-isolation"></a>
 ## 范围隔离
 
 文档按运行时范围隔离存储：
@@ -50,10 +70,13 @@ composer 中的文档控件会打开同一个管理器，因此从输入栏发�
 
 文件夹是真实目录，模型可通过常规文件系统工具查看。后端 API（`/api/documents`）由 `@deepseek-ai/dsh-host-userdoc-http` 和 `@deepseek-ai/dsh-userdoc-local` 提供；旧 `uploads` 的迁移规则见本地后端 [README](../../attachment/userdoc-local/README.zh.md)。
 
+<a id="license"></a>
 ## 许可证
 
 MIT
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 文档管理器
@@ -72,6 +95,7 @@ MIT
 
 **运行时不变式：** 不发布伴生入口。文档 UI 状态由客户端会话拥有，本包没有可断言的独立事件或可变数据关系。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与待办
 
 - 预览仅支持图片、PDF 和基于文本的文件；其他媒体类型显示下载替代提示。
@@ -81,3 +105,13 @@ MIT
 - 当前文件夹和全部作用域列表在提供方支持时使用有界服务端分页与不透明游标；旧提供方仍可通过浏览器本地分页使用。管理器持续挂载期间会保留已加载页面。
 - 移入回收站的文档只在提供方保留窗口内可恢复；永久清理不可撤销，活动文档仍会一直保留到删除。
 - 只能删除空文件夹；界面不递归删除目录树。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

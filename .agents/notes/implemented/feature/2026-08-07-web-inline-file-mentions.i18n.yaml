@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-07-web-inline-file-mentions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-07-web-inline-file-mentions.md
-2026-08-07-web-inline-file-mentions.md: 0c7341e9aec688a0661fedb18731a1c172215f45
-2026-08-07-web-inline-file-mentions.zh.md: 3483672b42ccfda819d4c42453fc6609910ca1d3
+/agent-note-inline-code-file-mentions-open-the-file-they-name:
+  en: dd830c81d49eab5b
+  zh: cc3a3c77f8b06cb3
+/agent-note-inline-code-file-mentions-open-the-file-they-name/problem:
+  en: d79275ac5f45cb57
+  zh: f446efdcba887f37
+/agent-note-inline-code-file-mentions-open-the-file-they-name/decision:
+  en: 6abd97abc9b5b22e
+  zh: 6ae13a88e3773f65
+/agent-note-inline-code-file-mentions-open-the-file-they-name/alternatives-considered:
+  en: 42cc403d63aa2ba7
+  zh: 01a2a2a51d6fa5b3
+/agent-note-inline-code-file-mentions-open-the-file-they-name/consequences:
+  en: d3a41d1277fa98de
+  zh: f618d0153020367f

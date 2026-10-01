@@ -34,3 +34,38 @@ it.each([undefined, { kind: 'personal' as const }, { kind: 'project' as const, p
   expect(() => rpc.stream!('/other', 'terminal/retain', {}, new AbortController().signal)).toThrow('shared /api channel')
   expect(() => rpc.stream!('/api', '../retain', {}, new AbortController().signal)).toThrow('invalid RPC target')
 })
+
+it.each(['http://example.test/', 'http://example.test/mount/', 'http://example.test/mount/index.html'])(
+  'resolves unary and stream endpoints under the document base %s', async (base) => {
+    const globals = globalThis as { document?: { baseURI?: string } }
+    const previous = globals.document
+    const sent: URL[] = []
+    globals.document = { baseURI: base }
+    try {
+      const rpc = createWebConnectionRpc(async (url, init) => {
+        sent.push(url)
+        const request = JSON.parse(init.body as string) as { rpcId: string; method?: string }
+        if (request.method === 'terminal/retain') {
+          return new Response([
+            JSON.stringify({ rpcId: request.rpcId, type: 'result', result: { ok: true, value: 'held' } }),
+            JSON.stringify({ rpcId: request.rpcId, type: 'end' }), '',
+          ].join('\n'), { headers: { 'content-type': 'application/x-ndjson' } })
+        }
+        return new Response(JSON.stringify({ type: 'server-response', rpcId: request.rpcId, result: { ok: true, value: 'ok' } }))
+      }, { kind: 'project', projectId: 7 })
+      await expect(rpc.call('/api', 'session.list', {})).resolves.toEqual({ ok: true, value: 'ok' })
+      for await (const _ of rpc.stream!('/api', 'terminal/retain', { args: { sessionId: 's', id: 't' } }, new AbortController().signal)) void _
+      expect(sent.map(url => url.pathname)).toEqual([
+        new URL('api/session.list', base).pathname,
+        new URL('api/_stream/terminal/retain', base).pathname,
+      ])
+      for (const url of sent) {
+        expect(url.origin).toBe('http://example.test')
+        expect(url.searchParams.get('dshTarget')).toBe('project:7')
+      }
+    } finally {
+      if (previous === undefined) delete globals.document
+      else globals.document = previous
+    }
+  },
+)

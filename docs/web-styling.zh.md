@@ -10,6 +10,7 @@
 
 全局样式表归 `ui-theme/src/styles/` 所有。组件样式以 CSS Modules 形式放在组件旁。当某个值属于该组件的布局或呈现约定时，组件可以定义局部自定义属性；共享颜色、排版、层级和动效属于主题包。
 
+<a id="component-rules"></a>
 ## 组件规则
 
 - 使用 CSS Modules 和 `clsx`；不得添加组件库或 Tailwind。

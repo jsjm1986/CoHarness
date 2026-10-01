@@ -12,7 +12,7 @@ function harness() {
       id: id(value), displayTitle: value, running: false, blank: false, updatedAt: 0,
     }])),
     archivedById: {},
-    current: id('a'), phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+    current: id('a'), phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   })
   const opened: SessionId[] = []
   const staged: SessionId[][] = []

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-20-remove-agent-boundary-mirror-events.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-06-20-remove-agent-boundary-mirror-events.md
-2026-06-20-remove-agent-boundary-mirror-events.md: cb3cb83e7e37fae52b59bb8566284aa80708e23a
-2026-06-20-remove-agent-boundary-mirror-events.zh.md: 85572deb662b544b1de635a063e3a19d2388fda4
+/agent-note-stop-mirroring-durable-boundaries-as-agent-events:
+  en: c56ffd5fb5c653a4
+  zh: 748b6342eabb6756
+/agent-note-stop-mirroring-durable-boundaries-as-agent-events/problem:
+  en: d6bc0e882781d5a9
+  zh: 0d23d0970aafbe0c
+/agent-note-stop-mirroring-durable-boundaries-as-agent-events/decision:
+  en: e419e7e4a49497ad
+  zh: d1ee862ce660f97c
+/agent-note-stop-mirroring-durable-boundaries-as-agent-events/scope-what-is-and-isn-t-removed:
+  en: 47506e60789f653e
+  zh: 59bfa4a7fc6e5d3e
+/agent-note-stop-mirroring-durable-boundaries-as-agent-events/alternatives-considered:
+  en: f9a8dbbf8ff0eaa2
+  zh: 811ba1505ea0dd26
+/agent-note-stop-mirroring-durable-boundaries-as-agent-events/consequences:
+  en: 9497b3640a3b7305
+  zh: 490d7471ec742b07

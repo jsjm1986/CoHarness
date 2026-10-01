@@ -53,7 +53,7 @@ type RoutedChatNodeOwner = ChatNodeOwnerProps & { readonly node: ChatNode }
 function snapshotBase(): ConversationSnapshot {
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: chatSnapshotFixture(), nodes: [],
-    turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue: [], running: false, composerPhase: 'active', removed: false, openState: 'open', openError: null,
     hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
   }
@@ -121,7 +121,8 @@ const toolResult = (seq: number, callId: string, name = 'bash'): ToolResultNode 
   content: [], isError: false, callView: null, resultView: null, subCalls: [],
 })
 const runningCall = (callId: string, name = 'bash'): RunningToolCall => ({
-  callId, name, argsRaw: `{"command":"cmd-${callId}"}`, turn: 2, step: 1, time: 1_000, callView: null, subCalls: [],
+  phase: 'start', callId, name, argsRaw: `{"command":"cmd-${callId}"}`, turn: 2, step: 1, time: 1_000,
+  callView: null, subCalls: [],
 })
 const command = (over: Partial<CommandNode> = {}): CommandNode => ({
   kind: 'command', seq: 5, time: 5_000, commandId: 'cmd-1' as CommandNode['commandId'],
@@ -140,13 +141,13 @@ const compaction = (over: Partial<CompactionSummaryNode> = {}): CompactionSummar
 /** Empty sessions-list hook for the global standard-kit seat. */
 function emptySessions() {
   const store = createSnapshotStore<SessionListState>(
-    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })
   return bindSnapshotSelector(store)
 }
 
 function emptyWorkspaces() {
   const store = createSnapshotStore<WorkspaceListState>({
-    items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+    items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
     baselinesReady: true, recentWorkspaceId: undefined,
   })
   return bindSnapshotSelector(store)
@@ -420,6 +421,7 @@ describe('Chat node rendering', () => {
         assistant(4, 'Wrote `report.html`; `notes.md` untouched.', 1),
       ],
       turnEnds: new Map([[1, 4]]),
+      openTurn: undefined,
     })
     // Stub provider mirroring the real service: only produced files resolve.
     h.props.fileMentions = owner => ({
@@ -765,6 +767,7 @@ describe('ChatView', () => {
         assistant(6, 'second turn', 2),
       ],
       turnEnds: new Map([[1, 4], [2, 6]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // Branch renders only under assistant answers; user bubbles keep copy alone.
@@ -786,6 +789,7 @@ describe('ChatView', () => {
       ],
       // Boundary seqs follow the log: a turn/end is strictly after its own nodes.
       turnEnds: new Map([[1, 3]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // 2 user + the settled turn-1 tail, which keeps its seat while a later
@@ -808,6 +812,7 @@ describe('ChatView', () => {
       ],
       turnTimings: new Map([[1, { startTime: 1_000, endTime: 20_000 }]]),
       turnEnds: new Map([[1, 20]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // The exact turn/end includes trailing tool activity after the final text.
@@ -829,6 +834,7 @@ describe('ChatView', () => {
       nodes: [user(1, 'hi'), first, second],
       turnTimings: new Map([[1, { startTime: 1_000, endTime: 20_000 }]]),
       turnEnds: new Map([[1, 20]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // First-step ttft (1.2s) plus 100 tokens over 5s of decode.
@@ -850,6 +856,7 @@ describe('ChatView', () => {
       nodes: [user(1, 'hi'), settled],
       turnTimings: new Map([[1, { startTime: 1_000 }]]),
       turnEnds: new Map(),
+      openTurn: undefined,
       running: true,
     })
     const view = render(<h.ChatView {...h.props} />)
@@ -921,6 +928,7 @@ describe('ChatView', () => {
       nodes: [user(1, 'hi'), assistant(2, 'answer')],
       turnTimings: new Map([[1, { startTime: 1_000, endTime: 2_000 }]]),
       turnEnds: new Map([[1, 2]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // The user row keeps its time hover scope; the settled assistant tail now
@@ -933,6 +941,7 @@ describe('ChatView', () => {
     const h = makeHarness({
       nodes: [assistant(16, 'tail without trigger')],
       turnEnds: new Map([[1, 16]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     expect(view.queryByText(/用时/)).toBeNull()
@@ -942,6 +951,7 @@ describe('ChatView', () => {
     const h = makeHarness({
       nodes: [user(1, 'question'), assistant(2, 'answer')],
       turnEnds: new Map([[1, 3]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // The user bubble offers no branch; the settled answer's is live.
@@ -982,6 +992,7 @@ describe('ChatView', () => {
     const h = makeHarness({
       nodes: [user(1, 'question'), assistant(2, 'answer'), toolResult(3, 'a'), interruptedThink],
       turnEnds: new Map([[1, 5]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     expect(view.getAllByRole('button', { name: '复制' })).toHaveLength(2)

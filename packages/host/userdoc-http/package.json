@@ -27,21 +27,22 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-client-connection": "workspace:^",
-    "@deepseek-ai/dsh-collaboration": "workspace:^",
-    "@deepseek-ai/dsh-gateway-runtime": "workspace:^",
-    "@deepseek-ai/dsh-userdoc": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-client-connection": "workspace:*",
+    "@deepseek-ai/dsh-collaboration": "workspace:*",
+    "@deepseek-ai/dsh-gateway-runtime": "workspace:*",
+    "@deepseek-ai/dsh-userdoc": "workspace:*"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/cordis-plugin-include": "workspace:^",
-    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
-    "@deepseek-ai/dsh-client-connection": "workspace:^",
-    "@deepseek-ai/dsh-collaboration": "workspace:^",
-    "@deepseek-ai/dsh-gateway-runtime": "workspace:^",
-    "@deepseek-ai/dsh-host-webserver": "workspace:^",
-    "@deepseek-ai/dsh-userdoc": "workspace:^",
-    "@deepseek-ai/dsh-userdoc-local": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/cordis-plugin-include": "workspace:~",
+    "@deepseek-ai/cordis-plugin-loader": "workspace:~",
+    "@deepseek-ai/dsh-client-connection": "workspace:*",
+    "@deepseek-ai/dsh-collaboration": "workspace:*",
+    "@deepseek-ai/dsh-credentials-local": "workspace:*",
+    "@deepseek-ai/dsh-gateway-runtime": "workspace:*",
+    "@deepseek-ai/dsh-host-webserver": "workspace:*",
+    "@deepseek-ai/dsh-userdoc": "workspace:*",
+    "@deepseek-ai/dsh-userdoc-local": "workspace:*"
   }
 }

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-cordis-config-source-plane-resolution-gate.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-30-cordis-config-source-plane-resolution-gate.md
-2026-07-30-cordis-config-source-plane-resolution-gate.md: f9070d39559948ef27f96df5afccd7c4e076f131
-2026-07-30-cordis-config-source-plane-resolution-gate.zh.md: 0e8a2d22e8ed5238f4263b28f31b7074c5dbbe20
+/agent-note-verify-cordis-config-gates-source-plane-resolution-of-configured-plugins:
+  en: 694bf314b266aeaa
+  zh: 8a698e69f0202aa8
+/agent-note-verify-cordis-config-gates-source-plane-resolution-of-configured-plugins/problem:
+  en: 02c75e8bc755bc81
+  zh: cb556bff78cd78d1
+/agent-note-verify-cordis-config-gates-source-plane-resolution-of-configured-plugins/decision:
+  en: 360be318fa29115e
+  zh: 52f9fd142388e4d0
+/agent-note-verify-cordis-config-gates-source-plane-resolution-of-configured-plugins/alternatives-considered:
+  en: 3ce7aec17ed46d09
+  zh: 16f84a393bd8b1f3
+/agent-note-verify-cordis-config-gates-source-plane-resolution-of-configured-plugins/consequences:
+  en: 521bf49c336ec9ae
+  zh: 5d3f58603c9eeaf3

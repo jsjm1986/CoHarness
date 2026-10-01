@@ -1,3 +1,8 @@
+---
+description: "Shared anonymous user identity for DeepSeek Harness telemetry and feedback correlation"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-anonymous-user-id
 
 English | [中文](README.zh.md)
@@ -10,18 +15,33 @@ The identity is never derived from the hostname, network address, git remote, or
 
 DeepSeek Harness uses one anonymous identifier per harness home to correlate telemetry, feedback, and DeepSeek requests from the same installation without identifying the user. The random UUID is stored in `$DSH_HOME/.anonymous-user-id` (`$DSH_HOME` defaults to `~/.dsh`), persists across restarts, and is regenerated after you delete the file. Different harness homes use different identifiers, and the value contains no machine or account data. Built-in features create and attach it automatically; package consumers can reuse the same value for installation-scoped correlation, but cannot join records across homes.
 
+## Table of Contents
+
+- [Storage contract](#storage-contract)
+- [Composition](#composition)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="storage-contract"></a>
 ## Storage contract
 
 Reads and writes are synchronous because both boot-time telemetry construction and direct command execution need one API. The result is memoized per resolved file path for the process lifetime. A first writer uses exclusive creation and a concurrent loser adopts the persisted winner; a corrupt file is replaced. Persistence is best-effort, so an unwritable home still receives a process-local UUID rather than blocking telemetry or feedback.
 
+<a id="composition"></a>
 ## Composition
 
 This package is a shared library, not a Cordis plugin. Consumers import `getOrCreateAnonymousUserId()` directly. Its invariant companion is intentionally empty because the package owns no event stream or public mutable relation that can be checked without creating the identity as a side effect. `DSH_TELEMETRY_DISABLED` stops telemetry export only; it does not suppress direct feedback acknowledgement or the DeepSeek provider header.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The id is created once, persisted as a single durable line, and immutable thereafter; there is no changing relation to observe.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the shared identifier reaches DeepSeek only as model-hidden HTTP metadata and registers nothing model-facing.
@@ -36,3 +56,13 @@ None; the transport header changes neither tokens nor the model-visible prefix.
 - **Best-effort concurrency** — a reader landing in the narrow interval between a concurrent process's exclusive create and completed write can use a different in-memory UUID for that run; later launches converge on the persisted value.
 - **No cross-home identity** — different `$DSH_HOME` values cannot be correlated.
 - **Configured DeepSeek gateways receive the id** — `dsh-llm-deepseek` sends the stable header to its resolved `baseURL`, including deployment overrides, independently of telemetry sharing mode.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

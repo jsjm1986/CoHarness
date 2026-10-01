@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-archive-gateway
 
 [English](README.md) | 中文
@@ -19,10 +24,22 @@
 使用 `dsh-archive-gateway` 把 Gateway 启动的运行时的持久工作区归档状态同步到 Gateway 归档索引。带修订号、幂等的批次携带归档 id、谱系、头部、归属与搜索投影；该修订的全部批次成功后 Gateway 命令才被应用。请求有界，dispose 会等待在途的同步。
 
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每个同步批次都从持久会话语料派生，并对照 Gateway 索引打上 revision 戳；提供方不持有本地归档事实。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 没有直接影响；提供方仅同步归档会话记录以服务管理员专用历史，不贡献任何模型输入。
@@ -31,9 +48,20 @@
 
 无；本包从不组装或发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - 只有使用 Gateway 凭据启动的运行时才会同步；独立的本地组合继续使用原有归档行为。
 - 所属运行时不可用或持久化日志损坏时，个人正文无法读取；Gateway 会保留归档索引行并报告正文不可用。
 - 归档读取会拒绝包含超过 10,000 个子会话的谱系，或应用序号下限后保留记录超过 100,000 条、总计超过 64 MiB 的结果。`fromSeq` 是分别应用于每个子会话的包含式序号下限，不是全局时间顺序游标。
 - 运行时提供的个人详情也必须符合相同的子会话、事件页和字节上限；替换结果无效或超限时，会保留索引详情并将 `syncState` 设为 `unavailable`。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

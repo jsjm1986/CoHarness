@@ -204,7 +204,6 @@ describe('PluginManagerPage', () => {
 
   it.each([
     ['agent-team-profile', 'builtinAgentTeamTitle', 'builtinAgentTeamDescription'],
-    ['agent-team-web-profile', 'builtinAgentTeamWebTitle', 'builtinAgentTeamWebDescription'],
     ['auto-review', 'builtinAutoReviewTitle', 'builtinAutoReviewDescription'],
   ] as const)('localizes %s across cards, details, switches, and uninstall confirmation', (suffix, titleKey, descriptionKey) => {
     const name = `@deepseek-ai/dsh-experimental-${suffix}`

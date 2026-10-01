@@ -27,10 +27,10 @@ function props() {
     current: SID_A,
     phase: 'ready',
     subagentsByParent: {},
-    jobsBySession: {},
+    jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })
-  const workspaces = createSnapshotStore<WorkspaceListState>({ items: [{ workspaceId: 'wa' as never, title: 'Workspace A', createdAt: '2026-09-08', updatedAt: '2026-09-08', path: '/work/alpha', sessionIds: [SID_A] }], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined })
+  const workspaces = createSnapshotStore<WorkspaceListState>({ items: [{ workspaceId: 'wa' as never, title: 'Workspace A', createdAt: '2026-09-08', updatedAt: '2026-09-08', path: '/work/alpha', sessionIds: [SID_A] }], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined })
   const store = createWorkbenchStore().create()
   return {
     sessionsStore: sessions, workspacesStore: workspaces,

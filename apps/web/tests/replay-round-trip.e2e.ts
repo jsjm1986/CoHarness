@@ -49,7 +49,7 @@ describe('web e2e: fresh round trip through the real assembly', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     // Fresh world: connect a Workspace so the composer scenarios start live.
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
@@ -136,8 +136,8 @@ describe('web e2e: fresh round trip through the real assembly', () => {
     const bashResult = sessionEvents.find(event =>
       event.type === 'tool/result' && event.data.message.source.callId === bashCall.data.callId)
     if (bashResult?.type !== 'tool/result') throw new Error('the bash tool call produced no durable result')
-    expect(bashResult.data.message.content[0].isError).toBe(false)
-    expect(bashResult.data.message.content[0].content.filter(block => block.type === 'text').map(block => block.text).join(''))
+    expect(bashResult.data.message.isError).toBe(false)
+    expect(bashResult.data.message.content.filter(block => block.type === 'text').map(block => block.text).join(''))
       .toBe('WEB_E2E_OK\n')
     const turnEnds = sessionEvents.filter(e => e.type === 'turn/end')
     expect(turnEnds.length).toBe(1)

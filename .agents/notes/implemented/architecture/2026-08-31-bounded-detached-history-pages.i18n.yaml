@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-31-bounded-detached-history-pages.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-31-bounded-detached-history-pages.md
-2026-08-31-bounded-detached-history-pages.md: e5ae1dc6e1cf797ae85dfecfdac54e394eaa0295
-2026-08-31-bounded-detached-history-pages.zh.md: 9dd057f3be54acccf9dd6e4f65bde38d23bb81fc
+/agent-note-bounded-detached-history-pages:
+  en: 5c31ad050ce91f3f
+  zh: f1eb6c3f5f0e7724
+/agent-note-bounded-detached-history-pages/problem:
+  en: 5dd1ac9b3bee5e7f
+  zh: 1ee90c6ccb0d7562
+/agent-note-bounded-detached-history-pages/decision:
+  en: d4c76fd1e3dc6edb
+  zh: afb7dc03977ec48a
+/agent-note-bounded-detached-history-pages/alternatives-considered:
+  en: 6dfff8967731c639
+  zh: c63fcca1f45767ea
+/agent-note-bounded-detached-history-pages/consequences:
+  en: 86ac13de4f1d3035
+  zh: 5810db6b9c5ecaae
+/agent-note-bounded-detached-history-pages/verification:
+  en: 8887da7a98a277ee
+  zh: c7817b26448171db

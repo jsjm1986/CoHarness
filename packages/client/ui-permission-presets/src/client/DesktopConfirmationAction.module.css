@@ -74,6 +74,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
+  corner-shape: round;
   background: #3fb950;
   flex-shrink: 0;
 }
@@ -123,6 +124,14 @@
 .scopeNoteIcon {
   font-size: 0.9375rem;
   flex-shrink: 0;
+}
+
+.scopeNoteInfo .scopeNoteIcon::before {
+  content: "ℹ️";
+}
+
+.scopeNoteOk .scopeNoteIcon::before {
+  content: "✓";
 }
 
 .techInfo {

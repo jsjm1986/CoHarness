@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-07-feedback-acknowledgement-sharing-disclosure.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-07-feedback-acknowledgement-sharing-disclosure.md
-2026-08-07-feedback-acknowledgement-sharing-disclosure.md: daba82708b14babe0366549fc23f7dc3e9fc0e7d
-2026-08-07-feedback-acknowledgement-sharing-disclosure.zh.md: 2be6c95dd5f02b7b7e8831bbc8a8932adc2645af
+/agent-note-feedback-acknowledgement-sharing-disclosure:
+  en: 6708475e200ac1c0
+  zh: 78bf010384fe45f8
+/agent-note-feedback-acknowledgement-sharing-disclosure/problem:
+  en: 6772624817d840ef
+  zh: d314e81e272e370b
+/agent-note-feedback-acknowledgement-sharing-disclosure/decision:
+  en: ae51abf99539ed36
+  zh: ce0b017405e7f0c6
+/agent-note-feedback-acknowledgement-sharing-disclosure/alternatives-considered:
+  en: f01ff70adca747a2
+  zh: 93b2003f7cc191ef
+/agent-note-feedback-acknowledgement-sharing-disclosure/consequences:
+  en: 40d69367d0e342cf
+  zh: de7201b9834a2f51

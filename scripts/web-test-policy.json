@@ -182,6 +182,10 @@
   "packages": {
     "client/hmr": "shell",
     "client/locale": "all",
+    "client/shortcuts": [
+      "settings",
+      "shell"
+    ],
     "client/ui-agent-preset": "settings",
     "client/ui-attachment": "conversation",
     "client/ui-brand-official": "shell",
@@ -233,6 +237,10 @@
     "client/ui-settings-plugin-inventory": "settings",
     "client/ui-settings-plugins": "settings",
     "client/ui-settings-unarchive-sessions": "settings",
+    "client/ui-shortcuts": [
+      "settings",
+      "shell"
+    ],
     "client/ui-sidebar": [
       "shell",
       "subagent",

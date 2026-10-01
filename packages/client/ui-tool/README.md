@@ -1,3 +1,8 @@
+---
+description: "Client Tool call-tree renderer and keyed per-tool presentation slot"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-tool
 
 English | [中文](README.zh.md)
@@ -12,6 +17,18 @@ Expanded generic and terminal rows expose **Open details in sidebar** when their
 
 `dsh-client-ui-tool` is the client Tool presentation plugin of the dsh web client: it renders every tool call in the conversation. `ui-conversation` dispatches each ordered `tool-call` Conversation Node through the matching key of `conversation.chat.node`; this package renders its root and PTC dispatch children, then dispatches every atomic call through the keyed `tool.call.toolview` slot. Unregistered Tool names use the generic card. Business UI packages register only their wire Tool names and atomic views — they do not pair Session events, rebuild the transcript, or own root/subcall topology, because the Runtime remains authoritative for call/result pairing, lifecycle, and recursive `subCalls` projection.
 
+## Table of Contents
+
+- [Rendering contract](#rendering-contract)
+- [Atomic Tool views](#atomic-tool-views)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="rendering-contract"></a>
 ## Rendering contract
 
 `ToolCallTree` receives one root `ToolCallBlock` that already contains recursive `subCalls`, selection state, the session `cwd`, and Host callbacks for opening files and inspecting calls. It recursively walks the standard call blocks and sends the root and children at every depth through the same atomic dispatch path, without subscribing to a separate parent-to-children map.
@@ -32,6 +49,7 @@ A native or PTC dispatch failure carrying `AUTO_REVIEW_DENIED` takes precedence 
 
 Generic rows retain the original argument payload and format it only when an expandable row is opened. This keeps large file-edit and code payloads out of the collapsed-list allocation while preserving the same formatted body on expansion.
 
+<a id="atomic-tool-views"></a>
 ## Atomic Tool views
 
 An owning business package registers its wire Tool name into `tool.call.toolview`:
@@ -48,12 +66,16 @@ The owner payload is `ToolCallOwnerProps`: `callId`, `toolName`, the frozen `blo
 
 This package currently owns the generic fallback and the built-in shell/pwsh, read, write/edit, grep/glob, web, todo, question, and Code Dispatch presentations. `ui-skill` demonstrates a business-owned registration for `skill`.
 
+Recorded-result tools — goal, schedule, Cordis inspection, workflow/ralph, session-query, subagent/team, job, terminal-session, and LSP calls — share `DetailsRow`, which projects a successful single-text result into a compact `ToolDetails` list of localized fields, badges, receipts, and file locations. A result whose recorded format is unknown, malformed, mixed-content, or spilled keeps the generic Input/Output body, so no diagnostic text is ever hidden. `todo_write` renders the recorded list itself and, when the loaded window contains a preceding durable `todo/write`, diffs added/updated/removed entries against it; `todoToolview` installs that index through `conversationEvents`/`conversationViews` (`tool-todo-history`), which also repairs baselines when older history is prepended. The details side panel renders the same structured body ahead of its raw-output fallback, so the compact card and the panel never disagree about a result's content.
+
 Card-specific limits and fallback rules remain in the owning [terminal](../../../.agents/notes/implemented/feature/2026-07-28-web-terminal-card.md), [diff](../../../.agents/notes/implemented/feature/2026-07-30-web-diff-card.md), [read](../../../.agents/notes/implemented/feature/2026-07-30-web-read-card-frontend.md), [search](../../../.agents/notes/implemented/feature/2026-07-30-web-search-card.md), and [web](../../../.agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.md) notes.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Call/result pairing, lifecycle, and `subCalls` projection stay authoritative in the Runtime; the package renders dispatched blocks and registers tool-view slots.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side tool presentation layer that renders logged calls without changing model context.
@@ -67,3 +89,13 @@ None; this package neither assembles nor sends a provider request.
 - The Host excludes `run_code` from PTC mode program bindings, so production events produce one dispatch level; the recursive Runtime/UI contract supports nesting.
 - First-party Tool views are colocated here and can move to their owning business packages independently through the keyed slot.
 - Tool copy reuses the `ui-conversation` locale namespace. Ask-user transcript pairing is best-effort: ambiguous or mixed payloads remain generic so no diagnostic block is discarded.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-26-admin-archive-conversation-reader.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-26-admin-archive-conversation-reader.md
-2026-08-26-admin-archive-conversation-reader.md: 2124f2e937b2ab4cb0094ef511dea5b78226713a
-2026-08-26-admin-archive-conversation-reader.zh.md: 66dc47d430b30d4cdaaddc0eddb5ef80e69bdd85
+/agent-note-human-readable-admin-archive-conversation-reader:
+  en: 242449f8a7ed2cf3
+  zh: 350fb6bfefacb75f
+/agent-note-human-readable-admin-archive-conversation-reader/problem:
+  en: 49f4a840ca3546f2
+  zh: e4bc2802befc4caf
+/agent-note-human-readable-admin-archive-conversation-reader/decision:
+  en: 37879c26054b016c
+  zh: 04b8d21794dc6b69
+/agent-note-human-readable-admin-archive-conversation-reader/alternatives-considered:
+  en: 25926051f7cab41b
+  zh: b919671471459723
+/agent-note-human-readable-admin-archive-conversation-reader/consequences:
+  en: 410b76310928e2e0
+  zh: 1e5ec388db77162e
+/agent-note-human-readable-admin-archive-conversation-reader/verification:
+  en: 7b32bcf4e2b7efc3
+  zh: 8a273594ed42df67

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-14-gateway-body-migration.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-14-gateway-body-migration.md
-2026-09-14-gateway-body-migration.md: da6fa51604f6b6a5036d625da3e9f2d16c07a22b
-2026-09-14-gateway-body-migration.zh.md: 2024354247c0065361a57ec1df33741008100df5
+/agent-note-gateway-body-migration-is-server-authoritative:
+  en: 1d90a82d927b5a68
+  zh: b71205d90a52e839
+/agent-note-gateway-body-migration-is-server-authoritative/problem:
+  en: b7eea5920fb24843
+  zh: 27b948e77eb6eb5c
+/agent-note-gateway-body-migration-is-server-authoritative/decision:
+  en: 8bd6fda060f8c331
+  zh: 4cf975a403e5cc5d
+/agent-note-gateway-body-migration-is-server-authoritative/alternatives-considered:
+  en: 1ade3cb62d0932de
+  zh: 9fcdcefbc6464c13
+/agent-note-gateway-body-migration-is-server-authoritative/consequences:
+  en: 0d1f2d4129fbf36d
+  zh: cdf1e328324606fd
+/agent-note-gateway-body-migration-is-server-authoritative/verification:
+  en: 8f443eedfdb39901
+  zh: c8843621f83f6531

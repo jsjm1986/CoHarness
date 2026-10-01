@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-required-gateway-plugin-tests.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-17-required-gateway-plugin-tests.md
-2026-09-17-required-gateway-plugin-tests.md: baee86a09ac603f561c5d3193aa7f6387f3c57a8
-2026-09-17-required-gateway-plugin-tests.zh.md: 9c154f9b7049b0a5a180307ba44ff24643d5500f
+/agent-note-required-gateway-plugin-tests:
+  en: a843f18ed908fcc8
+  zh: 1fa31f4ee5b9db9c
+/agent-note-required-gateway-plugin-tests/problem:
+  en: fb32ea7876a1bdb4
+  zh: b659750d6e26db64
+/agent-note-required-gateway-plugin-tests/decision:
+  en: fee34c3c894ccd23
+  zh: d8fc3f72c455c3cd
+/agent-note-required-gateway-plugin-tests/alternatives-considered:
+  en: b305fd1ae787f29e
+  zh: 0abc2475f8b69133
+/agent-note-required-gateway-plugin-tests/consequences:
+  en: 4ddd107ac8fd248e
+  zh: 095d1d1075a33f44
+/agent-note-required-gateway-plugin-tests/testing:
+  en: 8d0ae3ca12c23541
+  zh: 145803437553d719

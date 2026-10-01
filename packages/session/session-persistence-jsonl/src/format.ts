@@ -24,7 +24,7 @@ import type { SessionFormatEvent } from '@deepseek-ai/dsh-session-format'
 import type { SessionFormatRecovery, SessionFormatRestore } from '@deepseek-ai/dsh-session-format'
 import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import { assertV3RowAdmission } from '@deepseek-ai/dsh-session-format-v2-to-v3'
-import { assertV4RowAdmission } from '@deepseek-ai/dsh-session-format-v3-to-v4'
+import { assertV7RowAdmission } from '@deepseek-ai/dsh-session-format-v6-to-v7'
 import {
   SessionFormatUnsupportedError,
   sessionFormatVersionRefusal,
@@ -427,7 +427,7 @@ export class SessionLogScanner {
     this.meta = parsed.meta
     this.restore = parsed.restore
     this.assertRowAdmission = expectedVersion === sessionFormatCatalog.currentVersion
-      ? assertV4RowAdmission
+      ? assertV7RowAdmission
       : expectedVersion === 3 ? assertV3RowAdmission : (): void => {}
     this.inputBytes = headerRecord.length
     this.committedBytes = headerRecord.length

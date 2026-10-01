@@ -46,13 +46,17 @@ interface InventoryCommit {
 function main(args: string[]): number {
   const tagIndex = args.indexOf('--tag')
   const tag = tagIndex >= 0 ? args[tagIndex + 1] : undefined
-  if (tag === undefined || tag.startsWith('--')) fail('usage: gen-upstream-commit-inventory --tag <newTag>')
+  if (tag === undefined || tag.startsWith('--')) fail('usage: gen-upstream-commit-inventory --tag <newTag> [--from <baselineCommit>]')
   const manifest = loadUpstreamSyncManifest(root)
   const toCommit = resolveTagCommit(root, tag)
   if (toCommit === null) fail(`tag "${tag}" is not fetched locally`)
+  const fromIndex = args.indexOf('--from')
+  const fromArg = fromIndex >= 0 ? args[fromIndex + 1] : undefined
+  const baselineCommit = fromArg ?? manifest.syncedCommit
+  const baselineTag = fromArg === undefined ? manifest.syncedTag : fromArg
 
   const upstreamOnly = new Set(manifest.upstreamOnly.map(item => item.package))
-  const log = git(['log', '--no-merges', '--format=%H%x00%s%x00', `${manifest.syncedCommit}..${toCommit}`])
+  const log = git(['log', '--no-merges', '--format=%H%x00%s%x00', `${baselineCommit}..${toCommit}`])
   const commits: InventoryCommit[] = []
   for (const record of log.split('\0\n')) {
     const line = record.replace(/\0$/, '')
@@ -76,7 +80,7 @@ function main(args: string[]): number {
 
   const out = {
     schemaVersion: 1,
-    generatedFrom: { baseline: manifest.syncedTag, baselineCommit: manifest.syncedCommit, target: tag, targetCommit: toCommit },
+    generatedFrom: { baseline: baselineTag, baselineCommit, target: tag, targetCommit: toCommit },
     commitCount: commits.length,
     commits,
   }

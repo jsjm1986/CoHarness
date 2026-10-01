@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/README.md
-README.md: ce2794815b3beb29b9f4b20f4f2928c43bd5f7ba
-README.zh.md: ac3c6e36ae86a8cfb32c760c750ff6df934db3e3
+/harness-gateway:
+  en: 8302ff457ba35ee1
+  zh: e4f946b2193ffd0b
+/harness-gateway/toolchain:
+  en: b59b6e11a672d823
+  zh: 7b4f814515387d88
+/harness-gateway/configuration-environment-variables-see-src-config-ts:
+  en: aa26b0cab1e4d787
+  zh: c2f05014f16e617a
+/harness-gateway/admin-console-and-project-grants:
+  en: fe943936cb935b08
+  zh: 830207a989358e1a
+/harness-gateway/plugin-management:
+  en: d4efa58ffd53a6e9
+  zh: e94e18092dd5e7a2
+/harness-gateway/user-terminals:
+  en: e0b675257d4e4f68
+  zh: eb88c89945da1d78
+/harness-gateway/android-shell-and-completion-notifications:
+  en: 72a9968da0393e82
+  zh: 4d316e3b470249fc
+/harness-gateway/project-collaborative-conversations:
+  en: 3ee1c544781e503c
+  zh: 0d519a28bd312c00
+/harness-gateway/model-governance-and-usage-accounting:
+  en: eb28042a9cf0f3f4
+  zh: 42b12cd4fd7fb2e6
+/harness-gateway/postgresql-control-plane:
+  en: f6b3c2bec06e7521
+  zh: 6f6eed12e5dd114d
+/harness-gateway/deployment-maintenance-and-coordinated-restore:
+  en: 7ef905bf3ac7c13a
+  zh: 0fccbd0a765322ba
+/harness-gateway/access-revocation-across-gateways:
+  en: b841061ff4b270a6
+  zh: 11f233f8d060f9e3
+/harness-gateway/layered-directory-enforcement:
+  en: 91962bdcbcf1d939
+  zh: ded1f7362217d6d1

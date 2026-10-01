@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-web-result-card-frontend.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-web-result-card-frontend.md
-2026-07-30-web-result-card-frontend.md: 6a00e0820af2c4010554df444a7585fb226294bf
-2026-07-30-web-result-card-frontend.zh.md: 42543e2dcde181ba7fd75f4965e83adefe32d872
+/agent-note-web-result-card-frontend-rendering-the-web-render-intent-in-the-browser:
+  en: a42c062904d594d6
+  zh: 1f388b77e67c26fb
+/agent-note-web-result-card-frontend-rendering-the-web-render-intent-in-the-browser/problem:
+  en: dadcd60141224701
+  zh: 519743905b624ac1
+/agent-note-web-result-card-frontend-rendering-the-web-render-intent-in-the-browser/decision:
+  en: e39ce0732422f29b
+  zh: bee4c51d36d49ae8
+/agent-note-web-result-card-frontend-rendering-the-web-render-intent-in-the-browser/consequences:
+  en: 8e6d9ea33f716620
+  zh: 151f246dd300dec0
+/agent-note-web-result-card-frontend-rendering-the-web-render-intent-in-the-browser/alternatives-considered:
+  en: 3751e92a20937a69
+  zh: 3dfa45e53f317383
+/agent-note-web-result-card-frontend-rendering-the-web-render-intent-in-the-browser/testing:
+  en: a5a64645e2df418d
+  zh: 5fb42c7372f4a7a5
+/agent-note-web-result-card-frontend-rendering-the-web-render-intent-in-the-browser/related:
+  en: 1e9db30ff52d982c
+  zh: 23f3cb732ae3bedb

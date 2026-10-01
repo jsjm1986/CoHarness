@@ -1,12 +1,29 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 
+import { api, graphql, initializeIssueStartDate, issueSnapshot } from './github.mjs'
+import {
+  auditIssue,
+  initializePullRequestStartDates,
+  repairIssueLabels,
+  runLifecycle,
+} from './lifecycle.mjs'
+import {
+  lifecyclePullRequestSnapshot,
+  pullRequestSnapshot,
+  runPullRequestCheck,
+  runPullRequestPreflight,
+} from './pull-request.mjs'
 import {
   assertCanonicalRepository,
   canonicalRepository,
   countVisibleUnits,
   nextResolvingIssueStatus,
   parseReferences,
+  projectDate,
   projectOwnerSelection,
   retainIssueReferences,
   resolvingIssueStatusCommand,
@@ -14,7 +31,78 @@ import {
   validateBody,
   validateIssue,
   validatePullRequest,
-} from './policy.mjs'
+} from './rules.mjs'
+
+const projectGraphqlData = ({
+  projectItem = true,
+  startDate = null,
+  startDateField = true,
+  startDateType = 'DATE',
+  startDateIsIssueField = false,
+} = {}) => ({
+  user: {
+    projectV2: {
+      id: 'project-id',
+      title: 'DSH Issue Management',
+      fields: {
+        nodes: [
+          {
+            id: 'status-field-id',
+            name: 'Status',
+            dataType: 'SINGLE_SELECT',
+            isIssueField: false,
+            options: [{ id: 'inbox-option-id', name: 'Inbox' }],
+          },
+          ...(startDateField
+            ? [
+                {
+                  id: 'start-date-field-id',
+                  name: 'Start Date',
+                  dataType: startDateType,
+                  isIssueField: startDateIsIssueField,
+                },
+              ]
+            : []),
+        ],
+      },
+    },
+  },
+  repository: {
+    issue: {
+      id: 'issue-id',
+      projectItems: {
+        nodes: projectItem
+          ? [
+              {
+                id: 'item-id',
+                project: { id: 'project-id' },
+                fieldValueByName: { name: 'Inbox', optionId: 'inbox-option-id' },
+                startDateValue: startDate === null ? null : { date: startDate },
+              },
+            ]
+          : [],
+      },
+    },
+  },
+})
+
+const mockGraphql = (t, resolve) => {
+  const requests = []
+  const previousToken = process.env.GH_TOKEN
+  process.env.GH_TOKEN = 'test-token'
+  t.after(() => {
+    if (previousToken === undefined) delete process.env.GH_TOKEN
+    else process.env.GH_TOKEN = previousToken
+  })
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    assert.equal(url, 'https://api.github.com/graphql')
+    assert.equal(options.headers.Authorization, 'Bearer test-token')
+    const request = JSON.parse(options.body)
+    requests.push(request)
+    return Response.json({ data: resolve(request, requests.length - 1) })
+  })
+  return requests
+}
 
 const withDetails = (summary) =>
   `${summary}\n\n<details><summary>验收与细节</summary>待补充。</details>`
@@ -64,6 +152,32 @@ const reviewedPull = (labels) => ({
   labels,
   references: { all: [2], resolving: [], related: [2] },
   issues: new Map([[2, { priority: null }]]),
+})
+
+test('keeps the five Issue types as collapsed-details templates', () => {
+  const directory = new URL('../ISSUE_TEMPLATE/', import.meta.url)
+  assert.deepEqual(
+    readdirSync(directory).sort(),
+    ['bug.md', 'config.yml', 'feature.md', 'idea.md', 'research.md', 'task.md'],
+  )
+  const types = { 'bug.md': 'Bug', 'feature.md': 'Feature', 'idea.md': 'Idea', 'research.md': 'Research', 'task.md': 'Task' }
+  for (const [file, type] of Object.entries(types)) {
+    const source = readFileSync(new URL(file, directory), 'utf8')
+    const frontmatter = source.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? ''
+    const keys = frontmatter
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => line.slice(0, line.indexOf(':')))
+      .sort()
+    assert.deepEqual(keys, ['about', 'assignees', 'labels', 'name', 'title', 'type'], file)
+    assert.match(source, new RegExp(`^type: ${type}$`, 'm'), file)
+    assert.match(source, /<details>/, file)
+    assert.doesNotMatch(source, /<details[^>]*\sopen/i, file)
+  }
+  assert.equal(
+    readFileSync(new URL('config.yml', directory), 'utf8'),
+    'blank_issues_enabled: false\ncontact_links: []\n',
+  )
 })
 
 test('requires policy runs to target the configured repository', () => {
@@ -169,6 +283,108 @@ test('reserves PR kind and legacy labels for pull requests', () => {
   assert.deepEqual(validateIssue({ ...legalIssue, labels: ['area/web', 'source/member'] }), [])
 })
 
+test('removes reserved labels from Issues before validation', async (t) => {
+  const previousToken = process.env.GH_TOKEN
+  process.env.GH_TOKEN = 'test-token'
+  t.after(() => {
+    if (previousToken === undefined) delete process.env.GH_TOKEN
+    else process.env.GH_TOKEN = previousToken
+  })
+  const requests = []
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    requests.push({ url, method: options.method })
+    assert.equal(options.headers.Authorization, 'Bearer test-token')
+    if (url.endsWith('/labels/bug-fix')) {
+      return Response.json({ message: 'Label does not exist' }, { status: 404 })
+    }
+    return Response.json([])
+  })
+
+  const issue = {
+    ...legalIssue,
+    number: 42,
+    labels: ['area/web', 'kind/bug-fix', 'bug-fix', 'source/member'],
+  }
+  const repaired = await repairIssueLabels(issue)
+
+  assert.deepEqual(repaired.labels, ['area/web', 'source/member'])
+  assert.deepEqual(issue.labels, ['area/web', 'kind/bug-fix', 'bug-fix', 'source/member'])
+  assert.deepEqual(validateIssue(repaired), [])
+  assert.deepEqual(requests, [
+    {
+      url: 'https://api.github.com/repos/jsjm1986/CoHarness/issues/42/labels/kind%2Fbug-fix',
+      method: 'DELETE',
+    },
+    {
+      url: 'https://api.github.com/repos/jsjm1986/CoHarness/issues/42/labels/bug-fix',
+      method: 'DELETE',
+    },
+  ])
+})
+
+test('deletes a stale audit comment after repairing its only violation', async (t) => {
+  const previousToken = process.env.GH_TOKEN
+  process.env.GH_TOKEN = 'test-token'
+  t.after(() => {
+    if (previousToken === undefined) delete process.env.GH_TOKEN
+    else process.env.GH_TOKEN = previousToken
+  })
+  const requests = []
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    requests.push({ url, method: options.method ?? 'GET' })
+    if (url.endsWith('/issues/42')) {
+      return Response.json({
+        node_id: 'issue-id',
+        title: '修复标签残留',
+        body: withDetails('修复标签残留。'),
+        assignees: [],
+        labels: [{ name: 'area/web' }, { name: 'kind/bug-fix' }],
+        type: { name: 'Bug' },
+        state: 'open',
+        state_reason: null,
+      })
+    }
+    if (url.endsWith('/issues/42/issue-field-values?per_page=100')) return Response.json([])
+    if (url.endsWith('/graphql')) {
+      return Response.json({ data: projectGraphqlData() })
+    }
+    if (url.endsWith('/labels/kind%2Fbug-fix')) return Response.json([{ name: 'area/web' }])
+    if (url.endsWith('/issues/42/comments?per_page=100')) {
+      return Response.json([
+        {
+          id: 99,
+          user: { type: 'Bot' },
+          body: '<!-- dsh-issue-policy -->\nold audit',
+        },
+      ])
+    }
+    if (url.endsWith('/issues/comments/99')) return new Response(null, { status: 204 })
+    return Response.json({ message: 'unexpected request' }, { status: 500 })
+  })
+
+  assert.deepEqual(await auditIssue(42), [])
+  assert.deepEqual(
+    requests.map(({ url, method }) => ({ path: new URL(url).pathname + new URL(url).search, method })),
+    [
+      { path: '/repos/jsjm1986/CoHarness/issues/42', method: 'GET' },
+      { path: '/repos/jsjm1986/CoHarness/issues/42/issue-field-values?per_page=100', method: 'GET' },
+      { path: '/graphql', method: 'POST' },
+      {
+        path: '/repos/jsjm1986/CoHarness/issues/42/labels/kind%2Fbug-fix',
+        method: 'DELETE',
+      },
+      {
+        path: '/repos/jsjm1986/CoHarness/issues/42/comments?per_page=100',
+        method: 'GET',
+      },
+      {
+        path: '/repos/jsjm1986/CoHarness/issues/comments/99',
+        method: 'DELETE',
+      },
+    ],
+  )
+})
+
 test('keeps terminal Status aligned with the native close reason', () => {
   assert.deepEqual(
     validateIssue({ ...legalIssue, status: 'Done', state: 'closed', stateReason: 'completed' }),
@@ -194,6 +410,155 @@ test('separates resolving and informational references', () => {
     }),
     { all: [4, 7, 12], resolving: [12], related: [4, 7] },
   )
+})
+
+test('converts PR creation timestamps to Shanghai Project dates', () => {
+  assert.equal(projectDate('2026-08-27T15:59:59Z', 'Asia/Shanghai'), '2026-08-27')
+  assert.equal(projectDate('2026-08-27T16:00:00Z', 'Asia/Shanghai'), '2026-08-28')
+  assert.throws(() => projectDate('invalid', 'Asia/Shanghai'), /无效的 PR 创建时间/)
+})
+
+test('initializes every referenced Issue only for a PR opened event', async () => {
+  const writes = []
+  const pull = {
+    createdAt: '2026-08-27T16:00:00Z',
+    references: { all: [4, 7, 12] },
+  }
+  const initialize = async (number, date) => writes.push({ number, date })
+
+  await initializePullRequestStartDates(pull, 'opened', initialize)
+  assert.deepEqual(writes, [
+    { number: 4, date: '2026-08-28' },
+    { number: 7, date: '2026-08-28' },
+    { number: 12, date: '2026-08-28' },
+  ])
+
+  for (const action of ['edited', 'synchronize', 'reopened']) {
+    await initializePullRequestStartDates(pull, action, initialize)
+  }
+  assert.equal(writes.length, 3)
+})
+
+test('reads Priority from the native Issue field and Status from the Project item', async (t) => {
+  const previousGhToken = process.env.GH_TOKEN
+  const previousGithubToken = process.env.GITHUB_TOKEN
+  const previousProjectToken = process.env.PROJECT_TOKEN
+  process.env.GH_TOKEN = 'repository-token'
+  delete process.env.GITHUB_TOKEN
+  process.env.PROJECT_TOKEN = 'project-token'
+  t.after(() => {
+    if (previousGhToken === undefined) delete process.env.GH_TOKEN
+    else process.env.GH_TOKEN = previousGhToken
+    if (previousGithubToken === undefined) delete process.env.GITHUB_TOKEN
+    else process.env.GITHUB_TOKEN = previousGithubToken
+    if (previousProjectToken === undefined) delete process.env.PROJECT_TOKEN
+    else process.env.PROJECT_TOKEN = previousProjectToken
+  })
+  const urls = []
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    urls.push(url)
+    if (url.endsWith('/issues/42')) {
+      assert.equal(options.headers.Authorization, 'Bearer repository-token')
+      return Response.json({
+        node_id: 'issue-id',
+        title: '原生字段优先级',
+        body: null,
+        assignees: [],
+        labels: [],
+        type: { name: 'Task' },
+        state: 'open',
+        state_reason: null,
+      })
+    }
+    if (url.endsWith('/issues/42/issue-field-values?per_page=100')) {
+      assert.equal(options.headers.Authorization, 'Bearer repository-token')
+      return Response.json([
+        { issue_field_name: 'Priority', single_select_option: { name: 'P1' } },
+      ])
+    }
+    assert.equal(url, 'https://api.github.com/graphql')
+    assert.equal(options.headers.Authorization, 'Bearer project-token')
+    return Response.json({ data: projectGraphqlData() })
+  })
+
+  const issue = await issueSnapshot(42)
+
+  assert.equal(issue.priority, 'P1')
+  assert.equal(issue.status, 'Inbox')
+  assert.deepEqual(urls, [
+    'https://api.github.com/repos/jsjm1986/CoHarness/issues/42',
+    'https://api.github.com/repos/jsjm1986/CoHarness/issues/42/issue-field-values?per_page=100',
+    'https://api.github.com/graphql',
+  ])
+})
+
+test('writes an empty Project Start Date with the configured field', async (t) => {
+  const requests = mockGraphql(t, (request) => {
+    if (request.query.includes('query(')) return projectGraphqlData()
+    return { updateProjectV2ItemFieldValue: { projectV2Item: { id: 'item-id' } } }
+  })
+
+  await initializeIssueStartDate(42, '2026-08-28')
+
+  assert.equal(requests.length, 2)
+  assert.match(requests[0].query, /isIssueField/)
+  assert.match(requests[0].query, /startDateValue: fieldValueByName/)
+  assert.equal(requests[0].variables.projectOwnerIsUser, true)
+  assert.equal(requests[0].variables.projectOwner, 'jsjm1986')
+  assert.equal(requests[0].variables.startDateField, 'Start Date')
+  assert.match(requests[0].query, /ProjectV2ItemFieldDateValue/)
+  assert.match(requests[1].query, /updateProjectV2ItemFieldValue/)
+  assert.match(requests[1].query, /value: \{date: \$date\}/)
+  assert.deepEqual(requests[1].variables, {
+    projectId: 'project-id',
+    itemId: 'item-id',
+    fieldId: 'start-date-field-id',
+    date: '2026-08-28',
+  })
+})
+
+test('preserves an existing Project Start Date', async (t) => {
+  const requests = mockGraphql(t, () => projectGraphqlData({ startDate: '2026-08-01' }))
+
+  await initializeIssueStartDate(42, '2026-08-28')
+
+  assert.equal(requests.length, 1)
+})
+
+test('adds a referenced Issue to the Project before setting Start Date', async (t) => {
+  const requests = mockGraphql(t, (request) => {
+    if (request.query.includes('query(')) return projectGraphqlData({ projectItem: false })
+    if (request.query.includes('addProjectV2ItemById')) {
+      return { addProjectV2ItemById: { item: { id: 'new-item-id' } } }
+    }
+    return { updateProjectV2ItemFieldValue: { projectV2Item: { id: 'new-item-id' } } }
+  })
+
+  await initializeIssueStartDate(42, '2026-08-28')
+
+  assert.equal(requests.length, 3)
+  assert.deepEqual(requests[1].variables, { projectId: 'project-id', contentId: 'issue-id' })
+  assert.deepEqual(requests[2].variables, {
+    projectId: 'project-id',
+    itemId: 'new-item-id',
+    fieldId: 'start-date-field-id',
+    date: '2026-08-28',
+  })
+})
+
+test('rejects a missing, non-Date, or Issue-level Start Date field', async (t) => {
+  let response = projectGraphqlData({ startDateField: false })
+  const requests = mockGraphql(t, () => response)
+
+  await assert.rejects(initializeIssueStartDate(42, '2026-08-28'), /Project 缺少 Start Date 字段/)
+  response = projectGraphqlData({ startDateType: 'TEXT' })
+  await assert.rejects(initializeIssueStartDate(42, '2026-08-28'), /Start Date 字段必须为 Date/)
+  response = projectGraphqlData({ startDateIsIssueField: true })
+  await assert.rejects(
+    initializeIssueStartDate(42, '2026-08-28'),
+    /Start Date 字段必须为 Project Date 字段/,
+  )
+  assert.equal(requests.length, 3)
 })
 
 test('does not treat pull request references as Issue associations', () => {
@@ -301,10 +666,21 @@ test('maps only explicit review handoffs to review status commands', () => {
   )
 })
 
-test('keeps ordinary pull request events as forward-only implementation signals', () => {
-  for (const action of ['opened', 'edited', 'synchronize', 'reopened', 'labeled', 'unlabeled']) {
+test('keeps PR opening, reopening, and body edits as implementation signals', () => {
+  for (const action of ['opened', 'reopened']) {
     assert.equal(resolvingIssueStatusCommand('pull_request', { action }), 'implementation')
   }
+  assert.equal(
+    resolvingIssueStatusCommand('pull_request', { action: 'edited', changes: { body: { from: '' } } }),
+    'implementation',
+  )
+  for (const action of ['synchronize', 'labeled', 'unlabeled', 'edited']) {
+    assert.equal(resolvingIssueStatusCommand('pull_request', { action }), null)
+  }
+  assert.equal(
+    resolvingIssueStatusCommand('pull_request', { action: 'edited', changes: { title: { from: '' } } }),
+    null,
+  )
   assert.equal(
     resolvingIssueStatusCommand('pull_request', { action: 'review_request_removed' }),
     null,
@@ -434,5 +810,279 @@ test('allows missing Priority only when resolving Issues are also unprioritized'
     validatePullRequest({ ...pull, labels: [...pull.labels, 'p2'] }).includes(
       '有 Priority 的解决型 PR 要求每个被解决 Issue 都设置 Priority',
     ),
+  )
+})
+
+const issueFixture = ({ title = '常规议题', body = null, fieldValues = [], pull_request, state = 'open' } = {}) => ({
+  node_id: 'issue-id',
+  title,
+  body,
+  assignees: [],
+  labels: [],
+  type: { name: 'Task' },
+  state,
+  state_reason: null,
+  pull_request,
+  fieldValues,
+})
+
+const mockPolicyApi = (t, { pull = {}, requested = true, reviews = [], issues = {} } = {}) => {
+  const environment = ['GH_TOKEN', 'GITHUB_TOKEN', 'PROJECT_TOKEN', 'GITHUB_API_URL', 'GITHUB_OUTPUT']
+  const previous = new Map(environment.map((key) => [key, process.env[key]]))
+  const directory = mkdtempSync(join(tmpdir(), 'dsh-policy-'))
+  t.after(() => {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    rmSync(directory, { recursive: true, force: true })
+  })
+  for (const key of environment) delete process.env[key]
+  process.env.GH_TOKEN = 'repository-token'
+  process.env.GITHUB_OUTPUT = join(directory, 'output')
+  const requests = []
+  const output = []
+  t.mock.method(process.stdout, 'write', (text) => { output.push(text); return true })
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const path = new URL(url).pathname + new URL(url).search
+    requests.push(path)
+    if (path.endsWith('/pulls/10')) return Response.json({
+      draft: false, user: { type: 'User' }, body: 'Refs #2',
+      labels: [{ name: 'kind/cleanup' }, { name: 'area/infra' }], ...pull,
+    })
+    if (path.endsWith('/requested_reviewers')) {
+      return Response.json({ users: requested ? [{}] : [], teams: [] })
+    }
+    if (path.endsWith('/reviews?per_page=100')) return Response.json(reviews)
+    const fieldMatch = path.match(/\/issues\/(\d+)\/issue-field-values\?per_page=100$/)
+    if (fieldMatch) {
+      const number = Number(fieldMatch[1])
+      assert.ok(Object.hasOwn(issues, number), 'Unexpected request: ' + path)
+      const issue = issues[number]
+      return Response.json(issue?.fieldValues ?? [])
+    }
+    const number = Number(path.match(/\/issues\/(\d+)$/)?.[1])
+    assert.ok(Object.hasOwn(issues, number), 'Unexpected request: ' + path)
+    const issue = issues[number]
+    return Response.json(issue ?? { message: 'Not Found' }, { status: issue === null ? 404 : 200 })
+  })
+  return { requests, output, workflowOutput: () => readFileSync(process.env.GITHUB_OUTPUT, 'utf8') }
+}
+
+for (const [name, pull, requested, count, needsProject, automated] of [
+  ['draft', { draft: true }, true, 1, true, false],
+  ['Bot', { user: { type: 'Bot' } }, true, 1, false, true],
+  ['App', { user: { type: 'App' } }, true, 1, false, true],
+  ['not reviewed', {}, false, 3, true, false],
+]) {
+  test('reads no Issue or Project for a currently exempt ' + name + ' PR', async (t) => {
+    const fixture = mockPolicyApi(t, { pull: { body: 'Fixes #999', ...pull }, requested })
+    const event = { pull_request: { number: 10, draft: false, user: { type: 'User' } } }
+    assert.deepEqual(await runPullRequestPreflight(event), {
+      eligible: false,
+      needsProject,
+      automated,
+    })
+    assert.equal(fixture.requests.length, count)
+    assert.equal(
+      fixture.workflowOutput(),
+      `eligible=false\nexempt=true\nneeds-project=${needsProject}\nlegacy-automated=${automated}\n`,
+    )
+    await runPullRequestCheck(event)
+    assert.equal(fixture.requests.length, count * 2)
+    assert.ok(fixture.output.every((text) => text.includes('Issue policy exempt')))
+  })
+}
+
+test('validates informational Issues and ignores PR numbers without Project reads', async (t) => {
+  const fixture = mockPolicyApi(t, {
+    pull: { body: 'Refs #2; Fixes #3' },
+    issues: { 2: issueFixture(), 3: issueFixture({ pull_request: {} }) },
+  })
+  const event = { pull_request: { number: 10 } }
+  assert.deepEqual(await runPullRequestPreflight(event), {
+    eligible: true,
+    needsProject: true,
+    automated: false,
+  })
+  assert.equal(fixture.requests.length, 6)
+  assert.equal(fixture.workflowOutput(), 'eligible=true\nexempt=false\nneeds-project=true\nlegacy-automated=false\n')
+  await runPullRequestCheck(event)
+  assert.equal(fixture.requests.length, 12)
+  assert.ok(!fixture.requests.includes('/graphql'))
+})
+
+test('requires a real Issue and explains why stacked PR references do not qualify', async (t) => {
+  const fixture = mockPolicyApi(t, {
+    pull: { body: 'Fixes #3' },
+    issues: { 3: issueFixture({ pull_request: {} }) },
+  })
+  await assert.rejects(runPullRequestCheck({ pull_request: { number: 10 } }), /Issue policy 未通过/)
+  assert.equal(fixture.requests.length, 4)
+  assert.match(fixture.output.join(''), /PR 编号（包括堆叠依赖 PR）不算 Issue 引用/)
+})
+
+test('enforces current metadata on title edits and prior reviews without requested reviewers', async (t) => {
+  const fixture = mockPolicyApi(t, {
+    requested: false,
+    reviews: [{}],
+    pull: { labels: [] },
+    issues: { 2: issueFixture() },
+  })
+  await assert.rejects(runPullRequestCheck({ action: 'edited', changes: { title: { from: 'old' } }, pull_request: { number: 10 } }), /Issue policy 未通过/)
+  assert.equal(fixture.requests.length, 5)
+  assert.match(fixture.output.join(''), /PR 必须至少有一个 area/)
+})
+
+test('fails closed on missing referenced numbers', async (t) => {
+  const fixture = mockPolicyApi(t, { pull: { body: 'Fixes #2' }, issues: { 2: null } })
+  await assert.rejects(runPullRequestPreflight({ pull_request: { number: 10 } }), /404/)
+  assert.equal(fixture.requests.length, 4)
+})
+
+test('performs no lifecycle requests for removed signals or title-only edits', async (t) => {
+  const fixture = mockPolicyApi(t)
+  for (const action of ['synchronize', 'labeled', 'unlabeled']) {
+    await runLifecycle('pull_request', { action, pull_request: { number: 10 } })
+  }
+  await runLifecycle('pull_request', { action: 'edited', changes: { title: { from: '' } }, pull_request: { number: 10 } })
+  for (const state of ['approved', 'commented']) {
+    await runLifecycle('pull_request_review', { action: 'submitted', review: { state }, pull_request: { number: 10 } })
+  }
+  assert.deepEqual(fixture.requests, [])
+})
+
+test('keeps REST headers, null responses, and transport errors unchanged', async (t) => {
+  mockPolicyApi(t)
+  process.env.GH_TOKEN = 'preferred-token'
+  process.env.PROJECT_TOKEN = 'project-token'
+  process.env.GITHUB_API_URL = 'https://github.example/api/v3'
+  const requests = []
+  const responses = [
+    Response.json({ ok: true }),
+    new Response(null, { status: 204 }),
+    new Response('missing', { status: 404 }),
+    new Response('denied', { status: 403 }),
+    Response.json({ errors: [{ message: 'first' }, { message: 'second' }] }),
+  ]
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    requests.push({ url, options })
+    return responses.shift()
+  })
+  assert.deepEqual(await api('/example'), { ok: true })
+  assert.deepEqual(requests[0], {
+    url: 'https://github.example/api/v3/example',
+    options: { headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: 'Bearer preferred-token',
+      'X-GitHub-Api-Version': '2026-03-10',
+      'User-Agent': 'dsh-issue-policy',
+    } },
+  })
+  assert.equal(await api('/empty'), null)
+  assert.equal(await api('/missing', { allow404: true }), null)
+  await assert.rejects(api('/denied', { method: 'PATCH' }), { message: 'PATCH /denied: 403 denied' })
+  await assert.rejects(graphql('query { viewer { login } }', {}), { message: 'first; second' })
+  assert.equal(requests[4].options.headers.Authorization, 'Bearer project-token')
+  assert.equal(requests[4].options.method, 'POST')
+  assert.equal(requests[4].options.body, JSON.stringify({ query: 'query { viewer { login } }', variables: {} }))
+  assert.equal(requests.length, 5)
+})
+
+test('reads policy snapshots in reference order without Project reads', async (t) => {
+  const fixture = mockPolicyApi(t, {
+    pull: { body: 'Refs #4; Fixes #3; Fixes #2' },
+    issues: {
+      2: issueFixture({ fieldValues: [{ issue_field_name: 'Priority', single_select_option: { name: 'P1' } }] }),
+      3: issueFixture({ pull_request: {} }),
+      4: issueFixture(),
+    },
+  })
+  const expectedIssue = (number, priority = null) => ({
+    number,
+    nodeId: 'issue-id',
+    title: '常规议题',
+    body: '',
+    assignees: [],
+    labels: [],
+    type: 'Task',
+    priority,
+    status: null,
+    state: 'open',
+    stateReason: null,
+  })
+  assert.deepEqual(await pullRequestSnapshot(10), {
+    number: 10,
+    isDraft: false,
+    authorType: 'User',
+    reviewRequestCount: 1,
+    reviewCount: 0,
+    labels: ['kind/cleanup', 'area/infra'],
+    references: { all: [2, 4], resolving: [2], related: [4] },
+    issues: new Map([[2, expectedIssue(2, 'P1')], [4, expectedIssue(4)]]),
+  })
+  const repo = '/repos/jsjm1986/CoHarness'
+  assert.deepEqual(fixture.requests, [
+    repo + '/pulls/10',
+    repo + '/pulls/10/requested_reviewers',
+    repo + '/pulls/10/reviews?per_page=100',
+    repo + '/issues/2',
+    repo + '/issues/2/issue-field-values?per_page=100',
+    repo + '/issues/3',
+    repo + '/issues/4',
+    repo + '/issues/4/issue-field-values?per_page=100',
+  ])
+  assert.deepEqual(fixture.output, [])
+})
+
+test('reads lifecycle references for draft Bot PRs without review or Project requests', async (t) => {
+  const fixture = mockPolicyApi(t, {
+    pull: { draft: true, user: { type: 'Bot' }, body: 'Fixes #2; Refs #4', created_at: '2026-08-27T16:00:00Z' },
+    issues: { 2: issueFixture(), 4: issueFixture() },
+  })
+  const snapshot = await lifecyclePullRequestSnapshot(10)
+  assert.equal(snapshot.createdAt, '2026-08-27T16:00:00Z')
+  assert.deepEqual(snapshot.references, { all: [2, 4], resolving: [2], related: [4] })
+  assert.deepEqual([...snapshot.issues.keys()], [2, 4])
+  const repo = '/repos/jsjm1986/CoHarness'
+  assert.deepEqual(fixture.requests, [
+    repo + '/pulls/10',
+    repo + '/issues/2',
+    repo + '/issues/2/issue-field-values?per_page=100',
+    repo + '/issues/4',
+    repo + '/issues/4/issue-field-values?per_page=100',
+  ])
+  assert.deepEqual(fixture.output, [])
+})
+
+test('allocates lifecycle runners only for relevant reviews and PR body edits', () => {
+  const source = readFileSync(new URL('../workflows/issue-lifecycle.yml', import.meta.url), 'utf8')
+  const issues = source.split('  issues:')[1].split('  pull_request:')[0]
+  const pulls = source.split('  pull_request:')[1].split('  pull_request_review:')[0]
+  const actions = (block) => [...block.matchAll(/^      - (\w+)$/gm)].map((match) => match[1])
+  assert.deepEqual(
+    actions(issues),
+    ['opened', 'edited', 'assigned', 'unassigned', 'labeled', 'unlabeled', 'closed', 'reopened', 'typed', 'untyped', 'field_added', 'field_removed'],
+  )
+  assert.deepEqual(actions(pulls), ['opened', 'edited', 'reopened', 'review_requested'])
+  const job = source.slice(source.indexOf('  lifecycle:'))
+  const beforeSteps = job.slice(0, job.indexOf('    steps:'))
+  assert.ok(beforeSteps.includes('    if: >-'))
+  assert.ok(beforeSteps.includes("github.repository == 'jsjm1986/CoHarness'"))
+  assert.ok(beforeSteps.includes("vars.DSH_ISSUE_AUTOMATION_ENABLED == 'true'"))
+  assert.ok(beforeSteps.includes("github.event.review.state == 'changes_requested'"))
+  assert.ok(beforeSteps.includes("github.event.action != 'edited' || github.event.changes.body != null"))
+  assert.ok(source.includes('ref: ${{ github.event.repository.default_branch }}'))
+  assert.ok(source.includes('persist-credentials: false'))
+})
+
+test('keeps the policy job on App-token auth and ships the selective-preflight marker', () => {
+  const source = readFileSync(new URL('../workflows/issue-policy.yml', import.meta.url), 'utf8')
+  assert.ok(source.includes('GH_TOKEN: ${{ steps.app-token.outputs.token }}'))
+  assert.doesNotMatch(source, /GITHUB_TOKEN:\s*\$\{\{ github\.token \}\}/)
+  assert.ok(source.includes('run: node .github/issue-management/policy.mjs pr'))
+  assert.deepEqual(
+    JSON.parse(readFileSync(new URL('./selective-preflight.json', import.meta.url), 'utf8')),
+    { version: 1 },
   )
 })

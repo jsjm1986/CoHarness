@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-cmdline-seam-trim.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-11-cmdline-seam-trim.md
-2026-08-11-cmdline-seam-trim.md: d7908d2c80552f13500ccd36c59a249f1374cbb1
-2026-08-11-cmdline-seam-trim.zh.md: 75a57c022fe71494e0a7165277c4cb351240f1b1
+/agent-note-trim-the-command-line-seams-to-existing-interfaces:
+  en: 3248d0553f095f9b
+  zh: d8f5488d80fcac72
+/agent-note-trim-the-command-line-seams-to-existing-interfaces/problem:
+  en: a38934a0b5d62e8f
+  zh: cf623483237c5957
+/agent-note-trim-the-command-line-seams-to-existing-interfaces/decision:
+  en: ffe162f8fa5dedc9
+  zh: 9f0777c19ff47585
+/agent-note-trim-the-command-line-seams-to-existing-interfaces/alternatives-considered:
+  en: 83175391d96d77b4
+  zh: 992956afd7b289a3
+/agent-note-trim-the-command-line-seams-to-existing-interfaces/consequences:
+  en: e98f23ae75e7d3cb
+  zh: b8f2de1e354bde47

@@ -605,4 +605,74 @@ describe('Host Workspace increments', () => {
     expect((await after).payload.type).not.toBe('host/archived-sessions-changed')
     abort.abort()
   })
+
+  it('pins a session to the front of the registry set, streams it once, and refuses archived or missing ids', async () => {
+    const { api, root } = await harness()
+    const workspace = expectOk(await api.workspace.create(request({ path: stageDir(root, 'pin-home') }))).workspace
+    const sessionId = SessionId('session-to-pin')
+    const otherId = SessionId('session-pinned-later')
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId })))
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId: otherId })))
+    expect(expectOk(await api.workspace.list(request({}))).pinnedSessionIds).toEqual([])
+
+    const abort = new AbortController()
+    const stream: AsyncIterator<RpcRequest<HostFrame>> =
+      api.events.host(request({}), abort.signal)[Symbol.asyncIterator]()
+    const changed = nextHostFrame(stream)
+    expect(expectOk(await api.workspace.pinSession(request({ sessionId }))).pinnedSessionIds)
+      .toEqual([sessionId])
+    expect(await changed).toMatchObject({
+      payload: { type: 'host/pinned-sessions-changed', pinnedSessionIds: [sessionId] },
+    })
+
+    // A newer pin fronts the complete ordered set; list re-baselines it.
+    const second = nextHostFrame(stream)
+    expect(expectOk(await api.workspace.pinSession(request({ sessionId: otherId }))).pinnedSessionIds)
+      .toEqual([otherId, sessionId])
+    expect((await second).payload).toMatchObject({
+      type: 'host/pinned-sessions-changed', pinnedSessionIds: [otherId, sessionId],
+    })
+    expect(expectOk(await api.workspace.list(request({}))).pinnedSessionIds).toEqual([otherId, sessionId])
+
+    // An already-pinned id resolves as a no-op: the next observed frames are a
+    // later attach's, not another pin snapshot.
+    const after = nextHostFrame(stream)
+    expect(expectOk(await api.workspace.pinSession(request({ sessionId }))).pinnedSessionIds)
+      .toEqual([otherId, sessionId])
+    const markerSession = SessionId('session-after-repin')
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId: markerSession })))
+    expect((await after).payload.type).not.toBe('host/pinned-sessions-changed')
+    // The attach emits its session-added + workspace-changed pair: drain the
+    // second increment so the unpin observation starts from a clean stream.
+    expect((await nextHostFrame(stream)).payload.type).not.toBe('host/pinned-sessions-changed')
+
+    // Unpinning echoes the remaining set; a repeat is a silent no-op.
+    const unpinned = nextHostFrame(stream)
+    expect(expectOk(await api.workspace.unpinSession(request({ sessionId: otherId }))).pinnedSessionIds)
+      .toEqual([sessionId])
+    expect((await unpinned).payload).toMatchObject({
+      type: 'host/pinned-sessions-changed', pinnedSessionIds: [sessionId],
+    })
+    expect(expectOk(await api.workspace.unpinSession(request({ sessionId: otherId }))).pinnedSessionIds)
+      .toEqual([sessionId])
+
+    // Archiving drops the pin in the same durable write: both snapshots stream.
+    const archived = nextHostFrame(stream)
+    const pinDropped = nextHostFrame(stream)
+    expectOk(await api.workspace.archiveSession(request({ sessionId })))
+    const drops = [await archived, await pinDropped]
+    expect(drops.map(envelope => envelope.payload.type))
+      .toEqual(['host/archived-sessions-changed', 'host/pinned-sessions-changed'])
+    expect(drops[1]).toMatchObject({ payload: { pinnedSessionIds: [] } })
+
+    const deniedArchived = await api.workspace.pinSession(request({ sessionId }))
+    expect(deniedArchived.result).toMatchObject({
+      ok: false, error: { code: 'session-archived', details: { sessionId } },
+    })
+    const missing = await api.workspace.pinSession(request({ sessionId: SessionId('session-ghost') }))
+    expect(missing.result).toMatchObject({
+      ok: false, error: { code: 'session-not-found', details: { sessionId: 'session-ghost' } },
+    })
+    abort.abort()
+  })
 })

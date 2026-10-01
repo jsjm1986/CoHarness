@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-web-agent-runtime-context.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-28-web-agent-runtime-context.md
-2026-07-28-web-agent-runtime-context.md: 6c2bb8faf0db56d2a29b47726ab295c3501cce2d
-2026-07-28-web-agent-runtime-context.zh.md: c32be64ba0a90e87dbe483e64b4d01f0ad331654
+/agent-note-web-agents-receive-explicit-runtime-context:
+  en: 9ccc58089201cc0f
+  zh: a43eafa2b2750757
+/agent-note-web-agents-receive-explicit-runtime-context/problem:
+  en: 473ddd1c68bf528c
+  zh: eb2ee6f560af930c
+/agent-note-web-agents-receive-explicit-runtime-context/decision:
+  en: afe9638f9212f175
+  zh: aaf12f4f935b44c5
+/agent-note-web-agents-receive-explicit-runtime-context/verification:
+  en: 3b8398b597678717
+  zh: b9ec11665167b96c
+/agent-note-web-agents-receive-explicit-runtime-context/alternatives-considered:
+  en: d6ba200e3ae17a02
+  zh: bcf84131f43a6593
+/agent-note-web-agents-receive-explicit-runtime-context/consequences:
+  en: e869187bb718e4a4
+  zh: 83cc5ac231e13fd1

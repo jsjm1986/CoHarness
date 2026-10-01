@@ -3,7 +3,7 @@
 
 # Capability Seams And Core Services
 
-A service can be a core spine service, a swappable capability seam, or a bundle/composition point. The graph shows the package that owns the service declaration, known implementation packages, and packages that consume the service directly.
+A service can be a core spine service, a swappable capability seam, a bundle/composition point, or a standalone service. The graph shows the package that owns the service declaration, known implementation packages, and packages that consume the service directly.
 
 ```mermaid
 flowchart LR
@@ -144,7 +144,7 @@ flowchart LR
   svc_userQuestions["ctx.userQuestions<br/>Human question/answer seam"]
   pkg_plan_mode["plan-mode"]
   svc_planMode["ctx.planMode<br/>Plan collaboration state"]
-  pkg_agent_presets["agent-presets"]
+  pkg_agent_preset_registry["agent-preset-registry"]
   svc_agentPresets["ctx.agentPresets<br/>Per-session agent composition"]
   pkg_commands["commands"]
   svc_commands["ctx.commands<br/>Human command registry"]
@@ -154,8 +154,10 @@ flowchart LR
   svc_sessionProjectionCache["ctx.sessionProjectionCache<br/>Persisted projection cache"]
   pkg_skill["skill"]
   svc_skills["ctx.skills<br/>Skill provider registry"]
+  pkg_sandbox_windows_acl["sandbox-windows-acl"]
   pkg_skill_badge["skill-badge"]
   pkg_skill_filesystem["skill-filesystem"]
+  pkg_skill_office["skill-office"]
   svc_agents["ctx.agents<br/>Agent service"]
   pkg_acp["acp"]
   pkg_agent_default_model["agent-default-model"]
@@ -227,6 +229,7 @@ flowchart LR
   svc_jobs["ctx.jobs<br/>Background job registry"]
   pkg_jobs_local["jobs-local"]
   pkg_tool_jobs["tool-jobs"]
+  pkg_api_job_controller["api-job-controller"]
   pkg_web["web"]
   svc_web["ctx.web<br/>Web access provider registry"]
   pkg_web_search_exa["web-search-exa"]
@@ -264,7 +267,7 @@ flowchart LR
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
   pkg_agent_loop --> svc_agentLoop
-  pkg_agent_presets --> svc_agentPresets
+  pkg_agent_preset_registry --> svc_agentPresets
   pkg_agent_team --> svc_agentTeams
   pkg_api_gateway --> svc_typertGateway
   pkg_api_terminal_controller --> svc_terminalController
@@ -343,6 +346,7 @@ flowchart LR
   pkg_sandbox_local --> svc_sandbox
   pkg_sandbox_policy --> svc_sandboxPolicy
   pkg_sandbox_ssh --> svc_sandbox
+  pkg_sandbox_windows_acl --> svc_skills
   pkg_session --> svc_sessions
   pkg_session_persistence --> svc_sessionPersistence
   pkg_session_persistence_gateway --> svc_sessionPersistence
@@ -365,6 +369,7 @@ flowchart LR
   pkg_skill --> svc_skills
   pkg_skill_badge --> svc_skills
   pkg_skill_filesystem --> svc_skills
+  pkg_skill_office --> svc_skills
   pkg_spill --> svc_spillStore
   pkg_spill_local --> svc_spillStore
   pkg_ssh --> svc_ssh
@@ -448,8 +453,10 @@ flowchart LR
   svc_invariants --> pkg_agent_loop
   svc_invariants --> pkg_scope
   svc_invariants --> pkg_session
+  svc_jobs --> pkg_api_job_controller
   svc_jobs --> pkg_tool_bash
   svc_jobs --> pkg_tool_jobs
+  svc_jobs --> pkg_tool_pwsh
   svc_jobs --> pkg_tool_subagent
   svc_jobs --> pkg_tool_terminal
   svc_llm --> pkg_agent_loop
@@ -602,11 +609,11 @@ flowchart LR
 | `ctx.tools` | `core` | [`tools`](../packages/core/tools) | - | [`agent-loop`](../packages/core/agent-loop), [`tool-ask-user`](../packages/interaction/tool-ask-user), [`tool-bash`](../packages/shell/tool-bash), [`tool-cordis`](../packages/extensions/tool-cordis), [`tool-fs`](../packages/fs/tool-fs), [`tool-terminal`](../packages/terminal/tool-terminal), [`tool-skill`](../packages/skill/tool-skill), [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-todo`](../packages/todo/tool-todo), [`tool-web`](../packages/web/tool-web) | - | Registers capabilities, owns the PTC transport, and routes calls through pre-policy, monotonic guards, around dispatch, post-policy, and final-result observation. |
 | `ctx.userQuestions` | `seam` | [`user-questions`](../packages/interaction/user-questions) | - | [`tool-ask-user`](../packages/interaction/tool-ask-user) | - | UI front ends provide the active human-answer provider; tool-ask-user pauses a tool call on the provider-neutral ask() promise. |
 | `ctx.planMode` | `core` | [`plan-mode`](../packages/plan/plan-mode) | - | - | - | Folds logged plan/mode state, flushes user selections at turn boundaries, renders deployment-owned guidance, registers /plan, and keeps the plan-exit schema stable across transitions. |
-| `ctx.agentPresets` | `core` | [`agent-presets`](../packages/preset/agent-presets) | - | - | - | Discovers preset directories over trusted and user-authored roots and mounts one preset cordis.yml under an agent scope during creation, rejecting a row that never activates or that publishes into the root service realm. |
+| `ctx.agentPresets` | `core` | `agent-preset-registry` | - | - | - | Eagerly mounts YAML-declared preset revisions, binds Agents and cold readers to scoped contributions, and retains retired revisions until their last user releases them. |
 | `ctx.commands` | `core` | [`commands`](../packages/interaction/commands) | - | - | - | Plugins register direct human commands without sending invocations to the model. |
 | `ctx.sessionProjections` | `core` | [`session-projection`](../packages/session/session-projection) | - | [`tool-todo`](../packages/todo/tool-todo), [`session-title`](../packages/session/session-title), [`host-apiproxy`](../packages/host/apiproxy) | - | Domains register state-driven fold units; the eager drive keeps per-session watermark states and api-proxy serves baselines and pushes changed values. |
 | `ctx.sessionProjectionCache` | `core` | [`session-projection-cache`](../packages/session/session-projection-cache) | - | [`host-apiproxy`](../packages/host/apiproxy) | - | Durably checkpoints projection unit states per session (throttled + turn/end/detach mandatory points) and serves the cold-read ladder: cache row + persistence tail replay, so listings never load full logs. |
-| `ctx.skills` | `seam` | [`skill`](../packages/skill/skill) | [`skill-badge`](../packages/skill/skill-badge), [`skill-filesystem`](../packages/skill/skill-filesystem) | [`tool-skill`](../packages/skill/tool-skill) | - | Merges provider skill catalogs; tool-skill renders the session-prefix catalog and loads complete skill bodies. |
+| `ctx.skills` | `seam` | [`skill`](../packages/skill/skill) | [`sandbox-windows-acl`](../packages/sandbox/sandbox-windows-acl), [`skill-badge`](../packages/skill/skill-badge), [`skill-filesystem`](../packages/skill/skill-filesystem), [`skill-office`](../packages/skill/skill-office) | [`tool-skill`](../packages/skill/tool-skill) | - | Merges provider skill catalogs; tool-skill renders the session-prefix catalog and loads complete skill bodies. |
 | `ctx.agents` | `core` | [`agent`](../packages/core/agent) | - | [`agent-loop`](../packages/core/agent-loop), [`acp`](../packages/acp/acp), `subagent-inprocess` | - | Owns live Agent handles, the create/resume factory seam, and process-local initiator propagation. |
 | `ctx.agentDefaultModel` | `core` | [`agent-default-model`](../packages/core/agent-default-model) | - | [`headless`](../packages/bundle/headless), [`host-apiproxy`](../packages/host/apiproxy) | - | Layers the default ModelSelection through settings so direct and Host-backed Agent entry points share one state owner. |
 | `ctx.agentLoop` | `bundle` | [`agent-loop`](../packages/core/agent-loop) | - | [`agent-spine-demo`](../packages/examples/agent-spine-demo) | - | The one concrete loop plugin; extension packages depend on dsh-agent events and services, not on this package. |
@@ -630,7 +637,7 @@ flowchart LR
 | `ctx.subagents` | `seam` | [`subagent`](../packages/subagent/subagent) | [`subagent-spawn-in-process`](../packages/subagent/subagent-spawn-in-process), [`subagent-fork-in-process`](../packages/subagent/subagent-fork-in-process), [`subagent-acp`](../packages/subagent/subagent-acp), [`subagent-codex`](../packages/subagent/subagent-codex), [`subagent-claude-code`](../packages/subagent/subagent-claude-code), [`subagent-dsh-sdk`](../packages/subagent/subagent-dsh-sdk) | [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-subagent-control`](../packages/subagent/tool-subagent-control), [`tool-ralph`](../packages/workflow/tool-ralph) | - | Providers implement transports; the service also owns optional Activation-based continuation orchestration, tool-subagent selects one-shot or continuable delegation, tool-subagent-control delivers follow-ups, and tool-ralph requires one fresh structured-output route. |
 | `ctx.subagentModelSelection` | `core` | [`tool-subagent`](../packages/subagent/tool-subagent) | - | [`tool-subagent`](../packages/subagent/tool-subagent) | - | The settings service validates and snapshots the host allowlist used by the delegation tool when model-selection support is explicitly enabled; the shipped composition keeps it disabled by default. |
 | `ctx.agentTeams` | `core` | `agent-team` | - | `tool-agent-team` | - | Owns the implicit-root roster, durable peer mailbox, shared task DAG, and continuable-child lifecycle; tool-agent-team contributes the scoped model policy and controls. |
-| `ctx.jobs` | `seam` | [`jobs`](../packages/jobs/jobs) | [`jobs-local`](../packages/jobs/jobs-local) | [`tool-bash`](../packages/shell/tool-bash), [`tool-terminal`](../packages/terminal/tool-terminal), [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-jobs`](../packages/jobs/tool-jobs) | - | Producers (background bash, PTY sends, and subagent delegations) register running work; tool-jobs is the model-facing controller that reads, lists, and kills it; jobs-local is the process-local registry. |
+| `ctx.jobs` | `seam` | [`jobs`](../packages/jobs/jobs) | [`jobs-local`](../packages/jobs/jobs-local) | [`tool-bash`](../packages/shell/tool-bash), [`tool-pwsh`](../packages/shell/tool-pwsh), [`tool-terminal`](../packages/terminal/tool-terminal), [`tool-subagent`](../packages/subagent/tool-subagent), [`tool-jobs`](../packages/jobs/tool-jobs), `api-job-controller` | - | Producers (background bash/pwsh, PTY sends, and subagent delegations) register running work; record-declaring jobs additionally stream raw output for non-consuming observers; tool-jobs is the model-facing controller that reads, lists, and kills it; jobs-local is the process-local registry. |
 | `ctx.web` | `seam` | [`web`](../packages/web/web) | [`web-search-exa`](../packages/web/web-search-exa), [`web-search-perplexity`](../packages/web/web-search-perplexity), [`web-search-deepseek`](../packages/web/web-search-deepseek), [`web-fetch-http`](../packages/web/web-fetch-http) | [`tool-web`](../packages/web/tool-web) | - | Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names. |
 | `ctx.spillStore` | `seam` | [`spill`](../packages/spill/spill) | [`spill-local`](../packages/spill/spill-local) | [`spill-policy`](../packages/spill/spill-policy) | - | The backend saves oversized tool text and returns a model-facing locator plus retrieval hint; spill-policy is the tools/post-execute consumer that decides when to spill. |
 | `ctx.directoryPicker` | `seam` | `directory-picker` | `directory-picker-native`, `directory-picker-browse` | `apiproxy` | - | Discriminated interaction capability: the native backend opens one OS chooser on the host display, the browse backend serves listing/creation primitives for the in-app browser; dual-face backends fill ui-workspace directory-flow slots from their browser halves (no wire advertisement). |

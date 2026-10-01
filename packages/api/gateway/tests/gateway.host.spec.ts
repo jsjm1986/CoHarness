@@ -3,7 +3,8 @@ import type { AddressInfo } from 'node:net'
 import { describe, expect, it, vi } from 'vitest'
 import { Context, Service, symbols } from '@deepseek-ai/cordis'
 import { z } from 'zod'
-import { apply as applyConnection, inject as connectionInject } from '@deepseek-ai/dsh-client-connection'
+import { apply as applyConnection, inject as connectionInject, type HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
+import { provideBrowserCredentials } from './browser-credentials.ts'
 import type { WebServer, WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import {
   bindTypertRemote,
@@ -199,6 +200,22 @@ async function serveRoute(route: WebRoute, failures?: unknown[]): Promise<{ read
       })
     }),
   }
+}
+
+/** Exchange a Connection launch token without mounting the frontend fallback. */
+function browserCookie(connection: HostConnectionHandle, origin: string): string {
+  const target = new URL(connection.authenticatedUrl(origin))
+  let setCookie: string | undefined
+  connection.authorizeIndex({
+    method: 'GET',
+    url: `${target.pathname}${target.search}`,
+    headers: { host: target.host },
+  }, {
+    writeHead(_status, headers) { setCookie = headers?.['set-cookie'] },
+    end() {},
+  })
+  if (setCookie === undefined) throw new Error('gateway fixture did not receive an authentication cookie')
+  return setCookie.split(';', 1)[0]!
 }
 
 class FirstSharedService extends Service {
@@ -1197,6 +1214,7 @@ describe('TypertGatewayService', () => {
   it('dispatches claimed invocations through /api and leaves unclaimed endpoints to its fallback', async () => {
     const ctx = new Context().extend({ fixtureScope: 'http-caller' })
     const routes: WebRoute[] = []
+    provideBrowserCredentials(ctx)
     ctx.provide('webServer', fakeHttpServer(routes) as WebServer)
     const connectionFiber = ctx.plugin({ inject: [...connectionInject], apply: applyConnection })
     await connectionFiber
@@ -1210,11 +1228,12 @@ describe('TypertGatewayService', () => {
     let strictActive = true
     expect(routes).toHaveLength(1)
     const server = await serveRoute(routes[0]!)
+    const cookie = browserCookie(ctx.connection, server.origin)
 
     try {
       const response = await fetch(`${server.origin}/api/goals/create`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', cookie },
         body: JSON.stringify({
           type: 'client-request',
           rpcId: 'rpc-http',
@@ -1234,7 +1253,7 @@ describe('TypertGatewayService', () => {
 
       const invalid = await fetch(`${server.origin}/api/goals/create`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', cookie },
         body: JSON.stringify({
           type: 'client-request',
           rpcId: 'rpc-invalid',
@@ -1258,7 +1277,7 @@ describe('TypertGatewayService', () => {
       strictActive = false
       const withdrawn = await fetch(`${server.origin}/api/goals/create`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', cookie },
         body: JSON.stringify({
           type: 'client-request',
           rpcId: 'rpc-withdrawn',
@@ -1278,7 +1297,7 @@ describe('TypertGatewayService', () => {
       })
       expect(JSON.stringify(withdrawnBody)).toContain('strict definition was withdrawn')
 
-      const unclaimed = await fetch(`${server.origin}/api/legacy/list`, { method: 'POST' })
+      const unclaimed = await fetch(`${server.origin}/api/legacy/list`, { method: 'POST', headers: { cookie } })
       expect(unclaimed.status).toBe(404)
     } finally {
       await server.close()
@@ -1306,6 +1325,7 @@ describe('Remote stream dispatch', () => {
   it('serves Remote streams over the trusted /api/_stream HTTP subtree', async () => {
     const ctx = new Context().extend({ fixtureScope: 'stream-caller' })
     const routes: WebRoute[] = []
+    provideBrowserCredentials(ctx)
     ctx.provide('webServer', fakeHttpServer(routes) as WebServer)
     const connectionFiber = ctx.plugin({ inject: [...connectionInject], apply: applyConnection })
     await connectionFiber
@@ -1319,11 +1339,12 @@ describe('Remote stream dispatch', () => {
     const route = routes[0]
     if (route === undefined) throw new Error('fixture Connection did not register its /api route')
     const server = await serveRoute(route, failures)
+    const cookie = browserCookie(ctx.connection, server.origin)
     const post = (endpoint: string, payload: unknown, init?: RequestInit) => fetch(
       `${server.origin}/api/_stream/${endpoint}`,
       {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', cookie },
         body: JSON.stringify({ type: 'client-request', rpcId: `stream-${endpoint}`, method: endpoint, payload }),
         ...init,
       },

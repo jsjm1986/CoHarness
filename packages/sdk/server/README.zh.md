@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-sdk-jsonrpc-server
 
 [English](README.md) | 中文
@@ -8,30 +13,52 @@
 
 `dsh-sdk-jsonrpc-server` 通过 stdio 服务 SDK 协议格式（wire format），使进程外客户端能够驱动 harness agent（智能体）：它为每个 `sessionId` 打开一个会话、把用户提示词排入队列，并把每个会话事件与 agent 状态转换流式发回客户端。把它作为 `jsonrpc` 插件挂载到 Loader 组合中；外围插件树提供其余一切——agent、模型适配器、持久化与工具。Stdout 只承载 JSON-RPC 帧，因此部署不得组合 stdout logger。它通过 dispose（资源释放）根运行时并以 0 退出应答 `shutdown`；EOF 与信号退出归 app bin 负责。
 
+## 目录
+
+- [组装](#wiring)
+- [配置](#config)
+- [stdout 即协议](#stdout-is-the-protocol)
+- [关闭与退出语义](#shutdown-and-exit-semantics)
+- [协议说明](#wire-notes)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="wiring"></a>
 ## 组装
 
 `inject: ['agents']`。服务器按 `sessionId` 获取或创建一个 agent。只有服务对生命周期建立快照时记录的 `local` 标志为 true，服务器才会转发 subagent 完成事件；提供方名称、子级 id 和持久化谱系均不能证明本地性。已注册的适配器优先；尚无适配器负责的 `deepseek-official` 路由会挂载 `dsh-llm-deepseek`，任何其他尚无适配器负责的提供方都会导致初始化失败。其他能力由外围 `cordis.yml` 提供。
 
+<a id="config"></a>
 ## 配置
 
 `maxTokensAsSuccess` 默认为 `false`，且只影响 `subagent.finished` 上由部署映射的状态；根会话提示词没有提示词级状态。`JsonRpcConfig.input`、`output` 和 `exit` 是仅供运行时使用的传输钩子；生产环境使用进程 stdio 和 `process.exit`。JSON-RPC 传输默认限制输入行 1 MiB、待处理请求 1,000 个、并发入站处理器 100 个、排队输出 8 MiB。服务器另行限制存活 session 1,000 个、提示词内容 4 MiB 和 1,000 个内容块；所有上限都可配置为正整数，超限工作会被拒绝。
 
+<a id="stdout-is-the-protocol"></a>
 ## stdout 即协议
 
 Stdout 只承载 JSON-RPC 帧。部署不得组合 stdout logger；诊断应写入 stderr。
 
+<a id="shutdown-and-exit-semantics"></a>
 ## 关闭与退出语义
 
 插件响应 `shutdown`，刷新响应并 dispose（资源释放）根上下文，使 SDK 持有的 agent、订阅和持久化达到完全停稳，然后以代码 0 退出。EOF 和信号退出由 app bin 处理，后者也会 dispose 根上下文。仅卸载此插件会停止服务，但不会退出进程。
 
+<a id="wire-notes"></a>
 ## 协议说明
 
 `initialize` 是运行时就绪边界：服务器由 Loader 组合挂载时，会等待当前插件树完成所有加载任务后再响应，因此首次提示词能够看到 MCP 初始工具发现等异步同级能力。没有 Loader 的手工组装上下文仍可立即使用。`initialize.serverInfo.name` 的协议稳定值为 `deepseek-harness-sdk-runtime`。可选的正整数 `initialize.maxTokens` 会成为每个 SDK 创建的 agent 及其进程内后代的请求输出上限；非法值会使初始化失败，省略时则不发送 SDK 上限，并应用所选适配器或提供方路由的默认值。`session/prompt` 将一条带标识的用户消息排入队列，并立即返回 `{ messageId }`。服务器将每个持久事实作为 `session.event` 流式发出，并将整个 agent 生命周期的每次状态转换作为 `session.status` 发出；它不会把某条助手消息或 `turn/end` 归属于该提示词。同一会话上的独立请求可以继续排入更多工作。持久化根目录和 persona 由 `cordis.yml` 提供。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。服务器把每个 stdio 帧翻译为 harness 调用；会话状态留在它所驱动的运行时中。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### SDK 用户消息
@@ -48,9 +75,20 @@ Stdout 只承载 JSON-RPC 帧。部署不得组合 stdout logger；诊断应写�
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **协议没有逐会话关闭或提示词取消方法**：SDK 创建的 agent 会一直存活到进程关闭。
 - **没有逐提示词结果**：`MessageId` 只标识 inbox 准入；拥有自动化活动区间的客户端必须自行定义并观察该区间。
 - **stdout 纯净性由部署保证**：外围配置仍可能加载 stdout logger 并破坏 JSON-RPC 通道；此插件不会检查或否决同级 logger。
 - **自动挂载适配器仅支持 DeepSeek**：`initialize` 可以复用任何预先注册的模型适配器，但唯一的回退行为是挂载 `dsh-llm-deepseek`。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

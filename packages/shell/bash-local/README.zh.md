@@ -120,6 +120,7 @@ if (result.timedOut) console.log('timed out after', result.timeoutMs)
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -129,6 +130,7 @@ if (result.timedOut) console.log('timed out after', result.timeoutMs)
 
 不会直接导致 KV Cache 失效；请求前缀的任何变更由具名消费方负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

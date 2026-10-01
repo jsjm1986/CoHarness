@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-web-file-and-session-references.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-web-file-and-session-references.md
-2026-07-27-web-file-and-session-references.md: 7d7ae67896e4b8d0fe43a3fc4ebf2acc3573e904
-2026-07-27-web-file-and-session-references.zh.md: b0d3bec7cbcaa9c0f6ec78c67b19cb13573c1acc
+/agent-note-web-file-and-session-references:
+  en: 5c8e0107d6aea8c6
+  zh: 7bf14af053c9f92b
+/agent-note-web-file-and-session-references/problem:
+  en: ed8f52815b2931cb
+  zh: 35641629645fc354
+/agent-note-web-file-and-session-references/decision:
+  en: e21afff3918aee69
+  zh: f4625d2f5a7eef8f
+/agent-note-web-file-and-session-references/reference-transaction:
+  en: 72b22a3749ee99e6
+  zh: d2f515be5f1f695e
+/agent-note-web-file-and-session-references/alternatives-considered:
+  en: d36240bd2dde81c0
+  zh: 1577eb289af69462
+/agent-note-web-file-and-session-references/verification:
+  en: f276d190218a3e75
+  zh: 669cc75de696124c
+/agent-note-web-file-and-session-references/consequences:
+  en: 30c7e3fd4532d0a7
+  zh: 84ecc1777c5a5860

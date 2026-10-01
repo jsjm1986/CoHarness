@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-renderer
 
 [English](README.md) | 中文
@@ -10,6 +15,16 @@ client entry 还持有 slot outlet、会话 provider 以及 observable 到 uSES 
 
 `dsh-client-ui-renderer` 挂载组装完成的 dsh Web 客户端 GUI：完整客户端插件名册稳定后，启动内核调用 `ctx.uiRenderer.mount(container)`，它会 hydrate 不依赖框架的启动页，并在下一次绘制前切换到完整的 React 应用。业务插件仍是接收类型化 props 的普通 React 组件，通过 props 获取会话与 Workspace 数据，永远不需要自行接线订阅——渲染器在 slot outlet 处把运行时的裸 observable source 绑定为 selector 钩子。Web 外壳与启动内核是它仅有的直接消费方，因此只要组合需要 React 渲染的 GUI，就需要它。
 
+## 目录
+
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该包是浏览器端渲染组装层，不注册任何面向模型的内容。
@@ -18,7 +33,18 @@ client entry 还持有 slot outlet、会话 provider 以及 observable 到 uSES 
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **应用首帧会等待全部客户端 entry**——启动内核只在 loader 名册稳定后交出挂载点。按区域就绪仍属暂缓事项。
 - **slot 渲染没有 Suspense 集成或逐 entry 惰性加载**——完整插件名册稳定后，渲染器才挂载根节点。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>
