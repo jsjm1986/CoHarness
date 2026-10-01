@@ -463,7 +463,7 @@ describe('PluginManagerPage', () => {
   })
 
   it('shows the subject while installing, folds the pnpm output behind the details, and stops through the Host', () => {
-    const subject = { spec: 'dsh-x', status: 'accepted', kind: 'registry', name: 'dsh-x', version: '1.4.2', description: 'A sidebar.', bundle: true } as const
+    const subject = { spec: 'dsh-x', status: 'accepted', kind: 'registry', registry: null, name: 'dsh-x', version: '1.4.2', description: 'A sidebar.', bundle: true } as const
     const run = { jobId: 'j1', command: 'pnpm add dsh-x', cwd: '/home/u/.dsh/profiles/web', output: 'Progress: resolved \x1b[96m1\x1b[39m\n' }
     const { actions, set } = renderTab({ install: { ...IDLE_INSTALL, open: true, spec: 'dsh-x', phase: 'running', subject, runs: [run] } })
     expect(screen.getByRole('status').textContent).toBe(en.installingTitle)
@@ -506,7 +506,7 @@ describe('PluginManagerPage', () => {
   })
 
   it('waits with the Host through starting, stopping, and applying, and words an unconfirmed stop', () => {
-    const subject = { spec: 'slow', status: 'accepted', kind: 'registry', name: 'slow', bundle: true } as const
+    const subject = { spec: 'slow', status: 'accepted', kind: 'registry', registry: null, name: 'slow', bundle: true } as const
     const { actions, set } = renderTab({ install: { ...IDLE_INSTALL, open: true, spec: 'slow', phase: 'starting', subject } })
     // Before the Host acknowledges the run there is nothing to stop: cancel, back, and close all wait.
     expect(screen.getByRole('status').textContent).toBe(en.installStarting)
@@ -537,7 +537,7 @@ describe('PluginManagerPage', () => {
   })
 
   it('offers to enable what a finished install added, and says when it waits for a restart', () => {
-    const subject = { spec: '/plugins/dsh-x', status: 'accepted', kind: 'path', name: 'dsh-x', bundle: true } as const
+    const subject = { spec: '/plugins/dsh-x', status: 'accepted', kind: 'path', registry: null, name: 'dsh-x', bundle: true } as const
     const { actions, set } = renderTab({
       install: {
         ...IDLE_INSTALL,
@@ -563,7 +563,7 @@ describe('PluginManagerPage', () => {
     expect(screen.getByText(en.installDoneRestart)).toBeTruthy()
 
     // A run that named no bundle leaves only Done.
-    set({ install: { ...IDLE_INSTALL, open: true, spec: 'dsh-x', phase: 'done', subject: { spec: 'dsh-x', status: 'accepted', kind: 'registry', name: 'dsh-x', bundle: true } } })
+    set({ install: { ...IDLE_INSTALL, open: true, spec: 'dsh-x', phase: 'done', subject: { spec: 'dsh-x', status: 'accepted', kind: 'registry', registry: null, name: 'dsh-x', bundle: true } } })
     expect(screen.getByText(en.installDoneNothing)).toBeTruthy()
     expect(screen.queryByRole('button', { name: en.installEnableNow })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: en.installClose }))
@@ -571,7 +571,7 @@ describe('PluginManagerPage', () => {
   })
 
   it('asks to allow the scripts a blocked install left pending, retries with them, and says what was allowed', () => {
-    const subject = { spec: 'dsh-x', status: 'accepted', kind: 'registry', name: 'dsh-x', bundle: true } as const
+    const subject = { spec: 'dsh-x', status: 'accepted', kind: 'registry', registry: null, name: 'dsh-x', bundle: true } as const
     const { actions, set } = renderTab({
       install: {
         ...IDLE_INSTALL, open: true, spec: 'dsh-x', phase: 'failed', subject,
@@ -598,7 +598,7 @@ describe('PluginManagerPage', () => {
   })
 
   it('words a failed install by its kind, else in the Host\'s words, and retries it', () => {
-    const subject = { spec: 'github:a/b', status: 'accepted', kind: 'git', bundle: null } as const
+    const subject = { spec: 'github:a/b', status: 'accepted', kind: 'git', registry: null, bundle: null } as const
     const { actions, set } = renderTab({
       install: {
         ...IDLE_INSTALL,
@@ -644,7 +644,7 @@ describe('PluginManagerPage', () => {
     set({ install: { ...IDLE_INSTALL, open: true, spec: 'x', phase: 'failed', failure: null } })
     expect(screen.getByText(en.installFailureGeneric)).toBeTruthy()
     // A tarball spec reads by its kind too.
-    set({ install: { ...IDLE_INSTALL, open: true, spec: '/p/x.tgz', phase: 'failed', subject: { spec: '/p/x.tgz', status: 'accepted', kind: 'tarball', bundle: null }, failure: null } })
+    set({ install: { ...IDLE_INSTALL, open: true, spec: '/p/x.tgz', phase: 'failed', subject: { spec: '/p/x.tgz', status: 'accepted', kind: 'tarball', registry: null, bundle: null }, failure: null } })
     expect(screen.getByText(en.installSubjectTarball)).toBeTruthy()
   })
 

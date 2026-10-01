@@ -61,7 +61,7 @@ export function pluginManagementRemote(target: PluginManagementTarget, lifetime:
     pluginManager: {
       listPlugins: () => call('pluginManager/listPlugins', {}),
       listBundles: () => call('pluginManager/listBundles', {}),
-      inspect: (spec, signal) => call('pluginManager/inspect', { spec }, signal),
+      inspect: (spec, options, signal) => call('pluginManager/inspect', { spec, options }, signal),
       setPluginEnabled: (id, enabled) => call('pluginManager/setPluginEnabled', { id, enabled }),
       setBundleEnabled: (name, enabled) => call('pluginManager/setBundleEnabled', { name, enabled }),
       removeBundle: (name, signal) => call('pluginManager/removeBundle', { name }, signal),

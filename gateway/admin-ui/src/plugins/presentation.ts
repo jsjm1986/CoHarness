@@ -30,6 +30,7 @@ const CODE_KEYS = {
   'stop-profile': 'reasonStopProfile',
   'bundle-in-use': 'reasonBundleInUse',
   'stale-approval': 'reasonStaleApproval',
+  'incompatible-version': 'reasonIncompatibleVersion',
   'operation-error': 'reasonOperationError',
 } satisfies Record<ManagementError['code'], PluginManagerLocaleKey>
 
@@ -49,7 +50,9 @@ const FAILED_KEYS = {
  * @param t - the manager's translate seat.
  * @returns the sentence.
  */
-export function managementText(error: { readonly code: ManagementError['code']; readonly diagnostic?: string }, t: Translate): string {
+export function managementText(error: { readonly code: ManagementError['code']; readonly diagnostic?: string; readonly incompatible?: readonly { name: string; version: string }[] }, t: Translate): string {
+  if (error.code === 'incompatible-version' && error.incompatible !== undefined && error.incompatible.length > 0)
+    return `${t('reasonIncompatibleVersion')}: ${error.incompatible.map(pkg => `${pkg.name}@${pkg.version}`).join(', ')}`
   if (error.code !== 'operation-error') return t(CODE_KEYS[error.code])
   return error.diagnostic === undefined || error.diagnostic === '' ? t('reasonOperationError') : error.diagnostic
 }

@@ -283,7 +283,7 @@ describe('PluginManagerController', () => {
     face.editInstallSpec('other')
     expect(state().install.spec).toBe('  dsh-new ')
     expect(plugins.inspect).toHaveBeenCalledTimes(1)
-    expect(plugins.inspect).toHaveBeenCalledWith('dsh-new', expect.any(AbortSignal))
+    expect(plugins.inspect).toHaveBeenCalledWith('dsh-new', undefined, expect.any(AbortSignal))
     const requestId = await started()
     expect(state().install.subject).toEqual({ spec: 'dsh-new', ...INSPECTED })
     expect(plugins.installBundle).toHaveBeenCalledTimes(1)
@@ -365,7 +365,7 @@ describe('PluginManagerController', () => {
     face.openInstall()
     face.editInstallSpec('dsh-x')
     face.runInstall()
-    const checkSignal = (plugins.inspect.mock.calls[0] as unknown[])[1] as AbortSignal
+    const checkSignal = (plugins.inspect.mock.calls[0] as unknown[])[2] as AbortSignal
     face.cancelInstall()
     expect(checkSignal.aborted).toBe(true)
     expect(state().install).toMatchObject({ open: true, phase: 'idle', spec: 'dsh-x', inputError: null })
@@ -379,7 +379,7 @@ describe('PluginManagerController', () => {
     face.runInstall()
     face.closeInstall()
     expect(state().install.open).toBe(false)
-    expect((plugins.inspect.mock.calls[1] as unknown[])[1]).toMatchObject({ aborted: true })
+    expect((plugins.inspect.mock.calls[1] as unknown[])[2]).toMatchObject({ aborted: true })
     // From the failed screen the same control goes back to the spec.
     face.openInstall()
     face.editInstallSpec('dsh-x')

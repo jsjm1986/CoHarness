@@ -531,7 +531,7 @@ export class PluginManagerController {
       phase: 'checking', inputError: null, subject: null, runs: [], detailsOpen: false,
       installed: null, restartRequired: false, failure: null, approvedBuilds: [],
     })
-    const inspected = await this.ctx.remote.pluginManager.inspect(spec, controller.signal)
+    const inspected = await this.ctx.remote.pluginManager.inspect(spec, undefined, controller.signal)
     if (this.gone(controller.signal)) return
     this.inspectAbort = undefined
     if (!inspected.ok) {
