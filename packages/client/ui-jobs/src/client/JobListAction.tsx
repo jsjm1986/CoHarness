@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import type { JobView, ObservedJob } from '@deepseek-ai/dsh-client-runtime/client'
+import { parseClientSessionKey, runtimeTargetKey, type JobView, type ObservedJob } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
   IconChevronDownOutline14, IconStopFill16, MobileSheetBackdrop, StateDot, TerminalBlock,
@@ -312,6 +312,9 @@ function JobItem({ job, view, expanded, now, onToggle, kill, t }: {
 export function JobListAction({ sessionId, useSessions, observe, killJob, t }: JobListActionProps) {
   const jobs = useSessions(state => state.jobsBySession[sessionId]) ?? NO_TASKS
   const observedViews = useSessions(state => state.observedJobs)
+  // The pooled aggregate scopes observed rows by runtime; a plain session id
+  // addresses the base (personal) runtime.
+  const observedScope = runtimeTargetKey(parseClientSessionKey(sessionId)?.runtime ?? { kind: 'personal' })
   const [open, setOpen] = useState(false)
   const phone = useMediaQuery('(max-width: 767px)')
   const [expandedKey, setExpandedKey] = useState<string | undefined>(undefined)
@@ -472,7 +475,7 @@ export function JobListAction({ sessionId, useSessions, observe, killJob, t }: J
     <JobItem
       key={String(job.id)}
       job={job}
-      view={isObservable(job) ? observedViews[String(job.id)] : undefined}
+      view={isObservable(job) ? observedViews[`${observedScope}:${String(job.id)}`] : undefined}
       expanded={expandedKey === String(job.id)}
       now={now}
       onToggle={() => {

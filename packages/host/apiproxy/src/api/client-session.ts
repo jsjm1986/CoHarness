@@ -43,3 +43,14 @@ export function parseClientSessionKey(key: string): ClientSessionAddress | undef
   const sessionId = value[1] as SessionId
   return clientSessionKey(runtime, sessionId) === key ? { runtime, sessionId } : undefined
 }
+
+/**
+ * Name one runtime target in a collision-free scope string. Shared by every
+ * client-side aggregate that folds per-runtime maps (job ids collide across
+ * runtimes; the scope prefix keeps them apart).
+ * @param target - runtime target to name.
+ * @returns `personal` or `project:<id>`.
+ */
+export function runtimeTargetKey(target: ClientRuntimeTarget): string {
+  return target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`
+}

@@ -1,5 +1,5 @@
 /** Account-scoped pool of SessionRuntime instances used by the workbench. */
-import { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { clientSessionKey, parseClientSessionKey, runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { Context, Fiber } from '@deepseek-ai/cordis'
 import type {
   ConnectionHandle,
@@ -50,7 +50,7 @@ interface RuntimeEntry {
 function runtimeScope(): void {}
 
 function targetKey(target: ConnectionRuntimeTarget): string {
-  return target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`
+  return runtimeTargetKey(target)
 }
 
 /** Bound on a lazily opened target runtime's initial readiness wait. A failed
@@ -209,7 +209,7 @@ export class SessionRuntimePool implements ISessions {
     const archivedById: Record<SessionId, SessionSummary> = {}
     const subagentsByParent: SessionListState['subagentsByParent'] = {}
     const jobsBySession: SessionListState['jobsBySession'] = {}
-    const observedJobs: SessionListState['observedJobs'] = {}
+    const observedJobs: Record<string, SessionListState['observedJobs'][string]> = {}
     for (const entry of this.entries.values()) {
       const state = this.projectEntry(entry)
       ids.push(...state.ids)
@@ -217,7 +217,12 @@ export class SessionRuntimePool implements ISessions {
       Object.assign(archivedById, state.archivedById)
       Object.assign(subagentsByParent, state.subagentsByParent)
       Object.assign(jobsBySession, state.jobsBySession)
-      Object.assign(observedJobs, state.observedJobs)
+      // Job ids are per-runtime counters, so the aggregate qualifies each
+      // observation with its runtime scope; consumers rebuild the same key
+      // from the session's runtime address.
+      for (const [jobId, view] of Object.entries(state.observedJobs)) {
+        observedJobs[`${entry.key}:${jobId}`] = view
+      }
       if (entry.runtime === this.base) this.currentScopeList.set(state)
     }
     const current = this.activeSession !== undefined && byId[this.activeSession] !== undefined
@@ -879,13 +884,17 @@ export class SessionRuntimePool implements ISessions {
     // Unowned jobs answer on the base runtime; an owned job whose owner is not
     // yet indexed also resolves there — the fenced read then answers
     // job-not-found instead of dead-ending the observation.
-    const runtime = (sessionId === undefined ? undefined : this.sessionOwners.get(sessionId)?.runtime) ?? this.base
-    return runtime.observeJob(sessionId, jobId)
+    const owner = sessionId === undefined ? undefined : this.sessionOwners.get(sessionId)
+    const runtime = owner?.runtime ?? this.base
+    // An owned job unwraps to its wire Session ID; an unindexed owner keeps
+    // the pooled key so the fenced read answers job-not-found.
+    return runtime.observeJob(owner === undefined ? sessionId : this.originalId(sessionId as SessionId, owner), jobId)
   }
 
   killJob(sessionId: SessionId, jobId: JobView['id']): Promise<boolean> {
-    const runtime = this.sessionOwners.get(sessionId)?.runtime ?? this.base
-    return runtime.killJob(sessionId, jobId)
+    const owner = this.sessionOwners.get(sessionId)
+    if (owner === undefined) return this.base.killJob(sessionId, jobId)
+    return owner.runtime.killJob(this.originalId(sessionId, owner), jobId)
   }
   /** Record the preset observed for one Session.
    * @param id - Session identity.

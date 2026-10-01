@@ -48,7 +48,9 @@ function props(
     phase: 'ready',
     subagentsByParent: {},
     jobsBySession: jobs.length > 0 ? { [SESSION]: jobs } : {},
-    observedJobs: observed,
+    // The pooled aggregate qualifies observed rows with the runtime scope;
+    // SESSION is a plain id and therefore reads the personal scope.
+    observedJobs: Object.fromEntries(Object.entries(observed).map(([key, view]) => [`personal:${key}`, view])),
     currentAddress: undefined,
   } satisfies SessionListState
   function useSessions<T>(select: (snapshot: SessionListState) => T): T {

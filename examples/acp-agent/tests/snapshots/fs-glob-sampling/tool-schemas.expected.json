@@ -16,7 +16,7 @@
           },
           "timeoutMs": {
             "type": "number",
-            "description": "Timeout in milliseconds. The executor applies its configured default and cap, and kills the command on expiry."
+            "description": "Timeout in milliseconds. The executor applies its configured default and cap; on expiry the command moves to the background as a job instead of being killed."
           },
           "workdir": {
             "type": "string",

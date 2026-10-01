@@ -51,13 +51,13 @@ class BashArgs(TypedDict):
     command: str
     # Clear, concise description of what this command does in active voice, 5-10 words (shown in the UI). Examples: "ls" → "List files in current directory"; "git status" → "Show working tree status"; "npm install" → "Install package dependencies".
     description: str
-    # Timeout in milliseconds. The executor applies its configured default and cap, and kills the command on expiry.
+    # Timeout in milliseconds. The executor applies its configured default and cap; on expiry the command moves to the background as a job instead of being killed.
     timeoutMs: NotRequired[float]
     # Working directory for this command. Defaults to the session workspace; a relative path is resolved against it.
     workdir: NotRequired[str]
     # Run in the background and return a job id immediately (collect with job_output, stop with job_kill). No timeout applies.
     run_in_background: NotRequired[bool]
-    # The wider sandbox mode this command needs. Only valid as a one-shot retry of a command the sandbox just denied; requires justification and user approval.
+    # The narrowest wider sandbox mode for a one-shot retry of the exact command the sandbox just denied; the retry asks the user for approval.
     sandbox_permissions: NotRequired[Literal["workspace-write", "danger-full-access"]]
     # Required with sandbox_permissions: one sentence for the user explaining why this exact command needs the wider access.
     justification: NotRequired[str]
@@ -67,32 +67,39 @@ class BashOutput1(TypedDict):
     kind: Literal["background"]
     jobId: str
 
-class BashOutput2Stdout(TypedDict):
+class BashOutput2(TypedDict):
+    kind: Literal["promoted"]
+    jobId: str
+    timeoutMs: float
+    output: str
+
+class BashOutput3Stdout(TypedDict):
     text: str
     truncated: bool
     spillPath: NotRequired[str]
 
-class BashOutput2Stderr(TypedDict):
+class BashOutput3Stderr(TypedDict):
     text: str
     truncated: bool
     spillPath: NotRequired[str]
 
-class BashOutput2Sandbox(TypedDict):
+class BashOutput3Sandbox(TypedDict):
     mode: str
     denied: bool
     enforcement: NotRequired[str]
     runnerFailed: NotRequired[bool]
 
-class BashOutput2(TypedDict):
+class BashOutput3(TypedDict):
     kind: Literal["foreground"]
     exitCode: int | None
     signal: str | None
     timedOut: bool
     aborted: bool
+    stopped: NotRequired[str]
     timeoutMs: float
-    stdout: BashOutput2Stdout
-    stderr: BashOutput2Stderr
-    sandbox: NotRequired[BashOutput2Sandbox]
+    stdout: BashOutput3Stdout
+    stderr: BashOutput3Stderr
+    sandbox: NotRequired[BashOutput3Sandbox]
 
 class CreateGoalArgs(TypedDict):
     # The concrete completion objective inferred from the direct human request.
@@ -237,9 +244,9 @@ class JobListOutput(TypedDict):
 class JobOutputArgs(TypedDict):
     # Job id returned by the tool that started the background work.
     job_id: str
-    # Block until the job reaches a terminal status or the timeout expires. A timed-out wait returns [status: running] and leaves the job alive.
+    # Block until the job finishes or the timeout expires; a timed-out wait leaves the job running. Defaults to false.
     wait: NotRequired[bool]
-    # Max wait in milliseconds (only meaningful with wait: true). Defaults to the configured wait timeout; capped by the configured maximum.
+    # Max wait in milliseconds with wait: true. Defaults to and is capped by configuration.
     timeout_ms: NotRequired[float]
     # Additional keys beyond those declared are allowed.
 
@@ -523,7 +530,7 @@ class WriteOutput(TypedDict):
     after: str
 
 class Tools(Protocol):
-    async def bash(self, args: BashArgs) -> BashOutput1 | BashOutput2:
+    async def bash(self, args: BashArgs) -> BashOutput1 | BashOutput2 | BashOutput3:
         """Execute a bash command (`bash -c`) and return its stdout/stderr. Each call runs in a fresh shell: no state (cwd, variables, functions) persists between calls — pass `workdir` instead of using `cd`. Non-zero exits are reported as `[exit code: N]`. Current harness environment facts are exposed through managed `$DSH_*` variables; inspect them when needed. Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]` — a policy denial, not a bug in the command; do not retry another way. Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. Set `run_in_background: true` for long-running commands: the call returns a job id immediately; read its output with `job_output` and stop it with `job_kill`. Attempting a command the sandbox may deny is safe and expected: run it and read the marker rather than assuming the denial. When a command is denied and a wider mode would let it succeed, escalate immediately in the same turn — the one sanctioned exception to a denial: retry the exact same command once with `sandbox_permissions` (the narrowest wider mode that suffices) plus a one-sentence `justification`. Do not detour through chat to ask permission first — the approval prompt raised by that retry is how the user consents. If the session states approval prompts are disabled, there is no exception: a denial is final — do not set `sandbox_permissions`. Never escalate speculatively: ground the request in a real denial — normally the one this command just hit; escalating up front is fine only when this session already denied the same access. A rejected escalation is final for that command — stop and explain, never work around it — but it does not forbid attempting or escalating other commands later."""
     async def create_goal(self, args: CreateGoalArgs) -> CreateGoalOutput1 | CreateGoalOutput2:
         """Create a persisted goal that keeps this session working across automatic continuation rounds. Use it when the direct human request is a long-running objective, even if the user did not say \"goal\"; not for single-turn work."""
@@ -540,11 +547,11 @@ class Tools(Protocol):
     async def interrupt_agent(self, args: InterruptAgentArgs) -> InterruptAgentOutput:
         """Request cancellation of a background agent's current turn by its agent id. The target may be your direct child or a deeper agent created under you. Only the current turn stops: messages already queued for the agent stay parked until a later send_message, agents it started keep running, and the agent itself stays available for follow-ups. This call returns as soon as the stop request is accepted, so the target may keep running briefly; interrupting an agent that already finished is an accepted no-op."""
     async def job_kill(self, args: JobKillArgs) -> JobKillOutput:
-        """Request cancellation of a running background job by job id. Returns immediately; the job settles as killed once its work actually stops."""
+        """Request cancellation of a running background job."""
     async def job_list(self, args: dict[str, Any]) -> list[JobListOutput]:
         """List your background jobs (running and finished) with their ids, kinds, and statuses."""
     async def job_output(self, args: JobOutputArgs) -> JobOutputOutput:
-        """Read a background job. Stream jobs return only output since the previous read; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. Reads are non-blocking unless `wait: true`, which waits up to the configured cap."""
+        """Read a background job: output since the previous read for stream jobs, or the result of a finished final-output job."""
     async def list_agents(self, args: ListAgentsArgs) -> list[ListAgentsOutput1 | ListAgentsOutput2]:
         """List your continuable background subagents by durable id and label. Use it to recall which ones you started, not to poll for completion — you are told when one finishes. Status comes from the live registry: running means the agent is working right now, idle means it is loaded but between turns (it may be waiting on agents it started), and ready means it exists only in storage — resumable, not terminal, and not a result waiting to be collected; a `send_message` steers a running child at its nearest step boundary or starts a turn for an idle or ready child, and a direct child remains a `send_message` candidate in every status. The snapshot is not a delivery promise — `send_message` performs the authoritative check and may still fail. Children that could not be read are reported as diagnostics instead of being silently dropped. Scope `descendants` walks the whole tree below you in stable pre-order, annotating each entry with its durable direct-parent session id and depth. You may use `send_message` only for depth-1 entries; deeper entries are candidates for `interrupt_agent` only."""
     async def present(self, args: PresentArgs) -> PresentOutput:

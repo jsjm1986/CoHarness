@@ -3,7 +3,7 @@
 {"type":"turn/start","data":{"turn":1}}
 {"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}
 {"type":"step/start","data":{"turn":1,"step":1}}
-{"type":"system/message","data":{"turn":1,"step":1,"message":{"role":"system","content":[{"type":"text","text":"{{system}}"}],"source":{"kind":"system-prompt"},"id":"f72cfacf-4650-4e94-ad95-851ff0a9e5b8"}},"surfaceOp":"append"}
+{"type":"system/message","data":{"turn":1,"step":1,"message":{"role":"system","content":[{"type":"text","text":"{{system}}"}],"source":{"kind":"system-prompt"},"id":"437d00d9-c71a-4a14-b543-3315fab547ff"}},"surfaceOp":"append"}
 {"type":"user/message","data":{"content":[{"type":"text","text":"Use the subagent tool exactly once with description 'echo probe' and prompt: Reply with exactly: child answer 42. Then reply with the subagent's final answer verbatim."}],"source":{"kind":"user"},"role":"user","id":"ce62572c-2af9-4162-aca6-82ae0c89bc48"},"surfaceOp":"append"}
 {"type":"session/title","data":{"title":"Use the subagent tool exactly","messageSeqs":[5],"source":{"kind":"fallback"}}}
 {"type":"request/header","data":{"header":{"config":{"provider":"deepseek-official","model":"deepseek-v4-flash"},"tools":"{{tools}}"},"reason":"initial"}}

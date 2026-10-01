@@ -495,3 +495,40 @@ it('retains four colliding Host IDs with independent scopes, payloads, holds, an
     expect(pool.binding(keys[2]!)).toBe(bindings[2])
   } finally { await ctx.fiber.dispose() }
 })
+
+it('forwards pooled job reads and kills to the owner runtime under the original Session ID', async () => {
+  const ctx = new Context()
+  const baseApi = new FakeApiClient()
+  const projectApi = new FakeApiClient()
+  projectApi.onList = () => Promise.resolve(ok({ items: [{
+    sessionId: 'project-session' as SessionId,
+    updatedAt: 10,
+    running: false,
+    blank: false,
+    cwd: '/projects/demo',
+  }] }))
+  const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+  const targetConnection = connection(projectApi, (sinks) => {
+    queueMicrotask(() => sinks.onConnected?.({
+      version: 'test', cwd: '/projects/demo', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+    }))
+  })
+  const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget: () => targetConnection }, fakeRemote())
+  try {
+    const target = { kind: 'project' as const, projectId: 7 }
+    await expect(pool.ensureSession(target, 'project-session' as SessionId)).resolves.toBe(true)
+    const key = clientSessionKey(target, 'project-session' as SessionId)
+    await pool.killJob(key, 'bash-1' as never)
+    expect(projectApi.callsOf('jobs.kill').at(-1)).toMatchObject({ sessionId: 'project-session', jobId: 'bash-1' })
+    expect(baseApi.callsOf('jobs.kill')).toHaveLength(0)
+    const release = pool.observeJob(key, 'bash-1' as never)
+    await vi.waitFor(() => {
+      expect(projectApi.callsOf('jobs.output').at(-1)).toMatchObject({ sessionId: 'project-session', jobId: 'bash-1' })
+    })
+    release()
+    expect(baseApi.callsOf('jobs.output')).toHaveLength(0)
+    // The observed view lands under its runtime-scoped key, not the bare job id.
+    await vi.waitFor(() => { expect(pool.list.getSnapshot().observedJobs['project:7:bash-1']).toBeDefined() })
+    expect(pool.list.getSnapshot().observedJobs['bash-1']).toBeUndefined()
+  } finally { await ctx.fiber.dispose() }
+})
