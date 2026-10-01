@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createLayoutStore } from '@deepseek-ai/dsh-client-ui-layout/src/client/stores.ts'
 import {
-  DETAILS_DEFAULT, DETAILS_MAX, DETAILS_MIN,
+  DETAILS_MAX_RATIO, DETAILS_MIN,
   SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
 } from '@deepseek-ai/dsh-client-ui-layout/src/client/columns.ts'
 
@@ -17,10 +17,10 @@ const PERSIST_KEY = 'dsh.layout.panels'
 beforeEach(() => { localStorage.clear() })
 
 describe('createLayoutStore', () => {
-  it('initializes the sidebar at its default width, details closed, wide viewport assumed', () => {
+  it('initializes the sidebar at its default width, details preference unset, no viewport yet', () => {
     const { store } = createLayoutStore().create()
     expect(store.getSnapshot()).toEqual({
-      sidebar: SIDEBAR_DEFAULT, details: 0, narrow: false, narrowExpanded: false,
+      sidebar: SIDEBAR_DEFAULT, details: null, viewportWidth: 0, narrowExpanded: false,
       rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
     })
   })
@@ -38,14 +38,16 @@ describe('createLayoutStore', () => {
     expect(store.getSnapshot().sidebar).toBe(SIDEBAR_MIN)
     actions.setSidebar(9999)
     expect(store.getSnapshot().sidebar).toBe(SIDEBAR_MAX)
+    actions.setViewportWidth(1920)
     actions.setDetails(1)
     expect(store.getSnapshot().details).toBe(DETAILS_MIN)
     actions.setDetails(9999)
-    expect(store.getSnapshot().details).toBe(DETAILS_MAX)
+    expect(store.getSnapshot().details).toBe(1920 * DETAILS_MAX_RATIO)
   })
 
   it('toggleSidebar flips closed <-> contract default (drag width forgotten)', () => {
     const { store, actions } = createLayoutStore().create()
+    actions.setViewportWidth(1920)
     actions.setSidebar(400)
     actions.toggleSidebar()
     expect(store.getSnapshot().sidebar).toBe(0)
@@ -55,11 +57,12 @@ describe('createLayoutStore', () => {
 
   it('narrow toggleSidebar flips only the re-expand override; the width preference survives', () => {
     const { store, actions } = createLayoutStore().create()
+    actions.setViewportWidth(1920)
     actions.setSidebar(400)
-    actions.setNarrow(true)
+    actions.setViewportWidth(980)
     actions.toggleSidebar()
     expect(store.getSnapshot()).toEqual({
-      sidebar: 400, details: 0, narrow: true, narrowExpanded: true,
+      sidebar: 400, details: null, viewportWidth: 980, narrowExpanded: true,
       rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
     })
     actions.toggleSidebar()
@@ -69,82 +72,96 @@ describe('createLayoutStore', () => {
 
   it('a rightbar presentation report collapses the squeeze-open sidebar: one narrow surface at a time', () => {
     const { store, actions } = createLayoutStore().create()
-    actions.setNarrow(true)
+    actions.setViewportWidth(980)
     actions.toggleSidebar()
     expect(store.getSnapshot().narrowExpanded).toBe(true)
     actions.openRightbar(true, false)
     expect(store.getSnapshot()).toMatchObject({
-      details: DETAILS_DEFAULT, narrowExpanded: false,
+      details: null, narrowExpanded: false,
       rightbarShown: true, rightbarTrack: true, rightbarFullscreen: false,
     })
   })
 
   it('narrow sidebar requests leave auxiliary dismissal to the frame owner', () => {
     const { store, actions } = createLayoutStore().create()
-    actions.setNarrow(true)
+    actions.setViewportWidth(980)
     actions.openRightbar(true, false)
     actions.toggleSidebar()
     expect(store.getSnapshot()).toMatchObject({
-      details: DETAILS_DEFAULT, narrowExpanded: true,
+      narrowExpanded: true,
       rightbarShown: true, rightbarTrack: true, rightbarFullscreen: false,
     })
     // The swap is symmetric: opening details again re-collapses the rail.
     actions.openRightbar(true, false)
     expect(store.getSnapshot()).toMatchObject({
-      details: DETAILS_DEFAULT, narrowExpanded: false,
+      narrowExpanded: false,
       rightbarShown: true, rightbarTrack: true, rightbarFullscreen: false,
     })
   })
 
   it('wide toggleSidebar is unaffected by an open details panel', () => {
     const { store, actions } = createLayoutStore().create()
+    actions.setViewportWidth(1920)
     actions.openRightbar(true, false)
     actions.toggleSidebar()
-    expect(store.getSnapshot()).toMatchObject({ sidebar: 0, details: DETAILS_DEFAULT })
+    expect(store.getSnapshot()).toMatchObject({ sidebar: 0, details: null })
   })
 
   it('collapseNarrow drops only the override (scrim tap / compact navigation)', () => {
     const { store, actions } = createLayoutStore().create()
+    actions.setViewportWidth(1920)
     actions.setSidebar(400)
-    actions.setNarrow(true)
+    actions.setViewportWidth(980)
     actions.toggleSidebar()
     expect(store.getSnapshot().narrowExpanded).toBe(true)
     actions.collapseNarrow()
-    expect(store.getSnapshot()).toMatchObject({ narrowExpanded: false, sidebar: 400, narrow: true })
+    expect(store.getSnapshot()).toMatchObject({ narrowExpanded: false, sidebar: 400, viewportWidth: 980 })
     // Idempotent while already collapsed.
     actions.collapseNarrow()
     expect(store.getSnapshot().narrowExpanded).toBe(false)
   })
 
-  it('crossing the breakpoint drops the override; a same-value setNarrow keeps it', () => {
+  it('crossing the breakpoint drops the override; a same-side resize keeps it', () => {
     const { store, actions } = createLayoutStore().create()
-    actions.setNarrow(true)
+    actions.setViewportWidth(980)
     actions.toggleSidebar()
     expect(store.getSnapshot().narrowExpanded).toBe(true)
-    actions.setNarrow(true)
+    actions.setViewportWidth(960)
     expect(store.getSnapshot().narrowExpanded).toBe(true)
-    actions.setNarrow(false)
+    actions.setViewportWidth(1920)
     expect(store.getSnapshot()).toMatchObject({
-      narrow: false, narrowExpanded: false,
+      viewportWidth: 1920, narrowExpanded: false,
       rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
     })
-    actions.setNarrow(true)
+    actions.setViewportWidth(980)
     expect(store.getSnapshot().narrowExpanded).toBe(false)
   })
 
-  it('rightbar reports preserve resized width while releasing the visible track', () => {
+  it('opening leaves the preference unset; a dragged width survives close/open', () => {
     const { store, actions } = createLayoutStore().create()
+    actions.setViewportWidth(1920)
     actions.openRightbar(true, false)
-    expect(store.getSnapshot().details).toBe(DETAILS_DEFAULT)
+    // The ratio default resolves in the frame at render time, not here.
+    expect(store.getSnapshot().details).toBeNull()
     actions.setDetails(500)
-    actions.openRightbar(true, false)
-    expect(store.getSnapshot().details).toBe(500)
     actions.closeRightbar()
     expect(store.getSnapshot()).toMatchObject({ details: 500, rightbarShown: false, rightbarTrack: false })
+    // Reopening keeps the dragged preference; the frame stops deriving.
+    actions.openRightbar(true, false)
+    expect(store.getSnapshot().details).toBe(500)
+  })
+
+  it('an untouched preference still tracks viewport changes (resolved per render)', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.setViewportWidth(1440)
+    actions.openRightbar(true, false)
+    actions.setViewportWidth(1920)
+    expect(store.getSnapshot().details).toBeNull()
   })
 
   it('does not persist panel geometry', () => {
     const first = createLayoutStore().create()
+    first.actions.setViewportWidth(1920)
     first.actions.setSidebar(400)
     first.actions.openRightbar(true, false)
     first.actions.setDetails(500)
@@ -153,8 +170,8 @@ describe('createLayoutStore', () => {
     const second = createLayoutStore().create()
     expect(second.store.getSnapshot()).toEqual({
       sidebar: SIDEBAR_DEFAULT,
-      details: 0,
-      narrow: false,
+      details: null,
+      viewportWidth: 0,
       narrowExpanded: false,
       rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
     })

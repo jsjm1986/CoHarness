@@ -96,6 +96,10 @@ function mountFrame() {
     />
   )
   const utils = render(element())
+  // The mount-time observer tick pushes the frame width into the store so
+  // ratio-based actions (openRightbar's 45% seed, setDetails clamps) resolve
+  // against the real viewport like they do in production.
+  act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
   const frame = utils.container.firstElementChild as HTMLElement
   return { instance, frame, slotCalls, rerenderFrame: () => { utils.rerender(element()) }, ...utils }
 }
@@ -171,7 +175,7 @@ describe('AppFrame', () => {
     expect(keys).toContain('rightbar')
     expect(keys).not.toContain('conversation.empty')
     expect(slotCalls.find(c => c.key === 'conversation')!.props).toEqual({ compact: false })
-    expect(slotCalls.find(c => c.key === 'rightbar')!.props).toMatchObject({ width: 360, viewportWidth: 1920, canShow: true })
+    expect(slotCalls.find(c => c.key === 'rightbar')!.props).toMatchObject({ width: 864, viewportWidth: 1920, canShow: true })
   })
 
   it('keeps the conversation slot mounted while no session is current', () => {
@@ -195,13 +199,13 @@ describe('AppFrame', () => {
   it('lets the tab owner report visibility across Session changes', () => {
     const { frame, instance, rerenderFrame } = mountFrame()
     act(() => { instance.actions.openRightbar(true, false) })
-    expect(tracks(frame)).toEqual([280, 360])
+    expect(tracks(frame)).toEqual([280, 864])
     selectedSession.current = 's-next' as SessionId
     act(() => { rerenderFrame(); instance.actions.closeRightbar() })
     expect(tracks(frame)).toEqual([280, 0])
-    expect(instance.getSnapshot().details).toBe(360)
+    expect(instance.getSnapshot().details).toBeNull() // no drag yet: nothing to preserve
     act(() => { instance.actions.openRightbar(true, false) })
-    expect(tracks(frame)).toEqual([280, 360])
+    expect(tracks(frame)).toEqual([280, 864])
     selectedSession.current = undefined
     act(() => { rerenderFrame() })
     expect(tracks(frame)).toEqual([280, 0])
@@ -234,18 +238,31 @@ describe('AppFrame', () => {
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.openRightbar(true, false) })
     const handles = frame.querySelectorAll('[class*="handle"]')
-    drag(handles[1]!, 1560, 1500)
-    expect(tracks(frame)[1]).toBe(420)
+    drag(handles[1]!, 1056, 996) // 864 + 60 = 924
+    expect(tracks(frame)[1]).toBe(924)
+  })
+
+  it('details drag can exceed the old pixel ceiling on wide viewports', () => {
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.openRightbar(true, false) })
+    const handles = frame.querySelectorAll('[class*="handle"]')
+    // 1920 * 0.7 = 1344 is the drag ceiling; +500px lands on it.
+    drag(handles[1]!, 1056, 556)
+    expect(instance.getSnapshot().details).toBe(1344)
+    expect(tracks(frame)).toEqual([280, 1240]) // available = 1920-280-400 < 1344
   })
 
   it('drag base is the rendered (concession-clamped) width, not the preference', () => {
-    frameWidth = 1250 // step-2 squeeze: details renders 330 while preference is 360
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.openRightbar(true, false) })
-    expect(tracks(frame)).toEqual([280, 330])
     const handles = frame.querySelectorAll('[class*="handle"]')
-    drag(handles[1]!, 920, 930) // shrink by 10 from the rendered width
-    expect(instance.getSnapshot().details).toBe(320)
+    drag(handles[1]!, 1056, 920) // widen past the resolved default → preference 1000
+    expect(instance.getSnapshot().details).toBe(1000)
+    frameWidth = 1250 // squeeze: details renders 570 while preference stays 1000
+    act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
+    expect(tracks(frame)).toEqual([280, 570])
+    drag(handles[1]!, 670, 680) // shrink by 10 from the rendered width
+    expect(instance.getSnapshot().details).toBe(560)
   })
 
   it('details column stays mounted at zero width', () => {
@@ -256,18 +273,22 @@ describe('AppFrame', () => {
   })
 
   it('keeps one auxiliary root mounted and delegates its presentation at every width', () => {
-    frameWidth = 1030
+    // Expanded band with a max-dragged sidebar: 1024-420-400 = 204 < 300, so
+    // the open details reports canShow=false and takes no track.
+    frameWidth = 1024
     const { frame, instance, slotCalls, getByTestId } = mountFrame()
+    act(() => { instance.actions.setSidebar(420) })
     const latest = () => slotCalls.filter(c => c.key === 'rightbar').at(-1)!.props
-    expect(latest()).toMatchObject({ width: 360, canShow: false })
+    expect(latest()).toMatchObject({ width: 0, canShow: false })
     act(() => { instance.actions.openRightbar(true, false) })
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([420, 0])
     frameWidth = 1920
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([280, 360])
-    expect(latest()).toMatchObject({ width: 360, canShow: true })
+    // Never dragged: the width re-resolves at 45% of the widened viewport.
+    expect(tracks(frame)).toEqual([420, 864])
+    expect(latest()).toMatchObject({ width: 864, canShow: true })
     act(() => { instance.actions.closeRightbar() })
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([420, 0])
     expect(getByTestId('details-content')).toBeTruthy()
     expect(frame.querySelector('[class*="detailsPanel"]')).toBeNull()
   })
@@ -285,12 +306,16 @@ describe('AppFrame', () => {
   it('viewport shrink triggers the concession chain via ResizeObserver', () => {
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.openRightbar(true, false) })
+    // A dragged pixel preference makes the concession observable (the ratio
+    // default would simply re-resolve below the squeeze).
+    drag(frame.querySelectorAll('[class*="handle"]')[1]!, 1056, 920)
+    expect(instance.getSnapshot().details).toBe(1000)
     frameWidth = 1250
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([280, 330])
+    expect(tracks(frame)).toEqual([280, 570])
     frameWidth = 1920
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([280, 360])
+    expect(tracks(frame)).toEqual([280, 1000])
   })
 
   it('drag handles disappear for collapsed columns', () => {
@@ -571,6 +596,7 @@ describe('AppFrame — unmount with an in-flight resize frame', () => {
     act(() => { instance.actions.openRightbar(true, false) })
     frameWidth = 1250
     act(() => { fireResize?.(); fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([280, 330])
+    // Untouched preference: the ratio default re-resolves at 563 < 570.
+    expect(tracks(frame)).toEqual([280, 563])
   })
 })
