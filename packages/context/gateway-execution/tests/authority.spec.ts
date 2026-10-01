@@ -1473,7 +1473,7 @@ describe('immutable current execution', () => {
     ]
     const kill = vi.fn((id: string) => { jobs.find(job => job.id === id)!.status = 'killed' })
     const wait = vi.fn(async (id: string) => jobs.find(job => job.id === id))
-    f.ctx.provide('jobs', { list: () => jobs, onJobsChanged: () => () => {}, kill, wait } as never)
+    f.ctx.provide('jobs', { list: () => jobs, events: { subscribe: () => () => {} }, kill, wait } as never)
     const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
     f.responses.set('/authorize', async (body) => {
       if (body.scopeId === firstId) return new Response(null, { status: 403 })
@@ -1553,7 +1553,7 @@ describe('immutable current execution', () => {
       executionScope: { parentSessionId: f.agent.id, scopeId: firstId, inputs: [A], primaryActorUserId: 1, unverifiedHistory: false } }
     const kill = vi.fn(() => { job.status = 'killed' })
     const wait = vi.fn(async () => job)
-    f.ctx.provide('jobs', { list: () => [job], onJobsChanged: () => () => {}, kill, wait } as never)
+    f.ctx.provide('jobs', { list: () => [job], events: { subscribe: () => () => {} }, kill, wait } as never)
     f.responses.set('/authorize', async body => body.scopeId === firstId ? new Response(null, { status: 403 }) : Response.json(second()))
     f.stream.enqueue(new TextEncoder().encode('{"type":"invalidate","userId":1}\n'))
     await vi.waitFor(() => { expect(wait).toHaveBeenCalledOnce() })

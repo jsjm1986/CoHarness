@@ -88,7 +88,7 @@ The executor is the pwsh twin of `dsh-bash-sandbox`: it inherits `dsh-pwsh-local
 
 ### Main flow
 
-For a confined mode, `resolve()` stamps the per-call policy; `run` and `start` wrap the pwsh argv through the provider and hand the confined argv to the inherited subprocess path. At settlement the executor classifies the outcome: a runner failure outranks a denial because the command never ran, a failed run whose stderr carries the runner's denial dialect is reported `denied: true`, and every confined run carries its mode and enforcement facts. `danger-full-access` bypasses the provider entirely and stamps `denied: false`.
+For a confined mode, `resolve()` stamps the per-call policy; `execute` wraps the pwsh argv through the provider and hand the confined argv to the inherited subprocess path. At settlement the executor classifies the outcome: a runner failure outranks a denial because the command never ran, a failed run whose stderr carries the runner's denial dialect is reported `denied: true`, and every confined run carries its mode and enforcement facts. `danger-full-access` bypasses the provider entirely and stamps `denied: false`.
 
 ### Invariants
 

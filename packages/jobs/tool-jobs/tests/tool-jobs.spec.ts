@@ -164,9 +164,9 @@ describe('tool-jobs setup', () => {
       .rejects.toThrow('waitTimeoutMs (100) exceeds maxWaitTimeoutMs (50)')
   })
 
-  it('defaults delivery to unbounded wakeup and rejects an unknown lane', () => {
+  it('defaults delivery to bounded wakeup and rejects an unknown lane', () => {
     expect(ToolJobs.Config({}).completionDelivery).toBe('wakeup')
-    expect(ToolJobs.Config({}).maxConsecutiveWakes).toBeUndefined()
+    expect(ToolJobs.Config({}).maxConsecutiveWakes).toBe(10)
     expect(() => ToolJobs.Config({ completionDelivery: 'loud' as never })).toThrow()
     expect(() => ToolJobs.Config({ maxConsecutiveWakes: 0 })).toThrow()
   })

@@ -48,8 +48,8 @@ afterEach(() => {
 })
 
 /**
- * A scriptable fake executor: `resolve()` mirrors the real defaulting, `run()`
- * returns the armed foreground script, `start()` returns the armed background
+ * A scriptable fake executor: `resolve()` mirrors the real defaulting, `result()`
+ * returns the armed foreground script, `execute()` returns the armed background
  * handle.
  */
 class FakeBash extends ShellExecutor {

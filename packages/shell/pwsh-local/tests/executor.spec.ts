@@ -1,7 +1,7 @@
 /**
  * Real-process tests for `@deepseek-ai/dsh-pwsh-local`: the LOCAL subprocess
  * service plus a REAL pwsh executable, exercised through the executor seam
- * (`resolve` → `run`/`start`). These verify the world — actual PowerShell
+ * (`resolve` → `execute`/`result`). These verify the world — actual PowerShell
  * runs, output capture, truncation and spill, deadlines, kill escalation, and
  * the background-handle contract. The suite self-skips when no usable `pwsh`
  * resolves (a CI accommodation for hosts without PowerShell); the pure unit tests

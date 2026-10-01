@@ -95,20 +95,14 @@ export function ringDelta(chunks: readonly JobChunk[]): string {
 /**
  * Adapt asynchronous shell preparation after job admission without exposing a partial process.
  * @param start - starts the process with job-owned cancellation.
- * @param outcome - projects the settled process into the job outcome. A
- *   callback that produces a string is the legacy consuming-read renderer
- *   from before pull sources existed: the job outcome then falls back to
- *   {@link processOutcome}, and the string remains what the returned
- *   `readOutput` hook serves.
+ * @param outcome - projects the settled process into the job outcome.
  * @returns synchronous job hooks whose completion includes preparation and
- *   process settlement. The hooks additionally carry `readOutput`, the
- *   consuming-read view of the published process, for callers still on the
- *   pre-pull-source surface; the registry only reads `cancel`/`done`.
+ *   process settlement; the registry reads `cancel`/`done`.
  */
 export function processJob(
   start: (signal: AbortSignal) => Promise<ShellProcess>,
-  outcome: (process: ShellProcess) => JobOutcome | string,
-): JobHooks & { readonly readOutput?: () => string } {
+  outcome: (process: ShellProcess) => JobOutcome,
+): JobHooks {
   const controller = new AbortController()
   let process: ShellProcess | undefined
   const done: Promise<JobOutcome> = (async () => {
@@ -119,8 +113,7 @@ export function processJob(
       } finally {
         await process.done
       }
-      const projected = outcome(process)
-      return typeof projected === 'string' ? processOutcome(process) : projected
+      return outcome(process)
     } catch (error: unknown) {
       return {
         status: controller.signal.aborted && process === undefined ? 'killed' : 'failed',
@@ -128,21 +121,13 @@ export function processJob(
       }
     }
   })()
-  const hooks = {
+  return {
     cancel: (reason?: string): void => {
       if (controller.signal.aborted) return
       controller.abort(reason)
       process?.kill()
     },
     done,
-    readOutput: (): string => {
-      if (process === undefined) return ''
-      const rendered = outcome(process)
-      // A structured JobOutcome has no string read view; the hook exists for
-      // the legacy string-rendering outcome variant.
-      return typeof rendered === 'string' ? rendered : ''
-    },
   }
-  return hooks
 }
 /* jscpd:ignore-end */

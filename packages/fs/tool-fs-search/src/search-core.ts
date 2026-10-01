@@ -6,7 +6,7 @@
  * and workdir-relative path display.
  *
  * Both tools execute as ordinary foreground spawns through `ctx.subprocess` —
- * never `ctx.shell`, never `ctx.shell.start()`, never a model-visible background
+ * never `ctx.shell`, never `ctx.shell.execute()`, never a model-visible background
  * task. The ripgrep binary ships inside the npm package, so no system `rg`
  * install is required, and no shell layer exists between the argv vector and
  * ripgrep, so no shell quoting is involved. Raw `rg` stdout is an internal

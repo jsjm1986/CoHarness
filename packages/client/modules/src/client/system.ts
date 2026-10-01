@@ -105,8 +105,9 @@ export class ClientModuleSystem implements ClientModuleLoader {
   private readonly materializing = new Set<string>()
   private readonly graphRows = new Map<string, BootModuleRow>()
   private readonly loadBundle: (url: string) => Promise<void>
-  /** Batch URLs whose transport or execution already failed; rows still missing from them go straight to their one-resource URL. */
-  private readonly failedBundleUrls = new Set<string>()
+  /** Batch URLs whose transport or execution already failed, keyed to the first attempt's failure
+   * lines; rows still missing from them go straight to their one-resource URL. */
+  private readonly failedBundleUrls = new Map<string, readonly string[]>()
   /** Every URL whose script has executed once; a batch among them is never requested again. */
   private readonly executedBundleUrls = new Set<string>()
 
@@ -210,21 +211,22 @@ export class ClientModuleSystem implements ClientModuleLoader {
       return 'not-registered'
     }
     let outcome: Awaited<ReturnType<typeof attempt>> = 'transport-failed'
-    if (this.failedBundleUrls.has(preferred)) {
-      failures.push(`${preferred}: skipped after an earlier failure of this bundle`)
+    const remembered = this.failedBundleUrls.get(preferred)
+    if (remembered !== undefined) {
+      failures.push(...remembered)
     } else if (fallback !== undefined && this.executedBundleUrls.has(preferred)) {
       // The batch already ran (an earlier importer was a row it did register)
       // and this row is still missing: a replay would stop at the first
       // duplicate registration.
       failures.push(`${preferred}: already executed without registering "${id}"`)
       outcome = 'not-registered'
-      this.failedBundleUrls.add(preferred)
+      this.failedBundleUrls.set(preferred, [...failures])
     } else {
       outcome = await attempt(preferred)
       if (outcome === 'transport-failed') outcome = await attempt(preferred)
       // Only a batch URL is remembered: a one-resource URL has no fallback and
       // stays retryable on the next import, as before.
-      if (outcome !== 'registered' && fallback !== undefined) this.failedBundleUrls.add(preferred)
+      if (outcome !== 'registered' && fallback !== undefined) this.failedBundleUrls.set(preferred, [...failures])
     }
     if (outcome !== 'registered' && fallback !== undefined) outcome = await attempt(fallback)
     if (outcome !== 'registered') {

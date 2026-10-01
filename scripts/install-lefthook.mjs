@@ -14,12 +14,13 @@ import {
 } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 // Production-context installs (e.g. the Python runtime deploy's `pnpm install
 // --production`) omit devDependencies; a missing lefthook package means there
 // are no hooks to install, not an install failure.
 const lefthookPackage = (() => {
   try {
-    return JSON.parse(readFileSync(new URL('lefthook/package.json', import.meta.resolve('lefthook/package.json')), 'utf8'))
+    return JSON.parse(readFileSync(fileURLToPath(import.meta.resolve('lefthook/package.json')), 'utf8'))
   } catch {
     return undefined
   }

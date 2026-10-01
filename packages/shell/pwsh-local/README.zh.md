@@ -57,16 +57,17 @@ kind: "package-reference"
 
 ### 运行命令
 
-用 `run` 运行命令并从结果读取输出；非零退出、超时或取消都会返回描述性结果，只有基础设施失败才会导致调用被拒绝。命令字符串作为单个参数传给 `-Command`：由 PowerShell 自己解析文本，不存在中间 shell，因此没有需要转义的 shell 引号层，原生 Win32 路径也原样通过。每条命令都先固定 UTF-8 输出，因此即使在 Windows PowerShell 5.1 兜底上，非 ASCII 输出也不会乱码。环境默认面向模型：`NO_COLOR=1 PAGER=cat GIT_PAGER=cat`（没有 `TERM=dumb`——那是 POSIX 概念），调用方显式提供的条目仍然优先。
+用 `execute` 运行命令并从执行结果的 `result()` 读取输出；非零退出、超时或取消都会返回描述性结果，只有基础设施失败才会导致调用被拒绝。命令字符串作为单个参数传给 `-Command`：由 PowerShell 自己解析文本，不存在中间 shell，因此没有需要转义的 shell 引号层，原生 Win32 路径也原样通过。每条命令都先固定 UTF-8 输出，因此即使在 Windows PowerShell 5.1 兜底上，非 ASCII 输出也不会乱码。环境默认面向模型：`NO_COLOR=1 PAGER=cat GIT_PAGER=cat`（没有 `TERM=dumb`——那是 POSIX 概念），调用方显式提供的条目仍然优先。
 
 ```text
-const result = await ctx.shell.run(ctx.shell.resolve({ command: 'Get-ChildItem' }))
+const execution = await ctx.shell.execute(ctx.shell.resolve({ command: 'Get-ChildItem' }))
+const result = await execution.result()
 if (result.timedOut) console.log('timed out after', result.timeoutMs)
 ```
 
 ### 后台进程
 
-等待 `start` 即可在后台运行命令；它完成准备后返回进程句柄，且不应用执行超时。取消或准备失败会在发布句柄前拒绝调用。`readOutput()` 把流增量合并为一次消费式读取，并在 `[stderr]` 分段下标记 stderr；`kill()` 终止由提供方管理的 range；`done` 在 direct command 关闭时结算且绝不 reject。job id、所有权、轮询与通知属于通用 `ctx.jobs` 运行时，工具层会把句柄注册进去。
+在 `onExpiry: 'none'` 下等待 `execute` 即可在后台运行命令；它完成准备后返回进程句柄，且不应用执行超时。取消或准备失败会在发布句柄前拒绝调用。`readOutput()` 把流增量合并为一次消费式读取，并在 `[stderr]` 分段下标记 stderr；`kill()` 终止由提供方管理的 range；`done` 在 direct command 关闭时结算且绝不 reject。job id、所有权、轮询与通知属于通用 `ctx.jobs` 运行时，工具层会把句柄注册进去。
 
 <a id="adjusting-budgets-at-runtime"></a>
 ### 运行时调整预算

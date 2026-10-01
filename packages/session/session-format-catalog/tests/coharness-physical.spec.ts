@@ -19,16 +19,16 @@ function row(type: string, seq: number, data: Record<string, SessionFormatJsonVa
 
 const user = { id: 'question', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'question' }] }
 const assistant = { id: 'answer', role: 'assistant', source: { kind: 'model', provider: 'p', model: 'm' }, content: [{ type: 'text', text: 'hello' }] }
-const system = { id: 'system', role: 'system', source: { kind: 'plugin', plugin: 'prompt' }, content: [] }
+const system = { id: 'system', role: 'system', source: { kind: 'system-prompt' }, content: [] }
 
 it.each([0, 1, 2, 3])('retains the declared seedLength and draft metadata from v%s', (version) => {
   const value = header(version, { seedLength: 0, draft: true })
   expect(coharnessJsonlFormatCatalog.readHeader(value)).toMatchObject({
     status: 'migration-required', storedVersion: version,
-    header: { version: 6, isSeeded: true, draft: true },
+    header: { version: 7, isSeeded: true, draft: true },
   })
   expect(restore(version, [row('session/end-seed', 0, {})], { seedLength: 0, draft: true }))
-    .toMatchObject({ header: { version: 6, draft: true, isSeeded: true }, inheritedEventCount: 0 })
+    .toMatchObject({ header: { version: 7, draft: true, isSeeded: true }, inheritedEventCount: 0 })
   expect(value).not.toHaveProperty('isSeeded')
 })
 
@@ -71,7 +71,7 @@ it('retains permission origin after an earlier v1 chunk group is consumed', () =
 
 it('keeps current, future and released-header admission independent of the legacy reader', () => {
   expect(coharnessJsonlFormatCatalog.readHeader(header(6))).toMatchObject({ status: 'malformed' })
-  expect(coharnessJsonlFormatCatalog.readHeader(header(7))).toMatchObject({ status: 'unsupported' })
+  expect(coharnessJsonlFormatCatalog.readHeader(header(8))).toMatchObject({ status: 'unsupported' })
   expect(sessionFormatCatalog.readHeader(header(3))).toMatchObject({ status: 'malformed' })
   expect(coharnessJsonlFormatCatalog.readHeader(header(3, { draft: 'yes' }))).toMatchObject({ status: 'malformed' })
   expect(coharnessJsonlFormatCatalog.readHeader(header(3, { isSeeded: false, seedLength: 1 }))).toMatchObject({ status: 'malformed' })
@@ -84,12 +84,12 @@ it('verifies stored generations without silently advancing their version', () =>
   historical.decodeRow(row('permission/preset', 0, { preset: 'workspace-write', origin: 'selection' }))
   expect(historical.header).toMatchObject({ version: 3, draft: false })
   expect(historical.finish()).toMatchObject({ header: { version: 3, draft: false }, events: [{ type: 'permission/preset' }] })
-  for (const version of [5, 6]) {
+  for (const version of [5, 6, 7]) {
     const native = coharnessJsonlFormatCatalog.createStoredRestore(header(version, { isSeeded: false }), { recovery: 'strict', validation: 'current' })
     expect(native.finish()).toMatchObject({ header: { version }, events: [] })
   }
-  const current = coharnessJsonlFormatCatalog.createRestore(header(6, { isSeeded: false }), { recovery: 'strict', validation: 'current' })
-  expect(current.finish()).toMatchObject({ header: { version: 6 }, events: [] })
+  const current = coharnessJsonlFormatCatalog.createRestore(header(7, { isSeeded: false }), { recovery: 'strict', validation: 'current' })
+  expect(current.finish()).toMatchObject({ header: { version: 7 }, events: [] })
 })
 
 it.each([null, { inherited: false }])('refuses a contradictory inherited cut payload (%j)', (data) => {

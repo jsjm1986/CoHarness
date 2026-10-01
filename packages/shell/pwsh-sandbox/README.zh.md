@@ -88,7 +88,7 @@ kind: "package-reference"
 
 ### 主要流程
 
-对受限模式，`resolve()` 标记每次调用的策略；`run` 与 `start` 把 pwsh argv 经提供方包装，再把受限 argv 交给继承的子进程路径。结算时执行器对结果分类：runner 失败优先于拒绝（命令从未运行），stderr 携带 runner 拒绝方言的失败运行报告 `denied: true`，每次受限运行都携带模式与强制执行事实。`danger-full-access` 完全绕过提供方，并标记 `denied: false`。
+对受限模式，`resolve()` 标记每次调用的策略；`execute` 把 pwsh argv 经提供方包装，再把受限 argv 交给继承的子进程路径。结算时执行器对结果分类：runner 失败优先于拒绝（命令从未运行），stderr 携带 runner 拒绝方言的失败运行报告 `denied: true`，每次受限运行都携带模式与强制执行事实。`danger-full-access` 完全绕过提供方，并标记 `denied: false`。
 
 ### 不变式
 

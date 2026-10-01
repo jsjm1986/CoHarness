@@ -180,7 +180,7 @@ export interface ShellProcessRead {
 }
 
 /**
- * A background process handle returned by {@link ShellExecutor.start}. It is the
+ * A process handle published by {@link ShellExecutor.execute}. It is the
  * only access path; buffered output remains readable after exit. Composition
  * teardown (the subprocess service's disposal) kills running processes and
  * awaits {@link done}; an executor-only reload leaves them running.

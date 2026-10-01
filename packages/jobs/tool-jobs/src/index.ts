@@ -3,8 +3,8 @@
  * `ctx.jobs`. Loading the plugin attaches the controller required by
  * producers. It also delivers completions the model has not already
  * collected to the owning agent: injected into a busy owner's next step, or
- * opening a turn on an idle one under the default `wakeup` delivery, unbounded
- * unless `maxConsecutiveWakes` caps it per owner.
+ * opening a turn on an idle one under the default `wakeup` delivery, bounded
+ * per owner by `maxConsecutiveWakes` (default 10).
  * @module @deepseek-ai/dsh-tool-jobs
  */
 
@@ -53,11 +53,10 @@ export interface Config {
   completionDelivery?: CompletionDelivery
   /**
    * Turns one owner may have opened by completion wakes before the next
-   * notice degrades to injection, reset by any user-authored input. Absent by
-   * default: every idle completion wakes its owner. Set it to bound the
-   * self-exciting chain where a woken turn starts the job whose completion
-   * wakes it again, at the cost of notices past the cap waiting silently for
-   * the next user input.
+   * notice degrades to injection, reset by any user-authored input. Defaults
+   * to 10: the bound blocks the self-exciting chain where a woken turn starts
+   * the job whose completion wakes it again, at the cost of notices past the
+   * cap waiting silently for the next user input.
    */
   maxConsecutiveWakes?: number
 }
@@ -66,7 +65,7 @@ export const Config: z<Config> = z.object({
   waitTimeoutMs: z.number().min(1).default(30_000),
   maxWaitTimeoutMs: z.number().min(1).default(600_000),
   completionDelivery: z.union(['quiet', 'wakeup'] as const).default('wakeup'),
-  maxConsecutiveWakes: z.number().min(1),
+  maxConsecutiveWakes: z.number().min(1).default(10),
 })
 
 /** Shared schema for job-control outputs. */
@@ -208,7 +207,7 @@ export function apply(ctx: Context, config: Config): void {
     throw new Error(`tool-jobs: waitTimeoutMs (${waitDefault}) exceeds maxWaitTimeoutMs (${waitCap})`)
   }
   // A budget is a count of turns: a fraction never names a turn, and
-  // `Infinity` would spell an "unbounded" that omitting the field already means.
+  // `Infinity` is not a cap.
   if (wakeBudget !== undefined && !Number.isSafeInteger(wakeBudget)) {
     throw new Error(`tool-jobs: maxConsecutiveWakes (${wakeBudget}) must be a whole number of turns`)
   }

@@ -170,11 +170,11 @@ The `SANDBOX_UNAVAILABLE` error code (owned by the [sandbox seam](sandbox.md)) i
 
 ## Background processes: `ShellProcess`
 
-`start()` resolves with a handle after asynchronous launch preparation; cancellation or preparation failure rejects before publication. The handle has no id or owner. `dsh-tool-bash` adapts it into `ctx.jobs.start()` hooks; the generic runtime then owns job identity and lifecycle. `done` resolves when the underlying process settles and never rejects; a subprocess provider rejection becomes a `killed` process with a stage-neutral error on stderr. Reads remain valid after settlement, and sandbox facts are stamped before `done` resolves.
+`execute()` resolves with a handle after asynchronous launch preparation; cancellation or preparation failure rejects before publication. The handle has no id or owner. `dsh-tool-bash` adapts it into `ctx.jobs.start()` hooks; the generic runtime then owns job identity and lifecycle. `done` resolves when the underlying process settles and never rejects; a subprocess provider rejection becomes a `killed` process with a stage-neutral error on stderr. Reads remain valid after settlement, and sandbox facts are stamped before `done` resolves.
 
 ```ts type-equiv
 /**
- * A background process handle returned by {@link ShellExecutor.start}. It is the
+ * A process handle published by {@link ShellExecutor.execute}. It is the
  * only access path; buffered output remains readable after exit. Composition
  * teardown (the subprocess service's disposal) kills running processes and
  * awaits {@link done}; an executor-only reload leaves them running.
@@ -232,7 +232,7 @@ interface ShellProcessRead {
 
 ## The service
 
-`ShellExecutor` owns `resolve`, foreground `run`, background-process `start`, and the `sandboxMode` capability fact. `dsh-bash-local` owns command defaulting, timeout/abort classification, the terminal environment, and the background read merge; managed-range termination, bounded collectors, spill files, credential scrubbing, and disposal quiescence are the [subprocess service](subprocess.md)'s. `dsh-tool-bash` owns model-facing rendering and adapts background handles into the [generic job runtime](jobs.md). `dsh-shell` owns the shell tools' shared exit-status contract: the exported `parseExitStatus`/`ParsedExitStatus` inverts the `[exit code: N]` / `[killed by signal: X]` markers `dsh-tool-bash`'s `renderResult` and `dsh-tool-pwsh`'s `renderPwshResult` append, and both tools' `presentResult` use it to split the rendered text into the terminal card's output body and its exit-status pill.
+`ShellExecutor` owns `resolve` and `execute` — whose `result()` is the foreground projection while the handle itself carries the background `ShellProcess` surface — and the `sandboxMode` capability fact. `dsh-bash-local` owns command defaulting, timeout/abort classification, the terminal environment, and the background read merge; managed-range termination, bounded collectors, spill files, credential scrubbing, and disposal quiescence are the [subprocess service](subprocess.md)'s. `dsh-tool-bash` owns model-facing rendering and adapts background handles into the [generic job runtime](jobs.md). `dsh-shell` owns the shell tools' shared exit-status contract: the exported `parseExitStatus`/`ParsedExitStatus` inverts the `[exit code: N]` / `[killed by signal: X]` markers `dsh-tool-bash`'s `renderResult` and `dsh-tool-pwsh`'s `renderPwshResult` append, and both tools' `presentResult` use it to split the rendered text into the terminal card's output body and its exit-status pill.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
