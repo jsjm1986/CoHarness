@@ -34,6 +34,18 @@ describe('UserService', () => {
     expect(alice.mustChangePassword).toBe(true)
   })
 
+  it('reads one listed row with its instance port and state', async () => {
+    const { users } = setup()
+    const alice = await users.create({ username: 'alice', password: 'pw-123456' })
+    const listed = users.list().find(user => user.id === alice.id)
+    expect(users.getListedById(alice.id)).toMatchObject({
+      id: alice.id, port: listed?.port, instanceState: listed?.instanceState,
+    })
+    expect(users.getListedById(99999)).toBeNull()
+    await users.remove(alice.id)
+    expect(users.getListedById(alice.id)).toBeNull()
+  })
+
   it('rejects invalid or duplicate usernames', async () => {
     const { cfg, users } = setup()
     await users.create({ username: 'alice', password: 'pw-123456' })

@@ -8,12 +8,14 @@ const keyOf = (owner: Owner): string => `${owner.kind}:${String(owner.id)}`
 const messageOf = (error: unknown): string => error instanceof Error ? error.message : '无法更新授权'
 
 /** Shared optimistic editor; each resource owns its decisions and explanation. */
-export function ResourcePermissions({ name, description, saved, read, write }: {
+export function ResourcePermissions({ name, description, saved, read, write, kinds = ['user', 'project'] }: {
   name: string
   description: string
   saved: string
   read: (kind: AdminResourcePolicy['kind'], id: number, signal?: AbortSignal) => Promise<AdminResourcePolicy>
   write: (policy: AdminResourcePolicy) => Promise<AdminResourcePolicy>
+  /** Subject kinds offered by the picker; user-scoped grants live on the user detail page. */
+  kinds?: ReadonlyArray<AdminResourcePolicy['kind']>
 }) {
   const [owners, setOwners] = useState<Owner[]>([])
   const [selected, setSelected] = useState('')
@@ -28,10 +30,13 @@ export function ResourcePermissions({ name, description, saved, read, write }: {
   const [reload, setReload] = useState(0)
   const [ownerReload, setOwnerReload] = useState(0)
 
+  const allowUser = kinds.includes('user')
+  const allowProject = kinds.includes('project')
+
   useEffect(() => {
     let disposed = false
     setLoadingOwners(true)
-    void Promise.all([listUsers(), listProjects()]).then(([users, projects]) => {
+    void Promise.all([allowUser ? listUsers() : Promise.resolve([]), allowProject ? listProjects() : Promise.resolve([])]).then(([users, projects]) => {
       if (disposed) return
       setError('')
       setOwners([
@@ -41,7 +46,7 @@ export function ResourcePermissions({ name, description, saved, read, write }: {
     }).catch((cause: unknown) => { if (!disposed) setError(messageOf(cause)) })
       .finally(() => { if (!disposed) setLoadingOwners(false) })
     return () => { disposed = true; generation.current++ }
-  }, [ownerReload])
+  }, [ownerReload, allowUser, allowProject])
 
   useEffect(() => {
     const owner = owners.find(item => keyOf(item) === selected)
@@ -72,15 +77,16 @@ export function ResourcePermissions({ name, description, saved, read, write }: {
     } finally { if (attempt === generation.current) setSaving(false) }
   }
 
-  return <Section title={`${name}准入资格`}>
+  return <Section title={allowUser ? `${name}准入资格` : `${name}项目授权`}>
     <div className="sectionBody">
     <p className="muted">{description}</p>
+    {allowUser ? null : <p className="muted">用户主体的{name}准入资格在「用户」详情页按用户管理。</p>}
     <ErrorBanner message={error} />
     {loadingOwners ? <LoadingState label="正在加载授权对象" /> : <Field label="授权对象">
       <select className="select" aria-label={`${name}授权对象`} value={selected} disabled={saving} onChange={(event) => {
         generation.current++; setPolicy(null); setLoading(false); setNotice(''); setError(''); setSelected(event.target.value)
       }}>
-        <option value="">请选择用户或项目</option>
+        <option value="">{allowUser ? '请选择用户或项目' : '请选择项目'}</option>
         {owners.map(owner => <option key={keyOf(owner)} value={keyOf(owner)}>{owner.label}</option>)}
       </select>
     </Field>}

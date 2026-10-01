@@ -485,6 +485,59 @@ describe('admin JSON API', () => {
     expect(await deps.users.getById(admin.id)).not.toBeNull()
   })
 
+  it('returns one user and lists its stored project memberships', async () => {
+    const { base, cookie, member, admin, deps } = await setup()
+    const detail = await fetch(`${base}/admin/api/users/${member.id}`, { headers: { cookie } })
+    expect(detail.status).toBe(200)
+    const detailBody = await detail.json()
+    expect(detailBody).toMatchObject({ id: member.id, username: 'worker' })
+    const listRow = (await deps.users.list()).find(user => user.id === member.id)
+    expect(detailBody.port).toBe(listRow?.port)
+    expect(typeof detailBody.port).toBe('number')
+    expect(detailBody.instanceState).toBe(listRow?.instanceState)
+    expect(typeof detailBody.instanceState).toBe('string')
+    expect((await fetch(`${base}/admin/api/users/99999`, { headers: { cookie } })).status).toBe(404)
+
+    const empty = await fetch(`${base}/admin/api/users/${member.id}/memberships`, { headers: { cookie } })
+    expect(empty.status).toBe(200)
+    expect(await empty.json()).toEqual({ memberships: [] })
+
+    const project = await deps.projects.createManaged!({ name: 'owned', ownerUserId: admin.id })
+    await deps.projects.setMember(project.id, member.id, 'ro')
+    const listed = await fetch(`${base}/admin/api/users/${member.id}/memberships`, { headers: { cookie } })
+    expect(await listed.json()).toEqual({
+      memberships: [expect.objectContaining({ projectId: project.id, name: 'owned', mode: 'ro' })],
+    })
+    expect((await fetch(`${base}/admin/api/users/99999/memberships`, { headers: { cookie } })).status).toBe(404)
+  })
+
+  it('reads the stored per-user quota and rejects missing subjects', async () => {
+    const { base, cookie, member } = await setup()
+    const initial = await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=${member.id}`, { headers: { cookie } })
+    expect(initial.status).toBe(200)
+    expect(await initial.json()).toEqual({
+      tokenMode: 'inherit', tokenLimit: null,
+      companyCostMode: 'inherit', companyCostMicrosLimit: null,
+    })
+
+    const write = await fetch(`${base}/admin/api/quotas`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        subjectType: 'user', subjectId: String(member.id),
+        tokenLimit: 5000, companyCostMicrosLimit: null,
+      }),
+    })
+    expect(write.status).toBe(204)
+    const stored = await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=${member.id}`, { headers: { cookie } })
+    expect(await stored.json()).toEqual({
+      tokenMode: 'custom', tokenLimit: 5000,
+      companyCostMode: 'unlimited', companyCostMicrosLimit: null,
+    })
+
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=99999`, { headers: { cookie } })).status).toBe(404)
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=project&subjectId=1`, { headers: { cookie } })).status).toBe(400)
+  })
+
   it('returns JSON { error: "origin not allowed" } for /admin/api CSRF failures', async () => {
     const { base, cookie } = await setup()
     const res = await fetch(`${base}/admin/api/users`, {

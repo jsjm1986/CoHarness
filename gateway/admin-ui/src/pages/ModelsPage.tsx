@@ -14,6 +14,7 @@ import {
   type ModelRegistrationReport,
 } from '../api.ts'
 import { OrganizationModelsEditor } from '../components/OrganizationModelsEditor.tsx'
+import { ModelIdentity, modelKey, OverrideSelect, RoleDefaults } from '../components/models.tsx'
 import {
   Button,
   Dialog,
@@ -566,39 +567,6 @@ function ModelDirectory({
   )
 }
 
-function ModelIdentity({ row }: { row: ModelGovernanceRow }) {
-  return (
-    <div className="modelIdentity">
-      <span className="itemIcon"><Sparkles aria-hidden="true" /></span>
-      <span className="modelIdentityText"><strong>{row.displayName}</strong><span className="codeText">{row.provider}/{row.model}</span></span>
-    </div>
-  )
-}
-
-function RoleDefaults({ row }: { row: ModelGovernanceRow }) {
-  return (
-    <div className="roleDefaults">
-      <span className={row.adminAllowed ? 'allowed' : 'denied'}>管理员 {row.adminAllowed ? '允许' : '拒绝'}</span>
-      <span className={row.userAllowed ? 'allowed' : 'denied'}>用户 {row.userAllowed ? '允许' : '拒绝'}</span>
-    </div>
-  )
-}
-
-function OverrideSelect({ label, value, disabled, onChange }: {
-  label: string
-  value: boolean | undefined
-  disabled: boolean
-  onChange: (value: string) => void
-}) {
-  return (
-    <select aria-label={label} className="select selectCompact overrideSelect" disabled={disabled} value={value === undefined ? 'inherit' : value ? 'allow' : 'deny'} onChange={event => onChange(event.target.value)}>
-      <option value="inherit">继承角色</option>
-      <option value="allow">允许</option>
-      <option value="deny">拒绝</option>
-    </select>
-  )
-}
-
 function PriceSummary({ row }: { row: ModelGovernanceRow }) {
   const values = [row.inputMicrosPerMillion, row.outputMicrosPerMillion, row.cacheReadMicrosPerMillion, row.cacheWriteMicrosPerMillion]
   return (
@@ -606,10 +574,6 @@ function PriceSummary({ row }: { row: ModelGovernanceRow }) {
       {PRICE_LABELS.map((label, index) => <span key={label}><b>{label}</b><span>{microsToYuan(values[index] ?? 0)}</span></span>)}
     </div>
   )
-}
-
-function modelKey(row: { provider: string; model: string }): string {
-  return `${row.provider}\0${row.model}`
 }
 
 function messageFrom(cause: unknown): string {

@@ -2031,6 +2031,8 @@ describePg('PostgreSQL baseline', () => {
       const member = await users.create({ username: 'runtime-user', password: 'pw-12345678' })
       expect(admin.id).not.toBe(member.id)
       expect((await users.list()).map(user => user.port)).toEqual([45100, 45101])
+      expect(await users.getListedById(member.id)).toMatchObject({ id: member.id, port: 45101, instanceState: expect.any(String) })
+      expect(await users.getListedById(999999)).toBeNull()
       await expect(users.setStatus(admin.id, 'disabled')).rejects.toThrow('cannot-remove-last-admin')
 
       const loggedIn = await auth.login('runtime-user', 'pw-12345678', '127.0.0.1', 'vitest')

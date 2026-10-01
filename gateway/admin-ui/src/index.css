@@ -431,6 +431,7 @@ a {
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text);
+  text-decoration: none;
   font-weight: 550;
   line-height: 1;
   white-space: nowrap;

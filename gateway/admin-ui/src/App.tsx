@@ -21,8 +21,8 @@ import { NavLink, Navigate, Route, BrowserRouter as Router, Routes, useLocation 
 import { AuditPage } from './pages/AuditPage.tsx'
 import { ProjectDetailPage } from './pages/ProjectDetailPage.tsx'
 import { ProjectListPage } from './pages/ProjectListPage.tsx'
-import { UserDetailPage } from './pages/UserDetailPage.tsx'
 import { UsersPage } from './pages/UsersPage.tsx'
+import { UserDetailPage } from './pages/UserDetailPage.tsx'
 import { lazy, Suspense, useState } from 'react'
 import { Dialog } from './components/ui.tsx'
 const PluginsPage = lazy(async () => ({ default: (await import('./pages/PluginsPage.tsx')).PluginsPage }))
