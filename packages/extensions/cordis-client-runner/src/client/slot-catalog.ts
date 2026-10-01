@@ -736,7 +736,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation.pane\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-permission-presets DesktopConfirmationAction id \'desktop-confirmation\'',
       'client-ui-sidebar-right BlankExpandButton id \'auxiliary-sidebar\'',
       'client-ui-sidebar-terminal TerminalRecovery',
     ],
@@ -1196,6 +1195,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'conversation.session.header\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
       'client-ui-open-in-app OpenInAppAction id \'open-in-app\'',
+      'client-ui-permission-presets DesktopConfirmationAction id \'desktop-confirmation\'',
       'session-log-export SessionLogDownloadHeaderAction id \'session-log-download\'',
     ],
     replaceRisk: 'none',

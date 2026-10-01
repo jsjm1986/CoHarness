@@ -3,12 +3,12 @@
   - button "Close":
     - img
   - paragraph: Your confirmation is shared with child agents and PTC within this root session. New participants, another root or a changed desktop require confirmation again.
-  - term: Root session
-  - definition: desktop-confirmation-root
-  - term: Execution node
-  - definition: acceptance-node
   - term: Desktop
   - definition: display-0
+  - term: Execution node
+  - definition: acceptance-node
+  - term: Root session
+  - definition: desktop-confirmation-root
   - term: Current account
   - definition: "12"
   - status: You have not confirmed this root session may use this desktop.

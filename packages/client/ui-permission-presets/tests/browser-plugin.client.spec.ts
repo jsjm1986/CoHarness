@@ -88,7 +88,7 @@ async function bench() {
     name: 'root',
     children: {
       'settings.general.item': { kind: 'list', scope: 'root' },
-      'conversation.input.left': { kind: 'list', scope: 'session' },
+      'conversation.session.header.utilities': { kind: 'list', scope: 'session' },
     },
   } as never, () => null)
   const settingsNamespaces: SettingsNamespaceView[] = []
@@ -180,7 +180,7 @@ async function bench() {
 describe('ui-permission browser plugin', () => {
   it('binds desktop confirmation to the exact pane and removes the action on disposal', async () => {
     const b = await bench()
-    const entry = b.ctx.slots.entries('conversation.input.left').find(item => item.options.id === 'desktop-confirmation')
+    const entry = b.ctx.slots.entries('conversation.session.header.utilities').find(item => item.options.id === 'desktop-confirmation')
     expect(entry?.component).toBe(DesktopConfirmationAction)
     const inject = entry?.inject as unknown as (sessionId: SessionId) => DesktopConfirmationInjected
     const connection = b.ctx.get('connection') as ConnectionHandle
@@ -191,7 +191,7 @@ describe('ui-permission browser plugin', () => {
     expect(inject(sid('managed')).connection).toBe(scoped)
     expect(forSession).toHaveBeenCalledWith(sid('managed'))
     await b.fiber.dispose()
-    expect(b.ctx.slots.entries('conversation.input.left')).toHaveLength(0)
+    expect(b.ctx.slots.entries('conversation.session.header.utilities')).toHaveLength(0)
   })
 
   it('keeps the Host catalog intact and refuses unavailable account selections', async () => {
