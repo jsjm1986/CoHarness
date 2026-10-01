@@ -39,6 +39,10 @@ kind: "package-reference"
 - name: '@deepseek-ai/dsh-jobs-local'
 ```
 
+会话清理保留会在生产者执行前拒绝新的所属任务。所属 Agent 被释放时会取消并等待其运行中和停止中的任务。
+
+受管任务在启动生产者前捕获执行身份。同一 Agent 的后续请求不能替换运行中任务的来源或完成归因。
+
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `maxConcurrentJobsPerOwner` | `10` | 每个精确所有者，或共享的无主桶中，`running` 加 `stopping` 任务的最大数量 |

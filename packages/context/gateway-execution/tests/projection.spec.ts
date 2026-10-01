@@ -1,7 +1,7 @@
 /** Durable projection caches retain execution restrictions without exposing them to the browser. */
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
-import type { ExecutionInputId, ExecutionState } from '@deepseek-ai/dsh-execution-authority'
+import type { ExecutionInputId, ExecutionScopeId, ExecutionState } from '@deepseek-ai/dsh-execution-authority'
 import { expect, it } from 'vitest'
 import { EXECUTION_PROJECTION as projection } from '../src/projection.ts'
 
@@ -84,4 +84,24 @@ it('rejects an unrecognized durable execution event instead of granting authorit
   const initial = projection.init(session.header, SessionLogOffset(0))
   const event = { type: 'gateway/execution', seq: 0, time: 0, data: { kind: 'unknown' } }
   expect(() => projection.apply(initial, event as never)).toThrow()
+})
+
+it('requires a reader admission marker before scoped state, inherited work, or automatic continuations', () => {
+  const session = Session.create(SessionId('protocol'))
+  const initial = projection.init(session.header, SessionLogOffset(0))
+  const scopeId = '10000000-0000-4000-8000-000000000001' as ExecutionScopeId
+  const scope = { parentSessionId: session.id, scopeId, inputs: [A], primaryActorUserId: 1, unverifiedHistory: false }
+  const scoped = session.append('gateway/execution', { kind: 'accepted', state: { ...accepted, scopeId } })
+  const inherited = session.append('gateway/execution', { kind: 'inherit', scope })
+  const continuation = session.append('gateway/continuation', { key: 'goal:test:1', scope })
+  for (const event of [scoped, inherited, continuation]) {
+    expect(() => projection.apply(initial, event)).toThrow('requires its reader admission event')
+  }
+  const marker = session.append('gateway/scoped-execution', { version: 1 })
+  const admitted = projection.apply(initial, marker)
+  expect(projection.apply(admitted, scoped).state.scopeId).toBe(scopeId)
+  expect(projection.apply(admitted, inherited).inheritance).toEqual(scope)
+  expect(projection.apply(admitted, continuation).continuation).toEqual({ key: 'goal:test:1', scope })
+  expect(() => projection.apply(initial, { ...marker, data: { version: 2 } } as never)).toThrow('unsupported scoped execution protocol')
+  expect(() => projection.apply(initial, { ...marker, ignorable: true })).toThrow('unsupported scoped execution protocol')
 })

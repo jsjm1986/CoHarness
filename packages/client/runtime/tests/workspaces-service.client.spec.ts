@@ -2,6 +2,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import type { SessionId, WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-remotes/client'
 import { SessionRuntime } from '../src/client/sessions/service.ts'
+import { SessionRuntimePool } from '../src/client/sessions/pool.ts'
+import { clientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { WorkspaceManager } from '../src/client/workspaces/manager.ts'
 import { DirectoryBrowseError, WorkspaceCreateError, WorkspaceRuntime } from '../src/client/workspaces/service.ts'
 import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.ts'
@@ -21,6 +23,47 @@ function workspace(id: string, sessionIds: SessionId[] = [], createdAt = '2026-0
     createdAt, updatedAt: createdAt,
   }
 }
+
+it.each(['plain', 'encoded-looking'] as const)('keeps %s draft reservations in wire identity through repeated pooled creates', async (kind) => {
+  const raw = kind === 'plain' ? sid('private-draft') : clientSessionKey({ kind: 'project', projectId: 8 }, sid('private-draft'))
+  const target = { kind: 'project' as const, projectId: 7 }
+  const storage = new Map<string, string>([['dsh.workspace.drafts.v1', JSON.stringify({
+    alpha: { draftId: 'draft-reservation', sessionId: raw, workspacePath: '/w/alpha' },
+  })]])
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => { storage.set(key, value) },
+    removeItem: (key: string) => { storage.delete(key) },
+  })
+  const ctx = new Context()
+  await ctx.plugin(() => {}).await()
+  const api = new FakeApiClient()
+  api.onList = async () => ok({ items: [] })
+  api.onWorkspaceList = async () => ok({ items: [workspace('alpha')] })
+  api.onCreate = async request => ok({ sessionId: callField(request, 'sessionId') as SessionId })
+  const base = new SessionRuntime(ctx, api, fakeRemote(api), undefined, { provideService: false })
+  const pool = new SessionRuntimePool(ctx, base, {
+    api, isLoopback: false,
+    hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
+    state: { getSnapshot: () => undefined, subscribe: () => () => {} },
+    rpc: { call: () => Promise.reject(new Error('Unexpected Remote')) },
+    reconnect: () => {}, start: () => ({ stop: () => {} }),
+  }, fakeRemote(api))
+  pool.setBaseRuntimeTarget(target)
+  const workspaces = new WorkspaceRuntime(ctx, api, pool)
+  try {
+    await Promise.all([workspaces.refresh(), base.refresh()])
+    const key = clientSessionKey(target, raw)
+    await expect(workspaces.connectWorkspace(wid('alpha'))).resolves.toBe(key)
+    await expect(workspaces.connectWorkspace(wid('alpha'))).resolves.toBe(key)
+    expect(api.callsOf('session.create')).toHaveLength(2)
+    expect(api.callsOf('session.create').map(call => callField(call, 'sessionId'))).toEqual([raw, raw])
+    expect(JSON.parse(storage.get('dsh.workspace.drafts.v1')!)).toMatchObject({ alpha: { sessionId: raw } })
+    api.onList = async () => ok({ items: [{ sessionId: raw, updatedAt: 2, running: false, blank: false, cwd: '/w/alpha' }] })
+    await base.refresh()
+    expect(JSON.parse(storage.get('dsh.workspace.drafts.v1')!)).toEqual({})
+  } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
+})
 
 describe('WorkspaceManager', () => {
   it('replays changed frames over hydration and adopts the durable order on refresh', async () => {

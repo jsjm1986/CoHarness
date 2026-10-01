@@ -33,7 +33,7 @@ import { acknowledgeReloadConnectionLoss, launchWebScaffold, watchConsole, type 
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
 /** Wire path of the history round-trip the conversation root waits out (POST /api/session.history). */
-const HISTORY_ROUTE = '**/api/session.history'
+const HISTORY_ROUTE = /\/api\/session\.history(?:\?.*)?$/
 
 /**
  * The conversation root's own phase attribute. `div` disambiguates it from the

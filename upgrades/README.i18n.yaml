@@ -3,5 +3,5 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write upgrades/README.md
 /upstream-sync-and-upgrade-records:
-  en: 4aa7b0d3935c9175
-  zh: 8cee42baf9bfd8e1
+  en: 80ae15e891bbad3b
+  zh: e8f6a48d5b400a1f

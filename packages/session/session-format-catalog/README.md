@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-session-format-catalog` gives persistence one deterministic Session format reader without consulting mounted plugins. It assembles codecs and adjacent edges from the earliest supported format through the [current writer format](../../../docs/session-format-status.md), checks the complete gap-free chain at module initialization, and exposes physical dispatch, header-only classification, single-pass row restoration, and current record encoding through `sessionFormatCatalog`. Backends that store decoded headers and event rows instead of released JSONL (SQLite, Gateway/PostgreSQL, detached coordinator reads) use `sessionLogicalFormatCatalog`, which projects stored metadata onto the released requirements, normalizes the declared CoHarness v2 database dialect, and runs the same released edges and current-artifact validation.
+`dsh-session-format-catalog` assembles the released Session readers and adjacent migrations through the [current writer format](../../../docs/session-format-status.md). Persistence readers use this static inventory before plugins mount. It supports released JSONL, CoHarness historical JSONL and decoded database rows, validates restored data, and refuses unsupported formats.
 
 ## Table of Contents
 
@@ -30,6 +30,10 @@ English | [中文](README.zh.md)
 Import this library from persistence and test-support readers that need the complete first-party released-format inventory before any feature plugin mounts. Feature compositions do not register or reorder its entries. No runtime invariant companion is published because construction rejects an invalid static inventory and each completed restore validates its result; mutable row-decoder state belongs to one caller-owned streaming restore.
 
 ### Entry point
+
+`dsh-session-format-catalog` gives persistence one deterministic Session format reader without consulting mounted plugins. It assembles codecs and adjacent edges from the earliest supported format through the [current writer format](../../../docs/session-format-status.md), checks the complete gap-free chain at module initialization, and exposes physical dispatch, header-only classification, single-pass row restoration, and current record encoding through `sessionFormatCatalog`. Backends that store decoded headers and event rows instead of released JSONL (SQLite, Gateway/PostgreSQL, detached coordinator reads) use `sessionLogicalFormatCatalog`, which projects stored metadata onto the released requirements, normalizes the declared CoHarness v2 database dialect, and runs the same released edges and current-artifact validation.
+
+CoHarness JSONL persistence uses `coharnessJsonlFormatCatalog`. Its declared v0–v3 framing retains header `seedLength`, optional `draft`, and packed Assistant chunks. The generated inventory still owns every adjacent edge and the current encoder; the reader selects the historical dialect without changing the stored version. Released `isSeeded` headers and current generations retain native admission. Unknown source fields, contradictory cuts, missing message identity, and future versions are refused.
 
 ```text
 const descriptor = sessionFormatCatalog.readHeader(physicalHeader)

@@ -27,7 +27,7 @@ The Web turn tail shows recorded workspace changes and explicit file deliveries.
 
 The [workspace recorder](../../deliverables/workspace-changes/README.md) announces summaries with `workspace/changes`; the [present tool](../../deliverables/tool-present/README.md) records `deliverables/presented`. `deliverablesDefinition` folds these events into turn data without scanning conversation history. Mutation-location fallback retains support for tools that declare diff or edit render intent.
 
-Review shows one file at a time with unified or side-by-side hunks, line wrapping, creation/deletion facts, and explicit binary or oversized states. Comparisons read the recorded turn snapshots, not current file contents. The renderer limits visible comparison lines and reports truncation. A separate preview action reads the current file. A disposed or restarted recorder yields an unavailable historical comparison rather than reconstructing one from current files.
+Review shows one file at a time with unified or side-by-side hunks, line wrapping, creation/deletion facts, and explicit binary or oversized states. Comparisons read the recorded turn snapshots, not current file contents. The renderer limits visible comparison lines and reports truncation. A separate preview action reads the current file. Completed comparisons survive recorder release and Host restart. Missing older history displays an unavailable status with an explicit retry; a failed recording displays an incomplete status without implying zero changes.
 
 Reads use the Session's runtime connection and ApiProxy authorization. The Host checks Session access and recorded paths before and after asynchronous reads. Client readers belong to the retained Session, discard cached results on connection replacement, and abort on disposal. A review resource must declare the same Session as its sidebar. Hidden tabs do not initiate comparisons.
 
@@ -64,7 +64,7 @@ The guidance remains unchanged throughout the plugin lifetime and is reusable ac
 
 ## Known Limitations and Deferred Work
 
-- Historical comparisons live only as long as the Host recorder. The Session event remains durable after its comparison is unavailable.
+- History created before durable review storage may retain an announcement without its comparison. Current files cannot reconstruct that history.
 - Inline-code matching accepts exact paths and unambiguous basenames; it does not guess path suffixes or files named only in prose.
 - The recorder currently captures local execution. Remote execution needs a recorder using the same remote filesystem and subprocess target.
 

@@ -42,25 +42,27 @@
     "semver": "^7.8.5"
   },
   "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/cordis-plugin-group": "workspace:~",
     "@deepseek-ai/cordis-plugin-include": "workspace:~",
     "@deepseek-ai/cordis-plugin-loader": "workspace:~",
-    "@deepseek-ai/dsh-launch-environment": "workspace:*",
     "@deepseek-ai/dsh-home-paths": "workspace:*",
-    "@deepseek-ai/dsh-system-prompt": "workspace:*",
-    "@deepseek-ai/cordis": "workspace:~"
+    "@deepseek-ai/dsh-launch-environment": "workspace:*",
+    "@deepseek-ai/dsh-managed-data": "workspace:*",
+    "@deepseek-ai/dsh-system-prompt": "workspace:*"
   },
   "devDependencies": {
-    "@deepseek-ai/schemastery": "workspace:~",
+    "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/cordis-plugin-group": "workspace:~",
     "@deepseek-ai/cordis-plugin-include": "workspace:~",
     "@deepseek-ai/cordis-plugin-loader": "workspace:~",
     "@deepseek-ai/cordis-plugin-timer": "workspace:~",
-    "@deepseek-ai/dsh-launch-environment": "workspace:*",
     "@deepseek-ai/dsh-home-paths": "workspace:*",
+    "@deepseek-ai/dsh-launch-environment": "workspace:*",
+    "@deepseek-ai/dsh-managed-data": "workspace:*",
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
+    "@deepseek-ai/schemastery": "workspace:~",
     "@types/js-yaml": "^4.0.9",
-    "@types/semver": "^7.8.0",
-    "@deepseek-ai/cordis": "workspace:~"
+    "@types/semver": "^7.8.0"
   }
 }

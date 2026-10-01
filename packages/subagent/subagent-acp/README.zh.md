@@ -61,7 +61,7 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 | `disposeGraceMs` | `3000` | POSIX 在 SIGTERM 后、SIGKILL 前的宽限时间（Windows 直接强制终止），须为正值且不得大于 [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.zh.md)。 |
 | `resume` | `false` | 启用持续成员：提供方获得 `prepareContinuable`，成员子级以进程内 continuation 管理的 Agent 运行，其模型调用经 `session/load` 驱动耐用 ACP 会话。要求 `llm` 服务与声明 `loadSession` 的 agent。 |
 | `stateDir` | `~/.dsh/external-members` | 成员绑定存储（`acp.jsonl`）所在目录。仅随 `resume` 使用。 |
-| `memberCwd` | `cwd`，否则为 harness 启动目录 | 成员 ACP 会话的工作区。仅随 `resume` 使用。 |
+| `memberCwd` | `cwd`，否则为成员 Session cwd | 持续成员的工作区覆盖值，在其执行目标上验证。 |
 
 ```yaml
 - id: subagent-acp
@@ -80,7 +80,7 @@ ACP 不声明任何启动时能力，因为当前进程无法强制执行远程�
 
 设置 `resume: true` 后提供方声明 `prepareContinuable`，`ctx.subagents.startContinuable` 即可接受它——包括 Team roster 的提供方选择通道。成员子级是由 continuation 管理器拥有的普通进程内 Agent（耐用身份、inbox、持久化、重启）；本包只提供模型路由：每次成员模型调用 spawn 一个 ACP 子进程，挂载成员的耐用 ACP 会话（已绑定时 `session/load`，首轮 `session/new`），发出一次提示词，然后处置进程。
 
-`session/load` 是可选 ACP 能力，因此提供方在成员创建时探测一次——不能续接的 agent 在耐用子级诞生前即被拒绝。绑定存储记录 harness 子会话 ↔ ACP 会话映射与最后发出的提示词；轮次中途崩溃后，下一次调用可经 `session/load` 重放的 transcript 证明该提示词：已完结的答案直接重放不重发，可证未送达的提示词重发一次，不可证的提示词被丢弃而非重复投递。
+`session/load` 是可选能力，成员创建会在发布耐用子级之前探测它。绑定存储保留子会话 ↔ ACP 会话映射、待决提示词和已消费游标。实时提示词只有收到 `end_turn` 才算完成；取消和其他停止原因均失败。加载的历史没有可关联到准确请求的终止结果，因此中断的提示词报告 `EXTERNAL_TURN_OUTCOME_UNKNOWN` 且不重发。耐用会话仍能续接，但部分重放文本不算成功。
 
 未设置 `resume` 时提供方保持仅一次性能力——没有 `prepareContinuable`，可继续启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
 

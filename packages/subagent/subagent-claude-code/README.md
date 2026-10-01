@@ -59,16 +59,21 @@ The provider advertises no optional start-time capabilities and reports `inherit
 | `permissionMode` | `dontAsk` | Native non-interactive permission policy fixed for every run from this Provider instance. |
 | `disposeGraceMs` | `3000` | Positive finite grace in milliseconds, no greater than [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.md), between the shared process-tree owner's termination tiers; disposal then waits for whole-tree exit. |
 | `stateDir` | `~/.dsh/external-members` | Directory holding instance-specific binding stores; `claude-code.jsonl` belongs to the default instance. Used only by persistent members. |
-| `memberCwd` | harness launch directory | Workspace for member Claude sessions. Used only by persistent members. |
+| `memberCwd` | member Session cwd | Workspace override for persistent members, validated on their execution target. |
+| `remoteCommand` | `claude` | Preinstalled program resolved inside an SSH target; local execution keeps the bundled program. |
 
 <a id="persistent-members"></a>
 ## Persistent members
+
+SSH uses the target’s preinstalled `remoteCommand`. Its child receives only explicitly configured environment values, without Host HOME, PATH or SDK process environment; the target program reads its own user and project settings.
+
+Each call resolves its workspace and subprocess provider through the actual member Session. An SSH Session requires filesystem and subprocess providers in the same standing realm; missing providers refuse execution without Host fallback. Before first launch, the binding store pins the canonical cwd and execution target and rejects changes after restart. Corrupt or unreadable records cannot become new members. Legacy bindings without target evidence remain intact and require a new member before execution.
 
 The default `claude-code` instance keeps its existing model route and `claude-code.jsonl` store. Other names receive separate deterministic routes and files derived from the full provider name. Names remain distinct on case-insensitive filesystems; removing one instance releases only its route. Renaming an instance changes its persistent identity and does not adopt another instance's bindings.
 
 When the `llm` service is mounted this provider also advertises `prepareContinuable`, so `ctx.subagents.startContinuable` accepts it — the Team roster's provider-selection channel included. A member child is an ordinary in-process Agent owned by the continuation manager (durable identity, inbox, persistence, restart); this package contributes only the model route: every member model call runs one Claude Agent SDK `query` with `persistSession` on the member's durable Claude session (`resume` when bound), then releases the SDK process.
 
-The binding store records the harness child session ↔ Claude session mapping and the last issued prompt; a crash mid-turn leaves the prompt provable from the durable transcript under `~/.claude/projects/` on the next call: a settled answer replays without resending, a provably absent prompt resends once, and an unprovable one is dropped rather than duplicated. Without the `llm` service the provider stays one-shot only — no `prepareContinuable`, so continuable starts reject `UNSUPPORTED_CAPABILITY`.
+The binding store records the child ↔ Claude session mapping, pending prompt, and consumed cursor. Successful SDK result messages complete live turns. After interruption, transcript text cannot prove an exact request completed or was never delivered: the pending request reports `EXTERNAL_TURN_OUTCOME_UNKNOWN` without querying again. The durable member remains available for a new explicit prompt. Without `llm`, continuable starts reject `UNSUPPORTED_CAPABILITY`.
 
 | `permissionMode` value | Native behavior |
 |---|---|

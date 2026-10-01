@@ -12,6 +12,8 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 
 `npm run build` 会把 Gateway 源码图生成到 `lib/`，并将相对导入改写为 `.js`；生产 supervisor 必须在同一个 release 目录中执行 `node lib/index.js`。源码 `tsx` 入口只用于开发和测试。
 
+创建用户、项目、运行时文件或部署状态的夹具使用 `tests/test-config.ts`，并传入自己通过 `mkdtemp` 创建的目录。它在服务启动前将可写配置路径限制在该目录内；子进程使用同一份显式环境。解析器测试仍直接验证生产默认值。只覆盖 `HGW_USERS_ROOT` 并不能隔离项目运行时、密钥、备份或 systemd 单元文件。
+
 ## 配置（环境变量，见 src/config.ts）
 
 | 变量 | 默认 | 说明 |
@@ -70,13 +72,19 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 
 `GET /admin/api/project-directories` 为现有目录浏览器提供数据。本地启动器模式从 `/` 开始，因此 macOS 外接磁盘显示在 `/Volumes` 下；systemd 模式显示只包含 `HGW_PROJECT_PATH_ROOTS` 的虚拟根，且配置根本身只能导航。每次响应包含一层排序后的目录，最多 1,000 条；隐藏目录带标记，并在 UI 中默认隐藏，直到管理员启用显示。离开 systemd 根的规范符号链接会被省略。浏览器绝不会读取管理员客户端的文件系统。最终创建项目时会再次解析和校验所选路径，并用稳定诊断拒绝非绝对路径、不存在、不是目录、不可访问、配置根外、Gateway 自有/保留、用户 home 和既有项目重叠的路径。受管名称会被修剪且必须恰好构成一个目录段，因此 `.`/`..`、分隔符、控制字符和经符号链接解析的逃逸都会被拒绝。重命名项目只改变目录中的名称，删除项目会保留宿主机文件。
 
-成员为 `ro` 或 `rw`，普通用户的有效列表（私有 home 加成员身份，每条带 `label`）写入 `$DSH_HOME/directory-grants.json`。管理员在个人和项目 scope 都得到文件系统根目录的 `rw` 授权和 Full access 预设。该预设只改变 dsh 的应用内 sandbox 与审批旋钮；项目运行时仍受内核项目路径约束。角色变化会重写这份投影，并重启正在运行的个人实例。用户删除是逻辑删除：停止个人实例、释放其运行时端口分配、吊销会话、移除项目与模型访问、在登录和管理列表中隐藏账号，并保留审计、用量、对话和 home 历史；用户名保持占用。
+成员为 `ro` 或 `rw`，普通用户的有效列表（私有 home 加成员身份，每条带 `label`）写入 `$DSH_HOME/directory-grants.json`。管理员在个人和项目 scope 都得到文件系统根目录的 `rw` 授权和 Full access 预设。该预设只改变 dsh 的应用内 sandbox 与审批旋钮；systemd 项目运行时仍受内核项目路径约束。角色变化会重写这份投影，并重启正在运行的个人实例。用户删除是逻辑删除：停止个人实例、释放其运行时端口分配、吊销会话、移除项目与模型访问、在登录和管理列表中隐藏账号，并保留审计、用量、对话和 home 历史；用户名保持占用。
 
-管理端的用户、项目、模型、用量和审计页面共用一套视觉系统：克制的表面色、统一的页面与分区标题、状态徽标、共享指标卡、明确的加载/空状态/错误状态、键盘焦点环，以及用于变更操作的弹窗表单。项目详情包含成员、实例状态、生效的按路由模型授权（含全部开启与全部关闭）、项目默认跟随模式和单模型例外、自然月 token/成本/缺失用量汇总、默认使用项目独立 Token 与公司成本额度的配置弹窗（也可改为继承普通成员额度），以及额度来源、路径、发起方式、所有者、成员和生效模型的配置摘要。个人 Provider 与模型登记使用带可见标签、明确 `YYYY-MM-DD` 日期格式以及应用/重置操作的筛选器，编辑草稿时不会为每个字符发起请求，日期无效时不会发起请求。视口宽度大于 `840px` 时使用固定侧栏和便于横向比较的数据表；宽度不超过 `840px` 时，侧栏变为吸顶品牌栏加七项固定底部导航，表格行切换为易读的卡片，模型视图控件保持单行。宽度不超过 `560px` 时，表单网格改为单列、操作按钮填满可用宽度，弹窗接近全屏并让正文独立滚动。粗指针控件预留 `44px` 触控目标，同时遵循深色配色和减少动画偏好。修改界面后运行 `npm run build --prefix gateway/admin-ui` 重新生成静态资源；运行中的网关直接提供生成后的 `gateway/public/admin` 文件，不需要数据库迁移。
+管理端的用户、项目、模型、用量和审计页面共用一套视觉系统：克制的表面色、统一的页面与分区标题、状态徽标、共享指标卡、明确的加载/空状态/错误状态、键盘焦点环，以及用于变更操作的弹窗表单。项目详情包含成员、实例状态、生效的按路由模型授权（含全部开启与全部关闭）、项目默认跟随模式和单模型例外、自然月 token/成本/缺失用量汇总、回填已保存来源和上限的额度弹窗（包含明确的零额度与普通成员继承关系），以及额度来源、路径、发起方式、所有者、成员和生效模型的配置摘要。价格编辑器保留微元单价的六位小数，并与存储层共用十进制转换。个人 Provider 与模型登记使用带可见标签、明确 `YYYY-MM-DD` 日期格式以及应用/重置操作的筛选器，编辑草稿时不会为每个字符发起请求，日期无效时不会发起请求。视口宽度大于 `840px` 时使用固定侧栏和便于横向比较的数据表；宽度不超过 `840px` 时，侧栏变为吸顶品牌栏加单行固定底部导航，其中包含五个主要入口和通往其他全部功能的“更多”菜单，表格行切换为易读的卡片，模型视图控件保持单行。宽度不超过 `560px` 时，表单网格改为单列、操作按钮填满可用宽度，弹窗接近全屏并让正文独立滚动。SSH、Webhook 和部署表格使用有界横向滚动区域，触控、指针及键盘均能到达各项操作。粗指针控件预留 `44px` 触控目标，同时遵循深色配色和减少动画偏好。修改界面后运行 `npm run build --prefix gateway/admin-ui` 重新生成静态资源；运行中的网关直接提供生成后的 `gateway/public/admin` 文件，不需要数据库迁移。
+
+项目重命名错误保留在打开的表单内，提交草稿不被清空。文档所有权转移仅适用于活动项目文档。审计行在请求结果旁展示安全的对象标识、配置代次和执行状态，不返回原始详情或秘密。
 
 项目逻辑设置与服务器资源使用不同的所有权路径。`/account/api/preferences` 按账户保存语言、主题和忙碌 Enter 选择，即使当前处于项目作用域也仍然属于个人。`/account/api/projects/:id/configuration` 返回项目主题策略和能力标记；项目 owner 与组织管理员可以更新它。`/account/api/projects/:id/model-settings` 及其凭据/发现子路径通过加密 PostgreSQL 行和 revision 栅栏管理项目 Provider。其他成员看到的项目设置面板保持只读，但仍会解释每项所有权边界。`/admin` 只汇总这些设置并链接到选定的项目作用域；目录路径、挂载、生命周期、额度和组织模型授权仍由管理员操作。
 
-Admin 的**归档**频道从 Gateway 归档索引列出组织级根对话。它支持按状态、标题／正文／Session ID、用户和项目筛选，打开以聊天方式展示、并把完整事件收进可折叠技术详情的分页阅读器，导出 JSON，并通过确认弹窗批量恢复、移入回收站或永久清理。个人正文仍由所属运行时保存并按需读取；项目正文使用 PostgreSQL。每次查看、导出和变更都会写入审计，但审计行不复制消息正文；运行时归档快照携带 revision，Admin 离线变更会在运行时恢复后对账。
+Admin 的**归档**频道从 Gateway 归档索引列出组织级根对话。它支持按状态、标题／正文／Session ID、用户和项目筛选，打开以聊天方式展示、并把完整事件收进可折叠技术详情的分页阅读器，导出 JSON，并通过确认弹窗批量恢复、移入回收站或永久清理。个人正文仍由所属运行时保存并按需读取；项目正文使用 PostgreSQL。正文查看、导出和变更会写入审计，状态轮询不重复记录查看；审计行不复制消息正文。运行时归档快照携带 revision，Admin 离线变更会在运行时恢复后对账。
+
+归档永久清理先排队，所属运行时确认空闲资源释放后才执行。有活跃轮次、子任务、终端或待处理输入时拒绝，不删除历史。先清理 Review 数据，再按子级到祖先删除个人日志；项目数据在回执事务内删除。Admin 显示等待状态或保留失败原因，确认后才更新结果；状态轮询只读元数据，不重载正文。离线实例保留队列，后台不会启动它。
+
+SSH 目标元数据在 `/admin/ssh` 管理。可选的 `passwordRef` 是连接运行时解析的凭据名称，不是密码值。编辑器保留并显示该引用；明确清空字段表示不使用此引用，改用 OpenSSH 配置。API 更新省略 `passwordRef` 时保留已有值，明确传入 `null` 才移除它。两种操作都受目标 revision 保护。
 
 ## 插件管理
 
@@ -105,7 +113,7 @@ Gateway 按认证用户保存 Android Token，只在持久化 completed turn 后
 本地 `stopAll()` 的 worker 在单个目标失败后继续处理剩余的已跟踪运行时；各 worker 处理完毕后以自身遇到的第一个错误拒绝。`Promise.allSettled` 等待所有 worker 结束，再按数组顺序报告第一个被拒绝的 worker，而非全局时间上最早的错误。systemd 关闭仍不执行操作；本地进程退出时的强制清理与外层关闭截止时间不变，因此到期可中断剩余处理（[决策](../.agents/notes/implemented/bug-fix/2026-09-17-stop-all-worker-failures.zh.md)）。
 
 账户运行在个人 scope 或一个可访问项目 scope 中。个人 scope 保留每用户运行时及其持久化；每个项目使用一个覆盖项目路径的共享运行时。scope 选择端点会先启动并等待目标运行时就绪，再写入新的 scope Cookie；启动失败会保留当前 scope，成功后的页面重载会直接连接已就绪进程。代理重试响应禁止缓存并声明两秒后重试，HTML 等待页把自动刷新元数据放在文档 head 中。Gateway 为所选运行时签发短期请求 principal，并在每次代理的 HTTP/WebSocket 操作中转发。长时间 HTTP/WebSocket 工作会持有串行 runtime lease；idle 回收会重新检查 lease 准入，若停止操作赢得竞态则使用新 generation 重试，而不会转发过期端口。运行时会在 Host 代码观察请求前验证组织、用户、scope、运行时 id 和 generation。私有运行时凭据与协作端点只允许 loopback 访问。完整决策见[项目协作对话](../.agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.zh.md)。
-账户工作台额外提供 `/account/api/workbench/catalog`，只返回个人空间和成员可访问项目的对话元数据，不包含 transcript 内容。个人 runtime 暂时不可用时，Gateway 仍会返回已有的 ACL 过滤账户记录，个人启动失败不会隐藏项目对话。浏览器 API 与 WebSocket 请求可以携带 `dshTarget` 选择器；Gateway 会在解析目标运行时和签发 principal 前，根据当前认证成员关系重新校验该选择器。这样并行面板可以保持独立运行时连接，同时继续使用同一套 ACL、sandbox 和 approval 检查。
+账户工作台额外提供 `/account/api/workbench/catalog`，只返回个人空间和成员可访问项目的对话元数据，不包含 transcript 内容。只有个人会话目录和归档目录都读取完成，`personalComplete` 字段才为 true。个人 runtime 不可用时仍可返回经过 ACL 过滤的项目记录，但不完整的个人目录不能证明会话已删除，也不能移除已保存的个人窗格。浏览器 API 与 WebSocket 请求可以携带 `dshTarget` 选择器；Gateway 会在解析目标运行时和签发 principal 前，根据当前认证成员关系重新校验该选择器。这样并行面板可以保持独立运行时连接，同时继续使用同一套 ACL、sandbox 和 approval 检查。
 
 项目成员分为 `ro` 和 `rw`。组织管理员无需项目成员记录，就对每个活动项目及其全部对话（包括私密根对话）拥有隐式 `rw` 权限。管理员专用的 `danger-full-access` 预设在个人或项目 scope 中都会在验证请求身份后提供；普通用户不能通过 `/permission` 或新会话默认设置选择它。在共享项目会话中，权限事件属于整个会话，因此管理员切换预设后，所有参与者看到的应用内预设都会改变，直到下一次获得授权的选择；systemd 项目单元仍把宿主访问限制在项目路径内。对普通成员而言，根对话选择项目公开或仅创建者可见，后代继承根 ACL。Host 操作会授权读取、写入、管理、fork、stream、审批和问题；PostgreSQL 只接受每项共享审批/问题的一份响应。项目运行时通过 Gateway PostgreSQL 提供方保存 Session header 和完整事件；其写入和读取解码器会在数据进入活动 Session 前要求精确的事件 envelope 字段与 surface 元数据。持久参与者元数据使模型与 transcript 能区分贡献者。Web 插件展示 scope、可见性、创建者、参与者和贡献次数，并为 `ro` 成员替换完整 composer；浏览器不是授权边界。
 
@@ -145,6 +153,10 @@ Gateway 还负责 `/api/documents/transfer/uploads` 下的目标作用域可续�
 
 管理员通过管理端或 `/admin/api/webhook-endpoints`（`POST`、`POST …/update`、`POST …/mutate`，支持 `enable`/`disable`/`remove`）注册 Webhook 端点。新端点处于停用状态、对受理请求返回 404，需管理员显式启用后才接收投递。每个端点绑定 Provider（`github`）、以 `HGW_WEBHOOK_SECRET_KEY_FILE` 加密的只写签名密钥、执行账号、个人或项目运行时目标、事件与动作筛选、按 `owner/repo` 完整名与载荷 `repository.full_name` 做大小写不敏感匹配的结构化仓库筛选、`{{path}}` 标题与提示词模板以及接收限值。Provider 向公开的 `POST /webhook/<端点号>` 路由投递；网关先按存储密钥验证签名，再做持久去重，通过的投递被派发到目标运行时的受管 `webhook-dispatch` 路由，每次投递受理一个会话。管理员可查询 `/admin/api/webhook-deliveries?endpointId=<uuid>`，并使用可选的 `cursor` 与 `limit`（1–100，默认 50）。响应提供有界的投递回执，不包含事件载荷或秘密。`submitted` 表示提示词已接收，不表示 Agent 成功；`ignored` 表示配置的事件、动作或仓库筛选排除了该投递，回执的错误代码指明未命中的规则；`unknown` 阻止自动重新派发。已落定的回执可由管理员通过 `POST /admin/api/webhook-deliveries/redispatch` 重跑，按端点当前配置生成一条有审计的新回执。预留服务分别接收受理限流窗口和正文防重放窗口。窗口内的相同正文在跨节点间共用一个回执，所有已见投递 ID 在窗口过期后仍绑定该回执。派发中或结果未知时，窗口之外的自动重复请求也会被阻止。
 
+项目 Webhook 根会话默认项目可见；每个端点可选择执行账号私有。派发前和持久化前都要求当前项目写入资格；个人目标必须归属该执行账号。
+
+Webhook 仅能在重新核验账号、项目写入权限和 Auto 资格后唤醒空闲回收的运行时。人工停止状态在 Gateway 重启和后台权限刷新后保持有效。有使用权的用户可以主动启动并打开，被动重连不能启动。账号停用或维护期间拒绝启动。主体停用或删除、成员资格停用或运行时分配缺失时返回 `INSTANCE_UNAVAILABLE`，显式启动不能绕过。只有仍具备资格、但被停止策略阻止的运行时才返回 `INSTANCE_STOPPED`。无法确定历史停止原因的旧记录需要先显式启动一次。
+
 钉死版本的 PostgreSQL 17 部署位于 [`deploy/postgres/`](deploy/postgres/README.zh.md)。Gateway 入口会应用其不可变 migration，并在配置的活跃企业与计算节点无法解析时拒绝监听。认证、用户、账户偏好、项目、个人/项目实例、共享项目对话、协作抢占、审计、模型治理、项目 Provider 配置与加密凭据、额度和用量都由 PostgreSQL 支撑。内部 UUID 保留企业外键，数字公共 ID 保持现有 HTTP API 稳定。SQLite 只保留为停止写入后的最终导入源和回滚备份；运行中的 Gateway 不会打开它。
 
 每次调用都会先以 UUID 写入运行时本地的崩溃安全 outbox。仅回环的 intake 在 PostgreSQL 中按 UUID 去重，按调用时间选择生效价格版本，并根据非秘密凭据来源标签归属公司成本（`file`/`project-env`/`request` 为个人，启动环境来源为公司，未知来源按公司成本保守计入）。账本不写 API Key、提示词或回复内容。自然月使用 `HGW_USAGE_TIME_ZONE`；Token 与公司成本额度支持角色默认、按用户继承/不限/自定义，以及项目继承或显式额度。额度只在 80% 和 100% 提醒，不阻断调用。账务归属始终只属于一个用户或项目；共享项目记录在可确认时额外保存已验证的参与者 ID，用于非计费活动分析；无法还原的历史项目记录保持未归属。用户在 Web shell 看到持久阈值提醒；管理员看到分开的个人、项目和贡献者汇总、缺失计量次数以及明确的价格覆盖状态。
@@ -153,9 +165,17 @@ Admin 用量 API 保留原有主体汇总，并新增 `/admin/api/usage/overview
 
 ## 部署维护与协调恢复
 
-升级与恢复是受控操作，而不是只依赖启动迁移或 `deploy/postgres` 的 shell 脚本。`harness.cluster_control` 每个组织一行：模式（`serving`/`maintenance`/`restoring`）、节点必须确认的维护纪元、围栏陈旧写者的写纪元、以及操作员备注。`harness.deployment_operations` 是操作台账；`harness.backup_records` 登记每个转储及其受管文件清单、验证状态和取材时的写纪元。每个计算节点在 `maintenance_applied_epoch` 上报已应用的维护纪元；心跳新鲜但未确认当前纪元的节点计为活跃写者，被声明为 `offline` 的节点不计入——若它继续心跳则回到 `active`。
+写者收敛前，全部运行时进程必须确认已停止，已登记为离线的节点也不例外。部署页显示尚未停止的实例数量。管理员可在维护期间停止个人实例；恢复前的陈旧进程不能执行该操作。恢复应用器在文件核对完成前持有独占数据库咨询锁。恢复 SQL 还持有自己的事务锁，并在变更前和提交前核验协调后端身份；本机 Docker 命令代理退出不能解除数据库互斥。失败的恢复保持 `restoring` 并阻止退出维护，可通过 `pg:deploy restore` 重试；只有完整文件核对通过后才返回维护状态。
 
-维护窗口开启时，Gateway 以 503（`maintenance`）拒绝所有变更类 HTTP 与 runtime 调用；恢复完成后推进的写纪元会让每个在恢复前启动的进程被拒绝（`stale-epoch`）。管理员在管理端 Deployment 页或 `/admin/api/deployment*` 驱动窗口（集群状态、进入/退出维护、节点排空、恢复请求、备份创建/列出/验证）；状态变更请求全部审计。独立应用器 `pnpm pg:deploy <status|maintenance enter|maintenance exit|apply|backup|restore|restart-plan>`（`scripts/deploy-apply.ts`）在服务进程之外执行受控序列：认领待处理的管理端恢复请求、等待写者静止、在窗口内应用迁移、转储数据库并快照受管文件（principal 密钥、runtime 凭据、治理与 webhook 密钥、bootstrap 密码文件）、校验转储与全部清单摘要后再原子恢复文件、并输出滚动重启顺序。`HGW_PGDUMP_COMMAND`/`HGW_PGRESTORE_COMMAND` 配置 pg 客户端命令行——包括 `docker exec` 形式——`HGW_BACKUP_DIR` 选择产物目录。转储恢复会把 cluster control 行回滚，因此应用器在完成前重新断言 restoring 窗口；`completeRestore` 随后单调推进写纪元，使恢复前基线的写者自我围栏出局。
+升级与恢复是受控操作，而不是只依赖启动迁移或 `deploy/postgres` 的 shell 脚本。`harness.cluster_control` 每个组织一行：模式（`serving`/`maintenance`/`restoring`）、节点必须确认的维护纪元、围栏陈旧写者的写纪元、以及操作员备注。`harness.deployment_operations` 是操作台账；`harness.backup_records` 登记每个转储及其受管文件清单、验证状态和取材时的写纪元。每个计算节点在 `maintenance_applied_epoch` 上报已应用的维护纪元；心跳新鲜但未确认当前纪元的节点计为活跃写者，离线节点仍需确认其运行时全部停止——若它继续心跳则回到 `active`。
+
+维护窗口开启时，Gateway 以 503（`maintenance`）拒绝变更类 HTTP 与 runtime 调用；恢复后推进的写纪元会拒绝所有在恢复前启动的进程（`stale-epoch`）。管理端 Deployment 页与 `pnpm pg:deploy backup` 通过同一服务创建并验证备份；恢复请求由独立的 `pnpm pg:deploy restore` 应用器执行。`HGW_PGDUMP_COMMAND` 和 `HGW_PGRESTORE_COMMAND` 配置 PostgreSQL 命令封装，`HGW_PSQL_COMMAND` 可选择配套的 SQL 执行器，`HGW_BACKUP_DIR` 选择私有备份存储。
+
+完整备份要求维护状态、运行时已停止，以及数据库数据操作租约。 用户删除导致运行实例行移除后，保留的用户仍是数据所有者；缺少该行时，本地归属必须以已确认的单组织、单节点拓扑为前提。创建账号在数据库事务内先登记将预建的文档目录，再创建目录，因此从未启动运行时的账号也在覆盖范围内。数据库提交失败时保留诊断文件，不把它们归到其他账号。每个运行时的存储提供者在 `DSH_MANAGED_DATA_MANIFEST` 中登记实际解析后的路径；配置改变后仍保留之前的路径。备份捕获获准根目录下的全部普通文件和空目录，以及节点所有的配置与凭据，并记录副本字节摘要、权限和所有者。会话保留全部已提交代次，包括损坏的原始记录；附件、User Documents、历史 Review、外部成员绑定和待投递的治理 outbox 记录保留各自所有者定义的存储。项目源码、SSH 工作区、未知文件和链接不会因递归打包状态目录而被认领。缺失清单、未批准的自定义根、符号链接逃逸或不完整快照均拒绝操作。完整数据包目前要求一个组织和一个计算节点；本机数据包不能证明其他节点文件系统已被覆盖。
+
+对于提供者记录未包含的历史根，节点管理员使用[受管数据记录格式](../packages/util/managed-data/README.zh.md)提供私有的 `HGW_MANAGED_DATA_APPROVAL_FILE`，owner 前缀为 `user:<public-id>/` 或 `project:<public-id>/`。复核当前和已停用的存储位置并停止写者后，执行 `pnpm pg:deploy inventory adopt --runtime user:<public-id>`（或 `project:<public-id>`）。此命令只追加明确批准的根，保留已有记录并登记采纳操作。批准也不能认领整个项目工作区或 Harness home。不会根据熟悉的目录名推断缺失记录。
+
+恢复较旧备份前，应用器先创建并验证当前数据库与受管数据的完整保护备份。保护备份身份及选中转储／清单摘要与恢复保护状态同时提交；重试复用第一次保护副本。数据库事务保留当前维护、操作和备份记录，并拒绝不同的组织或计算节点身份。文件核对只在受管根内移除后来新增的成员，恢复记录中的字节和元数据，且完整成员验证通过后才返回维护状态。恢复保留当前节点配置、修订号和数据库连接文件。当前节点尚未执行的应用请求仍须通过写纪元核验；数据库恢复不能重新授予旧请求执行资格。可预览备份中已应用的设置供管理员另行审阅；恢复不会应用旧的待处理请求或旧地址。数据位置或节点身份不同会在替换数据库前拒绝，要求明确迁移。台账同时记录选中的清单和保留这些控制文件的派生清单。保护副本保留到管理员明确清理。失败保持写入关闭；`pnpm pg:deploy restore` 继续已登记的目标，不会重新备份部分恢复状态。旧式浅层清单不能作为完整备份。持久性与恢复规则见[维护说明](../.agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.zh.md)。
 
 ## 跨 Gateway 撤权
 
@@ -169,4 +189,4 @@ PostgreSQL 监听连接丢失时会关闭已准入的代理流量。重连等待
 
 ## 目录强制的分层
 
-网关只做认证与编排；普通用户目录访问由 Linux 生产的 systemd 挂载命名空间和每个实例内加载的 [dsh-directory-guard](../plugins/dsh-directory-guard/README.zh.md) 插件共同强制。普通用户单元会先遮蔽用户根、项目运行时根、已配置项目根和 Gateway 私有凭据路径，再仅回绑运行时 home、`$DSH_HOME` 与获准项目目录；`ProtectSystem=strict`、`ProtectHome=tmpfs` 和移除 `CAP_SYS_ADMIN` 覆盖整个进程树。home 补丁还会用应用内目录浏览器替代宿主操作系统选择器，由浏览器列出授权根并拒绝根外路径。管理员保留同一插件组合，但得到文件系统根目录授权和 Full access 预设；其 systemd 单元取消普通用户的目录遮蔽与系统/home 只读设置，同时继续使用非 root 运行时账户，并保留 `NoNewPrivileges`、能力限制和 Gateway 目录排除。共享项目单元以 `HGW_PROJECT_RUNTIME_USER` 运行，只绑定项目路径与其私有 `$DSH_HOME`，并把凭据设置暴露为只读。受控用户项目根必须为 `HGW_PROJECT_RUNTIME_USER` 继承组访问（例如由 root 拥有、`harness-project` 作为组且权限为 setgid `2770`，或使用等效默认 ACL），否则新分配的目录无法被项目单元打开。macOS 没有 systemd 挂载命名空间，因此普通用户和共享项目的全进程约束仍属于开发环境限制。
+网关只做认证与编排；普通用户目录访问由 Linux 生产的 systemd 挂载命名空间和每个实例内加载的 [dsh-directory-guard](../plugins/dsh-directory-guard/README.zh.md) 插件共同强制。普通用户单元会先遮蔽用户根、项目运行时根、已配置项目根和 Gateway 私有凭据路径，再仅回绑运行时 home、`$DSH_HOME` 与获准项目目录；`ProtectSystem=strict`、`ProtectHome=tmpfs` 和移除 `CAP_SYS_ADMIN` 覆盖整个进程树。home 补丁还会用应用内目录浏览器替代宿主操作系统选择器，由浏览器列出授权根并拒绝根外路径。管理员保留同一插件组合，但得到文件系统根目录授权和 Full access 预设；其 systemd 单元取消普通用户的目录遮蔽与系统/home 只读设置，同时继续使用非 root 运行时账户，并保留 `NoNewPrivileges`、能力限制和 Gateway 目录排除。共享项目单元以 `HGW_PROJECT_RUNTIME_USER` 运行，只绑定项目路径与其私有 `$DSH_HOME`，并把凭据设置暴露为只读。受控用户项目根必须为 `HGW_PROJECT_RUNTIME_USER` 继承组访问（例如由 root 拥有、`harness-project` 作为组且权限为 setgid `2770`，或使用等效默认 ACL），否则新分配的目录无法被项目单元打开。macOS 的 local 启动器没有 systemd 挂载命名空间：终端和不透明命令使用宿主机账户的文件系统权限。因此 macOS 部署仅适用于具有同等主机权限的可信人员，不能承诺用户或项目之间的进程级隔离。Gateway 身份、项目 ACL 和管理员校验仍然生效。

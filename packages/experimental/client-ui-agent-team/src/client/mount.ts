@@ -57,7 +57,7 @@ function registerUi(ctx: ClientContext): void {
       // The refresh is asynchronous: skip navigation when the user has already
       // moved to another session view while it was in flight.
       if (sessions.list.getSnapshot().current !== sessionId) return
-      const address: SubagentAddress = { parentSessionId, childSessionId: member.id, mode: 'continuable' }
+      const address: SubagentAddress = { parentSessionId, childSessionId: sessions.keyFor?.(member.id, sessions.runtimeIdentityFor?.(parentSessionId)) ?? member.id, mode: 'continuable' }
       sessions.openSubagent(address)
     },
   }

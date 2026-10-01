@@ -73,6 +73,8 @@ The docked surface's last tab carries one more rule, decided in the store's `clo
 
 This product saves layouts, tabs, ratios, floating positions, and presentation by verified account, runtime target, and Session. A local scope requires the Host to explicitly declare that execution authority is unnecessary; missing Gateway identity never grants local access. Restoration validates JSON, references, and resource Session ownership before retention. Losing identity verification clears in-memory layouts and resource holds; renewed verification loads only that identity’s records. Revocation does not delete another account’s persisted records. Navigation parameters, file contents, connections, and undo history are not persisted. Storage failure leaves an in-memory layout usable.
 
+Persisted ownership uses the original Host ID alongside its account and runtime, preserving existing terminal bindings and layouts. Restore qualifies only declared Session segments in built-in file, tool and historical-review addresses before validating their owner; content and unrelated extension addresses are not rewritten.
+
 `sidebarRight.openTabs` publishes metadata only for adopted Sessions under the current verified identity. Product startup does not discover unauthenticated localStorage layouts. Adopted stores remain authoritative for the current window; other windows’ writes cannot replace a live layout.
 
 <a id="extension-seats"></a>

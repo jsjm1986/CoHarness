@@ -20,6 +20,8 @@ export interface WorkbenchConversation {
 /** ACL-filtered account conversation directory response. */
 export interface WorkbenchCatalog {
   personal: { id: number; name: string }
+  /** Whether the personal runtime's Session and archive directories were both read successfully. */
+  personalComplete: boolean
   activeRuntime: SessionRuntimeTarget
   projects: readonly { projectId: number; name: string; mode: 'ro' | 'rw' }[]
   items: readonly WorkbenchConversation[]
@@ -42,7 +44,7 @@ export function parseWorkbenchCatalog(value: unknown): WorkbenchCatalog {
     || typeof personal.name !== 'string' || (activeRuntime.kind !== 'personal'
       && (activeRuntime.kind !== 'project' || typeof activeRuntime.projectId !== 'number'
         || !Number.isSafeInteger(activeRuntime.projectId) || activeRuntime.projectId <= 0))
-    || !Array.isArray(root.projects) || !Array.isArray(root.items)) {
+    || typeof root.personalComplete !== 'boolean' || !Array.isArray(root.projects) || !Array.isArray(root.items)) {
     throw new Error('invalid workbench catalog')
   }
   const projects = root.projects.map<WorkbenchCatalog['projects'][number]>((candidate) => {
@@ -70,7 +72,8 @@ export function parseWorkbenchCatalog(value: unknown): WorkbenchCatalog {
       || typeof row.blank !== 'boolean' || typeof row.canWrite !== 'boolean') throw new Error('invalid workbench conversation')
     return row as unknown as WorkbenchConversation
   })
-  return { personal: { id: personal.id, name: personal.name }, activeRuntime: activeRuntime as SessionRuntimeTarget, projects, items }
+  return { personal: { id: personal.id, name: personal.name }, personalComplete: root.personalComplete,
+    activeRuntime: activeRuntime as SessionRuntimeTarget, projects, items }
 }
 
 /** Fetch the authenticated account's ACL-filtered conversation directory.

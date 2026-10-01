@@ -18,6 +18,7 @@ import type {} from '@deepseek-ai/dsh-agent-default-model'
 import type { ApiProxy } from './api/index.ts'
 import {
   authorizeTypertRemote,
+  invokeTypertRemote,
   createApiProxy,
   DEFAULT_COLD_BLANK_PROBE_MAX_BYTES,
 } from './api-proxy.ts'
@@ -128,6 +129,7 @@ export class ApiProxyService extends Service implements ApiProxy {
   constructor(ctx: Context, config: Config) {
     super(ctx, 'apiProxy')
     ctx.on('typert-gateway/authorize', payload => authorizeTypertRemote(ctx, payload))
+    ctx.on('typert-gateway/invoke', (payload, next) => invokeTypertRemote(ctx, payload, next))
     const api = createApiProxy(ctx, {
       defaultModelSelection: () => ctx.agentDefaultModel.currentSelection(),
       saveDefaultModelSelection: selection => ctx.agentDefaultModel.saveSelection(selection),
@@ -166,3 +168,5 @@ export class ApiProxyService extends Service implements ApiProxy {
 }
 
 export default ApiProxyService
+
+export type { HostSessionLifecycle } from './session-lifecycle.ts'

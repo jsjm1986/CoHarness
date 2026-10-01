@@ -82,9 +82,10 @@ export function Deliverables({
   useEffect(() => {
     if (announced !== null && summary === undefined) void loadChangesSummary(sessionId, announced.seq)
   }, [announced, summary, sessionId, loadChangesSummary])
-  const changes = announced !== null && typeof summary === 'object' && summary.files.length > 0
+  const changes = announced !== null && typeof summary === 'object' && (summary.files.length > 0 || summary.incomplete === true)
     ? { seq: announced.seq, ...summary }
     : null
+  const unavailable = announced !== null && summary === 'missing'
   const collapsible = matched.presented.length > COLLAPSED_PRESENTED_COUNT
   const presented = collapsible && !expanded
     ? matched.presented.slice(0, COLLAPSED_PRESENTED_COUNT)
@@ -93,6 +94,10 @@ export function Deliverables({
     if (host === null) void reloadPresentedHost()
   }, [host, reloadPresentedHost])
   return <>
+    {unavailable && <div data-review-unavailable role="status">
+      <p>{t('changes.unavailable')}</p>
+      <Button onClick={() => { void loadChangesSummary(sessionId, announced.seq) }}>{t('presented.retry')}</Button>
+    </div>}
     {changes !== null && <ChangedFiles changes={changes} cwd={cwd} t={t} sessionId={sessionId}
       useChangesDiff={useChangesDiff} loadChangesDiff={loadChangesDiff}
       openReview={(index) => { openChangesReview({ sessionId, seq: changes.seq, turn: changes.turn }, index) }} />}

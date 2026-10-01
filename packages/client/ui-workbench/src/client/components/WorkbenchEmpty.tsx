@@ -10,13 +10,13 @@ type Props = PropsRuntime<'conversation.workbench.empty'> & PropsLocale<typeof N
   & PropsStore<ReturnType<typeof createWorkbenchStore>>
 
 /** Render the workbench's empty state. */
-export function WorkbenchEmpty({ t, actions }: Props) {
+export function WorkbenchEmpty({ t, actions, viewport }: Props) {
   return (
     <div className={css.empty} data-workbench-empty-content="">
       <div className={css.emptyIcon} aria-hidden><IconPlusOutline16 /></div>
       <strong>{t('emptyTitle')}</strong>
-      <span>{t('emptyBody')}</span>
-      <Button variant="primary" onClick={() => { actions.openPicker() }}>
+      <span>{t(viewport.pendingIdentity === true ? 'layoutPending' : 'emptyBody')}</span>
+      <Button variant="primary" disabled={viewport.pendingIdentity === true} onClick={() => { actions.openPicker() }}>
         {t('add')}
       </Button>
     </div>

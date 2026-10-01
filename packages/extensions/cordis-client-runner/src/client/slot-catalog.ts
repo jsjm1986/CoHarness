@@ -1287,9 +1287,11 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     doc: 'Empty state rendered when the workbench has no selected panes.',
     registerOptions: [],
     ownerProps: [
-      '/** Owner share for the empty workbench state. */\nexport interface ConversationWorkbenchEmptyOwnerProps {\n  /** Marker owner share for the empty workbench surface. */\n  children?: never\n}',
+      '/** Owner share for the empty workbench state. */\nexport interface ConversationWorkbenchEmptyOwnerProps {\n  /** Current saved-layout verification state. */\n  viewport: ConversationViewportSnapshot\n}',
     ],
-    ownerPropsReferences: [],
+    ownerPropsReferences: [
+      'ConversationViewportSnapshot',
+    ],
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',

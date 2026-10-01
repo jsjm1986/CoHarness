@@ -9,6 +9,7 @@
  * teardown cancel force-fails only the record and reports a possible orphan.
  * @module @deepseek-ai/dsh-jobs-local
  */
+import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -74,6 +75,8 @@ interface ProducerState {
 
 /** The registry's mutable per-job record (never handed out — see {@link LocalJobRegistry.view}). */
 interface TrackedJob {
+  /** Origin retained for completion input; never a current authorization grant. */
+  executionScope: ExecutionInheritance | undefined
   id: JobId
   kind: JobKind
   label: string
@@ -226,6 +229,7 @@ export class LocalJobRegistry extends JobRegistry {
     // The id is issued before the starter runs so the producer face can carry
     // it; a throwing starter still leaves nothing registered — its ordinal is
     // simply skipped.
+    const executionScope = owner === undefined ? undefined : executionAuthorityOf(this.ctx)?.capture(owner)
     const count = (this.counters.get(spec.kind) ?? 0) + 1
     this.counters.set(spec.kind, count)
     const id = JobId(`${spec.kind}-${count}`)
@@ -241,6 +245,7 @@ export class LocalJobRegistry extends JobRegistry {
     let markSettled!: () => void
     const settled = new Promise<void>((resolve) => { markSettled = resolve })
     const job: TrackedJob = {
+      executionScope,
       id,
       kind: spec.kind,
       label: spec.label,
@@ -415,6 +420,7 @@ export class LocalJobRegistry extends JobRegistry {
     const spillPaths = [...new Set(job.spillPaths.filter((path): path is string => path !== undefined))]
     return {
       id: job.id,
+      ...(job.executionScope === undefined ? {} : { executionScope: job.executionScope }),
       kind: job.kind,
       label: job.label,
       ...owner !== undefined ? { owner } : {},
@@ -612,6 +618,14 @@ export class LocalJobRegistry extends JobRegistry {
    * service teardown detach the cross-fiber effect.
    */
   private ensureOwnerCleanup(owner: Agent): void {
+    const ownerId = owner.id
+    const agents = this.selfCtx.get('agents')
+    if (agents === undefined) {
+      throw new Error('background job ownership requires the agent registry (load @deepseek-ai/dsh-agent)')
+    }
+    if (agents.get(ownerId) !== owner || agents.isRemoving(ownerId)) {
+      throw new Error(`agent "${ownerId}" is not the registered agent instance (background job owner must be live)`)
+    }
     if (this.ownerCleanups.has(owner)) return
     // Record only after attach succeeds; a disposing scope rejects new effects.
     const detach = owner.ctx.effect(() => async () => {

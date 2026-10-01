@@ -9,7 +9,7 @@ kind: "package-library"
 
 ## 概述
 
-`dsh-session-format-catalog` 为持久化提供一个确定性的 Session 格式读取器，且无需查询已挂载插件。它装配从最早受支持格式到[当前写入格式](../../../docs/session-format-status.zh.md)的编解码器与相邻迁移边，在模块初始化时校验完整且无缺口的迁移链，并通过 `sessionFormatCatalog` 暴露物理分派、仅 header 分类、单遍行还原和当前格式逐记录编码。存储已解码 header 与事件行而非发布版 JSONL 的后端（SQLite、Gateway/PostgreSQL、脱离对象的协调器读取）使用 `sessionLogicalFormatCatalog`：它把存储元数据投影到发布版要求上，归一化声明的 CoHarness v2 数据库方言，并运行同一套发布版迁移边与当前产物校验。
+`dsh-session-format-catalog` 装配已发布 Session 格式的读取器及其到[当前写入格式](../../../docs/session-format-status.zh.md)的相邻迁移。持久化读取方在插件挂载前使用这份静态清单。它支持已发布 JSONL、CoHarness 历史 JSONL 和已解码数据库行，校验还原数据并拒绝不支持的格式。
 
 ## 目录
 
@@ -30,6 +30,10 @@ kind: "package-library"
 当持久化与测试支持读取方需要在任何功能插件挂载前取得完整第一方已发布格式清单时，导入本库。功能组合不会注册或重排其条目。它不发布运行时不变式伴生入口，因为构造过程会拒绝无效静态清单，每次完成的还原也会校验结果；可变行 decoder 状态只属于一次由调用方持有的流式还原。
 
 ### 入口
+
+`dsh-session-format-catalog` 为持久化提供一个确定性的 Session 格式读取器，且无需查询已挂载插件。它装配从最早受支持格式到[当前写入格式](../../../docs/session-format-status.zh.md)的编解码器与相邻迁移边，在模块初始化时校验完整且无缺口的迁移链，并通过 `sessionFormatCatalog` 暴露物理分派、仅 header 分类、单遍行还原和当前格式逐记录编码。存储已解码 header 与事件行而非发布版 JSONL 的后端（SQLite、Gateway/PostgreSQL、脱离对象的协调器读取）使用 `sessionLogicalFormatCatalog`：它把存储元数据投影到发布版要求上，归一化声明的 CoHarness v2 数据库方言，并运行同一套发布版迁移边与当前产物校验。
+
+CoHarness JSONL 持久化使用 `coharnessJsonlFormatCatalog`。其已发布 v0–v3 编码保留头部 `seedLength`、可选 `draft` 和压缩的 Assistant chunk。生成清单仍拥有全部相邻迁移边与当前编码器；读取器在不改变原存储版本的情况下选择历史方言。采用 `isSeeded` 的已发布头部和当前代次保留原生准入规则。未知来源字段、矛盾的种子边界、缺失的消息身份及未来版本均被拒绝。
 
 ```text
 const descriptor = sessionFormatCatalog.readHeader(physicalHeader)

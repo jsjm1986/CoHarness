@@ -12,6 +12,7 @@ import {
   RemoteScope,
   TypertLookupFailure,
   type InvocationDescriptor,
+  type TypertGatewayAuthorizationRequest,
   type TypertContext,
   type TypertLookup,
   type TypertLookupProvider,
@@ -450,6 +451,8 @@ describe('TypertGatewayService', () => {
     const agent = { id: 'agent-1' }
     const abort = new AbortController()
     let authorized = false
+    let lookupComplete = false
+    let invoking = false
     ctx.on('typert-gateway/authorize', (payload) => {
       expect(payload).toMatchObject({
         endpoint: 'goals/create',
@@ -465,8 +468,17 @@ describe('TypertGatewayService', () => {
       ...agentLookup(agent),
       resolve: (id) => {
         expect(authorized).toBe(true)
+        expect(invoking).toBe(false)
+        lookupComplete = true
         return id === agent.id ? agent : undefined
       },
+    })
+    ctx.on('typert-gateway/invoke', async (payload, next) => {
+      expect(lookupComplete).toBe(true)
+      expect(payload.args).toEqual({ agentId: 'agent-1', request: { title: 'ship' } })
+      expect(service.calls).toEqual([])
+      invoking = true
+      try { return await next() } finally { invoking = false }
     })
     registerStrict(ctx, [createDescriptor()])
 
@@ -487,6 +499,8 @@ describe('TypertGatewayService', () => {
       details: { action: 'write', reason: 'forbidden' },
     })
     let lookupCalls = 0
+    const invoke = vi.fn((_payload: TypertGatewayAuthorizationRequest, next: () => Promise<unknown>) => next())
+    ctx.on('typert-gateway/invoke', invoke)
     ctx.on('typert-gateway/authorize', () => { throw rejection })
     ctx.typert.lookups.register('gatewayFixture', {
       ...agentLookup({ id: 'agent-1' }),
@@ -503,6 +517,7 @@ describe('TypertGatewayService', () => {
       args: { agentId: 'agent-1', request: { title: 'ship' } },
     })).rejects.toBe(rejection)
     expect(lookupCalls).toBe(0)
+    expect(invoke).not.toHaveBeenCalled()
     expect(service.calls).toEqual([])
   })
 

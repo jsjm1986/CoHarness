@@ -43,6 +43,8 @@ kind: "package-reference"
 
 该服务要求 Agent、Session、Session persistence 与 continuable-subagent 服务。没有持久 Session 存储的组合不会激活它。
 
+尚未结束的日志修改、队友创建与恢复、邮箱投递和异步确认，会持有相关 Session 标识直到最后一个异步检查点结束。操作完成、失败或取消前，永久清理会拒绝这些标识；Team 请求仍持有会话时，不会关闭其写入者。
+
 <a id="team-identity-and-roster"></a>
 ## Team 身份与 roster
 

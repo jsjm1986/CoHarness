@@ -544,6 +544,27 @@ describe('same-session goal driving', () => {
     expect(test.adapter.requests).toHaveLength(0)
   })
 
+  it('retains an unfinished checkpoint during driver unload and releases it after the task settles', async () => {
+    const test = await harness([])
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    test.ctx.on('session/flush', async () => {
+      entered.resolve(undefined)
+      await release.promise
+    })
+    test.ctx.goals.create(test.agent, { objective: 'finish admitted persistence before teardown' })
+    await entered.promise
+    const disposal = Promise.resolve(test.driver.dispose())
+    try {
+      await waitForGoal(test.ctx, test.agent, goal => goal?.activation === 'disarmed')
+      expect(() => { using _reservation = test.ctx.agents.reserveRemoval([test.agent.id]) })
+        .toThrow('pending lifecycle operation')
+    } finally { release.resolve(undefined) }
+    await disposal
+    expect(test.adapter.requests).toHaveLength(0)
+    expect(test.ctx.goals.get(test.agent)).toMatchObject({ phase: 'active', activation: 'disarmed', roundsStarted: 0 })
+    using _reservation = test.ctx.agents.reserveRemoval([test.agent.id])
+  })
+
   it('settles a goal round from its successful retry turn, not the failed original', async () => {
     const test = await harness([
       new LlmError('transient', 'SERVER'),
@@ -718,6 +739,23 @@ describe('same-session goal driving', () => {
 
     expect(goal?.phase).toBe('active')
     expect(test.adapter.requests).toHaveLength(0)
+  })
+
+  it('disarms a drive refused by permanent removal without repeatedly retrying admission', async () => {
+    const test = await harness([])
+    const admissions = vi.spyOn(test.ctx.agents, 'reserveUse')
+    const flushes = vi.fn()
+    test.ctx.on('session/flush', flushes)
+    {
+      using _reservation = test.ctx.agents.reserveRemoval([test.agent.id])
+      test.ctx.goals.create(test.agent, { objective: 'do not enter reserved removal' })
+      await waitForGoal(test.ctx, test.agent, goal => goal?.activation === 'disarmed')
+      expect(admissions).toHaveBeenCalledOnce()
+      expect(flushes).not.toHaveBeenCalled()
+      expect(test.adapter.requests).toHaveLength(0)
+    }
+    expect(test.ctx.goals.get(test.agent)).toMatchObject({ phase: 'active', activation: 'disarmed', roundsStarted: 0 })
+    using _reservation = test.ctx.agents.reserveRemoval([test.agent.id])
   })
 
   it('fails an initial pre-step read closed even when the first disarm attempt throws', async () => {

@@ -43,6 +43,8 @@ Every limit must be a positive safe integer. `maxMembers` counts every name ever
 
 The service requires Agent, Session, Session persistence, and continuable-subagent services. A composition without durable Session storage does not activate it.
 
+Pending journal mutations, teammate creation and recovery, mailbox dispatch, and asynchronous acknowledgements retain their affected Session identities through the last awaited checkpoint. Permanent purge refuses those identities until the operation completes, fails, or is cancelled; it cannot close a Session writer while a Team request still owns it.
+
 <a id="team-identity-and-roster"></a>
 ## Team identity and roster
 

@@ -91,6 +91,7 @@ const PACKAGE_LIBRARIES: Readonly<Record<string, string>> = {
   'packages/util/code-language': 'Zero-dependency file-extension to syntax-highlighting language table.',
   'packages/util/home-paths': 'Zero-dependency harness-home path resolver.',
   'packages/util/launch-environment': 'Zero-dependency environment resolver.',
+  'packages/util/managed-data': 'Append-only managed-data inventory record library; plain module functions.',
   'packages/util/lazy-require': 'Caller-relative CommonJS-compatible dependency loader.',
   'packages/util/native-command': 'Host-side subprocess runner utility.',
   'packages/util/output-retention': 'Zero-dependency retention utility.',

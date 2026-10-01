@@ -179,6 +179,7 @@ Prefix-stable for the life of an agent: a composition is installed once, before 
 
 ## Known Limitations and Deferred Work
 
+- Managed launches with `DSH_MANAGED_DATA_MANIFEST` register resolved user-trusted preset roots before data writes. Shipped roots are not claimed. An invalid inventory refuses initialization; [inventory and backup rules](../../util/managed-data/README.md) govern retained roots and deployment approval.
 - **A preset outside the writable root is discoverable but not deletable** — `remove()` refuses anything that does not live under the FIRST `user` root, so a deployment that configures its own writable root while leaving `includeUserRoot` on lists the harness-home presets, mounts them, and then answers "it does not live under the writable preset root" for every delete. The roster carries one writable root by design; a deployment that wants only its own sets `includeUserRoot: false`.
 - **A preset cannot be changed once a session has produced anything** — `recompose` re-links a BLANK session's parent scope to another standing mount, and only a blank one: switching a composition that already ran would strand tools the model has called. Changing the default affects only sessions created afterwards.
 - **A generation is keyed on the composition file alone** — the stamp check notices `agent.cordis.yml` changing, not an edit to a skill file or asset beside it; those reach new sessions only once the composition file itself moves or the process restarts.

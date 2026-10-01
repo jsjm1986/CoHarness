@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { applyModelGovernanceToUser, refreshModelGovernance, writeModelGovernanceFile } from '../src/apply-model-governance.ts'
 import { AuditService } from '../src/audit.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { ModelGovernanceService, type ModelRegistrationEvent, type UsageEvent } from '../src/model-governance.ts'
 import { createUsageIntakeServer } from '../src/usage-intake.ts'
@@ -17,7 +17,7 @@ afterEach(async () => { for (const close of closers.splice(0).reverse()) await c
 async function fixture(timeZone = 'Asia/Shanghai') {
   const root = mkdtempSync(join(tmpdir(), 'hgw-model-int-'))
   const db = openDb(join(root, 'gateway.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_USAGE_TIME_ZONE: timeZone })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), HGW_USAGE_TIME_ZONE: timeZone })
   const users = new UserService(db, cfg)
   const user = await users.create({ username: 'metered-user', password: 'pw-12345678' })
   const governance = new ModelGovernanceService(db, timeZone)

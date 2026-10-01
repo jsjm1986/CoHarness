@@ -1,8 +1,8 @@
 /** Browser download state shared by the Session Header button and `/export`. */
 
 import { createSnapshotStore, type SessionId, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { readApiResponseText } from '@deepseek-ai/dsh-client-runtime/client'
-import { SESSION_LOG_EXPORT_ROUTE } from '../routes.ts'
+import { readApiResponseText, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
+import { SESSION_LOG_EXPORT_PATH } from '../routes.ts'
 
 /** Download phases presented by the shared modal. */
 export type SessionLogDownloadStatus = 'downloading' | 'success' | 'error'
@@ -45,6 +45,12 @@ export function downloadUrl(url: string, filename: string): void {
   anchor.click()
 }
 
+/** Resolve the browser's Host base with the connection carrier's null-origin fallback. */
+function hostBase(): string {
+  const origin = (globalThis as { location?: { origin?: string } }).location?.origin
+  return origin !== undefined && origin !== 'null' ? origin : 'http://dsh.internal'
+}
+
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -60,10 +66,12 @@ export class SessionLogDownloadController {
   /**
    * @param fetcher - HTTP carrier used to read the host-streamed ZIP.
    * @param save - browser save operation.
+   * @param privateResourceUrl - account pinning for the native browser download.
    */
   constructor(
     private readonly fetcher: Fetch = (input, init) => fetch(input, init),
     private readonly save: Save = downloadUrl,
+    private readonly privateResourceUrl: (url: string) => string = url => url,
   ) {}
 
   /**
@@ -107,14 +115,20 @@ export class SessionLogDownloadController {
   private async run(sessionId: SessionId, signal: AbortSignal): Promise<void> {
     this.publish(sessionId, { open: true, status: 'downloading', error: null })
     try {
-      const query = new URLSearchParams({ sessionId, includeDescendants: 'true' })
-      const route = `${SESSION_LOG_EXPORT_ROUTE}?${query.toString()}`
-      const response = await this.fetcher(route, { method: 'HEAD', signal })
+      const url = new URL(SESSION_LOG_EXPORT_PATH, hostBase())
+      const address = parseClientSessionKey(sessionId)
+      const original = address?.sessionId ?? sessionId
+      url.searchParams.set('sessionId', original)
+      if (address !== undefined) url.searchParams.set('dshTarget', address.runtime.kind === 'personal'
+        ? 'personal' : `project:${String(address.runtime.projectId)}`)
+      url.searchParams.set('includeDescendants', 'true')
+      const target = new URL(this.privateResourceUrl(url.toString()))
+      const response = await this.fetcher(target, { method: 'HEAD', signal })
       if (!response.ok) {
         const detail = await readApiResponseText(response).catch(() => '')
         throw new Error(`Export failed: HTTP ${response.status}${detail === '' ? '' : ` ${detail}`}`)
       }
-      this.save(route, sessionLogZipFilename(sessionId))
+      this.save(target.toString(), sessionLogZipFilename(original))
       const open = this.store.getSnapshot().bySession[String(sessionId)]?.open ?? true
       this.publish(sessionId, { open, status: 'success', error: null })
     } catch (error: unknown) {

@@ -527,10 +527,10 @@ describe('archive-gateway synchronization', () => {
       archived = false
       revision++
     })
-    const remove = vi.fn(async () => { stored = false })
+    const remove = vi.fn(async (_id: SessionId, _signal?: AbortSignal) => { stored = false })
     let snapshotCalls = 0
     const request = vi.fn<GatewayRequest>(async (path: string) => {
-      if (path.endsWith('/ack')) return gatewayResponse()
+      if (path.endsWith('/ack')) return gatewayResponse({ acknowledged: true })
       snapshotCalls += 1
       return gatewayResponse(snapshotCalls === 1 ? {
         commands: [{ id: 'command-1', rootSessionId: root, action: 'purge' }],
@@ -539,6 +539,7 @@ describe('archive-gateway synchronization', () => {
     const ctx = new Context()
     ctx.provide('connection', { http: { handlePrefix: vi.fn() } } as never)
     ctx.provide('gatewayRuntime', {
+      identity: { kind: 'user', id: 1, generation: 1 },
       requireCurrent: () => ({ claims: { user: { role: 'admin' }, purpose: 'archive-read' } }),
       request,
     } as never)
@@ -551,13 +552,14 @@ describe('archive-gateway synchronization', () => {
     ctx.provide('sessionPersistence', {
       list: async () => stored ? [{ header: entry.header }] : [],
       readFrom: async () => ({ meta: entry.header, events: [] }),
+      readPage: async () => ({ meta: entry.header, events: [], hasMore: false, endSeq: null }),
       remove,
     } as never)
     await ctx.plugin(ArchiveGateway).await()
     await vi.waitFor(() => {
       expect(request.mock.calls.filter(([path]) => path.endsWith('/snapshot'))).toHaveLength(2)
     })
-    expect(remove).toHaveBeenCalledWith(root)
+    expect(remove.mock.calls[0]?.[0]).toBe(root)
     expect(unarchiveSession).toHaveBeenCalledWith(root)
     expect(request.mock.calls.filter(([path]) => path.endsWith('/ack'))).toHaveLength(1)
     const finalSnapshot = request.mock.calls.filter(([path]) => path.endsWith('/snapshot')).at(-1)

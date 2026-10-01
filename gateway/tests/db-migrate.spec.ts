@@ -11,6 +11,45 @@ function tables(db: Database.Database): string[] {
 }
 
 describe('SQLite schema migration', () => {
+  it('preserves stopped v8 instances as manual and retains explicit idle reasons across reopen', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-v8-stop-'))
+    const file = join(root, 'g.sqlite')
+    let db = new Database(file)
+    try {
+      db.exec(`
+        CREATE TABLE schema_meta(version INTEGER NOT NULL);
+        INSERT INTO schema_meta VALUES(8);
+        CREATE TABLE users(id INTEGER PRIMARY KEY,username TEXT,password_hash TEXT,display_name TEXT,
+          role TEXT,status TEXT,home_path TEXT,must_change_password INTEGER,created_at INTEGER,updated_at INTEGER,
+          deleted_at INTEGER,auto_review_eligible INTEGER);
+        INSERT INTO users VALUES(1,'stopped','hash','','user','active','/stopped',0,1,1,NULL,1),
+          (2,'running','hash','','user','active','/running',0,1,1,NULL,0),
+          (3,'stopping','hash','','user','active','/stopping',0,1,1,NULL,0);
+        CREATE TABLE instances(user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          port INTEGER NOT NULL UNIQUE,state TEXT NOT NULL DEFAULT 'stopped'
+          CHECK(state IN ('stopped','starting','ready','stopping')),pid INTEGER,started_at INTEGER,last_activity_at INTEGER);
+        INSERT INTO instances VALUES(1,31001,'stopped',NULL,NULL,1),(2,31002,'ready',123,1,2),(3,31003,'stopping',456,1,3);
+      `)
+      db.close()
+      db = openDb(file)
+      expect(db.prepare('SELECT user_id,state,pid,stop_reason FROM instances ORDER BY user_id').all()).toEqual([
+        { user_id: 1, state: 'stopped', pid: null, stop_reason: 'manual' },
+        { user_id: 2, state: 'ready', pid: 123, stop_reason: null },
+        { user_id: 3, state: 'stopping', pid: 456, stop_reason: 'manual' },
+      ])
+      expect(db.prepare('SELECT auto_review_eligible FROM users WHERE id=1').get()).toEqual({ auto_review_eligible: 1 })
+      expect(() => db.prepare("UPDATE instances SET stop_reason='unknown' WHERE user_id=1").run()).toThrow()
+      db.prepare("UPDATE instances SET stop_reason='idle' WHERE user_id=1").run()
+      db.close()
+      db = openDb(file)
+      expect(db.prepare('SELECT stop_reason FROM instances WHERE user_id=1').get()).toEqual({ stop_reason: 'idle' })
+      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: 9 })
+    } finally {
+      if (db.open) db.close()
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('upgrades a v7 user with no Auto grant and preserves the grant on later opens', () => {
     const root = mkdtempSync(join(tmpdir(), 'hgw-v7-auto-'))
     const file = join(root, 'g.sqlite')
@@ -32,21 +71,21 @@ describe('SQLite schema migration', () => {
       db.close()
       db = openDb(file)
       expect(db.prepare('SELECT auto_review_eligible FROM users WHERE id=1').get()).toEqual({ auto_review_eligible: 1 })
-      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: 8 })
+      expect(db.prepare('SELECT version FROM schema_meta').get()).toEqual({ version: 9 })
     } finally {
       if (db?.open) db.close()
       rmSync(root, { recursive: true, force: true })
     }
   })
 
-  it('creates project tables on a fresh database and records schema_version=8', () => {
+  it('creates project tables on a fresh database and records schema_version=9', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite')
     const db = openDb(file)
     expect(tables(db)).toEqual(expect.arrayContaining(['projects', 'project_members', 'model_registration_events', 'schema_meta']))
     expect(tables(db)).not.toEqual(expect.arrayContaining(['groups', 'dir_grants']))
     expect((db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>)
       .some(column => column.name === 'model_access_default_allowed')).toBe(true)
-    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(8)
+    expect((db.prepare(`SELECT version FROM schema_meta`).get() as { version: number }).version).toBe(9)
   })
 
   it('folds dir_grants and group members into projects; rw beats ro; then drops old tables', () => {

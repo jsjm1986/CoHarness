@@ -114,6 +114,9 @@ describe(key: CredentialKey): AuthorizationEntry | undefined
  * Withdraw the attempt running for a key, if any. Separate from the
  * request's own signal because a request/response transport answers a Cancel
  * button on a second call, with no handle on the first one's signal.
+ * Cancellation has no effect once a commit's write was admitted to storage:
+ * the granted credential is allowed to land and the caller hears the write's
+ * own outcome rather than a revoked grant.
  * @param key - the credential record whose attempt should stop.
  */
 cancel(key: CredentialKey): void

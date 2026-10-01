@@ -522,9 +522,9 @@ describe('task admission and package contracts', () => {
     const safeController = new AbortController()
     const safeStarting = ctx.subagents.start(
       'codex-safe',
-      request(undefined, safeController.signal),
+      withExecutionContext(ctx, request(undefined, safeController.signal)),
     )
-    const bypassStarting = ctx.subagents.start('codex-bypass', request())
+    const bypassStarting = ctx.subagents.start('codex-bypass', withExecutionContext(ctx, request()))
     for (const [child, model] of [
       [safeChild, 'codex-safe-model'],
       [bypassChild, 'codex-bypass-model'],
@@ -545,7 +545,7 @@ describe('task admission and package contracts', () => {
     await safeFiber.dispose()
     expect(ctx.subagents.list()).toEqual(['codex-bypass'])
     expect(removed).toEqual(['codex-safe'])
-    await expect(ctx.subagents.start('codex-safe', request()))
+    await expect(ctx.subagents.start('codex-safe', withExecutionContext(ctx, request())))
       .rejects.toMatchObject({ code: 'NO_PROVIDER' })
 
     const safeTurn = await safeChild.peer.nextMethod('turn/start')
@@ -626,7 +626,7 @@ describe('task admission and package contracts', () => {
     vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue(child.handle)
     codex.apply(ctx, { env: {}, disposeGraceMs: 3_000 })
     expect(ctx.subagents.getProvider('codex')).toBeDefined()
-    const starting = ctx.subagents.start('codex', request())
+    const starting = ctx.subagents.start('codex', withExecutionContext(ctx, request()))
     const initialize = await child.peer.nextMethod('initialize')
     child.peer.respond(initialize, { userAgent: 'codex-cli 0.153.4' })
     await child.peer.nextMethod('initialized')
@@ -719,14 +719,14 @@ describe('task admission and package contracts', () => {
     const spawn = vi.spyOn(ctx.subprocess, 'spawn')
     await ctx.plugin(codex, {})
 
-    await expect(ctx.subagents.start('codex', {
+    await expect(ctx.subagents.start('codex', withExecutionContext(ctx, {
       prompt: [{ type: 'text', text: 'task' }],
       parent: {
         id: 'parent-without-cwd',
         session: { header: {} },
       } as unknown as Agent,
       signal: new AbortController().signal,
-    })).rejects.toThrow(
+    }))).rejects.toThrow(
       'subagent-codex: no working directory for the child — delegate from a parent session that has one',
     )
     expect(spawn).not.toHaveBeenCalled()
@@ -2160,11 +2160,11 @@ describe('run lifecycle and quiescence', () => {
       id: 'parent-with-invalid-cwd',
       session: { header: { cwd: 'relative/SECRET_TOKEN' } },
     } as unknown as Agent
-    const invalidCwdError: unknown = await ctx.subagents.start('codex-diagnostic', {
+    const invalidCwdError: unknown = await ctx.subagents.start('codex-diagnostic', withExecutionContext(ctx, {
       prompt: [{ type: 'text', text: 'task' }],
       parent: invalidCwdParent,
       signal: new AbortController().signal,
-    }).then(
+    })).then(
       () => undefined,
       (error: unknown) => error,
     )
@@ -2183,18 +2183,18 @@ describe('run lifecycle and quiescence', () => {
 
     const invalidCwdAbort = new AbortController()
     invalidCwdAbort.abort(new Error('cancel invalid cwd startup'))
-    await expect(ctx.subagents.start('codex-diagnostic', {
+    await expect(ctx.subagents.start('codex-diagnostic', withExecutionContext(ctx, {
       prompt: [{ type: 'text', text: 'task' }],
       parent: invalidCwdParent,
       signal: invalidCwdAbort.signal,
-    })).rejects.toThrow('aborted before app-server startup')
+    }))).rejects.toThrow('aborted before app-server startup')
     expect(spawn).not.toHaveBeenCalled()
 
-    const starting = ctx.subagents.start('codex-diagnostic', {
+    const starting = ctx.subagents.start('codex-diagnostic', withExecutionContext(ctx, {
       prompt: [{ type: 'text', text: 'task' }],
       parent: fakeParent,
       signal: new AbortController().signal,
-    })
+    }))
     const initialize = await child.peer.nextMethod('initialize')
     child.peer.respond(initialize, { userAgent: 'codex-cli 0.153.4' })
     await child.peer.nextMethod('initialized')
@@ -2341,3 +2341,7 @@ describe('disposeCodexChild', () => {
     await disposal
   })
 })
+
+function withExecutionContext<T extends { parent: Agent }>(ctx: Context, request: T): T {
+  return { ...request, parent: { ...request.parent, ctx } }
+}

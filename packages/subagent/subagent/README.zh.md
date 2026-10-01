@@ -138,6 +138,12 @@ Agent 消息的权限就是确切的相邻关系：发送方必须在线，目�
 
 `@deepseek-ai/dsh-subagent/external` 承载共享成员机制：仅追加的 JSONL 绑定存储（子会话 ↔ 外部会话，含待决提示词与已消费游标）、尾随用户提示词窗口，以及恢复规则——已完结的外部答案直接重放不重发，可证未送达的提示词重发一次，不可证的结果以 `EXTERNAL_TURN_OUTCOME_UNKNOWN` 丢弃而不冒重复投递的风险。
 
+`resolveChildExecution` 由实际 Agent 的 Session 选择工作区及执行目标；`externalMemberAgent` 拒绝没有活动所有者的模型请求。外部绑定在首次启动前记录规范 cwd 和目标，恢复时拒绝变动。存储损坏或读取失败会阻断执行，不能当成空存储新建成员；没有目标证明的旧绑定仍保留，但不能自动恢复。
+
+空闲会话释放会等待待处理委派与仍被持有的单次运行，包括结果结算后的资源处置。可继续子级的物化与驻留也会阻止释放。删除预留会拒绝新的委派，普通停止与取消仍保持原有行为。
+
+提供方确认轮次身份后，共享驱动器先把它写入待决记录，再接受完成结果。缺少该身份的旧记录不能仅凭提示词文本匹配获得推断出的完成证明。
+
 ### 结算投递
 
 当一个驻留 Activation 结算时，管理器会在父级自身的轮次流中告知该子级持久化的直接父级：这个子级已经产出它将产出的全部内容。对于每个已经向调用方返回过 id 的子级，管理器都会无条件投递结算通知，不考虑该子级是否曾向父级发过消息。最需要说明结局的终止情形，包括达到 token 上限、模型失败、取消或拆卸，恰恰是子级根本没有机会选择的那些情形。在第一条消息被接受之前就回滚的物化保持静默，因为那位调用方已被告知该子级未建立。消息会携带该 epoch 的终止原因、它产出过的最终 assistant 内容，以及持久化来源 `{ kind: 'subagent-settled', form: 'notice', senderSessionId: <child-id> }`——与子级自撰的 `subagent-report` 是不同的来源 kind，因此 transcript（文本记录）绝不会把运行时写下的话算到子级头上。
@@ -217,6 +223,7 @@ You are a delegated subagent: your permission scope was fixed when you were star
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
+- 设置 `DSH_MANAGED_DATA_MANIFEST` 的受管启动会在写入数据前登记共享的外部成员绑定文件。清单无效时拒绝初始化；保留旧根和部署批准遵循[清单与备份规则](../../util/managed-data/README.zh.md)。
 - **ACP 子 agent 仍为一次性，且无法通过追踪枚举**：ACP 运行在 parent 会话语料中没有本地 child 会话。ACP 的 `prepareContinuable` 需要在提供方专用描述符数据中持久化远端会话 id，以及逐子 agent 的继续执行能力声明，因为 ACP 的 `loadSession` 支持按子 agent 协商，而不是通过方法是否存在来确定。远程提供方还需要一份独立的 Activation 所有权约定，具备等效的经认证控制和子先于父的完全停稳保证，才能支持可继续子 agent。
 - **仅支持相邻 Agent 之间的模型消息**：`sendMessage()` 要求确切在线的发送方；任何发送方都可以把直接可继续子级作为目标，只有拥有驻留可继续 Activation 的发送方才能把直接父级作为目标。兄弟节点和更深的后代都不是消息目标。浏览器与 Team 的 prompt 走独立的内部 Queue 适配器；只有 `interrupt()` 接受持久化 parent 地址形式的用户授权，因为停止一个轮次是幂等的且不投递任何内容。
 - **子到父投递要求直接父级保持在线**：服务没有持久化的父级 mailbox；父级缺席时直接拒绝该消息，而不是接受一份无法唤醒的工作。

@@ -36,7 +36,7 @@ function Counts({ added, deleted, t }: { added: number; deleted: number } & Prop
  */
 export function ChangedFiles({ changes, cwd, openReview, t, sessionId, useChangesDiff, loadChangesDiff }: {
   /** The served summary with the sequence of the event that announced it. */
-  changes: Pick<ChangesSummary, 'files' | 'total' | 'added' | 'deleted'> & { seq: number }
+  changes: Pick<ChangesSummary, 'files' | 'total' | 'added' | 'deleted' | 'incomplete'> & { seq: number }
   cwd: string | undefined
   /** Open the turn's review on the file at an original summary index. */
   openReview: (index: number) => void
@@ -45,6 +45,10 @@ export function ChangedFiles({ changes, cwd, openReview, t, sessionId, useChange
   const pathDescriptionId = useId()
   const [expanded, setExpanded] = useState(false)
   const singleFile = changes.total === 1 ? changes.files[0] : undefined
+  if (changes.incomplete === true) return <div className={css.card} data-changed-files role="alert">
+    <strong>{t('changes.incomplete')}</strong>
+    <p>{t('changes.storageFailure')}</p>
+  </div>
   const foldable = changes.files.length > COLLAPSED_ROWS
   const rows = foldable && !expanded ? changes.files.slice(0, COLLAPSED_ROWS) : changes.files
   const header = <button type="button" className={css.header}

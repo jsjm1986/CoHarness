@@ -1,5 +1,6 @@
-import type { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import type { ExecutionAuthority } from '@deepseek-ai/dsh-execution-authority'
+import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
 import { ReasoningEffortId, type LlmCallConfig } from '@deepseek-ai/dsh-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -13,6 +14,7 @@ import { createWebhookSession } from '../src/session.ts'
 
 interface HarnessOptions {
   authority?: Pick<ExecutionAuthority, 'stamp' | 'authorizeSelection'>
+  readAuthority?: () => HarnessOptions['authority']
   requiredAuthority?: boolean
   failAt?: 'permission-resolve' | 'preset-resolve' | 'standing' | 'workspace' | 'agent' | 'attach' | 'permission-set' | 'title' | 'followup'
   failDetach?: boolean
@@ -77,7 +79,9 @@ function harness(options: HarnessOptions = {}): SessionHarness {
     },
   }
   const fake = {
-    get: vi.fn((name: string) => name === 'executionAuthority' ? options.authority : options.requiredAuthority),
+    get: vi.fn((name: string) => name === 'executionAuthority'
+      ? options.readAuthority === undefined ? options.authority : options.readAuthority()
+      : options.requiredAuthority),
     logger: { warn: vi.fn() },
     permissionPresets: {
       resolve(name: string) {
@@ -197,6 +201,22 @@ function modelRequestListener(test: SessionHarness): (
 }
 
 describe('webhook Session creation', () => {
+  it('admits an authorized Session when Cordis returns a new proxy for the same authority', async () => {
+    class Provider extends Service {
+      constructor(ctx: Context) { super(ctx, 'executionAuthority') }
+      stamp: ExecutionAuthority['stamp'] = async (_session, message) => message
+      authorizeSelection: ExecutionAuthority['authorizeSelection'] = async () => {}
+    }
+    const registry = new Context(), fiber = registry.plugin(Provider)
+    try {
+      await fiber.await()
+      const test = harness({ readAuthority: () => executionAuthorityOf(registry) })
+      await create(test)
+      expect(test.calls.at(-1)).toBe('followup')
+      expect(test.messages).toHaveLength(1)
+    } finally { await registry.fiber.dispose() }
+  })
+
   it('requires managed authority before resolving a workspace or creating an Agent', async () => {
     const test = harness({ requiredAuthority: true })
     await expect(create(test)).rejects.toThrow('Managed execution requires its authorization provider')

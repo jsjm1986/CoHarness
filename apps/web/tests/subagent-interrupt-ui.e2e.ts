@@ -188,7 +188,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     // parentAvailable: false while the child Activation stays live (the
     // interrupt RPC itself needs no live parent — covered host-side by
     // subagent-interrupt.e2e.ts).
-    const pattern = '**/api/subagents/list'
+    const pattern = /\/api\/subagents\/list(?:\?.*)?$/
     await page.route(pattern, async (route) => {
       const response = await route.fetch()
       const body = await response.json() as {

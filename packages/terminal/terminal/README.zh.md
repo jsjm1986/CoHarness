@@ -7,6 +7,8 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
+待处理 PTY 分配及保留中的终端会阻止确切 Agent 所有者的空闲释放。Session 删除预留会在 spawn 前拒绝新的终端准入。
+
 ## 概述
 
 `dsh-terminal` 为 harness 提供持久且限定所有者范围的终端会话：会话让 shell 或 REPL 状态跨工具调用存活，且每个操作都被限制在创建它的那个确切 agent（智能体）内。本包提供 `ctx.terminals` 服务，负责生成不透明的会话 id、通过已注册的后端路由会话创建，并在所有者或服务 dispose（资源释放）时等待完全停稳的清理。它本身不定义任何终端机制：`dsh-terminal-bash` 之类的后端负责启动与就绪检测，`dsh-tool-terminal` 中的面向模型工具负责呈现。会话只存在于进程本地：harness 重启后不会恢复。

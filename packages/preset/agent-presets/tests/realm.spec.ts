@@ -18,12 +18,15 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
+import TerminalController from '@deepseek-ai/dsh-api-terminal-controller'
+import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AgentPresets from '../src/index.ts'
 import { environmentForAgent } from '../src/mount.ts'
 import type { Config } from '../src/index.ts'
 import type {} from '../src/types.ts'
+import { externalMemberAgent, resolveChildExecution } from '@deepseek-ai/dsh-subagent'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 // The probe preset lives in its own root so the shared `system`/`user`
@@ -91,6 +94,48 @@ afterEach(async () => {
 })
 
 describe('standing realms', () => {
+  it('discovers an SSH-bound Session terminal shell in its standing execution realm', async () => {
+    const local = {
+      terminalEnvironment: vi.fn(async () => ({ platform: 'posix', defaultShell: '/local/shell' })),
+      resolveExecutable: vi.fn(async (path: string) => path),
+    }
+    const remote = {
+      terminalEnvironment: vi.fn(async () => ({ platform: 'posix', defaultShell: '/remote/shell' })),
+      resolveExecutable: vi.fn(async (path: string) => path),
+    }
+    ctx.provide('subprocess', local as never)
+    ctx.provide('sandboxPolicy', {} as never)
+    await ctx.plugin(TypertRegistry)
+    ctx.agentPresets.registerRealm('ssh-terminal', async (scope) => {
+      const isolate = Object.create(scope[Context.isolate]) as Record<string, symbol>
+      isolate['subprocess'] = Symbol('subprocess')
+      scope[Context.isolate] = isolate
+      scope.provide('subprocess', remote as never)
+    })
+    await ctx.plugin(TerminalController)
+    const { agent } = await ctx.agents.create({
+      sessionId: SessionId('ssh-terminal-owner'),
+      meta: { sshTarget: 7 },
+      setup: async (scope) => { await ctx.agentPresets.mount(scope, 'probe', 'ssh-terminal') },
+    })
+    const shells = await ctx.terminalController.shells(agent, new AbortController().signal)
+    expect(shells[0]?.path).toBe('/remote/shell')
+    expect(local.terminalEnvironment).not.toHaveBeenCalled()
+    expect(remote.terminalEnvironment).toHaveBeenCalledOnce()
+  })
+
+  it('refuses an SSH-bound terminal whose standing realm has no subprocess provider', async () => {
+    const local = { terminalEnvironment: vi.fn(), resolveExecutable: vi.fn() }
+    ctx.provide('subprocess', local as never)
+    ctx.provide('sandboxPolicy', {} as never)
+    await ctx.plugin(TypertRegistry)
+    await ctx.plugin(TerminalController)
+    const { agent } = await ctx.agents.create({ sessionId: SessionId('missing-ssh-realm'), meta: { sshTarget: 7 } })
+    await expect(ctx.terminalController.shells(agent, new AbortController().signal))
+      .rejects.toThrow('requires subprocess and sandbox policy providers')
+    expect(local.terminalEnvironment).not.toHaveBeenCalled()
+  })
+
   it('runs the realm hook before the preset rows so they resolve the shadowed service', async () => {
     ctx.agentPresets.registerRealm('ssh-a', async (scopeCtx) => { shadowFs(scopeCtx, 'realm-a') })
 
@@ -172,6 +217,45 @@ describe('standing realms', () => {
     await expect(agentOn(ctx, 'sess-a', 'probe', 'ssh-a')).rejects.toThrow('realm admission failed')
     await agentOn(ctx, 'sess-b', 'probe', 'ssh-a')
     expect(calls).toBe(2)
+  })
+
+  it('resolves external members in their standing SSH realm and never falls back to Host services', async () => {
+    const host = { resolveExecutable: vi.fn() }
+    ctx.provide('subprocess', host as never)
+    const target = { targetKey: 'remote-directory', displayPath: '/remote-only' }
+    const remote = { resolveExecutable: vi.fn(async () => '/remote/bin/agent') }
+    const filesystem = {
+      resolve: vi.fn(async () => target), stat: vi.fn(async () => ({ type: 'directory' })),
+      processPath: vi.fn(() => '/remote/canonical'),
+    }
+    const make = async (label: string, services: Record<string, unknown>) => {
+      ctx.agentPresets.registerRealm(label, async (scope) => {
+        const isolate = Object.create(scope[Context.isolate]) as Record<string, symbol>
+        for (const name of Object.keys(services)) isolate[name] = Symbol(name)
+        scope[Context.isolate] = isolate
+        for (const [name, value] of Object.entries(services)) scope.provide(name, value)
+      })
+      return (await ctx.agents.create({ sessionId: SessionId(label), meta: { cwd: '/remote-only', sshTarget: 17 },
+        setup: async agentCtx => void await ctx.agentPresets.mount(agentCtx, 'probe', label),
+      })).agent
+    }
+    const agent = await make('external-remote', { fs: filesystem, subprocess: remote })
+    const signal = new AbortController().signal
+    const execution = await resolveChildExecution(ctx, agent, undefined, signal)
+    expect(execution.cwd).toBe('/remote/canonical')
+    expect(execution.target).toBe('ssh:17')
+    expect(execution.subprocess.resolveExecutable === remote.resolveExecutable).toBe(true)
+    expect(filesystem.resolve).toHaveBeenCalledWith('/remote-only', { signal })
+    expect(externalMemberAgent(ctx, agent.id) === agent).toBe(true)
+    expect(() => externalMemberAgent(ctx, SessionId('missing'))).toThrow('no active execution owner')
+    await expect(resolveChildExecution(ctx, agent, undefined, AbortSignal.abort())).rejects.toThrow()
+    filesystem.stat.mockResolvedValueOnce({ type: 'file' })
+    await expect(resolveChildExecution(ctx, agent, undefined, signal)).rejects.toThrow('not a directory')
+    const noProcess = await make('external-no-process', { fs: filesystem })
+    await expect(resolveChildExecution(ctx, noProcess, undefined, signal)).rejects.toThrow('no subprocess provider')
+    const noFiles = await make('external-no-files', { subprocess: remote })
+    await expect(resolveChildExecution(ctx, noFiles, undefined, signal)).rejects.toThrow('no filesystem provider')
+    expect(host.resolveExecutable).not.toHaveBeenCalled()
   })
 
   it('exposes the realm-installed environment through environmentForAgent', async () => {

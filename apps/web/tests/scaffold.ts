@@ -186,6 +186,8 @@ export interface WebScaffold {
 
 /** Options for {@link launchWebScaffold}. */
 export interface LaunchOptions {
+  /** Record actual storage roots inside this isolated Harness home for backup integration scenarios. */
+  managedDataInventory?: boolean
   /** Compose the optional multi-session workbench; ordinary scenarios exercise single-session fallback. */
   workbench?: boolean
   /** Disable the optional native Open In app rows when the host package is not built in a fixture. */
@@ -355,6 +357,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
   // credentials rows were configured with.
   const skillRootEnvironment = {
     DSH_HOME: harnessHome,
+    DSH_MANAGED_DATA_MANIFEST: options.managedDataInventory === true ? join(harnessHome, 'managed-data.jsonl') : undefined,
     DSH_AGENTS_HOME: join(workspaceCwd, '.agents-home'),
     DSH_BUNDLED_SKILL_DIR: join(workspaceCwd, '.bundled-skills'),
   }
@@ -370,7 +373,10 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       else process.env[key] = value
     }
   }
-  Object.assign(process.env, skillRootEnvironment)
+  for (const [key, value] of Object.entries(skillRootEnvironment)) {
+    if (value === undefined) Reflect.deleteProperty(process.env, key)
+    else process.env[key] = value
+  }
   let storageRoot: string
   try {
     storageRoot = await mkdtemp(join(tmpdir(), 'dsh-web-e2e-storage-'))
@@ -424,6 +430,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       },
     },
     { id: 'session-persistence-jsonl', config: { root: persistenceRoot } },
+    { id: 'workspace-changes', config: { storageRoot: join(harnessHome, 'workspace-reviews') } },
     // An explicit document root also disables implicit ~/uploads migration.
     // The real store still warms, locks, sweeps and drains inside this world.
     { id: 'userdoc-local', config: { uploadRoot: documentRoot } },
@@ -432,10 +439,9 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // the seeded-session scenarios navigate by content search, and these e2e
     // runs are the assembled coverage for the opt-in search path.
     { id: 'session-query-sqlite', config: { path: ':memory:', openAt: 'first-search' } },
-    // storage-json's yml root is anchored to the real $DSH_HOME; pin the row
-    // to an absolute temp root (removed with the workspace at close) so tests
-    // never write the user's harness home.
-    { id: 'storage-json', config: { root: join(workspaceCwd, '.dsh-storages') } },
+    // Application state belongs under the private Harness home. A project
+    // snapshot must not race its projection-cache temporary files.
+    { id: 'storage-json', config: { root: join(harnessHome, 'storages') } },
     // Skill discovery is model-visible input. Pin every host-level root inside
     // the owned temp world so ~/.dsh, ~/.agents, and a bundled-root env setting
     // cannot change replay requests or conversation goldens. Project roots stay

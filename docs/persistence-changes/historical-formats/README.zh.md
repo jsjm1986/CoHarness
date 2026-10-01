@@ -35,7 +35,7 @@ description: "查找从 V0 到工作区写入器版本的每个 Session 格式�
 | 4 | PR #218 | [V4](v4.zh.md) | [JSON](v4.schema.json) | 60 / 488 |
 | 5 | PR #218 | [V5](v5.zh.md) | [JSON](v5.schema.json) | 63 / 508 |
 | 6 | PR #232 | [V6](v6.zh.md) | [JSON](v6.schema.json) | 63 / 508 |
-| 7 | 当前工作树 | [当前目录](../../persistence-catalog.zh.md) | [JSON](../../persistence-schema.json) | 64 / 634 |
+| 7 | 当前工作树 | [当前目录](../../persistence-catalog.zh.md) | [JSON](../../persistence-schema.json) | 66 / 641 |
 
 <!-- persistence-format-index:end -->
 

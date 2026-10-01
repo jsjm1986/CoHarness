@@ -32,7 +32,10 @@ describe('web: Cordis Workspace workbench', () => {
   let scaffold: WebScaffold | undefined
   let browser: Browser | undefined
   let page: Page
+  let releaseStartupHistory: (() => void) | undefined
   afterEach(async () => {
+    releaseStartupHistory?.()
+    releaseStartupHistory = undefined
     await browser?.close()
     await scaffold?.close()
     browser = undefined
@@ -66,12 +69,14 @@ describe('web: Cordis Workspace workbench', () => {
     // binding; no Session internals are injected.
     const seed = await readFile(SEED, 'utf8')
     const workspaceIds: string[] = []
+    const hostIds: string[] = []
     for (const name of ['alpha', 'beta', 'gamma', 'delta-with-a-long-workspace-name']) {
       const path = join(scaffold.workspaceCwd, name)
       await mkdir(path)
       await mkdir(join(path, 'workspace'))
       const workspace = await scaffold.ctx.workspaceRegistry.create(path)
       const session = await seedSession(scaffold, seed, `workbench-${name}`, undefined, path)
+      hostIds.push(session)
       await workspace.attachSession(session)
       await scaffold.ctx.agents.resume({
         resumeSessionId: session,
@@ -85,13 +90,29 @@ describe('web: Cordis Workspace workbench', () => {
     page.on('websocket', (socket) => { sockets.push(socket.url()) })
     const tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'workbench'))
-    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    const requestedHistory = Promise.withResolvers<undefined>()
+    const releasedHistory = Promise.withResolvers<undefined>()
+    releaseStartupHistory = () => { releasedHistory.resolve(undefined) }
+    let held = false
+    await page.route(/\/api\/session\.history(?:\?.*)?$/, async (route) => {
+      if (!held) {
+        held = true
+        requestedHistory.resolve(undefined)
+        await releasedHistory.promise
+      }
+      await route.continue()
+    })
+    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await requestedHistory.promise
     const toolbar = page.locator('[data-workbench-toolbar]')
     await toolbar.waitFor({ timeout: 30_000 })
-    // The conversation viewport boots in single-session mode; entering the
-    // workbench is an explicit gesture through the toolbar's chooser, which
-    // switches the viewport and mounts the default layout's (empty) panes.
+    // History completion moves the same root controls from Hero to title row;
+    // an already-open menu must survive without a second opening gesture.
     await toolbar.getByRole('button', { name: 'Select workbench' }).click()
+    await page.getByRole('menuitem', { name: /我的工作台/ }).waitFor()
+    releasedHistory.resolve(undefined)
+    await page.locator('[class*="titleRow"] [data-workbench-toolbar]').waitFor()
+    expect(await toolbar.getByRole('button', { name: 'Select workbench' }).getAttribute('aria-expanded')).toBe('true')
     await page.getByRole('menuitem', { name: /我的工作台/ }).click()
     await page.locator('[data-workbench-empty-content]').waitFor({ timeout: 30_000 })
     for (const workspaceId of workspaceIds) {
@@ -111,22 +132,22 @@ describe('web: Cordis Workspace workbench', () => {
     const approvalPrompt = fixtureUserPrompts(await readFile(APPROVAL, 'utf8'))[0]!
     const replyPrompt = fixtureUserPrompts(await readFile(REPLY, 'utf8'))[0]!
     await prompt(a, approvalPrompt)
-    await expect.poll(() => (assistantFrames.get(ids[0]!) ?? 0) > 0, { timeout: 30_000 }).toBe(true)
+    await expect.poll(() => (assistantFrames.get(hostIds[0]!) ?? 0) > 0, { timeout: 30_000 }).toBe(true)
     await prompt(b, replyPrompt)
-    await expect.poll(() => (assistantFrames.get(ids[1]!) ?? 0) > 0, { timeout: 30_000 }).toBe(true)
+    await expect.poll(() => (assistantFrames.get(hostIds[1]!) ?? 0) > 0, { timeout: 30_000 }).toBe(true)
     expect(await a.locator('[data-state="ongoing"]').count()).toBeGreaterThan(0)
     expect(await b.locator('[data-state="ongoing"]').count()).toBeGreaterThan(0)
     const approval = a.locator('[data-approval-key]')
     await approval.waitFor({ timeout: 60_000 })
     await prompt(c, replyPrompt)
-    await expect.poll(() => (assistantFrames.get(ids[2]!) ?? 0) > 0, { timeout: 30_000 }).toBe(true)
+    await expect.poll(() => (assistantFrames.get(hostIds[2]!) ?? 0) > 0, { timeout: 30_000 }).toBe(true)
     await c.getByRole('button', { name: 'Close pane', exact: true }).click()
-    await expect.poll(() => events.get(ids[2]!)?.some(event => event.type === 'turn/end'), { timeout: 60_000 }).toBe(true)
+    await expect.poll(() => events.get(hostIds[2]!)?.some(event => event.type === 'turn/end'), { timeout: 60_000 }).toBe(true)
     expect(await panes.count()).toBe(3)
     expect(await approval.count()).toBe(1)
     expect(await d.locator('textarea').first().inputValue()).toBe('Delta draft survives pane changes')
     await approval.getByRole('button', { name: 'Allow once', exact: true }).click()
-    await expect.poll(() => events.get(ids[0]!)?.some(event => event.type === 'turn/end'), { timeout: 60_000 }).toBe(true)
+    await expect.poll(() => events.get(hostIds[0]!)?.some(event => event.type === 'turn/end'), { timeout: 60_000 }).toBe(true)
     expect(await approval.count()).toBe(0)
     expect(sockets.length).toBe(2)
     await compareOrRefreshGolden(join(SNAPSHOTS, 'toolbar.expected.md'), await captureStableAria(page, '[data-workbench-toolbar]', scaffold.workspaceCwd), MODE)

@@ -9,6 +9,8 @@ kind: "package-reference"
 
 JSONL 持久会话存储后端：`SessionPersistence` 的一个具体实现（`dsh-session-persistence` seam）。每个会话有一个仅追加的逻辑 JSONL 日志，默认存储为 `.jsonl.zstd`；禁用压缩时使用原始 `.jsonl`。
 
+历史 CoHarness 头部和压缩流由 `coharnessJsonlFormatCatalog` 解码。只读句柄准备迁移但不发布；写句柄在原始文件旁发布经过验证的当前代次，原文件保持不变。已声明的权限来源、文档引用、流凭据归因和草稿元数据在转换后保留。缺失的历史消息来源或轮次坐标属于损坏数据，读取器不会补造。
+
 ## 概述
 
 `dsh-session-persistence-jsonl` 把每个会话存为当前的仅追加 JSONL 日志，并保留不可变的历史格式 generation——默认以带校验和的 Zstandard 帧存储，禁用压缩时以换行分隔的原始文本行存储。它通过持久化句柄提供当前逻辑 `SessionEvent` 流，因此格式迁移、压缩、历史解码与崩溃恢复仍是存储内部细节。当消费方需要按会话的磁盘文件时选择它；选择 `compression: 'none'` 后日志可作为纯文本按行读取。根目录是唯一必填配置；持久性、延迟实体化、[受支持的历史格式迁移](../session-format-catalog/README.zh.md)与撕裂尾部崩溃恢复都随后端提供。
@@ -103,7 +105,8 @@ JSONL 存储不修改实时请求前缀。只有重建历史、当前 envelope �
 
 ## 已知限制与暂缓事项 <a id="known-limitations-and-deferred-work"></a>
 
-- **只加载已配置编码和 catalog 中的 generation**：此 backend 会把发布版 v0/v1/v2/v3/v4 artifact 迁移到当前 v5，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
+- 设置 `DSH_MANAGED_DATA_MANIFEST` 的受管启动会在写入数据前登记实际解析后的 Session 目录，包括全部已提交代次。清单无效时拒绝初始化；保留旧根和部署批准遵循[清单与备份规则](../../util/managed-data/README.zh.md)。
+- **只加载已配置编码和 catalog 中的 generation**：此 backend 会把发布版 v0–v5 artifact 迁移到当前 v6，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
 - **平铺文件存储布局不加载**：加载前使用独立根，或将预发布产物移入项目/会话目录布局。
 - **压缩文件不能直接按行读取**：使用后端加载；或在写入新根前选择 `compression: 'none'`，以便外部行 reader 使用。
 - **不删除会话文件**：日志在 `root` 下累积，直到外部移除（seam 无删除接口）。

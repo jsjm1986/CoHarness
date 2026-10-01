@@ -96,7 +96,7 @@ export async function applyGrantsToUser(
   const state = await deps.instances.stateOf(userId)
   if (state !== 'ready' && state !== 'starting') return 'written'
   try {
-    await deps.instances.stop(userId)
+    await deps.instances.stop(userId, 'access-change')
     await deps.instances.ensureRunning(user)
     return 'restarted'
   } catch (error) {

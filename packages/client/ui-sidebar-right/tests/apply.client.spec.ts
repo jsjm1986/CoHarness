@@ -13,7 +13,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { createSnapshotStore, ProjectUiPolicyRuntime, sessionPersistenceKey } from '@deepseek-ai/dsh-client-runtime/client'
+import { clientSessionKey, createSnapshotStore, ProjectUiPolicyRuntime, sessionPersistenceKey } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply, inject } from '../src/client/index.ts'
 import type { GuideInjected, SidebarRightInjected } from '../src/client/index.ts'
 import { apply as hostApply } from '../src/index.ts'
@@ -29,6 +30,8 @@ import { GuideTitle } from '../src/client/tabs/guide/GuideTitle.tsx'
 import { ToolBody } from '../src/client/tabs/tool/ToolBody.tsx'
 import { GUIDE_ID } from '../src/client/tabs/guide/definition.ts'
 import { en, zh } from '../src/client/locales.ts'
+import { writeSidebarLayout } from '../src/client/persistence.ts'
+import { createSidebarRightStore as createStore } from '../src/client/stores.ts'
 
 const SESSION = 's-test' as SessionId
 
@@ -42,7 +45,7 @@ interface Recorded {
   component: unknown
 }
 
-async function boot() {
+async function boot(sessionId = SESSION, runtime: SessionRuntimeTarget = { kind: 'personal' }) {
   const ctx = new Context()
   const registered: Recorded[] = []
   const slots = {
@@ -77,9 +80,10 @@ async function boot() {
     catalog: createSnapshotStore<readonly never[]>([]),
   } as never)
   const sessions = {
+    runtimeIdentityFor: () => runtime,
     retain: vi.fn(() => ({ release: vi.fn() })),
     list: createSnapshotStore<{ current: SessionId | undefined; byId: Record<string, { id: SessionId }> }>({
-      current: SESSION, byId: { [SESSION]: { id: SESSION } },
+      current: sessionId, byId: { [sessionId]: { id: sessionId } },
     }),
   }
   ctx.provide('sessions', sessions as never)
@@ -96,7 +100,7 @@ async function boot() {
   }
   const injectedOf = (entry: Recorded): unknown => {
     if (entry.inject === undefined) throw new Error(`expected ${entry.name} to inject`)
-    return entry.inject(SESSION)
+    return entry.inject(sessionId)
   }
   return { ctx, registered, dictionaries, layout, resources, fiber, seat, injectedOf, policy, description, sessions }
 }
@@ -411,6 +415,42 @@ describe('ui-sidebar-right apply', () => {
       expect(instance.getSnapshot().bySession).toEqual({})
       await fiber.dispose()
     } finally { vi.unstubAllGlobals() }
+  })
+
+  it('restores a verified old layout into its qualified pane without changing its account/runtime storage owner', async () => {
+    const values = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value) },
+      removeItem: (key: string) => { values.delete(key) },
+    })
+    const runtime = { kind: 'project' as const, projectId: 7 }
+    const key = clientSessionKey(runtime, SESSION)
+    const { ctx, seat, description, policy, fiber, resources } = await boot(key, runtime)
+    try {
+      description.set({ executionAuthorityRequired: true })
+      policy.setVerifiedAccountId(1)
+      const storage = JSON.stringify(['account:1', ['project', 7], SESSION])
+      expect(sessionPersistenceKey(ctx.sessions, key, true, 1)).toBe(storage)
+      const old = createStore(() => ({ kind: 'guide', title: 'Start' }), false).create(SESSION)
+      old.actions.openContent(SESSION, {
+        kind: 'file', title: 'Historical file', contentId: `dsh-resource://file/session/${SESSION}/a.txt`,
+      }, () => {})
+      const surface = old.getSnapshot().bySession[SESSION]!
+      writeSidebarLayout(storage, surface)
+      const before = values.get(`dsh.sidebar-right.v1.${storage}`)
+      const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
+      const restored = handle.create(key)
+      const tabs = Object.values(restored.getSnapshot().bySession[key]!.layout.tabs)
+      const expectedAddress = `dsh-resource://file/session/${encodeURIComponent(key)}/a.txt`
+      expect(tabs).toContainEqual(expect.objectContaining({ title: 'Historical file', contentId: expectedAddress }))
+      expect(resources.pin).toHaveBeenCalledWith(expect.objectContaining({ address: expectedAddress, sessionId: key }),
+        expect.any(AbortSignal))
+      expect(values.get(`dsh.sidebar-right.v1.${storage}`)).toBe(before)
+      policy.setVerifiedAccountId(undefined)
+      expect(restored.getSnapshot().bySession).toEqual({})
+      expect(values.get(`dsh.sidebar-right.v1.${storage}`)).toBe(before)
+    } finally { await fiber.dispose(); vi.unstubAllGlobals() }
   })
 
   it('drops only the session binding when nothing was persisted', async () => {

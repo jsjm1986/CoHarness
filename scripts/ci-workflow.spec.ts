@@ -487,10 +487,14 @@ describe('CI workflow', () => {
     })
     const manifest = JSON.parse(readFileSync(resolve(root, 'gateway/package.json'), 'utf8')) as { scripts: Record<string, string> }
     expect(manifest.scripts['test:postgres']).toContain('--no-file-parallelism')
-    for (const suite of ['postgres', 'access-invalidation', 'execution']) {
+    for (const suite of ['postgres', 'access-invalidation', 'execution', 'ssh', 'webhook', 'maintenance', 'deployment-restore']) {
       expect(manifest.scripts['test:postgres']).toContain(`tests/${suite}.spec.ts`)
       expect(manifest.scripts.test).toContain(`--exclude tests/${suite}.spec.ts`)
     }
+    expect(gatewaySteps[postgresIndex]?.env).toMatchObject({
+      HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","pg_dump"]',
+      HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","pg_restore"]',
+    })
   })
 
   it('limits release and sandbox workflows to relevant changes while retaining manual or scheduled runs', () => {

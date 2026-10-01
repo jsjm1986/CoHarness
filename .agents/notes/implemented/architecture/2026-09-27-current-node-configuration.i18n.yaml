@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-09-27-current-node-configuration.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-current-node-configuration.md
+/agent-note-current-node-configuration-with-independent-application:
+  en: 1c2a4a509b399b4c
+  zh: 2fbbb3ee3482a604
+/agent-note-current-node-configuration-with-independent-application/problem:
+  en: 083304717e1a3973
+  zh: 63192e0cd1a7e77c
+/agent-note-current-node-configuration-with-independent-application/decision:
+  en: bd6d2d68d08ec690
+  zh: cc7ea52925255022
+/agent-note-current-node-configuration-with-independent-application/alternatives-considered:
+  en: 8555a1f33d4920fd
+  zh: 74dad589085ba0f7
+/agent-note-current-node-configuration-with-independent-application/consequences:
+  en: 06720c2075939ada
+  zh: c068e51f0dcf15a8

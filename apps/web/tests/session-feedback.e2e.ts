@@ -51,7 +51,7 @@ describe('web e2e: Session feedback dialog', () => {
     await dialog.getByRole('textbox', { name: 'Feedback details' }).fill('The sidebar needs a clearer label.')
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(DIRECTORY, 'dialog.expected.md'), snapshot, webSnapshotMode())
-    await page.route('**/api/sessionFeedback/record', route => route.abort('connectionfailed'), { times: 1 })
+    await page.route(/\/api\/sessionFeedback\/record(?:\?.*)?$/, route => route.abort('connectionfailed'), { times: 1 })
     await dialog.getByRole('button', { name: 'Submit', exact: true }).click()
     await page.getByRole('alert').getByText('Could not save feedback', { exact: true }).waitFor()
     expect(await dialog.getByRole('textbox', { name: 'Feedback details' }).inputValue()).toBe('The sidebar needs a clearer label.')

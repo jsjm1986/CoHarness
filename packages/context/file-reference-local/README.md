@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 Local-filesystem implementation of `ctx.fileReferences`. It maintains one bounded `WorkspaceFileSearch` per agent, rooted at that session's `cwd` and falling back to the host process cwd. The index ranks direct directory listings for queries containing `/`, otherwise fuzzy-ranks a bounded recursive index; it never follows directory symlinks.
 
-Tool-result events invalidate the addressed agent's reusable index so later completion observes likely workspace mutations. Agent disposal releases that index and its scoped prompt contribution; plugin disposal awaits every prompt fiber and releases all cached searches.
+Tool-result events invalidate the addressed agent's reusable index so later completion observes likely workspace mutations. Agent disposal releases that index and its scoped prompt contribution; plugin disposal awaits every prompt fiber and releases all cached searches. Cleanup also accepts a registration that its Agent scope has already disposed.
 
 ## Summary
 

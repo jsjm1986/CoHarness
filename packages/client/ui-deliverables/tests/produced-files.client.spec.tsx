@@ -705,7 +705,7 @@ describe('ChangedFiles card', () => {
     return { props, openFile, view }
   }
 
-  it('reads the announced summary once and renders nothing while it loads, when it is gone, or when it lists no file', async () => {
+  it('keeps successful summaries cached and exposes unavailable history without inventing changed files', async () => {
     const summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
@@ -727,6 +727,7 @@ describe('ChangedFiles card', () => {
       expect(view.container.querySelector('[data-changed-files]')).toBeNull()
     }
     expect(summaries.state.getSnapshot()[changesSummaryUrl(SessionId('child-session'), 7)]).toBe('missing')
+    expect(view.getByRole('status').textContent).toContain(en['changes.unavailable'])
     await summaries.load(SessionId('child-session'), 5)
     expect(fetchMock).toHaveBeenCalledTimes(3)
     // A replaced connection forgets every read; a later mount asks the new Host again.
@@ -741,6 +742,29 @@ describe('ChangedFiles card', () => {
     await summaries.dispose()
     await summaries.load(SessionId('child-session'), 9)
     expect(summaries.state.getSnapshot()[changesSummaryUrl(SessionId('child-session'), 9)]).toBeUndefined()
+  })
+
+  it('shows an incomplete review without claiming zero changed files or offering an invalid comparison', () => {
+    const incomplete = servedStore({ turn: 1, files: [], total: 0, added: 0, deleted: 0, incomplete: true })
+    const { view } = renderCard(undefined, zh, { changes, presented: [] as never[] }, incomplete)
+    expect(view.getByRole('alert').textContent).toContain(zh['changes.incomplete'])
+    expect(view.getByRole('alert').textContent).toContain(zh['changes.storageFailure'])
+    expect(view.queryByText('已编辑 0 个文件')).toBeNull()
+    expect(view.queryByRole('button', { name: '在侧边栏查看本轮改动' })).toBeNull()
+  })
+
+  it('retries an unavailable immutable review only after an explicit click', async () => {
+    const fetchRecord = vi.fn(async () => Response.json(served))
+    const summaries = new ChangesSummaryStore(fetchRecord)
+    summaries.state.set({ [changesSummaryUrl(SessionId('child-session'), 5)]: 'missing' })
+    const { props, view } = renderCard(undefined, en, { changes, presented: [] as never[] }, summaries)
+    expect(fetchRecord).not.toHaveBeenCalled()
+    fireEvent.click(view.getByRole('button', { name: 'Retry' }))
+    await vi.waitFor(() => { expect(summaries.state.getSnapshot()[changesSummaryUrl(SessionId('child-session'), 5)]).toEqual(served) })
+    view.rerender(<Deliverables {...props} matched={{ changes, presented: [] }} openFile={() => {}}
+      sessionId={SessionId('child-session')} t={makeTranslate(en)} />)
+    expect(view.getByText('Edited 11 files')).toBeTruthy()
+    expect(fetchRecord).toHaveBeenCalledTimes(1)
   })
 
   it('sums the header from the Host totals, not from the capped list', () => {

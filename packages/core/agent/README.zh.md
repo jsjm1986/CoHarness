@@ -7,6 +7,8 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
+`AgentHandle.tryDisposeIdle()` 会拒绝运行中的轮次、维护、待处理输入、活跃子级或插件持有的资源。成功的空闲释放会在清理前关闭输入。`ctx.agents.reserveRemoval(ids)` 须保持到持久删除及回执完成；`reserveUse(ids)` 保护异步生命周期查找。这些预留不会授予他人句柄的释放权限。
+
 ## 概述
 
 使用 `dsh-agent` 创建或恢复实时 agent（智能体）、发送后续或 steering（中途引导）输入、注入面向模型的上下文、取消工作，并等待 agent 进入空闲状态。插件、UI、钩子与编排器还可以观察或拦截 agent 活动，并仅为一个 agent 应用能力而不影响其他 agent。当代码需要通过公开 `Agent` API 控制或扩展实时 agent 时，请选择本包。请将它与 `dsh-agent-loop` 等 agent 驱动器配合使用；本包本身不会创建模型请求。发起方归因仅存在于进程内，跨 worker、进程、持久队列与重启时必须显式传递。

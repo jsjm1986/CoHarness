@@ -6,14 +6,14 @@
   en: 8302ff457ba35ee1
   zh: e4f946b2193ffd0b
 /harness-gateway/toolchain:
-  en: b59b6e11a672d823
-  zh: 7b4f814515387d88
+  en: c2320daf2514d280
+  zh: 1b840f4201871ee5
 /harness-gateway/configuration-environment-variables-see-src-config-ts:
   en: aa26b0cab1e4d787
   zh: c2f05014f16e617a
 /harness-gateway/admin-console-and-project-grants:
-  en: fe943936cb935b08
-  zh: 830207a989358e1a
+  en: a0b6404eb8383d4c
+  zh: 93a8ed172bb83c0a
 /harness-gateway/plugin-management:
   en: d4efa58ffd53a6e9
   zh: e94e18092dd5e7a2
@@ -24,20 +24,20 @@
   en: 72a9968da0393e82
   zh: 4d316e3b470249fc
 /harness-gateway/project-collaborative-conversations:
-  en: 3ee1c544781e503c
-  zh: 0d519a28bd312c00
+  en: eddc83c9293c23ed
+  zh: c40c362c87520ae7
 /harness-gateway/model-governance-and-usage-accounting:
   en: eb28042a9cf0f3f4
   zh: 42b12cd4fd7fb2e6
 /harness-gateway/postgresql-control-plane:
-  en: f6b3c2bec06e7521
-  zh: 6f6eed12e5dd114d
+  en: 04a528fb6dcfa463
+  zh: de644c28fc3df854
 /harness-gateway/deployment-maintenance-and-coordinated-restore:
-  en: 7ef905bf3ac7c13a
-  zh: 0fccbd0a765322ba
+  en: ea43e796e2c2dac1
+  zh: 6cfde3555964d734
 /harness-gateway/access-revocation-across-gateways:
   en: b841061ff4b270a6
   zh: 11f233f8d060f9e3
 /harness-gateway/layered-directory-enforcement:
-  en: 91962bdcbcf1d939
-  zh: ded1f7362217d6d1
+  en: ab52b7ae0a8333a8
+  zh: 72608aa76089e7d7

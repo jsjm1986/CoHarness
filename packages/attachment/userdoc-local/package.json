@@ -29,6 +29,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-home-paths": "workspace:*",
+    "@deepseek-ai/dsh-managed-data": "workspace:*",
     "@deepseek-ai/dsh-userdoc": "workspace:*"
   },
   "dependencies": {
@@ -38,6 +39,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-home-paths": "workspace:*",
+    "@deepseek-ai/dsh-managed-data": "workspace:*",
     "@deepseek-ai/dsh-userdoc": "workspace:*"
   }
 }

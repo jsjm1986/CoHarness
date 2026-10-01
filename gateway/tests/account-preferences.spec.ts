@@ -8,7 +8,7 @@ import type {
   AccountPreferenceMutation, AccountPreferencesView, GatewayAccountPreferencesService,
 } from '../src/account-preferences.ts'
 import { AuditService } from '../src/audit.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ProjectService } from '../src/projects.ts'
@@ -36,7 +36,7 @@ const VIEW: AccountPreferencesView = {
 async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'hgw-prefs-'))
   const db = openDb(join(root, 'gateway.sqlite'))
-  const cfg = loadConfig({
+  const cfg = testConfig(root, {
     HGW_USERS_ROOT: join(root, 'users'),
     HGW_STATE_ROOT: join(root, 'state'),
     HGW_USER_PROJECTS_ROOT: join(root, 'user-projects'),

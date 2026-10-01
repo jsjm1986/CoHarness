@@ -122,6 +122,7 @@ export class ReactLoopAgent implements Agent {
   private requestSurfaceGeneration: number
   private readonly runtimeContext: RuntimeContextProjection
   /** Process-local revision of assistant frames for this attached Session. */
+  private admissionClosed = false
   private assistantStreamRevision = 0
   private assistantAttemptCounter = 0
   private readonly systemPrompt: SystemPromptProjection
@@ -152,6 +153,19 @@ export class ReactLoopAgent implements Agent {
 
   get status(): AgentStatus {
     return this.phase.kind === 'idle' || this.phase.kind === 'maintenance' ? 'idle' : 'running'
+  }
+
+  /** Close input before the lifecycle owner awaits any teardown work. */
+  closeAdmission(): void {
+    this.admissionClosed = true
+    this.inbox.closeAdmission()
+  }
+
+  /** Refuse busy release without cancelling a turn, maintenance task, or queued input. */
+  closeIdleAdmission(): boolean {
+    if (this.phase.kind !== 'idle' || this.inbox.hasPending) return false
+    this.closeAdmission()
+    return true
   }
 
   /** Commit a phase and publish its externally visible status transition. */
@@ -203,6 +217,7 @@ export class ReactLoopAgent implements Agent {
   }
 
   runMaintenance<T>(job: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    if (this.admissionClosed) throw new Error(`agent "${this.id}" input is closed`)
     if (this.phase.kind !== 'idle') throw new Error(`agent "${this.id}" already has active work`)
     const done = Promise.withResolvers<undefined>()
     const maintenance: Phase = {

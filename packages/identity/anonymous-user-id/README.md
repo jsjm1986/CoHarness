@@ -29,7 +29,7 @@ DeepSeek Harness uses one anonymous identifier per harness home to correlate tel
 <a id="storage-contract"></a>
 ## Storage contract
 
-Reads and writes are synchronous because both boot-time telemetry construction and direct command execution need one API. The result is memoized per resolved file path for the process lifetime. A first writer uses exclusive creation and a concurrent loser adopts the persisted winner; a corrupt file is replaced. Persistence is best-effort, so an unwritable home still receives a process-local UUID rather than blocking telemetry or feedback.
+Reads and writes are synchronous because both boot-time telemetry construction and direct command execution need one API. The result is memoized per resolved file path for the process lifetime. A first writer uses exclusive creation and a concurrent loser adopts the persisted winner; a corrupt file is replaced. Identity persistence is best-effort, so an unwritable standalone home still receives a process-local UUID. With `DSH_MANAGED_DATA_MANIFEST`, the function records its exact identity file on first lookup and when the selected inventory changes, using [managed-data](../../util/managed-data/README.md); a damaged inventory refuses that admission before identity writes. Cached lookups keep their memory-only path, while backups independently validate the inventory. The stored identifier is therefore included in the deployment backup without claiming its entire Harness home.
 
 <a id="composition"></a>
 ## Composition

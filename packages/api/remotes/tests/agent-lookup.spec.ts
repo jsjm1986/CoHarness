@@ -40,6 +40,29 @@ function stubAgent(ctx: Context, session: Session): Agent {
 }
 
 describe('API Remote Agent resolver races', () => {
+  it('retains a shared cold resume handle once and fences its whole lookup from removal', async () => {
+    const ctx = await createContext(), sessionId = sid('owned-cold-resume')
+    const meta = header(sessionId), entered = Promise.withResolvers<undefined>(), proceed = Promise.withResolvers<undefined>()
+    provideSession(ctx, meta, async () => { entered.resolve(undefined); await proceed.promise; return { meta, events: [] } })
+    const handle = { agent: stubAgent(ctx, ctx.sessions.prepare(sessionId, { meta: { cwd: '/proj' } })), dispose: async () => {}, tryDisposeIdle: async () => false }
+    const resume = vi.spyOn(ctx.agents, 'resume').mockResolvedValue(handle), onResumed = vi.fn()
+    const resolver = createApiRemoteAgentResolver(ctx, { onResumed })
+    try {
+      const first = resolver.agentFor(sessionId), second = resolver.agentFor(sessionId)
+      await entered.promise
+      expect(() => ctx.agents.reserveRemoval([sessionId])).toThrow('pending lifecycle')
+      proceed.resolve(undefined)
+      expect(await first).toEqual({ agent: handle.agent })
+      expect(await second).toEqual({ agent: handle.agent })
+      expect(resume).toHaveBeenCalledOnce()
+      expect(onResumed).toHaveBeenCalledExactlyOnceWith(handle)
+      using _removal = ctx.agents.reserveRemoval([sessionId])
+      const denied = await resolver.agentFor(sessionId)
+      expect(denied).toMatchObject({ error: { code: 'internal' } })
+      if ('error' in denied) expect(denied.error.message).toContain('being removed')
+    } finally { proceed.resolve(undefined); await ctx.fiber.dispose() }
+  })
+
   it('maps an inspected session without a cwd to session-not-found', async () => {
     const ctx = await createContext()
     const sessionId = sid('missing-after-inspect')
@@ -66,7 +89,7 @@ describe('API Remote Agent resolver races', () => {
     })
     const resume = vi.spyOn(ctx.agents, 'resume').mockImplementation(async () => {
       if (published === undefined) throw new Error('Session was not published')
-      return { agent: stubAgent(ctx, published), dispose: () => Promise.resolve() }
+      return { agent: stubAgent(ctx, published), dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
     })
 
     const result = await createApiRemoteAgentResolver(ctx, {}).agentFor(sessionId)
@@ -142,7 +165,7 @@ describe('API Remote Agent resolver races', () => {
     const agentCtx = ctx.extend()
     vi.spyOn(ctx.agents, 'resume').mockImplementation(async () => {
       if (published === undefined) throw new Error('Session was not published')
-      return { agent: stubAgent(agentCtx, published), dispose: () => Promise.resolve() }
+      return { agent: stubAgent(agentCtx, published), dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
     })
     const defaultProvider = ctx.typert.contexts.getHost('agent')
     createApiRemoteAgentResolver(ctx, {})

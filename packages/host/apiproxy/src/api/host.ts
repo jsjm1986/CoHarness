@@ -57,6 +57,8 @@ export interface HostApi {
     fileManager?: 'finder' | 'explorer' | 'directory' | null
     /** Explicit deployment identity; absence is unknown, never proof of independent local access. */
     executionAuthorityRequired?: boolean
+    /** Runtime pinned by the launch credential, independent of the viewer's current project selection. */
+    runtimeTarget?: { kind: 'personal' } | { kind: 'project'; projectId: number }
     /** Present only when a filesystem provider serves read-only Workspace resources. */
     workspaceFiles?: { maxBytes: number; maxLines: number; maxEntries: number; maxResources: number }
   }>>

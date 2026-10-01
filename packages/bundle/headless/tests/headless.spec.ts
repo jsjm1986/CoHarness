@@ -181,13 +181,13 @@ async function bench(script: Script, options: BenchOptions = {}): Promise<{
       })
       script.before?.(session)
       const agent = await mount(ownerCtx, session, createOptions)
-      return { agent, dispose: () => Promise.resolve() }
+      return { agent, dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
     },
     async resume(ownerCtx: Context, resumeOptions: ResumeAgentOptions): Promise<AgentHandle> {
       const session = ctx.sessions.get(resumeOptions.resumeSessionId)
       if (session === undefined) throw new Error(`no attached Session ${resumeOptions.resumeSessionId}`)
       const agent = await mount(ownerCtx, session, resumeOptions)
-      return { agent, dispose: () => Promise.resolve() }
+      return { agent, dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
     },
   })
   if (options.omitSessionQuery !== true && (options.sessionId !== undefined || options.observe !== undefined)) {

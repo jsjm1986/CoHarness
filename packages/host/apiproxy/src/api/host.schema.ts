@@ -21,6 +21,10 @@ export const hostDescribeValueSchema = z.object({
   canOpenPath: z.boolean(),
   fileManager: z.enum(['finder', 'explorer', 'directory']).nullable().optional(),
   executionAuthorityRequired: z.boolean().optional(),
+  runtimeTarget: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('personal') }),
+    z.object({ kind: z.literal('project'), projectId: z.number().int().positive() }),
+  ]).optional(),
   workspaceFiles: z.object({
     maxBytes: z.number().int().positive(),
     maxLines: z.number().int().positive(),

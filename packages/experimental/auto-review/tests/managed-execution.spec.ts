@@ -37,6 +37,8 @@ class Authority extends ExecutionAuthority {
   entered = Promise.withResolvers<undefined>()
   stamp(_session: Session, _message: UserMessage): Promise<UserMessage> { throw new Error('fixture never stamps inputs') }
   answer(_session: Session, _questionId: string, _answer: unknown): Promise<boolean> { throw new Error('fixture has no questions') }
+  runCaptured<T>(_agent: Agent, _scope: ExecutionInheritance, work: () => T): T { return work() }
+  async runRequest<T>(_agent: Agent, _input: unknown, work: () => T): Promise<Awaited<T>> { return await work() }
   capture(_agent: Agent): ExecutionInheritance { throw new Error('fixture never delegates') }
   captureSession(_sessionId: SessionId): Promise<ExecutionInheritance> { throw new Error('fixture never captures another Session') }
   inherit(_session: Session, _scope: ExecutionInheritance): void { throw new Error('fixture never inherits') }

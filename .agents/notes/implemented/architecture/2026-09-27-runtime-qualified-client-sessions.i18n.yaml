@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-09-27-runtime-qualified-client-sessions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-runtime-qualified-client-sessions.md
+/agent-note-runtime-qualified-client-sessions:
+  en: 3cbcd9c9cbf9b553
+  zh: b84b80eb1317144a
+/agent-note-runtime-qualified-client-sessions/problem:
+  en: 9020c46fbef16bd8
+  zh: e7311dc52005af1c
+/agent-note-runtime-qualified-client-sessions/decision:
+  en: 433d22c43b63c0be
+  zh: 609be6137a71fd0c
+/agent-note-runtime-qualified-client-sessions/alternatives-considered:
+  en: e15652d2f14d530b
+  zh: 37542f56c12eabae
+/agent-note-runtime-qualified-client-sessions/consequences:
+  en: 3bbcf79a2cc0278e
+  zh: dd4e92a1eaa59a85
+/agent-note-runtime-qualified-client-sessions/verification:
+  en: 269e407ba9a9efd8
+  zh: 04074a129aac9497

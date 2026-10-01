@@ -16,10 +16,10 @@ interface Props extends PropsRuntime<'conversation.workbench.pane.header'>, Prop
   openFiles?: () => void
 }
 
-/** Map a Session summary to its pane status dot: pending interaction, running, or idle. */
+/** Map unavailable or waiting Sessions to a warning, running Sessions to activity, and idle Sessions to completion. */
 export function stateOf(summary: SessionListState['byId'][SessionId] | undefined): 'ongoing' | 'warning' | 'done' {
-  if (summary?.pendingInteraction !== undefined) return 'warning'
-  if (summary?.running) return 'ongoing'
+  if (summary === undefined || summary.pendingInteraction !== undefined) return 'warning'
+  if (summary.running) return 'ongoing'
   return 'done'
 }
 
@@ -33,11 +33,13 @@ export function WorkbenchPaneHeader({
   const summary = useSessions(s => s.byId[sessionId])
   const workspace = workspaceTitle ?? summary?.workspaceName ?? workspaceTitleOf(summary?.cwd ?? '')
   const showFiles = filesAvailable?.() === true && openFiles !== undefined
+  const status = summary === undefined ? 'notLoaded' : stateOf(summary) === 'warning' ? 'waiting'
+    : stateOf(summary) === 'ongoing' ? 'running' : 'ready'
   return (
     <header className={css.paneHeader} data-workbench-pane-header="" onClick={onFocus}>
-      <span className={css.paneStatus} title={t(stateOf(summary) === 'warning' ? 'waiting' : stateOf(summary) === 'ongoing' ? 'running' : 'ready')}>
+      <span className={css.paneStatus} title={t(status)}>
         <StateDot state={stateOf(summary)} size={8} />
-        <span className={css.srOnly}>{t(stateOf(summary) === 'warning' ? 'waiting' : stateOf(summary) === 'ongoing' ? 'running' : 'ready')}</span>
+        <span className={css.srOnly}>{t(status)}</span>
       </span>
       <div className={css.paneTitle}>
         <strong title={summary?.displayTitle}>{summary?.displayTitle ?? t('untitled')}</strong>

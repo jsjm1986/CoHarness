@@ -101,6 +101,8 @@ Host 分别跟踪待完成的提供方启动与已发布子 agent。共享中止
 
 -----
 
+受管 Workflow 回调保留工作流启动时捕获的执行范围。worker 延迟请求创建子任务时，不能借用父 Agent 上后续人类请求的身份。
+
 <a id="further-exploration"></a>
 ## 进一步探索
 

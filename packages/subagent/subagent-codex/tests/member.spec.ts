@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { appendFileSync, chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import { AgentRegistry, type Agent } from '@deepseek-ai/dsh-agent'
 import LlmRuntime, { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import {
   ExternalBindingStore,
@@ -148,7 +148,7 @@ function memberConfig(dir: string): CodexMemberConfig {
 /** Answer the next member turn end to end on the scripted peer. */
 async function driveTurn(
   child: FakeChild,
-  options: { threadId: string; turnId?: string; answer: string; resume: boolean },
+  options: { threadId: string; turnId?: string; answer: string; resume: boolean; ephemeral?: boolean },
 ): Promise<void> {
   const turnId = options.turnId ?? 'turn-1'
   const initialize = await child.peer.nextMethod('initialize')
@@ -160,8 +160,8 @@ async function driveTurn(
     child.peer.respond(resume, { thread: { id: options.threadId } })
   } else {
     const start = await child.peer.nextMethod('thread/start')
-    expect((start.params as { ephemeral?: boolean }).ephemeral).toBe(false)
-    child.peer.respond(start, { thread: { id: options.threadId } })
+    expect((start.params as { ephemeral?: boolean }).ephemeral).toBe(options.ephemeral ?? false)
+    child.peer.respond(start, { thread: { id: options.threadId, ephemeral: options.ephemeral ?? false } })
   }
   const turnStart = await child.peer.nextMethod('turn/start')
   child.peer.respond(turnStart, { turn: { id: turnId } })
@@ -303,10 +303,12 @@ describe('CodexMemberTransport', () => {
     vi.stubEnv('HOME', home)
     vi.stubEnv('USERPROFILE', home)
     writeRollout(home, 'thread-9', [])
-    const second = await memberTurn(dir, store, messages, {
-      threadId: 'thread-9', answer: 'retried answer', resume: true,
-    })
-    expect(outcomeText(second)).toBe('retried answer')
+    const spawn = vi.fn(() => fakeChild().handle)
+    await expect(collect(externalMemberTurn(
+      { sessionId: child, messages, signal }, store,
+      new CodexMemberTransport(memberConfig(dir), spawn),
+    ))).rejects.toMatchObject({ code: EXTERNAL_TURN_OUTCOME_UNKNOWN })
+    expect(spawn).not.toHaveBeenCalled()
     expect(store.binding(child)?.externalId).toBe('thread-9')
   })
 
@@ -335,10 +337,12 @@ describe('CodexMemberTransport', () => {
     const messages = userMessages(['task one'])
     const store = new ExternalBindingStore(join(dir, 'bindings.jsonl'))
     store.bind(child, 'thread-9')
-    store.markPending(child, { prompt: 'task one', throughMessageId: messages[0]!.id })
+    store.markPending(child, { prompt: 'task one', throughMessageId: messages[0]!.id, externalTurnId: 'turn-9' })
     writeRollout(home, 'thread-9', [
-      { type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'task one' }] } },
-      { type: 'response_item', payload: { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'settled answer' }] } },
+      { type: 'event_msg', payload: { type: 'task_started', turn_id: 'turn-9' } },
+      { type: 'event_msg', payload: { type: 'user_message', message: 'task one' } },
+      { type: 'response_item', payload: { type: 'message', role: 'assistant', phase: 'final_answer', content: [{ type: 'output_text', text: 'settled answer' }] } },
+      { type: 'event_msg', payload: { type: 'task_complete', turn_id: 'turn-9', last_agent_message: 'settled answer' } },
     ])
 
     const transport = new CodexMemberTransport(memberConfig(dir), () => fakeChild().handle)
@@ -372,7 +376,7 @@ describe('CodexMemberTransport', () => {
     expect(store.binding(child)?.pending).toBeUndefined()
   })
 
-  it('resends a prompt the rollout proves absent', async () => {
+  it('does not resend an issued prompt merely absent from a readable rollout', async () => {
     const dir = root()
     const home = root()
     vi.stubEnv('HOME', home)
@@ -384,14 +388,15 @@ describe('CodexMemberTransport', () => {
     store.markPending(child, { prompt: 'lost task', throughMessageId: messages[0]!.id })
     writeRollout(home, 'thread-9', [])
 
-    // 'absent' falls through to the ordinary window path: the turn runs once.
-    const chunks = await memberTurn(dir, store, messages, {
-      threadId: 'thread-9', answer: 'retried answer', resume: true,
-    })
-    expect(outcomeText(chunks)).toBe('retried answer')
+    const spawn = vi.fn(() => fakeChild().handle)
+    await expect(collect(externalMemberTurn(
+      { sessionId: child, messages, signal }, store,
+      new CodexMemberTransport(memberConfig(dir), spawn),
+    ))).rejects.toMatchObject({ code: EXTERNAL_TURN_OUTCOME_UNKNOWN })
+    expect(spawn).not.toHaveBeenCalled()
   })
 
-  it('proves absent when no rollout file exists for the thread', () => {
+  it('keeps the outcome unknown when no rollout file exists for the bound thread', () => {
     const home = root()
     vi.stubEnv('HOME', home)
     vi.stubEnv('USERPROFILE', home)
@@ -399,9 +404,7 @@ describe('CodexMemberTransport', () => {
       prompt: 'p',
       throughMessageId: userMessages(['x'])[0]!.id,
     })
-    // Codex rollouts are per-thread files: absent file proves the prompt never
-    // reached a durable thread we know of.
-    expect(recovery).toEqual({ kind: 'absent' })
+    expect(recovery).toEqual({ kind: 'unknown' })
   })
 })
 
@@ -442,98 +445,62 @@ describe('CodexMemberAdapter', () => {
   })
 })
 
-describe('recoverCodexThread rollout variants', () => {
-  function pending(prompt: string) {
-    return { prompt, throughMessageId: userMessages(['x'])[0]!.id }
-  }
-
-  it('reads user and agent text across codex-rs payload variants', () => {
-    const home = root()
-    vi.stubEnv('HOME', home)
-    vi.stubEnv('USERPROFILE', home)
-    // Every entry AFTER the prompt is evaluated twice: the backward
-    // findLastIndex user scan until the prompt match, then the forward agent
-    // scan to the end — so payload variants belong after the prompt entry.
-    writeRollout(home, 'thread-v', [
-      { payload: { type: 'user_message', message: 'task' } },
-      {},
-      { payload: {} },
-      { payload: { type: 'user_message' } },
-      { payload: { type: 'message', role: 'user' } },
-      { payload: { type: 'message', role: 'user', content: [{ type: 'input_text' }] } },
-      { payload: { type: 'agent_message' } },
-      { payload: { type: 'agent_message', message: 'one' } },
-      { payload: { type: 'message', role: 'assistant' } },
-      { payload: { type: 'message', role: 'assistant', content: [{ type: 'output_text' }] } },
-      { payload: { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'two' }, { type: 'input_text', text: 'ignored' }] } },
-      { payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'later question' }] } },
-    ])
-    const recovery = recoverCodexThread('thread-v', pending('task'))
-    expect(recovery).toEqual({ kind: 'result', text: 'one\ntwo' })
-  })
-
-  it('reports unknown when the matched prompt has no later agent text', () => {
-    const home = root()
-    vi.stubEnv('HOME', home)
-    vi.stubEnv('USERPROFILE', home)
-    writeRollout(home, 'thread-u', [
-      { payload: { type: 'user_message', message: 'task' } },
-      { payload: { type: 'agent_message' } },
-    ])
-    expect(recoverCodexThread('thread-u', pending('task'))).toEqual({ kind: 'unknown' })
-  })
-
-  it('stops parsing at a torn tail line', () => {
-    const home = root()
-    vi.stubEnv('HOME', home)
-    vi.stubEnv('USERPROFILE', home)
-    writeRollout(home, 'thread-t', [
-      { payload: { type: 'user_message', message: 'task' } },
-      { payload: { type: 'agent_message', message: 'answer' } },
-    ])
-    const dir = join(home, '.codex', 'sessions', '2026', '01', '01')
-    appendFileSync(join(dir, 'rollout-2026-01-01T00-00-00-thread-t.jsonl'), '{"payload":')
-    expect(recoverCodexThread('thread-t', pending('task')))
-      .toEqual({ kind: 'result', text: 'answer' })
-  })
-
-  it('reports absent when the sessions tree holds only unrelated rollouts', () => {
-    const home = root()
-    vi.stubEnv('HOME', home)
-    vi.stubEnv('USERPROFILE', home)
-    // Non-matching files exercise the name filter's reject side while the walk
-    // still proves the wanted thread absent.
-    writeRollout(home, 'thread-other', [
-      { payload: { type: 'user_message', message: 'task' } },
-    ])
-    writeFileSync(
-      join(home, '.codex', 'sessions', '2026', '01', '01', 'notes.txt'),
-      'not a rollout',
-    )
-    expect(recoverCodexThread('thread-missing', pending('task'))).toEqual({ kind: 'absent' })
-  })
-
-  it.skipIf(process.platform === 'win32' || (typeof process.getuid === 'function' && process.getuid() === 0))(
-    'reports unknown when the rollout file exists but cannot be read',
-    () => {
-      const home = root()
-      vi.stubEnv('HOME', home)
-      vi.stubEnv('USERPROFILE', home)
-      writeRollout(home, 'thread-u', [
-        { payload: { type: 'user_message', message: 'task' } },
-      ])
-      const file = join(home, '.codex', 'sessions', '2026', '01', '01', 'rollout-2026-01-01T00-00-00-thread-u.jsonl')
-      chmodSync(file, 0o000)
-      try {
-        expect(recoverCodexThread('thread-u', pending('task'))).toEqual({ kind: 'unknown' })
-      } finally {
-        chmodSync(file, 0o644)
-      }
-    },
-  )
-})
-
 describe('CodexMemberSession', () => {
+  it('uses USERPROFILE for a Windows member without an explicit Codex state directory', async () => {
+    const home = root(), dir = root()
+    writeRollout(home, 'windows-thread', [
+      { type: 'event_msg', payload: { type: 'task_started', turn_id: 'turn-1' } },
+      { type: 'event_msg', payload: { type: 'user_message', message: 'task' } },
+      { type: 'response_item', payload: { type: 'message', role: 'assistant', phase: 'final_answer', content: [{ type: 'output_text', text: 'Windows state' }] } },
+      { type: 'event_msg', payload: { type: 'task_complete', turn_id: 'turn-1', last_agent_message: 'Windows state' } },
+    ])
+    const descriptor = Object.getOwnPropertyDescriptor(process, 'platform')!
+    const transport = new CodexMemberTransport({ ...memberConfig(dir), env: { USERPROFILE: home, HOME: dir } }, () => fakeChild().handle)
+    const session = await transport.open('windows-thread', signal)
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    try {
+      await expect(session.recover({ prompt: 'task', throughMessageId: userMessages(['task'])[0]!.id, externalTurnId: 'turn-1' }, signal))
+        .resolves.toEqual({ kind: 'result', text: 'Windows state' })
+    } finally {
+      Object.defineProperty(process, 'platform', descriptor)
+      await session.dispose()
+    }
+  })
+
+  it.each(['HOME', 'CODEX_HOME'])('recovers from the external process %s instead of the host default', async (key) => {
+    const home = root(), dir = root()
+    writeRollout(home, 'bound-thread', [
+      { type: 'event_msg', payload: { type: 'task_started', turn_id: 'turn-1' } },
+      { type: 'event_msg', payload: { type: 'user_message', message: 'task' } },
+      { type: 'response_item', payload: { type: 'message', role: 'assistant', phase: 'final_answer', content: [{ type: 'output_text', text: 'answer' }] } },
+      { type: 'event_msg', payload: { type: 'task_complete', turn_id: 'turn-1', last_agent_message: 'answer' } },
+    ])
+    const env: Record<string, string> = key === 'HOME' ? { HOME: home, USERPROFILE: home } : { CODEX_HOME: join(home, '.codex') }
+    const transport = new CodexMemberTransport({ ...memberConfig(dir), env }, () => fakeChild().handle)
+    const session = await transport.open('bound-thread', signal)
+    await expect(session.recover({ prompt: 'task', throughMessageId: userMessages(['task'])[0]!.id, externalTurnId: 'turn-1' }, signal))
+      .resolves.toEqual({ kind: 'result', text: 'answer' })
+    await session.dispose()
+  })
+
+  it('records the acknowledged turn before waiting for completion and restores it from disk', async () => {
+    const dir = root(), child = fakeChild(), sessionId = SessionId('pending-id')
+    const file = join(dir, 'bindings.jsonl'), store = new ExternalBindingStore(file)
+    const turn = collect(externalMemberTurn({ sessionId, messages: userMessages(['task']), signal }, store,
+      new CodexMemberTransport(memberConfig(dir), () => child.handle)))
+    const initialize = await child.peer.nextMethod('initialize')
+    child.peer.respond(initialize, { userAgent: 'codex-cli 0.153.4' })
+    await child.peer.nextMethod('initialized')
+    const start = await child.peer.nextMethod('thread/start')
+    child.peer.respond(start, { thread: { id: 'persisted-thread' } })
+    const request = await child.peer.nextMethod('turn/start')
+    child.peer.respond(request, { turn: { id: 'acknowledged-turn' } })
+    await vi.waitFor(() => { expect(new ExternalBindingStore(file).binding(sessionId)?.pending?.externalTurnId).toBe('acknowledged-turn') })
+    child.fromChild.end()
+    await expect(turn).rejects.toThrow('closed')
+    expect(new ExternalBindingStore(file).binding(sessionId)?.pending?.externalTurnId).toBe('acknowledged-turn')
+  })
+
   it('proves an unbound session absent without touching a rollout', async () => {
     const dir = root()
     const transport = new CodexMemberTransport(memberConfig(dir), () => fakeChild().handle)
@@ -588,24 +555,38 @@ describe('CodexMemberSession', () => {
 })
 
 describe('codex member plugin', () => {
-  it('prepares continuable children and drives member turns through ctx.subprocess.spawn', async () => {
+  it.each([false, true])('routes member and one-shot processes to their selected world (remote=%s)', async (remote) => {
     const dir = root()
     const ctx = new Context()
     contexts.push(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     await ctx.plugin(LlmRuntime)
+    const target = remote ? new Context() : ctx
+    if (remote) {
+      contexts.push(target)
+      await target.plugin(LocalSubprocessRuntime)
+      vi.spyOn(await import('@deepseek-ai/dsh-subagent'), 'resolveChildExecution').mockResolvedValue({
+        cwd: dir, remote: true, target: 'ssh:17', subprocess: target.subprocess,
+      })
+      vi.spyOn(target.subprocess, 'resolveExecutable').mockResolvedValue('/target/bin/codex')
+    }
+    const hostSpawn = remote ? vi.spyOn(ctx.subprocess, 'spawn') : undefined
     const child = fakeChild()
-    const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(() => child.handle)
-    await ctx.plugin(codex, { stateDir: dir, memberCwd: dir })
+    const spawn = vi.spyOn(target.subprocess, 'spawn').mockImplementation(() => child.handle)
+    await ctx.plugin(codex, { stateDir: dir, ...remote ? { model: 'chosen-codex' } : {}, memberCwd: dir })
 
     const provider = ctx.subagents.getProvider('codex')!
-    await expect(provider.prepareContinuable!({
+    await expect(provider.prepareContinuable!(withExecutionContext(ctx, {
       sessionId: SessionId('continuable-child'),
       parent: { session: { header: { cwd: dir } } } as unknown as Agent,
       signal,
-    })).resolves.toEqual({})
+    }))).resolves.toEqual({})
 
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    const memberSession = ctx.sessions.create(SessionId('ctx-member-child'), { meta: { cwd: dir, ...remote ? { sshTarget: 17 } : {} } })
+    ctx.agents.register({ id: memberSession.id, session: memberSession, ctx, status: 'idle' } as Agent)
     const driving = driveTurn(child, { threadId: 'thread-ctx', answer: 'ctx answer', resume: false })
     const chunks = await collect(ctx.llm.stream({
       provider: CODEX_MEMBER_ROUTE,
@@ -616,5 +597,31 @@ describe('codex member plugin', () => {
     await driving
     expect(outcomeText(chunks)).toBe('ctx answer')
     expect(spawn).toHaveBeenCalledOnce()
+    if (remote) {
+      expect(spawn.mock.calls[0]![0].argv).toEqual(['/target/bin/codex', 'app-server', '--stdio'])
+      const once = fakeChild()
+      spawn.mockImplementationOnce(() => once.handle)
+      const drivingOnce = driveTurn(once, { threadId: 'one-shot', answer: 'one-shot answer', resume: false, ephemeral: true })
+      const run = await ctx.subagents.start('codex', { parent: { id: memberSession.id, session: memberSession, ctx } as Agent,
+        prompt: [{ type: 'text', text: 'one shot' }], signal })
+      expect((await run.result).stopReason).toBe('completed')
+      await drivingOnce
+      await run.dispose()
+      expect(spawn).toHaveBeenCalledTimes(2)
+      expect(hostSpawn).not.toHaveBeenCalled()
+    }
   })
+})
+
+function withExecutionContext<T extends { parent: Agent }>(ctx: Context, request: T): T {
+  return { ...request, parent: { ...request.parent, ctx } }
+}
+
+it('never reads a Host rollout to recover a bound remote Codex thread', async () => {
+  const session = await new CodexMemberTransport({ ...memberConfig(root()), remote: true }, () => {
+    throw new Error('recovery must not spawn')
+  }).open('remote-thread', signal)
+  const [message] = userMessages(['pending'])
+  expect(await session.recover({ prompt: 'pending', throughMessageId: message!.id }, signal)).toEqual({ kind: 'unknown' })
+  await session.dispose()
 })

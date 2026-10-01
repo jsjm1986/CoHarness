@@ -27,16 +27,18 @@ kind: "package-reference"
 
 `executionAuthorityOf(ctx)` 返回可用提供者。当所属应用声明 `executionAuthorityRequired` 时，提供者缺失会抛出 `execution/forbidden`；消费者不能将受管提供者缺失解释为本机权限。
 
+`sameExecutionAuthority(current, captured)` 在异步授权后比较底层 Cordis 提供方。调用仍使用带追踪的提供方；新建追踪代理不代表提供方发生变化。移除和替换仍会使已取得的授权失效。
+
 <a id="runtime-contract"></a>
 ## 运行时约定
 
 输入传输通过 `stamp` 登记精确的人工消息，通过 `answer` 认领待回答问题的答案。用于展示的参与者字段和浏览器自报角色不能证明执行身份。提供者在替换输入时保留先前的编辑者。
 
-委派在异步创建前捕获真正发起操作的 Agent。`captureSession` 为显式分叉读取实时或冷态来源的完整授权资料，不受所选转录前缀限制。`inherit` 将限制记录在子会话自己的日志中；`relay` 在相邻投递及其重试中保留发送方的限制。Session 访问检查和问题身份验证仍由传输负责。
+委派在异步创建前捕获真实发起 Agent。`runCaptured` 将延迟回调绑定到该范围，`runRequest` 在传输查找完成后证明当前人类命令的来源，并保留已有捕获操作或子任务继承。只有新的根命令创建独立范围。`captureSession` 读取来源会话的当前执行，不受所选历史前缀影响。`inherit` 记录子任务来源，`relay` 将相邻 Agent 或同会话后台任务的结果带入接收操作。问题回答指定问题打开时捕获的范围。传输仍负责会话访问检查和问题身份验证。
 
-`authorize` 为请求的能力检查执行 Agent 及其当前权限。`authorizeSelection` 在提交前检查显式特权预设选择。已捕获的范围、持久化事件或普通工具审批都不能替代这两类检查。取消仍由操作拥有，并传入异步授权和投递。
+`authorize` 核验确切执行范围与当前权限。工具派发前的守卫传入注册表颁发的执行令牌，使嵌套 PTC 调用在其他包装器运行前也保留父调用身份。`authorizeSelection` 核验当前选择者，但不更改执行身份。执行范围、持久事件或普通审批都不是权限授权。操作取消在核验与投递期间始终有效。
 
-读取时必需的 `gateway/execution` 事件保留已接受的参与者事实和委派限制。不理解该事件的读取器必须拒绝日志，不能省略其中的限制。生成元数据可以携带已验证输入引用和一个主要计费参与者；其计费用途由 [Auto 审查归因](../../../.agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.zh.md) 负责。
+读取时必需的 `gateway/execution` 事件保留已接受的参与者事实和委派限制。保存或传出新式执行范围前，其 Session 记录 `gateway/scoped-execution`；不支持范围授权的读取者必须拒绝该日志。缺少此准入标记的执行范围状态无效。`gateway/continuation` 独立记录自动执行的来源。不含范围引用的旧记录仍可读取；这些事件词表扩展不改变 Session 结构格式。生成元数据可以携带已验证输入引用和一个主要计费参与者；其计费用途由 [Auto 审查归因](../../../.agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.zh.md) 负责。
 
 <a id="invariants"></a>
 ## 不变量

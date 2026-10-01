@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-09-28-gateway-fixture-state-isolation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-28-gateway-fixture-state-isolation.md
+/agent-note-gateway-fixture-state-isolation:
+  en: 3f1939804f3a8039
+  zh: 6a074e22b4b7b9b1
+/agent-note-gateway-fixture-state-isolation/problem:
+  en: 26c84625d04f11b1
+  zh: 70f045250f92e4a0
+/agent-note-gateway-fixture-state-isolation/decision:
+  en: 8d390dacf55cfbf6
+  zh: 1f60ec76f21c0c0e
+/agent-note-gateway-fixture-state-isolation/alternatives-considered:
+  en: 1a8b8f7b0104a325
+  zh: 9b8bdd6444c2014f
+/agent-note-gateway-fixture-state-isolation/consequences:
+  en: d224c2dbef571d43
+  zh: 12912f67c15a2a23

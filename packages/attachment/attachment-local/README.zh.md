@@ -48,6 +48,7 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与待完成工作
 
+- 设置 `DSH_MANAGED_DATA_MANIFEST` 的受管启动会在写入数据前登记实际解析后的 `attachments/v1` 目录。清单无效时拒绝初始化；保留旧根和部署批准遵循[清单与备份规则](../../util/managed-data/README.zh.md)。
 - 规范化附件对象会无限期保留；派生请求图片文件受 `requestImageCacheMaxBytes`、`requestImageCacheMaxEntries` 和 `requestImageCacheTtlMs` 限制，并由尽力而为的定时器回收。
 - 本地后端假定宿主与提供方适配器共享同一个文件系统服务。
 - 动态 GIF 源图只保留首帧；动画在版本一图片契约之外。

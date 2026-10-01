@@ -1,6 +1,6 @@
 import { setImmediate } from 'node:timers/promises'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import { createScope } from '@deepseek-ai/dsh-scope'
@@ -39,7 +39,17 @@ async function fixture(authorizeSelection?: (agent: Agent, preset: string) => Pr
   return { ctx, session, agent, select, permissionFiber }
 }
 
+class TracedAuthority extends Service {
+  constructor(ctx: Context) { super(ctx, 'executionAuthority') }
+}
+
 describe('permission command authorization', () => {
+  it('applies an authorized selection while its traced authority provider remains current', async () => {
+    const f = await fixture(async () => {})
+    await f.ctx.plugin(TracedAuthority)
+    expect(await f.select()).toMatchObject({ result: { kind: 'success', text: 'preset auto' } })
+    expect(f.ctx.permissionPresets.current(f.session)).toBe(AUTO_PRESET)
+  })
   it('awaits live authorization before recording an explicit selection', async () => {
     const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
     let requested: { agent: Agent; preset: string } | undefined
@@ -119,6 +129,15 @@ class MemorySettings extends SettingsProvider {
 }
 
 describe('permission default authorization', () => {
+  it('persists an authorized default while its traced authority provider remains current', async () => {
+    const f = await fixture()
+    await f.ctx.plugin(TracedAuthority)
+    f.ctx.provide('permissionPresetAuthorization', { canSelect: () => true, authorizeDefault: async () => {} })
+    await f.ctx.plugin(MemorySettings)
+    const settings = f.ctx.settings as MemorySettings
+    await settings.mutate('permission', [{ op: 'set', path: ['defaultPreset'], value: 'danger-full-access' }])
+    expect(settings.doc).toEqual({ permission: { defaultPreset: 'danger-full-access' } })
+  })
   it('refuses a default grant from a policy that was removed before persistence', async () => {
     const f = await fixture()
     const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()

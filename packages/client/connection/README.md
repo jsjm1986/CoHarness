@@ -13,6 +13,12 @@ Wire consumer layer: the client plugin's apply mounts `ctx.connection` (shared a
 
 The client handle also exposes an observable connection state and an immediate `reconnect()` action. The WebSocket downlink heartbeat permits two missed Pongs before scheduling termination, which tolerates one busy event-loop interval while still recovering a stalled host.
 
+Browser Session addresses carry runtime identity without changing Host IDs. The application registers one address resolver; `api` routes declared Session fields while `wireApi` is reserved for the runtime owner holding original IDs. Remote routing also accepts generated Agent lookup fields and application-declared JSON paths; unrelated payload strings are never rewritten. A managed Host must declare its runtime target before buffered frames become visible. An explicit personal target remains separate when the bootstrap carrier belongs to a project.
+
+One document pins its verified Gateway account. Its fetch wrapper covers only same-origin `/api` and `/account/api/` requests, carrying `x-dsh-expected-principal-id`; sockets wait for the initial HTTP identity outcome and carry `dshPrincipal`. Gateway compares these with its authenticated user and returns `x-dsh-principal-id`. An explicit mismatch, revoked authentication or bootstrap access denial aborts old requests, withdraws Runtime-owned Session and slot state, and then reloads the document. Missing identity during a transient connection failure does not become a different account. Legacy clients without the expected-ID field retain server authorization behavior.
+
+The decoded Host description fixes the document’s bootstrap runtime before scope-sensitive requests and sockets open. Requests without an explicit runtime use that fixed target, so another tab’s scope cookie cannot redirect them. Application-generated private preview and download URLs use `privateResourceUrl` to carry the same account and runtime checks through native navigation; public links remain unchanged.
+
 ## Summary
 
 The package carries browser-to-Host Remote calls, exact Fetch responses, and connection generations. The Client plugin mounts `ctx.connection` with current-page loopback state, generic RPC, the active generation and its Host facts, observable recovery state, an immediate reconnect command, and the registration point for one generation source. A generation becomes visible when its source reports ready; source completion, failure, withdrawal, or an explicit stop clears it before `ConnectionController` applies its retry policy.

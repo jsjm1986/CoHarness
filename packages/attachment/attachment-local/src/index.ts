@@ -1,5 +1,6 @@
 /** Local durable attachment backend rooted below `DSH_HOME`. @module @deepseek-ai/dsh-attachment-local */
 
+import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -174,6 +175,7 @@ export class LocalAttachmentStore extends AttachmentStore {
     super(ctx)
     const dshHome = resolveDshHome(config.dshHome)
     this.root = join(dshHome, 'attachments', 'v1')
+    registerManagedDataPath({ owner: '@deepseek-ai/dsh-attachment-local', kind: 'directory', path: this.root }, process.env.DSH_MANAGED_DATA_MANIFEST)
     this.cacheRoot = dshCachePath({ dshHome }, 'attachments')
     this.imageLimits = Object.freeze({
       maxImageBytes: config.maxImageBytes ?? DEFAULT_MAX_IMAGE_BYTES,

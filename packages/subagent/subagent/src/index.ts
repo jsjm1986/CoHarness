@@ -250,6 +250,8 @@ export class SubagentRuntime extends TypertRemoteService {
   private settingsSource: () => Config
 
   private providers = new Map<string, SubagentProvider>()
+  private readonly pendingParents = new WeakMap<Agent, number>()
+  private readonly leasedRuns = new WeakMap<Agent, Set<SubagentRun>>()
   private continuations: SubagentContinuationManager | undefined
   /**
    * The contained lifecycle-edge publisher. Built here because scoped dispatch
@@ -260,6 +262,8 @@ export class SubagentRuntime extends TypertRemoteService {
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'subagents')
+    ctx.on('agent/idle-release-check', ({ agent }) => (this.pendingParents.get(agent) ?? 0) > 0
+      || (this.leasedRuns.get(agent)?.size ?? 0) > 0 ? 'busy' : undefined, { global: true })
     assertSubagentMaxDepth(config.maxDepth)
     positiveLimit(
       config.maxContinuableActivations,
@@ -326,7 +330,7 @@ export class SubagentRuntime extends TypertRemoteService {
    * @throws when continuation services are unavailable or materialization fails.
    */
   async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart> {
-    return this.requireContinuations().startContinuable(spec)
+    return this.withPendingParent(spec.request.parent, () => this.requireContinuations().startContinuable(spec))
   }
 
   /**
@@ -349,7 +353,7 @@ export class SubagentRuntime extends TypertRemoteService {
     content: ContentBlock[],
     options: SubagentSendMessageOptions,
   ): Promise<MessageId> {
-    return this.requireContinuations().sendMessage(sender, targetId, content, options)
+    return this.withPendingParent(sender, () => this.requireContinuations().sendMessage(sender, targetId, content, options))
   }
 
   /**
@@ -731,35 +735,55 @@ export class SubagentRuntime extends TypertRemoteService {
    * @returns the published holder-owned run.
    */
   async start(name: string, request: SubagentStartRequest): Promise<SubagentRun> {
-    const provider = this.expectProvider(name)
-    this.assertCapabilities(provider, request)
-    assertSubagentMaxDepth(request.maxDepth)
-    if (request.outputSchema !== undefined) assertObjectJsonSchema(request.outputSchema)
-    const descriptor = snapshotSubagentDescriptor({
-      mode: 'one-shot',
-      provider: name,
-      ...request.label !== undefined ? { label: request.label } : {},
-    })
-    const resolved: ResolvedSubagentStartRequest = { ...request, descriptor }
-    const run = await provider.start(resolved)
-    const child = run.localAgent?.session
-    if (child !== undefined) {
-      try {
-        establishCatalogChild(request.parent.session, child.header, descriptor)
-      } catch (error: unknown) {
-        // No caller receives this run; the catalog error owns the failed start.
-        void run.result.catch(() => undefined)
+    return this.withPendingParent(request.parent, async () => {
+      const provider = this.expectProvider(name)
+      this.assertCapabilities(provider, request)
+      assertSubagentMaxDepth(request.maxDepth)
+      if (request.outputSchema !== undefined) assertObjectJsonSchema(request.outputSchema)
+      const descriptor = snapshotSubagentDescriptor({
+        mode: 'one-shot',
+        provider: name,
+        ...request.label !== undefined ? { label: request.label } : {},
+      })
+      const resolved: ResolvedSubagentStartRequest = { ...request, descriptor }
+      const run = await provider.start(resolved)
+      const owned = this.leasedRuns.get(request.parent) ?? new Set<SubagentRun>()
+      this.leasedRuns.set(request.parent, owned)
+      owned.add(run)
+      const child = run.localAgent?.session
+      if (child !== undefined) {
         try {
-          await run.dispose()
-        } catch (cleanupError: unknown) {
-          this.ctx.logger.warn(
-            `subagent: disposal after catalog append failure also failed: ${String(cleanupError)}`,
-          )
+          establishCatalogChild(request.parent.session, child.header, descriptor)
+        } catch (error: unknown) {
+          // No caller receives this run; the catalog error owns the failed start.
+          void run.result.catch(() => undefined)
+          try {
+            await run.dispose()
+            owned.delete(run)
+          } catch (cleanupError: unknown) {
+            this.ctx.logger.warn(
+              `subagent: disposal after catalog append failure also failed: ${String(cleanupError)}`,
+            )
+          }
+          throw error
         }
-        throw error
       }
+      const observed = observeRun(this.emitLifecycle, name, request.parent, run)
+      const dispose = observed.dispose.bind(observed)
+      let disposal: Promise<void> | undefined
+      return { ...observed, dispose: () => disposal ??= dispose().then(() => { owned.delete(run) }) }
+    })
+  }
+
+  private async withPendingParent<T>(parent: Agent, operation: () => Promise<T>): Promise<T> {
+    if (this.ctx.get('agents')?.isRemoving(parent.id) === true) throw new SubagentError('Parent Session is being removed', 'DRAINING')
+    const pending = this.pendingParents
+    pending.set(parent, (pending.get(parent) ?? 0) + 1)
+    try { return await operation() } finally {
+      const count = pending.get(parent) as number
+      if (count === 1) pending.delete(parent)
+      else pending.set(parent, count - 1)
     }
-    return observeRun(this.emitLifecycle, name, request.parent, run)
   }
 
   /**

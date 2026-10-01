@@ -12,7 +12,14 @@ python -m pip install deepseek-harness-sdk
 
 Python SDK 没有独立的应用入口。它以 `--profile sdk` 启动内置的 `dsh` CLI（命令行界面）；所选 profile 负责 JSON-RPC 服务器、agent（智能体）组合、凭据、持久化、工具和关闭流程。
 
-每次启动都必须显式指定 Harness home。请传入 `dsh_home`，或在子进程环境中提供非空的 `DSH_HOME`。SDK 刻意不会发现 `~/.dsh`。
+```py
+with DeepSeekHarness(dsh_home="./.harness") as harness:
+    result = harness.run("Say hi.")
+```
+
+`DeepSeekHarness` 会保留其按需启动的运行时子进程，以便在多次调用之间复用。请像上例一样将其用作上下文管理器，或在使用完毕后显式调用 `close()`。
+
+SDK 使用内置的 `dsh` 可执行文件和 `sdk` 运行 profile。必须显式设置 `dsh_home` 或非空 `DSH_HOME`；SDK 不会隐式选择个人目录。通过 `profile` 和有序 `patches` 配置发行应用。所选 profile 必须提供 stdio JSON-RPC 及其必需服务。独立目录会移除继承的 `DSH_MANAGED_DATA_MANIFEST`，同目录启动则保留。需要把子进程数据登记到备份范围时，通过 `HarnessConfig.env` 显式指定其自己的清单；该字段叠加到继承的环境。
 
 ```py
 from deepseek_harness import DeepSeekHarness

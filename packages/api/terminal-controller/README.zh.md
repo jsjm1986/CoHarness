@@ -7,6 +7,8 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
+待处理授权、分配及保留中的终端会阻止空闲会话清理。终端创建在授权后复核删除预留，因此已提交表单不能向正在删除的会话分配 shell。
+
 ## 概述
 
 从 Web 侧栏在会话工作区打开执行环境的默认 shell。重新连接已有进程，并关闭 provider 管理的完整进程范围。终端输出不进入 Agent 对话记录。保留终端会占用进程和有界屏幕缓存。
@@ -24,6 +26,8 @@ kind: "package-reference"
 
 <a id="use-this-package"></a>
 ## 使用此包
+
+绑定 SSH 的 Session 通过其 standing 执行 realm 发现 shell 并分配 PTY。缺少远端 subprocess 提供方时操作失败，不会回退到 Host 的本机进程环境。
 
 Client 插件拥有生成的 `remote.terminal` 命名空间，并在卸载时释放。共享 Remote 组装不挂载第二份副本。
 

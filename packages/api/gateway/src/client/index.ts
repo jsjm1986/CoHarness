@@ -469,11 +469,14 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     const connection = this.ownerCtx.get('connection') as ConnectionHandle | undefined
     if (connection === undefined) throw new Error(`client api: ${endpoint} has no active Connection`)
     const scope = projection ?? descriptor.scope
-    const sessionId = scope?.context === 'agent' ? args[scope.wire]
-      : descriptor.namespace === 'terminal' ? args.sessionId : undefined
+    const sessionId = connection.sessionForRemote?.(endpoint, args)
+      ?? (scope?.context === 'agent' ? args[scope.wire]
+        : descriptor.namespace === 'terminal' ? args.sessionId : undefined)
+      ?? this.ownerCtx.typert.contexts.getClient('agent')?.identity(callerCtx)
     const targetConnection = typeof sessionId === 'string'
       ? connection.forSession?.(sessionId as SessionId) ?? connection
       : connection
+    const wireArgs = connection.mapRemoteArguments?.(endpoint, args, scope?.context === 'agent' ? scope.wire : undefined) ?? args
     const callerSignal = hasCallerSignal ? values[expected] as AbortSignal | undefined : undefined
     const signal = callerSignal === undefined
       ? token.abort.signal
@@ -482,7 +485,7 @@ class ClientRemoteService extends Service implements TypertClientRemote {
       return (async function* () {
         if (targetConnection.rpc.stream === undefined) throw new Error('This Connection does not support Remote streams')
         try {
-          for await (const result of targetConnection.rpc.stream('/api', endpoint, { args }, signal)) {
+          for await (const result of targetConnection.rpc.stream('/api', endpoint, { args: wireArgs }, signal)) {
             signal.throwIfAborted()
             if (!result.ok) throw rebuiltFailure(result.error)
             yield result.value
@@ -495,7 +498,7 @@ class ClientRemoteService extends Service implements TypertClientRemote {
       })()
     }
     try {
-      const result = await targetConnection.rpc.call('/api', endpoint, { args }, signal)
+      const result = await targetConnection.rpc.call('/api', endpoint, { args: wireArgs }, signal)
       if (!mountActive(token)) return withdrawn(endpoint)
       if (!result.ok) return { ok: false, error: rebuiltFailure(result.error) }
       return { ok: true, value: result.value }

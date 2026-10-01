@@ -22,6 +22,10 @@ kind: "package-reference"
 
 -----
 
+控制器将窗格带 runtime 限定的 Session 键解码为原始 Host ID 和显式 runtime 目标。`HEAD` 预检与浏览器保存使用同一个固定账号的 URL，其他标签页切换账号或作用域不能重定向待执行的下载。
+
+Host 下载端点会在 `readRaw` 前 flush 活动的根 Session，因此斜杠命令触发的 ZIP 会包含启动下载的 `command/run` 与 `command/done` 事件对。冷持久化 Session 不需要 flush。
+
 <a id="use-this-package"></a>
 ## 使用本包
 

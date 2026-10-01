@@ -55,16 +55,23 @@ kind: "package-bundle"
 | `permissionMode` | `never` | 为该提供方实例的每个线程固定原生非交互审批与沙箱模式。 |
 | `disposeGraceMs` | `3000` | 共享进程树责任方各终止层级之间的宽限期，单位为毫秒且须为正有限值，并不得大于仓库共享的 [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.zh.md)；随后资源释放会等待整棵进程树退出。 |
 | `stateDir` | `~/.dsh/external-members` | 实例独立绑定存储的目录；`codex.jsonl` 属于默认实例。仅由持续成员使用。 |
-| `memberCwd` | harness 启动目录 | 成员 Codex 线程的工作区。仅由持续成员使用。 |
+| `memberCwd` | 成员 Session cwd | 持续成员的工作区覆盖值，在其执行目标上验证。 |
+| `remoteCommand` | `codex` | 在 SSH 目标内解析的预装程序；本机继续使用随包固定的程序。 |
 
 <a id="persistent-members"></a>
 ## 持续成员
+
+SSH 使用目标机器上的 `remoteCommand`，不会发送 Host 的 Node 或包路径。远端待决轮次无法通过 Host 的 rollout 证明结果，因此保持未知且不自动重发；正常后续提示仍使用远端持久线程。
+
+每次调用通过实际成员 Session 解析工作区及子进程提供方，SSH 会话必须使用同一 standing realm 的文件系统和子进程，缺失时拒绝而不回退到 Host。绑定存储在首次启动前固定规范路径及执行目标，重启后拒绝目标变化。损坏或不可读的记录不能被视为新成员；缺少目标证明的旧绑定保留原记录，须新建成员后才能执行。
+
+本地 rollout 缺失或不可读时，已发出提示词的结果保持未知。这不能证明提示词未送达，也不能据此自动重发。
 
 默认 `codex` 实例保留既有模型路由及 `codex.jsonl` 存储。其他名称根据完整提供方名称生成独立、确定的路由和文件，在大小写不敏感的文件系统上仍保持隔离；卸载一个实例只释放其路由。重命名实例会改变其持久身份，不会收养其他实例的绑定。
 
 挂载 `llm` 服务时本提供方同时声明 `prepareContinuable`，`ctx.subagents.startContinuable` 即可接受它——包括 Team roster 的提供方选择通道。成员子级是由 continuation 管理器拥有的普通进程内 Agent（耐用身份、inbox、持久化、重启）；本包只提供模型路由：每次成员模型调用 spawn `codex app-server --stdio`，挂载成员的耐用线程（已绑定时 `thread/resume`，首轮 `thread/start` 带 `ephemeral: false`），发出一次轮次，然后处置进程。
 
-绑定存储记录 harness 子会话 ↔ Codex 线程映射与最后发出的提示词；轮次中途崩溃后，下一次调用可经 `~/.codex/sessions/` 下的耐用 rollout 证明该提示词：已完结的答案直接重放不重发，可证未送达的提示词重发一次，不可证的提示词被丢弃而非重复投递。没有 `llm` 服务时提供方保持仅一次性能力——没有 `prepareContinuable`，可继续启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
+绑定存储记录子会话 ↔ 线程映射、待决提示词、已确认的轮次 ID 和已消费游标。恢复必须在同一 rollout 中找到该 ID 对应的原始提示词及成功终止事件，且最终文本与终止答案一致。进度文本、重复提示词、其他轮次、缺失确认、失败轮次以及损坏或缺失的 rollout 都保持未知，不自动重发。正常成员仍可续接耐用线程；未挂载 `llm` 时，持续成员启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
 
 | `permissionMode` 值 | `thread/start` 字段 | 原生行为 |
 |---|---|---|

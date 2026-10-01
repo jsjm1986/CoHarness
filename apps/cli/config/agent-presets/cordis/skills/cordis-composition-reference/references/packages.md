@@ -58,6 +58,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-locale` | no | Locale plugin: Host-backed language preference, external language packs, fallback chains, snapshots, and typed namespace dictionaries |
 | `@deepseek-ai/dsh-client-modules` | no | Client module system, dual-face: node half composes the __DSH_BOOT__ entry graph (incremental dsh.client scan, bundle route, index tap, webPlugins service); browser half is the lazy-CJS module table the vendored cordis Loader consumes as its internal seam |
 | `@deepseek-ai/dsh-client-runtime` | no | Client core services: SlotRegistry, SessionRuntime (scope tree + object layer) |
+| `@deepseek-ai/dsh-client-shortcuts` | yes | Application keyboard command registry and physical-key routing |
 | `@deepseek-ai/dsh-client-ui-agent-preset` | no | Agent-preset surfaces: the default for later sessions, this session's seat, and the composition editor |
 | `@deepseek-ai/dsh-client-ui-attachment` | no | Dynamic attachment presentation plugin for conversation input and message-image slots |
 | `@deepseek-ai/dsh-client-ui-brand-official` | no | Official DeepSeek Harness brand occupants for the Web client's sidebar and conversation Hero slots |
@@ -86,6 +87,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-ui-settings-plugin-inventory` | no | Read-only Cordis Loader inventory tab in Web Plugins settings |
 | `@deepseek-ai/dsh-client-ui-settings-plugins` | no | Plugins settings section with feature-owned tabs and configurable host-plane plugin cards |
 | `@deepseek-ai/dsh-client-ui-settings-unarchive-sessions` | no | Archived-session settings page: the registry-global archive set with one Unarchive action per row |
+| `@deepseek-ai/dsh-client-ui-shortcuts` | no | Keyboard shortcut reference, recording, and local preference editing |
 | `@deepseek-ai/dsh-client-ui-sidebar` | no | Sidebar plugin: session multi-level tree, search, grouping, state dots |
 | `@deepseek-ai/dsh-client-ui-sidebar-browser` | no | Sandboxed Web browser tabs for the right Sidebar |
 | `@deepseek-ai/dsh-client-ui-sidebar-right` | no | Right Sidebar: the docking surface's session-bound state, its panel and header expand control, and the navigation service over it |
@@ -97,7 +99,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-ui-trajectory` | no | Trajectory event ledger with an interactive timing overview: pure-consumer plugin registering into the conversation ViewMap (no service) |
 | `@deepseek-ai/dsh-client-ui-usage-alert` | no | Gateway usage-quota alerts in the global Harness shell overlay |
 | `@deepseek-ai/dsh-client-ui-user-questions` | no | Web ask_user_question feature: host tool mount plus composer-takeover question UI |
-| `@deepseek-ai/dsh-client-ui-workbench` | no | Cordis multi-session Workspace workbench UI |
+| `@deepseek-ai/dsh-client-ui-workbench` | yes | Cordis multi-session Workspace workbench UI |
 | `@deepseek-ai/dsh-client-ui-workflow-run` | no | Durable workflow-run Conversation Node and nested member disclosure for dsh web |
 | `@deepseek-ai/dsh-client-ui-workspace` | no | Workspace picker plugin: one WorkspacePicker registered into the sidebar and empty-state workspace slots |
 
@@ -121,7 +123,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@deepseek-ai/dsh-agent-instructions` | yes | Workspace context loader for AGENTS.md/CLAUDE.md instruction files |
-| `@deepseek-ai/dsh-archive-gateway` | no | Synchronizes runtime conversation archive state with the Gateway |
+| `@deepseek-ai/dsh-archive-gateway` | yes | Synchronizes runtime conversation archive state with the Gateway |
 | `@deepseek-ai/dsh-collaboration-context` | no | Durable participant attribution for shared project conversations |
 | `@deepseek-ai/dsh-collaboration-gateway` | no | Gateway-backed project collaboration provider for DeepSeek Harness |
 | `@deepseek-ai/dsh-file-reference-local` | yes | Local-filesystem ctx.fileReferences provider with bounded fuzzy indexes |

@@ -116,3 +116,8 @@ export {
 
 // ---- Method registry and derived generics ----
 export type { RequestPayload, ResponseValue, RpcMethodMap } from './rpc-map.ts'
+
+export { clientSessionKey, parseClientSessionKey } from './client-session.ts'
+export type { ClientSessionAddress, ClientSessionKey, ClientRuntimeTarget } from './client-session.ts'
+export { REMOTE_SESSION_POLICIES, remoteSessionId, mapRemoteSessionIds } from './remote-session-routing.ts'
+export type { RemoteSessionPolicy } from './remote-session-routing.ts'

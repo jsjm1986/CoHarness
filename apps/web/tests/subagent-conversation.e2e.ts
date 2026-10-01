@@ -265,7 +265,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
 
   it('keeps known descendants reachable across a stale empty catalog response', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-subagent-stale-catalog'))
-    const pattern = '**/api/subagents/list'
+    const pattern = /\/api\/subagents\/list(?:\?.*)?$/
     let firstClaimed = false
     let emptyDelivered = false
     let trailingRequested = false

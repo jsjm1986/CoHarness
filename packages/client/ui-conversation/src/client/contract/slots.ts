@@ -783,8 +783,8 @@ export interface ConversationWorkbenchToolbarOwnerProps {
 
 /** Owner share for the empty workbench state. */
 export interface ConversationWorkbenchEmptyOwnerProps {
-  /** Marker owner share for the empty workbench surface. */
-  children?: never
+  /** Current saved-layout verification state. */
+  viewport: ConversationViewportSnapshot
 }
 
 /** Owner share for the sidebar workbench display-settings hole. */

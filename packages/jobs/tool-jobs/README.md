@@ -58,6 +58,8 @@ Loading the plugin with no config is the common path; a `waitTimeoutMs` above `m
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-jobs) is the exhaustive source for every accepted field and its JSDoc.
 
+Managed completion notices retain the job’s original execution scope. Reading a running or stopping job preserves its active origin; terminal output is historical data and does not add earlier participants to an independent new request. Reading data never resumes the producer or transfers its permission to the reader.
+
 ### What can go wrong
 
 An agent whose composition loads no `tool-jobs` cannot start background work: this plugin's controller is what arms producers' `ctx.jobs.start()`. A model-supplied wait longer than `maxWaitTimeoutMs` is clamped down to the cap, and a timed-out wait returns `[status: running]` and leaves the job alive rather than failing. A completion notice pending on an idle owner does not survive that owner's disposal.

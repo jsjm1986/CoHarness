@@ -674,7 +674,8 @@ function eligibilityDenied(exec: ToolExecution): PreToolDecision {
 
 /** The same verified inputs and primary actor must still own an allowed review. */
 function unchangedExecution(before: ExecutionState, after: ExecutionState): boolean {
-  return before.revision === after.revision
+  return before.scopeId === after.scopeId
+    && before.revision === after.revision
     && before.primaryActorUserId === after.primaryActorUserId
     && before.unverifiedHistory === after.unverifiedHistory
     && before.inputs.length === after.inputs.length
@@ -737,7 +738,7 @@ export function apply(ctx: Context): void {
           const authority = executionAuthorityOf(ctx)
           if (managed && authority === undefined) return eligibilityDenied(exec)
           managed ||= authority !== undefined
-          const current = await authority?.authorize('auto-review', agent, signal)
+          const current = await authority?.authorize('auto-review', agent, signal, exec)
           if (current !== undefined) {
             if (current.unverifiedHistory || current.primaryActorUserId === undefined) return eligibilityDenied(exec)
             execution = { ...current, primaryActorUserId: current.primaryActorUserId }
@@ -767,7 +768,7 @@ export function apply(ctx: Context): void {
             if (execution === undefined) return eligibilityDenied(exec)
             const authority = executionAuthorityOf(ctx)
             if (authority === undefined) return eligibilityDenied(exec)
-            const current = await authority.authorize('auto-review', agent, signal)
+            const current = await authority.authorize('auto-review', agent, signal, exec)
             if (!unchangedExecution(execution, current)) return eligibilityDenied(exec)
           } catch {
             // Revoke or provider failure during review prevents the pending tool body.

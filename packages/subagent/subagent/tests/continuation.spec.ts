@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { SettingsProvider, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { agentCarrier } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -507,6 +508,35 @@ describe('continuable activation capacity', () => {
 })
 
 describe('SubagentRuntime.startContinuable', () => {
+  it('keeps idle removal blocked through pending materialization and a resident child', async () => {
+    const release = Promise.withResolvers<undefined>()
+    const { ctx, parent } = await setupWith(new GatedAdapter([{ chunks: textResponse('complete'), gate: release.promise }]))
+    parkParent(ctx, parent)
+    const manager = continuationManager(ctx), registry = continuationActivations(ctx)
+    const agents = registry.ownerCtx.agents, create = agents.create.bind(agents)
+    const entered = Promise.withResolvers<undefined>(), publish = Promise.withResolvers<undefined>()
+    const spy = vi.spyOn(agents, 'create').mockImplementationOnce(async (options) => {
+      entered.resolve(undefined)
+      await publish.promise
+      return create(options)
+    })
+    try {
+      const starting = manager.startContinuable(startSpec(parent))
+      await entered.promise
+      expect(ctx.bail(agentCarrier(parent), 'agent/idle-release-check', { agent: parent })).toBe('busy')
+      const unrelated = await ctx.agentLoop.create(SessionId('unrelated-purge'), { provider: 'mock', model: 'mock' })
+      expect(ctx.bail(agentCarrier(unrelated), 'agent/idle-release-check', { agent: unrelated })).toBeUndefined()
+      publish.resolve(undefined)
+      const child = await starting
+      expect(ctx.bail(agentCarrier(parent), 'agent/idle-release-check', { agent: parent })).toBe('busy')
+      release.resolve(undefined)
+      await waitNoActivation(ctx, child.childId)
+      expect(ctx.bail(agentCarrier(parent), 'agent/idle-release-check', { agent: parent })).toBeUndefined()
+      using _removal = ctx.agents.reserveRemoval([parent.id])
+      await expect(manager.startContinuable(startSpec(parent))).rejects.toMatchObject({ code: 'DRAINING' })
+    } finally { publish.resolve(undefined); release.resolve(undefined); spy.mockRestore() }
+  })
+
   it('returns both identities at inbox acceptance, without waiting for the turn or the log', async () => {
     const { ctx, parent, adapter } = await setup([textResponse('first answer')])
     const enqueued: { id: MessageId; loggedYet: boolean }[] = []

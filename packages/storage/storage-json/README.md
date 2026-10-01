@@ -64,6 +64,7 @@ None — the backend never touches live request prefixes.
 
 ## Known Limitations and Deferred Work
 
+- Managed launches with `DSH_MANAGED_DATA_MANIFEST` register the configured JSON storage root before data writes. An invalid inventory refuses initialization; [inventory and backup rules](../../util/managed-data/README.md) govern retained roots and deployment approval.
 - Windows durability relies on libuv's `rename()` (`MoveFileExW` with replacement) without an explicit write-through flag; the session-log backend's stricter Win32 write-through publish helper is planned to move down here when the append-log facet lands (see the Agent Note's migration section).
 - No cross-process write locking: two processes writing the same root can interleave whole-file replacements (last write wins). Single-host-process deployments are the current consumer; the multi-process story is deferred per the Agent Note's out-of-scope table.
 

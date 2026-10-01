@@ -11,6 +11,8 @@ THE concrete agent plugin and loop driver. Its package-internal implementation s
 
 This is the only package in the harness that contains concrete loop logic. Everything else is an abstract service or a plugin against extension points — new behavior goes into plugins, not here.
 
+Idle permanent removal uses the factory-owned `tryDisposeIdle()` operation. It checks the true driver phase and synchronous resource observers before closing input. Public `idle` status alone is insufficient because maintenance keeps that status. Ordinary disposal retains its cancel-convergence behavior.
+
 ## Summary
 
 `dsh-agent-loop` creates fresh agents or resumes persisted sessions, then drives each turn through model requests, streamed responses, tool execution, and durable session history. Mount it for standard agent compositions; declarative entries start agents at boot, while the public `ctx.agents` API supports programmatic creation and resume. `maxParallelToolCalls` limits concurrent parallel-safe calls, and exclusive calls retain ordering. Cancellation preserves streamed text already delivered to the user. Choose a custom `Agent` implementation only when the standard "call model, run tools, repeat" lifecycle is insufficient.

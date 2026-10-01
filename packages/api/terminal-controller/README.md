@@ -7,6 +7,8 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
+Pending authorization, allocation and retained terminals prevent idle Session purge. Terminal creation rechecks a removal reservation after authorization, so an already submitted form cannot allocate a shell into a Session being deleted.
+
 ## Summary
 
 Open the execution environment's default shell in a Session workspace from the Web sidebar. Reconnect to existing processes and close their complete provider-owned process ranges. Terminal output stays outside the Agent transcript. Keeping a terminal open retains its process and a bounded screen buffer.
@@ -24,6 +26,8 @@ Open the execution environment's default shell in a Session workspace from the W
 
 <a id="use-this-package"></a>
 ## Use this package
+
+SSH-bound Sessions resolve shell discovery and PTY allocation through their standing execution realm. A missing remote subprocess provider fails the operation; it never falls back to the Host process environment.
 
 The Client plugin owns its generated `remote.terminal` namespace and releases it when unloaded. The shared Remote assembly does not mount a second copy.
 

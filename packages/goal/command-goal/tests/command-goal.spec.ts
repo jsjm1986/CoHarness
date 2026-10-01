@@ -109,6 +109,26 @@ describe('@deepseek-ai/dsh-command-goal registration', () => {
 })
 
 describe('/goal human command', () => {
+  it('attests execution-producing commands while keeping status and stopping available', async () => {
+    const test = await harness()
+    const runRequest = vi.fn(async (_agent: Agent, _input: unknown, operation: () => unknown) => operation())
+    test.ctx.provide('executionAuthority', { runRequest } as never)
+    await run(test, ' objective')
+    await run(test, ' edit updated objective')
+    expect(runRequest).toHaveBeenCalledTimes(2)
+    const goal = test.ctx.goals.get(test.agent)!
+    test.ctx.goals.pause(test.agent, ref(goal))
+    await run(test, ' resume')
+    expect(runRequest).toHaveBeenCalledTimes(3)
+    runRequest.mockImplementation(async () => { throw new Error('execution identity unavailable') })
+    await expect(run(test)).resolves.toMatchObject({ kind: 'success' })
+    await expect(run(test, ' pause')).resolves.toMatchObject({ kind: 'success' })
+    await expect(run(test, ' clear')).resolves.toMatchObject({ kind: 'success' })
+    expect(runRequest).toHaveBeenCalledTimes(3)
+    expect(test.ctx.goals.get(test.agent)).toBeUndefined()
+    await test.ctx.fiber.dispose()
+  })
+
   it('shows an empty status without mutating the session', async () => {
     const test = await harness()
     await expect(run(test)).resolves.toEqual({
@@ -290,6 +310,20 @@ describe('/goal image attachments', () => {
     expect(message.content.map(block => block.type)).toEqual(['image', 'image', 'text'])
     expect(message.content.at(-1)).toEqual({ type: 'text', text: 'Reference images for the goal objective.' })
     expect((message.content[0] as { attachment: { name: string } }).attachment.name).toBe('ref-1.png')
+  })
+
+  it('keeps the creating command scope on its admitted objective attachment', async () => {
+    const test = await harness()
+    provideStore(test)
+    const scope = { parentSessionId: test.agent.id, inputs: [], unverifiedHistory: true }
+    test.agent.ctx.provide('executionAuthority', { capture: () => scope } as never)
+    const followup = vi.fn()
+    ;(test.agent as unknown as { followup: typeof followup }).followup = followup
+    const result = await runWithImages(test, ' inspect this reference', 1)
+    expect(result.kind).toBe('success')
+    expect(followup.mock.calls[0]?.[0]).toMatchObject({ source: { kind: 'user', gatewayExecutionScope: scope } })
+    await test.ctx.fiber.dispose()
+    await test.agent.ctx.fiber.dispose()
   })
 
   it('accompanies an edit and a post-complete recreate the same way', async () => {

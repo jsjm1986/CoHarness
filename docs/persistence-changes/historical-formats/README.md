@@ -35,7 +35,7 @@ The index is generated from validated snapshots and the current writer constant.
 | 4 | PR #218 | [V4](v4.md) | [JSON](v4.schema.json) | 60 / 488 |
 | 5 | PR #218 | [V5](v5.md) | [JSON](v5.schema.json) | 63 / 508 |
 | 6 | PR #232 | [V6](v6.md) | [JSON](v6.schema.json) | 63 / 508 |
-| 7 | Current checkout | [Current catalog](../../persistence-catalog.md) | [JSON](../../persistence-schema.json) | 64 / 634 |
+| 7 | Current checkout | [Current catalog](../../persistence-catalog.md) | [JSON](../../persistence-schema.json) | 66 / 641 |
 
 <!-- persistence-format-index:end -->
 

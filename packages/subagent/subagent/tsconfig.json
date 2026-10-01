@@ -94,6 +94,21 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../context/execution-authority"
+    },
+    {
+      "path": "../../interaction/permission-presets"
+    },
+    {
+      "path": "../../fs/fs"
+    },
+    {
+      "path": "../../subprocess/subprocess"
+    },
+    {
+      "path": "../../util/managed-data"
     }
   ]
 }

@@ -9,6 +9,8 @@ kind: "package-reference"
 
 agent preset 的各个表层：General 设置中的一行，用于选择新建会话据以组装的 [preset](../../preset/agent-presets/README.zh.md)；新建会话界面上的一枚 chip，用于选择**下一个会话**的 preset；会话标题旁的一个只读标签；以及一个设置页分区，用于管理名单——复制、删除、默认值，以及通往 preset 自身文件的入口。
 
+每个保留的 Workbench Session 独立拥有预设芯片及名册读取。读取使用该 Session Context 中当前挂载的命名空间，并在发布响应前复核其代次。选择操作捕获该 Session 的浏览器身份，因此切换焦点不能重定向未完成的选择。尚无 Session 的创建流程与设置保留当前空间的暂存选择，不会将其应用到其他 runtime 的空白 Session。
+
 ## 概述
 
 使用本包可以为新的 Web GUI 会话选择 agent preset、在会话标题中查看当前 preset，并在设置中管理可用 preset。Agent 模式选择器默认显示；设置可以隐藏它，而不会改变运行中或历史会话；隐藏期间新会话按部署默认值组装，已保存的默认值被搁置，待选择器恢复时再生效。preset 在会话创建时即固定，因此更改选择或默认值只影响此后创建的会话。如果部署未提供任何 preset，这些控件保持隐藏，每个会话都使用宿主组装。

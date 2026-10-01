@@ -31,8 +31,8 @@ changes:
     after: "7a08afdb5a9102ded1745785ae107a70d66bfd475b8cf0c2cfcb9d3cf531ca12"
     decision: version-bump
   - root: "event:agent/inbox/spliced"
-    previous: "2026-09-22-v5-execution"
-    after: "ce6ac250fccac765e878218fef76a86b8f882facf73f79404808e731dced4312"
+    previous: "2026-09-27-execution-scopes-and-durable-reviews"
+    after: "c2cb3d8c8da40ffc59ce9101819cbb2ebb7db013d68c6c6f24212f96a0ea1d7d"
     decision: version-bump
   - root: "event:assistant/attempt"
     previous: "2026-09-21-v4"
@@ -55,16 +55,16 @@ changes:
     after: "a5805fab2457f244f1124989f2d50e48544294de239092278992db8b95807f71"
     decision: version-bump
   - root: "event:session/title-llm-request"
-    previous: "2026-09-22-v5-execution"
-    after: "a32c4291e11836c516954c0ab513a8a8c9aaa4142d48d46f46a9c1f4fbfcdb20"
+    previous: "2026-09-27-execution-scopes-and-durable-reviews"
+    after: "1f8decc10456cbcd8c952378918b915209c4e5076b925e967054967cf95d76ca"
     decision: version-bump
   - root: "event:system/message"
     previous: "2026-09-21-v4"
     after: "7458c8c4c4c8680f8e34181f26646ef2f4dfe90604b4b48f97583b35a7d6ddcc"
     decision: version-bump
   - root: "event:team/message/queued"
-    previous: "2026-09-22-v5-execution"
-    after: "5a0d9ac2adbc3447fedace87986312b95d62ab8566df9ee9107468adaedf945f"
+    previous: "2026-09-27-execution-scopes-and-durable-reviews"
+    after: "81015090958d429f1b861db7dd28a260a092e305aacb9cd05edbf0e4097aef6d"
     decision: version-bump
   - root: "event:tool/ptc-dispatch"
     previous: "2026-09-21-v4"
@@ -79,8 +79,8 @@ changes:
     after: "0f8512903d94f57a4748fa1a2092e64342856796684e6b8343db685b192745ce"
     decision: version-bump
   - root: "event:user/message"
-    previous: "2026-09-22-v5-execution"
-    after: "7523cca26f55497c36e9eef18c37a2f096ad66e42fff2eb563285a64fea9f3f1"
+    previous: "2026-09-27-execution-scopes-and-durable-reviews"
+    after: "c61fe5daf5ee4c1c344188ecd64ecad8acce295dca9b5e87c6f92dc9278cbc27"
     decision: version-bump
 ```
 

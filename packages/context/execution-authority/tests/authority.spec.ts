@@ -1,7 +1,7 @@
 /** Missing managed configuration cannot recreate independent local authority. */
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import { expect, it } from 'vitest'
-import ExecutionAuthority, { executionAuthorityOf } from '../src/index.ts'
+import ExecutionAuthority, { executionAuthorityOf, sameExecutionAuthority } from '../src/index.ts'
 
 it('rejects mounting the definition as an implementation', () => {
   expect(() => { Reflect.construct(ExecutionAuthority, [new Context()]) }).toThrow(/requires a concrete provider/)
@@ -27,4 +27,23 @@ it('returns the actual provider and rejects its absence after removal', () => {
   expect(executionAuthorityOf(ctx)).toBe(provider)
   remove()
   expect(() => executionAuthorityOf(ctx)).toThrow(/requires its authorization provider/)
+})
+
+it('recognizes the same service through distinct Cordis proxies and refuses a replacement', async () => {
+  class Provider extends Service { constructor(ctx: Context) { super(ctx, 'executionAuthority') } }
+  const ctx = new Context()
+  let fiber = ctx.plugin(Provider)
+  try {
+    await fiber.await()
+    const original = executionAuthorityOf(ctx)
+    const next = executionAuthorityOf(ctx)
+    expect(next).not.toBe(original)
+    expect(sameExecutionAuthority(next, original)).toBe(true)
+    await fiber.dispose()
+    expect(sameExecutionAuthority(executionAuthorityOf(ctx), original)).toBe(false)
+    fiber = ctx.plugin(Provider)
+    await fiber.await()
+    expect(sameExecutionAuthority(executionAuthorityOf(ctx), original)).toBe(false)
+    expect(sameExecutionAuthority(undefined, undefined)).toBe(true)
+  } finally { await fiber.dispose() }
 })

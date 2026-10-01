@@ -55,6 +55,21 @@ describePg('Gateway SSH targets', () => {
       .rejects.toMatchObject({ status: 400 })
   })
 
+  it('preserves an omitted password reference and clears only an explicit null', async () => {
+    const f = await fixture()
+    const service = new PostgresSshTargetService(f.context)
+    const created = await service.create(f.admin.id, { ...targetInput, passwordRef: 'SSH_PASSWORD' })
+    const renamed = await service.update({ targetId: created.publicId, revision: created.revision,
+      fields: { ...targetInput, name: 'renamed-builder' } })
+    expect(renamed.passwordRef).toBe('SSH_PASSWORD')
+    await expect(service.update({ targetId: created.publicId, revision: renamed.revision,
+      fields: { ...targetInput, passwordRef: 'invalid-reference' } })).rejects.toMatchObject({ status: 400 })
+    expect((await service.list())[0]?.passwordRef).toBe('SSH_PASSWORD')
+    const cleared = await service.update({ targetId: created.publicId, revision: renamed.revision,
+      fields: { ...targetInput, passwordRef: null } })
+    expect(cleared.passwordRef).toBeNull()
+  })
+
   it('shares targets under project management authority', async () => {
     const f = await fixture()
     const service = new PostgresSshTargetService(f.context)

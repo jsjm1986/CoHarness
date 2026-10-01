@@ -17,9 +17,13 @@ The existing Host stream carries `host/workspace-file-changed` for authorized Ag
 
 `session.history` and `subagent.history` accept `toolCallId` for an independent complete-turn read. The call lookup uses the existing Session observation owner without activating an Agent or computing projections; child reads retain catalog and parent/child authorization. Pagination selectors and conversation-only detail cannot accompany it. The Fetch carrier packs this turn without cutting its prefix; the client response-size limit still rejects oversized responses. Missing calls return an empty result, while authorization, persistence and cancellation failures remain errors.
 
-`workspaceChanges.summary` and `workspaceChanges.diff` serve recorded turn comparisons through the same Session and directory authorization. They recheck permissions after reads and return null when the recorder no longer holds the snapshot. Deleted files remain reviewable; current contents, private storage paths, and Git object identifiers are not substituted for historical evidence.
+`workspaceChanges.summary` and `workspaceChanges.diff` serve recorded turn comparisons through the same Session and directory authorization. They recheck permissions after reads and resolve immutable artifacts through live or persisted Session announcements. Missing artifacts return null; storage corruption remains an error. Deleted files remain reviewable; current contents, private storage paths, and Git object identifiers are not substituted for historical evidence.
 
 `desktop.status` and `desktop.confirm` use Session write authorization and the deployment's interactive confirmation controller. They never start a model turn. An unconfigured controller returns null status and refuses writes; confirmation binds the displayed root, node and desktop. The Host rechecks access after awaiting the operation, and cancellation or disposal prevents a late successful response.
+
+The Host retains its create, resume and fork handles for `hostSessionLifecycle`. Permanent purge releases only those exact idle owners and holds their identity reservations through storage removal and Gateway acknowledgement. Busy or unknown owners refuse before deletion.
+
+`host.describe.runtimeTarget` identifies the runtime from its managed launch credential, or declares personal scope for an independent Host. The browser-safe API exports canonical Client Session addresses and the explicit Remote Session-path policy shared with Host authorization; those helpers never rewrite arbitrary payload strings or change durable IDs.
 
 ## Summary
 

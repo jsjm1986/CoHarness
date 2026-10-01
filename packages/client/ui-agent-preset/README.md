@@ -9,6 +9,8 @@ English | [中文](README.zh.md)
 
 The agent-preset surfaces: a General-settings row choosing which [preset](../../preset/agent-presets/README.md) new sessions are composed from, a chip on the new-session screen choosing the next session's, a read-only label in the session header, and a settings section that manages the roster — copy, delete, default, and the way into a preset's own files.
 
+Each retained Workbench Session owns its preset chip and roster reads. Reads resolve the currently mounted namespace in that Session’s Context and recheck its generation before publishing the reply. Selection captures that Session’s browser identity, so focusing another pane cannot redirect a pending choice. The no-session creation flow and settings retain their current-space staged choice; it never applies to a different runtime’s blank Session.
+
 ## Summary
 
 Use this package to choose the agent preset for a new Web GUI session, see the active preset in the session header, and manage available presets in Settings. The Agent mode picker is shown by default; Settings can hide it without changing running or historical sessions, and while it is hidden new sessions compose from the deployment default with the saved default parked until the picker returns. A preset fixes at session creation, so changing the selection or default affects only later sessions. If the deployment provides no presets, these controls stay hidden and every session uses the host composition.

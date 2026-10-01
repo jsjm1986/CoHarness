@@ -7,6 +7,10 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
+The background job registry contract (`ctx.jobs`). The abstract `JobRegistry` and its vocabulary types give long-running producers shared ids, owner isolation, reads, cancellation, waiting, notices, and cleanup under one contract; the process-local registry lives in [`dsh-jobs-local`](../jobs-local/README.md). Producer plugins extend `JobKindMap` with their opaque id namespace.
+
+A running or stopping job answers the Workspace registry's archive-admission probe for its owner, and the owning Agent's disposal cancels and awaits it. Unowned jobs live until the service is disposed; resource cleanup beyond the ring remains the producer's responsibility.
+
 ## Summary
 
 `dsh-jobs` lets tools keep long-running work active while an agent continues. Each job receives a stable `<kind>-N` id, and its owning agent can read output, wait with a timeout, or request cancellation. Ownership is scoped to the agent session, so other agents cannot inspect or stop the job; completion arrives as an in-session notice without polling. Users can watch retained live output without consuming what the agent can read. Background jobs can start only when the deployment supplies job execution.
@@ -111,7 +115,7 @@ Read these pages when the package-level contract is not enough. They move from t
 <a id="model-experience"></a>
 ## Model Experience
 
-Indirectly, through producer and controller plugins, which own all model rendering over the job registry.
+Indirectly, through producer and controller plugins, which own all model rendering over the job registry. Managed job projections include the immutable execution scope captured at job creation; completion consumers retain this origin, and model-facing job summaries omit authorization metadata.
 
 #### KV Cache effect
 

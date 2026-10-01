@@ -782,7 +782,7 @@ jobs:
           ln -s ../gateway/node_modules/@standard-schema node_modules/@standard-schema
           ln -s ../gateway/node_modules/zod node_modules/zod
           ln -s ../../vendor/cosmokit node_modules/@deepseek-ai/cosmokit
-          gateway/node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog
+          gateway/node_modules/.bin/tsc -b vendor/cordis vendor/schemastery vendor/cosmokit packages/session/session-format packages/session/session-format-catalog packages/util/managed-data packages/util/atomic-write
       - name: Typecheck Gateway
         run: npm run typecheck --prefix gateway
       # The production `npm run build` resolves workspace packages through their
@@ -805,6 +805,9 @@ jobs:
       - name: Test Gateway
         run: npm test --prefix gateway
       - name: Test Gateway PostgreSQL authorization and invalidation
+        env:
+          HGW_TEST_PG_DUMP_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","pg_dump"]'
+          HGW_TEST_PG_RESTORE_COMMAND: '["docker","exec","-i","${{ job.services.postgres.id }}","pg_restore"]'
         run: npm run test:postgres --prefix gateway
       - name: Preserve gate evidence
         if: always()

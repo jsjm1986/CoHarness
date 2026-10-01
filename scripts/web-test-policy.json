@@ -12,6 +12,7 @@
   ],
   "scenarios": {
     "access-confirmation.e2e.ts": "shell",
+    "admin-form-values.e2e.ts": "settings",
     "agent-preset-authoring.e2e.ts": "settings",
     "agent-preset-selection.e2e.ts": "settings",
     "approval-composer.e2e.ts": "conversation",
@@ -36,6 +37,7 @@
     "declared-reasoning.e2e.ts": "conversation",
     "default-model.e2e.ts": "settings",
     "default-product-isolation.e2e.ts": "shell",
+    "desktop-confirmation.e2e.ts": "conversation",
     "details-session-lifecycle.e2e.ts": "lifecycle",
     "diff-context.e2e.ts": "conversation",
     "document-manager.e2e.ts": "documents",
@@ -43,6 +45,7 @@
     "goal-bar.e2e.ts": "conversation",
     "goal-command-presentation.e2e.ts": "conversation",
     "goal-multi-turn-actions.e2e.ts": "conversation",
+    "historical-jsonl.e2e.ts": "lifecycle",
     "hmr-live.e2e.ts": "shell",
     "home-path-tilde.snapshot.ts": "shell",
     "image-display.snapshot.ts": "conversation",
@@ -66,6 +69,7 @@
     "permission-policy-context.e2e.ts": "settings",
     "plan-control-row.e2e.ts": "conversation",
     "plan-review.e2e.ts": "conversation",
+    "plugin-administration.e2e.ts": "settings",
     "plugin-config.e2e.ts": "settings",
     "produced-file-mentions.e2e.ts": "conversation",
     "produced-files.e2e.ts": "documents",
@@ -80,10 +84,12 @@
     "reference-drill.e2e.ts": "conversation",
     "replay-round-trip.e2e.ts": "lifecycle",
     "responsive-shell.e2e.ts": "shell",
+    "runtime-identity.e2e.ts": "workbench",
     "scaffold-hermetic.e2e.ts": "shell",
     "schedule-after.e2e.ts": "conversation",
     "search-card.snapshot.ts": "conversation",
     "seeded-history.e2e.ts": "lifecycle",
+    "session-feedback.e2e.ts": "conversation",
     "settings-chrome.e2e.ts": "settings",
     "settings-compact.e2e.ts": "settings",
     "shipped-composition.e2e.ts": "shell",
@@ -102,23 +108,20 @@
     "subagent-interrupt-ui.e2e.ts": "subagent",
     "subagent-interrupt.e2e.ts": "subagent",
     "todo-row.snapshot.ts": "conversation",
+    "tool-details.e2e.ts": "conversation",
     "trajectory-virtualization.e2e.ts": "conversation",
     "turn-tail-actions.e2e.ts": "conversation",
+    "user-terminal.e2e.ts": "conversation",
     "vite-entry.e2e.ts": "shell",
     "web-search-round.e2e.ts": "conversation",
+    "webhook.e2e.ts": "conversation",
     "workbench.e2e.ts": "workbench",
     "workflow-run.e2e.ts": "workbench",
     "workspace-files.e2e.ts": "workbench",
     "workspace-history-entry.e2e.ts": "documents",
     "workspace-management.e2e.ts": "documents",
-    "tool-details.e2e.ts": "conversation",
-    "workspace-review.e2e.ts": "conversation",
-    "session-feedback.e2e.ts": "conversation",
     "workspace-office.e2e.ts": "documents",
-    "desktop-confirmation.e2e.ts": "conversation",
-    "user-terminal.e2e.ts": "conversation",
-    "plugin-administration.e2e.ts": "settings",
-    "webhook.e2e.ts": "conversation"
+    "workspace-review.e2e.ts": "conversation"
   },
   "sharedInputs": {
     "examples/acp-agent/tests/snapshots/cancel-tool-calls/session.v6.jsonl": [
@@ -164,13 +167,16 @@
       "plugin-administration.e2e.ts"
     ],
     "gateway/admin-ui/src/App.tsx": [
-      "plugin-administration.e2e.ts"
+      "plugin-administration.e2e.ts",
+      "admin-form-values.e2e.ts"
     ],
     "gateway/admin-ui/src/api.ts": [
-      "plugin-administration.e2e.ts"
+      "plugin-administration.e2e.ts",
+      "admin-form-values.e2e.ts"
     ],
     "gateway/admin-ui/vite.config.ts": [
-      "plugin-administration.e2e.ts"
+      "plugin-administration.e2e.ts",
+      "admin-form-values.e2e.ts"
     ],
     "gateway/admin-ui/scripts/prepare-remotes.ts": [
       "plugin-administration.e2e.ts"

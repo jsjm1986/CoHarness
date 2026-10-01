@@ -24,7 +24,7 @@ import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
 import { observeSidebarFocus } from './focus.ts'
 import { registerSidebarShortcuts } from './shortcuts.ts'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { parseWorkspaceResourceAddress, workspaceResourceAddress, sessionPersistenceKey } from '@deepseek-ai/dsh-client-runtime/client'
+import { parseWorkspaceResourceAddress, workspaceResourceAddress, sessionPersistenceKey, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -32,7 +32,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from './contract/slots.ts'
-import { clearSidebarLayout, readSidebarLayout, writeSidebarLayout } from './persistence.ts'
+import { clearSidebarLayout, readSidebarLayout, writeSidebarLayout, qualifySavedResource } from './persistence.ts'
 import { parseToolAddress, toolAddress } from './tabs/tool/address.ts'
 import { ToolBody } from './tabs/tool/ToolBody.tsx'
 import { GuideBody, type GuideInjected } from './tabs/guide/GuideBody.tsx'
@@ -187,13 +187,21 @@ export function apply(ctx: ClientContext): void {
         const restore = (): void => {
           restoring = true
           try {
-            const saved = key === undefined ? undefined : readSidebarLayout(key)
+            let saved = key === undefined ? undefined : readSidebarLayout(key)
+            const address = parseClientSessionKey(sessionId)
+            if (saved !== undefined && address !== undefined) {
+              saved = { ...saved, layout: { ...saved.layout,
+                tabs: Object.fromEntries(Object.entries(saved.layout.tabs).map(([id, tab]) => [id, {
+                  ...tab, contentId: qualifySavedResource(tab.contentId, address.sessionId, sessionId),
+                }])),
+              } }
+            }
             const valid = saved !== undefined && Object.values(saved.layout.tabs).every((tab) => {
               if (!tab.contentId.startsWith('dsh-resource://')) return true
               try { validateResource(sessionId, tab.contentId); return true } catch { return false }
             })
             if (saved !== undefined && !valid && key !== undefined) clearSidebarLayout(key)
-            instance.store.set({ bySession: valid ? { [scopeKey]: saved } : {} })
+            instance.store.set({ bySession: valid && saved !== undefined ? { [scopeKey]: saved } : {} })
           } finally { restoring = false }
         }
         restore()

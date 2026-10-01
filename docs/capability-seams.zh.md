@@ -9,10 +9,12 @@
 
 ```mermaid
 flowchart LR
+  pkg_host_apiproxy["host-apiproxy"]
+  svc_hostSessionLifecycle["ctx.hostSessionLifecycle<br/>Host ownership and idle release of Session handles"]
+  pkg_archive_gateway["archive-gateway"]
   pkg_execution_authority["execution-authority"]
   svc_executionAuthority["ctx.executionAuthority<br/>Verified human participants and current execution privileges"]
   pkg_gateway_execution["gateway-execution"]
-  pkg_host_apiproxy["host-apiproxy"]
   pkg_subagent["subagent"]
   pkg_subagent_in_process_driver["subagent-in-process-driver"]
   pkg_experimental_agent_team["experimental-agent-team"]
@@ -320,6 +322,7 @@ flowchart LR
   pkg_gateway_runtime --> svc_gatewayRuntime
   pkg_goal --> svc_goals
   pkg_hmr --> svc_hmr
+  pkg_host_apiproxy --> svc_hostSessionLifecycle
   pkg_invariants --> svc_invariants
   pkg_jobs --> svc_jobs
   pkg_jobs_local --> svc_jobs
@@ -451,6 +454,8 @@ flowchart LR
   svc_gatewayRuntime --> pkg_collaboration_gateway
   svc_gatewayRuntime --> pkg_session_persistence_gateway
   svc_hmr --> pkg_app_boot
+  svc_hostSessionLifecycle --> pkg_archive_gateway
+  svc_hostSessionLifecycle --> pkg_host_apiproxy
   svc_invariants --> pkg_agent
   svc_invariants --> pkg_agent_loop
   svc_invariants --> pkg_scope
@@ -569,6 +574,7 @@ flowchart LR
 
 | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.hostSessionLifecycle` | `core` | [`host-apiproxy`](../packages/host/apiproxy) | - | [`host-apiproxy`](../packages/host/apiproxy), [`archive-gateway`](../packages/context/archive-gateway) | - | Host 保存自身的工厂句柄，在清理期间预留 Session 标识，并在删除持久归档之前仅释放已确认空闲的资源。 |
 | `ctx.executionAuthority` | `seam` | [`execution-authority`](../packages/context/execution-authority) | [`gateway-execution`](../packages/context/gateway-execution) | [`host-apiproxy`](../packages/host/apiproxy), [`subagent`](../packages/subagent/subagent), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver), [`experimental-agent-team`](../packages/experimental/agent-team), [`experimental-auto-review`](../packages/experimental/auto-review) | - | 输入传输层记录已认证参与人；委派工作继承其权限限制，特权操作重新核验当前授权。 |
 | `ctx.pluginManagementAuthorization` | `seam` | [`plugin-manager`](../packages/boot/plugin-manager) | [`gateway-execution`](../packages/context/gateway-execution) | [`plugin-manager`](../packages/boot/plugin-manager), [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | 受管运行时在 profile 和动态插件操作前核验当前管理员权限，包括排队等待的变更。 |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | 拥有模块与精确配置 watcher；应用变更共享其队列，自动重载等待应用文件锁。 |

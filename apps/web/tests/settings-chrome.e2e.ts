@@ -68,7 +68,7 @@ describe('web e2e: settings modal and General preferences', () => {
     const openDocument = dialog.getByRole('button', { name: '打开配置文件' })
     await openDocument.waitFor({ timeout: 10_000 })
     let openRequests = 0
-    await page.route('**/api/settings.openDocument', async (route) => {
+    await page.route(/\/api\/settings\.openDocument(?:\?.*)?$/, async (route) => {
       const envelope = route.request().postDataJSON() as {
         rpcId: string
         payload: Record<string, never>
@@ -88,7 +88,7 @@ describe('web e2e: settings modal and General preferences', () => {
     await openDocument.click()
     await expect.poll(() => openRequests, { timeout: 5_000 }).toBe(1)
     await expect.poll(() => openDocument.isEnabled(), { timeout: 5_000 }).toBe(true)
-    await page.unroute('**/api/settings.openDocument')
+    await page.unroute(/\/api\/settings\.openDocument(?:\?.*)?$/)
     // Golden of the freshly opened dialog (default zh, General active).
     // The preset row stays disabled until its settings.describe load resolves;
     // capture only once the row has settled enabled.

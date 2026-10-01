@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-09-27-current-request-execution-scopes.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.md
+/agent-note-current-request-execution-scopes:
+  en: 5f02aba590ad0458
+  zh: 0c88e69856c07a35
+/agent-note-current-request-execution-scopes/problem:
+  en: b503d4a74bcad021
+  zh: 10a3d34e6c569042
+/agent-note-current-request-execution-scopes/decision:
+  en: 96fedec4907658d9
+  zh: 79d841a8856a95e4
+/agent-note-current-request-execution-scopes/alternatives-considered:
+  en: 992c479b343b24c6
+  zh: add175d6449e4a89
+/agent-note-current-request-execution-scopes/consequences:
+  en: 4b8aa74d53eefb13
+  zh: f65fbb96b8bd903b
+/agent-note-current-request-execution-scopes/testing:
+  en: 622af4b4f496440f
+  zh: b83e8e14a1e26852

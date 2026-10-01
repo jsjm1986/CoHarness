@@ -46,6 +46,7 @@ Normalization and request projection are deterministic. An unchanged attachment 
 
 ## Known Limitations and Deferred Work
 
+- Managed launches with `DSH_MANAGED_DATA_MANIFEST` register the resolved `attachments/v1` directory before data writes. An invalid inventory refuses initialization; [inventory and backup rules](../../util/managed-data/README.md) govern retained roots and deployment approval.
 - Normalized attachment objects are retained indefinitely; derived request-image files are bounded by `requestImageCacheMaxBytes`, `requestImageCacheMaxEntries`, and `requestImageCacheTtlMs` and are reclaimed by a best-effort timer.
 - The local backend assumes the host and provider adapter share this filesystem service.
 - Animated GIF sources keep only their first frame; animation is outside the version-one image contract.

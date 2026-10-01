@@ -97,6 +97,7 @@ async function harness(
       return {
         agent,
         dispose: unregister,
+        tryDisposeIdle: async () => false,
       }
     },
     async resume() {

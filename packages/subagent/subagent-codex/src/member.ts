@@ -9,7 +9,6 @@
  * @module @deepseek-ai/dsh-subagent-codex/member
  */
 
-import { readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { LlmAdapter } from '@deepseek-ai/dsh-llm'
@@ -20,6 +19,7 @@ import {
   externalMemberTurn,
   type ExternalMemberSession,
   type ExternalMemberTransport,
+  type ExternalMemberTransportSource,
   type ExternalPendingPrompt,
   type ExternalRecovery,
   type ExternalTurnBound,
@@ -30,6 +30,8 @@ import {
   disposeCodexChild,
 } from './run.ts'
 import { CodexAppServerWire } from './wire.ts'
+import { recoverCodexThread } from './rollout.ts'
+export { recoverCodexThread } from './rollout.ts'
 import type { CodexPermissionMode } from './run.ts'
 
 /** The registered LLM route this package's continuable members resolve to. */
@@ -40,121 +42,15 @@ export const CODEX_MEMBER_MODEL = 'codex'
 
 /** Options carried from the provider's resolved config into each member turn. */
 export interface CodexMemberConfig {
+  /** Target-local command; absent uses the bundled Host program. */
+  readonly executable?: string
+  /** Remote rollouts cannot be read from Host storage. */
+  readonly remote?: boolean
   readonly cwd: string
   readonly model?: string
   readonly permissionMode: CodexPermissionMode
   readonly env: Record<string, string>
   readonly disposeGraceMs: number
-}
-
-interface CodexRolloutPayload {
-  readonly type?: string
-  readonly role?: string
-  readonly message?: string
-  readonly content?: readonly { readonly type?: string; readonly text?: string }[]
-}
-
-interface CodexRolloutEntry {
-  readonly type?: string
-  readonly payload?: CodexRolloutPayload
-}
-
-/** Extract user-authored text from one rollout entry, across codex-rs payload variants. */
-function rolloutUserText(entry: CodexRolloutEntry): string | undefined {
-  const payload = entry.payload
-  if (payload === undefined) return undefined
-  if (payload.type === 'user_message') return payload.message ?? ''
-  if (payload.type === 'message' && payload.role === 'user') {
-    return (payload.content ?? [])
-      .filter(block => block.type === 'input_text')
-      .map(block => block.text ?? '')
-      .join('')
-  }
-  return undefined
-}
-
-/** Extract assistant-authored text from one rollout entry, across codex-rs payload variants. */
-function rolloutAgentText(entry: CodexRolloutEntry): string | undefined {
-  const payload = entry.payload
-  if (payload === undefined) return undefined
-  if (payload.type === 'agent_message') return payload.message ?? ''
-  if (payload.type === 'message' && payload.role === 'assistant') {
-    return (payload.content ?? [])
-      .filter(block => block.type === 'output_text')
-      .map(block => block.text ?? '')
-      .join('')
-  }
-  return undefined
-}
-
-/**
- * Locate the rollout file for one durable thread under `~/.codex/sessions`.
- * @param externalId - the thread identity encoded in the rollout filename.
- * @returns the absolute rollout path, or `undefined` when absent.
- */
-function codexRolloutPath(externalId: string): string | undefined {
-  const root = join(homedir(), '.codex', 'sessions')
-  const queue: string[] = [root]
-  while (queue.length > 0) {
-    const dir = queue.pop() as string
-    let entries: import('node:fs').Dirent<string>[]
-    try {
-      entries = readdirSync(dir, { withFileTypes: true, encoding: 'utf8' })
-    } catch {
-      continue
-    }
-    for (const entry of entries) {
-      const path = join(dir, entry.name)
-      if (entry.isDirectory()) queue.push(path)
-      else if (entry.isFile() && entry.name.endsWith(`${externalId}.jsonl`)) return path
-    }
-  }
-  return undefined
-}
-
-/**
- * Read the durable Codex rollout transcript and prove the state of one issued
- * prompt: a later agent message means `result`, no matching user message
- * means `absent`, and a matched user message with no later agent message
- * means `unknown`.
- * @param externalId - the durable thread identity.
- * @param pending - the issued prompt exactly as sent.
- * @returns the provable state.
- */
-export function recoverCodexThread(
-  externalId: string,
-  pending: ExternalPendingPrompt,
-): ExternalRecovery {
-  const path = codexRolloutPath(externalId)
-  if (path === undefined) return { kind: 'absent' }
-  let raw: string
-  try {
-    raw = readFileSync(path, 'utf8')
-  } catch {
-    /* v8 ignore next -- an unreadable rollout needs POSIX mode bits; POSIX-gated suites own this arm. */
-    return { kind: 'unknown' }
-  }
-  const entries: CodexRolloutEntry[] = []
-  for (const line of raw.split('\n')) {
-    if (line === '') continue
-    try {
-      entries.push(JSON.parse(line) as CodexRolloutEntry)
-    } catch {
-      // A torn tail write is ordinary after a crash; the parseable prefix stays authoritative.
-      break
-    }
-  }
-  const promptIndex = entries.findLastIndex(entry => rolloutUserText(entry) === pending.prompt)
-  if (promptIndex < 0) return { kind: 'absent' }
-  const texts: string[] = []
-  for (let i = promptIndex + 1; i < entries.length; i++) {
-    const entry = entries[i]
-    /* v8 ignore next -- entries is a dense push-built array; indexing never yields undefined. */
-    if (entry === undefined) continue
-    const text = rolloutAgentText(entry)
-    if (text !== undefined && text !== '') texts.push(text)
-  }
-  return texts.length === 0 ? { kind: 'unknown' } : { kind: 'result', text: texts.join('\n') }
 }
 
 /** One open Codex thread bound to one member turn or recovery pass. */
@@ -173,9 +69,11 @@ class CodexMemberSession implements ExternalMemberSession {
     this.externalId = externalId
   }
 
-  async *turn(prompt: string, signal: AbortSignal): AsyncIterable<string | ExternalTurnBound | ExternalTurnOutcome> {
+  async *turn(
+    prompt: string, signal: AbortSignal, started?: (turnId: string) => void,
+  ): AsyncIterable<string | ExternalTurnBound | ExternalTurnOutcome> {
     const child = this.spawn({
-      argv: codexAppServerArgv(),
+      argv: codexAppServerArgv(this.config.executable),
       cwd: this.config.cwd,
       stdio: { stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' },
       graceMs: this.config.disposeGraceMs,
@@ -205,7 +103,7 @@ class CodexMemberSession implements ExternalMemberSession {
     } else {
       await wire.resumeThread(this.externalId, signal)
     }
-    const result = await wire.runTurn([prompt], signal)
+    const result = await wire.runTurn([prompt], signal, started)
     const text = result.output
       .filter(block => block.type === 'text')
       .map(block => block.text)
@@ -218,7 +116,10 @@ class CodexMemberSession implements ExternalMemberSession {
 
   recover(pending: ExternalPendingPrompt, _signal: AbortSignal): Promise<ExternalRecovery> {
     if (this.externalId === undefined) return Promise.resolve({ kind: 'absent' })
-    return Promise.resolve(recoverCodexThread(this.externalId, pending))
+    if (this.config.remote === true) return Promise.resolve({ kind: 'unknown' })
+    const storageRoot = this.config.env.CODEX_HOME
+      ?? join(this.config.env[process.platform === 'win32' ? 'USERPROFILE' : 'HOME'] ?? homedir(), '.codex')
+    return Promise.resolve(recoverCodexThread(this.externalId, pending, storageRoot))
   }
 
   async dispose(): Promise<void> {
@@ -253,7 +154,7 @@ export class CodexMemberTransport implements ExternalMemberTransport {
 /** LLM adapter owning the member route; each model call becomes one external turn. */
 export class CodexMemberAdapter extends LlmAdapter {
   constructor(
-    private readonly transport: ExternalMemberTransport,
+    private readonly transport: ExternalMemberTransportSource,
     private readonly store: ExternalBindingStore,
   ) {
     super()

@@ -67,6 +67,7 @@ No direct invalidation; the consuming plugin owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 
+- Managed launches with `DSH_MANAGED_DATA_MANIFEST` register the resolved settings document, including a configured custom path before data writes. An invalid inventory refuses initialization; [inventory and backup rules](../../util/managed-data/README.md) govern retained roots and deployment approval.
 - **Same-namespace conflicts stay last-write-wins** — the writer lock and read-modify-write keep concurrent writers from dropping each other's namespaces, but two writers editing one namespace still resolve to the later write; there is no per-value merge or revision check.
 - **A missed watcher event stays unseen until the next signal** — reads never re-stat the file, so a change the watcher fails to report is only folded in by the next event, the next write, or a restart.
 - **Comment preservation is YAML-only and map-shaped** — JSON documents re-serialize without comments (JSON has none), and comments inside a changed array (or attached inline to a changed scalar value) go with the value they described.

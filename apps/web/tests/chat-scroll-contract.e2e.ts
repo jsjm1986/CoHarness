@@ -506,7 +506,7 @@ describe('web e2e: long Chat scroll contract', () => {
       let releaseGate: (() => void) | undefined
       const gate = new Promise<void>((resolve) => { releaseGate = resolve })
       releaseHistory = () => { releaseGate?.() }
-      await world.page.route('**/api/session.history', async (route) => {
+      await world.page.route(/\/api\/session\.history(?:\?.*)?$/, async (route) => {
         const request = route.request().postDataJSON() as {
           method?: string
           payload?: { beforeSeq?: number }
@@ -555,7 +555,7 @@ describe('web e2e: long Chat scroll contract', () => {
       await settled
       await expect.poll(() => world.page.locator('[data-streaming="true"]').count(), { timeout: 15_000 }).toBe(0)
       await world.page.getByText(LIVE_TEXT_DONE, { exact: false }).last().waitFor({ timeout: 15_000 })
-      await world.page.unroute('**/api/session.history')
+      await world.page.unroute(/\/api\/session\.history(?:\?.*)?$/)
 
       let additionalPages = 0
       while (additionalPages < 8) {

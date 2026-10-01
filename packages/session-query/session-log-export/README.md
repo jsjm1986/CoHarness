@@ -22,6 +22,10 @@ English | [中文](README.zh.md)
 
 -----
 
+The controller decodes the pane’s runtime-qualified Session key into its original Host ID and explicit runtime target. The `HEAD` preflight and browser save use the same account-pinned URL, so another tab’s account or scope change cannot redirect a pending download.
+
+The Host download endpoint flushes a live root Session before `readRaw`, so a slash-triggered ZIP includes the `command/run` and `command/done` pair whose acknowledgment started the download. Cold persisted Sessions require no flush.
+
 <a id="use-this-package"></a>
 ## Use this package
 

@@ -3,6 +3,8 @@
  * narrow RpcRequest<P> and echoes request.rpcId on the RpcResponse<T>.
  */
 
+import { REMOTE_SESSION_POLICIES, remoteSessionId } from './api/remote-session-routing.ts'
+import { hostSessionLifecycle } from './session-lifecycle.ts'
 import type {} from '@deepseek-ai/dsh-plugin-manager'
 import { randomUUID } from 'node:crypto'
 import { createDesktopApi } from './desktop.ts'
@@ -14,7 +16,7 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path
 import { z as zod } from 'zod'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-terminal-controller'
-import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
+import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentSetup, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
@@ -201,44 +203,7 @@ const COLD_SUMMARY_BATCH_SIZE = 16
 /** Default maximum artifact size eligible for one cold blankness read. */
 export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 1024
 
-interface TypertSessionAuthorization {
-  readonly action: CollaborationAction
-  readonly sessionId: (args: Readonly<Record<string, unknown>>) => SessionId | undefined
-}
 
-/** Project-scope Remote methods whose resource and mutation class are explicit. */
-const PROJECT_TYPERT_SESSION_AUTHORIZATION: Readonly<Record<string, TypertSessionAuthorization>> = Object.freeze({
-  'commands/list': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'commands/execute': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'fileReferences/list': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'sessionReferenceResolver/candidates': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'goals/create': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/edit': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/pause': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/resume': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/complete': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/clear': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'messageFeedback/list': { action: 'read', sessionId: args => typertRequestSessionId(args.request) },
-  'messageFeedback/put': { action: 'write', sessionId: args => typertRequestSessionId(args.request) },
-  'messageFeedback/delete': { action: 'write', sessionId: args => typertRequestSessionId(args.request) },
-  'dynamicCordisRunner/runHostHalf': { action: 'approve', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/getClientCode': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/settleUserRun': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/stopFromPanel': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/undefineFromPanel': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/reportRenderFailure': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/reportClientGuardFailure': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/resolveInspectQuery': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/get': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'subagents/list': { action: 'read', sessionId: args => typertSessionId(args.parentSessionId) },
-  'subagents/prompt': { action: 'write', sessionId: args => typertRequestFieldSessionId(args.request, 'parentSessionId') },
-  'subagents/interruptByParent': { action: 'write', sessionId: args => typertSessionId(args.parentSessionId) },
-  'agentPresets/select': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'agentTeams/view': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'agentTeams/createTask': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'agentTeams/updateTask': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'sessionFeedback/record': { action: 'write', sessionId: args => typertRequestSessionId(args.request) },
-})
 
 /**
  * Project-scope Remote methods that expose read-only process-wide runtime state
@@ -302,17 +267,6 @@ function typertSessionId(value: unknown): SessionId | undefined {
   return typeof value === 'string' && value.length > 0 ? brandSessionId(value) : undefined
 }
 
-/** Read a Session identity from a decoded request object. */
-function typertRequestSessionId(value: unknown): SessionId | undefined {
-  return typertRequestFieldSessionId(value, 'sessionId')
-}
-
-/** Read a Session identity from one named field of a decoded request object. */
-function typertRequestFieldSessionId(value: unknown, field: string): SessionId | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
-  return typertSessionId(Reflect.get(value, field))
-}
-
 /** Reject a Typert call through the carrier's existing collaboration error branch. */
 function rejectTypertCollaboration(error: unknown, action: CollaborationAction, sessionId?: SessionId): never {
   throw new TypertLookupFailure<RpcError>(collaborationRefusal(error, action, sessionId))
@@ -333,6 +287,24 @@ interface GatewayRuntimeIdentityReader {
 function pluginAdministration(ctx: Context): boolean {
   const runtime = ctx.get('gatewayRuntime') as GatewayRequestReader | undefined
   return runtime?.current()?.claims.purpose === 'plugin-admin'
+}
+
+/**
+ * Bind a live human request after its Agent lookup has completed.
+ * @param ctx - Host Context with the managed authority provider.
+ * @param payload - already authorized and decoded Remote invocation.
+ * @param next - resolved business method.
+ * @returns its result under the current initiator's verified identity.
+ */
+export function invokeTypertRemote(ctx: Context, payload: TypertGatewayAuthorizationRequest,
+  next: () => Promise<unknown>): Promise<unknown> {
+  const rule = REMOTE_SESSION_POLICIES[payload.endpoint]
+  if (rule === undefined || rule.action === 'read' || rule.execution !== 'request') return next()
+  const id = remoteSessionId(payload.endpoint, payload.args)
+  const agent = id === undefined ? undefined : ctx.agents.get(brandSessionId(id))
+  const authority = executionAuthorityOf(ctx)
+  return agent === undefined || authority === undefined ? next()
+    : authority.runRequest(agent, { endpoint: payload.endpoint, args: payload.args }, next)
 }
 
 /**
@@ -367,7 +339,7 @@ export async function authorizeTypertRemote(
   }
   const collaboration = ctx.get('collaboration')
   if (collaboration === undefined) return
-  const policy = PROJECT_TYPERT_SESSION_AUTHORIZATION[payload.endpoint]
+  const policy = REMOTE_SESSION_POLICIES[payload.endpoint]
   const action = policy?.action ?? 'manage'
   let authority: CollaborationAuthority
   try {
@@ -388,7 +360,7 @@ export async function authorizeTypertRemote(
   if (policy === undefined) {
     rejectTypertCollaboration(new CollaborationError('forbidden'), action)
   }
-  const sessionId = policy.sessionId(payload.args)
+  const sessionId = remoteSessionId(payload.endpoint, payload.args)
   if (sessionId === undefined) {
     rejectTypertCollaboration(new Error('Remote authorization did not receive a Session identity'), action)
   }
@@ -1291,6 +1263,7 @@ function requestedFrame(pending: PendingApproval): RpcRequest<MuxFrame> {
 
 /** One host-owned question wait, addressed by the stable server-request id. */
 interface PendingQuestion {
+  executionScope: ExecutionInheritance | undefined
   rpcId: RpcId
   sessionId: SessionId
   questions: AskUserQuestionItem[]
@@ -1814,6 +1787,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   const selections = new WeakMap<Agent, WebModelSelectionRef>()
   /** Client-chosen identity creation/resume, deduplicated across concurrent retries. */
   const sessionCreations = new Map<SessionId, Promise<Agent>>()
+  const sessionOwner = hostSessionLifecycle(ctx)
   /** Draft workspace attachments are published only after durable content lands. */
   const draftSessions = new Map<SessionId, {
     workspace: Workspace
@@ -2444,6 +2418,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   // restore that history under the old tool set.
   const { agentFor, pendingResume } = createApiRemoteAgentResolver(ctx, {
     agentOptions,
+    onResumed: (handle) => { sessionOwner.own(handle) },
     setup: async ({ meta, events }) =>
       (await composeAgent(resolveSessionPreset({ header: meta, events }), meta.sshTarget)).setup,
     liveAdmission: async (agent) => {
@@ -2603,6 +2578,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       const rpcId = RpcId(randomUUID())
       const pending: PendingQuestion = {
         rpcId, sessionId, questions: request.questions, resolve, reject,
+        executionScope: request.agent === undefined ? undefined : executionAuthorityOf(ctx)?.capture(request.agent),
         ...(request.signal === undefined ? {} : { signal: request.signal }),
       }
       const onAbort = (): void => {
@@ -3189,6 +3165,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     draft = false,
     sshTarget?: number,
   ): Promise<Agent> {
+    using _admission = ctx.agents.reserveUse([sessionId])
     let creation = sessionCreations.get(sessionId)
     if (creation === undefined) {
       creation = (async () => {
@@ -3235,11 +3212,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           // rebuilding it differently would replay tool calls the model can no
           // longer make. The persisted SSH binding likewise re-mounts from the
           // header, re-resolved under the resuming caller's authority.
-          return (await ctx.agents.resume({
+          return sessionOwner.own(await ctx.agents.resume({
             resumeSessionId: sessionId,
             agentOptions: agentOptions(),
             setup: (await composeAgent(storedPreset, inspected.meta.sshTarget)).setup,
-          })).agent
+          }))
         }
 
         if (sshTarget === undefined) {
@@ -3250,7 +3227,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
         }
         const composition = await composeAgent(presetId, sshTarget)
-        return (await ctx.agents.create({
+        return sessionOwner.own(await ctx.agents.create({
           sessionId,
           agentOptions: agentOptions(),
           meta: {
@@ -3260,7 +3237,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             ...sshTarget === undefined ? {} : { sshTarget },
           },
           setup: composition.setup,
-        })).agent
+        }))
       })().catch((error: unknown) => {
         // Another Host entry path may have published the same identity while
         // this operation crossed an asynchronous persistence/filesystem step.
@@ -4485,6 +4462,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const { sessionId, atSeq } = request.payload
         const authorized = await authorizeSession(sessionId, 'write')
         if ('error' in authorized) return err(request, authorized.error)
+        let admission: Disposable
+        try {
+          admission = ctx.agents.reserveUse([sessionId])
+        } catch (error: unknown) {
+          return err(request, { code: 'fork-unavailable', message: String(error), details: { sessionId } })
+        }
+        using _admission = admission
         let source: SessionReadState
         try {
           source = await readSessionState(sessionId)
@@ -4545,7 +4529,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // plane, composing nothing would leave the child with no tools at all.
         const forkComposition = await composeAgent(resolveSessionPreset(source), source.header.sshTarget)
         try {
-          await ctx.agents.create({
+          sessionOwner.own(await ctx.agents.create({
             sessionId: childId,
             seed: events.slice(0, cut),
             meta: {
@@ -4563,7 +4547,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               if (executionScope !== undefined && authority !== undefined) authority.inherit(agent.session, executionScope)
               return forkComposition.setup(agentCtx, agent)
             },
-          })
+          }))
         } catch (error: unknown) {
           return err(request, {
             code: 'internal',
@@ -5317,6 +5301,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         // TODO: version should read apps/cli's package.json; placeholder for now.
         const selection = defaults.defaultModelSelection()
+        const runtimeIdentity = (ctx.get('gatewayRuntime', false) as GatewayRuntimeIdentityReader | undefined)?.identity
         return ok(request, {
           version: '0.0.1',
           // Same source as session.create's fallback: the UI's default project
@@ -5331,6 +5316,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           canOpenPath: !projectScope && canOpenPaths(),
           fileManager: !projectScope && canOpenPaths() ? nativeFileManager() : null,
           executionAuthorityRequired: ctx.get('executionAuthorityRequired') === true,
+          runtimeTarget: runtimeIdentity?.kind === 'project'
+            ? { kind: 'project' as const, projectId: runtimeIdentity.id } : { kind: 'personal' as const },
           ...(ctx.get('fs') === undefined ? {} : { workspaceFiles: {
             maxBytes: defaults.workspaceFileMaxBytes ?? DEFAULT_WORKSPACE_FILE_MAX_BYTES,
             maxLines: defaults.workspaceFileMaxLines ?? DEFAULT_WORKSPACE_FILE_MAX_LINES,
@@ -6360,7 +6347,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const execution = executionAuthorityOf(ctx)
         const session = ctx.sessions.get(pending.sessionId)
         if (execution !== undefined) {
-          if (session === undefined || !await execution.answer(session, pending.rpcId, payload.answer)) {
+          if (session === undefined || !await execution.answer(session, pending.rpcId, payload.answer, pending.executionScope)) {
             return { accepted: false, reason: 'not-pending' }
           }
         } else if (authorized.authority !== undefined && !await authorized.authority.claimInteraction(

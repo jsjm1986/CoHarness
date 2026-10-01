@@ -630,6 +630,13 @@ class HarnessClient:
                 "the Python SDK never uses ~/.dsh implicitly"
             )
 
+        if "DSH_MANAGED_DATA_MANIFEST" not in (self.config.env or {}):
+            inherited_home = os.environ.get("DSH_HOME", "").strip()
+            if not inherited_home or Path(inherited_home).expanduser().resolve() != Path(
+                env["DSH_HOME"]
+            ).expanduser().resolve():
+                env.pop("DSH_MANAGED_DATA_MANIFEST", None)
+
         patches = tuple(
             argument
             for patch in self.config.patches

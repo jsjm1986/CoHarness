@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentCarrier } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import TerminalSessionService, { TerminalBackendCleanupError, TerminalError, TerminalSessionId } from '@deepseek-ai/dsh-terminal'
 import type {
@@ -154,6 +154,24 @@ describe('TerminalSessionService backend registry', () => {
 })
 
 describe('TerminalSessionService ownership and lifecycle', () => {
+  it('vetoes idle release from allocation through close and refuses a new terminal during removal', async () => {
+    const ctx = await harness(), owner = stubAgent(ctx, 'purge-terminal')
+    await ctx.agents.register(owner)
+    const ready = Promise.withResolvers<TerminalBackendSession>(), session = new StubSession()
+    ctx.terminals.registerBackend({ type: 'deferred', spawn: () => ready.promise })
+    try {
+      const spawning = ctx.terminals.spawn(owner, { type: 'deferred' })
+      expect(ctx.bail(agentCarrier(owner), 'agent/idle-release-check', { agent: owner })).toBe('busy')
+      ready.resolve(session)
+      const created = await spawning
+      expect(ctx.bail(agentCarrier(owner), 'agent/idle-release-check', { agent: owner })).toBe('busy')
+      await ctx.terminals.kill(owner, created.sessionId)
+      expect(ctx.bail(agentCarrier(owner), 'agent/idle-release-check', { agent: owner })).toBeUndefined()
+      using _removal = ctx.agents.reserveRemoval([owner.id])
+      await expect(ctx.terminals.spawn(owner, { type: 'deferred' })).rejects.toMatchObject({ code: 'OWNER_NOT_LIVE' })
+    } finally { ready.resolve(session); await ctx.fiber.dispose() }
+  })
+
   it('publishes only after spawn and fences every operation to the exact owner', async () => {
     const ctx = await harness()
     const b = backend()

@@ -1,3 +1,4 @@
+import type { ExecutionInheritance, ExecutionInputId, ExecutionScopeId } from '@deepseek-ai/dsh-execution-authority'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -161,6 +162,36 @@ function scriptedSource(reads: { text: string; lossy?: boolean }[], channel?: 's
 describe('LocalJobRegistry.start', () => {
   it('preserves the SessionId brand on public owner projections', () => {
     expectTypeOf<JobView['owner']>().toEqualTypeOf<SessionId | undefined>()
+    expectTypeOf<JobView['executionScope']>().toEqualTypeOf<ExecutionInheritance | undefined>()
+  })
+
+  it('refuses new owned jobs while the owner is being removed', async () => {
+    const ctx = await harness(), owner = await liveAgent(ctx, 'purge-job-owner')
+    try {
+      using _removal = ctx.agents.reserveRemoval([owner.id])
+      expect(() => ctx.jobs.start(producer({ owner }).spec)).toThrow()
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('retains the originating execution scope after another request becomes current', async () => {
+    const ctx = await harness(), owner = await liveAgent(ctx, 'job-scope')
+    const scope: ExecutionInheritance = Object.freeze({ parentSessionId: owner.id,
+      scopeId: '10000000-0000-4000-8000-000000000001' as ExecutionScopeId,
+      inputs: Object.freeze(['00000000-0000-4000-8000-000000000001' as ExecutionInputId]),
+      primaryActorUserId: 1, unverifiedHistory: false })
+    let current = scope
+    ctx.provide('executionAuthority', { capture: () => current } as never)
+    const task = producer({ owner }), id = ctx.jobs.start(task.spec)
+    try {
+      current = { ...scope, primaryActorUserId: 2 }
+      expect(ctx.jobs.get(id, owner.id).executionScope).toEqual(scope)
+      const settled: JobEvent[] = []
+      ctx.jobs.events.subscribe({ owners: 'all' }, (event) => { if (event.type === 'settled') settled.push(event) })
+      task.settle({ status: 'completed', result: 'original work' })
+      await ctx.jobs.wait(id, 1000, owner.id)
+      expect(settled).toHaveLength(1)
+      expect(settled[0]).toMatchObject({ job: { executionScope: scope } })
+    } finally { task.settle({ status: 'killed' }); await ctx.fiber.dispose() }
   })
 
   it('refuses to register while no job controller serves the owner', async () => {
@@ -1039,17 +1070,24 @@ describe('LocalJobRegistry disposal', () => {
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(LocalJobRegistry)
     const standing = createScope(ctx, {})
+    const completed = vi.fn()
     // One mount contributes both kinds into the same layer, as `tool-jobs`
     // does; unloading it must leave nothing serving the agents that joined it.
     const mount = await standing.ctx.plugin({
       inject: ['jobs'],
       apply(pluginCtx: Context) {
         pluginCtx.jobs.attachController('tool-jobs')
-        pluginCtx.jobs.events.subscribe({ owners: 'scope' }, () => {})
+        pluginCtx.jobs.events.subscribe({ owners: 'scope' }, (event) => {
+          if (event.type === 'settled') completed(event)
+        })
       },
     })
     const owner = await liveAgent(ctx, 'joined', scopeOf(standing.ctx))
-    expect(() => ctx.jobs.start(producer({ owner }).spec)).not.toThrow()
+    const task = producer({ owner })
+    expect(() => ctx.jobs.start(task.spec)).not.toThrow()
+    task.settle({ status: 'completed' })
+    await tick()
+    expect(completed).toHaveBeenCalledOnce()
 
     await mount.dispose()
 

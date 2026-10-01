@@ -55,6 +55,8 @@ profile 导入插件前，DSH 会检查其 `peerDependencies` 中对 `@deepseek-
 
 精确版本豁免保存在 profile 自己的 `compatibility.json` 中，而不是 `package.json`，因此写豁免不会触及依赖清单、组合包列表或 Cordis patch 文件。它把精确的 `package-name@version` 键映射到精确 DSH 运行时版本列表；插件升级和 DSH 升级都不继承授权。文件缺失表示没有豁免。文件损坏绝不会阻止 profile 启动：读取器接受的记录仍然生效，每条被拒绝的记录会与插件拒绝信息一起输出到 stderr，此后该文件被视为只读，因此豁免写入会拒绝执行并要求用户手工修复，而不是覆盖用户的内容。豁免通过直接编辑该文件管理。
 
+受管启动器设置 `DSH_MANAGED_DATA_MANIFEST` 时，profile 初始化、加载和清单写入会先登记 `package.json`、`cordis.patch.yml`、`pnpm-workspace.yaml` 与 `pnpm-lock.yaml`，再修改 profile 数据。不认领依赖树或模块投影。清单不可读取或损坏时，在改动 profile 文件前拒绝初始化或规范化。应用所有的独立 profile 必须使用自己的清单目标，或不含父级清单的环境；参见[受管数据归属](../../util/managed-data/README.zh.md)。
+
 你的机器本地偏好同样位于 harness home 中：
 
 - **`.env`**——你的普通环境层：调用目录的文件优先于 harness home 的文件，两者都低于继承环境。在文件中设置的进程启动变量（如 `PATH`、`DSH_*`、`XDG_*`）会被拒绝：请改为导出这些变量。四个代理名（`HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY`、`NO_PROXY`）只从 harness home 的文件接受，绝不从调用目录的文件接受——后者随 clone 一起到来。对于只想加载某个目录 `.env` 的非产品 bin，文件缺失不影响启动，文件无法加载时输出一行带标签的警告。

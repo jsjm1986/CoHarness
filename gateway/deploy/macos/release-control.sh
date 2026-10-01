@@ -35,6 +35,12 @@ load_environment() {
   [[ "$PORT" =~ ^[0-9]+$ ]] || fail "HGW_PORT must be an integer"
   [[ "$ACTIVATION_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] \
     || fail "HGW_ACTIVATION_TIMEOUT_SECONDS must be a positive integer"
+  local current=''
+  current="$(canonical_directory "$RELEASES_ROOT/current" || true)"
+  if [[ -n "$current" && -s "$current/gateway/lib/node-config-cli.js" ]]; then
+    PORT="$("$NODE" "$current/gateway/lib/node-config-cli.js" port)" \
+      || fail 'managed node configuration could not be read; use the local node-config recovery command'
+  fi
 }
 
 assert_direct_release() {
@@ -195,6 +201,20 @@ run_gateway() {
   exec "$NODE" --import tsx/esm "$release/gateway/src/index.ts"
 }
 
+run_node_config() {
+  [[ $# -eq 1 ]] || fail 'usage: release-control.sh config <watch|status|apply|recover>'
+  case "$1" in watch|status|apply|recover) ;; *) fail 'invalid node configuration action' ;; esac
+  load_environment
+  local release
+  release="$(current_release)" || fail 'no active release'
+  [[ -s "$release/gateway/lib/node-config-cli.js" ]] || fail 'active release has no node configuration applier'
+  export HGW_RELEASE_ROOT="$release"
+  unset HGW_DSH_COMMAND HGW_DSH_REPO_ROOT HGW_MODEL_GOVERNANCE_PACKAGE HGW_GATEWAY_DIR
+  if [[ "${HGW_GUARD_PATCH:-}" != 'off' ]]; then unset HGW_GUARD_PATCH; fi
+  cd "$release/gateway"
+  exec "$NODE" "$release/gateway/lib/node-config-cli.js" "$1"
+}
+
 activate_release() {
   [[ $# -eq 1 ]] || fail 'usage: release-control.sh activate <release-directory>'
   load_environment
@@ -227,6 +247,9 @@ activate_release() {
   fi
   if launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1 \
     && wait_for_release "$release" "$previous_pid"; then
+    if launchctl print "$DOMAIN/$LABEL-config" >/dev/null 2>&1; then
+      launchctl kickstart -k "$DOMAIN/$LABEL-config" || fail 'Gateway activated but the configuration applier could not restart'
+    fi
     printf 'activated release %s (pid %s)\n' "$(basename "$release")" "$(launch_pid)"
     return 0
   fi
@@ -302,8 +325,9 @@ status() {
 
 case "${1:-}" in
   run) shift; [[ $# -eq 0 ]] || fail 'run accepts no arguments'; run_gateway ;;
+  config) shift; run_node_config "$@" ;;
   activate) shift; activate_release "$@" ;;
   prune) shift; prune_release "$@" ;;
   status) shift; [[ $# -eq 0 ]] || fail 'status accepts no arguments'; status ;;
-  *) fail 'usage: release-control.sh {run|activate <release>|prune <release>|status}' ;;
+  *) fail 'usage: release-control.sh {run|config <watch|status|apply|recover>|activate <release>|prune <release>|status}' ;;
 esac

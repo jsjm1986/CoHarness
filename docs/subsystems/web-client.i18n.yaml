@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/web-client.md
 /web-client-architecture:
-  en: b7d2de3798122a9e
-  zh: 62598228a4241d8c
+  en: 2c4d7c78beaac4ae
+  zh: 57ee9d1e13488ec8
 /web-client-architecture/layers-and-ownership:
   en: a87baae81ba4020e
   zh: b789e16a9c0d5e8a

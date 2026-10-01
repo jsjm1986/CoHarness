@@ -154,6 +154,21 @@
     },
     {
       "path": "../../context/execution-authority"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/include"
+    },
+    {
+      "path": "../../experimental/agent-team"
+    },
+    {
+      "path": "../../goal/goal-round-driver"
+    },
+    {
+      "path": "../../session/session-persistence-jsonl"
     }
   ]
 }

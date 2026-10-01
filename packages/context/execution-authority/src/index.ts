@@ -1,12 +1,13 @@
 /** Verified execution identity Service Definition. @module @deepseek-ai/dsh-execution-authority */
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context, Service, symbols } from '@deepseek-ai/cordis'
+import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { MessageId, UserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { ExecutionCapability, ExecutionInheritance, ExecutionQuestionId, ExecutionState } from './types.ts'
 
-export type { ExecutionCapability, ExecutionInheritance, ExecutionInputId, ExecutionQuestionId, ExecutionState } from './types.ts'
+export type { ExecutionCapability, ExecutionInheritance, ExecutionInputId, ExecutionQuestionId, ExecutionScopeId, ExecutionState } from './types.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -36,9 +37,28 @@ export abstract class ExecutionAuthority extends Service {
    * @param session - Session owning the live question.
    * @param questionId - exact pending question identity verified by the transport.
    * @param answer - parser-validated answer.
+   * @param scope - exact execution captured when the question opened.
    * @returns whether the caller owns this answer, including an identical retry.
    */
-  abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown): Promise<boolean>
+  abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown, scope?: ExecutionInheritance): Promise<boolean>
+
+  /**
+   * Preserve captured execution identity across an asynchronous callback.
+   * @param agent - exact lifecycle owner of the operation.
+   * @param scope - participants captured when the work was admitted.
+   * @param work - callback that must not borrow a later request's identity.
+   * @returns the callback result.
+   */
+  abstract runCaptured<T>(agent: Agent, scope: ExecutionInheritance, work: () => T): T
+
+  /**
+   * Attest a live human command before it creates background execution.
+   * @param agent - target authorized by the calling transport.
+   * @param input - exact command or Remote invocation to attribute.
+   * @param work - operation executed under the verified initiator.
+   * @returns the operation result.
+   */
+  abstract runRequest<T>(agent: Agent, input: unknown, work: () => T): Promise<Awaited<T>>
 
   /**
    * Capture the current participants before awaiting delegated work.
@@ -48,9 +68,9 @@ export abstract class ExecutionAuthority extends Service {
   abstract capture(agent: Agent): ExecutionInheritance
 
   /**
-   * Capture the complete authority of a cold or live source for an explicit fork.
+   * Capture the current execution of a cold or live source for an explicit fork.
    * @param sessionId - source already authorized by the fork transport.
-   * @returns current participant references, independently of the selected history cut.
+   * @returns current execution references, independently of the selected history cut.
    */
   abstract captureSession(sessionId: SessionId): Promise<ExecutionInheritance>
 
@@ -76,9 +96,11 @@ export abstract class ExecutionAuthority extends Service {
    * @param capability - required privilege; identity alone grants none.
    * @param agent - actual executing Agent.
    * @param signal - operation-owned cancellation.
+   * @param execution - exact tool call when authorization precedes other execution wrappers.
    * @returns verified participants for attribution; one call incurs one charge.
    */
-  abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal): Promise<ExecutionState>
+  abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal,
+    execution?: ToolExecution): Promise<ExecutionState>
 
   /**
    * Authorize an explicit preset selection before its synchronous commit.
@@ -99,6 +121,18 @@ export function executionAuthorityOf(ctx: Context): ExecutionAuthority | undefin
     throw new RemoteError('execution/forbidden', 'Managed execution requires its authorization provider.', { capability: 'execute' })
   }
   return authority
+}
+
+/**
+ * Compare providers across Cordis reads without confusing fresh tracing proxies with replacement.
+ * @param current - provider resolved after asynchronous authorization.
+ * @param captured - provider that performed authorization before the final mutation.
+ * @returns whether both reads refer to the same provider, including local absence.
+ */
+export function sameExecutionAuthority(current: ExecutionAuthority | undefined, captured: ExecutionAuthority | undefined): boolean {
+  const original = (value: ExecutionAuthority | undefined) =>
+    (value as (ExecutionAuthority & { [symbols.original]?: ExecutionAuthority }) | undefined)?.[symbols.original] ?? value
+  return original(current) === original(captured)
 }
 
 export default ExecutionAuthority

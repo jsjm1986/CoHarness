@@ -8,9 +8,11 @@
  * @module @deepseek-ai/dsh-tool-jobs
  */
 
+import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
+import type { ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority/types'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { boundContextSummary, createUserMessage, type ContentBlock } from '@deepseek-ai/dsh-llm'
+import { boundContextSummary, createUserMessage, MessageId, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { TextRetainer } from '@deepseek-ai/dsh-output-retention'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -23,7 +25,11 @@ import { publicJob, renderModelDelta, statusLine } from './render.ts'
 import type { PublicJobSnapshot } from './render.ts'
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
-    'tool-jobs': { kind: 'tool-jobs' } & ContextFormed
+    'tool-jobs': {
+      kind: 'tool-jobs'
+      /** Captured origin of the completed job, when the authority seam is loaded. */
+      gatewayExecutionScope?: ExecutionInheritance
+    } & ContextFormed
   }
 }
 
@@ -281,6 +287,10 @@ export function apply(ctx: Context, config: Config): void {
     // absent here when it left before settlement — and then no inbox is left.
     const owner = ctx.get('agents')?.get(event.job.owner)
     if (owner === undefined) return
+    const authority = executionAuthorityOf(ctx)
+    const captured = event.job.executionScope
+    const scope = authority === undefined || captured === undefined ? captured
+      : authority.runCaptured(owner, captured, () => authority.capture(owner))
     const message = createUserMessage({
       content: [{
         type: 'text',
@@ -288,6 +298,7 @@ export function apply(ctx: Context, config: Config): void {
       }],
       source: {
         kind: 'tool-jobs',
+        ...(scope === undefined ? {} : { gatewayExecutionScope: scope }),
         form: 'notice',
         summary: completionSummary(event.job),
       },
@@ -342,6 +353,19 @@ export function apply(ctx: Context, config: Config): void {
         // state. A timed-out or aborted wait has left the registry's waiter
         // set before any later settlement, which then notifies as usual.
         await jobs.wait(id, Math.min(args.timeout_ms ?? waitDefault, waitCap), exec.agent?.id, exec.signal)
+      }
+      const view = jobs.get(id, exec.agent?.id)
+      const authority = executionAuthorityOf(ctx)
+      if ((view.status === 'running' || view.status === 'stopping')
+        && exec.agent !== undefined && view.executionScope !== undefined && authority !== undefined) {
+        const agent = exec.agent, origin = view.executionScope
+        for (;;) {
+          exec.signal.throwIfAborted()
+          const captured = authority.runCaptured(agent, origin, () => authority.capture(agent))
+          await authority.relay(agent.session, captured, MessageId(`job-output:${exec.callId}`), exec.signal)
+          const current = authority.runCaptured(agent, origin, () => authority.capture(agent))
+          if (JSON.stringify(current) === JSON.stringify(captured)) break
+        }
       }
       return readBody(jobs.read(id, exec.agent?.id))
     },

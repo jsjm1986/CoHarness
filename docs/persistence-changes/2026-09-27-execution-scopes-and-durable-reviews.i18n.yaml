@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-09-27-execution-scopes-and-durable-reviews.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-09-27-execution-scopes-and-durable-reviews.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-09-27-execution-scopes-and-durable-reviews:
+  en: 5c7ad1243efd7f92
+  zh: fccba23139bcf118
+/2026-09-27-execution-scopes-and-durable-reviews/summary:
+  en: 2779ee2a531b7622
+  zh: 8e97144b41e0f2d1
+/2026-09-27-execution-scopes-and-durable-reviews/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-09-27-execution-scopes-and-durable-reviews/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-09-27-execution-scopes-and-durable-reviews/compatibility:
+  en: b204aed41acab05f
+  zh: ef04c34e6b9e04a2
+/2026-09-27-execution-scopes-and-durable-reviews/verification:
+  en: 87f8458d80e464c5
+  zh: 56f409cd01cacaf1
+/2026-09-27-execution-scopes-and-durable-reviews/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

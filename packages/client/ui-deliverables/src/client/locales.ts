@@ -48,6 +48,9 @@ export const zh = {
   'row.stopped': '已中断',
   'row.inspect': '查看调用',
   'changes.title': '已编辑 {count} 个文件',
+  'changes.incomplete': '本轮改动审阅未完整保存',
+  'changes.unavailable': '本轮历史改动暂不可用。请重试，或检查存储与备份中的审阅记录。',
+  'changes.storageFailure': '文件改动可能已经发生。请先处理存储问题，再发起新的请求；已有历史审阅仍会保留。',
   'changes.added': '+{count}',
   'changes.deleted': '-{count}',
   'changes.binary': '二进制',
@@ -86,6 +89,9 @@ export const zh = {
 
 /** English dictionary (same key set). */
 export const en: Record<DeliverablesKey, string> = {
+  'changes.incomplete': 'This turn’s review was not fully saved',
+  'changes.unavailable': 'This turn’s historical review is unavailable. Retry or check its stored and backed-up records.',
+  'changes.storageFailure': 'File changes may already have occurred. Resolve the storage problem before sending a new request. Existing reviews are preserved.',
   'produced.label': 'Produced',
   'produced.moreOne': '+ 1 file',
   'produced.more': '+ {count} files',

@@ -181,7 +181,7 @@ describe('web e2e: plugin configuration section', () => {
     const arrived = Promise.withResolvers<undefined>()
     const release = Promise.withResolvers<undefined>()
     const drained = Promise.withResolvers<undefined>()
-    const pattern = '**/api/settings.mutate'
+    const pattern = /\/api\/settings\.mutate(?:\?.*)?$/
     await page.route(pattern, async (route) => {
       try {
         const response = await route.fetch()

@@ -39,6 +39,10 @@ Loading the plugin registers `ctx.jobs`; every field is optional.
 - name: '@deepseek-ai/dsh-jobs-local'
 ```
 
+A Session removal reservation refuses new owned jobs before producer execution. The owning Agent's disposal cancels and awaits its running and stopping jobs.
+
+Managed jobs capture execution identity before producer startup. A later request on the same Agent cannot replace a running job’s origin or its completion attribution.
+
 | Field | Default | Meaning |
 |---|---|---|
 | `maxConcurrentJobsPerOwner` | `10` | Maximum `running` plus `stopping` jobs per exact owner, or in the shared unowned bucket |

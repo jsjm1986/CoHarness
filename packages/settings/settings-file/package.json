@@ -27,10 +27,11 @@
   ],
   "license": "MIT",
   "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-atomic-write": "workspace:*",
     "@deepseek-ai/dsh-home-paths": "workspace:*",
-    "@deepseek-ai/dsh-settings": "workspace:*",
-    "@deepseek-ai/cordis": "workspace:~"
+    "@deepseek-ai/dsh-managed-data": "workspace:*",
+    "@deepseek-ai/dsh-settings": "workspace:*"
   },
   "dependencies": {
     "@deepseek-ai/dsh-util-values": "workspace:*",
@@ -39,9 +40,10 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
+    "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-atomic-write": "workspace:*",
     "@deepseek-ai/dsh-home-paths": "workspace:*",
-    "@deepseek-ai/dsh-settings": "workspace:*",
-    "@deepseek-ai/cordis": "workspace:~"
+    "@deepseek-ai/dsh-managed-data": "workspace:*",
+    "@deepseek-ai/dsh-settings": "workspace:*"
   }
 }

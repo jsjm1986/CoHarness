@@ -13,9 +13,11 @@
  * @module @deepseek-ai/dsh-subagent/external
  */
 
+import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { dirname } from 'node:path'
+import { z } from 'zod'
 import type { MessageId, RequestMessage, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 
@@ -55,6 +57,8 @@ export interface ExternalPendingPrompt {
   readonly prompt: string
   /** The newest user message id the prompt consumed. */
   readonly throughMessageId: MessageId
+  /** Provider-confirmed turn identity, recorded before accepting its terminal result. */
+  readonly externalTurnId?: string
 }
 
 /** One settled external turn folded out of the binding store. */
@@ -100,10 +104,13 @@ export interface ExternalMemberSession {
    * Send one user prompt and stream the external turn's assistant text.
    * @param prompt - the exact text for the external session's next user turn.
    * @param signal - caller cancellation; an aborted turn leaves the outcome unknown.
+   * @param started - synchronously persist a provider-confirmed turn identity, when available.
    * @returns text pieces in order, an {@link ExternalTurnBound} the moment a
    *   fresh identity mints, then the terminal outcome.
    */
-  turn(prompt: string, signal: AbortSignal): AsyncIterable<string | ExternalTurnBound | ExternalTurnOutcome>
+  turn(
+    prompt: string, signal: AbortSignal, started?: (externalTurnId: string) => void,
+  ): AsyncIterable<string | ExternalTurnBound | ExternalTurnOutcome>
   /**
    * Prove the state of a previously issued prompt from the external
    * runtime's own durable transcript. Implementations read the external
@@ -133,13 +140,27 @@ export interface ExternalMemberTransport {
   open(externalId: string | undefined, signal: AbortSignal): Promise<ExternalMemberSession>
 }
 
+/** Resolve a transport for the exact child Session at each execution, before opening it. */
+export type ExternalMemberTransportSource = ExternalMemberTransport
+  | ((child: SessionId, signal: AbortSignal) => Promise<ExternalMemberTransport>)
+
 /** Error code stamped when an unknown-outcome external prompt is dropped, never resent. */
 export const EXTERNAL_TURN_OUTCOME_UNKNOWN = 'EXTERNAL_TURN_OUTCOME_UNKNOWN'
 
-type StoreRecord =
-  | { readonly v: 1; readonly kind: 'bind'; readonly child: string; readonly externalId: string }
-  | { readonly v: 1; readonly kind: 'pending'; readonly child: string; readonly prompt: string; readonly throughMessageId: string }
-  | { readonly v: 1; readonly kind: 'consumed'; readonly child: string; readonly messageId: string }
+/** Immutable execution coordinates recorded before an external Session can bind. */
+export interface ExternalExecutionIdentity {
+  readonly cwd: string
+  readonly target: string
+}
+
+const recordBase = z.object({ v: z.literal(1), child: z.string().min(1) }).strict()
+const storeRecordSchema = z.discriminatedUnion('kind', [
+  recordBase.extend({ kind: z.literal('bind'), externalId: z.string().min(1) }),
+  recordBase.extend({ kind: z.literal('pending'), prompt: z.string(), throughMessageId: z.string().min(1), externalTurnId: z.string().optional() }),
+  recordBase.extend({ kind: z.literal('consumed'), messageId: z.string() }),
+  recordBase.extend({ kind: z.literal('execution'), cwd: z.string().min(1), target: z.string().regex(/^(?:local|ssh:[1-9][0-9]*)$/u) }),
+])
+type StoreRecord = z.infer<typeof storeRecordSchema>
 
 /** One stored turn window: the trailing user run not yet consumed by the external session. */
 export interface ExternalPromptWindow {
@@ -156,13 +177,16 @@ export interface ExternalPromptWindow {
  * harness process that created it — concurrent writers are out of scope.
  */
 export class ExternalBindingStore {
-  private readonly bindings = new Map<string, ExternalMemberBinding>()
+  private bindings = new Map<string, ExternalMemberBinding>()
+  private executions = new Map<string, ExternalExecutionIdentity>()
   private loaded = false
 
   /**
    * @param file - the JSONL backing file, created with its parent directory on first write.
    */
-  constructor(private readonly file: string) {}
+  constructor(private readonly file: string) {
+    registerManagedDataPath({ owner: '@deepseek-ai/dsh-subagent', kind: 'file', path: file }, process.env.DSH_MANAGED_DATA_MANIFEST)
+  }
 
   /**
    * Read the folded binding for one child.
@@ -172,6 +196,23 @@ export class ExternalBindingStore {
   binding(child: SessionId): ExternalMemberBinding | undefined {
     this.ensureLoaded()
     return this.bindings.get(child)
+  }
+
+  /**
+   * Bind the child to its verified execution world before starting any external process.
+   * @param child - exact durable member identity.
+   * @param execution - canonical cwd and target resolved from that Session.
+   */
+  assertExecution(child: SessionId, execution: ExternalExecutionIdentity): void {
+    this.ensureLoaded()
+    const current = this.executions.get(child)
+    if (current !== undefined) {
+      if (current.cwd !== execution.cwd || current.target !== execution.target) throw new Error('External member execution target changed')
+      return
+    }
+    if (this.bindings.has(child)) throw new Error('Legacy external member binding has no verified execution target; create a new member')
+    this.append({ v: 1, kind: 'execution', child, cwd: execution.cwd, target: execution.target })
+    this.executions.set(child, { cwd: execution.cwd, target: execution.target })
   }
 
   /**
@@ -234,50 +275,64 @@ export class ExternalBindingStore {
 
   private append(record: StoreRecord): void {
     this.ensureLoaded()
-    mkdirSync(dirname(this.file), { recursive: true })
-    appendFileSync(this.file, JSON.stringify(record) + '\n')
+    mkdirSync(dirname(this.file), { recursive: true, mode: 0o700 })
+    appendFileSync(this.file, JSON.stringify(record) + '\n', { mode: 0o600, flush: true })
   }
 
   private ensureLoaded(): void {
     if (this.loaded) return
-    this.loaded = true
     let raw: string
     try {
       raw = readFileSync(this.file, 'utf8')
-    } catch {
-      // First use: the file does not exist; any other read failure also starts
-      // empty because a corrupt-tail store must not fabricate bindings.
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      this.loaded = true
       return
     }
+    const bindings = new Map<string, ExternalMemberBinding>()
+    const executions = new Map<string, ExternalExecutionIdentity>()
     for (const line of raw.split('\n')) {
       if (line === '') continue
-      const record = JSON.parse(line) as StoreRecord
-      const current = this.bindings.get(record.child)
+      const record = storeRecordSchema.parse(JSON.parse(line) as unknown)
+      const current = bindings.get(record.child)
       switch (record.kind) {
+        case 'execution': {
+          const previous = executions.get(record.child)
+          if (previous !== undefined && (previous.cwd !== record.cwd || previous.target !== record.target)) {
+            throw new Error('External member store contains conflicting execution targets')
+          }
+          executions.set(record.child, { cwd: record.cwd, target: record.target })
+          break
+        }
         case 'bind':
-          this.bindings.set(record.child, {
+          bindings.set(record.child, {
             externalId: record.externalId,
             ...current?.consumedMessageId === undefined ? {} : { consumedMessageId: current.consumedMessageId },
             ...current?.pending === undefined ? {} : { pending: current.pending },
           })
           break
         case 'pending':
-          if (current === undefined) break
-          this.bindings.set(record.child, {
+          if (current === undefined) throw new Error('External member pending record has no binding')
+          bindings.set(record.child, {
             ...current,
-            pending: { prompt: record.prompt, throughMessageId: record.throughMessageId as MessageId },
+            pending: { prompt: record.prompt, throughMessageId: record.throughMessageId as MessageId,
+              ...(record.externalTurnId === undefined ? {} : { externalTurnId: record.externalTurnId }) },
           })
           break
         case 'consumed':
-          if (current === undefined) break
-          this.bindings.set(record.child, {
+          if (current === undefined) throw new Error('External member consumed record has no binding')
+          bindings.set(record.child, {
             externalId: current.externalId,
             ...record.messageId === '' ? {} : { consumedMessageId: record.messageId as MessageId },
           })
           break
       }
     }
+    this.bindings = bindings
+    this.executions = executions
+    this.loaded = true
   }
+
 }
 
 /**
@@ -329,23 +384,24 @@ export function externalPromptWindow(
  * and settle the consumed cursor. Shared by every external-member adapter.
  * @param options - the loop-assembled request (requires `sessionId`).
  * @param store - the provider's binding store.
- * @param transport - the provider's open/recover/dispose transport.
+ * @param transport - fixed transport or a factory resolving the exact child's execution target.
  * @returns raw chunks for the adapter's `stream`.
  */
 export async function* externalMemberTurn(
   options: { readonly sessionId?: SessionId; readonly messages: readonly RequestMessage[]; readonly signal?: AbortSignal },
   store: ExternalBindingStore,
-  transport: ExternalMemberTransport,
+  transport: ExternalMemberTransportSource,
 ): AsyncIterable<StreamChunk> {
   const child = options.sessionId
   if (child === undefined) {
     throw new Error('external member adapter: the request carries no session id')
   }
   const signal = options.signal ?? new AbortController().signal
+  const connection = typeof transport === 'function' ? await transport(child, signal) : transport
   const binding = store.binding(child)
 
   if (binding?.pending !== undefined) {
-    const session = await transport.open(binding.externalId, signal)
+    const session = await connection.open(binding.externalId, signal)
     let recovery: ExternalRecovery
     try {
       recovery = await session.recover(binding.pending, signal)
@@ -376,7 +432,7 @@ export async function* externalMemberTurn(
         )
     }
     // Fall through on 'absent' to run the same window against a clean pending state.
-    yield* externalMemberTurn(options, store, transport)
+    yield* externalMemberTurn(options, store, connection)
     return
   }
 
@@ -386,7 +442,7 @@ export async function* externalMemberTurn(
     return
   }
 
-  const session = await transport.open(binding?.externalId, signal)
+  const session = await connection.open(binding?.externalId, signal)
   try {
     let boundId = store.binding(child)?.externalId
     if (session.externalId !== undefined && session.externalId !== boundId) {
@@ -408,7 +464,9 @@ export async function* externalMemberTurn(
     }
     const collected: string[] = []
     let outcome: ExternalTurnOutcome | undefined
-    for await (const piece of session.turn(window.prompt, signal)) {
+    for await (const piece of session.turn(window.prompt, signal, (externalTurnId) => {
+      store.markPending(child, { ...pending, externalTurnId })
+    })) {
       // Fresh sessions mint their identity while the first turn runs; the
       // `bound` piece arrives the moment that happens — before the prompt
       // issues for transports that mint at open — so the binding and the

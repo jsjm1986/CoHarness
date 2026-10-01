@@ -300,6 +300,24 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the disposer that clears the factory slot. The exact Cordis effect disposer (single-shot): composite (generator) effects may yield it directly — exact identity nests the teardown in order.',
       },
       {
+        signature: 'reserveRemoval(ids: readonly SessionId[]): Disposable',
+        description: 'Hold Session identities while an owner releases resources and removes durable data. Existing factory work and overlapping removals refuse the reservation.',
+        parameters: [{ name: 'ids', description: 'exact identities whose creation and resource admission must remain closed.' }],
+        returns: 'a caller-owned reservation, released after the whole removal operation settles.',
+      },
+      {
+        signature: 'isRemoving(id: SessionId): boolean',
+        description: 'Test the current removal reservation before allocating an Agent-owned resource.',
+        parameters: [{ name: 'id', description: 'Session whose caller has already been authenticated.' }],
+        returns: 'whether its owner is releasing it for durable deletion.',
+      },
+      {
+        signature: 'reserveUse(ids: readonly SessionId[]): Disposable',
+        description: 'Keep an addressed lifecycle request out of concurrent permanent removal.',
+        parameters: [{ name: 'ids', description: 'identities used while resolving or preparing an Agent operation.' }],
+        returns: 'a caller-owned reservation to retain until the operation settles.',
+      },
+      {
         signature: 'async create(options: CreateAgentOptions): Promise<AgentHandle>',
         description: 'Create and publish a new agent through the registered factory. Distinct from register (which records an already-constructed agent): this constructs the agent and its session. Rejects if no factory is registered or creation/setup fails. The resolved AgentHandle lets the owner tear down exactly this agent.',
         parameters: [{ name: 'options', description: 'shared identity, optional live parent, session seed/metadata, and agent options.' }],
@@ -611,7 +629,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'cancel(key: CredentialKey): void',
-        description: 'Withdraw the attempt running for a key, if any. Separate from the request\'s own signal because a request/response transport answers a Cancel button on a second call, with no handle on the first one\'s signal.',
+        description: 'Withdraw the attempt running for a key, if any. Separate from the request\'s own signal because a request/response transport answers a Cancel button on a second call, with no handle on the first one\'s signal. Cancellation has no effect once a commit\'s write was admitted to storage: the granted credential is allowed to land and the caller hears the write\'s own outcome rather than a revoked grant.',
         parameters: [{ name: 'key', description: 'the credential record whose attempt should stop.' }],
       },
       {
@@ -919,10 +937,22 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'immutable input with verified origin reference.',
       },
       {
-        signature: 'abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown): Promise<boolean>',
+        signature: 'abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown, scope?: ExecutionInheritance): Promise<boolean>',
         description: 'Claim a verified human answer and include its responder before delivery.',
-        parameters: [{ name: 'session', description: 'Session owning the live question.' }, { name: 'questionId', description: 'exact pending question identity verified by the transport.' }, { name: 'answer', description: 'parser-validated answer.' }],
+        parameters: [{ name: 'session', description: 'Session owning the live question.' }, { name: 'questionId', description: 'exact pending question identity verified by the transport.' }, { name: 'answer', description: 'parser-validated answer.' }, { name: 'scope', description: 'exact execution captured when the question opened.' }],
         returns: 'whether the caller owns this answer, including an identical retry.',
+      },
+      {
+        signature: 'abstract runCaptured<T>(agent: Agent, scope: ExecutionInheritance, work: () => T): T',
+        description: 'Preserve captured execution identity across an asynchronous callback.',
+        parameters: [{ name: 'agent', description: 'exact lifecycle owner of the operation.' }, { name: 'scope', description: 'participants captured when the work was admitted.' }, { name: 'work', description: 'callback that must not borrow a later request\'s identity.' }],
+        returns: 'the callback result.',
+      },
+      {
+        signature: 'abstract runRequest<T>(agent: Agent, input: unknown, work: () => T): Promise<Awaited<T>>',
+        description: 'Attest a live human command before it creates background execution.',
+        parameters: [{ name: 'agent', description: 'target authorized by the calling transport.' }, { name: 'input', description: 'exact command or Remote invocation to attribute.' }, { name: 'work', description: 'operation executed under the verified initiator.' }],
+        returns: 'the operation result.',
       },
       {
         signature: 'abstract capture(agent: Agent): ExecutionInheritance',
@@ -932,9 +962,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'abstract captureSession(sessionId: SessionId): Promise<ExecutionInheritance>',
-        description: 'Capture the complete authority of a cold or live source for an explicit fork.',
+        description: 'Capture the current execution of a cold or live source for an explicit fork.',
         parameters: [{ name: 'sessionId', description: 'source already authorized by the fork transport.' }],
-        returns: 'current participant references, independently of the selected history cut.',
+        returns: 'current execution references, independently of the selected history cut.',
       },
       {
         signature: 'abstract inherit(session: Session, scope: ExecutionInheritance): void',
@@ -948,9 +978,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'recipient restrictions for an onward delegation of this delivery.',
       },
       {
-        signature: 'abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal): Promise<ExecutionState>',
+        signature: 'abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal, execution?: ToolExecution): Promise<ExecutionState>',
         description: 'Recheck every participant against current permissions.',
-        parameters: [{ name: 'capability', description: 'required privilege; identity alone grants none.' }, { name: 'agent', description: 'actual executing Agent.' }, { name: 'signal', description: 'operation-owned cancellation.' }],
+        parameters: [{ name: 'capability', description: 'required privilege; identity alone grants none.' }, { name: 'agent', description: 'actual executing Agent.' }, { name: 'signal', description: 'operation-owned cancellation.' }, { name: 'execution', description: 'exact tool call when authorization precedes other execution wrappers.' }],
         returns: 'verified participants for attribution; one call incurs one charge.',
       },
       {
@@ -1231,6 +1261,25 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Read direct module dependency URLs from the active Node loader.',
         parameters: [{ name: 'url', description: 'Module URL.' }],
         returns: 'Linked module URLs, or an empty list for an uncached module.',
+      },
+    ],
+  },
+  {
+    key: 'hostSessionLifecycle',
+    summary: 'Host-internal lifecycle operations; this service is not a Remote or HTTP endpoint.',
+    description: 'Host-internal lifecycle operations; this service is not a Remote or HTTP endpoint.',
+    methods: [
+      {
+        signature: 'own(handle: AgentHandle): Agent',
+        description: 'Retain the disposer returned to this Host entry point by the Agent factory.',
+        parameters: [{ name: 'handle', description: 'newly created or resumed Agent owned by this API.' }],
+        returns: 'that exact Agent for ordinary request routing.',
+      },
+      {
+        signature: 'withReleased<T>(ids: readonly SessionId[], remove: () => Promise<T>): Promise<T>',
+        description: 'Release idle API-owned Sessions in runtime child-first order while preventing same-identity recreation.',
+        parameters: [{ name: 'ids', description: 'the complete durable tree selected by the archive owner.' }, { name: 'remove', description: 'durable removal, invoked only after all releases succeed.' }],
+        returns: 'the removal result; busy or unknown owners leave persistent data untouched.',
       },
     ],
   },
@@ -3525,21 +3574,27 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'workspaceChanges',
-    summary: 'Serves the summaries and file comparisons the recorder keeps for live Sessions.',
-    description: 'Serves the summaries and file comparisons the recorder keeps for live Sessions.',
+    summary: 'Serves live and durably recorded historical comparisons.',
+    description: 'Serves live and durably recorded historical comparisons.',
     methods: [
       {
-        signature: 'summary(sessionId: SessionId, seq: number): WorkspaceChangesSummary | undefined',
+        signature: 'removeStored(sessionId: SessionId, signal?: AbortSignal): Promise<void>',
+        description: 'Remove stored reviews for an explicitly purged, released Session.',
+        parameters: [{ name: 'sessionId', description: 'identity selected by the authenticated archive owner.' }, { name: 'signal', description: 'purge cancellation.' }],
+        returns: 'after its immutable artifacts have been removed.',
+      },
+      {
+        signature: 'summary(sessionId: SessionId, seq: number, signal?: AbortSignal): WorkspaceChangesSummary | undefined | Promise<WorkspaceChangesSummary | undefined>',
         description: 'The summary announced by one `workspace/changes` event.',
-        parameters: [{ name: 'sessionId', description: 'the Session that appended the event.' }, { name: 'seq', description: 'the event\'s sequence number.' }],
-        returns: 'the summary, or undefined once its Session was disposed or when this Host never recorded it.',
+        parameters: [{ name: 'sessionId', description: 'the Session that appended the event.' }, { name: 'seq', description: 'the event\'s sequence number.' }, { name: 'signal', description: 'optional cancellation for a persisted read.' }],
+        returns: 'the summary, or undefined when no historical record is available.',
       },
       {
         signature: 'diff(sessionId: SessionId, seq: number, index: number, signal: AbortSignal): Promise<WorkspaceFileDiff | undefined>',
         description: 'Compare one listed file\'s contents at turn start and turn end.',
         parameters: [{ name: 'sessionId', description: 'the Session that appended the event.' }, { name: 'seq', description: 'the event\'s sequence number.' }, { name: 'index', description: 'the file\'s index in the summary\'s `files`.' }, { name: 'signal', description: 'cancels the reads.' }],
-        returns: 'the comparison, or undefined once its Session was disposed, when this Host never recorded it, or when no file has that index.',
-        throws: ['when a snapshot read fails for a live Session.'],
+        returns: 'the comparison, or undefined when the artifact or file index is unavailable.',
+        throws: ['when historical data is corrupt or storage cannot be read.'],
       },
     ],
   },
@@ -3735,6 +3790,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'A step or turn errored.',
     description: 'A step or turn errored. The machine reports a failure here even when the error has no in-turn position for a durable record.',
     parameters: [{ name: 'payload', description: '.error - the failure, verbatim. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
+  },
+  {
+    name: 'agent/idle-release-check',
+    mode: 'bail',
+    signature: '\'agent/idle-release-check\'(this: Scoped<Agent>, payload: { agent: Agent }): \'busy\' | undefined',
+    summary: 'Synchronously refuse idle disposal while a plugin owns pending work or retained resources.',
+    description: 'Synchronously refuse idle disposal while a plugin owns pending work or retained resources. Listeners inspect only resources owned by the exact Agent and return undefined otherwise. Scope-filtered dispatch; global resource registries still match the exact payload Agent.',
+    parameters: [{ name: 'payload', description: 'the Agent whose lifecycle owner requested idle disposal.' }],
   },
   {
     name: 'agent/inbox/claimed',
@@ -4209,6 +4272,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'payload', description: 'decoded endpoint, service, method, arguments, and signal.' }],
   },
   {
+    name: 'typert-gateway/invoke',
+    mode: 'waterfall',
+    signature: '\'typert-gateway/invoke\'(payload: TypertGatewayAuthorizationRequest, next: () => Promise<unknown>): Promise<unknown>',
+    summary: 'Wrap the resolved method after authorization and all lookups have completed.',
+    description: 'Wrap the resolved method after authorization and all lookups have completed.',
+    parameters: [{ name: 'payload', description: 'decoded invocation whose receiver and arguments are ready.' }],
+  },
+  {
     name: 'user-questions/request',
     mode: 'waterfall',
     signature: '\'user-questions/request\'( this: Scoped<Agent>, request: AskUserQuestionRequestEvent, next: () => Promise<AskUserQuestionAnswer>, ): Promise<AskUserQuestionAnswer>',
@@ -4330,7 +4401,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AgentHandle',
-    declaration: 'export interface AgentHandle {\n    agent: Agent;\n    dispose(): Promise<void>;\n}',
+    declaration: 'export interface AgentHandle {\n    agent: Agent;\n    dispose(): Promise<void>;\n    tryDisposeIdle(): Promise<boolean>;\n}',
   },
   {
     name: 'AgentOptions',
@@ -4926,7 +4997,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ExecutionInheritance',
-    declaration: 'export interface ExecutionInheritance {\n    readonly parentSessionId: SessionId;\n    readonly inputs: readonly ExecutionInputId[];\n    readonly unverifiedHistory: boolean;\n    readonly primaryActorUserId?: number;\n}',
+    declaration: 'export interface ExecutionInheritance {\n    readonly parentSessionId: SessionId;\n    readonly scopeId?: ExecutionScopeId;\n    readonly inputs: readonly ExecutionInputId[];\n    readonly unverifiedHistory: boolean;\n    readonly primaryActorUserId?: number;\n}',
   },
   {
     name: 'ExecutionInputId',
@@ -4937,8 +5008,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ExecutionQuestionId = Branded<\'rpc-id\'>;',
   },
   {
+    name: 'ExecutionScopeId',
+    declaration: 'export type ExecutionScopeId = Branded<\'ExecutionScopeId\'>;',
+  },
+  {
     name: 'ExecutionState',
-    declaration: 'export interface ExecutionState {\n    readonly revision: string;\n    readonly inputs: readonly ExecutionInputId[];\n    readonly actors: readonly {\n        readonly userId: number;\n    }[];\n    readonly primaryActorUserId?: number;\n    readonly unverifiedHistory: boolean;\n}',
+    declaration: 'export interface ExecutionState {\n    readonly revision: string;\n    readonly scopeId?: ExecutionScopeId;\n    readonly inputs: readonly ExecutionInputId[];\n    readonly actors: readonly {\n        readonly userId: number;\n    }[];\n    readonly primaryActorUserId?: number;\n    readonly unverifiedHistory: boolean;\n}',
   },
   {
     name: 'FeedbackCategory',
@@ -7406,7 +7481,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WorkspaceChangesSummary',
-    declaration: 'export interface WorkspaceChangesSummary {\n    turn: number;\n    cwd: string;\n    files: WorkspaceChangedFile[];\n    total: number;\n    added: number;\n    deleted: number;\n    snapshot?: {\n        before: string;\n        after: string;\n    };\n}',
+    declaration: 'export interface WorkspaceChangesSummary {\n    incomplete?: true;\n    turn: number;\n    cwd: string;\n    files: WorkspaceChangedFile[];\n    total: number;\n    added: number;\n    deleted: number;\n    snapshot?: {\n        before: string;\n        after: string;\n    };\n}',
   },
   {
     name: 'WorkspaceDiffHunk',

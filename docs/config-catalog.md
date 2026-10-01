@@ -145,7 +145,7 @@ export interface Config {
 
 - `inject`: `agents` · `sessions` · `llm` · `tools` · `systemPrompt` · `sessionProjections`
 - `refs`: [`AgentOptions`](subsystems/core.md) · [`SessionId`](subsystems/core.md)
-- `source`: [`packages/core/agent-loop/src/index.ts:318`](../packages/core/agent-loop/src/index.ts)
+- `source`: [`packages/core/agent-loop/src/index.ts:319`](../packages/core/agent-loop/src/index.ts)
 
 ```ts config-catalog
 /** Agent-loop plugin configuration. */
@@ -351,7 +351,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-terminal-controller`
 
 - `inject`: `subprocess` · `sandboxPolicy` · `typert`
-- `source`: [`packages/api/terminal-controller/src/index.ts:29`](../packages/api/terminal-controller/src/index.ts)
+- `source`: [`packages/api/terminal-controller/src/index.ts:30`](../packages/api/terminal-controller/src/index.ts)
 
 ```ts config-catalog
 /** Deployment limits and an optional shell profile. */
@@ -391,12 +391,29 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-api-terminal-controller -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-archive-gateway -->
+<a id="deepseek-aidsh-archive-gateway"></a>
+
+## `@deepseek-ai/dsh-archive-gateway`
+
+- `inject`: `connection` · `gatewayRuntime` · `workspaceRegistry`
+- `source`: [`packages/context/archive-gateway/src/index.ts:20`](../packages/context/archive-gateway/src/index.ts)
+
+```ts config-catalog
+/** Online command delivery without periodic full-history synchronization. */
+export interface Config {
+  /** Milliseconds between completed pending-command probes; operations never overlap. */
+  commandPollMs?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-archive-gateway -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-attachment-local -->
 <a id="deepseek-aidsh-attachment-local"></a>
 
 ## `@deepseek-ai/dsh-attachment-local`
 
-- `source`: [`packages/attachment/attachment-local/src/index.ts:61`](../packages/attachment/attachment-local/src/index.ts)
+- `source`: [`packages/attachment/attachment-local/src/index.ts:62`](../packages/attachment/attachment-local/src/index.ts)
 
 ```ts config-catalog
 /** Local attachment backend configuration. */
@@ -692,7 +709,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-credentials-local`
 
-- `source`: [`packages/credentials/credentials-local/src/index.ts:64`](../packages/credentials/credentials-local/src/index.ts)
+- `source`: [`packages/credentials/credentials-local/src/index.ts:65`](../packages/credentials/credentials-local/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: file location and hot-reload behavior. */
@@ -987,14 +1004,14 @@ export type Config = LocalConfig
 ## `@deepseek-ai/dsh-gateway-execution`
 
 - `inject`: `gatewayRuntime` · `agents` · `sessions` · `sessionQuery` · `permissionPresets` · `sandboxPolicy` · `sessionProjections`
-- `source`: [`packages/context/gateway-execution/src/index.ts:30`](../packages/context/gateway-execution/src/index.ts)
+- `source`: [`packages/context/gateway-execution/src/index.ts:32`](../packages/context/gateway-execution/src/index.ts)
 
 ```ts config-catalog
 /** Reconnection applies to authorization updates, never to model or tool effects. */
 export interface Config {
   /** Delay before reconnecting a lost Gateway authorization stream, in milliseconds. */
   reconnectDelayMs?: number
-  /** Maximum wait for a revoked background job to release its resources, in milliseconds. */
+  /** Maximum wait for a revoked background job or detached tool call to release its resources, in milliseconds. */
   jobStopTimeoutMs?: number
   /** Node-local interactive desktop identifier; absent disables managed desktop effects. */
   desktop?: string
@@ -1156,7 +1173,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-host-apiproxy`
 
 - `inject`: `agentDefaultModel` · `agents` · `attachments` · `directoryPicker` · `llm` · `sessions` · `subagents` · `sessionQuery` · `tools` · `userQuestions` · `workspaceRegistry`
-- `source`: [`packages/host/apiproxy/src/index.ts:58`](../packages/host/apiproxy/src/index.ts)
+- `source`: [`packages/host/apiproxy/src/index.ts:59`](../packages/host/apiproxy/src/index.ts)
 
 ```ts config-catalog
 /** Gateway plugin configuration. */
@@ -1307,7 +1324,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-jobs-local`
 
-- `source`: [`packages/jobs/jobs-local/src/index.ts:45`](../packages/jobs/jobs-local/src/index.ts)
+- `source`: [`packages/jobs/jobs-local/src/index.ts:46`](../packages/jobs/jobs-local/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for the process-local job registry. */
@@ -2369,7 +2386,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-session-persistence-jsonl`
 
-- `source`: [`packages/session/session-persistence-jsonl/src/index.ts:89`](../packages/session/session-persistence-jsonl/src/index.ts)
+- `source`: [`packages/session/session-persistence-jsonl/src/index.ts:90`](../packages/session/session-persistence-jsonl/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config for the JSONL backend's root and physical encoding. */
@@ -2618,7 +2635,7 @@ export type Config = SessionTitleLlmConfig
 
 ## `@deepseek-ai/dsh-settings-file`
 
-- `source`: [`packages/settings/settings-file/src/index.ts:22`](../packages/settings/settings-file/src/index.ts)
+- `source`: [`packages/settings/settings-file/src/index.ts:23`](../packages/settings/settings-file/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: file location and hot-reload behavior. */
@@ -2848,7 +2865,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-storage-json`
 
 - `inject`: `storage`
-- `source`: [`packages/storage/storage-json/src/index.ts:28`](../packages/storage/storage-json/src/index.ts)
+- `source`: [`packages/storage/storage-json/src/index.ts:29`](../packages/storage/storage-json/src/index.ts)
 
 ```ts config-catalog
 /**
@@ -2991,9 +3008,8 @@ export interface Config {
    */
   stateDir?: string
   /**
-   * Workspace for member ACP sessions. Member turns have no parent session to
-   * inherit one from; defaults to {@link cwd}, else the harness launch
-   * directory. Used only when {@link resume} is enabled.
+   * Workspace override for persistent ACP members; defaults to {@link cwd},
+   * else the member Session working directory. Used only with {@link resume}.
    */
   memberCwd?: string
 }
@@ -3009,7 +3025,7 @@ export type PermissionPolicy = 'allow' | 'reject'
 ## `@deepseek-ai/dsh-subagent-claude-code`
 
 - `inject`: `subagents` · `subprocess`
-- `source`: [`packages/subagent/subagent-claude-code/src/index.ts:50`](../packages/subagent/subagent-claude-code/src/index.ts)
+- `source`: [`packages/subagent/subagent-claude-code/src/index.ts:53`](../packages/subagent/subagent-claude-code/src/index.ts)
 
 ```ts config-catalog
 /** Deployment-owned model, permission, environment, and process-release settings. */
@@ -3039,10 +3055,11 @@ export interface Config {
    */
   stateDir?: string
   /**
-   * Workspace for persistent member sessions. Member turns have no parent
-   * Agent to inherit one from; defaults to the harness launch directory.
+   * Workspace override for persistent members; omitted uses the member Session working directory.
    */
   memberCwd?: string
+  /** Preinstalled command resolved inside an SSH execution target. */
+  remoteCommand?: string
 }
 
 /** Profile-selectable non-interactive Claude Code permission mode. */
@@ -3056,7 +3073,7 @@ export type ClaudeCodePermissionMode = typeof CLAUDE_CODE_PERMISSION_MODES[numbe
 ## `@deepseek-ai/dsh-subagent-codex`
 
 - `inject`: `subagents` · `subprocess`
-- `source`: [`packages/subagent/subagent-codex/src/index.ts:48`](../packages/subagent/subagent-codex/src/index.ts)
+- `source`: [`packages/subagent/subagent-codex/src/index.ts:51`](../packages/subagent/subagent-codex/src/index.ts)
 
 ```ts config-catalog
 /** Deployment-owned model, permission, environment, and process-release settings. */
@@ -3081,10 +3098,11 @@ export interface Config {
    */
   stateDir?: string
   /**
-   * Workspace for persistent member sessions. Member turns have no parent
-   * Agent to inherit one from; defaults to the harness launch directory.
+   * Workspace override for persistent members; omitted uses the member Session working directory.
    */
   memberCwd?: string
+  /** Preinstalled command resolved inside an SSH execution target. */
+  remoteCommand?: string
 }
 
 /** Profile-selectable non-interactive Codex permission mode. */
@@ -3468,7 +3486,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-tool-jobs`
 
 - `inject`: `tools` · `jobs` · `systemPrompt`
-- `source`: [`packages/jobs/tool-jobs/src/index.ts:41`](../packages/jobs/tool-jobs/src/index.ts)
+- `source`: [`packages/jobs/tool-jobs/src/index.ts:47`](../packages/jobs/tool-jobs/src/index.ts)
 
 ```ts config-catalog
 /** Configures bounded `job_output` waits and completion-notice delivery. */
@@ -3977,7 +3995,7 @@ export type ApprovalPolicy = 'ask' | 'never'
 
 ## `@deepseek-ai/dsh-userdoc-local`
 
-- `source`: [`packages/attachment/userdoc-local/src/index.ts:180`](../packages/attachment/userdoc-local/src/index.ts)
+- `source`: [`packages/attachment/userdoc-local/src/index.ts:181`](../packages/attachment/userdoc-local/src/index.ts)
 
 ```ts config-catalog
 /** Local document backend configuration. */
@@ -4232,15 +4250,19 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-workspace-changes`
 
-- `inject`: `subprocess` · `fs`
-- `source`: [`packages/deliverables/workspace-changes/src/index.ts:35`](../packages/deliverables/workspace-changes/src/index.ts)
+- `inject`: `subprocess` · `fs` · `sessionProjections`
+- `source`: [`packages/deliverables/workspace-changes/src/index.ts:42`](../packages/deliverables/workspace-changes/src/index.ts)
 
 ```ts config-catalog
 /** Snapshot, capture, and comparison bounds. Invalid values fail plugin load. */
 export interface Config {
-  /** Milliseconds one git command may run before the turn's record is abandoned. */
+  /** Private historical review root; omitted uses `DSH_HOME/workspace-reviews`. */
+  storageRoot?: string
+  /** Maximum serialized bytes per immutable review, enforced on publication and reads. */
+  maxReviewBytes: number
+  /** Milliseconds one git command may run before recording fails and the turn is stopped. */
   timeoutMs: number
-  /** Bytes of git output retained per command; a larger diff listing abandons the record. */
+  /** Bytes of git output retained per command; a larger diff listing fails the recording and stops the turn. */
   outputMaxBytes: number
   /** Maximum files carried by one summary; `total` still reports the complete count. */
   maxFiles: number
@@ -4285,7 +4307,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-agent` | — | [`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts) |
 | `@deepseek-ai/dsh-api-gateway` | `typert` | [`packages/api/gateway/src/index.ts`](../packages/api/gateway/src/index.ts) |
 | `@deepseek-ai/dsh-api-remotes` | — | [`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts) |
-| `@deepseek-ai/dsh-archive-gateway` | `connection` · `gatewayRuntime` · `workspaceRegistry` | [`packages/context/archive-gateway/src/index.ts`](../packages/context/archive-gateway/src/index.ts) |
 | `@deepseek-ai/dsh-authorization` | `credentials` | [`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts) |
 | `@deepseek-ai/dsh-browser-use` | — | [`packages/browser-use/browser-use/src/index.ts`](../packages/browser-use/browser-use/src/index.ts) |
 | `@deepseek-ai/dsh-client-locale` | — | [`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts) |
@@ -4442,6 +4463,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@deepseek-ai/dsh-llm-deepseek` | — | [`packages/llm/llm-deepseek/src/index.ts`](../packages/llm/llm-deepseek/src/index.ts) |
 | `@deepseek-ai/dsh-llm-mock-server` | — | [`packages/test-support/llm-mock-server/src/index.ts`](../packages/test-support/llm-mock-server/src/index.ts) |
 | `@deepseek-ai/dsh-loader-smoke` | — | [`packages/test-support/loader-smoke/src/index.ts`](../packages/test-support/loader-smoke/src/index.ts) |
+| `@deepseek-ai/dsh-managed-data` | — | [`packages/util/managed-data/src/index.ts`](../packages/util/managed-data/src/index.ts) |
 | `@deepseek-ai/dsh-native-command` | — | [`packages/util/native-command/src/index.ts`](../packages/util/native-command/src/index.ts) |
 | `@deepseek-ai/dsh-output-retention` | — | [`packages/util/output-retention/src/index.ts`](../packages/util/output-retention/src/index.ts) |
 | `@deepseek-ai/dsh-package-manifest` | — | [`packages/util/package-manifest/src/index.ts`](../packages/util/package-manifest/src/index.ts) |

@@ -62,6 +62,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   agentPresets: 'core.md',
   agents: 'core.md',
   apiProxy: 'typert.md',
+  hostSessionLifecycle: 'typert.md',
   approval: 'approval.md',
   attachments: 'attachment.md',
   authorization: 'credentials.md',
@@ -157,6 +158,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   webTerminals: 'client-side terminal view models — packages/api/terminal-controller/README.md owns the API',
   sidebarRight: 'client-face navigation service — packages/client/ui-sidebar-right/README.md owns the API',
   sidebarRightTabs: 'client-face tab registry — packages/client/ui-sidebar-right/README.md owns the API',
+  shortcuts: 'client-face keyboard shortcut service — packages/client/shortcuts/README.md owns the API',
   executionAuthorityRequired: 'managed-deployment marker is owned by packages/context/execution-authority/README.md',
   appExit: 'not a service: launcher-provided bounded process-exit callback — packages/boot/cmdline/README.md owns the launcher contract',
   appReady: 'not a service: launcher-provided successful-startup signal — packages/boot/cmdline/README.md owns the launcher contract',
@@ -763,6 +765,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
 
 /** TypeScript lib and pinned framework types with no repository-owned data page. */
 export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
+  'Disposable',
   'Plugin',
   'AbortSignal',
   'AsyncIterable',
@@ -777,6 +780,7 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
   'ReturnType',
   'Pick',
   'Promise',
+  'Awaited',
   'ReadableStream',
   'Record',
   'Request',

@@ -3,6 +3,7 @@
  * dependencies activate and exposes the mount operation used by the web boot
  * kernel after the complete client roster settles.
  */
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { createElement, useLayoutEffect, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client'
@@ -38,7 +39,7 @@ declare module '@deepseek-ai/cordis' {
 }
 
 /** Services required before application assembly. */
-export const inject = ['slots', 'sessions']
+export const inject = ['slots', 'sessions', 'connection']
 
 interface BootSnapshot {
   className: string
@@ -77,10 +78,35 @@ function mountApp(container: HTMLElement, app: () => ReactNode): Root {
  */
 export function apply(ctx: Context): void {
   ctx.slots.install(createSlotRenderer())
+  const mounted = new Set<() => void>()
+  const connection = ctx.get('connection') as ConnectionHandle
+  const withdraw = (): void => {
+    const failures: unknown[] = []
+    for (const unmount of [...mounted]) {
+      try { unmount() } catch (error) { failures.push(error) }
+    }
+    if (failures.length > 0) {
+      // The whole document is being replaced; detached portals must not retain private account content.
+      document.body.replaceChildren()
+      throw new AggregateError(failures, 'Client account renderer cleanup failed')
+    }
+  }
+  const onPrincipalChange = connection.onPrincipalChange
+  if (onPrincipalChange !== undefined) {
+    ctx.effect(() => onPrincipalChange(withdraw), 'ui-renderer: authenticated document withdrawal')
+  }
   ctx.reflect.provide('uiRenderer', {
     mount: (container: HTMLElement): (() => void) => {
       const root = mountApp(container, buildRenderApp({ ctx }))
-      return () => { root.unmount() }
+      let active = true
+      const unmount = (): void => {
+        if (!active) return
+        active = false
+        mounted.delete(unmount)
+        try { root.unmount() } finally { container.replaceChildren() }
+      }
+      mounted.add(unmount)
+      return unmount
     },
   })
 }

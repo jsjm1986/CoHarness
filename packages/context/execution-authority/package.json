@@ -37,6 +37,7 @@
     "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*"
   },
   "devDependencies": {
@@ -45,6 +46,7 @@
     "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-llm": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*"
   }
 }

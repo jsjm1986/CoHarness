@@ -1,3 +1,4 @@
+import type { ExecutionInheritance, ExecutionScopeId } from '@deepseek-ai/dsh-execution-authority'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -283,6 +284,37 @@ describe('tool-jobs setup', () => {
 })
 
 describe('job_output', () => {
+  it('keeps stream output unconsumed when origin verification fails and includes changes before reading', async () => {
+    const { ctx } = await setup()
+    const owner = await fakeAgent(ctx, 'captured-output')
+    const origin: ExecutionInheritance = { parentSessionId: owner.id,
+      scopeId: '10000000-0000-4000-8000-000000000001' as ExecutionScopeId,
+      inputs: [], unverifiedHistory: true }
+    let current = origin, rejected = true, changed = false
+    const relay = vi.fn(async () => {
+      if (rejected) throw new Error('origin verification unavailable')
+      if (!changed) {
+        changed = true
+        current = { ...origin, scopeId: '10000000-0000-4000-8000-000000000002' as ExecutionScopeId }
+      }
+      return current
+    })
+    ctx.provide('executionAuthority', { capture: () => current,
+      runCaptured: (_agent: Agent, _scope: ExecutionInheritance, action: () => unknown) => action(), relay } as never)
+    const task = producer({ owner: owner.id })
+    const id = ctx.jobs.start(task.spec)
+    task.append('original output')
+    try {
+      const refused = await call(ctx, 'job_output', { job_id: id }, owner)
+      expect(refused.isError).toBe(true)
+      rejected = false
+      const output = await call(ctx, 'job_output', { job_id: id }, owner)
+      expect(output.isError).toBe(false)
+      expect(text(output)).toContain('original output')
+      expect(relay).toHaveBeenCalledTimes(3)
+    } finally { task.settle({ status: 'completed' }); await ctx.fiber.dispose() }
+  })
+
   it('reads a consuming delta with a trailing status line', async () => {
     const { ctx } = await setup()
     const p = producer()

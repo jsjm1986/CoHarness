@@ -57,6 +57,7 @@ No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 
+- Managed launches with `DSH_MANAGED_DATA_MANIFEST` register the resolved document root and optional legacy upload root before data writes. An invalid inventory refuses initialization; [inventory and backup rules](../../util/managed-data/README.md) govern retained roots and deployment approval.
 - **No business storage quota** — the default has no per-document or per-user byte quota. The provider still protects the host with a configurable minimum free-space reserve, concurrent-session limit, and cleanup of abandoned upload sessions.
 - **Completed-document retention is explicit** — active documents live until deleted; trashed documents are recoverable only for `trashRetentionDays`, after which the provider purges them. Session records, including completed-state metadata, are temporary and are cleaned after the configured upload retention.
 - **`list` walks the tree on every call** — there is no index, so a root holding many thousands of files pays a full scan per listing.

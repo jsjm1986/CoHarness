@@ -21,11 +21,11 @@
   en: faca639ea41419b0
   zh: 2d25c64fee1b382c
 /deepseek-ai-dsh-subagent-acp/configuration:
-  en: c3e81dd1b74b8eb2
-  zh: ec305433bd2935e3
+  en: fb305ced41facf8d
+  zh: 2fdff5daaa4a900c
 /deepseek-ai-dsh-subagent-acp/persistent-members-resume:
-  en: c6ced7e15c7cc976
-  zh: 55318a68f4311c1d
+  en: 89f2d51a25b76c61
+  zh: 7bd5b8f823731b7d
 /deepseek-ai-dsh-subagent-acp/stop-reason-mapping:
   en: 45b2968fa828e67c
   zh: 9b86400f6ff65d91
@@ -63,7 +63,7 @@
   en: f5d5f97a153f7c70
   zh: afc7da8783b348c6
 /deepseek-ai-dsh-subagent-acp/known-limitations-and-deferred-work:
-  en: aedd2b6b9f246a79
+  en: e5f45750df8ac79e
   zh: fc2c183f45c45529
 /deepseek-ai-dsh-subagent-acp/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773

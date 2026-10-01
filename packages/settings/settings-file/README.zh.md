@@ -69,6 +69,7 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
+- 设置 `DSH_MANAGED_DATA_MANIFEST` 的受管启动会在写入数据前登记实际解析后的设置文档，包括配置的自定义路径。清单无效时拒绝初始化；保留旧根和部署批准遵循[清单与备份规则](../../util/managed-data/README.zh.md)。
 - **同 namespace 冲突仍是后写胜出** — 写锁加读-改-写让并发写入者不会丢掉彼此的 namespace，但两个写入者编辑同一个 namespace 时仍以较后的写入为准；没有按值合并，也没有修订检查。
 - **漏掉的 watcher 事件在下一个信号前保持不可见** — 读取从不重新 stat 文件，因此 watcher 漏报的变更只会在下一个事件、下一次写入或重启时被并入。
 - **注释保留仅限 YAML 且仅限 map 形状** — JSON 文档重新序列化，无注释（JSON 本身没有），且被改数组内部的注释（或行内附着在被改标量值上的注释）随其所描述的值一同被换掉。
