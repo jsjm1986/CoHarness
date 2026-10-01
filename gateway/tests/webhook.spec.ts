@@ -319,6 +319,17 @@ describePg('Gateway webhook endpoints and intake', () => {
     expect((await second.deliveries.list(other.id)).items[0]).toMatchObject({ state: 'unknown', errorCode: 'dispatch-failed' })
   })
 
+  it('carries preset-invalid through to the receipt when the runtime reports it', async () => {
+    const f = await fixture()
+    const refusing = await stubRuntime(() => ({ status: 400, body: { error: 'preset-invalid' } }))
+    const intake = await intakeFor(f, refusing.port)
+    const endpoint = await intake.endpoints.create(f.admin.id, endpointInput(f))
+    await intake.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    const body = JSON.stringify({ ref: 'refs/heads/main', after: 'abc' })
+    expect((await post(intake.base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
+    expect((await intake.deliveries.list(endpoint.id)).items[0]).toMatchObject({ state: 'rejected', errorCode: 'preset-invalid' })
+  })
+
   it('retains a manual stop after Gateway startup reconciliation and fences automatic start claims', async () => {
     const f = await fixture()
     const repository = new PostgresInstanceRepository(f.context, 48000)

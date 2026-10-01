@@ -16,6 +16,7 @@ import { join } from 'node:path'
 import type { Writable } from 'node:stream'
 import { promisify } from 'node:util'
 import type { GatewayConfig } from './config.ts'
+import { RuntimeLog } from './runtime-log.ts'
 import { renderUserUnit, unitName, type GrantEntry, type SystemdOptions } from './systemd.ts'
 
 const localChildren = new Set<ChildProcess>()
@@ -193,10 +194,17 @@ export interface Launcher {
 /** macOS dev driver: plain subprocesses tracked by their ChildProcess. */
 export class LocalLauncher implements Launcher {
   readonly instancesOutliveGateway = false
+  private readonly logDrains = new Map<string, { child: ChildProcess; done: Promise<void> }>()
 
   constructor(private readonly cfg: GatewayConfig) {}
 
   async start(runtime: LaunchRuntime): Promise<InstanceProc> {
+    const previous = this.logDrains.get(runtime.dshHome)
+    if (previous !== undefined) {
+      // A crashed parent can leave descendants holding its output pipes.
+      await terminateLocalTree(previous.child, 0)
+      await previous.done
+    }
     const argv = this.cfg.dshCommand.map(a => a.replaceAll('{port}', String(runtime.port)))
     const child = spawn(argv[0] ?? 'node', argv.slice(1), {
       cwd: runtime.homePath,
@@ -213,11 +221,32 @@ export class LocalLauncher implements Launcher {
         // and ignores the variable.
         TSX_TSCONFIG_PATH: join(this.cfg.dshRepoRoot, 'tsconfig.base.json'),
       },
-      stdio: ['ignore', 'ignore', 'inherit', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
     })
     installLocalChildCleanup()
     localChildren.add(child)
+    // Runtime application logs go to stdout; persist them under the instance's
+    // own dsh home with a two-generation cap. stderr additionally keeps its
+    // central path to the supervisor log so crashes stay visible in one place.
+    const runtimeLog = new RuntimeLog(
+      join(runtime.dshHome, 'logs', 'runtime.log'),
+      this.cfg.runtimeLogCapBytes,
+    )
+    child.stdio[1]?.pipe(runtimeLog, { end: false })
+    child.stdio[2]?.pipe(runtimeLog, { end: false })
+    child.stdio[2]?.pipe(process.stderr, { end: false })
+    const logDrained = new Promise<void>(resolve => {
+      child.once('close', () => {
+        void runtimeLog.close()
+          .catch(() => { console.error('[gateway] runtime log stream failed to close') })
+          .finally(resolve)
+      })
+    })
+    this.logDrains.set(runtime.dshHome, { child, done: logDrained })
+    void logDrained.then(() => {
+      if (this.logDrains.get(runtime.dshHome)?.done === logDrained) this.logDrains.delete(runtime.dshHome)
+    })
     // Keep the handle until the entire detached group is gone. The direct
     // child can exit while a grandchild still owns the runtime port.
     child.once('exit', () => {
@@ -241,12 +270,14 @@ export class LocalLauncher implements Launcher {
       })
     } catch (error) {
       await terminateLocalTree(child, 0).catch(() => {})
+      await logDrained
       throw new Error(`runtime credential delivery failed for ${runtime.runtimeKey}: ${String(error)}`)
     }
     return {
       hasExited: () => child.exitCode !== null || child.signalCode !== null,
       terminate: async (graceMs: number) => {
         await terminateLocalTree(child, graceMs)
+        await logDrained
       },
     }
   }

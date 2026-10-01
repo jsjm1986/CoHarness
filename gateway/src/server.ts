@@ -98,12 +98,17 @@ export interface GatewayDeps {
    */
   maintenanceGate?: () => Promise<import('./postgres/maintenance-service.ts').WriteGateVerdict>
   /**
-   * Mark one mutating request as an in-flight writer until its response
-   * closes. Called at gate admission — before the gate verdict is read — so
+   * Mark one mutating request as an in-flight writer until its handler
+   * settles, even if its client disconnects. Called at gate admission — before the gate verdict is read — so
    * the node's reported writer count covers work already past the gate, not
-   * just requests still waiting on it. Absent disables inflight accounting.
+   * just requests still waiting on it. Applied only to gateway-local write
+   * paths: proxied `/api` calls hold no deployment write themselves (their
+   * effects reach the store through `/internal/runtime/*` and the usage
+   * intake, both separately counted), so a long-lived streaming response
+   * would otherwise pin the quiesce ledger open indefinitely. Absent
+   * disables inflight accounting.
    */
-  writerSpan?: (res: ServerResponse) => void
+  writerSpan?: () => (() => void)
   readiness?: (signal?: AbortSignal) => Awaitable<void>
 }
 
@@ -563,6 +568,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     }
   }
 
+  const writerReleases = new WeakMap<ServerResponse, () => void>()
   const server = createServer((req, res) => {
     void handle(req, res).catch((error: unknown) => {
       if (!res.writableEnded) {
@@ -589,7 +595,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         }
       }
       if (!(error instanceof BodyTooLargeError)) console.error('[gateway] request failed:', error)
-    })
+    }).finally(() => { writerReleases.get(res)?.(); writerReleases.delete(res) })
   })
 
   /**
@@ -603,7 +609,10 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (req.method === 'GET' || req.method === 'HEAD') return true
     if (pathname === '/login' || pathname === '/logout' || pathname === '/account/password'
       || pathname.startsWith('/admin/api/deployment') || pathname.startsWith('/admin/api/backups')) return true
-    deps.writerSpan?.(res)
+    if (pathname !== '/api' && !pathname.startsWith('/api/') && !writerReleases.has(res)) {
+      const release = deps.writerSpan?.()
+      if (release !== undefined) writerReleases.set(res, release)
+    }
     const verdict = await deps.maintenanceGate()
     if (verdict === 'open') return true
     if (verdict === 'maintenance' && req.method === 'POST'
@@ -800,7 +809,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         send(res, 400, '{"error":"invalid-push-device-id"}', 'application/json')
         return
       }
-      if (deviceId === '') {
+      if (!/^[0-9a-f-]{36}$/iu.test(deviceId)) {
         send(res, 400, '{"error":"invalid-push-device-id"}', 'application/json')
         return
       }

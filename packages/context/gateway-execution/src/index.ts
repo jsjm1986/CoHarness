@@ -190,6 +190,7 @@ export class GatewayExecution extends ExecutionAuthority {
       const current = this.execution.getStore()
       const scope = current?.agent === agent ? this.currentScope(agent)
         : executionScope({ parentSessionId: agent.id, inputs: [], unverifiedHistory: true })
+      this.ensureScopedProtocol(agent.session, scope.scopeId)
       agent.session.append('gateway/continuation', {
         key: `goal:${change.goal.id}:${String(change.goal.revision)}`, scope })
     }, { prepend: true })

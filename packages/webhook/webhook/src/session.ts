@@ -7,7 +7,7 @@ import { isAbsolute } from 'node:path'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { ModelSelection } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
-import type {} from '@deepseek-ai/dsh-agent-presets'
+import type { AgentPreset } from '@deepseek-ai/dsh-agent-presets'
 import { boundContextSummary, createUserMessage, errorChain, type LlmCallConfig } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-permission-presets'
 import type { SessionId } from '@deepseek-ai/dsh-session'
@@ -15,6 +15,25 @@ import type {} from '@deepseek-ai/dsh-session-title'
 import type {} from '@deepseek-ai/dsh-workspace'
 import type { WebhookRuleId } from './brand.ts'
 import type { VerifiedWebhookDelivery, WebhookSessionRequest } from './types.ts'
+
+/**
+ * The rule result named an agent or permission preset the deployment does
+ * not supply. Reported as a distinct failure so the dispatch route can tell
+ * a misconfigured endpoint apart from a mid-dispatch failure and the gateway
+ * receipt can carry a diagnosable `preset-invalid` code instead of the
+ * catch-all `dispatch-failed`.
+ */
+export class WebhookPresetError extends Error {
+  constructor(
+    /** The request field that failed to resolve. */
+    readonly field: 'agentPreset' | 'permissionPreset',
+    /** The preset id the rule result supplied. */
+    readonly preset: string,
+    options?: ErrorOptions,
+  ) {
+    super(`webhook: ${field} "${preset}" is not a configured preset`, options)
+  }
+}
 
 /** Detached values the creation transaction keeps across asynchronous preflight. */
 interface ResolvedWebhookSessionRequest {
@@ -125,8 +144,17 @@ export async function createWebhookSession(
 ): Promise<SessionId> {
   const authority = executionAuthorityOf(ctx)
   const resolved = resolveRequest(ctx, request)
-  ctx.permissionPresets.resolve(resolved.permissionPreset)
-  const preset = await ctx.agentPresets.resolve(resolved.agentPreset)
+  try {
+    ctx.permissionPresets.resolve(resolved.permissionPreset)
+  } catch (error: unknown) {
+    throw new WebhookPresetError('permissionPreset', resolved.permissionPreset, { cause: error })
+  }
+  let preset: AgentPreset
+  try {
+    preset = await ctx.agentPresets.resolve(resolved.agentPreset)
+  } catch (error: unknown) {
+    throw new WebhookPresetError('agentPreset', resolved.agentPreset, { cause: error })
+  }
   await ctx.agentPresets.standingKeyFor(preset.id)
   signal.throwIfAborted()
 

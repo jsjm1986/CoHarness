@@ -209,11 +209,14 @@ export class GatewayExecutionIdentity {
 
   /**
    * Register immutable Session lineage without granting any execution authority.
+   * A project Session's lineage comes from its persisted header or, before first
+   * materialization, from an unexpired draft reservation for the same project,
+   * which admits only a root unseeded Session.
    * @param subject - authenticated current runtime
    * @param value - parsed wire metadata
    * @param header - PostgreSQL metadata already checked against the project runtime, if applicable
    */
-  async register(subject: RuntimeCredentialSubject, value: unknown, header?: ConversationHeader): Promise<void> {
+  async register(subject: RuntimeCredentialSubject, value: unknown, header?: Pick<ConversationHeader, 'id' | 'parentSessionId' | 'seedLength'>): Promise<void> {
     const request = object(value, ['sessionId', 'parentSessionId', 'isSeeded'])
     const sessionId = identity(request.sessionId)
     const parent = request.parentSessionId === undefined ? undefined : identity(request.parentSessionId)
@@ -505,7 +508,8 @@ export class GatewayExecutionIdentity {
     return transaction(this.pool, async client => {
       await this.session(client, subject, sessionId)
       const actor = await this.principalActor(client, subject, sessionId, principal)
-      const base = { rootSessionId: sessionId, nodeId, desktop, userId: principal.user.id }
+      const occupancy = await this.desktopOccupancy(client, subject, nodeId, desktop, sessionId)
+      const base = { rootSessionId: sessionId, nodeId, desktop, userId: principal.user.id, occupancy }
       try {
         await this.eligibleActors(client, subject, sessionId, [actor], 'desktop')
       } catch (error) {
@@ -515,6 +519,30 @@ export class GatewayExecutionIdentity {
       const confirmed = await this.confirmedDesktopActors(client, subject, sessionId, nodeId, desktop, [actor])
       return { ...base, eligible: true, confirmed: confirmed === 1 }
     })
+  }
+
+  /** Live grant and queue state of one desktop resource, without other holders' identities. */
+  private async desktopOccupancy(client: PoolClient, subject: RuntimeCredentialSubject, nodeId: string, desktop: string, sessionId: string) {
+    const resourceKey = `${subject.organizationId}/${nodeId}/${desktop}`
+    const result = await client.query<{ resource_state: string; grants: string; own_grants: string; queued: string }>(
+      `SELECT dr.state AS resource_state,
+        count(g.grant_id) FILTER (WHERE g.state <> 'released') AS grants,
+        count(g.grant_id) FILTER (WHERE g.state <> 'released' AND g.holder_json->>'runId' = $2
+          AND g.holder_json->'runtime' = $3::jsonb) AS own_grants,
+        (SELECT count(*) FROM harness.desktop_queue q
+          WHERE q.resource_key = dr.resource_key AND q.state = 'queued') AS queued
+        FROM harness.desktop_resources dr
+        LEFT JOIN harness.desktop_grants g ON g.resource_key = dr.resource_key
+        WHERE dr.resource_key = $1
+        GROUP BY dr.resource_key, dr.state`, [resourceKey, sessionId, JSON.stringify({ ...subject.target, generation: subject.generation })])
+    const row = result.rows[0]
+    const grants = Number(row?.grants ?? 0)
+    return {
+      available: row === undefined || row.resource_state === 'available',
+      inUse: grants > 0,
+      heldByThisSession: grants > 0 && Number(row?.own_grants ?? 0) > 0,
+      queued: Number(row?.queued ?? 0),
+    }
   }
 
   /**
@@ -861,7 +889,17 @@ export class GatewayExecutionIdentity {
       JOIN harness.projects p ON p.id=c.project_id AND p.organization_id=c.organization_id
       WHERE c.organization_id=$1 AND c.id=$2 AND c.project_id=$3 AND c.status<>'deleted' AND r.status<>'deleted'
         AND p.status='active' FOR SHARE OF c,r,p`, [subject.organizationId, sessionId, subject.projectInternalId])
-    const session = sessions.rows[0]
+    // An unmaterialized draft's write authority comes from its unexpired same-project
+    // reservation, which names the creator and visibility.
+    const session = sessions.rows[0] ?? (await client.query<{ visibility: string; creator_user_id: string | null }>(
+      `SELECT d.visibility,d.user_id AS creator_user_id
+        FROM harness.conversation_draft_reservations d
+        JOIN harness.projects p ON p.id=d.project_id AND p.organization_id=d.organization_id
+        WHERE d.organization_id=$1 AND d.session_id=$2 AND d.project_id=$3
+          AND d.lease_expires_at > now() AND p.status='active'
+          AND NOT EXISTS (SELECT 1 FROM harness.conversation_sessions c
+            WHERE c.organization_id=d.organization_id AND c.id=d.session_id)
+        FOR SHARE OF d,p`, [subject.organizationId, sessionId, subject.projectInternalId])).rows[0]
     if (session === undefined) throw new ExecutionIdentityError(403, 'execution Session is not writable in this runtime')
     const members = await client.query<{ user_id: string; access_mode: string }>(`SELECT user_id,access_mode FROM harness.project_members
       WHERE organization_id=$1 AND project_id=$2 AND user_id=ANY($3::uuid[]) FOR SHARE`,

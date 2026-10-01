@@ -51,7 +51,7 @@ describe('web e2e: explicit root desktop confirmation', () => {
           }
           expect(path).toBe('/internal/runtime/execution/desktop-confirmation')
           return Response.json({ rootSessionId: ROOT, nodeId: 'acceptance-node', desktop: 'display-0', userId: 12,
-            eligible: true, confirmed })
+            eligible: true, confirmed, occupancy: { available: true, inUse: false, heldByThisSession: false, queued: 0 } })
         },
       }, () => root, 'display-0'),
     })

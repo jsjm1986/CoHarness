@@ -324,9 +324,13 @@ export class GatewayWebhookIntake {
         }
         return { state: 'unknown', errorCode: 'dispatch-result' }
       }
-      await response.body?.cancel()
+      const detail = await response.json().then(
+        (body: unknown) => body !== null && typeof body === 'object'
+          ? (body as Record<string, unknown>)['error'] : undefined,
+        () => undefined,
+      )
       return response.status < 500
-        ? { state: 'rejected', errorCode: 'dispatch-refused' }
+        ? { state: 'rejected', errorCode: detail === 'preset-invalid' ? 'preset-invalid' : 'dispatch-refused' }
         : { state: 'unknown', errorCode: 'dispatch-failed' }
     } catch {
       return { state: 'unknown', errorCode: 'dispatch-failed' }

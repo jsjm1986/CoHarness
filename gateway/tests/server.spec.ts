@@ -344,7 +344,8 @@ describe('gateway server', () => {
       expect(userId).toBe(1)
       return { id: `device-${input.token}` }
     })
-    const removeDevice = vi.fn(async (userId: number, deviceId: string) => userId === 1 && deviceId === 'device-token')
+    const removeDevice = vi.fn(async (userId: number, deviceId: string) => userId === 1
+      && deviceId === '018f8c3e-9d74-7f2e-b4a1-2c3d4e5f6a7b')
     deps.push = {
       registerDevice,
       removeDevice,
@@ -389,11 +390,17 @@ describe('gateway server', () => {
     expect(invalidProvider.status).toBe(400)
     expect(await invalidProvider.json()).toEqual({ error: 'invalid-push-device' })
 
-    const removed = await fetch(`${base}/account/api/push-devices/device-token`, {
+    const removed = await fetch(`${base}/account/api/push-devices/018f8c3e-9d74-7f2e-b4a1-2c3d4e5f6a7b`, {
       method: 'DELETE', headers: { cookie, origin: base },
     })
     expect(removed.status).toBe(204)
-    expect(removeDevice).toHaveBeenCalledWith(1, 'device-token')
+    expect(removeDevice).toHaveBeenCalledWith(1, '018f8c3e-9d74-7f2e-b4a1-2c3d4e5f6a7b')
+
+    const malformed = await fetch(`${base}/account/api/push-devices/not-a-uuid`, {
+      method: 'DELETE', headers: { cookie, origin: base },
+    })
+    expect(malformed.status).toBe(400)
+    expect(await malformed.json()).toEqual({ error: 'invalid-push-device-id' })
   })
 
   it('forces password change before proxying', async () => {

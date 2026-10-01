@@ -264,6 +264,22 @@ export function listUsers(): Promise<AdminUser[]> {
   return request('/admin/api/users')
 }
 
+export function getUser(id: number): Promise<AdminUser> {
+  return request(`/admin/api/users/${id}`)
+}
+
+/** One stored project membership row as seen from the member's account side. */
+export type UserMembership = {
+  projectId: number
+  name: string
+  path: string
+  mode: GrantMode
+}
+
+export function listUserMemberships(userId: number): Promise<{ memberships: UserMembership[] }> {
+  return request(`/admin/api/users/${userId}/memberships`)
+}
+
 export function createUser(body: {
   username: string
   password: string
@@ -1048,6 +1064,21 @@ export function setQuota(body: {
   companyCostMicrosLimit: number | null | 'inherit'
 }): Promise<void> {
   return request('/admin/api/quotas', { method: 'PUT', body: JSON.stringify(body) })
+}
+
+/** Per-metric user quota setting: role inheritance, unlimited, or an explicit monthly cap. */
+export type UserQuotaMode = 'inherit' | 'unlimited' | 'custom'
+
+/** Stored per-user quota modes; limits are set only for `custom` entries. */
+export type UserQuotaView = {
+  tokenMode: UserQuotaMode
+  tokenLimit: number | null
+  companyCostMode: UserQuotaMode
+  companyCostMicrosLimit: number | null
+}
+
+export function getUserQuota(userId: number): Promise<UserQuotaView> {
+  return request(`/admin/api/quotas?subjectType=user&subjectId=${userId}`)
 }
 
 export function listUsageOverview(month?: string): Promise<UsageOverview> {

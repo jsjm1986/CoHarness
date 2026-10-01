@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GatewayCollaboration } from '@deepseek-ai/dsh-collaboration-gateway'
 import { Context } from '@deepseek-ai/cordis'
 import type { GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
+import { WebhookPresetError } from '@deepseek-ai/dsh-webhook'
 import { afterEach, expect, it, vi } from 'vitest'
 import { registerWebhookDispatch } from '../src/webhook.ts'
 
@@ -301,6 +302,11 @@ it('rejects a delivery event that JSON cannot round-trip', async () => {
 it('maps input validation failures to an invalid-dispatch response', async () => {
   const f = fixture({ failSession: new TypeError('model is not configurable') })
   expect(await f.respond(fakeResponse(), validBody)).toEqual({ status: 400, json: { error: 'invalid-dispatch' } })
+})
+
+it('maps unresolvable presets to a distinguishable preset-invalid refusal', async () => {
+  const f = fixture({ failSession: new WebhookPresetError('agentPreset', 'code') })
+  expect(await f.respond(fakeResponse(), validBody)).toEqual({ status: 400, json: { error: 'preset-invalid' } })
 })
 
 it('logs non-Error dispatch failures verbatim', async () => {

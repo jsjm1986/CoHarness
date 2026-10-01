@@ -908,11 +908,27 @@ async function dispatch(
     return true
   }
 
+  const userMemberships = /^\/admin\/api\/users\/(\d+)\/memberships$/.exec(pathname)
+  if (userMemberships !== null) {
+    if (method !== 'GET') return false
+    const userId = Number(userMemberships[1])
+    if (await deps.users.getById(userId) === null) { sendError(res, 404, 'user not found'); return true }
+    if (deps.projects.membershipsFor === undefined) { sendError(res, 503, 'membership listing unavailable'); return true }
+    sendJson(res, 200, { memberships: await deps.projects.membershipsFor(userId) })
+    return true
+  }
+
   const userIdPath = /^\/admin\/api\/users\/(\d+)$/.exec(pathname)
   if (userIdPath !== null) {
     const userId = Number(userIdPath[1])
     const target = await deps.users.getById(userId)
     if (target === null) { sendError(res, 404, 'user not found'); return true }
+    if (method === 'GET') {
+      const listed = await deps.users.getListedById(userId)
+      if (listed === null) { sendError(res, 404, 'user not found'); return true }
+      sendJson(res, 200, listed)
+      return true
+    }
     if (method === 'DELETE') {
       if (userId === admin.id) throw new Error('cannot-delete-self')
       const removed = await deps.instances.withStopped(
@@ -1211,7 +1227,21 @@ async function dispatch(
   }
 
   if (pathname === '/admin/api/quotas') {
-    if (deps.governance === undefined || method !== 'PUT') return false
+    if (deps.governance === undefined) return false
+    if (method === 'GET') {
+      if (deps.governance.userQuota === undefined) { sendError(res, 503, 'user quota read unavailable'); return true }
+      const query = new URL(req.url ?? '/', 'http://x').searchParams
+      const subjectType = query.get('subjectType')
+      const subjectId = query.get('subjectId')
+      if (subjectType !== 'user' || subjectId === null) { sendError(res, 400, 'user quota subject required'); return true }
+      const userId = Number(subjectId)
+      if (!Number.isSafeInteger(userId) || userId <= 0 || await deps.users.getById(userId) === null) {
+        sendError(res, 404, 'user not found'); return true
+      }
+      sendJson(res, 200, await deps.governance.userQuota(userId))
+      return true
+    }
+    if (method !== 'PUT') return false
     const input = parseObject(body); const subjectType = str(input, 'subjectType'); const subjectId = str(input, 'subjectId')
     if ((subjectType !== 'role' && subjectType !== 'user' && subjectType !== 'project') || subjectId === undefined) {
       sendError(res, 400, 'invalid quota subject'); return true

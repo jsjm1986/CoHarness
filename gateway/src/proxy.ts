@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isIP } from 'node:net'
 import type { Duplex } from 'node:stream'
-import httpProxy from 'http-proxy'
+import * as httpProxy from 'http-proxy-3'
 import { writeRuntimeGrantsFile } from './apply-grants.ts'
 import {
   ensureModelGovernanceForProject,
@@ -318,6 +318,14 @@ export function createProxyHandlers(
         }
         res.once('finish', finish)
         res.once('close', finish)
+        // Attribute client disconnects: the public tunnel logs a generic
+        // "context canceled" without the path, so a close before the response
+        // completes gets its own line naming the canceled request.
+        res.once('close', () => {
+          if (!res.writableFinished) {
+            console.error(`[gateway] client disconnected mid-response: ${req.method} ${pathname} -> ${ready.target.kind} ${String(ready.target.id)}`)
+          }
+        })
         try {
           server.web(req, res, targetOptions(ready.port, principal), () => {
             if (!res.headersSent) {

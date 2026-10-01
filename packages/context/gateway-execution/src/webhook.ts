@@ -4,7 +4,7 @@ import type {} from '@deepseek-ai/dsh-collaboration'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GATEWAY_WEBHOOK_DISPATCH_PATH, type GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
-import { createWebhookSession, WebhookRuntime, WebhookDeliveryId, WebhookRuleId, WebhookSourceId, type VerifiedWebhookDelivery } from '@deepseek-ai/dsh-webhook'
+import { createWebhookSession, WebhookPresetError, WebhookRuntime, WebhookDeliveryId, WebhookRuleId, WebhookSourceId, type VerifiedWebhookDelivery } from '@deepseek-ai/dsh-webhook'
 import { isJsonValue, type JsonValue } from '@deepseek-ai/dsh-util-values'
 import { z } from 'zod'
 
@@ -126,9 +126,12 @@ function registerRoute(ctx: Context, signal: AbortSignal): void {
       send(res, 200, { sessionId })
     })().catch((error: unknown) => {
       if (res.writableEnded) return
-      const status = error instanceof TypeError ? 400
+      const status = error instanceof TypeError || error instanceof WebhookPresetError ? 400
         : CollaborationFailure !== undefined && error instanceof CollaborationFailure && error.code !== 'gateway-unavailable' ? 403 : 502
-      send(res, status, { error: status === 400 ? 'invalid-dispatch' : 'dispatch-failed' })
+      send(res, status, {
+        error: error instanceof WebhookPresetError ? 'preset-invalid'
+          : status === 400 ? 'invalid-dispatch' : 'dispatch-failed',
+      })
       ctx.logger.warn('webhook dispatch failed', { error: error instanceof Error ? error.message : String(error) })
     })
   }, { authority: 'loopback' }), 'gateway-execution: webhook dispatch route')

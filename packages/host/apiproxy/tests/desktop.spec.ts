@@ -11,7 +11,10 @@ import { InProcessApiClient } from '../src/fetch/client.ts'
 
 async function fixture() {
   const ctx = new Context(), id = SessionId('pane'), agent = { id } as Agent
-  const value = { rootSessionId: SessionId('root'), nodeId: 'node', desktop: 'screen', userId: 3, eligible: true, confirmed: false }
+  const value = {
+    rootSessionId: SessionId('root'), nodeId: 'node', desktop: 'screen', userId: 3, eligible: true, confirmed: false,
+    occupancy: { available: true, inUse: false, heldByThisSession: false, queued: 0 },
+  }
   const read = vi.fn(async () => value), set = vi.fn(async () => ({ ...value, confirmed: true }))
   const forbidden: RpcError = { code: 'collaboration-forbidden', message: 'denied', details: { action: 'write', reason: 'forbidden', sessionId: id } }
   const authorize = vi.fn(async (): Promise<{ authority: undefined } | { error: RpcError }> => ({ authority: undefined }))

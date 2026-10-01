@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3'
 import { toUserRow, type UserRow } from './auth.ts'
 import type { GatewayConfig } from './config.ts'
 import { hashPassword } from './password.ts'
+import type { GatewayUserListRow } from './services.ts'
 import { prepareUserData } from './user-data.ts'
 
 const USERNAME_RE = /^[a-z][a-z0-9-]{1,30}$/
@@ -54,7 +55,7 @@ export class UserService {
     return row
   }
 
-  list(): Array<UserRow & { port: number; instanceState: string }> {
+  list(): GatewayUserListRow[] {
     const rows = this.db.prepare(
       `SELECT u.*, i.port AS port, i.state AS instance_state
        FROM users u JOIN instances i ON i.user_id = u.id
@@ -64,6 +65,18 @@ export class UserService {
       const raw = r as { port: number; instance_state: string }
       return { ...toUserRow(r), port: raw.port, instanceState: raw.instance_state }
     })
+  }
+
+  /** Read one user with its personal instance port and state, or null when absent or deleted. */
+  getListedById(id: number): GatewayUserListRow | null {
+    const row = this.db.prepare(
+      `SELECT u.*, i.port AS port, i.state AS instance_state
+       FROM users u JOIN instances i ON i.user_id = u.id
+       WHERE u.id = ? AND u.deleted_at IS NULL`,
+    ).get(id)
+    if (row === undefined) return null
+    const raw = row as { port: number; instance_state: string }
+    return { ...toUserRow(row as never), port: raw.port, instanceState: raw.instance_state }
   }
 
   getById(id: number): UserRow | null {

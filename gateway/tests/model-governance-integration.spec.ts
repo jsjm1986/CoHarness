@@ -143,3 +143,40 @@ describe('model governance integration', () => {
     expect(governance.summary({ kind: 'user', id: user.id }).companyCostMicrosLimit).toBe(200)
   })
 })
+
+it('rechecks maintenance after queueing and owns admitted writes until they settle', async () => {
+  const { cfg, user, governance } = await fixture()
+  const fenced: import('../src/services.ts').GatewayModelGovernanceService = governance
+  let open = true, writers = 0, release!: () => void, entered!: () => void
+  const waiting = new Promise<void>(resolve => { release = resolve })
+  const began = new Promise<void>(resolve => { entered = resolve })
+  fenced.projectionWrite = async operation => {
+    writers++
+    try {
+      if (!open) throw new Error('maintenance')
+      return await operation()
+    } finally { writers-- }
+  }
+  const readPolicy = governance.policyFor.bind(governance)
+  fenced.policyFor = async target => {
+    entered()
+    await waiting
+    return readPolicy(target)
+  }
+  const first = writeModelGovernanceFile(cfg, fenced, user)
+  await began
+  expect(writers).toBe(1)
+  const queued = writeModelGovernanceFile(cfg, fenced, user)
+  const refused = expect(queued).rejects.toThrow('maintenance')
+  open = false
+  release()
+  await first
+  await refused
+  expect(writers).toBe(0)
+  const path = join(cfg.usersRoot, user.username, 'dsh', 'model-governance.json')
+  const retained = readFileSync(path, 'utf8')
+  await expect(writeModelGovernanceFile(cfg, fenced, user)).rejects.toThrow('maintenance')
+  expect(readFileSync(path, 'utf8')).toBe(retained)
+  open = true
+  await expect(writeModelGovernanceFile(cfg, fenced, user)).resolves.toBe(path)
+})

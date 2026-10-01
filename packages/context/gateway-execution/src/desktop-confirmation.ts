@@ -5,8 +5,12 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { DesktopConfirmationController } from '@deepseek-ai/dsh-computer-use'
 import { readGatewayResponseJson, type GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 
+const occupancy = z.object({ available: z.boolean(), inUse: z.boolean(),
+  heldByThisSession: z.boolean(), queued: z.number().int().nonnegative() }).strict()
+
 const status = z.object({ rootSessionId: z.string().min(1).transform(SessionId), nodeId: z.string().min(1),
-  desktop: z.string().min(1), userId: z.number().int().positive(), eligible: z.boolean(), confirmed: z.boolean() }).strict()
+  desktop: z.string().min(1), userId: z.number().int().positive(), eligible: z.boolean(), confirmed: z.boolean(),
+  occupancy }).strict()
 
 /**
  * Bind explicit human gestures to the live root and configured desktop.

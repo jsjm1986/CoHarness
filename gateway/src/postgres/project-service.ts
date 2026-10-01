@@ -18,6 +18,7 @@ import {
   type ProjectOrigin,
   type ProjectThemePolicy,
   type ProjectRow,
+  type UserProjectMembership,
 } from '../projects.ts'
 import { transaction } from './database.ts'
 import { allocateInstancePorts } from './port-allocation.ts'
@@ -375,6 +376,28 @@ export class PostgresProjectService {
         WHERE organization_id=$1 AND project_id=$2 AND user_id=$3`,
       [this.context.organizationId, locked.project_id, locked.user_id])
     })
+  }
+
+  async membershipsFor(userId: number): Promise<UserProjectMembership[]> {
+    const result = await this.context.pool.query<{
+      public_id: string
+      name: string
+      path: string
+      access_mode: GrantMode
+    }>(`SELECT p.public_id::text,p.name::text,pm.local_path path,m.access_mode
+      FROM harness.project_members m
+      JOIN harness.projects p ON p.id=m.project_id AND p.organization_id=m.organization_id AND p.status='active'
+      JOIN harness.project_mounts pm ON pm.project_id=p.id AND pm.organization_id=p.organization_id
+        AND pm.node_id=$2 AND pm.status='active'
+      JOIN harness.users u ON u.id=m.user_id AND u.organization_id=m.organization_id
+      WHERE m.organization_id=$1 AND u.public_id=$3 ORDER BY p.name`,
+    [this.context.organizationId, this.context.nodeId, userId])
+    return result.rows.map(row => ({
+      projectId: publicNumber(row.public_id, 'project'),
+      name: row.name,
+      path: row.path,
+      mode: row.access_mode,
+    }))
   }
 
   /** Create a pending invitation for one organization user. */

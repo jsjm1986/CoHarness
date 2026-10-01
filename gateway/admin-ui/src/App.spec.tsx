@@ -50,4 +50,11 @@ describe('App', () => {
     expect(screen.queryByRole('dialog', { name: '更多管理功能' })).toBeNull()
     expect(within(mobile!).getByRole('button', { name: '更多管理功能' }).classList.contains('active')).toBe(true)
   })
+
+  it('redirects /users to the users list', async () => {
+    window.history.replaceState({}, '', '/admin/users')
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: '用户页面' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/admin')
+  })
 })

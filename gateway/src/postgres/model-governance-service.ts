@@ -28,6 +28,7 @@ import type {
   ProjectCredentialView,
   ProjectModelProviderRow,
   ProjectModelSettingsView,
+  UserQuotaView,
 } from '../model-governance.ts'
 import { ORGANIZATION_PROVIDER_PATTERN, ProjectModelSettingsConflictError } from '../model-governance.ts'
 import { OrganizationModelCredentialCipher } from '../organization-model-credentials.ts'
@@ -412,6 +413,8 @@ function zeroUsageMeasure(): UsageMeasure {
 
 /** PostgreSQL-backed model access, pricing, quotas, and usage accounting. */
 export class PostgresModelGovernanceService {
+  /** Gateway-owned maintenance admission, including queued and background file projections. */
+  projectionWrite?: <T>(operation: () => Promise<T>) => Promise<T>
   constructor(
     private readonly context: PostgresRuntimeContext,
     private readonly credentialCipher: OrganizationModelCredentialCipher,
@@ -1370,6 +1373,29 @@ export class PostgresModelGovernanceService {
       companyCostMicrosLimit: limits?.company_cost_limit === null || limits?.company_cost_limit === undefined
         ? null
         : decimalToMicros(limits.company_cost_limit),
+    }
+  }
+
+  async userQuota(userId: number): Promise<UserQuotaView> {
+    const user = await internalUserId(this.context.pool, this.context.organizationId, userId)
+    if (user === null) throw new Error(`unknown user ${String(userId)}`)
+    const result = await this.context.pool.query<{
+      token_mode: 'inherit' | 'unlimited' | 'custom'
+      token_limit: string | null
+      company_cost_mode: 'inherit' | 'unlimited' | 'custom'
+      company_cost_limit: string | null
+    }>('SELECT token_mode,token_limit::text,company_cost_mode,company_cost_limit::text FROM harness.user_quotas WHERE user_id=$1',
+      [user])
+    const row = result.rows[0]
+    return {
+      tokenMode: row?.token_mode ?? 'inherit',
+      tokenLimit: row?.token_mode === 'custom' && row.token_limit !== null
+        ? safeCount(row.token_limit, 'user token limit')
+        : null,
+      companyCostMode: row?.company_cost_mode ?? 'inherit',
+      companyCostMicrosLimit: row?.company_cost_mode === 'custom' && row.company_cost_limit !== null
+        ? decimalToMicros(row.company_cost_limit)
+        : null,
     }
   }
 

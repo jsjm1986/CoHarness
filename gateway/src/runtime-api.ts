@@ -94,7 +94,7 @@ interface RuntimeApiDependencies {
   conversations: Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
     & Partial<Pick<ConversationRepository,
       'readHeader' | 'readFrom' | 'readPage' | 'readHistoryIndex' | 'revision' | 'migrate'
-      | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner'>>
+      | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner' | 'hasProjectDraftReservation'>>
   collaboration: Pick<
     PostgresCollaborationService,
     'access' | 'claimInteraction' | 'projectForUser' | 'readableSessionIds'
@@ -703,8 +703,14 @@ export function createRuntimeApiHandler(
         }
         res.setHeader('cache-control', 'no-store')
         if (action === 'register-session') {
-          const header = subject.target.kind === 'project'
+          let header: Pick<ConversationHeader, 'id' | 'parentSessionId' | 'seedLength'> | undefined = subject.target.kind === 'project'
             ? await storedHeader(payload.sessionId, subject, requestSignal(req, res)) : undefined
+          if (header === undefined && subject.projectInternalId !== undefined
+            && await deps.conversations.hasProjectDraftReservation?.(subject.organizationId, payload.sessionId, subject.projectInternalId) === true) {
+            // A live draft reservation binds this Session id to the project before
+            // the first append materializes its header; it admits a root unseeded Session only.
+            header = { id: payload.sessionId }
+          }
           await execution.register(subject, value, header)
           send(res, 200, { registered: true })
         } else if (action === 'capture') {

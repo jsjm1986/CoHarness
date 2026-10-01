@@ -4865,11 +4865,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DesktopConfirmation',
-    declaration: 'export interface DesktopConfirmation {\n    rootSessionId: SessionId;\n    nodeId: string;\n    desktop: string;\n    userId: number;\n    eligible: boolean;\n    confirmed: boolean;\n}',
+    declaration: 'export interface DesktopConfirmation {\n    rootSessionId: SessionId;\n    nodeId: string;\n    desktop: string;\n    userId: number;\n    eligible: boolean;\n    confirmed: boolean;\n    occupancy: DesktopOccupancy;\n}',
   },
   {
     name: 'DesktopConfirmationController',
     declaration: 'export interface DesktopConfirmationController {\n    read(agent: Agent, signal: AbortSignal): Promise<DesktopConfirmation>;\n    set(agent: Agent, expected: Pick<DesktopConfirmation, \'rootSessionId\' | \'nodeId\' | \'desktop\'>, confirmed: boolean, signal: AbortSignal): Promise<DesktopConfirmation>;\n}',
+  },
+  {
+    name: 'DesktopOccupancy',
+    declaration: 'export interface DesktopOccupancy {\n    available: boolean;\n    inUse: boolean;\n    heldByThisSession: boolean;\n    queued: number;\n}',
   },
   {
     name: 'DeveloperMessage',

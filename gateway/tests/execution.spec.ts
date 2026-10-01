@@ -381,6 +381,24 @@ describePg('Gateway execution identities', () => {
     const acquired = await lease('acquire', { ...rootAddress, requestId: 'first' })
     expect(acquired).toMatchObject({ status: 200, body: { status: 'granted' } })
     const grantId = acquired.body.grantId
+    const confirmStatus = (sessionId: string) => f.call('desktop-confirmation', { sessionId, desktop: 'display-0' }, f.admin)
+    expect(await confirmStatus(root)).toMatchObject({ status: 200, body: {
+      occupancy: { available: true, inUse: true, heldByThisSession: true, queued: 0 } } })
+    expect(await confirmStatus(other)).toMatchObject({ status: 200, body: {
+      occupancy: { available: true, inUse: true, heldByThisSession: false } } })
+    const originalHolder = (await pool.query<{ holder_json: { runtime: { kind: string; id: number; generation: number } } }>(
+      'SELECT holder_json FROM harness.desktop_grants WHERE grant_id=$1', [grantId])).rows[0]!.holder_json
+    for (const runtime of [
+      { ...originalHolder.runtime, kind: 'user' },
+      { ...originalHolder.runtime, id: f.other.id },
+      { ...originalHolder.runtime, generation: originalHolder.runtime.generation + 1 },
+    ]) {
+      await pool.query('UPDATE harness.desktop_grants SET holder_json=$1::jsonb WHERE grant_id=$2',
+        [JSON.stringify({ ...originalHolder, runtime }), grantId])
+      expect(await confirmStatus(root)).toMatchObject({ status: 200, body: {
+        occupancy: { inUse: true, heldByThisSession: false } } })
+    }
+    await pool.query('UPDATE harness.desktop_grants SET holder_json=$1::jsonb WHERE grant_id=$2', [JSON.stringify(originalHolder), grantId])
     expect(await lease('acquire', { ...childAddress, requestId: 'child' }))
       .toMatchObject({ status: 200, body: { status: 'held', grantId } })
     expect(await lease('heartbeat', { ...childAddress, grantId }))
@@ -417,6 +435,8 @@ describePg('Gateway execution identities', () => {
     expect(acquired.status).toBe(200)
     const grantId = acquired.body.grantId as string
     expect(await lease('acquire', second, { requestId: 'second' })).toMatchObject({ status: 200, body: { status: 'queued' } })
+    expect(await f.call('desktop-confirmation', { sessionId: second, desktop: 'display-0' }, f.admin))
+      .toMatchObject({ status: 200, body: { occupancy: { inUse: true, heldByThisSession: false, queued: 1 } } })
     expect((await lease('stop', second, { grantId })).status).toBe(403)
     expect(await lease('stop', first, { grantId })).toMatchObject({ status: 200, body: { stopping: true } })
     expect(await lease('stop', first, { grantId })).toMatchObject({ status: 200, body: { stopping: true } })
@@ -525,6 +545,53 @@ describePg('Gateway execution identities', () => {
     expect((await f.call('register-session', { sessionId: id }, undefined, f.other)).status).toBe(403)
     expect((await f.call('register-session', { sessionId: id, isSeeded: true })).status).toBe(403)
     expect((await f.call('/internal/runtime/session/append', { ...append, sessionId: randomUUID() })).status).toBe(400)
+  })
+
+  it('registers a leased project draft before its header materializes', async () => {
+    const f = await fixture(), id = randomUUID()
+    expect((await f.call('/internal/runtime/session/draft/reserve', {
+      draftId: randomUUID(), sessionId: id, cwd: '/tmp/draft-registration', visibility: 'project',
+    }, f.admin)).status).toBe(200)
+    expect((await f.call('register-session', { sessionId: id })).status).toBe(200)
+    expect((await f.call('register-session', { sessionId: id })).status).toBe(200)
+    expect((await f.call('register-session', { sessionId: id, isSeeded: true })).status).toBe(403)
+    const parent = await f.session()
+    expect((await f.call('register-session', { sessionId: id, parentSessionId: parent })).status).toBe(403)
+    expect((await f.call('register-session', { sessionId: id }, undefined, f.other)).status).toBe(403)
+    expect((await f.call('register-session', { sessionId: randomUUID() })).status).toBe(403)
+    const expired = randomUUID()
+    expect((await f.call('/internal/runtime/session/draft/reserve', {
+      draftId: randomUUID(), sessionId: expired, cwd: '/tmp/draft-registration', visibility: 'project',
+    }, f.admin)).status).toBe(200)
+    await pool.query(`UPDATE harness.conversation_draft_reservations
+      SET lease_expires_at=now()-interval '1 second' WHERE session_id=$1`, [expired])
+    expect((await f.call('register-session', { sessionId: expired })).status).toBe(403)
+  })
+
+  it('admits the first input and desktop confirmation on a leased project draft', async () => {
+    const f = await fixture(), id = randomUUID()
+    const policies = new DesktopAccess(f.context)
+    const user = { kind: 'user' as const, id: f.admin.id }, project = { kind: 'project' as const, id: f.project.id }
+    await policies.set(user, true, '0'); await policies.set(project, true, '0')
+    const reserve = (sessionId: string, visibility: 'project' | 'private') => f.call('/internal/runtime/session/draft/reserve', {
+      draftId: randomUUID(), sessionId, cwd: '/tmp/draft-registration', visibility,
+    }, f.admin)
+    expect((await reserve(id, 'project')).status).toBe(200)
+    expect((await f.call('register-session', { sessionId: id })).status).toBe(200)
+    await f.admit(id)
+    expect(await f.call('desktop-confirmation', { sessionId: id, desktop: 'display-0' }, f.admin))
+      .toMatchObject({ status: 200, body: { rootSessionId: id, eligible: true, confirmed: false } })
+    const priv = randomUUID()
+    expect((await reserve(priv, 'private')).status).toBe(200)
+    expect((await f.call('register-session', { sessionId: priv })).status).toBe(200)
+    expect((await f.call('input', { sessionId: priv, messageId: randomUUID(), contentHash: hash('m'), kind: 'message' }, f.member)).status).toBe(403)
+    expect((await f.call('input', { sessionId: priv, messageId: randomUUID(), contentHash: hash('a'), kind: 'message' }, f.admin)).status).toBe(200)
+    const expired = randomUUID()
+    expect((await reserve(expired, 'project')).status).toBe(200)
+    expect((await f.call('register-session', { sessionId: expired })).status).toBe(200)
+    await pool.query(`UPDATE harness.conversation_draft_reservations
+      SET lease_expires_at=now()-interval '1 second' WHERE session_id=$1`, [expired])
+    expect((await f.call('input', { sessionId: expired, messageId: randomUUID(), contentHash: hash('e'), kind: 'message' }, f.admin)).status).toBe(403)
   })
 
   it('rejects caller actors, wrong bindings, and unverified historical participant fields', async () => {

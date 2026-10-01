@@ -75,6 +75,7 @@
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-session-format-v4-to-v5": "workspace:*",
     "@deepseek-ai/dsh-session-format-v5-to-v6": "workspace:*",
+    "@deepseek-ai/dsh-session-persistence-gateway": "workspace:*",
     "@deepseek-ai/dsh-session-projection": "workspace:*",
     "@deepseek-ai/dsh-session-query": "workspace:*",
     "@deepseek-ai/dsh-session-query-sqlite": "workspace:*",

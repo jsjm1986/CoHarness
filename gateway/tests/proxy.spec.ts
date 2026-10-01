@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import type { AddressInfo, Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { AuditService } from '../src/audit.ts'
 import { AuthService } from '../src/auth.ts'
@@ -315,6 +315,20 @@ describe('proxy handlers', () => {
     expect(response.status).toBe(200)
     const body = await response.text()
     expect(body).toBe('data: open\n\ndata: tick\n\n')
+  })
+
+  it('logs the request path when a client disconnects before the response completes', async () => {
+    const { deps, base, cookie, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    cleanup.push(() => spy.mockRestore())
+    const controller = new AbortController()
+    const pending = fetch(`${base}/api/hold`, { headers: { cookie }, signal: controller.signal })
+    await pending.then(response => expect(response.status).toBe(200))
+    controller.abort()
+    await vi.waitFor(() => {
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('client disconnected mid-response: GET /api/hold'))
+    }, { timeout: 5000 })
   })
 
   it('proxies websocket upgrades with rewritten host', async () => {

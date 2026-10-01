@@ -17,10 +17,11 @@ import {
   Webhook,
   type LucideIcon,
 } from 'lucide-react'
-import { NavLink, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom'
+import { NavLink, Navigate, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom'
 import { AuditPage } from './pages/AuditPage.tsx'
 import { ProjectDetailPage } from './pages/ProjectDetailPage.tsx'
 import { ProjectListPage } from './pages/ProjectListPage.tsx'
+import { UserDetailPage } from './pages/UserDetailPage.tsx'
 import { UsersPage } from './pages/UsersPage.tsx'
 import { lazy, Suspense, useState } from 'react'
 import { Dialog } from './components/ui.tsx'
@@ -54,6 +55,8 @@ export function App() {
         <main className="mainContent">
           <Routes>
             <Route path="/" element={<UsersPage />} />
+            <Route path="/users" element={<Navigate to="/" replace />} />
+            <Route path="/users/:id" element={<UserDetailPage />} />
             <Route path="/projects" element={<ProjectListPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
             <Route path="/plugins" element={<Suspense fallback={<p role="status">正在加载插件管理</p>}><PluginsPage /></Suspense>} />

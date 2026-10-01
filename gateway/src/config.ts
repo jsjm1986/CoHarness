@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { basename, join, posix, resolve } from 'node:path'
 import { DEFAULT_DESKTOP_COORDINATOR_CONFIG, type DesktopCoordinatorConfig } from './desktop-coordinator.ts'
+import { DEFAULT_RUNTIME_LOG_CAP_BYTES } from './runtime-log.ts'
 
 export interface GatewayConfig {
   /** Canonical immutable release directory for managed deployments. */
@@ -42,6 +43,8 @@ export interface GatewayConfig {
   executionWatchHeartbeatMs: number
   /** Maximum bytes retained or streamed from one runtime upstream response. */
   upstreamResponseLimitBytes: number
+  /** Per-file byte cap for a local-launcher runtime's `logs/runtime.log` (HGW_RUNTIME_LOG_CAP_BYTES). */
+  runtimeLogCapBytes: number
   /** Maximum buffered body bytes accepted by one authenticated runtime API call. */
   runtimeApiBodyLimitBytes: number
   /** Days a trashed archive remains recoverable before purge. */
@@ -484,6 +487,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     DEFAULT_UPSTREAM_RESPONSE_LIMIT_BYTES,
     'HGW_UPSTREAM_RESPONSE_LIMIT_BYTES',
   )
+  const runtimeLogCapBytes = positiveSafeInteger(
+    env.HGW_RUNTIME_LOG_CAP_BYTES,
+    DEFAULT_RUNTIME_LOG_CAP_BYTES,
+    'HGW_RUNTIME_LOG_CAP_BYTES',
+  )
   const idleTimeoutMs = positiveSafeInteger(env.HGW_IDLE_TIMEOUT_MS, 30 * 60 * 1000, 'HGW_IDLE_TIMEOUT_MS')
   const readinessTimeoutMs = timerDelay(env.HGW_READINESS_TIMEOUT_MS, 30 * 1000, 'HGW_READINESS_TIMEOUT_MS')
   const sessionTtlMs = positiveSafeInteger(env.HGW_SESSION_TTL_MS, 7 * 24 * 3600 * 1000, 'HGW_SESSION_TTL_MS')
@@ -551,6 +559,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     principalAssertionTtlMs,
     upstreamTimeoutMs,
     upstreamResponseLimitBytes,
+    runtimeLogCapBytes,
     runtimeApiBodyLimitBytes,
     archiveRetentionDays,
     databaseStartupRetryInitialMs,

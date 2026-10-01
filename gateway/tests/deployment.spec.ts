@@ -220,4 +220,45 @@ describe('maintenance write gate', () => {
     })
     expect(authorized.status).toBe(503)
   })
+
+  it('excludes proxied /api requests from the writer ledger while still gating them', async () => {
+    const { deps, post } = await setup()
+    const span = vi.fn()
+    deps.writerSpan = span
+    deps.maintenanceGate = vi.fn(async (): Promise<'open' | 'maintenance'> => 'open')
+    const proxied = await post('/api/session.history', {})
+    expect(proxied.status).toBe(503)
+    expect(span).not.toHaveBeenCalled()
+    expect((await post('/admin/api/users', { username: 'zoe', password: 'pw-12345678' })).status).toBe(200)
+    expect(span).toHaveBeenCalledOnce()
+    deps.maintenanceGate = vi.fn(async (): Promise<'open' | 'maintenance'> => 'maintenance')
+    const gated = await post('/api/session.history', {})
+    expect(gated.status).toBe(503)
+    expect(await gated.json()).toEqual({ error: 'maintenance' })
+    expect(span).toHaveBeenCalledOnce()
+  })
+})
+
+it('retains a writer until its handler settles after the HTTP client disconnects', async () => {
+  const { deps, base, cookie } = await setup()
+  let writers = 0, release!: () => void, entered!: () => void
+  const waiting = new Promise<void>(resolve => { release = resolve })
+  const began = new Promise<void>(resolve => { entered = resolve })
+  deps.maintenanceGate = async () => 'open'
+  deps.writerSpan = () => { writers++; return () => { writers-- } }
+  const create = deps.users.create.bind(deps.users)
+  deps.users.create = async input => { entered(); await waiting; return create(input) }
+  const abort = new AbortController()
+  const request = fetch(`${base}/admin/api/users`, { method: 'POST',
+    headers: { cookie, origin: base, 'content-type': 'application/json' },
+    body: JSON.stringify({ username: 'after-disconnect', password: 'pw-12345678' }), signal: abort.signal })
+  const cancelled = expect(request).rejects.toThrow()
+  try {
+    await began
+    abort.abort()
+    await cancelled
+    expect(writers).toBe(1)
+  } finally { release() }
+  await vi.waitFor(() => { expect(writers).toBe(0) })
+  expect(await deps.users.getByUsername('after-disconnect')).not.toBeNull()
 })

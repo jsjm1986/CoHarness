@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import type { UserRow } from '../auth.ts'
 import type { GatewayConfig } from '../config.ts'
 import { hashPassword } from '../password.ts'
+import type { GatewayUserListRow } from '../services.ts'
 import { prepareUserData } from '../user-data.ts'
 import { transaction } from './database.ts'
 import { allocateInstancePorts } from './port-allocation.ts'
@@ -115,7 +116,7 @@ export class PostgresUserService {
     return created
   }
 
-  async list(): Promise<Array<UserRow & { port: number; instanceState: string }>> {
+  async list(): Promise<GatewayUserListRow[]> {
     const result = await this.context.pool.query<PostgresUserRow>(
       `${this.selectUsers()} ORDER BY u.public_id`, [this.context.organizationId, this.context.nodeId],
     )
@@ -128,6 +129,16 @@ export class PostgresUserService {
       [this.context.organizationId, this.context.nodeId, id],
     )
     return result.rows[0] === undefined ? null : toUser(result.rows[0])
+  }
+
+  /** Read one user with its personal instance port and state, or null when absent or deleted. */
+  async getListedById(id: number): Promise<GatewayUserListRow | null> {
+    const result = await this.context.pool.query<PostgresUserRow>(
+      `${this.selectUsers('AND u.public_id=$3')} LIMIT 1`,
+      [this.context.organizationId, this.context.nodeId, id],
+    )
+    const row = result.rows[0]
+    return row === undefined ? null : { ...toUser(row), port: row.port, instanceState: row.instance_state }
   }
 
   async getByUsername(username: string): Promise<UserRow | null> {
