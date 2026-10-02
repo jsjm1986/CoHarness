@@ -2,14 +2,27 @@
 import { runPluginCommand } from '@deepseek-ai/dsh-plugin-manager/operations'
 import { INSTALL_ANCHOR } from './profile-boot.ts'
 import { resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
+function requireDesktopProfile(dir: string): void {
+  if (!existsSync(join(dir, 'package.json'))) {
+    throw new Error('Open DeepSeek Harness Desktop once to initialize its profile, then fully quit it before running dsh plugin --profile desktop.')
+  }
+}
+
 /** Run package management for a profile.
- * @param profile Profile name.
+ * @param profile Profile name; Desktop's reserved profile must already be initialized by the application.
  * @param args Pnpm arguments relative to the invoking directory.
  * @returns Pnpm exit code.
  */
 export async function runPlugin(profile: string, args: readonly string[]): Promise<number> {
+  if (profile === 'desktop') {
+    try { requireDesktopProfile(resolveProfileDir(profile)) } catch (error) {
+      process.stderr.write(`dsh: ${String(error)}\n`)
+      return 1
+    }
+  }
   const result = await runPluginCommand({ profile, installAnchor: INSTALL_ANCHOR, cwd: process.cwd() }, args, {
     execution: 'cli',
     outputBytes: 16384,

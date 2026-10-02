@@ -11,13 +11,20 @@ import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { parseDshArgs } from './args.ts'
 import { reportStartupFailure } from './startup-diagnostics.ts'
 
+/** Installation-owned switches supplied by a packaged CLI launcher. */
+export interface RunCliOptions {
+  /** Permit plugin commands for Desktop's existing profile; reserved for its installed carrier. */
+  manageDesktopProfile?: boolean
+}
+
 /**
  * Run the public dsh command-line interface.
+ * @param options - Desktop profile access supplied by the installation.
  * @returns a promise that settles when the selected command mode finishes.
  */
-export async function runCli(): Promise<void> {
+export async function runCli(options: RunCliOptions = {}): Promise<void> {
   const version = getDshRuntimeVersion()
-  const invocation = parseDshArgs(process.argv.slice(2), version)
+  const invocation = parseDshArgs(process.argv.slice(2), version, options.manageDesktopProfile)
 
   switch (invocation.mode) {
     case 'profile': {
