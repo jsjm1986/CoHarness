@@ -32,47 +32,47 @@ changes:
     decision: version-bump
   - root: "event:agent/inbox/spliced"
     previous: "2026-09-27-execution-scopes-and-durable-reviews"
-    after: "c2cb3d8c8da40ffc59ce9101819cbb2ebb7db013d68c6c6f24212f96a0ea1d7d"
+    after: "17cca412a54e2dbbf68dab1b758475cb8a7cf49587a12baa281ad50640dd0048"
     decision: version-bump
   - root: "event:assistant/attempt"
     previous: "2026-09-21-v4"
-    after: "8e551c3f10065b20d3e5cb6bfde0589863be64be79f5200e7863128bcb69c270"
+    after: "153b841c3c35bc747c310e21aca6aee533814f52096f8e65e9198b72bf5a29d9"
     decision: version-bump
   - root: "event:assistant/message"
     previous: "2026-09-21-v4"
-    after: "f12eaba818724effce06f9bdb2f588571fd5635c1878a4cb27de8eb9fce49906"
+    after: "eaf72fc58fc3a3e9d7bf5727a2db76f173a7ee3be6789f83f67c4db83396afc2"
     decision: version-bump
   - root: "event:compaction/summary"
     previous: "2026-09-21-v4"
-    after: "f8fa8c5a6a47b23509f46b6ff6441ae7a66f3114b84ec2470df4a5a74d586802"
+    after: "e2f9a41e0989f54ed8cee80f8db2bcf9d60a5c810dc9d45b83fa050b9dce7602"
     decision: version-bump
   - root: "event:developer/message"
     previous: null
-    after: "5320348194cbbdd3f0332a88ffafd298bb5653dab4a5ef8d4e45f8a19b3fa782"
+    after: "8b13edeffcf9c5196c51828f56de435a403c0259f32fdacc7803d901e4abccb4"
     decision: version-bump
   - root: "event:request/header"
     previous: "2026-09-21-v4"
-    after: "a5805fab2457f244f1124989f2d50e48544294de239092278992db8b95807f71"
+    after: "4208123b50df5006b181481ab45fcf1cde807b88d3fd4d340090bc2e202fac41"
     decision: version-bump
   - root: "event:session/title-llm-request"
     previous: "2026-09-27-execution-scopes-and-durable-reviews"
-    after: "1f8decc10456cbcd8c952378918b915209c4e5076b925e967054967cf95d76ca"
+    after: "6be2289bd4a263141169e2312135aa301ab4a020cbefb3efd3566dbcedb64a31"
     decision: version-bump
   - root: "event:system/message"
     previous: "2026-09-21-v4"
-    after: "7458c8c4c4c8680f8e34181f26646ef2f4dfe90604b4b48f97583b35a7d6ddcc"
+    after: "69081694be231d56fd9580ba14645fd5e35373202605d5c5c841a9435b5fa3b1"
     decision: version-bump
   - root: "event:team/message/queued"
     previous: "2026-09-27-execution-scopes-and-durable-reviews"
-    after: "81015090958d429f1b861db7dd28a260a092e305aacb9cd05edbf0e4097aef6d"
+    after: "f8acbb9e1eacad9eeb67db7bd1aa605911a94981fac4f66d2ce3300eb58f2341"
     decision: version-bump
   - root: "event:tool/ptc-dispatch"
     previous: "2026-09-21-v4"
-    after: "0587e446c5bcafffdb12fb5a836a8cfafa31d6f0df65cba20e8108be6acaeb3e"
+    after: "100f6dca1468538239522cde3533e5bd721d0f1a7b50bea8b0eb533ea6c96163"
     decision: version-bump
   - root: "event:tool/result"
     previous: "2026-09-21-v4"
-    after: "d1468b7a9b9f41d9ea09be46ff2708e1fd33742817b5bc0ab1147f97d34e5a2f"
+    after: "7c9f44e90a0058f4cc532ae20dad0c10afa6eba22e70a6c79fc79490bad64397"
     decision: version-bump
   - root: "event:turn/end"
     previous: "2026-09-21-v4"
@@ -80,14 +80,14 @@ changes:
     decision: version-bump
   - root: "event:user/message"
     previous: "2026-09-27-execution-scopes-and-durable-reviews"
-    after: "c61fe5daf5ee4c1c344188ecd64ecad8acce295dca9b5e87c6f92dc9278cbc27"
+    after: "19ae9d6f5ef287ab26008d065769608401b9c6907bb2a3f7781bc7276651c804"
     decision: version-bump
 ```
 
 <a id="compatibility"></a>
 ## Compatibility
 
-V6 readers reject every structural addition: new `source` union variants, the V7 content blocks, `developer/message`, and the extended `turn/end` reason all fail V6 admission, so the transition requires a format version bump. The V6-to-V7 adjacent migration rewrites sources and tool results in place on a one-to-one mapping: it republishes the header at version 7, preserves `seq`, `surfaceOp`, and `sourceEventSeqs` coordinates, and inserts, removes, or renumbers no event. Two optional fields accepted without their own bump ride the same transition: `request/header` `tools[].deferLoading` and `tool/result` message `isError`. Committed V6 artifacts remain immutable under the adjacent-generation rule.
+V6 readers reject every structural addition: new `source` union variants, the V7 content blocks, `developer/message`, and the extended `turn/end` reason all fail V6 admission, so the transition requires a format version bump. The V6-to-V7 adjacent migration rewrites sources and tool results in place on a one-to-one mapping: it republishes the header at version 7, preserves `seq`, `surfaceOp`, and `sourceEventSeqs` coordinates, and inserts, removes, or renumbers no event. Two optional fields accepted without their own bump ride the same transition: `request/header` `tools[].deferLoading` and `tool/result` message `isError`. The transition also publishes the recorded source policy on user/developer `source` unions — the attribution-kind vocabulary, the `kind` discriminator, and the preserved-unknown rule — and the `@persistenceReserved` markers that keep retired `tool`/`system` fields closed; neither exists in the V6 record, so both ride the same bump. Committed V6 artifacts remain immutable under the adjacent-generation rule.
 
 <a id="verification"></a>
 ## Verification

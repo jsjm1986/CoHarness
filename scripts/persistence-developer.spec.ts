@@ -23,16 +23,18 @@ function toolAdditionSchema() {
 }
 
 describe('developer field compatibility', () => {
-  it('keeps refusing the retired inline tool field even though the V7 schema admits it structurally', () => {
+  it('requires a version bump before a future declaration can use the rejected inline tool field', () => {
     const { before, nodes, blockIndex, block, stringIndex } = toolAdditionSchema()
     nodes[blockIndex] = { ...block, properties: [
       ...block.properties.filter(property => property.name !== 'tool'),
       { name: 'tool', type: stringIndex, optional: true },
     ] }
     const schema = canonicalizeSchema(nodes, 0)
-    // V7 carries no schema-level `never` reservation for `tool`; the codec refuses it behaviorally.
     expect(classifyPersistenceChange(before, { ...before, schema, digest: schemaDigest(schema) }))
-      .toContainEqual(expect.objectContaining({ kind: 'optional-property-added', requiresVersionBump: false }))
+      .toContainEqual(expect.objectContaining({ requiresVersionBump: true }))
+    const reserved = block.properties.find(property => property.name === 'tool')
+    expect(reserved).toMatchObject({ optional: true })
+    expect(before.schema.nodes[reserved!.type]).toEqual({ kind: 'primitive', type: 'never' })
     const event: SessionFormatEvent = { type: 'developer/message', seq: 3, time: 4, surfaceOp: 'append', data: {
       turn: 1, step: 1, headerSeq: 2, message: { id: 'legacy-inline', role: 'developer', source: { kind: 'tool-registry' },
         content: [{ type: 'tool-addition', toolName: 'search', tool: 'optional metadata' }],

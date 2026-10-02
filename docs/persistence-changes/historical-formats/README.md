@@ -35,7 +35,7 @@ The index is generated from validated snapshots and the current writer constant.
 | 4 | PR #218 | [V4](v4.md) | [JSON](v4.schema.json) | 60 / 488 |
 | 5 | PR #218 | [V5](v5.md) | [JSON](v5.schema.json) | 63 / 508 |
 | 6 | PR #232 | [V6](v6.md) | [JSON](v6.schema.json) | 63 / 508 |
-| 7 | Current checkout | [Current catalog](../../persistence-catalog.md) | [JSON](../../persistence-schema.json) | 66 / 641 |
+| 7 | Current checkout | [Current catalog](../../persistence-catalog.md) | [JSON](../../persistence-schema.json) | 66 / 647 |
 
 <!-- persistence-format-index:end -->
 
@@ -44,7 +44,7 @@ The index is generated from validated snapshots and the current writer constant.
 
 Each `vN.md` / `vN.zh.md` pair has `kind: persistence-format`, an identical `yaml persistence-format` declaration binding every root key to its captured digest, a pairing sidecar, and a complete `vN.schema.json`. The [template](../../../.agents/skills/dsh-doc/templates/persistence-format.md) defines these records. Roots cover the logical Session header, physical JSONL header, event envelope, and all first-party events at the selected checkpoint; each root includes every reachable declared type. Packed physical body records have separate codec owners linked from each page.
 
-V0 and V2 use the latest matching tags in the [captured prerelease archive](../releases/README.md). V1 uses an intermediate source tree identified in its reference because the captured tags contain no V1 writer. Historical sources retain file paths without line numbers. Snapshots preserve historical optional fields and opaque values; they do not substitute current types into older formats. Historical identifiers remain intact only in schema JSON and the verified generated schema regions; authored prose follows current terminology rules.
+V0 and V2 use the latest matching tags in the [captured prerelease archive](../releases/README.md). V1 uses an intermediate source tree identified in its reference because the captured tags contain no V1 writer. V3 captures the verified inventory before the V4 writer change in PR #4320. Historical sources retain file paths without line numbers. Snapshots preserve historical optional fields and opaque values; they do not substitute current types into older formats. Historical identifiers remain intact only in schema JSON and the verified generated schema regions; authored prose follows current terminology rules.
 
 These references describe selected schemas, not historical application replay or migration safety. Same-version event additions and optional payload changes can produce other valid inventories. The prerelease archive retains tag-by-tag differences; [change records](../README.md) retain current compatibility acknowledgements. Neither history is replaced by these format snapshots.
 
@@ -60,7 +60,7 @@ pnpm run verify-persistence-catalog
 pnpm run verify-persistence-formats --archive 3
 ```
 
-Replace `3` with the outgoing writer version for other transitions. `--archive N` creates `vN.schema.json` from the current inventory, retains exactly the types reachable from its roots, and removes source line numbers. It refuses an existing destination, a version other than the current writer, invalid or incomplete schemas, and combination with `--write`. Add the snapshot’s bilingual record and source evidence using the [template](../../../.agents/skills/dsh-doc/templates/persistence-format.md). Retain all earlier records. The successor uses the current catalog; copying a new current catalog cannot satisfy the archived predecessor requirement. Follow the [Session format library](../../../packages/session/session-format/README.md) for runtime changes.
+Replace `3` with the outgoing writer version for other transitions. `--archive N` creates `vN.schema.json` from the current inventory, retains exactly the types reachable from its roots, and removes source line numbers. It refuses an existing destination, a version other than the current writer, invalid or incomplete schemas, and combination with `--write`. Add the snapshot’s bilingual record and source evidence using the [template](../../../.agents/skills/dsh-doc/templates/persistence-format.md). Retain all earlier records. The successor uses the current catalog; copying a new current catalog cannot satisfy the archived predecessor requirement. Follow the [format-version cookbook](../../cookbook/adding-a-session-format-version.md) for runtime changes.
 
 The schema definitions and index inside comment markers are generated. After advancing the writer and completing the machine data and authored evidence, refresh their tables and pairing records, then verify:
 

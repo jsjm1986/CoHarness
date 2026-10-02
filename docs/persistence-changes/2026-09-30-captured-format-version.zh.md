@@ -28,19 +28,19 @@ baseline: false
 changes:
   - root: "event:agent/inbox/spliced"
     previous: "2026-09-30-v7-tool-result"
-    after: "b81c9983d178996c4f994fb4ae8b3b2eb2babd12a2f22de72477a5028e63f70c"
+    after: "9a986adc7ddd7022a990c0e8bea148be9adee877e7185e1a128b6fc9b248e3c7"
     decision: same-version
   - root: "event:developer/message"
     previous: "2026-09-30-v7-tool-result"
-    after: "30b19509806348b545945e42357c4bdf50865bf02cf49a7f4a50dd4349f668e3"
+    after: "31b3741c54811477977e2764c8fc19cb12bcd5205a926b7a95426e9c0c71b4de"
     decision: same-version
   - root: "event:session/title-llm-request"
     previous: "2026-09-30-v7-tool-result"
-    after: "2e67c918285d4485db9235a00a13a92cd5796536e72442d261c8eb50f02a8c10"
+    after: "f642567464886e372fac8bfbeadae9c3a3271a007f9ccc586eca4eb060bed10c"
     decision: same-version
   - root: "event:user/message"
     previous: "2026-09-30-v7-tool-result"
-    after: "8de225d2721d0d6ea44d6d11f46aa1b59a9b9638da88bb73c7465fbfcca5b055"
+    after: "ac021627b9df3cf0141fef60757efdde2688128309681fbad725f387bd8e9dfb"
     decision: same-version
 ```
 
@@ -50,9 +50,13 @@ changes:
 每项改动只为引用元素增加一个可选属性。写入方可以输出该字段，读取方必须接受缺省，现有载荷语义不变，因此 Session 格式版本保持不变。
 
 <a id="verification"></a>
+
+<a id="verification"></a>
 ## 验证
 
 四个事件 schema 在当前清单与本记录的 after 快照中均携带该可选字段；packages/context/session-reference 在捕获快照格式版本已知时写入它，其 spec 覆盖 seeded 与非 seeded 捕获。
+
+<a id="dev-note"></a>
 
 <a id="dev-note"></a>
 ## 开发备注

@@ -73,7 +73,7 @@ export interface PersistenceSchemaInventory {
 }
 
 /** Type metadata with an explicit graph when roots cannot reconstruct it exactly. */
-interface PersistenceTypeIndex extends Omit<PersistenceType, 'schema'> {
+export interface PersistenceTypeIndex extends Omit<PersistenceType, 'schema'> {
   readonly schema?: CanonicalSchema
 }
 
@@ -289,7 +289,7 @@ export function schemaDigest(schema: CanonicalSchema): string {
  * @param schema - resolved persisted type.
  * @returns whether any reachable property records compatibility metadata.
  */
-function schemaHasCompatibility(schema: CanonicalSchema): boolean {
+export function schemaHasCompatibility(schema: CanonicalSchema): boolean {
   return schema.nodes.some(node => node.kind === 'object' && node.properties.some(property => property.compatibility !== undefined))
 }
 
