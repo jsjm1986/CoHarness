@@ -6,21 +6,12 @@ const responses = [
 ]
 
 class SnapshotSession {
-  motd = '__DSH_PERSISTENT_PWSH_PROMPT__ '
+  motd = 'dsh> '
   statusValue = { kind: 'running' }
-  scrollback = '__DSH_PERSISTENT_PWSH_PROMPT__ '
+  scrollback = 'dsh> '
   next = 0
 
   startSend(request) {
-    if (request.submit && request.text.startsWith('function prompt')) {
-      const viewport = `${request.text}\r\n${this.motd}`
-      this.scrollback += viewport
-      return {
-        done: Promise.resolve({ viewport, waitReason: 'stdin_read', sessionStatus: this.statusValue, truncated: false }),
-        readOutput: () => ({ delta: viewport, truncated: false }),
-        cancel: () => false,
-      }
-    }
     const response = responses[this.next++]
     if (!response || !request.submit || !request.text.includes(`[Console]::Out.Write('  ${response.token}  ')`)) {
       throw new Error('unexpected padded-completion snapshot command')
