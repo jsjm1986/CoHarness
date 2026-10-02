@@ -2467,8 +2467,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   // Publish the shared Session-resolution surface non-session capabilities
   // inject (the Schedule service resolves a due task's original Session
   // through it). Same resolver instance: the cold-resume and ownership rules
-  // cannot drift between entry points.
-  ctx.provide('sessionController', { resolveAgent: agentFor })
+  // cannot drift between entry points. The publish is idempotent because
+  // the resolver derives from this ctx — a second proxy on the same ctx
+  // contributes nothing.
+  if (ctx.get('sessionController') === undefined) {
+    ctx.provide('sessionController', { resolveAgent: agentFor })
+  }
 
   /** Send one transient frame to every connected mux consumer. */
   function broadcast(payload: MuxFrame): void {

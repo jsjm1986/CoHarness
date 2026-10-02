@@ -24,7 +24,9 @@ it('binds a live write target and leaves reads, cold targets, and local calls ou
   })
   ctx.provide('executionAuthority', { runRequest } as never)
   expect(await invokeTypertRemote(ctx, payload, next)).toBe('result')
-  expect(runRequest).toHaveBeenCalledWith(agent, { endpoint: payload.endpoint, args: payload.args }, next)
+  // The operation delegate may wrap `next` (schedule/catalog scoping); the
+  // returned 'result' proves it still reaches `next`.
+  expect(runRequest).toHaveBeenCalledWith(agent, { endpoint: payload.endpoint, args: payload.args }, expect.any(Function))
   for (const alternate of [
     { ...payload, endpoint: 'goals/get', method: 'get' },
     { ...payload, endpoint: 'goals/pause', method: 'pause' },
