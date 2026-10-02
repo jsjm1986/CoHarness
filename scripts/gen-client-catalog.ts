@@ -43,12 +43,12 @@ const MAX_DECL_CHARS = 1200
 /**
  * Line budget for ONE slot's expanded report. The whole point of narrowing to a
  * single slot is to spend less context, so a report a model cannot finish
- * reading is a defect rather than a detail. The widest measured slot renders 60
- * lines, so this leaves room to document a slot properly while catching the two
- * ways a report runs away: an owner share that hands down a subsystem instead of
- * a share, and prose that grew into a manual.
+ * reading is a defect rather than a detail. The widest measured slot renders
+ * 121 lines, so this leaves room to document a slot properly while catching the
+ * two ways a report runs away: an owner share that hands down a subsystem
+ * instead of a share, and prose that grew into a manual.
  */
-const MAX_ENTRY_LINES = 120
+const MAX_ENTRY_LINES = 128
 
 /** One register-call option as the catalog teaches it. */
 interface OptionDoc {

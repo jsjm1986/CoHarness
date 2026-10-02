@@ -10,9 +10,11 @@
  */
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
-import { commitSessionNavigation, type ClientContext, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { commitSessionNavigation, type ClientContext, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+// Type-only: pulls the layout plugin's Context merge (ctx.layout).
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from './contract/slots.ts'
 import { pinOrderAccounts, pinOrderSource } from './pin-order.ts'
 import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './shortcuts.ts'
@@ -35,6 +37,28 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
+/** Session navigation face other plugins consume through `ctx.uiWorkspace`. */
+export interface UiWorkspace {
+  /**
+   * Select a Session and show its Conversation as one UI navigation action.
+   * @param sessionId - target Session; the navigation rejects when it was
+   * archived meanwhile or is otherwise unavailable.
+   */
+  openSession(sessionId: SessionId): void
+  /**
+   * Start a New Session flow and navigate to its Session.
+   * @param workspaceId - explicit target; absent inherits the current or most recent Workspace.
+   */
+  startSession(workspaceId?: WorkspaceId): void
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Cross-plugin Workspace/Session navigation capability. */
+    uiWorkspace: UiWorkspace
+  }
+}
+
 /** Dictionary namespace owned by this plugin. */
 const NS = 'workspace'
 
@@ -46,7 +70,7 @@ const NS = 'workspace'
  * provides a waitable service. apply therefore depends on each slot
  * declaration through `slots.inject()` instead of assuming order.
  */
-export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'connection', 'conversationViewport', 'shortcuts']
+export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'connection', 'conversationViewport', 'shortcuts', 'layout']
 
 /**
  * Register the browser and picker once their slot declarations are on the
@@ -90,6 +114,9 @@ export function apply(ctx: ClientContext): void {
         throw new Error(ctx.locale.bind(NS)('navigation.unavailable'))
       }
       ctx.sessions.open(sessionId)
+      // Opening a Session always reveals its Conversation, including the
+      // no-op reselection of the current Session from another main panel.
+      ctx.layout.selectPanel(null)
     })
   }
   // Fork resolves only after the child opens so callers can classify the
@@ -102,6 +129,16 @@ export function apply(ctx: ClientContext): void {
         return childId
       })
   }
+  const uiWorkspace: UiWorkspace = {
+    openSession: (sessionId) => {
+      void openSession(sessionId).catch((reason: unknown) => {
+        if (reason instanceof Error && reason.name === 'AbortError') return
+        console.warn('session navigation failed:', reason)
+      })
+    },
+    startSession: (workspaceId) => { ctx.workspaces.startSession(workspaceId) },
+  }
+  ctx.effect(() => ctx.reflect.provide('uiWorkspace', uiWorkspace), 'ui-workspace: navigation service')
   const shortcutControls = createWorkspaceShortcutControls()
   installWorkspaceShortcuts(ctx, {
     startSession: () => { ctx.workspaces.startSession() },
@@ -190,6 +227,8 @@ export function apply(ctx: ClientContext): void {
       children: {
         'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' },
         'sidebar.workspaces.workbench': { kind: 'single', scope: 'root' },
+        'sidebar.session.row.leading': { kind: 'list', scope: 'root' },
+        'sidebar.session.row.hover': { kind: 'list', scope: 'root' },
       },
       store: viewStore,
       inject: browserInjected,

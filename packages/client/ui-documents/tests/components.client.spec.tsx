@@ -181,7 +181,10 @@ describe('DocumentsModal', () => {
 
   it('renders a button with the document label, opens the modal on click, and closes on Escape', () => {
     createUserDocClient.mockReturnValue(makeClient())
-    render(<DocumentsButton t={t as never} wide={false} useSessions={useNoCurrentSession as never} useWorkspaces={undefined as never} />)
+    render(<DocumentsButton
+      t={t as never} wide={false} useSessions={useNoCurrentSession as never}
+      useWorkspaces={undefined as never} usePanelInfo={undefined as never}
+    />)
     expect(screen.getByRole('button', { name: '文档' }).className.split(/\s+/)).toContain(buttonCss.rail)
     fireEvent.click(screen.getByRole('button', { name: '文档' }))
     expect(screen.getByRole('dialog', { name: '文档管理' })).toBeTruthy()
@@ -191,7 +194,10 @@ describe('DocumentsModal', () => {
 
   it('shows the document label beside the icon when the sidebar is wide', () => {
     createUserDocClient.mockReturnValue(makeClient())
-    render(<DocumentsButton t={t as never} wide={true} useSessions={useNoCurrentSession as never} useWorkspaces={undefined as never} />)
+    render(<DocumentsButton
+      t={t as never} wide={true} useSessions={useNoCurrentSession as never}
+      useWorkspaces={undefined as never} usePanelInfo={undefined as never}
+    />)
     expect(screen.getByRole('button', { name: '文档' }).textContent).toContain('文档')
   })
 
@@ -212,7 +218,10 @@ describe('DocumentsModal', () => {
       return { ok: true, json: async () => ({}) }
     }))
     createUserDocClient.mockReturnValue(client)
-    render(<DocumentsButton t={t as never} wide={false} useSessions={useNoCurrentSession as never} useWorkspaces={undefined as never} />)
+    render(<DocumentsButton
+      t={t as never} wide={false} useSessions={useNoCurrentSession as never}
+      useWorkspaces={undefined as never} usePanelInfo={undefined as never}
+    />)
     fireEvent.click(screen.getByRole('button', { name: '文档' }))
     expect(await screen.findByRole('dialog', { name: t('modal.title.project', { name: 'Compiler' }) })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })

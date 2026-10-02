@@ -337,7 +337,10 @@ describe('ProducedFiles row', () => {
     const openFile = vi.fn<(path: string) => void>()
 
     const view = render(
-      <ProducedFiles matched={paths} openFile={openFile} {...capability(true)} t={t} />,
+      <ProducedFiles
+        {...tailOwner(produced(...paths.map((path, index) => [index + 1, path] as const)), paths.length, openFile)}
+        {...capability(true)} t={t}
+      />,
     )
     expect(view.getByText('产物')).toBeTruthy()
     const row = view.container.querySelector('[data-produced-files-row]')
@@ -359,12 +362,15 @@ describe('ProducedFiles row', () => {
   it('keeps the folder action absent without overflow or a local native opener', () => {
     const openFile = vi.fn<(path: string) => void>()
     const view = render(
-      <ProducedFiles matched={['a.md']} openFile={openFile} {...capability(true)} t={t} />,
+      <ProducedFiles {...tailOwner(produced([1, 'a.md']), 1, openFile)} {...capability(true)} t={t} />,
     )
     const overflowing = ['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md']
     expect(view.queryByRole('button', { name: '在文件夹中显示' })).toBeNull()
     for (const unavailable of [capability(false), capability(true, false), capability(undefined)]) {
-      view.rerender(<ProducedFiles matched={overflowing} openFile={openFile} {...unavailable} t={t} />)
+      view.rerender(<ProducedFiles
+        {...tailOwner(produced(...overflowing.map((path, index) => [index + 1, path] as const)), overflowing.length, openFile)}
+        {...unavailable} t={t}
+      />)
       expect(view.queryByRole('button', { name: '在文件夹中显示' })).toBeNull()
     }
   })
@@ -372,7 +378,7 @@ describe('ProducedFiles row', () => {
   it('uses singular English copy when exactly one file is hidden', () => {
     const view = render(
       <ProducedFiles
-        matched={['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md']}
+        {...tailOwner(produced(...['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md'].map((path, index) => [index + 1, path] as const)), 7)}
         openFile={() => {}}
         {...capability(false)}
         t={makeTranslate(en)}
@@ -419,7 +425,7 @@ describe('plugin registration', () => {
     const sessionId = SessionId('project-review')
     await ctx.plugin(SlotRegistry).await()
     await ctx.plugin(ConversationEventRegistry).await()
-    ctx.slots.register({ name: 'root', children: { 'conversation.chat.turnTail': { kind: 'chain', scope: 'session' } } } as never, () => null)
+    ctx.slots.register({ name: 'root', children: { 'conversation.chat.turnTail': { kind: 'list', scope: 'session' } } } as never, () => null)
     const summary = vi.fn(async () => ({ result: { ok: true, value: { turn: 1, files: [], total: 0, added: 0, deleted: 0 } } }))
     const baseSummary = vi.fn()
     const target = { kind: 'project', projectId: 7 }
@@ -435,7 +441,8 @@ describe('plugin registration', () => {
     try {
       await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
       await ctx.plugin({ inject: [...inject], apply }).await()
-      const entry = ctx.slots.entries('conversation.chat.turnTail').find(item => item.select === selectDeliverables)!
+      const entry = ctx.slots.entries('conversation.chat.turnTail')
+        .find(item => item.options.id === '@deepseek-ai/dsh-client-ui-deliverables')!
       const face = entry.inject!(sessionId as never) as unknown as DeliverablesInjected
       forTarget.mockReturnValueOnce(undefined as never)
       expect(() => entry.inject!(SessionId('missing-runtime') as never)).toThrow('runtime is unavailable')
@@ -468,7 +475,7 @@ describe('plugin registration', () => {
     await ctx.plugin(SlotRegistry).await()
     await ctx.plugin(ConversationEventRegistry).await()
     ctx.slots.register({ name: 'root', children: {
-      'conversation.chat.turnTail': { kind: 'chain', scope: 'session' },
+      'conversation.chat.turnTail': { kind: 'list', scope: 'session' },
       'tool.call.toolview': { kind: 'keyed', scope: 'session' },
       'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session' },
     } } as never, () => null)
@@ -500,7 +507,8 @@ describe('plugin registration', () => {
       await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
       const fiber = ctx.plugin({ inject: [...inject], apply })
       await fiber.await()
-      const entry = ctx.slots.entries('conversation.chat.turnTail').find(item => item.select === selectDeliverables)!
+      const entry = ctx.slots.entries('conversation.chat.turnTail')
+        .find(item => item.options.id === '@deepseek-ai/dsh-client-ui-deliverables')!
       const face = entry.inject!(sessionId as never) as unknown as DeliverablesInjected
       const tab = ctx.slots.entries('sidebar.right.pane.tab')[0]!.inject!(sessionId as never) as unknown as ReviewInjected
       expect(tab.hooks.changesSummary).toBe(face.hooks.changesSummary)
@@ -566,7 +574,7 @@ describe('plugin registration', () => {
     // The owning view's child declaration, stood up by a bench root entry.
     ctx.slots.register({
       name: 'root',
-      children: { 'conversation.chat.turnTail': { kind: 'chain', scope: 'session' } },
+      children: { 'conversation.chat.turnTail': { kind: 'list', scope: 'session' } },
     } as never, () => null)
     const hostDescription = { getSnapshot: () => undefined, subscribe: () => () => {} }
     ctx.provide('connection', {
@@ -584,12 +592,19 @@ describe('plugin registration', () => {
 
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    const [entry] = ctx.slots.entries('conversation.chat.turnTail')
+    const entries = ctx.slots.entries('conversation.chat.turnTail')
+    const entry = entries.find(item => item.options.id === '@deepseek-ai/dsh-client-ui-deliverables/produced-files')
     expect(entry).toBeDefined()
     expect(entry?.inject?.()).toEqual({ isLoopback: false, hooks: { hostDescription } })
-    expect(entry?.select?.(tailOwner(produced([2, 'fallback.txt']), 3) as never)).toEqual(['fallback.txt'])
-    expect(entry?.select?.(tailOwner({ produced: [], changes: { seq: 2 } }, 3) as never)).toBeNull()
-    expect(entry?.select?.(tailOwner({ produced: [], presented: [{ path: 'delivery.txt', seq: 2, index: 0 }] }, 3) as never)).toBeNull()
+    // List-seat gating lives inside the component: the produced row appears
+    // only when the turn produced files AND no delivery/changes card claimed
+    // the tail.
+    expect(selectProducedFiles(tailOwner(produced([2, 'fallback.txt']), 3))).toEqual(['fallback.txt'])
+    expect(
+      changesForClosing(tailOwner({ produced: [], changes: { seq: 2 } }, 3))
+      === null && presentedForClosing(tailOwner({ produced: [], changes: { seq: 2 } }, 3)).length === 0,
+    ).toBe(false)
+    expect(presentedForClosing(tailOwner({ produced: [], presented: [{ path: 'delivery.txt', seq: 2, index: 0 }] }, 3)).length).toBeGreaterThan(0)
 
 
     // The prose face is live while the plugin is: a produced turn yields a

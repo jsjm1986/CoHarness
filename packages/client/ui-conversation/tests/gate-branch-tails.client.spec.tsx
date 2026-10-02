@@ -131,6 +131,7 @@ describe('render branch tails', () => {
         useSession={bindSnapshotSelector({ getSnapshot: () => snap, subscribe: () => () => {} })}
         useSessions={bindSnapshotSelector(emptyList)}
         useWorkspaces={bindSnapshotSelector(emptyWorkspaces)}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useProjection={(() => undefined)}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
@@ -141,6 +142,8 @@ describe('render branch tails', () => {
           addDocuments: () => true,
           removeDocument: () => {},
           pruneDocuments: () => {},
+          captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+          insertText: () => false,
           submit: () => {},
         }}
         {...(chat.getSnapshot().selection ?? {})}
@@ -192,6 +195,7 @@ describe('render branch tails', () => {
         useSession={bindSnapshotSelector({ getSnapshot: () => snap, subscribe: () => () => {} })}
         useSessions={bindSnapshotSelector(emptyList)}
         useWorkspaces={bindSnapshotSelector(emptyWorkspaces)}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useProjection={(() => undefined)}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
@@ -202,6 +206,8 @@ describe('render branch tails', () => {
           addDocuments: () => true,
           removeDocument: () => {},
           pruneDocuments: () => {},
+          captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+          insertText: () => false,
           submit: () => {},
         }}
         {...(chat.getSnapshot().selection ?? {})}

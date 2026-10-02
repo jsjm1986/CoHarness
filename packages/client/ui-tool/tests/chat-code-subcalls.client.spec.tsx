@@ -91,9 +91,9 @@ function snapshotWith(
 }
 
 /** Test-owned AppFrame role: declares and renders the resident conversation area. */
-type AppRootProps = PropsRenderSlots<'conversation' | 'details'>
+type AppRootProps = PropsRenderSlots<'main' | 'details'>
 function AppRoot({ renderSlot }: AppRootProps) {
-  return <>{renderSlot('conversation', {})}</>
+  return <>{renderSlot('main', {}, { entryKey: 'conversation' })}</>
 }
 
 /**
@@ -177,7 +177,7 @@ async function bench(snapshot: ConversationSnapshot) {
   slots.register({
     name: 'root',
     children: {
-      'conversation': { kind: 'single', scope: 'root' },
+      'main': { kind: 'keyed', scope: 'root' },
       'details': { kind: 'single', scope: 'session' },
     },
   }, AppRoot)

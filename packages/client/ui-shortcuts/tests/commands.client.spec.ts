@@ -7,6 +7,7 @@ import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { DesktopKeyboardApi, DesktopShortcutInput, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/protocol'
 import type { createSettingsShellStore } from '../../ui-settings-general/src/client/shell-store.ts'
+import type { createLayoutStore } from '../../ui-layout/src/client/stores.ts'
 import type { ReferenceInjected } from '../src/client/Reference.tsx'
 import type { createShortcutsStore } from '../src/client/store.ts'
 
@@ -132,6 +133,12 @@ describe('assembled shortcut command owners', () => {
     expect(settings.getSnapshot().open).toBe(false)
     // The panel actions write the mounted entry's store instance, so observe the frame's DOM marker.
     const collapsed = () => client.container!.querySelector('[data-sidebar-collapsed]') !== null
+    // jsdom's inert ResizeObserver never reports the frame width, so the store
+    // keeps the narrow-viewport initial value and toggleSidebar would only
+    // flip the drawer override. Pin a wide width to exercise the sidebar
+    // preference path the DOM marker observes.
+    const layoutStore = (client.ctx.slots.entries('root')[0]!.store as ReturnType<typeof createLayoutStore>).create()
+    act(() => { layoutStore.actions.setViewportWidth(1440) })
     expect(collapsed()).toBe(false)
     press('KeyB')
     expect(collapsed()).toBe(true)

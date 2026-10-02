@@ -1,0 +1,5 @@
+# Browser-zone assertions need a fresh reading after the non-browser preparation turn.
+# The Schedule rows come from the scenario's schedule overlay (`config/examples/schedule`).
+- id: time-context
+  config:
+    refreshIntervalMs: 0

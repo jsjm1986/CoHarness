@@ -249,7 +249,7 @@ function workspaceGroupHalf(e: { clientY: number; currentTarget: HTMLElement }):
 type SessionTreeProps = Pick<
   WorkspaceBrowserProps,
   'useSessions' | 'startSession' | 'forkSession' | 'pinSession' | 'unpinSession'
-  | 'insertWorkspaceBefore' | 'insertSessionBefore' | 't'
+  | 'insertWorkspaceBefore' | 'insertSessionBefore' | 'renderSlot' | 't'
 > & {
   open: (sessionId: SessionId) => void
   /** Host account home for POSIX hover-path abbreviation. */
@@ -291,7 +291,7 @@ function SessionTree({
   onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive,
   insertWorkspaceBefore, insertSessionBefore, orderBy, workspaceReady, newShortcut,
   groupExpansion, setGroupExpanded,
-  sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, home, t,
+  sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, home, renderSlot, t,
 }: SessionTreeProps) {
   const list = useSessions(s => s)
   const current = list.current
@@ -605,6 +605,7 @@ function SessionTree({
                     onPin={pinSession}
                     onUnpin={unpinSession}
                     drag={dragProps}
+                    renderSlot={renderSlot}
                     t={t}
                   />
                 )
@@ -634,7 +635,7 @@ function SessionTree({
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
   useSessions, open, forkSession, pinSession, unpinSession, onSessionRename, onSessionArchive, rowState,
-  orderBy, workspaceReady, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
+  orderBy, workspaceReady, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, renderSlot, t,
 }: Pick<
   SessionTreeProps,
   | 'useSessions'
@@ -651,6 +652,7 @@ function FlatList({
   | 'sessionUpdatedAtByAccount'
   | 'syncSessionOrderAccount'
   | 'setSessionOrder'
+  | 'renderSlot'
   | 't'
 >) {
   const list = useSessions(s => s)
@@ -731,6 +733,7 @@ function FlatList({
               onArchive={onSessionArchive}
               onPin={pinSession}
               onUnpin={unpinSession}
+              renderSlot={renderSlot}
               flat
               drag={{
                 start: () => {
@@ -1340,6 +1343,7 @@ export function WorkspaceBrowser({
                 sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
                 syncSessionOrderAccount={actions.syncSessionOrderAccount}
                 setSessionOrder={actions.setSessionOrder}
+                renderSlot={renderSlot}
                 t={t}
               />
             )
@@ -1367,6 +1371,7 @@ export function WorkspaceBrowser({
                 insertSessionBefore={insertSessionBefore}
                 orderBy={orderBy}
                 home={home}
+                renderSlot={renderSlot}
                 t={t}
                 onRenameRequest={(workspaceId, currentTitle) => {
                   setRenameTarget({ workspaceId, currentTitle })

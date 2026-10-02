@@ -44,6 +44,7 @@ async function createRuntime(): Promise<SlotTestRuntime> {
     register: vi.fn(() => () => {}),
     catalog: { getSnapshot: () => EMPTY_CATALOG, subscribe: () => () => {} },
   })
+  runtime.provide('layout', { selectPanel: vi.fn() })
   runtime.slots.installLocale(locale)
   return runtime
 }

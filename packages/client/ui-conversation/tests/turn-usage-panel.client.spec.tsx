@@ -34,9 +34,9 @@ describe('TurnUsagePanel', () => {
 
   it('shows turn duration and timing details in the existing clock contract', () => {
     const view = render(<TurnTimePanel runMs={3_903_000} ttftMs={1_200} tokensPerSecond={20} t={t} />)
-    fireEvent.click(view.getByRole('button', { name: 'Ran for 1h 05m 03s' }))
+    fireEvent.click(view.getByRole('button', { name: 'Ran for 1h 5m 3s' }))
     const dialog = view.getByRole('dialog', { name: 'Turn time and speed' })
-    expect(dialog.textContent).toContain('Total run time1h 05m 03s')
+    expect(dialog.textContent).toContain('Total run time1h 5m 3s')
     expect(dialog.textContent).toContain('Tokens per second (TPS)20 tok/s')
     expect(dialog.textContent).toContain('Time to first token (TTFT)1.2s')
   })

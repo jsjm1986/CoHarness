@@ -375,8 +375,11 @@ export function apply(ctx: Context): void {
 
   // Resident current-session-optional shell. It owns the stable Hero/composer
   // frame while strict session slots fill only their session-bound regions.
+  // The reserved `conversation` key keeps the layout's main selection on this
+  // surface until a global panel is explicitly selected.
   slots.register({
-    name: 'conversation',
+    name: 'main',
+    key: 'conversation',
     locale: NS,
     store: viewportStore,
     children: {

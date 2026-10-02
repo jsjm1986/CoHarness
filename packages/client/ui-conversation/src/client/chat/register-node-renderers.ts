@@ -55,7 +55,7 @@ export function registerChatNodeRenderers(
     locale: NS,
     inject: (): TurnTailPerformanceInjected => ({ hooks: { performanceUsage } }),
     children: {
-      'conversation.chat.turnTail': { kind: 'chain', scope: 'session' },
+      'conversation.chat.turnTail': { kind: 'list', scope: 'session' },
       'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' },
     },
   }, TurnTailNodeView))

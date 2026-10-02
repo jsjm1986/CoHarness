@@ -38,6 +38,10 @@ function emptyWorkspaces() {
   })
   return bindSnapshotSelector(store)
 }
+function emptyPanelInfo() {
+  const store = createSnapshotStore({ activePanelId: null })
+  return bindSnapshotSelector(store)
+}
 
 function mount(
   preference: ThemePreference = 'system',
@@ -52,6 +56,7 @@ function mount(
   const props: AppearanceRowComponentProps = {
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
+    usePanelInfo: emptyPanelInfo(),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
     t: (key: string) => COPY[key] ?? key,

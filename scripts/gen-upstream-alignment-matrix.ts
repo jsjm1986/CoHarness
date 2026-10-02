@@ -84,7 +84,7 @@ const AREA_PHASE: Record<string, string> = {
 const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
   'packages/session/session-format-v3-to-v4': {
     status: 'reject',
-    targetAssessment: 'not-carried',
+    targetAssessment: 'fork-owned',
     rejectReason: 'Same-key upstream package with unrelated semantics: CoHarness owns session-format-v3-to-v4 for the released v3→v4 edge, while upstream rc.1 uses the key for its V4-generation line. Recorded upstreamShadowed in scripts/upstream-sync.json. Upstream V4 event vocabulary (developer/message, forked, tool-role streaming, attachments, plugin:<name>) is absorbed event-by-event into the fork v6→v7 edge — never file-merged.',
     localDisposition: 'Owner decision: retain v6 generation; absorb upstream event semantics via a new adjacent v6→v7 migration edge in P4.',
   },
@@ -105,13 +105,13 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
   },
   'packages/settings/settings-file': {
     status: 'reject',
-    targetAssessment: 'not-carried',
+    targetAssessment: 'fork-owned',
     rejectReason: 'Upstream removed packages/settings/settings-file between the baseline and rc.1; the fork-owned settings pipeline (settingsScope governance, owner/project-write semantics, settings.yaml) is retained as an owned package.',
     localDisposition: 'Owner decision: keep the fork settings model; selectively absorb upstream capabilities such as schema projection without moving governance.',
   },
   'packages/client/ui-settings-unarchive-sessions': {
     status: 'reject',
-    targetAssessment: 'not-carried',
+    targetAssessment: 'fork-owned',
     rejectReason: 'Upstream removed the package between the baseline and rc.1; the fork-owned archive surface is retained.',
   },
   'packages/experimental/agent-team-web-profile': {
@@ -138,12 +138,12 @@ const ROW_OVERRIDES: Record<string, Record<string, unknown>> = {
   'packages/client/ui-schedule': {
     status: 'adapt',
     targetAssessment: 'increment-review-required',
-    localDisposition: 'Intentional product divergence: the fork keeps Session-event-sourced conversational schedule delivery (see .agents/notes/implemented/simplification/2026-08-09-conversational-schedule-delivery.md); upstream\'s Host-owned task store and presentation projection are not carried. Reversal needs a new owner decision.',
+    localDisposition: 'Host-owned task store carried: the conversational-delivery decision was superseded and archived at .agents/notes/archived/simplification/2026-08-09-conversational-schedule-delivery.md. ui-schedule is resident in the shipped web-app patch and activates under experimental/schedule-bundle; browser projections run on ClientSessionKey — catalog rows keyed via ctx.sessions.keyFor, Remote calls decode back to raw Host ids (see .agents/notes/implemented/bug-fix/2026-10-03-schedule-catalog-session-identity.md).',
   },
   'packages/schedule/schedule': {
     status: 'adapt',
     targetAssessment: 'increment-review-required',
-    localDisposition: 'Same divergence as packages/client/ui-schedule: Session-scoped durable reminders and live root Agent delivery stay; upstream delivery-history/storage surfaces are reviewed event-by-event rather than file-merged.',
+    localDisposition: 'Host-owned task store carried byte-identical to rc.2 except type-only import rewrites onto the fork api/remotes session-controller. storage.ts/delivery-history.ts/update.ts own active and ended tasks; historical schedule/change events decode as LegacyScheduleRecord without implicit migration.',
   },
   'packages/client/connection': {
     status: 'adapt',

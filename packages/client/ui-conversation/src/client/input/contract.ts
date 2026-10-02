@@ -107,6 +107,21 @@ export interface SessionInputResolver {
 export interface InputActions extends InputDraftActions {
   /** Enter submission (adjudication / claim transaction / default sink inside). */
   submit(): void
+  /**
+   * Snapshot the last shell-reported caret as an insertion span; absent any
+   * report the span is the draft end. The span's draftRev CAS lets a later
+   * {@link insertText} detect intervening edits.
+   * @returns the collapsed capture-time span.
+   */
+  captureInsertion(): TokenSpan
+  /**
+   * Splice plain text over a captured span while the draft is unchanged;
+   * refused during adjudication/submission and after any intervening edit.
+   * @param text - transcript or other externally produced plain text.
+   * @param span - span from {@link captureInsertion}.
+   * @returns whether the text was applied.
+   */
+  insertText(text: string, span: TokenSpan): boolean
 }
 
 /** One surfaced notice (command results, adjudication failures). seq keys re-render of repeats. */

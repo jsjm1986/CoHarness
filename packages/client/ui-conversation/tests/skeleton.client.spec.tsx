@@ -177,6 +177,7 @@ function mount(
           useSession={useSession}
           useSessions={props.useSessions}
           useWorkspaces={props.useWorkspaces}
+          usePanelInfo={(() => { throw new Error('unused') }) as never}
           useProjection={(() => undefined)}
           useInput={useInput}
           inputActions={inputActions}
@@ -197,6 +198,7 @@ function mount(
           useSession={useSession}
           useSessions={props.useSessions}
           useWorkspaces={props.useWorkspaces}
+          usePanelInfo={(() => { throw new Error('unused') }) as never}
           useProjection={(() => undefined)}
           useInput={useInput}
           inputActions={inputActions}
@@ -220,6 +222,7 @@ function mount(
           useSession={useSession}
           useSessions={props.useSessions}
           useWorkspaces={props.useWorkspaces}
+          usePanelInfo={(() => { throw new Error('unused') }) as never}
           useProjection={(() => undefined)}
           useInput={useInput}
           inputActions={inputActions}

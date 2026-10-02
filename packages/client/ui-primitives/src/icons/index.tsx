@@ -1015,3 +1015,11 @@ export const IconPinFill16 = ({ size = 16, className }: IconProps) => (
     />
   </svg>
 )
+
+/** ic_ds_microphone_outline_16 — upstream rc.2 voice-input glyph (1px outline). */
+export const IconMicrophoneOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth={1} aria-hidden="true">
+    <rect x={5} y={1.5} width={6} height={9} rx={3} />
+    <path d="M2.35 8.675C3.075 11.3 5.2 13.125 8 13.125C10.8 13.125 12.925 11.3 13.65 8.675M8 13.125V15" />
+  </svg>
+)

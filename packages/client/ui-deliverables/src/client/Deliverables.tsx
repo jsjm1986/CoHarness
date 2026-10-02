@@ -56,7 +56,7 @@ export function selectDeliverables(owner: TurnTailOwnerProps): DeliverablesMatch
  * @param props - closing Turn, file actions, and localized copy.
  * @returns file rows, or null when the Turn declares none.
  */
-export function DeliverablesTail(props: PropsRuntime<'conversation.chat.turnTail'> & { matched: DeliverablesMatch } & PropsLocale<typeof NS> & InjectFace<DeliverablesInjected>) {
+export function DeliverablesTail(props: PropsRuntime<'conversation.chat.turnTail'> & PropsLocale<typeof NS> & InjectFace<DeliverablesInjected>) {
   const matched = selectDeliverables(props)
   return matched === null ? null : <Deliverables {...props} matched={matched} />
 }

@@ -96,6 +96,7 @@ const kitBase: Omit<QuestionComposerProps, 'matched' | 'useStore' | 'useQuestion
   useSession: selector => selector(sessionState),
   useSessions: selector => selector(sessionList),
   useWorkspaces: selector => selector(workspaceState),
+  usePanelInfo: selector => selector({ activePanelId: null }),
   useProjection: (() => undefined),
   useInput: selector => selector(inputState),
   inputActions: {
@@ -106,6 +107,8 @@ const kitBase: Omit<QuestionComposerProps, 'matched' | 'useStore' | 'useQuestion
     addDocuments: () => false,
     removeDocument: () => { throw new Error('unused') },
     pruneDocuments: () => { throw new Error('unused') },
+    captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+    insertText: () => false,
     submit: () => { throw new Error('unused') },
   },
   // The seat's key domain is question ∪ common.

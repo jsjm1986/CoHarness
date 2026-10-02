@@ -38,7 +38,7 @@
 //
 // That conjunction is why `band` and `timeCoveredBy` are both asserted and
 // neither replaces the other. Removing only the gutter leaves `timeCoveredBy` at
-// 0, because the bar is then 4px wide and the row's right padding remains
+// 0, because the bar is then 5px wide and the row's right padding remains
 // larger than the bar,
 // so it abuts the timestamp without covering it; `band` catches that case.
 // Removing both is what produces the reported overlap, and `timeCoveredBy`
@@ -176,7 +176,7 @@ function measureList(page: Page): Promise<ListMetrics> {
       })
       .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
       .filter(rule => rule.selectorText === '::-webkit-scrollbar-thumb:hover')
-      .map(rule => rule.style.getPropertyValue('background'))
+      .map(rule => rule.style.getPropertyValue('background-color'))
     const style = getComputedStyle(list)
     const pseudoWidth = getComputedStyle(list, '::-webkit-scrollbar').width
     const barWidth = pseudoWidth === 'auto' ? 15 : Number.parseFloat(pseudoWidth)
@@ -495,9 +495,9 @@ describe('web e2e: sidebar session list scrollbar (reserved gutter / themed thum
     // the hover token included.
     expect(light.standardWidth).toBe('auto')
     expect(light.standardColor).toBe('auto')
-    // The pseudo-element path is the one in force: the sheet's own 4px sizing
+    // The pseudo-element path is the one in force: the sheet's own 5px sizing
     // and transparent track reached a container it never names.
-    expect(light.width).toBe('4px')
+    expect(light.width).toBe('5px')
     expect(light.track).toBe('rgba(0, 0, 0, 0)')
     // The resting and the hover rule each read the rebindable indirection, and
     // the two resolve to DIFFERENT colours on this list: the l1 pair arrived

@@ -62,7 +62,7 @@ function mountFrame() {
   const renderSlot = ((key: string, owner: object) => {
     slotCalls.push({ key, props: owner })
     if (key === 'sidebar') return <div data-testid="sidebar-content" />
-    if (key === 'conversation') return <div data-testid="center-content" />
+    if (key === 'main') return <div data-testid="center-content" />
     if (key === 'rightbar') return <div data-testid="details-content" />
     if (key === 'conversation.empty') return <div data-testid="empty-content" />
     return <div data-testid="other-content" />
@@ -90,6 +90,9 @@ function mountFrame() {
       renderSlot={renderSlot}
       useSessions={useSessions}
       useWorkspaces={((sel: (s: WorkspaceListState) => unknown) => sel(workspaceState)) as never}
+      // AppFrame reads panel selection from the layout store; the standard
+      // hook seat only satisfies GlobalStandardProps.
+      usePanelInfo={(() => { throw new Error('AppFrame reads panelInfo through the layout store') }) as never}
       SessionProvider={SessionProviderStub}
       t={t}
       dismissRightbar={() => { instance.actions.closeRightbar() }}
@@ -171,10 +174,10 @@ describe('AppFrame', () => {
     expect(getByTestId('center-content')).toBeTruthy()
     expect(getByTestId('details-content')).toBeTruthy()
     const keys = slotCalls.map(c => c.key)
-    expect(keys).toContain('conversation')
+    expect(keys).toContain('main')
     expect(keys).toContain('rightbar')
     expect(keys).not.toContain('conversation.empty')
-    expect(slotCalls.find(c => c.key === 'conversation')!.props).toEqual({ compact: false })
+    expect(slotCalls.find(c => c.key === 'main')!.props).toEqual({ compact: false })
     expect(slotCalls.find(c => c.key === 'rightbar')!.props).toMatchObject({ width: 864, viewportWidth: 1920, canShow: true })
   })
 
@@ -184,7 +187,7 @@ describe('AppFrame', () => {
     selectedSession.current = undefined
     const { slotCalls, getByTestId } = mountFrame()
     expect(getByTestId('center-content')).toBeTruthy()
-    expect(slotCalls.map(c => c.key)).toContain('conversation')
+    expect(slotCalls.map(c => c.key)).toContain('main')
   })
 
   it('renders both column occupants before baselines settle (no loading gate)', () => {
@@ -192,7 +195,7 @@ describe('AppFrame', () => {
     // pending rendering — both occupants mount from first paint.
     baselinesReady.current = false
     const { slotCalls } = mountFrame()
-    expect(slotCalls.map(c => c.key)).toContain('conversation')
+    expect(slotCalls.map(c => c.key)).toContain('main')
     expect(slotCalls.map(c => c.key)).toContain('rightbar')
   })
 
@@ -424,7 +427,7 @@ describe('AppFrame — compact drawer and overlay details', () => {
     expect(toggle.getAttribute('aria-label')).toBe('drawer.open')
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(frame.querySelector('[data-mobile-app-header]')?.textContent).toBe('Test')
-    expect(slotCalls.find(c => c.key === 'conversation')?.props).toEqual({ compact: true })
+    expect(slotCalls.find(c => c.key === 'main')?.props).toEqual({ compact: true })
     expect(slotCalls.some(c => c.key === 'shell.mobile.header.actions')).toBe(true)
   })
 

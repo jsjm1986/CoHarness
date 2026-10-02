@@ -22,6 +22,7 @@ function mount() {
       items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
+    usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
     useDisplaySettings: bindSnapshotSelector(settings),
     setWidth: vi.fn((value: number) => { settings.setWidth(value) }),
     setFullWidth: vi.fn((value: boolean) => { settings.setFullWidth(value) }),

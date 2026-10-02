@@ -1,1 +1,1 @@
-- "treeitem \"Plan awaiting review Plan a small change: add {{ago}}\" [selected]"
+- 'treeitem "Plan awaiting review Plan a small change: add" [selected]'

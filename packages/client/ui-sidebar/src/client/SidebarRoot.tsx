@@ -22,7 +22,11 @@ import clsx from 'clsx'
 import {
   CoHarnessMark, IconNewChatOutline16, IconPanelLeftOutline16, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SidebarRootComponentProps } from './contract/slots.ts'
+import type { PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
+import type {
+  SidebarPanelMetadata, SidebarRootComponentProps, SidebarRootInjected, SidebarSectionOwnerProps,
+} from './contract/slots.ts'
 import css from './SidebarRoot.module.css'
 
 /** Wide-content unmount delay; matches the 150ms wide-content fade-out. */
@@ -36,6 +40,38 @@ const COLLAPSE_SETTLE_MS = 150
  */
 const SCROLLBAR_LINGER_MS = 2000
 
+type PanelRowProps =
+  Pick<SidebarPanelMetadata, 'id' | 'label'>
+  & Pick<SidebarSectionOwnerProps, 'wide'>
+  & Pick<PropsRuntime<'sidebar'>, 'usePanelInfo'>
+  & Pick<InjectFace<SidebarRootInjected>, 'selectPanel'>
+  & PropsRenderSlots<'sidebar.panellist'>
+
+/** Each panel row subscribes only to its own selection state. */
+function PanelRow({ id, label, wide, usePanelInfo, selectPanel, renderSlot }: PanelRowProps) {
+  const active = usePanelInfo(info => info.activePanelId === id)
+  return (
+    <Tooltip label={label} delayMs={500} disabled={wide}>
+      <button
+        type="button"
+        className={clsx(css.panelRow, active && css.panelActive)}
+        aria-label={label}
+        aria-current={active ? 'page' : undefined}
+        onClick={() => { selectPanel(id) }}
+      >
+        <span className={css.panelGlyph} aria-hidden="true">
+          {renderSlot('sidebar.panellist', { size: wide ? 16 : 18, active }, { only: id })}
+        </span>
+        {wide && (
+          <span className={clsx(css.panelTitle, css.wide)}>
+            {label}
+          </span>
+        )}
+      </button>
+    </Tooltip>
+  )
+}
+
 /**
  * Render the sidebar column shell.
  * @param props - composed slot props (runtime share + injected callbacks, contract/slots.ts).
@@ -48,9 +84,13 @@ export function SidebarRoot({
   useViewport,
   exitWorkbench,
   toggleSidebar,
+  selectPanel,
+  usePanels,
+  usePanelInfo,
   t,
   renderSlot,
 }: SidebarRootComponentProps) {
+  const panels = usePanels(snapshot => snapshot)
   const workbenchMode = useViewport(state => state.mode === 'workbench')
   // Wide content stays mounted while the collapse animates (fading via
   // .collapsed .wide), unmounts at settle, and remounts right away on expand.
@@ -191,6 +231,22 @@ export function SidebarRoot({
           {wide && <span className={clsx(css.newSessionLabel, css.wide)}>{t('session.new')}</span>}
         </button>
       </Tooltip>}
+
+      {panels.length > 0 && (
+        <nav className={css.panelList} aria-label={t('panels.label')}>
+          {panels.map(({ id, label }) => (
+            <PanelRow
+              key={id}
+              id={id}
+              label={label}
+              wide={wide}
+              usePanelInfo={usePanelInfo}
+              selectPanel={selectPanel}
+              renderSlot={renderSlot}
+            />
+          ))}
+        </nav>
+      )}
 
       {/* The browsing region fills the column between the controls and the
           foot in both states; its rail icon column rides the same slot. */}

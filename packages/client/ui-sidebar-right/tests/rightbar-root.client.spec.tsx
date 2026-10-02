@@ -37,6 +37,7 @@ function mounted(views: readonly SidebarSessionViewSnapshot[], props: Partial<Pa
     renderSlot={renderSlot as never}
     useSessions={(<T,>(selector: (state: { current: SessionId | undefined }) => T): T => selector({ current: OTHER })) as never}
     useWorkspaces={vi.fn() as never}
+    usePanelInfo={vi.fn() as never}
     useViews={(<T,>(selector: (views: readonly SidebarSessionViewSnapshot[]) => T): T => selector(views))}
     mountView={mountView}
     selectView={selectView}

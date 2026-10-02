@@ -41,12 +41,8 @@
   padding: var(--dsw-space-3) var(--dsw-space-4);
   max-height: 150px;
   overflow-y: auto;
-}
-
-.ioSection::-webkit-scrollbar-thumb {
-  border: var(--dsh-scrollbar-thumb-inset) solid transparent;
-  background-clip: padding-box;
-  border-radius: var(--dsw-radius-sm);
+  /* The transparent thumb border floats the scrollbar off the card edge. */
+  --dsh-scrollbar-thumb-border: 1px;
 }
 
 .ioSection::-webkit-scrollbar-track {

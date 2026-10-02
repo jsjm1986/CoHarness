@@ -22,10 +22,10 @@
 - group "Message timing": "{{clock}}"
 - button "Copy":
   - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
+- button "Context injection runtime-context":
   - img
   - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
+  - text: Context injection runtime-context
 - paragraph: partial
 - status: Deep diving...
 - textbox "Message the agent"
@@ -40,4 +40,5 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Stop generating"
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

@@ -17,11 +17,18 @@ import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
+import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { GroupNode, SearchResultNode, SessionNode } from '../tree.ts'
 import css from './Rows.module.css'
 
 /** The standard locale seat, prop-passed from the browser root. */
 type RowTranslate = WorkspaceBrowserProps['t']
+
+/** The browser's `renderSlot` narrowed to the two ambient session-row seats. */
+type RowRenderSlots = PropsRenderSlots<
+  | 'sidebar.session.row.leading'
+  | 'sidebar.session.row.hover'
+>['renderSlot']
 
 /** Row display title: blank rows show the localized New Session label. */
 function displayTitle(node: SessionNode, t: RowTranslate): string {
@@ -315,7 +322,12 @@ function PinnedIndicator({ t }: { t: RowTranslate }) {
 }
 
 /** Hover-card body: full title, relative time, and every relevant live status. */
-function SessionHoverContent({ node, now, t }: { node: SessionNode; now: number; t: RowTranslate }) {
+function SessionHoverContent({ node, now, renderSlot, t }: {
+  node: SessionNode
+  now: number
+  renderSlot: RowRenderSlots
+  t: RowTranslate
+}) {
   const statuses = sessionStatuses(node, t)
   return (
     <div className={css.hoverContent}>
@@ -323,6 +335,7 @@ function SessionHoverContent({ node, now, t }: { node: SessionNode; now: number;
       {/* Same placeholder rule as the row's trailing cell: no timestamp
           before the first prompt. */}
       {!node.blank && <div className={css.hoverTime}>{hoverTimeLabel(node.updatedAt, now, t)}</div>}
+      {renderSlot('sidebar.session.row.hover', { sessionId: node.id })}
       {statuses.map(status => (
         <div className={css.hoverStatus} key={status.label}>
           <StateDot state={status.state} />
@@ -395,7 +408,9 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
  * @param props.t - the browser root's locale seat.
  * @returns the session row.
  */
-export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, onPin, onUnpin, drag, flat = false, t }: {
+export function SessionNodeItem({
+  node, currentId, now, onOpen, onRename, onFork, onArchive, onPin, onUnpin, drag, flat = false, renderSlot, t,
+}: {
   node: SessionNode
   currentId: string | undefined
   now: number
@@ -414,6 +429,8 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   drag?: RowDragProps | undefined
   /** The row is rendered without a parent Workspace header. */
   flat?: boolean | undefined
+  /** Ambient per-row seats (schedule marks): leading cell and hover card. */
+  renderSlot: RowRenderSlots
   t: RowTranslate
 }) {
   const row = node
@@ -484,7 +501,11 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
           and is cleared by opening the session. */}
       {(!flat || showStatus) && (
         <span className={css.slot}>
-          {showStatus && <SessionStatusDots statuses={statuses} />}
+          {/* A higher-priority state replaces the ambient leading seat; idle
+              rows lend the cell to it. Blank rows keep it empty. */}
+          {showStatus
+            ? <SessionStatusDots statuses={statuses} />
+            : !row.blank && renderSlot('sidebar.session.row.leading', { sessionId: node.id })}
         </span>
       )}
       <span className={css.title}>{title}</span>
@@ -553,7 +574,7 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   return (
     <HoverCard
       anchor={ownRow}
-      content={<SessionHoverContent node={node} now={now} t={t} />}
+      content={<SessionHoverContent node={node} now={now} renderSlot={renderSlot} t={t} />}
       disabled={menuOpen || drag?.active === true}
       copyText={row.blank ? undefined : row.title}
       copyLabel={t('copy')}

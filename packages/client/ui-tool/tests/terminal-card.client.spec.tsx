@@ -554,10 +554,12 @@ describe('DetailsPanel Output section', () => {
         useSession={bindSnapshotSelector({ getSnapshot: () => snapshot, subscribe: () => () => {} })}
         useSessions={bindSnapshotSelector(sessions)}
         useWorkspaces={bindSnapshotSelector(workspaces)}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
           setDraft: () => {}, addImages: () => true, removeImage: () => {}, pruneImages: () => {},
-          addDocuments: () => true, removeDocument: () => {}, pruneDocuments: () => {}, submit: () => {},
+          addDocuments: () => true, removeDocument: () => {}, pruneDocuments: () => {},
+          captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }), insertText: () => false, submit: () => {},
         }}
         useProjection={(() => undefined)}
         {...(chat.getSnapshot().selection ?? {})}
@@ -744,10 +746,12 @@ describe('DetailsPanel Output section', () => {
           items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
           baselinesReady: true, recentWorkspaceId: undefined,
         }))}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
           setDraft: () => {}, addImages: () => true, removeImage: () => {}, pruneImages: () => {},
-          addDocuments: () => true, removeDocument: () => {}, pruneDocuments: () => {}, submit: () => {},
+          addDocuments: () => true, removeDocument: () => {}, pruneDocuments: () => {},
+          captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }), insertText: () => false, submit: () => {},
         }}
         useProjection={(() => undefined)}
         {...(chat.getSnapshot().selection ?? {})}

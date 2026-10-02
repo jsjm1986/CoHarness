@@ -80,32 +80,6 @@ export const CLIENT_NOTES: readonly string[] = [
 // detection is told to skip the data rather than the file.
 export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
   {
-    key: 'conversation',
-    kind: 'single',
-    scope: 'root',
-    summary: 'The whole center column, across both the no-session hero and a live conversation.',
-    doc: 'The whole center column, across both the no-session hero and a live\nconversation. OCCUPIED by ui-conversation\'s ConversationRoot, which\ndeclares the session body, composer, and input seats inside it —\nregistering here replaces the entire conversation surface (and removes\nevery seat it declares) rather than adding to it.\n\nRoot scope keeps the viewport mounted across active-pane changes.\nThe occupant owns explicit session providers and receives the shell\'s\ncompact presentation flag; session facts belong to its pane children.',
-    registerOptions: [],
-    ownerProps: [
-      '/** Conversation owner share: the shell\'s resolved compact mode. */\nexport interface ConvOwnerProps {\n  /** True when the frame is using the phone presenter. */\n  compact?: boolean\n}',
-    ],
-    ownerPropsReferences: [],
-    standardProps: [
-      'useSessions: SnapshotSelectorHook<SessionListState>',
-      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
-    ],
-    keyDomain: '',
-    hookContext: '',
-    slotInject: '',
-    declaredBy: 'an entry in \'root\' (client-ui-layout), so it exists while that entry is mounted',
-    occupants: [
-      'client-ui-conversation ConversationRoot',
-    ],
-    replaceRisk: 'shadows-shipped-ui',
-    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation\', () => ctx.slots.register(\n      { name: \'conversation\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:73',
-  },
-  {
     key: 'conversation.chat.assistant-actions',
     kind: 'list',
     scope: 'session',
@@ -140,6 +114,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -155,7 +130,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.chat.assistant-actions\', () => ctx.slots.register(\n      { name: \'conversation.chat.assistant-actions\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:198',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:199',
   },
   {
     key: 'conversation.chat.commandview',
@@ -181,6 +156,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -222,6 +198,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -258,16 +235,28 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
   },
   {
     key: 'conversation.chat.turnTail',
-    kind: 'chain',
+    kind: 'list',
     scope: 'session',
-    summary: 'The completed Turn Node\'s extension chain, rendered before that Node\'s IconActions.',
-    doc: 'The completed Turn Node\'s extension chain, rendered before that Node\'s\nIconActions. Entries derive a match from the engine-owned Turn and\nclosing seq before mounting, so presentation components never mount\nonly to return null; an all-declined chain renders nothing.',
+    summary: 'The completed Turn Node\'s extension list, rendered before that Node\'s IconActions.',
+    doc: 'The completed Turn Node\'s extension list, rendered before that Node\'s\nIconActions. Entries derive a match from the engine-owned Turn and\nclosing seq before mounting, so presentation components never mount\nonly to return null; entries render by ascending `order` and each\nself-gates on its own Turn data.',
     registerOptions: [
       {
-        name: 'select',
+        name: 'id',
         requirement: 'required',
-        type: '(owner) => unknown | null',
-        doc: 'Pure routing selector. Entries are tried in ascending order; the first non-null result wins and arrives as the component\'s `matched` prop. All-null falls through to the owner\'s fallback.',
+        type: 'string',
+        doc: 'Your cell key. Use an id of your own: a fresh id is added beside the shipped entries, while reusing a shipped id puts you in THAT cell and replaces it. Owners that filter by id address you by it.',
+      },
+      {
+        name: 'order',
+        requirement: 'optional',
+        type: 'number',
+        doc: 'Position among the entries, ascending (default 0).',
+      },
+      {
+        name: 'label',
+        requirement: 'optional',
+        type: 'string | (() => string)',
+        doc: 'Display text where the owner projects one (nav rows, tabs). A thunk is re-read on every projection, so localized text follows the active locale without re-registering.',
       },
     ],
     ownerProps: [
@@ -279,6 +268,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -290,12 +280,13 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation.chat.node\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-deliverables ProducedFiles',
-      'client-ui-deliverables DeliverablesTail',
+      'client-ui-deliverables ProducedFiles id \'@deepseek-ai/dsh-client-ui-deliverables/produced-files\'',
+      'client-ui-deliverables DeliverablesTail id \'@deepseek-ai/dsh-client-ui-deliverables\'',
+      'client-ui-schedule ScheduleTurnCard id \'schedule-created\'',
     ],
     replaceRisk: 'none',
-    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.chat.turnTail\', () => ctx.slots.register(\n      { name: \'conversation.chat.turnTail\', select: owner => null },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:190',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.chat.turnTail\', () => ctx.slots.register(\n      { name: \'conversation.chat.turnTail\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:191',
   },
   {
     key: 'conversation.composer',
@@ -321,6 +312,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -339,7 +331,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.composer\', () => ctx.slots.register(\n      { name: \'conversation.composer\', select: owner => null },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:229',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:230',
   },
   {
     key: 'conversation.composer.bar',
@@ -357,6 +349,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: MaybeSnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId | undefined',
       'useProjection: UseProjection',
@@ -372,7 +365,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.composer.bar\', () => ctx.slots.register(\n      { name: \'conversation.composer.bar\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:304',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:305',
   },
   {
     key: 'conversation.composer.dock',
@@ -410,6 +403,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -425,7 +419,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.composer.dock\', () => ctx.slots.register(\n      { name: \'conversation.composer.dock\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:273',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:274',
   },
   {
     key: 'conversation.details.images',
@@ -445,6 +439,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -460,7 +455,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.details.images\', () => ctx.slots.register(\n      { name: \'conversation.details.images\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:221',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:222',
   },
   {
     key: 'conversation.details.tool',
@@ -478,6 +473,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -493,7 +489,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.details.tool\', () => ctx.slots.register(\n      { name: \'conversation.details.tool\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:213',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:214',
   },
   {
     key: 'conversation.hero.agentPreset',
@@ -509,6 +505,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -519,7 +516,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.hero.agentPreset\', () => ctx.slots.register(\n      { name: \'conversation.hero.agentPreset\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:248',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:249',
   },
   {
     key: 'conversation.hero.brand.mark',
@@ -535,6 +532,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -545,7 +543,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.hero.brand.mark\', () => ctx.slots.register(\n      { name: \'conversation.hero.brand.mark\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:242',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:243',
   },
   {
     key: 'conversation.hero.workspace',
@@ -563,6 +561,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -573,7 +572,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.hero.workspace\', () => ctx.slots.register(\n      { name: \'conversation.hero.workspace\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:236',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:237',
   },
   {
     key: 'conversation.hero.workspace.directoryFlow',
@@ -589,6 +588,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -600,7 +600,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.hero.workspace.directoryFlow\', () => ctx.slots.register(\n      { name: \'conversation.hero.workspace.directoryFlow\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-workspace/src/client/contract/slots.ts:65',
+    source: 'packages/client/ui-workspace/src/client/contract/slots.ts:71',
   },
   {
     key: 'conversation.input.attachments',
@@ -619,6 +619,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: MaybeSnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId | undefined',
       'useProjection: UseProjection',
@@ -634,7 +635,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.attachments\', () => ctx.slots.register(\n      { name: \'conversation.input.attachments\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:306',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:307',
   },
   {
     key: 'conversation.input.dock',
@@ -672,6 +673,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -689,7 +691,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.dock\', () => ctx.slots.register(\n      { name: \'conversation.input.dock\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:264',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:265',
   },
   {
     key: 'conversation.input.left',
@@ -727,6 +729,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -743,7 +746,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.left\', () => ctx.slots.register(\n      { name: \'conversation.input.left\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:282',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:283',
   },
   {
     key: 'conversation.input.model',
@@ -759,6 +762,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -774,7 +778,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.model\', () => ctx.slots.register(\n      { name: \'conversation.input.model\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:330',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:331',
   },
   {
     key: 'conversation.input.overlay',
@@ -807,6 +811,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -840,6 +845,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -855,7 +861,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.plan\', () => ctx.slots.register(\n      { name: \'conversation.input.plan\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:320',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:321',
   },
   {
     key: 'conversation.input.right',
@@ -893,6 +899,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -903,10 +910,12 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     hookContext: '',
     slotInject: '',
     declaredBy: 'an entry in \'conversation.pane\' (client-ui-conversation), so it exists while that entry is mounted',
-    occupants: [],
+    occupants: [
+      'experimental-client-ui-voice-input VoiceInput id \'voice-input\'',
+    ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.input.right\', () => ctx.slots.register(\n      { name: \'conversation.input.right\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:290',
+    source: 'packages/client/ui-conversation/src/client/contract/slots.ts:291',
   },
   {
     key: 'conversation.message.images',
@@ -926,6 +935,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -957,6 +967,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: MaybeSnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId | undefined',
       'useProjection: UseProjection',
@@ -966,7 +977,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     keyDomain: '',
     hookContext: '',
     slotInject: '',
-    declaredBy: 'an entry in \'conversation\' (client-ui-conversation), so it exists while that entry is mounted',
+    declaredBy: 'an entry in \'main\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
       'client-ui-conversation ConversationPane',
     ],
@@ -1007,6 +1018,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -1036,6 +1048,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -1067,6 +1080,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -1117,6 +1131,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -1131,7 +1146,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-agent-preset AgentPresetLabel id \'agent-preset\'',
       'client-ui-collaboration ConversationShareAction id \'collaboration-sharing\'',
       'client-ui-jobs JobListAction id \'job-list\'',
-      'client-ui-schedule ScheduleCatalogAction id \'schedule-catalog\'',
       'experimental-client-ui-agent-team TeamAction id \'agent-team\'',
     ],
     replaceRisk: 'none',
@@ -1150,6 +1164,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -1183,6 +1198,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -1233,6 +1249,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -1246,6 +1263,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-open-in-app OpenInAppAction id \'open-in-app\'',
       'client-ui-permission-presets DesktopConfirmationAction id \'desktop-confirmation\'',
+      'client-ui-schedule ScheduleCatalogAction id \'schedule-catalog\'',
       'session-log-export SessionLogDownloadHeaderAction id \'session-log-download\'',
     ],
     replaceRisk: 'none',
@@ -1285,6 +1303,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -1317,6 +1336,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -1345,11 +1365,12 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
     slotInject: '',
-    declaredBy: 'an entry in \'conversation\' (client-ui-conversation), so it exists while that entry is mounted',
+    declaredBy: 'an entry in \'main\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
       'client-ui-workbench WorkbenchEmpty',
     ],
@@ -1390,6 +1411,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -1399,7 +1421,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     keyDomain: '',
     hookContext: '',
     slotInject: '',
-    declaredBy: 'an entry in \'conversation\' (client-ui-conversation), so it exists while that entry is mounted',
+    declaredBy: 'an entry in \'main\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
       'client-ui-workbench WorkbenchPaneHeader id \'workbench-pane-header\'',
     ],
@@ -1423,11 +1445,12 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
     slotInject: '',
-    declaredBy: 'an entry in \'conversation\' (client-ui-conversation), so it exists while that entry is mounted',
+    declaredBy: 'an entry in \'main\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
       'client-ui-workbench WorkbenchToolbar',
     ],
@@ -1449,6 +1472,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -1464,6 +1488,41 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'details\', () => ctx.slots.register(\n      { name: \'details\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-layout/src/client/index.ts:93',
+  },
+  {
+    key: 'main',
+    kind: 'keyed',
+    scope: 'root',
+    summary: 'The whole center column, keyed between the Conversation (reserved key `conversation`, occupied by ui-conversation\'s ConversationRoot, which declares the session body, composer, and input seats inside it) and optional global panels — registering a `key` here adds a top-level central surface selected through `ctx.layout.selectPanel`, and global panels keep the current Session selection intact.',
+    doc: 'The whole center column, keyed between the Conversation (reserved key\n`conversation`, occupied by ui-conversation\'s ConversationRoot, which\ndeclares the session body, composer, and input seats inside it) and\noptional global panels — registering a `key` here adds a top-level\ncentral surface selected through `ctx.layout.selectPanel`, and global\npanels keep the current Session selection intact.\n\nRoot scope keeps the viewport mounted across active-pane changes.\nOccupants receive the shell\'s compact presentation flag; session facts\nbelong to their own scoped children — a global panel declares none of\nthe conversation\'s session seats.',
+    registerOptions: [
+      {
+        name: 'key',
+        requirement: 'required',
+        type: 'string',
+        doc: 'Your cell key: the entry renders where the owner dispatches this exact key. Registering an already-occupied key replaces that occupant.',
+      },
+    ],
+    ownerProps: [
+      '/** Main-panel owner share: the shell\'s resolved compact mode. */\nexport interface ConvOwnerProps {\n  /** True when the frame is using the phone presenter. */\n  compact?: boolean\n}',
+    ],
+    ownerPropsReferences: [],
+    standardProps: [
+      'useSessions: SnapshotSelectorHook<SessionListState>',
+      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
+    ],
+    keyDomain: 'open: any string the owner dispatches (no compile-time key set), already taken: conversation',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'root\' (client-ui-layout), so it exists while that entry is mounted',
+    occupants: [
+      'client-ui-conversation ConversationRoot key \'conversation\'',
+      'client-ui-schedule TaskManagerPage',
+    ],
+    replaceRisk: 'shadows-shipped-ui',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'main\', () => ctx.slots.register(\n      { name: \'main\', key: \'<one key the owner dispatches>\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
     source: 'packages/client/ui-layout/src/client/index.ts:83',
   },
   {
@@ -1482,6 +1541,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -1492,7 +1552,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'rightbar\', () => ctx.slots.register(\n      { name: \'rightbar\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:85',
+    source: 'packages/client/ui-layout/src/client/index.ts:95',
   },
   {
     key: 'rightbar.session',
@@ -1512,6 +1572,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -1543,6 +1604,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -1588,6 +1650,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -1614,6 +1677,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -1659,6 +1723,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -1695,6 +1760,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -1740,6 +1806,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -1773,6 +1840,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: 'open: any string the owner dispatches (no compile-time key set), none are taken yet',
     hookContext: '',
@@ -1816,6 +1884,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -1849,6 +1918,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: 'open: any string the owner dispatches (no compile-time key set), already taken: subagent',
     hookContext: '',
@@ -1898,6 +1968,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -1906,6 +1977,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-settings-plugin-inventory PluginInventorySettingsTab id \'all\'',
       'client-ui-settings-plugins ConfigurablePluginsTab id \'configurable\'',
+      'experimental-client-ui-voice-input VoicePreparation id \'voice\'',
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.plugins.tab\', () => ctx.slots.register(\n      { name: \'settings.plugins.tab\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
@@ -1946,6 +2018,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -1976,6 +2049,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -2021,6 +2095,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -2037,7 +2112,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'shell.mobile.header.actions\', () => ctx.slots.register(\n      { name: \'shell.mobile.header.actions\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:98',
+    source: 'packages/client/ui-layout/src/client/index.ts:108',
   },
   {
     key: 'shell.overlay',
@@ -2070,19 +2145,21 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
     slotInject: '',
     declaredBy: 'an entry in \'root\' (client-ui-layout), so it exists while that entry is mounted',
     occupants: [
+      'client-ui-schedule ScheduleDeleteToast id \'schedule.delete-toast\'',
       'client-ui-shortcuts ShortcutReference id \'shortcuts\'',
       'client-ui-sidebar-terminal TerminalCleanup',
       'client-ui-usage-alert UsageAlert id \'usage-alert\'',
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'shell.overlay\', () => ctx.slots.register(\n      { name: \'shell.overlay\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:96',
+    source: 'packages/client/ui-layout/src/client/index.ts:106',
   },
   {
     key: 'sidebar',
@@ -2098,6 +2175,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -2108,7 +2186,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar\', () => ctx.slots.register(\n      { name: \'sidebar\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:61',
+    source: 'packages/client/ui-layout/src/client/index.ts:69',
   },
   {
     key: 'sidebar.brand.mark',
@@ -2124,6 +2202,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -2134,7 +2213,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.brand.mark\', () => ctx.slots.register(\n      { name: \'sidebar.brand.mark\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:24',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:25',
   },
   {
     key: 'sidebar.brand.name',
@@ -2150,6 +2229,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -2160,7 +2240,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.brand.name\', () => ctx.slots.register(\n      { name: \'sidebar.brand.name\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:29',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:30',
   },
   {
     key: 'sidebar.footer.action',
@@ -2195,6 +2275,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -2207,7 +2288,53 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.footer.action\', () => ctx.slots.register(\n      { name: \'sidebar.footer.action\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:53',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:59',
+  },
+  {
+    key: 'sidebar.panellist',
+    kind: 'list',
+    scope: 'root',
+    summary: 'Global panel icons.',
+    doc: 'Global panel icons. Each list id addresses the matching `main` panel;\nthe sidebar owns the button and resolves its label from list metadata.',
+    registerOptions: [
+      {
+        name: 'id',
+        requirement: 'required',
+        type: 'string',
+        doc: 'Your cell key. Use an id of your own: a fresh id is added beside the shipped entries, while reusing a shipped id puts you in THAT cell and replaces it. Owners that filter by id address you by it.',
+      },
+      {
+        name: 'order',
+        requirement: 'optional',
+        type: 'number',
+        doc: 'Position among the entries, ascending (default 0).',
+      },
+      {
+        name: 'label',
+        requirement: 'optional',
+        type: 'string | (() => string)',
+        doc: 'Display text where the owner projects one (nav rows, tabs). A thunk is re-read on every projection, so localized text follows the active locale without re-registering.',
+      },
+    ],
+    ownerProps: [
+      '/** Icon presentation supplied by the global panel row. */\nexport interface SidebarPanelIconOwnerProps {\n  /** Requested square edge in pixels. */\n  size: number\n  /** Whether this panel is selected in the main column. */\n  active: boolean\n}',
+    ],
+    ownerPropsReferences: [],
+    standardProps: [
+      'useSessions: SnapshotSelectorHook<SessionListState>',
+      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
+    ],
+    keyDomain: '',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'sidebar\' (client-ui-sidebar), so it exists while that entry is mounted',
+    occupants: [
+      'client-ui-schedule TaskManagerIcon',
+    ],
+    replaceRisk: 'none',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.panellist\', () => ctx.slots.register(\n      { name: \'sidebar.panellist\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:35',
   },
   {
     key: 'sidebar.right.pane.tab',
@@ -2228,6 +2355,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -2240,6 +2368,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'rightbar.session\' (client-ui-sidebar-right), so it exists while that entry is mounted',
     occupants: [
       'client-ui-deliverables ReviewTab',
+      'client-ui-schedule ScheduleTaskTab',
       'client-ui-sidebar-browser BrowserBody',
       'client-ui-sidebar-right ToolBody key \'tool-details\'',
       'client-ui-sidebar-right GuideBody',
@@ -2269,6 +2398,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -2280,6 +2410,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: 'SidebarRightTabInjected',
     declaredBy: 'an entry in \'rightbar.session\' (client-ui-sidebar-right), so it exists while that entry is mounted',
     occupants: [
+      'client-ui-schedule ScheduleTaskTabTitle',
       'client-ui-sidebar-browser BrowserTitle',
       'client-ui-sidebar-right GuideTitle',
       'client-ui-sidebar-terminal TerminalTitle',
@@ -2307,6 +2438,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -2343,6 +2475,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -2395,6 +2528,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -2411,6 +2545,102 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     source: 'packages/client/ui-sidebar-right/src/client/contract/slots.ts:103',
   },
   {
+    key: 'sidebar.session.row.hover',
+    kind: 'list',
+    scope: 'root',
+    summary: 'Section of the Session row\'s hover card between its relative time and its trailing status line.',
+    doc: 'Section of the Session row\'s hover card between its relative time and\nits trailing status line. Mounted only while that card is open.',
+    registerOptions: [
+      {
+        name: 'id',
+        requirement: 'required',
+        type: 'string',
+        doc: 'Your cell key. Use an id of your own: a fresh id is added beside the shipped entries, while reusing a shipped id puts you in THAT cell and replaces it. Owners that filter by id address you by it.',
+      },
+      {
+        name: 'order',
+        requirement: 'optional',
+        type: 'number',
+        doc: 'Position among the entries, ascending (default 0).',
+      },
+      {
+        name: 'label',
+        requirement: 'optional',
+        type: 'string | (() => string)',
+        doc: 'Display text where the owner projects one (nav rows, tabs). A thunk is re-read on every projection, so localized text follows the active locale without re-registering.',
+      },
+    ],
+    ownerProps: [
+      '/** Owner share of the ambient per-row schedule seats. */\nexport interface SessionRowScheduleOwnerProps {\n  /** Session this row shows; the occupant addresses its own data by this id. */\n  readonly sessionId: SessionId\n}',
+    ],
+    ownerPropsReferences: [
+      'SessionId',
+    ],
+    standardProps: [
+      'useSessions: SnapshotSelectorHook<SessionListState>',
+      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
+    ],
+    keyDomain: '',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'sidebar.workspaces\' (client-ui-workspace), so it exists while that entry is mounted',
+    occupants: [
+      'client-ui-schedule SessionScheduleHover id \'schedule-tasks\'',
+    ],
+    replaceRisk: 'none',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.session.row.hover\', () => ctx.slots.register(\n      { name: \'sidebar.session.row.hover\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-workspace/src/client/contract/slots.ts:88',
+  },
+  {
+    key: 'sidebar.session.row.leading',
+    kind: 'list',
+    scope: 'root',
+    summary: 'Leading decoration of one Session row, in the 16px cell before the title that the row\'s own state dot otherwise occupies.',
+    doc: 'Leading decoration of one Session row, in the 16px cell before the title\nthat the row\'s own state dot otherwise occupies. A higher-priority state\n(a pending interaction, live activity) replaces the seat with that dot\nfor the same row, so an occupant here never renders beside a status dot\nand is mounted only by a row whose primary state is idle.',
+    registerOptions: [
+      {
+        name: 'id',
+        requirement: 'required',
+        type: 'string',
+        doc: 'Your cell key. Use an id of your own: a fresh id is added beside the shipped entries, while reusing a shipped id puts you in THAT cell and replaces it. Owners that filter by id address you by it.',
+      },
+      {
+        name: 'order',
+        requirement: 'optional',
+        type: 'number',
+        doc: 'Position among the entries, ascending (default 0).',
+      },
+      {
+        name: 'label',
+        requirement: 'optional',
+        type: 'string | (() => string)',
+        doc: 'Display text where the owner projects one (nav rows, tabs). A thunk is re-read on every projection, so localized text follows the active locale without re-registering.',
+      },
+    ],
+    ownerProps: [
+      '/** Owner share of the ambient per-row schedule seats. */\nexport interface SessionRowScheduleOwnerProps {\n  /** Session this row shows; the occupant addresses its own data by this id. */\n  readonly sessionId: SessionId\n}',
+    ],
+    ownerPropsReferences: [
+      'SessionId',
+    ],
+    standardProps: [
+      'useSessions: SnapshotSelectorHook<SessionListState>',
+      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
+    ],
+    keyDomain: '',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'sidebar.workspaces\' (client-ui-workspace), so it exists while that entry is mounted',
+    occupants: [
+      'client-ui-schedule SessionScheduleMark id \'schedule-mark\'',
+    ],
+    replaceRisk: 'none',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.session.row.leading\', () => ctx.slots.register(\n      { name: \'sidebar.session.row.leading\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-workspace/src/client/contract/slots.ts:83',
+  },
+  {
     key: 'sidebar.settings',
     kind: 'single',
     scope: 'root',
@@ -2424,6 +2654,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -2434,7 +2665,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.settings\', () => ctx.slots.register(\n      { name: \'sidebar.settings\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:42',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:48',
   },
   {
     key: 'sidebar.settings.action',
@@ -2469,6 +2700,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -2479,7 +2711,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.settings.action\', () => ctx.slots.register(\n      { name: \'sidebar.settings.action\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:48',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:54',
   },
   {
     key: 'sidebar.workspaces',
@@ -2495,6 +2727,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -2505,7 +2738,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.workspaces\', () => ctx.slots.register(\n      { name: \'sidebar.workspaces\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:36',
+    source: 'packages/client/ui-sidebar/src/client/contract/slots.ts:42',
   },
   {
     key: 'sidebar.workspaces.directoryFlow',
@@ -2521,6 +2754,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -2532,7 +2766,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.workspaces.directoryFlow\', () => ctx.slots.register(\n      { name: \'sidebar.workspaces.directoryFlow\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-workspace/src/client/contract/slots.ts:67',
+    source: 'packages/client/ui-workspace/src/client/contract/slots.ts:73',
   },
   {
     key: 'sidebar.workspaces.workbench',
@@ -2548,6 +2782,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
     ],
     keyDomain: '',
     hookContext: '',
@@ -2558,7 +2793,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.workspaces.workbench\', () => ctx.slots.register(\n      { name: \'sidebar.workspaces.workbench\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-workspace/src/client/contract/slots.ts:69',
+    source: 'packages/client/ui-workspace/src/client/contract/slots.ts:75',
   },
   {
     key: 'tool.call.toolview',
@@ -2590,6 +2825,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',
@@ -2685,6 +2921,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'usePanelInfo: UsePanelInfo',
       'useSession: SnapshotSelectorHook<ConversationSnapshot>',
       'sessionId: SessionId',
       'useProjection: UseProjection',

@@ -200,11 +200,15 @@ describe('ImageGallery', () => {
     const useWorkspaces: MessageImagesProps['useWorkspaces'] = () => {
       throw new Error('MessageImages does not read the workspace list snapshot')
     }
+    const usePanelInfo: MessageImagesProps['usePanelInfo'] = () => {
+      throw new Error('MessageImages does not read the panel info snapshot')
+    }
     const props: MessageImagesProps = {
       sessionId: 'message-images-test' as MessageImagesProps['sessionId'],
       useSession,
       useSessions,
       useWorkspaces,
+      usePanelInfo,
       useProjection: () => undefined,
       useInput,
       inputActions: {
@@ -215,6 +219,8 @@ describe('ImageGallery', () => {
         addDocuments: vi.fn(() => true),
         removeDocument: vi.fn(),
         pruneDocuments: vi.fn(),
+        captureInsertion: vi.fn(() => ({ start: 0, end: 0, draftRev: 0 })),
+        insertText: vi.fn(() => false),
         submit: vi.fn(),
       },
       images: [{ attachment }],

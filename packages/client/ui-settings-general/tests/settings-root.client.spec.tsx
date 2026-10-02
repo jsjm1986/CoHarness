@@ -65,6 +65,7 @@ function mount({
   const props: SettingsRootComponentProps = {
     useSessions,
     useWorkspaces: unusedHook,
+    usePanelInfo: unusedHook,
     useStore: bindSnapshotSelector(shell),
     actions: shell.actions,
     reconnect,

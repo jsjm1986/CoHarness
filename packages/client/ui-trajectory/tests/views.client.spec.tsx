@@ -244,6 +244,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
   const inputActions = {
     setDraft: vi.fn(), addImages: vi.fn(), removeImage: vi.fn(), pruneImages: vi.fn(),
     addDocuments: vi.fn(), removeDocument: vi.fn(), pruneDocuments: vi.fn(), submit: vi.fn(),
+    captureInsertion: vi.fn(() => ({ start: 0, end: 0, draftRev: 0 })), insertText: vi.fn(() => false),
   }
   // Minimal outlet twin: resolve the ring entry by the `only` filter and
   // render it with the session standard kit (what SlotOutlet does for a
@@ -286,6 +287,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
         useSession={useSession}
         useSessions={emptySessions()}
         useWorkspaces={emptyWorkspaces()}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useProjection={(() => undefined)}
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
@@ -302,6 +304,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
         useSession={useSession}
         useSessions={emptySessions()}
         useWorkspaces={emptyWorkspaces()}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useProjection={(() => undefined)}
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}

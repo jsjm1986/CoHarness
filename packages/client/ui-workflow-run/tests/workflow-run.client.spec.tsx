@@ -284,6 +284,7 @@ function panelProps(data: WorkflowRunChatData, sessions = listState(), openSessi
     sessionId: PARENT_ID,
     useSessions: selector => selector(sessions),
     useSession: (() => undefined) as WorkflowRunPanelProps['useSession'],
+    usePanelInfo: selector => selector({ activePanelId: null }),
     useProjection: () => undefined,
     useInput: () => { throw new Error('unused') },
     inputActions: { setDraft: () => {}, submit: () => {} } as unknown as WorkflowRunPanelProps['inputActions'],

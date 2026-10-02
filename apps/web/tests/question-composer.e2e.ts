@@ -36,9 +36,11 @@ const ANSWERED_EXPANDED_EXPECTED = join(SNAPSHOT_DIR, 'answered-expanded.expecte
 // The timed tool's second settlement: the wait expired, and the answer arrived
 // afterwards. Its golden owns the state the reported symptom lands in.
 const LATE_ANSWERED_EXPECTED = join(SNAPSHOT_DIR, 'late-answered.expected.md')
+const QUEUED_EXPECTED = join(SNAPSHOT_DIR, 'queued.expected.md')
 const MODE = webSnapshotMode()
 const CANCELLED_SEED_ID = 'ask-question-cancelled-row-web-e2e'
 const LATE_ANSWERED_SEED_ID = 'ask-question-late-answered-row-web-e2e'
+const QUEUED_SEED_ID = 'ask-question-queued-row-web-e2e'
 
 // The composer's own growth cap, in text lines (QuestionComposer.module.css
 // .fieldMirror). Asserted as TEXT lines, not as a box height: the two variants
@@ -162,11 +164,11 @@ function lateReplyTail(callId: string, questions: unknown): string[] {
  * it and keeps the recorded turn closed.
  * @param fixture - the recorded round trip.
  * @param outcome - `cancelled` settles the call as the user's own dismissal;
- * `late-answered` settles it as the timed tool's expired wait and appends the
- * reply that answers it a turn later.
+ * `queued` and `late-answered` settle the expired wait and append its reply
+ * before or after the next turn admits it.
  * @returns the derived fixture text.
  */
-function resettledFixture(fixture: string, outcome: 'cancelled' | 'late-answered'): string {
+function resettledFixture(fixture: string, outcome: 'cancelled' | 'queued' | 'late-answered'): string {
   let asked: { callId: string; questions: unknown } | undefined
   let replaced = false
   const lines: string[] = []
@@ -186,7 +188,7 @@ function resettledFixture(fixture: string, outcome: 'cancelled' | 'late-answered
         || event.type === 'turn/end') lines.push(line)
       continue
     }
-    if (event.type === 'request/header' && outcome === 'late-answered') {
+    if (event.type === 'request/header' && outcome !== 'cancelled') {
       // The recording was made under the blocking legacy tool; the derived
       // timed settlement needs the header that tool's timed sibling records.
       const data = event.data
@@ -234,6 +236,12 @@ function resettledFixture(fixture: string, outcome: 'cancelled' | 'late-answered
     lines.push(JSON.stringify(event))
   }
   if (!replaced || asked === undefined) throw new Error('question fixture has no settled ask_user_question call')
+  if (outcome === 'queued') {
+    const end = lines.pop()
+    const final: unknown = end === undefined ? undefined : JSON.parse(end)
+    if (!isRecord(final) || final.type !== 'turn/end') throw new Error('question fixture does not end its first turn')
+    return `${[...lines, lateReplyTail(asked.callId, asked.questions)[0], end].join('\n')}\n`
+  }
   const tail = outcome === 'cancelled' ? [] : lateReplyTail(asked.callId, asked.questions)
   return `${[...lines, ...tail].join('\n')}\n`
 }
@@ -538,6 +546,50 @@ describe.skipIf(MODE === 'record')('web e2e: cancelled question transcript', () 
   }, 60_000)
 })
 
+describe.skipIf(MODE === 'record')('web e2e: queued question reply', () => {
+  let seeded: SeededTranscript
+
+  beforeAll(async () => {
+    seeded = await openSeededTranscript(
+      resettledFixture(await readFile(FIXTURE, 'utf8'), 'queued'),
+      QUEUED_SEED_ID,
+    )
+  }, 120_000)
+
+  afterAll(async () => {
+    await seeded?.browser.close()
+    await seeded?.scaffold.close()
+  })
+
+  it('keeps a submitted reply read-only across a browser reload', async () => {
+    const { page, scaffold, tripwire } = seeded
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-question-queued-row'))
+    await expandTurnProcesses(page)
+    const row = page.locator('[data-tool="ask_user_question"]')
+    await row.waitFor()
+    await page.getByRole('button', { name: 'View answers', exact: true }).waitFor()
+    expect(await page.locator('[data-question-key]').count()).toBe(0)
+
+    await page.reload({ waitUntil: 'load' })
+    await expandTurnProcesses(page)
+    await row.waitFor()
+    await page.getByRole('button', { name: 'View answers', exact: true }).waitFor()
+    expect(await page.locator('[data-question-key]').count()).toBe(0)
+    await page.getByRole('button', { name: 'View answers', exact: true }).click()
+    // The custom answer sits in the read-only field's value, not a text node.
+    const review = page.locator('[data-question-key]')
+    await review.waitFor({ timeout: 10_000 })
+    await expect.poll(() => review.locator('textarea').inputValue(), { timeout: 10_000 })
+      .toBe('Answered after the timeout')
+
+    const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
+      .split(QUEUED_SEED_ID).join('{{seededId}}')
+    await compareOrRefreshGolden(QUEUED_EXPECTED, snapshot, MODE)
+    expect(tripwire.pageErrors).toEqual([])
+    expect(tripwire.warnings).toEqual([])
+  }, 60_000)
+})
+
 // The timed tool's own second settlement. The recorded result is the expired
 // wait, so the answers live in the reply that landed a turn later and reach the
 // row only through the `userQuestions` projection — the whole chain the reported
@@ -617,6 +669,7 @@ describe.skipIf(MODE === 'record')('web e2e: late-answered question transcript',
       'cancelled.expected.md',
       'answered-expanded.expected.md',
       'late-answered.expected.md',
+      'queued.expected.md',
     ])
   })
 })

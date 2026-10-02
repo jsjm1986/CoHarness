@@ -51,13 +51,8 @@
      IN/OUT card's sections) instead of pushing the output off screen. */
   max-height: 150px;
   overflow-y: auto;
-}
-
-/* Banner scrollbar floats off the card edge like the output's. */
-.header::-webkit-scrollbar-thumb {
-  border: var(--dsh-scrollbar-thumb-inset) solid transparent;
-  background-clip: padding-box;
-  border-radius: var(--dsw-radius-sm);
+  /* Banner scrollbar floats off the card edge like the output's. */
+  --dsh-scrollbar-thumb-border: 1px;
 }
 
 .header::-webkit-scrollbar-track {
@@ -163,14 +158,9 @@
   font: var(--dsl-terminal-font);
   overflow-x: auto;
   overflow-y: auto;
-}
-
-/* Both output scrollbars (vertical cap, horizontal pre overflow) use the
-   shared transparent inset so the thumb never hugs the rounded corner. */
-.output::-webkit-scrollbar-thumb {
-  border: var(--dsh-scrollbar-thumb-inset) solid transparent;
-  background-clip: padding-box;
-  border-radius: var(--dsw-radius-sm);
+  /* Both output scrollbars (vertical cap, horizontal pre overflow) carry the
+     transparent border so the thumb never hugs the rounded corner. */
+  --dsh-scrollbar-thumb-border: 1px;
 }
 
 /* Track end-margins keep the thumb's travel out of the card's rounded

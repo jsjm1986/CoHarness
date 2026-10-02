@@ -29,11 +29,14 @@ function props(readCall: DetailsSlotProps['readCall']): DetailsSlotProps {
     useSession: bindSnapshotSelector(createSnapshotStore(snapshot)),
     useSessions: bindSnapshotSelector(createSnapshotStore<SessionListState>({ ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })),
     useWorkspaces: bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({ items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined })),
+    usePanelInfo: () => { throw new Error('unused') },
     useProjection: () => undefined,
     useInput: () => { throw new Error('unused') },
     inputActions: {
       setDraft: () => {}, addImages: () => true, removeImage: () => {}, pruneImages: () => {},
-      addDocuments: () => true, removeDocument: () => {}, pruneDocuments: () => {}, submit: () => {},
+      addDocuments: () => true, removeDocument: () => {}, pruneDocuments: () => {},
+      captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }), insertText: () => false,
+      submit: () => {},
     },
     renderSlot: vi.fn((_name: string, _owner: unknown, options?: { fallback?: unknown }) => options?.fallback ?? null) as never,
   }

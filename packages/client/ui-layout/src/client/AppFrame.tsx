@@ -29,7 +29,7 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share + locale seat. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'conversation' | 'rightbar' | 'shell.overlay' | 'shell.mobile.header.actions'>
+  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.overlay' | 'shell.mobile.header.actions'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'layout'>
   & { dismissRightbar: () => void }
@@ -342,9 +342,14 @@ export function AppFrame({
             })}
           </div>
         )}
-      {/* The conversation viewport is root-scoped; details use the selected
-          Session unless an explicit pane action pins their target. */}
-      <CenterColumn>{renderSlot('conversation', { compact: mode === 'compact' })}</CenterColumn>
+      {/* The center column is keyed between the Conversation and any
+          registered global panel; details use the selected Session unless an
+          explicit pane action pins their target. */}
+      <CenterColumn>
+        {renderSlot('main', { compact: mode === 'compact' }, {
+          entryKey: panels.panelInfo.activePanelId ?? 'conversation',
+        })}
+      </CenterColumn>
       {overlayPanels && <div className={css.scrim} data-open={detailsOpen || undefined} aria-hidden onClick={dismissRightbar} />}
       <DetailsColumn>
         {renderSlot('rightbar', {

@@ -155,6 +155,9 @@ function makeHost() {
       list,
       provideInfo: provide,
     },
+    getRootRevision: () => 0,
+    subscribeRootRevision: () => () => {},
+    rootSources: () => ({}),
     workspaces: { list: workspaces },
   }
   return {

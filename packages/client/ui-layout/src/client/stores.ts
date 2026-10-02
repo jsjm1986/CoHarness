@@ -10,6 +10,7 @@
  * face receives the bound actions through the registration's inject hook.
  */
 import { defineStore, type EngineStoreHandle, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { MainPanelId } from './service.ts'
 import {
   clampWidth, DETAILS_MAX_RATIO, DETAILS_MIN,
   SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
@@ -26,6 +27,8 @@ import {
  * `details` is the user's pixel preference or null while untouched.
  */
 type LayoutState = {
+  /** Selected global center panel; null renders the Conversation. */
+  panelInfo: { activePanelId: MainPanelId | null }
   sidebar: number
   details: number | null
   viewportWidth: number
@@ -41,6 +44,8 @@ type LayoutState = {
  * return type); drift fails assignability at the defineStore call.
  */
 type LayoutActions = {
+  selectPanel: (draft: LayoutState, panelId: MainPanelId | null) => void
+  retainMainPanels: (draft: LayoutState, panelIds: readonly string[]) => void
   focusRightbar: (draft: LayoutState, sessionId: SessionId) => void
   openRightbar: (draft: LayoutState, track: boolean, fullscreen: boolean) => void
   closeRightbar: (draft: LayoutState) => void
@@ -60,10 +65,19 @@ type LayoutActions = {
 export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutActions>  {
   const handle = defineStore({
     init: (): LayoutState => ({
+      panelInfo: { activePanelId: null },
       sidebar: SIDEBAR_DEFAULT, details: null, viewportWidth: 0, narrowExpanded: false,
       rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
     }),
     actions: {
+      selectPanel: (d, panelId: MainPanelId | null) => {
+        d.panelInfo.activePanelId = panelId
+      },
+      retainMainPanels: (d, panelIds: readonly string[]) => {
+        if (d.panelInfo.activePanelId !== null && !panelIds.includes(d.panelInfo.activePanelId)) {
+          d.panelInfo.activePanelId = null
+        }
+      },
       focusRightbar: (d, sessionId: SessionId) => { d.detailsSessionId = sessionId },
       openRightbar: (d, track: boolean, fullscreen: boolean) => {
         // `details` stays null until the first drag: the frame resolves the

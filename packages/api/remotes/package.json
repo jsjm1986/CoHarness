@@ -26,6 +26,10 @@
       "types": "./lib/types/types.d.ts",
       "default": "./lib/types/types.js"
     },
+    "./session-controller": {
+      "types": "./lib/types/session-controller.d.ts",
+      "default": "./lib/types/session-controller.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
@@ -94,6 +98,7 @@
     "@deepseek-ai/dsh-message-feedback": "workspace:*",
     "@deepseek-ai/dsh-permission-presets": "workspace:*",
     "@deepseek-ai/dsh-plugin-manager": "workspace:*",
+    "@deepseek-ai/dsh-schedule": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-session-persistence": "workspace:*",
     "@deepseek-ai/dsh-session-reference": "workspace:*",

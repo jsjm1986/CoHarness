@@ -6,24 +6,9 @@ import type { Session, SessionEvent, SessionHeader, SessionId, SessionLogOffset 
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import { TypertLookupFailure, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type {} from '@deepseek-ai/dsh-typert-registry'
+import type { ApiRemoteLookupError, ApiRemoteAgentResult } from './session-controller.ts'
 
-/** Caller-facing failures preserved by the Gateway's RPC adapter. */
-export type ApiRemoteLookupError =
-  | { readonly code: 'agent-busy'; readonly message: string; readonly details: { readonly reason: string } }
-  | { readonly code: 'session-not-found'; readonly message: string; readonly details: { readonly sessionId: SessionId } }
-  | { readonly code: 'session-writer-held'; readonly message: string; readonly details: { readonly sessionId: SessionId } }
-  /**
-   * The session's durable execution binding (a managed SSH target) could not
-   * be re-qualified for the joining caller — same wire code the managed
-   * authorization service raises for a refused resolve.
-   */
-  | { readonly code: 'ssh/forbidden'; readonly message: string; readonly details: Record<never, never> }
-  | { readonly code: 'internal'; readonly message: string; readonly details: Record<never, never> }
-
-/** Result of resolving one session identity to its live Agent. */
-export type ApiRemoteAgentResult =
-  | { readonly agent: Agent }
-  | { readonly error: ApiRemoteLookupError }
+export type { ApiRemoteLookupError, ApiRemoteAgentResult, ApiSessionController } from './session-controller.ts'
 
 /** Resume configuration supplied by the owning Host composition. */
 export interface ApiRemoteAgentOptions {

@@ -15,14 +15,14 @@ import { ChangesDiffStore } from './changes-diff.ts'
 import { ChangesSummaryStore } from './changes-summary.ts'
 import { PresentedOpenController } from './present-open.ts'
 import { PresentRow } from './PresentRow.tsx'
-import { DeliverablesTail, selectDeliverables, type DeliverablesInjected } from './Deliverables.tsx'
+import { DeliverablesTail, type DeliverablesInjected } from './Deliverables.tsx'
 import { ReviewTab, type ReviewInjected } from './ReviewTab.tsx'
 import { CHANGES_REVIEW_ID, changesReviewDefinition } from './review-definition.ts'
 import { createReviewStore } from './review-store.ts'
 import { ProducedFiles } from './ProducedFiles.tsx'
 import { en, NS, zh, type DeliverablesKey } from './locales.ts'
 import {
-  deliverablesDefinition, producedFileMentions, selectProducedFiles, presentedForClosing, changesForClosing,
+  deliverablesDefinition, producedFileMentions, selectProducedFiles, presentedForClosing,
 } from './turn-deliverables.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -52,7 +52,8 @@ export function apply(ctx: ClientContext): void {
     'conversation.chat.turnTail',
     () => ctx.slots.register({
       name: 'conversation.chat.turnTail',
-      select: owner => changesForClosing(owner) === null && presentedForClosing(owner).length === 0 ? selectProducedFiles(owner) : null,
+      id: '@deepseek-ai/dsh-client-ui-deliverables/produced-files',
+      order: 10,
       locale: NS,
       inject: () => ({
         isLoopback: connection.isLoopback,
@@ -126,7 +127,7 @@ export function apply(ctx: ClientContext): void {
     }
   })
   ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
-    name: 'conversation.chat.turnTail', select: selectDeliverables, locale: NS,
+    name: 'conversation.chat.turnTail', id: '@deepseek-ai/dsh-client-ui-deliverables', locale: NS,
     inject: (sessionId): DeliverablesInjected => {
       const { summaries, diffs, opener } = forSession(sessionId)
       return {

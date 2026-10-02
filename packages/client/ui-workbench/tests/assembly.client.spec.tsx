@@ -23,8 +23,8 @@ class ResizeObserverStub {
   disconnect(): void {}
 }
 
-function Root({ renderSlot }: PropsRenderSlots<'conversation' | 'details'>) {
-  return <>{renderSlot('conversation', {})}</>
+function Root({ renderSlot }: PropsRenderSlots<'main' | 'details'>) {
+  return <>{renderSlot('main', {}, { entryKey: 'conversation' })}</>
 }
 
 beforeEach(() => {
@@ -66,7 +66,7 @@ describe('assembled workbench', () => {
       ] as never
     })
     await runtime.root.declare({
-      conversation: { kind: 'single', scope: 'root' },
+      main: { kind: 'keyed', scope: 'root' },
       details: { kind: 'single', scope: 'session' },
     }, Root)
     await runtime.mount({ inject: [...conversationInject], apply: applyConversation })
@@ -91,11 +91,11 @@ describe('assembled workbench', () => {
 })
 
 /** Test-owned shell role: the browsing region plus the conversation surface that hosts the toolbar. */
-function SidebarFrame({ renderSlot }: PropsRenderSlots<'sidebar.workspaces' | 'conversation'>) {
+function SidebarFrame({ renderSlot }: PropsRenderSlots<'sidebar.workspaces' | 'main'>) {
   return (
     <>
       {renderSlot('sidebar.workspaces', { wide: true, expandSidebar: () => {} })}
-      {renderSlot('conversation', {})}
+      {renderSlot('main', {}, { entryKey: 'conversation' })}
     </>
   )
 }
@@ -138,7 +138,7 @@ describe('assembled workbench sidebar panel', () => {
     await runtime.root.declare(
       {
         'sidebar.workspaces': { kind: 'single', scope: 'root' },
-        conversation: { kind: 'single', scope: 'root' },
+        main: { kind: 'keyed', scope: 'root' },
         details: { kind: 'single', scope: 'session' },
       } as never,
       SidebarFrame as never,

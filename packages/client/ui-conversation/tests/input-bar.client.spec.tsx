@@ -185,6 +185,7 @@ function bench(over?: BenchOptions) {
       items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
+    usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
     useProjection: ((key: string, selector?: (v: unknown) => unknown) =>
       (selector ?? (v => v))(key === 'permissions'
         ? (over?.permissions === undefined ? undefined : { currentValue: over.permissions.currentValue })

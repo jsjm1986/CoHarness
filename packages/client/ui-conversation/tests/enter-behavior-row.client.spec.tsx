@@ -27,12 +27,17 @@ function emptyWorkspaces() {
   }))
 }
 
+function emptyPanelInfo() {
+  return bindSnapshotSelector(createSnapshotStore({ activePanelId: null }))
+}
+
 function mount() {
   const policy = new ComposerSubmissionPolicy()
   const setBusyEnter = vi.fn((behavior: 'queue' | 'steer') => { policy.setBusyEnter(behavior) })
   const props: EnterBehaviorRowProps = {
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
+    usePanelInfo: emptyPanelInfo(),
     useBusyEnter: bindSnapshotSelector(policy.busyEnter),
     useSettings: bindSnapshotSelector(policy.settings),
     setBusyEnter,

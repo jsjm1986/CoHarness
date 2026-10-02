@@ -658,7 +658,8 @@
       "sovereignty": "tracked"
     },
     "interaction/user-questions": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-10-02-timed-user-questions-mux-port.md"
     },
     "jobs/jobs": {
       "sovereignty": "adapted",
@@ -1124,6 +1125,30 @@
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
+    },
+    "experimental/api-speech-to-text": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
+    "experimental/client-ui-voice-input": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
+    "experimental/schedule-bundle": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-24-schedule-opt-in-optional-bundle.md"
+    },
+    "experimental/speech-to-text": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
+    "experimental/speech-to-text-sensevoice": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
+    "experimental/voice-input-bundle": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     }
   },
   "upstreamOnly": [
@@ -1246,32 +1271,8 @@
       "reason": "official account credentials excluded"
     },
     {
-      "package": "experimental/api-speech-to-text",
-      "reason": "voice/STT lane excluded"
-    },
-    {
-      "package": "experimental/client-ui-voice-input",
-      "reason": "voice/STT lane excluded"
-    },
-    {
       "package": "experimental/inspector",
       "reason": "experimental prototype with no cloud consumer"
-    },
-    {
-      "package": "experimental/schedule-bundle",
-      "reason": "bundle composition is CoHarness-owned; schedule capability stays via schedule/schedule"
-    },
-    {
-      "package": "experimental/speech-to-text",
-      "reason": "voice/STT lane excluded"
-    },
-    {
-      "package": "experimental/speech-to-text-sensevoice",
-      "reason": "voice/STT lane excluded"
-    },
-    {
-      "package": "experimental/voice-input-bundle",
-      "reason": "voice/STT lane excluded"
     },
     {
       "package": "experimental/webworker-packer",

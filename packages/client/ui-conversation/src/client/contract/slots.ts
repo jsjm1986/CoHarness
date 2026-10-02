@@ -182,12 +182,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'conversation.chat.commandview': { kind: 'keyed'; scope: 'session'; owner: CommandRowOwnerProps }
     /**
-     * The completed Turn Node's extension chain, rendered before that Node's
+     * The completed Turn Node's extension list, rendered before that Node's
      * IconActions. Entries derive a match from the engine-owned Turn and
      * closing seq before mounting, so presentation components never mount
-     * only to return null; an all-declined chain renders nothing.
+     * only to return null; entries render by ascending `order` and each
+     * self-gates on its own Turn data.
      */
-    'conversation.chat.turnTail': { kind: 'chain'; scope: 'session'; owner: TurnTailOwnerProps }
+    'conversation.chat.turnTail': { kind: 'list'; scope: 'session'; owner: TurnTailOwnerProps }
     /**
      * Action strip attached to one finalized assistant message, rendered
      * inside that message's IconActions row. The chat entry owns the render
@@ -837,7 +838,7 @@ export interface ConversationViewportInjected {
 
 /** Full props of the current-session or multi-pane conversation host. */
 export type ConversationSlotProps =
-  PropsRuntime<'conversation'> & PropsRenderSlots<
+  PropsRuntime<'main'> & PropsRenderSlots<
     'conversation.pane' | 'conversation.workbench.toolbar' | 'conversation.workbench.empty'
     | 'conversation.workbench.pane.header'
   >

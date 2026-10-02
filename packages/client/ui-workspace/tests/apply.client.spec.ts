@@ -86,11 +86,14 @@ async function bench() {
   // in this lane, so browser-language detection never runs and the locale
   // comes from FALLBACK_LOCALE (en): state the asserted locale explicitly.
   locale.setLocale('zh')
+  const selectPanel = vi.fn()
+  ctx.provide('layout', { selectPanel } as never)
   ctx.provide('locale', locale)
   return {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, startSession, rename,
     insertSessionBefore, open, clear, search, renameSession, binding, fork,
     viewportState, replaceActive, workspaceList, sessionList, pinSession, unpinSession,
+    selectPanel,
   }
 }
 
@@ -114,7 +117,7 @@ type ViewInstance = ReturnType<ReturnType<typeof createWorkspaceViewStore>['crea
 
 describe('ui-workspace apply', () => {
   it('declares the services it drives', () => {
-    expect(inject).toEqual(['slots', 'sessions', 'workspaces', 'locale', 'connection', 'conversationViewport', 'shortcuts'])
+    expect(inject).toEqual(['slots', 'sessions', 'workspaces', 'locale', 'connection', 'conversationViewport', 'shortcuts', 'layout'])
   })
 
   it('registers browser and pickers for declarations arriving before or after apply', async () => {
@@ -162,6 +165,9 @@ describe('ui-workspace apply', () => {
     expect(b.startSession).toHaveBeenLastCalledWith(undefined)
     await browser.open('session' as never)
     expect(b.open).toHaveBeenCalledWith('session')
+    // Opening always reveals the Conversation, even when the target is already
+    // selected (the open came from a main-panel surface like the task catalog).
+    expect(b.selectPanel).toHaveBeenCalledWith(null)
     // Single-mode opens must not materialize a workbench pane.
     expect(b.replaceActive).not.toHaveBeenCalled()
     b.viewportState.mode = 'workbench'

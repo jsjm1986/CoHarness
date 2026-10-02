@@ -29,6 +29,9 @@ function emptyWorkspaces() {
     baselinesReady: true, recentWorkspaceId: undefined,
   }))
 }
+function emptyPanelInfo() {
+  return bindSnapshotSelector(createSnapshotStore({ activePanelId: null }))
+}
 
 const readySection: ConversationSettings = {
   busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13,
@@ -43,6 +46,7 @@ describe('TranscriptViewRow', () => {
     const props: TranscriptViewRowProps = {
       useSessions: emptySessions(),
       useWorkspaces: emptyWorkspaces(),
+      usePanelInfo: emptyPanelInfo(),
       useTranscriptView: bindSnapshotSelector(policy.mode),
       useSettings: bindSnapshotSelector(policy.settings),
       setTranscriptView: (mode) => { policy.setMode(mode) },
@@ -65,6 +69,7 @@ describe('TranscriptViewRow', () => {
       <TranscriptViewRow
         useSessions={emptySessions()}
         useWorkspaces={emptyWorkspaces()}
+        usePanelInfo={emptyPanelInfo()}
         useTranscriptView={bindSnapshotSelector(policy.mode)}
         useSettings={bindSnapshotSelector(policy.settings)}
         setTranscriptView={vi.fn()}
@@ -86,6 +91,7 @@ describe('PerformanceUsageRow', () => {
       <PerformanceUsageRow
         useSessions={emptySessions()}
         useWorkspaces={emptyWorkspaces()}
+        usePanelInfo={emptyPanelInfo()}
         usePerformanceUsage={bindSnapshotSelector(policy.mode)}
         useSettings={bindSnapshotSelector(policy.settings)}
         setPerformanceUsage={(mode) => { policy.setMode(mode) }}
@@ -108,6 +114,7 @@ describe('LinkOpeningRow', () => {
     const props: LinkOpeningRowProps = {
       useSessions: emptySessions(),
       useWorkspaces: emptyWorkspaces(),
+      usePanelInfo: emptyPanelInfo(),
       useLinkOpening: bindSnapshotSelector(policy.destination),
       useBrowserAvailable: bindSnapshotSelector(createSnapshotStore(browserAvailable)),
       useSettings: bindSnapshotSelector(policy.settings),

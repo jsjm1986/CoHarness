@@ -33,6 +33,11 @@ async function bench() {
   // ui-theme's Appearance row binds a durable scope through these two.
   ctx.provide('remote', { $on: () => () => {} } as never)
   ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
+  // ui-layout watches ctx.sessions.list for selection changes that return the
+  // center to the Conversation; a static empty list satisfies the wiring.
+  ctx.provide('sessions', {
+    list: { getSnapshot: () => ({ current: undefined }), subscribe: () => () => {} },
+  } as never)
   await ctx.plugin({ inject: themeInject, apply: themeApply }).await()
   await slotsFiber.await()
   return { ctx, slots: ctx.get('slots') as SlotRegistry }
@@ -40,7 +45,7 @@ async function bench() {
 
 describe('ui-layout client apply', () => {
   it('declares its service dependencies', () => {
-    expect(inject).toEqual(['slots', 'theme', 'locale', 'shortcuts'])
+    expect(inject).toEqual(['slots', 'theme', 'locale', 'shortcuts', 'sessions'])
   })
 
   it('provides ctx.layout and registers AppFrame with the shell child declarations', async () => {
@@ -52,7 +57,7 @@ describe('ui-layout client apply', () => {
     expect(slots.entries('root')).toHaveLength(1)
     // …and declared the shell children in the ledger.
     expect(slots.spec('sidebar')).toEqual({ kind: 'single', scope: 'root' })
-    expect(slots.spec('conversation')).toEqual({ kind: 'single', scope: 'root' })
+    expect(slots.spec('main')).toEqual({ kind: 'keyed', scope: 'root' })
     expect(slots.spec('rightbar')).toEqual({ kind: 'single', scope: 'root' })
     expect(slots.spec('shell.mobile.header.actions')).toEqual({ kind: 'list', scope: 'session' })
   })

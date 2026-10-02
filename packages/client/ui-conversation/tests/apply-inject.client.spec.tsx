@@ -71,7 +71,7 @@ async function bench(desktop = false, developerTools = stubDeveloperTools()) {
   // The AppFrame role: the conversation-package slots must be declared by a
   // live entry before apply can contribute into them.
   await runtime.root.declare({
-    'conversation': { kind: 'single', scope: 'root' },
+    'main': { kind: 'keyed', scope: 'root' },
     'details': { kind: 'single', scope: 'session' },
   }, (_p: { renderSlot?: unknown }) => null)
 
@@ -80,7 +80,7 @@ async function bench(desktop = false, developerTools = stubDeveloperTools()) {
   // The host face (store resolution) exists only inside the installed
   // renderer, so materialize it the way the shell does.
   runtime.renderRoot()
-  const entryOf = (key: 'conversation' | 'conversation.pane' | 'conversation.session' | 'conversation.session.header' | 'conversation.composer.bar' | 'conversation.view' | 'details') =>
+  const entryOf = (key: 'main' | 'conversation.pane' | 'conversation.session' | 'conversation.session.header' | 'conversation.composer.bar' | 'conversation.view' | 'details') =>
     runtime.slots.entries(key)[0]!
   /** Resolve store instance + call the inject the way the outlet would. */
   const conversationApi = (id: SessionId) => {

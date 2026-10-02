@@ -71,3 +71,12 @@
   25%, 37.4% { opacity: 0.35; }
   37.5%, 100% { opacity: 0.15; }
 }
+
+/* Step appearance: a hollow pending circle that fills with the state color;
+ * done additionally paints the state color and centers a check glyph. */
+.step { display: inline-flex; flex: none; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 50%; corner-shape: round; border: 1.5px solid var(--dsw-alias-label-tertiary); color: var(--dsw-alias-label-primary-foreground); }
+.step[data-state='done'] { border-color: var(--dsw-alias-state-success-primary); background: var(--dsw-alias-state-success-primary); }
+.step[data-state='error'] { border-color: var(--dsw-alias-state-error-primary); background: var(--dsw-alias-state-error-primary); }
+.step[data-state='warning'] { border-color: var(--dsw-alias-state-warn-primary); }
+/* Idle shares the base hollow circle: it is the absence of activity, so it
+ * keeps the tertiary label border beside the three outcome colors. */

@@ -207,7 +207,7 @@ function TurnStatus({ startTime, t }: {
       {t('chat.deepDiving')}
       {showClock && (
         <span className={css.turnStatusClock} aria-hidden>
-          {formatRunDuration(elapsedMs, t)}
+          {formatRunDuration(elapsedMs, t).map(part => part.text).join('')}
         </span>
       )}
     </div>

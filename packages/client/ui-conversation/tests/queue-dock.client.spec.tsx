@@ -98,6 +98,7 @@ function kitFor(snapshot: ConversationSnapshot, injected: Partial<QueueDockInjec
     t,
     useSessions: (() => { throw new Error('unused') }) as unknown as SnapshotSelectorHook<SessionListState>,
     useWorkspaces: (() => { throw new Error('unused') }) as never,
+    usePanelInfo: (() => { throw new Error('unused') }) as never,
     useProjection: (() => undefined) as never,
     useInput: (() => { throw new Error('unused') }) as never,
     inputActions: { setDraft: () => {}, submit: () => {} } as never,

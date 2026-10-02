@@ -36,6 +36,7 @@ function props() {
     sessionsStore: sessions, workspacesStore: workspaces,
     useStore: bindSnapshotSelector(store), actions: store.actions,
     useSessions: bindSnapshotSelector(sessions), useWorkspaces: bindSnapshotSelector(workspaces),
+    usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
   }
 }
 

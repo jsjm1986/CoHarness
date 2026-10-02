@@ -27,6 +27,10 @@ function emptyWorkspaces() {
   })
   return bindSnapshotSelector(store)
 }
+function emptyPanelInfo() {
+  const store = createSnapshotStore({ activePanelId: null })
+  return bindSnapshotSelector(store)
+}
 
 function mount(active = 'en', settings: SettingsControlState = {
   status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' },
@@ -38,6 +42,7 @@ function mount(active = 'en', settings: SettingsControlState = {
   const props: LanguageRowComponentProps = {
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
+    usePanelInfo: emptyPanelInfo(),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
     t: (key: string) => ({

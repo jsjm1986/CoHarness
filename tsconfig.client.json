@@ -117,6 +117,8 @@
     { "path": "./packages/client/ui-renderer" },
     { "path": "./packages/client/web" },
     { "path": "./packages/experimental/client-ui-agent-team" },
+    { "path": "./packages/experimental/client-ui-voice-input" },
+    { "path": "./packages/experimental/speech-to-text" },
     { "path": "./apps/web" }
   ]
 }

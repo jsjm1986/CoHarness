@@ -13,6 +13,9 @@
   ],
   "references": [
     {
+      "path": "./tsconfig.session-controller.json"
+    },
+    {
       "path": "../../context/collaboration"
     },
     {
@@ -41,6 +44,9 @@
     },
     {
       "path": "../../preset/agent-presets"
+    },
+    {
+      "path": "../../schedule/schedule"
     },
     {
       "path": "../../session/session-persistence"

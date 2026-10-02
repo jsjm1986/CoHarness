@@ -20,6 +20,7 @@ describe('createLayoutStore', () => {
   it('initializes the sidebar at its default width, details preference unset, no viewport yet', () => {
     const { store } = createLayoutStore().create()
     expect(store.getSnapshot()).toEqual({
+      panelInfo: { activePanelId: null },
       sidebar: SIDEBAR_DEFAULT, details: null, viewportWidth: 0, narrowExpanded: false,
       rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
     })
@@ -62,6 +63,7 @@ describe('createLayoutStore', () => {
     actions.setViewportWidth(980)
     actions.toggleSidebar()
     expect(store.getSnapshot()).toEqual({
+      panelInfo: { activePanelId: null },
       sidebar: 400, details: null, viewportWidth: 980, narrowExpanded: true,
       rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false,
     })
@@ -169,6 +171,7 @@ describe('createLayoutStore', () => {
 
     const second = createLayoutStore().create()
     expect(second.store.getSnapshot()).toEqual({
+      panelInfo: { activePanelId: null },
       sidebar: SIDEBAR_DEFAULT,
       details: null,
       viewportWidth: 0,

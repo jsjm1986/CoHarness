@@ -20,11 +20,12 @@ import type {
   ChatNode, ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, SelectionTarget, UseChatNodeTurnData,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { createChatStore } from '../src/client/stores.ts'
 import { presentationPolicyFor } from '../src/client/presentation-policy.ts'
 import { ChatView } from '../src/client/chat/ChatView.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en, zh } from '../src/client/locales.ts'
 import { AssistantNodeView } from '../src/client/chat/AssistantNodeView.tsx'
 import { CommandNodeView, ManualCompactionNodeView } from '../src/client/chat/CommandNodeView.tsx'
 import { SystemPromptRow } from '../src/client/chat/SystemPromptRow.tsx'
@@ -35,8 +36,12 @@ import {
   TurnMaxTokensNodeView, UnknownNodeView, UserMessageNodeView,
 } from '../src/client/chat/MessageItem.tsx'
 import { TurnTailNodeView } from '../src/client/chat/TurnTailNodeView.tsx'
-import { formatRunDuration } from '../src/client/chat/message-chrome.ts'
+import { formatRunDuration as durationParts } from '../src/client/chat/message-chrome.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
+
+function formatRunDuration(ms: number, t: Parameters<typeof durationParts>[1]): string {
+  return durationParts(ms, t).map(part => part.text).join('')
+}
 
 afterEach(() => {
   cleanup()
@@ -187,8 +192,6 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   }> = []
   const renderCommandSlot = ((_key: string, _owner: object, opts?: { fallback?: React.ReactNode }) =>
     opts?.fallback ?? null) as unknown as React.ComponentProps<typeof CommandNodeView>['renderSlot']
-  const renderTurnTail = ((_key: string, _owner: object) => null) as unknown as
-    React.ComponentProps<typeof TurnTailNodeView>['renderSlotChain']
   const renderTurnTailSlot = (() => null) as unknown as
     React.ComponentProps<typeof TurnTailNodeView>['renderSlot']
   const renderSlot = ((key: string, owner: object, opts?: {
@@ -238,7 +241,6 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
           <TurnTailNodeView
             {...nodeProps<'turn-tail'>()}
             renderSlot={renderTurnTailSlot}
-            renderSlotChain={renderTurnTail}
             usePerformanceUsage={selector => selector(performanceUsageMode)}
             SessionProvider={props.SessionProvider}
           />
@@ -279,6 +281,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     useSession: bindSnapshotSelector(source),
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
+    usePanelInfo: (() => { throw new Error('unused') }),
     useProjection: (() => undefined),
     useInput: (() => { throw new Error('unused') }),
     inputActions: {
@@ -289,6 +292,8 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
       addDocuments: () => true,
       removeDocument: () => {},
       pruneDocuments: () => {},
+      captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+      insertText: () => false,
       submit: () => {},
     },
     useStore: bindSnapshotSelector(chat),
@@ -544,8 +549,17 @@ describe('Chat node rendering', () => {
     expect(formatRunDuration(0, t)).toBe('0秒')
     expect(formatRunDuration(-500, t)).toBe('0秒')
     expect(formatRunDuration(15_999, t)).toBe('15秒')
-    expect(formatRunDuration(125_000, t)).toBe('2分05秒')
-    expect(formatRunDuration(3_903_000, t)).toBe('1小时05分03秒')
+    expect(formatRunDuration(125_000, t)).toBe('2分5秒')
+    // The hour rolls at exactly 3600s, never at 60 displayed minutes.
+    expect(formatRunDuration(3_599_999, t)).toBe('59分59秒')
+    expect(formatRunDuration(3_600_000, t)).toBe('1小时0分0秒')
+    expect(formatRunDuration(3_903_000, t)).toBe('1小时5分3秒')
+    expect(formatRunDuration(7_261_000, t)).toBe('2小时1分1秒')
+  })
+
+  it('formatRunDuration uses the English hour units', () => {
+    const t = makeTranslate(en, commonEn)
+    expect(formatRunDuration(3_903_000, t)).toBe('1h 5m 3s')
   })
 
 })
@@ -1250,7 +1264,7 @@ describe('ChatView', () => {
     const view = render(<h.ChatView {...h.props} />)
     // Freshly mounted (as after a reload) yet already past the 15s gate.
     const status = view.getByRole('status')
-    expect(status.textContent).toMatch(/^深度求索中\.\.\.2分0\d秒$/)
+    expect(status.textContent).toMatch(/^深度求索中\.\.\.2分\d秒$/)
     expect(status.querySelector('[aria-hidden="true"]')).not.toBeNull()
     act(() => {
       h.set({ queue: [{
@@ -1262,7 +1276,7 @@ describe('ChatView', () => {
         text: 'also',
       }] })
     })
-    expect(status.textContent).toMatch(/^深度求索中\.\.\.2分0\d秒$/)
+    expect(status.textContent).toMatch(/^深度求索中\.\.\.2分\d秒$/)
   })
 
   it('hands each ordered root call to the keyed business-node slot', () => {

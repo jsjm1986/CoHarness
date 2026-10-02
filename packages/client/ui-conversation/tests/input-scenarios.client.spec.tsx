@@ -148,6 +148,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
       items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
+    usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
     useProjection: (() => undefined),
     useInput: bindSnapshotSelector(shell.state),
     inputActions: shell.actions,

@@ -103,9 +103,9 @@
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  border: 0.5px solid var(--dsw-alias-settings-card-stroke);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-xl);
-  background: var(--dsw-alias-settings-card-fill);
+  background: var(--dsw-alias-bg-module-platform);
 }
 
 .card[data-open='true'] {
@@ -397,10 +397,10 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border: 0.5px solid var(--dsw-alias-settings-card-stroke);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-xl);
   padding: 15px 14px;
-  background: var(--dsw-alias-settings-card-fill);
+  background: var(--dsw-alias-bg-module-platform);
 }
 
 .skeletonBar {

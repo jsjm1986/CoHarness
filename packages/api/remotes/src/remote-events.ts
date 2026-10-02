@@ -6,6 +6,8 @@
  * type-only.
  */
 
+import type {} from '@deepseek-ai/dsh-schedule/client'
+
 /**
  * Host events this application forwards to consumers verbatim: no projection,
  * no redaction, no renaming. The wire name is the Host cordis event name and
@@ -32,5 +34,6 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   '@deepseek-ai/cordis/inspect-query-resolved',
   'llm/adapters-updated',
   'permission-presets/catalog-changed',
+  'schedule/changed',
   'settings/document-updated',
 ] as const
