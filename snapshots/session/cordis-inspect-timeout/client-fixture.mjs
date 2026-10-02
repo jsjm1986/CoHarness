@@ -4,42 +4,30 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 export const name = 'client-inspect-timeout-fixture'
-export const inject = ['cordisInspect', 'agents', 'llm', 'typertGateway']
+export const inject = ['cordisInspect', 'agents', 'llm']
 
 /**
- * Register a silent event source and open real Gateway Client streams on demand.
- * @param {import('@deepseek-ai/cordis').Context} ctx - owner of the source and streams.
- * @returns opener resolving after readiness, with abort and quiescent close operations.
+ * Provide a liveness-probe stand-in and connect/disconnect Clients on demand.
+ * @param {import('@deepseek-ai/cordis').Context} ctx - owner of the probe service.
+ * @returns opener resolving once the Client reads connected, with abort and quiescent close operations.
  */
 export function registerSilentClientTransport(ctx) {
-  ctx.effect(() => ctx.typertGateway.registerRemoteEvents(async function* (signal) {
-    await new Promise(resolve => {
-      if (signal.aborted) resolve()
-      else signal.addEventListener('abort', resolve, { once: true })
-    })
-  }, { home: '/snapshot-host' }))
+  let live = false
+  ctx.root.provide('apiProxy', { hasLiveClient: () => live })
   return async () => {
-    const controller = new AbortController()
-    const stream = await ctx.typertGateway.wireStream.open(
-      '$events', { args: {} }, (async function* () {})(), undefined, controller.signal,
-    )
-    const iterator = stream[Symbol.asyncIterator]()
-    const close = ctx.effect(() => async () => {
-      controller.abort()
-      await iterator.return?.()
-    })
-    const ready = await iterator.next()
-    assert.equal(ready.done, false)
-    assert.equal(ready.value.type, 'ready')
-    assert.equal(ctx.typertGateway.hasLiveClient(), true)
-    return { abort: () => { controller.abort() }, close }
+    live = true
+    assert.equal(ctx.get('apiProxy').hasLiveClient(), true)
+    return {
+      abort: () => { live = false },
+      close: async () => { live = false },
+    }
   }
 }
 
 /**
  * Mirror a Client manifest and deliver only the first query's failure.
  * @param {import('@deepseek-ai/cordis').Context} ctx - isolated snapshot Host.
- * @returns after the Gateway Client stream is ready.
+ * @returns after the Client connection is open.
  */
 export async function apply(ctx) {
   await registerSilentClientTransport(ctx)()
@@ -54,7 +42,7 @@ export async function apply(ctx) {
   })
   let requests = 0
   ctx.on('llm/stream', (options, next) => {
-    assert.equal(ctx.typertGateway.hasLiveClient(), true)
+    assert.equal(ctx.get('apiProxy').hasLiveClient(), true)
     assert.deepEqual(
       options.messages.filter(message => message.role === 'tool').map(resultFields),
       expected.slice(0, requests++).map(resultFields),
@@ -77,7 +65,7 @@ export async function apply(ctx) {
     }],
   }])
   let queries = 0
-  ctx.on('cordis/inspect-query', (request) => {
+  ctx.on('@deepseek-ai/cordis/inspect-query', (request) => {
     if (++queries !== 1) return
     const agent = ctx.agents.get(request.agentId)
     if (agent === undefined) throw new Error('Client inspect request has no owning Agent')

@@ -1,11 +1,11 @@
-/** Browser transport fixture using real Gateway event streams and Client inspect queries. */
+/** Browser transport fixture driving Client inspect queries through the liveness probe. */
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { registerSilentClientTransport } from '../cordis-inspect-timeout/client-fixture.mjs'
 
 export const name = 'client-inspect-liveness-fixture'
-export const inject = ['cordisInspect', 'agents', 'llm', 'typertGateway']
+export const inject = ['cordisInspect', 'agents', 'llm']
 
 /**
  * Leave a disconnected query pending until timeout, then answer after reconnection.
@@ -13,6 +13,7 @@ export const inject = ['cordisInspect', 'agents', 'llm', 'typertGateway']
  */
 export function apply(ctx) {
   const open = registerSilentClientTransport(ctx)
+  const live = () => ctx.get('apiProxy')?.hasLiveClient() ?? false
   const expected = readFileSync(process.env.DSH_SNAPSHOT_FILE, 'utf8').trim().split('\n')
     .map(line => JSON.parse(line))
     .filter(event => event.type === 'tool/result')
@@ -34,14 +35,14 @@ export function apply(ctx) {
     )
     switch (requests++) {
       case 0:
-        assert.equal(ctx.typertGateway.hasLiveClient(), false)
+        assert.equal(live(), false)
         break
       case 1:
         assert.equal(queries.length, 0, 'An offline query never reaches the browser transport')
         client = await open()
         break
       case 2:
-        assert.equal(ctx.typertGateway.hasLiveClient(), false)
+        assert.equal(live(), false)
         assert.equal(queries.length, 1)
         assert.deepEqual(resolved, queries, 'Timeout settles the disconnected query')
         await client.close()
@@ -50,9 +51,9 @@ export function apply(ctx) {
       case 3:
         assert.equal(queries.length, 2)
         assert.deepEqual(resolved, queries, 'The reconnected query settles separately')
-        assert.equal(ctx.typertGateway.hasLiveClient(), true)
+        assert.equal(live(), true)
         await client.close()
-        assert.equal(ctx.typertGateway.hasLiveClient(), false)
+        assert.equal(live(), false)
         break
       default:
         assert.fail('Unexpected model request after Client inspection recovered')
@@ -73,14 +74,14 @@ export function apply(ctx) {
       outputSchema: { type: 'object' },
     }],
   }])
-  ctx.on('cordis/inspect-query-resolved', ({ requestId }) => { resolved.push(requestId) })
-  ctx.on('cordis/inspect-query', (request) => {
-    assert.equal(ctx.typertGateway.hasLiveClient(), true)
+  ctx.on('@deepseek-ai/cordis/inspect-query-resolved', ({ requestId }) => { resolved.push(requestId) })
+  ctx.on('@deepseek-ai/cordis/inspect-query', (request) => {
+    assert.equal(live(), true)
     assert.deepEqual(request.input, { service: 'remote' })
     queries.push(request.requestId)
     if (queries.length === 1) {
       client.abort()
-      assert.equal(ctx.typertGateway.hasLiveClient(), false)
+      assert.equal(live(), false)
       assert.deepEqual(resolved, [], 'Disconnection leaves the query pending until timeout')
       return
     }
