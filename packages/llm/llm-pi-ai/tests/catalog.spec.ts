@@ -494,7 +494,7 @@ describe('catalog routes with per-model configuration', () => {
 
     const listed = await ctx.llm.listModels('deepseek')
     expect(listed.map(model => model.id).sort())
-      .toEqual(getBuiltinModels('deepseek').map(model => model.id).sort())
+      .toEqual([...getBuiltinModels('deepseek').map(model => model.id), 'deepseek-v4-flash', 'deepseek-v4-flash-vision-exp'].sort())
   })
 
   it('overrides one catalog model field and defaults the rest from the catalog', async () => {
@@ -781,7 +781,7 @@ describe('modelOverrides', () => {
   }
 
   it('reshapes one catalog model while the rest of the catalog keeps serving', () => {
-    const catalogSize = getBuiltinModels('deepseek').length
+    const catalogSize = getBuiltinModels('deepseek').length + 2 // the two retained legacy deepseek ids
     const target = deepseekModel()
     const resolved = resolveProfiles({
       deepseek: {

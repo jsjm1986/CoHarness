@@ -214,6 +214,59 @@ export function catalogProviderTakesApiKey(provider: string): boolean {
 }
 
 /**
+ * Legacy model ids this deployment keeps serving after the installed catalog
+ * renamed them, keyed by provider and alias id. pi-ai 0.87 renamed
+ * `deepseek-v4-flash` to `deepseek-flash` and dropped `vision-exp`; existing
+ * session logs, settings documents, and composition profiles still name the
+ * older ids, so the entries below retain the 0.85-era metadata verbatim —
+ * including the wire `id` — rather than inheriting the successor's fields.
+ */
+const LEGACY_MODEL_ENTRIES: Record<string, Record<string, Model<Api>>> = {
+  deepseek: {
+    'deepseek-v4-flash': {
+      id: 'deepseek-v4-flash',
+      name: 'DeepSeek V4 Flash',
+      api: 'openai-completions',
+      baseUrl: 'https://api.deepseek.com',
+      provider: 'deepseek',
+      reasoning: true,
+      input: ['text'],
+      cost: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0 },
+      contextWindow: 1_000_000,
+      maxTokens: 384_000,
+      compat: {
+        supportsStore: false,
+        supportsDeveloperRole: false,
+        maxTokensField: 'max_tokens',
+        requiresReasoningContentOnAssistantMessages: true,
+        thinkingFormat: 'deepseek',
+      },
+      thinkingLevelMap: { minimal: null, low: 'low', medium: null, high: 'high', max: 'max' },
+    },
+    'deepseek-v4-flash-vision-exp': {
+      id: 'deepseek-v4-flash-vision-exp',
+      name: 'DeepSeek V4 Flash Vision Exp',
+      api: 'openai-completions',
+      baseUrl: 'https://api.deepseek.com',
+      provider: 'deepseek',
+      reasoning: true,
+      input: ['text', 'image'],
+      cost: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0 },
+      contextWindow: 1_000_000,
+      maxTokens: 384_000,
+      compat: {
+        supportsStore: false,
+        supportsDeveloperRole: false,
+        maxTokensField: 'max_tokens',
+        requiresReasoningContentOnAssistantMessages: true,
+        thinkingFormat: 'deepseek',
+      },
+      thinkingLevelMap: { minimal: null, low: 'low', medium: null, high: 'high', max: 'max' },
+    },
+  },
+}
+
+/**
  * The installed catalog models for one route, indexed by model id.
  * @param provider - provider route key.
  * @returns catalog models by id; empty for a route pi-ai does not ship.
@@ -221,7 +274,11 @@ export function catalogProviderTakesApiKey(provider: string): boolean {
 export function catalogModels(provider: string): Map<string, Model<Api>> {
   if (!catalogProviders().has(provider)) return new Map()
   const models = getBuiltinModels(provider as BuiltinProvider) as Model<Api>[]
-  return new Map(models.map(model => [model.id, model]))
+  const byId = new Map(models.map(model => [model.id, model]))
+  for (const [id, entry] of Object.entries(LEGACY_MODEL_ENTRIES[provider] ?? {})) {
+    if (!byId.has(id)) byId.set(id, entry)
+  }
+  return byId
 }
 
 /**
@@ -368,6 +425,7 @@ type OfferedCompatField =
   | OfferedIn<typeof RESPONSES_COMPAT_GATE>
   | OfferedIn<typeof ANTHROPIC_COMPAT_GATE>
   | OfferedIn<typeof BEDROCK_COMPAT_GATE>
+  // oxlint-disable-next-line typescript/no-redundant-type-constituents -- Include gates whose current offering is empty.
   | OfferedIn<typeof MISTRAL_COMPAT_GATE>
 
 /**
