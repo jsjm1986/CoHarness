@@ -52,8 +52,9 @@ Schemas and guidance enter requests while the plugin is visible. Results append 
 
 Unchanged schemas and guidance remain prefix-stable. Results append to history, while other plugin changes can alter later tool schemas.
 
-<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - Client queries need a responding page and use the Host runner's [bounded wait and retry policy](../cordis-host-runner/README.md#client-inspection). Inspection cannot invoke service methods, configure plugins, or execute generated code.
 - `Config.listConfigs` walks the profile Loader tree only. Agent preset `plugins` lists mount in detached preset trees, so a plugin present only inside a preset declaration is not listed unless the profile tree also mounts it.

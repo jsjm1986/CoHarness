@@ -175,6 +175,8 @@ interface SessionEventMap {
 
 <a id="the-request-header-event-requestheader"></a>
 
+<a id="todoitem--one-todo-list-entry"></a>
+
 ### `TodoItem`——一条待办事项
 
 `todo/write` 事件整列表快照的单元。刻意保持精简——一行 `content` 与三态 `status`（无 id、优先级或 `activeForm`）：每次写入都整体替换列表，因此条目无需稳定身份。见 [todo_write Agent Note](../../.agents/notes/implemented/feature/2026-06-29-todo-write-tool.zh.md)。

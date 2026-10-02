@@ -243,6 +243,14 @@ Root interface of the unified API. New client-request domain = one new file pair
  * @returns Transport receipt for the response delivery.
  */
 respond(message: ClientResponse): Promise<RpcReceipt>
+
+/**
+ * Host-only liveness probe: whether at least one `events.mux` Client stream is
+ * open and has not been cancelled. Producers that dispatch to page listeners use
+ * it to fail fast instead of waiting out their response deadline.
+ * @returns whether a live Client event stream exists.
+ */
+hasLiveClient(): boolean
 ```
 
 Source: [`packages/host/apiproxy/src/api/index.ts`](../../packages/host/apiproxy/src/api/index.ts)
