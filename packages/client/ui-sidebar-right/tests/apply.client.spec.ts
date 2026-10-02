@@ -383,7 +383,7 @@ describe('ui-sidebar-right apply', () => {
     const handle = seat('rightbar.session').store as ReturnType<typeof createSidebarRightStore>
     const instance = handle.create(SESSION)
     instance.actions.open(SESSION)
-    const reference = { release: vi.fn() }
+    const reference = { ready: Promise.resolve(), release: vi.fn() }
     sessions.retain.mockReturnValueOnce(reference)
     resources.pin.mockImplementationOnce(() => { throw new Error('pin failed') })
     expect(() => {

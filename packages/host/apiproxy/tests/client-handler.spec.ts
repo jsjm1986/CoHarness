@@ -35,6 +35,7 @@ function scriptedApi(overrides: {
   const err = <T>(r: RpcRequest<unknown>): Promise<RpcResponse<T>> =>
     Promise.resolve({ rpcId: r.rpcId, result: { ok: false, error: { code: 'internal' as const, message: 'stub', details: {} } } })
   return {
+    hasLiveClient: () => true,
     desktop: { status: r => ok(r, null), confirm: r => err(r) },
     sessions: {
       list: r => ok(r, { items: [] }),

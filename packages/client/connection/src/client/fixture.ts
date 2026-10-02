@@ -2499,6 +2499,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   }
 
   const api: ApiProxy = {
+    hasLiveClient: () => true,
     desktop: {
       status: request => ok(request, null),
       confirm: request => err(request, { code: 'internal', message: 'Fixture has no managed desktop.', details: {} }),

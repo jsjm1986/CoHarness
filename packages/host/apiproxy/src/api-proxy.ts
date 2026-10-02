@@ -135,12 +135,11 @@ import {
   TypertLookupFailure,
   type TypertGatewayAuthorizationRequest,
 } from '@deepseek-ai/dsh-typert-protocol'
+import type {} from '@deepseek-ai/dsh-skill'
 // Type-only: the dynamic-package runner's forwarded-event declarations. Its
 // client-safe `./types` subpath deliberately, not the package root — the root
-// merges `ctx.dynamicCordisRunner`, and a dependency on that package would
-// rebuild the api-remotes cycle this direction exists to avoid.
+// merges `ctx.dynamicCordisRunner`, a service the proxy does not consume.
 import type {} from '@deepseek-ai/dsh-cordis-host-runner/types'
-import type {} from '@deepseek-ai/dsh-skill'
 // The settings/credentials seams: brand guards run at this wire boundary; the
 // service reads stay optional (`ctx.get`) so a composition without either
 // provider still serves every other domain.

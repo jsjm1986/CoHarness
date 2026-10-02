@@ -87,7 +87,7 @@ class FakeApiProxy extends Service {
 
 async function connectPage(): Promise<FakeApiProxy> {
   await ctx.plugin(FakeApiProxy)
-  const proxy = ctx.get('apiProxy' as never) as FakeApiProxy
+  const proxy: FakeApiProxy = ctx.get('apiProxy' as string)
   proxy.liveClients = 1
   return proxy
 }

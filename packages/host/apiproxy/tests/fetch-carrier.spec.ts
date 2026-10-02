@@ -62,6 +62,7 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
     }
   }
   return {
+    hasLiveClient: () => true,
     desktop: {
       status: async request => ({ rpcId: request.rpcId, result: { ok: true, value: null } }),
       confirm: async request => ({ rpcId: request.rpcId, result: { ok: false, error: { code: 'internal', message: 'No desktop configured.', details: {} } } }),
