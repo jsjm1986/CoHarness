@@ -161,6 +161,20 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
    * @param actx - session-scope ctx.
    * @returns the resident controller.
    */
+  /**
+   * Close every open popup for a command whose options have become stale.
+   * Pending loads and confirmations lose their binding; drafts stay intact.
+   * @param name - command name without the leading slash.
+   */
+  dismiss(name: string): void {
+    for (const popup of this.live.popups.values()) {
+      // A catalog that went stale underneath the card takes its rows away; the
+      // composer keeps the keyboard the card was holding, like every other
+      // dismissal path.
+      if (popup.state.getSnapshot().command === name) popup.dismiss({ focusComposer: true })
+    }
+  }
+
   popupFor(actx: ClientContext): PopupSelectController<ClientSessionContext> {
     const sessions = this.sessions()
     const id = sessions.scopeOf(actx)

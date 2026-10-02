@@ -259,20 +259,62 @@
   gap: 2px;
 }
 
-.group + .group {
-  margin-top: var(--dsw-space-1);
+.searchRow {
+  position: relative;
+  flex-shrink: 0;
+  margin: 2px 0 3px;
 }
 
-.groupTitle {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 6px 8px 2px;
-  background: var(--dsw-specific-menu);
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 500;
+.searchRow .search {
+  display: flex;
+  height: auto;
+  padding: 5px 7px;
+  border: 0 solid transparent;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+}
+
+.searchRow .searchWithQuery {
+  padding-right: 34px;
+}
+
+.searchClear {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  corner-shape: round;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.searchClear:hover,
+.searchClear:focus-visible {
+  outline: none;
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.searchRow .search:focus-within {
+  border-color: transparent;
+}
+
+.searchRow .search input {
+  padding: 0;
+  font-size: 12px;
+  line-height: normal;
+}
+
+.searchRow .search input::placeholder {
+  color: var(--dsw-alias-label-caption);
 }
 
 .option {
@@ -293,8 +335,9 @@
   cursor: pointer;
 }
 
-.option:hover:not(:disabled),
-.option:focus-visible {
+.option:not(.modelOption):hover:not(:disabled),
+.option:focus-visible,
+.optionActive:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
@@ -497,13 +540,7 @@
 }
 
 /* Section rows sit inside SessionSettingsSheet, whose selected state is a
-   quiet surface tint rather than a second card. Provider headings use the
-   sheet surface as their sticky backing, so they remain readable while the
-   list scrolls without painting a bar behind every group. */
-.sectionContent .groupTitle {
-  background: var(--dsw-alias-bg-layer-2);
-}
-
+   quiet surface tint rather than a second card. */
 .sectionContent .option[aria-checked='true'] {
   background: var(--dsw-alias-interactive-bg-active);
 }

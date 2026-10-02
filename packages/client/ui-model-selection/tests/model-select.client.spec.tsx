@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ComponentProps } from 'react'
@@ -40,10 +40,22 @@ function state(overrides: Partial<ModelDirectoryState> = {}): ModelDirectoryStat
     }],
     failures: [],
     status: 'ready',
+    pending: null,
     error: null,
     ...overrides,
   }
 }
+
+const scrollIntoView = vi.fn()
+beforeEach(() => {
+  scrollIntoView.mockClear()
+  const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView')
+  Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, writable: true, value: scrollIntoView })
+  onTestFinished(() => {
+    if (descriptor === undefined) Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+    else Object.defineProperty(Element.prototype, 'scrollIntoView', descriptor)
+  })
+})
 
 afterEach(cleanup)
 
@@ -173,6 +185,65 @@ describe('ModelSelect reasoning effort', () => {
       })
       expect(trigger.getAttribute('aria-label')).toBe('选择模型，当前 DeepSeek-V4-Flash，推理等级 Max')
     })
+  })
+
+  it('spins on the trigger and the chosen model row until the selection settles, across pane changes', async () => {
+    const groups = [{
+      id: 'deepseek-official',
+      name: 'DeepSeek',
+      models: [
+        { id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', reasoning },
+        { id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro' },
+      ],
+    }]
+    const directory = createSnapshotStore<ModelDirectoryState>(state({ groups }))
+    let settle!: () => void
+    const select = vi.fn((selection: ModelSelection) => {
+      directory.set(state({ groups, status: 'selecting', pending: selection }))
+      return new Promise<boolean>((resolve) => {
+        settle = () => {
+          directory.set(state({ groups, current: selection }))
+          resolve(true)
+        }
+      })
+    })
+    render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
+    const spinners = () => document.querySelectorAll('[data-state="ongoing"]')
+
+    const trigger = screen.getByRole('button', { name: /选择模型|当前/ })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek-V4-Pro/ }))
+    expect(spinners()).toHaveLength(2)
+    expect(screen.getByRole('menuitemradio', { name: /DeepSeek-V4-Pro/ }).querySelector('[data-state="ongoing"]')).not.toBeNull()
+    expect(trigger.querySelector('[data-state="ongoing"]')).not.toBeNull()
+    expect(trigger.getAttribute('aria-busy')).toBe('true')
+
+    // Leaving the pane unmounts the row; the trigger keeps the feedback.
+    fireEvent.keyDown(trigger, { key: 'Escape' })
+    expect(screen.queryByRole('menuitemradio')).toBeNull()
+    expect(spinners()).toHaveLength(1)
+    expect(trigger.querySelector('[data-state="ongoing"]')).not.toBeNull()
+
+    await act(async () => { settle() })
+    expect(spinners()).toHaveLength(0)
+    expect(trigger.getAttribute('aria-busy')).toBe('false')
+  })
+
+  it('spins on the chosen effort row only', () => {
+    const directory = createSnapshotStore<ModelDirectoryState>(state())
+    const select = vi.fn((selection: ModelSelection) => {
+      directory.set(state({ status: 'selecting', pending: selection }))
+      return new Promise<boolean>(() => {})
+    })
+    render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /选择模型|当前/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Max/ }))
+    expect(screen.getAllByRole('menuitemradio')
+      .filter(row => row.querySelector('[data-state="ongoing"]') !== null)
+      .map(row => row.textContent)).toEqual(['Max'])
   })
 
   it('offers provider default only when the adapter does not configure a model default', () => {
@@ -434,6 +505,7 @@ describe('ModelSelect keyboard walk', () => {
   })
 
   it('keeps the card navigable when a pane has no rows, and leaves a retry its Tab', () => {
+    const load = vi.fn()
     const directory = createSnapshotStore<ModelDirectoryState>(state({
       groups: [], failures: [], status: 'error', error: 'catalog down',
     }))
@@ -441,7 +513,7 @@ describe('ModelSelect keyboard walk', () => {
       locked={false}
       available
       directory={directory}
-      load={vi.fn()}
+      load={load}
       select={vi.fn().mockResolvedValue(true)}
       t={t}
     />)
@@ -450,13 +522,18 @@ describe('ModelSelect keyboard walk', () => {
     trigger.focus()
     fireEvent.click(trigger)
     fireEvent.click(screen.getByRole('menuitem', { name: /^模型/ }))
+    // The search row stays hidden when there is nothing to filter.
+    expect(screen.queryByRole('searchbox')).toBeNull()
     // No rows to hand the keyboard to: the trigger keeps it, so the card's
     // keys still reach the menu.
     expect(document.activeElement).toBe(trigger)
 
     const retry = screen.getByRole('button', { name: '重试' })
-    expect(fireEvent.keyDown(trigger, { key: 'Tab' })).toBe(false)
-    expect(document.activeElement).toBe(retry)
+    expect(fireEvent.mouseDown(retry)).toBe(false)
+    fireEvent.click(retry)
+    // Mount, open, and the retry click each run one load.
+    expect(load).toHaveBeenCalledTimes(3)
+    retry.focus()
     // A control that is not a row keeps the browser's traversal.
     expect(fireEvent.keyDown(retry, { key: 'Tab' })).toBe(true)
     // Escape still backs out of the pane and then closes the card.
