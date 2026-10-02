@@ -2,6 +2,8 @@
 /** Recorded detail cards, conservative fallback, and standard row interactions. */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
 import type { ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconUserOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
@@ -23,6 +25,11 @@ function result(name: string, value: unknown, args = '{}'): ToolResultNode {
 }
 
 afterEach(cleanup)
+
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
 
 describe('detailsCardModel', () => {
   it('reads the recorded goal phase and activation, including blockers and absence', () => {
@@ -106,7 +113,7 @@ describe('DetailsRow', () => {
   it('expands fields with the keyboard and keeps Inspect and the details action available', () => {
     const inspect = vi.fn()
     const openDetails = vi.fn()
-    render(<DetailsRow {...{ toolName: 'get_goal', block: result('get_goal', { goal, activation: 'armed' }), inspect, openDetails, t } as Parameters<typeof DetailsRow>[0]} />)
+    render(<DetailsRow {...{ toolName: 'get_goal', block: result('get_goal', { goal, activation: 'armed' }), inspect, openDetails, t, useDisclosure } as Parameters<typeof DetailsRow>[0]} />)
     expect(screen.queryByText('Rounds')).toBeNull()
     fireEvent.keyDown(screen.getByRole('button', { expanded: false }), { key: 'Enter' })
     expect(screen.getByText('Rounds')).toBeTruthy()
@@ -121,7 +128,7 @@ describe('DetailsRow', () => {
   it('presents teammate-coordination tools under the teammate icon', () => {
     const inspect = vi.fn()
     const expectedIcon = render(<IconUserOutline16 size={14} />).container.querySelector('svg')!.outerHTML
-    const view = render(<DetailsRow {...{ toolName: 'wait_agent', block: result('wait_agent', { timedOut: true }), inspect, t } as Parameters<typeof DetailsRow>[0]} />)
+    const view = render(<DetailsRow {...{ toolName: 'wait_agent', block: result('wait_agent', { timedOut: true }), inspect, t, useDisclosure } as Parameters<typeof DetailsRow>[0]} />)
     expect(screen.getByText('Wait for subagent')).toBeTruthy()
     expect(view.container.querySelector('svg')?.outerHTML).toBe(expectedIcon)
   })

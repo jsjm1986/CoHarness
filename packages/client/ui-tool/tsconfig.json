@@ -21,6 +21,12 @@
       "path": "../../api/remotes/tsconfig.client.json"
     },
     {
+      "path": "../../interaction/user-questions"
+    },
+    {
+      "path": "../../util/workspace-path"
+    },
+    {
       "path": "../connection/tsconfig.client.json"
     },
     {

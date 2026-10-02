@@ -63,7 +63,7 @@ function summarize(argsRaw: string | null, t: TodoRowProps['t']): RowSummary | n
  *  Input/Output sections). Non-ok execution states keep the shared row's dot
  *  semantics — a cancelled call wrote no todo/write, so it must not read as a
  *  completed update. */
-export function TodoRow({ toolName, block, inspect, openDetails, useSession, t }: TodoRowProps) {
+export function TodoRow({ useDisclosure, toolName, block, inspect, openDetails, useSession, t }: TodoRowProps) {
   const baseline = useSession(snapshot => snapshot.views.get('tool-todo-history')?.get(block.callId))
   const hasMore = useSession(snapshot => snapshot.hasMore)
   const diff = useMemo(() => todoDiffModel(block, baseline, hasMore, t), [block, baseline, hasMore, t])
@@ -71,6 +71,7 @@ export function TodoRow({ toolName, block, inspect, openDetails, useSession, t }
   const summary = summarize(model.bodyRaw, t) ?? { text: model.summary, extra: 0 }
   return (
     <ToolRow
+      useDisclosure={useDisclosure}
       t={t}
       variant={model.variant}
       toolName={toolName}

@@ -1,10 +1,11 @@
 /** Root/subcall Tool composition with one keyed atomic dispatch path. */
 import { memo, useMemo, type ReactNode } from 'react'
-import type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ToolCallHookContext, ToolCallOwnerProps, ToolCallPhaseProps, ToolTreeProps,
 } from '../contract/slots.ts'
 import { toolRowModel } from './models/tool-call-model.ts'
+import { bindToolCallDisclosure } from './tool-call-disclosure.ts'
 import { GenericToolCard } from './toolviews/GenericToolCard.tsx'
 import css from './ToolCallTree.module.css'
 
@@ -37,10 +38,14 @@ const ToolCall = memo(function ToolCall({
   const hookContext = useMemo<ToolCallHookContext>(() => ({
     callId,
     assistant: preparing ? assistant : undefined,
+    disclosure: createSnapshotStore(false),
   }), [assistant, callId, preparing])
+  const useDisclosure = useMemo(
+    () => bindToolCallDisclosure(hookContext.disclosure), [hookContext])
   const owner: ToolCallOwnerProps = useMemo(() => ({
     callId,
     toolName,
+    useDisclosure,
     ...call,
     openFile,
     cwd,
@@ -49,7 +54,7 @@ const ToolCall = memo(function ToolCall({
     renderMessageImages,
     openDetails: openCallDetails === undefined ? undefined : () => { openCallDetails(callId) },
     inspect: () => { inspectCall(callId) },
-  }), [callId, toolName, call, openFile, cwd, home, nested, renderMessageImages, openCallDetails, inspectCall])
+  }), [callId, toolName, useDisclosure, call, openFile, cwd, home, nested, renderMessageImages, openCallDetails, inspectCall])
   // An Auto-review denial is the call's whole story: route it through the
   // generic row so a keyed toolview cannot hide the denial behind its own card.
   const autoReviewDenied = useMemo(

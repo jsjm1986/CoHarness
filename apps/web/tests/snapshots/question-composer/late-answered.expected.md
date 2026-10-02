@@ -1,0 +1,66 @@
+- banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - navigation "Session hierarchy":
+    - button "Use the ask_user_question tool to" [disabled]
+  - button "Session log":
+    - text: Session log
+    - img
+  - button "Open right sidebar":
+    - img
+- navigation "Turn navigation":
+  - button "Jump to turn 1"
+  - button "Jump to turn 2"
+- button "1 tool call · 1 intermediate message" [expanded]:
+  - text: 1 tool call · 1 intermediate message
+  - img
+- text: "Use the ask_user_question tool to ask me exactly one multi-select question with id \"color\", question \"Which color do you prefer?\", header \"Pick one\", and two options: label \"Blue\" with description \"A cool recessive hue that reads as calm and trustworthy in long reading sessions and dense dashboards.\", and label \"Green\" with description \"A restful mid-spectrum hue with the highest perceived brightness, easiest on the eye over long sessions.\" Set multi_select to true. After I answer, reply with the single word DONE and stop."
+- group "Message timing": "{{clock}}"
+- button "Copy":
+  - img
+- button "Think The user wants me to use the ask_user_question tool with specific parameters. Let me do exactly that.":
+  - img
+  - img
+  - text: Think The user wants me to use the ask_user_question tool with specific parameters. Let me do exactly that.
+- button "Ask question 1/1 answered View answers" [expanded]:
+  - img
+  - text: Ask question 1/1 answered
+  - button "View answers":
+    - img
+    - text: View answers
+- term: Which color do you prefer?
+- definition: Green Answered after the timeout
+- button "Inspect"
+- button "Process details" [expanded]:
+  - text: Process details
+  - img
+- button "Context injection user-question-reply":
+  - img
+  - img
+  - text: Context injection user-question-reply
+- group "Reply to earlier pending questions":
+  - button "Reply to earlier pending questions · Open question details": Reply to earlier pending questions Green, Answered after the timeout
+  - text: "{{clock}}"
+  - button "Copy":
+    - img
+- region "Which color do you prefer?":
+  - text: Pick one
+  - heading "Which color do you prefer?" [level=2]
+  - text: Answered
+  - button "Collapse the question card" [expanded]:
+    - img
+  - button "Close the panel — reopen it from the tool call":
+    - img
+  - group:
+    - checkbox "Blue" [disabled]: Blue A cool recessive hue that reads as calm and trustworthy in long reading sessions and dense dashboards.
+    - checkbox "Green" [checked] [disabled]: Green A restful mid-spectrum hue with the highest perceived brightness, easiest on the eye over long sessions.
+    - textbox "Type your answer" [disabled]: Answered after the timeout
+  - button "Previous question" [disabled]:
+    - img
+  - text: 1 / 1
+  - button "Next question" [disabled]:
+    - img
+  - status
+- separator "Adjust transcript content width"
+- separator "Adjust transcript content width"

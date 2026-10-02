@@ -7,7 +7,7 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
   CommandNode, CompactionSummaryNode, ConversationSnapshot, ConversationTurnDataMap,
-  ObservableSnapshot, PendingInteraction, PendingWait, SessionId, ToolCallBlock,
+  ObservableSnapshot, PendingWait, SessionId, SessionPendingEntry, ToolCallBlock,
   TurnLocation, WorkspaceId,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationViewportSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
@@ -741,7 +741,7 @@ export type ComposerBarProps =
 export interface ComposerChainProps {
   /** Whether this pane may request automatic input focus. */
   active?: boolean
-  interactions: readonly PendingInteraction[]
+  interactions: readonly SessionPendingEntry[]
   /** Current conversation facts for feature-owned takeover selectors. */
   session: ConversationSnapshot | undefined
 }

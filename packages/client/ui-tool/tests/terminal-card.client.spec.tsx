@@ -5,6 +5,7 @@
 // and the details panel's Output section.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
@@ -29,6 +30,7 @@ import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-conversation/src/client
 import { BashRow } from '../src/client/tool/toolviews/bash-sample.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
 
 type BashRowProps = Parameters<typeof BashRow>[0]
 
@@ -36,6 +38,11 @@ type BashRowProps = Parameters<typeof BashRow>[0]
 const t: GenericToolCardProps['t'] = makeTranslate(zh, commonZh)
 
 afterEach(cleanup)
+
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
 
 /**
  * Match an output line with its interior whitespace intact: the column
@@ -300,7 +307,7 @@ describe('terminalCardModel', () => {
 
 describe('chat row terminal body', () => {
   const ownerProps = (block: StartedToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName: 'bash', openFile: vi.fn(), t,
+    callId: 'c1', toolName: 'bash', openFile: vi.fn(), t, useDisclosure,
     ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
   })
 

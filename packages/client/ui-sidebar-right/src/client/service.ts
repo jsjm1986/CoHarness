@@ -108,6 +108,8 @@ export interface SidebarRightHost {
  * @param tabs - registered tab types.
  * @param pin - resource retention for an occurrence's lifetime.
  * @param host - the viewport rule and focus continuity the commands use.
+ * @param options - `discoverSaved` scans existing surfaces on adopt; `validateResource` rejects a restored resource the session no
+ *   longer owns.
  * @returns the controller; store adoption and scope removal; naming the on-screen Session; and recording a seat's room rule.
  */
 export function createSidebarRightController(
@@ -126,7 +128,9 @@ export function createSidebarRightController(
   const rooms = new Map<SessionId, RoomRule>()
   const onScreen = createSnapshotStore<SessionId | undefined>(undefined)
   const inventory = new SidebarTabInventory(options.discoverSaved)
-  const controller = new SidebarRightController(tabs, pin, host, { adopted, rooms, onScreen, openTabs: inventory.source, validateResource: options.validateResource })
+  const controller = new SidebarRightController(tabs, pin, host, {
+    adopted, rooms, onScreen, openTabs: inventory.source, validateResource: options.validateResource,
+  })
   return {
     controller,
     forget: (sessionId) => {

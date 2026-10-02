@@ -41,7 +41,7 @@ The session header renders the session-scoped `'conversation.session.header.acti
 interface ComposerChainProps {
   /** Whether this pane may request automatic input focus. */
   active?: boolean
-  interactions: readonly PendingInteraction[]
+  interactions: readonly SessionPendingEntry[]
   /** Current conversation facts for feature-owned takeover selectors. */
   session: ConversationSnapshot | undefined
 }

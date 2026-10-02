@@ -15,7 +15,7 @@ import type {
   RpcError, RpcId, SessionId, SubagentAddress, ToolCallView, ToolResultView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
-import type { PendingInteraction } from './pending.ts'
+import type { SessionPendingEntry } from './pending.ts'
 import type { ContextProducerView, KnownContextForm } from './context-producer.ts'
 import type {
   ChatConversationViewNode, ConversationTimelineSnapshot, ConversationViewSnapshotStore,
@@ -610,7 +610,7 @@ export interface ConversationSnapshot {
   openTurn: number | undefined
   partial: PartialAssistant | null
   runningCalls: readonly RunningToolCall[]
-  pending: readonly PendingInteraction[]
+  pending: readonly SessionPendingEntry[]
   /** Local prompt-submission echoes not yet observed as durable events or queue occurrences. */
   pendingSubmissions?: readonly PendingSubmission[]
   /** Authoritative transient inbox snapshot, including queued and steering placements. */

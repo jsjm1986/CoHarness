@@ -154,14 +154,6 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
   }
 
   /**
-   * Resolve the per-session popup controller (lazy; dies with the session
-   * scope). The controller's consume callback dispatches the scoped
-   * consume-token event back to this session; focusComposer reaches the
-   * composer through the overlay slot currency.
-   * @param actx - session-scope ctx.
-   * @returns the resident controller.
-   */
-  /**
    * Close every open popup for a command whose options have become stale.
    * Pending loads and confirmations lose their binding; drafts stay intact.
    * @param name - command name without the leading slash.
@@ -175,6 +167,14 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     }
   }
 
+  /**
+   * Resolve the per-session popup controller (lazy; dies with the session
+   * scope). The controller's consume callback dispatches the scoped
+   * consume-token event back to this session; focusComposer reaches the
+   * composer through the overlay slot currency.
+   * @param actx - session-scope ctx.
+   * @returns the resident controller.
+   */
   popupFor(actx: ClientContext): PopupSelectController<ClientSessionContext> {
     const sessions = this.sessions()
     const id = sessions.scopeOf(actx)

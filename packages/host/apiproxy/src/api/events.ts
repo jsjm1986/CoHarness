@@ -149,8 +149,8 @@ export type MuxFrame =
   }
   | { type: 'approval/requested'; sessionId: SessionId; approvalId: ApprovalRequestId; toolName: string; callId?: ToolCallId; reason?: string }
   | { type: 'approval/resolved'; sessionId: SessionId; approvalId: ApprovalRequestId; outcome: ApprovalOutcome }
-  | { type: 'question/requested'; sessionId: SessionId; questions: AskUserQuestionItem[] }
-  | { type: 'question/resolved'; sessionId: SessionId; questionRpcId: RpcId; outcome: 'answered' | 'cancelled' }
+  | { type: 'question/requested'; sessionId: SessionId; questions: AskUserQuestionItem[]; wait?: { callId: ToolCallId; timed?: boolean } }
+  | { type: 'question/resolved'; sessionId: SessionId; questionRpcId: RpcId; outcome: 'answered' | 'cancelled' | 'pending' }
   /**
    * Complete transient inbox state after every enqueue, mutation, claim, or
    * discard. Pending work is not model-visible and therefore has no durable

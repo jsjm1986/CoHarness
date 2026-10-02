@@ -9,6 +9,7 @@
 // collapsed by default and appears only once the whole row is expanded.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
@@ -30,6 +31,7 @@ import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
 
 afterEach(cleanup)
 
@@ -126,8 +128,12 @@ describe('webCardModel', () => {
 })
 
 describe('chat row web body', () => {
+  const useDisclosure: UseDisclosure = () => {
+    const [expanded, setExpanded] = useState(false)
+    return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+  }
   const ownerProps = (block: StartedToolCall | ToolResultNode, toolName: string): ToolCallOwnerProps => ({
-    callId: block.callId, toolName, openFile: vi.fn(),
+    callId: block.callId, toolName, openFile: vi.fn(), useDisclosure,
     ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
   })
   // WebRow reads only toolName/block off the full runtime share plus the locale

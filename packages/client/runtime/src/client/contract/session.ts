@@ -15,6 +15,7 @@ import type {
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { ChatSnapshot, ConversationSnapshot } from '../sessions/conversation.ts'
 import type { PendingSubmissionImage, PendingSubmissionPlacement } from '../sessions/conversation.ts'
+import type { SessionPublishedInteraction } from '../sessions/pending.ts'
 import type { ObservableSnapshot } from './store.ts'
 
 /** Why a local submission echo retired from the session snapshot. */
@@ -55,6 +56,15 @@ export interface ProjectionsFace {
 
 /** Identity plus the behavior verbs features may invoke on a session. */
 export interface ISession {
+  /**
+   * Publish a plugin-owned interaction carrier into the pending feed the
+   * composer chain reads. The carrier owns its own settlement channel; this
+   * seat only carries it to presentation. Republishing the same `key` replaces
+   * the earlier entry.
+   * @param entry - the publisher's carrier (`kind`/`key`/`sessionId` at minimum).
+   * @returns withdrawal for the publisher's hide or dispose path.
+   */
+  publishInteraction(entry: SessionPublishedInteraction): () => void
   /** Browser resource identity; pooled Sessions qualify the original Host ID with its runtime. */
   readonly sessionId: SessionId
   /** Host-computed projection values by key (the useProjection seat). */

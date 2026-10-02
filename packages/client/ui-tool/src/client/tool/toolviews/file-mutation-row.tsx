@@ -40,7 +40,7 @@ export function FileMutationRow(props: FileMutationRowProps) {
 
 /** Preparation phase: the streamed argument prefix sizes the summary copy. */
 function PreparingFileMutationRow({
-  toolName, useToolCallArgumentsPartial, t,
+  toolName, useToolCallArgumentsPartial, t, useDisclosure,
 }: Extract<FileMutationRowProps, { phase: 'preparing' }>) {
   const raw = useToolCallArgumentsPartial()
   return (
@@ -50,15 +50,17 @@ function PreparingFileMutationRow({
       title={t(toolTitleKey(toolName))}
       summary={t('tool.preparing.content', { kilobytes: Math.ceil(raw.length / 1024) })}
       t={t}
+      useDisclosure={useDisclosure}
     />
   )
 }
 
-function StartedFileMutationRow({ toolName, block, cwd, home, openFile, inspect, openDetails, t }: Exclude<FileMutationRowProps, { phase: 'preparing' }>) {
+function StartedFileMutationRow({ useDisclosure, toolName, block, cwd, home, openFile, inspect, openDetails, t }: Exclude<FileMutationRowProps, { phase: 'preparing' }>) {
   const model = toolRowModel(toolName, block, cwd, home)
   const diff = diffCardModel(block)
   return (
     <ToolRow
+      useDisclosure={useDisclosure}
       t={t}
       variant={model.variant}
       toolName={toolName}

@@ -43,7 +43,7 @@ function detailIcon(toolName: string) {
  * @param props - Tool call, row actions, and locale supplied by the keyed slot.
  * @returns A Tool row with structured details or generic input/output.
  */
-export function DetailsRow({ toolName, block, cwd, home, openFile, inspect, openDetails, t }: DetailsRowProps) {
+export function DetailsRow({ useDisclosure, toolName, block, cwd, home, openFile, inspect, openDetails, t }: DetailsRowProps) {
   const model = toolRowModel(toolName, block, cwd, home)
   const locale = document.documentElement.lang
   const details = useMemo(() => detailsCardModel(block, t, locale), [block, t, locale])
@@ -53,6 +53,7 @@ export function DetailsRow({ toolName, block, cwd, home, openFile, inspect, open
     : model.titleKey
   return (
     <ToolRow
+      useDisclosure={useDisclosure}
       t={t}
       variant={model.variant}
       toolName={toolName}

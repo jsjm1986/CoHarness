@@ -2,6 +2,8 @@
 /** todo_write atomic Tool presentation and its plan-summary model. */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
 import type { ConversationSnapshot, TodoItem, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
@@ -29,6 +31,11 @@ const PARALLEL: TodoItem[] = [
   { content: '读源码', status: 'in_progress' },
   { content: '补测试', status: 'pending' },
 ]
+
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
 
 describe('planSummary', () => {
   it('counts done/total and names the single active item with no extra count', () => {
@@ -75,7 +82,7 @@ function rowProps(block: unknown): TodoRowProps {
     sessionId: 's1',
     useSessions: () => undefined,
     useSession: ((selector: (value: ConversationSnapshot) => unknown) => selector(snapshot)) as TodoRowProps['useSession'],
-    t,
+    t, useDisclosure,
   } as unknown as TodoRowProps
 }
 

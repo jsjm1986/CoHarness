@@ -5,7 +5,7 @@
 
 [English](event-producer-consumer.md) | 中文
 
-本矩阵展示哪些包会派发各个已声明事件，以及哪些包会监听这些事件。事件之间存在多对多关系，因此密集的关系数据以表格而非一张大型关系图呈现。接收方和事件名称类型还涵盖有意绕过 `ctx.emit` 的内含派发位置，例如 subagent 生命周期封装。官方 `cordis/*` 兼容事件可以来自仓库外加载的插件，因此其派发方行会标明这个外部来源。
+本矩阵展示哪些包会派发各个 harness 自有事件，以及哪些包会监听这些事件。事件之间存在多对多关系，因此密集的关系数据以表格而非一张大型关系图呈现。接收方和事件名称类型还涵盖有意绕过 `ctx.emit` 的内含派发位置，例如 subagent 生命周期封装。
 
 <!-- BEGIN GENERATED event-producer-consumer:events -->
 | Event | Mode | Declared in | Dispatchers | Listeners |
@@ -84,7 +84,7 @@
 | `tools/result` | `emit` | [`packages/core/tools/src/index.ts:198`](../packages/core/tools/src/index.ts) | [`tools`](../packages/core/tools) (`events.dispatch`) | [`agent-instructions`](../packages/context/agent-instructions), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver), [`tool-present`](../packages/deliverables/tool-present) |
 | `typert-gateway/authorize` | `serial` | [`packages/typert/protocol/src/types.ts:616`](../packages/typert/protocol/src/types.ts) | `gateway` (`serial`) | `apiproxy` |
 | `typert-gateway/invoke` | `waterfall` | [`packages/typert/protocol/src/types.ts:609`](../packages/typert/protocol/src/types.ts) | `gateway` (`waterfall`) | `apiproxy` |
-| `user-questions/request` | `waterfall` | [`packages/interaction/user-questions/src/types.ts:88`](../packages/interaction/user-questions/src/types.ts) | [`user-questions`](../packages/interaction/user-questions) (`waterfall`) | `apiproxy` |
+| `user-questions/request` | `waterfall` | [`packages/interaction/user-questions/src/types.ts:160`](../packages/interaction/user-questions/src/types.ts) | [`user-questions`](../packages/interaction/user-questions) (`waterfall`) | `apiproxy` |
 | `webserver/index-inject` | `emit` | [`packages/host/webserver/src/index.ts:34`](../packages/host/webserver/src/index.ts) | `webserver` (`emit`) | `connection`, `modules`, `shortcuts` |
 | `workflow/agent-end` | `emit` | [`packages/workflow/workflow/src/index.ts:79`](../packages/workflow/workflow/src/index.ts) | [`workflow`](../packages/workflow/workflow) (`events.dispatch`) | [`tool-workflow`](../packages/workflow/tool-workflow), [`workflow`](../packages/workflow/workflow) |
 | `workflow/agent-start` | `emit` | [`packages/workflow/workflow/src/index.ts:68`](../packages/workflow/workflow/src/index.ts) | [`workflow`](../packages/workflow/workflow) (`events.dispatch`) | [`tool-workflow`](../packages/workflow/tool-workflow), [`workflow`](../packages/workflow/workflow) |
@@ -98,7 +98,7 @@
 | `workspace/session-stop` | `parallel` | [`packages/workspace/workspace/src/index.ts:170`](../packages/workspace/workspace/src/index.ts) | [`workspace`](../packages/workspace/workspace) (`parallel`) | [`jobs`](../packages/jobs/jobs), [`schedule`](../packages/schedule/schedule), [`subagent`](../packages/subagent/subagent), [`workspace`](../packages/workspace/workspace) |
 <!-- END GENERATED event-producer-consumer:events -->
 
-## 包源码中出现的非 harness 或未声明事件字符串
+## Non-harness or undeclared event strings seen in package source
 
 <!-- BEGIN GENERATED event-producer-consumer:undeclared -->
 | Event string | Dispatchers | Listeners |
@@ -113,4 +113,4 @@
 | `loader/volatile-update` | - | [`llm-deepseek`](../packages/llm/llm-deepseek) |
 <!-- END GENERATED event-producer-consumer:undeclared -->
 
-维护模式：生成内容。Cordis 事件声明及生产方／监听方的关系边由仓库的 TypeScript Program 解析。
+Maintenance mode: generated: Cordis event declarations and producer/listener edges are resolved from the repository TypeScript Program.

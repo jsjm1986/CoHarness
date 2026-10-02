@@ -84,7 +84,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'layout',
     summary: 'The outward layout face (`ctx.layout`): the panel transitions other plugins may trigger — and exactly what a test fake must supply.',
-    description: 'The outward layout face (`ctx.layout`): the panel transitions other plugins may trigger — and exactly what a test fake must supply.',
+    description: 'The outward layout face (`ctx.layout`): the panel transitions other plugins may trigger — and exactly what a test fake must supply. The attachPanels wiring hook stays on the concrete class (root-entry assembly only).',
     methods: [
       {
         signature: 'toggleSidebar(): void',
@@ -548,7 +548,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ConversationSnapshot',
-    declaration: 'export interface ConversationSnapshot {\n    sessionId: SessionId;\n    views: ConversationViewSnapshotStore;\n    chat: ChatSnapshot;\n    nodes: readonly ConversationNode[];\n    turnTimings: ReadonlyMap<number, {\n        readonly startTime: number;\n        readonly endTime?: number;\n    }>;\n    turnEnds: ReadonlyMap<number, number>;\n    openTurn: number | undefined;\n    partial: PartialAssistant | null;\n    runningCalls: readonly RunningToolCall[];\n    pending: readonly PendingInteraction[];\n    pendingSubmissions?: readonly PendingSubmission[];\n    queue: readonly QueuedMessage[];\n    running: boolean;\n    subagent: {\n        address: SubagentAddress;\n        parentAvailable: boolean;\n    } | null;\n    composerPhase: ComposerPhase;\n    removed: boolean;\n    openState: OpenState;\n    openError: RpcError | null;\n    hasMore: boolean;\n    loadingOlder: boolean;\n    historyWindowMode: HistoryWindowMode;\n    historyDetail: HistoryDetailState;\n    historyNavigation?: HistoryNavigationSnapshot;\n    promptError: PromptError | null;\n    blank: boolean;\n    lastAgentError: string | null;\n}',
+    declaration: 'export interface ConversationSnapshot {\n    sessionId: SessionId;\n    views: ConversationViewSnapshotStore;\n    chat: ChatSnapshot;\n    nodes: readonly ConversationNode[];\n    turnTimings: ReadonlyMap<number, {\n        readonly startTime: number;\n        readonly endTime?: number;\n    }>;\n    turnEnds: ReadonlyMap<number, number>;\n    openTurn: number | undefined;\n    partial: PartialAssistant | null;\n    runningCalls: readonly RunningToolCall[];\n    pending: readonly SessionPendingEntry[];\n    pendingSubmissions?: readonly PendingSubmission[];\n    queue: readonly QueuedMessage[];\n    running: boolean;\n    subagent: {\n        address: SubagentAddress;\n        parentAvailable: boolean;\n    } | null;\n    composerPhase: ComposerPhase;\n    removed: boolean;\n    openState: OpenState;\n    openError: RpcError | null;\n    hasMore: boolean;\n    loadingOlder: boolean;\n    historyWindowMode: HistoryWindowMode;\n    historyDetail: HistoryDetailState;\n    historyNavigation?: HistoryNavigationSnapshot;\n    promptError: PromptError | null;\n    blank: boolean;\n    lastAgentError: string | null;\n}',
   },
   {
     name: 'ConversationStepDataMap',
@@ -636,7 +636,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ISession',
-    declaration: 'export interface ISession {\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    readCallHistory(callId: ToolCallId, signal?: AbortSignal): Promise<ChatSnapshot>;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
+    declaration: 'export interface ISession {\n    publishInteraction(entry: SessionPublishedInteraction): () => void;\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    readCallHistory(callId: ToolCallId, signal?: AbortSignal): Promise<ChatSnapshot>;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
   },
   {
     name: 'KeyedHooksSources',
@@ -847,8 +847,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionMaybeStandardProps {\n}',
   },
   {
+    name: 'SessionPendingEntry',
+    declaration: 'export type SessionPendingEntry = PendingInteraction | SessionPublishedInteraction;',
+  },
+  {
     name: 'SessionProviderComponent',
     declaration: 'export type SessionProviderComponent = (props: SessionAreaProps) => ReactNode;',
+  },
+  {
+    name: 'SessionPublishedInteraction',
+    declaration: 'export interface SessionPublishedInteraction {\n    readonly kind: string;\n    readonly key: string;\n    readonly sessionId: SessionId;\n}',
   },
   {
     name: 'SessionSearchResultItem',

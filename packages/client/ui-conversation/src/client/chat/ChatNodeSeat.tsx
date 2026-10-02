@@ -6,6 +6,8 @@ import css from './ChatView.module.css'
 
 interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly nodeKey: string
+  /** Mounted but collapsed behind the turn's process toggle. */
+  readonly folded?: boolean
   readonly useSession: ChatViewSlotProps['useSession']
   readonly renderSlot: ChatViewSlotProps['renderSlot']
   readonly t: ChatViewSlotProps['t']
@@ -17,7 +19,7 @@ type RoutedChatNodeOwner = {
 
 /** Subscribe and dispatch one stable Context key without observing sibling Nodes. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
-  nodeKey, selectedCallId, cwd, openFile, openCallDetails, inspectCall, forkAt,
+  nodeKey, folded, selectedCallId, cwd, openFile, openCallDetails, inspectCall, forkAt,
   renderMessageImages, fileMentions, turnProcess, useSession, renderSlot, t,
 }: ChatNodeSeatProps) {
   const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey))
@@ -45,6 +47,8 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   return (
     <div
       className={css.flowItem}
+      hidden={folded === true ? true : undefined}
+      data-turn-process-member={folded === true ? true : undefined}
       data-chat-anchor-key={routedNode.key}
       data-chat-flow-key={routedNode.key}
       data-chat-flow-kind={routedNode.kind}

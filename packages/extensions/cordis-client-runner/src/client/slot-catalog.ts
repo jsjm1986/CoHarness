@@ -227,7 +227,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'useInput: SnapshotSelectorHook<InputState>',
       'inputActions: InputActions',
     ],
-    keyDomain: 'fixed by the owner\'s key table { [Kind in ChatNodeKind]: { node: ChatNode<Kind> } }, already taken: assistant-step, command, command-input, compaction, context, manual-compaction, model-retry, steering, system-prompt, tool-call, turn-error, turn-max-tokens, turn-process, turn-tail, unknown, user, workflow-run',
+    keyDomain: 'fixed by the owner\'s key table { [Kind in ChatNodeKind]: { node: ChatNode<Kind> } }, already taken: assistant-step, command, command-input, compaction, context, manual-compaction, model-retry, question-reply, steering, system-prompt, tool-call, turn-error, turn-max-tokens, turn-process, turn-tail, unknown, user, workflow-run',
     hookContext: 'string',
     slotInject: 'ChatNodeTurnDataInjected',
     declaredBy: 'an entry in \'conversation.view\' (client-ui-conversation), so it exists while that entry is mounted',
@@ -248,6 +248,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-conversation UnknownNodeView key \'unknown\'',
       'client-ui-goal GoalCommandInputView key \'command-input\'',
       'client-ui-tool ToolCallTree key \'tool-call\'',
+      'client-ui-user-questions QuestionReplyView key \'question-reply\'',
       'client-ui-workflow-run WorkflowRunPanel key \'workflow-run\'',
     ],
     replaceRisk: 'shadows-shipped-ui',
@@ -310,11 +311,11 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/**\n * Composer chain currency: what ConversationRoot dispatches at its\n * renderSlotChain site. The owner declares the currency only — never a\n * per-entry contract; takeover packages narrow it in their own selectors\n * (`interactions.find(i => i.kind === ...)`), so new takeover kinds register\n * with zero owner changes.\n */\nexport interface ComposerChainProps {\n  /** Whether this pane may request automatic input focus. */\n  active?: boolean\n  interactions: readonly PendingInteraction[]\n  /** Current conversation facts for feature-owned takeover selectors. */\n  session: ConversationSnapshot | undefined\n}',
+      '/**\n * Composer chain currency: what ConversationRoot dispatches at its\n * renderSlotChain site. The owner declares the currency only — never a\n * per-entry contract; takeover packages narrow it in their own selectors\n * (`interactions.find(i => i.kind === ...)`), so new takeover kinds register\n * with zero owner changes.\n */\nexport interface ComposerChainProps {\n  /** Whether this pane may request automatic input focus. */\n  active?: boolean\n  interactions: readonly SessionPendingEntry[]\n  /** Current conversation facts for feature-owned takeover selectors. */\n  session: ConversationSnapshot | undefined\n}',
     ],
     ownerPropsReferences: [
       'ConversationSnapshot',
-      'PendingInteraction',
+      'SessionPendingEntry',
     ],
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
@@ -971,6 +972,54 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.pane\', () => ctx.slots.register(\n      { name: \'conversation.pane\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
     source: 'packages/client/ui-conversation/src/client/contract/slots.ts:97',
+  },
+  {
+    key: 'conversation.plan-review.actions',
+    kind: 'list',
+    scope: 'session',
+    summary: 'Actions for the exact plan under review; approval remains with the question composer.',
+    doc: 'Actions for the exact plan under review; approval remains with the question composer.',
+    registerOptions: [
+      {
+        name: 'id',
+        requirement: 'required',
+        type: 'string',
+        doc: 'Your cell key. Use an id of your own: a fresh id is added beside the shipped entries, while reusing a shipped id puts you in THAT cell and replaces it. Owners that filter by id address you by it.',
+      },
+      {
+        name: 'order',
+        requirement: 'optional',
+        type: 'number',
+        doc: 'Position among the entries, ascending (default 0).',
+      },
+      {
+        name: 'label',
+        requirement: 'optional',
+        type: 'string | (() => string)',
+        doc: 'Display text where the owner projects one (nav rows, tabs). A thunk is re-read on every projection, so localized text follows the active locale without re-registering.',
+      },
+    ],
+    ownerProps: [
+      '/**\n * A request narrowed to the `plan-review` presentation intent: everything the\n * decision card renders and answers with, so the panel never re-reads the\n * request fields. `approve` and `decline` are the asker\'s own options — an\n * answer must carry one of those labels verbatim — and `plan` is the markdown\n * body under review.\n */\nexport interface PlanReview {\n  /** The reviewed question\'s id, echoed in the answer. */\n  id: string\n  /** The question text, kept as the card\'s accessible name. */\n  question: string\n  /** The plan markdown under review. */\n  plan: string\n  /** Logged tool invocation used to reopen this plan. */\n  callId?: ToolCallId\n  /** The option that approves the plan. */\n  approve: QuestionOption\n  /** The option that declines it; absent when the asker offered no other option. */\n  decline?: QuestionOption\n}',
+    ],
+    ownerPropsReferences: [],
+    standardProps: [
+      'useSessions: SnapshotSelectorHook<SessionListState>',
+      'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
+      'useSession: SnapshotSelectorHook<ConversationSnapshot>',
+      'sessionId: SessionId',
+      'useProjection: UseProjection',
+      'useInput: SnapshotSelectorHook<InputState>',
+      'inputActions: InputActions',
+    ],
+    keyDomain: '',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'conversation.composer\' (client-ui-user-questions), so it exists while that entry is mounted',
+    occupants: [],
+    replaceRisk: 'none',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.plan-review.actions\', () => ctx.slots.register(\n      { name: \'conversation.plan-review.actions\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-user-questions/src/client/contract/slots.ts:14',
   },
   {
     key: 'conversation.session',
@@ -2511,7 +2560,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     kind: 'keyed',
     scope: 'session',
     summary: 'Keyed atomic Tool call view, dispatched by the wire Tool name.',
-    doc: 'Keyed atomic Tool call view, dispatched by the wire Tool name. Register\nwith `key: \'<tool name>\'` to own how one tool\'s calls render inside a\nturn — the key domain is open, so there is no compile-time key set to\npick from and a typo simply never renders.\n\nRegistering an occupied key replaces its view; unclaimed keys use the\ngeneric tool row. The owner passes the call\'s identity, its frozen\nlifecycle stage through explicit phase props, and the expansion state\n(see ToolCallOwnerProps). Preparing blocks carry no dispatched\narguments; useToolCallArgumentsPartial optionally subscribes to their\nraw prefix.',
+    doc: 'Keyed atomic Tool call view, dispatched by the wire Tool name. Register\nwith `key: \'<tool name>\'` to own how one tool\'s calls render inside a\nturn; the key domain is open, so a typo simply never renders.\n\nRegistering an occupied key replaces its view; unclaimed keys use the\ngeneric tool row. The owner passes the call\'s identity, frozen lifecycle\nstage, and expansion state (see ToolCallOwnerProps); preparing blocks\ncarry no dispatched arguments.',
     registerOptions: [
       {
         name: 'key',
@@ -2521,7 +2570,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/** Standard owner currency supplied to every atomic Tool view. */\nexport interface ToolCallCommonProps {\n  /** Tool call identity, stable across running and settled forms. */\n  callId: string\n  /** Wire Tool name and keyed dispatch value. */\n  toolName: string\n  /** Session workspace root for relative summaries. */\n  cwd?: string | undefined\n  /** Host account home; POSIX home-rooted summaries display as `~`. */\n  home?: string | undefined\n  /** Open an argument path at its optional requested line through the Host. */\n  openFile: (path: string, options?: { line?: number }) => void\n  /**\n   * Whether this call is a run_code sub-dispatch: nested calls persist no\n   * presentationMeta and no wire views, so the owner carries the fact (the\n   * node has no parent link).\n   */\n  nested?: boolean | undefined\n  /**\n   * Slot-backed image gallery renderer from the owning chat node; an absent\n   * renderer keeps an image card\'s envelope text beside an empty gallery position.\n   */\n  renderMessageImages?: RenderMessageImages | undefined\n  /** Open this exact call in an auxiliary detail tab. */\n  openDetails?: (() => void) | undefined\n  /** Inspect this call in the trajectory view when availa /* …truncated — full shape in source */',
+      '/** Standard owner currency supplied to every atomic Tool view. */\nexport interface ToolCallCommonProps {\n  /**\n   * Stable Hook; each invocation owns its open state bound to this call\'s\n   * disclosure cell, so the generic and question rows share expansion.\n   */\n  useDisclosure: UseDisclosure\n  /** Tool call identity, stable across running and settled forms. */\n  callId: string\n  /** Wire Tool name and keyed dispatch value. */\n  toolName: string\n  /** Session workspace root for relative summaries. */\n  cwd?: string | undefined\n  /** Host account home; POSIX home-rooted summaries display as `~`. */\n  home?: string | undefined\n  /** Open an argument path at its optional requested line through the Host. */\n  openFile: (path: string, options?: { line?: number }) => void\n  /**\n   * Whether this call is a run_code sub-dispatch: nested calls persist no\n   * presentationMeta and no wire views, so the owner carries the fact (the\n   * node has no parent link).\n   */\n  nested?: boolean | undefined\n  /**\n   * Slot-backed image gallery renderer from the owning chat node; an absent\n   * renderer keeps an image card\'s envelope text beside an empty gallery position.\n   */\n  renderMessageImages?: /* …truncated — full shape in source */',
       '/** Common owner callbacks and the data admitted at the current tool stage. */\nexport type ToolCallOwnerProps = ToolCallCommonProps & ToolCallPhaseProps',
       '/** Stage-specific tool data; only start/result expose the dispatched call material. */\nexport type ToolCallPhaseProps =\n  | { readonly phase: \'preparing\'; readonly block: PreparingToolCall }\n  | { readonly phase: \'start\'; readonly block: StartedToolCall }\n  | { readonly phase: \'result\'; readonly block: ToolResultNode }',
     ],
@@ -2530,6 +2579,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'RenderMessageImages',
       'StartedToolCall',
       'ToolResultNode',
+      'UseDisclosure',
       'Wire',
     ],
     standardProps: [
@@ -2603,7 +2653,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'tool.call.toolview\', () => ctx.slots.register(\n      { name: \'tool.call.toolview\', key: \'<one key the owner dispatches>\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-tool/src/client/contract/slots.ts:29',
+    source: 'packages/client/ui-tool/src/client/contract/slots.ts:27',
   },
   {
     key: 'tool.view.cordis',

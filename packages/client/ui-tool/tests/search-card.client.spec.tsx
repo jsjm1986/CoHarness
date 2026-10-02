@@ -7,6 +7,7 @@
 // both grep and glob is pinned here too.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
@@ -27,11 +28,17 @@ import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/t
 import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
 import { SearchRow, searchToolview } from '../src/client/tool/toolviews/search-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
 
 /** SearchRow now composes ToolRow, so its props include the locale `t` seat. */
 type SearchRowProps = Parameters<typeof SearchRow>[0]
 
 afterEach(cleanup)
+
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
 
 /** Conversation-locale translate stub for the render sites' `t` seat. */
 const t: GenericToolCardProps['t'] = makeTranslate(zh, commonZh)
@@ -187,7 +194,7 @@ describe('searchCardModel', () => {
 
 describe('chat row search body (GenericToolCard fallback)', () => {
   const ownerProps = (block: StartedToolCall | ToolResultNode, toolName: string): GenericToolCardProps => ({
-    callId: 'c1', toolName, openFile: vi.fn(), t,
+    callId: 'c1', toolName, openFile: vi.fn(), t, useDisclosure,
     ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
   })
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -239,6 +246,7 @@ describe('chat row search body (GenericToolCard fallback)', () => {
 describe('SearchRow keyed card', () => {
   const rowProps = (block: RunningToolCall | ToolResultNode, toolName: string): SearchRowProps => ({
     callId: 'c1', toolName, block, openFile: vi.fn(), sessionId: SID, t,
+    useDisclosure,
   } as unknown as SearchRowProps)
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */

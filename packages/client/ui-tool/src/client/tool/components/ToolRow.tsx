@@ -17,7 +17,7 @@
 // independent); an error row's collapsed summary is the failure's first line in
 // the error color.
 
-import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useMemo, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
   CodeBlock, DiffBlock, diffTotals, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
@@ -27,6 +27,7 @@ import { AskQuestionCard } from './AskQuestionCard.tsx'
 import type { RenderMessageImages } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { CHAT_DIFF_MAX_LINES, type DiffCardModel } from '../models/diff-card-model.ts'
 import type { AskQuestionCardModel } from '../models/ask-question-card-model.ts'
+import type { UseDisclosure } from '../../contract/slots.ts'
 import type { ImageCardModel } from '../models/image-card-model.ts'
 import { CHAT_READ_MAX_LINES, type ReadCardModel } from '../models/read-card-model.ts'
 import { CHAT_SEARCH_MAX_LINES, type SearchCardModel } from '../models/search-card-model.ts'
@@ -38,6 +39,8 @@ import { ToolDetails, type ToolDetailsModel } from './ToolDetails.tsx'
 import css from './ToolRow.module.css'
 
 export interface ToolRowProps {
+  /** Subscribe here, where the row owns its expanded body. */
+  useDisclosure: UseDisclosure
   /** Open the addressed Tool detail tab when supplied by the shell. */
   openDetails?: (() => void) | undefined
   /** The render site's conversation locale seat (terminal/code body copy). */
@@ -155,6 +158,7 @@ function stateStatus(state: ToolRowState, t: TranslateNS<'conversation'>): strin
 }
 
 export function ToolRow({
+  useDisclosure,
   openDetails,
   t,
   variant,
@@ -181,7 +185,7 @@ export function ToolRow({
   onOpenFile,
   inspect,
 }: ToolRowProps) {
-  const [expanded, setExpanded] = useState(false)
+  const { expanded, toggle: toggleExpand } = useDisclosure()
   const terminalBody = terminal ?? null
   const diffBody = diff ?? null
   const readBody = read ?? null
@@ -223,9 +227,6 @@ export function ToolRow({
   const suffix = failureLine === null ? summarySuffix ?? diffStat : null
   // The failure line is error prose, not the path: no open-file affordance.
   const fileLink = filePath !== undefined && onOpenFile !== undefined && failureLine === null
-  const toggleExpand = () => {
-    setExpanded(v => !v)
-  }
   const openFile = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation()
     if (filePath === undefined) return

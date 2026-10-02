@@ -73,7 +73,8 @@
     "@deepseek-ai/dsh-settings": "workspace:*",
     "@deepseek-ai/dsh-subagent": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
-    "@deepseek-ai/dsh-typert-registry": "workspace:*"
+    "@deepseek-ai/dsh-typert-registry": "workspace:*",
+    "@deepseek-ai/dsh-user-questions": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
@@ -99,6 +100,7 @@
     "@deepseek-ai/dsh-settings": "workspace:*",
     "@deepseek-ai/dsh-subagent": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
-    "@deepseek-ai/dsh-typert-registry": "workspace:*"
+    "@deepseek-ai/dsh-typert-registry": "workspace:*",
+    "@deepseek-ai/dsh-user-questions": "workspace:*"
   }
 }

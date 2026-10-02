@@ -64,8 +64,8 @@ export const muxFrameSchema = z.discriminatedUnion('type', [
   // Non-empty by wire contract: the user-questions service rejects empty
   // batches at ask() (EMPTY_QUESTIONS), so an empty frame is host breakage
   // and must fail loud here, not reach the composer.
-  z.object({ type: z.literal('question/requested'), sessionId: sessionIdSchema, questions: z.array(askUserQuestionItemSchema).min(1) }),
-  z.object({ type: z.literal('question/resolved'), sessionId: sessionIdSchema, questionRpcId: rpcIdSchema, outcome: z.union([z.literal('answered'), z.literal('cancelled')]) }),
+  z.object({ type: z.literal('question/requested'), sessionId: sessionIdSchema, questions: z.array(askUserQuestionItemSchema).min(1), wait: z.object({ callId: z.string(), timed: z.boolean().optional() }).optional() }),
+  z.object({ type: z.literal('question/resolved'), sessionId: sessionIdSchema, questionRpcId: rpcIdSchema, outcome: z.union([z.literal('answered'), z.literal('cancelled'), z.literal('pending')]) }),
   z.object({
     type: z.literal('session/queue'),
     sessionId: sessionIdSchema,

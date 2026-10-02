@@ -12,6 +12,8 @@
 // gallery must still leave the media type and dimensions visible.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { Context } from '@deepseek-ai/cordis'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
@@ -95,6 +97,11 @@ const stubRenderMessageImages = (): RenderMessageImages => (
     </div>
   ))
 )
+
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
 
 describe('imageCardModel', () => {
   it('derives the card from settled image metadata and its raw envelope', () => {
@@ -276,7 +283,7 @@ describe('ReadImageRow keyed toolview', () => {
   ): Parameters<typeof ReadImageRow>[0] => ({
     callId: 'c1', toolName: 'read_image', block, openFile: vi.fn(), nested, renderMessageImages,
     sessionId: SID, useSessions: bindSnapshotSelector(list()),
-    t,
+    t, useDisclosure,
   } as unknown as Parameters<typeof ReadImageRow>[0])
 
   const toggleRow = (view: { container: HTMLElement }) => {

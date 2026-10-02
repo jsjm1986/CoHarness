@@ -27,6 +27,7 @@ export function sessionPresentation(session: SessionFace, sessionId: SessionId, 
       return projected ?? next
     },
     subscribe: listener => session.subscribe(listener),
+    publishInteraction: entry => session.publishInteraction(entry),
     ...(session.beginSubmission === undefined ? {} : { beginSubmission: session.beginSubmission.bind(session) }),
     readCallHistory: session.readCallHistory.bind(session),
     prompt: session.prompt.bind(session),

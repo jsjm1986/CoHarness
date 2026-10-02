@@ -197,7 +197,11 @@ describe('built-in conversation node Definitions', () => {
       at(2, 'step/start', { turn: 1, step: 1 }),
       at(3, 'turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'legacy' } } }),
     ])
-    expect(node(snapshot(empty), 'turn-process')).toBeUndefined()
+    // A closed turn owns a process row even without assistant evidence, so
+    // transcript members it leaves behind still fold under it.
+    expect(node(snapshot(empty), 'turn-process')?.data).toMatchObject({
+      turn: 1, messageCount: 0, toolCallCount: 0, subagentCount: 0, answerAnchorSeq: null,
+    })
 
     const value = assembler([
       at(10, 'turn/start', { turn: 2 }),

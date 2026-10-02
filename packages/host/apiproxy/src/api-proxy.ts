@@ -1266,6 +1266,8 @@ interface PendingQuestion {
   rpcId: RpcId
   sessionId: SessionId
   questions: AskUserQuestionItem[]
+  /** Host-named wait identity: the Client card key and its timed flag, replayed verbatim. */
+  wait?: { callId: ToolCallId; timed?: boolean }
   resolve: (answer: AskUserQuestionAnswer) => void
   reject: (error: UserQuestionError) => void
   signal?: AbortSignal
@@ -2558,7 +2560,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   })
 
   /** Remove a wait before settling it: synchronous deletion makes the first claimant win. */
-  function claimQuestion(pending: PendingQuestion, outcome: 'answered' | 'cancelled'): void {
+  function claimQuestion(pending: PendingQuestion, outcome: 'answered' | 'cancelled' | 'pending'): void {
     pendingQuestions.delete(pending.rpcId)
     if (pending.signal !== undefined && pending.onAbort !== undefined) {
       pending.signal.removeEventListener('abort', pending.onAbort)
@@ -2580,12 +2582,21 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       const pending: PendingQuestion = {
         rpcId, sessionId, questions: request.questions, resolve, reject,
         executionScope: request.agent === undefined ? undefined : executionAuthorityOf(ctx)?.capture(request.agent),
+        ...(request.wait === undefined ? {} : { wait: request.wait }),
         ...(request.signal === undefined ? {} : { signal: request.signal }),
       }
       const onAbort = (): void => {
-        claimQuestion(pending, 'cancelled')
-        reject(new UserQuestionError(
-          'ask_user_question was aborted before the user answered', 'ASK_ABORTED'))
+        // A timed wait ends with the service's ASK_TIMED_OUT as the abort
+        // reason: the frame outcome distinguishes a continued question (still
+        // answerable from its tool call row) from a real cancellation, and the
+        // rejection preserves the code so askTimed can map it to `pending`.
+        const reason = request.signal?.reason
+        const timedOut = reason instanceof UserQuestionError && reason.code === 'ASK_TIMED_OUT'
+        claimQuestion(pending, timedOut ? 'pending' : 'cancelled')
+        reject(reason instanceof Error
+          ? reason
+          : new UserQuestionError(
+            'ask_user_question was aborted before the user answered', 'ASK_ABORTED'))
       }
       pending.onAbort = onAbort
       pendingQuestions.set(rpcId, pending)
@@ -2596,7 +2607,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       }
       const envelope: RpcRequest<MuxFrame> = {
         rpcId,
-        payload: { type: 'question/requested', sessionId, questions: request.questions },
+        payload: { type: 'question/requested', sessionId, questions: request.questions,
+          ...(pending.wait === undefined ? {} : { wait: pending.wait }) },
       }
       broadcastEnvelope(envelope)
     })
@@ -5947,6 +5959,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 payload: {
                   type: 'question/requested', sessionId: pending.sessionId,
                   questions: pending.questions,
+                  ...(pending.wait === undefined ? {} : { wait: pending.wait }),
                 },
               })
             }
@@ -6307,9 +6320,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       const pending = pendingQuestions.get(message.rpcId)
       if (pending === undefined) return { accepted: false, reason: 'not-pending' }
       if (!message.result.ok) {
-        if (message.result.error.code !== 'cancelled') {
+        if (message.result.error.code !== 'cancelled' && message.result.error.code !== 'timed-out') {
           return { accepted: false, reason: 'bad-response' }
         }
+        const timedOut = message.result.error.code === 'timed-out'
         /* jscpd:ignore-start -- approval and question cancellation share an authorization CAS ladder. */
         const authorized = await authorizeSession(pending.sessionId, 'write')
         if ('error' in authorized) return { accepted: false, reason: 'bad-response' }
@@ -6319,15 +6333,20 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             pending.sessionId,
             'question',
             String(pending.rpcId),
-            { cancelled: true },
+            timedOut ? { timedOut: true } : { cancelled: true },
           )) return { accepted: false, reason: 'not-pending' }
         } catch {
           return { accepted: false, reason: 'bad-response' }
         }
         if (pendingQuestions.get(message.rpcId) !== pending) return { accepted: false, reason: 'not-pending' }
-        claimQuestion(pending, 'cancelled')
+        // A client-side countdown ending is 'pending', not a cancellation: the
+        // business wait outlives the frame, so the question stays answerable.
+        claimQuestion(pending, timedOut ? 'pending' : 'cancelled')
         pending.reject(new UserQuestionError(
-          'the user cancelled ask_user_question', 'ASK_CANCELLED'))
+          timedOut
+            ? 'ask_user_question timed out before the user answered'
+            : 'the user cancelled ask_user_question',
+          timedOut ? 'ASK_TIMED_OUT' : 'ASK_CANCELLED'))
         return { accepted: true }
         /* jscpd:ignore-end */
       }

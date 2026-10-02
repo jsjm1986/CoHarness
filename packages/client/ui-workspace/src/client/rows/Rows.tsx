@@ -232,6 +232,8 @@ function assertNever(value: never): never {
 interface SessionStatus {
   state: StateDotState
   label: string
+  /** Compact right-cell text replacing the timestamp while this status is primary. */
+  trailingLabel?: string
 }
 
 /**
@@ -256,13 +258,25 @@ function sessionStatuses(
   let pending: SessionStatus | undefined
   switch (node.pendingInteraction) {
     case 'approval':
-      pending = { state: 'warning', label: t('status.waitingApproval') }
+      pending = {
+        state: 'warning',
+        label: t('status.waitingApproval'),
+        trailingLabel: t('status.compact.approval'),
+      }
       break
     case 'plan-review':
-      pending = { state: 'warning', label: t('status.planReview') }
+      pending = {
+        state: 'warning',
+        label: t('status.planReview'),
+        trailingLabel: t('status.compact.planReview'),
+      }
       break
     case 'question':
-      pending = { state: 'warning', label: t('status.waitingAnswer') }
+      pending = {
+        state: 'warning',
+        label: t('status.waitingAnswer'),
+        trailingLabel: t('status.compact.answer'),
+      }
       break
     case undefined: break
     /* v8 ignore next -- closed PendingInteractionStatus union */
@@ -481,7 +495,14 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
           happened in it yet, so a "now" timestamp and the row verbs
           (rename/fork/archive) would all act on content that does not
           exist — both trailing cells stay off until the first prompt. */}
-      {!row.blank && <span className={css.time}>{timeLabel(row.updatedAt, now, t)}</span>}
+      {!row.blank && (
+        <span
+          className={css.time}
+          aria-hidden={primaryStatus.trailingLabel === undefined ? undefined : true}
+        >
+          {primaryStatus.trailingLabel ?? timeLabel(row.updatedAt, now, t)}
+        </span>
+      )}
       {/* Trails the time so the marker occupies the same right-edge cell as
           the hover pin button that replaces it. */}
       {row.pinned && !row.blank && <PinnedIndicator t={t} />}

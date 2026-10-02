@@ -41,7 +41,7 @@ Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。
 interface ComposerChainProps {
   /** Whether this pane may request automatic input focus. */
   active?: boolean
-  interactions: readonly PendingInteraction[]
+  interactions: readonly SessionPendingEntry[]
   /** Current conversation facts for feature-owned takeover selectors. */
   session: ConversationSnapshot | undefined
 }

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 
 import type { StartedToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
@@ -10,6 +11,12 @@ import { localizeAutoReviewDenial, normalizeAutoReviewReason } from '../src/clie
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
+
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
 
 afterEach(() => {
   cleanup()
@@ -269,7 +276,7 @@ describe('tool-call-model', () => {
 
 describe('ToolRow', () => {
   const rowProps = {
-    t,
+    t, useDisclosure,
     variant: 'bash' as const, icon: <i data-testid="tool-icon" />, title: 'Bash',
     summary: 'List files', bodyRaw: '{"a":1}', state: 'ok' as const,
   }
@@ -447,7 +454,7 @@ describe('ToolRow', () => {
 
 describe('GenericToolCard', () => {
   const props = (toolName: string, block: StartedToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName, openFile: vi.fn(), t,
+    callId: 'c1', toolName, openFile: vi.fn(), t, useDisclosure,
     ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
   })
 

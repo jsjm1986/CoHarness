@@ -1,11 +1,15 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import UserQuestionService, {
+  TIMED_WAIT_PARAMETER,
   UserQuestionError,
   type AskUserQuestionAnswer,
   type AskUserQuestionRequest,
 } from '@deepseek-ai/dsh-user-questions'
+import { createToolResultMessage, ToolCallId, type ToolSchema, type UserMessage } from '@deepseek-ai/dsh-llm'
+import { Session, SessionId, TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 interface QuestionAnswerer {
   ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>
@@ -350,5 +354,338 @@ describe('UserQuestionService', () => {
       { id: 'plan-review', selected: ['Approve'] },
     ])
     expect(p.seen[0]?.questions[1]?.intent).toEqual(intent)
+  })
+})
+
+/** Rejection as the Client runtime ships it across the wire: a plain Error carrying the typed name and code. */
+function wireRejection(code: string): Error {
+  const error = new Error(`client rejected with ${code}`) as Error & { code: string }
+  error.name = 'UserQuestionError'
+  error.code = code
+  return error
+}
+
+interface LiveAgent extends Agent {
+  steer: ReturnType<typeof vi.fn<(message: UserMessage) => void>>
+  inject: ReturnType<typeof vi.fn<(message: UserMessage) => void>>
+}
+
+function liveAgent(id: string): LiveAgent {
+  const steer = vi.fn<(message: UserMessage) => void>()
+  const inject = vi.fn<(message: UserMessage) => void>()
+  return Object.assign(stubAgent(id), {
+    session: Session.create(SessionId(id)),
+    steer,
+    inject,
+  })
+}
+
+async function timedContext(): Promise<Context> {
+  const ctx = new Context()
+  await ctx.plugin(AgentRegistry)
+  await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(UserQuestionService)
+  return ctx
+}
+
+const timedQuestions = [{ id: 'scope', question: 'Which scope?', options: [{ label: 'Tool only' }] }]
+const timedCallId = ToolCallId('ask-timed')
+
+function replyText(message: UserMessage): unknown {
+  const block = message.content[0]
+  if (block === undefined || block.type !== 'text') throw new Error('expected a text reply')
+  return JSON.parse(block.text)
+}
+
+describe('askTimed', () => {
+  it('expires a forwarded request even when no Client ever responds or delegates', async () => {
+    vi.useFakeTimers()
+    onTestFinished(() => { vi.useRealTimers() })
+    const ctx = await timedContext()
+    onTestFinished(async () => { await ctx.fiber.dispose() })
+    const agent = liveAgent('timed-no-client')
+    ctx.agents.enter(agent, undefined)
+    const turn = new AbortController()
+    let forwardedSignal: AbortSignal | undefined
+    registerAnswerer(ctx, {
+      ask: request => new Promise((_resolve, reject) => {
+        forwardedSignal = request.signal
+        request.signal?.addEventListener('abort', () => { reject(request.signal?.reason) }, { once: true })
+      }),
+    })
+    const result = ctx.userQuestions.askTimed(
+      { agent, questions: timedQuestions, signal: turn.signal }, timedCallId, 5_000,
+    )
+    expect(forwardedSignal).not.toBe(turn.signal)
+    await vi.advanceTimersByTimeAsync(5_000)
+    await expect(result).resolves.toEqual({ pending: true, callId: timedCallId })
+    expect(forwardedSignal?.aborted).toBe(true)
+    expect(turn.signal.aborted).toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('keeps a Client-claimed wait open and closes its stream when the answer settles', async () => {
+    vi.useFakeTimers()
+    onTestFinished(() => { vi.useRealTimers() })
+    const ctx = await timedContext()
+    onTestFinished(async () => { await ctx.fiber.dispose() })
+    const agent = liveAgent('timed-claimed')
+    ctx.agents.enter(agent, undefined)
+    const answer = Promise.withResolvers<AskUserQuestionAnswer>()
+    registerAnswerer(ctx, { ask: () => answer.promise })
+    let settled = false
+    const result = ctx.userQuestions.askTimed({ agent, questions: timedQuestions }, timedCallId, 5_000)
+      .finally(() => { settled = true })
+    const stream = ctx.userQuestions.attachWait(agent, timedCallId, new AbortController().signal)[Symbol.asyncIterator]()
+    expect(await stream.next()).toEqual({ done: false, value: { remainingMs: 5_000 } })
+    const end = stream.next()
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(settled).toBe(false)
+    await expect(ctx.userQuestions.askTimed({ agent, questions: timedQuestions }, timedCallId, 5_000))
+      .rejects.toMatchObject({ code: 'DUPLICATE_WAIT' })
+    const batch = { answers: [{ id: 'scope', selected: ['Tool only'] }] }
+    answer.resolve(batch)
+    await expect(result).resolves.toEqual(batch)
+    expect(await end).toEqual({ done: true, value: undefined })
+    expect(await ctx.userQuestions.attachWait(agent, timedCallId, new AbortController().signal)
+      [Symbol.asyncIterator]().next()).toMatchObject({ done: true })
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('returns the answer when a Client settles the request inside the window', async () => {
+    const ctx = await timedContext()
+    const agent = liveAgent('timed-answered')
+    ctx.agents.enter(agent, undefined)
+    const seen: AskUserQuestionRequest[] = []
+    registerAnswerer(ctx, {
+      ask: async (request) => { seen.push(request); return { answers: [{ id: 'scope', selected: ['Tool only'] }] } },
+    })
+    const result = await ctx.userQuestions.askTimed({ agent, questions: timedQuestions }, timedCallId, 120_000)
+
+    expect(result).toEqual({ answers: [{ id: 'scope', selected: ['Tool only'] }] })
+    expect(seen[0]?.wait?.callId).toBe(timedCallId)
+    expect(seen[0]?.wait?.timed).toBe(true)
+    await ctx.fiber.dispose()
+  })
+
+  it('maps the Client deadline rejection to the pending result and rethrows any other code', async () => {
+    const ctx = await timedContext()
+    const agent = liveAgent('timed-expired')
+    ctx.agents.enter(agent, undefined)
+    let code = 'ASK_TIMED_OUT'
+    registerAnswerer(ctx, { ask: () => Promise.reject(wireRejection(code)) })
+
+    await expect(ctx.userQuestions.askTimed({ agent, questions: timedQuestions }, timedCallId, 120_000))
+      .resolves.toEqual({ pending: true, callId: timedCallId })
+    code = 'ASK_CANCELLED'
+    await expect(ctx.userQuestions.askTimed({ agent, questions: timedQuestions }, timedCallId, 120_000))
+      .rejects.toMatchObject({ name: 'UserQuestionError', code: 'ASK_CANCELLED' })
+    await ctx.fiber.dispose()
+  })
+
+  it('holds an unclaimed request until the deadline and then returns pending', async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = await timedContext()
+      const agent = liveAgent('timed-unclaimed')
+      ctx.agents.enter(agent, undefined)
+      let settled = false
+      const result = ctx.userQuestions.askTimed({ agent, questions: timedQuestions }, timedCallId, 5_000)
+        .finally(() => { settled = true })
+
+      await vi.advanceTimersByTimeAsync(4_999)
+      expect(settled).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(result).resolves.toEqual({ pending: true, callId: timedCallId })
+      await ctx.fiber.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('aborts the hold with the turn signal', async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = await timedContext()
+      const agent = liveAgent('timed-aborted-hold')
+      ctx.agents.enter(agent, undefined)
+      const controller = new AbortController()
+      const result = ctx.userQuestions.askTimed(
+        { agent, questions: timedQuestions, signal: controller.signal }, timedCallId, 5_000,
+      )
+      const rejection = expect(result).rejects.toMatchObject({ code: 'ASK_ABORTED' })
+
+      await vi.advanceTimersByTimeAsync(1_000)
+      controller.abort()
+
+      await rejection
+      await ctx.fiber.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('rethrows a provider failure that is not a question error', async () => {
+    const ctx = await timedContext()
+    const agent = liveAgent('timed-provider-crash')
+    ctx.agents.enter(agent, undefined)
+    registerAnswerer(ctx, { ask: () => Promise.reject(new TypeError('provider crashed')) })
+
+    await expect(ctx.userQuestions.askTimed({ agent, questions: timedQuestions }, timedCallId, 120_000))
+      .rejects.toThrow(TypeError)
+    await ctx.fiber.dispose()
+  })
+
+  it('does not start the unclaimed hold when the turn ended while the request went unclaimed', async () => {
+    const ctx = await timedContext()
+    const agent = liveAgent('timed-preaborted-hold')
+    ctx.agents.enter(agent, undefined)
+    const controller = new AbortController()
+    registerAnswerer(ctx, {
+      ask: () => {
+        controller.abort(new Error('turn ended'))
+        return Promise.reject(wireRejection('NO_PROVIDER'))
+      },
+    })
+
+    await expect(ctx.userQuestions.askTimed(
+      { agent, questions: timedQuestions, signal: controller.signal }, timedCallId, 5_000,
+    )).rejects.toMatchObject({ name: 'UserQuestionError', code: 'ASK_ABORTED' })
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects non-positive waits before dispatching', async () => {
+    const ctx = await timedContext()
+    const agent = liveAgent('timed-invalid')
+    ctx.agents.enter(agent, undefined)
+    const ask = vi.fn(async () => ({ answers: [] }))
+    registerAnswerer(ctx, { ask })
+
+    await expect(ctx.userQuestions.askTimed({ agent, questions: timedQuestions }, timedCallId, 0))
+      .rejects.toMatchObject({ code: 'BAD_TIMEOUT' })
+    expect(ask).not.toHaveBeenCalled()
+    await ctx.fiber.dispose()
+  })
+})
+
+describe('late replies', () => {
+  /** The timed tool's schema as the request header records it: the wait parameter is what marks the calls that follow as timed. */
+  const timedToolSchema: ToolSchema = {
+    name: 'ask_user_question',
+    description: 'Ask brief questions.',
+    parameters: { type: 'object', properties: { questions: { type: 'array' }, [TIMED_WAIT_PARAMETER]: { type: 'integer' } } },
+  }
+
+  function askInLog(agent: Agent, callId: ToolCallId, tools: ToolSchema[] = [timedToolSchema]): void {
+    agent.session.append('turn/start', { turn: 1 })
+    agent.session.append('step/start', { turn: 1, step: 1 })
+    agent.session.append('request/header', {
+      header: { config: { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, tools },
+      reason: 'initial',
+    })
+    agent.session.append('tool/call', {
+      turn: 1, step: 1, callId, name: 'ask_user_question',
+      arguments: JSON.stringify({ questions: timedQuestions }),
+    })
+  }
+
+  function continueInLog(agent: Agent, callId: ToolCallId): void {
+    agent.session.append('tool/result', {
+      turn: 1, step: 1,
+      message: createToolResultMessage({
+        callId, content: [{ type: 'text', text: JSON.stringify({ pending: true, callId }) }], isError: false,
+      }),
+    }, { surfaceOp: 'append' })
+  }
+
+  it('steers an answer into a continued question and closes it once the reply enters the inbox', async () => {
+    const ctx = await timedContext()
+    const agent = liveAgent('late-answer')
+    ctx.agents.enter(agent, undefined)
+    askInLog(agent, timedCallId)
+    continueInLog(agent, timedCallId)
+    const batch = { answers: [{ id: 'scope', selected: ['Tool only'] }] }
+
+    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(true)
+
+    expect(agent.steer).toHaveBeenCalledOnce()
+    const steered = agent.steer.mock.calls[0]![0]
+    expect(steered.source).toEqual({ kind: 'user-question-reply', callId: timedCallId, outcome: 'answered' })
+    expect(replyText(steered)).toEqual({
+      kind: 'answer_to_pending_question', tool: 'ask_user_question', callId: timedCallId,
+      questions: timedQuestions, answers: batch.answers,
+    })
+    agent.session.append('agent/inbox/spliced', { target: 'next-step', start: 0, inserted: [steered] })
+    expect(ctx.userQuestions.answer(agent, timedCallId, batch)).toBe(false)
+    await ctx.fiber.dispose()
+  })
+
+  it('answers nothing when the composition carries no Session projections', async () => {
+    const ctx = new Context()
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(UserQuestionService)
+    const agent = liveAgent('late-no-projections')
+    ctx.agents.enter(agent, undefined)
+    askInLog(agent, timedCallId)
+    continueInLog(agent, timedCallId)
+
+    expect(ctx.userQuestions.answer(agent, timedCallId, { answers: [] })).toBe(false)
+    expect(agent.steer).not.toHaveBeenCalled()
+    await ctx.fiber.dispose()
+  })
+
+  it('refuses an open question and an unknown call', async () => {
+    const ctx = await timedContext()
+    const agent = liveAgent('late-open')
+    ctx.agents.enter(agent, undefined)
+    askInLog(agent, timedCallId)
+
+    expect(ctx.userQuestions.answer(agent, timedCallId, { answers: [] })).toBe(false)
+    expect(ctx.userQuestions.answer(agent, ToolCallId('never-asked'), { answers: [] })).toBe(false)
+    expect(agent.steer).not.toHaveBeenCalled()
+    expect(agent.inject).not.toHaveBeenCalled()
+    await ctx.fiber.dispose()
+  })
+
+  it('refuses a batch that does not name each question of the call exactly once', async () => {
+    const ctx = await timedContext()
+    const agent = liveAgent('late-malformed')
+    ctx.agents.enter(agent, undefined)
+    askInLog(agent, timedCallId)
+    continueInLog(agent, timedCallId)
+
+    for (const answers of [
+      [],
+      [{ id: 'other', selected: ['Tool only'] }],
+      [{ id: 'scope', selected: ['Tool only'] }, { id: 'scope', selected: [] }],
+      [{ id: 'scope', selected: ['Tool only'] }, { id: 'other', selected: [] }],
+    ]) {
+      expect(() => ctx.userQuestions.answer(agent, timedCallId, { answers }))
+        .toThrow(expect.objectContaining({ name: 'UserQuestionError', code: 'BAD_ANSWER' }))
+    }
+    expect(agent.steer).not.toHaveBeenCalled()
+    // The question stays continued and takes a well-formed batch afterwards.
+    expect(ctx.userQuestions.answer(agent, timedCallId, { answers: [{ id: 'scope', selected: [] }] })).toBe(true)
+    await ctx.fiber.dispose()
+  })
+
+  it('never lists a call the blocking legacy tool made, even one the process never finished', async () => {
+    const ctx = await timedContext()
+    const agent = liveAgent('legacy-interrupted')
+    ctx.agents.enter(agent, undefined)
+    const legacySchema: ToolSchema = { ...timedToolSchema, parameters: { type: 'object', properties: { questions: { type: 'array' } } } }
+    askInLog(agent, timedCallId, [legacySchema])
+    agent.session.append('tool/result', {
+      turn: 1, step: 1,
+      message: createToolResultMessage({
+        callId: timedCallId, content: [{ type: 'text', text: 'The tool call was interrupted after it was recorded.' }], isError: true,
+      }),
+      error: { name: 'SessionFormatError', code: TOOL_OUTCOME_UNKNOWN },
+    }, { surfaceOp: 'append' })
+
+    expect(ctx.sessionProjections.stateOf(agent.session, 'userQuestions')?.questions).toEqual({ active: [], settled: [] })
+    expect(ctx.userQuestions.answer(agent, timedCallId, { answers: [{ id: 'scope', selected: [] }] })).toBe(false)
+    expect(agent.steer).not.toHaveBeenCalled()
+    await ctx.fiber.dispose()
   })
 })

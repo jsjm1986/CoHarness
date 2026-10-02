@@ -70,6 +70,7 @@ export function BashRow(props: BashRowProps) {
         icon={BASH_ICON}
         title={props.t(toolTitleKey(props.toolName))}
         t={props.t}
+        useDisclosure={props.useDisclosure}
       />
     )
   }

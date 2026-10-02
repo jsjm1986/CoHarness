@@ -481,6 +481,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'message', description: 'Client response carrying the server request\'s rpcId.' }],
         returns: 'Transport receipt for the response delivery.',
       },
+      {
+        signature: 'hasLiveClient(): boolean',
+        description: 'Host-only liveness probe: whether at least one `events.mux` Client stream is open and has not been cancelled. Producers that dispatch to page listeners use it to fail fast instead of waiting out their response deadline.',
+        parameters: [],
+        returns: 'whether a live Client event stream exists.',
+      },
     ],
   },
   {
@@ -3420,6 +3426,26 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: '`ctx.userQuestions`: validation plus the scoped answerer waterfall.',
     methods: [
       {
+        signature: '@Remote answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer): boolean',
+        description: 'Answer a continued question. The reply is steered into the agent as a user message whose source names the call; that message is also the record that closes the question in the projection.',
+        parameters: [{ name: 'agent', description: 'Live root agent for the owning Session.' }, { name: 'callId', description: 'Continued question identity.' }, { name: 'answer', description: 'Complete structured answer batch, one item per question of the call.' }],
+        returns: 'Whether the question was continued and accepted the answer.',
+        throws: ['{UserQuestionError} `BAD_ANSWER` when the batch does not name each question of the call exactly once.'],
+      },
+      {
+        signature: '@Remote({ mode: \'stream\' }) async *attachWait(agent: Agent, callId: ToolCallId, signal: AbortSignal): AsyncIterable<{ remainingMs: number }>',
+        description: 'Let one answer UI hold a live timed wait. Closing the stream releases its claim.',
+        parameters: [{ name: 'agent', description: 'Live root agent owning the question.' }, { name: 'callId', description: 'Foreground tool call to attach to.' }, { name: 'signal', description: 'Remote stream cancellation, including Client disconnect.' }],
+        returns: 'One Host-computed remaining duration, or no frames once the wait ended.',
+      },
+      {
+        signature: 'async askTimed( request: AskUserQuestionRequest & { agent: Agent }, callId: ToolCallId, timeoutMs: number, ): Promise<TimedUserQuestionResult>',
+        description: 'Foreground wait whose first settlement the Client decides: the Client rejects with `ASK_TIMED_OUT` when its countdown ends, and this method maps that code to the pending result.',
+        parameters: [{ name: 'request', description: 'Questions, live owner agent, and abort signal.' }, { name: 'callId', description: 'Tool call identity the Client card is keyed by.' }, { name: 'timeoutMs', description: 'Positive foreground wait in milliseconds.' }],
+        returns: 'The answer when it arrives inside the window, otherwise a pending result, also when no connected Client claimed the request by the deadline.',
+        throws: ['{UserQuestionError} `BAD_TIMEOUT` for a non-integer, non-positive, or oversized wait.'],
+      },
+      {
         signature: 'async ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>',
         description: 'Ask the scoped answerer waterfall and wait for the user\'s answer.\n\nWhen a caller supplies an agent, human interaction is valid only for the exact live runtime root. Runtime ownership, not durable session lineage, decides this boundary: an owned child has no human answerer and would block forever, while a lineage-bearing session resumed as a new runtime root may ask normally.',
         parameters: [{ name: 'request', description: 'Questions, owner agent, and abort signal.' }],
@@ -4497,7 +4523,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AskUserQuestionRequestEvent',
-    declaration: 'export interface AskUserQuestionRequestEvent {\n    questions: AskUserQuestionItem[];\n    agent?: Agent;\n    signal?: AbortSignal;\n}',
+    declaration: 'export interface AskUserQuestionRequestEvent {\n    questions: AskUserQuestionItem[];\n    agent?: Agent;\n    signal?: AbortSignal;\n    wait?: {\n        callId: ToolCallId;\n        timed?: boolean;\n    };\n}',
   },
   {
     name: 'AssembleContext',
@@ -6994,6 +7020,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TerminalWaitReason',
     declaration: 'export type TerminalWaitReason = \'stdin_read\' | \'inferred_idle\' | \'timeout\' | \'session_exit\';',
+  },
+  {
+    name: 'TimedUserQuestionResult',
+    declaration: 'export type TimedUserQuestionResult = AskUserQuestionAnswer | {\n    pending: true;\n    callId: ToolCallId;\n};',
   },
   {
     name: 'TodoItem',
