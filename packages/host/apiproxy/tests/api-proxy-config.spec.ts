@@ -324,14 +324,20 @@ describe('settings domain', () => {
       doc: { 'llm-deepseek': { apiKey: 'user-secret', baseURL: 'https://user' } },
       documentPath: '/tmp/custom-settings.yaml',
     } })
-    ctx.settings.register(NS, AdapterConfig, { base: { baseURL: 'https://base' } })
+    ctx.settings.register(NS, AdapterConfig, {
+      base: { baseURL: 'https://base' },
+      label: { en: 'DeepSeek', zh: 'DeepSeek 模型' },
+    })
+    ctx.settings.register(settingsNamespace('unlabelled'), z.object({ key: z.string().default('x') }))
     const api = createApiProxy(ctx, DEFAULTS)
     const value = expectOk(await api.settings.describe(request({})))
     expect(value.writable).toBe(true)
     expect(value.hasDocument).toBe(true)
-    expect(value.namespaces).toHaveLength(1)
+    expect(value.namespaces).toHaveLength(2)
     const view = value.namespaces[0]!
     expect(view.ns).toBe('llm-deepseek')
+    expect(view.label).toEqual({ en: 'DeepSeek', zh: 'DeepSeek 模型' })
+    expect(value.namespaces[1]!.label).toBeUndefined()
     expect(view.applies).toBe('live')
     expect((view.schema as { refs?: unknown }).refs).toBeDefined()
     expect(view.value).toEqual({ apiKeyEnv: 'DEEPSEEK_API_KEY', baseURL: 'https://user' })

@@ -278,6 +278,7 @@ export class SubagentRuntime extends TypertRemoteService {
     this.settingsSource = () => config
     ctx.inject(['settings'], (settingsCtx) => {
       settingsCtx.settings.installSection(ctx, SUBAGENT_SETTINGS_NAMESPACE, SubagentRuntime.Config, config, {
+        label: { en: 'Subagent', zh: '子智能体' },
         owner: 'project',
         projectWrite: 'manager',
         projectWritePaths: [['maxDepth'], ['maxActiveSubagents']],

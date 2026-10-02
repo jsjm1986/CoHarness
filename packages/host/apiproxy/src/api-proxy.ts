@@ -3550,6 +3550,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       revision: descriptor.revision,
       writable: namespaceWritable,
       owner: descriptor.owner,
+      ...descriptor.label === undefined ? {} : { label: descriptor.label },
       ...writableReason === undefined ? {} : { writableReason },
       ...descriptor.projectWritePaths === undefined
         ? {}

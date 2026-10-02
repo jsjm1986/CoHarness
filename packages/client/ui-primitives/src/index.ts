@@ -80,6 +80,9 @@ export { MessageText } from './markdown/MessageText.tsx'
 export { extractMarkdownPlainText } from './markdown/plain-text.ts'
 export type { MarkdownPlainTextMode, MarkdownPlainTextOptions } from './markdown/plain-text.ts'
 export * from './icons/index.tsx'
+export {
+  PluginArtworkTerminal, PluginArtworkLoop, PluginArtworkSubagent, PluginArtworkSearch, PluginArtworkDefault,
+} from './plugin-artwork.tsx'
 
 export { ReferenceIcon } from './ReferenceIcon.tsx'
 export type { ReferenceIconKind, ReferenceIconProps } from './ReferenceIcon.tsx'

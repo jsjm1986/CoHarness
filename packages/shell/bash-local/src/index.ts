@@ -163,6 +163,7 @@ export class LocalBashExecutor extends ShellExecutor {
     this.source = () => config
     ctx.inject(['settings'], (settingsCtx) => {
       settingsCtx.settings.installSection(ctx, SHELL_SETTINGS_NAMESPACE, SECTION_SCHEMA, entry, {
+        label: { en: 'Shell', zh: '终端' },
         owner: 'project',
         projectWrite: 'manager',
         projectWritePaths: [['timeoutMs'], ['maxTimeoutMs'], ['maxOutputBytes'], ['maxSpillBytes'], ['graceMs']],

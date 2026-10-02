@@ -5,6 +5,7 @@ import { ErrorBanner, Field, PageHeader, Button, LoadingState, Section } from '.
 import { PluginManagerPage } from '../plugins/PluginManagerPage.tsx'
 import { PluginManagerController } from '../plugins/manager-store.ts'
 import { pluginManagementRemote } from '../plugins/transport.ts'
+import { resolveLocalized } from '../plugins/presentation.ts'
 import { zh } from '../plugins/locales.ts'
 import { ProfileSettingsController } from '../plugins/settings-store.ts'
 import { PluginConfiguration, SETTINGS_OWNER_LABELS } from '../plugins/PluginConfiguration.tsx'
@@ -43,6 +44,7 @@ function ManagerView({ controller, settings }: { controller: PluginManagerContro
         ? `${SETTINGS_OWNER_LABELS[view.owner ?? 'deployment']} · ${view.applies === 'restart' ? '保存后需重启' : '即时配置'}`
         : <PluginConfiguration key={view.ns} view={view} controller={settings} />
     }}
+    resolveText={resolveLocalized}
     t={(key, parameters) => Object.entries(parameters ?? {}).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), zh[key])} /></>
 }
 

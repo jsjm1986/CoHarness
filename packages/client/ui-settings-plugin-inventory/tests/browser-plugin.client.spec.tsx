@@ -66,6 +66,11 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
 
     const injected = (entry.inject as unknown as () => PluginInventorySettingsTabInjected)()
     expect(injected.hooks.clientSync).toBe(b.state)
+    const text = { en: 'Local tools', zh: '本地工具' }
+    expect(injected.resolveText(text)).toBe('本地工具')
+    b.locale.setLocale('en')
+    expect(injected.resolveText(text)).toBe('Local tools')
+    b.locale.setLocale('zh')
     injected.retryClient()
     expect(b.retry).toHaveBeenCalledOnce()
     const failure = new Error('page retry failed')

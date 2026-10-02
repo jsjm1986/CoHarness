@@ -36,6 +36,9 @@
       "path": "../../preset/agent-presets/tsconfig.json"
     },
     {
+      "path": "../../util/package-manifest"
+    },
+    {
       "path": "../../../vendor/cordis"
     },
     {

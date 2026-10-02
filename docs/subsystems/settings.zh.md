@@ -64,6 +64,8 @@ interface SettingsRegisterOptions<T> {
    * object-prototype keys.
    */
   projectWritePaths?: readonly SettingsProjectWritePath[]
+  /** Localized display title for surfaces that list the namespace outside its owner's own UI. */
+  label?: LocalizedText
 }
 ```
 
@@ -150,6 +152,8 @@ interface SettingsDescriptor {
   projectWritePaths?: string[][]
   /** Schema-declared secret positions; present only under `redactSecrets`. */
   secrets?: RedactedSecret[]
+  /** Registrant's localized display title, when declared. */
+  label?: LocalizedText
 }
 ```
 

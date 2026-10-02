@@ -135,6 +135,9 @@
       "path": "../../util/brand"
     },
     {
+      "path": "../../util/package-manifest"
+    },
+    {
       "path": "../../util/crypto"
     },
     {

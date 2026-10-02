@@ -29,7 +29,7 @@ kind: "package-reference"
 
 - `documentPath` — 提供方拥有用户可编辑文件时，该字段是文件的绝对路径；非文件提供方保留 `undefined`。Host 配置适配器据此派生可用性，而浏览器协议只暴露一个布尔能力，绝不暴露文件系统目标。
 - `prepareDocument()` — 让文档做好供原生编辑器打开的准备后返回该路径。基类实现返回 `documentPath`；文件提供方可先创建缺失的文档。
-- `register(ns, schema, { base?, applies? })` — 返回 owner 的 `SettingsScope`（`get`/`watch`/`update`）。注册是调用方插件 fiber 上的 effect：dispose（资源释放）该 fiber 即移除 namespace 及其观察者。schema 拒绝的存量分节会使注册本身失败；重复 namespace 立即报错。
+- `register(ns, schema, { base?, applies?, label? })` — 返回 owner 的 `SettingsScope`（`get`/`watch`/`update`）。注册是调用方插件 fiber 上的 effect：dispose（资源释放）该 fiber 即移除 namespace 及其观察者。schema 拒绝的存量分节会使注册本身失败；重复 namespace 立即报错。`label` 是可选的本地化展示标题（`LocalizedText`），随 `describe()` 抵达在注册方自身界面之外为该 namespace 题名的界面；缺省这些界面回退到 namespace 键名。
 
 - 注册选项可通过 `authorizeWrite(value)` 执行实时授权。它在写入排到队首后收到不可变的解析候选值，完成后才能持久化。授权拒绝、等待期间 owner／服务卸载或外部版本改变时，不写入存储。启动、注册与提供方重载只运行同步 schema 与 `validate` 检查。
 - `describe(options?)` — 每个 namespace 一条描述（`schema.toJSON()` 封装、解析值、分离出的 `base`/`user` 层、`applies`），供配置界面使用；字段出现在 `user` 中即标记其被用户覆盖。`describe({ redactSecrets: true })` 从每一层剥离 `role('secret')` 字段，移除可能包含机密的 schema 节点默认值，并附加 `secrets` slot 列表（`{ path, set }`）；每个协议接口都必须传入它，纯遍历器 `redactSecrets(schema, value)` 与 `redactSchemaDefaults(schema)` 已导出，供其他 wire 使用。

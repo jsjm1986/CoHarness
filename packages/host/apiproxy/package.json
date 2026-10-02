@@ -58,6 +58,7 @@
     "@deepseek-ai/dsh-model-provider-config": "workspace:*",
     "@deepseek-ai/dsh-native-command": "workspace:*",
     "@deepseek-ai/dsh-office-to-pdf": "workspace:*",
+    "@deepseek-ai/dsh-package-manifest": "workspace:*",
     "@deepseek-ai/dsh-permission-presets": "workspace:*",
     "@deepseek-ai/dsh-sandbox-ssh": "workspace:*",
     "@deepseek-ai/dsh-scope": "workspace:*",

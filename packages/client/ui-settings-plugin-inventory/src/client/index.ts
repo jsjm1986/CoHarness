@@ -46,6 +46,7 @@ export function apply(ctx: ClientContext): void {
     presetDisplayText(preset, agentPresetCopy).name
   const injected = (): PluginInventorySettingsTabInjected => ({
     list, presetName,
+    resolveText: text => ctx.locale.resolveText(text),
     hooks: { clientSync: ctx.modules.entries.state },
     retryClient: () => { void ctx.modules.entries.retry().catch((error: unknown) => { ctx.logger.error(error) }) },
   })

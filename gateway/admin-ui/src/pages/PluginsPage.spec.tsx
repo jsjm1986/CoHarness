@@ -24,7 +24,10 @@ beforeEach(() => {
       listBundles: vi.fn(async () => ({ ok: true as const, value: [] })),
       inspect: unused, setPluginEnabled: unused, setBundleEnabled: unused,
       installBundle: unused, cancelInstall: unused, removeBundle: unused,
+      registries: vi.fn(async () => ({ ok: true as const, value: { registry: null, fallbackRegistries: [], resolved: null } })),
+      waitForInstall: unused,
     },
+    pluginRegistryProbe: { fastest: unused },
   })
 })
 async function chooseUser() {

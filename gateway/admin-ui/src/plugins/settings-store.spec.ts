@@ -23,6 +23,18 @@ it('loads registered namespaces without duplicating account preferences and acce
   expect(await controller.save('shell', [], 2)).toMatchObject({ ok: false, error: { code: 'wrong-namespace' } })
   expect(controller.state.getSnapshot().namespaces[0]?.revision).toBe(2)
 })
+it('carries the registrant label onto ledger items and keeps the namespace fallback', async () => {
+  const { controller, remote } = fixture()
+  vi.mocked(remote.describe).mockResolvedValueOnce(described([
+    { ...view, label: { en: 'Shell', zh: '终端' } },
+    { ...view, ns: 'unlabelled' },
+  ]))
+  await controller.load()
+  expect(controller.ledger.getSnapshot().items).toEqual([
+    { id: 'shell', label: 'shell', labelText: { en: 'Shell', zh: '终端' } },
+    { id: 'unlabelled', label: 'unlabelled' },
+  ])
+})
 it('discards old reads when a newer load or accepted mutation has superseded them', async () => {
   const { controller, remote } = fixture()
   await controller.load()

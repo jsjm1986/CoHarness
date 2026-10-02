@@ -10,7 +10,8 @@ const invocationSchema = z.object({
   target: targetSchema, nodeId: z.string().min(1), generation: z.number().int().positive(), rpcId: z.uuid(),
   endpoint: z.enum(['settings.describe', 'settings.mutate', 'pluginInventory/list', 'pluginManager/listPlugins', 'pluginManager/listBundles', 'pluginManager/inspect',
     'pluginManager/setPluginEnabled', 'pluginManager/setBundleEnabled', 'pluginManager/installBundleStream',
-    'pluginManager/cancelInstall', 'pluginManager/removeBundle']),
+    'pluginManager/cancelInstall', 'pluginManager/removeBundle', 'pluginManager/registries', 'pluginManager/waitForInstall',
+    'pluginRegistryProbe/fastest']),
   args: z.record(z.string(), z.unknown()),
 }).strict()
 
@@ -19,10 +20,62 @@ export class PluginManagementError extends Error {
   constructor(readonly status: 400 | 403 | 404 | 409 | 502 | 503, message: string) { super(message) }
 }
 
+/** Deadline for the parallel registry pings and lifetime of a winning registry or unavailable result. */
+const REGISTRY_PROBE_TIMEOUT_MS = 1500
+const REGISTRY_PROBE_CACHE_TTL_MS = 300_000
+/** The public registries the probe compares, as the install dialog offers them. */
+const REGISTRY_PROBE_ENDPOINTS = ['https://registry.npmjs.org/-/ping', 'https://registry.npmmirror.com/-/ping']
+
 /** Uses the runtime's generated validation and upstream manager; never starts an idle instance. */
 export class GatewayPluginManagement {
+  /** Process-local registry probe state shared by every administrator's dialog. */
+  private probePending: Promise<string | null> | undefined
+  private probeCached: { registry: string | null; expiresAt: number } | undefined
+
   constructor(private readonly deps: Pick<GatewayDeps, 'users' | 'projects' | 'instances' | 'cfg'>,
     private readonly signer: GatewayPrincipalSigner, private readonly nodeId: string) {}
+
+  /**
+   * Race the public registry pings; the manager dialog uses the winner to preselect a mirror
+   * when pnpm's own configuration names npm's official registry. Concurrent readers share one
+   * probe; a winner cancels and awaits the loser; results are cached.
+   * @returns the first registry with a successful response, or null when neither responds successfully.
+   */
+  private fastestRegistry(): Promise<string | null> {
+    if (this.probeCached !== undefined && this.probeCached.expiresAt > Date.now()) {
+      return Promise.resolve(this.probeCached.registry)
+    }
+    this.probePending ??= this.probeRegistries().finally(() => { this.probePending = undefined })
+    return this.probePending
+  }
+
+  private async probeRegistries(): Promise<string | null> {
+    const finished = new AbortController()
+    const signal = AbortSignal.any([finished.signal, AbortSignal.timeout(REGISTRY_PROBE_TIMEOUT_MS)])
+    const requests = REGISTRY_PROBE_ENDPOINTS.map(async endpoint => ({
+      registry: new URL('/', endpoint).href,
+      response: await fetch(endpoint, { signal, redirect: 'error' }),
+    }))
+    const successful = requests.map(async (request) => {
+      const { registry, response } = await request
+      if (!response.ok) throw new Error(`Registry ping returned HTTP ${response.status}`)
+      return registry
+    })
+    let registry: string | null
+    try {
+      registry = await Promise.any(successful)
+    } catch {
+      registry = null
+    } finally {
+      finished.abort()
+      const responses = await Promise.allSettled(requests)
+      await Promise.allSettled(responses.map(async (result) => {
+        if (result.status === 'fulfilled') await result.value.response.body?.cancel()
+      }))
+    }
+    this.probeCached = { registry, expiresAt: Date.now() + REGISTRY_PROBE_CACHE_TTL_MS }
+    return registry
+  }
 
   /** Bind the selected running profile before showing actions; stopped instances stay stopped. */
   async target(admin: UserRow, input: unknown): Promise<PluginManagementTarget> {
@@ -53,6 +106,11 @@ export class GatewayPluginManagement {
     const instances = this.deps.instances
     if (!await instances.isLive(target) || await instances.generationOf(target) !== generation) {
       throw new PluginManagementError(409, 'profile instance changed; reload before retrying')
+    }
+    if (value.endpoint === 'pluginRegistryProbe/fastest') {
+      const registry = await this.fastestRegistry().catch(() => null)
+      yield new TextEncoder().encode(JSON.stringify({ type: 'server-response', rpcId: value.rpcId, result: { ok: true, value: registry } }))
+      return
     }
     if (instances.operationRef === undefined) throw new PluginManagementError(503, 'profile operation leases unavailable')
     try { await instances.operationRef(target, 1, generation) } catch (error) {

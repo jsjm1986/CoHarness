@@ -9,6 +9,7 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import type z from '@deepseek-ai/schemastery'
 import { deepEqualJson, deepFreeze } from '@deepseek-ai/dsh-util-values'
+import type { LocalizedText } from '@deepseek-ai/dsh-package-manifest'
 import { redactSchemaDefaults, redactSecrets } from './redact.ts'
 import type { RedactedSecret } from './redact.ts'
 import type { SettingsNamespace, SettingsUpdateSource } from './types.ts'
@@ -106,6 +107,8 @@ export interface SettingsRegisterOptions<T> {
    * object-prototype keys.
    */
   projectWritePaths?: readonly SettingsProjectWritePath[]
+  /** Localized display title for surfaces that list the namespace outside its owner's own UI. */
+  label?: LocalizedText
 }
 
 /** One registered namespace as surfaced to configuration UIs. */
@@ -140,6 +143,8 @@ export interface SettingsDescriptor {
   projectWritePaths?: string[][]
   /** Schema-declared secret positions; present only under `redactSecrets`. */
   secrets?: RedactedSecret[]
+  /** Registrant's localized display title, when declared. */
+  label?: LocalizedText
 }
 
 /** Options for {@link SettingsProvider.describe}. */
@@ -410,6 +415,8 @@ interface SettingsRegistration {
   projectWrite: SettingsProjectWrite
   /** Optional path allowlist for project-manager writes. */
   projectWritePaths?: string[][]
+  /** Registrant's localized display title. */
+  label?: LocalizedText
   /** Owner-supplied check for constraints the schema cannot express. */
   validate?: (value: unknown) => void
   /** Optional live authorization for in-process persistence only. */
@@ -552,6 +559,7 @@ export abstract class SettingsProvider extends Service {
       ...options?.authorizeWrite === undefined
         ? {}
         : { authorizeWrite: options.authorizeWrite as (value: unknown) => Promise<void> },
+      ...options?.label === undefined ? {} : { label: options.label },
       resolved: deepFreeze(this.resolve(schema, options?.base, this.section(parsedNs), options?.validate)),
       revision: 0,
       watchers: new Set(),
@@ -596,7 +604,7 @@ export abstract class SettingsProvider extends Service {
    * @param ns - consumer-owned settings namespace.
    * @param schema - schema resolving the namespace.
    * @param entry - composition entry used as the base and fallback value.
-   * @param hooks - source sink, change notification, and optional validation.
+   * @param hooks - source sink, change notification, and optional validation and display title.
    * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
    */
   installSection<const Namespace extends string, T>(
@@ -613,6 +621,7 @@ export abstract class SettingsProvider extends Service {
       ...hooks.owner === undefined ? {} : { owner: hooks.owner },
       ...hooks.projectWrite === undefined ? {} : { projectWrite: hooks.projectWrite },
       ...hooks.projectWritePaths === undefined ? {} : { projectWritePaths: hooks.projectWritePaths },
+      ...hooks.label === undefined ? {} : { label: hooks.label },
     })
     hooks.setSource(() => scope.get())
     this.ctx.effect(() => () => {
@@ -663,6 +672,7 @@ export abstract class SettingsProvider extends Service {
         ...registration.projectWritePaths === undefined
           ? {}
           : { projectWritePaths: registration.projectWritePaths.map(path => [...path]) },
+        ...registration.label === undefined ? {} : { label: registration.label },
       }
       if (options?.redactSecrets !== true) return descriptor
       const schema = registration.schema as z<never>
@@ -1072,6 +1082,8 @@ export interface SettingsSectionHooks<T> {
   projectWrite?: SettingsProjectWrite
   /** Optional path allowlist for project-manager writes. */
   projectWritePaths?: readonly SettingsProjectWritePath[]
+  /** Localized display title for surfaces that list the namespace outside its owner's own UI. */
+  label?: LocalizedText
 }
 
 /**
@@ -1085,7 +1097,7 @@ export interface SettingsSectionHooks<T> {
  * @param ns - the consumer-owned settings namespace.
  * @param schema - schema resolving the namespace (typically the plugin Config).
  * @param entry - the consumer's composition entry config, used as `base`.
- * @param hooks - source sink and change notification.
+ * @param hooks - source sink, change notification, and optional display title.
  */
 export function installSettingsSection<T>(
   ctx: Context,
