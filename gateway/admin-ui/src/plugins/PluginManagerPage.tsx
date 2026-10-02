@@ -527,11 +527,9 @@ interface GuideExample {
   readonly hintKey: PluginManagerLocaleKey
 }
 
-/** The spec forms the install guide shows, each with an example the person can drop into the field. */
+/** The spec form the install guide shows, with an example the person can drop into the field. */
 const GUIDE_EXAMPLES = [
   { key: 'id', titleKey: 'installGuideIdTitle', exampleKey: 'installGuideIdExample', hintKey: 'installGuideIdHint' },
-  { key: 'git', titleKey: 'installGuideGitTitle', exampleKey: 'installGuideGitExample', hintKey: 'installGuideGitHint' },
-  { key: 'path', titleKey: 'installGuidePathTitle', exampleKey: 'installGuidePathExample', hintKey: 'installGuidePathHint' },
 ] as const satisfies readonly GuideExample[]
 
 /** The one-line reading of a classified pnpm failure. */
@@ -669,9 +667,8 @@ function InstallDialog({
                 <p className={css.guideIntro}>{t('installGuideIntro')}</p>
                 <p className={css.guideNote}>{t('installGuideIdNote')}</p>
                 <ol className={css.guideList}>
-                  {GUIDE_EXAMPLES.map(({ key, titleKey, exampleKey, hintKey }, index) => (
+                  {GUIDE_EXAMPLES.map(({ key, titleKey, exampleKey, hintKey }) => (
                     <li key={key} className={css.guideItem}>
-                      <span className={css.guideIndex} aria-hidden="true">{index + 1}</span>
                       <div className={css.guideMain}>
                         <span className={css.guideTitle}>{t(titleKey)}</span>
                         <span className={css.guideExample}>
@@ -694,7 +691,10 @@ function InstallDialog({
                 </ol>
                 <p className={css.guideSafety} role="note">
                   <IconWarningOutline16 size={14} aria-hidden="true" />
-                  <span>{t('installGuideSafety')}</span>
+                  <span className={css.guideSafetyText}>
+                    <span>{t('installGuideSafety')}</span>
+                    <span>{t('installUpgradeNotice')}</span>
+                  </span>
                 </p>
               </div>
             )
