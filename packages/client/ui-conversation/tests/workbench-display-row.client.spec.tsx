@@ -36,7 +36,10 @@ function publishReady(scope: ReturnType<typeof stubSettingsScope<ConversationSet
   act(() => {
     scope.publish({
       status: 'ready', writable: true,
-      value: { chatContentWidth: 720, chatFontSize: 15, chatFullWidth: false, busyEnter: 'queue' },
+      value: {
+        chatContentWidth: 720, chatFontSize: 15, chatFullWidth: false, busyEnter: 'queue',
+        performanceUsage: 'detailed', linkOpening: 'sidebar',
+      },
     })
   })
 }

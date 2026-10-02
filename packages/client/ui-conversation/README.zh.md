@@ -111,7 +111,7 @@ Access 控件还会根据会话所属连接应用[当前账户资格规则](../u
 <a id="settings-authority"></a>
 ## 设置权限
 
-忙碌状态下的 Enter 偏好以及对话显示偏好都属于账户级 settings 字段。即使处于项目作用域，它们的设置行也会使用账户 transport；在取得可写视图前拒绝变更，提供方限制以内联状态显示，最新写入失败时采用恢复后的值。宽度和字号写入使用数值，并与 Enter 偏好共用同一个账户 revision 栅栏，因此一个字段不会污染另一个字段的写入状态。policy 与显示控制器会随 conversation 插件释放自己的 scope 订阅，因此 HMR 与销毁不会留下设置监听器。显示设置行的紧凑变体填充工作台侧栏面板声明的 `conversation.workbench.display` 孔位，并绑定同一控制器与账户作用域。
+忙碌状态下的 Enter 偏好以及对话显示、工作步骤密度、性能详情、链接打开方式偏好都属于账户级 settings 字段。即使处于项目作用域，它们的设置行也会使用账户 transport；在取得可写视图前拒绝变更，提供方限制以内联状态显示，最新写入失败时采用恢复后的值。宽度和字号写入使用数值，并与 Enter 偏好共用同一个账户 revision 栅栏，因此一个字段不会污染另一个字段的写入状态。工作步骤密度经 presentation-policy 表解析为已完成 turn 折叠、思考预览、过程细节三处开关，由 Chat 视图各消费点读取；性能详情开关控制已完成 turn 的用量面板与 composer 统计细节；链接打开方式在内置 Browser 标签页（没有 Browser 消费方认领 `web/browser-open` bail 时回落新标签页）与普通新标签页之间选择，且当装配未注册 Browser 标签类型时该行整体隐藏。policy 与显示控制器会随 conversation 插件释放自己的 scope 订阅，因此 HMR 与销毁不会留下设置监听器。显示设置行的紧凑变体填充工作台侧栏面板声明的 `conversation.workbench.display` 孔位，并绑定同一控制器与账户作用域。
 
 <a id="invariants"></a>
 ## 不变量

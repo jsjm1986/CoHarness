@@ -7,9 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useEffect } from 'react'
 import type {
-  AssistantMessageNode, CommandNode, CompactionSummaryNode, ConversationNode, ConversationSnapshot,
-  ModelRetryNode, RunningToolCall, SessionId, SessionListState, ToolCallBlock, ToolResultNode, TurnErrorNode,
-  TurnMaxTokensNode, TurnNavigationItem, UserMessageNode, WorkspaceListState,
+  AssistantMessageNode, ChatConversationViewNode, CommandNode, CompactionSummaryNode, ConversationNode,
+  ConversationSnapshot, ModelRetryNode, RunningToolCall, SessionId, SessionListState, ToolCallBlock,
+  ToolResultNode, TurnErrorNode, TurnMaxTokensNode, TurnNavigationItem, UserMessageNode, WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
@@ -22,6 +22,7 @@ import type {
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { createChatStore } from '../src/client/stores.ts'
+import { presentationPolicyFor } from '../src/client/presentation-policy.ts'
 import { ChatView } from '../src/client/chat/ChatView.tsx'
 import { zh } from '../src/client/locales.ts'
 import { AssistantNodeView } from '../src/client/chat/AssistantNodeView.tsx'
@@ -45,10 +46,14 @@ afterEach(() => {
 // so one harness's selection cannot rehydrate into the next.
 beforeEach(() => {
   localStorage.clear()
+  performanceUsageMode = 'detailed'
 })
 
 const SID = 's1' as SessionId
 type RoutedChatNodeOwner = ChatNodeOwnerProps & { readonly node: ChatNode }
+
+/** Mutable detail level consumed by the harness's TurnTail dispatch. */
+let performanceUsageMode: 'compact' | 'detailed' = 'detailed'
 
 function snapshotBase(): ConversationSnapshot {
   return {
@@ -114,11 +119,12 @@ const turnError = (seq: number, code?: string, message?: string): TurnErrorNode 
 const turnMaxTokens = (seq: number): TurnMaxTokensNode => ({
   kind: 'turn-max-tokens', seq, time: seq * 1_000, turn: 1, step: 0,
 })
-const toolResult = (seq: number, callId: string, name = 'bash'): ToolResultNode => ({
+const toolResult = (seq: number, callId: string, name = 'bash', turn?: number): ToolResultNode & { turn?: number } => ({
   kind: 'tool-result', seq, time: seq * 1_000, callId,
   call: { name, argsRaw: `{"command":"cmd-${callId}","description":"run ${callId}"}` },
   callTime: seq * 1_000 - 500,
   content: [], isError: false, callView: null, resultView: null, subCalls: [],
+  ...(turn === undefined ? {} : { turn }),
 })
 const runningCall = (callId: string, name = 'bash'): RunningToolCall => ({
   phase: 'start', callId, name, argsRaw: `{"command":"cmd-${callId}"}`, turn: 2, step: 1, time: 1_000,
@@ -233,6 +239,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
             {...nodeProps<'turn-tail'>()}
             renderSlot={renderTurnTailSlot}
             renderSlotChain={renderTurnTail}
+            usePerformanceUsage={selector => selector(performanceUsageMode)}
             SessionProvider={props.SessionProvider}
           />
         )
@@ -298,6 +305,11 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     forkAt,
     // Absent-service default; mention tests override with a real resolver.
     fileMentions: () => undefined,
+    // Fixed 'detailed' policy; mode-dependent specs override per case.
+    presentation: {
+      getSnapshot: () => presentationPolicyFor('detailed'),
+      subscribe: () => () => {},
+    },
     // Mirrors the real lookup chain (conversation namespace, then common).
     t,
   }
@@ -401,6 +413,87 @@ describe('Focused Chat disclosures', () => {
     fireEvent.click(row)
     expect(view.getByText('system instructions')).toBeTruthy()
     expect(row.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('folds a completed turn behind its process row unless the policy keeps turns expanded', () => {
+    const base = chatSnapshotFixture({
+      nodes: [user(1, 'do it'), toolResult(2, 'a', 'bash', 1)],
+      turnEnds: new Map([[1, 3]]),
+    })
+    const turn = base.timeline.turns.get(1)
+    const processNode = {
+      key: 'fixture:turn-process:1',
+      id: 'p1',
+      target: 'chat',
+      kind: 'turn-process',
+      anchorSeq: 0.5,
+      location: { kind: 'turn', turn },
+      visibility: 'visible',
+      data: { turn: 1, controlAnchorSeq: 1, messageCount: 0, toolCallCount: 1, subagentCount: 0, answerAnchorSeq: null },
+    } as unknown as ChatNode
+    const byKey = new Map<string, ChatConversationViewNode>()
+    for (const key of base.order) {
+      const entry = base.nodes.get(key)
+      if (entry !== undefined) byKey.set(key, entry)
+    }
+    byKey.set(processNode.key, processNode)
+    const chat = {
+      ...base,
+      order: [processNode.key, ...base.order],
+      nodes: {
+        get: (key: string) => byKey.get(key),
+        values: () => [...byKey.values()],
+      },
+    }
+    const detailed = makeHarness({ chat })
+    const folded = render(<detailed.ChatView {...detailed.props} />)
+    const member = folded.getByTestId('tool-seat-a').closest('[data-turn-process-member]')
+    expect(member?.hasAttribute('hidden')).toBe(true)
+    folded.unmount()
+
+    const verbose = makeHarness({ chat })
+    verbose.props.presentation = {
+      getSnapshot: () => presentationPolicyFor('verbose'),
+      subscribe: () => () => {},
+    }
+    const expanded = render(<verbose.ChatView {...verbose.props} />)
+    const shown = expanded.getByTestId('tool-seat-a').closest('[data-turn-process-member]')
+    expect(shown).toBeNull()
+    expanded.unmount()
+  })
+
+  it('shows the completed-turn usage panels in Detailed and drops them in Compact', () => {
+    const base = chatSnapshotFixture({
+      nodes: [user(1, 'hi'), assistant(2, 'done', 1)],
+      turnEnds: new Map([[1, 3]]),
+    })
+    const tailKey = base.order.find(key => key.includes('turn-tail'))
+    if (tailKey === undefined) throw new Error('fixture produced no turn-tail node')
+    const tail = base.nodes.get(tailKey)
+    if (tail === undefined) throw new Error('turn-tail missing from the node store')
+    const patched = {
+      ...tail,
+      data: {
+        ...tail.data as Record<string, unknown>,
+        tokenUsage: { uncachedInputTokens: 100, outputTokens: 20, cacheReadTokens: 50, cacheWriteTokens: 0 },
+      },
+    } as typeof tail
+    const nodes = {
+      get: (key: string) => key === tailKey ? patched : base.nodes.get(key),
+      values: base.nodes.values.bind(base.nodes),
+    }
+    const chat = { ...base, nodes }
+
+    const detailed = makeHarness({ chat })
+    const detailedView = render(<detailed.ChatView {...detailed.props} />)
+    expect(detailedView.queryByText(/用量 /)).not.toBeNull()
+    detailedView.unmount()
+
+    performanceUsageMode = 'compact'
+    const compact = makeHarness({ chat })
+    const compactView = render(<compact.ChatView {...compact.props} />)
+    expect(compactView.queryByText(/用量 /)).toBeNull()
+    compactView.unmount()
   })
 })
 

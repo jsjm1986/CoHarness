@@ -6,6 +6,7 @@ import { resolveSlotLabel, type BoundActions } from '@deepseek-ai/dsh-client-ui-
 import {
   createSnapshotStore, resolveWorkspacePath, workspacePathForResource, workspaceResourceAddress, type ISessions, type SessionId,
   permissionAvailabilitySource, permissionUnavailableReason, commitSessionNavigation,
+  type ObservableSnapshot,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
@@ -38,7 +39,7 @@ import { DisplaySettingsRow } from './settings/DisplaySettingsRow.tsx'
 import type { DisplaySettingsRowInjected } from './settings/DisplaySettingsRow.tsx'
 import { WorkbenchDisplayRow } from './settings/WorkbenchDisplayRow.tsx'
 import { ChatView } from './chat/ChatView.tsx'
-import { StatsPills } from './chat/StatsPills.tsx'
+import { StatsPills, type StatsPillsInjected } from './chat/StatsPills.tsx'
 import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { queueDockEntry } from './queue/QueueDock.tsx'
@@ -51,8 +52,15 @@ import { DetailsPanel } from './skeleton/DetailsPanel.tsx'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
-import { CONVERSATION_SETTINGS_NAMESPACE, type ConversationSettings } from '../submission-settings.ts'
+import { CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_TRANSCRIPT_VIEW_MODE, type ConversationSettings } from '../submission-settings.ts'
 import { ConversationDisplaySettings } from './display-settings.ts'
+import { TranscriptViewPolicy } from './transcript-view.ts'
+import { PerformanceUsagePolicy } from './performance-usage.ts'
+import { LinkOpeningPolicy } from './link-opening.ts'
+import { derivePresentationPolicy } from './presentation-policy.ts'
+import { TranscriptViewRow, type TranscriptViewRowInjected } from './settings/TranscriptViewRow.tsx'
+import { PerformanceUsageRow, type PerformanceUsageRowInjected } from './settings/PerformanceUsageRow.tsx'
+import { LinkOpeningRow, type LinkOpeningRowInjected } from './settings/LinkOpeningRow.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -90,6 +98,12 @@ const ABSENT_MENU_LAUNCHER = {
 }
 /** Registered identity of the developer-tools-gated trajectory view. */
 const TRAJECTORY_VIEW_ID = 'trajectory'
+
+/** Structural minimum of ui-sidebar-right's tab-type registry, reached via `ctx.reflect.get`. */
+interface BrowserTabsRegistry {
+  get(kind: string): unknown
+  subscribe(listener: () => void): () => void
+}
 
 const EMPTY_DOCUMENTS: readonly [] = []
 const ABSENT_DOCUMENTS = {
@@ -163,7 +177,6 @@ export function apply(ctx: Context): void {
 
 
   registerConversationNodes(ctx)
-  registerChatNodeRenderers(ctx)
 
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-conversation: dictionaries')
 
@@ -180,10 +193,52 @@ export function apply(ctx: Context): void {
   })
   const submissionPolicy = new ComposerSubmissionPolicy(conversationSettings)
   const displaySettings = new ConversationDisplaySettings(conversationSettings)
+  const transcriptView = new TranscriptViewPolicy(
+    conversationSettings, 'dshDesktop' in globalThis ? 'standard' : DEFAULT_TRANSCRIPT_VIEW_MODE)
+  const presentation = derivePresentationPolicy(transcriptView.mode)
+  const performancePolicy = new PerformanceUsagePolicy(conversationSettings)
+  const linkOpening = new LinkOpeningPolicy(conversationSettings)
   ctx.effect(() => () => {
     submissionPolicy.dispose()
     displaySettings.dispose()
+    transcriptView.dispose()
+    performancePolicy.dispose()
+    linkOpening.dispose()
   }, 'ui-conversation: settings observers')
+  registerChatNodeRenderers(ctx, performancePolicy.mode)
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'transcript-view',
+    order: 12,
+    locale: NS,
+    inject: (): TranscriptViewRowInjected => ({
+      hooks: { transcriptView: transcriptView.mode, settings: transcriptView.settings },
+      setTranscriptView: (mode) => { transcriptView.setMode(mode) },
+    }),
+  }, TranscriptViewRow))
+
+  // The destination choice only exists while a built-in Browser tab type is
+  // registered; assemblies without one keep the external default. The registry
+  // comes through the reflect layer: ui-sidebar-right's own project reference
+  // points back here, so a typed Context merge would close a reference cycle.
+  const sidebarRightTabs = ctx.reflect.get('sidebarRightTabs') as BrowserTabsRegistry | undefined
+  const browserAvailable: ObservableSnapshot<boolean> = sidebarRightTabs === undefined
+    ? { getSnapshot: () => false, subscribe: () => () => {} }
+    : {
+      getSnapshot: () => sidebarRightTabs.get('browser') !== undefined,
+      subscribe: listener => sidebarRightTabs.subscribe(listener),
+    }
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'link-opening',
+    order: 17,
+    locale: NS,
+    inject: (): LinkOpeningRowInjected => ({
+      hooks: { linkOpening: linkOpening.destination, browserAvailable, settings: linkOpening.settings },
+      setLinkOpening: (destination) => { linkOpening.setDestination(destination) },
+    }),
+  }, LinkOpeningRow))
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -208,6 +263,16 @@ export function apply(ctx: Context): void {
     locale: NS,
     inject: displaySettingsInject,
   }, DisplaySettingsRow))
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'performance-usage',
+    order: 32,
+    locale: NS,
+    inject: (): PerformanceUsageRowInjected => ({
+      hooks: { performanceUsage: performancePolicy.mode, settings: performancePolicy.settings },
+      setPerformanceUsage: (mode) => { performancePolicy.setMode(mode) },
+    }),
+  }, PerformanceUsageRow))
   // Same display-settings face inside the workbench sidebar panel: the hole is
   // declared by ui-workbench's sidebar registration and owned by this package.
   ctx.slots.inject('conversation.workbench.display', () => ctx.slots.register({
@@ -588,8 +653,11 @@ export function apply(ctx: Context): void {
           layout.openDetails(sessionId, target)
         },
         openExternalLink: (url) => {
-          if (ctx.bail('web/browser-open', { sessionId, url }) !== true) window.open(url, '_blank', 'noopener,noreferrer')
+          if (linkOpening.destination.getSnapshot() === 'sidebar'
+            && ctx.bail('web/browser-open', { sessionId, url }) === true) return
+          window.open(url, '_blank', 'noopener,noreferrer')
         },
+        presentation,
         fileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner),
         openFile: async (path, options) => {
           const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
@@ -642,7 +710,13 @@ export function apply(ctx: Context): void {
 
   // Session stats stick with the composer; the two pills expose time and
   // token/cache details without adding another runtime or transport path.
-  slots.register({ name: 'conversation.composer.dock', id: 'stats', order: 0, locale: NS }, StatsPills)
+  slots.register({
+    name: 'conversation.composer.dock',
+    id: 'stats',
+    order: 0,
+    locale: NS,
+    inject: (): StatsPillsInjected => ({ hooks: { performanceUsage: performancePolicy.mode } }),
+  }, StatsPills)
 
   // Class-plugin mount (packages/AGENTS.md service form): the service
   // registers itself as `conversation` and lives on its own child fiber.

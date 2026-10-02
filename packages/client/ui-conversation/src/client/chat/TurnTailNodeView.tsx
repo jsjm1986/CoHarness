@@ -1,18 +1,30 @@
 import { memo } from 'react'
-import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PerformanceUsageMode } from '../../submission-settings.ts'
 import type { ChatNodeViewProps, TurnTailOwnerProps } from '../contract/slots.ts'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import { TurnTimePanel, TurnUsagePanel } from './TurnUsagePanel.tsx'
 import { assistantText } from './turn-assistant.ts'
 import css from './TurnTailNodeView.module.css'
 
+/** Registration-side inject face carrying the live performance detail preference. */
+export interface TurnTailPerformanceInjected {
+  hooks: {
+    /** Persisted statistics detail bound as usePerformanceUsage. */
+    performanceUsage: ObservableSnapshot<PerformanceUsageMode>
+  }
+}
+
 type TurnTailNodeViewProps = ChatNodeViewProps<'turn-tail'>
   & PropsRenderSlots<'conversation.chat.turnTail' | 'conversation.chat.assistant-actions'>
+  & InjectFace<TurnTailPerformanceInjected>
 
 /** Turn-local actions and feature tail over the Location index, independent of Assistant placement. */
 export const TurnTailNodeView = memo(function TurnTailNodeView({
-  node, openFile, forkAt, renderSlot, renderSlotChain, t, useSession,
+  node, openFile, forkAt, renderSlot, renderSlotChain, t, useSession, usePerformanceUsage,
 }: TurnTailNodeViewProps) {
+  const detailed = usePerformanceUsage(mode => mode) === 'detailed'
   const data = node.data
   const hasLaterChatNode = useSession(snapshot =>
     snapshot.chat.locations.getTurn(data.turn).at(-1) !== node.key)
@@ -49,19 +61,21 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
         branchUnavailable={data.branchUnavailable || hasLaterChatNode}
         className={css.actions}
         extraActions={assistantActions}
-        usageAction={(
-          <>
-            {data.tokenUsage !== undefined && <TurnUsagePanel usage={data.tokenUsage} t={t} />}
-            {runMs !== undefined && (
-              <TurnTimePanel
-                runMs={runMs}
-                tokensPerSecond={data.tokensPerSecond}
-                ttftMs={data.ttftMs}
-                t={t}
-              />
-            )}
-          </>
-        )}
+        usageAction={!detailed
+          ? null
+          : (
+            <>
+              {data.tokenUsage !== undefined && <TurnUsagePanel usage={data.tokenUsage} t={t} />}
+              {runMs !== undefined && (
+                <TurnTimePanel
+                  runMs={runMs}
+                  tokensPerSecond={data.tokensPerSecond}
+                  ttftMs={data.ttftMs}
+                  t={t}
+                />
+              )}
+            </>
+          )}
         t={t}
       />
     </div>

@@ -54,7 +54,8 @@ async function bench(desktop = false, developerTools = stubDeveloperTools()) {
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
-  runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: developerTools.preference } as never)
+  const settingsScopeStub = stubSettingsScope()
+  runtime.provide('settingsScope', { bind: () => settingsScopeStub.scope, developerTools: developerTools.preference } as never)
   const sessionFake = sessionFakeFor()
   await runtime.sessions.add({
     id: ROOT,
@@ -128,7 +129,7 @@ async function bench(desktop = false, developerTools = stubDeveloperTools()) {
   return {
     runtime, feature, slots: runtime.slots, entryOf,
     conversationApi, conversationHeaderApi, residentApi, composerApi, chatViewApi, inputApi,
-    sessionFake, layoutFake,
+    sessionFake, layoutFake, settingsScopeStub,
   }
 }
 
@@ -281,6 +282,35 @@ describe('conversation slot inject API', () => {
     b.runtime.workspaces.stub('openPath', () => Promise.reject(new Error('xdg-open is not available')))
     const { injected } = b.chatViewApi(ROOT)
     await expect(injected.openFile('src/a.ts')).rejects.toThrow('xdg-open is not available')
+    await b.runtime.dispose()
+  })
+
+  it('routes external links to the browser bail or a new tab per the link-opening preference', async () => {
+    const b = await bench()
+    const windowOpen = vi.fn()
+    vi.stubGlobal('open', windowOpen)
+    const claimed: string[] = []
+    b.runtime.ctx.on('web/browser-open', ({ url }) => {
+      claimed.push(url)
+      return true
+    })
+    const { injected } = b.chatViewApi(ROOT)
+    expect(injected.openExternalLink).toBeDefined()
+    injected.openExternalLink?.('https://example.com/a')
+    expect(claimed).toEqual(['https://example.com/a'])
+    expect(windowOpen).not.toHaveBeenCalled()
+
+    b.settingsScopeStub.publish({
+      status: 'ready', writable: true,
+      value: {
+        busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13,
+        performanceUsage: 'detailed', linkOpening: 'new-tab',
+      },
+    })
+    injected.openExternalLink?.('https://example.com/b')
+    expect(claimed).toEqual(['https://example.com/a'])
+    expect(windowOpen).toHaveBeenCalledWith('https://example.com/b', '_blank', 'noopener,noreferrer')
+    vi.unstubAllGlobals()
     await b.runtime.dispose()
   })
 

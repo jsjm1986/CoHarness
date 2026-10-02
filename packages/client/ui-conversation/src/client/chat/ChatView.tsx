@@ -13,7 +13,7 @@
 // ChatNodeSeat subscribes to one Node key, so Assistant deltas and Tool
 // lifecycle updates replace only their own row without remounting it.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type {
   ConversationTimelineSnapshot, PendingSubmission, TurnNavigationItem,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -221,7 +221,7 @@ function TurnStatus({ startTime, t }: {
 export function ChatView({
   useSession, useSessions, useStore, renderSlot, sessionId, openFile, openDetails, openExternalLink, loadOlder,
   loadHistoryUntil, loadImage, inspectCall, chatScroll, forkAt,
-  fileMentions, t,
+  fileMentions, presentation, t,
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
   const nodeStore = useSession(s => s.chat.nodes)
@@ -239,6 +239,10 @@ export function ChatView({
   const historyWindowMode = useSession(s => s.historyWindowMode)
   const loadingOlder = useSession(s => s.loadingOlder)
   const selectedCallId = useStore(s => s.selection?.callId)
+  const presentationPolicy = useSyncExternalStore(
+    listener => presentation.subscribe(listener),
+    () => presentation.getSnapshot(),
+  )
   const [fileOpenError, setFileOpenError] = useState<{ path: string; message: string; options?: { line?: number } } | null>(null)
   const [fileOpenBusy, setFileOpenBusy] = useState(false)
   const [activeTurn, setActiveTurn] = useState<number | null>(null)
@@ -374,7 +378,8 @@ export function ChatView({
       if (turn === undefined) continue
       const process = processByTurn.get(turn)
       if (process === undefined || node.kind === 'turn-process') continue
-      const open = processOpen.get(turn) ?? (turn === runningTurn || turnProcessAlwaysOpen(node))
+      const open = processOpen.get(turn)
+        ?? (!presentationPolicy.foldCompletedTurns || turn === runningTurn || turnProcessAlwaysOpen(node))
       if (open) continue
       if (TURN_PROCESS_INDEPENDENT.has(node.kind)) continue
       if (process.answerAnchorSeq !== null
@@ -385,7 +390,7 @@ export function ChatView({
         && (process.answerAnchorSeq === null || node.anchorSeq < process.answerAnchorSeq)) folded.add(key)
     }
     return folded
-  }, [nodeStore, order, processByTurn, processOpen, runningTurn])
+  }, [nodeStore, order, processByTurn, processOpen, runningTurn, presentationPolicy])
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
@@ -754,7 +759,8 @@ export function ChatView({
               const process = turn === undefined ? undefined : processByTurn.get(turn)
               const open = turn === undefined || process === undefined
                 ? true
-                : processOpen.get(turn) ?? (turn === runningTurn || turnProcessAlwaysOpen(node))
+                : processOpen.get(turn)
+                  ?? (!presentationPolicy.foldCompletedTurns || turn === runningTurn || turnProcessAlwaysOpen(node))
               const folded = foldedKeys.has(nodeKey)
               const turnProcess = node?.kind === 'turn-process' && turn !== undefined
                 ? { open, setOpen: (value: boolean) => {
@@ -779,6 +785,7 @@ export function ChatView({
                   forkAt={forkAt}
                   renderMessageImages={renderMessageImages}
                   fileMentions={fileMentions}
+                  presentation={presentationPolicy}
                   {...turnProcess === undefined ? {} : { turnProcess }}
                   renderSlot={renderSlot}
                   t={t}

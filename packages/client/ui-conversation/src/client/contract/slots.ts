@@ -24,6 +24,7 @@ import type { createConversationViewportStore } from '../viewport.ts'
 import type { createChatStore } from '../stores.ts'
 import type { ConversationDisplaySettingsSnapshot } from '../display-settings.ts'
 import type { BusyEnterBehavior } from './composer-submission.ts'
+import type { ChatPresentationPolicy } from '../presentation-policy.ts'
 import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
 import type { ToolCallId, SelectionTarget, ViewTab } from './views.ts'
 
@@ -505,6 +506,8 @@ export interface ChatNodeOwnerProps {
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
   /** Turn-process disclosure controller for the process summary row. */
   turnProcess?: { readonly open: boolean; readonly setOpen: (open: boolean) => void }
+  /** Active work-details presentation policy; absent in runtimes without the preference. */
+  presentation?: ChatPresentationPolicy | undefined
 }
 
 /** Full props of one registered keyed Chat business renderer. */
@@ -972,6 +975,8 @@ export interface ChatViewInjected {
   }
   /** Fork through the completed turn ending at the eligible message `seq`, then open the child. */
   forkAt: (seq: number) => void
+  /** Live work-details presentation policy derived from the persisted transcriptView preference. */
+  presentation: ObservableSnapshot<ChatPresentationPolicy>
   /**
    * Prose file-mention vocabulary for one closing message, from the optional
    * {@link ChatFileMentions} service (resolved lazily per call, so composing

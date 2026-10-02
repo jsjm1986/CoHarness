@@ -23,7 +23,7 @@ describe('ConversationDisplaySettings', () => {
     stub.publish({
       status: 'ready',
       writable: true,
-      value: { busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13 },
+      value: { busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13, performanceUsage: 'detailed', linkOpening: 'sidebar' },
       write: { status: 'idle' },
     })
     settings.setWidth(840)
@@ -32,7 +32,7 @@ describe('ConversationDisplaySettings', () => {
     stub.publish({ write: { status: 'saving' } })
     expect(settings.width()).toBe(840)
     stub.publish({
-      value: { busyEnter: 'queue', chatContentWidth: 840, chatFontSize: 13 },
+      value: { busyEnter: 'queue', chatContentWidth: 840, chatFontSize: 13, performanceUsage: 'detailed', linkOpening: 'sidebar' },
       write: { status: 'idle' },
     })
     expect(settings.width()).toBe(840)
@@ -45,7 +45,7 @@ describe('ConversationDisplaySettings', () => {
     stub.publish({
       status: 'ready',
       writable: true,
-      value: { busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13 },
+      value: { busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13, performanceUsage: 'detailed', linkOpening: 'sidebar' },
       write: { status: 'idle' },
     })
     settings.setFullWidth(true)
@@ -57,7 +57,7 @@ describe('ConversationDisplaySettings', () => {
     expect(stub.set).toHaveBeenCalledWith('chatFullWidth', false)
 
     stub.publish({
-      value: { busyEnter: 'queue', chatContentWidth: 900, chatFontSize: 13, chatFullWidth: false },
+      value: { busyEnter: 'queue', chatContentWidth: 900, chatFontSize: 13, chatFullWidth: false, performanceUsage: 'detailed', linkOpening: 'sidebar' },
       write: { status: 'idle' },
     })
     expect(settings.getSnapshot().chatFullWidth).toBe(false)
@@ -69,7 +69,7 @@ describe('ConversationDisplaySettings', () => {
     stub.publish({
       status: 'ready',
       writable: true,
-      value: { busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13 },
+      value: { busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13, performanceUsage: 'detailed', linkOpening: 'sidebar' },
       write: { status: 'idle' },
     })
     settings.setFontSize(17)
