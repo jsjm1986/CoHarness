@@ -6,6 +6,10 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { resolveWorkspacePath } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+// Type-only: the ctx.settingsScope Context merge (the developerTools member
+// supplies the changed-files gate). Cross-plugin collaboration goes through
+// the service, never a value import.
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { changesReviewAddress } from '../changes.ts'
 import { ChangesDiffStore } from './changes-diff.ts'
 import { ChangesSummaryStore } from './changes-summary.ts'
@@ -32,7 +36,9 @@ export { ProducedFiles, type ProducedFilesProps } from './ProducedFiles.tsx'
 export { producedForClosing } from './turn-deliverables.ts'
 
 /** Required services for the tail-slot registration and its dictionaries. */
-export const inject = ['slots', 'locale', 'conversationEvents', 'connection', 'sessions', 'sidebarRightTabs', 'sidebarRight']
+export const inject = [
+  'slots', 'locale', 'conversationEvents', 'connection', 'sessions', 'sidebarRightTabs', 'sidebarRight', 'settingsScope',
+]
 
 /**
  * Client plugin body: register the dictionaries and the turn-tail entry.
@@ -127,6 +133,7 @@ export function apply(ctx: ClientContext): void {
         hooks: {
           presentedOpen: opener.state, presentedHost: opener.host, presentedApps: opener.apps,
           changesSummary: summaries.state, changesDiff: diffs.state,
+          showCodeDiff: ctx.settingsScope.developerTools.enabled,
         },
         reloadPresentedHost: () => opener.loadHost(),
         loadChangesSummary: (id, seq) => summaries.load(id, seq),

@@ -11,12 +11,13 @@ import { apply, inject } from '../src/client/index.ts'
 import { SettingsSchemaService } from '../src/client/schema.ts'
 import { SettingsScopeBinder } from '../src/client/settings-scope.ts'
 import { apply as nodeApply } from '../src/index.ts'
+import { DeveloperToolsSettingsSchema } from '../src/developer-tools-settings.ts'
 
 /** Boot the browser half over a fake connection and test remote events. */
-function bench(isLoopback = true) {
+function bench(isLoopback = true, namespaces: unknown[] = []) {
   const describeCall = vi.fn().mockResolvedValue({
     rpcId: 'plugin-bench' as never,
-    result: { ok: true, value: { writable: true, hasDocument: true, namespaces: [] } },
+    result: { ok: true, value: { writable: true, hasDocument: true, namespaces } },
   })
   const ctx = new Context()
   ctx.provide('connection', {
@@ -53,6 +54,23 @@ describe('settings domain base plugin', () => {
     await fiber.dispose()
   })
 
+  it('serves the shared developer-tools preference from the ui-settings namespace', async () => {
+    const { ctx, describeCall, fiber } = bench(true, [{
+      ns: 'ui-settings',
+      schema: DeveloperToolsSettingsSchema.toJSON(),
+      value: { enabled: true },
+      applies: 'live',
+      secrets: [],
+      revision: 0,
+    }])
+    await fiber.await()
+    await vi.waitFor(() => {
+      expect(ctx.settingsScope.developerTools.enabled.getSnapshot()).toBe(true)
+    })
+    expect(describeCall).toHaveBeenCalledTimes(1)
+    await fiber.dispose()
+  })
+
   it('fiber disposal retires the service and its invalidation subscriptions', async () => {
     const { ctx, describeCall, fiber } = bench()
     await fiber.await()
@@ -68,7 +86,13 @@ describe('settings domain base plugin', () => {
 })
 
 describe('ui-settings node half', () => {
-  it('the node apply is an inert loader seat', () => {
-    expect(() => { nodeApply() }).not.toThrow()
+  it('defers the developer-tools namespace registration until a settings provider exists', async () => {
+    const ctx = new Context()
+    expect(() => { nodeApply(ctx) }).not.toThrow()
+    const register = vi.fn()
+    ctx.provide('settings', { register } as never)
+    await vi.waitFor(() => {
+      expect(register).toHaveBeenCalledWith('ui-settings', expect.anything())
+    })
   })
 })

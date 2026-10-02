@@ -27,6 +27,8 @@ export interface DeliverablesInjected {
     presentedApps: ObservableSnapshot<ReturnType<PresentedOpenController['apps']['getSnapshot']>>
     changesSummary: ObservableSnapshot<ReturnType<ChangesSummaryStore['state']['getSnapshot']>>
     changesDiff: ObservableSnapshot<ReturnType<ChangesDiffStore['state']['getSnapshot']>>
+    /** Shared developer-tool enablement gating the changed-files card. */
+    showCodeDiff: ObservableSnapshot<boolean>
   }
   reloadPresentedHost: PresentedOpenController['loadHost']
   loadChangesSummary: ChangesSummaryStore['load']
@@ -69,15 +71,17 @@ export function DeliverablesTail(props: PropsRuntime<'conversation.chat.turnTail
 export function Deliverables({
   matched, openFile, t, sessionId, useSessions, openPresented, openChangesReview, usePresentedOpen, usePresentedHost,
   usePresentedApps, useChangesSummary, useChangesDiff, reloadPresentedHost, loadChangesSummary, loadChangesDiff, loadPresentedApps,
+  useShowCodeDiff,
 }: Pick<TurnTailOwnerProps, 'openFile'> & {
   matched: DeliverablesMatch
 } & PropsLocale<typeof NS> & Pick<SessionStandardProps, 'sessionId'> & Pick<GlobalStandardProps, 'useSessions'> & InjectFace<DeliverablesInjected>) {
   const [expanded, setExpanded] = useState(false)
+  const showCodeDiff = useShowCodeDiff(value => value)
   const cwd = useSessions(state => state.byId[sessionId]?.cwd)
   const states = usePresentedOpen(value => value)
   const apps = usePresentedApps(value => value)
   const host = usePresentedHost(value => value)
-  const announced = matched.changes
+  const announced = showCodeDiff ? matched.changes : null
   const summary = useChangesSummary(value => announced === null ? undefined : value[changesSummaryUrl(sessionId, announced.seq)])
   useEffect(() => {
     if (announced !== null && summary === undefined) void loadChangesSummary(sessionId, announced.seq)

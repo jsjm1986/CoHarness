@@ -304,6 +304,7 @@ describe('the new-session chip controller', () => {
       failList?: string
       throwOn?: 'list' | 'select'
       modeSelection?: boolean
+      developerTools?: boolean
       list?: () => Promise<{
         ok: true
         value: { presets: unknown[]; authorable: boolean; modeSelectionEnabled: boolean }
@@ -332,7 +333,11 @@ describe('the new-session chip controller', () => {
         },
       },
     } as unknown as Pick<ClientRemote, 'agentPresets'>
-    return new AgentPresetSeatController(remote, () => current as SeatSessionSummary | undefined)
+    const developerTools = options.developerTools ?? true
+    return new AgentPresetSeatController(remote, () => current as SeatSessionSummary | undefined, undefined, {
+      getSnapshot: () => developerTools,
+      subscribe: () => () => {},
+    })
   }
 
   const ROSTER: { id: string; trust: 'system' | 'user'; isDefault: boolean }[] = [
@@ -441,6 +446,18 @@ describe('the new-session chip controller', () => {
 
     await controller.select('minimal')
 
+    expect(writes).toEqual([])
+  })
+
+  it('refuses to compose a pick while developer tools are disabled', async () => {
+    const writes: Recorded[] = []
+    const controller = chip(
+      ROSTER, { id: 's1', blank: true, agentPreset: 'standard' }, { writes, developerTools: false })
+    await controller.load()
+    await controller.select('minimal')
+
+    // The picker is hidden under the same preference, so a stage reaching
+    // apply here came from a stale surface and must not land.
     expect(writes).toEqual([])
   })
 

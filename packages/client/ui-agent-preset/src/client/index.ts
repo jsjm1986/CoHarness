@@ -142,7 +142,7 @@ export function apply(ctx: ClientContext): void {
         }
     }, (sessionId, agentPreset) => {
       scope.sessions.noteAgentPreset(sessionId as never, agentPreset)
-    })
+    }, ctx.settingsScope.developerTools.enabled)
     seatRef = seat
 
     const panes = new Map<SessionId, { seat: AgentPresetSeatController; labels: AgentPresetSettingsController }>()
@@ -170,7 +170,7 @@ export function apply(ctx: ClientContext): void {
             ...(summary.agentPreset === undefined ? {} : { agentPreset: summary.agentPreset }) }
         }, (sessionId, preset) => {
           if (scope.sessions.binding(id) === binding) scope.sessions.noteAgentPreset(sessionId as SessionId, preset)
-        }),
+        }, ctx.settingsScope.developerTools.enabled),
         labels: new AgentPresetSettingsController(connection.forSession?.(id).api ?? api, remote, ctx.settingsScope.describe()),
       }
       panes.set(id, owned)
@@ -183,7 +183,10 @@ export function apply(ctx: ClientContext): void {
     const seatInjected = (id?: SessionId): AgentPresetSeatInjected => {
       const selected = id === undefined || scope.sessions.keyFor === undefined ? seat : pane(id).seat
       return {
-        hooks: { agentPresetSeat: selected.store },
+        hooks: {
+          agentPresetSeat: selected.store,
+          developerTools: ctx.settingsScope.developerTools.enabled,
+        },
         load: () => selected.load(),
         select: (preset: string) => selected.select(preset),
         introduced: () => { selected.introduced() },
@@ -196,6 +199,14 @@ export function apply(ctx: ClientContext): void {
     }
 
     scope.effect(() => {
+      // Turning Developer tools off clears every staged pick before any
+      // apply can compose it — `apply()` drops the stage itself.
+      const developerTools = ctx.settingsScope.developerTools.enabled
+      const stopGate = developerTools.subscribe(() => {
+        if (developerTools.getSnapshot()) return
+        void seat.apply()
+        for (const value of panes.values()) void value.seat.apply()
+      })
       // Connecting a workspace either creates a blank session or reuses one,
       // and either way the chip's pick predates it — so the stage is applied
       // when the session arrives, not when it was made.
@@ -246,6 +257,7 @@ export function apply(ctx: ClientContext): void {
         inject: labelInjected,
       }, AgentPresetLabel)
       return () => {
+        stopGate()
         stop()
         settingsMoved()
         presetSelected()

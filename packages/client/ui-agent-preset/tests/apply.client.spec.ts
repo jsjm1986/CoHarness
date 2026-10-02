@@ -23,6 +23,10 @@ import { AgentPresetSeat } from '../src/client/AgentPresetSeat.tsx'
 import type { AgentPresetSeatInjected } from '../src/client/AgentPresetSeat.tsx'
 import { AgentPresetSeatController } from '../src/client/seat-store.ts'
 import { apply as nodeApply } from '../src/index.ts'
+import { DeveloperToolsSettingsSchema } from '@deepseek-ai/dsh-client-ui-settings'
+
+/** Serialized section schema the Host would serve for the `ui-settings` namespace. */
+const DEVELOPER_TOOLS_ENVELOPE = DeveloperToolsSettingsSchema.toJSON()
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
 // so browser-language detection never runs and a fresh LocaleRuntime opens on
@@ -134,7 +138,18 @@ async function bench(
         // The row reads this to learn whether this browser may write at all.
         describe: () => Promise.resolve({
           rpcId: 'r',
-          result: { ok: true as const, value: { writable: true, hasDocument: true, namespaces: [] } },
+          result: { ok: true as const, value: {
+            writable: true,
+            hasDocument: true,
+            namespaces: [{
+              ns: 'ui-settings',
+              schema: DEVELOPER_TOOLS_ENVELOPE,
+              value: { enabled: true },
+              applies: 'live' as const,
+              secrets: [],
+              revision: 0,
+            }],
+          } },
         }),
         update: async (payload: { patch: { default?: unknown; modeSelectionEnabled?: unknown } }) => {
           calls.push(`settings:${JSON.stringify(payload.patch)}`)
@@ -845,6 +860,9 @@ describe('ui-agent-preset apply', () => {
 })
 
 describe('AgentPresetSeatController reconciliation', () => {
+  /** Accepted developer-tools preference: selection gates need it on. */
+  const devToolsOn = { getSnapshot: () => true, subscribe: () => () => {} }
+
   it('does not capture a non-blank session', () => {
     const controller = new AgentPresetSeatController(
       {} as never,
@@ -862,6 +880,8 @@ describe('AgentPresetSeatController reconciliation', () => {
     const controller = new AgentPresetSeatController(
       { agentPresets: { select } } as never,
       () => current,
+      undefined,
+      devToolsOn,
     )
     const captured = controller.blankSessionId()
     if (captured === undefined) throw new Error('expected a blank session')
@@ -889,6 +909,8 @@ describe('AgentPresetSeatController reconciliation', () => {
         },
       } as never,
       () => ({ id: 's1' as never, blank: true }),
+      undefined,
+      devToolsOn,
     )
     controller.stage('minimal')
 

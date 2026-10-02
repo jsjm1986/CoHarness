@@ -15,7 +15,7 @@
 // chat-toolview-slot.spec.tsx.
 
 import { describe, expect, it, vi } from 'vitest'
-import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionBehaviorOverrides } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { ISession, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -45,7 +45,7 @@ function sessionFakeFor() {
   } satisfies SessionBehaviorOverrides
 }
 
-async function bench(desktop = false) {
+async function bench(desktop = false, developerTools = stubDeveloperTools()) {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', {
     api: { settings: {} }, isLoopback: desktop,
@@ -54,7 +54,7 @@ async function bench(desktop = false) {
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
-  runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+  runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: developerTools.preference } as never)
   const sessionFake = sessionFakeFor()
   await runtime.sessions.add({
     id: ROOT,
@@ -422,6 +422,24 @@ describe('conversation slot inject API', () => {
     off()
     off2()
     unsub()
+    await b.runtime.dispose()
+  })
+
+  it('filters the trajectory view while developer tools are disabled', async () => {
+    const developerTools = stubDeveloperTools()
+    const b = await bench(false, developerTools)
+    const off = b.slots.register(
+      { name: 'conversation.view', id: 'trajectory', order: 4, label: 'T' } as never, (() => null) as never)
+    const { injected } = b.conversationApi(ROOT)
+    await Promise.resolve() // ledger notifications batch per microtask
+    expect(injected.views.list().map(v => v.id)).toEqual(['chat', 'trajectory'])
+    const version = injected.views.version()
+    developerTools.publish(false)
+    expect(injected.views.list().map(v => v.id)).toEqual(['chat'])
+    expect(injected.views.version()).toBeGreaterThan(version)
+    developerTools.publish(true)
+    expect(injected.views.list().map(v => v.id)).toEqual(['chat', 'trajectory'])
+    off()
     await b.runtime.dispose()
   })
 })

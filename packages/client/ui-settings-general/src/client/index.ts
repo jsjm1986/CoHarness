@@ -21,6 +21,7 @@ import type {
 } from './shell-contract.ts'
 import { SettingsRoot } from './SettingsRoot.tsx'
 import { CloseLabel, HeaderContent, TriggerContent } from './chrome.tsx'
+import { DeveloperToolsRow, type DeveloperToolsRowInjected } from './DeveloperToolsRow.tsx'
 import { GeneralSection } from './GeneralSection.tsx'
 import { SettingsDocumentAction } from './SettingsDocumentAction.tsx'
 import type { SettingsDocumentActionInjected } from './SettingsDocumentAction.tsx'
@@ -33,6 +34,7 @@ import { en, zh, type SettingsKey } from './locales.ts'
 export type {
   CloseLabelProps, HeaderContentProps, TriggerContentProps,
 } from './chrome.tsx'
+export type { DeveloperToolsRowInjected } from './DeveloperToolsRow.tsx'
 export type {
   GeneralSectionComponentProps,
 } from './GeneralSection.tsx'
@@ -197,6 +199,13 @@ export function apply(ctx: ClientContext): void {
   }
   ctx.slots.inject('settings.close', () =>
     ctx.slots.register({ name: 'settings.close', locale: NS }, CloseLabel))
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item', id: 'developer-tools', order: 15, locale: NS,
+    inject: (): DeveloperToolsRowInjected => ({
+      hooks: { developerTools: ctx.settingsScope.developerTools.enabled },
+      setEnabled: enabled => ctx.settingsScope.developerTools.setEnabled(enabled),
+    }),
+  }, DeveloperToolsRow))
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     id: 'general',

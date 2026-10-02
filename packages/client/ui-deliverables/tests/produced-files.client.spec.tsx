@@ -19,7 +19,7 @@ import type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply as applyLocale, inject as localeInject } from '@deepseek-ai/dsh-client-locale/client'
 import type { ChatFileMentions, TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { makeTranslate, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { makeTranslate, stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
 import { ProducedFiles, type ProducedFilesProps } from '../src/client/ProducedFiles.tsx'
 import {
   changesForClosing, presentedForClosing, basename, deliverablesDefinition, producedFileMentions, producedForClosing, selectProducedFiles,
@@ -431,7 +431,7 @@ describe('plugin registration', () => {
     ctx.provide('sidebarRight', { openSessionResource: vi.fn() } as never)
     ctx.provide('sidebarRightTabs', { register: () => () => {} } as never)
     ctx.provide('remote', { $on: () => () => {} } as never)
-    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
     try {
       await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
       await ctx.plugin({ inject: [...inject], apply }).await()
@@ -495,7 +495,7 @@ describe('plugin registration', () => {
     ctx.provide('sidebarRight', { openSessionResource: navigate } as never)
     ctx.provide('sidebarRightTabs', { register: () => () => {} } as never)
     ctx.provide('remote', { $on: () => () => {} } as never)
-    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
     try {
       await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
       const fiber = ctx.plugin({ inject: [...inject], apply })
@@ -579,7 +579,7 @@ describe('plugin registration', () => {
     ctx.provide('sidebarRight', { openResource: vi.fn() } as never)
     ctx.provide('sidebarRightTabs', { register: () => () => {} } as never)
     ctx.provide('remote', { $on: () => () => {} } as never)
-    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
     await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
 
     const fiber = ctx.plugin({ inject: [...inject], apply })
@@ -641,6 +641,7 @@ function openProps(controller = new PresentedOpenController(() => ({ name: '', a
     openChangesReview: vi.fn<DeliverablesInjected['openChangesReview']>(),
     usePresentedOpen: <T,>(select: (state: ReturnType<typeof controller.state.getSnapshot>) => T): T =>
       select(controller.state.getSnapshot()),
+    useShowCodeDiff: <T,>(select: (state: boolean) => T): T => select(true),
   }
 }
 const changedFile = (display: string, added = 1, deleted = 0, extra: { binary?: true; oversized?: true; path?: string } = {}) =>
@@ -965,6 +966,27 @@ it.each([{}, { turn: '1', callId: 'bad', files: [] },
   const view = render(<Deliverables {...openProps(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), summaries)} matched={matched} openFile={owner.openFile} sessionId={SessionId('session')} t={makeTranslate(en)} />)
   expect(view.getByText('Edited a.txt')).toBeTruthy()
   expect(view.queryByText('Deliverables')).toBeNull()
+})
+
+it('withholds the changed-files card while developer tools are disabled', () => {
+  const value = assembler([
+    at(1, 'turn/start', { turn: 1 }),
+    call(2, 'write-a', diff('a.txt')),
+    result(3, 'write-a'),
+    at(4, 'deliverables/presented', { turn: 1, callId: 'x', files: [{ path: 'report.txt' }] }),
+    at(5, 'workspace/changes', { turn: 1 }),
+  ])
+  const owner = tailOwner(deliverablesOf(value), 6)
+  const matched = selectDeliverables(owner)!
+  const summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))
+  summaries.state.set({ [changesSummaryUrl(SessionId('session'), 5)]: { turn: 1, files: [{ path: 'a.txt', display: 'a.txt', added: 1, deleted: 0 }], total: 1, added: 1, deleted: 0 } })
+  const view = render(<Deliverables
+    {...openProps()}
+    useShowCodeDiff={<T,>(select: (state: boolean) => T): T => select(false)}
+    matched={matched} openFile={owner.openFile} sessionId={SessionId('session')} t={makeTranslate(en)} />)
+  // The announced diff is withheld; delivered files still list.
+  expect(view.queryByText('Edited a.txt')).toBeNull()
+  expect(view.queryByText('report.txt')).toBeTruthy()
 })
 
 it('shows descriptions and falls back to file metadata without hiding extensionless deliveries', () => {

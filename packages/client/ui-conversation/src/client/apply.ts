@@ -88,6 +88,9 @@ const ABSENT_MENU_LAUNCHER = {
   getSnapshot: (): string | null => null,
   subscribe: () => () => {},
 }
+/** Registered identity of the developer-tools-gated trajectory view. */
+const TRAJECTORY_VIEW_ID = 'trajectory'
+
 const EMPTY_DOCUMENTS: readonly [] = []
 const ABSENT_DOCUMENTS = {
   getSnapshot: () => EMPTY_DOCUMENTS,
@@ -218,19 +221,26 @@ export function apply(ctx: Context): void {
   // persisted: a fresh page load keeps the open-jump-to-bottom default.
   const chatScrollPositions = new Map<SessionId, ChatScrollPosition>()
 
+  const developerTools = ctx.settingsScope.developerTools.enabled
   const viewTabs = (): ViewTab[] => {
     const tabs: ViewTab[] = []
+    const developerViews = developerTools.getSnapshot()
     for (const entry of slots.entries('conversation.view')) {
       /* v8 ignore next -- unreachable: list registration validates id at load. */
       if (entry.options.id === undefined) continue
+      if (!developerViews && entry.options.id === TRAJECTORY_VIEW_ID) continue
       tabs.push({ id: entry.options.id, label: resolveSlotLabel(entry.options.label) ?? entry.options.id })
     }
     return tabs
   }
   const views = {
     list: viewTabs,
-    subscribe: (fn: () => void) => slots.subscribe('conversation.view', fn),
-    version: () => slots.getVersion('conversation.view'),
+    subscribe: (fn: () => void) => {
+      const stopSlot = slots.subscribe('conversation.view', fn)
+      const stopPreference = developerTools.subscribe(fn)
+      return () => { stopSlot(); stopPreference() }
+    },
+    version: () => slots.getVersion('conversation.view') + (developerTools.getSnapshot() ? 0 : 1),
   }
 
   // The per-session input machine registry (SessionInputResolver face; published as
@@ -609,7 +619,7 @@ export function apply(ctx: Context): void {
         // the first view, and the untouched inspect target stays inert.
         inspectCall: (callId) => {
           actions.setInspect({ callId })
-          actions.setView('trajectory')
+          actions.setView(TRAJECTORY_VIEW_ID)
         },
         chatScroll: {
           save: (position) => {
