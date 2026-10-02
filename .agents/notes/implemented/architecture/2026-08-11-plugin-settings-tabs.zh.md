@@ -32,6 +32,6 @@ Status: implemented
 
 Settings 只有一行“插件”导航，排在“Agent 预设”之前，包含**插件配置**与**插件列表**两个标签页。“Agent 预设”仍是独立分区，因为它编辑每个会话的 agent 组装，而非实时 Host Loader 树。
 
-功能所有权保持明确：`ui-settings-plugins` 拥有“插件”页面与可编辑卡片，`ui-settings-plugin-inventory` 拥有只读清单视图，Host／RPC 路径不变。新的“插件”视图只需注册一个 `settings.plugins.tab` 贡献即可加入。
+功能所有权保持明确：`ui-settings-plugins` 拥有“插件”页面与可编辑卡片，`ui-settings-plugin-inventory` 拥有清单视图——含经管理员授权的启停开关（见[授权门控的插件启停](../feature/2026-10-02-grant-gated-plugin-enablement.zh.md)）——Host／RPC 路径不变。新的“插件”视图只需注册一个 `settings.plugins.tab` 贡献即可加入。
 
 该聚合依赖分区拥有方被组装：没有 `ui-settings-plugins` 时，`ui-settings-plugin-inventory` 会等待标签 slot 的声明且不渲染任何内容。这是通过 slot 注册表承载的有意组合依赖，而不是静态包 import。

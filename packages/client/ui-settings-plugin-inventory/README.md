@@ -1,5 +1,5 @@
 ---
-description: "Scope-grouped read-only plugin inventory tab in Web Plugins settings for the dsh web client: agent-preset compositions first, the global plane behind a disclosure, search across both."
+description: "Scope-grouped plugin inventory tab in Web Plugins settings for the dsh web client: agent-preset compositions first, the global plane behind a disclosure, search across both, and administrator-granted enablement switches."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The **Plugin list** tab lets Web users inspect plugins without changing their configuration. It lists agent presets, open by default, then the collapsed global inventory; a search opens both. Cards show localized titles and descriptions when available, identify instances by stable entry id, and expose enablement, source details, runtime status, disabled conditions, and discovery failures; preset-provided global entries name their presets. Search covers both groups and points to matches in other presets. The tab handles loading, empty, no-match, failure, and retry states without exposing transport details, and still shows the global inventory without a preset roster.
+The **Plugin list** tab lets Web users inspect plugins and, when an administrator has granted plugin management, change their enablement. It lists agent presets, open by default, then the collapsed global inventory; a search opens both. Cards show localized titles and descriptions when available, identify instances by stable entry id, and expose enablement, source details, runtime status, disabled conditions, and discovery failures; preset-provided global entries name their presets. Search covers both groups and points to matches elsewhere. The tab handles loading, empty, no-match, failure, and retry states without exposing transport details, and shows the global inventory without a preset roster.
 
 ## Table of Contents
 
@@ -28,6 +28,10 @@ The **Plugin list** tab lets Web users inspect plugins without changing their co
 Open the Plugins section in Settings and select the **Plugin list** tab to inspect the Host's plugin inventory. The tab reads no Remote during plugin activation — selecting it for the first time mounts the component and lazily calls `ctx.remote.pluginInventory.list()` through `api-remotes`.
 
 A failed installation with pending pnpm build permissions offers **Allow these scripts and retry**. The action displays the exact package names and persistent permission scope, then retries the original package spec and activation choice. One click approves the entire displayed group, which can include pending packages from earlier attempts. Closing the page grants no permission.
+
+### Enablement under an administrator grant
+
+When the Host reports a plugin manager, the tab probes management authorization by calling `pluginManager.listPlugins()` — the manager's own authorization answers the grant, so the probe can never diverge from what mutations allow. A granted viewer sees an enablement switch inside each expanded global-plane card whose entry carries a profile-patch address; protected rows such as the manager itself stay switch-free. Toggling calls `pluginManager.setPluginEnabled` and re-reads the inventory. A denied viewer sees a notice to contact an administrator and the inventory stays read-only; a deployment without a plugin manager shows neither the notice nor switches. Preset-composition rows remain read-only in every state.
 
 ### Reading a card
 
@@ -96,7 +100,7 @@ None; this package neither assembles nor sends a provider request.
 These limits define the freshness and reach of the inventory view; they are current package constraints.
 
 - **One snapshot per Settings mount or retry** — the tab does not subscribe to Loader changes or automatically refetch after reconnect; switching tabs preserves the current snapshot, while reopening Settings obtains a new one.
-- **Read-only in both planes** — the tab shows global and preset enablement but mutates neither; enable/disable controls that write a custom preset's own composition file are deliberate follow-up work.
+- **Preset rows stay read-only** — global entries gain enablement switches under the administrator grant, while preset compositions still display enablement without mutating it; controls that write a custom preset's own composition file are deliberate follow-up work.
 
 <a id="dev-note"></a>
 ### Dev Note
@@ -108,4 +112,4 @@ None.
 
 </details>
 
-**Runtime invariant:** No companion is published. This package owns a read-only Settings contribution.
+**Runtime invariant:** No companion is published. This package owns a grant-gated Settings contribution.

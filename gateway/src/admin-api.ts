@@ -558,9 +558,11 @@ async function dispatch(
   }
 
   if ((pathname === '/admin/api/desktops/permissions' || pathname === '/admin/api/terminals/permissions'
-    || pathname === '/admin/api/ssh/permissions') && (method === 'GET' || method === 'POST')) {
-    const resource = pathname.includes('/terminals/') ? 'terminal' : pathname.includes('/ssh/') ? 'ssh' : 'desktop'
-    const access = resource === 'terminal' ? deps.terminalAccess : resource === 'ssh' ? deps.sshAccess : deps.desktopAccess
+    || pathname === '/admin/api/ssh/permissions' || pathname === '/admin/api/plugins/permissions') && (method === 'GET' || method === 'POST')) {
+    const resource = pathname.includes('/terminals/') ? 'terminal' : pathname.includes('/ssh/') ? 'ssh'
+      : pathname.includes('/plugins/') ? 'plugin' : 'desktop'
+    const access = resource === 'terminal' ? deps.terminalAccess : resource === 'ssh' ? deps.sshAccess
+      : resource === 'plugin' ? deps.pluginAccess : deps.desktopAccess
     if (access === undefined) { sendError(res, 503, `${resource}-access-unavailable`); return true }
     if (method === 'GET') {
       const query = new URL(req.url ?? pathname, 'http://admin').searchParams

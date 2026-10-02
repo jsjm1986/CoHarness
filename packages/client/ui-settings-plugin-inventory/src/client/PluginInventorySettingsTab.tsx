@@ -1,13 +1,14 @@
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import type { ClientEntryState } from '@deepseek-ai/dsh-client-modules/client'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
-import type { PluginInventorySnapshot } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ChangeResult, PluginInfo, PluginInventorySnapshot } from '@deepseek-ai/dsh-api-remotes/client'
 import type { LocalizedText } from '@deepseek-ai/dsh-package-manifest'
 import {
   IconChevronDownOutline14,
   IconSearchOutline16,
   Menu,
   StateDot,
+  Switch,
   Tag,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { StateDotState, TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -19,6 +20,16 @@ type PluginInventoryEntry = PluginInventorySnapshot['entries'][number]
 type AgentPresetGroup = NonNullable<PluginInventorySnapshot['agentPresets']>[number]
 type AgentPresetRow = AgentPresetGroup['rows'][number]
 
+/**
+ * The viewer's plugin-management grant: `granted` carries the manager's own
+ * rows so their patch addresses key the switches; `denied` asks the viewer to
+ * contact an administrator; `unavailable` means the manager answered with a
+ * non-authorization failure and the inventory stays read-only.
+ */
+export type ManagementProbe =
+  | { readonly status: 'unavailable' | 'denied' }
+  | { readonly status: 'granted'; readonly plugins: readonly PluginInfo[] }
+
 /** Registration-side Remote face used by the section. */
 export interface PluginInventorySettingsTabInjected {
   /** Resolve local package text in the current Client locale at render time. */
@@ -29,6 +40,13 @@ export interface PluginInventorySettingsTabInjected {
   retryClient: () => void
   /** Read a current Host inventory snapshot. */
   list: () => Promise<PluginInventorySnapshot>
+  /**
+   * Probe plugin-management authorization through the manager's own listing,
+   * so the answer can never diverge from what the mutations allow.
+   */
+  management: () => Promise<ManagementProbe>
+  /** Persist one global entry's enablement through the manager. */
+  setPluginEnabled: (entryId: PluginInfo['entryId'], enabled: boolean) => Promise<ChangeResult>
   /**
    * Display name for one preset: shipped presets resolve through the
    * agent-preset dictionaries, user-authored ones keep their own metadata.
@@ -248,9 +266,9 @@ function StateTag({ kind, label }: { readonly kind: EnablementKind; readonly lab
   return kind === 'enabled' ? null : <Tag tone={TAG_TONES[kind]}>{label}</Tag>
 }
 
-/** Render the read-only plugin inventory: agent presets first, then the global plane. */
+/** Render the plugin inventory: agent presets first, then the global plane, with grant-gated enablement switches. */
 export function PluginInventorySettingsTab(
-  { list, presetName, resolveText, t, useClientSync, retryClient }: PluginInventorySettingsTabProps,
+  { list, presetName, resolveText, management, setPluginEnabled, t, useClientSync, retryClient }: PluginInventorySettingsTabProps,
 ): ReactNode {
   const clientSync = useClientSync(snapshot => snapshot)
   const sectionId = useId()
@@ -262,6 +280,9 @@ export function PluginInventorySettingsTab(
   const [presetOpen, setPresetOpen] = useState<boolean | null>(null)
   const [globalOpen, setGlobalOpen] = useState<boolean | null>(null)
   const [state, setState] = useState<ViewState>({ status: 'loading' })
+  const [managed, setManaged] = useState<ReadonlyMap<string, PluginInfo> | 'denied' | null>(null)
+  const [toggling, setToggling] = useState<ReadonlySet<string>>(new Set())
+  const [toggleFailed, setToggleFailed] = useState(false)
 
   useEffect(() => {
     let current = true
@@ -271,6 +292,26 @@ export function PluginInventorySettingsTab(
     )
     return () => { current = false }
   }, [list, request])
+
+  // The probe only runs while the Host reports a manager; without one the
+  // inventory is read-only without an administrator notice.
+  useEffect(() => {
+    if (state.status !== 'ready' || state.snapshot.managementAvailable !== true) {
+      setManaged(null)
+      return
+    }
+    let current = true
+    void Promise.resolve().then(() => management()).then(
+      (probe) => {
+        if (!current) return
+        setManaged(probe.status === 'granted'
+          ? new Map(probe.plugins.map(row => [row.entryId, row]))
+          : probe.status === 'denied' ? 'denied' : null)
+      },
+      () => { if (current) setManaged(null) },
+    )
+    return () => { current = false }
+  }, [management, state])
 
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const searching = normalizedQuery.length > 0
@@ -324,6 +365,26 @@ export function PluginInventorySettingsTab(
   }
   const toggleRow = (key: string): void => {
     setExpanded(current => current === key ? null : key)
+  }
+  const togglePlugin = (entry: PluginInventoryEntry, enabled: boolean): void => {
+    if (toggling.has(entry.entryId)) return
+    setToggling(current => new Set(current).add(entry.entryId))
+    setToggleFailed(false)
+    void (async () => {
+      try {
+        await setPluginEnabled(entry.entryId, enabled)
+        setState({ status: 'loading' })
+        setRequest(value => value + 1)
+      } catch {
+        setToggleFailed(true)
+      } finally {
+        setToggling((current) => {
+          const next = new Set(current)
+          next.delete(entry.entryId)
+          return next
+        })
+      }
+    })()
   }
 
   /** Trailing status and detail facts for one row of the selected preset. */
@@ -380,6 +441,8 @@ export function PluginInventorySettingsTab(
     const key = `global:${entry.entryId}`
     const { title, description } = pluginText(entry, resolveText)
     const failed = entry.fiberPhase === 'failed'
+    const manager = managed instanceof Map ? managed.get(entry.entryId) : undefined
+    const switchable = manager !== undefined && manager.patchId !== undefined
     const stateText = failed
       ? t('failedTag')
       : providers !== undefined ? t('presetEnabledTag') : t(entry.enabled ? 'enabledTag' : 'disabledTag')
@@ -410,26 +473,37 @@ export function PluginInventorySettingsTab(
           moduleName={entry.moduleName}
           moduleLabel={t('moduleLabel')}
           entryId={entry.entryId}
-          facts={providers !== undefined
-            ? [
-              [t('configuration'), t('presetProvidedDetail')],
-              [t('enabledIn'), (
-                <span className={css.enabledIn}>
-                  <span>{providers.map(preset => presetName(preset)).join(' · ')}</span>
-                  <button
-                    type="button"
-                    className={css.jumpLink}
-                    onClick={() => { setChosenPreset(providers[0].id) }}
-                  >
-                    {t('viewInPreset')}
-                  </button>
-                </span>
-              )],
-            ]
-            : [
-              [t('configuration'), t(entry.enabled ? 'enabledTag' : 'disabledTag')],
-              ...entry.enabled ? [[t('runtime'), phaseLabel(entry.fiberPhase, t)] as const] : [],
-            ]}
+          facts={[
+            ...providers !== undefined
+              ? [
+                [t('configuration'), t('presetProvidedDetail')] as const,
+                [t('enabledIn'), (
+                  <span className={css.enabledIn}>
+                    <span>{providers.map(preset => presetName(preset)).join(' · ')}</span>
+                    <button
+                      type="button"
+                      className={css.jumpLink}
+                      onClick={() => { setChosenPreset(providers[0].id) }}
+                    >
+                      {t('viewInPreset')}
+                    </button>
+                  </span>
+                )] as const,
+              ]
+              : [
+                [t('configuration'), t(entry.enabled ? 'enabledTag' : 'disabledTag')] as const,
+                ...entry.enabled ? [[t('runtime'), phaseLabel(entry.fiberPhase, t)] as const] : [],
+              ],
+            ...switchable ? [[t('management'), (
+              <Switch
+                key="management"
+                checked={entry.enabled}
+                disabled={toggling.has(entry.entryId)}
+                label={t('toggleLabel', { name: title })}
+                onChange={(next) => { togglePlugin(entry, next) }}
+              />
+            )] as const] : [],
+          ]}
         />
       </PluginCard>
     )
@@ -483,6 +557,8 @@ export function PluginInventorySettingsTab(
               onChange={(event) => { setQuery(event.currentTarget.value) }}
             />
           </label>
+          {managed === 'denied' ? <p className={css.status} role="status">{t('managementDenied')}</p> : null}
+          {toggleFailed ? <p className={css.status} role="alert">{t('toggleFailed')}</p> : null}
           {entries.length === 0 && presets.length === 0 ? <p className={css.status}>{t('empty')}</p> : null}
           {nothingMatches ? <p className={css.status}>{t('emptySearch')}</p> : null}
 

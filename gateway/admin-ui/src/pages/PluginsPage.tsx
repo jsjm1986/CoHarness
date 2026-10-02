@@ -9,6 +9,7 @@ import { resolveLocalized } from '../plugins/presentation.ts'
 import { zh } from '../plugins/locales.ts'
 import { ProfileSettingsController } from '../plugins/settings-store.ts'
 import { PluginConfiguration, SETTINGS_OWNER_LABELS } from '../plugins/PluginConfiguration.tsx'
+import { PluginPermissions } from '../components/PluginPermissions.tsx'
 
 function Manager({ target, invalidate }: { target: PluginManagementTarget; invalidate: (message: string) => void }) {
   const [owner, setOwner] = useState<{ controller: PluginManagerController; settings: ProfileSettingsController; abort: AbortController } | null>(null)
@@ -93,5 +94,6 @@ export function PluginsPage() {
       {binding === null ? null : <p className="muted">节点 {binding.nodeId} · {binding.generation === null ? '实例未运行；此页面不会启动实例。' : `实例代次 ${binding.generation}`}</p>}
     </div></Section>
     {binding?.generation == null ? null : <div className="adminPluginManager"><Manager key={`${binding.nodeId}:${selected}:${binding.generation}`} target={binding} invalidate={invalidate} /></div>}
+    <PluginPermissions />
   </div>
 }

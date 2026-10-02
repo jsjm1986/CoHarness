@@ -31,9 +31,12 @@ export function gatewayPluginManagementAuthorization(
     async authorize() {
       signal.throwIfAborted()
       const principal = runtime.current()
-      if (principal === undefined || principal.claims.user.role !== 'admin'
+      // The Gateway endpoint decides who manages: administrators and
+      // qualified members both reach it, while restricted-purpose and expired
+      // assertions never leave this runtime.
+      if (principal === undefined
         || (principal.claims.purpose !== undefined && principal.claims.purpose !== 'plugin-admin') || principal.claims.expiresAt <= Date.now()) {
-        throw new RemoteError('plugin-management/forbidden', 'Profile management requires an authenticated administrator.', {})
+        throw new RemoteError('plugin-management/forbidden', 'Profile management requires an authenticated account.', {})
       }
       const response = await runtime.request('/internal/runtime/plugin-management/authorize', {
         method: 'POST', principal, signal,

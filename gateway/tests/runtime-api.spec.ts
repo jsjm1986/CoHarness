@@ -16,6 +16,7 @@ import {
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import { DesktopCoordinator, SqliteDesktopCoordinatorRepository } from '../src/desktop-coordinator.ts'
 import type { DocumentTransferResponse } from '../src/document-transfer.ts'
+import type { RuntimeTarget } from '../src/instances.ts'
 import { createRuntimeApiHandler } from '../src/runtime-api.ts'
 
 const ORGANIZATION_ID = '11d4a86c-4624-44fa-b69f-7e3f48cc5a04'
@@ -104,10 +105,11 @@ function fixture() {
     [CREATOR_ID, 'rw'],
     [MEMBER_ID, 'rw'],
   ])
-  const query = vi.fn(async (_text: string, values?: unknown[]) => ({
-    rows: values?.[1] === CREATOR_ID ? [{ id: CREATOR_INTERNAL_ID }]
-      : values?.[1] === ADMIN_ID ? [{ id: ADMIN_INTERNAL_ID }] : [],
-  }))
+  const query = vi.fn(async (_text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[]; rowCount: number }> => {
+    const rows = values?.[1] === CREATOR_ID ? [{ id: CREATOR_INTERNAL_ID }]
+      : values?.[1] === ADMIN_ID ? [{ id: ADMIN_INTERNAL_ID }] : []
+    return { rows, rowCount: rows.length }
+  })
   const append = vi.fn(async (
     _sessionId: string,
     _batchId: string,
@@ -129,7 +131,13 @@ function fixture() {
       pool: { query } as unknown as Pool,
     },
     instances: {
-      authenticateRuntimeToken: vi.fn(async (token: string) => token === RUNTIME_TOKEN ? {
+      authenticateRuntimeToken: vi.fn(async (token: string): Promise<{
+        organizationId: string
+        target: RuntimeTarget
+        generation: number
+        userInternalId?: string
+        projectInternalId?: string
+      } | null> => token === RUNTIME_TOKEN ? {
         organizationId: ORGANIZATION_ID,
         target: { kind: 'project' as const, id: PROJECT_ID },
         generation: GENERATION,
@@ -191,7 +199,7 @@ describe('profile management authorization', () => {
     const path = '/internal/runtime/plugin-management/authorize'
     expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 204 })
     expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining("m.role='admin'"), [ORGANIZATION_ID, ADMIN_ID])
-    runtime.query.mockResolvedValueOnce({ rows: [] })
+    runtime.query.mockResolvedValueOnce({ rows: [], rowCount: 0 })
     expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 403 })
   })
 
@@ -206,17 +214,65 @@ describe('profile management authorization', () => {
     expect(await request(runtime.handler, path, { body: {}, principal: issue('plugin-admin') })).toMatchObject({ status: 204 })
     expect(await request(runtime.handler, path, { body: {}, principal: issue('terminal-admin') })).toMatchObject({ status: 403 })
     expect(await request(runtime.handler, '/internal/runtime/terminal-management/authorize', { body: {}, principal: issue('plugin-admin') })).toMatchObject({ status: 403 })
-    runtime.query.mockResolvedValueOnce({ rows: [] })
+    runtime.query.mockResolvedValueOnce({ rows: [], rowCount: 0 })
     expect(await request(runtime.handler, path, { body: {}, principal: issue('plugin-admin') })).toMatchObject({ status: 403 })
   })
 
-  it('rejects a member or a missing principal before looking up deployment authority', async () => {
+  it('rejects an unqualified member and a missing principal', async () => {
     const runtime = fixture()
     const path = '/internal/runtime/plugin-management/authorize'
     expect(await request(runtime.handler, path, { body: {}, principal: runtime.issuePrincipal(CREATOR_ID) }))
       .toMatchObject({ status: 403 })
+    expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining('plugin_access_policies'), [ORGANIZATION_ID, CREATOR_ID])
     expect(await request(runtime.handler, path, { body: {} })).toMatchObject({ status: 403 })
-    expect(runtime.query).not.toHaveBeenCalled()
+  })
+
+  it('admits a member only while the user and project policies stay enabled', async () => {
+    const runtime = fixture()
+    const path = '/internal/runtime/plugin-management/authorize'
+    const principal = runtime.issuePrincipal(CREATOR_ID)
+    runtime.query.mockResolvedValueOnce({ rows: [{ enabled: false }], rowCount: 1 })
+    expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 403 })
+    runtime.query.mockResolvedValueOnce({ rows: [{ enabled: true }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+    expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 403 })
+    expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining('project_id=$2'), [ORGANIZATION_ID, PROJECT_INTERNAL_ID])
+    runtime.query.mockResolvedValueOnce({ rows: [{ enabled: true }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }], rowCount: 1 })
+    expect(await request(runtime.handler, path, { body: {}, principal })).toMatchObject({ status: 204 })
+  })
+
+  it('admits a granted member on a personal runtime without a project policy', async () => {
+    const runtime = fixture()
+    runtime.deps.instances.authenticateRuntimeToken.mockResolvedValue({
+      organizationId: ORGANIZATION_ID,
+      target: { kind: 'user', id: CREATOR_ID },
+      generation: GENERATION,
+      userInternalId: CREATOR_INTERNAL_ID,
+    })
+    const principal = runtime.principals.issue({
+      user: user(CREATOR_ID),
+      scope: { kind: 'personal' },
+      runtime: { kind: 'user', id: CREATOR_ID, generation: GENERATION },
+    })
+    runtime.query.mockResolvedValueOnce({ rows: [{ enabled: true }], rowCount: 1 })
+    expect(await request(runtime.handler, '/internal/runtime/plugin-management/authorize', { body: {}, principal }))
+      .toMatchObject({ status: 204 })
+    expect(runtime.query).toHaveBeenLastCalledWith(expect.stringContaining('plugin_access_policies'), [ORGANIZATION_ID, CREATOR_ID])
+    expect(runtime.query).not.toHaveBeenCalledWith(expect.stringContaining('project_id=$2'), expect.anything())
+  })
+
+  it('keeps purpose assertions administrator-only on the profile endpoint', async () => {
+    const runtime = fixture()
+    const purpose = runtime.principals.issue({
+      user: user(CREATOR_ID), purpose: 'plugin-admin',
+      scope: { kind: 'project', projectId: PROJECT_ID, projectName: 'Shared', mode: 'rw' },
+      runtime: { kind: 'project', id: PROJECT_ID, generation: GENERATION },
+    })
+    // The signer still emits it, but claim validation refuses a purpose on a
+    // non-administrator before the authorization branch runs.
+    expect(await request(runtime.handler, '/internal/runtime/plugin-management/authorize', { body: {}, principal: purpose }))
+      .toMatchObject({ status: 400 })
   })
 })
 

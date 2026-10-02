@@ -70,6 +70,8 @@ export interface GatewayDeps {
   /** Optional interactive-desktop coordinator; absent where desktop driving is disabled. */
   desktops?: import('./desktop-coordinator.ts').DesktopCoordinator
   desktopAccess?: Pick<import('./desktop-access.ts').DesktopAccess, 'get' | 'set'>
+  /** Optional administrator-owned plugin-management qualification store. */
+  pluginAccess?: Pick<import('./plugin-access.ts').PluginAccess, 'get' | 'set'>
   pluginManagement?: Pick<import('./plugin-management.ts').GatewayPluginManagement, 'target' | 'invoke'>
   terminalManagement?: Pick<import('./terminal-management.ts').GatewayTerminalManagement, 'list' | 'close'>
   terminalAccess?: Pick<import('./terminal-access.ts').TerminalAccess, 'get' | 'set'>

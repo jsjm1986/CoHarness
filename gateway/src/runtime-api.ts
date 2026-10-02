@@ -762,14 +762,35 @@ export function createRuntimeApiHandler(
       if ((pathname === '/internal/runtime/plugin-management/authorize' || pathname === '/internal/runtime/terminal-management/authorize') && req.method === 'POST') {
         const terminal = pathname === '/internal/runtime/terminal-management/authorize'
         const claims = assertionFor(req, deps.principals, subject, true, { allowTerminalAdmin: terminal, allowPluginAdmin: !terminal })!
-        if (claims.user.role !== 'admin' || (terminal ? claims.purpose !== 'terminal-admin' : claims.purpose !== undefined && claims.purpose !== 'plugin-admin')) throw new CollaborationDeniedError('forbidden')
-        const current = await deps.context.pool.query(`SELECT u.id FROM harness.users u
-          JOIN harness.memberships m ON m.user_id=u.id AND m.organization_id=u.organization_id
-          JOIN harness.organizations o ON o.id=u.organization_id AND o.status='active'
-          WHERE u.organization_id=$1 AND u.public_id=$2 AND u.deleted_at IS NULL
-            AND u.status='active' AND m.status='active' AND m.role='admin'`,
-        [subject.organizationId, claims.user.id])
-        if (current.rows.length !== 1) throw new CollaborationDeniedError('forbidden')
+        if (terminal || claims.user.role === 'admin') {
+          // Administrators keep unconditional management authority; the
+          // elevated purpose stays restricted to them.
+          if (claims.user.role !== 'admin' || (terminal ? claims.purpose !== 'terminal-admin' : claims.purpose !== undefined && claims.purpose !== 'plugin-admin')) throw new CollaborationDeniedError('forbidden')
+          const current = await deps.context.pool.query(`SELECT u.id FROM harness.users u
+            JOIN harness.memberships m ON m.user_id=u.id AND m.organization_id=u.organization_id
+            JOIN harness.organizations o ON o.id=u.organization_id AND o.status='active'
+            WHERE u.organization_id=$1 AND u.public_id=$2 AND u.deleted_at IS NULL
+              AND u.status='active' AND m.status='active' AND m.role='admin'`,
+          [subject.organizationId, claims.user.id])
+          if (current.rows.length !== 1) throw new CollaborationDeniedError('forbidden')
+        } else {
+          // A non-administrator manages a profile only under the
+          // administrator-granted plugin policy, with an ordinary principal.
+          if (claims.purpose !== undefined) throw new CollaborationDeniedError('forbidden')
+          const granted = await deps.context.pool.query<{ enabled: boolean | null }>(`SELECT p.enabled FROM harness.users u
+            JOIN harness.memberships m ON m.user_id=u.id AND m.organization_id=u.organization_id
+            JOIN harness.organizations o ON o.id=u.organization_id AND o.status='active'
+            LEFT JOIN harness.plugin_access_policies p ON p.organization_id=u.organization_id AND p.user_id=u.id
+            WHERE u.organization_id=$1 AND u.public_id=$2 AND u.deleted_at IS NULL
+              AND u.status='active' AND m.status='active'`,
+          [subject.organizationId, claims.user.id])
+          if (granted.rows[0]?.enabled !== true) throw new CollaborationDeniedError('forbidden')
+          if (subject.target.kind === 'project') {
+            const project = await deps.context.pool.query(`SELECT 1 FROM harness.plugin_access_policies
+              WHERE organization_id=$1 AND project_id=$2 AND enabled`, [subject.organizationId, subject.projectInternalId])
+            if (project.rowCount !== 1) throw new CollaborationDeniedError('forbidden')
+          }
+        }
         res.writeHead(204, { 'cache-control': 'no-store' })
         res.end()
         return true

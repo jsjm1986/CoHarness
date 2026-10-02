@@ -865,19 +865,29 @@ export class GatewayExecutionIdentity {
       WHERE u.organization_id=$1 AND u.id=ANY($2::uuid[]) AND u.status='active' AND u.deleted_at IS NULL
         AND m.status='active' AND o.status='active' FOR SHARE OF u,m`, [subject.organizationId, actorIds])
     if (result.rows.length !== actorIds.length || result.rows.some(actor =>
-      (capability === 'plugin-management' && actor.role !== 'admin')
-      || (capability === 'auto-review' && actor.auto_review_eligible !== true))) {
+      capability === 'auto-review' && actor.auto_review_eligible !== true)) {
       throw new ExecutionIdentityError(403, 'an execution actor is no longer eligible')
     }
-    if (capability === 'desktop' || capability === 'user-terminal' || capability === 'ssh') {
-      const resource = capability === 'desktop' ? 'desktop' : capability === 'ssh' ? 'ssh' : 'terminal'
-      const users = await client.query<{ user_id: string }>(`SELECT user_id FROM harness.${resource}_access_policies
-        WHERE organization_id=$1 AND user_id=ANY($2::uuid[]) AND enabled FOR SHARE`, [subject.organizationId, actorIds])
-      if (users.rows.length !== actorIds.length) throw new ExecutionIdentityError(403, `an execution actor lacks ${resource} qualification`)
-      if (subject.target.kind === 'project') {
-        const project = await client.query(`SELECT 1 FROM harness.${resource}_access_policies
-          WHERE organization_id=$1 AND project_id=$2 AND enabled FOR SHARE`, [subject.organizationId, subject.projectInternalId])
-        if (project.rowCount !== 1) throw new ExecutionIdentityError(403, `${resource} access is not enabled for this project`)
+    const resource = capability === 'plugin-management' ? 'plugin'
+      : capability === 'desktop' ? 'desktop'
+      : capability === 'ssh' ? 'ssh'
+      : capability === 'user-terminal' ? 'terminal' : undefined
+    if (resource !== undefined) {
+      // Plugin management keeps administrators unqualified by policy; every
+      // other actor needs an enabled grant, and a project target needs the
+      // project's grant whenever any non-admin actor participates.
+      const needed = capability === 'plugin-management'
+        ? result.rows.filter(actor => actor.role !== 'admin').map(actor => actor.id)
+        : actorIds
+      if (needed.length > 0) {
+        const users = await client.query<{ user_id: string }>(`SELECT user_id FROM harness.${resource}_access_policies
+          WHERE organization_id=$1 AND user_id=ANY($2::uuid[]) AND enabled FOR SHARE`, [subject.organizationId, needed])
+        if (users.rows.length !== needed.length) throw new ExecutionIdentityError(403, `an execution actor lacks ${resource} qualification`)
+        if (subject.target.kind === 'project') {
+          const project = await client.query(`SELECT 1 FROM harness.${resource}_access_policies
+            WHERE organization_id=$1 AND project_id=$2 AND enabled FOR SHARE`, [subject.organizationId, subject.projectInternalId])
+          if (project.rowCount !== 1) throw new ExecutionIdentityError(403, `${resource} access is not enabled for this project`)
+        }
       }
     }
     if (subject.target.kind === 'user') {

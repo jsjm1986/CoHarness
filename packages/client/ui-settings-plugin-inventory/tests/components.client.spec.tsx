@@ -27,12 +27,16 @@ function props(
   list: PluginInventorySettingsTabInjected['list'],
   presetName: PluginInventorySettingsTabInjected['presetName'] = preset => preset.name ?? preset.id,
   resolveText: PluginInventorySettingsTabInjected['resolveText'] = text => typeof text === 'string' ? text : text.en,
+  management: PluginInventorySettingsTabInjected['management'] = async () => ({ status: 'unavailable' }),
+  setPluginEnabled: PluginInventorySettingsTabInjected['setPluginEnabled'] = async () => { throw new Error('unexpected toggle') },
 ): PluginInventorySettingsTabProps {
   return {
     t,
     list,
     presetName,
     resolveText,
+    management,
+    setPluginEnabled,
     useClientSync: bindSnapshotSelector(createSnapshotStore<ClientEntryState>({ syncing: false, failures: [] })),
     retryClient: vi.fn(),
   } as PluginInventorySettingsTabProps
@@ -676,4 +680,77 @@ it('shows current-page sync errors and retries without re-reading Host inventory
   expect(list).toHaveBeenCalledOnce()
   act(() => { sync.set({ syncing: false, failures: [] }) })
   expect(screen.queryByRole('alert')).toBeNull()
+})
+
+describe('grant-gated enablement', () => {
+  const managedSnapshot = (entries: Snapshot['entries']): Snapshot => ({ entries, managementAvailable: true })
+  const timerEntry = {
+    entryId: 'include:timer' as PluginEntryId, moduleName: 'cordis:timer', enabled: true, fiberPhase: 'active' as const,
+  }
+
+  it('offers switches only on patch-addressable rows and persists toggles through the manager', async () => {
+    const list = vi.fn(async () => managedSnapshot([
+      timerEntry,
+      { entryId: 'include:protected' as PluginEntryId, moduleName: '@deepseek-ai/dsh-plugin-manager', enabled: true, fiberPhase: 'active' as const },
+    ]))
+    const management = vi.fn<PluginInventorySettingsTabInjected['management']>(async () => ({
+      status: 'granted',
+      plugins: [
+        { ...timerEntry, patchId: 'patch-1' },
+        { entryId: 'include:protected' as PluginEntryId, moduleName: '@deepseek-ai/dsh-plugin-manager', enabled: true, fiberPhase: 'active' as const, readOnlyReason: 'management-required' as const },
+      ],
+    }))
+    const setPluginEnabled = vi.fn<PluginInventorySettingsTabInjected['setPluginEnabled']>(async () => ({
+      changed: true, application: 'applied', stage: 'enable', target: 'include:timer', enabled: false,
+    }))
+    render(<PluginInventorySettingsTab {...props(list, undefined, undefined, management, setPluginEnabled)} />)
+    await screen.findByRole('searchbox', { name: en.search })
+    fireEvent.click(globalToggle())
+    await waitFor(() => { expect(management).toHaveBeenCalledOnce() })
+    // Only one card details region is mounted at a time, so toggle first.
+    fireEvent.click(screen.getByRole('button', { name: /timer.*Enabled/ }))
+    const toggle = await screen.findByRole('switch', { name: 'Toggle timer' })
+    fireEvent.click(toggle)
+    await waitFor(() => { expect(setPluginEnabled).toHaveBeenCalledWith('include:timer', false) })
+    await waitFor(() => { expect(list).toHaveBeenCalledTimes(2) })
+    fireEvent.click(screen.getByRole('button', { name: /plugin-manager.*Enabled/ }))
+    await screen.findByText(en.moduleLabel)
+    expect(screen.queryByRole('switch')).toBeNull()
+  })
+
+  it('points unauthorized viewers at an administrator and stays read-only', async () => {
+    const management = vi.fn<PluginInventorySettingsTabInjected['management']>(async () => ({ status: 'denied' }))
+    render(<PluginInventorySettingsTab {...props(async () => managedSnapshot([timerEntry]), undefined, undefined, management)} />)
+    await screen.findByRole('searchbox', { name: en.search })
+    expect(await screen.findByText(en.managementDenied)).toBeTruthy()
+    fireEvent.click(globalToggle())
+    fireEvent.click(screen.getByRole('button', { name: /timer.*Enabled/ }))
+    await waitFor(() => { expect(screen.queryByRole('switch')).toBeNull() })
+  })
+
+  it('skips the probe entirely when the Host reports no manager', async () => {
+    const management = vi.fn<PluginInventorySettingsTabInjected['management']>(async () => ({ status: 'denied' }))
+    render(<PluginInventorySettingsTab {...props(async () => ({ entries: [timerEntry] }), undefined, undefined, management)} />)
+    await screen.findByRole('searchbox', { name: en.search })
+    fireEvent.click(globalToggle())
+    await screen.findByRole('button', { name: /timer.*Enabled/ })
+    expect(management).not.toHaveBeenCalled()
+    expect(screen.queryByText(en.managementDenied)).toBeNull()
+  })
+
+  it('reports a failed toggle without losing the inventory', async () => {
+    const setPluginEnabled = vi.fn<PluginInventorySettingsTabInjected['setPluginEnabled']>(async () => { throw new Error('denied by policy') })
+    render(<PluginInventorySettingsTab {...props(
+      async () => managedSnapshot([timerEntry]),
+      undefined,
+      undefined,
+      async () => ({ status: 'granted', plugins: [{ ...timerEntry, patchId: 'patch-1' }] }),
+      setPluginEnabled,
+    )} />)
+    await screen.findByRole('searchbox', { name: en.search })
+    fireEvent.click(globalToggle())
+    fireEvent.click(screen.getByRole('button', { name: /timer.*Enabled/ }))
+    fireEvent.click(await screen.findByRole('switch', { name: 'Toggle timer' }))
+    expect((await screen.findByRole('alert')).textContent).toBe(en.toggleFailed)
+  })
 })

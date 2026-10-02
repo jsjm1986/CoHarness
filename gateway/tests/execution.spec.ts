@@ -678,6 +678,33 @@ describePg('Gateway execution identities', () => {
     expect((await f.call('authorize', { sessionId: id, capability: 'execute' })).status).toBe(403)
   })
 
+  it('admits qualified members for plugin management until the grant is revoked', async () => {
+    const f = await fixture(), id = await f.session()
+    const receipt = await f.admit(id, f.member)
+    await f.enter(id, receipt)
+    expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(403)
+    await pool.query('INSERT INTO harness.plugin_access_policies(organization_id,user_id,enabled,revision) VALUES($1,$2,true,1)',
+      [f.organizationId, f.member.uuid])
+    expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(403)
+    await pool.query('INSERT INTO harness.plugin_access_policies(organization_id,project_id,enabled,revision) VALUES($1,$2,true,1)',
+      [f.organizationId, f.project.uuid])
+    expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(200)
+    expect((await f.call('selection', { sessionId: id, capability: 'plugin-management' }, f.member)).status).toBe(204)
+    await pool.query('UPDATE harness.plugin_access_policies SET enabled=false,revision=revision+1 WHERE organization_id=$1 AND user_id=$2',
+      [f.organizationId, f.member.uuid])
+    expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(403)
+  })
+
+  it('keeps administrator plugin management authority in a project without any policy', async () => {
+    const f = await fixture(), id = await f.session()
+    const receipt = await f.admit(id, f.admin)
+    await f.enter(id, receipt)
+    expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(200)
+    await pool.query('INSERT INTO harness.plugin_access_policies(organization_id,user_id,enabled,revision) VALUES($1,$2,true,1)',
+      [f.organizationId, f.member.uuid])
+    expect((await f.call('authorize', { sessionId: id, capability: 'plugin-management' })).status).toBe(200)
+  })
+
   it('validates delayed attribution from inherited facts after eligibility is revoked', async () => {
     const f = await fixture(), parent = await f.session(), receipt = await f.admit(parent)
     const state = (await f.enter(parent, receipt)).body

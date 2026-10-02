@@ -7,6 +7,7 @@ import {
   deleteUser,
   getDesktopPolicy,
   getModelAccess,
+  getPluginPolicy,
   getSshPolicy,
   getTerminalPolicy,
   getUser,
@@ -20,6 +21,7 @@ import {
   setDesktopPolicy,
   setMember,
   setModelAccess,
+  setPluginPolicy,
   setQuota,
   setSshPolicy,
   setTerminalPolicy,
@@ -209,6 +211,13 @@ export function UserDetailPage() {
                   userId={userId}
                   read={getDesktopPolicy}
                   write={setDesktopPolicy}
+                />
+                <UserQualificationCard
+                  name="插件管理"
+                  description="在个人空间管理插件（启用、安装、移除）的资格；项目空间另需项目授权。"
+                  userId={userId}
+                  read={getPluginPolicy}
+                  write={setPluginPolicy}
                 />
               </div>
             </div>

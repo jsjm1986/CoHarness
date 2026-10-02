@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-02-grant-gated-plugin-enablement.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-grant-gated-plugin-enablement.md
+/agent-note-grant-gated-plugin-enablement-in-the-web-settings-plugin-list:
+  en: 9ebac8528adaa5f9
+  zh: 47ddf3a3e4e0ac3f
+/agent-note-grant-gated-plugin-enablement-in-the-web-settings-plugin-list/problem:
+  en: 2ce4f4ea745e8b44
+  zh: 00205a54a89b6d6a
+/agent-note-grant-gated-plugin-enablement-in-the-web-settings-plugin-list/decision:
+  en: 282c372714b4b7ae
+  zh: 6926f550a5d397a3
+/agent-note-grant-gated-plugin-enablement-in-the-web-settings-plugin-list/alternatives-considered:
+  en: 2a063ba37eec4843
+  zh: 97b4924a31b40f4e
+/agent-note-grant-gated-plugin-enablement-in-the-web-settings-plugin-list/consequences:
+  en: 9324a1fdbc56eda3
+  zh: 6d57428437809e9f

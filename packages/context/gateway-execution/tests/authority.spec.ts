@@ -651,6 +651,20 @@ describe('managed execution identity', () => {
     expect(selection.canSelect('danger-full-access')).toBe(false)
   })
 
+  it('forwards a member principal to the Gateway policy endpoint instead of rejecting locally', async () => {
+    const f = await fixture()
+    const member = principal()
+    member.claims.user.role = 'user'
+    f.setPrincipal(member)
+    f.responses.set('/authorize', async (_body, init) => init?.principal === undefined
+      ? Response.json(state()) : new Response(null, { status: 204 }))
+    await f.ctx.get('pluginManagementAuthorization')?.authorize()
+    expect(f.request).toHaveBeenLastCalledWith('/internal/runtime/plugin-management/authorize', expect.objectContaining({ principal: member }))
+    f.responses.set('/authorize', async (_body, init) => init?.principal === undefined
+      ? Response.json(state()) : new Response(null, { status: 403 }))
+    await expect(f.ctx.get('pluginManagementAuthorization')?.authorize()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
+  })
+
   it('drains a refused profile authorization response before reporting denial', async () => {
     const f = await fixture()
     f.setPrincipal(principal())

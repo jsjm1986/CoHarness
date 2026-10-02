@@ -743,7 +743,7 @@ describe('admin JSON API', () => {
 })
 
 describe('admin desktop coordination API', () => {
-  it.each(['desktop', 'terminal'] as const)('restricts %s qualification reads and writes to administrators with request protection', async (resource) => {
+  it.each(['desktop', 'terminal', 'plugin'] as const)('restricts %s qualification reads and writes to administrators with request protection', async (resource) => {
     const { base, cookie, deps } = await setup()
     const get = vi.fn(async () => ({ kind: 'user' as const, id: 1, enabled: false, revision: '0' }))
     const set = vi.fn(async () => ({ kind: 'user' as const, id: 1, enabled: true, revision: '1' }))

@@ -6,7 +6,7 @@ import * as api from '../api.ts'
 import { pluginManagementRemote } from '../plugins/transport.ts'
 import { PluginsPage } from './PluginsPage.tsx'
 
-vi.mock('../api.ts', () => ({ listUsers: vi.fn(), listProjects: vi.fn(), pluginManagementTarget: vi.fn() }))
+vi.mock('../api.ts', () => ({ listUsers: vi.fn(), listProjects: vi.fn(), pluginManagementTarget: vi.fn(), getPluginPolicy: vi.fn(), setPluginPolicy: vi.fn() }))
 vi.mock('../plugins/transport.ts', () => ({ pluginManagementRemote: vi.fn() }))
 afterEach(cleanup)
 const target: api.PluginManagementTarget = { nodeId: 'node-a', target: { kind: 'user', id: 1 }, generation: 3 }
