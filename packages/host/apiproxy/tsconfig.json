@@ -93,6 +93,9 @@
       "path": "../../preset/agent-presets"
     },
     {
+      "path": "../../schedule/schedule"
+    },
+    {
       "path": "../../session-query/session-query"
     },
     {

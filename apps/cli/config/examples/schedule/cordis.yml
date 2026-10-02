@@ -1,0 +1,11 @@
+# Opt-in host Schedule service and its Session task catalog.
+
+- insert:
+    - id: time-context
+      name: '@deepseek-ai/dsh-time-context'
+
+    - id: schedule
+      name: '@deepseek-ai/dsh-schedule'
+
+- id: ui-schedule
+  disabled: false

@@ -154,6 +154,8 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
 // Side-effect type import: resolves the `approval/request` waterfall and
 // `ctx.get('approval')` without a value dependency on the seam (optional composition).
 import type {} from '@deepseek-ai/dsh-user-approval'
+// Type-only: resolves the `schedule/changed` forward event and `ctx.get('schedule')`.
+import type {} from '@deepseek-ai/dsh-schedule/client'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
 import { inboxProjectionDefinition } from './inbox-projection.ts'
 import { modelSelectionProjectionDefinition } from './model-selection-projection.ts'
@@ -211,6 +213,9 @@ export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 1024
  * owning service filters rows that carry Session-scoped metadata itself.
  */
 const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
+  // Host-wide read whose payload the invoke seam narrows back to the
+  // participant's readable Sessions — the task store is global, visibility is not.
+  'schedule/catalog',
   'pluginInventory/list',
   'dynamicCordisRunner/inventory',
   'llm/listProviders',
@@ -297,13 +302,30 @@ function pluginAdministration(ctx: Context): boolean {
  */
 export function invokeTypertRemote(ctx: Context, payload: TypertGatewayAuthorizationRequest,
   next: () => Promise<unknown>): Promise<unknown> {
+  const invoke = (): Promise<unknown> => {
+    if (payload.endpoint !== 'schedule/catalog') return next()
+    const collaboration = ctx.get('collaboration')
+    if (collaboration === undefined) return next()
+    // The task store is Host-wide; a project-scoped caller receives only the
+    // entries bound to Sessions that participant may read.
+    const authority = collaboration.capture()
+    if (authority.participant.scope.kind === 'personal') return next()
+    return next().then(async (result) => {
+      if (!Array.isArray(result)) return result
+      const ids = [...new Set(result
+        .map(entry => (entry as { sessionId?: unknown }).sessionId)
+        .filter((id): id is string => typeof id === 'string'))] as SessionId[]
+      const readable = await authority.readableSessionIds(ids)
+      return result.filter(entry => readable.has((entry as { sessionId: SessionId }).sessionId))
+    })
+  }
   const rule = REMOTE_SESSION_POLICIES[payload.endpoint]
-  if (rule === undefined || rule.action === 'read' || rule.execution !== 'request') return next()
+  if (rule === undefined || rule.action === 'read' || rule.execution !== 'request') return invoke()
   const id = remoteSessionId(payload.endpoint, payload.args)
   const agent = id === undefined ? undefined : ctx.agents.get(brandSessionId(id))
   const authority = executionAuthorityOf(ctx)
-  return agent === undefined || authority === undefined ? next()
-    : authority.runRequest(agent, { endpoint: payload.endpoint, args: payload.args }, next)
+  return agent === undefined || authority === undefined ? invoke()
+    : authority.runRequest(agent, { endpoint: payload.endpoint, args: payload.args }, invoke)
 }
 
 /**
@@ -2441,6 +2463,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       }
     },
   })
+
+  // Publish the shared Session-resolution surface non-session capabilities
+  // inject (the Schedule service resolves a due task's original Session
+  // through it). Same resolver instance: the cold-resume and ownership rules
+  // cannot drift between entry points.
+  ctx.provide('sessionController', { resolveAgent: agentFor })
 
   /** Send one transient frame to every connected mux consumer. */
   function broadcast(payload: MuxFrame): void {

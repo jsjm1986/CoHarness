@@ -1,23 +1,51 @@
 ---
-description: "The Schedule family owns reminders whose durable state lives in the original Session log. A process-local owner waits only while that Session has a live root Agent; cold Sessions resume overdue work when they become live again and never imply an external notification channel."
+description: "The schedule package group: Host-owned scheduled reminders and task management."
 kind: "package-group"
 ---
 
-# schedule/ — Session-local reminders
+# schedule/ — Host-owned reminders
 
 English | [中文](README.zh.md)
 
-The Schedule family owns reminders whose durable state lives in the original Session log. A process-local owner waits only while that Session has a live root Agent; cold Sessions resume overdue work when they become live again and never imply an external notification channel.
-
-| Package | Role | ctx key |
-|---|---|---|
-| `schedule/` | Versioned Schedule events and fold, model-facing create/list/delete tools, and a live root-Agent timer owner | — |
-
-The package deliberately exposes no public Schedule service or mutable database. Tools and runtime append to the Session stream; due work enters the same conversation through the Agent's ordinary follow-up queue.
-
-See [Session-local Schedule](../../docs/subsystems/schedule.md) for the durable record, transition, view, and delivery contracts.
-
-
 ## Summary
 
-The schedule group lets an agent create, list, and cancel reminders for the current conversation. Reminders can run after a delay, at an absolute time, or on a fixed interval; when due, they arrive as ordinary messages in that conversation. They survive restarts, but never leave the session or send email, SMS, or push notifications. The group's package provides reminder management and delivery. Optional browser packages show the current reminder catalog and mark conversations with known active reminders; those indicators reflect cached state and may lag the running session.
+Create one-shot, fixed-rate, daily, weekly, or cron reminders for a conversation and keep them across Host restarts. Inspect active and inactive tasks without opening their original Sessions. Use Schedule for reminder creation and delivery, and the optional Tasks page for cross-Session inspection and confirmed deletion. Due reminders arrive as ordinary follow-up messages in the original conversation, not email, SMS, or push notifications.
+
+## Table of Contents
+
+- [Packages](#packages)
+- [Related documentation](#related-documentation)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="packages"></a>
+## Packages
+
+Choose this package for persistent reminder management.
+
+| Package | Role |
+|---|---|
+| [`schedule/`](schedule/README.md) | Host-owned reminder persistence, scheduling, inspection, and explicit deletion |
+
+-----
+
+<a id="related-documentation"></a>
+## Related documentation
+
+- [Schedule subsystem](../../docs/subsystems/schedule.md) — task records, latest receipts, timing, and delivery contracts.
+- [Generated tool catalog](../../docs/tool-catalog.md#deepseek-aidsh-schedule) — the `schedule_create`/`schedule_list`/`schedule_update`/`schedule_delete` schemas the model receives.
+- [Schedule user guide](../../docs/user/guide/schedule.md) — enable reminders and inspect active or inactive tasks.
+- [Web task page and reminder catalog](../client/ui-schedule/README.md) — browser inspection of tasks and confirmed deletion.
+
+-----
+
+<a id="dev-note"></a>
+## Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

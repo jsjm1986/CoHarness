@@ -301,12 +301,14 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
         EVERY_PROMPTS[0],
         EVERY_INTERVAL_SECONDS,
         seededAt - EVERY_FIXTURE_AGE_MS,
+        'Every primary',
       ),
       createEveryScheduleRecord(
         ScheduleId('schedule-every-secondary'),
         EVERY_PROMPTS[1],
         EVERY_INTERVAL_SECONDS,
         seededAt - EVERY_FIXTURE_AGE_MS,
+        'Every secondary',
       ),
     ]
     for (const record of everyRecords) {

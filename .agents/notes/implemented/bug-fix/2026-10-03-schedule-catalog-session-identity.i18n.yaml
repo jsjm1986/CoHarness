@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-03-schedule-catalog-session-identity.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-03-schedule-catalog-session-identity.md
+/agent-note-schedule-catalog-session-identity-and-linked-session-reveal:
+  en: 6b70cf1c2fef7f7f
+  zh: c8561050cd88e1f0
+/agent-note-schedule-catalog-session-identity-and-linked-session-reveal/problem:
+  en: e77d43281521e911
+  zh: c817914f9456c7f2
+/agent-note-schedule-catalog-session-identity-and-linked-session-reveal/decision:
+  en: cf11c9912b423d09
+  zh: 13d2fb8180143eff
+/agent-note-schedule-catalog-session-identity-and-linked-session-reveal/alternatives-considered:
+  en: f3696b620a7c56eb
+  zh: e4791dd75a8a28bb
+/agent-note-schedule-catalog-session-identity-and-linked-session-reveal/consequences:
+  en: ef21bd0260ee5e47
+  zh: e2121cdbf7cf5f0a
+/agent-note-schedule-catalog-session-identity-and-linked-session-reveal/testing:
+  en: aecc6360fda2dc70
+  zh: 3eddb2e5d7e7b9b6
