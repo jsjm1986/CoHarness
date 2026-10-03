@@ -855,7 +855,7 @@ it('admin plugin routes preserve target identity, stream bytes and deny ordinary
   deps.pluginManagement = { target, async *invoke(admin, input, signal) {
     expect(admin.role).toBe('admin'); expect(signal.aborted).toBe(false); invoked.push(input)
     yield bytes
-  } }
+  }, async state() { throw new Error('not wired in this test') }, async saveState() { throw new Error('not wired in this test') } }
   const bound = await fetch(`${base}/admin/api/plugins/target?kind=user&id=3`, { headers: { cookie } })
   expect(await bound.json()).toEqual(binding)
   const response = await fetch(`${base}/admin/api/plugins/invoke`, { method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: JSON.stringify(invocation) })

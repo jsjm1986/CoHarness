@@ -525,7 +525,7 @@ describe('timed card', () => {
     vi.useFakeTimers()
     const carrier = new PendingQuestion(SID, [{ id: 'free', question: '补充说明' }], ToolCallId('claiming'))
     const request = createWaterfallRequest(Date.now() + 2_000, undefined,
-      channel => carrier.detachWaterfall(channel))
+      (channel) => { carrier.detachWaterfall(channel) })
     try {
       render(<QuestionComposer matched={carrier} {...kit} />)
       const field = screen.getByPlaceholderText(zh['custom.placeholder'])

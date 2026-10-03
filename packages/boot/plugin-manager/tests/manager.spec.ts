@@ -15,7 +15,8 @@ import {
   reconcileProfilePatches, OPTIONAL_BUNDLES, PluginPackages, readPluginMeta, getDshRuntimeVersion,
   type ProfileContext, type RuntimeResolution,
 } from '@deepseek-ai/dsh-app-boot'
-import PluginManager, { type Config, type PluginChange, type PluginInstallFrame, type PluginInstallLogChunk, type PluginInstallProgress, type PluginInstallRequestId } from '../src/index.ts'
+import PluginManager, { type Config, type PluginChange, type PluginDesiredState, type PluginInstallFrame, type PluginInstallLogChunk, type PluginInstallProgress, type PluginInstallRequestId } from '../src/index.ts'
+import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import Hmr from '@deepseek-ai/dsh-hmr'
 import Timer from '@deepseek-ai/cordis-plugin-timer'
@@ -1405,21 +1406,39 @@ it.each([false, true])('rechecks installed bundle peers before accepting a disab
   expect(readProfileManifest('test', dir).dsh?.profile?.bundles).toEqual(['core', 'extra'])
 })
 
-it('requires deployment authorization before exposing a managed profile', async () => {
+it('requires deployment authorization before mutating a managed profile', async () => {
   const authorize = vi.fn(async () => { throw new Error('administrator required') })
   const { manager } = await fixture('startup', false, (ctx) => {
     ctx.provide('pluginManagementAuthorization', { authorize, protectedModules: new Set<string>() })
   }, { authorization: 'required' })
-  await expect(manager.listPlugins()).rejects.toThrow('administrator required')
+  await expect(manager.setBundleEnabled('extra', false)).rejects.toThrow('administrator required')
   expect(authorize).toHaveBeenCalledOnce()
 })
 
-it('fails closed when a required deployment authority is unavailable', async () => {
-  const { manager } = await fixture('startup', false, undefined, { authorization: 'required' })
-  await expect(manager.listPlugins()).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
+it('reads the managed profile for every caller and reports the manage grant through access', async () => {
+  const authorize = vi.fn(async (): Promise<void> => { throw new RemoteError('plugin-management/forbidden', 'administrator required', {}) })
+  const { manager } = await fixture('startup', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', { authorize, protectedModules: new Set<string>() })
+  }, { authorization: 'required' })
+  await expect(manager.listPlugins()).resolves.toBeInstanceOf(Array)
+  await expect(manager.listBundles()).resolves.toBeInstanceOf(Array)
+  await expect(manager.registries()).resolves.toMatchObject({ resolved: 'https://registry.npmjs.org/' })
+  await expect(manager.listVersionExemptions()).resolves.toMatchObject({ exemptions: {} })
+  await expect(manager.waitForInstall('missing' as PluginInstallRequestId)).resolves.toBeNull()
+  expect(authorize).not.toHaveBeenCalled()
+  await expect(manager.access()).resolves.toEqual({ manage: false })
+  authorize.mockImplementation(async () => {})
+  await expect(manager.access()).resolves.toEqual({ manage: true })
 })
 
-it('rejects every management entry before profile mutation when deployment authority denies', async () => {
+it('fails closed on writes when a required deployment authority is unavailable', async () => {
+  const { manager } = await fixture('startup', false, undefined, { authorization: 'required' })
+  await expect(manager.setBundleEnabled('extra', false)).rejects.toMatchObject({ code: 'plugin-management/forbidden' })
+  await expect(manager.listPlugins()).resolves.toBeInstanceOf(Array)
+  await expect(manager.access()).resolves.toEqual({ manage: false })
+})
+
+it('rejects every mutation while reads stay open when deployment authority denies', async () => {
   const { manager, dir } = await fixture('startup', false, (ctx) => {
     ctx.provide('pluginManagementAuthorization', {
       protectedModules: new Set<string>(), authorize: async () => { throw new Error('administrator required') },
@@ -1432,15 +1451,19 @@ it('rejects every management entry before profile mutation when deployment autho
   const before = profileFiles()
   const requestId = 'unstarted' as PluginInstallRequestId
   const operations: Array<() => Promise<unknown>> = [
-    () => manager.listPlugins(), () => manager.listBundles(), () => manager.inspect('bundle'),
-    () => manager.registries(), () => manager.listVersionExemptions(),
+    () => manager.inspect('bundle'),
     () => manager.setVersionExemption('bundle@1.0.0', '0.0.0', true, true),
     () => manager.setPluginEnabled('include:managed' as Parameters<PluginManager['setPluginEnabled']>[0], false),
     () => manager.setBundleEnabled('extra', false), () => manager.installBundle('bundle'),
-    () => manager.waitForInstall(requestId), () => manager.cancelInstall(requestId), () => manager.removeBundle('extra'),
+    () => manager.cancelInstall(requestId), () => manager.removeBundle('extra'),
     () => manager.installBundleStream('bundle', { requestId }, new AbortController().signal)[Symbol.asyncIterator]().next(),
   ]
   for (const operation of operations) await expect(operation()).rejects.toThrow('administrator required')
+  await expect(manager.listPlugins()).resolves.toBeInstanceOf(Array)
+  await expect(manager.listBundles()).resolves.toBeInstanceOf(Array)
+  await expect(manager.registries()).resolves.toBeInstanceOf(Object)
+  await expect(manager.listVersionExemptions()).resolves.toBeInstanceOf(Object)
+  await expect(manager.waitForInstall(requestId)).resolves.toBeNull()
   expect(profileFiles()).toEqual(before)
 })
 
@@ -1594,4 +1617,56 @@ it('acknowledges a queued install before the writer lock and cancels without spa
     expect(frames.at(-1)).toMatchObject({ type: 'result', value: { changed: false, application: 'cancelled' } })
     expect(install).not.toHaveBeenCalled()
   } finally { release.resolve(undefined); await owner; await iterator.return?.() }
+})
+
+it('publishes a committed composition to the deployment state store', async () => {
+  let stored = { revision: '3', state: null as PluginDesiredState | null }
+  const published: Array<{ state: PluginDesiredState; baseRevision: string }> = []
+  const { manager } = await fixture('live', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', {
+      protectedModules: new Set<string>(), authorize: async () => {},
+      readDesiredState: async () => stored,
+      publishDesiredState: async (state: PluginDesiredState, baseRevision: string) => {
+        published.push({ state, baseRevision })
+        if (baseRevision !== stored.revision) return { status: 'conflict' as const, current: stored }
+        stored = { revision: '4', state }
+        return { status: 'applied' as const, revision: '4' }
+      },
+    })
+  }, { authorization: 'required' })
+  await expect(manager.setBundleEnabled('extra', false)).resolves.toMatchObject({ changed: true, application: 'applied' })
+  expect(published).toEqual([{ state: { entries: [], bundles: ['core'] }, baseRevision: '3' }])
+})
+
+it('converges the profile onto a newer stored composition when a publish conflicts', async () => {
+  const stored = {
+    revision: '2',
+    state: { entries: [{ id: 'managed', disabled: true }], bundles: ['core'] } satisfies PluginDesiredState,
+  }
+  const { manager, dir } = await fixture('live', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', {
+      protectedModules: new Set<string>(), authorize: async () => {},
+      readDesiredState: async () => ({ revision: '1', state: null }),
+      publishDesiredState: async () => ({ status: 'conflict' as const, current: stored }),
+    })
+  }, { authorization: 'required' })
+  const result = await manager.setBundleEnabled('extra', false)
+  expect(result.changed).toBe(true)
+  expect(result.warnings).toContain('the administrator saved a newer plugin state; the profile converged to it')
+  expect(parse(readFileSync(join(dir, 'cordis.patch.yml'), 'utf8'))).toEqual([{ id: 'managed', disabled: true }])
+  expect(readProfileManifest('test', dir).dsh?.profile?.bundles).toEqual(['core'])
+})
+
+it('keeps the profile composition and warns when the state store is unreachable', async () => {
+  const { manager, dir } = await fixture('live', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', {
+      protectedModules: new Set<string>(), authorize: async () => {},
+      readDesiredState: async () => { throw new Error('gateway unreachable') },
+      publishDesiredState: async () => { throw new Error('unreachable') },
+    })
+  }, { authorization: 'required' })
+  const result = await manager.setBundleEnabled('extra', false)
+  expect(result.changed).toBe(true)
+  expect(result.warnings?.[0]).toMatch(/^desired-state sync failed: gateway unreachable/)
+  expect(readProfileManifest('test', dir).dsh?.profile?.bundles).toEqual(['core'])
 })

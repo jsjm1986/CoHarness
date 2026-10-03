@@ -92,7 +92,7 @@ function mountFrame() {
       useWorkspaces={((sel: (s: WorkspaceListState) => unknown) => sel(workspaceState)) as never}
       // AppFrame reads panel selection from the layout store; the standard
       // hook seat only satisfies GlobalStandardProps.
-      usePanelInfo={(() => { throw new Error('AppFrame reads panelInfo through the layout store') }) as never}
+      usePanelInfo={() => { throw new Error('AppFrame reads panelInfo through the layout store') }}
       SessionProvider={SessionProviderStub}
       t={t}
       dismissRightbar={() => { instance.actions.closeRightbar() }}

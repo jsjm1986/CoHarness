@@ -9,7 +9,7 @@ import { Context } from '@deepseek-ai/cordis'
 import type { Entry, EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import z from '@deepseek-ai/schemastery'
-import { TypertRemoteService, Remote, RemoteError } from '@deepseek-ai/dsh-typert-protocol'
+import { TypertRemoteService, Remote, RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import { pluginEntryId, readPluginInventory } from '@deepseek-ai/dsh-host-plugin-inventory'
 import {
   readPluginMeta, readProfileManifest, resolveBundleDir, loadOverlayPatches, composeEntries,
@@ -25,13 +25,15 @@ import { classifyInstallFailure } from './install-failure.ts'
 import { InvalidInstallSpecError, parseInstallSpec, type ParsedInstallSpec } from './install-spec.ts'
 import { attributeFailure, normalizeRegistry, NPMMIRROR_REGISTRY, registryPlan } from './registry.ts'
 import { writePluginEnabled } from './patch.ts'
+import { applyDesiredState, readDesiredState } from './desired-state.ts'
 import { incompatiblePlugin, ManagementFailure } from './failure.ts'
 import { approveBuilds, readPendingBuilds } from './build-approval.ts'
 import { checkGithubConnection } from './github-connection.ts'
 import type {
   BundleInfo, BundleRowInfo, ChangeResult, InspectOptions, InstallBundleOptions, ManagementError, PackageResult, PluginChange,
-  PluginEntryId, PluginInfo, PluginInspectProblem, PluginInstallCancellation, PluginInstallProgress, PluginInstallRequestId,
-  PluginInstallFrame, PluginRegistries, PluginSpecInspection, PluginManagementAuthorization, Registry,
+  PluginEntryId, PluginInfo, PluginInspectProblem, PluginInstallCancellation, PluginInstallProgress,
+  PluginInstallRequestId, PluginInstallFrame, PluginManagementAccess, PluginManagementCapability, PluginRegistries,
+  PluginSpecInspection, PluginManagementAuthorization, Registry,
 } from './types.ts'
 export type * from './types.ts'
 export { classifyInstallFailure, type InstallFailureFacts } from './install-failure.ts'
@@ -238,14 +240,35 @@ export class PluginManager extends TypertRemoteService {
   }
 
   /** Check deployment authority independently of tool approval or sandbox mode.
-   * @returns After the current caller is permitted to manage this profile.
+   * @param capability - 'read' permits every caller that reached the service;
+   * 'manage' enforces the deployment's authorization provider.
+   * @returns After the current caller is permitted the operation.
    */
-  async authorize(): Promise<void> {
+  async authorize(capability: PluginManagementCapability = 'manage'): Promise<void> {
     this.abort.signal.throwIfAborted()
+    if (capability === 'read') return
     const policy = this.ownerContext.get('pluginManagementAuthorization')
-    if (policy !== undefined) await policy.authorize()
+    if (policy !== undefined) await policy.authorize('manage')
     else if (this.authorizationRequired) {
       throw new RemoteError('plugin-management/forbidden', 'Profile management authorization is unavailable.', {})
+    }
+  }
+
+  /** Report whether the caller may change the profile, for interfaces gating controls on it.
+   * @returns `manage` after probing the deployment policy; read access is unconditional.
+   */
+  @Remote
+  async access(): Promise<PluginManagementAccess> {
+    this.abort.signal.throwIfAborted()
+    const policy = this.ownerContext.get('pluginManagementAuthorization')
+    if (policy === undefined) return { manage: !this.authorizationRequired }
+    try {
+      await policy.authorize('manage')
+      return { manage: true }
+    } catch (error) {
+      // Authorization refusals answer `manage:false`; transport and service failures still fail the call.
+      if (remoteErrorOf(error) !== undefined) return { manage: false }
+      throw error
     }
   }
 
@@ -255,7 +278,7 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   async listVersionExemptions(): Promise<{ exemptions: Record<string, string[]>; warnings: string[] }> {
-    await this.authorize()
+    await this.authorize('read')
     const { exemptions, warnings } = readProfileCompatibility(this.profile.dir)
     return { exemptions, warnings }
   }
@@ -281,7 +304,7 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   async listPlugins(): Promise<PluginInfo[]> {
-    await this.authorize()
+    await this.authorize('read')
     const rows = flatten(composeEntries([readProfilePatches('dsh', this.profile)]))
     const snapshot = await readPluginInventory(this.ctx)
     return snapshot.entries.map((entry) => {
@@ -306,7 +329,7 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   async listBundles(): Promise<BundleInfo[]> {
-    await this.authorize()
+    await this.authorize('read')
     const manifest = readProfileManifest('dsh', this.profile.dir)
     const exemptions = readProfileVersionExemptions(this.profile.dir)
     const selected = manifest.dsh?.profile?.bundles ?? []
@@ -352,7 +375,7 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   async registries(): Promise<PluginRegistries> {
-    await this.authorize()
+    await this.authorize('read')
     return {
       ...this.configuredRegistries, fallbackRegistries: [...this.configuredRegistries.fallbackRegistries],
       resolved: await readProfileRegistry(this.profile.dir, {
@@ -637,7 +660,7 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   async waitForInstall(requestId: PluginInstallRequestId): Promise<ChangeResult | null> {
-    await this.authorize()
+    await this.authorize('read')
     return this.installs.get(requestId)?.result ?? null
   }
 
@@ -863,12 +886,17 @@ export class PluginManager extends TypertRemoteService {
     return reconcileProfilePatches(this.ownerContext.root, readProfilePatches('dsh', this.profile), 'dsh', requiredIds)
   }
 
+  /** The state-store revision this profile last observed; undefined until the first publish. */
+  private stateRevision: string | undefined
+  /** Serializes desired-state publishes so they commit in file-change order. */
+  private syncTail: Promise<void> = Promise.resolve()
+
   private async change(
     operation: (result: ChangeResult) => Promise<ChangeResult['application'] | void>,
     request: Pick<ChangeResult, 'stage' | 'target' | 'enabled'>,
     reason: PluginChange['reason'],
   ): Promise<ChangeResult> {
-    return withFileLock(join(this.profile.dir, 'package.json'), async () => {
+    const result = await withFileLock(join(this.profile.dir, 'package.json'), async () => {
       this.abort.signal.throwIfAborted()
       await this.authorize()
       const before = this.diskState()
@@ -888,6 +916,52 @@ export class PluginManager extends TypertRemoteService {
       this.ownerContext.emit('plugin-manager/changed', { reason })
       return result
     }, { waitMs: this.lockWaitMs })
+    if (result.changed && result.application !== 'failed' && result.application !== 'cancelled') {
+      const sync = this.syncTail.then(() => this.syncDesiredState(result))
+      this.syncTail = sync.then(() => undefined, () => undefined)
+      await sync
+    }
+    return result
+  }
+
+  /**
+   * Publish the composition the profile files now hold to the deployment's
+   * state store. A conflict means an administrator saved a newer desired
+   * state: the profile rewrites its managed files to that state and reloads,
+   * converging the live composition without a restart. Every failure degrades
+   * to a result warning; the profile files stay authoritative until the next
+   * start re-projects the store.
+   * @param result - the committed change the warnings attach to.
+   */
+  private async syncDesiredState(result: ChangeResult): Promise<void> {
+    const policy = this.ownerContext.get('pluginManagementAuthorization')
+    if (policy?.readDesiredState === undefined || policy.publishDesiredState === undefined) return
+    const warn = (text: string) => { result.warnings = [...result.warnings ?? [], text] }
+    try {
+      if (this.stateRevision === undefined) {
+        this.stateRevision = (await policy.readDesiredState()).revision
+      }
+      if (this.abort.signal.aborted) return
+      const observed = await readDesiredState(this.profile.dir, this.profile.patchPath)
+      const outcome = await policy.publishDesiredState(observed, this.stateRevision)
+      if (outcome.status === 'applied') {
+        this.stateRevision = outcome.revision
+        return
+      }
+      this.stateRevision = outcome.current.revision
+      const desired = outcome.current.state
+      if (desired !== null) {
+        await withFileLock(join(this.profile.dir, 'package.json'), async () => {
+          await applyDesiredState(this.profile.dir, this.profile.patchPath, desired)
+        }, { waitMs: this.lockWaitMs })
+        result.warnings = [...result.warnings ?? [], ...await this.reload()]
+        this.ownerContext.emit('plugin-manager/changed', { reason: 'desired-state' })
+      }
+      warn('the administrator saved a newer plugin state; the profile converged to it')
+    } catch (error) {
+      if (this.abort.signal.aborted) return
+      warn(`desired-state sync failed: ${messageOf(error)}`)
+    }
   }
 
   private diskState(): string {

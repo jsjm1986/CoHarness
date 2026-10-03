@@ -54,13 +54,13 @@ export class MockAccountPreferences implements AccountPreferencesTransport {
     if (mutation.operation === 'set' && mutation.value !== undefined) fields[mutation.field] = mutation.value
     else this.overrides[mutation.namespace] = Object.fromEntries(
       Object.entries(fields).filter(([key]) => key !== mutation.field),
-    ) as typeof fields
+    )
     this.revision += 1
     return Promise.resolve(this.view())
   }
 
   private view(): AccountPreferencesView {
-    const merge = <T extends object>(base: T, overrides: Record<string, unknown>): T => ({ ...base, ...overrides }) as T
+    const merge = <T extends object>(base: T, overrides: Record<string, unknown>): T => ({ ...base, ...overrides })
     return {
       revision: this.revision,
       values: {
@@ -74,7 +74,7 @@ export class MockAccountPreferences implements AccountPreferencesTransport {
         'ui-conversation': { ...this.overrides['ui-conversation'] },
       },
       migrated: false,
-    } as AccountPreferencesView
+    }
   }
 }
 

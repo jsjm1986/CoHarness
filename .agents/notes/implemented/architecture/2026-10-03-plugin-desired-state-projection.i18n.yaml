@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-03-plugin-desired-state-projection.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-03-plugin-desired-state-projection.md
+/agent-note-postgresql-desired-plugin-state-projects-into-runtime-profiles-and-instances-publish-observed-composition:
+  en: a63343444b6bee85
+  zh: b8a09ba17ca5ab84
+/agent-note-postgresql-desired-plugin-state-projects-into-runtime-profiles-and-instances-publish-observed-composition/problem:
+  en: a629b35a81e567ff
+  zh: 75960e3e01366e66
+/agent-note-postgresql-desired-plugin-state-projects-into-runtime-profiles-and-instances-publish-observed-composition/decision:
+  en: 1ac9fcd1ea2ae8e3
+  zh: d01c427533d02ee5
+/agent-note-postgresql-desired-plugin-state-projects-into-runtime-profiles-and-instances-publish-observed-composition/alternatives-considered:
+  en: b66618f6fffcbadc
+  zh: 678685be4d984a17
+/agent-note-postgresql-desired-plugin-state-projects-into-runtime-profiles-and-instances-publish-observed-composition/consequences:
+  en: 0741392fe6a26af1
+  zh: 6de1217dcbf86451

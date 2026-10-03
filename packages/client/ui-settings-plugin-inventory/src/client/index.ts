@@ -38,10 +38,12 @@ export function apply(ctx: ClientContext): void {
     }
     return result.value
   }
-  // The manager's own authorization is the probe: listing answers the grant
-  // alongside the rows it governs, so no separate capability call can drift
-  // from what the mutations actually allow.
+  // The manager's own capability answer is the probe: `access` reports the
+  // manage grant while inventory reads stay open, and an older Host without
+  // the remote still refuses the read itself on denial.
   const management: PluginInventorySettingsTabInjected['management'] = async () => {
+    const access = await ctx.remote.pluginManager.access()
+    if (access.ok && !access.value.manage) return { status: 'denied' }
     const result = await ctx.remote.pluginManager.listPlugins()
     if (!result.ok) {
       if (result.error.code === 'plugin-management/forbidden') return { status: 'denied' }

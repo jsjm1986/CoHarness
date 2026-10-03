@@ -434,7 +434,9 @@ function reconcileQuestions(ctx: ClientContext, cards: QuestionCards): () => voi
       do {
         reconcileAgain = false
         reconcilePass()
-      } while (reconcileAgain)
+        // A re-entrant call sets the flag through the guard above; the closure
+        // write is invisible to narrowing, so the read asserts boolean.
+      } while (reconcileAgain as boolean)
     } finally {
       reconciling = false
     }

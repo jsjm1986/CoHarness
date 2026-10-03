@@ -80,9 +80,9 @@ function namespaceProxy(namespace: string, rpc: ClientConnectionRpc, mock: Remot
         const args = [...values]
         const signal = args.at(-1) instanceof AbortSignal ? (args.pop() as AbortSignal) : undefined
         if (mock.modeOf(endpoint) === 'stream') {
-          const stream = rpc.stream
+          const stream = rpc.stream?.bind(rpc)
           if (stream === undefined) throw new Error(`client-test-runtime: ${endpoint} is a stream but the carrier has no stream channel`)
-          return streamEndpoint(endpoint, stream.bind(rpc), { args }, signal ?? new AbortController().signal)
+          return streamEndpoint(endpoint, stream, { args }, signal ?? new AbortController().signal)
         }
         return callEndpoint(endpoint, rpc, { args }, signal)
       }

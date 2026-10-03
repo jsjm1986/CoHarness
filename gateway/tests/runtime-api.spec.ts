@@ -17,6 +17,7 @@ import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import { DesktopCoordinator, SqliteDesktopCoordinatorRepository } from '../src/desktop-coordinator.ts'
 import type { DocumentTransferResponse } from '../src/document-transfer.ts'
 import type { RuntimeTarget } from '../src/instances.ts'
+import type { PluginStateSnapshot } from '../src/plugin-state.ts'
 import { createRuntimeApiHandler } from '../src/runtime-api.ts'
 
 const ORGANIZATION_ID = '11d4a86c-4624-44fa-b69f-7e3f48cc5a04'
@@ -124,6 +125,12 @@ function fixture() {
   }
   const archiveSnapshot = vi.fn(async () => [{ id: 'command-1', rootSessionId: 'session-archive', action: 'restore' as const }])
   const archiveAck = vi.fn(async () => true)
+  const pluginState = {
+    readForSubject: vi.fn(async (): Promise<PluginStateSnapshot> => ({ revision: '0', state: null })),
+    publishForSubject: vi.fn(async (_subject: unknown, _state: unknown, _baseRevision: unknown):
+      Promise<{ status: 'applied'; revision: string } | { status: 'conflict'; current: PluginStateSnapshot }> =>
+      ({ status: 'applied' as const, revision: '1' })),
+  }
   const deps = {
     context: {
       organizationSlug: ORGANIZATION_SLUG,
@@ -166,6 +173,7 @@ function fixture() {
     governance: { resolveOrganizationCredential },
     push,
     archives: { syncRuntimeSnapshot: archiveSnapshot, acknowledgeCommand: archiveAck, hasPendingCommands: vi.fn(async () => false) },
+    pluginState,
   } satisfies RuntimeDependencies
   const issuePrincipal = (userId: number, mode: 'ro' | 'rw' = modes.get(userId) ?? 'rw') => principals.issue({
     user: user(userId, userId === ADMIN_ID ? 'admin' : 'user'),
@@ -189,6 +197,7 @@ function fixture() {
     push,
     archiveSnapshot,
     archiveAck,
+    pluginState,
   }
 }
 
@@ -273,6 +282,55 @@ describe('profile management authorization', () => {
     // non-administrator before the authorization branch runs.
     expect(await request(runtime.handler, '/internal/runtime/plugin-management/authorize', { body: {}, principal: purpose }))
       .toMatchObject({ status: 400 })
+  })
+})
+
+describe('plugin desired state endpoints', () => {
+  it('reports 503 when no state store is wired', async () => {
+    const runtime = fixture()
+    const { pluginState: _omitted, ...deps } = runtime.deps
+    const handler = createRuntimeApiHandler(deps)
+    expect(await request(handler, '/internal/runtime/plugin-state', { method: 'GET', body: {} }))
+      .toMatchObject({ status: 503, body: { error: 'plugin-state-unavailable' } })
+  })
+
+  it('reads the authenticated runtime owner state', async () => {
+    const runtime = fixture()
+    runtime.pluginState.readForSubject.mockResolvedValueOnce({ revision: '2', state: { entries: [], bundles: ['core'] } })
+    expect(await request(runtime.handler, '/internal/runtime/plugin-state', { method: 'GET', body: {} }))
+      .toMatchObject({ status: 200, body: { revision: '2', state: { entries: [], bundles: ['core'] } } })
+    expect(runtime.pluginState.readForSubject).toHaveBeenCalledWith(expect.objectContaining({
+      organizationId: ORGANIZATION_ID, projectInternalId: PROJECT_INTERNAL_ID, generation: GENERATION,
+    }))
+  })
+
+  it('publishes a composition and reports the committed revision', async () => {
+    const runtime = fixture()
+    runtime.pluginState.publishForSubject.mockResolvedValueOnce({ status: 'applied', revision: '3' })
+    expect(await request(runtime.handler, '/internal/runtime/plugin-state', {
+      body: { state: { entries: [{ id: 'x', disabled: true }], bundles: ['core'] }, baseRevision: '2' },
+    })).toMatchObject({ status: 200, body: { revision: '3' } })
+    expect(runtime.pluginState.publishForSubject).toHaveBeenCalledWith(
+      expect.objectContaining({ projectInternalId: PROJECT_INTERNAL_ID }),
+      { entries: [{ id: 'x', disabled: true }], bundles: ['core'] }, '2')
+  })
+
+  it('answers 409 with the current state when the publisher is stale', async () => {
+    const runtime = fixture()
+    runtime.pluginState.publishForSubject.mockResolvedValueOnce({
+      status: 'conflict', current: { revision: '5', state: null },
+    })
+    expect(await request(runtime.handler, '/internal/runtime/plugin-state', {
+      body: { state: { entries: [], bundles: [] }, baseRevision: '2' },
+    })).toMatchObject({ status: 409, body: { revision: '5', state: null } })
+  })
+
+  it('rejects malformed reports and unauthenticated callers', async () => {
+    const runtime = fixture()
+    expect(await request(runtime.handler, '/internal/runtime/plugin-state', { body: 'not-an-object' }))
+      .toMatchObject({ status: 400 })
+    expect(await request(runtime.handler, '/internal/runtime/plugin-state', { body: {}, token: 'not-authorized' }))
+      .toMatchObject({ status: 401 })
   })
 })
 

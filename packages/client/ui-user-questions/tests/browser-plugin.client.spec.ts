@@ -61,8 +61,8 @@ async function bench(declare = true) {
   const projection = createSnapshotStore<{ active: readonly PendingUserQuestion[]; settled: readonly never[] }>({ active: [], settled: [] })
   const sessionStore = createSnapshotStore<{ pending: readonly PendingWait[] }>({ pending: [] })
   const session = {
-    subscribe: sessionStore.subscribe,
-    getSnapshot: sessionStore.getSnapshot,
+    subscribe: (listener: () => void) => sessionStore.subscribe(listener),
+    getSnapshot: () => sessionStore.getSnapshot(),
     projections: { faceOf: () => projection },
     publishInteraction: vi.fn((_entry: object) => () => {}),
   }

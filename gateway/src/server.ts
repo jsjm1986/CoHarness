@@ -72,7 +72,9 @@ export interface GatewayDeps {
   desktopAccess?: Pick<import('./desktop-access.ts').DesktopAccess, 'get' | 'set'>
   /** Optional administrator-owned plugin-management qualification store. */
   pluginAccess?: Pick<import('./plugin-access.ts').PluginAccess, 'get' | 'set'>
-  pluginManagement?: Pick<import('./plugin-management.ts').GatewayPluginManagement, 'target' | 'invoke'>
+  pluginManagement?: Pick<import('./plugin-management.ts').GatewayPluginManagement, 'target' | 'invoke' | 'state' | 'saveState'>
+  /** Optional durable plugin desired-state store backing spawn projection and runtime write-back. */
+  pluginState?: Pick<import('./plugin-state.ts').PostgresPluginState, 'get' | 'set' | 'readForSubject' | 'publishForSubject' | 'projection' | 'markApplied' | 'applied' | 'observed' | 'project'>
   terminalManagement?: Pick<import('./terminal-management.ts').GatewayTerminalManagement, 'list' | 'close'>
   terminalAccess?: Pick<import('./terminal-access.ts').TerminalAccess, 'get' | 'set'>
   sshAccess?: Pick<import('./ssh-access.ts').SshAccess, 'get' | 'set'>

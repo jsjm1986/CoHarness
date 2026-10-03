@@ -100,8 +100,9 @@ function partsSummary(rows: readonly PackageRow[], t: Translate): string {
   ].join(' · ')
 }
 
-/** Switching for a pack's rows: which rows have a write in flight, and the write. */
+/** Switching for a pack's rows: the caller's manage grant, which rows have a write in flight, and the write. */
 interface RowToggles {
+  readonly canManage: boolean
   readonly busy: (row: PackageRow) => boolean
   readonly onSetEnabled: (row: PackageRow, enabled: boolean) => void
 }
@@ -148,12 +149,13 @@ function PackageArtwork({ src, row = false, size = row ? ROW_ARTWORK_SIZE : CARD
     : <img className={css.packageImage} src={src} width={size} height={size} alt="" onError={() => { setFailedSource(src) }} />
 }
 
-/** A row's switch: locked, saying why, when the Host refuses to address the row through the profile patch. */
-function RowSwitch({ row, title, t, busy, onChange }: {
+/** A row's switch: locked, saying why, when the Host refuses to address the row through the profile patch or the deployment's grant. */
+function RowSwitch({ row, title, t, busy, canManage, onChange }: {
   readonly row: PackageRow
   readonly title: string
   readonly t: Translate
   readonly busy: boolean
+  readonly canManage: boolean
   readonly onChange: (enabled: boolean) => void
 }): ReactNode {
   const locked = row.readOnlyReason !== undefined || row.entryId === undefined
@@ -161,8 +163,10 @@ function RowSwitch({ row, title, t, busy, onChange }: {
     <Switch
       checked={row.enabled}
       label={t('partToggle', { name: title })}
-      disabled={busy || locked}
-      {...row.readOnlyReason === undefined ? {} : { title: managementText({ code: row.readOnlyReason }, t) }}
+      disabled={busy || locked || !canManage}
+      {...!canManage
+        ? { title: t('managementDenied') }
+        : row.readOnlyReason === undefined ? {} : { title: managementText({ code: row.readOnlyReason }, t) }}
       onChange={onChange}
     />
   )
@@ -256,7 +260,7 @@ function RowsSection({ rows, t, resolveText, toggle, configure }: {
                   {toggle === undefined
                     ? null
                     : <RowSwitch
-                      row={row} title={title} t={t} busy={toggle.busy(row)}
+                      row={row} title={title} t={t} busy={toggle.busy(row)} canManage={toggle.canManage}
                       onChange={(enabled) => { toggle.onSetEnabled(row, enabled) }}
                     />}
                 </div>
@@ -273,19 +277,22 @@ function RowsSection({ rows, t, resolveText, toggle, configure }: {
  * A bundle's enable switch on its card and its page: locked, saying why, for
  * one the Host protects; off and locked for one it cannot read.
  */
-function EnableSwitch({ pkg, title, t, busy, onSetEnabled }: {
+function EnableSwitch({ pkg, title, t, busy, canManage, onSetEnabled }: {
   readonly pkg: PackageView
   readonly title: string
   readonly t: Translate
   readonly busy: boolean
+  readonly canManage: boolean
   readonly onSetEnabled: (enabled: boolean) => void
 }): ReactNode {
   return (
     <Switch
       checked={pkg.enabled}
       label={t('enableToggle', { name: title })}
-      disabled={busy || pkg.readOnlyReason !== undefined || (!pkg.enabled && pkg.error !== undefined)}
-      {...pkg.readOnlyReason === undefined ? {} : { title: managementText({ code: pkg.readOnlyReason }, t) }}
+      disabled={busy || !canManage || pkg.readOnlyReason !== undefined || (!pkg.enabled && pkg.error !== undefined)}
+      {...!canManage
+        ? { title: t('managementDenied') }
+        : pkg.readOnlyReason === undefined ? {} : { title: managementText({ code: pkg.readOnlyReason }, t) }}
       onChange={onSetEnabled}
     />
   )
@@ -379,12 +386,13 @@ function DetailTop({ crumbLabel, crumbText, onBack, icon, actions }: {
 }
 
 /** One package as a card that opens its page: its name, its one-liner, its tags, and its bundle switch. */
-function PackageCard({ pkg, t, resolveText, busy, highlighted, onOpen, onSetEnabled }: {
+function PackageCard({ pkg, t, resolveText, busy, highlighted, canManage, onOpen, onSetEnabled }: {
   readonly pkg: PackageView
   readonly t: Translate
   readonly resolveText: ResolveText
   readonly busy: boolean
   readonly highlighted: boolean
+  readonly canManage: boolean
   readonly onOpen: () => void
   readonly onSetEnabled: (enabled: boolean) => void
 }): ReactNode {
@@ -409,7 +417,7 @@ function PackageCard({ pkg, t, resolveText, busy, highlighted, onOpen, onSetEnab
           </>
         )}
         description={description}
-        end={<EnableSwitch pkg={pkg} title={title} t={t} busy={busy} onSetEnabled={onSetEnabled} />}
+        end={<EnableSwitch pkg={pkg} title={title} t={t} busy={busy} canManage={canManage} onSetEnabled={onSetEnabled} />}
       />
       <MetadataError error={pkg.meta?.error} t={t} />
     </li>
@@ -541,13 +549,14 @@ function RowDetail({ pkg, row, t, resolveText, onBack, renderSlot, form }: {
  * itself; and its rows with their switches and configure controls.
  */
 function PackageDetail({
-  pkg, t, resolveText, busy, rowBusy, configured, configure, renderSlot,
+  pkg, t, resolveText, busy, canManage, rowBusy, configured, configure, renderSlot,
   onBack, onSetEnabled, onUninstall, onSetRowEnabled,
 }: {
   readonly pkg: PackageView
   readonly t: Translate
   readonly resolveText: ResolveText
   readonly busy: boolean
+  readonly canManage: boolean
   /** Whether a row has a write in flight. */
   readonly rowBusy: (row: PackageRow) => boolean
   /** Whether the bundle registered a configuration of its own. */
@@ -580,14 +589,14 @@ function PackageDetail({
                   className={css.danger}
                   icon={<IconTrashOutline16 size={13} />}
                   aria-label={t('uninstallLabel', { name: title })}
-                  disabled={busy || pkg.readOnlyReason !== undefined}
+                  disabled={busy || !canManage || pkg.readOnlyReason !== undefined}
                   onClick={onUninstall}
                 >
                   {t('uninstall')}
                 </Button>
               )
               : null}
-            <EnableSwitch pkg={pkg} title={title} t={t} busy={busy} onSetEnabled={onSetEnabled} />
+            <EnableSwitch pkg={pkg} title={title} t={t} busy={busy} canManage={canManage} onSetEnabled={onSetEnabled} />
           </div>
         )}
       />
@@ -617,7 +626,7 @@ function PackageDetail({
           rows={pkg.rows}
           t={t}
           resolveText={resolveText}
-          toggle={pkg.enabled ? { busy: row => busy || rowBusy(row), onSetEnabled: onSetRowEnabled } : undefined}
+          toggle={pkg.enabled ? { canManage, busy: row => busy || rowBusy(row), onSetEnabled: onSetRowEnabled } : undefined}
           configure={configure}
         />
         {renderSlot('plugins.detail.section', { subject })}
@@ -1292,6 +1301,8 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
   const loaded = state.status === 'ready' || state.status === 'error'
   // A denied account re-probes on refresh: an administrator grant lands without a reload.
   const refreshable = loaded || state.status === 'denied'
+  // Reads are open to every account; `manage` alone decides whether controls write.
+  const canManage = state.manage
   const refreshing = state.refreshStatus === 'refreshing'
   const openPkg = view.kind === 'package' || view.kind === 'row' ? listed.find(pkg => pkg.name === view.name) : undefined
   const openItem = view.kind === 'item' ? ledger.items.find(item => item.id === view.id) : undefined
@@ -1314,6 +1325,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
       resolveText={resolveText}
       busy={state.busy.includes(pkg.name)}
       highlighted={state.highlight === pkg.name}
+      canManage={canManage}
       onOpen={() => { setActivation(null); setView({ kind: 'package', name: pkg.name }) }}
       onSetEnabled={(enabled) => { setActivation(enabled ? pkg.name : null); props.setEnabled(pkg.name, enabled) }}
     />
@@ -1362,7 +1374,8 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
                   </span>
                 </button>
               </Tooltip>
-              <Button variant="primary" size="sm" className={css.addButton} icon={<IconPlusOutline16 size={13} />} disabled={!loaded} onClick={props.openInstall}>
+              <Button variant="primary" size="sm" className={css.addButton} icon={<IconPlusOutline16 size={13} />}
+                disabled={!loaded || !canManage} {...!canManage ? { title: t('managementDenied') } : {}} onClick={props.openInstall}>
                 {t(state.install.requestId === undefined ? 'addPlugin' : 'installViewTask')}
               </Button>
             </div>
@@ -1375,8 +1388,8 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
           <StateDot state="idle" />{t('unavailable')}
         </p>
       ) : null}
-      {showsCards && state.status === 'denied' ? (
-        <p className={`${css.status} ${css.statusWithDot}`} role="status">
+      {showsCards && (state.status === 'denied' || (loaded && !canManage)) ? (
+        <p className={`${css.status} ${css.statusWithDot}`} role="status" data-plugin-readonly={!canManage && state.status !== 'denied' ? '' : undefined}>
           <StateDot state="idle" />{t('managementDenied')}
         </p>
       ) : null}
@@ -1421,6 +1434,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
             t={t}
             resolveText={resolveText}
             busy={state.busy.includes(openPkg.name)}
+            canManage={canManage}
             rowBusy={row => row.entryId !== undefined && state.busy.includes(rowKey(row.entryId))}
             configured={ledger.bundles.has(openPkg.name)}
             configure={configure(openPkg)}

@@ -382,7 +382,7 @@ export function ModelSelect(
       }
       const checked = menuRef.current?.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"]:not([disabled])')
       const target = checked ?? rows.find(item => !item.disabled)
-      if (target === undefined || target === null) return
+      if (target === undefined) return
       target.focus()
       return
     }

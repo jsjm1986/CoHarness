@@ -277,6 +277,8 @@ export interface PluginManagerState {
    * `error` keeps the last packages.
    */
   readonly status: 'idle' | 'loading' | 'ready' | 'error' | 'unavailable' | 'denied'
+  /** Whether the caller may change the profile; false renders every mutation control read-only. */
+  readonly manage: boolean
   /**
    * Manual refresh feedback: `refreshing` until reads settle and the 400 ms minimum elapses;
    * `failed` after a failed refresh without cached inventory; otherwise `idle`, including
@@ -532,7 +534,7 @@ export class PluginManagerController {
     private readonly ctx: ClientContext,
   ) {
     this.store = createSnapshotStore<PluginManagerState>({
-      status: 'idle', refreshStatus: 'idle', packages: [], busy: [], notice: null,
+      status: 'idle', refreshStatus: 'idle', packages: [], busy: [], notice: null, manage: true,
       install: IDLE_INSTALL, confirm: null, highlight: null,
     })
   }
@@ -790,9 +792,12 @@ export class PluginManagerController {
           this.patch({ status: 'unavailable', packages: [] })
           continue
         }
-        const [bundles, plugins] = await Promise.all([
+        const [bundles, plugins, access] = await Promise.all([
           this.ctx.remote.pluginManager.listBundles(),
           this.ctx.remote.pluginManager.listPlugins(),
+          // An older Host's generated client lacks `access` and throws
+          // synchronously; that is the same fallback as a refused answer.
+          Promise.resolve().then(() => this.ctx.remote.pluginManager.access()).catch(() => undefined),
         ])
         if (generation !== this.generation) return
         if (!bundles.ok || !plugins.ok) {
@@ -811,6 +816,9 @@ export class PluginManagerController {
         this.hasCachedInventory = true
         this.patch({
           status: 'ready',
+          // An older Host without the access remote answers transport failure;
+          // its mutations still carry their own refusal.
+          manage: access?.ok === true ? access.value.manage : true,
           refreshStatus: this.getSnapshot().refreshStatus === 'refreshing' ? 'refreshing' : 'idle',
           packages: sortPackages(bundles.value.map(bundle => packageView(bundle, plugins.value))),
         })

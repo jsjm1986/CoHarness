@@ -36,6 +36,7 @@ import {
 import type { PostgresInstanceRepository } from './postgres/instance-repository.ts'
 import type { PostgresCollaborationService } from './postgres/collaboration-service.ts'
 import { SshTargetError, type PostgresSshTargetService } from './postgres/ssh-target-service.ts'
+import { PluginStateError } from './plugin-state.ts'
 import { internalUserId, type PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import type { GatewayPushService } from './push-notifications.ts'
 import type { GatewayModelGovernanceService } from './services.ts'
@@ -127,6 +128,8 @@ interface RuntimeApiDependencies {
   desktops?: DesktopCoordinator
   /** Optional registered SSH targets; absent in standalone compositions without managed SSH. */
   sshTargets?: Pick<PostgresSshTargetService, 'resolveForRuntime'>
+  /** Optional durable plugin desired-state store; absent in compositions without PostgreSQL. */
+  pluginState?: Pick<import('./plugin-state.ts').PostgresPluginState, 'readForSubject' | 'publishForSubject'>
 }
 
 function send(res: ServerResponse, status: number, value: unknown): void {
@@ -793,6 +796,23 @@ export function createRuntimeApiHandler(
         }
         res.writeHead(204, { 'cache-control': 'no-store' })
         res.end()
+        return true
+      }
+      if (pathname === '/internal/runtime/plugin-state' && (req.method === 'GET' || req.method === 'POST')) {
+        if (deps.pluginState === undefined) { send(res, 503, { error: 'plugin-state-unavailable' }); return true }
+        const reply = (status: number, body: unknown) => {
+          res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+          res.end(JSON.stringify(body))
+        }
+        if (req.method === 'GET') {
+          reply(200, await deps.pluginState.readForSubject(subject))
+          return true
+        }
+        const payload = record(JSON.parse(body))
+        if (payload === undefined) throw new PluginStateError(400, 'invalid plugin state report')
+        const outcome = await deps.pluginState.publishForSubject(subject, payload.state, payload.baseRevision)
+        if (outcome.status === 'conflict') reply(409, outcome.current)
+        else reply(200, { revision: outcome.revision })
         return true
       }
       if (pathname === '/internal/runtime/ssh/resolve' && req.method === 'POST') {
@@ -1713,6 +1733,10 @@ export function createRuntimeApiHandler(
       }
       if (error instanceof SshTargetError) {
         send(res, error.status, { error: error.message, message: error.message })
+        return true
+      }
+      if (error instanceof PluginStateError) {
+        send(res, error.status, { error: error.message })
         return true
       }
       if (error instanceof SyntaxError || (error instanceof Error && error.message.startsWith('invalid '))) {

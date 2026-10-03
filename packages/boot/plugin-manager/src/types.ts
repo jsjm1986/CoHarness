@@ -5,14 +5,66 @@ import type { PluginInventoryEntry } from '@deepseek-ai/dsh-host-plugin-inventor
 export type { PluginEntryId } from '@deepseek-ai/dsh-host-plugin-inventory/types'
 import type { PluginEntryId } from '@deepseek-ai/dsh-host-plugin-inventory/types'
 
+/** How deep into the profile a caller's operation reaches. */
+export type PluginManagementCapability = 'read' | 'manage'
+
+/**
+ * One desired patch row as the state store records it: only rows whose keys
+ * stay within id, name, and disabled, so a projection can replace them
+ * without touching the profile's other declarations.
+ */
+export interface PluginDesiredEntry {
+  id: string
+  name?: string
+  disabled: boolean
+}
+
+/** The deployment's complete desired plugin composition for one profile. */
+export interface PluginDesiredState {
+  /** Patch rows the profile's management layer carries, in declaration order. */
+  entries: PluginDesiredEntry[]
+  /** The profile's ordered bundle selection (`dsh.profile.bundles`). */
+  bundles: string[]
+}
+
+/** A desired-state row and the optimistic-concurrency revision guarding it. */
+export interface PluginDesiredStateSnapshot {
+  /** '0' when no desired state has been saved for the profile yet. */
+  revision: string
+  state: PluginDesiredState | null
+}
+
+/** The outcome of publishing the profile's observed composition to the store. */
+export type PluginDesiredStatePublish =
+  | { status: 'applied'; revision: string }
+  | {
+    status: 'conflict'
+    /** The revision that replaced the publisher's base, plus the state it saved. */
+    current: PluginDesiredStateSnapshot
+  }
+
 /** Deployment-owned authority for current-profile management. */
 export interface PluginManagementAuthorization {
   /** Modules a managed profile cannot disable or replace through a bundle. */
   readonly protectedModules: ReadonlySet<string>
   /** Recheck the current caller before profile reads or writes.
+   * @param capability - 'read' permits any runtime principal; 'manage' enforces the deployment's policy.
    * @returns After the deployment permits the operation; rejects without permission.
    */
-  authorize(): Promise<void>
+  authorize(capability?: PluginManagementCapability): Promise<void>
+  /**
+   * Read the profile's saved desired state. Present only in deployments with
+   * a durable state store; standalone profiles manage files directly.
+   * @returns the store's current snapshot.
+   */
+  readDesiredState?(): Promise<PluginDesiredStateSnapshot>
+  /**
+   * Publish the profile's observed composition after a committed change.
+   * @param state - the managed rows and bundle selection the profile files now hold.
+   * @param baseRevision - the store revision the publisher last saw.
+   * @returns 'applied' with the new revision, or 'conflict' carrying the store's current state.
+   */
+  publishDesiredState?(state: PluginDesiredState, baseRevision: string): Promise<PluginDesiredStatePublish>
 }
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
@@ -251,10 +303,16 @@ export type PluginInstallFrame =
   | { readonly type: 'log'; readonly chunk: PluginInstallLogChunk }
   | { readonly type: 'result'; readonly value: ChangeResult }
 
+/** The caller's management authorization, for interfaces that gate controls on it. */
+export interface PluginManagementAccess {
+  /** Whether the caller may change the profile's plugins and bundles. */
+  manage: boolean
+}
+
 /** What changed in the profile, for consumers that show it. */
 export interface PluginChange {
-  /** The operation that changed it. */
-  readonly reason: 'plugin' | 'bundle' | 'install' | 'remove'
+  /** The operation that changed it; `desired-state` is a convergence the state store drove, not a caller's operation. */
+  readonly reason: 'plugin' | 'bundle' | 'install' | 'remove' | 'desired-state'
 }
 
 declare module '@deepseek-ai/cordis' {

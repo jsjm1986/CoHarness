@@ -33,7 +33,7 @@ async function mounted(ctx: Context, config: object) {
           const prev = current
           section = { ...section, ...patch }
           current = { ...current, ...patch }
-          for (const callback of [...watchers]) await callback(current, prev)
+          for (const callback of [...watchers]) callback(current, prev)
         },
       }
     },

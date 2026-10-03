@@ -18,6 +18,10 @@ The [boot package group](../../packages/boot/README.md) owns launcher-provided p
 
 `PluginInstallFrame` is one private progress, log or final-result frame. `installBundleStream` requires a unique request id, admits only its own diagnostics and cancels the owned installation when its transport closes. Consumers require the final result and a clean stream end; they must not reconnect and replay an installation.
 
+`PluginManagementCapability` splits operations into `read`, open to any caller reaching the service, and `manage`, which the deployment's authorization policy decides. `PluginManagementAccess` reports the caller's `manage` grant so interfaces can gate controls without probing a write.
+
+`PluginDesiredState` is the deployment's desired composition for one profile: verbatim patch `entries` whose keys stay within `id`, `name`, `disabled`, plus the ordered `bundles` selection. `PluginDesiredStateSnapshot` pairs a saved state with the store's optimistic-concurrency `revision` (`'0'` while none is saved), and `PluginDesiredStatePublish` answers `applied` with the new revision or `conflict` with the store's current snapshot.
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -63,9 +67,25 @@ Deployment-owned authority for current-profile management.
 
 ```ts cordis-catalog
 /** Recheck the current caller before profile reads or writes.
+ * @param capability - 'read' permits any runtime principal; 'manage' enforces the deployment's policy.
  * @returns After the deployment permits the operation; rejects without permission.
  */
-authorize(): Promise<void>
+authorize(capability?: PluginManagementCapability): Promise<void>
+
+/**
+ * Read the profile's saved desired state. Present only in deployments with
+ * a durable state store; standalone profiles manage files directly.
+ * @returns the store's current snapshot.
+ */
+readDesiredState?(): Promise<PluginDesiredStateSnapshot>
+
+/**
+ * Publish the profile's observed composition after a committed change.
+ * @param state - the managed rows and bundle selection the profile files now hold.
+ * @param baseRevision - the store revision the publisher last saw.
+ * @returns 'applied' with the new revision, or 'conflict' carrying the store's current state.
+ */
+publishDesiredState?(state: PluginDesiredState, baseRevision: string): Promise<PluginDesiredStatePublish>
 ```
 
 Source: [`packages/boot/plugin-manager/src/types.ts`](../../packages/boot/plugin-manager/src/types.ts)
@@ -78,9 +98,16 @@ Manage profile files and apply their declared reload lifecycle.
 
 ```ts cordis-catalog
 /** Check deployment authority independently of tool approval or sandbox mode.
- * @returns After the current caller is permitted to manage this profile.
+ * @param capability - 'read' permits every caller that reached the service;
+ * 'manage' enforces the deployment's authorization provider.
+ * @returns After the current caller is permitted the operation.
  */
-async authorize(): Promise<void>
+async authorize(capability: PluginManagementCapability = 'manage'): Promise<void>
+
+/** Report whether the caller may change the profile, for interfaces gating controls on it.
+ * @returns `manage` after probing the deployment policy; read access is unconditional.
+ */
+@Remote async access(): Promise<PluginManagementAccess>
 
 /** Read exact plugin-version exemptions saved in this profile.
  * @returns Accepted package-name@version keys with the runtime versions they may run on, and any
@@ -181,6 +208,24 @@ async authorize(): Promise<void>
 ```
 
 Source: [`packages/boot/plugin-manager/src/index.ts`](../../packages/boot/plugin-manager/src/index.ts)
+
+<a id="ctxpluginregistryprobe--pluginregistryprobe"></a>
+
+### `ctx.pluginRegistryProbe` — `PluginRegistryProbe`
+
+Compares public registry responses on the Host; the Client owns the initial selection.
+
+```ts cordis-catalog
+/**
+ * Race npm and npmmirror HTTPS ping responses through the Host's fetch proxy.
+ * Concurrent readers share a probe; a winner cancels and awaits the other request.
+ * @returns the first registry with a successful response, or null when disabled or neither responds successfully; results are cached.
+ * @throws rejects when the service has been unloaded.
+ */
+@Remote async fastest(): Promise<string | null>
+```
+
+Source: [`packages/client/ui-plugin-manager/src/index.ts`](../../packages/client/ui-plugin-manager/src/index.ts)
 
 <a id="ctxprofilecontext--profilecontext"></a>
 

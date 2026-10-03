@@ -236,11 +236,16 @@ const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
   'dynamicCordisRunner/invoke',
   'dynamicCordisRunner/syncInspectManifest',
   'agentPresets/list',
+  'pluginManager/access',
   'pluginManager/listPlugins',
   'pluginManager/listBundles',
+  'pluginManager/listVersionExemptions',
+  'pluginManager/registries',
+  'pluginManager/waitForInstall',
   'pluginManager/inspect',
   'pluginManager/setPluginEnabled',
   'pluginManager/setBundleEnabled',
+  'pluginManager/setVersionExemption',
   'pluginManager/installBundle',
   'pluginManager/installBundleStream',
   'pluginManager/cancelInstall',
@@ -310,13 +315,14 @@ export function invokeTypertRemote(ctx: Context, payload: TypertGatewayAuthoriza
     // entries bound to Sessions that participant may read.
     const authority = collaboration.capture()
     if (authority.participant.scope.kind === 'personal') return next()
-    return next().then(async (result) => {
+    return next().then(async (result: unknown) => {
       if (!Array.isArray(result)) return result
-      const ids = [...new Set(result
+      const rows: readonly unknown[] = result
+      const ids = [...new Set(rows
         .map(entry => (entry as { sessionId?: unknown }).sessionId)
         .filter((id): id is string => typeof id === 'string'))] as SessionId[]
       const readable = await authority.readableSessionIds(ids)
-      return result.filter(entry => readable.has((entry as { sessionId: SessionId }).sessionId))
+      return rows.filter(entry => readable.has((entry as { sessionId: SessionId }).sessionId))
     })
   }
   const rule = REMOTE_SESSION_POLICIES[payload.endpoint]
@@ -2622,7 +2628,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // reason: the frame outcome distinguishes a continued question (still
         // answerable from its tool call row) from a real cancellation, and the
         // rejection preserves the code so askTimed can map it to `pending`.
-        const reason = request.signal?.reason
+        const reason: unknown = request.signal?.reason
         const timedOut = reason instanceof UserQuestionError && reason.code === 'ASK_TIMED_OUT'
         claimQuestion(pending, timedOut ? 'pending' : 'cancelled')
         reject(reason instanceof Error

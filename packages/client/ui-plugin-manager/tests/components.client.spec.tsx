@@ -71,6 +71,7 @@ const READY: PluginManagerState = {
   packages: [],
   busy: [],
   notice: null,
+  manage: true,
   install: IDLE_INSTALL,
   confirm: null,
   highlight: null,
@@ -376,6 +377,23 @@ describe('PluginManagerPage', () => {
     expect(actions.refresh).toHaveBeenCalledTimes(1)
     // The detail keeps showing the kept data behind the alert.
     expect(document.querySelector('[data-plugin-detail]')).not.toBeNull()
+  })
+
+  it('lists the inventory read-only when the deployment grants no management', () => {
+    const { actions } = renderTab({ manage: false, packages: [pkg()] })
+    // Every card, row, and button stays visible; each mutation control is disabled.
+    const banner = screen.getByText(en.managementDenied)
+    expect(banner.closest('[role="status"]')?.getAttribute('data-plugin-readonly')).toBe('')
+    const cardSwitch = screen.getByRole('switch', { name: en.enableToggle.replace('{name}', 'dsh-better-sidebar') })
+    expect(cardSwitch).toHaveProperty('disabled', true)
+    expect(cardSwitch.getAttribute('title')).toBe(en.managementDenied)
+    fireEvent.click(cardSwitch)
+    expect(actions.setEnabled).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: en.addPlugin })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: en.refresh })).toHaveProperty('disabled', false)
+    fireEvent.click(screen.getByRole('button', { name: en.openDetail.replace('{name}', 'dsh-better-sidebar') }))
+    const detail = document.querySelector('[data-plugin-detail]') as HTMLElement
+    expect(within(detail).getByRole('switch', { name: en.enableToggle.replace('{name}', 'dsh-better-sidebar') })).toHaveProperty('disabled', true)
   })
 
   it('lists the installed bundles as cards, the installation\'s offered ones as official, and tags a problem the Host reports', () => {

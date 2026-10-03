@@ -175,6 +175,7 @@ export class ReadinessTimeline {
 
   /** Spy on every sanitizer's `push` so each decoded chunk is recorded with its prompt verdict. */
   observeSanitizer(): void {
+    // oxlint-disable-next-line typescript/unbound-method -- The spy restores `this` through .call on each chunk.
     const original = TerminalSanitizer.prototype.push
     const record = (sanitizer: TerminalSanitizer, chunk: string, result: SanitizedChunk): void => {
       this.recordChunk(sanitizer, chunk, result)

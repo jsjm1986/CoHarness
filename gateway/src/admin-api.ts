@@ -32,6 +32,7 @@ import {
 } from './postgres/conversation-archive-service.ts'
 import { DesktopCoordinationError } from './desktop-coordinator.ts'
 import { PluginManagementError } from './plugin-management.ts'
+import { PluginStateError } from './plugin-state.ts'
 import { TerminalManagementError } from './terminal-management.ts'
 import { WebhookReceiptError } from './postgres/webhook-delivery-service.ts'
 import { WebhookEndpointError } from './postgres/webhook-endpoint-service.ts'
@@ -104,6 +105,7 @@ function mapError(error: unknown): { status: number; error: string } {
   if (error instanceof BackupError) return { status: error.status, error: error.message }
   if (error instanceof DeploymentCommandError) return { status: 500, error: 'deployment-command-failed' }
   if (error instanceof PluginManagementError) return { status: error.status, error: error.message }
+  if (error instanceof PluginStateError) return { status: error.status === 500 ? 500 : error.status, error: error.message }
   if (error instanceof TerminalManagementError) return { status: error.status, error: error.message }
   if (error instanceof ResourceAccessError) return { status: error.status, error: error.message }
   if (error instanceof DocumentCatalogError) return { status: error.status, error: error.code }
@@ -536,6 +538,20 @@ async function dispatch(
     } finally {
       lifetime.abort(); req.removeListener('aborted', closed); res.removeListener('close', closed)
       await iterator.return(undefined)
+    }
+    return true
+  }
+
+  if (pathname === '/admin/api/plugins/state' && (method === 'GET' || method === 'POST')) {
+    if (deps.pluginManagement === undefined) { sendError(res, 503, 'plugin-management-unavailable'); return true }
+    if (method === 'GET') {
+      const query = new URL(req.url ?? pathname, 'http://admin').searchParams
+      sendJson(res, 200, await deps.pluginManagement.state(admin, { kind: query.get('kind'), id: Number(query.get('id')) }))
+    } else {
+      const input = parseObject(body)
+      const view = await deps.pluginManagement.saveState(admin, input)
+      await write('admin.plugins.state', { target: input.target, revision: view.revision })
+      sendJson(res, 200, view)
     }
     return true
   }

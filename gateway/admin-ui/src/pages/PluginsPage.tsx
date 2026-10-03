@@ -5,6 +5,7 @@ import { ErrorBanner, Field, PageHeader, Button, LoadingState, Section } from '.
 import { PluginManagerPage } from '../plugins/PluginManagerPage.tsx'
 import { PluginManagerController } from '../plugins/manager-store.ts'
 import { pluginManagementRemote } from '../plugins/transport.ts'
+import { DesiredStateEditor } from '../plugins/DesiredStateEditor.tsx'
 import { resolveLocalized } from '../plugins/presentation.ts'
 import { zh } from '../plugins/locales.ts'
 import { ProfileSettingsController } from '../plugins/settings-store.ts'
@@ -93,7 +94,20 @@ export function PluginsPage() {
       {loading ? <LoadingState label="正在读取插件实例" /> : null}
       {binding === null ? null : <p className="muted">节点 {binding.nodeId} · {binding.generation === null ? '实例未运行；此页面不会启动实例。' : `实例代次 ${binding.generation}`}</p>}
     </div></Section>
-    {binding?.generation == null ? null : <div className="adminPluginManager"><Manager key={`${binding.nodeId}:${selected}:${binding.generation}`} target={binding} invalidate={invalidate} /></div>}
+    {binding === null ? null : (
+      <Section title="期望插件状态">
+        <div className="sectionBody">
+          <DesiredStateEditor key={`${binding.target.kind}:${binding.target.id}`} kind={binding.target.kind} id={binding.target.id} />
+        </div>
+      </Section>
+    )}
+    {binding?.generation == null ? null : (
+      <Section title="运行中的实例">
+        <div className="sectionBody">
+          <div className="adminPluginManager"><Manager key={`${binding.nodeId}:${selected}:${binding.generation}`} target={binding} invalidate={invalidate} /></div>
+        </div>
+      </Section>
+    )}
     <PluginPermissions />
   </div>
 }

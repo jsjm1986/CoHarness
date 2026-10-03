@@ -32,6 +32,7 @@ async function bench() {
     listBundles: vi.fn(() => Promise.resolve({ ok: true as const, value: [] })),
     listPlugins: vi.fn(() => Promise.resolve({ ok: true as const, value: [] })),
     registries: vi.fn(() => Promise.resolve({ ok: true as const, value: { registry: null, fallbackRegistries: [], resolved: null } })),
+    access: vi.fn(() => Promise.resolve({ ok: true as const, value: { manage: true } })),
   }
   ctx.provide('remote.pluginInventory', pluginInventory)
   ctx.provide('remote.pluginRegistryProbe', pluginRegistryProbe)

@@ -59,8 +59,7 @@ function optionsOf(directory: SessionModels, t: TranslateNS<'model'>): SelectOpt
         id: rowId(group.id, model.id),
         label: model.name,
         group: { name: group.id, label: name },
-        ...(directory.current !== null
-          && directory.current.provider === group.id
+        ...(directory.current.provider === group.id
           && directory.current.model === model.id
           ? { active: true } : {}),
       })

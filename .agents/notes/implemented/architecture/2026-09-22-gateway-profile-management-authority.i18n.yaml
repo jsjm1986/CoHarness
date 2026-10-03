@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.md
 /agent-note-gateway-authority-for-profile-management:
-  en: 4ec5f2aaf8576cd5
-  zh: e6a8e47166fa9ece
+  en: a782735ef281441c
+  zh: aee6df3db0bd1a92
 /agent-note-gateway-authority-for-profile-management/problem:
   en: df6383897edfbb58
   zh: 258f4c9d9108234a
 /agent-note-gateway-authority-for-profile-management/decision:
-  en: 1c92872a08fd46ea
-  zh: 342bb74372fde9d1
+  en: 3982dabe99a62145
+  zh: 9fc98aa8733c6b90
 /agent-note-gateway-authority-for-profile-management/administrative-workflow:
   en: d5640dedf0705424
   zh: 3778b600414d044e

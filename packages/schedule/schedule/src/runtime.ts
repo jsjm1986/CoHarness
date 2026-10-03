@@ -99,7 +99,9 @@ export class ScheduleRuntime {
       const committed = new Set<ScheduleTask['record']['id']>()
       try {
         const resolved = await this.ctx.sessionController.resolveAgent(task.sessionId)
-        if ('error' in resolved) throw resolved.error
+        if ('error' in resolved) {
+          throw new Error(`schedule: resolveAgent ${task.sessionId} refused: ${resolved.error.code}: ${resolved.error.message}`)
+        }
         // oxlint-disable-next-line typescript/no-unnecessary-condition -- Disposal can run while Session restoration is awaited.
         if (this.stopping) return
         const now = Date.now()

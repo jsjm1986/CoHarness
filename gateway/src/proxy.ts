@@ -132,16 +132,25 @@ export function createProxyHandlers(
     if (runtime.user !== undefined) {
       writeRuntimeGrantsFile(runtime.dshHome, await runtimeDirectoryGrants(runtime.user, projects), cfg.usersRoot)
       if (deps.governance !== undefined) await writeModelGovernanceFile(cfg, deps.governance, runtime.user)
-      return
+    } else {
+      if (runtime.project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
+      writeRuntimeGrantsFile(runtime.dshHome, [{
+        path: runtime.project.path,
+        mode: 'rw',
+        label: runtime.project.name,
+      }], cfg.projectRuntimesRoot)
+      if (deps.governance !== undefined) {
+        await writeProjectModelGovernanceFile(cfg, deps.governance, runtime.project)
+      }
     }
-    if (runtime.project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
-    writeRuntimeGrantsFile(runtime.dshHome, [{
-      path: runtime.project.path,
-      mode: 'rw',
-      label: runtime.project.name,
-    }], cfg.projectRuntimesRoot)
-    if (deps.governance !== undefined) {
-      await writeProjectModelGovernanceFile(cfg, deps.governance, runtime.project)
+    if (deps.pluginState !== undefined) {
+      // Desired state is newer than what this instance last applied when the
+      // manager's write-back already carried it: only pending revisions write.
+      const pending = await deps.pluginState.projection(runtime.target)
+      if (pending !== null && pending !== 'current') {
+        await deps.pluginState.project(runtime.dshHome, pending.state)
+        await deps.pluginState.markApplied(runtime.target, pending.revision)
+      }
     }
   }
   instances.beforeUse = async (runtime): Promise<void> => {

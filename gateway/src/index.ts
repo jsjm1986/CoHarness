@@ -2,6 +2,7 @@ import { nodeConfigurationAuthority } from './postgres/node-configuration-author
 import { loadManagedNodeEnvironment, NodeConfigurationStore } from './node-config-store.ts'
 import { DesktopAccess } from './desktop-access.ts'
 import { PluginAccess } from './plugin-access.ts'
+import { PostgresPluginState } from './plugin-state.ts'
 import { SshAccess } from './ssh-access.ts'
 import { TerminalAccess } from './terminal-access.ts'
 import { GatewayPluginManagement } from './plugin-management.ts'
@@ -382,6 +383,7 @@ heartbeatTimer.unref()
 const webhookDeliveries = new PostgresWebhookDeliveryService(context)
 const webhookEndpoints = new PostgresWebhookEndpointService(context,
   new WebhookSecretCipher(loadOrganizationModelCredentialKey(cfg.webhookSecretKeyFile)))
+const pluginState = new PostgresPluginState(context)
 const deps: GatewayDeps = {
   cfg,
   auth,
@@ -401,7 +403,8 @@ const deps: GatewayDeps = {
   terminalAccess: new TerminalAccess(context),
   sshAccess: new SshAccess(context),
   sshTargets: new PostgresSshTargetService(context),
-  pluginManagement: new GatewayPluginManagement({ users, projects, instances, cfg }, principalKeys.signer, context.nodeId),
+  pluginManagement: new GatewayPluginManagement({ users, projects, instances, cfg, pluginState }, principalKeys.signer, context.nodeId),
+  pluginState,
   terminalManagement: new GatewayTerminalManagement({ users, projects, instances, cfg }, principalKeys.signer, context.nodeId),
   webhookDeliveries,
   webhookEndpoints,
@@ -527,6 +530,7 @@ const server = createGatewayServer(deps, {
     archives,
     principals: principalKeys.signer,
     governance,
+    pluginState: deps.pluginState,
     push,
     documentTransfer: createDocumentTransferHandler({
       instances: deps.instances,

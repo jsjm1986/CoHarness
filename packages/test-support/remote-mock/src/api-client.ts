@@ -97,7 +97,7 @@ const API_METHODS = {
     models: 'llm.models',
     discoverModels: 'llm.discoverModels',
   },
-} as const satisfies { readonly [D in keyof Omit<IApiClient, 'events' | 'respond'>]: Record<keyof IApiClient[D], keyof RpcMethodMap & string> }
+} as const satisfies { readonly [D in keyof Omit<IApiClient, 'events' | 'respond'>]: Record<keyof IApiClient[D], keyof RpcMethodMap> }
 
 /** Mint one response id the way the real carrier does: the responder echoes the request's brand. */
 function mintRpcId(seq: number): RpcId {

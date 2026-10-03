@@ -54,6 +54,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   userTerminalAuthorization: 'collaboration.md',
   userTerminalAdministration: 'collaboration.md',
   pluginManager: 'boot.md',
+  pluginRegistryProbe: 'boot.md',
   profileContext: 'boot.md',
   hmr: 'boot.md',
   mcpResources: 'mcp.md',
@@ -198,6 +199,7 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   workspaceResources: 'client-side metadata-only resource registry — packages/client/runtime/README.md owns the API',
   permissionCatalog: 'client-side per-runtime catalog directory — packages/client/runtime/README.md owns the API',
   sshAuthorization: 'interface-typed optional managed-deployment service (SshAuthorization) — packages/ssh/ssh/README.md owns the API',
+  pluginNavigation: 'client-face Plugins-page navigation service — packages/client/ui-plugin-manager/README.md owns the API',
 }
 
 /**
@@ -791,6 +793,11 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   InstallBundleOptions: 'boot.md',
   PluginInstallCancellation: 'boot.md',
   PluginInstallRequestId: 'boot.md',
+  PluginManagementAccess: 'boot.md',
+  PluginManagementCapability: 'boot.md',
+  PluginDesiredState: 'boot.md',
+  PluginDesiredStateSnapshot: 'boot.md',
+  PluginDesiredStatePublish: 'boot.md',
 }
 
 /** TypeScript lib and pinned framework types with no repository-owned data page. */

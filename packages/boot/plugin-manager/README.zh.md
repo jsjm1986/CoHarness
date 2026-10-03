@@ -59,7 +59,9 @@ kind: "package-reference"
 
 pnpm 11 拦下依赖脚本时，失败的安装在 `pendingBuilds` 里报告 profile 中所有待决定的包名，包括先前尝试留下的；失败的运行会恢复 `package.json` 与 `pnpm-lock.yaml`，但有意不恢复 pnpm 记录这些名字的 `pnpm-workspace.yaml`。Web 插件页提供**允许这些脚本并重试**；工具可以在用户于对话中批准这些脚本后，通过 `install_bundle` 的 `approvedBuilds` 代为授权。服务只校验待决定的名字，不核实对话中的批准。授权按包名保存在当前 profile，允许以宿主用户的权限执行命令，并在再次安装失败后保留。只能批准当前未决定的名字；已有的拒绝与通配规则不能通过此操作覆盖。`allowBuilds` 里出现 YAML 锚点或别名时拒绝授权。重试保留原来的启用选择。
 
-Gateway 管理的运行时在每次服务操作前重新核验管理员身份，工具审批或 Full access 不能代替此授权。`authorization: required` 在授权提供者不可用时拒绝操作；独立本机 profile 默认使用 `local`。Gateway 在持久写锁和配置队列内再次检查授权，拒绝已撤销的权限。受保护的部署插件及其父条目不能被组合包 patch 替换或关闭。
+Gateway 管理的运行时在每次变更前重新核验管理员身份，工具审批或 Full access 不能代替此授权。读操作（`listPlugins`、`listBundles`、`listVersionExemptions`、`registries`、`waitForInstall`、`access`）对所有能到达服务的调用者开放，`access()` 报告 `{ manage }`，界面可以据此禁用控件而无需试探写入。`authorization: required` 在授权提供者不可用时拒绝变更但保留读取；独立本机 profile 默认使用 `local`。Gateway 在持久写锁和配置队列内再次检查授权，拒绝已撤销的权限。受保护的部署插件及其父条目不能被组合包 patch 替换或关闭。
+
+Gateway 管理的运行时还会在每次已提交的变更后，把观测到的组合——受管理的 patch 行与组合包选择——连同它上次投影的修订号一起发布到部署的插件状态存储。存储返回新修订号，或在管理员在此期间保存了更新期望状态时返回冲突；此时管理器把已保存的期望状态物化进 profile 文件并调和正在运行的组合，使离线编辑在下一次变更时收敛到在线实例上。存储无法接受的发布保留已提交的文件，并在结果的 `warnings` 中报告同步待定；下次启动的投影会应用存储中的修订。
 
 管理安装使用按请求隔离的流，具有有界进度缓冲和实时权限检查。重复的活动请求 id 会被拒绝。断连会取消安装并等待清理；客户端不得自动重放。普通 Host 事件订阅不会接收这些日志。
 

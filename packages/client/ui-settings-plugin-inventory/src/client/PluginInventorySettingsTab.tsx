@@ -441,7 +441,7 @@ export function PluginInventorySettingsTab(
     const key = `global:${entry.entryId}`
     const { title, description } = pluginText(entry, resolveText)
     const failed = entry.fiberPhase === 'failed'
-    const manager = managed instanceof Map ? managed.get(entry.entryId) : undefined
+    const manager = managed === 'denied' || managed === null ? undefined : managed.get(entry.entryId)
     const switchable = manager !== undefined && manager.patchId !== undefined
     const stateText = failed
       ? t('failedTag')

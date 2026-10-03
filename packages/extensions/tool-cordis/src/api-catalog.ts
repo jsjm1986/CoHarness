@@ -1671,10 +1671,22 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
       },
       {
-        signature: 'authorize(): Promise<void>',
+        signature: 'authorize(capability?: PluginManagementCapability): Promise<void>',
         description: 'Recheck the current caller before profile reads or writes.',
-        parameters: [],
+        parameters: [{ name: 'capability', description: '\'read\' permits any runtime principal; \'manage\' enforces the deployment\'s policy.' }],
         returns: 'After the deployment permits the operation; rejects without permission.',
+      },
+      {
+        signature: 'readDesiredState?(): Promise<PluginDesiredStateSnapshot>',
+        description: 'Read the profile\'s saved desired state. Present only in deployments with a durable state store; standalone profiles manage files directly.',
+        parameters: [],
+        returns: 'the store\'s current snapshot.',
+      },
+      {
+        signature: 'publishDesiredState?(state: PluginDesiredState, baseRevision: string): Promise<PluginDesiredStatePublish>',
+        description: 'Publish the profile\'s observed composition after a committed change.',
+        parameters: [{ name: 'state', description: 'the managed rows and bundle selection the profile files now hold.' }, { name: 'baseRevision', description: 'the store revision the publisher last saw.' }],
+        returns: '\'applied\' with the new revision, or \'conflict\' carrying the store\'s current state.',
       },
     ],
   },
@@ -1684,10 +1696,16 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Manage profile files and apply their declared reload lifecycle.',
     methods: [
       {
-        signature: 'async authorize(): Promise<void>',
+        signature: 'async authorize(capability: PluginManagementCapability = \'manage\'): Promise<void>',
         description: 'Check deployment authority independently of tool approval or sandbox mode.',
+        parameters: [{ name: 'capability', description: '\'read\' permits every caller that reached the service; \'manage\' enforces the deployment\'s authorization provider.' }],
+        returns: 'After the current caller is permitted the operation.',
+      },
+      {
+        signature: '@Remote async access(): Promise<PluginManagementAccess>',
+        description: 'Report whether the caller may change the profile, for interfaces gating controls on it.',
         parameters: [],
-        returns: 'After the current caller is permitted to manage this profile.',
+        returns: '`manage` after probing the deployment policy; read access is unconditional.',
       },
       {
         signature: '@Remote async listVersionExemptions(): Promise<{ exemptions: Record<string, string[]>; warnings: string[] }>',
@@ -1766,6 +1784,20 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Unload and remove a profile-owned bundle dependency through dsh plugin\'s pnpm path.',
         parameters: [{ name: 'name', description: 'Installed dependency name.' }, { name: 'signal', description: 'Cancellation from the calling tool or Remote transport.' }],
         returns: 'Removal diagnostics and the remaining profile state.',
+      },
+    ],
+  },
+  {
+    key: 'pluginRegistryProbe',
+    summary: 'Compares public registry responses on the Host; the Client owns the initial selection.',
+    description: 'Compares public registry responses on the Host; the Client owns the initial selection.',
+    methods: [
+      {
+        signature: '@Remote async fastest(): Promise<string | null>',
+        description: 'Race npm and npmmirror HTTPS ping responses through the Host\'s fetch proxy. Concurrent readers share a probe; a winner cancels and awaits the other request.',
+        parameters: [],
+        returns: 'the first registry with a successful response, or null when disabled or neither responds successfully; results are cached.',
+        throws: ['rejects when the service has been unloaded.'],
       },
     ],
   },
@@ -5934,7 +5966,23 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PluginChange',
-    declaration: 'export interface PluginChange {\n    readonly reason: \'plugin\' | \'bundle\' | \'install\' | \'remove\';\n}',
+    declaration: 'export interface PluginChange {\n    readonly reason: \'plugin\' | \'bundle\' | \'install\' | \'remove\' | \'desired-state\';\n}',
+  },
+  {
+    name: 'PluginDesiredEntry',
+    declaration: 'export interface PluginDesiredEntry {\n    id: string;\n    name?: string;\n    disabled: boolean;\n}',
+  },
+  {
+    name: 'PluginDesiredState',
+    declaration: 'export interface PluginDesiredState {\n    entries: PluginDesiredEntry[];\n    bundles: string[];\n}',
+  },
+  {
+    name: 'PluginDesiredStatePublish',
+    declaration: 'export type PluginDesiredStatePublish = {\n    status: \'applied\';\n    revision: string;\n} | {\n    status: \'conflict\';\n    current: PluginDesiredStateSnapshot;\n};',
+  },
+  {
+    name: 'PluginDesiredStateSnapshot',
+    declaration: 'export interface PluginDesiredStateSnapshot {\n    revision: string;\n    state: PluginDesiredState | null;\n}',
   },
   {
     name: 'PluginEntryId',
@@ -5983,6 +6031,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PluginLocalizedMeta',
     declaration: 'export interface PluginLocalizedMeta {\n    readonly title?: LocalizedText;\n    readonly description?: LocalizedText;\n    readonly icon?: string;\n    readonly error?: string;\n}',
+  },
+  {
+    name: 'PluginManagementAccess',
+    declaration: 'export interface PluginManagementAccess {\n    manage: boolean;\n}',
+  },
+  {
+    name: 'PluginManagementCapability',
+    declaration: 'export type PluginManagementCapability = \'read\' | \'manage\';',
   },
   {
     name: 'PluginRegistries',

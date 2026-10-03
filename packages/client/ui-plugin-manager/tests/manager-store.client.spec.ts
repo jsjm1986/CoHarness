@@ -86,6 +86,9 @@ function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
     removeBundle: vi.fn(() => Promise.resolve(ok(APPLIED))),
     setBundleEnabled: vi.fn(() => Promise.resolve(ok(APPLIED))),
     setPluginEnabled: vi.fn(() => Promise.resolve(ok(APPLIED))),
+    access: vi.fn<() => Promise<ReturnType<typeof ok<{ manage: boolean }>> | ReturnType<typeof refused>>>(
+      () => Promise.resolve(ok({ manage: true })),
+    ),
     ...overrides,
   }
   const probe = { fastest: overrides.fastest ?? vi.fn(() => Promise.resolve(ok(null))) }
@@ -456,6 +459,16 @@ describe('PluginManagerController', () => {
     expect(state()).toBe(before)
     expect(listener).not.toHaveBeenCalled()
     expect(plugins.listBundles).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the inventory readable without a management grant and falls back to writable on an old Host', async () => {
+    const { plugins, state, controller } = bench({ access: vi.fn(() => Promise.resolve(ok({ manage: false }))) })
+    await controller.load()
+    expect(state()).toMatchObject({ status: 'ready', manage: false })
+    expect(plugins.listBundles).toHaveBeenCalledOnce()
+    plugins.access.mockResolvedValueOnce(refused('transport', 'no such remote'))
+    await controller.load()
+    expect(state()).toMatchObject({ status: 'ready', manage: true })
   })
 
   it('reports a Host without a managed profile as unavailable and keeps the last packages across a failed read', async () => {

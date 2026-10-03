@@ -117,11 +117,16 @@ export class GatewayExecution extends ExecutionAuthority {
     }, this.lifetime.signal)
     ctx.provide('pluginManagementAuthorization', {
       protectedModules: policy.protectedModules,
-      authorize: async () => {
+      authorize: async (capability = 'manage') => {
+        if (capability === 'read') return
         const agent = ctx.agents.currentInitiator()
         if (agent === undefined) await policy.authorize()
         else await this.authorize('plugin-management', agent)
       },
+      // Desired-state sync is runtime-scoped, not caller-scoped: the profile's
+      // composition is shared, so publish and read ride the runtime credential.
+      readDesiredState: policy.readDesiredState?.bind(policy),
+      publishDesiredState: policy.publishDesiredState?.bind(policy),
     })
     ctx.provide('permissionPresetAuthorization', {
       canSelect: (preset: string) => {

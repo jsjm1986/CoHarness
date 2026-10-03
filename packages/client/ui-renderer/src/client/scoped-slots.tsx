@@ -378,7 +378,7 @@ function standardProps(
     standardPropsCache.set(host, cache)
     rootKitRevision.set(host, host.getRootRevision())
   }
-  if (cache !== undefined && rootKitRevision.get(host) !== host.getRootRevision()) {
+  if (rootKitRevision.get(host) !== host.getRootRevision()) {
     // A provideRoot install/dispose re-keys the root kit; session kits spread
     // it at build, so the whole cache is rebuilt on the roster tick.
     cache = { root: buildRootStandard(host), session: new WeakMap(), sessionMaybe: new WeakMap() }

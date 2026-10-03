@@ -284,8 +284,6 @@ export class TestClient {
       }
       throw error
     }
-    // Defined: `system` is assigned inside the try before any step that returns.
-    if (system === undefined) throw new Error('test-client: boot completed without a module system')
     return new TestClient(ctx, mock, mountPoint.element, restore, system)
   }
 

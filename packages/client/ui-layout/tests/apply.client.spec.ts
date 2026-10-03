@@ -86,7 +86,7 @@ describe('ui-layout client apply', () => {
     await fiber.await()
     const entry = slots.entries('root')[0]!
     const injected = (entry.inject as () => object)()
-    expect(injected).toEqual({ dismissRightbar: expect.any(Function) })
+    expect(injected).toEqual({ dismissRightbar: expect.any(Function) as unknown })
     const handle = entry.store as ReturnType<typeof createLayoutStore>
     const instance = handle.create()
     expect(handle.create()).toBe(instance)

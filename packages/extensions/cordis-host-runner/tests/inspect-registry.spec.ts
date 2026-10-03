@@ -78,7 +78,7 @@ class FakeApiProxy extends Service {
   static inject: string[] = []
   liveClients = 0
   constructor(ctx: Context) {
-    super(ctx, 'apiProxy' as never)
+    super(ctx, 'apiProxy')
   }
   hasLiveClient(): boolean {
     return this.liveClients > 0
@@ -87,7 +87,7 @@ class FakeApiProxy extends Service {
 
 async function connectPage(): Promise<FakeApiProxy> {
   await ctx.plugin(FakeApiProxy)
-  const proxy: FakeApiProxy = ctx.get('apiProxy' as string)
+  const proxy = ctx.get('apiProxy' as string) as FakeApiProxy
   proxy.liveClients = 1
   return proxy
 }

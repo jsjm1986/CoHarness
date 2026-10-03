@@ -40,11 +40,13 @@ async function bench() {
     .mockResolvedValue({ ok: true, value: [] })
   const setPluginEnabled = vi.fn<() => Promise<RemoteAnswer<ChangeResult>>>()
     .mockResolvedValue({ ok: true, value: { changed: true, application: 'applied', stage: 'enable', target: 'x' } })
-  ctx.provide('remote.pluginManager', { listPlugins, setPluginEnabled })
+  const access = vi.fn<() => Promise<RemoteAnswer<{ manage: boolean }>>>()
+    .mockResolvedValue({ ok: true, value: { manage: true } })
+  ctx.provide('remote.pluginManager', { listPlugins, setPluginEnabled, access })
   const retry = vi.fn(async () => {})
   const state = { getSnapshot: () => ({ syncing: false, failures: [] }), subscribe: () => () => {} }
   ctx.provide('modules', { entries: { state, retry } } as unknown as ClientModuleLoader)
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, listPlugins, setPluginEnabled, retry, state }
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, listPlugins, setPluginEnabled, access, retry, state }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -91,6 +93,9 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
     b.list.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
     await expect(injected.list()).rejects.toThrow('pluginInventory.list failed: REMOTE_ERROR: unavailable')
     await expect(injected.management()).resolves.toEqual({ status: 'granted', plugins: [] })
+    b.access.mockResolvedValueOnce({ ok: true, value: { manage: false } })
+    await expect(injected.management()).resolves.toEqual({ status: 'denied' })
+    b.access.mockResolvedValueOnce({ ok: false, error: { code: 'gateway/unknown-remote', message: 'no such remote' } })
     b.listPlugins.mockResolvedValueOnce({ ok: false, error: { code: 'plugin-management/forbidden', message: 'denied' } })
     await expect(injected.management()).resolves.toEqual({ status: 'denied' })
     b.listPlugins.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'offline' } })

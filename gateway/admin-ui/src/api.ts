@@ -1146,6 +1146,25 @@ export function pluginManagementInvoke(input: unknown, signal: AbortSignal): Pro
   return request('/admin/api/plugins/invoke', { method: 'POST', body: JSON.stringify(input), signal })
 }
 
+/** One patch row the desired-state store records, matching the profile's managed-row form. */
+export interface PluginDesiredEntry { id: string; name?: string; disabled: boolean }
+/** The deployment's saved plugin composition for one runtime owner. */
+export interface PluginDesiredState { entries: PluginDesiredEntry[]; bundles: string[] }
+/** The store row, the instance's applied marker, and the files' observed composition. */
+export interface PluginManagementState {
+  revision: string
+  state: PluginDesiredState | null
+  appliedRevision: string
+  generation: number | null
+  observed: PluginDesiredState | null
+}
+export function pluginManagementState(kind: 'user' | 'project', id: number, signal?: AbortSignal): Promise<PluginManagementState> {
+  return request(`/admin/api/plugins/state?kind=${kind}&id=${String(id)}`, { signal })
+}
+export function pluginManagementSaveState(input: { target: { kind: 'user' | 'project'; id: number }; revision: string; state: PluginDesiredState | null }, signal?: AbortSignal): Promise<PluginManagementState> {
+  return request('/admin/api/plugins/state', { method: 'POST', body: JSON.stringify(input), signal })
+}
+
 export type DeploymentNodeStatus = 'active' | 'draining' | 'offline'
 export type ClusterMode = 'serving' | 'maintenance' | 'restoring'
 

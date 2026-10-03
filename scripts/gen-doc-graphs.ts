@@ -147,6 +147,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers.',
   },
   {
+    key: 'pluginRegistryProbe',
+    pkg: 'ui-plugin-manager',
+    title: 'Registry reachability probing for the install dialog',
+    mode: 'core',
+    consumers: ['ui-plugin-manager'],
+    note: 'Races the configured public registries through the Host fetch proxy and caches the first answer the Plugins-page install dialog can preselect.',
+  },
+  {
     key: 'profileContext',
     pkg: 'app-boot',
     title: 'Launcher-owned profile data',

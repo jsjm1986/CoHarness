@@ -1,11 +1,18 @@
 /** Administrator-only forwarding to the exact current-node profile generation. */
+import { join } from 'node:path'
 import { z } from 'zod'
 import type { UserRow } from './auth.ts'
 import { RuntimeLeaseUnavailableError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
+import { parseDesiredState, PluginStateError, type PluginDesiredState } from './plugin-state.ts'
 import type { GatewayDeps } from './server.ts'
 
 const targetSchema = z.object({ kind: z.enum(['user', 'project']), id: z.number().int().positive() }).strict()
+const stateWriteSchema = z.object({
+  target: targetSchema,
+  revision: z.string().regex(/^(0|[1-9][0-9]{0,18})$/u),
+  state: z.unknown().nullable(),
+}).strict()
 const invocationSchema = z.object({
   target: targetSchema, nodeId: z.string().min(1), generation: z.number().int().positive(), rpcId: z.uuid(),
   endpoint: z.enum(['settings.describe', 'settings.mutate', 'pluginInventory/list', 'pluginManager/listPlugins', 'pluginManager/listBundles', 'pluginManager/inspect',
@@ -16,6 +23,14 @@ const invocationSchema = z.object({
 }).strict()
 
 export interface PluginManagementTarget { nodeId: string; target: RuntimeTarget; generation: number | null }
+/** Offline-capable desired-state view: saved row, applied marker, and the files' current expression. */
+export interface PluginManagementState {
+  revision: string
+  state: PluginDesiredState | null
+  appliedRevision: string
+  generation: number | null
+  observed: PluginDesiredState | null
+}
 export class PluginManagementError extends Error {
   constructor(readonly status: 400 | 403 | 404 | 409 | 502 | 503, message: string) { super(message) }
 }
@@ -32,7 +47,7 @@ export class GatewayPluginManagement {
   private probePending: Promise<string | null> | undefined
   private probeCached: { registry: string | null; expiresAt: number } | undefined
 
-  constructor(private readonly deps: Pick<GatewayDeps, 'users' | 'projects' | 'instances' | 'cfg'>,
+  constructor(private readonly deps: Pick<GatewayDeps, 'users' | 'projects' | 'instances' | 'cfg' | 'pluginState'>,
     private readonly signer: GatewayPrincipalSigner, private readonly nodeId: string) {}
 
   /**
@@ -84,6 +99,59 @@ export class GatewayPluginManagement {
     await this.authorize(admin, parsed.data)
     const generation = await this.deps.instances.isLive(parsed.data) ? await this.deps.instances.generationOf(parsed.data) : null
     return { nodeId: this.nodeId, target: parsed.data, generation }
+  }
+
+  /** The owner's runtime home, where the observed profile projection lives. */
+  private async dshHomeFor(target: RuntimeTarget): Promise<string> {
+    if (target.kind === 'project') return join(this.deps.cfg.projectRuntimesRoot, String(target.id), 'dsh')
+    const owner = await this.deps.users.getById(target.id)
+    if (owner === null) throw new PluginManagementError(404, 'profile runtime owner not found')
+    return join(this.deps.cfg.usersRoot, owner.username, 'dsh')
+  }
+
+  /**
+   * Read the target's saved desired state, the instance's applied marker, and
+   * the composition the profile files currently express. Offline-safe: the
+   * instance is never started for a state read.
+   * @param admin - current authenticated administrator.
+   * @param input - exact target coordinates.
+   * @returns the complete desired-state view for the offline editor.
+   */
+  async state(admin: UserRow, input: unknown): Promise<PluginManagementState> {
+    const parsed = targetSchema.safeParse(input)
+    if (!parsed.success) throw new PluginManagementError(400, 'invalid plugin management target')
+    await this.authorize(admin, parsed.data)
+    const store = this.deps.pluginState
+    if (store === undefined) throw new PluginManagementError(503, 'plugin state store unavailable')
+    const [saved, appliedRevision, observed] = await Promise.all([
+      store.get(parsed.data), store.applied(parsed.data), store.observed(await this.dshHomeFor(parsed.data)),
+    ])
+    const generation = await this.deps.instances.isLive(parsed.data) ? await this.deps.instances.generationOf(parsed.data) : null
+    return { revision: saved.revision, state: saved.state, appliedRevision, generation, observed }
+  }
+
+  /**
+   * Commit one desired-state revision under optimistic concurrency. Live
+   * instances keep managing through invoke; this write applies on their next
+   * start or reconciles through their next published change.
+   * @param admin - current authenticated administrator.
+   * @param input - target, observed revision, and the complete desired state (null clears it).
+   * @returns the post-commit desired-state view.
+   */
+  async saveState(admin: UserRow, input: unknown): Promise<PluginManagementState> {
+    const parsed = stateWriteSchema.safeParse(input)
+    if (!parsed.success) throw new PluginManagementError(400, 'invalid plugin state request')
+    await this.authorize(admin, parsed.data.target)
+    const store = this.deps.pluginState
+    if (store === undefined) throw new PluginManagementError(503, 'plugin state store unavailable')
+    const state = parsed.data.state === null ? null : parseDesiredState(parsed.data.state)
+    try {
+      await store.set(parsed.data.target, state, parsed.data.revision)
+    } catch (error) {
+      if (error instanceof PluginStateError) throw new PluginManagementError(error.status === 500 ? 502 : error.status, error.message)
+      throw error
+    }
+    return this.state(admin, { kind: parsed.data.target.kind, id: parsed.data.target.id })
   }
 
   /**

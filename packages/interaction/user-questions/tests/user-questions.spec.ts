@@ -410,7 +410,10 @@ describe('askTimed', () => {
     registerAnswerer(ctx, {
       ask: request => new Promise((_resolve, reject) => {
         forwardedSignal = request.signal
-        request.signal?.addEventListener('abort', () => { reject(request.signal?.reason) }, { once: true })
+        request.signal?.addEventListener('abort', () => {
+          const reason: unknown = request.signal?.reason
+          reject(reason instanceof Error ? reason : new Error('user-questions spec: request aborted'))
+        }, { once: true })
       }),
     })
     const result = ctx.userQuestions.askTimed(

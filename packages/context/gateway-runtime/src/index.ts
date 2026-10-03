@@ -408,8 +408,8 @@ export function readGatewayRuntimeCredential(env: NodeJS.ProcessEnv = process.en
 }
 
 const PLUGIN_MANAGEMENT_PATHS = new Set([
-  'listPlugins', 'listBundles', 'inspect', 'setPluginEnabled', 'setBundleEnabled',
-  'installBundle', 'cancelInstall', 'removeBundle',
+  'access', 'listVersionExemptions', 'setVersionExemption', 'listPlugins', 'listBundles', 'registries',
+  'inspect', 'setPluginEnabled', 'setBundleEnabled', 'installBundle', 'waitForInstall', 'cancelInstall', 'removeBundle',
 ].map(method => `/api/pluginManager/${method}`))
 PLUGIN_MANAGEMENT_PATHS.add('/api/pluginInventory/list')
 PLUGIN_MANAGEMENT_PATHS.add('/api/settings.describe')
