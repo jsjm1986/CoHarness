@@ -345,7 +345,6 @@
     { "path": "./packages/boot/workspace-dependencies" },
     { "path": "./packages/boot/hmr" },
     { "path": "./packages/boot/plugin-manager" },
-    { "path": "./packages/boot/config-editor" },
     { "path": "./packages/sdk/server" },
     { "path": "./packages/examples/jsonrpc-demo" },
     { "path": "./packages/test-support/llm-replay" },
