@@ -244,6 +244,13 @@
         "packages/client/ui-plan/src/client/review-store.ts"
       ]
     },
+    "client/ui-plugin-manager": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-10-03-user-side-plugin-manager-page.md",
+      "removedUpstreamPaths": [
+        "packages/client/ui-plugin-manager/src/client/sanitize-install-input.ts"
+      ]
+    },
     "client/ui-primitives": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
@@ -1212,11 +1219,6 @@
       "package": "client/ui-chat",
       "reason": "client/ui-conversation owns the chat surface for the cloud product",
       "replacedBy": "client/ui-conversation"
-    },
-    {
-      "package": "client/ui-plugin-manager",
-      "reason": "plugin management surfaces live in client/ui-settings-plugins",
-      "replacedBy": "client/ui-settings-plugins"
     },
     {
       "package": "client/ui-session",

@@ -1172,7 +1172,16 @@ export async function assertFixtureInventory(dir: string, expected: string[]): P
   for (const entry of artifacts.filter(name => name.endsWith('.jsonl'))) {
     const content = await readFile(join(dir, entry), 'utf8')
     expect(scrubModelRequestBulk(content), `${dir}/${entry} carries request-header bulk`).toBe(content)
-    expect(redactSessionSnapshotIds([content]), `${dir}/${entry} carries unredacted identities`).toEqual([content])
+    expect(content, `${dir}/${entry} carries a run-local rpcId`)
+      .not.toMatch(/"rpcId"\s*:\s*"(?!(?:\{\{rpcId\}\}|\{\{rpc:[1-9]\d*\}\})")[^"]*"/)
+    // Both committed spellings are admitted: legacy {{xId}} placeholders and
+    // canonical {{kind:N}} tokens. Normalizing the legacy spellings first
+    // keeps the fixed-point comparison about unredacted raw identities only.
+    const canonicalized = content
+      .replace(/\{\{sessionId\}\}/g, '{{session:1}}')
+      .replace(/\{\{messageId\}\}/g, '{{message:1}}')
+      .replace(/\{\{rpcId\}\}/g, '{{rpc:1}}')
+    expect(redactSessionSnapshotIds([canonicalized]), `${dir}/${entry} carries unredacted identities`).toEqual([canonicalized])
   }
 }
 

@@ -5982,7 +5982,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PluginDesiredStateSnapshot',
-    declaration: 'export interface PluginDesiredStateSnapshot {\n    revision: string;\n    state: PluginDesiredState | null;\n}',
+    declaration: 'export interface PluginDesiredStateSnapshot {\n    revision: string;\n    state: PluginDesiredState | null;\n    appliedRevision?: string;\n}',
   },
   {
     name: 'PluginEntryId',

@@ -72,6 +72,21 @@ describe('Project Reference compiler faces', () => {
     ])
   })
 
+  it('admits a contract leaf whose own face matches and rejects it from the other face', () => {
+    const root = workspaceFixture({
+      host: ['./packages/api/split/tsconfig.contract.json'],
+      client: ['./packages/api/split/tsconfig.contract.json'],
+    })
+    writeJson(join(root, 'packages/api/split/tsconfig.contract.json'), {
+      extends: '../../../tsconfig.base.json',
+      references: [],
+    })
+
+    expect(collectProjectReferenceFaceViolations(root)).toEqual([
+      'tsconfig.client.json: Project Reference "./packages/api/split/tsconfig.contract.json" enters split project packages/api/split from a Client config; reference "packages/api/split/tsconfig.client.json" instead',
+    ])
+  })
+
   it('uses the referencing project face throughout the reachable graph', () => {
     const root = workspaceFixture({
       host: ['./packages/core/host-consumer'],

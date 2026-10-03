@@ -47,8 +47,13 @@ export function collectProjectReferenceFaceViolations(root: string): string[] {
           )
           continue
         }
-        const expected = resolve(splitRoot, `tsconfig.${face}.json`)
-        if (targetConfig !== expected) {
+        // A non-face leaf inside the split project is legal when its own
+        // compiler face matches the traversal's: contract-only faces such as
+        // api/remotes' session-controller exist so consumers can reference
+        // them without closing a project-reference cycle.
+        const targetFace = projectFace(root, targetConfig, projectConfig(root, targetConfig))
+        if (targetFace !== face) {
+          const expected = resolve(splitRoot, `tsconfig.${face}.json`)
           violations.push(
             `${repoPath(root, configPath)}: Project Reference ${JSON.stringify(reference)} enters split project ${repoPath(root, splitRoot)} from a ${faceLabel(face)} config; reference ${JSON.stringify(repoPath(root, expected))} instead`,
           )
