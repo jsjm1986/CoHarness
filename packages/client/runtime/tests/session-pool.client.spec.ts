@@ -75,6 +75,18 @@ describe('SessionRuntimePool', () => {
     expect(pool.runtimeTargetFor('project-session' as SessionId)).toBeUndefined()
   })
 
+  it('rejects Session verification when the target runtime transport is unavailable', async () => {
+    const ctx = new Context()
+    const baseApi = new FakeApiClient()
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const baseConnection: ConnectionHandle = { ...connection(baseApi), forTarget: () => undefined }
+    const pool = new SessionRuntimePool(ctx, base, baseConnection, fakeRemote())
+    // Unverifiable is not absent: workbench restore treats a rejection as a
+    // recoverable transport failure while false would drop the pane as denied.
+    await expect(pool.ensureSession({ kind: 'project', projectId: 7 }, 'unknown' as SessionId))
+      .rejects.toThrow('target runtime unavailable for Session verification')
+  })
+
   it('withdraws Session catalog ownership before stopping its connection and never falls back to another runtime', async () => {
     const ctx = new Context()
     await ctx.plugin(() => {}).await()

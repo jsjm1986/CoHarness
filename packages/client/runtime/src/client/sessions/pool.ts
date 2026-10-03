@@ -437,7 +437,9 @@ export class SessionRuntimePool implements ISessions {
   async ensureSession(target: SessionRuntimeTarget, id: SessionId, signal?: AbortSignal): Promise<boolean> {
     const active = signal === undefined ? this.lifetime.signal : AbortSignal.any([signal, this.lifetime.signal])
     const entry = await this.runtimeForTarget(target, active)
-    if (entry === undefined || entry.connection === undefined) return false
+    // An unreached or mid-release runtime cannot report absence; callers
+    // classify a thrown failure as unverifiable, never as "not found".
+    if (entry === undefined || entry.connection === undefined) throw new Error('target runtime unavailable for Session verification')
     const original = id
     if (!entry.runtime.list.getSnapshot().ids.includes(original)) return false
     const { result } = await entry.connection.api.workspace.list({}, active)
@@ -446,7 +448,8 @@ export class SessionRuntimePool implements ISessions {
       if (result.error.code === 'collaboration-forbidden') throw new WorkspaceResourceError('access-revoked', result.error.message)
       throw new Error(result.error.message)
     }
-    return this.entries.get(entry.key) === entry && !result.value.archivedSessionIds.includes(original)
+    if (this.entries.get(entry.key) !== entry) throw new Error('target runtime was released during Session verification')
+    return !result.value.archivedSessionIds.includes(original)
   }
 
   /** Create a Session in the target runtime and index its owner. */
