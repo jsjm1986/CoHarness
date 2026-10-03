@@ -151,7 +151,7 @@ describePg('PostgreSQL plugin_states', () => {
     const conflict = await state.publishForSubject(subject, { entries: [], bundles: [] }, '1')
     expect(conflict.status).toBe('conflict')
     if (conflict.status === 'conflict') expect(conflict.current).toEqual({ revision: '2', state: desired })
-    expect(await state.readForSubject({ organizationId, userInternalId })).toEqual({ revision: '2', state: desired })
+    expect(await state.readForSubject({ organizationId, userInternalId })).toEqual({ revision: '2', state: desired, appliedRevision: '2' })
   })
 
   it('projects only revisions newer than the instance applied marker', async () => {

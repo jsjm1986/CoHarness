@@ -32,6 +32,13 @@ export interface PluginDesiredStateSnapshot {
   /** '0' when no desired state has been saved for the profile yet. */
   revision: string
   state: PluginDesiredState | null
+  /**
+   * The revision the reader's own profile files were materialized from, when
+   * the deployment tracks it. A publisher that never saw `revision` must base
+   * its next write on this marker, not on `revision`, so a newer saved state
+   * still conflicts instead of being silently overwritten.
+   */
+  appliedRevision?: string
 }
 
 /** The outcome of publishing the profile's observed composition to the store. */

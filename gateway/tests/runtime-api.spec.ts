@@ -126,7 +126,7 @@ function fixture() {
   const archiveSnapshot = vi.fn(async () => [{ id: 'command-1', rootSessionId: 'session-archive', action: 'restore' as const }])
   const archiveAck = vi.fn(async () => true)
   const pluginState = {
-    readForSubject: vi.fn(async (): Promise<PluginStateSnapshot> => ({ revision: '0', state: null })),
+    readForSubject: vi.fn(async (): Promise<PluginStateSnapshot & { appliedRevision: string }> => ({ revision: '0', state: null, appliedRevision: '0' })),
     publishForSubject: vi.fn(async (_subject: unknown, _state: unknown, _baseRevision: unknown):
       Promise<{ status: 'applied'; revision: string } | { status: 'conflict'; current: PluginStateSnapshot }> =>
       ({ status: 'applied' as const, revision: '1' })),
@@ -296,9 +296,9 @@ describe('plugin desired state endpoints', () => {
 
   it('reads the authenticated runtime owner state', async () => {
     const runtime = fixture()
-    runtime.pluginState.readForSubject.mockResolvedValueOnce({ revision: '2', state: { entries: [], bundles: ['core'] } })
+    runtime.pluginState.readForSubject.mockResolvedValueOnce({ revision: '2', state: { entries: [], bundles: ['core'] }, appliedRevision: '1' })
     expect(await request(runtime.handler, '/internal/runtime/plugin-state', { method: 'GET', body: {} }))
-      .toMatchObject({ status: 200, body: { revision: '2', state: { entries: [], bundles: ['core'] } } })
+      .toMatchObject({ status: 200, body: { revision: '2', state: { entries: [], bundles: ['core'] }, appliedRevision: '1' } })
     expect(runtime.pluginState.readForSubject).toHaveBeenCalledWith(expect.objectContaining({
       organizationId: ORGANIZATION_ID, projectInternalId: PROJECT_INTERNAL_ID, generation: GENERATION,
     }))

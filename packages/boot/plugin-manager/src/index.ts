@@ -939,7 +939,11 @@ export class PluginManager extends TypertRemoteService {
     const warn = (text: string) => { result.warnings = [...result.warnings ?? [], text] }
     try {
       if (this.stateRevision === undefined) {
-        this.stateRevision = (await policy.readDesiredState()).revision
+        const snapshot = await policy.readDesiredState()
+        // The publish base is the revision this profile's files were built
+        // from, not the store head: an administrator's newer save must still
+        // conflict rather than be overwritten by this composition.
+        this.stateRevision = snapshot.appliedRevision ?? snapshot.revision
       }
       if (this.abort.signal.aborted) return
       const observed = await readDesiredState(this.profile.dir, this.profile.patchPath)
@@ -954,7 +958,14 @@ export class PluginManager extends TypertRemoteService {
         await withFileLock(join(this.profile.dir, 'package.json'), async () => {
           await applyDesiredState(this.profile.dir, this.profile.patchPath, desired)
         }, { waitMs: this.lockWaitMs })
-        result.warnings = [...result.warnings ?? [], ...await this.reload()]
+        try {
+          result.warnings = [...result.warnings ?? [], ...await this.reload()]
+        } catch (error) {
+          // Converging to a composition whose rows cannot all activate reports
+          // as a reload error; the files already carry the store's state, so
+          // surface it without losing the convergence fact or the change event.
+          warn(`profile reload after convergence reported: ${messageOf(error)}`)
+        }
         this.ownerContext.emit('plugin-manager/changed', { reason: 'desired-state' })
       }
       warn('the administrator saved a newer plugin state; the profile converged to it')

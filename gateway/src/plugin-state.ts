@@ -263,12 +263,31 @@ export class PostgresPluginState {
   }
 
   /**
-   * Read the desired state for the runtime the credential authenticates.
+   * Read the desired state for the runtime the credential authenticates,
+   * joined with the instance's applied marker: the revision this runtime's
+   * profile files were materialized from. A publisher that booted before an
+   * administrator's newer save bases its write on the marker, not the head,
+   * so the save still conflicts instead of being silently overwritten.
    * @param subject - authenticated runtime identity carrying its internal owner id.
-   * @returns the saved state and revision, or the revision-zero default.
+   * @returns the saved snapshot plus the applied marker; both '0' when the instance never launched here.
    */
-  async readForSubject(subject: { organizationId: string; userInternalId?: string; projectInternalId?: string }): Promise<PluginStateSnapshot> {
-    return this.readRow(this.context.pool, this.subjectOwner(subject))
+  async readForSubject(subject: { organizationId: string; userInternalId?: string; projectInternalId?: string }): Promise<PluginStateSnapshot & { appliedRevision: string }> {
+    const internal = this.subjectOwner(subject)
+    const result = await this.context.pool.query<{ entries: unknown; bundles: unknown; revision: string; applied: string }>(
+      `SELECT s.entries,s.bundles,COALESCE(s.revision,0)::text revision,
+        COALESCE(i.applied_policy_revision,0)::text applied
+        FROM harness.instances i
+        LEFT JOIN harness.plugin_states s ON s.organization_id=i.organization_id
+          AND s.${ownerColumn(internal)}=i.${ownerColumn(internal)}
+        WHERE i.organization_id=$1 AND i.${ownerColumn(internal)}=$2 AND i.assigned_node_id=$3`,
+      [internal.organizationId, ownerId(internal), this.context.nodeId])
+    const row = result.rows[0]
+    if (row === undefined) return { revision: '0', state: null, appliedRevision: '0' }
+    return {
+      revision: row.revision,
+      state: row.entries === null || row.bundles === null ? null : parseState(row),
+      appliedRevision: row.applied,
+    }
   }
 
   /**

@@ -1657,6 +1657,51 @@ it('converges the profile onto a newer stored composition when a publish conflic
   expect(readProfileManifest('test', dir).dsh?.profile?.bundles).toEqual(['core'])
 })
 
+it('seeds the publish base from the applied marker, not the store head, so a newer saved state conflicts', async () => {
+  const stored = {
+    revision: '4',
+    state: { entries: [{ id: 'managed', disabled: true }], bundles: ['core'] } satisfies PluginDesiredState,
+    appliedRevision: '3',
+  }
+  const published: Array<{ baseRevision: string }> = []
+  const { manager, dir } = await fixture('live', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', {
+      protectedModules: new Set<string>(), authorize: async () => {},
+      readDesiredState: async () => stored,
+      publishDesiredState: async (_state: PluginDesiredState, baseRevision: string) => {
+        published.push({ baseRevision })
+        if (baseRevision !== stored.revision) return { status: 'conflict' as const, current: stored }
+        return { status: 'applied' as const, revision: '5' }
+      },
+    })
+  }, { authorization: 'required' })
+  const result = await manager.setBundleEnabled('extra', false)
+  expect(published).toEqual([{ baseRevision: '3' }])
+  expect(result.warnings).toContain('the administrator saved a newer plugin state; the profile converged to it')
+  expect(parse(readFileSync(join(dir, 'cordis.patch.yml'), 'utf8'))).toEqual([{ id: 'managed', disabled: true }])
+})
+
+it('still reports convergence when the reload after a conflict cannot activate every entry', async () => {
+  const stored = {
+    revision: '2',
+    state: { entries: [{ id: 'managed', disabled: true }], bundles: ['core'] } satisfies PluginDesiredState,
+  }
+  const { manager, dir } = await fixture('live', false, (ctx) => {
+    ctx.provide('pluginManagementAuthorization', {
+      protectedModules: new Set<string>(), authorize: async () => {},
+      readDesiredState: async () => ({ revision: '1', state: null }),
+      publishDesiredState: async () => ({ status: 'conflict' as const, current: stored }),
+    })
+  }, { authorization: 'required' })
+  const reload = vi.spyOn(manager as unknown as { reload: () => Promise<string[]> }, 'reload')
+  reload.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('7 entries did not activate'))
+  const result = await manager.setBundleEnabled('extra', false)
+  expect(reload).toHaveBeenCalledTimes(2)
+  expect(result.warnings).toContain('profile reload after convergence reported: 7 entries did not activate')
+  expect(result.warnings).toContain('the administrator saved a newer plugin state; the profile converged to it')
+  expect(parse(readFileSync(join(dir, 'cordis.patch.yml'), 'utf8'))).toEqual([{ id: 'managed', disabled: true }])
+})
+
 it('keeps the profile composition and warns when the state store is unreachable', async () => {
   const { manager, dir } = await fixture('live', false, (ctx) => {
     ctx.provide('pluginManagementAuthorization', {
