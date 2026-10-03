@@ -212,7 +212,7 @@ export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 1024
  * request principal is captured, so every member (ro or rw) may call them; the
  * owning service filters rows that carry Session-scoped metadata itself.
  */
-const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
+export const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
   // Host-wide read whose payload the invoke seam narrows back to the
   // participant's readable Sessions — the task store is global, visibility is not.
   'schedule/catalog',
@@ -220,6 +220,22 @@ const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
   'dynamicCordisRunner/inventory',
   'llm/listProviders',
   'llm/listConfigurableProviders',
+  'permissionPresets/catalog',
+  'pluginRegistryProbe/fastest',
+  'speech/catalog',
+  'speech/follow',
+])
+
+/**
+ * Project-scope Remote operations with no Session identity that every
+ * participant may invoke — per-client voice capture prepares the shared
+ * provider and transcribes its own recordings; none carries another
+ * participant's data. Provider selection stays manager-only below.
+ */
+export const PROJECT_TYPERT_PROCESS_WIDE_OPERATIONS: ReadonlySet<string> = new Set([
+  'speech/prepare',
+  'speech/cancelPreparation',
+  'speech/transcribe',
 ])
 
 /**
@@ -228,10 +244,13 @@ const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
  * enforces its Session ACL or deployment management policy itself; this table
  * only admits the call after principal capture has verified project membership.
  */
-const USER_TERMINAL_ENDPOINTS = new Set(['environment', 'shells', 'list', 'create', 'retain', 'follow', 'write', 'resize', 'rename', 'close'].map(method => `terminal/${method}`))
+export const USER_TERMINAL_ENDPOINTS = new Set(['environment', 'shells', 'list', 'create', 'retain', 'follow', 'write', 'resize', 'rename', 'close'].map(method => `terminal/${method}`))
+
+/** Administrative terminal operations; the controller's own grant check runs inside the handler. */
+export const ADMIN_TERMINAL_ENDPOINTS: ReadonlySet<string> = new Set(['terminal/adminList', 'terminal/adminClose'])
 const TERMINAL_REQUEST_SIGNAL = new AbortController().signal
 
-const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
+export const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
   'dynamicCordisRunner/resolveRequestRun',
   'dynamicCordisRunner/invoke',
   'dynamicCordisRunner/syncInspectManifest',
@@ -257,17 +276,20 @@ const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
  * available to project managers, matching the RPC personal-configuration path.
  * A non-manager project member is refused before lookup.
  */
-const PROJECT_TYPERT_MANAGER_CONFIGURATION: ReadonlySet<string> = new Set([
+export const PROJECT_TYPERT_MANAGER_CONFIGURATION: ReadonlySet<string> = new Set([
   'agentPresets/read',
   'agentPresets/copy',
   'agentPresets/deletePreset',
+  // Speech provider selection is shared mutable state; participants without
+  // manage rights must not reconfigure the voice path for other members.
+  'speech/configure',
 ])
 
 /**
  * Project-scope Remote methods reserved for personal configuration: every
  * project member (ro, rw, or manager) is refused before lookup.
  */
-const PROJECT_TYPERT_PERSONAL_CONFIGURATION: ReadonlySet<string> = new Set([
+export const PROJECT_TYPERT_PERSONAL_CONFIGURATION: ReadonlySet<string> = new Set([
   'llm/discoverModels',
 ])
 
@@ -354,7 +376,7 @@ export async function authorizeTypertRemote(
     await manager.authorize()
     return
   }
-  if (payload.endpoint === 'terminal/adminList' || payload.endpoint === 'terminal/adminClose') return
+  if (ADMIN_TERMINAL_ENDPOINTS.has(payload.endpoint)) return
   if (USER_TERMINAL_ENDPOINTS.has(payload.endpoint)) {
     // Retained output uses the controller's revocable creator grant, not an expired browser assertion.
     if (payload.phase === 'stream-item') return
@@ -376,6 +398,7 @@ export async function authorizeTypertRemote(
   }
   if (authority.participant.scope.kind === 'personal') return
   if (PROJECT_TYPERT_PROCESS_WIDE_READS.has(payload.endpoint)) return
+  if (PROJECT_TYPERT_PROCESS_WIDE_OPERATIONS.has(payload.endpoint)) return
   if (PROJECT_TYPERT_REGISTRY_AUTHORIZED.has(payload.endpoint)) return
   if (PROJECT_TYPERT_MANAGER_CONFIGURATION.has(payload.endpoint)) {
     if (authority.participant.scope.canManage === true) return

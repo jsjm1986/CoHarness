@@ -46,6 +46,8 @@ export const REMOTE_SESSION_POLICIES: Readonly<Record<string, RemoteSessionPolic
   'agentTeams/createTask': { action: 'write', path: ['agentId'], execution: 'request' },
   'agentTeams/updateTask': { action: 'write', path: ['agentId'], execution: 'request' },
   'sessionFeedback/record': { action: 'write', path: ['request', 'sessionId'], execution: 'none' },
+  'userQuestions/answer': { action: 'write', path: ['agentId'], execution: 'request' },
+  'userQuestions/attachWait': { action: 'read', path: ['agentId'] },
 })
 
 /**

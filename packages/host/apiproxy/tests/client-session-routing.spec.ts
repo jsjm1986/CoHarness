@@ -23,6 +23,12 @@ it.each(['schedule/list', 'schedule/history', 'schedule/delete', 'schedule/updat
   },
 )
 
+it.each(['userQuestions/answer', 'userQuestions/attachWait'])(
+  'addresses %s through its Agent identity', (endpoint) => {
+    expect(remoteSessionId(endpoint, { agentId: 'question-session', callId: 'call-1' })).toBe('question-session')
+  },
+)
+
 it('rewrites Session addresses nested inside Schedule requests', async () => {
   const { mapRemoteSessionIds } = await import('../src/api/remote-session-routing.ts')
   const map = (id: import('@deepseek-ai/dsh-session/types').SessionId) => `host:${id}` as typeof id
