@@ -27,7 +27,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Page } from 'playwright'
 import { expect } from 'vitest'
@@ -1141,19 +1141,38 @@ async function toggleTurnProcesses(page: Page, expanded: 'true' | 'false', timeo
 
 /**
  * Fixture-inventory guard: the scenario directory holds exactly the expected
- * files and every committed JSONL is a scrub fixed-point without a run-local
- * browser RPC id. Legacy single-request and indexed identity tokens are valid.
+ * role files and every committed JSONL is a header-scrubbed, typed-redaction
+ * fixed point. A `snapshot.yml` manifest is validated when the scenario owns
+ * one; extra fixture generations collapse to their role's canonical name.
  * @param dir - the scenario snapshot directory.
- * @param expected - the exact expected file inventory.
+ * @param expected - the exact expected role inventory.
  */
 export async function assertFixtureInventory(dir: string, expected: string[]): Promise<void> {
   const entries = (await readdir(dir)).sort()
-  expect(entries).toEqual([...expected].sort())
-  for (const entry of entries.filter(name => name.endsWith('.jsonl'))) {
+  const ownsManifest = entries.includes('snapshot.yml')
+  const artifacts = entries.filter(name => name !== 'snapshot.yml')
+  const roleInventory = (names: readonly string[]): string[] => [...new Set(names.map((name) => {
+    const fixture = parseSessionFixtureName(name)
+    return fixture === undefined ? name : sessionFixtureName(fixture.index, 0)
+  }))].sort()
+  expect(roleInventory(artifacts)).toEqual(roleInventory(expected))
+  if (ownsManifest) {
+    const manifestPath = join(dir, 'snapshot.yml')
+    const manifest = parseSnapshotManifest(await readFile(manifestPath, 'utf8'), manifestPath)
+    expect(manifest.profile).toBe('web')
+    if (manifest.session === undefined) {
+      expect(
+        artifacts.some(name => parseSessionFixtureName(name)?.index === 0),
+        `${dir}: session owner must carry a canonical parent Session fixture`,
+      ).toBe(true)
+    } else {
+      expect(existsSync(resolve(dir, manifest.session.source)), `${dir}: session source`).toBe(true)
+    }
+  }
+  for (const entry of artifacts.filter(name => name.endsWith('.jsonl'))) {
     const content = await readFile(join(dir, entry), 'utf8')
     expect(scrubModelRequestBulk(content), `${dir}/${entry} carries request-header bulk`).toBe(content)
-    expect(content, `${dir}/${entry} carries a run-local rpcId`)
-      .not.toMatch(/"rpcId"\s*:\s*"(?!(?:\{\{rpcId\}\}|\{\{rpc:[1-9]\d*\}\})")[^"]*"/)
+    expect(redactSessionSnapshotIds([content]), `${dir}/${entry} carries unredacted identities`).toEqual([content])
   }
 }
 
