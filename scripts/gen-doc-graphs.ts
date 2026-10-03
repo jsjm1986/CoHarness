@@ -796,6 +796,37 @@ const SERVICE_ROLES: ServiceRole[] = [
     consumers: ['tool-cordis'],
     note: 'Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport.',
   },
+  {
+    key: 'schedule',
+    pkg: 'schedule',
+    title: 'Host scheduled messages',
+    mode: 'core',
+    note: 'Stores tasks independently of Session activation and queues due messages in the original Session.',
+  },
+  {
+    key: 'sessionController',
+    pkg: 'api-remotes',
+    title: 'Host Session resolution surface',
+    mode: 'core',
+    consumers: ['schedule'],
+    note: 'Resolves Session identities to their live Agents for other Host API domains, preserving the resolver\'s typed refusal codes.',
+  },
+  {
+    key: 'speechController',
+    pkg: 'experimental-api-speech-to-text',
+    title: 'Experimental transcription Remote',
+    mode: 'core',
+    note: 'Validates bounded browser audio before provider dispatch.',
+  },
+  {
+    key: 'speechToText',
+    pkg: 'experimental-speech-to-text',
+    title: 'Experimental speech recognition providers',
+    mode: 'seam',
+    implementations: ['experimental-speech-to-text-sensevoice'],
+    consumers: ['experimental-api-speech-to-text'],
+    note: 'Routes explicit recognizers; the browser uses the authenticated Remote and keeps transcripts in the draft until submission.',
+  },
 ]
 
 function generatedHeader(title: string): string[] {
