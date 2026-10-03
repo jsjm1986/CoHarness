@@ -4662,7 +4662,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // An archived session admits no input; clients may hold a stale
         // mounted view until the archive baseline lands. Minimal
         // compositions without a Workspace Registry have no archive set.
-        if (ctx.workspaceRegistry?.archivedSessionIds.includes(sessionId) === true) {
+        const workspaceRegistry = ctx.get('workspaceRegistry')
+        if (workspaceRegistry?.archivedSessionIds.includes(sessionId) === true) {
           return err(request, {
             code: 'session-archived',
             message: `session ${sessionId} is archived; unarchive it before sending input`,

@@ -3,7 +3,7 @@
 import type {
   HostFrame, IApiClient, RpcError, RpcRequest, RpcResult, SessionId, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
-import { transportError } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { transportError, parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { Notifier } from '../notifier.ts'
 import { Workspace, type WorkspaceCreateInput } from './workspace.ts'
 
@@ -77,8 +77,13 @@ export class WorkspaceManager {
     this.snapshotCache = this.buildSnapshot()
   })
 
-  /** @param api - shared wire client. */
-  constructor(private readonly api: IApiClient) {
+  /**
+   * @param api - shared wire client; session-addressed calls may route to a
+   *   foreign runtime while this manager only mirrors the base registry.
+   * @param localSession - whether the session owns to the mirrored registry;
+   *   whole-set echoes of a foreign mutation must not install locally.
+   */
+  constructor(private readonly api: IApiClient, private readonly localSession: (id: SessionId) => boolean = () => true) {
     this.snapshotCache = this.buildSnapshot()
   }
 
@@ -241,11 +246,14 @@ export class WorkspaceManager {
     const { result } = await this.api.workspace.archiveSession(
       options.stopActivity === true ? { sessionId, stopActivity: true } : { sessionId },
     )
-    if (result.ok) {
+    if (result.ok && this.localSession(sessionId)) {
       this.installArchived(result.value.archivedSessionIds, result.value.archiveRevision)
       // The Host drops an archived session's pin in the same durable write;
-      // mirror that locally so no frame shows the row both archived and pinned.
-      this.installPinned(this.pinnedSessionIds.filter(id => id !== sessionId))
+      // mirror that locally so no frame shows the row both archived and
+      // pinned. The stored set carries raw Host ids; a pooled caller passes
+      // the qualified key, so compare the de-qualified form.
+      const wireId = parseClientSessionKey(sessionId)?.sessionId ?? sessionId
+      this.installPinned(this.pinnedSessionIds.filter(id => id !== wireId))
     }
     return result
   }
@@ -260,7 +268,7 @@ export class WorkspaceManager {
    */
   async unarchiveSession(sessionId: SessionId): Promise<RpcResult<{ archivedSessionIds: SessionId[]; archiveRevision?: number }>> {
     const { result } = await this.api.workspace.unarchiveSession({ sessionId })
-    if (result.ok) this.installArchived(result.value.archivedSessionIds, result.value.archiveRevision)
+    if (result.ok && this.localSession(sessionId)) this.installArchived(result.value.archivedSessionIds, result.value.archiveRevision)
     return result
   }
 
@@ -274,7 +282,7 @@ export class WorkspaceManager {
   async pinSession(sessionId: SessionId): Promise<RpcResult<{ pinnedSessionIds: SessionId[] }>> {
     const requestSeq = ++this.pinRequestSeq
     const { result } = await this.api.workspace.pinSession({ sessionId })
-    if (result.ok && requestSeq === this.pinRequestSeq) {
+    if (result.ok && requestSeq === this.pinRequestSeq && this.localSession(sessionId)) {
       this.installPinned(result.value.pinnedSessionIds)
     }
     return result
@@ -291,7 +299,7 @@ export class WorkspaceManager {
   async unpinSession(sessionId: SessionId): Promise<RpcResult<{ pinnedSessionIds: SessionId[] }>> {
     const requestSeq = ++this.pinRequestSeq
     const { result } = await this.api.workspace.unpinSession({ sessionId })
-    if (result.ok && requestSeq === this.pinRequestSeq) {
+    if (result.ok && requestSeq === this.pinRequestSeq && this.localSession(sessionId)) {
       this.installPinned(result.value.pinnedSessionIds)
     }
     return result

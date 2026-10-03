@@ -144,7 +144,10 @@ export class WorkspaceRuntime implements IWorkspaces {
    * @param sessions - cross-domain sessions face used for recency and blank-session reuse.
    */
   constructor(ctx: Context, private readonly api: IApiClient, private readonly sessions: SessionsPort) {
-    this.manager = new WorkspaceManager(api)
+    // Whole-set echoes install only for sessions owned by the runtime this
+    // mirror tracks; a session-addressed call routed elsewhere returns a
+    // foreign registry's set, which its own runtime frames own.
+    this.manager = new WorkspaceManager(api, id => this.sessions.runtimeTargetFor?.(id) === undefined)
     this.list = createSnapshotStore<WorkspaceListState>({
       items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'pending', error: null,
       archiveRevision: 0,

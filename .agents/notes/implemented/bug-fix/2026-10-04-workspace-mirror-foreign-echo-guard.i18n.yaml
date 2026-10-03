@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-04-workspace-mirror-foreign-echo-guard.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-workspace-mirror-foreign-echo-guard.md
+/agent-note-pin-whole-set-workspace-echoes-to-the-mirrored-runtime:
+  en: fc4daa3952a20826
+  zh: c5d5c75cd2d9f27b
+/agent-note-pin-whole-set-workspace-echoes-to-the-mirrored-runtime/problem:
+  en: 93d799d4ea52302e
+  zh: d47b5031d79890dc
+/agent-note-pin-whole-set-workspace-echoes-to-the-mirrored-runtime/decision:
+  en: 3430c057327ea6d4
+  zh: b567f18349507a78
+/agent-note-pin-whole-set-workspace-echoes-to-the-mirrored-runtime/files:
+  en: 3611773412194d3c
+  zh: ddc10224e52fd231
+/agent-note-pin-whole-set-workspace-echoes-to-the-mirrored-runtime/consequences:
+  en: c40028fb46b34b71
+  zh: 95f4f496817957dc

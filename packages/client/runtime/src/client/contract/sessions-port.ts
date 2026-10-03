@@ -42,7 +42,7 @@ export interface SessionsPortList {
 }
 
 /** The sessions-service face injected into sibling domains. */
-export interface SessionsPort extends Pick<ISessions, 'retain' | 'keyFor'> {
+export interface SessionsPort extends Pick<ISessions, 'retain' | 'keyFor' | 'runtimeTargetFor'> {
   /**
    * Begin an asynchronous navigation intent, superseding any earlier intent.
    * Selecting, clearing, scope changes, and owner disposal cancel it.

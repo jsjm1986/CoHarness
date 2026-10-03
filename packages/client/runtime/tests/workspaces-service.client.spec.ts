@@ -258,6 +258,42 @@ describe('WorkspaceManager', () => {
     expect(manager.getSnapshot().archivedSessionIds).toEqual([sid('s1'), sid('s2'), sid('s3')])
   })
 
+  it('does not install a whole-set echo returned by a foreign runtime', async () => {
+    const api = new FakeApiClient()
+    api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [], archivedSessionIds: [sid('s-local')], pinnedSessionIds: [sid('s-local')],
+    }))
+    api.onWorkspaceArchiveSession = () => Promise.resolve(ok({ archivedSessionIds: [sid('s-foreign')] }))
+    api.onWorkspacePinSession = () => Promise.resolve(ok({ pinnedSessionIds: [sid('s-foreign')] }))
+    api.onWorkspaceUnpinSession = () => Promise.resolve(ok({ pinnedSessionIds: [sid('s-foreign')] }))
+    const manager = new WorkspaceManager(api, id => id !== sid('s-foreign'))
+    await manager.refresh()
+    expect(manager.getSnapshot().archivedSessionIds).toEqual([sid('s-local')])
+    expect(manager.getSnapshot().pinnedSessionIds).toEqual([sid('s-local')])
+
+    // The routed call lands on the owning runtime and returns that
+    // registry's set; the mirrored baseline must not adopt it.
+    await expect(manager.archiveSession(sid('s-foreign'))).resolves.toMatchObject({ ok: true })
+    expect(manager.getSnapshot().archivedSessionIds).toEqual([sid('s-local')])
+    await expect(manager.pinSession(sid('s-foreign'))).resolves.toMatchObject({ ok: true })
+    await expect(manager.unpinSession(sid('s-foreign'))).resolves.toMatchObject({ ok: true })
+    expect(manager.getSnapshot().pinnedSessionIds).toEqual([sid('s-local')])
+  })
+
+  it('drops the archived session pin for a qualified local id', async () => {
+    const api = new FakeApiClient()
+    const key = clientSessionKey({ kind: 'personal' }, sid('s1'))
+    api.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [], pinnedSessionIds: [sid('s1')] }))
+    api.onWorkspaceArchiveSession = () => Promise.resolve(ok({ archivedSessionIds: [sid('s1')] }))
+    const manager = new WorkspaceManager(api, () => true)
+    await manager.refresh()
+    expect(manager.getSnapshot().pinnedSessionIds).toEqual([sid('s1')])
+    // Callers pass the pooled key while the mirrored set stores raw Host
+    // ids; the pin-drop compares the de-qualified form.
+    await manager.archiveSession(key)
+    expect(manager.getSnapshot().pinnedSessionIds).toEqual([])
+  })
+
   it('merges a stale archive frame before a newer refresh baseline', async () => {
     const api = new FakeApiClient()
     const gate = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
