@@ -41,6 +41,7 @@
     "@deepseek-ai/dsh-client-web": "workspace:*",
     "@deepseek-ai/dsh-host-apiproxy": "workspace:*",
     "@deepseek-ai/dsh-remote-mock": "workspace:*",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

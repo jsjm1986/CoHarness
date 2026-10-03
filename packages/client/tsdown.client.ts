@@ -61,7 +61,7 @@ function styleInjectionModule(
  * Everything else under @deepseek-ai/* is either a module-table entry
  * (external) or a leak the purity gate rejects.
  */
-export const INLINE_SAFE = /^(?:@deepseek-ai\/dsh-(?:host-apiproxy|file-reference|session|llm|tools|brand|client-userdoc-upload|output-retention|typert-protocol|util-crypto|util-values)(?:\/|$)|@deepseek-ai\/dsh-session-format\/surface$|@deepseek-ai\/dsh-token-meter\/client$|@deepseek-ai\/dsh-host-open-in-app\/shared$|@deepseek-ai\/dsh-agent-presets\/display$|@deepseek-ai\/dsh-spill-policy\/notice$)/
+export const INLINE_SAFE = /^(?:@deepseek-ai\/dsh-(?:host-apiproxy|file-reference|session|llm|tools|brand|client-userdoc-upload|output-retention|typert-protocol|util-crypto|util-values)(?:\/|$)|@deepseek-ai\/dsh-session-format\/surface$|@deepseek-ai\/dsh-token-meter\/client$|@deepseek-ai\/dsh-host-open-in-app\/shared$|@deepseek-ai\/dsh-plugin-manager\/registry$|@deepseek-ai\/dsh-agent-presets\/display$|@deepseek-ai\/dsh-spill-policy\/notice$)/
 
 /**
  * Vendored framework libraries: rescoped into @deepseek-ai, so the gate below

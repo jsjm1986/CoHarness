@@ -1,6 +1,8 @@
 /** Test-owned Remote face: `$on` subscriptions driven by the internal forwarded-event plumbing. */
 import type { Context } from '@deepseek-ai/cordis'
 
+export { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
+
 /**
  * Remote service test double for the forwarded-event path. Feature specs need
  * `ctx.remote.$on` to exist (their plugins inject `remote`) and need forwarded

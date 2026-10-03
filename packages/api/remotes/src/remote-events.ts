@@ -7,6 +7,7 @@
  */
 
 import type {} from '@deepseek-ai/dsh-schedule/client'
+import type {} from '@deepseek-ai/dsh-plugin-manager/types'
 
 /**
  * Host events this application forwards to consumers verbatim: no projection,
@@ -34,6 +35,9 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   '@deepseek-ai/cordis/inspect-query-resolved',
   'llm/adapters-updated',
   'permission-presets/catalog-changed',
+  'plugin-manager/changed',
+  'plugin-manager/install-log',
+  'plugin-manager/install-state',
   'schedule/changed',
   'settings/document-updated',
 ] as const

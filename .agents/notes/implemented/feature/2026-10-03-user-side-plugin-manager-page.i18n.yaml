@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-03-user-side-plugin-manager-page.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-03-user-side-plugin-manager-page.md
+/agent-note-the-web-sidebar-plugins-page-brings-grant-gated-bundle-management-to-users:
+  en: 1d17c7bdff98b69d
+  zh: 41fb13b214dbe71c
+/agent-note-the-web-sidebar-plugins-page-brings-grant-gated-bundle-management-to-users/problem:
+  en: e72e7c640ce76090
+  zh: 12679f017d44b456
+/agent-note-the-web-sidebar-plugins-page-brings-grant-gated-bundle-management-to-users/decision:
+  en: abc3033052aa6581
+  zh: 1c4cc69397d22be7
+/agent-note-the-web-sidebar-plugins-page-brings-grant-gated-bundle-management-to-users/alternatives-considered:
+  en: c4c3bea04f306f90
+  zh: 7c90d56d7b64b8cf
+/agent-note-the-web-sidebar-plugins-page-brings-grant-gated-bundle-management-to-users/consequences:
+  en: dc76b51b86e0eccb
+  zh: beb6feba829d871c

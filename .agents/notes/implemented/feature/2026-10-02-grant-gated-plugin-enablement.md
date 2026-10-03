@@ -24,7 +24,7 @@ A new `plugin_access_policies` resource rides the existing `ResourceAccess` patt
 
 **Admin-purpose assertions for qualified users.** Purpose assertions are HTTP-path-restricted admin credentials; a non-admin carrying one is rejected outright. Ordinary principals keep user calls inside the existing project-membership and policy checks instead of widening the assertion lane.
 
-**A user-side `ui-plugin-manager` page.** Upstream's sidebar manager page duplicates admin functionality the fork keeps centralized; the requirement is enablement only, so the existing inventory tab hosts the grant-gated switch rather than a second page.
+**A user-side `ui-plugin-manager` page.** Upstream's sidebar manager page duplicates admin functionality the fork keeps centralized; the requirement is enablement only, so the existing inventory tab hosts the grant-gated switch rather than a second page. (The requirement later grew to bundle management and the page shipped — see [the user-side Plugins page](2026-10-03-user-side-plugin-manager-page.md).)
 
 ## Consequences
 
