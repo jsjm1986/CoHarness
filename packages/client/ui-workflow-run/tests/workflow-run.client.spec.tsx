@@ -282,6 +282,7 @@ function panelProps(data: WorkflowRunChatData, sessions = listState(), openSessi
   return {
     node: node(data),
     sessionId: PARENT_ID,
+    sessionKey: id => id,
     useSessions: selector => selector(sessions),
     useSession: (() => undefined) as WorkflowRunPanelProps['useSession'],
     usePanelInfo: selector => selector({ activePanelId: null }),
@@ -791,6 +792,29 @@ describe('WorkflowRunPanel', () => {
     render(<WorkflowRunPanel {...panelProps(data, listState(), openSession)} />)
     fireEvent.click(screen.getByRole('button', { name: '打开 worker' }))
     expect(openSession).toHaveBeenCalledWith('child-1')
+  })
+
+  it('navigates a raw wire childId when the sessions list is runtime-qualified', () => {
+    const qualifiedParent = 'dsh-session:v1:personal:parent-1' as SessionId
+    const qualifiedChild = 'dsh-session:v1:personal:child-1' as SessionId
+    const sessions = listState({
+      ids: [qualifiedParent, qualifiedChild],
+      byId: {
+        [qualifiedParent]: { id: qualifiedParent, displayTitle: 'parent', running: true, blank: false, updatedAt: 0 },
+        [qualifiedChild]: { id: qualifiedChild, displayTitle: 'child', parentId: qualifiedParent, origin: 'subagent', running: true, blank: false, updatedAt: 0 },
+      },
+      current: qualifiedParent,
+    })
+    const data: WorkflowRunChatData = { name: 'audit', status: 'running', phases: [phase()] }
+    const openSession = vi.fn()
+    const props = {
+      ...panelProps(data, sessions, openSession),
+      sessionId: qualifiedParent,
+      sessionKey: ((id: SessionId) => `dsh-session:v1:personal:${String(id)}` as SessionId),
+    }
+    render(<WorkflowRunPanel {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开 worker' }))
+    expect(openSession).toHaveBeenCalledWith(qualifiedChild)
   })
 
   it('promotes a running member when its ordinary Session row arrives', () => {

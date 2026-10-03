@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-04-workflow-member-session-key.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-workflow-member-session-key.md
+/agent-note-re-key-workflow-member-navigation-into-presentation-space:
+  en: 8bb3f3394a21b106
+  zh: bcd92a7208b21f8e
+/agent-note-re-key-workflow-member-navigation-into-presentation-space/problem:
+  en: 7941e9b12fe24240
+  zh: 809c4894485be4d4
+/agent-note-re-key-workflow-member-navigation-into-presentation-space/decision:
+  en: 70b5c64692632299
+  zh: 5da39de8860612ae
+/agent-note-re-key-workflow-member-navigation-into-presentation-space/files:
+  en: ecbc6017bc3bfe1f
+  zh: 15d68d7d3b920f73
+/agent-note-re-key-workflow-member-navigation-into-presentation-space/consequences:
+  en: 8bb635312f972382
+  zh: f7ede3aba69a6613

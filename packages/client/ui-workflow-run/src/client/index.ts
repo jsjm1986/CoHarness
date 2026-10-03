@@ -26,6 +26,8 @@ export function apply(ctx: ClientContext): void {
     key: 'workflow-run',
     locale: NS,
     inject: (): WorkflowRunInjected => ({
+      sessionKey: (id: SessionId, parentId: SessionId) =>
+        ctx.sessions.keyFor?.(id, ctx.sessions.runtimeIdentityFor?.(parentId)) ?? id,
       openSession: (id: SessionId) => { ctx.sessions.open(id) },
     }),
   }, WorkflowRunPanel))
