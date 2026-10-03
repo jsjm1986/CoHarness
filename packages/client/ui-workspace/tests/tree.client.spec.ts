@@ -23,6 +23,17 @@ const list = (...items: SessionSummary[]): SessionListState => ({
   current: undefined,
   phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
 })
+/**
+ * The pooled runtime's real shape: archived summaries leave `ids`/`byId` for
+ * the `archivedById` partition, so archive-aware derivations must merge.
+ */
+const partitionedList = (live: readonly SessionSummary[], archives: readonly SessionSummary[]): SessionListState => ({
+  ids: live.map(item => item.id),
+  byId: Object.fromEntries(live.map(item => [item.id, item])),
+  archivedById: Object.fromEntries(archives.map(item => [item.id, item])),
+  current: undefined,
+  phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
+})
 const workspace = (id: string, sessionIds: string[], title = id): WorkspaceView => ({
   workspaceId: wid(id), path: `/projects/${id}`, title,
   sessionIds: sessionIds.map(sid), createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
@@ -172,6 +183,38 @@ describe('Session ordering', () => {
     expect(deriveFlat(sessions, members, rowState({ archived: ['archived'], archivedFilter: 'only' }))
       .map(row => row.id)).toEqual(['archived'])
     expect(members).toEqual(['plain', 'archived'])
+  })
+
+  it('resolves archived summaries from the pooled archivedById partition', () => {
+    const sessions = partitionedList(
+      [summary('plain', 1)],
+      [summary('grouped-gone', 2), summary('loose-gone', 3)],
+    )
+    const archivedIds = ['grouped-gone', 'loose-gone']
+    const state = rowState({ archived: archivedIds })
+    const members = sessionMemberIds(sessions)
+    expect(members).toEqual(['plain', 'grouped-gone', 'loose-gone'])
+    const workspaces = [workspace('alpha', ['plain', 'grouped-gone'])]
+    // Default hides partitioned archives; `show` returns them to their slots.
+    expect(deriveGroups(sessions, workspaces, state, view(['alpha', UNGROUPED_KEY]))
+      .flatMap(g => g.sessions.map(row => row.id)))
+      .toEqual([sid('plain')])
+    expect(deriveGroups(sessions, workspaces, rowState({ archived: archivedIds, archivedFilter: 'show' }),
+      view(['alpha', UNGROUPED_KEY])).flatMap(g => g.sessions.map(row => row.id)))
+      .toEqual([sid('plain'), sid('grouped-gone'), sid('loose-gone')])
+    // `only` renders partitioned archives under their groups and drops live rows.
+    const only = deriveGroups(sessions, workspaces, rowState({ archived: archivedIds, archivedFilter: 'only' }),
+      view(['alpha', UNGROUPED_KEY]))
+    expect(only.map(g => [g.key, g.sessions.map(row => row.id)]))
+      .toEqual([['alpha', [sid('grouped-gone')]], [UNGROUPED_KEY, [sid('loose-gone')]]])
+    expect(deriveFlat(sessions, members, state).map(row => row.id)).toEqual(['plain'])
+    expect(deriveFlat(sessions, members, rowState({ archived: archivedIds, archivedFilter: 'only' })).map(row => row.id))
+      .toEqual(['grouped-gone', 'loose-gone'])
+    const found = deriveSearchResults(
+      sessions, workspaces, 'gone', state.archivedSessionIds, 'only',
+      { items: [], hasMore: false }, 20,
+    )
+    expect(found.items.map(row => row.id)).toEqual(['loose-gone', 'grouped-gone'])
   })
 
   it('pins only the selected blank without changing the base order', () => {

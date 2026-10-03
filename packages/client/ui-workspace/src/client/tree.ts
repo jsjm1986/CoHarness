@@ -155,6 +155,39 @@ export function owningParentFolder(path: string, parents: readonly string[]): st
   return owner
 }
 
+/**
+ * Summary lookup that also sees archived rows. The pooled Session list
+ * partitions archived summaries out of `byId` (and `ids`), so a derivation
+ * that must account for archives reads `byId[id] ?? archivedById[id]` —
+ * `byId` wins because a row lives in exactly one partition.
+ * @param list - sessions list snapshot.
+ * @param id - Session to resolve.
+ * @returns the live or archived summary, or undefined until it arrives.
+ */
+export function sessionSummaryOf(list: SessionListState, id: SessionId): SessionSummary | undefined {
+  return list.byId[id] ?? list.archivedById[id]
+}
+
+/**
+ * Summary record form of {@link sessionSummaryOf} for the helpers that take
+ * `summaries` maps (`orderByRecency`, `reconcileManualOrder`, recency sorts).
+ * @param list - sessions list snapshot.
+ * @returns merged live-then-archived summary record.
+ */
+export function sessionSummaries(list: SessionListState): SessionListState['byId'] {
+  return { ...list.archivedById, ...list.byId }
+}
+
+/**
+ * Every Session id the list knows, including the archived partition that
+ * `ids` excludes. Archive-aware enumerations use this in place of `list.ids`.
+ * @param list - sessions list snapshot.
+ * @returns live ids in Host order followed by archived ids in map order.
+ */
+export function sessionKnownIds(list: SessionListState): SessionId[] {
+  return [...list.ids, ...(Object.keys(list.archivedById) as SessionId[])]
+}
+
 /** Recency comparator: newest first, id as the deterministic tiebreak (ids are unique per group). */
 function byRecency(a: SessionSummary, b: SessionSummary): number {
   if (b.updatedAt !== a.updatedAt) return b.updatedAt - a.updatedAt
@@ -391,10 +424,11 @@ function groupByWorkspace(
   const workspaceMembers = currentHint === undefined
     ? undefined
     : new Set(workspaces.flatMap(workspace => workspace.sessionIds))
+  const summaries = sessionSummaries(list)
   for (const workspace of workspaces) {
     const members: SessionSummary[] = []
     for (const id of workspace.sessionIds) {
-      const summary = list.byId[id]
+      const summary = summaries[id]
       if (summary === undefined) continue // account may lead the list pull; the row appears when the summary lands
       accounted.add(id)
       if (!sessionVisible(summary, list.current, archived, archivedFilter)) continue
@@ -419,8 +453,8 @@ function groupByWorkspace(
       Date.parse(workspace.createdAt), workspace.title, members, 'account',
     ))
   }
-  const stray = list.ids
-    .map(id => list.byId[id])
+  const stray = sessionKnownIds(list)
+    .map(id => summaries[id])
     .filter((s): s is SessionSummary =>
       s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived, archivedFilter))
   if (stray.length > 0) {
@@ -430,7 +464,7 @@ function groupByWorkspace(
       undefined,
       undefined,
       '',
-      orderedUngrouped(stray, ungroupedOrder, list.byId),
+      orderedUngrouped(stray, ungroupedOrder, summaries),
       ungroupedOrder === undefined ? 'recency' : 'account',
     ))
   }
@@ -485,7 +519,8 @@ export function deriveGroups(
   const archived = new Set(rowState.archivedSessionIds)
   const pinned = new Set(rowState.pinnedSessionIds)
   const expandedGroups = new Set(view.expandedGroups)
-  const descendants = indexSubagentDescendants(list.byId)
+  const summaries = sessionSummaries(list)
+  const descendants = indexSubagentDescendants(summaries)
   const currentSummary = list.current === undefined ? undefined : list.byId[list.current]
   const currentGroup = list.current === undefined
     ? undefined
@@ -521,8 +556,9 @@ export function deriveGroups(
  * @returns known ordinary Session ids, including archives and only the current blank.
  */
 export function sessionMemberIds(list: SessionListState): SessionId[] {
-  return list.ids.filter((id) => {
-    const s = list.byId[id]
+  const summaries = sessionSummaries(list)
+  return sessionKnownIds(list).filter((id) => {
+    const s = summaries[id]
     return s !== undefined
       && s.origin !== 'subagent'
       && (!s.blank || s.id === list.current)
@@ -545,9 +581,10 @@ export function deriveFlat(
 ): SessionNode[] {
   const archived = new Set(rowState.archivedSessionIds)
   const pinned = new Set(rowState.pinnedSessionIds)
-  const descendants = indexSubagentDescendants(list.byId)
+  const summaries = sessionSummaries(list)
+  const descendants = indexSubagentDescendants(summaries)
   const members = sessionIds.flatMap((id) => {
-    const s = list.byId[id]
+    const s = summaries[id]
     return s !== undefined && sessionVisible(s, list.current, archived, rowState.archivedFilter) ? [s] : []
   })
   return sectionMembers(members, pinned, archived)
@@ -579,7 +616,8 @@ export function deriveSearchResults(
   const q = query.trim().toLowerCase()
   if (q === '') return { items: [], hasMore: false }
   const archived = new Set(archivedSessionIds)
-  const descendants = indexSubagentDescendants(list.byId)
+  const summaries = sessionSummaries(list)
+  const descendants = indexSubagentDescendants(summaries)
 
   const workspaceBySession = new Map<SessionId, string>()
   for (const workspace of workspaces) {
@@ -595,8 +633,8 @@ export function deriveSearchResults(
   }
 
   const local: SessionSummary[] = []
-  for (const id of list.ids) {
-    const summary = list.byId[id]
+  for (const id of sessionKnownIds(list)) {
+    const summary = summaries[id]
     // Blank placeholders never match a query (their canonical title displays
     // localized, so matching it would tie search to one language).
     if (summary === undefined || summary.blank || !sessionVisible(summary, list.current, archived, archivedFilter)) continue
@@ -618,7 +656,7 @@ export function deriveSearchResults(
   }
   for (const summary of local) include(summary)
   for (const item of content.items) {
-    const summary = list.byId[item.sessionId]
+    const summary = summaries[item.sessionId]
     if (summary !== undefined && !summary.blank && sessionVisible(summary, list.current, archived, archivedFilter)) include(summary)
   }
 

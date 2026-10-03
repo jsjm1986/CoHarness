@@ -9,7 +9,8 @@ import type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { FLAT_SESSION_ORDER_KEY } from './stores.ts'
 import {
-  orderByRecency, owningGroupKey, sessionMemberIds, type SessionRowState, UNGROUPED_KEY,
+  orderByRecency, owningGroupKey, sessionKnownIds, sessionMemberIds, sessionSummaries, type SessionRowState,
+  UNGROUPED_KEY,
 } from './tree.ts'
 
 /** What `pinSessionOrder` reconciles a pinned Session's accounts against. */
@@ -35,13 +36,14 @@ export function pinOrderSource(
   rowState: PinOrderSource['rowState'],
 ): PinOrderSource {
   const accounted = new Set(workspaces.flatMap(workspace => workspace.sessionIds))
+  const summaries = sessionSummaries(list)
   return {
     members: Object.fromEntries([
       ...workspaces.map(workspace => [workspace.workspaceId, workspace.sessionIds] as const),
-      [UNGROUPED_KEY, list.ids.filter(id => list.byId[id] !== undefined && !accounted.has(id))],
-      [FLAT_SESSION_ORDER_KEY, orderByRecency(sessionMemberIds(list), list.byId)],
+      [UNGROUPED_KEY, sessionKnownIds(list).filter(id => summaries[id] !== undefined && !accounted.has(id))],
+      [FLAT_SESSION_ORDER_KEY, orderByRecency(sessionMemberIds(list), summaries)],
     ]),
-    summaries: list.byId,
+    summaries,
     rowState,
   }
 }

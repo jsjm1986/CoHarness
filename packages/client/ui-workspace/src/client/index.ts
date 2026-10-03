@@ -269,7 +269,8 @@ export function apply(ctx: ClientContext): void {
           console.warn('session archive rejected:', reason)
           return
         }
-        const displayTitle = ctx.sessions.list.getSnapshot().byId[sessionId]?.title ?? sessionId
+        const list = ctx.sessions.list.getSnapshot()
+        const displayTitle = (list.byId[sessionId] ?? list.archivedById[sessionId])?.title ?? sessionId
         archiveRequest.set({ sessionId, displayTitle, activity })
       })
     },

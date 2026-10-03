@@ -28,7 +28,8 @@ import type { ArchivedFilter, SessionNode, SessionRowState } from './tree.ts'
 import type { SessionGroupBy, SessionOrderBy } from './stores.ts'
 import {
   deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
-  pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY,
+  pinCurrentBlank, reconcileManualOrder, sessionKnownIds, sessionMemberIds, sessionSummaries, sessionSummaryOf,
+  UNGROUPED_KEY,
 } from './tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './rows/Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY } from './stores.ts'
@@ -153,17 +154,18 @@ function nextSessionOrderAccount({
   sortByRecency: boolean
   rowState: SessionRowState
 }): { order: SessionId[]; updatedAt: Record<string, number>; changed: boolean } {
-  let order = reconcileManualOrder(sessionIds, previousOrder, list.byId, rowState)
+  const summaries = sessionSummaries(list)
+  let order = reconcileManualOrder(sessionIds, previousOrder, summaries, rowState)
   if (sortByRecency) {
-    order.sort((a, b) => compareSessionRecency(a, b, list.byId))
+    order.sort((a, b) => compareSessionRecency(a, b, summaries))
   } else if (orderBy === 'updated') {
     const promoted = sessionIds
       .filter((id) => {
-        const session = list.byId[id]
+        const session = summaries[id]
         return session !== undefined
           && (previousUpdatedAt[id] === undefined || session.updatedAt > previousUpdatedAt[id])
       })
-      .sort((a, b) => compareSessionRecency(a, b, list.byId))
+      .sort((a, b) => compareSessionRecency(a, b, summaries))
     if (promoted.length > 0) {
       const promotedIds = new Set(promoted)
       order = [...promoted, ...order.filter(id => !promotedIds.has(id))]
@@ -171,7 +173,7 @@ function nextSessionOrderAccount({
   }
   const updatedAt: Record<string, number> = {}
   for (const id of sessionIds) {
-    const session = list.byId[id]
+    const session = summaries[id]
     if (session !== undefined) updatedAt[id] = session.updatedAt
   }
   const orderChanged = previousOrder === undefined
@@ -388,8 +390,9 @@ function SessionTree({
   const ungroupedSessionIds = useMemo(() => {
     const accounted = new Set(workspaces.flatMap(workspace => workspace.sessionIds))
     const hintedWorkspaces = new Set(workspaces.map(workspace => workspace.workspaceId))
-    return list.ids.filter((id) => {
-      const summary = list.byId[id]
+    const summaries = sessionSummaries(list)
+    return sessionKnownIds(list).filter((id) => {
+      const summary = summaries[id]
       const hintedWorkspace = summary?.workspaceId
       return summary !== undefined
         && (hintedWorkspace === undefined || !hintedWorkspaces.has(hintedWorkspace))
@@ -403,7 +406,7 @@ function SessionTree({
     const accounts = [
       ...workspaces.map(workspace => ({
         key: workspace.workspaceId as string,
-        sessionIds: workspace.sessionIds.filter(id => list.byId[id] !== undefined),
+        sessionIds: workspace.sessionIds.filter(id => sessionSummaryOf(list, id) !== undefined),
       })),
       { key: UNGROUPED_KEY, sessionIds: ungroupedSessionIds },
     ]
@@ -425,21 +428,22 @@ function SessionTree({
     }
   }, [list, orderBy, rowState, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, ungroupedSessionIds, workspaces])
   const orderedWorkspaces = useMemo(() => {
+    const summaries = sessionSummaries(list)
     return workspaces.map((workspace) => {
       const stored = sessionOrderByAccount[workspace.workspaceId as string]
       const sessionIds = pinCurrentBlank(
-        reconcileManualOrder(workspace.sessionIds, stored, list.byId, rowState),
+        reconcileManualOrder(workspace.sessionIds, stored, summaries, rowState),
         currentBlank !== undefined && workspace.sessionIds.includes(currentBlank) ? currentBlank : undefined,
       )
       return { ...workspace, sessionIds }
     })
-  }, [currentBlank, list.byId, rowState, sessionOrderByAccount, workspaces])
+  }, [currentBlank, list, rowState, sessionOrderByAccount, workspaces])
   const orderedUngroupedSessionIds = useMemo(
     () => pinCurrentBlank(
-      reconcileManualOrder(ungroupedSessionIds, sessionOrderByAccount[UNGROUPED_KEY], list.byId, rowState),
+      reconcileManualOrder(ungroupedSessionIds, sessionOrderByAccount[UNGROUPED_KEY], sessionSummaries(list), rowState),
       currentBlank !== undefined && ungroupedSessionIds.includes(currentBlank) ? currentBlank : undefined,
     ),
-    [currentBlank, list.byId, rowState, sessionOrderByAccount, ungroupedSessionIds],
+    [currentBlank, list, rowState, sessionOrderByAccount, ungroupedSessionIds],
   )
   const groups = useMemo(
     () => deriveGroups(list, orderedWorkspaces, rowState, {
@@ -771,7 +775,7 @@ function FlatList({
   // Complete account membership in recency order — the flat list's natural
   // baseline. Archives stay members so an unarchive restores position;
   // deriveFlat sections the pinned block ahead of the supplied order.
-  const sessionIds = useMemo(() => orderByRecency(sessionMemberIds(list), list.byId), [list])
+  const sessionIds = useMemo(() => orderByRecency(sessionMemberIds(list), sessionSummaries(list)), [list])
   const previousOrderBy = useRef(orderBy)
   useEffect(() => {
     if (list.phase !== 'ready') return
@@ -795,10 +799,10 @@ function FlatList({
   const currentBlank = current !== undefined && list.byId[current]?.blank === true ? current : undefined
   const orderedSessionIds = useMemo(
     () => pinCurrentBlank(
-      reconcileManualOrder(sessionIds, sessionOrderByAccount[FLAT_SESSION_ORDER_KEY], list.byId, rowState),
+      reconcileManualOrder(sessionIds, sessionOrderByAccount[FLAT_SESSION_ORDER_KEY], sessionSummaries(list), rowState),
       currentBlank !== undefined && sessionIds.includes(currentBlank) ? currentBlank : undefined,
     ),
-    [currentBlank, list.byId, rowState, sessionIds, sessionOrderByAccount],
+    [currentBlank, list, rowState, sessionIds, sessionOrderByAccount],
   )
   const rows = useMemo(
     () => deriveFlat(list, orderedSessionIds, rowState),
