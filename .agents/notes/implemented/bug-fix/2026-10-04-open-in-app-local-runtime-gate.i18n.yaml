@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-04-open-in-app-local-runtime-gate.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-open-in-app-local-runtime-gate.md
+/agent-note-gate-the-open-in-app-action-on-base-runtime-session-ownership:
+  en: 9f4f256238dee59d
+  zh: 938b1ff5d53d0887
+/agent-note-gate-the-open-in-app-action-on-base-runtime-session-ownership/problem:
+  en: e6d810bd0ff368f6
+  zh: 4f20ceefbd832a84
+/agent-note-gate-the-open-in-app-action-on-base-runtime-session-ownership/decision:
+  en: c13d325dd2967890
+  zh: d8eba0037a112b1e
+/agent-note-gate-the-open-in-app-action-on-base-runtime-session-ownership/files:
+  en: f2f730a1ed0ccdb3
+  zh: 986740e3d9ac2ebd
+/agent-note-gate-the-open-in-app-action-on-base-runtime-session-ownership/consequences:
+  en: 4cfbc2885cce90e6
+  zh: e74ed4958d0ca2e9

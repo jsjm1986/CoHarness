@@ -28,6 +28,7 @@ function bench(over: {
   choice?: string
   cwd?: string
   launch?: (appId: string, path: string) => Promise<void>
+  localTarget?: (sessionId: SessionId) => boolean
 } = {}): Bench {
   const state = {
     ids: [SESSION],
@@ -56,6 +57,7 @@ function bench(over: {
     launch,
     choose,
     iconUrl: (appId: string) => `open-in-app/icon/${appId}`,
+    localTarget: over.localTarget ?? (() => true),
     t,
   } as unknown as OpenInAppActionProps
   return { props, launch, choose }
@@ -74,6 +76,13 @@ describe('OpenInAppAction visibility', () => {
       expect(container.innerHTML).toBe('')
       cleanup()
     }
+  })
+
+  it('renders nothing when the session belongs to a runtime other than the page host', () => {
+    const { container } = render(<OpenInAppAction {...bench({
+      apps: ['finder', 'cursor'], cwd: '/w', localTarget: () => false,
+    }).props} />)
+    expect(container.innerHTML).toBe('')
   })
 
   it('shows the remembered choice, falling back to the first available app when it is gone', () => {

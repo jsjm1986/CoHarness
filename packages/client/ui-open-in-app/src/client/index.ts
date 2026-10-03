@@ -48,6 +48,9 @@ export function apply(ctx: ClientContext): void {
       launch: (appId, path) => controller.launch(appId, path),
       choose: (appId) => { controller.choose(appId) },
       iconUrl: appId => `${OPEN_IN_APP_ICON_PREFIX}/${appId}`,
+      // The apps catalog and the open route belong to the page host; only a
+      // base-target session's cwd addresses this host's filesystem.
+      localTarget: sessionId => (ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const }).kind === 'base',
     }),
   }, OpenInAppAction))
 }
