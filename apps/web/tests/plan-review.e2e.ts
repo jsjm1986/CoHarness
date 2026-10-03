@@ -269,7 +269,7 @@ describe.skipIf(MODE === 'record')('web e2e: dismissed plan review', () => {
   // Replay supplies the continuation after the dismissal; the real rejection
   // result and the retained plan-mode state are the assertions.
   it('rejects exit_plan_mode and keeps plan mode after Request changes', async () => {
-    const scaffold = await launchWebScaffold({ replayFixture: FIXTURE, compareReplaySession: false, paceMs: 15 })
+    const scaffold = await launchWebScaffold({ replayFixture: FIXTURE, paceMs: 15 })
     let browser: Browser | undefined
     const events: SessionEvent[] = []
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { events.push(event) })
