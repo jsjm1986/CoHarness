@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Context } from '@deepseek-ai/cordis'
 import { SettingsSchemaService, type SchemaNode } from '../../../../packages/client/ui-settings/src/client/schema.ts'
 import type { SettingsNamespaceView, SettingsPathOpView } from '../../../../packages/host/apiproxy/src/api/settings.ts'
-import { Button, ErrorBanner } from '../components/ui.tsx'
+import { Button, ErrorBanner, StatusBadge } from '../components/ui.tsx'
 import type { ProfileSettingsController } from './settings-store.ts'
 
 interface Field { path: string[]; node: SchemaNode; secret: boolean; configured: boolean }
@@ -49,6 +49,15 @@ function description(field: Field): string {
   return typeof text === 'string' ? text : text?.zh ?? text?.en ?? ''
 }
 
+/** Compact constraint summary for one field: default plus declared bounds. */
+function constraints(field: Field, inherited: unknown): string {
+  const parts = [`默认：${format(inherited) || '未声明'}`]
+  if (field.node.meta.min !== undefined) parts.push(`最小 ${field.node.meta.min}`)
+  if (field.node.meta.max !== undefined) parts.push(`最大 ${field.node.meta.max}`)
+  if (field.node.meta.step !== undefined) parts.push(`步长 ${field.node.meta.step}`)
+  return parts.join(' · ')
+}
+
 /** Render one namespace using its authoritative schema; saving never sends an entire redacted section. */
 export function PluginConfiguration({ view, controller }: { view: SettingsNamespaceView; controller: ProfileSettingsController }) {
   const owner = useMemo(() => { const context = new Context(); return { context, schema: new SettingsSchemaService(context) } }, [])
@@ -91,11 +100,15 @@ export function PluginConfiguration({ view, controller }: { view: SettingsNamesp
     setSaving(false)
     if (!result.ok) { setError(result.error.message); return }
     setBase(result.value); setDraft({})
-    setSaved(result.value.applies === 'restart' ? '配置已保存，重启实例后生效。' : '即时配置已保存。')
+    setSaved(result.value.applies === 'restart' ? '配置已保存，重启实例后生效。' : '配置已保存并即时生效。')
   }
-  return <section className="sectionBody" aria-label={`${view.ns} 配置`}>
-    <p className="muted">归属：{SETTINGS_OWNER_LABELS[view.owner ?? 'deployment']} · 版本：{view.revision} · {view.applies === 'restart' ? '保存后需重启实例' : '即时配置'}</p>
-    <p className="muted">当前值由默认值、部署配置和本层覆盖共同决定。恢复继承只移除本层覆盖，不修改部署默认值。</p>
+  const ownerLabel = SETTINGS_OWNER_LABELS[view.owner ?? 'deployment']
+  return <section className="sectionBody configPanel" aria-label={`${view.ns} 配置`}>
+    <div className="configHead">
+      <StatusBadge>归属：{ownerLabel}</StatusBadge>
+      <StatusBadge tone={view.applies === 'restart' ? 'warning' : 'info'}>{view.applies === 'restart' ? '保存后需重启实例' : '保存后立即生效'}</StatusBadge>
+    </div>
+    <p className="muted configExplain">未修改项沿用继承值；修改只写入{ownerLabel}层，不改部署默认值。</p>
     {view.writable === false ? <p role="status">此配置当前只读。</p> : null}
     {conflict ? <p role="alert">配置已在其他位置更新。请放弃草稿、核对新值后重新编辑。</p> : null}
     <ErrorBanner message={error || form.error} />
@@ -107,31 +120,39 @@ export function PluginConfiguration({ view, controller }: { view: SettingsNamesp
       const text = change?.operation === 'set' ? change.text : format(value)
       const overridden = owner.schema.hasPath(base.user, field.path)
       const info = description(field)
-      return <fieldset key={key} className="sectionBody" disabled={disabled || field.node.meta.disabled === true}>
-        <legend>{label(field)}{field.node.meta.required === true ? '（必填）' : ''}</legend>
-        {info ? <p className="muted">{info}</p> : null}
+      const fieldDisabled = disabled || field.node.meta.disabled === true
+      const head = <div className="configFieldHead">
+        <span className="configFieldLabel"><code>{label(field)}</code>{field.node.meta.required === true ? <span className="muted">（必填）</span> : null}</span>
+        {field.secret ? <StatusBadge tone={field.configured ? 'success' : 'neutral'}>{field.configured ? '已配置' : '未配置'}</StatusBadge> : <span className="configFieldState">
+          {change?.operation === 'unset' ? <StatusBadge tone="warning">将恢复继承</StatusBadge>
+            : overridden || change?.operation === 'set' ? <StatusBadge tone="info">已覆盖</StatusBadge> : null}
+          {change?.operation !== 'unset' && (overridden || change?.operation === 'set')
+            ? <button type="button" className="linkButton" aria-label={`恢复继承：${label(field)}`} disabled={fieldDisabled}
+              onClick={() => edit(field.path, 'unset')}>恢复继承</button> : null}
+        </span>}
+      </div>
+      return <div key={key} className="configField">
+        {head}
+        {info ? <p className="muted configFieldHint">{info}</p> : null}
         {field.secret ? <>
-          <p>{field.configured ? '已配置；不显示原值。' : '尚未配置。'}</p>
-          <select className="select" aria-label={`${label(field)} 凭据操作`} value={change?.operation ?? 'retain'} onChange={event => {
+          <p className="muted">{field.configured ? '已配置；不显示原值。' : '尚未配置。'}</p>
+          <select className="select" aria-label={`${label(field)} 凭据操作`} value={change?.operation ?? 'retain'} disabled={fieldDisabled} onChange={event => {
             if (event.target.value === 'retain') setDraft(current => { const next = { ...current }; delete next[key]; return next })
             else edit(field.path, event.target.value as 'set' | 'unset')
           }}><option value="retain">保留</option><option value="set">替换</option><option value="unset">移除本层值并恢复继承</option></select>
-          {change?.operation === 'set' ? <input className="input" type="password" autoComplete="new-password" aria-label={`${label(field)} 新凭据`} value={change.text}
-            onChange={event => edit(field.path, 'set', event.target.value)} /> : null}
+          {change?.operation === 'set' ? <input className="input configFieldControl" type="password" autoComplete="new-password" aria-label={`${label(field)} 新凭据`} value={change.text}
+            disabled={fieldDisabled} onChange={event => edit(field.path, 'set', event.target.value)} /> : null}
         </> : <>
-          {field.node.type === 'boolean' ? <select className="select" aria-label={label(field)} value={text} onChange={event => edit(field.path, 'set', event.target.value)}>
+          {field.node.type === 'boolean' ? <select className="select" aria-label={label(field)} value={text} disabled={fieldDisabled} onChange={event => edit(field.path, 'set', event.target.value)}>
             {text === '' ? <option value="">未设置</option> : null}<option value="true">开启</option><option value="false">关闭</option>
-          </select> : field.node.type === 'string' || field.node.type === 'number' ? <input className="input" aria-label={label(field)}
+          </select> : field.node.type === 'string' || field.node.type === 'number' ? <input className="input configFieldControl" aria-label={label(field)}
             type={field.node.type === 'number' ? 'number' : 'text'} value={text} min={field.node.meta.min} max={field.node.meta.max} step={field.node.meta.step ?? 'any'}
-            onChange={event => edit(field.path, 'set', event.target.value)} /> : <textarea className="input" aria-label={label(field)} rows={6} value={text}
-              onChange={event => edit(field.path, 'set', event.target.value)} />}
-          <p className="muted">{overridden ? '已有本层覆盖' : '继承值'} · 默认／基础值：{format(inherited) || '未声明'}
-            {field.node.meta.min === undefined ? '' : ` · 最小 ${field.node.meta.min}`}{field.node.meta.max === undefined ? '' : ` · 最大 ${field.node.meta.max}`}
-            {field.node.meta.step === undefined ? '' : ` · 步长 ${field.node.meta.step}`}</p>
-          <Button onClick={() => edit(field.path, 'unset')}>恢复继承：{label(field)}</Button>
+            disabled={fieldDisabled} onChange={event => edit(field.path, 'set', event.target.value)} /> : <textarea className="input configFieldControl" aria-label={label(field)} rows={6} value={text}
+              disabled={fieldDisabled} onChange={event => edit(field.path, 'set', event.target.value)} />}
+          <p className="muted configFieldMeta">{constraints(field, inherited)}</p>
         </>}
-        {invalid.has(key) ? <p role="alert">{invalid.get(key)}</p> : null}
-      </fieldset>
+        {invalid.has(key) ? <p role="alert" className="configFieldInvalid">{invalid.get(key)}</p> : null}
+      </div>
     })}
     <div className="formActions"><Button disabled={disabled || !dirty || conflict || invalid.size > 0} onClick={() => { void save() }}>{saving ? '正在保存' : '保存配置'}</Button>
       <Button disabled={saving || !dirty} onClick={discard}>放弃草稿</Button></div>

@@ -43,7 +43,7 @@ function ManagerView({ controller, settings }: { controller: PluginManagerContro
       const view = configuration.namespaces.find(item => item.ns === selection.only)
       if (view === undefined) return <p>此配置已不可用，请重新读取实例。</p>
       return props.view === 'summary'
-        ? `${SETTINGS_OWNER_LABELS[view.owner ?? 'deployment']} · ${view.applies === 'restart' ? '保存后需重启' : '即时配置'}`
+        ? `${SETTINGS_OWNER_LABELS[view.owner ?? 'deployment']}层配置`
         : <PluginConfiguration key={view.ns} view={view} controller={settings} />
     }}
     resolveText={resolveLocalized}

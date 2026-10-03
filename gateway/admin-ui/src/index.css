@@ -3633,3 +3633,87 @@ a {
   align-items: center;
   gap: 10px;
 }
+
+/* Plugin configuration field cards on the plugin detail page. */
+.configPanel .configHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.configPanel .configExplain {
+  margin-top: 8px;
+}
+
+.configField {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-top: 10px;
+  background: var(--surface);
+}
+
+.configFieldHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.configFieldLabel {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.configFieldLabel .muted {
+  font-weight: 400;
+}
+
+.configFieldState {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.configFieldHint {
+  margin-top: 4px;
+}
+
+.configField .select,
+.configField .input {
+  margin-top: 8px;
+  max-width: 420px;
+}
+
+.configField textarea.input {
+  max-width: none;
+}
+
+.configFieldMeta {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.configFieldInvalid {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.linkButton {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.linkButton:hover:not(:disabled) {
+  color: var(--accent-hover);
+}
+
+.linkButton:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}

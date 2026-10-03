@@ -90,7 +90,7 @@ it('installs a local bundle through the built Admin workflow and verifies the re
       const config = page.getByRole('region', { name: 'subagent 配置', exact: true })
       await config.getByLabel('maxDepth', { exact: true }).fill('2')
       await config.getByRole('button', { name: '保存配置', exact: true }).click()
-      await config.getByText('即时配置已保存。', { exact: true }).waitFor()
+      await config.getByText('配置已保存并即时生效。', { exact: true }).waitFor()
       const settings = async () => parseYaml(await readFile(join(home, 'settings.yaml'), 'utf8')) as { subagent: { maxDepth: number } }
       expect((await settings()).subagent.maxDepth).toBe(2)
       await compareOrRefreshGolden(join(DIRECTORY, 'configuration.expected.md'), await config.ariaSnapshot(), webSnapshotMode())
