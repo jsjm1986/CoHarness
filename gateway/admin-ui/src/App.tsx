@@ -25,6 +25,8 @@ import { UsersPage } from './pages/UsersPage.tsx'
 import { UserDetailPage } from './pages/UserDetailPage.tsx'
 import { lazy, Suspense, useState } from 'react'
 import { Dialog } from './components/ui.tsx'
+import { adminLanguage, setAdminLanguage, type AdminLanguage } from './language.ts'
+import { translatePlugin } from './plugins/presentation.ts'
 const PluginsPage = lazy(async () => ({ default: (await import('./pages/PluginsPage.tsx')).PluginsPage }))
 import { ModelsPage } from './pages/ModelsPage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
@@ -45,6 +47,7 @@ export function App() {
           <AdminNav className="sidebarNav" />
           <div className="sidebarFooter">
             <span>管理中心</span>
+            <LanguageSelect />
             <LogoutButton />
           </div>
         </aside>
@@ -59,7 +62,7 @@ export function App() {
             <Route path="/users/:id" element={<UserDetailPage />} />
             <Route path="/projects" element={<ProjectListPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
-            <Route path="/plugins" element={<Suspense fallback={<p role="status">正在加载插件管理</p>}><PluginsPage /></Suspense>} />
+            <Route path="/plugins" element={<Suspense fallback={<p role="status">{translatePlugin(adminLanguage())('pageLoading')}</p>}><PluginsPage /></Suspense>} />
             <Route path="/models" element={<ModelsPage />} />
             <Route path="/usage" element={<UsagePage />} />
             <Route path="/documents" element={<DocumentsPage />} />
@@ -104,6 +107,15 @@ function Brand({ compact = false }: { compact?: boolean }) {
       </span>
     </div>
   )
+}
+
+/** The persisted surface-language choice; English renders the pages that carry a dictionary, the rest stay Chinese. */
+function LanguageSelect() {
+  return <select className="select selectCompact languageSelect" aria-label="界面语言" value={adminLanguage()}
+    onChange={event => { setAdminLanguage(event.target.value as AdminLanguage); window.location.reload() }}>
+    <option value="zh">中文</option>
+    <option value="en">English</option>
+  </select>
 }
 
 function LogoutButton({ compact = false }: { compact?: boolean }) {

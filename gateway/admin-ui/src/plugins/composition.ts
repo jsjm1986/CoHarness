@@ -14,6 +14,7 @@ import {
 import type { BundleInfo, PluginEntryId, PluginInfo } from '../../../../packages/boot/plugin-manager/src/types.ts'
 import { pluginManagementRemote, type PluginManagementRemote } from './transport.ts'
 import { resolveLocalized } from './presentation.ts'
+import { adminLanguage } from '../language.ts'
 
 /** The three persistent positions an entry can take; 'default' writes no managed row. */
 export type EntryChoice = 'on' | 'off' | 'default'
@@ -101,6 +102,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
   const [busy, setBusy] = useState(false)
   const [busyRow, setBusyRow] = useState('')
   const remoteRef = useRef<PluginManagementRemote | null>(null)
+  const language = adminLanguage()
 
   useEffect(() => {
     setView(null); setStorageDown(false); setDraft(null); setPlugins(null); setBundles(null); setError(''); setNotice('')
@@ -134,7 +136,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
       if (plugin.patchId === undefined) continue
       put(plugin.patchId, {
         moduleName: plugin.moduleName,
-        title: plugin.meta?.title === undefined ? undefined : resolveLocalized(plugin.meta.title),
+        title: plugin.meta?.title === undefined ? undefined : resolveLocalized(plugin.meta.title, language),
         live: { entryId: plugin.entryId, enabled: plugin.enabled, readOnly: false },
       })
     }
@@ -151,7 +153,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
       }
     }
     return [...merged.values()].sort((a, b) => (a.title ?? a.id).localeCompare(b.title ?? b.id))
-  }, [plugins, view, draft])
+  }, [plugins, view, draft, language])
 
   const bundleRows = useMemo(() => {
     const names = new Map<string, CompositionBundle>()
@@ -161,7 +163,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
     }
     for (const bundle of bundles ?? []) {
       put(bundle.name, {
-        title: bundle.meta?.title === undefined ? undefined : resolveLocalized(bundle.meta.title),
+        title: bundle.meta?.title === undefined ? undefined : resolveLocalized(bundle.meta.title, language),
         live: { enabled: bundle.enabled, readOnly: bundle.readOnlyReason !== undefined },
         observed: bundle.enabled,
       })
@@ -170,7 +172,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
     const desiredSet = draft?.bundles ?? view?.state?.bundles ?? view?.observed?.bundles
     for (const name of desiredSet ?? []) put(name, { desired: true })
     return [...names.values()].sort((a, b) => (a.title ?? a.name).localeCompare(b.title ?? b.name))
-  }, [bundles, view, draft])
+  }, [bundles, view, draft, language])
 
   const dirty = draft !== null && !stateEqual(draft, view?.state ?? null)
   const liveSelection = bundles?.filter(bundle => bundle.enabled).map(bundle => bundle.name)

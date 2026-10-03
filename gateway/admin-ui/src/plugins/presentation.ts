@@ -3,11 +3,22 @@
 import type { ManagementError, IncompatiblePlugin, Registry } from '../../../../packages/boot/plugin-manager/src/types.ts'
 import type { LocalizedText } from '../../../../packages/util/package-manifest/src/types.ts'
 
-import type { PluginManagerLocaleKey } from './locales.ts'
+import type { AdminLanguage } from '../language.ts'
+import { en, zh, type PluginManagerLocaleKey } from './locales.ts'
 import type { FailedAction, ManagerNotice, PackageRow, PackageView } from './manager-store.ts'
 
 /** The translate seat of the manager's dictionary. */
 export type Translate = (key: PluginManagerLocaleKey, parameters?: Record<string, string>) => string
+
+/**
+ * The translate seat bound to one admin language; `{name}` placeholders interpolate from the parameters.
+ * @param language - the dictionary to read.
+ * @returns the translate seat for that dictionary.
+ */
+export function translatePlugin(language: AdminLanguage): Translate {
+  const dictionary = language === 'en' ? en : zh
+  return (key, parameters) => Object.entries(parameters ?? {}).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), dictionary[key])
+}
 
 /** The registries with a name of their own, by host. */
 const REGISTRY_COPY = new Map<string, PluginManagerLocaleKey>([
@@ -46,13 +57,14 @@ function registryHost(registry: string): string {
 }
 
 /**
- * Resolve a Host-supplied localized string for this surface's Chinese copy.
+ * Resolve a Host-supplied localized string for the surface's language.
  * @param text - the metadata's translations, or a literal string.
- * @returns the Chinese or English text, or undefined for an empty dictionary.
+ * @param language - the preferred translation; the other language is the fallback.
+ * @returns the resolved text, or undefined for an empty dictionary.
  */
-export function resolveLocalized(text: LocalizedText): string | undefined {
+export function resolveLocalized(text: LocalizedText, language: AdminLanguage): string | undefined {
   if (typeof text === 'string') return text === '' ? undefined : text
-  return text.zh ?? text.en
+  return text[language] ?? text.zh ?? text.en
 }
 
 /** The sentence each of the Host's refusal codes reads as. */
