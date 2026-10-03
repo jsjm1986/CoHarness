@@ -1,3 +1,8 @@
+---
+description: "Bin that boots an external Cordis config for the stdio JSON-RPC SDK runtime"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-sdk-jsonrpc-demo
 
 English | [中文](README.zh.md)
@@ -9,24 +14,41 @@ Bin-only app that boots an external `cordis.yml`; its [`jsonrpc`](../../sdk/serv
 Use `dsh-sdk-jsonrpc-demo` as the bin-only app that boots an external `cordis.yml` and serves SDK clients over newline-delimited stdio through its `jsonrpc` entry. The config composes the spine, backends, and serving plugin; the published `dsh-jsonrpc-agent` bin resolves bare plugins from the configuration project.
 
 
+## Table of Contents
+
+- [Config discovery](#config-discovery)
+- [Exit lifecycle](#exit-lifecycle)
+- [stdout is the protocol](#stdout-is-the-protocol)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config-discovery"></a>
 ## Config discovery
 
 The first non-empty channel wins: `$DSH_CORDIS_CONFIG`, then positional `argv[2]`. If neither names an existing file, the bin prints one-line usage to stderr and exits 1; there is no working-directory or built-in fallback. [`dsh-app-boot`](../../boot/app-boot/README.md) makes plugin load failures fatal. This protocol does not use `DSH_SNAPSHOT`.
 
 A config without `dsh-sdk-jsonrpc-server` is valid and serves nothing; the bin does not designate a server plugin.
 
+<a id="exit-lifecycle"></a>
 ## Exit lifecycle
 
 stdin EOF and `SIGTERM` dispose the root to quiescence and exit 0; `SIGINT` exits 130 after the same disposal. EOF may cut off an in-flight turn as documented in the [distribution Agent Note](../../../.agents/notes/implemented/architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.md). The `jsonrpc` plugin owns response-before-exit protocol shutdown; both paths are idempotent and safe to race.
 
+<a id="stdout-is-the-protocol"></a>
 ## stdout is the protocol
 
 stdout carries only JSON-RPC frames. The bin and boot guards diagnose on stderr, and the config must omit stdout loggers.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The package supplies an entry point and a `cordis.yml`; all runtime relationships belong to the composed plugins.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the externally configured plugin tree, which owns all model context.
@@ -40,3 +62,13 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **The bin cannot prove that the config serves JSON-RPC** — a valid config with no `dsh-sdk-jsonrpc-server` entry boots successfully and serves nothing.
 - **No built-in or default config exists** — every launch must provide `DSH_CORDIS_CONFIG` or a positional path, and deployment owns the complete plugin tree and stdout discipline.
 - **stdin EOF cuts off in-flight work** — client disappearance disposes the root immediately; callers that need orderly completion use the protocol-level `shutdown` request.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-27-adjacent-agent-steer-messaging.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-27-adjacent-agent-steer-messaging.md
-2026-08-27-adjacent-agent-steer-messaging.md: 2a76734ae702cf6cd4ca067565e15e2d140f1757
-2026-08-27-adjacent-agent-steer-messaging.zh.md: d74c8a31ca4f53c6a46eb173377537baae3d498b
+/agent-note-adjacent-agents-share-one-steer-send-message-operation:
+  en: 758d31ae04ce0d4f
+  zh: 112475efbd52b9f6
+/agent-note-adjacent-agents-share-one-steer-send-message-operation/problem:
+  en: 2ff907c294d84c62
+  zh: 67d7f7424f3e66b6
+/agent-note-adjacent-agents-share-one-steer-send-message-operation/decision:
+  en: 1188c699ce6e6ca2
+  zh: 4d5b974cd1216f06
+/agent-note-adjacent-agents-share-one-steer-send-message-operation/decision/one-model-tool-and-one-return-instruction:
+  en: 8a4be155a4984ca8
+  zh: 00c2a61da2443530
+/agent-note-adjacent-agents-share-one-steer-send-message-operation/decision/complete-removal-and-reintroduction-condition:
+  en: 5a9ec6478cf7430c
+  zh: f4c2f067cc72040e
+/agent-note-adjacent-agents-share-one-steer-send-message-operation/alternatives-considered:
+  en: 1f62d5d938144666
+  zh: dec0f30228c5b7a7
+/agent-note-adjacent-agents-share-one-steer-send-message-operation/consequences:
+  en: ecfb2f7694c221ad
+  zh: ab992c6e22c702ab

@@ -14,6 +14,10 @@
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - text: Reply with a one-sentence description of event sourcing, then stop.
 - group "Message timing": "{{clock}}"
 - button "Copy":
@@ -56,4 +60,5 @@
   - button "7.9K tok · Cache hit 99%":
     - img
     - text: 7.9K tokCache hit 99%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

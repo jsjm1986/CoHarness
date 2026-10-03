@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-02-localized-plugin-metadata-channel.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-localized-plugin-metadata-channel.md
+/agent-note-localized-plugin-metadata-travels-the-host-projection-not-package-locale-dictionaries:
+  en: 40ed7e370dd729fc
+  zh: 707df85a71335e3d
+/agent-note-localized-plugin-metadata-travels-the-host-projection-not-package-locale-dictionaries/problem:
+  en: f17cb7eab5b9cc2b
+  zh: cae3f2737461e62d
+/agent-note-localized-plugin-metadata-travels-the-host-projection-not-package-locale-dictionaries/decision:
+  en: bc59fbc8fc7db7ff
+  zh: 81a464f3a79af5bc
+/agent-note-localized-plugin-metadata-travels-the-host-projection-not-package-locale-dictionaries/alternatives-considered:
+  en: 5e63f2d6efc09b75
+  zh: d66931c74bf1d2dc
+/agent-note-localized-plugin-metadata-travels-the-host-projection-not-package-locale-dictionaries/consequences:
+  en: 741a98376f4f679f
+  zh: 6a3ccfe1b24bbb2b

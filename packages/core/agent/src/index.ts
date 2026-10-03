@@ -88,11 +88,10 @@ export interface CreateAgentOptions {
   /** Exact fork-inherited prefix length when the session metadata sets `isSeeded`. */
   readonly inheritedEventCount?: SessionLogOffset
   /**
-   * Initial replay/fork history. A fork supplies a balanced completed-turn
-   * prefix of the parent's log. The complete seed must be contiguous from seq
-   * 0, carry only lossless-JSON data, and contain no open turn/step or dangling
-   * tool call. The factory passes it to the session's durable
-   * validator/snapshot boundary before publication.
+   * Initial replay/fork history, contiguous from seq 0 with lossless-JSON data.
+   * A fork supplies an exact parent prefix, its inherited marker, and closers
+   * for the open tail. Previously closed steps and turns remain unchanged.
+   * The factory validates and snapshots the seed before publication.
    */
   readonly seed?: readonly SessionEvent[]
   /** Per-agent options (model, …). */
@@ -162,6 +161,12 @@ export interface ResumeAgentOptions {
 export interface AgentHandle {
   agent: Agent
   dispose(): Promise<void>
+  /**
+   * Close admission and dispose only when no turn, maintenance task or inbox input remains.
+   * Live children and plugin-owned resources veto release through agent/idle-release-check.
+   * @returns false without changing a busy Agent; true after successful idle disposal.
+   */
+  tryDisposeIdle(): Promise<boolean>
 }
 
 /**
@@ -246,6 +251,8 @@ interface FactorySlot {
  */
 export class AgentRegistry extends Service {
   private store = new Map<SessionId, AgentEntry>()
+  private readonly removing = new Set<SessionId>()
+  private readonly creations = new Map<SessionId, number>()
   private factory: FactorySlot | undefined
   private readonly initiators = new AsyncLocalStorage<Agent | undefined>()
   private readonly initiatorRuns = new AsyncLocalStorage<InitiatorRun>()
@@ -379,6 +386,58 @@ export class AgentRegistry extends Service {
   }
 
   /**
+   * Hold Session identities while an owner releases resources and removes durable data.
+   * Existing factory work and overlapping removals refuse the reservation.
+   * @param ids - exact identities whose creation and resource admission must remain closed.
+   * @returns a caller-owned reservation, released after the whole removal operation settles.
+   */
+  reserveRemoval(ids: readonly SessionId[]): Disposable {
+    const selected = new Set(ids)
+    for (const id of selected) {
+      if (this.removing.has(id) || this.creations.has(id)) throw new Error(`Session "${id}" has a pending lifecycle operation`)
+    }
+    for (const id of selected) this.removing.add(id)
+    const removing = this.removing
+    let active = true
+    return { [Symbol.dispose]: () => {
+      if (!active) return
+      active = false
+      for (const id of selected) removing.delete(id)
+    } }
+  }
+
+  /**
+   * Test the current removal reservation before allocating an Agent-owned resource.
+   * @param id - Session whose caller has already been authenticated.
+   * @returns whether its owner is releasing it for durable deletion.
+   */
+  isRemoving(id: SessionId): boolean { return this.removing.has(id) }
+
+  /**
+   * Keep an addressed lifecycle request out of concurrent permanent removal.
+   * @param ids - identities used while resolving or preparing an Agent operation.
+   * @returns a caller-owned reservation to retain until the operation settles.
+   */
+  reserveUse(ids: readonly SessionId[]): Disposable { return this.creationClaim(ids) }
+
+  private creationClaim(ids: readonly (SessionId | undefined)[]): Disposable {
+    const selected = new Set(ids.filter((id): id is SessionId => id !== undefined))
+    for (const id of selected) if (this.removing.has(id)) throw new Error(`Session "${id}" is being removed`)
+    const creations = this.creations
+    for (const id of selected) creations.set(id, (creations.get(id) ?? 0) + 1)
+    let active = true
+    return { [Symbol.dispose]: () => {
+      if (!active) return
+      active = false
+      for (const id of selected) {
+        const count = creations.get(id) as number
+        if (count === 1) creations.delete(id)
+        else creations.set(id, count - 1)
+      }
+    } }
+  }
+
+  /**
    * Create and publish a new agent through the registered factory.
    * Distinct from {@link register} (which records an already-constructed
    * agent): this constructs the agent and its session. Rejects if no factory is
@@ -388,6 +447,7 @@ export class AgentRegistry extends Service {
    * @returns the handle after setup, rollback-covered publication, and loop start complete.
    */
   async create(options: CreateAgentOptions): Promise<AgentHandle> {
+    using _claim = this.creationClaim([options.sessionId, options.parentAgent?.id, options.meta?.parentSession])
     const ownerCtx = this.ctx
     // Re-trace a Service-backed factory through the accessing context
     // explicitly. This preserves AgentLoop's dependency origin while binding
@@ -396,7 +456,7 @@ export class AgentRegistry extends Service {
     const { target } = this.requireFactory()
     const receiver = getTraceable(ownerCtx, target)
     // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply intentionally supplies the caller-traced receiver
-    return Reflect.apply(target.createAgent, receiver, [ownerCtx, options])
+    return await Reflect.apply(target.createAgent, receiver, [ownerCtx, options])
   }
 
   /**
@@ -407,11 +467,12 @@ export class AgentRegistry extends Service {
    * @returns the handle after setup, rollback-covered publication, and loop start complete.
    */
   async resume(options: ResumeAgentOptions): Promise<AgentHandle> {
+    using _claim = this.creationClaim([options.resumeSessionId, options.parentAgent?.id])
     const ownerCtx = this.ctx
     const { target } = this.requireFactory()
     const receiver = getTraceable(ownerCtx, target)
     // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply intentionally supplies the caller-traced receiver
-    return Reflect.apply(target.resume, receiver, [ownerCtx, options])
+    return await Reflect.apply(target.resume, receiver, [ownerCtx, options])
   }
 
   /**
@@ -457,6 +518,7 @@ export class AgentRegistry extends Service {
    */
   enter(agent: Agent, owner: Agent | undefined): () => void {
     const id = agent.id
+    if (this.removing.has(id)) throw new Error(`Session "${id}" is being removed`)
     if (id !== agent.session.id) {
       throw new Error(`agent id "${id}" does not match session id "${agent.session.id}"`)
     }

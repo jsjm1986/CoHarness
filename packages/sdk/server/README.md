@@ -1,3 +1,8 @@
+---
+description: "Stdio JSON-RPC server plugin for out-of-process DeepSeek Harness SDK clients"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-sdk-jsonrpc-server
 
 English | [中文](README.zh.md)
@@ -8,30 +13,51 @@ The `jsonrpc` plugin serves newline-delimited JSON-RPC over stdio so out-of-proc
 
 `dsh-sdk-jsonrpc-server` serves the SDK wire protocol over stdio so out-of-process clients can drive harness agents: it opens one session per `sessionId`, queues user prompts, and streams every session event and agent status transition back to the client. Mount it as the `jsonrpc` plugin in a Loader composition; the surrounding tree supplies everything else — agents, model adapters, persistence, and tools. Stdout carries only JSON-RPC frames, so a deployment must not compose a stdout logger. It answers `shutdown` by disposing the root runtime and exiting 0; the app bin owns EOF and signal exits.
 
+## Table of Contents
+
+- [Wiring](#wiring)
+- [Config](#config)
+- [stdout is the protocol](#stdout-is-the-protocol)
+- [Shutdown and exit semantics](#shutdown-and-exit-semantics)
+- [Wire notes](#wire-notes)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="wiring"></a>
 ## Wiring
 
 `inject: ['agents']`. The server gets or creates one agent per `sessionId`. It forwards subagent completions only when the service-snapshotted lifecycle `local` flag is true; provider names, child ids, and durable lineage never establish locality. A registered adapter wins, an unowned `deepseek-official` route mounts `dsh-llm-deepseek`, and any other unowned provider fails initialization. Other capabilities come from the surrounding `cordis.yml`.
 
+<a id="config"></a>
 ## Config
 
 `maxTokensAsSuccess` defaults to `false` and affects only the deployment-mapped status on `subagent.finished`; root-session prompts have no prompt-level status. `JsonRpcConfig.input`, `output`, and `exit` are runtime-only transport hooks; production uses process stdio and `process.exit`. The JSON-RPC transport defaults to 1 MiB input lines, 1,000 pending requests, 100 concurrent inbound handlers, and 8 MiB queued output. The server additionally limits live sessions to 1,000, prompt content to 4 MiB and 1,000 content blocks; all bounds are configurable positive integers and reject excess work.
 
+<a id="stdout-is-the-protocol"></a>
 ## stdout is the protocol
 
 Stdout carries only JSON-RPC frames. The deployment must not compose a stdout logger; diagnostics belong on stderr.
 
+<a id="shutdown-and-exit-semantics"></a>
 ## Shutdown and exit semantics
 
 The plugin answers `shutdown`, flushes the response, disposes the root context so SDK-owned agents, subscriptions, and persistence reach quiescence, then exits with code 0. EOF and signal exits belong to the app bin, which also disposes the root context. Unloading only this plugin stops serving without exiting the process.
 
+<a id="wire-notes"></a>
 ## Wire notes
 
 `initialize` is the runtime-readiness boundary: when the server is mounted by a Loader composition, it waits for the current plugin tree to settle before replying, so async sibling capabilities such as initial MCP tool discovery are visible to the first prompt. Hand-built contexts without Loader remain immediately usable. `initialize.serverInfo.name` is the wire-stable `deepseek-harness-sdk-runtime`. An optional positive `initialize.maxTokens` becomes the request output cap of each SDK-created agent and its in-process descendants; invalid values reject initialization, while omission sends no SDK cap and allows the selected adapter or provider route default to apply. `session/prompt` queues one identified user message and immediately returns `{ messageId }`. The server streams every durable fact as `session.event` and every whole-agent lifecycle transition as `session.status`; it does not assign an assistant message or `turn/end` to that prompt. Independent requests may enqueue more work on the same session. Persistence roots and persona come from `cordis.yml`.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The server translates each stdio frame into harness calls; session state stays in the runtime it drives.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### SDK user message
@@ -54,3 +80,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **There is no per-prompt result** — `MessageId` identifies inbox admission only; clients that own an automation interval must define and observe that interval themselves.
 - **stdout purity is deployment-enforced** — a surrounding config can still load a stdout logger and corrupt the JSON-RPC channel; this plugin does not inspect or veto sibling loggers.
 - **Automatic adapter mounting is DeepSeek-specific** — `initialize` can reuse any pre-registered model adapter, but its only fallback mounts `dsh-llm-deepseek`.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

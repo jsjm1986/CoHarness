@@ -28,6 +28,9 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../util/managed-data"
     }
   ]
 }

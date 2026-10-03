@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-30-terminal-protocol-replies.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-30-terminal-protocol-replies.md
-2026-08-30-terminal-protocol-replies.md: 7cb4f019882feb4ee872055bf778198e866d0e4b
-2026-08-30-terminal-protocol-replies.zh.md: ed0e75945b679f941baf8cd1d76d360abe5f15e7
+/agent-note-drain-terminal-protocol-replies-before-pty-sends:
+  en: f844de31b03181e6
+  zh: f8f74e3a52b1dc77
+/agent-note-drain-terminal-protocol-replies-before-pty-sends/problem:
+  en: 9b9e578116d64a40
+  zh: d26214fe63fdf282
+/agent-note-drain-terminal-protocol-replies-before-pty-sends/decision:
+  en: 42a96eeaf9f8e4f5
+  zh: 49c18b5646d9927f
+/agent-note-drain-terminal-protocol-replies-before-pty-sends/verification:
+  en: c1eb0381e70ba5e6
+  zh: 799cb0bfff282a8a
+/agent-note-drain-terminal-protocol-replies-before-pty-sends/alternatives-considered:
+  en: df9b171329145047
+  zh: bed77871011f9fae
+/agent-note-drain-terminal-protocol-replies-before-pty-sends/consequences:
+  en: 4e445867b18b6bd6
+  zh: be9ad596ba71e729

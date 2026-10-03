@@ -259,6 +259,19 @@ describe('ModelsPage', () => {
     expect(api.setOrganizationCredential).toHaveBeenCalledWith('DSH_ORG_SECONDARY_API_KEY', 'sk-secondary')
   })
 
+  it.each([1, 1_234_567, Number.MAX_SAFE_INTEGER])('preserves all micro-unit prices when saving without edits: %s', async (inputMicrosPerMillion) => {
+    const model = { ...models[0]!, inputMicrosPerMillion, cacheReadMicrosPerMillion: 1 }
+    vi.mocked(api.listModels).mockResolvedValue([model])
+    const user = userEvent.setup()
+    render(<ModelsPage />)
+    await screen.findByText('组织主连接')
+    await user.click(screen.getByRole('button', { name: '权限与计价' }))
+    await user.click(screen.getAllByRole('button', { name: '配置模型治理' })[0]!)
+    const dialog = within(screen.getByRole('dialog', { name: '配置模型治理' }))
+    await user.click(dialog.getByRole('button', { name: '保存治理配置' }))
+    await waitFor(() => expect(api.saveModel).toHaveBeenCalledWith(model))
+  })
+
   it('keeps authorization and pricing in the governance view', async () => {
     const user = userEvent.setup()
     render(<ModelsPage />)

@@ -2,7 +2,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Context, Service } from '@deepseek-ai/cordis'
-import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
+import type { WebRoute, WebServer } from '@deepseek-ai/dsh-host-webserver'
 import {
   clientRequestSchema,
   RpcId,
@@ -13,9 +13,15 @@ import {
   type ServerResponse as RpcServerResponse,
 } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { bridge, type FetchHandler } from './http-bridge.ts'
-import { isTrustedApiRequest } from './api-request-trust.ts'
+import { header, isTrustedApiRequest } from './api-request-trust.ts'
 import { API_PATH } from './api-path.ts'
+import type { BrowserAuth } from './browser-auth.ts'
 import type {
+  ConnectionAuthenticationRequest,
+  ConnectionIndexRequest,
+  ConnectionIndexResponse,
+  ConnectionRequestRejection,
+  ConnectionRpcAuthority,
   ConnectionRpcEndpointMatcher,
   ConnectionRpcHandler,
   ConnectionRpcHandlerOptions,
@@ -50,6 +56,35 @@ export interface HostConnectionHandle {
   readonly rpc: HostConnectionRpc
   /** Streaming HTTP registry. */
   readonly http: HostConnectionHttp
+
+  /**
+   * Apply Connection's Host/Origin fence and browser authentication to one
+   * `/api` request. Registered `loopback` subtrees and endpoints keep their
+   * machine-caller fence as the complete admission.
+   * @param request - request headers and URL from the HTTP or upgrade request.
+   * @param kind - carrier the request arrived on; defaults to the `Upgrade`
+   *   header when the calling carrier cannot name itself.
+   * @returns rejection status, or undefined when the route may accept the request.
+   */
+  requestRejection(request: ConnectionIndexRequest, kind?: 'http' | 'upgrade'): ConnectionRequestRejection
+
+  /**
+   * Authenticate one frontend index request, owning a token redirect, 403, or
+   * 401. A mounted `connection/authenticate` provider answers first; its
+   * `'allow'` still passes the Host/Origin fence and its `'deny'` refuses
+   * before any token exchange.
+   * @param request - root or configured-index HTTP request.
+   * @param response - response owned when the result is false.
+   * @returns true only when the frontend may serve index.html.
+   */
+  authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean
+
+  /**
+   * Add the fresh process token to an ordinary Web application URL.
+   * @param baseUrl - clean application URL whose authority and mount are preserved.
+   * @returns tokenized URL for initial login.
+   */
+  authenticatedUrl(baseUrl: string): string
 }
 
 const INVALID_REQUEST_RPC_ID = RpcId('invalid-request')
@@ -83,8 +118,13 @@ export class HostConnectionService extends Service implements HostConnectionHand
    * Provide the Host half over the active HTTP server.
    * @param ctx - owning Connection plugin context.
    * @param trustedHosts - deployment authorities accepted by trusted-host channels.
+   * @param browserAuth - process token and persistent browser-session owner.
    */
-  constructor(ctx: Context, private readonly trustedHosts: readonly string[]) {
+  constructor(
+    ctx: Context,
+    private readonly trustedHosts: readonly string[],
+    private readonly browserAuth: BrowserAuth,
+  ) {
     super(ctx, 'connection')
   }
 
@@ -98,6 +138,61 @@ export class HostConnectionService extends Service implements HostConnectionHand
   }
 
   /**
+   * Apply the configured Host/Origin fence and browser authentication.
+   * `loopback` subtrees and channel or interceptor endpoints serve
+   * non-browser callers that cannot complete the token exchange, so their
+   * declared loopback fence is the complete admission.
+   * @param request - request headers and URL.
+   * @param kind - the arrival carrier; inferred from the Upgrade header only
+   *   when the caller cannot supply it.
+   * @returns rejection status, or undefined when the request may proceed.
+   */
+  requestRejection(request: ConnectionIndexRequest, kind?: 'http' | 'upgrade'): ConnectionRequestRejection {
+    const carrier = kind ?? (header(request.headers, 'upgrade') === undefined ? 'http' : 'upgrade')
+    const pathname = new URL(request.url ?? '/', 'http://dsh.invalid').pathname
+    const subtree = this.matchHttpPrefix(pathname)
+    if (subtree !== undefined) return this.rejectionFor(request, subtree.options.authority, carrier)
+    const endpoint = endpointFromPath(API_PATH, pathname)
+    const interceptor = this.interceptors.get(API_PATH)
+    const authority = endpoint !== undefined && interceptor?.matches(endpoint) === true
+      ? interceptor.options.authority
+      : 'trusted-host'
+    return this.rejectionFor(request, authority, carrier)
+  }
+
+  /**
+   * Authenticate an index request through the deployment provider, or the
+   * process-token exchange and cookie when no provider decides.
+   * @param request - incoming root or configured-index request.
+   * @param response - response owned when this method returns false.
+   * @returns true only when the caller may serve index.html.
+   */
+  authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean {
+    // The fence precedes every admission: a deployment provider's admit must
+    // never launder a foreign Host or cross-site Origin past the browser fence.
+    if (!isTrustedApiRequest(request, this.trustedHosts)) {
+      response.writeHead(403)
+      response.end('forbidden')
+      return false
+    }
+    const decision = this.providerDecision({
+      headers: request.headers, method: request.method, url: request.url, kind: 'index',
+    })
+    return this.browserAuth.authorizeIndex(
+      request, response, decision === undefined ? undefined : decision === 'allow',
+    )
+  }
+
+  /**
+   * Add this process's launch token to the clean application URL.
+   * @param baseUrl - clean browser URL whose authority and mount are preserved.
+   * @returns the same URL carrying the process token as its sole authentication input.
+   */
+  authenticatedUrl(baseUrl: string): string {
+    return this.browserAuth.authenticatedUrl(baseUrl)
+  }
+
+  /**
    * Dispatch a request already admitted by Connection's outer trust fence.
    * @param request - incoming request to match against registered prefixes.
    * @param response - response owned by the matched streaming handler.
@@ -105,10 +200,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
    */
   async dispatchHttp(request: IncomingMessage, response: ServerResponse): Promise<boolean> {
     const pathname = new URL(request.url ?? '/', 'http://dsh.internal').pathname
-    const matches = [...this.httpPrefixes.entries()]
-      .filter(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
-      .sort(([left], [right]) => right.length - left.length)
-    const registration = matches[0]?.[1]
+    const registration = this.matchHttpPrefix(pathname)
     if (registration === undefined) return false
     if (registration.options.authority === 'loopback' && !isTrustedApiRequest(request, [])) {
       response.writeHead(403)
@@ -163,6 +255,40 @@ export class HostConnectionService extends Service implements HostConnectionHand
     }
   }
 
+  private matchHttpPrefix(pathname: string): ConnectionHttpRegistration | undefined {
+    const matches = [...this.httpPrefixes.entries()]
+      .filter(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+      .sort(([left], [right]) => right.length - left.length)
+    return matches[0]?.[1]
+  }
+
+  /**
+   * Consult the deployment authentication provider, when one is mounted.
+   * `connection/authenticate` is a synchronous bail event; the first defined
+   * answer decides, and `'deny'` refuses even a valid browser cookie.
+   * @param request - request headers, method, URL, and arrival carrier.
+   * @returns the provider decision, or undefined when no provider answered.
+   */
+  private providerDecision(
+    request: ConnectionAuthenticationRequest,
+  ): 'allow' | 'deny' | undefined {
+    return this.ctx.bail('connection/authenticate', request)
+  }
+
+  private rejectionFor(
+    request: ConnectionIndexRequest,
+    authority: ConnectionRpcAuthority,
+    kind: 'http' | 'upgrade',
+  ): ConnectionRequestRejection {
+    if (authority === 'loopback') return isTrustedApiRequest(request, []) ? undefined : 403
+    if (!isTrustedApiRequest(request, this.trustedHosts)) return 403
+    const decision = this.providerDecision({
+      headers: request.headers, method: request.method, url: request.url, kind,
+    })
+    if (decision !== undefined) return decision === 'allow' ? undefined : 401
+    return this.browserAuth.isAuthenticated(request) ? undefined : 401
+  }
+
   private registerHttpPrefix(
     owner: Context,
     path: string,
@@ -186,22 +312,34 @@ export class HostConnectionService extends Service implements HostConnectionHand
     options: ConnectionRpcHandlerOptions,
   ): () => Promise<void> {
     assertChannel(channel)
-    const trustedHosts = options.authority === 'loopback' ? [] : this.trustedHosts
     const fetchHandler = rpcFetchHandler(channel, handler)
     const route: WebRoute = {
       kind: 'prefix',
       path: channel,
       handler: async (req, res) => {
-        if (!isTrustedApiRequest(req, trustedHosts)) {
-          res.writeHead(403)
-          res.end('forbidden')
+        const rejection = this.rejectionFor(req, options.authority, 'http')
+        if (rejection !== undefined) {
+          res.writeHead(rejection)
+          res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
           return
         }
-        await bridge(req, res, fetchHandler)
+        // Every accepted request crosses the same `connection/request`
+        // waterfall as the `/api` route, so authentication and request-context
+        // plugins apply identically to generic channels.
+        await owner.waterfall('connection/request', {
+          kind: 'http',
+          headers: req.headers,
+          ...(req.method === undefined ? {} : { method: req.method }),
+          pathname: new URL(req.url ?? '/', 'http://dsh.internal').pathname,
+        }, async () => {
+          await bridge(req, res, fetchHandler)
+        })
       },
     }
     return owner.effect(
-      () => owner.webServer.register(route),
+      // The global service store, not an inject-scoped read: a channel
+      // registrant declares `connection`, not `webServer`.
+      () => (owner.get('webServer') as WebServer).register(route),
       `client-connection: ${channel} rpc channel`,
     )
   }

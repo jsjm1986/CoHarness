@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-composer-context-stack-order.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-30-composer-context-stack-order.md
-2026-07-30-composer-context-stack-order.md: 150225ce27fa8459703170622cef754b7694e2fc
-2026-07-30-composer-context-stack-order.zh.md: 25bdd9a5848e2987ffe9243b6d273c61845d33fa
+/agent-note-composer-context-stack-order:
+  en: 36fba479db400af3
+  zh: 314e08a5fa6d83d9
+/agent-note-composer-context-stack-order/problem:
+  en: c66bae97f27b7bee
+  zh: a855986b1e85eddb
+/agent-note-composer-context-stack-order/decision:
+  en: fd8ed7cab5b3ba39
+  zh: 4685aebf58fc39f5
+/agent-note-composer-context-stack-order/verification:
+  en: 7b8f566c66ddf09e
+  zh: e2d8c0f2b651246a
+/agent-note-composer-context-stack-order/alternatives-considered:
+  en: 7b6ae4b1a015def7
+  zh: 084e7b108521a203
+/agent-note-composer-context-stack-order/consequences:
+  en: f302fef8283a9df1
+  zh: 7752d37d917b13c9

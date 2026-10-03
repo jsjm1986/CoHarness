@@ -53,6 +53,7 @@ export function conversationSnapshot(sessionId: SessionId): ConversationSnapshot
     nodes: [],
     turnTimings: new Map(),
     turnEnds: new Map(),
+    openTurn: undefined,
     partial: null,
     runningCalls: [],
     pending: [],
@@ -80,6 +81,7 @@ export function workspaceListState(): WorkspaceListState {
   return {
     items: [],
     archivedSessionIds: [],
+    pinnedSessionIds: [],
     state: 'idle',
     phase: 'ready',
     error: null,

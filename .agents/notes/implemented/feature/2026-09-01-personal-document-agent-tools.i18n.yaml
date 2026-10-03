@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-01-personal-document-agent-tools.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-01-personal-document-agent-tools.md
-2026-09-01-personal-document-agent-tools.md: 18b15b83db7c9fcf827d31d0aae5580c1437bbbc
-2026-09-01-personal-document-agent-tools.zh.md: e35a09ef1082c8b548358ca58335535ad690e23c
+/agent-note-personal-document-discovery-is-an-opt-in-agent-consumer:
+  en: efdbe2a5c98c70ca
+  zh: 60080af6e86630c9
+/agent-note-personal-document-discovery-is-an-opt-in-agent-consumer/problem:
+  en: 75227e6371822f70
+  zh: 2c52ed6e7b9da88c
+/agent-note-personal-document-discovery-is-an-opt-in-agent-consumer/decision:
+  en: 837eedfbe6c5f6d4
+  zh: c2603fe9c06d9728
+/agent-note-personal-document-discovery-is-an-opt-in-agent-consumer/model-facing-behavior:
+  en: aa0a36dd5cce7077
+  zh: 4be9b10c30b66708
+/agent-note-personal-document-discovery-is-an-opt-in-agent-consumer/verification:
+  en: e04865fadc5312ac
+  zh: 885bdc5e7479d995
+/agent-note-personal-document-discovery-is-an-opt-in-agent-consumer/alternatives-considered:
+  en: 54bf50055ce116a9
+  zh: ec0e97c7ace91fee
+/agent-note-personal-document-discovery-is-an-opt-in-agent-consumer/consequences:
+  en: 3ad770e1cf498d22
+  zh: 1475742df1e65f53

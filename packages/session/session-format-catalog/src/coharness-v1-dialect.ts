@@ -68,11 +68,12 @@ class CoharnessV1DialectStage implements SessionFormatMigrationStage {
       return
     }
     const dialect = hideDialectMembers(raw)
-    this.ledgers.push(dialect)
+    if (dialect.presetOrigin !== undefined || dialect.sourceMembers.length > 0) this.ledgers.push(dialect)
     const restoring: SessionFormatMigrationContext = {
       emitEvent: (emitted) => {
         const ledger = this.ledgers[0]
-        if (ledger !== undefined && emitted.type === ledger.event.type) {
+        if (ledger !== undefined && emitted.type === ledger.event.type
+          && (emitted.type !== 'user/message' || (emitted.data as { id?: unknown }).id === (ledger.event.data as { id?: unknown }).id)) {
           this.ledgers.shift()
           context.emitEvent(restoreDialectMembers(emitted, ledger))
           return

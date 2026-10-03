@@ -6,6 +6,7 @@
  * how a form learns a write-only field exists and whether it is configured.
  */
 
+import type { LocalizedText } from '@deepseek-ai/dsh-package-manifest'
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 
 /** Why a settings document or namespace is read-only for the current authority. */
@@ -50,6 +51,8 @@ export interface SettingsNamespaceView {
   writableReason?: SettingsWritableReason
   /** Logical owner used by settings UIs to explain its scope. */
   owner?: SettingsOwner
+  /** Registrant's localized display title; absent means surfaces fall back to `ns`. */
+  label?: LocalizedText
   /** Optional project-manager path allowlist; absent means all namespace paths. */
   projectWritePaths?: string[][]
 }

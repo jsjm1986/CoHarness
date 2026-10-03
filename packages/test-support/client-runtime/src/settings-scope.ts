@@ -53,3 +53,49 @@ export function stubSettingsScope<T>(): StubSettingsScope<T> {
     },
   }
 }
+
+/** Handle over the binder's shared developer-tools preference stub. */
+export interface StubDeveloperTools {
+  /** The `developerTools` member face a `settingsScope` service stub provides. */
+  readonly preference: {
+    readonly enabled: { getSnapshot(): boolean; subscribe(listener: () => void): () => void }
+    setEnabled(enabled: boolean): Promise<void>
+  }
+  /** Spy behind `preference.setEnabled`; resolves immediately. */
+  setEnabled: ReturnType<typeof vi.fn>
+  /** Flip the accepted value and notify subscribers.
+   * @param enabled - the preference state to publish.
+   */
+  publish(enabled: boolean): void
+}
+
+/**
+ * Build the binder's shared developer-tools preference for service stubs:
+ * starts enabled, records writes, and lets the test publish flips.
+ * @param initial - starting enablement; the shipped default is on.
+ * @returns the stub handle.
+ */
+export function stubDeveloperTools(initial = true): StubDeveloperTools {
+  let enabled = initial
+  const listeners = new Set<() => void>()
+  const setEnabled = vi.fn((next: boolean) => { stub.publish(next); return Promise.resolve() })
+  const stub: StubDeveloperTools = {
+    preference: {
+      enabled: {
+        getSnapshot: () => enabled,
+        subscribe: (listener) => {
+          listeners.add(listener)
+          return () => { listeners.delete(listener) }
+        },
+      },
+      setEnabled: (next: boolean) => setEnabled(next),
+    },
+    setEnabled,
+    publish(next) {
+      if (enabled === next) return
+      enabled = next
+      for (const listener of [...listeners]) listener()
+    },
+  }
+  return stub
+}

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-23-managed-desktop-execution.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-managed-desktop-execution.md
-2026-09-23-managed-desktop-execution.md: 183982b18fa3119c0f81d36f47382a92c8509416
-2026-09-23-managed-desktop-execution.zh.md: 7fbe7fb36e2c0e8c080495a629ead3e729fa2602
+/agent-note-enforce-deployment-authority-before-desktop-driver-calls:
+  en: a770c851388c3b39
+  zh: e6729c81215614ca
+/agent-note-enforce-deployment-authority-before-desktop-driver-calls/problem:
+  en: d53216f3b1fc4448
+  zh: b72cb20183be6b7a
+/agent-note-enforce-deployment-authority-before-desktop-driver-calls/decision:
+  en: b085172ddbf6bd7b
+  zh: 03676cecee2e487a
+/agent-note-enforce-deployment-authority-before-desktop-driver-calls/alternatives-considered:
+  en: addc6f66bf215900
+  zh: ba9a3807fee87da5
+/agent-note-enforce-deployment-authority-before-desktop-driver-calls/related-decisions:
+  en: a54675a0efbc325e
+  zh: d47a6ad7b4954b32
+/agent-note-enforce-deployment-authority-before-desktop-driver-calls/consequences:
+  en: 22f9190f65ce728d
+  zh: 78cffd61e28d0c8c

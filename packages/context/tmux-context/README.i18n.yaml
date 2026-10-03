@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/tmux-context/README.md
-README.md: 1e30943e653e2b43513e533576bb5a3c08d23d2c
-README.zh.md: de6f2e26e5678dd65a0959b3e9ac6df81bb8df26
+/:
+  en: 719f54f022818400
+  zh: 61495d48365178df
+/deepseek-ai-dsh-tmux-context:
+  en: 0f43520f0a78a2df
+  zh: 52d17f54ca7e0686
+/deepseek-ai-dsh-tmux-context/summary:
+  en: 4c62923f1912d201
+  zh: 7f2211f9616c0197
+/deepseek-ai-dsh-tmux-context/table-of-contents:
+  en: 5af5196221d77875
+  zh: e57b684fe0cc9cc0
+/deepseek-ai-dsh-tmux-context/config:
+  en: e98fa76e848f5fef
+  zh: c967c68d0e36dd6e
+/deepseek-ai-dsh-tmux-context/how-it-reads-tmux:
+  en: 1c151598a372c856
+  zh: 7ffd43ff3cb2c6f3
+/deepseek-ai-dsh-tmux-context/timing-semantics:
+  en: f171546b67900d93
+  zh: db4bfa66cc51b0a3
+/deepseek-ai-dsh-tmux-context/invariants:
+  en: 2c7b2c9ffcf8d64c
+  zh: f0b42c9d35a854a4
+/deepseek-ai-dsh-tmux-context/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-tmux-context/model-experience/preparation-time-tmux-location:
+  en: 9c9825ee622e4b92
+  zh: b9edc0c529612fe6
+/deepseek-ai-dsh-tmux-context/model-experience/preparation-time-tmux-location/what-the-model-sees:
+  en: 8697059219e2ab02
+  zh: d321f11003c93de9
+/deepseek-ai-dsh-tmux-context/model-experience/preparation-time-tmux-location/what-the-model-sees/changed-turn-reading:
+  en: efdd843a7c1aa9d7
+  zh: 533b6f25b583363e
+/deepseek-ai-dsh-tmux-context/model-experience/preparation-time-tmux-location/token-effect:
+  en: 6a0348385ba38e7e
+  zh: 02af00a2c5aea469
+/deepseek-ai-dsh-tmux-context/model-experience/preparation-time-tmux-location/kv-cache-effect:
+  en: 2fbf2175168e8244
+  zh: 6c51cb0d74cb05ce
+/deepseek-ai-dsh-tmux-context/known-limitations-and-deferred-work:
+  en: 270ec80d3a038f51
+  zh: b688d3e26ffe1431
+/deepseek-ai-dsh-tmux-context/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

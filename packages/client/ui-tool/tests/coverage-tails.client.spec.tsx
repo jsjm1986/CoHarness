@@ -2,6 +2,7 @@
 // Tool presentation branch tails not reached by the main acceptance specs.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { cleanup, render } from '@testing-library/react'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
@@ -12,6 +13,7 @@ import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/t
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
 import { BashRow } from '../src/client/tool/toolviews/bash-sample.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
 
 type BashRowProps = Parameters<typeof BashRow>[0]
 
@@ -31,7 +33,7 @@ function listStore() {
     archivedById: {},
     current: undefined,
     phase: 'ready',
-    subagentsByParent: {}, jobsBySession: {},
+    subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })
 }
@@ -44,10 +46,15 @@ function bashProps(block: RunningToolCall | ToolResultNode): BashRowProps {
   } as unknown as BashRowProps
 }
 
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
+
 describe('Tool presentation tails', () => {
   it('ToolRow stopped state renders the warning dot in the leading slot', () => {
     const view = render(
-      <ToolRow t={t} variant="bash" icon={<i data-testid="icon" />} title="Bash" summary="s" bodyRaw={null} state="stopped" />,
+      <ToolRow t={t} useDisclosure={useDisclosure} variant="bash" icon={<i data-testid="icon" />} title="Bash" summary="s" bodyRaw={null} state="stopped" />,
     )
     expect(view.queryByTestId('icon')).toBeNull()
     expect(view.container.querySelector('[data-state="stopped"]')).not.toBeNull()
@@ -61,7 +68,8 @@ describe('Tool presentation tails', () => {
       content: [], isError: false, callView: null, resultView: null, subCalls: [],
     }
     const props: GenericToolCardProps = {
-      callId: 'c5', toolName: 'todo_write', block: settled, openFile: vi.fn(), t,
+      callId: 'c5', toolName: 'todo_write', phase: 'result', block: settled, openFile: vi.fn(), t,
+      useDisclosure,
     }
     const view = render(<GenericToolCard {...props} />)
     expect(view.container.querySelector('[data-variant="others"] svg')).not.toBeNull()
@@ -84,7 +92,7 @@ describe('Tool presentation tails', () => {
 
   it('BashRow carries data-state for running and StateDots for error/stopped', () => {
     const running: RunningToolCall = {
-      callId: 'c1', name: 'bash', argsRaw: '{"command":"ls","description":"List"}',
+      phase: 'start', callId: 'c1', name: 'bash', argsRaw: '{"command":"ls","description":"List"}',
       turn: 1, step: 1, time: 1_000, callView: null, subCalls: [],
     }
     const errorResult: ToolResultNode = {

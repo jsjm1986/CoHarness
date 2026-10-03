@@ -39,6 +39,10 @@
   color: var(--dsw-alias-state-warn-label);
 }
 
+.icon.success {
+  color: var(--dsw-alias-state-success-primary);
+}
+
 .text {
   min-width: 0;
 }

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-admin-ui-visual-language-consistency.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-admin-ui-visual-language-consistency.md
-2026-08-25-admin-ui-visual-language-consistency.md: 501562d7259d78042e1559d84176223bdf4ca74a
-2026-08-25-admin-ui-visual-language-consistency.zh.md: ae7c157596b87a47a5bd8821967f829f751a1b57
+/agent-note-keep-the-gateway-admin-ui-visually-and-linguistically-consistent:
+  en: b9e15aea72324931
+  zh: 3de0577513b1d256
+/agent-note-keep-the-gateway-admin-ui-visually-and-linguistically-consistent/problem:
+  en: 7f85407b0a47c8e3
+  zh: 849375f82e80d44a
+/agent-note-keep-the-gateway-admin-ui-visually-and-linguistically-consistent/decision:
+  en: 201b37ae30e283f4
+  zh: 12e90c0c8bb61cee
+/agent-note-keep-the-gateway-admin-ui-visually-and-linguistically-consistent/alternatives-considered:
+  en: 4b30870e5ec980cf
+  zh: 89c8c1bc697b4ee4
+/agent-note-keep-the-gateway-admin-ui-visually-and-linguistically-consistent/consequences:
+  en: d12cfda0bc69d705
+  zh: 02f37344bc34c7c1

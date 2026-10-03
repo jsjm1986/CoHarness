@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-10-ci-lane-scope-classification.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-10-ci-lane-scope-classification.md
-2026-09-10-ci-lane-scope-classification.md: faddf6347ec6ea4cb359fb081f8909acbcaca8cf
-2026-09-10-ci-lane-scope-classification.zh.md: 81bb23d9378fa1d681bf20e16d5c2cd035350b23
+/agent-note-ci-lane-scope-classification:
+  en: 3749ee6460d32aa9
+  zh: 01f32f4c7197e70f
+/agent-note-ci-lane-scope-classification/problem:
+  en: 566595c32e8d168e
+  zh: d91e1e2d28b6cc39
+/agent-note-ci-lane-scope-classification/decision:
+  en: 64462dad486f75b5
+  zh: 1fd0b9e828d15f43
+/agent-note-ci-lane-scope-classification/alternatives-considered:
+  en: 2a5810d60a53bce5
+  zh: 268ee6c967d4caae
+/agent-note-ci-lane-scope-classification/consequences:
+  en: 9d0e1b693a1772e6
+  zh: cd451201fc10a550
+/agent-note-ci-lane-scope-classification/tests:
+  en: d855eadba0322aff
+  zh: 5fe64451e64f8138

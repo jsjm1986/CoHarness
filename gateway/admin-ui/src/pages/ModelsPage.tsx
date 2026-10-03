@@ -1,5 +1,6 @@
 import { ClipboardList, Filter, Pencil, RefreshCw, RotateCcw, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { decimalToMicros, microsToDecimal } from '../../../src/money.ts'
 import {
   getModelAccess,
   listModelRegistrations,
@@ -13,6 +14,7 @@ import {
   type ModelRegistrationReport,
 } from '../api.ts'
 import { OrganizationModelsEditor } from '../components/OrganizationModelsEditor.tsx'
+import { ModelIdentity, modelKey, OverrideSelect, RoleDefaults } from '../components/models.tsx'
 import {
   Button,
   Dialog,
@@ -48,11 +50,14 @@ const REGISTRATION_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 function yuanToMicros(value: string): number {
   const yuan = Number(value)
   if (!Number.isFinite(yuan) || yuan < 0) throw new Error('单价必须是非负数')
-  return Math.round(yuan * 1_000_000)
+  const text = value.trim()
+  const micros = /^\d+(?:\.\d+)?$/u.test(text) ? decimalToMicros(text) : Math.round(yuan * 1_000_000)
+  if (!Number.isSafeInteger(micros)) throw new Error('单价超过可精确保存的范围')
+  return micros
 }
 
 function microsToYuan(value: number): string {
-  return (value / 1_000_000).toFixed(4)
+  return microsToDecimal(value)
 }
 
 function registrationDate(value: string, endOfDay: boolean): number | undefined {
@@ -168,6 +173,7 @@ export function ModelsPage() {
   }
 
   function openGovernanceEditor(model: ModelGovernanceRow) {
+    setError('')
     setEditingModel(model)
     setModelDraft({ ...model })
     setPrices([
@@ -286,6 +292,7 @@ export function ModelsPage() {
       >
         {modelDraft === null ? null : (
           <form id="model-governance-form" onSubmit={event => void submitGovernance(event)}>
+            <ErrorBanner message={error} />
             <div className="modelGovernanceIdentity">
               <strong>{modelDraft.displayName}</strong>
               <span className="codeText">{modelDraft.provider}/{modelDraft.model}</span>
@@ -305,7 +312,7 @@ export function ModelsPage() {
                     className="input"
                     required
                     min="0"
-                    step="0.0001"
+                    step="0.000001"
                     inputMode="decimal"
                     value={prices[index]}
                     onChange={event => setPrices(prices.map((value, current) => current === index ? event.target.value : value))}
@@ -560,39 +567,6 @@ function ModelDirectory({
   )
 }
 
-function ModelIdentity({ row }: { row: ModelGovernanceRow }) {
-  return (
-    <div className="modelIdentity">
-      <span className="itemIcon"><Sparkles aria-hidden="true" /></span>
-      <span className="modelIdentityText"><strong>{row.displayName}</strong><span className="codeText">{row.provider}/{row.model}</span></span>
-    </div>
-  )
-}
-
-function RoleDefaults({ row }: { row: ModelGovernanceRow }) {
-  return (
-    <div className="roleDefaults">
-      <span className={row.adminAllowed ? 'allowed' : 'denied'}>管理员 {row.adminAllowed ? '允许' : '拒绝'}</span>
-      <span className={row.userAllowed ? 'allowed' : 'denied'}>用户 {row.userAllowed ? '允许' : '拒绝'}</span>
-    </div>
-  )
-}
-
-function OverrideSelect({ label, value, disabled, onChange }: {
-  label: string
-  value: boolean | undefined
-  disabled: boolean
-  onChange: (value: string) => void
-}) {
-  return (
-    <select aria-label={label} className="select selectCompact overrideSelect" disabled={disabled} value={value === undefined ? 'inherit' : value ? 'allow' : 'deny'} onChange={event => onChange(event.target.value)}>
-      <option value="inherit">继承角色</option>
-      <option value="allow">允许</option>
-      <option value="deny">拒绝</option>
-    </select>
-  )
-}
-
 function PriceSummary({ row }: { row: ModelGovernanceRow }) {
   const values = [row.inputMicrosPerMillion, row.outputMicrosPerMillion, row.cacheReadMicrosPerMillion, row.cacheWriteMicrosPerMillion]
   return (
@@ -600,10 +574,6 @@ function PriceSummary({ row }: { row: ModelGovernanceRow }) {
       {PRICE_LABELS.map((label, index) => <span key={label}><b>{label}</b><span>{microsToYuan(values[index] ?? 0)}</span></span>)}
     </div>
   )
-}
-
-function modelKey(row: { provider: string; model: string }): string {
-  return `${row.provider}\0${row.model}`
 }
 
 function messageFrom(cause: unknown): string {

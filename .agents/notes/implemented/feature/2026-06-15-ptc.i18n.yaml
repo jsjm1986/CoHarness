@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-15-ptc.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-15-ptc.md
-2026-06-15-ptc.md: 110f2686a395f3846c66f8a25e86514673a4c8bc
-2026-06-15-ptc.zh.md: fff70950889012deb426cdf7c8dfe697a29758c6
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry:
+  en: 9506116227b22bd0
+  zh: c2d42a9f483cfbe3
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/problem:
+  en: d47eb1b90fcc99e3
+  zh: 19648277554d0c2e
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/decision:
+  en: 0f02fb70e912f55a
+  zh: 3f4da06e60cfd682
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/decision/the-registry-owns-the-mode:
+  en: 8dbf6db108e76c38
+  zh: 0dc40d6ded150c1e
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/decision/the-run-code-tool-and-the-dispatch-bridge:
+  en: 5959b68c6e9ce550
+  zh: bc2e8e2ba714030a
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/decision/observability-tool-ptc-dispatch:
+  en: 556357bff8d437ef
+  zh: 14208030c1ed3a3d
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/decision/the-ptc-runtime-seam:
+  en: 1aee813e549dea5f
+  zh: d93660afe80e8b66
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/decision/the-worker-thread-runtime:
+  en: 14bb9fbdd10369cd
+  zh: dbf2fd269a5bbd2a
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/decision/trust-posture:
+  en: 55105483710ff81a
+  zh: ba5f8d2113e9d1a1
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/decision/what-the-model-sees:
+  en: 978026174552d14b
+  zh: 2d9175c04c67df33
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/consequences:
+  en: 761eb6c1aeb7af18
+  zh: 5434456a3d0a1b65
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/testing:
+  en: fdac93d95c77de21
+  zh: f66aa7861e197c10
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/alternatives-considered:
+  en: 9ca384f63ec9e75f
+  zh: ca8461adabb551d2
+/agent-note-ptc-mode-the-model-writes-typescript-against-the-tool-registry/risks:
+  en: c599deb7f9cc889b
+  zh: 61b4db744f8e30ee

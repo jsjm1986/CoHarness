@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-23-scoped-subagent-limits.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-scoped-subagent-limits.md
-2026-09-23-scoped-subagent-limits.md: 0d44206c76fbeb4cddfbeed5b96cc667b7c51d3d
-2026-09-23-scoped-subagent-limits.zh.md: 5594d9493e122dfafc2c10066b54d9b089af5aa1
+/agent-note-scoped-subagent-settings:
+  en: d964e47a3f45e7cb
+  zh: 37a7e79dd82d389e
+/agent-note-scoped-subagent-settings/problem:
+  en: ef85b00419bbb6d2
+  zh: 18007dda54eef6ca
+/agent-note-scoped-subagent-settings/decision:
+  en: 872358c6b2ccfcec
+  zh: 9b856ea9105bccb6
+/agent-note-scoped-subagent-settings/alternatives-considered:
+  en: 8bd98ec2658e0f68
+  zh: a05538de044957cc
+/agent-note-scoped-subagent-settings/consequences:
+  en: 43275bc20e74eafb
+  zh: 8b6f244b8f37bf97

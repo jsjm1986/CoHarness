@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/agent-tool-presentation/README.md
-README.md: 2b7b434f961a73c4f495e0ed7987cab0522772ee
-README.zh.md: 3576a2b5480449d4210e9820c47733f3e32ef253
+/:
+  en: bec65c5696b06f64
+  zh: 61495d48365178df
+/dsh-agent-tool-presentation:
+  en: f6615cbac6b53e23
+  zh: b120b984e9b1fa0d
+/dsh-agent-tool-presentation/summary:
+  en: aa73e921ddf92d72
+  zh: 474c415bd2e27c96
+/dsh-agent-tool-presentation/table-of-contents:
+  en: 96386d6e896771a4
+  zh: fb8868d66b348ac8
+/dsh-agent-tool-presentation/why-a-row-rather-than-a-registry:
+  en: 704b2e2d99089f96
+  zh: d09629a1f34d5f53
+/dsh-agent-tool-presentation/what-it-does:
+  en: fadf9993b4965b51
+  zh: 56ec9cd03fbb7a66
+/dsh-agent-tool-presentation/invariants:
+  en: c2cf677f229c4d73
+  zh: f3ec7e6f97048799
+/dsh-agent-tool-presentation/model-experience:
+  en: 35621b26757d462e
+  zh: a8869139783ae475
+/dsh-agent-tool-presentation/model-experience/kv-cache-effect:
+  en: c75b16e38577f026
+  zh: 45648c63631b8b82
+/dsh-agent-tool-presentation/known-limitations-and-deferred-work:
+  en: edcc7c005d1bfcb5
+  zh: cae06004c0f480c2
+/dsh-agent-tool-presentation/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

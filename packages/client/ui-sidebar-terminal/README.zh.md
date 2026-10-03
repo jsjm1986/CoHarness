@@ -56,6 +56,7 @@ Session 输入区贡献会查询 Host 终端，只为尚无标签关联的终端
 - [Right Sidebar](../../client/ui-sidebar-right/README.zh.md)
 - [Web terminal decision](../../../.agents/notes/implemented/feature/2026-09-09-web-sidebar-terminal.zh.md)
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -65,6 +66,7 @@ Session 输入区贡献会查询 Host 终端，只为尚无标签关联的终端
 
 无；终端输出只在浏览器与 Host 之间传输。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

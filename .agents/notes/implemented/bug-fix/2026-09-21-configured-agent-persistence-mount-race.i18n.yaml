@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-21-configured-agent-persistence-mount-race.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-21-configured-agent-persistence-mount-race.md
-2026-09-21-configured-agent-persistence-mount-race.md: 89107b004cfa7d7ed15941f43bd0af17c3cd3fae
-2026-09-21-configured-agent-persistence-mount-race.zh.md: eb65674cc252c69edc06bb1395ba7e1d619f66b3
+/agent-note-configured-agent-persistence-reads-wait-out-pending-loader-mounts:
+  en: 67ae37d22304c8de
+  zh: e4c0b0c0b1941e93
+/agent-note-configured-agent-persistence-reads-wait-out-pending-loader-mounts/problem:
+  en: d06af47d2d06bc21
+  zh: f78813d001128e86
+/agent-note-configured-agent-persistence-reads-wait-out-pending-loader-mounts/decision:
+  en: c3bb3064ffae1aeb
+  zh: 0f0321e88079c241
+/agent-note-configured-agent-persistence-reads-wait-out-pending-loader-mounts/alternatives-considered:
+  en: 694a81105f46babf
+  zh: b00d7b4003c1c6c5
+/agent-note-configured-agent-persistence-reads-wait-out-pending-loader-mounts/consequences:
+  en: 27ce9598473b2b54
+  zh: aa7782567b110029

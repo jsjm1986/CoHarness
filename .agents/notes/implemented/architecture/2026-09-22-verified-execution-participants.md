@@ -10,6 +10,8 @@ A shared Agent can execute after its originating HTTP request ends, after anothe
 
 ## Decision
 
+The Session-wide authorization lifetime in this note is partially superseded by [current-request execution scopes](2026-09-27-current-request-execution-scopes.md). Immutable input attestation, retained editors, live permission checks, and transport independence remain applicable.
+
 [Execution Authority](../../../../packages/context/execution-authority/README.md) defines input attestation, participant capture, delegation, and current permission checks. [Gateway Execution](../../../../packages/context/gateway-execution/README.md) implements them from Gateway PostgreSQL records. This keeps input and orchestration consumers independent of request transport while preserving the actual [Agent initiator](2026-07-15-agent-initiator-scope.md).
 
 The Gateway attests exact human inputs from live authenticated callers. Their opaque references bind organization, runtime, Session, message, and content; they never grant a role. Queue replacements retain earlier editors. An accepted question answer adds its verified responder; ordinary tool approval expresses consent without adding an execution participant. Display metadata remains useful to the transcript and model but is not an authorization source.
@@ -19,6 +21,8 @@ Participant restrictions accumulate for the Session. Before asynchronous child c
 Execution checks every retained participant's current access. Privileged operations additionally require every participant's relevant qualification; unknown historical identity prevents Full and Auto execution. Selecting a privileged preset checks the selector as well as existing participants, without inventing a new input. [Auto review and billing](../bug-fix/2026-09-22-auto-review-execution-attribution.md) and [profile management](2026-09-22-gateway-profile-management-authority.md) own their specific admission and attribution rules.
 
 Gateway Runtime marks the application as requiring execution authority. The requirement survives provider removal, and absence refuses managed execution. Its `interactive()` identity exists only during active HTTP handling; inherited request context is not background authority. A disconnected authorization stream invalidates pending grants and cancels active work. Reconnection enables fresh checks without replaying effects. Independent local profiles retain their own operator authority and do not compose the Gateway provider.
+
+Consumers compare underlying Cordis provider identity across asynchronous authorization. Fresh tracing proxies retain the same provider identity; a removed or replaced provider invalidates the pending operation. Calls still use their traced receiver so scope and resource ownership remain intact.
 
 ## Alternatives considered
 

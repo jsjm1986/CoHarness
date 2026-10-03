@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-workspace-document-manager.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-workspace-document-manager.md
-2026-08-17-workspace-document-manager.md: 53ee9c0c2d8f51920ffe06f5ee2fe14cc40eb45d
-2026-08-17-workspace-document-manager.zh.md: 176e156c45484235a8fba270273bf1a5aea39251
+/agent-note-workspace-document-manager-ui:
+  en: 2b648dcbb2ef72a1
+  zh: 6932e84ab8616cc6
+/agent-note-workspace-document-manager-ui/problem:
+  en: 5ffb5ec7e0c8a2ae
+  zh: fff331ab7e10c976
+/agent-note-workspace-document-manager-ui/decision:
+  en: 46667ca74ba4bce7
+  zh: f8dd34de33b0bba6
+/agent-note-workspace-document-manager-ui/design:
+  en: 6d02d879f2e6522d
+  zh: 3ba82066b144644a
+/agent-note-workspace-document-manager-ui/consequences:
+  en: e0c441571c62c9c1
+  zh: d36dec2e175e4a33
+/agent-note-workspace-document-manager-ui/verification:
+  en: 6ebdcaf09554be81
+  zh: 0adf05d5d115940b
+/agent-note-workspace-document-manager-ui/alternatives-considered:
+  en: e3dc4097c1db3e0b
+  zh: dcaae0340df41426

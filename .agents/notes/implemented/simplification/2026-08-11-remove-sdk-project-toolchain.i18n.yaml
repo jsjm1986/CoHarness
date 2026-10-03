@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-remove-sdk-project-toolchain.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-11-remove-sdk-project-toolchain.md
-2026-08-11-remove-sdk-project-toolchain.md: fc896c2823a1ccddf06c8dce788c4ffe72a9367a
-2026-08-11-remove-sdk-project-toolchain.zh.md: 9d33a89e28ec08c9fb516b902f58b440ea673c16
+/agent-note-remove-the-sdk-project-toolchain:
+  en: 324aa124224aff49
+  zh: d0b458c11b1fbae7
+/agent-note-remove-the-sdk-project-toolchain/problem:
+  en: 48b278ebc15fc2c1
+  zh: 9815c99ff93edc91
+/agent-note-remove-the-sdk-project-toolchain/decision:
+  en: 8effffc1141615f8
+  zh: 22f509fa5a492334
+/agent-note-remove-the-sdk-project-toolchain/verification:
+  en: 727858d91a912bed
+  zh: 69e8b61d5d13ea63
+/agent-note-remove-the-sdk-project-toolchain/alternatives-considered:
+  en: dc5d20103c889b4e
+  zh: 66cd903eadcea85a
+/agent-note-remove-the-sdk-project-toolchain/consequences:
+  en: 4a4f117db5806692
+  zh: c182ac64e71f45f8

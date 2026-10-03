@@ -3,7 +3,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { act, cleanup, waitFor } from '@testing-library/react'
 import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import { ProjectUiPolicyRuntime, WorkspaceResourceRegistry, createSnapshotStore, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
+import ShortcutsService from '@deepseek-ai/dsh-client-shortcuts/client'
+import { ProjectUiPolicyRuntime, WorkspaceResourceError, WorkspaceResourceRegistry, createSnapshotStore, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { apply as sidebarApply, inject as sidebarInject } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -36,6 +37,7 @@ it('opens an authorized workspace file through the assembled tab registry and re
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)
+    new ShortcutsService(runtime.ctx)
     await runtime.sessions.add({ id: SID })
     await runtime.root.declare({ rightbar: { kind: 'single', scope: 'root' } }, Root)
     await runtime.mount({ inject: [...sidebarInject], apply: sidebarApply })
@@ -90,6 +92,7 @@ it('routes Markdown and HTML resources through the assembled authorized readers'
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)
+    new ShortcutsService(runtime.ctx)
     await runtime.sessions.add({ id: SID })
     await runtime.root.declare({ rightbar: { kind: 'single', scope: 'root' } }, Root)
     await runtime.mount({ inject: [...sidebarInject], apply: sidebarApply })
@@ -107,5 +110,65 @@ it('routes Markdown and HTML resources through the assembled authorized readers'
     else Object.defineProperty(Element.prototype, 'getAnimations', animation)
     if (createDescriptor === undefined) Reflect.deleteProperty(URL, 'createObjectURL')
     else Object.defineProperty(URL, 'createObjectURL', createDescriptor)
+  }
+})
+
+it('surfaces a changed notice without rereading and clears content on revocation', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  const animation = Object.getOwnPropertyDescriptor(Element.prototype, 'getAnimations')
+  Object.defineProperty(Element.prototype, 'getAnimations', { configurable: true, value: () => [] })
+  const runtime = await SlotTestRuntime.create()
+  try {
+    const resources = new WorkspaceResourceRegistry()
+    let version = 'v1'
+    resources.register({ kind: 'base' }, {
+      stat: async () => ({ sessionId: SID, path: 'a.txt', version, type: 'file', changed: false }),
+    }, 5)
+    const reads = vi.fn(async (request: { path: string }) => ({
+      result: { ok: true as const, value: { path: request.path, version, offset: 1, limit: 40, eof: true, text: `content ${version}` } },
+    }))
+    runtime.provide('workspaceResources', resources)
+    runtime.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
+    runtime.provide('layout', { bindRightbar: () => () => {}, focusRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn() })
+    runtime.provide('connection', {
+      hostDescription: createSnapshotStore({ executionAuthorityRequired: false }),
+      api: { workspaceFiles: { read: reads } },
+    })
+    runtime.provide('conversationViewport', { snapshot: createSnapshotStore({ mode: 'single' as const, paneIds: [], paneRatios: [] }) })
+    const locale = new LocaleRuntime(runtime.ctx)
+    runtime.provide('locale', locale)
+    runtime.slots.installLocale(locale)
+    new ShortcutsService(runtime.ctx)
+    await runtime.sessions.add({ id: SID })
+    await runtime.root.declare({ rightbar: { kind: 'single', scope: 'root' } }, Root)
+    await runtime.mount({ inject: [...sidebarInject], apply: sidebarApply })
+    await runtime.mount({ inject: [...inject], apply })
+    const view = runtime.renderRoot()
+    const open = (path: string) => {
+      act(() => { runtime.ctx.bail('workspace/resource-open', { sessionId: SID, path, runtimeTarget: { kind: 'base' }, address: workspaceResourceAddress(SID, path) }) })
+    }
+    open('a.txt')
+    await waitFor(() => { expect(view.getByText('content v1')).toBeTruthy() })
+    expect(reads).toHaveBeenCalledTimes(1)
+
+    version = 'v2'
+    act(() => { resources.handleChange({ kind: 'base' }, { sessionId: SID, path: 'a.txt', version: 'v2' }) })
+    await waitFor(() => { expect(view.getByText(/file changed/i)).toBeTruthy() })
+    expect(reads).toHaveBeenCalledTimes(1)
+
+    // A hidden occurrence keeps no subscription: its change publishes nothing to reads.
+    open('b.txt')
+    await waitFor(() => { expect(reads.mock.calls.filter(call => call[0].path === 'b.txt')).toHaveLength(1) })
+    act(() => { resources.handleChange({ kind: 'base' }, { sessionId: SID, path: 'a.txt', version: 'v3' }) })
+    await waitFor(() => { expect(view.getByText('content v2')).toBeTruthy() })
+    expect(reads.mock.calls.filter(call => call[0].path === 'a.txt')).toHaveLength(1)
+
+    act(() => { resources.disconnect({ kind: 'base' }, new WorkspaceResourceError('access-revoked', 'Permission removed')) })
+    await waitFor(() => { expect(view.queryByText(/content/)).toBeNull() })
+    expect(view.getByRole('alert').textContent).toBe('Permission removed')
+  } finally {
+    await runtime.dispose()
+    if (animation === undefined) Reflect.deleteProperty(Element.prototype, 'getAnimations')
+    else Object.defineProperty(Element.prototype, 'getAnimations', animation)
   }
 })

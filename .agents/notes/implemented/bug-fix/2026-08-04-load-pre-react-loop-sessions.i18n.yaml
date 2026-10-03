@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-04-load-pre-react-loop-sessions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-04-load-pre-react-loop-sessions.md
-2026-08-04-load-pre-react-loop-sessions.md: 277a481f366f1182fd3948caf858607efd550e5e
-2026-08-04-load-pre-react-loop-sessions.zh.md: 67f6b361811a0de024b8e6130f31a33f1deaf9ef
+/agent-note-load-sessions-from-the-pre-react-loop-format:
+  en: 3780a493097edcd3
+  zh: b2bc67b8d836aa57
+/agent-note-load-sessions-from-the-pre-react-loop-format/problem:
+  en: fc047c9af0a21e75
+  zh: 189465808366ac46
+/agent-note-load-sessions-from-the-pre-react-loop-format/decision:
+  en: 59d4104cd1963bb1
+  zh: 50bdfc4789c02b01
+/agent-note-load-sessions-from-the-pre-react-loop-format/alternatives-considered:
+  en: 1bbf086a05c8c221
+  zh: 6180c929fa75f022
+/agent-note-load-sessions-from-the-pre-react-loop-format/consequences:
+  en: 4fe6d6b2e4420011
+  zh: 504ab47ee2c4172b
+/agent-note-load-sessions-from-the-pre-react-loop-format/related:
+  en: 30a9fb1046ce64fd
+  zh: d7daa2c9f9389e51

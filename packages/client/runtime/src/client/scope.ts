@@ -15,6 +15,7 @@ const kScope = Symbol('dsh.client.scope')
 
 interface ScopeIdentity {
   readonly sessionId: SessionId
+  readonly presentationId: SessionId
 }
 
 /** A minted Agent scope and its disposal boundary. */
@@ -32,11 +33,12 @@ function agentScope(): void {}
  * Mint an Agent scope under `ctx`.
  * @param ctx - client root context the scope fiber mounts under.
  * @param key - durable Session identity carried by this generation.
+ * @param presentationId - browser resource identity, separate from the Host Session ID.
  * @returns tagged context and its backing fiber.
  */
-export function createScope(ctx: Context, key: SessionId): AgentScopeHandle {
+export function createScope(ctx: Context, key: SessionId, presentationId: SessionId = key): AgentScopeHandle {
   const fiber = ctx.plugin(agentScope)
-  const identity: ScopeIdentity = { sessionId: key }
+  const identity: ScopeIdentity = { sessionId: key, presentationId }
   const scoped = fiber.ctx.extend({
     [kScope]: identity,
     [CordisContext.filter](listenerCtx: Context): boolean {
@@ -53,7 +55,7 @@ export function createScope(ctx: Context, key: SessionId): AgentScopeHandle {
  * @returns session identity, or undefined for root contexts.
  */
 export function scopeOf(ctx: Context): SessionId | undefined {
-  return scopeIdentityOf(ctx)?.sessionId
+  return scopeIdentityOf(ctx)?.presentationId
 }
 
 /**

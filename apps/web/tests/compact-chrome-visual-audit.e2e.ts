@@ -196,7 +196,7 @@ describe('visual audit: compact product chrome', () => {
           hasTouch: true,
           isMobile: true,
         })
-        await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+        await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
         await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
         await dismissOnboarding(page)
         await shot(page, `${prefix}-00-landing`)

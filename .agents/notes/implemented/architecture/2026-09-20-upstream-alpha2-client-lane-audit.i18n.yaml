@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-20-upstream-alpha2-client-lane-audit.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md
-2026-09-20-upstream-alpha2-client-lane-audit.md: 2fe63d1521e89ce48e5a21c8bb61fe5318917111
-2026-09-20-upstream-alpha2-client-lane-audit.zh.md: a5e2de94f69f04a29b753f5f5daa7afcbbb63214
+/agent-note-lane-7a-client-package-audit-against-upstream-alpha-2:
+  en: 5146c07849730975
+  zh: 3a08a2dbea324ea1
+/agent-note-lane-7a-client-package-audit-against-upstream-alpha-2/problem:
+  en: bf08bbf67d2bc77a
+  zh: 820e6c46b2d781c0
+/agent-note-lane-7a-client-package-audit-against-upstream-alpha-2/decision:
+  en: 24c759475c6896e7
+  zh: 54012f4eeb78399b
+/agent-note-lane-7a-client-package-audit-against-upstream-alpha-2/alternatives-considered:
+  en: 60f2ca28aba96a0a
+  zh: 8ef1b27e13e0f267
+/agent-note-lane-7a-client-package-audit-against-upstream-alpha-2/consequences:
+  en: e78e259c89337043
+  zh: a746956564e00888
+/agent-note-lane-7a-client-package-audit-against-upstream-alpha-2/testing:
+  en: 9f2cae0ea9a6686d
+  zh: 05137b58ad8f4e14

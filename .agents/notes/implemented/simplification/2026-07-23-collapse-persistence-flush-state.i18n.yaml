@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-23-collapse-persistence-flush-state.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-23-collapse-persistence-flush-state.md
-2026-07-23-collapse-persistence-flush-state.md: 2801079e5b322d076eced3a0113e7958d9b4c3b9
-2026-07-23-collapse-persistence-flush-state.zh.md: eb292ac1d357f3fa96715e99d5e2ecfc963938c6
+/agent-note-collapse-live-persistence-into-one-flush-controller:
+  en: da8a98741f362ace
+  zh: 3ed3ff61cfb5ba84
+/agent-note-collapse-live-persistence-into-one-flush-controller/problem:
+  en: fd1405bf560e1608
+  zh: e5eb1a81bdceba12
+/agent-note-collapse-live-persistence-into-one-flush-controller/decision:
+  en: 7e74f3871b01c058
+  zh: 45aea4bbfc05f1d7
+/agent-note-collapse-live-persistence-into-one-flush-controller/alternatives-considered:
+  en: e262459551274c92
+  zh: ba9986ed7d426983
+/agent-note-collapse-live-persistence-into-one-flush-controller/verification:
+  en: d000382db7b8319d
+  zh: 7687a094b9ede71b
+/agent-note-collapse-live-persistence-into-one-flush-controller/consequences:
+  en: f03c5447a89bcde0
+  zh: ff4bda1d7921bb59

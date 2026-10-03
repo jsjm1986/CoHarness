@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-production-client-hmr-opt-in.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-23-production-client-hmr-opt-in.md
-2026-08-23-production-client-hmr-opt-in.md: 8b816ee73085c7f83d0e1736afce01b792db1087
-2026-08-23-production-client-hmr-opt-in.zh.md: d2ef23aba5593cde8f24c7feccb51e9a6472402f
+/agent-note-production-client-artifact-polling-is-opt-in:
+  en: fc61ab27ea592f59
+  zh: 81b20b16bc5d2cf1
+/agent-note-production-client-artifact-polling-is-opt-in/problem:
+  en: 902539aca480ed85
+  zh: d7d8eb42155ab430
+/agent-note-production-client-artifact-polling-is-opt-in/decision:
+  en: c093008fd3ddc455
+  zh: 3399d7d83fb65fe9
+/agent-note-production-client-artifact-polling-is-opt-in/alternatives-considered:
+  en: ee69e30e1ae4c615
+  zh: db5ad98962ace595
+/agent-note-production-client-artifact-polling-is-opt-in/consequences:
+  en: 4b67b94b86f73faf
+  zh: 4a21bfa75e3f3eff

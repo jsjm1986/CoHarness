@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-third-party-memory-mcp-examples.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-31-third-party-memory-mcp-examples.md
-2026-07-31-third-party-memory-mcp-examples.md: e82d65a3a5a60cafcc47df5a6873cf5768cd8b8f
-2026-07-31-third-party-memory-mcp-examples.zh.md: 343683315ddfb3a5ecfbee96580900c505df3ef1
+/agent-note-third-party-memory-mcp-examples:
+  en: 9c6a4cb537dc8306
+  zh: 31e16958cac807f2
+/agent-note-third-party-memory-mcp-examples/problem:
+  en: 88cc7fb4a16e6aef
+  zh: ff850e85171512ba
+/agent-note-third-party-memory-mcp-examples/decision:
+  en: 37be37d0ef11f119
+  zh: 7cb68b4988be9fdd
+/agent-note-third-party-memory-mcp-examples/responsibility-boundary:
+  en: 5730d42aece76462
+  zh: 773ec1bfe61609de
+/agent-note-third-party-memory-mcp-examples/pins-storage-and-identity:
+  en: 0e540f26d72982e4
+  zh: 382c6cee587d87b2
+/agent-note-third-party-memory-mcp-examples/model-guidance:
+  en: 4a26df4782f3823a
+  zh: 0dab6ec32619f62e
+/agent-note-third-party-memory-mcp-examples/validation-contract:
+  en: ca503063a3451480
+  zh: d4e4154d9bf92a39
+/agent-note-third-party-memory-mcp-examples/alternatives-considered:
+  en: d63959b353f78bc6
+  zh: 2dfc8bfe554aaf29
+/agent-note-third-party-memory-mcp-examples/consequences:
+  en: 9576fd4cf12e7e19
+  zh: 8b57d1200b13ac4f

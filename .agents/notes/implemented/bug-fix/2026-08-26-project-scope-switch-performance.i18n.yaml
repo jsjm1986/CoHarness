@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-26-project-scope-switch-performance.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-26-project-scope-switch-performance.md
-2026-08-26-project-scope-switch-performance.md: 28d98e79b13d87d9fe9dcbaa686e0ce2f7613834
-2026-08-26-project-scope-switch-performance.zh.md: b02f74aeae53e62ae50e1200951dc011344648d2
+/agent-note-keep-repeated-project-scope-reloads-cheap:
+  en: 8a6fbf587db16e7c
+  zh: 627743b9104fce15
+/agent-note-keep-repeated-project-scope-reloads-cheap/problem:
+  en: adbaadfc2ae162d3
+  zh: 583f4fc900665b03
+/agent-note-keep-repeated-project-scope-reloads-cheap/decision:
+  en: 2efbd22bb465704f
+  zh: 95ba0ed0227237ad
+/agent-note-keep-repeated-project-scope-reloads-cheap/alternatives-considered:
+  en: a255a5d983e471c5
+  zh: 6bef0f0ef4c2ca3c
+/agent-note-keep-repeated-project-scope-reloads-cheap/consequences:
+  en: bfaf51eabfd6743d
+  zh: 1c956417242b72de

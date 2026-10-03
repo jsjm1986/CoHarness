@@ -32,6 +32,7 @@ function mountButton() {
     sessionId: SESSION,
     focus: vi.fn(),
     useStore: hookOf(instance),
+    useShortcuts: <T,>(selector: (entries: readonly { id: string }[]) => T): T => selector([]),
     actions: instance.actions,
     // Copy is the dictionary's contract; the key stands in for the translation.
     t: (key: string) => key,
@@ -69,6 +70,7 @@ it('exposes the blank-session composer entry and removes it when header chrome b
   const focus = vi.fn()
   let blank = true
   const props = { sessionId: SESSION, focus, useStore: hookOf(instance), actions: instance.actions,
+    useShortcuts: <T,>(selector: (entries: readonly { id: string }[]) => T): T => selector([]),
     t: (key: string) => key, useSession: (select: (state: { blank: boolean; composerPhase: string }) => unknown) => select({ blank, composerPhase: 'blank' }),
   } as unknown as ExpandButtonProps
   const view = render(<BlankExpandButton {...props} />)

@@ -117,7 +117,7 @@ describe('dialect compact vocabulary', () => {
       event('compaction/end', 0, { turn: 1 }),
     ]))
     const byId = (id: string) => migrated.events.find(item => (item.data as { id?: string }).id === id)
-    expect(byId('u-c')?.data).toMatchObject({ source: { kind: 'plugin', plugin: 'compact', compactionId: 'legacy-compaction:s:3' } })
+    expect(byId('u-c')?.data).toMatchObject({ source: { kind: 'compact-checkpoint', compactionId: 'legacy-compaction:s:3' } })
     expect(byId('u-own')?.data).toMatchObject({ source: { compactionId: 'own' } })
     expect(byId('u-p')?.data).toMatchObject({ source: { kind: 'user' } })
   })
@@ -398,8 +398,8 @@ describe('dialect message carriers', () => {
     const results = migrated.events.filter(item => item.type === 'tool/result')
     expect(results[1]?.data).toMatchObject({
       message: {
-        id: 'legacy-message:s:7', role: 'user',
-        content: [{ type: 'tool-result', toolCallId: 'c-2', content: [{ type: 'text', text: 'out' }], isError: false }],
+        id: 'legacy-message:s:7', role: 'tool',
+        toolCallId: 'c-2', content: [{ type: 'text', text: 'out' }], isError: false,
         source: { kind: 'tool', callId: 'c-2' },
       },
     })
@@ -772,9 +772,9 @@ describe('dialect stage run handling', () => {
 describe('logical catalog header surface', () => {
   it('classifies stored headers through readHeader', () => {
     expect(sessionLogicalFormatCatalog.readHeader('x').status).toBe('malformed')
-    expect(sessionLogicalFormatCatalog.readHeader({ version: 7, id: 's', createdAt: 1 }).status).toBe('unsupported')
-    expect(sessionLogicalFormatCatalog.readHeader({ version: 6, id: 's', createdAt: 1 }).status).toBe('current')
-    for (const version of [0, 1, 2, 3, 4, 5]) {
+    expect(sessionLogicalFormatCatalog.readHeader({ version: 8, id: 's', createdAt: 1 }).status).toBe('unsupported')
+    expect(sessionLogicalFormatCatalog.readHeader({ version: 7, id: 's', createdAt: 1 }).status).toBe('current')
+    for (const version of [0, 1, 2, 3, 4, 5, 6]) {
       expect(
         sessionLogicalFormatCatalog.readHeader({ version, id: 's', createdAt: 1 }).status,
       ).toBe('migration-required')
@@ -791,7 +791,7 @@ describe('logical catalog header surface', () => {
       ).status,
     ).toBe('malformed')
     const full = sessionLogicalFormatCatalog.readHeader({
-      version: 6, id: 's', createdAt: 1, cwd: '/x', parentSession: 'p', origin: 'subagent',
+      version: 7, id: 's', createdAt: 1, cwd: '/x', parentSession: 'p', origin: 'subagent',
       delegationDepth: 1, agentPreset: 'ptc', draft: false, isSeeded: true,
     })
     expect(full).toMatchObject({
@@ -804,18 +804,18 @@ describe('logical catalog header surface', () => {
     const migrated = sessionLogicalFormatCatalog.migrateHeader(
       { version: 2, id: 's', createdAt: 1, agentPreset: 'code' } as SessionFormatHeader,
     )
-    expect(migrated).toMatchObject({ version: 6, agentPreset: 'ptc' })
+    expect(migrated).toMatchObject({ version: 7, agentPreset: 'ptc' })
     expect(sessionLogicalFormatCatalog.migrateHeader(
       { version: 3, id: 's', createdAt: 1 } as SessionFormatHeader,
-    ).version).toBe(6)
+    ).version).toBe(7)
     expect(sessionLogicalFormatCatalog.migrateHeader(
       { version: 4, id: 's', createdAt: 1 } as SessionFormatHeader,
-    ).version).toBe(6)
+    ).version).toBe(7)
     expect(() => sessionLogicalFormatCatalog.migrateHeader('x' as unknown as SessionFormatHeader))
       .toThrow('must be a JSON object')
     expect(() => sessionLogicalFormatCatalog.migrateHeader(
-      { version: 7, id: 's', createdAt: 1 } as SessionFormatHeader,
-    )).toThrow('newer format v7')
+      { version: 8, id: 's', createdAt: 1 } as SessionFormatHeader,
+    )).toThrow('newer format v8')
   })
 })
 
@@ -836,7 +836,7 @@ describe('logical catalog stream admission', () => {
     s.emitEvent(event('turn/end', 1, { turn: 1, reason: { kind: 'completed' } }))
     expect(s.finish()).toBe(0)
     expect(emitted.map(item => item.type)).toEqual(['turn/start', 'turn/end'])
-    expect(s.header.version).toBe(6)
+    expect(s.header.version).toBe(7)
   })
 
   it('runs v3 admission on stored v3 rows and v4 admission on v4/v5/v6 rows', () => {
@@ -889,8 +889,7 @@ describe('logical catalog stream admission', () => {
     }, { surfaceOp: 'append' }))
     expect(() => wrapped.finish()).toThrow('refuses the transformed artifact')
     const { stream: passthrough } = stream(5)
-    passthrough.emitEvent(event('unknown/thing', 0, {}))
-    expect(() => passthrough.finish()).toThrow('unknown event type')
+    expect(() => { passthrough.emitEvent(event('unknown/thing', 0, {})) }).toThrow('unknown event type')
   })
 })
 
@@ -1278,7 +1277,7 @@ describe('dialect member admission', () => {
     const types = migrated.events.map(item => item.type)
     expect(types.slice(0, 5)).toEqual(['turn/start', 'step/start', 'system/message', 'goal/change', 'user/message'])
     const message = migrated.events[4]
-    expect(message?.data).toMatchObject({ id: 'u-g', source: { kind: 'plugin', plugin: 'goal' } })
+    expect(message?.data).toMatchObject({ id: 'u-g', source: { kind: 'goal' } })
   })
 
   it('still refuses unknown event types', () => {

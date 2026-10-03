@@ -1,19 +1,20 @@
 /** Shipped Web confirmation through real RPC and the Gateway confirmation controller, with a deterministic authority transport. */
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { GatewayRequestPrincipal } from '@deepseek-ai/dsh-gateway-runtime'
 import { desktopConfirmationController } from '@deepseek-ai/dsh-gateway-execution/src/desktop-confirmation.ts'
 import {
   launchWebScaffold, captureStableAria, compareOrRefreshGolden, assertFixtureInventory,
-  watchConsole, webSnapshotMode, type WebScaffold,
+  seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
 const ROOT = SessionId('desktop-confirmation-root')
+const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const DIRECTORY = fileURLToPath(new URL('./snapshots/desktop-confirmation', import.meta.url))
 
 describe('web e2e: explicit root desktop confirmation', () => {
@@ -24,10 +25,9 @@ describe('web e2e: explicit root desktop confirmation', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
     const { ctx, workspaceCwd } = scaffold
-    const created = await ctx.apiProxy.sessions.create({ rpcId: RpcId('desktop-create'), payload: { sessionId: ROOT, cwd: workspaceCwd } })
-    if (!created.result.ok) throw new Error(created.result.error.message)
-    const root = ctx.agents.get(ROOT)
-    if (root === undefined) throw new Error('Created desktop Session has no Agent')
+    // A seeded Session carries committed history, so the sidebar lists it and
+    // landing opens it — the live Agent arrives with that ordinary resume.
+    await seedSession(scaffold, await readFile(SEED, 'utf8'), ROOT)
     const workspace = await ctx.workspaceRegistry.create(workspaceCwd)
     await workspace.attachSession(ROOT)
     const human = { claims: { user: { id: 12 }, expiresAt: Date.now() + 180_000 } } as GatewayRequestPrincipal
@@ -51,9 +51,9 @@ describe('web e2e: explicit root desktop confirmation', () => {
           }
           expect(path).toBe('/internal/runtime/execution/desktop-confirmation')
           return Response.json({ rootSessionId: ROOT, nodeId: 'acceptance-node', desktop: 'display-0', userId: 12,
-            eligible: true, confirmed })
+            eligible: true, confirmed, occupancy: { available: true, inUse: false, heldByThisSession: false, queued: 0 } })
         },
-      }, () => root, 'display-0'),
+      }, agent => agent, 'display-0'),
     })
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
@@ -66,7 +66,16 @@ describe('web e2e: explicit root desktop confirmation', () => {
     if (scaffold === undefined) throw new Error('Desktop scaffold unavailable')
     onTestFailed(() => saveFailureShot(page, 'web-desktop-confirmation'))
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    // Landing restores the seeded Session; its transcript marker proves the
+    // session view (and with it the session header) is mounted.
+    await page.getByText('DONE', { exact: true }).waitFor({ timeout: 30_000 })
+    // The confirmation RPC resolves the Session's live Agent, which the open
+    // resume publishes asynchronously — wait for it before reading status.
+    await expect.poll(() => scaffold?.ctx.agents.get(ROOT) !== undefined, { timeout: 15_000 }).toBe(true)
+    const turnStarts = () => scaffold?.ctx.sessions.get(ROOT)?.snapshotEvents()
+      .filter(event => event.type === 'turn/start').length
+    const baseline = turnStarts()
     await page.getByRole('button', { name: 'Desktop access', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Desktop confirmation', exact: true })
     await dialog.getByText('acceptance-node', { exact: true }).waitFor()
@@ -86,7 +95,7 @@ describe('web e2e: explicit root desktop confirmation', () => {
     await dialog.getByRole('button', { name: 'Withdraw my confirmation', exact: true }).click()
     await dialog.getByText('You have not confirmed this root session may use this desktop.', { exact: true }).waitFor()
     expect(saves).toEqual([true, false])
-    expect(scaffold.ctx.sessions.get(ROOT)?.snapshotEvents().filter(event => event.type === 'turn/start')).toHaveLength(0)
+    expect(turnStarts()).toBe(baseline)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     expect(await page.locator('[data-slot-error]').count()).toBe(0)

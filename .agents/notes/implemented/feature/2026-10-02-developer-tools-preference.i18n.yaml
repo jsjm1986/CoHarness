@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-02-developer-tools-preference.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-developer-tools-preference.md
+/agent-note-developer-tools-preference-gates-diagnostics-surfaces-through-the-shared-settings-scope:
+  en: b17a2d0193023cd6
+  zh: 7f1505548540c6d5
+/agent-note-developer-tools-preference-gates-diagnostics-surfaces-through-the-shared-settings-scope/problem:
+  en: 48fd2cbcca5c2c14
+  zh: 3655b11ed951d5a3
+/agent-note-developer-tools-preference-gates-diagnostics-surfaces-through-the-shared-settings-scope/decision:
+  en: b568c5d6f07a38f5
+  zh: 41f831f60fb0a1e1
+/agent-note-developer-tools-preference-gates-diagnostics-surfaces-through-the-shared-settings-scope/alternatives-considered:
+  en: 36636d17bef4dc8c
+  zh: 5a8497fec54a61e1
+/agent-note-developer-tools-preference-gates-diagnostics-surfaces-through-the-shared-settings-scope/consequences:
+  en: 1a49aa473518bf98
+  zh: ecdf81761ec9062a

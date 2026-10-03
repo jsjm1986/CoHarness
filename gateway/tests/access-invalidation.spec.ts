@@ -9,7 +9,7 @@ import type { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import WebSocket, { WebSocketServer } from 'ws'
 import { PostgresAccessMonitor, type AccessInvalidationSubject } from '../src/access-invalidation.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { createGatewayDocumentScopeHandler, type GatewayDocumentScopeHandler } from '../src/document-transfer.ts'
 import { PostgresAuditService } from '../src/postgres/audit-service.ts'
 import { PostgresAuthService } from '../src/postgres/auth-service.ts'
@@ -60,7 +60,7 @@ async function fixture(options: {
     contexts.push({ pool, organizationId, organizationSlug: slug, nodeName, nodeId: node.rows[0]!.id })
   }
   const context = contexts[0]!
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes') })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECT_RUNTIMES_ROOT: join(root, 'runtimes') })
   const users = new PostgresUserService(context, cfg)
   const alice = await users.create({ username: 'alice', password: 'password-123' })
   const bob = await users.create({ username: 'bob', password: 'password-123' })
@@ -124,6 +124,7 @@ async function fixture(options: {
       auth: new PostgresAuthService(owner, cfg), audit: new PostgresAuditService(owner),
       collaboration: new PostgresCollaborationService(owner), accessMonitor: monitor,
       instances: {
+        stopReasonOf: async () => null,
         portOf: async () => port, generationOf: async () => 1, stateOf: async () => 'ready',
         isLive: async () => true, touch: async () => {}, wsRef: async () => {},
         operationRef: vi.fn<NonNullable<GatewayDeps['instances']['operationRef']>>(async () => {}),
@@ -194,7 +195,7 @@ describePg('cross-Gateway access invalidation', () => {
     await Promise.all([closed, ended])
     reader.releaseLock()
     await second.monitor.synchronize()
-    expect(second.stop).toHaveBeenCalledWith({ kind: 'user', id: f.alice.id })
+    expect(second.stop).toHaveBeenCalledWith({ kind: 'user', id: f.alice.id }, 'access-change')
     const pong = once(bob, 'message', { signal: AbortSignal.timeout(5_000) })
     bob.send('still-authorized')
     expect(String((await pong)[0])).toBe('still-authorized')
@@ -215,7 +216,7 @@ describePg('cross-Gateway access invalidation', () => {
     await closed
     await f.projects.removeMember(f.project.id, f.alice.id)
     await second.monitor.synchronize()
-    expect(second.stop).toHaveBeenCalledWith({ kind: 'user', id: f.alice.id })
+    expect(second.stop).toHaveBeenCalledWith({ kind: 'user', id: f.alice.id }, 'access-change')
     expect((await fetch(`${second.base}/api/echo${f.target}`, { headers: { cookie: f.aliceCookie } })).status).toBe(403)
   })
 
@@ -300,9 +301,9 @@ describePg('cross-Gateway access invalidation', () => {
     expect(gateway.stop).not.toHaveBeenCalled()
     await pool.query("UPDATE harness.project_mounts SET status='missing' WHERE organization_id=$1", [f.organizationId])
     await gateway.monitor.synchronize()
-    expect(gateway.stop).toHaveBeenCalledWith({ kind: 'user', id: f.alice.id })
-    expect(gateway.stop).toHaveBeenCalledWith({ kind: 'user', id: f.bob.id })
-    expect(gateway.stop).toHaveBeenCalledWith({ kind: 'project', id: f.project.id })
+    expect(gateway.stop).toHaveBeenCalledWith({ kind: 'user', id: f.alice.id }, 'access-change')
+    expect(gateway.stop).toHaveBeenCalledWith({ kind: 'user', id: f.bob.id }, 'access-change')
+    expect(gateway.stop).toHaveBeenCalledWith({ kind: 'project', id: f.project.id }, 'access-change')
   })
 
   it('invalidates active tokens and disabled organizations without waiting for principal expiry', async () => {

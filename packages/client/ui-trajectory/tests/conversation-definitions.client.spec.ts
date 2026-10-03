@@ -277,7 +277,7 @@ describe('Trajectory conversation Definitions', () => {
         id: 'checkpoint',
         role: 'user',
         content: [{ type: 'text', text: 'summary checkpoint' }],
-        source: { kind: 'plugin', plugin: 'compact', compactionId: 'complete' },
+        source: { kind: 'compact-checkpoint', compactionId: 'complete' },
       }),
       at(4, 'compaction/end', { compactionId: 'complete', turn: null }),
       at(5, 'compaction/start', { compactionId: 'orphan', turn: null }),

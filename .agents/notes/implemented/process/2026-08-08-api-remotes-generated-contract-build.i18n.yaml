@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-api-remotes-generated-contract-build.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-08-api-remotes-generated-contract-build.md
-2026-08-08-api-remotes-generated-contract-build.md: 2f5da20c947e60a3c76514631d1c64c38e07b4cd
-2026-08-08-api-remotes-generated-contract-build.zh.md: 92d840765a4297d76dfdbab851869c90ac8e6609
+/agent-note-ordered-build-for-api-remotes-generated-contracts:
+  en: 407156f5a4eeb0db
+  zh: b3bfe5e0b7f62e8f
+/agent-note-ordered-build-for-api-remotes-generated-contracts/problem:
+  en: beac1b36ee8fa380
+  zh: 04823479a1e10a6b
+/agent-note-ordered-build-for-api-remotes-generated-contracts/decision:
+  en: 6bf86906d1b13ef2
+  zh: a3611e5e8d1e8efe
+/agent-note-ordered-build-for-api-remotes-generated-contracts/the-sole-package-exception:
+  en: 206d0e0c1b4f55e7
+  zh: 2cba89d6ef037c1f
+/agent-note-ordered-build-for-api-remotes-generated-contracts/typert-and-tsdown:
+  en: 0416dda98c221013
+  zh: 9ea094a2dd41a409
+/agent-note-ordered-build-for-api-remotes-generated-contracts/alternatives-considered:
+  en: b7faea8a0e674c49
+  zh: 8cccf02e2940e2d4
+/agent-note-ordered-build-for-api-remotes-generated-contracts/consequences:
+  en: 386cf6e9e93877ab
+  zh: 1e4b2a341332f837

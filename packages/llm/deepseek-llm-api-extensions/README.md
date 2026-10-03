@@ -33,10 +33,12 @@ The registry owns addition and lifecycle, not field semantics. `@deepseek-ai/dsh
 
 <a id="model-experience"></a>
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Contributions are validated declarations applied while serializing each request; the registry holds no per-request relation.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through `@deepseek-ai/dsh-llm-deepseek`, which sends registered fields outside the model's `messages`, system prompt, and tool schemas.

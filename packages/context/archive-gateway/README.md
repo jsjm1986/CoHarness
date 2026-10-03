@@ -1,8 +1,15 @@
+---
+description: "Synchronizes runtime conversation archive state with the Gateway"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-archive-gateway
 
 English | [中文](README.zh.md)
 
 Synchronizes the durable Workspace archive state of a Gateway-launched runtime with the Gateway archive index. The provider sends revision-stamped, idempotent batches containing archived IDs, root lineage, session headers, retained Workspace placement, message counts, and title/body search projections; Gateway commands are applied after every batch for that revision succeeds. Projections treat only `user`-sourced `user/message` events as human turns: injected context, attribution notices, and goal wrap-ups contribute neither titles, message counts, nor search rows.
+
+Every `commandPollMs` (default 5000 milliseconds), the live runtime checks for its own pending commands. An empty queue triggers no history read or full projection. A pending command enters the existing serialized synchronization and acknowledgement flow, including requests written through another Gateway. Probes never overlap, retry after failure, and are cancelled and joined on disposal; background delivery does not start a stopped runtime.
 
 One synchronization request carries at most 1,000 session IDs, 5,000 search rows, and 4 MiB of search text. Search content is capped at 64 KiB per row for the index; the transcript remains unchanged. A root split across requests receives a final aggregate message count, repeated triggers while a synchronization is running collapse into one follow-up pass, and disposal aborts and joins the active request. A response carries at most 1,000 pending commands; applying a non-empty command page schedules another pass until the queue is empty.
 
@@ -14,15 +21,28 @@ The provider also registers a loopback-only `/api/internal/archive/read` route. 
 
 The provider is a runtime-only integration. Standalone local DSH compositions do not load it and keep their local archive registry unchanged.
 
+Permanent purge releases idle Host-owned handles before storage mutation and keeps their identity reservations through the Gateway acknowledgement. Reviews are removed first. Personal logs are removed deepest-first and root-last; project rows are removed only by the Gateway transaction. Busy refusal preserves data, while a later I/O failure remains an explicit partial-cleanup conflict for retry.
+
 ## Summary
 
 Use `dsh-archive-gateway` to synchronize a Gateway-launched runtime's durable Workspace archive state with the Gateway archive index. Revision-stamped, idempotent batches carry archived ids, lineage, headers, placement, and search projections; Gateway commands apply only after every batch of that revision succeeds. Requests are bounded and disposal joins the in-flight pass.
 
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Every sync batch is derived from the durable session corpus and revision-stamped against the Gateway index; the provider holds no local archive truth.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the provider synchronizes archived session records for administrator-only history and contributes no model input.
@@ -37,3 +57,13 @@ None; the package never assembles or sends provider requests.
 - A personal transcript cannot be read while its owning runtime is unavailable or its persisted log is corrupt; the Gateway keeps the archive index row and reports the body as unavailable.
 - Archive reads reject a lineage with more than 10,000 descendants or a post-floor result whose retained records exceed 100,000 records or 64 MiB. `fromSeq` is an inclusive sequence floor applied independently to every descendant session, not a global chronological cursor.
 - A runtime-provided personal detail must fit the same descendant, event-page, and byte budgets; an invalid or oversized replacement leaves the indexed detail visible with `syncState: unavailable`.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

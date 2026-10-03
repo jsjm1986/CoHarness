@@ -10,12 +10,13 @@ Status: implemented
 
 ## 决策
 
-**`WorkspaceFileTab` 按扩展名路由到四种正文之一，全部由同一组授权读取器供给。**
+**`WorkspaceFileTab` 按扩展名路由到五种正文之一，全部由同一组授权读取器供给；表格正文由[表格预览说明](2026-10-01-workbench-spreadsheet-preview.zh.md)覆盖。**
 
 - `md`/`markdown` 挂载 `WorkspaceMarkdownPreview`：累计既有的带版本保护 `readPreview` 文本分页直到 `eof`，再通过 `MarkdownText` 渲染前缀且不自动换行。分页在标签的 abort 信号下持续到达；stale-version 响应或访问失败停止累计，权限拒绝断开资源。
-- `html`/`htm` 挂载 `WorkspaceHtmlPreview`：经新增的 `readFileBytes` 读取器读取完整源——`stat` 加上锚定首个观测版本的有界 `workspaceFiles.readBytes` 窗口——然后打包直接声明的相对 `.js` classic 脚本与 `.css` 样式表。每个依赖在客户端相对文档目录解析（`.`、`..`、query、fragment 在调用前折叠，因为 Host 原样拒绝 `..`），并经由同一 `readFileBytes` 路径、同一 Session、runtime 目标与信号读取。打包强制单资源 4 MiB、总量 32 MiB、最多 64 个不同资源；外部、根相对、带 scheme、含反斜杠及 NUL 的引用一律不读取，module 导入、CSS `url()`/`@import` 与运行时 `fetch` 仍不支持。打包后的文档在仅有 `sandbox="allow-scripts"` 的不透明 Blob iframe 中运行；替换或卸载预览即吊销外层 Blob URL，非法 UTF-8、读取失败或超出限制使预览失败，而不会发布残缺包。
-- `pdf` 与 Office 扩展名保留 `WorkspaceDocumentPreview`；其余文件保留 `WorkspaceFilePreview`（分页文本、`data:` 图片或有界 Base64）。
+- `html`/`htm` 挂载 `WorkspaceHtmlPreview`：经 [`preview-readers.ts`](../../../../packages/client/ui-workbench/src/client/preview-readers.ts) 的 `readFileBytes` 读取完整源——`stat` 加上锚定首个观测版本、按调用方完整文件上限约束并以 Base64 返回的 `workspaceFiles.readBytes` 窗口——再由 `workspaceFileBytes` 解码用于打包直接声明的相对 `.js` classic 脚本与 `.css` 样式表。每个依赖在客户端相对文档目录解析（`.`、`..`、query、fragment 在调用前折叠，因为 Host 原样拒绝 `..`），并经由同一 `readFileBytes` 路径、同一 Session、runtime 目标与信号读取。打包强制单资源 4 MiB、总量 32 MiB、最多 64 个不同资源；外部、根相对、带 scheme、含反斜杠及 NUL 的引用一律不读取，module 导入、CSS `url()`/`@import` 与运行时 `fetch` 仍不支持。打包后的文档在仅有 `sandbox="allow-scripts"` 的不透明 Blob iframe 中运行；替换或卸载预览即吊销外层 Blob URL，非法 UTF-8、读取失败或超出限制使预览失败，而不会发布残缺包。
+- `pdf`、`doc`、`docx`、`ppt`、`pptx` 保留 `WorkspaceDocumentPreview`；`xlsx`、`xls`、`csv`、`tsv` 路由至工作簿查看器；其余文件保留 `WorkspaceFilePreview`（分页文本、`data:` 图片或有界 Base64）。
 - 预览内容仍是组件本地的瞬态状态：注册表只持有元数据、订阅与变更通知；正文经请求的 abort 信号持有读取、打包与取消。迟到的结果无法发布，因为每次 await 都在提交状态前检查信号。
+- 元数据订阅由框架持有：`WorkspaceFileTab` 通过 `keyedHooks.workspaceResource` 绑定源（隐藏标签使用空键），向每个预览交付普通的 `WorkspacePreviewResource` face——`{status, value, error, accessDenied}` 加绑定的 `reload`/`revoke` 回调——预览不持有 registry 或原始源。
 - 共享文案来自 workbench locale；每个新正文持有各自的本地化加载、失败、重试与 frame 标题文案。
 
 ## 备选方案

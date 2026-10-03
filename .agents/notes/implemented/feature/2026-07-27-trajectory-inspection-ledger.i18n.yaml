@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-trajectory-inspection-ledger.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-trajectory-inspection-ledger.md
-2026-07-27-trajectory-inspection-ledger.md: 7f97bc395ed694a0a750d3b744cc9887834ef32f
-2026-07-27-trajectory-inspection-ledger.zh.md: 6a38147a075480882db5c39a0810404654c6c849
+/agent-note-trajectory-inspection-ledger:
+  en: 905b33d8a9cb8540
+  zh: 6755405393d6b0d0
+/agent-note-trajectory-inspection-ledger/problem:
+  en: cf3f0e322a1df278
+  zh: ceedb1aa5695e895
+/agent-note-trajectory-inspection-ledger/decision:
+  en: d793b41e2adf1f9f
+  zh: 7b92f8cab728207e
+/agent-note-trajectory-inspection-ledger/alternatives-considered:
+  en: 520d4f476a456a38
+  zh: e5cf916b898fdf7d
+/agent-note-trajectory-inspection-ledger/consequences:
+  en: 33241107a2a396a8
+  zh: 59d8dc5bf897491c

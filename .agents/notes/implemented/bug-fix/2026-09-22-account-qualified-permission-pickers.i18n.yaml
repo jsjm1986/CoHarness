@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-account-qualified-permission-pickers.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-account-qualified-permission-pickers.md
-2026-09-22-account-qualified-permission-pickers.md: d802536dab07a4bbe18532aab4b768a5e19686cc
-2026-09-22-account-qualified-permission-pickers.zh.md: 242f76fda5b065c0ae397b6dd00446cda31b6af9
+/agent-note-account-qualified-permission-pickers:
+  en: 48c54d7928401edd
+  zh: bf6239609cc17642
+/agent-note-account-qualified-permission-pickers/problem:
+  en: 536b185191ca9ea5
+  zh: e2fbbb9fd841e1a0
+/agent-note-account-qualified-permission-pickers/decision:
+  en: 4311805f5d75d75e
+  zh: 31f6f8ce378cbc3d
+/agent-note-account-qualified-permission-pickers/alternatives-considered:
+  en: dfd1f18a4f636f3d
+  zh: 47b16432e5a31974
+/agent-note-account-qualified-permission-pickers/consequences:
+  en: 1c552c0b46e993b9
+  zh: c5553968e993e25f

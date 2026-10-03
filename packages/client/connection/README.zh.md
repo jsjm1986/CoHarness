@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-connection
 
 [English](README.md) | 中文
@@ -8,10 +13,29 @@
 
 客户端 handle 还暴露可观察的连接状态与立即 `reconnect()` 操作。WebSocket 下行心跳允许连续两次 Pong 丢失后再安排终止，在保持卡顿主机可恢复的同时容忍一次繁忙事件循环。
 
+浏览器 Session 地址携带 runtime 身份，但不改变 Host ID。应用注册唯一地址解析器；`api` 路由已声明的 Session 字段，`wireApi` 仅供持有原始 ID 的 runtime 所有者使用。Remote 路由还接受生成的 Agent lookup 字段及应用声明的 JSON 路径；无关载荷字符串绝不改写。受管 Host 必须先声明 runtime 目标，缓冲帧才会对消费者可见。引导连接属于项目时，显式个人目标仍使用独立连接。
+
+一个页面固定其已验证的 Gateway 账号。fetch 包装仅覆盖同源 `/api` 和 `/account/api/` 请求，携带 `x-dsh-expected-principal-id`；socket 等待首次 HTTP 身份结果后携带 `dshPrincipal` 建连。Gateway 将其与已认证用户比较，并返回 `x-dsh-principal-id`。明确不一致、认证被撤销或引导运行时访问被拒绝时，旧请求先中止，Runtime 所有的 Session 与 slot 状态撤下，然后重载页面。临时连接失败导致身份缺失不会被当成另一个账号。不带预期身份字段的旧客户端继续遵守服务端授权。
+
+解码后的 Host 描述先固定页面的引导 runtime，再开放依赖作用域的请求与 socket。未显式指定 runtime 的请求使用该固定目标，其他标签页更改作用域 cookie 不会重定向它们。应用生成的私有预览及下载 URL 使用 `privateResourceUrl`，让浏览器原生导航携带同样的账号与 runtime 核验；公共链接保持不变。
+
 ## 概述
 
 本包承载浏览器到 Host 的 Remote 调用、精确 Fetch 响应与 connection generation。Client 插件挂载 `ctx.connection`，其中包含当前页面的 loopback 状态、通用 RPC、当前 generation 及其 Host 信息、可观察的恢复状态、立即重连命令，以及单一 generation source 的注册点。source 报告 ready 后 generation 才可见；source 结束、失败、被撤回或显式 stop 都会清空它，再由 `ConnectionController` 执行重试策略。
 
+## 目录
+
+- [Host 配置](#host-configuration)
+- [/api 浏览器信任栅栏](#api-browser-trust-fence)
+- [`/api` WebSocket 下行](#api-websocket-downlinks)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="host-configuration"></a>
 ## Host 配置
 
 `historyPageTargetBytes` 接受正整数，并设置每个完整、未压缩的 history RPC `server-response` JSON 正文以 UTF-8 字节计的目标大小。默认值为 131072 字节。分页会保留完整的 append 来源消息组，因此一个不可分割的消息组可能超过该目标。Fetch 历史响应仍打包剩余的 `assistant/chunk` 游程，并往返 `detail: 'conversation'` 的可选 `omittedSpans`；下载档见 [两档会话历史传输决策](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)。
@@ -20,10 +44,12 @@
 
 浏览器 connection 还会按需提供 Gateway 的账户偏好和项目 Provider 设置 transport。账户偏好请求使用同源、revision 校验和不含敏感值的响应，覆盖语言、主题、忙碌 Enter、对话宽度和字号；项目模型请求覆盖项目 Provider 描述、加密凭据状态、端点发现和 mutation 应答，凭据值不会进入响应。不提供这些路由的 Host 会让 transport 保持缺失，调用方应显示明确的不可用状态，而不是回退到另一个账户的设置。
 
+<a id="api-browser-trust-fence"></a>
 ## /api 浏览器信任栅栏
 
-node 半侧在桥接或 upgrade 前守卫 `/api` 下的每个入口（`src/api-request-trust.ts`）。每个请求——无论是否带浏览器标记——`Host` 都必须是回环地址权威，或与某个 `trustedHosts` 条目匹配：带端口的 `host:port` 条目精确匹配，不带端口的条目匹配任意端口，两侧均经 WHATWG 归一化后比较（DNS rebinding 防御）。刻意不为无浏览器标记的 HTTP 请求开捷径：明文 HTTP 下浏览器的图片与导航读取既不带 `Origin` 也不带 Fetch-Metadata，因此无标记请求仍可能是被重绑页面发起的、响应可被读走的读取，而 Host 是重绑唯一伪造不了的请求头；WebSocket 浏览器握手会带 `Origin` 并通过同一道比较。非浏览器客户端经由回环地址、部署推导的 LAN IP 字面量或已声明的权威通过同一道栅栏。当标记存在时，如附带 `Origin`，则它必须与 Host 权威完全一致；显式的 `sec-fetch-site: cross-site` 标记一律拒绝。不是纯的、规范形 `host[:port]` 权威的 `trustedHosts` 条目——即 WHATWG 解析读回后与原文不完全一致的——会让插件加载明确报错：否则解析会悄悄授权 `harness.internal/path` 这类笔误里的 hostname，或把悬空冒号、补零端口放大成任意端口授权。HTTP 失败在任何 RPC 分发之前以纯 403 应答，upgrade 失败在启动任何事件流前拒绝握手。非回环组合必须显式信任其服务权威：Web 运行时从全接口服务器配置推导 LAN IP 字面量，cordis.yml 中的 `trustedHosts` 与 CLI（命令行界面）的 `--trusted-host` flag 则声明具名权威。`dsh web --host 0.0.0.0` 在远程访问具备认证层之前有意不受支持。这道栅栏是可达性策略，而不是认证；Web 载体不提供认证层。决策记录：[api 浏览器信任边界 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-28-api-browser-trust-boundary.zh.md)。
+node 半侧在桥接或 upgrade 前守卫 `/api` 下的每个入口（`src/api-request-trust.ts`）。每个请求——无论是否带浏览器标记——`Host` 都必须是回环地址权威，或与某个 `trustedHosts` 条目匹配：带端口的 `host:port` 条目精确匹配，不带端口的条目匹配任意端口，两侧均经 WHATWG 归一化后比较（DNS rebinding 防御）。刻意不为无浏览器标记的 HTTP 请求开捷径：明文 HTTP 下浏览器的图片与导航读取既不带 `Origin` 也不带 Fetch-Metadata，因此无标记请求仍可能是被重绑页面发起的、响应可被读走的读取，而 Host 是重绑唯一伪造不了的请求头；WebSocket 浏览器握手会带 `Origin` 并通过同一道比较。非浏览器客户端经由回环地址、部署推导的 LAN IP 字面量或已声明的权威通过同一道栅栏。当标记存在时，如附带 `Origin`，则它必须与 Host 权威完全一致；显式的 `sec-fetch-site: cross-site` 标记一律拒绝。不是纯的、规范形 `host[:port]` 权威的 `trustedHosts` 条目——即 WHATWG 解析读回后与原文不完全一致的——会让插件加载明确报错：否则解析会悄悄授权 `harness.internal/path` 这类笔误里的 hostname，或把悬空冒号、补零端口放大成任意端口授权。HTTP 失败在任何 RPC 分发之前以纯 403 应答，upgrade 失败在启动任何事件流前拒绝握手。非回环组合必须显式信任其服务权威：Web 运行时从全接口服务器配置推导 LAN IP 字面量，cordis.yml 中的 `trustedHosts` 与 CLI（命令行界面）的 `--trusted-host` flag 则声明具名权威。`dsh web --host 0.0.0.0` 在远程访问具备认证层之前有意不受支持。这道栅栏是可达性策略，而不是认证；认证运行在它之后。`connection.requestRejection` 随后先询问 `connection/authenticate` provider 监听器——第一个已定义的应答即生效：`'allow'` 无浏览器凭据即放行，`'deny'` 即使存在已签发的 Cookie 或存活启动令牌也拒绝，`undefined` 则回退到 index 路由 `?token` 交换所签发的、按权威绑定的 Cookie。同一顺序同时守护 `/api`、通用 RPC 通道、WebSocket upgrade，以及——经由 `connection.authorizeIndex`——在 `frontend-static` 提供之前的 index 本身。provider 放行仍须通过这道栅栏。已注册的 `loopback` 子树与 endpoint 以自身声明的机器栅栏作为全部准入，从不询问 provider。决策记录：[api 浏览器信任边界 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-28-api-browser-trust-boundary.zh.md) 与 [浏览器会话认证 Agent Note](../../../.agents/notes/implemented/architecture/2026-10-01-browser-auth-web-transport.zh.md)。
 
+<a id="api-websocket-downlinks"></a>
 ## `/api` WebSocket 下行
 
 Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下行连接发送 WebSocket Ping 控制帧；浏览器在协议层回复 Pong。这些帧不会进入应用流，插件销毁时会停止定时器。
@@ -34,10 +60,13 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 
 `connection/request` 是 Host 侧包围每个已通过浏览器信任栅栏请求的 waterfall。它接收请求进入时的 Node header，以及取值为 `http` 或 `upgrade` 的 `kind`，并在 RPC 分发或事件流开启前完成。认证与请求上下文监听器必须将 header 视为不可变值，并调用 `next()` 让独立插件组合；不委托会阻止后续监听器与载体处理器运行。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。连接状态按代限定作用域，并由每次 host 握手重建；消费方观察同一组已发布值，不存在第二个可能分歧的关系。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。协议消费层只在浏览器与主机之间搬运已经组合好的消息；这里没有任何内容进入模型请求。
@@ -46,8 +75,19 @@ Host 按 `websocketHeartbeatIntervalMs`（默认 30 秒）向每条打开的下�
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **History 可用性由 Host 决定**：该 carrier 只传输有界的 `session.history` 响应；部署能否在不恢复 Agent 的情况下读取冷日志，属于 Host 持久化提供方的职责。
 - **`/api` 桥把每个请求体整体缓冲在内存里**：`maxRequestBodyBytes`（默认 288 MiB，按默认 200 MiB 图片总量上限经 base64 膨胀加信封余量得出）因此同时是单请求的驻留内存上界；要降低它而不缩小图片限额，需要流式请求体路径。
 - 外层桥和内层 Fetch 解析器共用同一个 `maxRequestBodyBytes` 值，因此已准入的图片 envelope 不会再被较小的解析器默认值拒绝一次。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

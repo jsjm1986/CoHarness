@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-24-mobile-typography-and-presenter-baseline.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-24-mobile-typography-and-presenter-baseline.md
-2026-08-24-mobile-typography-and-presenter-baseline.md: 7a6fa96c2c3ed39270996918b8931dfeed39d6e5
-2026-08-24-mobile-typography-and-presenter-baseline.zh.md: 3c210f6f2c30ba126d91254fb0ed5f97ffe09816
+/agent-note-mobile-typography-and-presenter-baseline:
+  en: 85cb5ee708b263a4
+  zh: f8ba0d0f0fef592c
+/agent-note-mobile-typography-and-presenter-baseline/problem:
+  en: 029d3b87b5761a3c
+  zh: a921b35f8f69cd94
+/agent-note-mobile-typography-and-presenter-baseline/decision:
+  en: 29731c8e069480b1
+  zh: 22a4ebafe64eae34
+/agent-note-mobile-typography-and-presenter-baseline/alternatives-considered:
+  en: df2cb451a952f39f
+  zh: d70a8b69cb08b8db
+/agent-note-mobile-typography-and-presenter-baseline/consequences:
+  en: 8054dec256eb02a6
+  zh: 4012c16c987ae980
+/agent-note-mobile-typography-and-presenter-baseline/verification:
+  en: 29c9f5dd8ca159c9
+  zh: cd771d62dbe29bf7

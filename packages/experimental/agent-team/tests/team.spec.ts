@@ -68,6 +68,20 @@ function content(text: string) {
   return [{ type: 'text' as const, text }]
 }
 
+/** A failed assertion still releases the fixture's controlled asynchronous operation. */
+function expectRemovalHeld(ctx: Context, ids: readonly SessionId[], unblock: () => void): void {
+  let reservation: Disposable | undefined
+  let failure: unknown
+  try { reservation = ctx.agents.reserveRemoval(ids) } catch (error) { failure = error }
+  reservation?.[Symbol.dispose]()
+  try { expect(failure instanceof Error ? failure.message : failure).toContain('pending lifecycle operation') }
+  catch (error) { unblock(); throw error }
+}
+
+function expectRemovalAvailable(ctx: Context, ids: readonly SessionId[]): void {
+  using _reservation = ctx.agents.reserveRemoval(ids)
+}
+
 interface TeamServiceInternals {
   readonly roster: {
     readonly inFlightCreations: Set<Promise<unknown>>
@@ -1327,9 +1341,11 @@ describe('Team mailbox and waiting', () => {
     void changed.finally(() => { waitSettled = true })
     const creating = service.createTask(lead, { subject: 'wake', description: 'wake waiter' })
     await flushEntered.promise
+    expectRemovalHeld(ctx, [lead.id], () => { releaseFlush.resolve(undefined) })
     expect(waitSettled).toBe(false)
     releaseFlush.resolve(undefined)
     await creating
+    expectRemovalAvailable(ctx, [lead.id])
     await expect(changed).resolves.toEqual({ timedOut: false })
 
     const controller = new AbortController()
@@ -1398,6 +1414,7 @@ describe('Team mailbox and waiting', () => {
     const spawning = spawn(ctx, lead, 'disposing-worker')
     const rejected = expect(spawning).rejects.toMatchObject({ code: 'TEAM_DISPOSED' })
     await entered.promise
+    expectRemovalHeld(ctx, [lead.id, ...childId === undefined ? [] : [childId]], () => { release.resolve(undefined) })
 
     const disposal = teamFiber.dispose()
     await Promise.resolve()
@@ -1414,6 +1431,7 @@ describe('Team mailbox and waiting', () => {
 
     await rejected
     await disposal
+    expectRemovalAvailable(ctx, [lead.id, ...childId === undefined ? [] : [childId]])
     if (childId !== undefined) expect(ctx.agents.get(childId)).toBeUndefined()
     expect(ctx.get('agentTeams')).toBeUndefined()
   })
@@ -1520,6 +1538,7 @@ describe('Team mailbox and waiting', () => {
       signal: SIGNAL,
     })
     await entered.promise
+    expectRemovalHeld(ctx, [lead.id, started.member.id], () => { release.resolve(undefined) })
     const internal = ctx.agentTeams as unknown as { disposeRuntime(): Promise<void> }
     let disposed = false
     const disposal = internal.disposeRuntime().then(() => { disposed = true })
@@ -1530,6 +1549,7 @@ describe('Team mailbox and waiting', () => {
 
     await expect(sending).resolves.toMatchObject({ status: 'queued' })
     await disposal
+    expectRemovalAvailable(ctx, [lead.id, started.member.id])
     expect(disposed).toBe(true)
     expect(ctx.agents.get(started.member.id)).toBeUndefined()
   })
@@ -1578,10 +1598,12 @@ describe('Team mailbox and waiting', () => {
     let disposed = false
     const disposal = internal.disposeRuntime().then(() => { disposed = true })
     await entered.promise
+    expectRemovalHeld(ctx, [lead.id], () => { release.resolve(undefined) })
     await Promise.resolve()
     const disposedBeforeRelease = disposed
     release.resolve(undefined)
     await disposal
+    expectRemovalAvailable(ctx, [lead.id])
 
     expect(disposedBeforeRelease).toBe(false)
     expect(disposed).toBe(true)
@@ -1748,6 +1770,7 @@ describe('Team mailbox and waiting', () => {
     const reconcileSecond = teamInternals(second.ctx).roster
     const reconciling = reconcileSecond.reconcileProvisioning(second.lead, SIGNAL)
     await entered.promise
+    expectRemovalHeld(second.ctx, [second.lead.id, childId], () => { release.resolve(undefined) })
     second.lead.session.append('team/member', {
       version: 1,
       teamId: TeamId(second.lead.id),
@@ -1755,6 +1778,7 @@ describe('Team mailbox and waiting', () => {
     })
     release.resolve(undefined)
     await reconciling
+    expectRemovalAvailable(second.ctx, [second.lead.id, childId])
     expect(durable(second.lead).members[0]).toMatchObject({
       phase: 'failed', error: 'settled elsewhere',
     })
@@ -1816,5 +1840,26 @@ describe('Team Remote surface', () => {
     const waiting = ctx.agentTeams.waitForChange(lead, 60_000, new AbortController().signal)
     await ctx.agentTeams.createTask(lead, { subject: 'wakes the waiter', description: 'd' })
     await expect(waiting).resolves.toEqual({ timedOut: false })
+  })
+
+  it('keeps recovery mail queued while its target is reserved for removal and retries after release', async () => {
+    const { ctx, lead } = await setup([])
+    const message: TeamMessageSnapshot = {
+      id: TeamMessageId('removal-admission'), senderId: SessionId('sender'), senderName: 'sender',
+      targetId: lead.id, delivery: 'quiet', content: content('retained delivery'),
+    }
+    lead.session.append('team/message/queued', { version: 1, teamId: TeamId(lead.id), message })
+    await ctx.sessions.flush(lead.session)
+    const mailbox = teamInternals(ctx).mailbox
+    {
+      using _removal = ctx.agents.reserveRemoval([lead.id])
+      expect(await mailbox.tryDispatch(lead, message, SIGNAL)).toBe(false)
+    }
+    expect(durable(lead).pendingMessages).toHaveLength(1)
+    expect(lead.inbox.nextStep).toHaveLength(0)
+    expect(await mailbox.tryDispatch(lead, message, SIGNAL)).toBe(true)
+    expect(durable(lead).pendingMessages).toHaveLength(0)
+    expect(lead.inbox.nextStep).toHaveLength(1)
+    expectRemovalAvailable(ctx, [lead.id])
   })
 })

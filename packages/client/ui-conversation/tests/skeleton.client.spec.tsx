@@ -55,6 +55,15 @@ afterEach(() => {
 beforeEach(() => {
   localStorage.clear()
   vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+  // jsdom lacks pointer capture: emulate per-element so hasPointerCapture gates pass.
+  const captured = new WeakMap<Element, number>()
+  Element.prototype.setPointerCapture = function (id: number) { captured.set(this, id) }
+  Element.prototype.releasePointerCapture = function (_id: number) { captured.delete(this) }
+  Element.prototype.hasPointerCapture = function (id: number) { return captured.get(this) === id }
+  // Width-handle drags throttle through rAF; jsdom lacks it, so drive it with
+  // a real timer and flush via `flushFrames` in drag tests.
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => { cb(0) }, 16) as unknown as number)
+  vi.stubGlobal('cancelAnimationFrame', (h: number) => { clearTimeout(h) })
 })
 
 // Mirrors the real lookup chain (conversation namespace, then common).
@@ -72,14 +81,14 @@ function workspace(id = 'w1'): WorkspaceView {
 }
 
 const workspaceState = (items: readonly WorkspaceView[]): WorkspaceListState => ({
-  items, archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+  items, archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
   baselinesReady: true, recentWorkspaceId: undefined,
 })
 
 function conversationSnapshot(overrides: Partial<ConversationSnapshot> = {}): ConversationSnapshot {
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
-    nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue: [], running: false, composerPhase: 'active', removed: false,
     openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
     promptError: null, blank: false, subagent: null, lastAgentError: null,
@@ -122,7 +131,7 @@ function mount(
     byId: { [root]: rootRow, ...listed && { [SID]: childRow } },
     archivedById: {},
     current: SID,
-    phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+    phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   })
   const workspaces = createSnapshotStore<WorkspaceListState>(workspaceState(workspaceRows))
   const session = createSnapshotStore<ConversationSnapshot>(snapshot)
@@ -168,6 +177,7 @@ function mount(
           useSession={useSession}
           useSessions={props.useSessions}
           useWorkspaces={props.useWorkspaces}
+          usePanelInfo={(() => { throw new Error('unused') }) as never}
           useProjection={(() => undefined)}
           useInput={useInput}
           inputActions={inputActions}
@@ -188,6 +198,7 @@ function mount(
           useSession={useSession}
           useSessions={props.useSessions}
           useWorkspaces={props.useWorkspaces}
+          usePanelInfo={(() => { throw new Error('unused') }) as never}
           useProjection={(() => undefined)}
           useInput={useInput}
           inputActions={inputActions}
@@ -211,6 +222,7 @@ function mount(
           useSession={useSession}
           useSessions={props.useSessions}
           useWorkspaces={props.useWorkspaces}
+          usePanelInfo={(() => { throw new Error('unused') }) as never}
           useProjection={(() => undefined)}
           useInput={useInput}
           inputActions={inputActions}
@@ -222,6 +234,7 @@ function mount(
           retryDocument={() => {}}
           draftImages={() => []}
           useBusyEnter={bindSnapshotSelector(createSnapshotStore<'queue' | 'steer'>('queue'))}
+          useStopShortcut={bindSnapshotSelector(createSnapshotStore<readonly string[]>([]))}
           toggleCommandMenu={vi.fn()}
           useNotices={bindSnapshotSelector(wiring.notices)}
           useLexicon={bindSnapshotSelector(wiring.lexicon)}
@@ -303,62 +316,135 @@ describe('Hero chrome', () => {
 })
 
 describe('ConversationRoot resident composer', () => {
-  it('resizes the transcript with one captured pointer and ignores other pointers', () => {
-    const b = mount(conversationSnapshot())
-    const root = b.view.container.firstElementChild as HTMLElement
+  const rootOf = (b: ReturnType<typeof mount>): HTMLElement =>
+    b.view.container.firstElementChild as HTMLElement
+  const mockColumn = (root: HTMLElement, width: number): void => {
     Object.defineProperty(root, 'getBoundingClientRect', {
       configurable: true,
-      value: () => ({ left: 0, width: 1200, top: 0, right: 1200, bottom: 800, height: 800 }),
+      value: () => ({ left: 0, width, top: 0, right: width, bottom: 800, height: 800 }),
     })
-    const handle = b.view.getByRole('separator', { name: '调整对话内容宽度' })
+  }
+  const handles = (b: ReturnType<typeof mount>) => {
+    const pair = b.view.getAllByRole('separator', { name: '调整对话内容宽度' })
+    return {
+      left: pair.find(h => h.getAttribute('data-side') === 'left')!,
+      right: pair.find(h => h.getAttribute('data-side') === 'right')!,
+    }
+  }
+  const userWidth = (root: HTMLElement) => root.style.getPropertyValue('--dsh-chat-user-width')
+  const flushFrames = async () => { await act(async () => { await new Promise(r => setTimeout(r, 25)) }) }
 
-    fireEvent.pointerDown(handle, { pointerId: 7, clientX: 974 })
+  it('renders symmetric handles on both edges and resizes from either side', async () => {
+    const b = mount(conversationSnapshot())
+    const root = rootOf(b)
+    mockColumn(root, 1200)
+    const { left, right } = handles(b)
+
+    // Right handle outward +26px: symmetric widen doubles the travel → 800.
+    fireEvent.pointerDown(right, { pointerId: 7, clientX: 974 })
+    fireEvent.pointerMove(right, { pointerId: 99, clientX: 1100 })
+    await flushFrames()
     expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(748)
-    fireEvent.pointerMove(handle, { pointerId: 99, clientX: 1100 })
+    fireEvent.pointerMove(right, { pointerId: 7, clientX: 1000 })
+    await flushFrames()
+    // Mid-gesture the axis moves but the committed preference stays put.
+    expect(userWidth(root)).toBe('800px')
     expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(748)
-    fireEvent.pointerMove(handle, { pointerId: 7, clientX: 1000 })
+    fireEvent.pointerUp(right, { pointerId: 7, clientX: 1000 })
     expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(800)
-    fireEvent.pointerUp(handle, { pointerId: 99 })
+    fireEvent.pointerMove(right, { pointerId: 7, clientX: 1050 })
+    await flushFrames()
     expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(800)
-    fireEvent.pointerUp(handle, { pointerId: 7 })
-    fireEvent.pointerMove(handle, { pointerId: 7, clientX: 1050 })
-    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(800)
-    expect(handle.getAttribute('aria-valuenow')).toBe('800')
+    expect(right.getAttribute('aria-valuenow')).toBe('800')
+
+    // Left handle: outward is leftward, so -26px travel widens the same way.
+    fireEvent.pointerDown(left, { pointerId: 3, clientX: 200 })
+    fireEvent.pointerMove(left, { pointerId: 3, clientX: 174 })
+    await flushFrames()
+    expect(userWidth(root)).toBe('852px')
+    fireEvent.pointerUp(left, { pointerId: 3, clientX: 174 })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(852)
+  })
+
+  it('a press without travel leaves the stored preference untouched', async () => {
+    const b = mount(conversationSnapshot())
+    const root = rootOf(b)
+    mockColumn(root, 1200)
+    const { right } = handles(b)
+    fireEvent.pointerDown(right, { pointerId: 7, clientX: 974 })
+    fireEvent.pointerUp(right, { pointerId: 7, clientX: 974 })
+    await flushFrames()
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(748)
+  })
+
+  it('pointercancel abandons the gesture and restores the committed width', async () => {
+    const b = mount(conversationSnapshot())
+    const root = rootOf(b)
+    mockColumn(root, 1200)
+    const { right } = handles(b)
+    fireEvent.pointerDown(right, { pointerId: 7, clientX: 974 })
+    fireEvent.pointerMove(right, { pointerId: 7, clientX: 1000 })
+    await flushFrames()
+    expect(userWidth(root)).toBe('800px')
+    fireEvent.pointerCancel(right, { pointerId: 7 })
+    await flushFrames()
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(748)
+    expect(userWidth(root)).toBe('748px')
+  })
+
+  it('clamps the drag against the column edge budget', async () => {
+    const b = mount(conversationSnapshot())
+    const root = rootOf(b)
+    mockColumn(root, 1200)
+    const { right } = handles(b)
+    // 1200 - 176 = 1024 is the drag ceiling; a huge outward pull lands on it.
+    fireEvent.pointerDown(right, { pointerId: 7, clientX: 974 })
+    fireEvent.pointerMove(right, { pointerId: 7, clientX: 1600 })
+    await flushFrames()
+    expect(userWidth(root)).toBe('1024px')
+    fireEvent.pointerUp(right, { pointerId: 7, clientX: 1600 })
+    expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(1024)
   })
 
   it('supports keyboard width steps, accelerated steps, and range endpoints', () => {
     const b = mount(conversationSnapshot())
-    const handle = b.view.getByRole('separator', { name: '调整对话内容宽度' })
-    fireEvent.keyDown(handle, { key: 'ArrowLeft' })
+    const { right } = handles(b)
+    fireEvent.keyDown(right, { key: 'ArrowLeft' })
     expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(732)
-    fireEvent.keyDown(handle, { key: 'ArrowRight', shiftKey: true })
+    fireEvent.keyDown(right, { key: 'ArrowRight', shiftKey: true })
     expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(796)
-    fireEvent.keyDown(handle, { key: 'Home' })
+    fireEvent.keyDown(right, { key: 'Home' })
     expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(560)
-    fireEvent.keyDown(handle, { key: 'End' })
+    fireEvent.keyDown(right, { key: 'End' })
     expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(1080)
-    expect(handle.getAttribute('aria-valuenow')).toBe('1080')
-    fireEvent.keyDown(handle, { key: 'PageDown' })
+    expect(right.getAttribute('aria-valuenow')).toBe('1080')
+    fireEvent.keyDown(right, { key: 'PageDown' })
     expect(b.displaySettings.getSnapshot().chatContentWidth).toBe(1080)
   })
 
-  it('fills the pane in full-width mode and starts a drag from the rendered width', () => {
+  it('fills the pane in full-width mode and starts a drag from the rendered width', async () => {
     const b = mount(conversationSnapshot())
     b.displaySettings.set({ ...b.displaySettings.getSnapshot(), chatFullWidth: true })
     b.rerender()
-    const root = b.view.container.firstElementChild as HTMLElement
-    expect(root.style.getPropertyValue('--dsh-chat-content-width')).toContain('100%')
-    Object.defineProperty(root, 'getBoundingClientRect', {
-      configurable: true,
-      value: () => ({ left: 0, width: 1200, top: 0, right: 1200, bottom: 800, height: 800 }),
-    })
-    const handle = b.view.getByRole('separator', { name: '调整对话内容宽度' })
-    expect(handle.getAttribute('aria-valuetext')).toBe('占满')
+    const root = rootOf(b)
+    expect(userWidth(root)).toContain('100%')
+    mockColumn(root, 1200)
+    const { right } = handles(b)
+    expect(right.getAttribute('aria-valuetext')).toBe('占满')
 
     // Rendered width is the measured pane width (jsdom reports no gutter), so
-    // grabbing the edge and pulling in exits fill into a clamped pixel width.
-    fireEvent.pointerDown(handle, { pointerId: 7, clientX: 1192 })
-    expect(b.displaySettings.getSnapshot()).toMatchObject({ chatContentWidth: 1080, chatFullWidth: false })
+    // the gesture base clamps to the 1024 edge-budget ceiling; an inward pull
+    // of 50px exits fill into a pixel width of 924.
+    fireEvent.pointerDown(right, { pointerId: 7, clientX: 1192 })
+    fireEvent.pointerMove(right, { pointerId: 7, clientX: 1142 })
+    await flushFrames()
+    fireEvent.pointerUp(right, { pointerId: 7, clientX: 1142 })
+    expect(b.displaySettings.getSnapshot()).toMatchObject({ chatContentWidth: 924, chatFullWidth: false })
+  })
+
+  it('keeps the handles off the hero phase', () => {
+    const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true }))
+    expect(b.view.queryAllByRole('separator', { name: '调整对话内容宽度' })).toHaveLength(0)
   })
 
   it('renders the composer inert with the blocker\u2019s own reason', () => {

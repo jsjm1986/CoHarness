@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for upstream-upgrade-playbook.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/upstream-upgrade-playbook.md
-upstream-upgrade-playbook.md: 0d0e611f508e32eba0bdd45be3e38660b3f41f27
-upstream-upgrade-playbook.zh.md: 922046ccea569175477c741c6344f14d8b6bd341
+/upstream-upgrade-playbook:
+  en: 0f2ed478f81e014e
+  zh: a7da4724a1853c60
+/upstream-upgrade-playbook/two-change-tracks:
+  en: fbff42c338869089
+  zh: 8a40934e9891f7d4
+/upstream-upgrade-playbook/1-freeze-the-baseline:
+  en: 782a548494278016
+  zh: fe5689485c3bd3a5
+/upstream-upgrade-playbook/2-build-the-alignment-record:
+  en: 08a12d96fe83502e
+  zh: b1cbaf2347f2c220
+/upstream-upgrade-playbook/3-audit-cordis-seams-first:
+  en: 414cecb9cd133845
+  zh: 42c7643666d21813
+/upstream-upgrade-playbook/4-handle-breaking-changes-in-dependency-order:
+  en: d147d9dcd1ec11f7
+  zh: 84c14f92041e9ac5
+/upstream-upgrade-playbook/5-select-evidence-by-impact:
+  en: 32ffc80578caa8eb
+  zh: 89c00a2564a97587
+/upstream-upgrade-playbook/6-merge-and-release-in-layers:
+  en: 8b2834186d5f9f6f
+  zh: a03e91f76e680812
+/upstream-upgrade-playbook/7-close-the-record:
+  en: 3ebb0916e7f55a89
+  zh: 12c48c3eecd84acf
+/upstream-upgrade-playbook/what-stays-deliberately-flexible:
+  en: e39545fbae3e74b4
+  zh: 65e2e3eb3860e927
+/upstream-upgrade-playbook/8-avoid-these-shortcuts:
+  en: a14d7a75fe94c4dd
+  zh: ab221afb2140b3e1

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-bundle"
+---
+
 # @deepseek-ai/dsh-subagent-claude-code
 
 [English](README.md) | 中文
@@ -8,6 +13,22 @@
 
 当委派任务应在父工作区中以全新、无人值守的 Claude Code 会话运行时，安装这个 Profile Bundle。每次运行接受一个自包含文本任务，并返回最终答案或安全的失败诊断；推理、工具通信、stderr、用量信息和工作区差异不会进入父 Session。Claude 原生设置与身份验证继续是权威来源，而 Profile 配置选择模型、环境和 `permissionMode`。针对平台锁定的运行时仅在需要时启动，并且绝不会回退到宿主 `claude` 可执行文件。当隔离和真实 Claude Code 行为比续接或提示更重要时，选择本包。
 
+## 目录
+
+- [启动与所有权](#start-and-ownership)
+- [原生设置与交互](#native-settings-and-interaction)
+- [能力与上下文](#capabilities-and-context)
+- [配置](#configuration)
+- [持续成员](#persistent-members)
+- [产品兼容性与证据](#product-compatibility-and-evidence)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="start-and-ownership"></a>
 ## 启动与所有权
 
 `start(request)` 只接受非空的文本块序列，并根据父会话确定子级 cwd。它会创建一个私有 `AbortController`，调用官方 SDK 的 `query()`，并仅在 SDK 的 `spawnClaudeCodeProcess` 钩子已经提供由 [`dsh-subprocess`](../../subprocess/subprocess/README.zh.md) 管理的活动 CLI 句柄后发布此次运行。若在发布前发生失败或取消，它会关闭 query、终止所有已取得的进程树并等待其退出，然后拒绝 `start()` 调用。
@@ -16,16 +37,19 @@ SDK 接收由文本块原样拼接成的任务。提供方会完整迭代 SDK �
 
 本地取消会在结果竞态中胜出并映射为 `aborted`，且不附带失败诊断。`dispose()`（资源释放）具有幂等性：它会中止此次运行、请求 SDK query 关闭、调用共享的进程树逐级终止机制，并等待整棵进程树退出。SDK 的优雅关闭只表达协议意图；进程是否完全停稳仍以子进程句柄为准。启动与清理拒绝会在 Error 消息中公开同样固定的安全阶段和进程事实，而原始产品或 Host 错误只保留在内部 cause 链与提供方的 Host 日志中。结果失败与独立的清理失败仍彼此分离。
 
+<a id="native-settings-and-interaction"></a>
 ## 原生设置与交互
 
 提供方故意省略 SDK 的 `settingSources` 选项。因此，官方 SDK 会相对于父会话 cwd 读取宿主机常规的用户、项目和本地 Claude 设置，包括原生账户状态与产品配置。提供方既不复制也不过滤这些文件，也不会创建或修改登录状态。Profile 选择的 `permissionMode` 是唯一的 query 级覆盖：Claude Code 仍拥有其设置与沙箱，而所选原生模式决定这个无人值守 query 如何处理权限检查。
 
 每次 query 都设置 `persistSession: false` 并禁用 `AskUserQuestion`。除 bypass 模式外，`canUseTool` 会立即拒绝仍需人工审批的请求。Plan 模式还会把 `ExitPlanMode` 放入 SDK 的 `disallowedTools`，因此原生 settings 无法预先放行回到执行模式的转换，模型必须把完整计划作为最终答案返回。MCP elicitation 会被拒绝，已知的拒绝回退对话会被取消，未声明的对话类型则使用 SDK 的无对话失败行为。这些决定都不会等待用户界面。当两类事实共同参与一次失败运行时，`SubagentResult.diagnostic` 会先写入结构化失败行，再写入最新的安全权限决定；共享结果边界会把完整文本限制在 4096 个 UTF-8 字节以内。成功运行与本地取消都不会公开已捕获的事实。
 
+<a id="capabilities-and-context"></a>
 ## 能力与上下文
 
 本提供方不声明任何可选的启动时能力，并报告 `inheritsParentContext: false`。Claude Code 会接收独立文本任务和父会话 cwd，但不会接收父会话的对话、角色设定、工具筛选器、深度策略或结构化输出约定。每次运行都拥有独立的 SDK query、取消控制器、CLI 进程和不持久化的产品会话。
 
+<a id="configuration"></a>
 ## 配置
 
 | 配置键 | 默认值 | 含义 |
@@ -35,15 +59,21 @@ SDK 接收由文本块原样拼接成的任务。提供方会完整迭代 SDK �
 | `permissionMode` | `dontAsk` | 为该提供方实例的每次运行固定原生非交互权限策略。 |
 | `disposeGraceMs` | `3000` | 共享进程树责任方各终止层级之间的宽限期，单位为毫秒且须为正有限值，并不得大于仓库共享的 [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.zh.md)；随后资源释放会等待整棵进程树退出。 |
 | `stateDir` | `~/.dsh/external-members` | 实例独立绑定存储的目录；`claude-code.jsonl` 属于默认实例。仅由持续成员使用。 |
-| `memberCwd` | harness 启动目录 | 成员 Claude 会话的工作区。仅由持续成员使用。 |
+| `memberCwd` | 成员 Session cwd | 持续成员的工作区覆盖值，在其执行目标上验证。 |
+| `remoteCommand` | `claude` | 在 SSH 目标内解析的预装程序；本机继续使用随包固定的程序。 |
 
+<a id="persistent-members"></a>
 ## 持续成员
+
+SSH 使用目标机器预装的 `remoteCommand`。子进程只接收显式配置的环境变量，不携带 Host 的 HOME、PATH 或 SDK 进程环境；目标程序自行读取远端用户及项目配置。
+
+每次调用通过实际成员 Session 解析工作区及子进程提供方，SSH 会话必须使用同一 standing realm 的文件系统和子进程，缺失时拒绝而不回退到 Host。绑定存储在首次启动前固定规范路径及执行目标，重启后拒绝目标变化。损坏或不可读的记录不能被视为新成员；缺少目标证明的旧绑定保留原记录，须新建成员后才能执行。
 
 默认 `claude-code` 实例保留既有模型路由及 `claude-code.jsonl` 存储。其他名称根据完整提供方名称生成独立、确定的路由和文件，在大小写不敏感的文件系统上仍保持隔离；卸载一个实例只释放其路由。重命名实例会改变其持久身份，不会收养其他实例的绑定。
 
 挂载 `llm` 服务时本提供方同时声明 `prepareContinuable`，`ctx.subagents.startContinuable` 即可接受它——包括 Team roster 的提供方选择通道。成员子级是由 continuation 管理器拥有的普通进程内 Agent（耐用身份、inbox、持久化、重启）；本包只提供模型路由：每次成员模型调用在成员的耐用 Claude 会话上运行一次 Agent SDK `query`（已绑定时 `resume`，带 `persistSession`），然后释放 SDK 进程。
 
-绑定存储记录 harness 子会话 ↔ Claude 会话映射与最后发出的提示词；轮次中途崩溃后，下一次调用可经 `~/.claude/projects/` 下的耐用 transcript 证明该提示词：已完结的答案直接重放不重发，可证未送达的提示词重发一次，不可证的提示词被丢弃而非重复投递。没有 `llm` 服务时提供方保持仅一次性能力——没有 `prepareContinuable`，可继续启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
+绑定存储记录子会话 ↔ Claude 会话映射、待决提示词和已消费游标。实时轮次必须收到 SDK 成功结果才能完成。中断后，transcript 文本无法证明某次准确请求已完成或从未送达：待决请求报告 `EXTERNAL_TURN_OUTCOME_UNKNOWN`，不再次查询。耐用成员仍可接收新的明确提示词。未挂载 `llm` 时，持续成员启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
 
 | `permissionMode` 值 | 原生行为 |
 |---|---|
@@ -110,6 +140,7 @@ dsh --profile <name>
     maxDepth: provider-managed
 ```
 
+<a id="product-compatibility-and-evidence"></a>
 ## 产品兼容性与证据
 
 运行时依赖精确锁定为 `@anthropic-ai/claude-agent-sdk@0.3.263`，其八个平台包都携带 Claude Code 2.1.263。普通安装会按当前操作系统、CPU 及 Linux libc 选择一个载荷。对于当前 darwin-arm64 载荷，`npm pack --dry-run --json` 报告压缩包为 92,295,035 字节、解包后为 325,056,216 字节；其他平台可能不同，这些数值只用于披露而不是安装阈值。无密钥真实产品测试会让 SDK 选择 CLI，通过回环 Messages fixture 运行它，并断言共享子进程 argv 的首项就是该平台包的原生可执行文件。Loader 组合证明安装该 Bundle 只会注册休眠的 Claude Code provider，不会启动产品进程。
@@ -120,10 +151,13 @@ Loader 组合证明 Bundle 默认实例、两个额外命名 Claude 实例与现
 
 限定于项目所有者身份的分发授权涵盖官方 SDK 及每个 SDK 版本声明的官方 CLI／平台载荷。[`THIRD_PARTY_NOTICES.md`](../../../THIRD_PARTY_NOTICES.md) 会披露当前可选载荷闭包，但不会认定其中声明的条款属于宽松许可；其他无关的非宽松运行时依赖仍会使第三方声明门禁失败。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每次运行通过供应商 SDK 在委托工作区中提交一个任务并返回其结果；运行之间不保留会话状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 子级请求
@@ -154,6 +188,7 @@ Claude Code 子级会在一个全新的 SDK query 中接收独立文本任务。
 
 仅追加：前台会在可复用的父请求前缀后增加一个结果，后台则会继续追加 Job 启动确认、通知以及后续控制或收集结果。后台调度可能增加一个由通知唤醒的轮次，但这些消息都不会改写更早的前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 - **每次运行均新建一个 query 和一个进程**：不支持续接、恢复、池化、进度流或产品会话持久化。
@@ -165,3 +200,13 @@ Claude Code 子级会在一个全新的 SDK query 中接收独立文本任务。
 - **assistant 载荷仅包含最终文本**：失败运行可以额外公开独立的安全诊断；推理、中间消息、工具通信、用量信息、stderr 和工作区差异仍只保留在产品内部，通用 Job id、通知与状态来自共享作业运行时。
 - **没有可选的共享能力**：对于本提供方，共享服务会拒绝输出 schema、子任务角色设定、工具筛选和 harness 深度强制约束。
 - **没有按实际经过时间触发的超时或副作用回滚**：长时间运行的工作由调用方取消，且取消前已更改的文件或外部系统不会恢复原状。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

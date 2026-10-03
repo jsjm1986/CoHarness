@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-unary-apiproxy-remote-migration.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-08-10-unary-apiproxy-remote-migration.md
-2026-08-10-unary-apiproxy-remote-migration.md: 6e4121fb1ece092afcaf912fa96d40e0b6c463f8
-2026-08-10-unary-apiproxy-remote-migration.zh.md: f4c9fccc44414956afccd9b18a56cdec6a7f0e77
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services:
+  en: 5cf3fdb9d2b95aa5
+  zh: 91e7b1251e08be25
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/problem:
+  en: 31890e480b5335e6
+  zh: 0f00d6b27c2abdcc
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/proposal:
+  en: 360abac341a6c753
+  zh: 1b3d33794c4b43a8
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/migration-set:
+  en: 93ecc9151c893b9f
+  zh: 5400ae9f05141148
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/landed-migrations:
+  en: 6d4c2050e57d1092
+  zh: 4331ec959b2a9ea0
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/deferred-api-proxy-domains:
+  en: 07de0a2272217086
+  zh: b32829b4b9f12b68
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/agent-and-session-lookup-equivalence:
+  en: fb6144e0ff835e30
+  zh: cf211f752e804b45
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/client-and-error-behavior:
+  en: f9d9e3b8c7c344ea
+  zh: f5206e91d0f46cf6
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/privileged-authority:
+  en: 4a38b1eb2bbd7f9b
+  zh: 5aff72fb542ebc80
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/commit-boundaries:
+  en: 9db804f7ee6d3181
+  zh: e65e193637845252
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/alternatives-considered:
+  en: 561fbf6f096c0e91
+  zh: 49a657a1974332ee
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/acceptance-criteria:
+  en: a7825f0a82ca6119
+  zh: 0ae6ca86b9ae2d02
+/agent-note-migrate-simple-unary-api-proxy-calls-to-business-remote-services/risks:
+  en: 2511180c4c822255
+  zh: 06410661f869f3eb

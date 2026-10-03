@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { IconCheckOutline16 } from './icons/index.tsx'
 import css from './Toast.module.css'
 
 /** Full-opacity hold before the fade starts, when the owner names none. */
@@ -23,7 +24,10 @@ const FADE_MS = 1000
  * reads it as a custom property — so the two can no longer disagree and leave
  * the banner unmounting mid-fade.
  * @param props.text - resolved banner copy; the owner passes localized text.
- * @param props.icon - optional leading glyph (e.g. a warning icon).
+ * @param props.icon - optional leading glyph (e.g. a warning icon); ignored
+ * under `tone="success"`, which brings its own glyph.
+ * @param props.tone - 'success' renders a circled-check-style green check as
+ * the leading glyph; omitted, the icon seat keeps its warning tint.
  * @param props.holdMs - full-opacity hold before the fade; defaults to 3000.
  * @param props.anchor - optional element whose horizontal center the banner
  * follows (e.g. the composer card, so the banner centers over the chat column
@@ -31,9 +35,10 @@ const FADE_MS = 1000
  * @param props.onDone - called once the fade completes; unmount the toast here.
  * @returns the floating banner.
  */
-export function Toast({ text, icon, anchor, holdMs = HOLD_MS, onDone }: {
+export function Toast({ text, icon, tone, anchor, holdMs = HOLD_MS, onDone }: {
   text: string
   icon?: ReactNode
+  tone?: 'success'
   anchor?: HTMLElement | null
   holdMs?: number
   onDone: () => void
@@ -65,7 +70,9 @@ export function Toast({ text, icon, anchor, holdMs = HOLD_MS, onDone }: {
         '--dsh-toast-hold': `${String(holdMs)}ms`,
       } as CSSProperties}
     >
-      {icon !== undefined && <span className={css.icon} aria-hidden>{icon}</span>}
+      {tone === 'success'
+        ? <span className={`${css.icon} ${css.success}`} aria-hidden><IconCheckOutline16 /></span>
+        : icon !== undefined && <span className={css.icon} aria-hidden>{icon}</span>}
       <span className={css.text}>{text}</span>
     </div>,
     document.body,

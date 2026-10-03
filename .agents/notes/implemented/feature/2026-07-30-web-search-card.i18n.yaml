@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-web-search-card.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-web-search-card.md
-2026-07-30-web-search-card.md: 930a705fc227d7961e9cb1a51b0b04774a62c6a4
-2026-07-30-web-search-card.zh.md: 7771097423bda24c7fe254d5747205c1f06a5474
+/agent-note-web-search-card-the-grep-and-glob-render-intent-reaches-the-browser:
+  en: 22d87ba0f25bd0d5
+  zh: 44d03c211702ee74
+/agent-note-web-search-card-the-grep-and-glob-render-intent-reaches-the-browser/problem:
+  en: e665404d43cb0297
+  zh: 2d50f0a7c1345b9b
+/agent-note-web-search-card-the-grep-and-glob-render-intent-reaches-the-browser/decision:
+  en: e4606ab18248e580
+  zh: f27123b1853da336
+/agent-note-web-search-card-the-grep-and-glob-render-intent-reaches-the-browser/decision/render-sites:
+  en: a53d696389a7809c
+  zh: 02e8927273383b8f
+/agent-note-web-search-card-the-grep-and-glob-render-intent-reaches-the-browser/alternatives-considered:
+  en: 4481af2de338886c
+  zh: 6c251ad394d419ca
+/agent-note-web-search-card-the-grep-and-glob-render-intent-reaches-the-browser/consequences:
+  en: a0a356655aca8c96
+  zh: 016ba04c1a0e1dea
+/agent-note-web-search-card-the-grep-and-glob-render-intent-reaches-the-browser/testing:
+  en: c59eca7c40bb7a83
+  zh: c2c2453e91e7d30e
+/agent-note-web-search-card-the-grep-and-glob-render-intent-reaches-the-browser/related:
+  en: a30969d7a936317c
+  zh: d59af58e67960dd5

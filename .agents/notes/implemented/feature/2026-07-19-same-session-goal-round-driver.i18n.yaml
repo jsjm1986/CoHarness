@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-19-same-session-goal-round-driver.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-19-same-session-goal-round-driver.md
-2026-07-19-same-session-goal-round-driver.md: 9a2bbf40e86dd7ed5a35ca90e736bb321455488f
-2026-07-19-same-session-goal-round-driver.zh.md: a094b1289cd38e5f2c4e58270b653ffe984b9cbb
+/agent-note-same-session-goal-round-driver:
+  en: bb5ac988d2dbd7f7
+  zh: f809ac6b1422c10a
+/agent-note-same-session-goal-round-driver/problem:
+  en: de873459ddadd8fe
+  zh: 67a91615bf6839e5
+/agent-note-same-session-goal-round-driver/decision:
+  en: 64ac2ced98a0c87d
+  zh: 2b33693ea9f73727
+/agent-note-same-session-goal-round-driver/decision/reservation-and-admission:
+  en: d3b3ba38ab3edcbe
+  zh: d6bc548ea0c145c9
+/agent-note-same-session-goal-round-driver/decision/human-work-and-revision-races:
+  en: e83f1ce53cbce4ca
+  zh: 4d8d3023557d9527
+/agent-note-same-session-goal-round-driver/decision/settlement:
+  en: ba6387db942533a7
+  zh: 5903a62151f10e53
+/agent-note-same-session-goal-round-driver/decision/durability-and-cancellation-contract:
+  en: 609977b9489dc644
+  zh: 2c6522585cf8f9b5
+/agent-note-same-session-goal-round-driver/decision/process-lifecycle:
+  en: 2eeb37d22ff4eb7c
+  zh: 18a1b5be80cf3625
+/agent-note-same-session-goal-round-driver/testing:
+  en: 7732ade0c5a6145a
+  zh: 0e529d8a5a7e8256
+/agent-note-same-session-goal-round-driver/alternatives-considered:
+  en: d69faf2ba22a5d4c
+  zh: 9f1ac68c7755572b
+/agent-note-same-session-goal-round-driver/consequences:
+  en: f0be5090620680b3
+  zh: ba3636e9fcd1a177
+/agent-note-same-session-goal-round-driver/known-limitations-and-deferred-work:
+  en: 0726e2e973b4a5dc
+  zh: 7e487886519a5b89

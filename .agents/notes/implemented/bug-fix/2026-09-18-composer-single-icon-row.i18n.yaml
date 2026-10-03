@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-18-composer-single-icon-row.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-18-composer-single-icon-row.md
-2026-09-18-composer-single-icon-row.md: 33241584a1b3a9f111e6414a13bbb08bc9d8e6b4
-2026-09-18-composer-single-icon-row.zh.md: 6a7f004f847a5c064cef0ebc6196b297a7520d92
+/agent-note-mobile-composer-keeps-one-icon-only-toolbar-row:
+  en: 9e56e23285257246
+  zh: c6ad3f05436c0e14
+/agent-note-mobile-composer-keeps-one-icon-only-toolbar-row/problem:
+  en: eb9386bff1250c6a
+  zh: 9ebcc0791e68cdc6
+/agent-note-mobile-composer-keeps-one-icon-only-toolbar-row/decision:
+  en: cc9e47b7449069ad
+  zh: c0962d9ffe105681
+/agent-note-mobile-composer-keeps-one-icon-only-toolbar-row/alternatives-considered:
+  en: 880c047192ff0652
+  zh: c27f730dfa99f143
+/agent-note-mobile-composer-keeps-one-icon-only-toolbar-row/consequences:
+  en: 64c43521dc621627
+  zh: 33292759ecf53f41
+/agent-note-mobile-composer-keeps-one-icon-only-toolbar-row/testing:
+  en: 28e9d6f30c8bd87f
+  zh: 6da36f8151b6d01e

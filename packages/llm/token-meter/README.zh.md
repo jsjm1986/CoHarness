@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-token-meter
 
 [English](README.md) | 中文
@@ -8,10 +13,25 @@
 
 使用 `ctx.tokenMeter` 估算会话当前的请求与上下文压力，或为单条消息计价。测量会在当前模型路由与执行环境下回放持久会话日志，不进行模型调用。会话投影可用时，消费方可以读取 `tokenUsage`、`contextPressure` 与 `contextBreakdown`；文本和没有图片定价的路由采用近似的固定启发式规则，存在声明时应用视觉 token 定价，挂载 LLM（大语言模型）服务时文件按当前模型可见的句柄文本计价。只有请求 envelope 完全相同时才复用提供方报告的用量；本包不添加模型可见内容，也不在 loop 中做决策。
 
+## 目录
+
+- [配置](#configuration)
+- [测量约定](#measurement-contract)
+- [会话投影](#session-projections)
+- [组合](#composition)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="configuration"></a>
 ## 配置
 
 估算器没有配置项。它有意使用一项固定启发式规则：每个 token 按四个字符估算，再加上角色、块与请求 envelope 字段的结构开销。任何配置键都会被拒绝；模型容量属于拥有精确提供方／模型路由的适配器，可通过 `ctx.llm.resolveModelInfo().context` 获取。
 
+<a id="measurement-contract"></a>
 ## 测量约定
 
 `ctx.tokenMeter` 直接公开两个操作：
@@ -27,6 +47,7 @@ fold 跟踪完整请求标头快照、步骤边界、表层追加与替换、成
 
 用量计量会求和不重叠的输入、cache-read、cache-write 与输出 bucket；不会再次添加推理（reasoning）。每次成功调用都会记录一个 assistant 锚点，包括无内容调用。显式的空 `sourceEventSeqs` 列表表示已知空提供方流；遗留记录缺少该列表时，fold 会保守地将持久 assistant 输出视为提供方输出。
 
+<a id="session-projections"></a>
 ## 会话投影
 
 当组合提供 `ctx.sessionProjections` 时，token-meter 会通过一个可选子 fiber 注册三个单元。
@@ -51,6 +72,7 @@ fold 跟踪完整请求标头快照、步骤边界、表层追加与替换、成
 
 [Agent Note](../../../.agents/notes/implemented/architecture/2026-07-29-projected-token-usage-and-request-context.zh.md) 记录了否决「让这对值保持原子」方案的那次对比。需要同一边界精确数字的消费方应在自己的请求边界调用 `measure()`，而不是读取该投影。
 
+<a id="composition"></a>
 ## 组合
 
 ```yaml
@@ -60,10 +82,13 @@ fold 跟踪完整请求标头快照、步骤边界、表层追加与替换、成
 
 两个插件都有可用默认值。meter 保持与模型路由和可选压缩无关。部署会在 LLM 适配器上配置容量，并在 `dsh-compaction-basic` 上配置压缩策略。
 
+<a id="invariants"></a>
 ## 不变量
 
 不发布运行时不变式伴生插件：计量器从持久事件和当前请求上下文派生估算，没有可供独立比对的权威数据。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 间接地，通过 `dsh-compaction-basic` 等消费方；服务本身不添加任何提示词、消息、schema、工具或模型调用。
@@ -72,9 +97,20 @@ fold 跟踪完整请求标头快照、步骤边界、表层追加与替换、成
 
 不直接失效；任何请求前缀变更都由点名的消费方负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **固定启发式规则是近似值**：没有可复用提供方用量的内容按字符数加结构开销计价，而不是使用精确提供方 tokenizer 或请求 serializer。
 - **每次测量都会克隆当前表层**：一致且不可变的快照使读取成为 O(surface)，包括低于阈值的压力检查。
 - **提供方用量只能为完全相同的规范 envelope 复用**：提示词、前缀、工具、提供方、模型或调用配置变更都会有意回退到完整启发式估算。
 - **保守处理缺少源事件 seq 的遗留记录**：没有 `sourceEventSeqs` 的 assistant 消息无法区分提供方输出与 listener 改写，因此 fold 不会声称已知空流或精确分片流。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

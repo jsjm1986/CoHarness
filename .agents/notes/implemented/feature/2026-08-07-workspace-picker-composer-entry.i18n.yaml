@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-07-workspace-picker-composer-entry.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-07-workspace-picker-composer-entry.md
-2026-08-07-workspace-picker-composer-entry.md: dc9c26c291de6e7614ace3c787030c0032a9740d
-2026-08-07-workspace-picker-composer-entry.zh.md: 9121750ae1cbef2a94630d9ac43a765c03a397a7
+/agent-note-the-no-workspace-composer-opens-the-existing-picker:
+  en: 09ba891b08bbaa66
+  zh: a62aeb0bc089148c
+/agent-note-the-no-workspace-composer-opens-the-existing-picker/problem:
+  en: a95ace62946fa676
+  zh: 282529f0e83241ab
+/agent-note-the-no-workspace-composer-opens-the-existing-picker/decision:
+  en: da34243feb911d99
+  zh: 80f24b702021521d
+/agent-note-the-no-workspace-composer-opens-the-existing-picker/alternatives-considered:
+  en: d36b83f59e4779e7
+  zh: 0dc972c20501c75d
+/agent-note-the-no-workspace-composer-opens-the-existing-picker/consequences:
+  en: 3b97ac3531f92bc8
+  zh: 03304faf317a2d9c

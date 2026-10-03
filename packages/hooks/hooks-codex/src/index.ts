@@ -17,6 +17,13 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'hooks-codex': { kind: 'hooks-codex' } & ContextFormed
+  }
+}
+
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
@@ -79,7 +86,7 @@ function nextHandlerId(point: string): string {
   return `codex:${point}:${++handlerCounter}`
 }
 
-const PLUGIN_SOURCE: MessageSource = { kind: 'plugin', plugin: 'hooks-codex' }
+const CONTEXT_SOURCE: MessageSource = { kind: 'hooks-codex' }
 
 /** The summary cap bounds a persisted event field — a positive integer or the slice misbehaves silently. */
 function assertPositiveInteger(name: string, value: number): void {
@@ -186,7 +193,7 @@ export function apply(ctx: Context, config: Config): void {
   function contextFrom(merged: MergedHookOutcome): UserMessage | undefined {
     if (merged.additionalContext.length === 0) return undefined
     const content: ContentBlock[] = merged.additionalContext.map(text => ({ type: 'text', text: cap(text) }))
-    return createUserMessage({ content, source: PLUGIN_SOURCE })
+    return createUserMessage({ content, source: CONTEXT_SOURCE })
   }
 
   /** Prepend one context without flattening source fields or other downstream metadata. */
@@ -277,8 +284,8 @@ export function apply(ctx: Context, config: Config): void {
       // A blocking Stop hook forces continuation; a block with no reason (exit 2,
       // empty stderr) still forces it — fall back to a generic steering line
       // rather than letting the turn stop.
-      const text = cap(merged.reason ?? 'continue: blocked by Stop hook')
-      agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: PLUGIN_SOURCE }))
+      const text = merged.reason ?? 'continue: blocked by Stop hook'
+      agent.steer(createUserMessage({ content: [{ type: 'text', text: cap(text) }], source: CONTEXT_SOURCE }))
     }
   })
 }

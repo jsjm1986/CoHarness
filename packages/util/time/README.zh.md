@@ -45,6 +45,7 @@ import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 
 <a id="model-experience"></a>
 
+
 ## 模型体验
 
 间接影响，取决于把规范时区记到持久消息上的那个消费方——`dsh-time-context` 据此渲染该轮模型可见的时区指令与时间戳。
@@ -53,6 +54,7 @@ import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 
 自身没有。把时区派生文本注入请求的那个消费方，对该请求的缓存行为负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -69,3 +71,5 @@ import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 无。
 
 </details>
+
+<a id="model-experience"></a>

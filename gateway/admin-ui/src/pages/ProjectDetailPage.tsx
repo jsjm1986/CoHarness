@@ -2,6 +2,7 @@ import { ArrowLeft, ExternalLink, Pencil, Settings2, Sparkles, Trash2, Users } f
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
+  controlProjectInstance,
   deleteProject,
   getProjectModelAccess,
   getProject,
@@ -54,6 +55,7 @@ export function ProjectDetailPage() {
   const [error, setError] = useState('')
   const [pending, setPending] = useState('')
   const [renameOpen, setRenameOpen] = useState(false)
+  const [renameError, setRenameError] = useState('')
   const [projectName, setProjectName] = useState('')
   const [removeTarget, setRemoveTarget] = useState<AdminUser | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -78,6 +80,8 @@ export function ProjectDetailPage() {
   const [modelsLoading, setModelsLoading] = useState(true)
   const [modelsError, setModelsError] = useState('')
   const [modelPending, setModelPending] = useState('')
+  const [runtimeAction, setRuntimeAction] = useState<'start' | 'stop' | 'restart' | null>(null)
+  const [runtimeError, setRuntimeError] = useState('')
 
   const reload = useCallback(async (showLoading = false) => {
     if (!Number.isInteger(projectId) || projectId <= 0) {
@@ -235,12 +239,13 @@ export function ProjectDetailPage() {
   async function onRename(event: FormEvent) {
     event.preventDefault()
     setPending('rename')
+    setRenameError('')
     try {
       await renameProject(projectId, projectName)
       setRenameOpen(false)
       await reload()
     } catch (cause) {
-      setError(messageFrom(cause))
+      setRenameError(messageFrom(cause))
     } finally {
       setPending('')
     }
@@ -258,11 +263,14 @@ export function ProjectDetailPage() {
   }
 
   function openQuotaDialog() {
-    setQuotaSource('independent')
-    setTokenMode('unlimited')
-    setCostMode('unlimited')
-    setTokenLimit('')
-    setCostLimit('')
+    const quota = project?.quota
+    const storedTokens = quota?.tokenLimit ?? null
+    const storedCost = quota?.companyCostMicrosLimit ?? null
+    setQuotaSource(quota?.source ?? 'independent')
+    setTokenMode(storedTokens === null ? 'unlimited' : 'custom')
+    setCostMode(storedCost === null ? 'unlimited' : 'custom')
+    setTokenLimit(storedTokens === null ? '' : String(storedTokens))
+    setCostLimit(storedCost === null ? '' : String(storedCost / 1_000_000))
     setQuotaError('')
     setQuotaOpen(true)
   }
@@ -309,7 +317,7 @@ export function ProjectDetailPage() {
         title={project?.name ?? '项目详情'}
         description={project?.path}
         meta={project === null ? undefined : `${project.memberCount} 位成员`}
-        actions={project === null ? undefined : <Button icon={Pencil} onClick={() => setRenameOpen(true)}>重命名</Button>}
+        actions={project === null ? undefined : <Button icon={Pencil} onClick={() => { setRenameError(''); setProjectName(project.name); setRenameOpen(true) }}>重命名</Button>}
       />
       <ErrorBanner message={error} />
       {loading ? <Section><LoadingState label="正在加载项目" /></Section> : project === null ? (
@@ -343,6 +351,13 @@ export function ProjectDetailPage() {
                 <span>{project.configurationSummary === undefined
                   ? '状态未知'
                   : `${project.configurationSummary.runtimeState} · generation ${String(project.configurationSummary.runtimeGeneration)}`}</span>
+                <div className="formActions" aria-label="项目实例操作">
+                  {(['start', 'stop', 'restart'] as const).map(action => (
+                    <Button key={action} disabled={pending !== ''} onClick={() => { setRuntimeError(''); setRuntimeAction(action) }}>
+                      {action === 'start' ? '启动实例' : action === 'stop' ? '停止实例' : '重启实例'}
+                    </Button>
+                  ))}
+                </div>
               </div>
               <div>
                 <span className="definitionLabel">项目 Provider</span>
@@ -614,9 +629,29 @@ export function ProjectDetailPage() {
         )}
       >
         <form id="rename-project-form" onSubmit={event => void onRename(event)}>
+          <ErrorBanner message={renameError} />
           <Field label="项目名称"><input className="input" required autoFocus value={projectName} onChange={event => setProjectName(event.target.value)} /></Field>
         </form>
       </Dialog>
+
+      <Dialog
+        open={runtimeAction !== null}
+        title={runtimeAction === 'start' ? '启动项目实例' : runtimeAction === 'stop' ? '停止项目实例' : '重启项目实例'}
+        description={runtimeAction === 'start' ? '启动本节点的共享运行时。维护窗口中不允许启动。'
+          : `此操作影响项目 ${project?.name ?? ''} 的所有在线成员，并会中断正在执行的 Agent、子任务和终端。停止后后台任务不会自动唤醒实例。`}
+        onClose={() => { if (pending !== 'runtime') setRuntimeAction(null) }}
+        footer={<>
+          <Button disabled={pending === 'runtime'} onClick={() => { setRuntimeAction(null) }}>取消</Button>
+          <Button variant="primary" loading={pending === 'runtime'} onClick={() => {
+            const action = runtimeAction
+            if (action === null) return
+            setPending('runtime'); setRuntimeError('')
+            void controlProjectInstance(projectId, action).then(async () => { setRuntimeAction(null); await reload() })
+              .catch((cause: unknown) => { setRuntimeError(messageFrom(cause)) })
+              .finally(() => { setPending('') })
+          }}>确认执行</Button>
+        </>}
+      ><ErrorBanner message={runtimeError} /></Dialog>
 
       <ConfirmDialog
         open={removeTarget !== null}

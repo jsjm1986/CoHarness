@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createMessage, createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-title'
 import {
@@ -42,11 +42,7 @@ function markdownFixture(): string {
   session.append('system/message', {
     turn: 1,
     step: 1,
-    message: createMessage({
-      role: 'system',
-      content: [{ type: 'text', text: 'Fixture system prompt.' }],
-      source: { kind: 'plugin', plugin: 'test-fixture' },
-    }),
+    message: createSystemMessage('Fixture system prompt.'),
   }, { surfaceOp: 'append' })
   const user = session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: 'Render adjacent CJK strong emphasis.' }],
@@ -108,7 +104,7 @@ describe('web e2e: CJK-adjacent Markdown strong emphasis', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 

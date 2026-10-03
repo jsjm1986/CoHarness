@@ -5,6 +5,9 @@ import type {
 } from '../src/client/trajectory-contract.ts'
 import { TrajectorySnapshotBuilder } from '../src/client/trajectory-snapshot-builder.ts'
 
+const EMPTY_LOCATION_DATA_SOURCE = { getSnapshot: () => undefined, subscribe: () => () => {} }
+const EMPTY_LOCATION_DATA = { get: () => undefined, source: () => EMPTY_LOCATION_DATA_SOURCE }
+
 function assistantRequest(startSeq: number, step: number): Extract<RequestView, { purpose: 'assistant' }> {
   return {
     purpose: 'assistant',
@@ -30,14 +33,13 @@ function contribution(
 }
 
 function stepLocation(turn: number, step: number): TrajectoryRequestHeaderState['location'] {
-  const data = { get: () => undefined }
   const stepLocation = {
     turn,
     step,
     start: undefined,
     end: undefined,
     status: 'unknown' as const,
-    data,
+    data: EMPTY_LOCATION_DATA,
   }
   const turnLocation = {
     turn,
@@ -45,7 +47,7 @@ function stepLocation(turn: number, step: number): TrajectoryRequestHeaderState[
     end: undefined,
     status: 'unknown' as const,
     steps: [stepLocation],
-    data,
+    data: EMPTY_LOCATION_DATA,
   }
   return { kind: 'step', turn: turnLocation, step: stepLocation }
 }
@@ -154,6 +156,7 @@ describe('TrajectorySnapshotBuilder', () => {
       contribution('tool', 7, {
         kind: 'tool',
         root: {
+          phase: 'start',
           callId: 'call-edit',
           name: 'edit',
           argsRaw: '{}',
@@ -273,7 +276,8 @@ describe('TrajectorySnapshotBuilder', () => {
     const tool = contribution('tool', 6, {
       kind: 'tool',
       root: {
-        callId: 'call-read', name: 'read', argsRaw: '{}', turn: 1, step: 1, time: 6, callView: null, subCalls: [],
+        phase: 'start', callId: 'call-read', name: 'read', argsRaw: '{}', turn: 1, step: 1, time: 6,
+        callView: null, subCalls: [],
       },
     })
     const later = contribution('user:8', 8, {

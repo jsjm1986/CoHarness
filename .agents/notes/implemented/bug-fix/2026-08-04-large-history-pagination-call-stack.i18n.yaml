@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-04-large-history-pagination-call-stack.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-04-large-history-pagination-call-stack.md
-2026-08-04-large-history-pagination-call-stack.md: 5ddbaba68136f7893166fa1a22d794f0fd801999
-2026-08-04-large-history-pagination-call-stack.zh.md: 18e8c012c9fa59bbd516ce6bb73b52b24b8e761f
+/agent-note-large-history-source-event-lists-are-scanned-without-argument-expansion:
+  en: eee3af31f408c9bd
+  zh: 7eec92b8e4e58f56
+/agent-note-large-history-source-event-lists-are-scanned-without-argument-expansion/problem:
+  en: 00398c8807a5970c
+  zh: e9926ee0ef0931f9
+/agent-note-large-history-source-event-lists-are-scanned-without-argument-expansion/decision:
+  en: 78f2299581dfd79c
+  zh: d46038e344a7f4b9
+/agent-note-large-history-source-event-lists-are-scanned-without-argument-expansion/alternatives-considered:
+  en: 3518b252f11bed19
+  zh: 69c58815342084c2
+/agent-note-large-history-source-event-lists-are-scanned-without-argument-expansion/consequences:
+  en: 1beed2597a11e6e3
+  zh: eaab339d44c9d379

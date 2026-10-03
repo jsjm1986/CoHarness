@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write apps/android-shell/README.md
-README.md: cfd03b8b8585b485cc4cf56a0f47cce08e4a9ec0
-README.zh.md: 80d427c9c5e12ea2eec2e250e36a8bbc437d9583
+/android-shell:
+  en: 05458519a1dbc99f
+  zh: 71f977976d5a9a9b
+/android-shell/first-setup:
+  en: bf1dee88b396bd87
+  zh: e146a79e154b0b29
+/android-shell/later-releases:
+  en: dccee9b242c07022
+  zh: 32bf16afcb76c0cb
+/android-shell/crash-isolation-build:
+  en: 0446c0feabb829ed
+  zh: 9fece1e8501137d9
+/android-shell/push-providers:
+  en: e28f4e73aeb2bdc4
+  zh: e0223541eda1545a
+/android-shell/validation:
+  en: 256ee6fa356f1802
+  zh: ce3de7d2adf51cf3

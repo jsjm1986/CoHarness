@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-per-preset-standing-mounts.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-08-per-preset-standing-mounts.md
-2026-08-08-per-preset-standing-mounts.md: fe4bb0e2c39712d4b975b30c8b36d853d2051709
-2026-08-08-per-preset-standing-mounts.zh.md: bd9b29612015149cccdd1e5d38e6e50855286006
+/agent-note-per-preset-standing-mounts-over-a-scope-parent-chain:
+  en: 94d44ebb907ebe60
+  zh: 3a88fdfe84ef6edc
+/agent-note-per-preset-standing-mounts-over-a-scope-parent-chain/problem:
+  en: 4d9de4b8eb886f3a
+  zh: b2279b72eedd4f4e
+/agent-note-per-preset-standing-mounts-over-a-scope-parent-chain/decision:
+  en: 8f27472b1d62f33c
+  zh: 0f555971cd745177
+/agent-note-per-preset-standing-mounts-over-a-scope-parent-chain/consequences:
+  en: 3d7aa4b32908d6ae
+  zh: 65d7a8a5facd4aef
+/agent-note-per-preset-standing-mounts-over-a-scope-parent-chain/load-bearing-details:
+  en: f314e758d5c8f9fc
+  zh: 94446f70a847cc6b
+/agent-note-per-preset-standing-mounts-over-a-scope-parent-chain/alternatives-considered:
+  en: 359eff4bf0b1057b
+  zh: 889cf8529e22e45e

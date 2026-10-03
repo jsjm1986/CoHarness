@@ -1,3 +1,8 @@
+---
+description: "Locale plugin: Host-backed language preference, external language packs, fallback chains, snapshots, and typed namespace dictionaries"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-locale
 
 English | [中文](README.zh.md)
@@ -10,6 +15,18 @@ The package ships only `zh` and `en`. External client plugins add a selectable l
 
 Use `dsh-client-locale` to switch the web GUI between the shipped English and Chinese locales or languages added by client plugins. User selections take effect immediately; loopback pages persist them in `$DSH_HOME/settings.yaml`, while non-loopback pages keep them only for the current process. New browsers use the first supported language requested by the browser until an allowed stored preference arrives. Plugin authors add typed namespace dictionaries and translate through the public locale API; slot-rendered copy updates without a reload.
 
+## Table of Contents
+
+- [Language-pack registration](#language-pack-registration)
+- [Settings authority](#settings-authority)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="language-pack-registration"></a>
 ## Language-pack registration
 
 Register the definition and each translated namespace as effects owned by the language-pack plugin:
@@ -29,14 +46,17 @@ export function apply(ctx) {
 }
 ```
 
+<a id="settings-authority"></a>
 ## Settings authority
 
 The Language row follows the bound account-backed settings scope and disables selection while the first view is loading, the scope is unavailable, or its provider is read-only. A Gateway project runtime does not take ownership of this preference: the account transport persists it for the authenticated member, with a Host fallback only when the account route is explicitly unsupported. `LocaleRuntime.setLocale` applies the same writable-view guard, so programmatic callers cannot turn a disabled row into a mutation; failed writes are adopted back from the recovered value.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The active locale is one resolved value bound to the Host-owned settings namespace; provisional, saved, and pushed values follow a single precedence asserted by specs.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the locale service is a browser-side UI plugin layer that registers nothing model-facing.
@@ -50,3 +70,13 @@ None; this package neither assembles nor sends a provider request.
 - **Some surfaces keep inline copy** — Settings rows, the sidebar, question composer, and model select use locale seats; other packages still own static text directly.
 - **Registry-held text reads its translation once** — copy captured at registration time outside the slot render path (e.g. the `/model` command description in the command registry) keeps the language it was registered under until re-registration; slot-rendered copy follows switches live.
 - **Language packs own language-specific behavior** — the registry supplies selection, persistence, browser matching, key fallback, and `<html lang>`; it does not add plural rules or bidirectional layout.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

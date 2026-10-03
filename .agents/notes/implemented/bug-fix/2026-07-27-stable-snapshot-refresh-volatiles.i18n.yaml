@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-stable-snapshot-refresh-volatiles.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-27-stable-snapshot-refresh-volatiles.md
-2026-07-27-stable-snapshot-refresh-volatiles.md: c3eeeca01a7820b5f410bd895de998e944e58eb2
-2026-07-27-stable-snapshot-refresh-volatiles.zh.md: 79a2758e7a7353c983f4e8a9d2531830dec311e4
+/agent-note-stable-snapshot-refresh-volatiles:
+  en: 1c8894a040a25fa2
+  zh: 1c7e98929904bebc
+/agent-note-stable-snapshot-refresh-volatiles/problem:
+  en: 67740d9e104938a9
+  zh: 22d915800129029c
+/agent-note-stable-snapshot-refresh-volatiles/decision:
+  en: f0d850bfdb1043a4
+  zh: 66dee2267cbfa72f
+/agent-note-stable-snapshot-refresh-volatiles/alternatives-considered:
+  en: 3aa5b182bb763419
+  zh: 2176846cf574b067
+/agent-note-stable-snapshot-refresh-volatiles/consequences:
+  en: 51e618dfbae11fcf
+  zh: ab56354c0f8d3017

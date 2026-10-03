@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-03-package-anchored-subsystem-pages.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-03-package-anchored-subsystem-pages.md
-2026-08-03-package-anchored-subsystem-pages.md: 40f330d0feaca519bdc683e1992597b4be46cd8e
-2026-08-03-package-anchored-subsystem-pages.zh.md: 25f96e7411728e5cb49cd663dc5cd087688b068c
+/agent-note-package-anchored-subsystem-pages-and-thin-group-readmes:
+  en: 48a39166064d9f0d
+  zh: c23ba48570aab506
+/agent-note-package-anchored-subsystem-pages-and-thin-group-readmes/problem:
+  en: 2cc540eec8ae5f99
+  zh: 5d68c6b38bb9658f
+/agent-note-package-anchored-subsystem-pages-and-thin-group-readmes/decision:
+  en: 517513fb084a7914
+  zh: 0f96f221d8050fce
+/agent-note-package-anchored-subsystem-pages-and-thin-group-readmes/alternatives-considered:
+  en: 585a263cc45a2095
+  zh: f7c2464b0a7646e1
+/agent-note-package-anchored-subsystem-pages-and-thin-group-readmes/consequences:
+  en: c6807d45676a796f
+  zh: 148ccfdb63fad25f

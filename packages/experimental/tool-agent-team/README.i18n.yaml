@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/tool-agent-team/README.md
-README.md: df7552d94b9e3b1a7e9e9ead9f18ac1b96a8ec39
-README.zh.md: b1efea5c89123ae05fcfd62ce8ade9ac9e459b54
+/:
+  en: 77decee38faddfa1
+  zh: 61495d48365178df
+/deepseek-ai-dsh-experimental-tool-agent-team:
+  en: b1fa1bb8a063288c
+  zh: 6a38813dd1b41aef
+/deepseek-ai-dsh-experimental-tool-agent-team/summary:
+  en: 0cce9e5ec6d1946a
+  zh: 6bc76243f494815c
+/deepseek-ai-dsh-experimental-tool-agent-team/table-of-contents:
+  en: 1deaaecedb42b6b9
+  zh: 7bc8432d886ef101
+/deepseek-ai-dsh-experimental-tool-agent-team/config:
+  en: a265cc7aadb45f0b
+  zh: ba6c1642b7c43010
+/deepseek-ai-dsh-experimental-tool-agent-team/tools-and-authority:
+  en: 3ec1e8213a801369
+  zh: c42f5a3c43393942
+/deepseek-ai-dsh-experimental-tool-agent-team/invariants:
+  en: 729322e9f62f3655
+  zh: 46b4fda7831b9a9a
+/deepseek-ai-dsh-experimental-tool-agent-team/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-experimental-tool-agent-team/model-experience/team-policy-and-tools:
+  en: 8e1e365ff3b0dfb2
+  zh: c6c91fbf1e1df934
+/deepseek-ai-dsh-experimental-tool-agent-team/model-experience/team-policy-and-tools/what-the-model-sees:
+  en: 80a2f0838e81e044
+  zh: 7bde214af80e7bf5
+/deepseek-ai-dsh-experimental-tool-agent-team/model-experience/team-policy-and-tools/token-effect:
+  en: fe314af98a2130b8
+  zh: ea89cb40dd11d57c
+/deepseek-ai-dsh-experimental-tool-agent-team/model-experience/team-policy-and-tools/kv-cache-effect:
+  en: cba54e491b29b664
+  zh: f53b5507c6541f06
+/deepseek-ai-dsh-experimental-tool-agent-team/known-limitations-and-deferred-work:
+  en: fe6add6145fc4fa5
+  zh: 9a0f0d0a9594dae0
+/deepseek-ai-dsh-experimental-tool-agent-team/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

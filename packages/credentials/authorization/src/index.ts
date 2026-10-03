@@ -18,7 +18,8 @@
  *   methods: [{ id: 'oauth', label: 'Sign in with ChatGPT' }],
  *   async run(session) {
  *     session.notify({ message: 'Continue in your browser', url })
- *     await commitThroughCredentials(await exchange(session.signal))
+ *     const credential = await exchange(session.signal)
+ *     await session.commit(async () => credential)
  *   },
  * })
  * ```
@@ -27,7 +28,7 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
-import type { CredentialKey } from '@deepseek-ai/dsh-credentials'
+import type { CredentialKey, CredentialRecord } from '@deepseek-ai/dsh-credentials'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 
 import type {
@@ -105,16 +106,36 @@ export interface AuthorizationSession {
    * @throws when the human declines, or the prompt's own signal withdraws it.
    */
   prompt(prompt: AuthorizationPrompt): Promise<string>
+  /**
+   * Replace this attempt's credential record through the provider's
+   * serialized read-modify-write — the only write the seam counts as the
+   * flow's commit. The record is fixed to the flow's `key`: the callback
+   * carries no address because the session already belongs to one.
+   * Cancellation is observed at admission, again inside the exclusive
+   * mutation, and once more before the replacement reaches storage; a write
+   * admitted before a withdrawal lands anyway, so a record the human did
+   * authorize is never revoked by a late cancel.
+   * @param mutate - receives the current record and returns its replacement,
+   *   or `undefined` to leave the record as it stands.
+   * @returns the record after the write, or the current one when `mutate`
+   *   declined.
+   * @throws {AuthorizationError} code `WITHDRAWN` when the attempt was
+   *   withdrawn, replaced, or released before the write could be admitted.
+   */
+  commit(
+    mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>,
+  ): Promise<CredentialRecord | undefined>
 }
 
 /**
  * A plugin's knowledge of how to obtain one credential. The flow owns the
  * write: `run()` resolving means the record for `key` is committed through
- * `ctx.credentials` during that run, which the seam confirms — a commit
- * observed within the attempt, still present after it — before reporting
- * success. Committing inside the flow is what lets a library that persists
- * through its own store adapter (pi-ai's `Models.login()`) stay the single
- * writer instead of being copied back out and written twice.
+ * {@link AuthorizationSession.commit} during that run — the session's commit
+ * is the only write the seam accepts as this attempt's, so an unrelated
+ * same-key write cannot stand in for it. Committing inside the flow is what
+ * lets a library that persists through its own store adapter (pi-ai's
+ * `Models.login()`) stay the single writer instead of being copied back out
+ * and written twice.
  */
 export interface AuthorizationFlow {
   /** The credential record this flow writes. Its scope names the owning plugin. */
@@ -170,9 +191,26 @@ export interface AuthorizationRequest {
   signal?: AbortSignal
 }
 
-/** One attempt in flight, with the handle that withdraws it. */
+/** One attempt in flight: its withdrawal handle and the state a commit guards. */
 interface InFlight {
   readonly controller: AbortController
+  /** The flow's own promise, kept so release can outlast the caller's answer. */
+  flow?: Promise<void>
+  /** Tail of every commit queued through this attempt, failures included. */
+  queue: Promise<unknown>
+  /**
+   * `active`: withdrawal may still abort the attempt and retire its commits.
+   * `committing`: a replacement passed the last checkpoint and is inside the
+   * provider's storage operation — withdrawal is ignored from here on.
+   * `committed`: an admitted write completed successfully through storage.
+   * `failed`: an admitted write's storage operation rejected — the error is
+   * retained so it reaches the caller once the owned tail drains.
+   */
+  phase: { status: 'active' | 'committing' | 'committed' } | { status: 'failed'; error: unknown }
+  /** The flow promise settled; a later commit on this session must refuse. */
+  flowSettled: boolean
+  /** The reservation is released: a captured session's commit must refuse. */
+  released: boolean
 }
 
 /**
@@ -210,8 +248,11 @@ export class AuthorizationService extends Service {
         this.flows.delete(flow.key)
         // A flow leaving mid-attempt takes its attempt with it: the runner
         // belongs to a plugin that is going away, so letting it keep prompting
-        // would outlive the fiber that can answer for it.
-        this.running.get(flow.key)?.controller.abort()
+        // would outlive the fiber that can answer for it. An attempt already
+        // committing a write is past withdrawal — its storage operation
+        // finishes on its own terms.
+        const owner = this.running.get(flow.key)
+        if (owner?.phase.status === 'active') owner.controller.abort()
       }
     }.bind(this), 'authorization.registerFlow()')
     return () => void dispose()
@@ -249,10 +290,14 @@ export class AuthorizationService extends Service {
    * Withdraw the attempt running for a key, if any. Separate from the
    * request's own signal because a request/response transport answers a Cancel
    * button on a second call, with no handle on the first one's signal.
+   * Cancellation has no effect once a commit's write was admitted to storage:
+   * the granted credential is allowed to land and the caller hears the write's
+   * own outcome rather than a revoked grant.
    * @param key - the credential record whose attempt should stop.
    */
   cancel(key: CredentialKey): void {
-    this.running.get(key)?.controller.abort()
+    const owner = this.running.get(key)
+    if (owner?.phase.status === 'active') owner.controller.abort()
   }
 
   /**
@@ -294,21 +339,118 @@ export class AuthorizationService extends Service {
     // not exist hears about it whether or not it also gave up.
     if (request.signal?.aborted === true) return { status: 'cancelled' }
     const controller = new AbortController()
-    const withdraw = (): void => { controller.abort(request.signal?.reason) }
+    const owner: InFlight = {
+      controller, queue: Promise.resolve(), phase: { status: 'active' }, flowSettled: false, released: false,
+    }
+    // Withdrawal applies only while the attempt can still be withdrawn; a
+    // commit already past its last checkpoint ignores it.
+    const withdraw = (): void => { if (owner.phase.status === 'active') controller.abort(request.signal?.reason) }
     request.signal?.addEventListener('abort', withdraw, { once: true })
-    this.running.set(key, { controller })
+    this.running.set(key, owner)
     let settlement: AuthorizationSettlement = 'failed'
     try {
-      const outcome = await this.attempt(flow, method, controller.signal, request.interaction)
+      const outcome = await this.attempt(flow, method, owner, request.interaction)
       settlement = outcome.status
       return outcome
     } finally {
       request.signal?.removeEventListener('abort', withdraw)
-      this.running.delete(key)
-      // After the slot is released, so a listener that reacts by starting the
-      // next attempt is not refused by the one that just finished.
-      this.settle(key, settlement)
+      if (controller.signal.aborted) {
+        // The caller already heard cancelled; the reservation ends only once
+        // the orphaned flow and its queued commit work quiesce, and the
+        // settled event still fires after that release. A withdrawn session
+        // cannot enqueue new commits, so this tail is the whole owned work.
+        void Promise.allSettled([owner.flow ?? Promise.resolve(), owner.queue]).then(() => {
+          try {
+            this.finishRelease(key, owner, settlement)
+          } catch (error) {
+            this.warnSettledListenerFailure(key, error)
+          }
+        })
+      } else {
+        this.finishRelease(key, owner, settlement)
+      }
     }
+  }
+
+  /**
+   * End one attempt's reservation and fan out its settlement. The event fires
+   * only here, and only after the key is released, so a listener that reacts
+   * by starting the next attempt is never refused by the one that finished.
+   * @param key - the credential record the finished attempt was authorizing.
+   * @param owner - the attempt's owner record.
+   * @param settlement - how the attempt ended.
+   */
+  private finishRelease(key: CredentialKey, owner: InFlight, settlement: AuthorizationSettlement): void {
+    owner.released = true
+    if (this.running.get(key) === owner) this.running.delete(key)
+    this.settle(key, settlement)
+  }
+
+  /**
+   * The session's serialized write to the attempt's own record.
+   *
+   * Admission refuses outright once the attempt is withdrawn, its flow has
+   * settled, or this owner lost the key; inside the credential provider's
+   * exclusive mutation the same checks run again (the write may have queued
+   * behind another operation), then the mutation runs, then the checks run a
+   * third time before the replacement is returned to storage — the committed
+   * mark is set synchronously at that point, so a write already admitted
+   * completes even if the attempt is withdrawn while storage is working.
+   * @param key - the flow's credential record.
+   * @param owner - the attempt this session belongs to.
+   * @param mutate - receives the current record and returns its replacement, or `undefined` to retain it.
+   * @returns the record after the write, or the current one when the mutation declined.
+   */
+  private commitRecord(
+    key: CredentialKey,
+    owner: InFlight,
+    mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>,
+  ): Promise<CredentialRecord | undefined> {
+    const withdrawn = (when: string): AuthorizationError => new AuthorizationError(
+      `authorization for "${key}" ${when}`, 'WITHDRAWN',
+      owner.controller.signal.aborted ? { cause: owner.controller.signal.reason } : undefined)
+    // Owner flags can flip while a commit is queued or mid-mutation; a named
+    // closure keeps the checks beyond the compiler's across-await narrowing.
+    const isRetired = (): boolean => owner.released || owner.controller.signal.aborted
+      || owner.flowSettled || this.running.get(key) !== owner
+    if (isRetired()) {
+      return Promise.reject(withdrawn('no longer holds the record it is committing'))
+    }
+    // True only once this commit's replacement was handed to storage: a
+    // no-op mutation admits nothing, so it can never reach `committed`.
+    let admitted = false
+    const work = owner.queue
+      .then(() => this.ctx.credentials.modifyRecord(key, async (current) => {
+        // The write may have queued behind unrelated work; admission may have
+        // been withdrawn in the meantime.
+        if (isRetired()) {
+          throw withdrawn('was withdrawn before its credential write was admitted')
+        }
+        const next = await mutate(current)
+        // A declined mutation is handed back undefined: the provider returns
+        // the current record without writing or notifying.
+        if (next === undefined) return undefined
+        if (isRetired()) {
+          throw withdrawn('was withdrawn while its credential write was in flight')
+        }
+        // Synchronous, ahead of the storage write: a committing attempt is
+        // beyond recall — a withdrawal landing now cannot un-admit the write.
+        owner.phase = { status: 'committing' }
+        admitted = true
+        return next
+      }))
+      // `committed` belongs to a fulfilled write, not to admission; an
+      // admitted write's rejection is retained verbatim on the phase so the
+      // unawaited tail cannot lose it, and passes through unchanged.
+      .then((record) => {
+        if (admitted) owner.phase = { status: 'committed' }
+        return record
+      }, (error: unknown) => {
+        if (admitted) owner.phase = { status: 'failed', error }
+        throw error
+      })
+    owner.queue = work.catch(() => {})
+    return work
   }
 
   /* jscpd:ignore-start -- deliberate symmetry with the credentials seam's
@@ -357,69 +499,74 @@ export class AuthorizationService extends Service {
   private async attempt(
     flow: AuthorizationFlow,
     method: string,
-    signal: AbortSignal,
+    owner: InFlight,
     interaction: AuthorizationInteraction,
   ): Promise<AuthorizationOutcome> {
-    // Withdrawal settles the attempt whether or not the flow reacts to it. A
-    // flow is supposed to stop when its signal fires, but one that does not
-    // would otherwise hold the key for the life of the process, and a wedged
-    // key is indistinguishable from a busy one from the outside. The orphaned
-    // run is left to finish on its own; nothing waits on it, and a record it
-    // still manages to commit is a record the human did authorize.
+    const { signal } = owner.controller
+    // Withdrawal settles the caller-visible outcome whether or not the flow
+    // reacts to it. The orphaned run is left to finish on its own — the
+    // reservation outlives this method, so nothing the flow still does is
+    // read as another attempt's — but nothing awaits it here.
     const withdrawn = new Promise<'withdrawn'>((resolve) => {
       // `begin()` returns before claiming the key when its caller has already
       // withdrawn, so this signal cannot already be aborted here.
       signal.addEventListener('abort', () => { resolve('withdrawn') }, { once: true })
     })
-    // What the seam itself witnessed during the run, held as properties
-    // because closure writes do not narrow locals across awaits: the prompt
-    // wrapper sees a decline first-hand (a flow that rewraps the rejection on
-    // its way out cannot hide it), and confirming the commit means confirming
-    // it happened *now* — on a re-auth the record already exists, so presence
-    // alone would let a flow that wrote nothing report the stale credential
-    // as freshly authorized.
-    const observed = { declined: false, committed: false }
-    const unwatch = this.ctx.on('credentials/record-updated', (key: CredentialKey) => {
-      if (key === flow.key) observed.committed = true
-    })
-    try {
-      const running = flow.run({
-        method,
-        signal,
-        notify: (notice) => {
-          try {
-            interaction.notify(notice)
-          } catch (error) {
-            // Fire-and-forget is held at the seam: a surface that cannot
-            // render a notice (a page whose connection just closed) loses the
-            // notice, never the attempt.
-            this.ctx.logger.warn('authorization: the interaction surface failed to render a notice')
-            this.ctx.logger.warn(error)
-          }
-        },
-        prompt: prompt => interaction.prompt(prompt).catch((error: unknown) => {
-          if (error instanceof AuthorizationDeclinedError) observed.declined = true
-          throw error
-        }),
-      })
-      try {
-        if (await Promise.race([running.then(() => 'ran' as const), withdrawn]) === 'withdrawn') {
-          // Nothing awaits the orphan any more, so its eventual failure has to be
-          // marked handled or it would take down the process.
-          void running.catch(() => { this.ctx.logger.debug('authorization: withdrawn flow failed after the fact') })
-          return { status: 'cancelled' }
+    // A decline witnessed at the seam: a flow that rewraps the rejection on
+    // its way out cannot hide it.
+    const observed = { declined: false }
+    const running = flow.run({
+      method,
+      signal,
+      notify: (notice) => {
+        try {
+          interaction.notify(notice)
+        } catch (error) {
+          // Fire-and-forget is held at the seam: a surface that cannot
+          // render a notice (a page whose connection just closed) loses the
+          // notice, never the attempt.
+          this.ctx.logger.warn('authorization: the interaction surface failed to render a notice')
+          this.ctx.logger.warn(error)
         }
-      } catch (error) {
-        // A withdrawn attempt and a declined prompt are outcomes, not
-        // failures: the human said no, or closed the page. Anything else is
-        // the flow failing and belongs to the caller, cause chain intact.
-        if (signal.aborted || observed.declined) return { status: 'cancelled' }
+      },
+      prompt: prompt => interaction.prompt(prompt).catch((error: unknown) => {
+        if (error instanceof AuthorizationDeclinedError) observed.declined = true
         throw error
+      }),
+      commit: mutate => this.commitRecord(flow.key, owner, mutate),
+    })
+    owner.flow = running
+    void running.then(() => { owner.flowSettled = true }, () => { owner.flowSettled = true })
+    try {
+      if (await Promise.race([running.then(() => 'ran' as const), withdrawn]) === 'withdrawn') {
+        // Withdrawal only fires while the attempt is `active`, so nothing was
+        // admitted. Nothing awaits the orphan any more, so its eventual
+        // failure has to be marked handled or it would take down the process.
+        void running.catch(() => { this.ctx.logger.debug('authorization: withdrawn flow failed after the fact') })
+        return { status: 'cancelled' }
       }
-    } finally {
-      unwatch()
+    } catch (error) {
+      if (signal.aborted || (observed.declined && owner.phase.status === 'active')) {
+        // A withdrawn attempt and a declined prompt are outcomes, not
+        // failures: the human said no, or closed the page — and only before a
+        // commit was admitted. Anything else is the flow failing and belongs
+        // to the caller, cause chain intact — a rejected admitted write
+        // included.
+        return { status: 'cancelled' }
+      }
+      // A failed flow's owned commits drain before its error propagates: the
+      // reservation cannot release while admitted write work is still running.
+      await owner.queue.catch(() => {})
+      throw error
     }
-    if (!observed.committed) {
+    owner.flowSettled = true
+    // Drain commit work the flow queued before confirming: a fire-and-forget
+    // commit inside the run is still this attempt's write. An admitted write's
+    // retained storage failure outranks the missing-commit refusal; anything
+    // else unresolved is still not committed.
+    await owner.queue.catch(() => {})
+    if (owner.phase.status === 'failed') throw owner.phase.error
+    if (owner.phase.status !== 'committed') {
       throw new AuthorizationError(
         `authorization flow for "${flow.key}" resolved without committing a credential record in this attempt`,
         'NOT_COMMITTED')

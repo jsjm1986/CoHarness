@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within, fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
 import { DocumentsPage } from './DocumentsPage.tsx'
@@ -10,6 +10,7 @@ vi.mock('../api.ts', async (importOriginal) => {
     deleteAdminDocument: vi.fn(),
     getAdminDocument: vi.fn(),
     listAdminDocuments: vi.fn(),
+    listAdminDocumentsPage: vi.fn(),
     listDocumentMetrics: vi.fn(),
     listProjects: vi.fn(),
     listUsers: vi.fn(),
@@ -22,6 +23,7 @@ describe('DocumentsPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(api.listAdminDocumentsPage).mockImplementation(async () => ({ documents: await api.listAdminDocuments() }))
     vi.mocked(api.listUsers).mockResolvedValue([])
     vi.mocked(api.listProjects).mockResolvedValue([])
     vi.mocked(api.listAdminDocuments).mockResolvedValue([{
@@ -49,6 +51,27 @@ describe('DocumentsPage', () => {
       operations24h: 0,
       failures24h: 0,
     })
+  })
+
+  it.each(['personal', 'project'] as const)('offers ownership transfer only for an active project document (%s)', async (kind) => {
+    const row = (await api.listAdminDocuments())[0]!
+    const document = { ...row, scope: kind === 'personal' ? row.scope : { kind: 'project' as const, projectId: 3, label: 'Shared' },
+      owner: { id: 1, username: 'owner', displayName: 'Owner' } }
+    vi.mocked(api.listAdminDocuments).mockResolvedValue([document])
+    vi.mocked(api.getAdminDocument).mockResolvedValue({ document, history: [], copies: [] })
+    vi.mocked(api.listUsers).mockResolvedValue([{ id: 1, displayName: 'Owner' }, { id: 2, displayName: 'Member' }] as api.AdminUser[])
+    render(<DocumentsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '查看详情' }))
+    const dialog = within(await screen.findByRole('dialog', { name: '设计说明.md' }))
+    if (kind === 'personal') {
+      expect(dialog.queryByRole('button', { name: '转移所有权' })).toBeNull()
+      expect(dialog.getByText('所有者：Owner（个人文档归属其所在账号）')).toBeTruthy()
+      expect(api.transferAdminDocumentOwnership).not.toHaveBeenCalled()
+    } else {
+      fireEvent.change(dialog.getByLabelText('所有者'), { target: { value: '2' } })
+      fireEvent.click(dialog.getByRole('button', { name: '转移所有权' }))
+      await waitFor(() => expect(api.transferAdminDocumentOwnership).toHaveBeenCalledWith(document.catalogId, 2))
+    }
   })
 
   it('renders document owner sources with localized labels', async () => {

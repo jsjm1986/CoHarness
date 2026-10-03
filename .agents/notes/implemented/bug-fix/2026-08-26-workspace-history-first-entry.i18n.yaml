@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-26-workspace-history-first-entry.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-26-workspace-history-first-entry.md
-2026-08-26-workspace-history-first-entry.md: b6b99fc87435e35ae6de7e866eff5fa70660eb5a
-2026-08-26-workspace-history-first-entry.zh.md: 49b21abb0c8015031ccf497289c16703a7628b31
+/agent-note-workspace-entry-opens-history-before-new-sessions:
+  en: 26723b59cdbf3268
+  zh: 70c5db5b76f95c6e
+/agent-note-workspace-entry-opens-history-before-new-sessions/problem:
+  en: 15986de8729aa8f2
+  zh: fa737d3ba91958fd
+/agent-note-workspace-entry-opens-history-before-new-sessions/decision:
+  en: 39e9e62f5394b5d4
+  zh: ffc9b87326ff8134
+/agent-note-workspace-entry-opens-history-before-new-sessions/alternatives-considered:
+  en: d6339cb1f88cd482
+  zh: bd9b5a46ef6f2cf9
+/agent-note-workspace-entry-opens-history-before-new-sessions/consequences:
+  en: be82ef40db580436
+  zh: 81768c496b978461
+/agent-note-workspace-entry-opens-history-before-new-sessions/verification:
+  en: ab27dfe2bd8a3e37
+  zh: 9cf6dfbd4b0e7693

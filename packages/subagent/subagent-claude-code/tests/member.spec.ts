@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { appendFileSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Options, Query, SDKMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
@@ -20,16 +20,14 @@ import {
   CLAUDE_MEMBER_ROUTE,
   ClaudeMemberAdapter,
   ClaudeMemberTransport,
-  projectSlug,
-  recoverClaudeSession,
   type ClaudeMemberConfig,
 } from '../src/member.ts'
 
 /**
  * Member tests for persistent Claude children: `query` is mocked at the SDK
  * boundary (same seam as the one-shot spec), and `HOME`/`USERPROFILE` are
- * redirected — `os.homedir()` follows the platform variable — so
- * `recoverClaudeSession` reads fixture transcripts. No real CLI, no network.
+ * redirected to private fixture transcripts. Transcript content cannot replace
+ * a request-correlated completion. No real CLI, no network.
  */
 
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }))
@@ -171,14 +169,6 @@ function writeTranscript(home: string, cwd: string, sessionId: string, entries: 
   writeFileSync(join(dir, `${sessionId}.jsonl`), entries.map(e => JSON.stringify(e)).join('\n') + '\n')
 }
 
-describe('projectSlug', () => {
-  it('flattens every non-alphanumeric character the way Claude Code does', () => {
-    expect(projectSlug('/Users/me/work/repo')).toBe('-Users-me-work-repo')
-    expect(projectSlug('C:\\git\\cc-plus')).toBe('C--git-cc-plus')
-    expect(projectSlug('D:\\MatLab_HomeWork\\v1.2')).toBe('D--MatLab-HomeWork-v1-2')
-  })
-})
-
 describe('ClaudeMemberTransport', () => {
   it('runs the first turn fresh and resumes the bound session after it', async () => {
     const dir = root()
@@ -274,7 +264,7 @@ describe('ClaudeMemberTransport', () => {
     expect(captured[1]!.options.resume).toBe('claude-session-1')
   })
 
-  it('replays a proven pending result without re-querying', async () => {
+  it('refuses to treat transcript assistant text as an acknowledged result', async () => {
     const dir = root()
     const home = root()
     vi.stubEnv('HOME', home)
@@ -290,16 +280,15 @@ describe('ClaudeMemberTransport', () => {
     ])
 
     const transport = new ClaudeMemberTransport(memberConfig(dir), spawnDouble())
-    const chunks = await collect(externalMemberTurn(
+    await expect(collect(externalMemberTurn(
       { sessionId: child, messages, signal },
       store, transport,
-    ))
-    expect(outcomeText(chunks)).toBe('settled answer')
+    ))).rejects.toMatchObject({ code: EXTERNAL_TURN_OUTCOME_UNKNOWN })
     expect(queryMock).not.toHaveBeenCalled()
     expect(store.binding(child)?.pending).toBeUndefined()
   })
 
-  it('resends a prompt the transcript proves absent', async () => {
+  it('does not resend a bound prompt merely absent from the transcript', async () => {
     const dir = root()
     const home = root()
     vi.stubEnv('HOME', home)
@@ -313,12 +302,11 @@ describe('ClaudeMemberTransport', () => {
 
     scriptQuery([success('retried answer')])
     const transport = new ClaudeMemberTransport(memberConfig(dir), spawnDouble())
-    const chunks = await collect(externalMemberTurn(
+    await expect(collect(externalMemberTurn(
       { sessionId: child, messages, signal },
       store, transport,
-    ))
-    expect(outcomeText(chunks)).toBe('retried answer')
-    expect(queryMock).toHaveBeenCalledTimes(1)
+    ))).rejects.toMatchObject({ code: EXTERNAL_TURN_OUTCOME_UNKNOWN })
+    expect(queryMock).not.toHaveBeenCalled()
   })
 
   it('drops an unprovable pending prompt rather than resending it', async () => {
@@ -344,19 +332,7 @@ describe('ClaudeMemberTransport', () => {
     expect(store.binding(child)?.pending).toBeUndefined()
   })
 
-  it('proves absent when no transcript file exists at all', () => {
-    const dir = root()
-    const home = root()
-    vi.stubEnv('HOME', home)
-    vi.stubEnv('USERPROFILE', home)
-    const recovery = recoverClaudeSession(dir, 'no-such-session', {
-      prompt: 'p',
-      throughMessageId: userMessages(['x'])[0]!.id,
-    })
-    // A missing transcript cannot prove the prompt never arrived — a torn or
-    // relocated store reads unknown, not absent, so nothing is resent blindly.
-    expect(recovery).toEqual({ kind: 'unknown' })
-  })
+
 })
 
 describe('ClaudeMemberSession', () => {
@@ -516,48 +492,6 @@ describe('ClaudeMemberSession', () => {
       signal,
     )).resolves.toEqual({ kind: 'absent' })
     await session.dispose()
-  })
-})
-
-describe('recoverClaudeSession transcript variants', () => {
-  function pending(prompt: string) {
-    return { prompt, throughMessageId: userMessages(['x'])[0]!.id }
-  }
-
-  it('joins assistant text while skipping entries that carry no usable text', () => {
-    const dir = root()
-    const home = root()
-    vi.stubEnv('HOME', home)
-    vi.stubEnv('USERPROFILE', home)
-    writeTranscript(home, dir, 'claude-v', [
-      { type: 'user', message: { role: 'user', content: 'task' } },
-      // A user entry with no message at all reads as empty text, as does one
-      // whose only block lost its text field — neither can match the prompt.
-      { type: 'user' },
-      { type: 'user', message: { role: 'user', content: [{ type: 'text' }] } },
-      { type: 'user', message: { role: 'user', content: 'later question' } },
-      { type: 'assistant', message: { role: 'assistant', content: [] } },
-      { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'settled' }] } },
-    ])
-    expect(recoverClaudeSession(dir, 'claude-v', pending('task')))
-      .toEqual({ kind: 'result', text: 'settled' })
-  })
-
-  it('stops parsing at a torn tail line', () => {
-    const dir = root()
-    const home = root()
-    vi.stubEnv('HOME', home)
-    vi.stubEnv('USERPROFILE', home)
-    writeTranscript(home, dir, 'claude-t', [
-      { type: 'user', message: { role: 'user', content: 'task' } },
-      { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'answer' }] } },
-    ])
-    appendFileSync(
-      join(home, '.claude', 'projects', projectSlug(dir), 'claude-t.jsonl'),
-      '{"type":',
-    )
-    expect(recoverClaudeSession(dir, 'claude-t', pending('task')))
-      .toEqual({ kind: 'result', text: 'answer' })
   })
 })
 

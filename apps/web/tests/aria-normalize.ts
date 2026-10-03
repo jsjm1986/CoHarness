@@ -5,9 +5,15 @@ type RuntimeScope = 'timing' | 'clock' | 'ago' | 'elapsed' | undefined
 
 function runtimeScope(key: string): RuntimeScope {
   if (/^group "(?:Message timing|消息时间与速度)"$/.test(key)) return 'clock'
+  // The reply row's trailing label prints the late answer's wall-clock time.
+  if (/^group "(?:Reply to earlier pending questions|Dismissed earlier pending questions|回答先前等待中的问题|放弃回答先前等待中的问题)"$/.test(key)) return 'clock'
   if (/^(?:group|dialog) "(?:Session statistics|会话统计|Turn time and speed|本轮用时和速度)"$/.test(key)) return 'timing'
   if (/^tree "(?:Sessions|会话|Subagent sessions|子代理会话|Search results|搜索结果)"$/.test(key)) return 'ago'
   if (/^list "(?:Background jobs|后台任务)"$/.test(key)) return 'elapsed'
+  // Reminder rows print each next run in the reader's zone; the frozen page
+  // clock keeps the offset stable, but the zone identifier itself varies with
+  // the host tz database, so the stamp is volatile across platforms.
+  if (/^list "(?:Active reminders|活动提醒)"$/.test(key)) return 'clock'
   return undefined
 }
 

@@ -6,7 +6,7 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { DesktopConfirmation } from './types.ts'
-export type { DesktopConfirmation } from './types.ts'
+export type { DesktopConfirmation, DesktopOccupancy } from './types.ts'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-execution-authority'
 import type { ComputerUseProviderName } from './brand.ts'

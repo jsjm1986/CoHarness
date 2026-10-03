@@ -70,6 +70,7 @@ kind: "package-reference"
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -87,6 +88,7 @@ kind: "package-reference"
 
 一次选择把较早的图片换成占位文本，该请求的提供方缓存复用因此止于第一张被修改的图片。所选位置之后仍保持省略。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

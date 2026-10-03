@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-multi-select-custom-answer-composition.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-30-multi-select-custom-answer-composition.md
-2026-07-30-multi-select-custom-answer-composition.md: db5be2dbed1108ff63c1fddb166be1de934f98d3
-2026-07-30-multi-select-custom-answer-composition.zh.md: 796d379312483be5063a3a5d67dd6a0d0e37803e
+/agent-note-multi-select-custom-answer-composition:
+  en: dc0c79b12f19a9ee
+  zh: ad764a96fa291d57
+/agent-note-multi-select-custom-answer-composition/problem:
+  en: 201c5666d4700269
+  zh: 657f388d6067364d
+/agent-note-multi-select-custom-answer-composition/decision:
+  en: cace7628342758b5
+  zh: 960b5d94cdf7ba82
+/agent-note-multi-select-custom-answer-composition/alternatives-considered:
+  en: 7b44a7ac18e9a6a2
+  zh: e63cbd521cb206ba
+/agent-note-multi-select-custom-answer-composition/consequences:
+  en: 75d80c3e19e3f836
+  zh: f571f0d86440ebce

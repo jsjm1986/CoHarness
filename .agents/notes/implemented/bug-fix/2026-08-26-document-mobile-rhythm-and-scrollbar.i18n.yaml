@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-26-document-mobile-rhythm-and-scrollbar.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-26-document-mobile-rhythm-and-scrollbar.md
-2026-08-26-document-mobile-rhythm-and-scrollbar.md: 18f5560c5bb457b882180654bf07d07f162a7989
-2026-08-26-document-mobile-rhythm-and-scrollbar.zh.md: 698f07403916d2d76949fe8640da1c7475d1a251
+/agent-note-document-mobile-rhythm-and-shared-scrollbar-geometry:
+  en: 8652208cf3e3fb88
+  zh: c35a1f03b518db78
+/agent-note-document-mobile-rhythm-and-shared-scrollbar-geometry/problem:
+  en: e4b9f1df1428efa9
+  zh: e22ac0d7fbdea1a1
+/agent-note-document-mobile-rhythm-and-shared-scrollbar-geometry/decision:
+  en: 97b3b702607992c3
+  zh: 0d8d779245ca299f
+/agent-note-document-mobile-rhythm-and-shared-scrollbar-geometry/alternatives-considered:
+  en: 73e048d4489343c5
+  zh: d6273dd7ca68ce15
+/agent-note-document-mobile-rhythm-and-shared-scrollbar-geometry/consequences:
+  en: ca3fc6c707013cfc
+  zh: 268861e44307eac9
+/agent-note-document-mobile-rhythm-and-shared-scrollbar-geometry/verification:
+  en: 3dca79ddf149ee1d
+  zh: a7e68d258e0e1561

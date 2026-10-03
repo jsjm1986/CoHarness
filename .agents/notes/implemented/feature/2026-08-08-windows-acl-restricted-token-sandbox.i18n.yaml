@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-windows-acl-restricted-token-sandbox.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md
-2026-08-08-windows-acl-restricted-token-sandbox.md: 860ed18c8be2e0dab00631307e2c30fdcae12692
-2026-08-08-windows-acl-restricted-token-sandbox.zh.md: 6abbbeab49fc4eb3a1cb23cdbcc7084d5486a73a
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer:
+  en: cfc871213b6d8360
+  zh: 18ff96c2272fee09
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/problem:
+  en: 86e01a1c009ac595
+  zh: 91844972d41dd6f9
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/decision:
+  en: 125dea7427047966
+  zh: 920847efae9e6bee
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/acl-diagnosis-and-recovery:
+  en: 3383a9931a46fe4c
+  zh: dad5d3c0aa5b1a61
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/how-the-restriction-works-why-no-new-identity:
+  en: ac9b3d800889ea39
+  zh: 9db1065b6027f65f
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/alternatives-considered:
+  en: 6119e2aff3b6be5a
+  zh: 4237c596c10e1ee9
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/alternatives-considered/why-not-mxc-microsoft-xcontainer:
+  en: 0bb56896664ab257
+  zh: de921ecab11cf572
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/alternatives-considered/why-not-appcontainer:
+  en: 6e7ed26630c25476
+  zh: edd52735b36b0b12
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/alternatives-considered/why-not-landstrip:
+  en: 3414b20115389d7a
+  zh: 9aa44ea1610a5d1c
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/consequences:
+  en: 0c7ac3602f4f3671
+  zh: e59794c03eaf417b
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/testing:
+  en: b223cb2cf13193c9
+  zh: 61ddd0a0b99f8f56
+/agent-note-windows-sandbox-rung-raw-acl-restricted-tokens-over-mxc-and-appcontainer/related:
+  en: 53ec94860981d08a
+  zh: 29bf0038806cc953

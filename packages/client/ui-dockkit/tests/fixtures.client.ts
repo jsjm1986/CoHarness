@@ -11,7 +11,7 @@ import type { LayoutState } from '../src/contract/types.ts'
 export const SEED_CONTENT_ID = 'seed:start'
 
 /** Title of the seeded tab. */
-const SEED_TITLE = 'Start'
+export const SEED_TITLE = 'Start'
 
 /** The seeded tab an embedder would put in a fresh pane. */
 export function seedTab(id: TabId): TabRecord {

@@ -40,6 +40,8 @@ export const zh = {
   'status.pending': '待处理',
   'status.in_progress': '进行中',
   'status.completed': '已完成',
+  'task.expand': '展开',
+  'task.collapse': '收起',
 } satisfies Record<string, string>
 
 /** Agent Teams locale key union. */
@@ -79,6 +81,8 @@ export const en = {
   'memberStatus.inactive': 'Inactive',
   'memberStatus.provisioning': 'Provisioning',
   'memberStatus.failed': 'Failed',
+  'task.expand': 'Show more',
+  'task.collapse': 'Show less',
   'status.pending': 'Pending',
   'status.in_progress': 'In progress',
   'status.completed': 'Completed',

@@ -21,6 +21,12 @@ export interface WorkspaceListSnapshot {
    * lookups build their own transient Set where they need one.
    */
   archivedSessionIds: readonly SessionId[]
+  /**
+   * Registry-global pin set in Host pin order (most recently pinned first):
+   * pinned sessions lead their grouping-surface section. Same plain-array
+   * posture as `archivedSessionIds`.
+   */
+  pinnedSessionIds: readonly SessionId[]
   /** Versioned archive snapshot revision; absent on legacy carriers. */
   archiveRevision?: number
   state: 'idle' | 'loading' | 'error'
@@ -42,6 +48,10 @@ export class WorkspaceManager {
   // unversioned carriers remain append-only until the first revision arrives.
   private archivedSessionIds: readonly SessionId[] = []
   private archiveRevision = 0
+  /** Complete Host-confirmed pin set, most recently pinned first. */
+  private pinnedSessionIds: readonly SessionId[] = []
+  /** Latest pin-set request; a later request or a pushed pin set supersedes it. */
+  private pinRequestSeq = 0
   private state: WorkspaceListSnapshot['state'] = 'idle'
   private phase: WorkspaceListPhase = 'pending'
   private error: RpcError | null = null
@@ -95,6 +105,9 @@ export class WorkspaceManager {
           for (const delta of frames) items = applyWorkspaceDelta(items, delta)
           this.installViews(items)
           this.installArchived(result.value.archivedSessionIds, result.value.archiveRevision)
+          // A fresh baseline supersedes every in-flight pin request.
+          this.pinRequestSeq++
+          this.installPinned(result.value.pinnedSessionIds)
           this.state = 'idle'
           this.phase = 'ready'
         } else {
@@ -222,7 +235,12 @@ export class WorkspaceManager {
    */
   async archiveSession(sessionId: SessionId): Promise<RpcResult<{ archivedSessionIds: SessionId[]; archiveRevision?: number }>> {
     const { result } = await this.api.workspace.archiveSession({ sessionId })
-    if (result.ok) this.installArchived(result.value.archivedSessionIds, result.value.archiveRevision)
+    if (result.ok) {
+      this.installArchived(result.value.archivedSessionIds, result.value.archiveRevision)
+      // The Host drops an archived session's pin in the same durable write;
+      // mirror that locally so no frame shows the row both archived and pinned.
+      this.installPinned(this.pinnedSessionIds.filter(id => id !== sessionId))
+    }
     return result
   }
 
@@ -241,6 +259,39 @@ export class WorkspaceManager {
   }
 
   /**
+   * Pin one session in the registry-global set, then install the returned
+   * complete pin set. A reply superseded by a later pin request, a pushed
+   * pin frame, or a refresh baseline installs nothing.
+   * @param sessionId - session to pin.
+   * @returns the wire result.
+   */
+  async pinSession(sessionId: SessionId): Promise<RpcResult<{ pinnedSessionIds: SessionId[] }>> {
+    const requestSeq = ++this.pinRequestSeq
+    const { result } = await this.api.workspace.pinSession({ sessionId })
+    if (result.ok && requestSeq === this.pinRequestSeq) {
+      this.installPinned(result.value.pinnedSessionIds)
+    }
+    return result
+  }
+
+  /**
+   * Drop one session from the registry-global pin set, then install the
+   * returned complete pin set. The host treats an id that is not pinned as
+   * a no-op, and a superseded reply installs nothing — the same race
+   * posture as {@link pinSession}.
+   * @param sessionId - pinned session to unpin.
+   * @returns the wire result.
+   */
+  async unpinSession(sessionId: SessionId): Promise<RpcResult<{ pinnedSessionIds: SessionId[] }>> {
+    const requestSeq = ++this.pinRequestSeq
+    const { result } = await this.api.workspace.unpinSession({ sessionId })
+    if (result.ok && requestSeq === this.pinRequestSeq) {
+      this.installPinned(result.value.pinnedSessionIds)
+    }
+    return result
+  }
+
+  /**
    * Host-frame entry. Non-workspace frames are ignored so the runtime can
    * fan one host stream out to both object managers.
    * @param envelope - host stream envelope.
@@ -254,6 +305,11 @@ export class WorkspaceManager {
     }
     else if (envelope.payload.type === 'host/archived-sessions-changed') {
       this.installArchived(envelope.payload.archivedSessionIds, envelope.payload.archiveRevision)
+    }
+    else if (envelope.payload.type === 'host/pinned-sessions-changed') {
+      // A pushed pin set outranks every in-flight pin/unpin reply.
+      this.pinRequestSeq++
+      this.installPinned(envelope.payload.pinnedSessionIds)
     }
   }
 
@@ -284,6 +340,7 @@ export class WorkspaceManager {
     return {
       items: this.itemViews(),
       archivedSessionIds: this.archivedSessionIds,
+      pinnedSessionIds: this.pinnedSessionIds,
       archiveRevision: this.archiveRevision,
       state: this.state,
       phase: this.phase,
@@ -308,6 +365,20 @@ export class WorkspaceManager {
       && (revision === undefined || revision === this.archiveRevision)) return
     this.archivedSessionIds = next
     if (revision !== undefined) this.archiveRevision = revision
+    this.notifier.markDirty()
+  }
+
+  /**
+   * Install one complete Host-confirmed pin set. The pin set is fully
+   * replaced (unlike the revisioned archive merge): every carrier — unary
+   * echo, changed frame, list baseline — already carries the complete
+   * ordered set.
+   * @param pinnedSessionIds - complete pin set, most recently pinned first.
+   */
+  private installPinned(pinnedSessionIds: readonly SessionId[]): void {
+    if (pinnedSessionIds.length === this.pinnedSessionIds.length
+      && pinnedSessionIds.every((id, index) => id === this.pinnedSessionIds[index])) return
+    this.pinnedSessionIds = [...pinnedSessionIds]
     this.notifier.markDirty()
   }
 

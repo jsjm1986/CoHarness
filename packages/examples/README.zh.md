@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # examples/：开箱可运行的演示组合包
 
 [English](README.md) | 中文

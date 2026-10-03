@@ -369,6 +369,17 @@ export interface ProjectQuotaView {
   companyCostMicrosLimit: number | null
 }
 
+/** Per-metric user quota setting: role inheritance, unlimited, or an explicit monthly cap. */
+export type UserQuotaMode = 'inherit' | 'unlimited' | 'custom'
+
+/** Stored per-user quota modes; `limit` is set only when the matching mode is `custom`. */
+export interface UserQuotaView {
+  tokenMode: UserQuotaMode
+  tokenLimit: number | null
+  companyCostMode: UserQuotaMode
+  companyCostMicrosLimit: number | null
+}
+
 const nonEmpty = (value: string, name: string): string => {
   const accepted = value.trim()
   if (accepted === '') throw new Error(`${name} must not be empty`)
@@ -667,6 +678,25 @@ export class ModelGovernanceService {
       company_cost_micros_limit=excluded.company_cost_micros_limit`)
       .run(subjectType, subjectId, stored(tokenLimit, 'tokenLimit'), stored(costLimit, 'companyCostMicrosLimit'))
     this.bumpConfigurationRevision()
+  }
+
+  userQuota(userId: number): UserQuotaView {
+    const row = this.db.prepare(
+      `SELECT token_limit, company_cost_micros_limit FROM model_quotas
+       WHERE subject_type='user' AND subject_id=?`,
+    ).get(String(userId)) as { token_limit: number | null; company_cost_micros_limit: number | null } | undefined
+    const metric = (value: number | null): { mode: UserQuotaMode; limit: number | null } =>
+      value === -1 ? { mode: 'inherit', limit: null }
+        : value === null ? { mode: 'unlimited', limit: null }
+          : { mode: 'custom', limit: value }
+    const token = metric(row === undefined ? -1 : row.token_limit)
+    const cost = metric(row === undefined ? -1 : row.company_cost_micros_limit)
+    return {
+      tokenMode: token.mode,
+      tokenLimit: token.limit,
+      companyCostMode: cost.mode,
+      companyCostMicrosLimit: cost.limit,
+    }
   }
 
   ingest(subject: ModelUsageSubject, event: UsageEvent): { inserted: boolean; alerts: number } {

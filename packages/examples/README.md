@@ -1,3 +1,8 @@
+---
+description: "Pre-composed plugin bundles a thin leaf `cordis.yml` loads instead of assembling the spine and an entry point by hand. These are **demo / reference** packages — the `-demo` npm suffix marks each one as non-product surface, readable straight off the package name. The runnable leaves under the repo-root `examples/` and the Python SDK runtime are the consumers; each is just its swappable backends plus one bundle entry."
+kind: "package-group"
+---
+
 # examples/ — ready-to-run demo bundles
 
 English | [中文](README.zh.md)

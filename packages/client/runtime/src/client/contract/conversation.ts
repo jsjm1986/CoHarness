@@ -46,6 +46,22 @@ export interface ConversationTurnDataMap {}
 /** Merge-extensible business values published against one Step. */
 export interface ConversationStepDataMap {}
 
+/**
+ * Identity-stable observable face over one Location business key (the same
+ * getSnapshot/subscribe currency as every HostObservable; ui-renderer binds
+ * it to React at the slot site). The Engine notifies subscribers at the
+ * flush commit point, once per assembled batch.
+ */
+export interface ConversationLocationDataSource<Value> {
+  /** @returns latest immutable value published by the owning Context. */
+  getSnapshot(): Value
+  /**
+   * @param listener - change callback invoked at the next committed change.
+   * @returns unsubscribe.
+   */
+  subscribe(listener: () => void): () => void
+}
+
 /** Stable keyed reader for independently owned Location business values. */
 export interface ConversationLocationDataStore<DataMap extends object> {
   /**
@@ -54,6 +70,15 @@ export interface ConversationLocationDataStore<DataMap extends object> {
    * @returns latest immutable value, when its owning Context has published one.
    */
   get<Key extends keyof DataMap & string>(key: Key): Readonly<DataMap[Key]> | undefined
+  /**
+   * Resolve one key's subscription source; the returned object is stable per
+   * key, so a component may subscribe before any owner publishes a value.
+   * @param key - declaration-merged business key.
+   * @returns the key's observable face.
+   */
+  source<Key extends keyof DataMap & string>(
+    key: Key,
+  ): ConversationLocationDataSource<Readonly<DataMap[Key]> | undefined>
 }
 
 interface ConversationLocationDataValue {

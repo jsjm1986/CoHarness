@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-web-search-multiple-queries.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-web-search-multiple-queries.md
-2026-08-17-web-search-multiple-queries.md: f0a8bf3d69763231ee2c1f441ed52e2e0b7a6060
-2026-08-17-web-search-multiple-queries.zh.md: 5c6be5e20fdb7ea14fcc8ef3e1275f57a008152f
+/agent-note-web-search-accepts-multiple-queries-in-one-call:
+  en: 6dc2a2bc7872fdf1
+  zh: c89780c82a3e7898
+/agent-note-web-search-accepts-multiple-queries-in-one-call/problem:
+  en: 6c5ffd5eea4291fb
+  zh: b89349df07084807
+/agent-note-web-search-accepts-multiple-queries-in-one-call/decision:
+  en: a11665d04c7828cf
+  zh: e4f6d895c8880965
+/agent-note-web-search-accepts-multiple-queries-in-one-call/alternatives-considered:
+  en: fe9d19ec80e15fbd
+  zh: db37112ebe0599bb
+/agent-note-web-search-accepts-multiple-queries-in-one-call/consequences:
+  en: cf2511c286d9db61
+  zh: 158a1a4f07af28fa

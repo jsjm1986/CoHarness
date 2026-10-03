@@ -7,10 +7,29 @@ import { presentedFileUrl, type PresentedAction, type PresentedHost } from '../p
 /** Visible result of an explicit desktop gesture. */
 export type PresentedOpenPhase = 'opening' | 'opened' | 'revealing' | 'revealed' | 'error' | 'revealError' | 'nativeUnavailable'
 
+/** One OS-registered handler offered for a file, in the serving Host's order. */
+export interface PresentedFileApplication {
+  /** OS application identifier; the Host revalidates it against current handlers on open. */
+  readonly id: string
+  readonly name: string
+  readonly default: boolean
+  /** PNG or SVG data URL, or null when the desktop supplies no icon. */
+  readonly icon: string | null
+}
+
+/** One file's association read: known handlers plus refresh/failure state. */
+export interface PresentedAppState {
+  readonly applications: readonly PresentedFileApplication[]
+  readonly loading: boolean
+  readonly failed: boolean
+}
+
 /** Session-owned desktop gestures, abandoned when its authorization or lifetime ends. */
 export class PresentedOpenController {
   /** Gesture status keyed by the selected delivery or comparison. */
   readonly state = createSnapshotStore<Record<string, PresentedOpenPhase | undefined>>({})
+  /** Association reads keyed by the same delivery or comparison coordinate. */
+  readonly apps = createSnapshotStore<Record<string, PresentedAppState | undefined>>({})
   /** Current verified desktop capability; null requires a fresh read. */
   readonly host = createSnapshotStore<PresentedHost | 'error' | null>(null)
   private generation = new AbortController()
@@ -18,7 +37,10 @@ export class PresentedOpenController {
   private readonly pending = new Set<Promise<void>>()
 
   constructor(private readonly readHost: () => PresentedHost,
-    private readonly openPath: (path: string, action: PresentedAction, signal: AbortSignal) => Promise<void>) {}
+    private readonly openPath: (
+      path: string, action: PresentedAction, application: string | undefined, signal: AbortSignal,
+    ) => Promise<void>,
+    private readonly listApplications: (path: string, signal: AbortSignal) => Promise<readonly PresentedFileApplication[]>) {}
 
   /** Publish the current runtime's explicit desktop capability. */
   loadHost(): Promise<void> {
@@ -31,7 +53,32 @@ export class PresentedOpenController {
     this.generation.abort()
     this.generation = new AbortController()
     this.state.set({})
+    this.apps.set({})
     this.host.set(null)
+  }
+
+  /**
+   * Refresh one file's association list; every call re-queries the Host and the
+   * latest read wins. Reads stay silent while the desktop is unavailable.
+   * @param key - delivery or comparison coordinate the result is published under.
+   * @param path - declaration's workspace-relative file path.
+   */
+  loadApplications(key: string, path: string | undefined): void {
+    if (this.disposed || path === undefined || !this.readHost().available) return
+    const signal = this.generation.signal
+    this.apps.update((apps) => { apps[key] = { applications: apps[key]?.applications ?? [], loading: true, failed: false } })
+    const task = (async () => {
+      let result: PresentedAppState
+      try {
+        result = { applications: await this.listApplications(path, signal), loading: false, failed: false }
+      } catch {
+        // Association failures show one disabled row and never block the default open.
+        result = { applications: [], loading: false, failed: true }
+      }
+      if (!signal.aborted) this.apps.update((apps) => { apps[key] = result })
+    })()
+    this.pending.add(task)
+    void task.finally(() => { this.pending.delete(task) })
   }
 
   /** Open a declared file using its visible path after rechecking desktop availability.
@@ -40,10 +87,11 @@ export class PresentedOpenController {
    * @param index - declared file index.
    * @param action - open file or containing directory.
    * @param path - declaration's file path.
+   * @param application - explicit association id from `loadApplications`, or undefined for the OS default.
    * @returns after the gesture settles.
    */
-  open(sessionId: SessionId, seq: number, index: number, action: PresentedAction = 'open', path?: string): Promise<void> {
-    return this.request(presentedFileUrl(sessionId, seq, index), path, action)
+  open(sessionId: SessionId, seq: number, index: number, action: PresentedAction = 'open', path?: string, application?: string): Promise<void> {
+    return this.request(presentedFileUrl(sessionId, seq, index), path, action, application)
   }
 
   /** Open the current version of a reviewed file in an independent local desktop.
@@ -51,13 +99,14 @@ export class PresentedOpenController {
    * @param seq - change announcement sequence.
    * @param index - summary file index.
    * @param path - selected file path.
+   * @param application - explicit association id, or undefined for the OS default.
    * @returns after the gesture settles.
    */
-  openChanged(sessionId: SessionId, seq: number, index: number, path?: string): Promise<void> {
-    return this.request(changedFileUrl(sessionId, seq, index), path, 'open')
+  openChanged(sessionId: SessionId, seq: number, index: number, path?: string, application?: string): Promise<void> {
+    return this.request(changedFileUrl(sessionId, seq, index), path, 'open', application)
   }
 
-  private async request(key: string, path: string | undefined, action: PresentedAction): Promise<void> {
+  private async request(key: string, path: string | undefined, action: PresentedAction, application: string | undefined): Promise<void> {
     if (this.disposed) return
     const current = this.state.getSnapshot()[key]
     if (current === 'opening' || current === 'revealing') return
@@ -70,7 +119,7 @@ export class PresentedOpenController {
     const task = (async () => {
       let phase: PresentedOpenPhase
       try {
-        await this.openPath(path, action, signal)
+        await this.openPath(path, action, application, signal)
         phase = action === 'open' ? 'opened' : 'revealed'
       } catch {
         // Path RPC failures remain retryable without retaining provider diagnostics.
@@ -87,6 +136,7 @@ export class PresentedOpenController {
     this.disposed = true
     this.generation.abort()
     this.state.set({})
+    this.apps.set({})
     this.host.set(null)
     await Promise.all(this.pending)
   }

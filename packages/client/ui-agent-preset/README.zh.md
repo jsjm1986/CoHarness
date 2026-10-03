@@ -1,18 +1,44 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # dsh-client-ui-agent-preset
 
 [English](README.md) | 中文
 
 agent preset 的各个表层：General 设置中的一行，用于选择新建会话据以组装的 [preset](../../preset/agent-presets/README.zh.md)；新建会话界面上的一枚 chip，用于选择**下一个会话**的 preset；会话标题旁的一个只读标签；以及一个设置页分区，用于管理名单——复制、删除、默认值，以及通往 preset 自身文件的入口。
 
+每个保留的 Workbench Session 独立拥有预设芯片及名册读取。读取使用该 Session Context 中当前挂载的命名空间，并在发布响应前复核其代次。选择操作捕获该 Session 的浏览器身份，因此切换焦点不能重定向未完成的选择。尚无 Session 的创建流程与设置保留当前空间的暂存选择，不会将其应用到其他 runtime 的空白 Session。
+
 ## 概述
 
 使用本包可以为新的 Web GUI 会话选择 agent preset、在会话标题中查看当前 preset，并在设置中管理可用 preset。Agent 模式选择器默认显示；设置可以隐藏它，而不会改变运行中或历史会话；隐藏期间新会话按部署默认值组装，已保存的默认值被搁置，待选择器恢复时再生效。preset 在会话创建时即固定，因此更改选择或默认值只影响此后创建的会话。如果部署未提供任何 preset，这些控件保持隐藏，每个会话都使用宿主组装。
 
+## 目录
+
+- [为什么它是"新建会话"的偏好设置](#why-it-is-a-new-session-preference)
+- [新建会话 chip](#the-new-session-chip)
+- [会话标题旁的标签](#the-session-header-label)
+- [它读什么、写什么](#what-it-reads-and-writes)
+- [管理分区](#the-management-section)
+- [何时不显示这些表层](#when-the-surfaces-are-absent)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="why-it-is-a-new-session-preference"></a>
 ## 为什么它是"新建会话"的偏好设置
 
 会话的 preset 在创建时即固定——宿主拒绝以不同 preset 接管已存在的会话，因为该会话的历史是在最初那份 preset 的工具下产生的。因此本行不可能是实时切换，它也如实说明了这一点：更改只对此后开启的会话生效，而运行中的会话保持它们开始时的组装。
 
+<a id="the-new-session-chip"></a>
 ## 新建会话 chip
+
+Agent 预设设置中的「允许切换 Agent 模式」决定能否选择模式：关闭后新会话选择器消失，而设置卡片仍可选择继续用于新任务的已保存默认值，Creator 入口也保持可用。选择健康定义作为默认值也会同步当前新任务页面的空白会话。Creator 入口开启一个使用 `cordis` preset 的新任务。
 
 第二个表层，位于新建会话界面上、工作区选择器旁边。它落在这里而非 composer，是因为这里才是选择仍然成立的地方：一个大部分时间处于禁用状态的控件，属于它仍然可用的那个界面。
 
@@ -20,10 +46,12 @@ chip 以部署默认值打开，其选择是**暂存**的——该界面先于�
 
 已经开始的会话会被直接拒绝而非排队：宿主返回 `agent-preset-locked`，暂存值随之丢弃，而不是去等一个永远不会接受它的会话。
 
+<a id="the-session-header-label"></a>
 ## 会话标题旁的标签
 
 第三个表层，位于会话标题旁：**本会话**所运行的 preset，作为静态装饰呈现。在那里放一个控件，等于承诺一次宿主会断然拒绝的切换。它从会话自身的摘要读取 preset，并在 General 行所读的同一份名单上解析显示名称。转发的 owner 事件 `agent-preset/selected` 会在每个标签页中把已经提交的空会话切换折进这份共享摘要；发起方标签页可能已经采用 RPC 回执，而合并是幂等的。
 
+<a id="what-it-reads-and-writes"></a>
 ## 它读什么、写什么
 
 选项与当前默认值都来自同一次 `agentPreset.list` 调用。名单本身已经报告了"未显式选择的会话会得到哪个 id"，因此本行无需对 settings schema 做内省；写入目标是 `agent-presets` settings 命名空间的 `default` 字段，也正是宿主在创建时解析的那个字段。
@@ -34,6 +62,7 @@ preset 文件提供一套未国际化的 `name` 与 `description`，Web 将其�
 
 本行在自身命名空间的 `settings/document-updated` 以及 `connection/reset` 时重新读取：名单是一个活动目录，默认值是一项设置，外部编辑与重新连接都可能改变它。
 
+<a id="the-management-section"></a>
 ## 管理分区
 
 第四个表层，独立的设置页（`settings.section`，id 为 `agent-presets`，排在「模型」之后——选模型是日常操作，而组装 agent 是它背后那件塑造部署形态的事）：名单以卡片呈现，复制对话框是创建 preset 的唯一入口，随附组装则在只读查看器中展示。
@@ -45,6 +74,8 @@ preset 文件提供一套未国际化的 `name` 与 `description`，Web 将其�
 preset 自行发布描述，长度不限，而网格让每一行卡片等高——因此不加约束的描述会决定整份名单的高度。卡片把描述截断为四行，其余内容由 tooltip 承载，且仅在文本确实被裁切时才挂载。截断由 CSS 完成，因此无论卡片显示多少，完整描述始终留在无障碍树中。
 
 随附 preset 在只读查看器中打开。它是副本据以出发的已知良好组装，因此能读到它正是意义所在；它不提供位置也不提供删除——它的安装目录会被升级覆盖，不归用户管理。开篇引导语承担了从前创建按钮所暗示的信息：复制一份既有预设改成自己的，或用「创造模式」让 Agent 帮你创建。
+
+已知的随附 preset 还自带帮助：「模式说明」和「如何使用」打开一个只读阅读器，为 `standard`、`ptc`、`minimal` 和 `cordis` 提供经过编排的说明与示例任务。帮助不会改变当前选择——它的存在是为了让用户在不开新会话的情况下了解各模式的差异。自定义 preset 的能力声明由用户自己负责，因此帮助按钮只出现在随附卡片上。
 
 复制旁边是对话式入口：名单携带自指的 `cordis` preset 时，一张虚线添加卡（模型页的同款样式）会暂存它并开启新会话——分区经外壳的 owner-prop `close` 关闭设置面板，新会话 chip 自己的应用器负责组装工作区流程产出的空白会话。seat 会防止晚到的名单加载回退显示：暂存选择优先，其次是当前会话已携带的组装，最后才是部署默认值。
 
@@ -58,14 +89,18 @@ preset 自行发布描述，长度不限，而网格让每一行卡片等高—�
 
 `agentPreset.read`、`copy`、`openDocument` 与 `remove` 被固定在环回地址（见 [`dsh-client-connection`](../connection/README.zh.md)）：组装指明了一个会话所运行的插件，因此读取它是侦察，其余几个则管理名单并驱动宿主桌面。`agentPreset.list` 不在其中——它携带 id、信任级别、展示元数据，以及不含路径的能力与策略标志（`authorable`、`modeSelectionEnabled`），而局域网客户端的选择器需要它。
 
+<a id="when-the-surfaces-are-absent"></a>
 ## 何时不显示这些表层
 
 未组装任何 preset 的部署返回空名单，本行、chip、标签与分区都不渲染任何内容——此时每个会话共用宿主组装，也就无从选择或管理。未配置可写根目录的部署返回 `authorable: false`，分区随之退化为只读浏览：随附组装仍可在查看器中打开，但每个复制操作都被禁用并以原因作提示，而不是给出一个创建必然失败的对话框。名册返回 `modeSelectionEnabled: false` 时，chip 与 General 行都不渲染——分区继续管理名单、但其选择类操作被禁用，会话标题标签仍如实报告每个会话创建时所用的 preset。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。这些界面通过 settings 与远程调用读取并修改 Host 拥有的 preset 名册；插件只贡献 slot 占位内容，自身不保留 preset 数据。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 间接影响，经由此后会话据以组装的 preset；它所选择的 preset 拥有所有面向模型的效果。
@@ -74,8 +109,19 @@ preset 自行发布描述，长度不限，而网格让每一行卡片等高—�
 
 没有直接的失效影响。更改选择器可见性或默认值不会改变运行中会话的组装或前缀，也不会改变历史会话已记录的 preset；此后创建的会话依据它自己的组装建立自己的前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **没有元数据的 preset 按 id 列出** —— 展示文本是可选的，未取名的副本刻意回退到目录名，而不是与其来源呈现得一模一样。
 - **展示的路径是文本，不是链接** —— 宿主没有桌面打开器时，卡片显示目录供手工复制；浏览器自身无法打开宿主文件系统上的位置。
 - **组装编辑对页面不可见** —— 文件在浏览器之外编辑，传输层不广播文件变动，因此名单只在自身操作、`settings/document-updated` 与 `connection/reset` 时重读，而非每次磁盘编辑。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

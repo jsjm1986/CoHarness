@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write python/sdk-runtime/README.md
-README.md: 112b1bc5e31b9240ca1dd1beb569c5593b4d3854
-README.zh.md: ed83935e99783c9b51c7b288762fc8b52c7fbb08
+/deepseek-harness-runtime-bin:
+  en: 1ea1d8e6d2c14b02
+  zh: 8e0b9903158667a1
+/deepseek-harness-runtime-bin/installed-commands-and-artifacts:
+  en: def0ca2b39ff0dc6
+  zh: 720fd49d64e8676a
+/deepseek-harness-runtime-bin/python-module-api:
+  en: a88b7574e0e00a28
+  zh: 3fd4fe8c0b338e79
+/deepseek-harness-runtime-bin/packaged-profile-resolution:
+  en: 641c647efc49c568
+  zh: a29371de9fbbebfd
+/deepseek-harness-runtime-bin/build-and-distribution:
+  en: d14b7f43b76f6d40
+  zh: fe681d24706e40ce

@@ -1,3 +1,4 @@
+import { conversationSnapshot } from '@deepseek-ai/dsh-client-test-runtime'
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
@@ -227,4 +228,20 @@ describe('ui-collaboration apply', () => {
       b.restore()
     }
   })
+})
+
+it('keeps project read-only policy scoped to its pane while allowing personal creation', async () => {
+  const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
+  const b = await bench({ ...baseContext, scope: { kind: 'personal' }, projects: [{ ...baseContext.projects[0]!, mode: 'ro' }] })
+  try {
+    const entry = b.ctx.slots.entries('conversation.composer').find(candidate => candidate.component === ReadOnlyComposer)!
+    const select = entry.select as (owner: ComposerChainProps) => unknown
+    const owner = (kind: 'personal' | 'project'): ComposerChainProps => ({ interactions: [], session: conversationSnapshot(clientSessionKey(kind === 'personal' ? { kind } : { kind, projectId: 9 }, 'same' as SessionId)) })
+    expect(select(owner('personal'))).toBeNull()
+    expect(select(owner('project'))).toBe('project-read-only')
+    const personal: SessionCreateOptions = { runtimeTarget: { kind: 'personal' } }
+    expect(await b.ctx.waterfall('sessions/prepare-create', personal, () => Promise.resolve(personal))).toEqual(personal)
+    const project: SessionCreateOptions = { runtimeTarget: { kind: 'project', projectId: 9 } }
+    await expect(b.ctx.waterfall('sessions/prepare-create', project, () => Promise.resolve(project))).rejects.toThrow('read-only')
+  } finally { b.restore() }
 })

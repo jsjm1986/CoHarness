@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-29-sticky-composer-conversation-scroll.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-29-sticky-composer-conversation-scroll.md
-2026-07-29-sticky-composer-conversation-scroll.md: d628e10979318ba371d56f61c5e96363b4135ad7
-2026-07-29-sticky-composer-conversation-scroll.zh.md: 73ff61e7fac556f37392fdf604edb4d067f9fb9b
+/agent-note-fixed-header-sticky-composer-inside-the-transcript-scrollport:
+  en: d07d6cb3f16558e7
+  zh: 6f1ca946dd344e01
+/agent-note-fixed-header-sticky-composer-inside-the-transcript-scrollport/problem:
+  en: bfd2b60b63513eb9
+  zh: c9d91e57cbba28d3
+/agent-note-fixed-header-sticky-composer-inside-the-transcript-scrollport/decision:
+  en: 15424d2e958d7b34
+  zh: 2a8caf5ef369b9e2
+/agent-note-fixed-header-sticky-composer-inside-the-transcript-scrollport/alternatives-considered:
+  en: 913efdc4b7f8c4aa
+  zh: 875ec8ae221bcac1
+/agent-note-fixed-header-sticky-composer-inside-the-transcript-scrollport/consequences:
+  en: 20d50b44cc63d07b
+  zh: 86a9b997d495bcc2

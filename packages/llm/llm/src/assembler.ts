@@ -6,10 +6,11 @@
  * @module @deepseek-ai/dsh-llm/assembler
  */
 
-import { ToolCallId } from './brand.ts'
-import { assertNever } from './never.ts'
-import { createMessage } from './message.ts'
-import type { Message, MessageSource } from './message.ts'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import { assertNever } from '@deepseek-ai/dsh-util-values'
+import type { ToolCallId } from './brand.ts'
+import { createAssistantMessage } from './message.ts'
+import type { AssistantMessage, ModelMessageSource } from './message.ts'
 import type { ContentBlock, FinishReason, ReplayEnvelope, StreamChunk, TokenUsage } from './types.ts'
 
 interface PartialBlock {
@@ -125,7 +126,7 @@ export class BlockAssembler {
       case 'reasoning': return { type: 'reasoning', text: partial.textCache ??= partial.textParts.join('') }
       case 'tool-call': return {
         type: 'tool-call',
-        id: partial.toolCallId ?? ToolCallId(`call-${index}`),
+        id: partial.toolCallId ?? brandString<ToolCallId>(`call-${index}`),
         name: partial.toolCallName ?? '',
         arguments: partial.toolCallArgumentsCache ??= partial.toolCallArgumentParts.join(''),
       }
@@ -212,10 +213,10 @@ export class BlockAssembler {
 
   /**
    * The assembled assistant message.
-   * @param source - producer attribution for the assembled message.
+   * @param source - provider/model attribution (without the `kind` tag) for the assembled message.
    * @returns a frozen assistant-role message over `blocks()` (same open-block assembly rules).
    */
-  message(source: MessageSource = { kind: 'plugin', plugin: 'dsh-llm/assembler' }): Message {
-    return createMessage({ role: 'assistant', content: this.blocks(), source })
+  message(source: Omit<ModelMessageSource, 'kind'>): AssistantMessage {
+    return createAssistantMessage({ content: this.blocks(), source })
   }
 }

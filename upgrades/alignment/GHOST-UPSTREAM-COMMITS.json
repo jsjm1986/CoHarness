@@ -1,0 +1,10 @@
+{
+  "comment": "Upstream commits for packages created and deleted inside one sync range — present in the commit inventory with no net file diff, claimed by explicit matrix rows. Kept here so scripts/gen-upstream-alignment-matrix.ts carries no repository commit identifiers.",
+  "ghosts": {
+    "packages/util/ip-geolocation": {
+      "upstreamCommits": ["22be805026696a9c6ca95780a2611ddff7a10a40"],
+      "rejectReason": "Upstream created and removed packages/util/ip-geolocation inside the alpha.2→rc.1 range; absent at both endpoints and never shipped at a synced tag.",
+      "notes": "Ghost package: all its commits are mid-range add/remove pairs with no net diff. Recorded so the commit inventory claim stays complete."
+    }
+  }
+}

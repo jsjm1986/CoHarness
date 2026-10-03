@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-16-write-atomic-post-commit-fsync.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-16-write-atomic-post-commit-fsync.md
-2026-09-16-write-atomic-post-commit-fsync.md: ea2bb268b8618e14113bdebd42709c63622f0260
-2026-09-16-write-atomic-post-commit-fsync.zh.md: 0670060b0022c935349fa20d36c06d2c096e825a
+/agent-note-post-commit-fsync-failure-is-not-a-write-failure:
+  en: 113571c72b22307b
+  zh: d9178e5e1e9e2516
+/agent-note-post-commit-fsync-failure-is-not-a-write-failure/problem:
+  en: b6eda3a7609b63df
+  zh: a35177f60b8845e8
+/agent-note-post-commit-fsync-failure-is-not-a-write-failure/decision:
+  en: c302faffc7933222
+  zh: 6054c670da26540b
+/agent-note-post-commit-fsync-failure-is-not-a-write-failure/alternatives-considered:
+  en: 2d2e1dc10a6feb9b
+  zh: 826339b4f421727d
+/agent-note-post-commit-fsync-failure-is-not-a-write-failure/consequences:
+  en: 463b850525c46e9a
+  zh: fde7e7c181987242
+/agent-note-post-commit-fsync-failure-is-not-a-write-failure/verification:
+  en: bbe210bcbb08249c
+  zh: d6981acf25ba2f51

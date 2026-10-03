@@ -35,6 +35,9 @@ SDK 使用 base 默认提供的 `read`、`write` 和 `edit`。要添加 `str_rep
 
 -----
 
+
+**运行时不变式：** 不发布伴生入口。该 bundle 增加进程传输与启动 latch；帧纯度、help 排除和关闭行为由源码及构建产物的 stdio 测试负责。
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -52,6 +55,7 @@ profile 在第一方指导之前提供 `You are a coding agent powered by the {{
 
 对固定 profile、提供方、模型与工具清单保持稳定。由于随附 SDK profile 使用仅启动时 patch，profile 变化会在下一个进程生效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -59,7 +63,6 @@ profile 在第一方指导之前提供 `You are a coding agent powered by the {{
 - **profile 可能省略 SDK server**：TypeScript client 选择的自定义 profile 必须保留本组合包或另一个 `dsh-sdk-jsonrpc-server` 配置项；没有 peer 响应时，client 初始化会失败。
 - **用户插件可以破坏 stdout 纯净性**：profile 与逐次启动 patch 属于受信任应用组合。随附组合包不会向 stdout 写入非协议内容，但无法约束任意插入插件。
 - **配置变化需要重启**：`sdk-app` 组合包在 YAML 中禁用 HMR，因此一个 stdio 连接不会观察到 server 或 agent 依赖被替换。
-
 
 <a id="dev-note"></a>
 ### 开发备注
@@ -70,5 +73,3 @@ profile 在第一方指导之前提供 `You are a coding agent powered by the {{
 无。
 
 </details>
-
-**运行时不变式：** 不发布伴生入口。该 bundle 增加进程传输与启动 latch；帧纯度、help 排除和关闭行为由源码及构建产物的 stdio 测试负责。

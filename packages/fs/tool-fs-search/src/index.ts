@@ -8,7 +8,7 @@
  *
  * Local workspace discovery is a process-backed `rg` workflow, so these tools
  * execute through `ctx.subprocess.spawn()` with fixed ripgrep argv templates —
- * never `ctx.shell`, never `ctx.shell.start()`, never a model-visible background
+ * never `ctx.shell`, never `ctx.shell.execute()`, never a model-visible background
  * task. The tool layer owns schemas, argument validation, argv construction
  * ({@link module:@deepseek-ai/dsh-tool-fs-search/glob} /
  * {@link module:@deepseek-ai/dsh-tool-fs-search/grep}), result parsing,

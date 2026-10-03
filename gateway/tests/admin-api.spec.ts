@@ -11,7 +11,7 @@ import { AuditService } from '../src/audit.ts'
 import { DesktopCoordinator, SqliteDesktopCoordinatorRepository } from '../src/desktop-coordinator.ts'
 import { AuthService } from '../src/auth.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager, type RuntimeTargetInput } from '../src/instances.ts'
 import { ModelGovernanceService } from '../src/model-governance.ts'
@@ -55,7 +55,7 @@ async function setup(
 ) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects') })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects') })
   const instances = new InstanceManager(db, cfg)
   const stoppedTargets: RuntimeTargetInput[] = []
   const stop = instances.stop.bind(instances)
@@ -110,6 +110,20 @@ async function setup(
 }
 
 describe('admin JSON API', () => {
+  it('rejects an invalid organization provider id before invoking the storage service', async () => {
+    const { deps, base, cookie } = await setup()
+    const upsertProvider = vi.fn(async () => {})
+    Object.assign(deps.governance!, { upsertProvider })
+    const response = await fetch(`${base}/admin/api/model-providers`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'invalid-prefix', displayName: 'Invalid', driver: 'pi-ai',
+        protocol: 'openai-completions', baseURL: 'https://example.com/v1', authMode: 'none', status: 'disabled' }),
+    })
+    expect(response.status).toBe(400)
+    expect((await response.json() as { error: string }).error).toContain('org- prefix')
+    expect(upsertProvider).not.toHaveBeenCalled()
+  })
+
   it('restricts bounded webhook delivery diagnostics to authenticated administrators', async () => {
     const { deps, base, cookie } = await setup()
     const url = `${base}/admin/api/webhook-deliveries?endpointId=70ee10ba-3cb9-4e4f-91dd-03606a5527cb&limit=10`
@@ -243,6 +257,7 @@ describe('admin JSON API', () => {
     const archives = {
       adminList: async () => [row],
       detail: async () => detail,
+      status: async (id: string) => id === row.rootSessionId ? { ...row, syncState: 'conflict', lastSyncError: 'Stop active resources first' } : null,
       setState: async (id: string, state: 'archived' | 'trash') => { calls.push(`${state}:${id}`); return { ...row, state } },
       purge: async (id: string) => { calls.push(`purge:${id}`); return true },
     } as unknown as GatewayDeps['archives']
@@ -253,6 +268,11 @@ describe('admin JSON API', () => {
     const read = await fetch(`${base}/admin/api/archives/${row.rootSessionId}`, { headers: { cookie } })
     expect(read.status).toBe(200)
     expect(await read.json()).toEqual(detail)
+    const status = await fetch(`${base}/admin/api/archives/${row.rootSessionId}/status`, { headers: { cookie } })
+    expect(status.status).toBe(200)
+    expect(await status.json()).toMatchObject({ syncState: 'conflict', lastSyncError: 'Stop active resources first' })
+    expect((await fetch(`${base}/admin/api/archives/missing/status`, { headers: { cookie } })).status).toBe(404)
+    expect((await fetch(`${base}/admin/api/archives/${row.rootSessionId}/status`)).status).toBe(401)
     const action = await fetch(`${base}/admin/api/archives/actions`, {
       method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
       body: JSON.stringify({ action: 'restore', ids: [row.rootSessionId], idempotencyKey: 'archive-test' }),
@@ -465,6 +485,59 @@ describe('admin JSON API', () => {
     expect(await deps.users.getById(admin.id)).not.toBeNull()
   })
 
+  it('returns one user and lists its stored project memberships', async () => {
+    const { base, cookie, member, admin, deps } = await setup()
+    const detail = await fetch(`${base}/admin/api/users/${member.id}`, { headers: { cookie } })
+    expect(detail.status).toBe(200)
+    const detailBody = await detail.json()
+    expect(detailBody).toMatchObject({ id: member.id, username: 'worker' })
+    const listRow = (await deps.users.list()).find(user => user.id === member.id)
+    expect(detailBody.port).toBe(listRow?.port)
+    expect(typeof detailBody.port).toBe('number')
+    expect(detailBody.instanceState).toBe(listRow?.instanceState)
+    expect(typeof detailBody.instanceState).toBe('string')
+    expect((await fetch(`${base}/admin/api/users/99999`, { headers: { cookie } })).status).toBe(404)
+
+    const empty = await fetch(`${base}/admin/api/users/${member.id}/memberships`, { headers: { cookie } })
+    expect(empty.status).toBe(200)
+    expect(await empty.json()).toEqual({ memberships: [] })
+
+    const project = await deps.projects.createManaged!({ name: 'owned', ownerUserId: admin.id })
+    await deps.projects.setMember(project.id, member.id, 'ro')
+    const listed = await fetch(`${base}/admin/api/users/${member.id}/memberships`, { headers: { cookie } })
+    expect(await listed.json()).toEqual({
+      memberships: [expect.objectContaining({ projectId: project.id, name: 'owned', mode: 'ro' })],
+    })
+    expect((await fetch(`${base}/admin/api/users/99999/memberships`, { headers: { cookie } })).status).toBe(404)
+  })
+
+  it('reads the stored per-user quota and rejects missing subjects', async () => {
+    const { base, cookie, member } = await setup()
+    const initial = await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=${member.id}`, { headers: { cookie } })
+    expect(initial.status).toBe(200)
+    expect(await initial.json()).toEqual({
+      tokenMode: 'inherit', tokenLimit: null,
+      companyCostMode: 'inherit', companyCostMicrosLimit: null,
+    })
+
+    const write = await fetch(`${base}/admin/api/quotas`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        subjectType: 'user', subjectId: String(member.id),
+        tokenLimit: 5000, companyCostMicrosLimit: null,
+      }),
+    })
+    expect(write.status).toBe(204)
+    const stored = await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=${member.id}`, { headers: { cookie } })
+    expect(await stored.json()).toEqual({
+      tokenMode: 'custom', tokenLimit: 5000,
+      companyCostMode: 'unlimited', companyCostMicrosLimit: null,
+    })
+
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=99999`, { headers: { cookie } })).status).toBe(404)
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=project&subjectId=1`, { headers: { cookie } })).status).toBe(400)
+  })
+
   it('returns JSON { error: "origin not allowed" } for /admin/api CSRF failures', async () => {
     const { base, cookie } = await setup()
     const res = await fetch(`${base}/admin/api/users`, {
@@ -567,6 +640,19 @@ describe('admin JSON API', () => {
     expect(rows.every(r => r.detail === undefined)).toBe(true)
   })
 
+  it('returns safe audit targets and revisions while withholding secrets and raw details', async () => {
+    const { base, cookie, deps, admin } = await setup()
+    await deps.audit.write({ userId: admin.id, action: 'admin.ssh-targets.update', status: 200,
+      detail: JSON.stringify({ targetId: 17, revision: '9', name: 'private-name', password: 'fixture-secret', fields: { token: 'private' } }) })
+    const res = await fetch(`${base}/admin/api/audit?action=admin.ssh-targets.update`, { headers: { cookie } })
+    expect(res.status).toBe(200)
+    const rows = await res.json() as Array<Record<string, unknown>>
+    expect(rows[0]).toMatchObject({ outcome: 'success', metadata: { targetId: 17, revision: '9' } })
+    expect(rows[0]).not.toHaveProperty('detail')
+    expect(JSON.stringify(rows)).not.toContain('fixture-secret')
+    expect(JSON.stringify(rows)).not.toContain('private-name')
+  })
+
   it('rewrites grants on member write and on project delete', async () => {
     const { base, cookie, root, member, stoppedTargets } = await setup()
     const shared = join(root, 'shared'); mkdirSync(shared)
@@ -657,7 +743,7 @@ describe('admin JSON API', () => {
 })
 
 describe('admin desktop coordination API', () => {
-  it.each(['desktop', 'terminal'] as const)('restricts %s qualification reads and writes to administrators with request protection', async (resource) => {
+  it.each(['desktop', 'terminal', 'plugin'] as const)('restricts %s qualification reads and writes to administrators with request protection', async (resource) => {
     const { base, cookie, deps } = await setup()
     const get = vi.fn(async () => ({ kind: 'user' as const, id: 1, enabled: false, revision: '0' }))
     const set = vi.fn(async () => ({ kind: 'user' as const, id: 1, enabled: true, revision: '1' }))

@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-24-workspace-context.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-24-workspace-context.md
-2026-06-24-workspace-context.md: b676ab146b1449d15cfd20ff667899745344c0bf
-2026-06-24-workspace-context.zh.md: e75adf39f3000e36aa2360b0225828cb5262a88c
+/agent-note-workspace-context-instruction-files:
+  en: 1bab4dc5cd5e415b
+  zh: 45624812e7764e38
+/agent-note-workspace-context-instruction-files/problem:
+  en: 16daab4990f810a9
+  zh: 1736c738844769e9
+/agent-note-workspace-context-instruction-files/decision:
+  en: 3240c0780de4ab26
+  zh: a29c13d1973b84aa
+/agent-note-workspace-context-instruction-files/decision/file-names-and-precedence:
+  en: 76b089b840a04f57
+  zh: 8654b0d53c98d0c4
+/agent-note-workspace-context-instruction-files/decision/baseline-injection:
+  en: b7dc90bc7cbd176a
+  zh: 6bf6170f674148e5
+/agent-note-workspace-context-instruction-files/decision/dynamic-discovery-and-refresh:
+  en: 65240640627a27f8
+  zh: 839fe668fe19420d
+/agent-note-workspace-context-instruction-files/decision/duplicate-suppression-and-change-detection:
+  en: 5ab9cd07b3b2dda1
+  zh: 9eb29e08ecf9288c
+/agent-note-workspace-context-instruction-files/decision/byte-budget-and-bounded-reads:
+  en: 87162ca44a38ba60
+  zh: f619f1906f3cac88
+/agent-note-workspace-context-instruction-files/alternatives-considered:
+  en: 66ba13060f16aee9
+  zh: 0fba96c6f41f279e
+/agent-note-workspace-context-instruction-files/consequences:
+  en: de28f198a972dbec
+  zh: e21959d15cd019c0
+/agent-note-workspace-context-instruction-files/deferred:
+  en: bd27950ddb9cc05b
+  zh: 49da9cb82130f3e4

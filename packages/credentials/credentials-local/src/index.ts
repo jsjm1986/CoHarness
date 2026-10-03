@@ -35,6 +35,7 @@
  * @module @deepseek-ai/dsh-credentials-local
  */
 
+import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { watch as chokidarWatch } from 'chokidar'
@@ -557,6 +558,7 @@ export class LocalCredentialProvider extends CredentialProvider {
     // Programmatic construction may bypass Schemastery normalization; resolve
     // the same defaults in one explicit step either way.
     this.spec = resolveSpec(config)
+    registerManagedDataPath({ owner: '@deepseek-ai/dsh-credentials-local', kind: 'file', path: this.spec.filename }, process.env.DSH_MANAGED_DATA_MANIFEST)
   }
 
   /** The inherited-environment value for a reference, or `undefined` when empty or unset. */

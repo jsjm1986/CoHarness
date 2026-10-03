@@ -113,7 +113,11 @@ export const turnProcessDefinition: ConversationNodeDefinition<TurnProcessState>
   buildViewNode: (context) => {
     const state = context.state
     const location = turnLocation(context)
-    if (state === undefined || !state.evidence || !isTurnLocation(location)) return null
+    // A live turn only earns a process row once real evidence arrives; a
+    // closed turn always owns one — a turn that never produced assistant
+    // output still folds what it leaves behind, such as a late question reply.
+    if (state === undefined || !isTurnLocation(location)) return null
+    if (!state.evidence && location.turn.status !== 'closed') return null
     return chatNode(context, 'turn-process', state.controlAnchorSeq - 0.5, {
       turn: state.turn,
       controlAnchorSeq: state.controlAnchorSeq,

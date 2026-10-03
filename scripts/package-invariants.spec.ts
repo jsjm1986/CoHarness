@@ -78,10 +78,10 @@ function fixture(options: {
     exports,
     files: ['lib/index.js', ...invariantFile ? ['lib/invariant.js'] : []],
     peerDependencies: !invariantDependency || developmentOnlyInvariant ? {} : {
-      '@deepseek-ai/dsh-invariants': 'workspace:^',
+      '@deepseek-ai/dsh-invariants': 'workspace:*',
     },
     devDependencies: !invariantDependency ? {} : {
-      '@deepseek-ai/dsh-invariants': 'workspace:^',
+      '@deepseek-ai/dsh-invariants': 'workspace:*',
     },
   }
   writeFileSync(join(dir, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)

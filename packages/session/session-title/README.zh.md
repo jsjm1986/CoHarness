@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-title
 
 [English](README.md) | 中文
@@ -10,6 +15,18 @@
 
 使用 `dsh-session-title` 为每个会话提供客户端可见标题，标题可以来自第一条符合条件的用户消息、可选异步生成器或显式用户重命名。已接受的标题在回放、恢复与分页后仍然存在，但绝不会进入模型输入。自动生成绝不会延迟主 agent（智能体）响应，较新的标题请求会取代旧工作。当客户端需要带可配置长度上限的持久标题，以及通过 `refresh()` 主动重新生成标题的路径时，请选择本包。
 
+## 目录
+
+- [服务：`SessionTitleService`（ctx 键：`sessionTitle`）](#service-sessiontitleservice-ctx-key-sessiontitle)
+- [配置](#configuration)
+- [提供方约定](#provider-contract)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="service-sessiontitleservice-ctx-key-sessiontitle"></a>
 ## 服务：`SessionTitleService`（ctx 键：`sessionTitle`）
 
 - `get(session)` 从活跃或回放日志折叠最新已接受标题。
@@ -21,6 +38,7 @@
 
 fork 出的会话会原样继承种子中的标题事件。首消息节奏不会自动为子会话重新生成标题；全消息节奏可以在子会话收到后续用户提示词后追加新修订。
 
+<a id="configuration"></a>
 ## 配置
 
 所有上限都是必填项；该库不提供默认值。
@@ -31,12 +49,15 @@ fork 出的会话会原样继承种子中的标题事件。首消息节奏不会
 | `fallbackMaxBytes` | 回退允许的最大正整数 UTF-8 字节数；不得超过 `maxTitleBytes`。 |
 | `maxTitleBytes` | 接受任何来源标题的最大正整数 UTF-8 字节数。 |
 
+<a id="provider-contract"></a>
 ## 提供方约定
 
 提供方会提供带品牌类型的稳定 id、自动模式（`first-prompt` 或 `all-prompts`）和 `generate(request)`。请求携带活跃会话、截至一次固定修订的所有符合条件消息、可用时当前已记录的主请求路由，以及取消信号。结果包含非空标题、该请求中互不重复且有序的来源消息 seq，以及生成该标题时使用的可选提供方／模型路由。服务会在结果持久保存前进行规范化和验证。
 
 参见[会话标题数据结构](../../../docs/subsystems/session-title.zh.md)与[已实现决策](../../../.agents/notes/implemented/feature/2026-07-21-log-backed-session-titles.zh.md)。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 会话标题状态
@@ -53,7 +74,18 @@ fork 出的会话会原样继承种子中的标题事件。首消息节奏不会
 
 不影响主请求；标题事件不会改变其重建内容或缓存键。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 删除标题（不经显式 `refresh` 就解钉回自动标题）、搜索和列表索引不属于此服务。
 - 提供方注册表有意最多接受一个实现，因此部署若要组合相互竞争的标题策略，必须编写一个自行负责优先级的提供方。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

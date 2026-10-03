@@ -33,7 +33,13 @@
       "path": "../ui-workspace"
     },
     {
+      "path": "../../host/webserver"
+    },
+    {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     },
     {
       "path": "../ui-layout"

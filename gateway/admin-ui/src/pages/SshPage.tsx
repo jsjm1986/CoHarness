@@ -23,6 +23,7 @@ interface TargetDraft {
   workspace: string
   bootstrapPath: string
   bootstrapHash: string
+  passwordRef: string
   requestTimeoutMs: string
   maxFrameBytes: string
   maxPending: string
@@ -31,7 +32,7 @@ interface TargetDraft {
 
 const EMPTY_DRAFT: TargetDraft = {
   name: '', host: '', node: '', helper: '', helperHash: '', workspace: '',
-  bootstrapPath: '', bootstrapHash: '', requestTimeoutMs: '', maxFrameBytes: '', maxPending: '', leaseMs: '',
+  bootstrapPath: '', bootstrapHash: '', passwordRef: '', requestTimeoutMs: '', maxFrameBytes: '', maxPending: '', leaseMs: '',
 }
 
 function draftOf(target: AdminSshTarget): TargetDraft {
@@ -39,6 +40,7 @@ function draftOf(target: AdminSshTarget): TargetDraft {
     name: target.name, host: target.host, node: target.node, helper: target.helper,
     helperHash: target.helperHash, workspace: target.workspace,
     bootstrapPath: target.bootstrapPath ?? '', bootstrapHash: target.bootstrapHash ?? '',
+    passwordRef: target.passwordRef ?? '',
     requestTimeoutMs: target.requestTimeoutMs === null ? '' : String(target.requestTimeoutMs),
     maxFrameBytes: target.maxFrameBytes === null ? '' : String(target.maxFrameBytes),
     maxPending: target.maxPending === null ? '' : String(target.maxPending),
@@ -57,13 +59,17 @@ const limit = (value: string) => {
 function fieldsOf(draft: TargetDraft): AdminSshTargetFields {
   const bootstrapPath = text(draft.bootstrapPath)
   const bootstrapHash = text(draft.bootstrapHash)
+  const passwordRef = text(draft.passwordRef)
   if ((bootstrapPath === null) !== (bootstrapHash === null)) throw new Error('PTC 引导路径与摘要必须同时填写')
   if (!HASH_PATTERN.test(draft.helperHash.trim())) throw new Error('助手摘要必须是 64 位小写十六进制')
   if (bootstrapHash !== null && !HASH_PATTERN.test(bootstrapHash)) throw new Error('引导摘要必须是 64 位小写十六进制')
+  if (passwordRef !== null && !/^[A-Za-z_][A-Za-z0-9_]{0,255}$/u.test(passwordRef)) {
+    throw new Error('密码凭据引用必须以字母或下划线开头，只能包含字母、数字和下划线，最长 256 字符')
+  }
   return {
     name: draft.name.trim(), host: draft.host.trim(), node: draft.node.trim(), helper: draft.helper.trim(),
     helperHash: draft.helperHash.trim(), workspace: draft.workspace.trim(),
-    bootstrapPath, bootstrapHash,
+    bootstrapPath, bootstrapHash, passwordRef,
     requestTimeoutMs: limit(draft.requestTimeoutMs), maxFrameBytes: limit(draft.maxFrameBytes),
     maxPending: limit(draft.maxPending), leaseMs: limit(draft.leaseMs),
   }
@@ -168,26 +174,28 @@ export function SshPage() {
         {targets === null ? <LoadingState label="正在加载 SSH 目标" /> : targets.length === 0 ? (
           <EmptyState title="尚无 SSH 目标" detail="登记部署拥有的 OpenSSH 别名后，具备资格的账号才能在受管运行时挂载远端执行环境。" />
         ) : (
-          <table className="dataTable">
-            <thead><tr><th>名称</th><th>主机别名</th><th>远端工作区</th><th>共享项目</th><th>状态</th><th>操作</th></tr></thead>
-            <tbody>
-              {targets.map(target => (
-                <tr key={target.publicId}>
-                  <td>{target.name}</td>
-                  <td><code>{target.host}</code></td>
-                  <td><code>{target.workspace}</code></td>
-                  <td>{target.sharedProjects.length === 0 ? '—' : target.sharedProjects.map(id => projects.find(project => project.id === id)?.name ?? `#${String(id)}`).join('、')}</td>
-                  <td><StatusBadge tone={target.enabled ? 'success' : 'neutral'}>{target.enabled ? '已启用' : '已停用'}</StatusBadge></td>
-                  <td>
-                    <IconButton label="编辑" icon={Pencil} onClick={() => { setEditing({ target, draft: draftOf(target) }) }} />
-                    <IconButton label="项目共享" icon={Share2} onClick={() => { setSharing(target) }} />
-                    <Button variant="ghost" onClick={() => void toggle(target)} disabled={acting}>{target.enabled ? '停用' : '启用'}</Button>
-                    <IconButton label="删除" icon={Trash2} onClick={() => { setRemoving(target) }} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="tableWrap" role="region" aria-label="SSH 连接目标，可横向滚动" tabIndex={0}>
+            <table className="dataTable">
+              <thead><tr><th>名称</th><th>主机别名</th><th>远端工作区</th><th>共享项目</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                {targets.map(target => (
+                  <tr key={target.publicId}>
+                    <td>{target.name}</td>
+                    <td><code>{target.host}</code></td>
+                    <td><code>{target.workspace}</code></td>
+                    <td>{target.sharedProjects.length === 0 ? '—' : target.sharedProjects.map(id => projects.find(project => project.id === id)?.name ?? `#${String(id)}`).join('、')}</td>
+                    <td><StatusBadge tone={target.enabled ? 'success' : 'neutral'}>{target.enabled ? '已启用' : '已停用'}</StatusBadge></td>
+                    <td>
+                      <IconButton label="编辑" icon={Pencil} onClick={() => { setEditing({ target, draft: draftOf(target) }) }} />
+                      <IconButton label="项目共享" icon={Share2} onClick={() => { setSharing(target) }} />
+                      <Button variant="ghost" onClick={() => void toggle(target)} disabled={acting}>{target.enabled ? '停用' : '启用'}</Button>
+                      <IconButton label="删除" icon={Trash2} onClick={() => { setRemoving(target) }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Section>
       <SshPermissions />
@@ -204,8 +212,10 @@ export function SshPage() {
       >
         {editing === null ? null : (
           <div className="formGrid">
+            <div className="formSpanFull"><ErrorBanner message={error} /></div>
             <Field label="名称" hint="组织内唯一的管理显示名。"><input className="input" value={editing.draft.name} onChange={event => { patchDraft({ name: event.target.value }) }} /></Field>
             <Field label="主机别名" hint="包含既有用户、密钥和 known-hosts 配置的 OpenSSH 别名。"><input className="input" value={editing.draft.host} onChange={event => { patchDraft({ host: event.target.value }) }} /></Field>
+            <Field label="密码凭据引用" hint="可选；填写连接运行时能解析的凭据名称，不填写密码。留空使用 OpenSSH 配置。"><input className="input" autoComplete="off" value={editing.draft.passwordRef} onChange={event => { patchDraft({ passwordRef: event.target.value }) }} /></Field>
             <Field label="远端 Node 可执行文件" hint="绝对路径。"><input className="input" value={editing.draft.node} onChange={event => { patchDraft({ node: event.target.value }) }} /></Field>
             <Field label="助手入口" hint="已安装打包助手的绝对路径。"><input className="input" value={editing.draft.helper} onChange={event => { patchDraft({ helper: event.target.value }) }} /></Field>
             <Field label="助手摘要" hint="助手包的 SHA-256；不匹配拒绝连接。"><input className="input" value={editing.draft.helperHash} onChange={event => { patchDraft({ helperHash: event.target.value }) }} /></Field>

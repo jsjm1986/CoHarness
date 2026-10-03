@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-document-workspace-folders.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-document-workspace-folders.md
-2026-08-19-document-workspace-folders.md: e39ddb32bf94ba32c6b14744f6df256b22b429bb
-2026-08-19-document-workspace-folders.zh.md: 02485c8d30d42ae8bb7d437bd878e88bdc0589c7
+/agent-note-document-workspace-folders-and-migration:
+  en: ab363c8c9e700bb9
+  zh: d62269be99ce818a
+/agent-note-document-workspace-folders-and-migration/problem:
+  en: 2e8837b9a80482ec
+  zh: 995f0f7ddc01ee42
+/agent-note-document-workspace-folders-and-migration/decision:
+  en: e39d03506b4b217e
+  zh: c84fb4f970e3c736
+/agent-note-document-workspace-folders-and-migration/decision/storage-and-migration:
+  en: fe587d296b6a1bd1
+  zh: 2f6d10c3ad56f986
+/agent-note-document-workspace-folders-and-migration/decision/operations-and-ownership:
+  en: 591e2243ac95b843
+  zh: 329ca6082bbbbbdb
+/agent-note-document-workspace-folders-and-migration/verification:
+  en: 6b2aaad8671fb7b8
+  zh: c205e35e64900086
+/agent-note-document-workspace-folders-and-migration/alternatives-considered:
+  en: 2477ec232e02d3a9
+  zh: b38591db409a3f9c
+/agent-note-document-workspace-folders-and-migration/consequences:
+  en: 26280ead9702c5e0
+  zh: ee866f0d4ac30dd9

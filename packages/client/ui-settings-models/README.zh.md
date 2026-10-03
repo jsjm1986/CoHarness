@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings-models
 
 [English](README.md) | 中文
@@ -18,6 +23,17 @@ DeepSeek 步骤会从同一个 Models 联接快照得出首次运行就绪状态
 
 `dsh-client-ui-settings-models` 是 dsh Web 客户端的 Models 设置页面：用户可以配置 API 密钥（以只写方式存入 profile 的凭据引用之下）、编辑每个提供方的模型列表，并手工声明自定义 pi-ai 路由；页面以提供方行展示，一次只展开一张编辑卡片。该页面把提供方目录、设置文档与凭据描述合并为一个共享快照，因此行的状态在三个方面始终一致。它还会带首次运行的用户走两个有序弹窗——版本化内测声明，以及按条件显示的官方 DeepSeek 凭据步骤。
 
+## 目录
+
+- [模型列表与端点询问](#model-list-and-endpoint-interrogation)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="model-list-and-endpoint-interrogation"></a>
 ## 模型列表与端点询问
 
 pi-ai profile 的 `models` 列表就在卡片上编辑：一行一个模型，行上显示 id 与显示名称，上下文窗口、输出上限、图片输入复选框和按模型配置的思考等级都收在该行的展开区内，右侧是两个无文字的操作——展开与删除。勾选图片会写入 `input: ['text', 'image']`，取消则写入 `['text']`。空列表意味着「使用该路由的内置 catalog」，因此每一行都只会被刻意添加；清空容量会丢弃它，而不是存入一个 schema 会拒绝的值，配置留空的部分由适配器的路由级回退值定尺寸——留空的容量以提供方回退值作为占位符；显式填写的值仍按精确 token 数保存。字段使用十进制 `K` 和 `M`（`K` = 1,000，`M` = 1,000,000），不是正整数的容量不会被保存。
@@ -26,10 +42,13 @@ pi-ai profile 的 `models` 列表就在卡片上编辑：一行一个模型，�
 
 **添加自定义提供方**用来声明 pi-ai 未提供的路由。它是独立的一张卡片而非在编辑器上加字段，因为路由 id 正是在这里被*选定*的，而在选定之前 settings 地址并不存在：一次 `settings.mutate` 在 `providers.<route>` 上设置整个 profile，密钥则经 `credentials.set` 单独传递。Provider ID 只要求非空，不受目录或 shell 标识符格式限制；`org-` 与 `project-` 命名空间保留给受管理路由，凭据引用独立派生，特殊名称会加入稳定后缀以避免冲突。创建时仍要求端点、受支持的协议和至少一个唯一模型，这是适配器完成请求路由所需的最低事实。容量不参与门控，适配器会为省略的容量使用回退值。协议选项来自 namespace 自身的 schema，因此始终与适配器一致。密钥留空会保留提供方原生鉴权。如果 profile 写入成功而密钥写入失败，提供方仍会保留，重试只写凭据。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。页面在渲染时联接 `llm.providers`、`settings.describe` 与 `credentials.describe` 有线域；提供方与凭据状态仍由 Host 拥有。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。
@@ -38,6 +57,7 @@ pi-ai profile 的 `models` 列表就在卡片上编辑：一行一个模型，�
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **卡片上可编辑的只有 API 密钥与精选折叠区字段**：手写编辑器用 schema 通用的字段覆盖面换来了设计稿上的布局（[Agent Note](../../../.agents/notes/implemented/architecture/2026-07-30-web-config-plane.zh.md)）。两个家族都公开 `baseURL`、模型的 `id`/`name`/`contextWindow`/`maxTokens` 以及图片输入模态声明（DeepSeek 使用 `inputModalities`，pi-ai 使用 `input`）；pi-ai 行编辑器还会写入 `reasoningEfforts`，而端点未声明模态时保持 `input` 未设置。手工声明的 pi-ai 路由还公开 `displayName` 与 `api`。重试策略、超时、DeepSeek 模型说明及其他进阶字段仍留在 `settings.yaml` 中；编辑器未展示的现有模型字段会予以保留。不带这些约定字段的 profile schema 只渲染该提示，两套精选布局则以 `llm-deepseek`/`llm-pi-ai` 这两个 namespace 的名字为键。
@@ -45,3 +65,13 @@ pi-ai profile 的 `models` 列表就在卡片上编辑：一行一个模型，�
 - **只有 pi-ai 路由可以手工声明**：自定义提供方卡片写入 `llm-pi-ai`——唯一一个其 profile 描述整个提供方的 namespace。`llm-deepseek` 路由是组合面的事实，不是本页能创建的东西。
 - **询问覆盖 OpenAI 兼容和 Anthropic Messages 列表**：其他协议会报告自己无法被询问，其模型需手工填写；如果中转站不提供两个 `/models` 变体或返回的不是列表，也需要手工填写。
 - **未声明的存活路由无处渲染**：未附带可配置提供方声明即注册的路由没有 settings 地址；它在各选择器中仍然可见，但不会出现在本页的行里。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

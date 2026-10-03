@@ -1,3 +1,8 @@
+---
+description: "Remote BFF assembly and Host Agent/Session lookup policy"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-api-remotes
 
 English | [中文](README.zh.md)
@@ -16,12 +21,25 @@ The Client assembly mounts the generated Plugin Manager namespace for profile in
 
 Two-sided BFF for Host Remote capabilities selected by this application. The Host entry owns the forwarded-event selection and registers its application event source with API Gateway; the Client entry imports generated `/remote` artifacts as runtime values, mounts each contribution through `ctx.remote.$mount()`, and re-exports their declaration merges. Client business packages depend on this facade rather than the Gateway implementation or individual Remote runtime entries.
 
+## Table of Contents
+
+- [Forwarded Host events](#forwarded-host-events)
+- [Build boundary](#build-boundary)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="forwarded-host-events"></a>
 ## Forwarded Host events
 
 `src/remote-events.ts` holds `API_REMOTE_FORWARDED_EVENTS`, the allowlist of Host cordis events this application forwards to consumers verbatim — no projection, no redaction, no wire renaming — and therefore the legal key set of `ctx.remote.$on`; the type-only `src/types.ts` derives its selection face. The six dynamic Cordis event families include both the official `cordis/*` names and the fork's `@deepseek-ai/cordis/*` names. The Host still forwards the exact name it received; the Gateway Client treats each pair as one delivery family. Forwarding any other event remains one entry in the array: the type projection, consumer key face, and Host forwarding loop derive from it.
 
 The listener signature is not restated here. Each allowlisted event's cordis `Events` declaration lives in its owner package's client-safe `./types` export (`dsh-agent-presets`, `dsh-commands`, `dsh-cordis-host-runner`, `dsh-credentials`, `dsh-llm`, `dsh-settings`), and both faces of this package pull those declarations in, so "forwarded verbatim" holds by construction rather than by proof. The Host face additionally asserts the list against `TypertForwardableEvent`, which rejects a name that is not a declared event, one that binds an AgentScope, and one whose shape is not one-way.
 
+<a id="build-boundary"></a>
 ## Build boundary
 
 An ordinary repository package belongs to one TypeScript face: Host packages are registered in the root `tsconfig.host.json`, and Client packages in the root `tsconfig.client.json`. `api-remotes` is the only deliberate exception because its Host entry must participate in the Host Typert graph, while `src/client/index.ts` cannot compile until Host tsdown has generated the business packages' `/remote` declarations.
@@ -32,10 +50,14 @@ That exception is not just a `files` entry. The root `tsconfig.base.json` maps `
 
 The package-local `clientBundle(..., { hostPhase: true })` makes Host tsdown bundle the Host entry and the later Client tsdown bundle only the browser entry. Ordinary Client plugins remain single Client projects and produce both their Node loader entry and browser bundle during Client tsdown; do not copy this package's split merely because a package has both `src/index.ts` and `src/client/index.ts`.
 
+Agent lookup reserves its Session identity across asynchronous inspection and resume. The Host retains each resumed factory handle through `onResumed`; concurrent lookups share one creation and one ownership transfer. Permanent removal refuses an in-flight lookup, and a reserved removal refuses new lookup admission.
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Every contribution is mounted through `ctx.remote.$mount()` as an effect withdrawn with the assembly fiber, and identity resolution is per-call policy over the live Agent registry.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this BFF selects Remote application methods and forwarded events but registers nothing model-facing.
@@ -49,3 +71,13 @@ No direct effect; mounted Host capabilities own any model-visible behavior they 
 - The capability set is fixed by explicit build-time value imports; the Client does not discover the Host's active Services or Remote definitions at runtime.
 - Additional capabilities require an explicit `/remote` value import and mount in this assembly.
 - The standard Web Host supplies resume defaults and Agent-scope setup from the legacy API Proxy until that remaining BFF configuration moves into `api-remotes`.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-09-27-idle-session-purge.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-27-idle-session-purge.md
+/agent-note-idle-session-purge-through-its-lifecycle-owner:
+  en: e7df88ce43013618
+  zh: 0e60e567ac40522a
+/agent-note-idle-session-purge-through-its-lifecycle-owner/problem:
+  en: a2fbbcc16bbd074a
+  zh: 91b3591e10274834
+/agent-note-idle-session-purge-through-its-lifecycle-owner/decision:
+  en: 035bfc5850bfde5b
+  zh: 28d6a4a56152d351
+/agent-note-idle-session-purge-through-its-lifecycle-owner/alternatives-considered:
+  en: c5de1515e554b222
+  zh: faae3d39b40fdc8a
+/agent-note-idle-session-purge-through-its-lifecycle-owner/consequences:
+  en: 258c3ac32f7f2791
+  zh: b922aee4be8aba7c

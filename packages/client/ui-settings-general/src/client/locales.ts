@@ -18,6 +18,10 @@ export const zh = {
   'connection.connected': '连接成功',
   'connection.reconnect': '连接异常，点击立即重连',
   'connection.restart': '连接中断，正在重试，点击立即重连',
+  'shortcut.open': '打开设置',
+  'developerTools.title': '显示代码工作视图',
+  'developerTools.error': '保存失败，请重试',
+  'developerTools.description': '开启后，显示轨迹、本轮代码差异，可选择完整的 Agent 预设切换',
 } satisfies Record<string, string>
 
 /** The settings namespace key union. */
@@ -41,4 +45,8 @@ export const en = {
   'connection.connected': 'Connected',
   'connection.reconnect': 'Disconnected, reconnect now',
   'connection.restart': 'Reconnecting, reconnect now',
+  'shortcut.open': 'Open settings',
+  'developerTools.title': 'Show coding view',
+  'developerTools.error': 'Could not save. Please try again.',
+  'developerTools.description': 'Shows trajectory, code diffs, and all Agent presets',
 } satisfies Record<SettingsKey, string>

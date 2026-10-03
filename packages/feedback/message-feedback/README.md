@@ -1,3 +1,8 @@
+---
+description: "Lifecycle-bound per-message rating and note sidecar for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-message-feedback
 
 English | [中文](README.zh.md)
@@ -10,6 +15,20 @@ Public request, value, version, and failure types are exported from the package 
 
 This service records positive or negative ratings, an optional category from the fixed feedback taxonomy, and optional verbatim notes for finalized assistant messages. The canonical Session log owns every creation, edit, and deletion; `list`, `put`, and `delete` expose current feedback without constructing or waking an Agent. Feedback is log-only and does not enter model history.
 
+## Table of Contents
+
+- [Configuration](#configuration)
+- [Data, lifecycle, and durability](#data-lifecycle-and-durability)
+- [Service and Host Remote contract](#service-and-host-remote-contract)
+- [Compare-and-set and idempotency](#compare-and-set-and-idempotency)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="configuration"></a>
 ## Configuration
 
 | key | meaning |
@@ -27,6 +46,7 @@ Notes must contain at least one non-whitespace character, but accepted text is s
 
 The service injects `storageDomain`, `sessionPersistence`, and `sessions`. Its durable domain is `message_feedback`, with one `sessions` table row per `SessionId`.
 
+<a id="data-lifecycle-and-durability"></a>
 ## Data, lifecycle, and durability
 
 `MessageFeedbackItem` contains `messageId`, `rating: 'positive' | 'negative'`, optional `note`, an opaque equality-only `version`, and Host-assigned `createdAt`/`updatedAt` Unix-millisecond timestamps. A material update preserves `createdAt`, replaces `version`, and keeps `updatedAt` from moving backward. `list` returns fresh immutable snapshots in first-creation order; updating an item retains its place, while deleting and later recreating it appends a new item.
@@ -39,6 +59,7 @@ After initial validation, `put` establishes a durability barrier before writing 
 
 Message feedback is not Session-log content or a Session projection. It emits no `feedback/record` event, does not enter model history, and does not trigger `FEEDBACK_ONLY` telemetry release.
 
+<a id="service-and-host-remote-contract"></a>
 ## Service and Host Remote contract
 
 The same three `MessageFeedbackService` methods are published by `TypertRemoteService` and `@Remote`; the Host endpoint names are `messageFeedback.list`, `messageFeedback.put`, and `messageFeedback.delete`. Every method returns a discriminated business union: `{ ok: true, value }` or `{ ok: false, error }`. Operational storage, corruption, or missing-durability-listener failures reject instead of being mislabeled as business errors.
@@ -51,6 +72,7 @@ The same three `MessageFeedbackService` methods are published by `TypertRemoteSe
 
 `MessageFeedbackVersionConflict` returns the authoritative `current` item, or `null` when no item exists. This lets a caller reconcile the current rating, note, and version without a second `list` request. `MessageFeedbackNoteTooLarge` returns both `maxBytes` and `actualBytes`. The Client Remote aggregate does not mount the generated client contribution yet; Host callers can use the service/Remote contract without that client assembly.
 
+<a id="compare-and-set-and-idempotency"></a>
 ## Compare-and-set and idempotency
 
 `ifVersion: null` requests creation only; every request for an existing item requires its exact current version, including a no-op whose desired value already matches. The check is per message rather than per Session, so changing one item does not conflict with another. Every material create or update assigns a fresh opaque UUID token, preventing stale writes from crossing an ABA value cycle.
@@ -61,10 +83,12 @@ A per-Session promise queue encloses inspection, durability validation, sidecar 
 
 Plugin disposal closes mutation admission, drains every operation already accepted into the per-Session queues, and only then closes the storage domain. A mutation submitted after disposal begins rejects as a lifecycle failure instead of entering a closing domain.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Sidecar rows are persisted through the storage domain they belong to and exposed by the same Remote surface; no second copy exists to diverge.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Message feedback
@@ -90,3 +114,13 @@ Independent. Feedback does not change the model request prefix.
 - **Header identity is not a content fingerprint** — `{createdAt, cwd}` detects reuse only when those fields differ; a cloned log retaining the same header identity is indistinguishable.
 - **Trusted caller boundary** — `list`/`put`/`delete` carry no authenticated actor or audit identity. A deployment must expose the Host gateway only through its trusted or separately authenticated boundary until authorization and attribution are added.
 - **Catalog and row bounds** — a cold request scans the complete Session snapshot catalog because persistence has no lookup-by-id metadata operation. `maxNoteBytes` bounds one note, but the item count and aggregate retained bytes of one Session row are not capped; an indexed metadata read and deployment-owned row bound remain deferred until a concrete consumer defines their policy.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

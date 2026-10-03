@@ -22,6 +22,7 @@ import { assertSnapshotCorpusPolicy } from './session-snapshot-corpus-policy.ts'
 const repoRoot = resolve(import.meta.dirname, '..')
 const corpusRoot = join(repoRoot, 'snapshots')
 const profiles = ['acp', 'sdk', 'session', 'web'] as const
+
 interface Scenario {
   readonly key: string
   readonly profile: string
@@ -171,7 +172,7 @@ it('keeps a current-writer majority plus bounded declared historical migration c
   })))
 
   expect(assertSnapshotCorpusPolicy(inventory)).toMatchObject({
-    retainedRoles: 13,
-    retainedScenarios: 11,
+    retainedRoles: 14,
+    retainedScenarios: 12,
   })
 })

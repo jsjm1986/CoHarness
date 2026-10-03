@@ -199,7 +199,7 @@ function withMigratedEmptyHead(log: readonly SessionEvent[]): readonly unknown[]
       type: 'system/message', seq: 2, time: log[1]!.time, surfaceOp: 'append',
       data: { turn: 1, step: 1, message: {
         id: expect.stringMatching(/^v2-to-v3-system-[0-9a-f]{64}$/) as unknown,
-        role: 'system', content: [], source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
+        role: 'system', content: [], source: { kind: 'system-prompt' },
       } },
     },
     ...log.slice(2).map(event => ({ ...event, seq: SessionSeq(event.seq + 1) })),
@@ -621,9 +621,9 @@ describe('JsonlSessionPersistence: stored-format refusals', () => {
 
   it('points a future-generation refusal at the selected raw log path', async () => {
     const m = meta('newer-format', '/work')
-    const path = generationLogPath(root, m.cwd, m.id, 7, 'none')
+    const path = generationLogPath(root, m.cwd, m.id, SESSION_FORMAT_VERSION + 1, 'none')
     await mkdir(dirname(path), { recursive: true })
-    await writeFile(path, `${JSON.stringify({ ...toHeaderLine(m), version: 7 })}\n`)
+    await writeFile(path, `${JSON.stringify({ ...toHeaderLine(m), version: SESSION_FORMAT_VERSION + 1 })}\n`)
     const failure = await ctx.sessionPersistence.open(m.id, 'read').then(() => undefined, (error: unknown) => error as Error)
     expect(failure?.name).toBe('SessionFormatUnsupportedError')
     expect(failure?.message).toContain(`(raw log: ${path})`)
@@ -699,7 +699,7 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
   afterEach(async () => { await ctx.fiber.dispose() })
 
   it('projects a released v0 header through stat and list without reading or mutating its body', async () => {
-    expect(SESSION_FORMAT_VERSION).toBe(6)
+    expect(SESSION_FORMAT_VERSION).toBe(7)
     const header = meta('released-v0-metadata', '/work')
     const sourcePath = historicalLogPath(root, header.cwd, header.id)
     const currentPath = rawLogPath(root, header.cwd, header.id)
@@ -883,7 +883,7 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
     await retried.close()
   })
 
-  it.each(['read', 'write'] as const)('refuses the frozen pre-step V0 fixture on %s open without publishing a successor', async (access) => {
+  it.each(['read', 'write'] as const)('restores CoHarness pre-step V0 chronology on %s open while preserving its source', async (access) => {
     const id = SessionId('released-v0-real-shapes')
     const sourcePath = historicalLogPath(root, '/work', id)
     const currentPath = rawLogPath(root, '/work', id)
@@ -894,19 +894,26 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
     await writeFile(sourcePath, source)
     const before = await stat(sourcePath, { bigint: true })
 
-    await expect(ctx.sessionPersistence.open(id, access)).rejects.toMatchObject({
-      name: 'SessionFormatUnsupportedError',
-      message: expect.stringContaining('surface before first step') as unknown,
-    })
+    const handle = await ctx.sessionPersistence.open(id, access)
+    try {
+      const restored = await handle.read()
+      expect(handle.header.version).toBe(SESSION_FORMAT_VERSION)
+      expect(restored.events.some(event => event.type === 'system/message')).toBe(true)
+      expect(restored.events.some(event => event.type === 'user/message')).toBe(true)
+      expect(restored.events.map(event => event.seq)).toEqual(restored.events.map((_event, seq) => seq))
+      if (access === 'write') expect(scanLog(await readFile(currentPath)).events).toEqual(restored.events)
+      else await expect(readFile(currentPath)).rejects.toMatchObject({ code: 'ENOENT' })
+    } finally {
+      await handle.close()
+    }
     await ctx.sessionPersistence.flush()
 
     const after = await stat(sourcePath, { bigint: true })
     expect({ dev: after.dev, ino: after.ino, size: after.size, mtimeNs: after.mtimeNs, ctimeNs: after.ctimeNs })
       .toEqual({ dev: before.dev, ino: before.ino, size: before.size, mtimeNs: before.mtimeNs, ctimeNs: before.ctimeNs })
     expect(await readFile(sourcePath)).toEqual(source)
-    await expect(readFile(currentPath)).rejects.toMatchObject({ code: 'ENOENT' })
-    expect((await readdir(dirname(sourcePath))).filter(name => name !== 'session.lock'))
-      .toEqual(['session.jsonl'])
+    expect((await readdir(dirname(sourcePath))).filter(name => name !== 'session.lock').sort())
+      .toEqual(access === 'write' ? ['session.jsonl', `session.v${SESSION_FORMAT_VERSION}.jsonl`] : ['session.jsonl'])
   })
 
   it.each(['read', 'write'] as const)('restores canonical replacement envelopes from valid V2 chronology on %s open', async (access) => {
@@ -973,7 +980,7 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
       .toEqual(['session.v1.jsonl'])
   })
 
-  it('selects v1 from a v0/v1 directory, then v6 from the retained three-generation set', async () => {
+  it('selects v1 from a v0/v1 directory, then v7 from the retained three-generation set', async () => {
     const header = meta('mixed-generation-read', '/work')
     const directory = sessionDir(root, header.cwd, header.id)
     const v0Path = historicalLogPath(root, header.cwd, header.id)
@@ -989,13 +996,13 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
     await writer.close()
     expect((await readdir(directory)).filter(name => name.startsWith('session')).sort())
       .toEqual(process.platform === 'win32'
-        ? ['session.jsonl', 'session.v1.jsonl', 'session.v6.jsonl']
-        : ['session.jsonl', 'session.lock', 'session.v1.jsonl', 'session.v6.jsonl'])
+        ? ['session.jsonl', 'session.v1.jsonl', 'session.v7.jsonl']
+        : ['session.jsonl', 'session.lock', 'session.v1.jsonl', 'session.v7.jsonl'])
 
     await writeFile(v0Path, 'corrupt lower v0\n')
     await writeFile(v1Path, 'corrupt lower v1\n')
     await expect(readAll(ctx.sessionPersistence, header.id)).resolves.toEqual(migrated)
-    expect(await readFile(v3Path, 'utf8')).toContain('"version":6')
+    expect(await readFile(v3Path, 'utf8')).toContain('"version":7')
   })
 
   it('does not publish a historical generation through handle storage resolution', async () => {
@@ -1074,7 +1081,7 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
     const writer = await ctx.sessionPersistence.open(header.id, 'write')
     await writer.close()
     expect(await readFile(sourcePath, 'utf8')).toBe(`${source}\n`)
-    expect(await readFile(currentPath, 'utf8')).toContain('"version":6')
+    expect(await readFile(currentPath, 'utf8')).toContain('"version":7')
   })
 
   it('finishes publication before rejecting a write open cancelled during publication', async () => {
@@ -1090,7 +1097,7 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
 
     await expect(ctx.sessionPersistence.open(header.id, 'write', { signal: controller.signal }))
       .rejects.toBe(reason)
-    expect(await readFile(currentPath, 'utf8')).toContain('"version":6')
+    expect(await readFile(currentPath, 'utf8')).toContain('"version":7')
     const writer = await ctx.sessionPersistence.open(header.id, 'write')
     await writer.close()
   })
@@ -2288,7 +2295,7 @@ describe('JsonlSessionPersistence: nested v3 Assistant streams', () => {
     expect(loaded.events).toEqual(log)
   })
 
-  it.each([2, 3])('reads v%s rows and appends a v6 turn without changing predecessor bytes', async (version) => {
+  it.each([2, 3])('reads v%s rows and appends a v7 turn without changing predecessor bytes', async (version) => {
     const m = meta('mixed', '/work')
     const log = chunkRunLog()
     const sourcePath = generationLogPath(root, '/work', m.id, version, 'none')
@@ -2305,7 +2312,7 @@ describe('JsonlSessionPersistence: nested v3 Assistant streams', () => {
 
     const expected = version === 2 ? withMigratedEmptyHead(log) : log
     const restored = await readAll(ctx.sessionPersistence, m.id)
-    expect(restored.meta.version).toBe(6)
+    expect(restored.meta.version).toBe(7)
     expect(restored.events).toEqual(expected)
     expect(await readFile(sourcePath)).toEqual(source)
     if (version === 2) await expect(readFile(currentPath)).rejects.toMatchObject({ code: 'ENOENT' })
@@ -2318,9 +2325,9 @@ describe('JsonlSessionPersistence: nested v3 Assistant streams', () => {
 
     const loaded = await readAll(ctx.sessionPersistence, m.id)
     expect(loaded.events).toEqual([...expected, ...secondTurn])
-    expect(currentPath).toBe(join(dirname(sourcePath), 'session.v6.jsonl'))
+    expect(currentPath).toBe(join(dirname(sourcePath), 'session.v7.jsonl'))
     const successor = (await readFile(currentPath, 'utf8')).trimEnd().split('\n')
-    expect(JSON.parse(successor[0] as string)).toMatchObject({ version: 6 })
+    expect(JSON.parse(successor[0] as string)).toMatchObject({ version: 7 })
     expect(successor.slice(1).map(row => JSON.parse(row) as unknown)).toEqual([...expected, ...secondTurn])
     if (version === 2) expect(await readFile(sourcePath)).toEqual(source)
     // Compact tags stay nested; physical rows contain only current event tags.

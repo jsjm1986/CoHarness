@@ -22,12 +22,14 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { IconDataOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ModelDirectoryState } from './directory.ts'
 import { ModelDirectoryResolver } from './service.ts'
 import type { ModelSelectInjected } from './slots.ts'
 import { ModelSelect } from './ModelSelect.tsx'
-import { modelInputCapability, type ModelInputCapability } from './capabilities.ts'
+import { type ModelInputCapability } from './capabilities.ts'
 import { en, zh, type ModelKey } from './locales.ts'
+import { orderModelProviders } from './provider-order.ts'
 
 export { ModelDirectory } from './directory.ts'
 export type { ModelDirectoryState } from './directory.ts'
@@ -47,27 +49,19 @@ function rowId(providerId: string, modelId: string): string {
   return `${providerId}/${modelId}`
 }
 
-/** Flatten the directory into popup rows; failure rows are listed for visibility but never selectable. */
+/** Flatten the directory into grouped popup rows; failure rows are listed for visibility but never selectable. */
 function optionsOf(directory: SessionModels, t: TranslateNS<'model'>): SelectOption[] {
   const rows: SelectOption[] = []
-  for (const group of directory.groups) {
+  for (const group of orderModelProviders(directory.groups)) {
+    const name = group.id === 'deepseek-account' ? t('provider.account') : group.name
     for (const model of group.models) {
-      const capability = modelInputCapability(model)
-      const capabilityLabel = capability === 'image'
-        ? t('capability.image')
-        : capability === 'text'
-          ? t('capability.text')
-          : undefined
-      const detail = [
-        group.name,
-        model.description,
-        capabilityLabel,
-      ].filter((part): part is string => part !== undefined && part !== '')
       rows.push({
         id: rowId(group.id, model.id),
         label: model.name,
-        detail: detail.join(' · '),
-        ...(directory.current.provider === group.id && directory.current.model === model.id
+        group: { name: group.id, label: name },
+        ...(directory.current !== null
+          && directory.current.provider === group.id
+          && directory.current.model === model.id
           ? { active: true } : {}),
       })
     }
@@ -75,7 +69,7 @@ function optionsOf(directory: SessionModels, t: TranslateNS<'model'>): SelectOpt
   for (const failure of directory.failures) {
     rows.push({
       id: `failure/${failure.id}`,
-      label: failure.name,
+      label: failure.id === 'deepseek-account' ? t('provider.account') : failure.name,
       detail: t('option.loadError', { message: failure.message }),
     })
   }
@@ -153,19 +147,27 @@ export function apply(ctx: ClientContext): void {
     ),
   })
 
-  // Entry 1: the /model popupSelect over the shared directory. The command
-  // description is registry-held text: it reads t() once at registration and
-  // refreshes only on re-registration, not on locale change.
+  // Entry 1: the /model popupSelect over the shared directory. Row copy is
+  // read on every candidate pass, so a locale change reaches the next menu
+  // open without re-registration.
   ctx.inject(['commandUi', 'modelDirectories'], (scope: ClientContext) => {
     const command = scope.get('commandUi') as CommandUiContract
     const models = scope.modelDirectories
     const sessions = scope.sessions
     scope.effect(() => command.register({
       name: 'model',
-      description: t('command.description'),
+      label: () => t('command.label'),
+      description: () => t('command.description'),
+      icon: IconDataOutline16,
       available: session => sessions.subagentAddress(session.sessionId) === undefined,
       ui: {
         kind: 'popupSelect',
+        searchMode: 'fuzzy-label',
+        searchLabels: () => ({
+          placeholder: t('search.placeholder'),
+          empty: t('empty.models'),
+          noResults: t('search.empty'),
+        }),
         options: async (session) => {
           if (sessions.subagentAddress(session.sessionId) !== undefined) {
             throw new Error('model selection is unavailable for addressed subagent sessions')

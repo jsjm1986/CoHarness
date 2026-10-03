@@ -412,3 +412,24 @@ describe('connection lifecycle', () => {
     controller.stop()
   })
 })
+
+it('does not publish buffered Session frames when a managed Host omits its runtime identity', async () => {
+  const api = new FakeApiClient()
+  const description = deferred<Awaited<ReturnType<FakeApiClient['onDescribe']>>>()
+  api.onDescribe = () => description.promise
+  const connected = vi.fn()
+  const frame = vi.fn()
+  const failure = vi.fn()
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const controller = new ConnectionController(api, { onConnected: connected, onMuxEnvelope: frame, onFailure: failure }, FAST)
+  controller.start()
+  try {
+    await vi.waitFor(() => { expect(api.openMuxCount).toBe(1) })
+    api.pushMux(subscribedFrame())
+    description.resolve(ok({ version: '0', cwd: '/project', home: '/home', attachedSessions: 0, canOpenPath: false, executionAuthorityRequired: true }))
+    await vi.waitFor(() => { expect(failure).toHaveBeenCalled() })
+    expect(connected).not.toHaveBeenCalled()
+    expect(frame).not.toHaveBeenCalled()
+  } finally { controller.stop(); warning.mockRestore() }
+  await vi.waitFor(() => { expect(api.openMuxCount).toBe(0) })
+})

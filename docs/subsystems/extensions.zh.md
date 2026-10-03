@@ -46,7 +46,8 @@ list(): CordisInspectProviderView[]
  * @param input - optional lossless JSON input.
  * @param agent - requesting Agent and scope.
  * @param signal - tool-call cancellation.
- * @returns provider JSON data.
+ * @returns provider JSON data; Client queries fail fast when no live Client
+ * event stream exists and retain failure diagnostics on timeout.
  */
 async query( platform: CordisInspectPlatform, providerId: string, methodName: string, input: JsonValue | undefined, agent: Agent, signal: AbortSignal, ): Promise<JsonValue>
 
@@ -55,7 +56,7 @@ async query( platform: CordisInspectPlatform, providerId: string, methodName: st
  * @param agent - Agent whose Session owns the query.
  * @param requestId - Pending Client query identity.
  * @param resolution - Client provider result or failure.
- * @returns whether this response settled the still-pending query.
+ * @returns acknowledgement with accepted true only for a success that settles the query; failures remain diagnostics.
  */
 resolveClientQuery( agent: Agent, requestId: CordisInspectRequestId, resolution: CordisInspectQueryResolution, ): CordisInspectResolveAck
 ```

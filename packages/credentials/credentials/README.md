@@ -1,3 +1,8 @@
+---
+description: "Abstract credential seam (ctx.credentials): settings carry references to secrets, providers own the values"
+kind: "package-reference"
+---
+
 # dsh-credentials
 
 English | [中文](README.zh.md)
@@ -14,6 +19,18 @@ Credential Service Definition (`ctx.credentials`). One doctrine, three consequen
 
 `dsh-credentials` keeps secret values out of configuration by letting settings and `cordis.yml` refer to key names such as `DEEPSEEK_API_KEY`. It also stores durable per-plugin credential records, including authorization grants and provider environment values. A rotated stored key applies to the next request without a restart or configuration edit. Configuration UIs can report whether a key or record is set, its source, and whether it is writable without exposing values. Empty key values count as absent, while an empty record remains a deliberate stored credential.
 
+## Table of Contents
+
+- [Two key spaces, two questions](#two-key-spaces-two-questions)
+- [Surface](#surface)
+- [Providers](#providers)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="two-key-spaces-two-questions"></a>
 ## Two key spaces, two questions
 
 A `CredentialRef` answers *what is behind this environment-variable name*, layered over the process environment, the managed store, and `.env` files. Everything above describes that half.
@@ -22,6 +39,7 @@ A `CredentialKey` answers *what credential does this plugin hold for this id*. N
 
 The key is `<scope>/<id>`, where `scope` is the **owning plugin's registered name**. The scope is the owner rather than the domain because a `grant` payload is written in its owner's format: two plugins serving the same provider name would otherwise read each other's payload, and a record left behind by an uninstalled plugin could not be told apart from a live one. The `/` also keeps the two grammars disjoint, so the key spaces can never collide. A consumer whose id arrives from somewhere else — a settings dict key, a library's own provider id — asks `isCredentialKeySegment` before building a key, because an id outside the grammar can never have stored a record and should read as "nothing stored" rather than throw on the address.
 
+<a id="surface"></a>
 ## Surface
 
 ```ts
@@ -54,10 +72,12 @@ A `grant` record's `payload` is opaque: the seam never reads, validates, or resh
 
 The shadowing rule on `set`/`unset` is deliberate fail-loud: when a read-only source (the live process environment, in the local provider) currently supplies the reference, a write would appear to succeed while resolution keeps returning the shadowing value — the seam rejects instead, and `describe().writable` lets a UI render the reference read-only up front.
 
+<a id="providers"></a>
 ## Providers
 
 [`dsh-credentials-local`](../credentials-local/README.md) layers the inherited process environment over its managed `$DSH_HOME/.credentials.yaml` document, with the launcher's project and user `.env` layers as fallbacks. The seam shape leaves room for keyring-, helper-command-, and KMS-backed providers; a remote settings provider never needs to carry secrets.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the consuming adapter, which resolves each credential reference and owns every model-facing use a value authorizes.
@@ -72,3 +92,13 @@ No direct invalidation; resolved values never enter a request prefix.
 - **References are environment-variable-shaped** — one flat POSIX-identifier namespace, because a reference doubles as the environment name it resolves through. Records carry the richer `<owner>/<id>` addressing.
 - **Process-environment changes are invisible** — no event can fire for them; a UI only re-reads `describe()` on its own navigation.
 - **A record's owner is its scope, and nothing verifies the scope is mounted** — the seam stores what it is given and reports what it stores. Recognizing an orphan is the caller's join between `listRecords()` and whatever registry owns that scope; the seam has no registry of its own to check against.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -6,9 +6,18 @@
  * share from the return type.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { reconcileManualOrder, type SessionRowState } from './tree.ts'
 
 /** Browser-local order account for the hierarchy-free flat Session list. */
 export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
+
+/** What `pinSessionOrder` reconciles a pinned Session's accounts against. */
+type SessionOrderSource = {
+  members: Readonly<Record<string, readonly SessionId[]>>
+  summaries: SessionListState['byId']
+  rowState: Pick<SessionRowState, 'pinnedSessionIds' | 'archivedSessionIds'>
+}
 
 /** Session-list grouping mode: workspace sections or one flat recency list. */
 export type SessionGroupBy = 'workspace' | 'flat'
@@ -43,6 +52,12 @@ type WorkspaceViewActions = {
     updatedAt: Record<string, number>,
   ) => void
   setSessionOrder: (draft: WorkspaceViewState, accountKey: string, order: string[]) => void
+  pinSessionOrder: (
+    draft: WorkspaceViewState,
+    sessionId: string,
+    accountKeys: readonly string[],
+    source: SessionOrderSource,
+  ) => void
 }
 
 /**
@@ -81,6 +96,13 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       },
       setSessionOrder: (d, accountKey: string, order: string[]) => {
         d.sessionOrderByAccount[accountKey] = order
+      },
+      pinSessionOrder: (d, sessionId, accountKeys, source) => {
+        const selected = new Set(accountKeys)
+        d.sessionOrderByAccount = Object.fromEntries(Object.entries(source.members).map(([key, members]) => {
+          const order = reconcileManualOrder(members, d.sessionOrderByAccount[key], source.summaries, source.rowState)
+          return [key, selected.has(key) ? [sessionId, ...order.filter(id => id !== sessionId)] : order]
+        }))
       },
     },
   })

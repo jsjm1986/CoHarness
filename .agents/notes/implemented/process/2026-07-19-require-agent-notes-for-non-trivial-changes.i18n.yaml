@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-19-require-agent-notes-for-non-trivial-changes.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-19-require-agent-notes-for-non-trivial-changes.md
-2026-07-19-require-agent-notes-for-non-trivial-changes.md: 162ae61affb4c1b0ad526fa0da41f84ebbb02089
-2026-07-19-require-agent-notes-for-non-trivial-changes.zh.md: cc342547fa1977cf2a38240e79cd7e326a0cc010
+/agent-note-require-an-agent-note-for-every-non-trivial-change:
+  en: e8d6738247d709df
+  zh: c582cccc68474e26
+/agent-note-require-an-agent-note-for-every-non-trivial-change/problem:
+  en: 920b5c8b4196bc7e
+  zh: 0a2b7bc73f23f943
+/agent-note-require-an-agent-note-for-every-non-trivial-change/decision:
+  en: 1e9cbb7cf4e82bf4
+  zh: f408a284a65d32c8
+/agent-note-require-an-agent-note-for-every-non-trivial-change/alternatives-considered:
+  en: a9a8d96eb359326b
+  zh: eb92584b6809382e
+/agent-note-require-an-agent-note-for-every-non-trivial-change/consequences:
+  en: 370d219357630114
+  zh: 21b93717327716c4

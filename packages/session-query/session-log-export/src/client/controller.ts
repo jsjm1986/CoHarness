@@ -1,7 +1,8 @@
 /** Browser download state shared by the Session Header button and `/export`. */
 
 import { createSnapshotStore, type SessionId, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { readApiResponseText } from '@deepseek-ai/dsh-client-runtime/client'
+import { readApiResponseText, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
+import { SESSION_LOG_EXPORT_PATH } from '../routes.ts'
 
 /** Download phases presented by the shared modal. */
 export type SessionLogDownloadStatus = 'downloading' | 'success' | 'error'
@@ -65,10 +66,12 @@ export class SessionLogDownloadController {
   /**
    * @param fetcher - HTTP carrier used to read the host-streamed ZIP.
    * @param save - browser save operation.
+   * @param privateResourceUrl - account pinning for the native browser download.
    */
   constructor(
     private readonly fetcher: Fetch = (input, init) => fetch(input, init),
     private readonly save: Save = downloadUrl,
+    private readonly privateResourceUrl: (url: string) => string = url => url,
   ) {}
 
   /**
@@ -112,15 +115,20 @@ export class SessionLogDownloadController {
   private async run(sessionId: SessionId, signal: AbortSignal): Promise<void> {
     this.publish(sessionId, { open: true, status: 'downloading', error: null })
     try {
-      const url = new URL('/api/session.export', hostBase())
-      url.searchParams.set('sessionId', sessionId)
+      const url = new URL(SESSION_LOG_EXPORT_PATH, hostBase())
+      const address = parseClientSessionKey(sessionId)
+      const original = address?.sessionId ?? sessionId
+      url.searchParams.set('sessionId', original)
+      if (address !== undefined) url.searchParams.set('dshTarget', address.runtime.kind === 'personal'
+        ? 'personal' : `project:${String(address.runtime.projectId)}`)
       url.searchParams.set('includeDescendants', 'true')
-      const response = await this.fetcher(url, { method: 'HEAD', signal })
+      const target = new URL(this.privateResourceUrl(url.toString()))
+      const response = await this.fetcher(target, { method: 'HEAD', signal })
       if (!response.ok) {
         const detail = await readApiResponseText(response).catch(() => '')
         throw new Error(`Export failed: HTTP ${response.status}${detail === '' ? '' : ` ${detail}`}`)
       }
-      this.save(url.toString(), sessionLogZipFilename(sessionId))
+      this.save(target.toString(), sessionLogZipFilename(original))
       const open = this.store.getSnapshot().bySession[String(sessionId)]?.open ?? true
       this.publish(sessionId, { open, status: 'success', error: null })
     } catch (error: unknown) {

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-gui-full-access-confirmation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-31-gui-full-access-confirmation.md
-2026-07-31-gui-full-access-confirmation.md: c0ea200691368b3971a40a2f0efd387deb2fcac2
-2026-07-31-gui-full-access-confirmation.zh.md: a9604db70c40927b60138d2b623e465de436428e
+/agent-note-gui-full-access-risk-confirmation:
+  en: fe00f0a4f483f388
+  zh: 6bcb5e9f5aba993b
+/agent-note-gui-full-access-risk-confirmation/problem:
+  en: db771960821b05dc
+  zh: ac67bdea56e694f5
+/agent-note-gui-full-access-risk-confirmation/decision:
+  en: 566e107571d7e553
+  zh: 1566a9e52cb407c0
+/agent-note-gui-full-access-risk-confirmation/alternatives-considered:
+  en: c75ceb906560e90e
+  zh: 605a9f28c5a2513a
+/agent-note-gui-full-access-risk-confirmation/consequences:
+  en: 68a5dc8372f8142f
+  zh: c0036adce46846d9

@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-client-tool-presentation-ownership.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-08-client-tool-presentation-ownership.md
-2026-08-08-client-tool-presentation-ownership.md: 3feefc3cfbe538024b8610394b9f170c423556e8
-2026-08-08-client-tool-presentation-ownership.zh.md: 181c57a0da61795292d70b3d37ebd1485832795b
+/agent-note-client-tool-presentation-ownership:
+  en: 1c8d984ce4cb7bdf
+  zh: adbba811226e0e9d
+/agent-note-client-tool-presentation-ownership/problem:
+  en: 91b343a2e75cbe32
+  zh: 2e11de5cdc3bdf97
+/agent-note-client-tool-presentation-ownership/decision:
+  en: 5e5ab1f842ba2d00
+  zh: 920de5f533160658
+/agent-note-client-tool-presentation-ownership/runtime-and-render-path:
+  en: 114ca8db361d22e5
+  zh: a606a92ad5e08360
+/agent-note-client-tool-presentation-ownership/ownership-boundary:
+  en: a09e2aaee84494b7
+  zh: a9cdb7fc5864e958
+/agent-note-client-tool-presentation-ownership/verification:
+  en: 90e3349573b691b8
+  zh: bfdebfe4f0ae23c3
+/agent-note-client-tool-presentation-ownership/alternatives-considered:
+  en: aed254bdcaff09c7
+  zh: ea0b8ca9c29de6e2
+/agent-note-client-tool-presentation-ownership/consequences:
+  en: 0d101bfda0762e03
+  zh: 81c74430176d621f

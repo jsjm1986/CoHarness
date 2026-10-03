@@ -61,10 +61,18 @@ function transition(property = 'transform') {
 async function mountSeat(viewportWidth = 1440, canShow = true, entryCount = 0) {
   const runtime = await SlotTestRuntime.create()
   runtimes.push(runtime)
-  const frame = { bindRightbar: () => () => {}, focusRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn() }
+  const frame = {
+    bindRightbar: () => () => {}, focusRightbar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn(),
+    viewportWidth: createSnapshotStore(viewportWidth),
+  }
   const pin = vi.fn<(address: string, signal: AbortSignal) => void>()
   runtime.ctx.provide('layout', frame as never)
   runtime.ctx.provide('workspaceResources', { pin } as never)
+  runtime.ctx.provide('shortcuts', {
+    runtime: 'web',
+    register: vi.fn(() => () => {}),
+    catalog: createSnapshotStore<readonly never[]>([]),
+  } as never)
   runtime.ctx.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
   const description = createSnapshotStore({ executionAuthorityRequired: false })
   runtime.ctx.provide('connection', { hostDescription: description } as never)
@@ -163,6 +171,7 @@ describe('RightbarSeat presentation', () => {
     expect(h.layout()).toBe(retained)
   })
 
+
   it.each([0, 1, 2])('selects the default from %i guide entries and protects only a sole guide', async (entryCount) => {
     const h = await mountSeat(1440, true, entryCount)
     act(() => { h.controller.toggleExpanded() })
@@ -242,7 +251,7 @@ describe('RightbarSeat presentation', () => {
     expect(panel.style.width).toBe('420px')
     fireEvent.click(element(h.view.container, '[data-sidebar-right-mode]'))
     expect(h.layout().mode).toBe('fullscreen')
-    expect(panel.style.width).toBe('100%')
+    expect(panel.style.width).toBe('100vw')
     expect(panel.dataset['sidebarRightPanel']).toBe('fullscreen')
     expect(element(h.view.container, '[data-tab-body]')).toBe(body)
     expect(h.frame.openRightbar).toHaveBeenLastCalledWith(true, true)
@@ -547,7 +556,7 @@ describe('slot-owned useTabInfo', () => {
     expect(document.querySelector('[data-dockkit-tab-menu]')).toBeNull()
   })
 
-  it('hides split controls at two panes and adds a guide only to a pane without one', async () => {
+  it('explains the two-pane limit and adds a guide only to a pane without one', async () => {
     const h = await mountSeat()
     // Expanding first seeds the left pane's guide; only the right pane will lack one.
     act(() => { h.controller.toggleExpanded() })
@@ -559,7 +568,8 @@ describe('slot-owned useTabInfo', () => {
     const stored = h.instance.getSnapshot()
     act(() => { expect(h.controller.split()).toBeUndefined() })
     expect(h.instance.getSnapshot()).toBe(stored)
-    expect(splitButtons()).toHaveLength(0)
+    expect(splitButtons()).toHaveLength(2)
+    expect([...splitButtons()].every(button => button.hasAttribute('disabled'))).toBe(true)
     const right = dockPaneIds(h.layout())[1]!
     h.open('right.txt', { paneId: right })
     const guide = getPane(h.layout(), right).tabs.find(id => h.layout().tabs[id]?.kind === 'guide')!

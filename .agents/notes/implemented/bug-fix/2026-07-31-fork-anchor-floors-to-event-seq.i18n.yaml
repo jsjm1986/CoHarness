@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-fork-anchor-floors-to-event-seq.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-31-fork-anchor-floors-to-event-seq.md
-2026-07-31-fork-anchor-floors-to-event-seq.md: 760e73266570b149966be6af8264cd3699ffb7e0
-2026-07-31-fork-anchor-floors-to-event-seq.zh.md: c25a69462b7cbff4a6194d24793982479cae24e4
+/agent-note-fork-anchor-floors-to-an-event-seq:
+  en: baea8b7b4bb38d90
+  zh: 0c210dbde4eee39e
+/agent-note-fork-anchor-floors-to-an-event-seq/problem:
+  en: 489ed0a6e173462e
+  zh: d8a32b9893e2fc9a
+/agent-note-fork-anchor-floors-to-an-event-seq/decision:
+  en: 832044e9bed8979d
+  zh: fa1e631bfbd30dbd
+/agent-note-fork-anchor-floors-to-an-event-seq/alternatives-considered:
+  en: 08f93220af570716
+  zh: a879d52e920abc21
+/agent-note-fork-anchor-floors-to-an-event-seq/consequences:
+  en: 38b7d959b408a7ad
+  zh: 90f605e0b4831350

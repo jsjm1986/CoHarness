@@ -1,7 +1,8 @@
 /**
  * Derives the workspace browser tree from Host Workspace order and membership.
  * Unassigned Sessions trail under Ungrouped; only the selected blank Session
- * remains visible.
+ * remains visible. Pinned Sessions lead every section in the section's own
+ * order, reorderable only among themselves.
  */
 import {
   indexSubagentDescendants, type PendingInteractionStatus, type SessionId, type SessionListState,
@@ -11,6 +12,20 @@ import {
 
 /** Group key for Sessions outside every Workspace. */
 export const UNGROUPED_KEY = ''
+
+/**
+ * Resolve the Workspace browser group that owns one Session.
+ * @param workspaces - authoritative Workspace membership.
+ * @param sessionId - Session whose browser group is required.
+ * @returns owning Workspace id, or {@link UNGROUPED_KEY} when no Workspace accounts for it.
+ */
+export function owningGroupKey(
+  workspaces: readonly WorkspaceView[],
+  sessionId: SessionId,
+): string {
+  return (workspaces.find(workspace => workspace.sessionIds.includes(sessionId))
+    ?.workspaceId as string | undefined) ?? UNGROUPED_KEY
+}
 
 /** One top-level session row in a group or the flat list. */
 export interface SessionNode {
@@ -26,6 +41,8 @@ export interface SessionNode {
   runningSubagentCount: number
   /** Finished running while not selected and not yet opened (the green "done" reminder dot). */
   completed: boolean
+  /** In the registry-global pin set: leads its section, reorderable only among pinned rows. */
+  pinned: boolean
   updatedAt: number
   /** Client-local Workspace hint for a blank draft before Host attachment. */
   workspaceId?: WorkspaceId
@@ -113,6 +130,108 @@ function byRecency(a: SessionSummary, b: SessionSummary): number {
 }
 
 /**
+ * Project known account members by current Session recency.
+ * @param sessionIds - authoritative account membership.
+ * @param summaries - current Session summaries; members without a summary are omitted until it arrives.
+ * @returns known members newest first, with Session identity as the deterministic tie-break.
+ */
+export function orderByRecency(
+  sessionIds: readonly SessionId[],
+  summaries: SessionListState['byId'],
+): SessionId[] {
+  return sessionIds.flatMap((id) => {
+    const summary = summaries[id]
+    if (summary === undefined) return []
+    return [{ id, rank: summary.updatedAt }]
+  })
+    .sort((a, b) => {
+      if (a.rank !== b.rank) return b.rank - a.rank
+      return a.id < b.id ? -1 : 1
+    })
+    .map(member => member.id)
+}
+
+/** Registry-global row state consumed by every tree derivation. */
+export interface SessionRowState {
+  /** Registry-global pin ids in Host pin order; pinned rows lead their section in the local order. */
+  pinnedSessionIds: readonly SessionId[]
+  /** Archive set; members keep their account slots and are hidden from grouping surfaces. */
+  archivedSessionIds: readonly SessionId[]
+}
+
+/**
+ * Reconcile a browser-local order with current account membership. An absent
+ * saved order falls back to the caller's member order, so each account's
+ * natural baseline (Host order for Workspaces, recency for the browser-local
+ * accounts) survives the initial sync. New ordinary forks precede their
+ * sources without changing saved entries' relative order; members missing
+ * from the saved order supplement it — fresh pins in Host pin order first,
+ * ordinary members by recency, and archived members last so an unarchive
+ * restores position.
+ * @param memberIds - authoritative account membership and its natural order.
+ * @param savedOrder - previously saved browser-local order; absent defaults to member order.
+ * @param summaries - current Session metadata; unknown new members wait for their summaries.
+ * @param rowState - global pin and archive membership; only account members can supplement the order.
+ * @returns saved relative positions plus missing members ordered by pin, fork source, recency, and archive status.
+ */
+export function reconcileManualOrder(
+  memberIds: readonly SessionId[],
+  savedOrder: readonly string[] | undefined,
+  summaries: SessionListState['byId'],
+  rowState?: Pick<SessionRowState, 'pinnedSessionIds' | 'archivedSessionIds'>,
+): SessionId[] {
+  const members = new Map(memberIds.map(id => [id as string, id]))
+  const included = new Set<string>()
+  const ordered: SessionId[] = []
+  for (const key of savedOrder ?? memberIds) {
+    const id = members.get(key)
+    if (id === undefined || included.has(key)) continue
+    ordered.push(id)
+    included.add(key)
+  }
+  const archived = new Set(rowState?.archivedSessionIds)
+  const pins: SessionId[] = []
+  for (const sessionId of rowState?.pinnedSessionIds ?? []) {
+    const id = members.get(sessionId)
+    if (id === undefined || included.has(id) || archived.has(id) || summaries[id] === undefined) continue
+    pins.push(id)
+    included.add(id)
+  }
+  const ordinary: SessionId[] = []
+  const archives: SessionId[] = []
+  for (const id of orderByRecency([...members.values()].filter(id => !included.has(id)), summaries)) {
+    if (archived.has(id)) archives.push(id)
+    else ordinary.push(id)
+  }
+  const result = [...pins, ...ordered, ...ordinary, ...archives]
+  const pending = new Set(ordinary)
+  const placeFork = (id: SessionId): void => {
+    if (!pending.delete(id)) return
+    const parentId = summaries[id]?.parentId
+    if (parentId === undefined || parentId === id || !result.includes(parentId)) return
+    placeFork(parentId)
+    result.splice(result.indexOf(id), 1)
+    result.splice(result.indexOf(parentId), 0, id)
+  }
+  for (const id of [...ordinary].reverse()) placeFork(id)
+  return result
+}
+
+/**
+ * Keep the selected provisional New Session ahead of either base order.
+ * @param order - recency or reconciled order.
+ * @param currentBlank - selected blank Session in this account, when present.
+ * @returns a copy with the selected blank first and no duplicate slot.
+ */
+export function pinCurrentBlank(
+  order: readonly SessionId[],
+  currentBlank: SessionId | undefined,
+): SessionId[] {
+  if (currentBlank === undefined) return [...order]
+  return [currentBlank, ...order.filter(id => id !== currentBlank)]
+}
+
+/**
  * Ordinary sessions are visible; among blank sessions, only the current one
  * is visible. Subagent children use their parent header catalog; archived
  * sessions are visible nowhere, while their accounting slots remain so
@@ -133,6 +252,27 @@ function sessionTitle(session: SessionSummary): string {
   return session.blank ? '' : session.displayTitle
 }
 
+/**
+ * Keep the visible New Session placeholder first, then partition pinned and
+ * ordinary rows without changing either partition's caller order. An
+ * archived member is never pinned for section purposes.
+ */
+function sectionMembers(
+  members: readonly SessionSummary[],
+  pinned: ReadonlySet<SessionId>,
+  archived: ReadonlySet<SessionId>,
+): SessionSummary[] {
+  const placeholders: SessionSummary[] = []
+  const leading: SessionSummary[] = []
+  const rest: SessionSummary[] = []
+  for (const member of members) {
+    if (member.blank) placeholders.push(member)
+    else if (!archived.has(member.id) && pinned.has(member.id)) leading.push(member)
+    else rest.push(member)
+  }
+  return [...placeholders, ...leading, ...rest]
+}
+
 /** Build one group without projecting session lineage into presentation. */
 function buildGroup(
   key: string,
@@ -150,22 +290,25 @@ function buildGroup(
   return { key, workspaceId, cwd, createdAt, label, sessions }
 }
 
-/** Apply a stored Ungrouped order and append newly loose Sessions by recency. */
-function orderedUngrouped(members: readonly SessionSummary[], stored: readonly string[]): SessionSummary[] {
+/**
+ * Apply a stored Ungrouped order and append newly loose Sessions by recency.
+ * The stored order is already pin-aware (the browser reconciles it against
+ * the pin set); the recency fallback covers only members never saved.
+ */
+function orderedUngrouped(
+  members: readonly SessionSummary[],
+  stored: readonly string[] | undefined,
+  summaries: SessionListState['byId'],
+): SessionSummary[] {
   const byId = new Map(members.map(session => [session.id as string, session]))
-  const included = new Set<string>()
-  const ordered: SessionSummary[] = []
-  for (const key of stored) {
-    const session = byId.get(key)
-    if (session === undefined || included.has(key)) continue
-    ordered.push(session)
-    included.add(key)
-  }
-  for (const session of [...members].sort(byRecency)) {
-    if (included.has(session.id)) continue
-    ordered.push(session)
-  }
-  return ordered
+  const ids = stored === undefined
+    ? orderByRecency(members.map(session => session.id), summaries)
+    : reconcileManualOrder(members.map(session => session.id), stored, summaries)
+  return ids.flatMap((id) => {
+    const session = byId.get(id)
+    /* v8 ignore next -- ids are projected exclusively from the members used to build byId. */
+    return session === undefined ? [] : [session]
+  })
 }
 
 /**
@@ -227,7 +370,7 @@ function groupByWorkspace(
       undefined,
       undefined,
       '',
-      ungroupedOrder === undefined ? stray : orderedUngrouped(stray, ungroupedOrder),
+      orderedUngrouped(stray, ungroupedOrder, list.byId),
       ungroupedOrder === undefined ? 'recency' : 'account',
     ))
   }
@@ -237,6 +380,8 @@ function groupByWorkspace(
 function sessionNode(
   s: SessionSummary,
   descendants: ReadonlyMap<SessionId, SubagentDescendantSummary>,
+  pinned: ReadonlySet<SessionId>,
+  archived: ReadonlySet<SessionId>,
 ): SessionNode {
   return {
     id: s.id,
@@ -245,6 +390,7 @@ function sessionNode(
     running: s.running,
     runningSubagentCount: descendants.get(s.id)?.runningCount ?? 0,
     completed: s.completed === true,
+    pinned: !archived.has(s.id) && pinned.has(s.id),
     updatedAt: s.updatedAt,
     ...(s.workspaceId === undefined ? {} : { workspaceId: s.workspaceId }),
     ...(s.pendingInteraction === undefined ? {} : { pendingInteraction: s.pendingInteraction }),
@@ -257,23 +403,25 @@ function sessionNode(
  * Derive the workspace browser groups with every session as a top-level row.
  *
  * Every group shows; sessions populate under expanded groups in the selected
- * local order. Blank sessions are excluded except for the selected
- * provisional New Session row; archived sessions are excluded everywhere.
- * Content search lives outside this derivation
+ * local order with pinned rows leading each section. Blank sessions are
+ * excluded except for the selected provisional New Session row, which leads
+ * its section ahead of the pinned block; archived sessions are excluded
+ * everywhere. Content search lives outside this derivation
  * (see {@link deriveSearchResults}).
  * @param list - sessions list snapshot (`current` feeds containsCurrent).
  * @param workspaces - real workspaces in stable Host order.
- * @param archivedSessionIds - registry-global archive set.
+ * @param rowState - registry-global pin and archive sets.
  * @param view - local expansion arrays.
  * @returns group sections in render order.
  */
 export function deriveGroups(
   list: SessionListState,
   workspaces: readonly WorkspaceView[],
-  archivedSessionIds: readonly SessionId[],
+  rowState: SessionRowState,
   view: TreeView,
 ): GroupNode[] {
-  const archived = new Set(archivedSessionIds)
+  const archived = new Set(rowState.archivedSessionIds)
+  const pinned = new Set(rowState.pinnedSessionIds)
   const expandedGroups = new Set(view.expandedGroups)
   const descendants = indexSubagentDescendants(list.byId)
   const currentSummary = list.current === undefined ? undefined : list.byId[list.current]
@@ -294,35 +442,54 @@ export function deriveGroups(
       sessionCount: g.sessions.length,
       expanded,
       containsCurrent: g.key === currentGroup,
-      sessions: expanded ? g.sessions.map(session => sessionNode(session, descendants)) : [],
+      sessions: expanded
+        ? sectionMembers(g.sessions, pinned, archived)
+          .map(session => sessionNode(session, descendants, pinned, archived))
+        : [],
     })
   }
   return groups
 }
 
 /**
- * Derive the flat session list ("In one list" mode): every session — fork
- * children included — as a top-level row, strictly newest-first. No grouping,
- * no parent/child adjacency. Content search lives outside this derivation
- * (see {@link deriveSearchResults}).
+ * Select complete flat-list membership, independently of archive visibility:
+ * every known ordinary Session keeps its account slot so an unarchive
+ * restores its position.
  * @param list - sessions list snapshot.
- * @param archivedSessionIds - registry-global archive set.
- * @returns flat rows in render order.
+ * @returns known ordinary Session ids, including archives and only the current blank.
+ */
+export function sessionMemberIds(list: SessionListState): SessionId[] {
+  return list.ids.filter((id) => {
+    const s = list.byId[id]
+    return s !== undefined
+      && s.origin !== 'subagent'
+      && (!s.blank || s.id === list.current)
+  })
+}
+
+/**
+ * Derive flat rows from the browser's complete ordered Session ids, with
+ * pinned rows fronted ahead of the supplied order ("In one list" mode).
+ * Content search lives outside this derivation (see {@link deriveSearchResults}).
+ * @param list - sessions list snapshot used to resolve the ids.
+ * @param sessionIds - complete account members in the selected order, including hidden archives.
+ * @param rowState - registry-global pin and archive sets.
+ * @returns flat rows in sectioned order.
  */
 export function deriveFlat(
   list: SessionListState,
-  archivedSessionIds: readonly SessionId[],
+  sessionIds: readonly SessionId[],
+  rowState: SessionRowState,
 ): SessionNode[] {
-  const archived = new Set(archivedSessionIds)
+  const archived = new Set(rowState.archivedSessionIds)
+  const pinned = new Set(rowState.pinnedSessionIds)
   const descendants = indexSubagentDescendants(list.byId)
-  const rows: SessionSummary[] = []
-  for (const id of list.ids) {
+  const members = sessionIds.flatMap((id) => {
     const s = list.byId[id]
-    if (s === undefined || !sessionVisible(s, list.current, archived)) continue
-    rows.push(s)
-  }
-  rows.sort(byRecency)
-  return rows.map(session => sessionNode(session, descendants))
+    return s !== undefined && sessionVisible(s, list.current, archived) ? [s] : []
+  })
+  return sectionMembers(members, pinned, archived)
+    .map(session => sessionNode(session, descendants, pinned, archived))
 }
 
 /**

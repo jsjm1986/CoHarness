@@ -1,3 +1,8 @@
+---
+description: "One-shot Codex subagent provider over the official app-server protocol"
+kind: "package-bundle"
+---
+
 # @deepseek-ai/dsh-subagent-codex
 
 English | [中文](README.zh.md)
@@ -8,6 +13,21 @@ This package registers a Profile-named Codex subagent provider whose default nam
 
 Install `@deepseek-ai/dsh-subagent-codex` into a Profile when delegated work should run in a genuine, unattended Codex session in the parent Session's workspace. Each delegation uses a fresh isolated Codex thread for one self-contained text task and returns only its final answer or a safe failure diagnostic. Native Codex configuration and authentication remain authoritative, while `permissionMode` selects the non-interactive approval and sandbox behavior. The Bundle supplies a compatible native Codex payload, but it exposes no model capability until a delegation tool is configured.
 
+## Table of Contents
+
+- [Start and ownership](#start-and-ownership)
+- [Capabilities and context](#capabilities-and-context)
+- [Configuration](#configuration)
+- [Persistent members](#persistent-members)
+- [Product compatibility and evidence](#product-compatibility-and-evidence)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="start-and-ownership"></a>
 ## Start and ownership
 
 `start(request)` accepts only a non-empty sequence of text blocks and derives the child cwd from the parent Session. It then spawns the fixed command through [`dsh-subprocess`](../../subprocess/subprocess/README.md), performs `initialize` → `initialized`, maps the Profile-selected mode into official `thread/start` approval/reviewer/sandbox fields beside `{ cwd, ephemeral: true }`, and publishes the run only after Codex returns a valid ephemeral thread. A failure or cancellation before publication closes the wire, terminates the managed process tree, waits for it to exit, and rejects `start()`. Non-cancellation rejections expose only the fixed `initialize` or `thread-start` stage plus an already observed process outcome; raw product and Host errors remain on internal cause chains.
@@ -20,10 +40,12 @@ Local cancellation wins the result race and maps to `aborted`. For failed turns,
 
 `dispose()` is idempotent: it requests a best-effort `turn/interrupt` with both current ids when they are known, closes the JSON-RPC wire, ends stdin, invokes the shared process-tree termination escalation, waits for whole-tree exit, and detaches the stderr observer. Independent cleanup rejection uses the fixed `teardown` stage and any available process outcome. When startup and rollback both fail, the top-level aggregate message preserves both safe stage lines while the raw failures remain internal.
 
+<a id="capabilities-and-context"></a>
 ## Capabilities and context
 
 The provider advertises no optional start-time capabilities and reports `inheritsParentContext: false`. Codex receives the standalone text task and the parent Session cwd, but not the parent conversation, persona, tool filter, depth policy, or structured-output contract. The ephemeral Codex thread id and turn id stay private to this run and are never persisted in the parent Session.
 
+<a id="configuration"></a>
 ## Configuration
 
 | Key | Default | Meaning |
@@ -33,15 +55,23 @@ The provider advertises no optional start-time capabilities and reports `inherit
 | `permissionMode` | `never` | Native non-interactive approval and sandbox mode fixed for every thread from this Provider instance. |
 | `disposeGraceMs` | `3000` | Positive finite grace in milliseconds, no greater than [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.md), between the shared process-tree owner's termination tiers; disposal then waits for whole-tree exit. |
 | `stateDir` | `~/.dsh/external-members` | Directory holding instance-specific binding stores; `codex.jsonl` belongs to the default instance. Used only by persistent members. |
-| `memberCwd` | harness launch directory | Workspace for member Codex threads. Used only by persistent members. |
+| `memberCwd` | member Session cwd | Workspace override for persistent members, validated on their execution target. |
+| `remoteCommand` | `codex` | Preinstalled program resolved inside an SSH target; local execution keeps the bundled program. |
 
+<a id="persistent-members"></a>
 ## Persistent members
+
+SSH uses the target’s `remoteCommand`, without sending Host Node or package paths. A pending remote turn cannot be proven from a Host rollout, so it remains unknown and is not automatically resent; later explicit prompts still use the remote durable thread.
+
+Each call resolves its workspace and subprocess provider through the actual member Session. An SSH Session requires filesystem and subprocess providers in the same standing realm; missing providers refuse execution without Host fallback. Before first launch, the binding store pins the canonical cwd and execution target and rejects changes after restart. Corrupt or unreadable records cannot become new members. Legacy bindings without target evidence remain intact and require a new member before execution.
+
+A missing or unreadable local rollout leaves an issued prompt’s outcome unknown. It does not prove non-delivery and cannot authorize automatic resending.
 
 The default `codex` instance keeps its existing model route and `codex.jsonl` store. Other names receive separate deterministic routes and files derived from the full provider name. Names remain distinct on case-insensitive filesystems; removing one instance releases only its route. Renaming an instance changes its persistent identity and does not adopt another instance's bindings.
 
 When the `llm` service is mounted this provider also advertises `prepareContinuable`, so `ctx.subagents.startContinuable` accepts it — the Team roster's provider-selection channel included. A member child is an ordinary in-process Agent owned by the continuation manager (durable identity, inbox, persistence, restart); this package contributes only the model route: every member model call spawns `codex app-server --stdio`, attaches to the member's durable thread (`thread/resume` when bound, `thread/start` with `ephemeral: false` on the first turn), issues one turn, and disposes the process.
 
-The binding store records the harness child session ↔ Codex thread mapping and the last issued prompt; a crash mid-turn leaves the prompt provable from the durable rollout under `~/.codex/sessions/` on the next call: a settled answer replays without resending, a provably absent prompt resends once, and an unprovable one is dropped rather than duplicated. Without the `llm` service the provider stays one-shot only — no `prepareContinuable`, so continuable starts reject `UNSUPPORTED_CAPABILITY`.
+The binding store records the child ↔ thread mapping, pending prompt, acknowledged turn id, and consumed cursor. Recovery requires the exact prompt and successful terminal event for that id in the same rollout, with final text matching the terminal answer. Commentary, repeated prompt text, another turn, missing acknowledgments, failed turns, and corrupt or missing rollouts remain unknown and are never automatically resent. Healthy members still resume their durable thread. Without `llm`, continuable starts reject `UNSUPPORTED_CAPABILITY`.
 
 | `permissionMode` value | `thread/start` fields | Native behavior |
 |---|---|---|
@@ -106,6 +136,7 @@ The standalone composition below shows the complete explicit capability. A Profi
     maxDepth: provider-managed
 ```
 
+<a id="product-compatibility-and-evidence"></a>
 ## Product compatibility and evidence
 
 The production wire intentionally implements only the app-server methods required by this one-shot contract. The runtime dependency and all six optional-dependency aliases are pinned to `@openai/codex@0.153.4` / `codex-cli 0.153.4`. A normal install selects one payload for the current OS and CPU. For the current darwin-arm64 payload, `npm pack --dry-run --json @openai/codex@0.153.4-darwin-arm64` reports 115,672,312 packed bytes and 288,140,243 unpacked bytes. That package contains native `codex`, `codex-code-mode-host`, `rg`, and `zsh` resources; other platforms may differ, and these values are disclosure rather than an installation threshold.
@@ -114,10 +145,12 @@ Generated schema evidence and package tests pin all sixteen error-info variants,
 
 Installing with optional dependencies omitted, using an unsupported platform, or losing the selected payload makes the first delegation fail at `initialize` with the safe `unknown` category and any observed process outcome. Raw wrapper text remains on Host stderr; the provider neither probes a host CLI nor retries with one. An isolated wrapper fixture separately proves the native payload failure and absence of host fallback.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Each run submits one task to an ephemeral Codex thread in the delegating workspace and returns its result; no session state is retained between runs.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Child request
@@ -159,3 +192,13 @@ Append-only: foreground adds one result after the reusable parent prefix, while 
 - **Assistant payload is final text only** — a failed run may additionally expose the separate safe diagnostic; reasoning, commentary, intermediate messages, tool traffic, usage, raw stderr, and workspace diffs remain outside the parent Session, while generic Job ids, notices, and status come from the shared job runtime.
 - **No optional shared capabilities** — output schemas, child personas, tool filtering, and harness depth enforcement are rejected by the shared service for this provider.
 - **No wall-clock timeout or side-effect rollback** — the caller cancels long work, and files or external systems changed before cancellation are not restored.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

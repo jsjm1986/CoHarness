@@ -159,16 +159,12 @@
   overflow-wrap: anywhere;
   font: var(--dsw-font-markdown-code-block-small);
   color: var(--dsw-alias-label-secondary);
+  /* The transparent thumb border floats the scrollbar off the card edge. */
+  --dsh-scrollbar-thumb-border: 1px;
 }
 
 .instructions[data-error] {
   color: var(--dsw-alias-state-error-primary);
-}
-
-.instructions::-webkit-scrollbar-thumb {
-  border: var(--dsh-scrollbar-thumb-inset) solid transparent;
-  background-clip: padding-box;
-  border-radius: var(--dsw-radius-sm);
 }
 
 .instructions::-webkit-scrollbar-track {

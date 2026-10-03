@@ -1,6 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionStorageMetadata,  SessionEventSuffix, SessionInspection } from '@deepseek-ai/dsh-session-persistence'
 import { describe, expect, it } from 'vitest'
 import {
@@ -258,10 +259,10 @@ describe('session persistence page protocol', () => {
     } as SessionEvent
     const message = {
       type: 'user/message',
-      seq: 2,
+      seq: SessionSeq(2),
       time: 2,
-      data: { content: [{ type: 'text', text: 'message' }], source: { kind: 'user' } },
-      surfaceOp: 'append',
+      data: createUserMessage({ content: [{ type: 'text', text: 'message' }], source: { kind: 'user' } }),
+      surfaceOp: 'append' as const,
     } as SessionEvent
     expect(selectSessionPersistencePage([source, sourceWithoutEarlierSeq, message], 'newer', 10_000, 10, 10).events).toHaveLength(3)
 

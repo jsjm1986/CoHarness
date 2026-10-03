@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-stop-all-worker-failures.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-stop-all-worker-failures.md
-2026-09-17-stop-all-worker-failures.md: e85a942927649d5b181c9939d626e5219aa6537a
-2026-09-17-stop-all-worker-failures.zh.md: 91a1c56d395366e016cc0ccabb9a73f7577843a2
+/agent-note-drain-shutdown-workers-after-target-failures:
+  en: 15b0d62811c4cfaf
+  zh: 1b6420da5822649c
+/agent-note-drain-shutdown-workers-after-target-failures/problem:
+  en: aab8b834c8e28b4b
+  zh: ed75a3971f81b794
+/agent-note-drain-shutdown-workers-after-target-failures/decision:
+  en: 6ae735371e6b5a34
+  zh: 139f3d02fe8d8198
+/agent-note-drain-shutdown-workers-after-target-failures/alternatives-considered:
+  en: 7ec66cb953285126
+  zh: 76682325f038d51d
+/agent-note-drain-shutdown-workers-after-target-failures/consequences:
+  en: 2f4632ab8d22f412
+  zh: 20e741a41b52e2ba
+/agent-note-drain-shutdown-workers-after-target-failures/testing:
+  en: f9f8385b5ec878fd
+  zh: 7144e1bebd80e2fd

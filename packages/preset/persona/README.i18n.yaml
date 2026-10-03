@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/preset/persona/README.md
-README.md: 8fc2599f7113985be4f013ef2fb977559f7f64ad
-README.zh.md: 4552cd4fd7c2a97ed12c76dd07990484b7fe7758
+/:
+  en: 808306c29f2ea6d5
+  zh: 61495d48365178df
+/dsh-persona:
+  en: a5759be996e52e3f
+  zh: 7e66db2e1147b5c0
+/dsh-persona/summary:
+  en: 147d5511056246c0
+  zh: 9998f4c946957cf9
+/dsh-persona/table-of-contents:
+  en: 8bea00c458e2113c
+  zh: 9aa2b4fc89819e84
+/dsh-persona/scope-only:
+  en: b8b89998a12dbf92
+  zh: b49b16a649eeec98
+/dsh-persona/config:
+  en: 70caae45b742c80e
+  zh: f29f1f06370dc165
+/dsh-persona/invariants:
+  en: 5aa46a4351141bc1
+  zh: 4682cc2971a67a93
+/dsh-persona/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/dsh-persona/model-experience/the-persona-section:
+  en: 2b53c1d07ef68f24
+  zh: 33a3c17ab56adf57
+/dsh-persona/model-experience/the-persona-section/what-the-model-sees:
+  en: 7f01b67034a26a2f
+  zh: 7f65b5eee49e71a4
+/dsh-persona/model-experience/the-persona-section/token-effect:
+  en: af8e73cbc540aa5a
+  zh: fa1182678427ab11
+/dsh-persona/model-experience/the-persona-section/kv-cache-effect:
+  en: e9f96cf496c544c7
+  zh: 618fc6a03d8afec4
+/dsh-persona/known-limitations-and-deferred-work:
+  en: 8c0534ffaf288df2
+  zh: 5b75dc65cd470489
+/dsh-persona/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

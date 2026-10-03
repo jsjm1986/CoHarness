@@ -26,7 +26,13 @@ function latestLine(text: string): string {
  * @param props.t - conversation locale seat for status and Markdown actions.
  * @returns the reasoning disclosure.
  */
-export function ReasoningRow({ text, running, t }: { text: string; running: boolean; t: ChatViewSlotProps['t'] }) {
+export function ReasoningRow({ text, running, settledReasoningPreview = true, t }: {
+  text: string
+  running: boolean
+  /** Settled rows keep their first-line preview only while the preference allows it. */
+  settledReasoningPreview?: boolean | undefined
+  t: ChatViewSlotProps['t']
+}) {
   const [expanded, setExpanded] = useState(false)
   const summaryRef = useRef<HTMLSpanElement>(null)
   const labels = useMemo(() => markdownLabels(t), [t])
@@ -55,12 +61,14 @@ export function ReasoningRow({ text, running, t }: { text: string; running: bool
         expandable
         expandOnRowClick
         onToggle={() => { setExpanded(value => !value) }}
-        collapsedContent={(
-          <>
-            <span className={css.separator} aria-hidden />
-            <span ref={summaryRef} className={css.summary} data-follow-end={running || undefined}>{summary}</span>
-          </>
-        )}
+        collapsedContent={(running || settledReasoningPreview) && summary !== ''
+          ? (
+            <>
+              <span className={css.separator} aria-hidden />
+              <span ref={summaryRef} className={css.summary} data-follow-end={running || undefined}>{summary}</span>
+            </>
+          )
+          : undefined}
       >
         <div className={css.thinkBody}>
           <MarkdownText text={text} streaming={running} labels={labels} variant="compact" />

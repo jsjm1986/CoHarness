@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-project-scope-picker.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-project-scope-picker.md
-2026-08-25-project-scope-picker.md: 814ae99211e898c62a4ed63a273aab10886e9574
-2026-08-25-project-scope-picker.zh.md: fde2e2d265d56185e086039f73e89fbb1d961c0c
+/agent-note-scalable-project-scope-picker:
+  en: c6d1b44562e16bd0
+  zh: 8d8946a460e17166
+/agent-note-scalable-project-scope-picker/problem:
+  en: fa82c545677f4bfa
+  zh: 17ed272ed1a13f7e
+/agent-note-scalable-project-scope-picker/decision:
+  en: 61298e0b3d4fb14b
+  zh: 7dfd22f83abab208
+/agent-note-scalable-project-scope-picker/alternatives-considered:
+  en: 9a8214a8b6150ea8
+  zh: 4b60580c599e85f9
+/agent-note-scalable-project-scope-picker/consequences:
+  en: 76a5cb93b1fe6ef2
+  zh: 0453009f130bf60a
+/agent-note-scalable-project-scope-picker/verification:
+  en: 693a4584d1ae5821
+  zh: 79d48446ef7ba6e4

@@ -6,7 +6,7 @@
 // entries. Tool composition belongs to ui-tool and its machinery spec.
 
 import { describe, expect, it, vi } from 'vitest'
-import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -25,7 +25,7 @@ async function bench() {
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
-  runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+  runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
   await runtime.sessions.add({ id: ROOT, summary: { title: 'R', displayTitle: 'R' } }, { current: false })
   await runtime.sessions.add(
     { id: CHILD, summary: { title: 'C', displayTitle: 'C', parentId: ROOT } }, { current: false })
@@ -37,7 +37,7 @@ async function bench() {
   // Declared by ui-layout's root entry in production; the test root declares
   // them here so the contributions land.
   await runtime.root.declare({
-    'conversation': { kind: 'single', scope: 'root' },
+    'main': { kind: 'keyed', scope: 'root' },
     'details': { kind: 'single', scope: 'session' },
     'settings.general.item': { kind: 'list', scope: 'root' },
   }, (_p: { renderSlot?: unknown }) => null)
@@ -47,7 +47,7 @@ async function bench() {
 }
 
 /** First stored entry for a key (inject/store live directly on StoredEntry). */
-function renderEntryOf(slots: Awaited<ReturnType<typeof bench>>['slots'], key: 'conversation' | 'conversation.session' | 'conversation.session.header' | 'conversation.view' | 'details') {
+function renderEntryOf(slots: Awaited<ReturnType<typeof bench>>['slots'], key: 'main' | 'conversation.session' | 'conversation.session.header' | 'conversation.view' | 'details') {
   return slots.entries(key)[0] as undefined | { inject?: unknown; store?: unknown }
 }
 
@@ -75,7 +75,7 @@ describe('apply wiring', () => {
 
   it('occupies the slots + the ring; session entries share one store handle', async () => {
     const b = await bench()
-    const conversation = renderEntryOf(b.slots, 'conversation')
+    const conversation = renderEntryOf(b.slots, 'main')
     const conversationSession = renderEntryOf(b.slots, 'conversation.session')
     const conversationHeader = renderEntryOf(b.slots, 'conversation.session.header')
     const chatView = renderEntryOf(b.slots, 'conversation.view')
@@ -94,7 +94,9 @@ describe('apply wiring', () => {
     expect(b.slots.spec('conversation.hero.brand.mark')).toEqual({ kind: 'single', scope: 'root' })
     expect(b.slots.spec('conversation.hero.workspace')).toEqual({ kind: 'single', scope: 'root' })
     expect(b.slots.spec('conversation.hero.agentPreset')).toEqual({ kind: 'single', scope: 'root' })
-    expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual(['composer-enter', 'conversation-display'])
+    expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual([
+      'transcript-view', 'link-opening', 'composer-enter', 'conversation-display', 'performance-usage',
+    ])
     await b.runtime.dispose()
   })
 
@@ -113,7 +115,7 @@ describe('apply wiring', () => {
   it('plugin fiber disposal collects every registration (unload cascade, ring and hole included)', async () => {
     const b = await bench()
     await b.feature.dispose()
-    expect(b.slots.entries('conversation')).toHaveLength(0)
+    expect(b.slots.entries('main')).toHaveLength(0)
     // The declared ring collapses with its declaring entry, and the chat
     // entry's keyed hole (with the sample's registration) collapses with it.
     expect(b.slots.entries('conversation.view')).toHaveLength(0)

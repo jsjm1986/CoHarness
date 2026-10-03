@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-loader-activation-audit-consumers.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-17-loader-activation-audit-consumers.md
-2026-09-17-loader-activation-audit-consumers.md: 9e0e10b2603d610386d7b0cad19bc09ab28a0ec7
-2026-09-17-loader-activation-audit-consumers.zh.md: 84f4af4d4b16f7369b09a05d918cd03612053870
+/agent-note-consumers-audit-activation-instead-of-catching-transactional-rollback:
+  en: 8c8547e57717767a
+  zh: 12e7658166bd8dbc
+/agent-note-consumers-audit-activation-instead-of-catching-transactional-rollback/problem:
+  en: d75167c28d8dbe6a
+  zh: b2b2811a9d1bf052
+/agent-note-consumers-audit-activation-instead-of-catching-transactional-rollback/decision:
+  en: 460c7555cb6cd425
+  zh: c13505a68a6709be
+/agent-note-consumers-audit-activation-instead-of-catching-transactional-rollback/alternatives-considered:
+  en: 4ffea5b11e639136
+  zh: a1c6aca3b43c9f87
+/agent-note-consumers-audit-activation-instead-of-catching-transactional-rollback/consequences:
+  en: dd9f2aa83ad39583
+  zh: e2fcc563d38fa3de

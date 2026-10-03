@@ -1,6 +1,85 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/llm/llm-pi-ai/README.md
-README.md: 037fbac164fc39ecbae934b0159243bc27f4d972
-README.zh.md: 692c040f86db91be7a46262ccb704a921caabab4
+/:
+  en: 5b95296b78f8bc9c
+  zh: 61495d48365178df
+/deepseek-ai-dsh-llm-pi-ai:
+  en: 58fcf03f321a9537
+  zh: 2b0b3b282b1764f5
+/deepseek-ai-dsh-llm-pi-ai/summary:
+  en: ee82d88fee1332d6
+  zh: 3e66b494e4844f97
+/deepseek-ai-dsh-llm-pi-ai/table-of-contents:
+  en: dbd6f8dc46cf10bd
+  zh: 950b1f956116686a
+/deepseek-ai-dsh-llm-pi-ai/config:
+  en: f505c0a654bbcefd
+  zh: c795c807a4e8413b
+/deepseek-ai-dsh-llm-pi-ai/catalog-resolution:
+  en: ed449fd67b1a8299
+  zh: 0d41e6e620d12214
+/deepseek-ai-dsh-llm-pi-ai/catalog-resolution/per-model-reasoning-efforts:
+  en: 49ba15b62a08f6ac
+  zh: aed02a85886dbe96
+/deepseek-ai-dsh-llm-pi-ai/catalog-resolution/wire-compatibility-switches:
+  en: 5101c25307565011
+  zh: 204dcf70f727a0fc
+/deepseek-ai-dsh-llm-pi-ai/dynamic-configuration-settings-credentials:
+  en: 8046e1d70e15acda
+  zh: 97f9aa91d5c7b132
+/deepseek-ai-dsh-llm-pi-ai/endpoint-interrogation:
+  en: 911336d01350f28b
+  zh: ffc2e89bd8c9ab13
+/deepseek-ai-dsh-llm-pi-ai/provider-model-routing-and-replay:
+  en: 8581da66780c4d15
+  zh: 656f9b2d94ca892d
+/deepseek-ai-dsh-llm-pi-ai/provider-model-routing-and-replay/tagged-reasoning-in-openai-compatible-text:
+  en: 4806236e0d3fd2c7
+  zh: bc53d604768b28b1
+/deepseek-ai-dsh-llm-pi-ai/vocabulary-differences:
+  en: b250956ac42d60e4
+  zh: 86d9e2c9ed285528
+/deepseek-ai-dsh-llm-pi-ai/app-attribution:
+  en: 036e2a17cb17892e
+  zh: fc9f5de264ee169d
+/deepseek-ai-dsh-llm-pi-ai/dependency-weight:
+  en: 0bd44b73275fb252
+  zh: c3e520bc8f21ceca
+/deepseek-ai-dsh-llm-pi-ai/invariants:
+  en: dc2c15a4697777dc
+  zh: ce8698ad53d4d689
+/deepseek-ai-dsh-llm-pi-ai/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-llm-pi-ai/model-experience/provider-request-through-pi-ai:
+  en: e7348db3f7115960
+  zh: 5fd5fb09d7d09982
+/deepseek-ai-dsh-llm-pi-ai/model-experience/provider-request-through-pi-ai/what-the-model-sees:
+  en: 34e63beee750a3a9
+  zh: a869322d161d922f
+/deepseek-ai-dsh-llm-pi-ai/model-experience/provider-request-through-pi-ai/token-effect:
+  en: 820221e8ae37aa61
+  zh: 7e6ff4db10067fc0
+/deepseek-ai-dsh-llm-pi-ai/model-experience/provider-request-through-pi-ai/kv-cache-effect:
+  en: 8c1f842a95ab46fb
+  zh: d6dd124c82f1d96b
+/deepseek-ai-dsh-llm-pi-ai/model-experience/provider-response:
+  en: 802d7ff60a1d03ff
+  zh: c41c56e28f3e8680
+/deepseek-ai-dsh-llm-pi-ai/model-experience/provider-response/what-the-model-sees:
+  en: 9b7d6b95ec2c4351
+  zh: 356ac01aef9e8bed
+/deepseek-ai-dsh-llm-pi-ai/model-experience/provider-response/token-effect:
+  en: f002b21d0f4c3df0
+  zh: 388c8ed4676ed1af
+/deepseek-ai-dsh-llm-pi-ai/model-experience/provider-response/kv-cache-effect:
+  en: b6bd570c0159ba08
+  zh: 1c706ee993b1e0bf
+/deepseek-ai-dsh-llm-pi-ai/known-limitations-and-deferred-work:
+  en: e9579d0916cbe38d
+  zh: f364e7a67ae90a36
+/deepseek-ai-dsh-llm-pi-ai/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

@@ -290,11 +290,11 @@ describe('AgentRegistry factory seam', () => {
     const factory: AgentFactory = {
       async createAgent(ownerCtx, options) {
         calls.create.push({ ownerCtx, options })
-        return { agent: stubAgent(options.sessionId), dispose: () => Promise.resolve() }
+        return { agent: stubAgent(options.sessionId), dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
       },
       async resume(ownerCtx, options) {
         calls.resume.push({ ownerCtx, options })
-        return { agent: stubAgent(options.resumeSessionId), dispose: () => Promise.resolve() }
+        return { agent: stubAgent(options.resumeSessionId), dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
       },
     }
     return { factory, calls }
@@ -362,11 +362,11 @@ describe('AgentRegistry factory seam', () => {
       }
       async createAgent(_ownerCtx: Context, options: CreateAgentOptions) {
         this.calls().push('create')
-        return { agent: stubAgent(options.sessionId), dispose: () => Promise.resolve() }
+        return { agent: stubAgent(options.sessionId), dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
       }
       async resume(_ownerCtx: Context, options: ResumeAgentOptions) {
         this.calls().push('resume')
-        return { agent: stubAgent(options.resumeSessionId), dispose: () => Promise.resolve() }
+        return { agent: stubAgent(options.resumeSessionId), dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
       }
     }
     await ctx.plugin(TracedFactory)

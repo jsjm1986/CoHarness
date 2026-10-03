@@ -11,7 +11,7 @@ import type { ReadWorkspaceDocument } from '../src/client/components/WorkspaceDo
 import { createWorkspacePreviewReaders } from '../src/client/preview-readers.ts'
 import { en as pdfEn } from '../src/client/pdf/locales.ts'
 import { en as officeEn } from '../src/client/office/locales.ts'
-import { FontNotice } from '../src/client/office/FontNotice.tsx'
+import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 vi.mock('../src/client/pdf/pdf.tsx', () => ({ PdfBody: ({ data }: { data: Uint8Array }) => <pre data-testid="pdf">{new TextDecoder().decode(data)}</pre> }))
 afterEach(cleanup)
@@ -21,16 +21,24 @@ const pdf = (version = 'v1') => ({ bytes: btoa(`PDF ${version}`), version, missi
 function harness(read: ReadWorkspaceDocument) {
   const resources = new WorkspaceResourceRegistry()
   let version = 'v1'
+  let bytes = 10
   resources.register(request.runtimeTarget, {
-    stat: async () => ({ sessionId: id, path: request.path, type: 'file', version, bytes: 10, changed: false }),
+    stat: async () => ({ sessionId: id, path: request.path, type: 'file', version, bytes, changed: false }),
   }, 5)
   const close = vi.fn()
-  const view = render(<WorkspaceDocumentPreview request={request} resources={resources} read={read}
-    pdfT={makeTranslate(pdfEn)} officeT={makeTranslate(officeEn)} fontNotice={FontNotice} close={close} view={{ page: 1 }}
-    labels={{ close: 'Close', reload: 'Reload', changed: 'File changed' }} />)
+  const view = render(<PreviewResourceBinding resources={resources} request={request}>{resource =>
+    <WorkspaceDocumentPreview request={request} resource={resource} read={read}
+      pdfT={makeTranslate(pdfEn)} officeT={makeTranslate(officeEn)} close={close} view={{ page: 1 }}
+      labels={{ close: 'Close', reload: 'Reload', changed: 'File changed' }} />
+  }</PreviewResourceBinding>)
   return { ...view, resources, close, change() {
     version = 'v2'
     resources.handleChange(request.runtimeTarget, { sessionId: id, path: request.path, version })
+  }, revalidate(nextVersion: string, nextBytes: number) {
+    version = nextVersion
+    bytes = nextBytes
+    resources.disconnect(request.runtimeTarget)
+    resources.connected(request.runtimeTarget)
   } }
 }
 
@@ -49,6 +57,28 @@ it('retains the displayed revision until explicit reload, then clears it immedia
   expect(h.getByRole('button', { name: 'Reload' }).hasAttribute('disabled')).toBe(true)
   fireEvent.click(h.getByRole('button', { name: 'Close' }))
   expect(h.close).toHaveBeenCalledOnce()
+})
+
+it('retains the displayed document across a changed revalidation and re-reads the new revision on reload', async () => {
+  const calls: { version: string; bytes: number | undefined }[] = []
+  const read = vi.fn<ReadWorkspaceDocument>(async ({ version, bytes }) => {
+    calls.push({ version, bytes })
+    return pdf(version)
+  })
+  const h = harness(read)
+  await waitFor(() => { expect(h.getByTestId('pdf').textContent).toBe('PDF v1') })
+  expect(calls).toEqual([{ version: 'v1', bytes: 10 }])
+  act(() => { h.revalidate('v2', 30) })
+  await waitFor(() => {
+    expect(h.resources.source(request).getSnapshot().value).toMatchObject({ version: 'v2', bytes: 30, changed: true })
+  })
+  expect(h.getByText('File changed')).toBeTruthy()
+  expect(h.getByTestId('pdf').textContent).toBe('PDF v1')
+  expect(read).toHaveBeenCalledTimes(1)
+  fireEvent.click(h.getByRole('button', { name: 'Reload' }))
+  await waitFor(() => { expect(h.getByTestId('pdf').textContent).toBe('PDF v2') })
+  expect(calls).toEqual([{ version: 'v1', bytes: 10 }, { version: 'v2', bytes: 30 }])
+  expect(h.queryByText('File changed')).toBeNull()
 })
 
 it('discards late converted bytes after the preview is hidden', async () => {
@@ -84,7 +114,7 @@ it('propagates a denied conversion to every resource on the owning runtime', asy
   const read = vi.fn<ReadWorkspaceDocument>().mockRejectedValue(new WorkspaceResourceError('access-revoked', 'Permission removed'))
   const h = harness(read)
   await waitFor(() => { expect(h.getByRole('alert').textContent).toBe('Permission removed') })
-  expect(h.resources.source(request).get().error?.message).toBe('Permission removed')
+  expect(h.resources.source(request).getSnapshot().error?.message).toBe('Permission removed')
   expect(h.queryByTestId('pdf')).toBeNull()
   expect(h.getByRole('button', { name: 'Reload' }).hasAttribute('disabled')).toBe(true)
   expect(read).toHaveBeenCalledOnce()

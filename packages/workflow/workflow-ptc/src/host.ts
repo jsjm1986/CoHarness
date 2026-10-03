@@ -1,4 +1,5 @@
 /** Workflow child ownership and progress over the shared sandboxed PTC executor. */
+import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { PtcBindingFunction, PtcJsonValue, PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
@@ -112,6 +113,7 @@ function workflowResult(value: unknown): WorkflowResult {
 export class PtcWorkflowRun implements WorkflowRun {
   readonly result: Promise<WorkflowResult>
   private readonly controller = new AbortController()
+  private readonly executionScope: ExecutionInheritance | undefined
   private readonly children = new Map<number, ChildRecord>()
   private readonly pending = new Set<Promise<unknown>>()
   private readonly liveAgents = new Map<number, WorkflowAgentInfo>()
@@ -134,6 +136,7 @@ export class PtcWorkflowRun implements WorkflowRun {
     private readonly observer: ExecutionObserver,
     private readonly signal?: AbortSignal,
   ) {
+    this.executionScope = executionAuthorityOf(ctx)?.capture(parent)
     this.externalAbort = () => { this.cancel('workflow signal aborted') }
     if (signal?.aborted) this.externalAbort()
     else signal?.addEventListener('abort', this.externalAbort, { once: true })
@@ -197,7 +200,7 @@ export class PtcWorkflowRun implements WorkflowRun {
   private async startChild(request: ChildStartRequest): Promise<PtcJsonValue> {
     this.requireActive()
     const callId = ++this.started
-    const run = await this.subagents.start(this.provider, {
+    const start = () => this.subagents.start(this.provider, {
       prompt: [{ type: 'text', text: request.prompt }],
       parent: this.parent,
       signal: this.controller.signal,
@@ -209,6 +212,9 @@ export class PtcWorkflowRun implements WorkflowRun {
         },
       },
     })
+    const authority = executionAuthorityOf(this.ctx)
+    const run = await (authority === undefined || this.executionScope === undefined ? start()
+      : authority.runCaptured(this.parent, this.executionScope, start))
     const record: ChildRecord = { callId, run }
     this.children.set(callId, record)
     // A provider can publish after the signal fired while startup was pending.

@@ -3,7 +3,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { createSnapshotStore, type ConversationViewportSnapshot, type SessionListState, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import { clientSessionKey, createSnapshotStore, type ConversationViewportSnapshot, type SessionListState, type SessionId, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { SessionId as brandSessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkbenchEmpty } from '../src/client/components/WorkbenchEmpty.tsx'
 import { WorkbenchPaneHeader } from '../src/client/components/WorkbenchPaneHeader.tsx'
@@ -27,15 +27,16 @@ function props() {
     current: SID_A,
     phase: 'ready',
     subagentsByParent: {},
-    jobsBySession: {},
+    jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })
-  const workspaces = createSnapshotStore<WorkspaceListState>({ items: [{ workspaceId: 'wa' as never, title: 'Workspace A', createdAt: '2026-09-08', updatedAt: '2026-09-08', path: '/work/alpha', sessionIds: [SID_A] }], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined })
+  const workspaces = createSnapshotStore<WorkspaceListState>({ items: [{ workspaceId: 'wa' as never, title: 'Workspace A', createdAt: '2026-09-08', updatedAt: '2026-09-08', path: '/work/alpha', sessionIds: [SID_A] }], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined })
   const store = createWorkbenchStore().create()
   return {
     sessionsStore: sessions, workspacesStore: workspaces,
     useStore: bindSnapshotSelector(store), actions: store.actions,
     useSessions: bindSnapshotSelector(sessions), useWorkspaces: bindSnapshotSelector(workspaces),
+    usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
   }
 }
 
@@ -44,7 +45,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 describe('workbench components', () => {
   it('does not reinsert local sessions excluded by the account catalog', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      personal: { id: 1, name: 'admin' }, activeRuntime: { kind: 'personal' }, projects: [],
+      personalComplete: true, personal: { id: 1, name: 'admin' }, activeRuntime: { kind: 'personal' }, projects: [],
       items: [{ sessionId: SID_B, runtime: { kind: 'personal' }, title: 'Beta', cwd: '/work/beta',
         visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'admin', updatedAt: 0, blank: false, canWrite: true }],
     }))))
@@ -73,9 +74,18 @@ describe('workbench components', () => {
   it('renders the empty action and invokes the supplied add callback', () => {
     const p = props()
     const add = vi.spyOn(p.actions, 'openPicker')
-    render(<WorkbenchEmpty {...p} t={t} />)
+    render(<WorkbenchEmpty {...p} viewport={{ mode: 'workbench', paneIds: [], paneRatios: [] }} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
     expect(add).toHaveBeenCalledOnce()
+  })
+
+  it('keeps an unverified empty layout from opening a chooser that cannot save', () => {
+    const p = props()
+    const add = vi.spyOn(p.actions, 'openPicker')
+    render(<WorkbenchEmpty {...p} viewport={{ mode: 'workbench', paneIds: [], paneRatios: [], pendingIdentity: true }} t={t} />)
+    expect(screen.getByText(/尚未核实会话归属/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    expect(add).not.toHaveBeenCalled()
   })
 
   it('shows workspace basename, running state, and pane close/focus actions', () => {
@@ -180,7 +190,7 @@ describe('workbench components', () => {
 
 describe('workbench account targets and asynchronous chooser', () => {
   const directory = {
-    personal: { id: 1, name: 'My space' }, activeRuntime: { kind: 'project', projectId: 7 },
+    personalComplete: true, personal: { id: 1, name: 'My space' }, activeRuntime: { kind: 'project', projectId: 7 },
     projects: [{ projectId: 7, name: 'Team', mode: 'rw' }, { projectId: 8, name: 'Read only', mode: 'ro' }],
     items: [
       { sessionId: 'project', title: 'Project conversation', runtime: { kind: 'project', projectId: 7, projectName: 'Team' }, visibility: 'project', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true },
@@ -202,6 +212,21 @@ describe('workbench account targets and asynchronous chooser', () => {
     return { ...p, ...actions, view }
   }
 
+  it('keeps the layout menu open when the same root controls move from the Hero to the session header', () => {
+    const p = props()
+    const switchWorkbench = vi.fn()
+    const common = { ...p, viewport: { mode: 'single' as const, paneIds: [], paneRatios: [] }, tabbed: false,
+      chooseSession: vi.fn(), focusSession: vi.fn(), createSession: vi.fn(), setMode: vi.fn(), switchWorkbench, t }
+    const hero = render(<WorkbenchToolbar {...common} />)
+    fireEvent.click(screen.getByRole('button', { name: '选择工作台' }))
+    expect(screen.getByRole('menuitem', { name: /我的工作台/ })).toBeTruthy()
+    hero.unmount()
+    render(<WorkbenchToolbar {...common} inline />)
+    fireEvent.click(screen.getByRole('menuitem', { name: /我的工作台/ }))
+    expect(switchWorkbench).toHaveBeenCalledWith('default')
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
   it('hydrates project identities and filters choices by Workspace and query', async () => {
     serve()
     const hydrateCatalog = vi.fn(async () => {})
@@ -221,6 +246,23 @@ describe('workbench account targets and asynchronous chooser', () => {
     expect(screen.getByRole('button', { name: '新建对话' }).hasAttribute('disabled')).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: '关闭选择器' }))
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('hydrates restored panes arriving after the account catalog without refetching that catalog', async () => {
+    serve()
+    const p = props()
+    const actions = {
+      chooseSession: vi.fn(async () => ({ ok: true as const })), focusSession: vi.fn(),
+      createSession: vi.fn(async () => ({ ok: true as const })), setMode: vi.fn(),
+      hydrateCatalog: vi.fn(async () => {}),
+    }
+    const view = render(<WorkbenchToolbar {...p} {...actions} t={t} tabbed={false}
+      viewport={{ mode: 'workbench', paneIds: [], paneRatios: [] }} />)
+    await waitFor(() => { expect(actions.hydrateCatalog).toHaveBeenCalledWith(expect.any(Object), []) })
+    view.rerender(<WorkbenchToolbar {...p} {...actions} t={t} tabbed={false}
+      viewport={{ mode: 'workbench', paneIds: [SID_A, SID_B], paneRatios: [0.5, 0.5] }} />)
+    await waitFor(() => { expect(actions.hydrateCatalog).toHaveBeenLastCalledWith(expect.any(Object), [SID_A, SID_B]) })
+    expect(fetch).toHaveBeenCalledOnce()
   })
 
   it.each(['limit', 'unknown'] as const)('keeps a refused %s choice visible and reports remote errors', async (reason) => {
@@ -275,7 +317,7 @@ describe('workbench account targets and asynchronous chooser', () => {
     })
   })
 
-  it('ignores catalog completion after unmount and marks a failed catalog ready', async () => {
+  it('ignores catalog completion after unmount and reports a failed catalog separately', async () => {
     const pending = Promise.withResolvers<Response>()
     vi.stubGlobal('fetch', vi.fn(() => pending.promise))
     const hydrateCatalog = vi.fn(async () => {})
@@ -285,8 +327,28 @@ describe('workbench account targets and asynchronous chooser', () => {
     expect(hydrateCatalog).not.toHaveBeenCalled()
     const ready = vi.fn()
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 503 })))
-    toolbar({ markCatalogReady: ready })
+    toolbar({ catalogUnavailable: ready })
     await waitFor(() => { expect(ready).toHaveBeenCalledOnce() })
+  })
+
+  it('explains pending legacy ownership, refuses layout edits and allows directory retry and single mode', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(directory)))
+    vi.stubGlobal('fetch', fetcher)
+    const h = toolbar({ viewport: { mode: 'workbench', pendingIdentity: true, paneIds: [], paneRatios: [] } })
+    await waitFor(() => { expect(fetcher).toHaveBeenCalledOnce() })
+    expect(screen.getByRole('status').textContent).toContain('尚未核实会话归属')
+    expect(screen.getByRole('button', { name: '添加对话' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '选择工作台' }))
+    for (const name of ['新建工作台', '重命名工作台', '复制工作台', '删除工作台']) {
+      expect(screen.getByRole('menuitem', { name }).hasAttribute('disabled')).toBe(true)
+    }
+    fireEvent.click(screen.getByRole('menuitem', { name: '退出工作台' }))
+    expect(h.setMode).toHaveBeenCalledWith('single')
+    fireEvent.click(screen.getByRole('button', { name: '重新读取目录' }))
+    await waitFor(() => { expect(fetcher).toHaveBeenCalledTimes(2) })
+    h.view.rerender(<WorkbenchToolbar {...h} viewport={{ mode: 'workbench', paneIds: [], paneRatios: [] }} tabbed={false} t={t} />)
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByRole('button', { name: '添加对话' }).hasAttribute('disabled')).toBe(false)
   })
 })
 
@@ -326,7 +388,7 @@ describe('pane header controls', () => {
   it('keeps a missing Session identifiable and marks an idle known Session ready', () => {
     const missing = pane('missing' as SessionId)
     expect(screen.getByText('未命名对话')).toBeTruthy()
-    expect(screen.getByText('就绪')).toBeTruthy()
+    expect(screen.getByText('尚未载入')).toBeTruthy()
     missing.view.unmount()
     pane()
     expect(screen.getByText('Workspace A')).toBeTruthy()
@@ -482,9 +544,38 @@ describe('workbench toolbar edge paths', () => {
     expect(screen.getByRole('button', { name: 'Team chat /team' })).toBeTruthy()
   })
 
+  it('decodes local fallback addresses once and never interprets a catalog raw ID as a browser key', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))))
+    const raw = clientSessionKey({ kind: 'project', projectId: 7 }, SID_A)
+    const key = clientSessionKey({ kind: 'personal' }, raw)
+    const p = props()
+    p.sessionsStore.set({ ...p.sessionsStore.getSnapshot(), current: key, ids: [key], byId: {
+      [key]: { id: key, displayTitle: 'Prefixed raw ID', running: false, blank: false, updatedAt: 0 },
+    } })
+    const choose = vi.fn(async () => ({ ok: true as const }))
+    const view = render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench', paneIds: [key], paneRatios: [1] }} tabbed={false}
+      chooseSession={choose} focusSession={vi.fn()} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Prefixed raw ID' }))
+    expect(choose).toHaveBeenCalledWith(expect.objectContaining({ sessionId: raw, runtime: { kind: 'personal' } }), false)
+    await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
+    view.unmount()
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [],
+      items: [{ sessionId: raw, runtime: { kind: 'personal' }, title: 'Remote raw ID',
+        visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }],
+    }))))
+    render(<WorkbenchToolbar {...p} viewport={{ mode: 'workbench', paneIds: [raw], paneRatios: [1] }} tabbed={false}
+      chooseSession={choose} focusSession={vi.fn()} createSession={vi.fn()} setMode={vi.fn()} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
+    await screen.findByRole('button', { name: 'Remote raw ID' })
+    expect(screen.queryByText('已在工作台')).toBeNull()
+  })
+
   it('renders a blank-title candidate with its date instead of the untitled sentinel', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [],
+      personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [],
       items: [{ sessionId: 'blank-title', title: '   ', runtime: { kind: 'personal' }, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1750000000000, blank: false, canWrite: true }],
     }))))
     renderToolbar()
@@ -554,7 +645,7 @@ describe('workbench toolbar edge paths', () => {
 
   it('blocks creating in a read-only project and reports the reason', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'project', projectId: 7 },
+      personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'project', projectId: 7 },
       projects: [{ projectId: 7, name: 'Read only', mode: 'ro' }], items: [],
     }))))
     renderToolbar()
@@ -568,7 +659,7 @@ describe('workbench toolbar edge paths', () => {
 
   it('renders a project tab with a ready status and ignores non-navigation keys', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'project', projectId: 7 },
+      personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'project', projectId: 7 },
       projects: [{ projectId: 7, name: 'Team', mode: 'rw' }], items: [],
     }))))
     const focus = vi.fn()
@@ -588,7 +679,7 @@ describe('workbench toolbar edge paths', () => {
 
   it('marks a read-only candidate and its cwd scope in the picker', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [],
+      personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [],
       items: [{ sessionId: 'ro', title: 'Read-only row', cwd: '/x/y', runtime: { kind: 'personal' }, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: false }],
     }))))
     renderToolbar()
@@ -622,7 +713,7 @@ describe('workbench toolbar edge paths', () => {
 
   it('dismisses the workspace chooser menu without selecting', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [],
+      personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [],
     }))))
     renderToolbar()
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
@@ -672,7 +763,7 @@ describe('workbench toolbar edge paths', () => {
 
   it('filters an archived catalog row and resolves blank, untitled, and root-cwd titles', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [],
+      personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [],
       items: [
         { sessionId: 'archived-item', title: 'Archived row', runtime: { kind: 'personal' }, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true },
         { sessionId: SID_A, title: 'Blank current', runtime: { kind: 'personal' }, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: true, canWrite: true },
@@ -681,7 +772,8 @@ describe('workbench toolbar edge paths', () => {
       ],
     }))))
     const p = props()
-    p.workspacesStore.set({ ...p.workspacesStore.getSnapshot(), archivedSessionIds: ['archived-item' as never] })
+    p.workspacesStore.set({ ...p.workspacesStore.getSnapshot(), archivedSessionIds: [clientSessionKey({ kind: 'personal' }, 'archived-item' as SessionId)] })
+    p.sessionsStore.set({ ...p.sessionsStore.getSnapshot(), current: clientSessionKey({ kind: 'personal' }, SID_A) })
     renderToolbar(p)
     fireEvent.click(screen.getByRole('button', { name: '添加对话' }))
     await screen.findByRole('dialog')
@@ -723,6 +815,15 @@ describe('workbench sidebar panel', () => {
     />)
     return { face, renderSlot, viewportStore }
   }
+
+  it('allows leaving an unverified legacy layout while disabling its editing controls', () => {
+    const p = props()
+    const { face } = sidebar(p, { paneIds: [], paneRatios: [], pendingIdentity: true })
+    expect(screen.getByRole('button', { name: '添加对话' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: '等宽' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '退出工作台' }))
+    expect(face.exitWorkbench).toHaveBeenCalledOnce()
+  })
 
   it('renders the pane roster with focus, close, add, and equalize controls', () => {
     const p = props()

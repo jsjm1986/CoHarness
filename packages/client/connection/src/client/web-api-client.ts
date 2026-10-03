@@ -1,6 +1,6 @@
 /** Browser API carrier: HTTP upstream plus one bounded WebSocket downlink per event stream. */
 
-import type { ApiProxy, HostFrame, MuxFrame, RpcRequest, ServerRequest } from './api.ts'
+import type { ApiProxy, HostDescription, HostFrame, MuxFrame, RpcRequest, ServerRequest } from './api.ts'
 import { AbstractApiClient } from './api.ts'
 import { hostFrameSchema, muxFrameSchema } from '@deepseek-ai/dsh-host-apiproxy/api/events.schema'
 import { serverRequestSchema } from '@deepseek-ai/dsh-host-apiproxy/api/rpc.schema'
@@ -75,13 +75,23 @@ export class WebApiClient extends AbstractApiClient {
    * @param target - optional authenticated Gateway runtime target.
    * @param timeoutMs - bounded unary timeout.
    * @param maxResponseBytes - successful unary response budget.
+   * @param prepareSocketUrl - optional document identity admission before opening a socket.
+   * @param described - callback after a validated Host description, before connection streams become ready.
    */
   constructor(
     target?: { readonly kind: 'personal' } | { readonly kind: 'project'; readonly projectId: number },
     timeoutMs?: number,
     maxResponseBytes?: number,
+    private readonly prepareSocketUrl?: (url: URL, signal: AbortSignal) => Promise<URL>,
+    described?: (description: HostDescription) => void,
   ) {
     super(timeoutMs, maxResponseBytes, target)
+    const describe = this.host.describe.bind(this.host)
+    this.host.describe = async (payload, signal) => {
+      const response = await describe(payload, signal)
+      if (response.result.ok) described?.(response.result.value)
+      return response
+    }
   }
 
   protected doFetch(input: URL, init?: RequestInit): Promise<Response> {
@@ -110,7 +120,12 @@ export class WebApiClient extends AbstractApiClient {
     frameSchema: Parser<F>,
     onOpen?: () => void,
   ): AsyncGenerator<RpcRequest<F>> {
-    const url = this.resolveUrl(path)
+    const isAborted = (): boolean => signal.aborted
+    if (isAborted()) return
+    const candidate = this.resolveUrl(path)
+    let url: URL
+    try { url = this.prepareSocketUrl === undefined ? candidate : await this.prepareSocketUrl(candidate, signal) }
+    catch (error) { if (isAborted()) return; throw error }
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     const socket = new WebSocket(url)
     const inbox = new SocketQueue<F>()
@@ -179,7 +194,7 @@ export class WebApiClient extends AbstractApiClient {
     socket.addEventListener('message', handleMessage)
     socket.addEventListener('close', handleClose, { once: true })
     signal.addEventListener('abort', handleAbort, { once: true })
-    if (signal.aborted) handleAbort()
+    if (isAborted()) handleAbort()
     try {
       while (true) {
         while (inbox.length > 0) {

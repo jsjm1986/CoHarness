@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-02-portable-ci-runner-defaults.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-02-portable-ci-runner-defaults.md
-2026-09-02-portable-ci-runner-defaults.md: e9c437d9c88a470069cd5f09e313afd816f2d25d
-2026-09-02-portable-ci-runner-defaults.zh.md: d2212133cc6c6e1269480d0647b44ffd6aad0abc
+/agent-note-portable-defaults-for-repository-ci-runners:
+  en: 971742f675b28e33
+  zh: 5d8dfd515f50ad26
+/agent-note-portable-defaults-for-repository-ci-runners/problem:
+  en: 46b4e727633ffafc
+  zh: 2b34dac15debc841
+/agent-note-portable-defaults-for-repository-ci-runners/decision:
+  en: f356c4c1412e4378
+  zh: 823aabae0547cb4c
+/agent-note-portable-defaults-for-repository-ci-runners/alternatives-considered:
+  en: 58fb3c02966d0ddd
+  zh: 0ca76863a7b23811
+/agent-note-portable-defaults-for-repository-ci-runners/consequences:
+  en: 15304143f480cbf4
+  zh: ce0964b582ccf256
+/agent-note-portable-defaults-for-repository-ci-runners/testing:
+  en: 4ddb0041405abb85
+  zh: d0b0e7128eb1ec55

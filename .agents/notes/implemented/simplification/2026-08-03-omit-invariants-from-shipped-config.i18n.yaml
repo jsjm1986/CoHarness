@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-03-omit-invariants-from-shipped-config.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-03-omit-invariants-from-shipped-config.md
-2026-08-03-omit-invariants-from-shipped-config.md: a691a0949806a752203a41bd6c66a50e97d8f1d7
-2026-08-03-omit-invariants-from-shipped-config.zh.md: c1593f6a9b2c89626462c65c64050a0d98ecc965
+/agent-note-omit-runtime-invariants-from-shipped-dsh-config:
+  en: f5840f2d3a6fc433
+  zh: 35a60986ceb220bb
+/agent-note-omit-runtime-invariants-from-shipped-dsh-config/problem:
+  en: 26e866e62ae4eb92
+  zh: 7a5f6ff56bcce97b
+/agent-note-omit-runtime-invariants-from-shipped-dsh-config/decision:
+  en: cb2bc09d565f964c
+  zh: fc7e7c5ace7983bd
+/agent-note-omit-runtime-invariants-from-shipped-dsh-config/alternatives-considered:
+  en: e27def4cfab51b83
+  zh: bac703c2ded7299c
+/agent-note-omit-runtime-invariants-from-shipped-dsh-config/consequences:
+  en: a4a0427a2e8d2580
+  zh: eefb4c70938d9e85

@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-14-acp-multi-session.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-14-acp-multi-session.md
-2026-06-14-acp-multi-session.md: 7efdf968d1dc71e727c21b0c0ce4a6a51f3e6b42
-2026-06-14-acp-multi-session.zh.md: b713d5bd756d739a8876c7720042a34e81c25209
+/agent-note-multiplex-concurrent-acp-sessions-over-one-connection:
+  en: d61f322f06b1bd26
+  zh: 4300ec01fd711a50
+/agent-note-multiplex-concurrent-acp-sessions-over-one-connection/problem:
+  en: b92d7ee944762e04
+  zh: f35bce573c328137
+/agent-note-multiplex-concurrent-acp-sessions-over-one-connection/decision:
+  en: c9bbfaf1f69a98cc
+  zh: ece4ade736d7bfa1
+/agent-note-multiplex-concurrent-acp-sessions-over-one-connection/protocol-and-workspace-scope:
+  en: 2d36a854c5b97d06
+  zh: 71a83dd0e53a514e
+/agent-note-multiplex-concurrent-acp-sessions-over-one-connection/alternatives-considered:
+  en: 77e6c107f058bd8b
+  zh: 78ed662bb68aeee7
+/agent-note-multiplex-concurrent-acp-sessions-over-one-connection/consequences:
+  en: d7d6482830290556
+  zh: 7372b65d11c6448f
+/agent-note-multiplex-concurrent-acp-sessions-over-one-connection/verification:
+  en: 8fba648b2eb4234a
+  zh: 8f503906b8ffd63e

@@ -1,3 +1,8 @@
+---
+description: "Durable inline-text or path prompt context for user-uploaded documents"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-userdoc-context
 
 English | [中文](README.zh.md)
@@ -9,12 +14,23 @@ Prompt-side context for `ctx.userDocs`. The plugin validates the uploaded docume
 Use `dsh-userdoc-context` for prompt-side context over `ctx.userDocs`: it validates uploaded document ids before a prompt is admitted, chooses inline text or a path-only representation per document, and records the admitted snapshot in the Session log so the model sees a stable view.
 
 
+## Table of Contents
+
+- [Public API](#public-api)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="public-api"></a>
 ## Public API
 
 `prepareUserDocAttachments()` resolves a whole document batch before the Host calls `followup()` or `steer()`. It enforces `UserDocLimits.maxFilesPerMessage` and `maxMessageBytes`; a file at or below `maxInlineTextBytes` is read once and inlined only when its bytes are strict UTF-8. Other files remain path references for the agent's existing filesystem tools. `renderUserDocAttachment()` renders the frozen representation as a text block.
 
 After the exact `user/message` event is appended, the plugin adds one `userdoc/attached` event per document. Each event carries the cited message id, document index, metadata, and the representation that appeared in the user message, so replay can verify that model-visible document context was admitted by the Host rather than supplied by the browser.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Admitted document context
@@ -49,3 +65,13 @@ The rendered document text is part of the append-only user-message suffix. Reusi
 - **No document parser** — the plugin does not extract PDF, spreadsheet, image, or archive text. Binary and undecodable files remain path references, and the agent's tools decide how to inspect them.
 - **Snapshot at admission** — inline bytes and reference metadata are frozen before the prompt enters the Session; changes to the ordinary file after admission do not rewrite that historical message.
 - **No historical browser library** — the browser rail owns the current draft, while durable files remain in the workspace and are listed or removed through the Host document service.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

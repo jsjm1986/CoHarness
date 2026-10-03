@@ -44,6 +44,8 @@ export function apply(ctx: Context, config: Config): void {
     parameters: {
       files: {
         type: 'array', required: true,
+        // 4 is the recommended per-call count; `maxFiles` is the enforced ceiling above it.
+        description: 'Usually the 1-2 most important deliverables; at most 4 per call.',
         items: {
           type: 'object', additionalProperties: false,
           properties: {

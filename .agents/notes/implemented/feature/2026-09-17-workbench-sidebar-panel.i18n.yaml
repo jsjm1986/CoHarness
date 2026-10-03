@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-workbench-sidebar-panel.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-17-workbench-sidebar-panel.md
-2026-09-17-workbench-sidebar-panel.md: 104f0c35e71f2def9341536ad27715db1dddb919
-2026-09-17-workbench-sidebar-panel.zh.md: 6d223fc92f85dddb650f6ab7f1a25f7b30e5ba9f
+/agent-note-workbench-sidebar-panel-and-pane-scoped-markdown-tables:
+  en: 10c95fde3fbd2743
+  zh: 72b44fb4a0187033
+/agent-note-workbench-sidebar-panel-and-pane-scoped-markdown-tables/problem:
+  en: b86fcf32d8908bcf
+  zh: 8ade4e36502a8f1b
+/agent-note-workbench-sidebar-panel-and-pane-scoped-markdown-tables/decision:
+  en: f7041402a5ed58ed
+  zh: 1e81a438810ab077
+/agent-note-workbench-sidebar-panel-and-pane-scoped-markdown-tables/alternatives-considered:
+  en: 8ad19538905b349d
+  zh: c2a4c21a7c1705df
+/agent-note-workbench-sidebar-panel-and-pane-scoped-markdown-tables/consequences:
+  en: 51c302a94bfbfd5d
+  zh: e66b3ff04e59349b
+/agent-note-workbench-sidebar-panel-and-pane-scoped-markdown-tables/verification:
+  en: c7fb81dbb298938e
+  zh: 3f4b498958673afa

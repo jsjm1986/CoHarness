@@ -7,9 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useEffect } from 'react'
 import type {
-  AssistantMessageNode, CommandNode, CompactionSummaryNode, ConversationNode, ConversationSnapshot,
-  ModelRetryNode, RunningToolCall, SessionId, SessionListState, ToolCallBlock, ToolResultNode, TurnErrorNode,
-  TurnMaxTokensNode, TurnNavigationItem, UserMessageNode, WorkspaceListState,
+  AssistantMessageNode, ChatConversationViewNode, CommandNode, CompactionSummaryNode, ConversationNode,
+  ConversationSnapshot, ModelRetryNode, RunningToolCall, SessionId, SessionListState, ToolCallBlock,
+  ToolResultNode, TurnErrorNode, TurnMaxTokensNode, TurnNavigationItem, UserMessageNode, WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
@@ -20,10 +20,12 @@ import type {
   ChatNode, ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, SelectionTarget, UseChatNodeTurnData,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { createChatStore } from '../src/client/stores.ts'
+import { presentationPolicyFor } from '../src/client/presentation-policy.ts'
 import { ChatView } from '../src/client/chat/ChatView.tsx'
-import { zh } from '../src/client/locales.ts'
+import { en, zh } from '../src/client/locales.ts'
 import { AssistantNodeView } from '../src/client/chat/AssistantNodeView.tsx'
 import { CommandNodeView, ManualCompactionNodeView } from '../src/client/chat/CommandNodeView.tsx'
 import { SystemPromptRow } from '../src/client/chat/SystemPromptRow.tsx'
@@ -34,8 +36,12 @@ import {
   TurnMaxTokensNodeView, UnknownNodeView, UserMessageNodeView,
 } from '../src/client/chat/MessageItem.tsx'
 import { TurnTailNodeView } from '../src/client/chat/TurnTailNodeView.tsx'
-import { formatRunDuration } from '../src/client/chat/message-chrome.ts'
+import { formatRunDuration as durationParts } from '../src/client/chat/message-chrome.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
+
+function formatRunDuration(ms: number, t: Parameters<typeof durationParts>[1]): string {
+  return durationParts(ms, t).map(part => part.text).join('')
+}
 
 afterEach(() => {
   cleanup()
@@ -45,15 +51,19 @@ afterEach(() => {
 // so one harness's selection cannot rehydrate into the next.
 beforeEach(() => {
   localStorage.clear()
+  performanceUsageMode = 'detailed'
 })
 
 const SID = 's1' as SessionId
 type RoutedChatNodeOwner = ChatNodeOwnerProps & { readonly node: ChatNode }
 
+/** Mutable detail level consumed by the harness's TurnTail dispatch. */
+let performanceUsageMode: 'compact' | 'detailed' = 'detailed'
+
 function snapshotBase(): ConversationSnapshot {
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: chatSnapshotFixture(), nodes: [],
-    turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue: [], running: false, composerPhase: 'active', removed: false, openState: 'open', openError: null,
     hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
   }
@@ -114,14 +124,16 @@ const turnError = (seq: number, code?: string, message?: string): TurnErrorNode 
 const turnMaxTokens = (seq: number): TurnMaxTokensNode => ({
   kind: 'turn-max-tokens', seq, time: seq * 1_000, turn: 1, step: 0,
 })
-const toolResult = (seq: number, callId: string, name = 'bash'): ToolResultNode => ({
+const toolResult = (seq: number, callId: string, name = 'bash', turn?: number): ToolResultNode & { turn?: number } => ({
   kind: 'tool-result', seq, time: seq * 1_000, callId,
   call: { name, argsRaw: `{"command":"cmd-${callId}","description":"run ${callId}"}` },
   callTime: seq * 1_000 - 500,
   content: [], isError: false, callView: null, resultView: null, subCalls: [],
+  ...(turn === undefined ? {} : { turn }),
 })
 const runningCall = (callId: string, name = 'bash'): RunningToolCall => ({
-  callId, name, argsRaw: `{"command":"cmd-${callId}"}`, turn: 2, step: 1, time: 1_000, callView: null, subCalls: [],
+  phase: 'start', callId, name, argsRaw: `{"command":"cmd-${callId}"}`, turn: 2, step: 1, time: 1_000,
+  callView: null, subCalls: [],
 })
 const command = (over: Partial<CommandNode> = {}): CommandNode => ({
   kind: 'command', seq: 5, time: 5_000, commandId: 'cmd-1' as CommandNode['commandId'],
@@ -140,13 +152,13 @@ const compaction = (over: Partial<CompactionSummaryNode> = {}): CompactionSummar
 /** Empty sessions-list hook for the global standard-kit seat. */
 function emptySessions() {
   const store = createSnapshotStore<SessionListState>(
-    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })
   return bindSnapshotSelector(store)
 }
 
 function emptyWorkspaces() {
   const store = createSnapshotStore<WorkspaceListState>({
-    items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+    items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
     baselinesReady: true, recentWorkspaceId: undefined,
   })
   return bindSnapshotSelector(store)
@@ -180,8 +192,6 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   }> = []
   const renderCommandSlot = ((_key: string, _owner: object, opts?: { fallback?: React.ReactNode }) =>
     opts?.fallback ?? null) as unknown as React.ComponentProps<typeof CommandNodeView>['renderSlot']
-  const renderTurnTail = ((_key: string, _owner: object) => null) as unknown as
-    React.ComponentProps<typeof TurnTailNodeView>['renderSlotChain']
   const renderTurnTailSlot = (() => null) as unknown as
     React.ComponentProps<typeof TurnTailNodeView>['renderSlot']
   const renderSlot = ((key: string, owner: object, opts?: {
@@ -231,7 +241,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
           <TurnTailNodeView
             {...nodeProps<'turn-tail'>()}
             renderSlot={renderTurnTailSlot}
-            renderSlotChain={renderTurnTail}
+            usePerformanceUsage={selector => selector(performanceUsageMode)}
             SessionProvider={props.SessionProvider}
           />
         )
@@ -271,6 +281,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     useSession: bindSnapshotSelector(source),
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
+    usePanelInfo: (() => { throw new Error('unused') }),
     useProjection: (() => undefined),
     useInput: (() => { throw new Error('unused') }),
     inputActions: {
@@ -281,6 +292,8 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
       addDocuments: () => true,
       removeDocument: () => {},
       pruneDocuments: () => {},
+      captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+      insertText: () => false,
       submit: () => {},
     },
     useStore: bindSnapshotSelector(chat),
@@ -297,6 +310,11 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     forkAt,
     // Absent-service default; mention tests override with a real resolver.
     fileMentions: () => undefined,
+    // Fixed 'detailed' policy; mode-dependent specs override per case.
+    presentation: {
+      getSnapshot: () => presentationPolicyFor('detailed'),
+      subscribe: () => () => {},
+    },
     // Mirrors the real lookup chain (conversation namespace, then common).
     t,
   }
@@ -401,6 +419,87 @@ describe('Focused Chat disclosures', () => {
     expect(view.getByText('system instructions')).toBeTruthy()
     expect(row.getAttribute('aria-expanded')).toBe('true')
   })
+
+  it('folds a completed turn behind its process row unless the policy keeps turns expanded', () => {
+    const base = chatSnapshotFixture({
+      nodes: [user(1, 'do it'), toolResult(2, 'a', 'bash', 1)],
+      turnEnds: new Map([[1, 3]]),
+    })
+    const turn = base.timeline.turns.get(1)
+    const processNode = {
+      key: 'fixture:turn-process:1',
+      id: 'p1',
+      target: 'chat',
+      kind: 'turn-process',
+      anchorSeq: 0.5,
+      location: { kind: 'turn', turn },
+      visibility: 'visible',
+      data: { turn: 1, controlAnchorSeq: 1, messageCount: 0, toolCallCount: 1, subagentCount: 0, answerAnchorSeq: null },
+    } as unknown as ChatNode
+    const byKey = new Map<string, ChatConversationViewNode>()
+    for (const key of base.order) {
+      const entry = base.nodes.get(key)
+      if (entry !== undefined) byKey.set(key, entry)
+    }
+    byKey.set(processNode.key, processNode)
+    const chat = {
+      ...base,
+      order: [processNode.key, ...base.order],
+      nodes: {
+        get: (key: string) => byKey.get(key),
+        values: () => [...byKey.values()],
+      },
+    }
+    const detailed = makeHarness({ chat })
+    const folded = render(<detailed.ChatView {...detailed.props} />)
+    const member = folded.getByTestId('tool-seat-a').closest('[data-turn-process-member]')
+    expect(member?.hasAttribute('hidden')).toBe(true)
+    folded.unmount()
+
+    const verbose = makeHarness({ chat })
+    verbose.props.presentation = {
+      getSnapshot: () => presentationPolicyFor('verbose'),
+      subscribe: () => () => {},
+    }
+    const expanded = render(<verbose.ChatView {...verbose.props} />)
+    const shown = expanded.getByTestId('tool-seat-a').closest('[data-turn-process-member]')
+    expect(shown).toBeNull()
+    expanded.unmount()
+  })
+
+  it('shows the completed-turn usage panels in Detailed and drops them in Compact', () => {
+    const base = chatSnapshotFixture({
+      nodes: [user(1, 'hi'), assistant(2, 'done', 1)],
+      turnEnds: new Map([[1, 3]]),
+    })
+    const tailKey = base.order.find(key => key.includes('turn-tail'))
+    if (tailKey === undefined) throw new Error('fixture produced no turn-tail node')
+    const tail = base.nodes.get(tailKey)
+    if (tail === undefined) throw new Error('turn-tail missing from the node store')
+    const patched = {
+      ...tail,
+      data: {
+        ...tail.data as Record<string, unknown>,
+        tokenUsage: { uncachedInputTokens: 100, outputTokens: 20, cacheReadTokens: 50, cacheWriteTokens: 0 },
+      },
+    } as typeof tail
+    const nodes = {
+      get: (key: string) => key === tailKey ? patched : base.nodes.get(key),
+      values: base.nodes.values.bind(base.nodes),
+    }
+    const chat = { ...base, nodes }
+
+    const detailed = makeHarness({ chat })
+    const detailedView = render(<detailed.ChatView {...detailed.props} />)
+    expect(detailedView.queryByText(/用量 /)).not.toBeNull()
+    detailedView.unmount()
+
+    performanceUsageMode = 'compact'
+    const compact = makeHarness({ chat })
+    const compactView = render(<compact.ChatView {...compact.props} />)
+    expect(compactView.queryByText(/用量 /)).toBeNull()
+    compactView.unmount()
+  })
 })
 
 describe('Chat node rendering', () => {
@@ -420,6 +519,7 @@ describe('Chat node rendering', () => {
         assistant(4, 'Wrote `report.html`; `notes.md` untouched.', 1),
       ],
       turnEnds: new Map([[1, 4]]),
+      openTurn: undefined,
     })
     // Stub provider mirroring the real service: only produced files resolve.
     h.props.fileMentions = owner => ({
@@ -449,8 +549,17 @@ describe('Chat node rendering', () => {
     expect(formatRunDuration(0, t)).toBe('0秒')
     expect(formatRunDuration(-500, t)).toBe('0秒')
     expect(formatRunDuration(15_999, t)).toBe('15秒')
-    expect(formatRunDuration(125_000, t)).toBe('2分05秒')
-    expect(formatRunDuration(3_903_000, t)).toBe('1小时05分03秒')
+    expect(formatRunDuration(125_000, t)).toBe('2分5秒')
+    // The hour rolls at exactly 3600s, never at 60 displayed minutes.
+    expect(formatRunDuration(3_599_999, t)).toBe('59分59秒')
+    expect(formatRunDuration(3_600_000, t)).toBe('1小时0分0秒')
+    expect(formatRunDuration(3_903_000, t)).toBe('1小时5分3秒')
+    expect(formatRunDuration(7_261_000, t)).toBe('2小时1分1秒')
+  })
+
+  it('formatRunDuration uses the English hour units', () => {
+    const t = makeTranslate(en, commonEn)
+    expect(formatRunDuration(3_903_000, t)).toBe('1h 5m 3s')
   })
 
 })
@@ -765,6 +874,7 @@ describe('ChatView', () => {
         assistant(6, 'second turn', 2),
       ],
       turnEnds: new Map([[1, 4], [2, 6]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // Branch renders only under assistant answers; user bubbles keep copy alone.
@@ -786,6 +896,7 @@ describe('ChatView', () => {
       ],
       // Boundary seqs follow the log: a turn/end is strictly after its own nodes.
       turnEnds: new Map([[1, 3]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // 2 user + the settled turn-1 tail, which keeps its seat while a later
@@ -808,6 +919,7 @@ describe('ChatView', () => {
       ],
       turnTimings: new Map([[1, { startTime: 1_000, endTime: 20_000 }]]),
       turnEnds: new Map([[1, 20]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // The exact turn/end includes trailing tool activity after the final text.
@@ -829,6 +941,7 @@ describe('ChatView', () => {
       nodes: [user(1, 'hi'), first, second],
       turnTimings: new Map([[1, { startTime: 1_000, endTime: 20_000 }]]),
       turnEnds: new Map([[1, 20]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // First-step ttft (1.2s) plus 100 tokens over 5s of decode.
@@ -850,6 +963,7 @@ describe('ChatView', () => {
       nodes: [user(1, 'hi'), settled],
       turnTimings: new Map([[1, { startTime: 1_000 }]]),
       turnEnds: new Map(),
+      openTurn: undefined,
       running: true,
     })
     const view = render(<h.ChatView {...h.props} />)
@@ -921,6 +1035,7 @@ describe('ChatView', () => {
       nodes: [user(1, 'hi'), assistant(2, 'answer')],
       turnTimings: new Map([[1, { startTime: 1_000, endTime: 2_000 }]]),
       turnEnds: new Map([[1, 2]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // The user row keeps its time hover scope; the settled assistant tail now
@@ -933,6 +1048,7 @@ describe('ChatView', () => {
     const h = makeHarness({
       nodes: [assistant(16, 'tail without trigger')],
       turnEnds: new Map([[1, 16]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     expect(view.queryByText(/用时/)).toBeNull()
@@ -942,6 +1058,7 @@ describe('ChatView', () => {
     const h = makeHarness({
       nodes: [user(1, 'question'), assistant(2, 'answer')],
       turnEnds: new Map([[1, 3]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     // The user bubble offers no branch; the settled answer's is live.
@@ -982,6 +1099,7 @@ describe('ChatView', () => {
     const h = makeHarness({
       nodes: [user(1, 'question'), assistant(2, 'answer'), toolResult(3, 'a'), interruptedThink],
       turnEnds: new Map([[1, 5]]),
+      openTurn: undefined,
     })
     const view = render(<h.ChatView {...h.props} />)
     expect(view.getAllByRole('button', { name: '复制' })).toHaveLength(2)
@@ -1146,7 +1264,7 @@ describe('ChatView', () => {
     const view = render(<h.ChatView {...h.props} />)
     // Freshly mounted (as after a reload) yet already past the 15s gate.
     const status = view.getByRole('status')
-    expect(status.textContent).toMatch(/^深度求索中\.\.\.2分0\d秒$/)
+    expect(status.textContent).toMatch(/^深度求索中\.\.\.2分\d秒$/)
     expect(status.querySelector('[aria-hidden="true"]')).not.toBeNull()
     act(() => {
       h.set({ queue: [{
@@ -1158,7 +1276,7 @@ describe('ChatView', () => {
         text: 'also',
       }] })
     })
-    expect(status.textContent).toMatch(/^深度求索中\.\.\.2分0\d秒$/)
+    expect(status.textContent).toMatch(/^深度求索中\.\.\.2分\d秒$/)
   })
 
   it('hands each ordered root call to the keyed business-node slot', () => {

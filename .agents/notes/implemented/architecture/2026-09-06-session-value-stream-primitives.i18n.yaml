@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-06-session-value-stream-primitives.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-06-session-value-stream-primitives.md
-2026-09-06-session-value-stream-primitives.md: 4524f9f1f6064b9ac513857ada96e5f5ead08b43
-2026-09-06-session-value-stream-primitives.zh.md: e9309b239a06609aaedbed2a0c0c161b69a420aa
+/agent-note-session-value-and-assistant-stream-primitives:
+  en: 6e93feb69fb0ad8d
+  zh: 155c8034305a31a1
+/agent-note-session-value-and-assistant-stream-primitives/problem:
+  en: c8919e86566994a9
+  zh: 790f6ff9153ce476
+/agent-note-session-value-and-assistant-stream-primitives/decision:
+  en: e6ccc73ae35e3389
+  zh: 53c6705ccf766005
+/agent-note-session-value-and-assistant-stream-primitives/alternatives-considered:
+  en: 2e9ff768f4d9f80b
+  zh: 5b1f77af40074438
+/agent-note-session-value-and-assistant-stream-primitives/consequences:
+  en: d3505ed26eb0f59f
+  zh: e8d2f7f117e7a0de
+/agent-note-session-value-and-assistant-stream-primitives/verification:
+  en: 2c1f31f62d1b8bc8
+  zh: 737dc468fd355ea7

@@ -1,16 +1,19 @@
+import { nodeConfigurationAuthority } from './postgres/node-configuration-authority.ts'
+import { loadManagedNodeEnvironment, NodeConfigurationStore } from './node-config-store.ts'
 import { DesktopAccess } from './desktop-access.ts'
+import { PluginAccess } from './plugin-access.ts'
 import { SshAccess } from './ssh-access.ts'
 import { TerminalAccess } from './terminal-access.ts'
 import { GatewayPluginManagement } from './plugin-management.ts'
 import { GatewayTerminalManagement } from './terminal-management.ts'
 import { randomBytes } from 'node:crypto'
-import type { Server, ServerResponse } from 'node:http'
+import type { Server } from 'node:http'
 import { join } from 'node:path'
 import { createAdminApiHandler } from './admin-api.ts'
 import { PostgresAccountPreferencesService } from './postgres/account-preferences-service.ts'
-import { refreshModelGovernance } from './apply-model-governance.ts'
+import { refreshModelGovernance, scheduleModelGovernanceRefresh } from './apply-model-governance.ts'
 import { loadConfig } from './config.ts'
-import { InstanceManager, RuntimeLeaseUnavailableError } from './instances.ts'
+import { InstanceManager, RuntimeLeaseUnavailableError, RuntimeStartBlockedError } from './instances.ts'
 import type { RuntimeTarget } from './instances.ts'
 import { selectLauncher } from './launcher.ts'
 import { PostgresAuditService } from './postgres/audit-service.ts'
@@ -35,10 +38,12 @@ import {
 } from './organization-model-credentials.ts'
 import { PostgresProjectService } from './postgres/project-service.ts'
 import { checkPostgresReadiness, resolvePostgresRuntimeContext } from './postgres/runtime-context.ts'
+import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import { PostgresSshTargetService } from './postgres/ssh-target-service.ts'
 import { PostgresMaintenanceService, type WriteGateVerdict } from './postgres/maintenance-service.ts'
 import { PostgresBackupService } from './postgres/backup-service.ts'
 import { createDeploymentCommands } from './deployment-commands.ts'
+import { PostgresDeploymentBackups } from './postgres/deployment-backups.ts'
 import { migrationPlan } from './postgres/database.ts'
 import { PostgresUserService } from './postgres/user-service.ts'
 import { PostgresWebhookDeliveryService } from './postgres/webhook-delivery-service.ts'
@@ -70,6 +75,7 @@ import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { createGatewayServer, type GatewayDeps } from './server.ts'
 import { createUsageIntakeServer } from './usage-intake.ts'
 import { removeBootstrapAdminPassword, writeBootstrapAdminPassword } from './bootstrap-admin.ts'
+import type { GatewayModelGovernanceService } from './services.ts'
 
 function archiveReadPayload(value: unknown): ConversationArchiveRuntimeRead {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -106,9 +112,10 @@ function archiveReadPayload(value: unknown): ConversationArchiveRuntimeRead {
   }
 }
 
-const cfg = loadConfig()
+const effectiveEnvironment = await loadManagedNodeEnvironment(process.env)
+const cfg = loadConfig(effectiveEnvironment)
 if (cfg.releaseId !== undefined) console.log(`[gateway] release ${cfg.releaseId}`)
-const databaseUrl = await databaseUrlFromFile()
+const databaseUrl = await databaseUrlFromFile(effectiveEnvironment)
 const pool = createPostgresPool(databaseUrl)
 const startupAbort = new AbortController()
 const onStartupSignal = (): void => { startupAbort.abort() }
@@ -132,18 +139,58 @@ const context = await (async () => {
   } catch (error) {
     await pool.end().catch(() => { /* preserve the startup failure or signal outcome */ })
     if (startupAbort.signal.aborted) process.exit(0)
-    throw error
+    // Do not rethrow into a supervisor restart loop: the release parks with a
+    // degraded health surface so operators get one logged failure plus a
+    // reachable diagnostic endpoint instead of unbounded respawns.
+    const reason = error instanceof Error ? error.message : String(error)
+    console.error(`[gateway] startup failed permanently; parking with degraded health: ${reason}`)
+    const { createServer } = await import('node:http')
+    const degraded = createServer((_req, res) => {
+      res.writeHead(503, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({
+        ok: false,
+        release: cfg.releaseId,
+        configurationRevision: cfg.configurationRevision,
+        startupFailed: true,
+        detail: reason.slice(0, 300),
+      }))
+    })
+    degraded.on('error', (listenError: unknown) => {
+      console.error(`[gateway] degraded health listener failed: ${String(listenError)}`)
+    })
+    degraded.listen(cfg.port, '127.0.0.1', () => {
+      console.error(`[gateway] degraded health listener on http://127.0.0.1:${String(cfg.port)}`)
+    })
+    // The startup signal handlers only abort the aborted startup attempt;
+    // a parked process still answers termination requests.
+    const leaveParked = (): void => process.exit(0)
+    process.once('SIGINT', leaveParked)
+    process.once('SIGTERM', leaveParked)
+    // A referenced interval keeps the event loop alive even when the port
+    // cannot be bound; a pending promise alone does not hold a process open.
+    setInterval(() => {}, 3_600_000)
+    // Never resolves: keeps the narrowed PostgresRuntimeContext type while
+    // the process stays parked.
+    return await new Promise<PostgresRuntimeContext>(() => { /* parked */ })
   } finally {
     process.removeListener('SIGINT', onStartupSignal)
     process.removeListener('SIGTERM', onStartupSignal)
   }
 })()
+const maintenance = new PostgresMaintenanceService(context, cfg.nodeStaleMs)
+// Every cached dependency belongs to the data generation observed before loading it.
+const baselineWriteEpoch = await maintenance.currentWriteEpoch()
+async function assertCurrentDataEpoch(): Promise<void> {
+  if (await maintenance.currentWriteEpoch() !== baselineWriteEpoch) {
+    throw new Error('PostgreSQL write epoch advanced past this process; restart onto the restored snapshot')
+  }
+}
 const auth = new PostgresAuthService(context, cfg)
 const users = new PostgresUserService(context, cfg)
 const userPreferences = new PostgresAccountPreferencesService(context, cfg)
 const projects = new PostgresProjectService(context, cfg)
 const audit = new PostgresAuditService(context)
-const governance = new PostgresModelGovernanceService(
+const governance: GatewayModelGovernanceService = new PostgresModelGovernanceService(
   context,
   new OrganizationModelCredentialCipher(
     loadOrganizationModelCredentialKey(cfg.organizationModelCredentialKeyFile),
@@ -255,57 +302,81 @@ archives.setRuntimeReader(async (runtime, rootSessionId, fromSeq, limit) => {
   }
 })
 const accessMonitor = new PostgresAccessMonitor(context, cfg.accessInvalidationPollMs)
-const maintenance = new PostgresMaintenanceService(context, cfg.nodeStaleMs)
+const nodeConfiguration = new NodeConfigurationStore(context, cfg, effectiveEnvironment, nodeConfigurationAuthority(context))
+await nodeConfiguration.initialize()
 const backups = new PostgresBackupService(context)
-const deploymentCommands = createDeploymentCommands(cfg.pgDumpCommand, cfg.pgRestoreCommand)
-const managedPaths = [
-  cfg.principalKeyDir,
-  cfg.runtimeCredentialDir,
-  cfg.organizationModelCredentialKeyFile,
-  cfg.webhookSecretKeyFile,
-  cfg.bootstrapAdminPasswordFile,
-]
-// The write epoch captured at startup fences this process after a restore: a
-// completed restore bumps it, so pre-restore writers keep rejecting their own
-// mutations until an operator restarts them onto the restored snapshot.
-const baselineWriteEpoch = await maintenance.currentWriteEpoch()
+const deploymentCommands = createDeploymentCommands(cfg.pgDumpCommand, cfg.pgRestoreCommand, cfg.psqlCommand)
+
 const MAINTENANCE_GATE_CACHE_MS = 300
+let stoppingWriters = false
 let gateCache: { at: number; verdict: WriteGateVerdict } | undefined
 let observedMaintenanceEpoch = 0n
 const refreshMaintenanceGate = async (): Promise<WriteGateVerdict> => {
+  if (stoppingWriters) return 'maintenance'
   const gate = await maintenance.writeGate(baselineWriteEpoch)
   observedMaintenanceEpoch = gate.maintenanceEpoch
   gateCache = { at: Date.now(), verdict: gate.verdict }
   return gate.verdict
 }
 const maintenanceGate = async (): Promise<WriteGateVerdict> => {
+  if (stoppingWriters) return 'maintenance'
   if (gateCache !== undefined && Date.now() - gateCache.at < MAINTENANCE_GATE_CACHE_MS) return gateCache.verdict
   return refreshMaintenanceGate()
 }
-// Mutating HTTP requests count from gate admission until the response closes;
-// periodic sweeps count for their whole run. The heartbeat publishes the
-// total so the applier's quiesce waits for work already past the gate, not
-// just for new admissions to stop.
+// Mutating HTTP requests count from gate admission until their handler settles;
+// periodic sweeps count for their whole run. Proxied /api requests are
+// exempt: they mutate runtime-owned state, not the control plane a backup
+// dumps, and client-held streams must never block quiesce. The heartbeat
+// publishes the total so the applier's quiesce waits for work already past
+// the gate, not just for new admissions to stop.
 let writersInFlight = 0
+const writerWaiters = new Set<() => void>()
+const releaseWriter = (): void => {
+  writersInFlight -= 1
+  if (writersInFlight === 0) {
+    for (const resolve of writerWaiters) resolve()
+    writerWaiters.clear()
+  }
+}
+const waitForWriters = (): Promise<void> => writersInFlight === 0
+  ? Promise.resolve() : new Promise(resolve => { writerWaiters.add(resolve) })
 const trackWriter = <T>(operation: () => Promise<T>): Promise<T> => {
   writersInFlight += 1
   return Promise.resolve()
     .then(operation)
-    .finally(() => { writersInFlight -= 1 })
+    .finally(releaseWriter)
 }
-const writerSpan = (res: ServerResponse): void => {
+instances.startAdmission = operation => trackWriter(async () => {
+  const verdict = await refreshMaintenanceGate()
+  if (verdict !== 'open') throw new RuntimeStartBlockedError(verdict)
+  return operation()
+})
+const writerSpan = (): (() => void) => {
   writersInFlight += 1
-  res.once('close', () => { writersInFlight -= 1 })
+  return releaseWriter
 }
+const admitWriter = <T>(operation: () => Promise<T>): Promise<T> => trackWriter(async () => {
+  const verdict = await refreshMaintenanceGate()
+  if (verdict !== 'open') throw new RuntimeStartBlockedError(verdict)
+  return operation()
+})
+governance.projectionWrite = admitWriter
+let heartbeatInFlight: Promise<void> | undefined
+let heartbeatVerdict: WriteGateVerdict | undefined
+let onWritesReopened = (): void => {}
 // The heartbeat acknowledges only the epoch the write gate has already
 // enforced, so the applier never reads a quiesce this node has not applied.
 const heartbeatTimer = setInterval(() => {
-  void (async () => {
-    await refreshMaintenanceGate()
+  if (heartbeatInFlight !== undefined) return
+  heartbeatInFlight = (async () => {
+    const previous = heartbeatVerdict
+    const verdict = await refreshMaintenanceGate()
     await maintenance.heartbeat(observedMaintenanceEpoch, writersInFlight)
+    heartbeatVerdict = verdict
+    if (previous !== 'open' && verdict === 'open') onWritesReopened()
   })().catch((error: unknown) => {
     console.error('[gateway] maintenance heartbeat failed:', error)
-  })
+  }).finally(() => { heartbeatInFlight = undefined })
 }, cfg.nodeHeartbeatMs)
 heartbeatTimer.unref()
 const webhookDeliveries = new PostgresWebhookDeliveryService(context)
@@ -326,6 +397,7 @@ const deps: GatewayDeps = {
   instances,
   desktops,
   desktopAccess: new DesktopAccess(context),
+  pluginAccess: new PluginAccess(context),
   terminalAccess: new TerminalAccess(context),
   sshAccess: new SshAccess(context),
   sshTargets: new PostgresSshTargetService(context),
@@ -333,17 +405,13 @@ const deps: GatewayDeps = {
   terminalManagement: new GatewayTerminalManagement({ users, projects, instances, cfg }, principalKeys.signer, context.nodeId),
   webhookDeliveries,
   webhookEndpoints,
-  webhookIntake: new GatewayWebhookIntake({ cfg, users, projects, instances },
+  webhookIntake: new GatewayWebhookIntake({ cfg, users, instances, collaboration },
     webhookEndpoints, webhookDeliveries, principalKeys.signer),
   accessMonitor,
   maintenance,
+  nodeConfiguration,
   backups,
-  backupWork: {
-    commands: deploymentCommands,
-    databaseUrl,
-    backupDir: cfg.backupDir,
-    managedPaths,
-  },
+  backupWork: new PostgresDeploymentBackups(context, cfg, databaseUrl, deploymentCommands, effectiveEnvironment),
   migrationPlan: () => migrationPlan(pool, cfg.deployMigrationsDir),
   maintenanceGate,
   writerSpan,
@@ -351,34 +419,39 @@ const deps: GatewayDeps = {
     await checkPostgresReadiness(context, signal)
     await accessMonitor.synchronize()
     signal?.throwIfAborted()
-    // A completed restore moved the write epoch past this process's baseline;
-    // report unready so the node drains and restarts onto the restored data.
-    if (await maintenance.currentWriteEpoch() !== baselineWriteEpoch) {
-      throw new Error('PostgreSQL write epoch advanced past this process; restart onto the restored snapshot')
-    }
+    await assertCurrentDataEpoch()
   },
 }
 
-if (await deps.users.count() === 0) {
-  const password = randomBytes(12).toString('base64url')
-  await writeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile, password)
-  try {
-    await deps.users.create({ username: 'admin', password, role: 'admin' })
-  } catch (error: unknown) {
-    await removeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile).catch(() => {
-      // Preserve the user-creation failure; a stale file is surfaced on the
-      // next bootstrap attempt instead of hiding the original database error.
-    })
-    throw error
-  }
-  console.log(`[gateway] bootstrap admin created — username: admin; password written to owner-only file ${cfg.bootstrapAdminPasswordFile}`)
-  console.log('[gateway] 首次登录后会强制修改密码。')
+await assertCurrentDataEpoch()
+onWritesReopened = () => { scheduleModelGovernanceRefresh(deps) }
+try {
+  await admitWriter(async () => {
+    if (await deps.users.count() === 0) {
+      const password = randomBytes(12).toString('base64url')
+      await writeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile, password)
+      try {
+        await deps.users.create({ username: 'admin', password, role: 'admin' })
+      } catch (error: unknown) {
+        await removeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile).catch(() => {
+          // Preserve the user-creation failure; a stale file is surfaced on the
+          // next bootstrap attempt instead of hiding the original database error.
+        })
+        throw error
+      }
+      console.log(`[gateway] bootstrap admin created — username: admin; password written to owner-only file ${cfg.bootstrapAdminPasswordFile}`)
+      console.log('[gateway] 首次登录后会强制修改密码。')
+    }
+  })
+  // Reconcile every projection on Gateway startup so a surviving runtime and a
+  // never-started account receive the same current organization default. The
+  // operation is idempotent and does not alter authorization rows.
+  await refreshModelGovernance(deps)
+} catch (error) {
+  // A maintenance restart serves the control UI without creating accounts,
+  // credentials or policy files. Projections resume after maintenance ends.
+  if (!(error instanceof RuntimeStartBlockedError) || error.reason !== 'maintenance') throw error
 }
-
-// Reconcile every projection on Gateway startup so a surviving runtime and a
-// never-started account receive the same current organization default. The
-// operation is idempotent and does not alter authorization rows.
-await refreshModelGovernance(deps)
 
 const proxyHandlers = createProxyHandlers(deps, principalKeys.signer)
 await accessMonitor.synchronize()
@@ -529,6 +602,7 @@ const server = createGatewayServer(deps, {
     documentCatalogOverview: documentCatalogHandlers.overview,
     documentCatalogHistory: documentCatalogHandlers.history,
     desktops,
+    sshTargets: deps.sshTargets,
   }),
 })
 // Bind loopback only: the gateway is reached through the TLS entry (Cloudflare
@@ -618,6 +692,8 @@ let shuttingDown = false
 async function shutdown(signal: NodeJS.Signals): Promise<void> {
   if (shuttingDown) return
   shuttingDown = true
+  stoppingWriters = true
+  clearInterval(heartbeatTimer)
   const forced = setTimeout(() => {
     console.error(`[gateway] forced shutdown after ${String(SHUTDOWN_TIMEOUT_MS)}ms (${signal})`)
     process.exit(1)
@@ -637,6 +713,8 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
     proxyHandlers.close()
     await accessMonitor.close()
     await Promise.all([closeListeningServer(server), closeListeningServer(intake)])
+    await waitForWriters()
+    await heartbeatInFlight
     await deps.instances.stopAll()
     await pool.end()
     clearTimeout(forced)

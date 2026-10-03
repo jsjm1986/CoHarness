@@ -36,8 +36,7 @@ function noticeSource(
   speaker: ReturnType<typeof participant>,
 ) {
   return {
-    kind: 'plugin',
-    plugin: 'collaboration-context',
+    kind: 'collaboration-context',
     form: 'notice',
     summary: `Message from ${speaker.displayName}`,
     participantMessageId,
@@ -154,7 +153,7 @@ describe('web e2e: Chat labels project senders on bubbles', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 

@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-subagent-message-settlement-ordering.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-subagent-message-settlement-ordering.md
-2026-08-17-subagent-message-settlement-ordering.md: 2c5c38f2296dda0b24d467dc63b984307b6a56d2
-2026-08-17-subagent-message-settlement-ordering.zh.md: b1872ea2953da58eceb65727761b9bb795f9c5ee
+/agent-note-child-agent-messages-precede-their-settlement-notices:
+  en: b46c628c107fbdfe
+  zh: 829b71dae5e73e0f
+/agent-note-child-agent-messages-precede-their-settlement-notices/problem:
+  en: bdcb172246a960a0
+  zh: 41deade3fa1c93a3
+/agent-note-child-agent-messages-precede-their-settlement-notices/decision:
+  en: 0f58c267675dd052
+  zh: fe66d1db1c10c948
+/agent-note-child-agent-messages-precede-their-settlement-notices/decision/ordering-across-parent-states:
+  en: 2bceedd85283e6ed
+  zh: 6c11a3519fe9b941
+/agent-note-child-agent-messages-precede-their-settlement-notices/decision/verification:
+  en: b2d6b562739ea61c
+  zh: 33f56b3220b00953
+/agent-note-child-agent-messages-precede-their-settlement-notices/alternatives-considered:
+  en: a81f4efd6c32125e
+  zh: d38898c6b3352ad8
+/agent-note-child-agent-messages-precede-their-settlement-notices/consequences:
+  en: 3b8532d48efb656a
+  zh: 971bced6f6bed59d

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-01-windows-pwsh-default.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-01-windows-pwsh-default.md
-2026-08-01-windows-pwsh-default.md: ff66b017cedf790c87bc688a1c9b4099c1e9ce9c
-2026-08-01-windows-pwsh-default.zh.md: d287159c6a42b4649bc56019927429e5187e2291
+/agent-note-windows-defaults-to-pwsh:
+  en: 2553b692b51c3ce9
+  zh: 52c7f9eb7b10162a
+/agent-note-windows-defaults-to-pwsh/problem:
+  en: 9d7f4232d5153f67
+  zh: dd1c5d7ee10f0f02
+/agent-note-windows-defaults-to-pwsh/decision:
+  en: 614337aa4d01d83d
+  zh: 8fe968793d5d704d
+/agent-note-windows-defaults-to-pwsh/alternatives-considered:
+  en: 79bf326c23cd729b
+  zh: 7fe944ee87f9c5ec
+/agent-note-windows-defaults-to-pwsh/consequences:
+  en: 393d28ad5839120e
+  zh: c33d263e4591e297
+/agent-note-windows-defaults-to-pwsh/verification:
+  en: e6ec958890c2b751
+  zh: 6306d975ff94896b

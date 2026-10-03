@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-24-permission-catalog-mirror.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-24-permission-catalog-mirror.md
-2026-09-24-permission-catalog-mirror.md: 098c083ce042dd4be13e92e4a957f7146ad782cd
-2026-09-24-permission-catalog-mirror.zh.md: 0de2ee9a124d49aafba92442a9f4812fd8b9d4d8
+/agent-note-permission-catalog-directory-with-generation-fenced-reads:
+  en: 06cbbccb5eac0d4f
+  zh: 813cb9303a012f55
+/agent-note-permission-catalog-directory-with-generation-fenced-reads/problem:
+  en: 3e0d768fcd0e7eb5
+  zh: d00fa88d34cdc976
+/agent-note-permission-catalog-directory-with-generation-fenced-reads/decision:
+  en: c6951abd835e6c80
+  zh: 1c6f48ce89bdcfa2
+/agent-note-permission-catalog-directory-with-generation-fenced-reads/alternatives-considered:
+  en: 5eea37b4448de1e7
+  zh: 04e835ee088ecbdd
+/agent-note-permission-catalog-directory-with-generation-fenced-reads/consequences:
+  en: 09cfe8840a42f4f1
+  zh: 34805cffec6c4768

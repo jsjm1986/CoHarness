@@ -41,8 +41,8 @@ it('synchronizes two pages, disposes effects and restores an offline page from t
     const other = await otherContext.newPage()
     const consoles = [watchConsole(page), watchConsole(other)]
     onTestFailed(() => saveFailureShot(page, 'web-e2e-client-live'))
-    await openInventory(page, scaffold.baseUrl)
-    const otherInventory = await openInventory(other, scaffold.baseUrl)
+    await openInventory(page, scaffold.authenticatedUrl)
+    const otherInventory = await openInventory(other, scaffold.authenticatedUrl)
     let entryId: string | undefined
     const toggle = async () => {
       if (entryId === undefined) entryId = await scaffold.ctx.loader.create({ name: '@fixture/live-client' })
@@ -121,7 +121,7 @@ it('keeps a failed client download local and retries without changing Host enabl
   try {
     const page = await browser.newPage({ locale: ZH_BROWSER_LOCALE })
     onTestFailed(() => saveFailureShot(page, 'web-e2e-client-live-retry'))
-    await openInventory(page, scaffold.baseUrl)
+    await openInventory(page, scaffold.authenticatedUrl)
     const bundle = (url: URL) => url.pathname.startsWith('/plugins/') && url.search.includes('@fixture/live-client/client.js')
     await page.route(bundle, route => route.abort())
     const entryId = await scaffold.ctx.loader.create({ name: '@fixture/live-client' })
@@ -159,7 +159,7 @@ it('recovers an uncreated client entry with rebuilt factory code without navigat
   try {
     const page = await browser.newPage({ locale: ZH_BROWSER_LOCALE })
     onTestFailed(() => saveFailureShot(page, 'web-e2e-client-factory-rebuild'))
-    const inventory = await openInventory(page, scaffold.baseUrl)
+    const inventory = await openInventory(page, scaffold.authenticatedUrl)
     const draft = inventory.getByRole('searchbox', { name: '搜索插件' })
     await draft.fill('unfinished-filter')
     let navigations = 0
@@ -194,7 +194,7 @@ it('reports bootstrap rebuilds without remounting the settings page or navigatin
     const page = await browser.newPage({ locale: ZH_BROWSER_LOCALE })
     const console = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-client-bootstrap-rebuild'))
-    const inventory = await openInventory(page, scaffold.baseUrl)
+    const inventory = await openInventory(page, scaffold.authenticatedUrl)
     const draft = inventory.getByRole('searchbox', { name: '搜索插件' })
     await draft.fill('unfinished-filter')
     const originalInput = await draft.elementHandle()
@@ -226,7 +226,7 @@ it('removes the client UI and resources while Host cleanup is still pending', as
   onTestFinished(async () => { await browser.close() })
   try {
     const page = await browser.newPage({ locale: ZH_BROWSER_LOCALE })
-    await openInventory(page, scaffold.baseUrl)
+    await openInventory(page, scaffold.authenticatedUrl)
     let navigations = 0
     page.on('framenavigated', () => { navigations++ })
     const entryId = await scaffold.ctx.loader.create({ name: '@fixture/live-client' })

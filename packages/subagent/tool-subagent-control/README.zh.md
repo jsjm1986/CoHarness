@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-subagent-control
 
 [English](README.md) | 中文
@@ -14,10 +19,22 @@
 
 `dsh-tool-subagent-control` 为可继续子级添加全局控制工具：`send_message` 在直接父级与子级之间进行 steering（中途引导），`interrupt_agent` 停止子级当前轮次但保留其收件箱与后代，`list_agents`（来自可单独加载的 `list-agents` 插件）按持久化 ID 与标签列出可继续子级。父级与可继续子级继承相同的 `send_message` 定义和顺序，因此模型通信不会增加子级专属工具 schema。是否加载这些工具不会决定委派工具是否启动可继续工作。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。这些控制是 `ctx.subagents` 之上的薄注册；agent 状态属于注册表及其提供方。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 工具 schema
@@ -76,9 +93,20 @@
 
 仅追加；每个结果都位于可复用请求前缀之后。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **已投递的消息没有独立结果**：接受时只返回其 inbox `messageId`；目标之后的工作会落入该目标的持久化会话，绝不会通过本工具收集。回复是另一条显式指定目标的 `send_message`，不是本次调用的结果。
 - **只有受支持的相邻 Agent 之间才能通信**：任何发送方都可以把直接可继续子级作为目标，只有拥有驻留可继续 Activation 的发送方才能把直接父级作为目标，且该父级必须保持在线；兄弟节点和更深的后代不是消息目标，只有向直接子级的投递支持冷激活。
 - **列表是快照，而非投递承诺**：它可能与发布、dispose（资源释放）或后续消息发生竞态，另一个进程也可能激活当前进程报告为 `ready` 的 child；跨进程准确性需要共享租约。`interrupt_agent` 自己执行权威的在线 lineage 检查，因此过期的发现结果不会授予权限。
 - **没有分页或删除**：系统返回完整且稳定排序的集合；只要 child 会话仍在持久化存储中，它就会继续出现在列表中，服务级上限或删除操作留待后续产品决策。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

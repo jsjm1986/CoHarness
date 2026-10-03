@@ -1,13 +1,12 @@
 // ProducedFiles: the produced-file row a finished turn ends with. The paths
-// come pre-matched by the turn-tail chain from the mutation tools'
-// follow-along locations, never from the closing prose. Clicking one goes
-// through the same openFile the tool rows use — the Host's own opener, on the
-// Host machine.
+// come from the mutation tools' follow-along locations, never from the
+// closing prose. Clicking one goes through the same openFile the tool rows
+// use — the Host's own opener, on the Host machine.
 
 import type { HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { basename } from './turn-deliverables.ts'
+import { basename, changesForClosing, presentedForClosing, selectProducedFiles } from './turn-deliverables.ts'
 import type { NS } from './locales.ts'
 import css from './ProducedFiles.module.css'
 
@@ -25,9 +24,7 @@ export interface ProducedFilesInjected {
 }
 
 /** Matched paths plus the opener, locale, and injected Host capability. */
-export type ProducedFilesProps = Pick<TurnTailOwnerProps, 'openFile'> & {
-  matched: readonly string[]
-} & PropsLocale<typeof NS> & InjectFace<ProducedFilesInjected>
+export type ProducedFilesProps = TurnTailOwnerProps & PropsLocale<typeof NS> & InjectFace<ProducedFilesInjected>
 
 function moreLabel(t: ProducedFilesProps['t'], count: number): string {
   return count === 1 ? t('produced.moreOne') : t('produced.more', { count: String(count) })
@@ -38,11 +35,16 @@ function moreLabel(t: ProducedFilesProps['t'], count: number): string {
  * @param props - selector-matched paths, the chat view's file opener, and the locale seat.
  * @returns The produced-files row.
  */
-export function ProducedFiles({
-  matched: paths, openFile, isLoopback, useHostDescription, t,
-}: ProducedFilesProps) {
+export function ProducedFiles(owner: ProducedFilesProps) {
+  const { openFile, isLoopback, useHostDescription, t } = owner
+  // Self-gate on the same claim test the file-mention vocabulary runs: with no
+  // produced paths, changed files, or presented deliverable the row is absent.
+  const paths = changesForClosing(owner) === null && presentedForClosing(owner).length === 0
+    ? selectProducedFiles(owner)
+    : null
   const hostCanOpenPath = useHostDescription(description => description?.canOpenPath === true)
   const canOpenPath = isLoopback && hostCanOpenPath
+  if (paths === null) return null
   const shown = paths.slice(0, SHOWN_LIMIT)
   return (
     <div className={css.root}>

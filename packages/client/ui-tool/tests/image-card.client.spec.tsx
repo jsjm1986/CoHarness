@@ -12,12 +12,14 @@
 // gallery must still leave the media type and dimensions visible.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { Context } from '@deepseek-ai/cordis'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  RunningToolCall, SessionId, SessionListState, ToolResultNode,
+  RunningToolCall, SessionId, SessionListState, StartedToolCall, ToolResultNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { MessageImagesOwnerProps, RenderMessageImages } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
@@ -54,8 +56,8 @@ const withImage = (attachment: unknown) => [
   { type: 'image', attachment },
 ]
 
-const running = (over?: Partial<RunningToolCall>): RunningToolCall => ({
-  callId: 'c1', name: 'read_image', argsRaw: ARGS,
+const running = (over?: Partial<StartedToolCall>): StartedToolCall => ({
+  phase: 'start', callId: 'c1', name: 'read_image', argsRaw: ARGS,
   turn: 1, step: 1, time: 1_000, callView: null, subCalls: [], ...over,
 })
 
@@ -95,6 +97,11 @@ const stubRenderMessageImages = (): RenderMessageImages => (
     </div>
   ))
 )
+
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
 
 describe('imageCardModel', () => {
   it('derives the card from settled image metadata and its raw envelope', () => {
@@ -265,7 +272,7 @@ describe('ReadImageRow keyed toolview', () => {
     archivedById: {},
     current: SID,
     phase: 'ready',
-    subagentsByParent: {}, jobsBySession: {},
+    subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })
 
@@ -276,7 +283,7 @@ describe('ReadImageRow keyed toolview', () => {
   ): Parameters<typeof ReadImageRow>[0] => ({
     callId: 'c1', toolName: 'read_image', block, openFile: vi.fn(), nested, renderMessageImages,
     sessionId: SID, useSessions: bindSnapshotSelector(list()),
-    t,
+    t, useDisclosure,
   } as unknown as Parameters<typeof ReadImageRow>[0])
 
   const toggleRow = (view: { container: HTMLElement }) => {

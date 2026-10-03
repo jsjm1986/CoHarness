@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-19-make-jsonrpc-directional.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/simplification/2026-07-19-make-jsonrpc-directional.md
-2026-07-19-make-jsonrpc-directional.md: be0d8003e066b8695fb413d5a546e43694bf2225
-2026-07-19-make-jsonrpc-directional.zh.md: d070983b14898078b481a930eb70e7f6db53714a
+/agent-note-make-json-rpc-completion-and-transport-directional:
+  en: b6581586a3a5cb53
+  zh: 6cf431bf3c345d7c
+/agent-note-make-json-rpc-completion-and-transport-directional/problem:
+  en: d464014520aeb2ba
+  zh: 8d5b916ec1e52ae2
+/agent-note-make-json-rpc-completion-and-transport-directional/proposal:
+  en: 1877df56f4a6c009
+  zh: 88945feba13fd7f2
+/agent-note-make-json-rpc-completion-and-transport-directional/implementation-plan:
+  en: 98d36962531961b4
+  zh: 732397d5ac3e9da5
+/agent-note-make-json-rpc-completion-and-transport-directional/alternatives-considered:
+  en: 91e2427821f06086
+  zh: e1d2b38a4d67cc3e
+/agent-note-make-json-rpc-completion-and-transport-directional/acceptance-criteria:
+  en: c003617f26b1b309
+  zh: a0c92fd01a820b9d
+/agent-note-make-json-rpc-completion-and-transport-directional/risks:
+  en: 2a4ab79704013a71
+  zh: 17722ca6beff0536

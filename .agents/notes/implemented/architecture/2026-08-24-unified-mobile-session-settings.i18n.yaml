@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-24-unified-mobile-session-settings.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-24-unified-mobile-session-settings.md
-2026-08-24-unified-mobile-session-settings.md: a5bbe5090ebf2115c663b6ef6db69688795a55d7
-2026-08-24-unified-mobile-session-settings.zh.md: 5c2548492918697d5bdc3a5971a9d121cf8c07b7
+/agent-note-unified-mobile-session-settings:
+  en: 772e6939880c7299
+  zh: 32211a868f693d7f
+/agent-note-unified-mobile-session-settings/problem:
+  en: 86dc3255040537bb
+  zh: a062b77f2c8cd406
+/agent-note-unified-mobile-session-settings/decision:
+  en: 67a1b9db91a560ea
+  zh: 77aa67267635e471
+/agent-note-unified-mobile-session-settings/alternatives-considered:
+  en: 1692c9471510fce0
+  zh: 06abf2c441fb92a0
+/agent-note-unified-mobile-session-settings/consequences:
+  en: 2092583998bf5aaa
+  zh: 8cdf97158e2523d4
+/agent-note-unified-mobile-session-settings/verification:
+  en: 70eb06406940d350
+  zh: 1b13e7eac5b23cd9

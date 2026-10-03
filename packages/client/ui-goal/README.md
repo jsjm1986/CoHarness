@@ -1,3 +1,8 @@
+---
+description: "Session goal surface: GoalBar docked above the composer, read from the goal session projection"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-goal
 
 English | [中文](README.zh.md)
@@ -12,10 +17,21 @@ The `/client` exports are the plugin body (`apply`/`inject`), the `GoalBar`/`Goa
 
 The Web GUI goal surface shows both the durable goal state and its current process-local activation, and lets users edit, pause, resume, or clear the goal; rejected changes appear inline. It displays durable `/goal` runs as `Command input` bubbles so commands from users or the model remain visible after reload. Goal creation remains outside this package. Shipped Web presets other than `minimal` make `/goal` available to agents.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The live goal arrives through the `goal` session projection and mutations go through `ctx.remote.goals`; the plugin owns no domain store or refresh chain.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the `goals/edit`, `goals/pause`, `goals/resume`, and `goals/clear` mutations the strip routes; the host GoalService owns the model-visible goal context message those mutations queue.
@@ -27,3 +43,13 @@ None unless the queued goal context is admitted. An admitted context extends the
 ## Known Limitations and Deferred Work
 
 - **Durable phase only** — the projection omits process-local activation, so the strip cannot distinguish an active-but-disarmed goal from an armed one; resume re-arms through the RPC side. There is no host-live activation channel.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

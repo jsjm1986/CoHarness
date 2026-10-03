@@ -1,5 +1,6 @@
 import {
   ChartNoAxesCombined,
+  Ellipsis,
   Archive,
   FileText,
   FolderKanban,
@@ -16,12 +17,14 @@ import {
   Webhook,
   type LucideIcon,
 } from 'lucide-react'
-import { NavLink, Route, BrowserRouter as Router, Routes } from 'react-router-dom'
+import { NavLink, Navigate, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom'
 import { AuditPage } from './pages/AuditPage.tsx'
 import { ProjectDetailPage } from './pages/ProjectDetailPage.tsx'
 import { ProjectListPage } from './pages/ProjectListPage.tsx'
 import { UsersPage } from './pages/UsersPage.tsx'
-import { lazy, Suspense } from 'react'
+import { UserDetailPage } from './pages/UserDetailPage.tsx'
+import { lazy, Suspense, useState } from 'react'
+import { Dialog } from './components/ui.tsx'
 const PluginsPage = lazy(async () => ({ default: (await import('./pages/PluginsPage.tsx')).PluginsPage }))
 import { ModelsPage } from './pages/ModelsPage.tsx'
 import { UsagePage } from './pages/UsagePage.tsx'
@@ -52,6 +55,8 @@ export function App() {
         <main className="mainContent">
           <Routes>
             <Route path="/" element={<UsersPage />} />
+            <Route path="/users" element={<Navigate to="/" replace />} />
+            <Route path="/users/:id" element={<UserDetailPage />} />
             <Route path="/projects" element={<ProjectListPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
             <Route path="/plugins" element={<Suspense fallback={<p role="status">正在加载插件管理</p>}><PluginsPage /></Suspense>} />
@@ -118,14 +123,34 @@ function LogoutButton({ compact = false }: { compact?: boolean }) {
 }
 
 function AdminNav({ className }: { className: string }) {
+  const [moreOpen, setMoreOpen] = useState(false)
+  const { pathname } = useLocation()
+  const mobile = className === 'mobileNav'
+  const moreItems = NAV_ITEMS.slice(5)
+  const moreActive = moreItems.some(item => pathname === item.to || pathname.startsWith(`${item.to}/`))
   return (
-    <nav className={className} aria-label="管理导航">
-      {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
-        <NavLink key={to} to={to} end={end}>
-          <Icon aria-hidden="true" />
-          <span>{label}</span>
-        </NavLink>
-      ))}
-    </nav>
+    <>
+      <nav className={className} aria-label="管理导航">
+        {(mobile ? NAV_ITEMS.slice(0, 5) : NAV_ITEMS).map(({ to, label, icon: Icon, end }) => (
+          <NavLink key={to} to={to} end={end}>
+            <Icon aria-hidden="true" />
+            <span>{label}</span>
+          </NavLink>
+        ))}
+        {mobile ? <button type="button" className={moreActive ? 'active' : undefined}
+          aria-label="更多管理功能" aria-haspopup="dialog" aria-expanded={moreOpen}
+          onClick={() => setMoreOpen(true)}>
+          <Ellipsis aria-hidden="true" /><span>更多</span>
+        </button> : null}
+      </nav>
+      {mobile ? <Dialog open={moreOpen} title="更多管理功能" onClose={() => setMoreOpen(false)}>
+        <nav className="mobileMoreNav" aria-label="更多管理导航">
+          {moreItems.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end}
+            onClick={() => setMoreOpen(false)}>
+            <Icon aria-hidden="true" /><span>{label}</span>
+          </NavLink>)}
+        </nav>
+      </Dialog> : null}
+    </>
   )
 }

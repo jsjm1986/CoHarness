@@ -1,3 +1,8 @@
+---
+description: "Registry service for package-owned DeepSeek Harness runtime invariants"
+kind: "package-reference"
+---
+
 # dsh-invariants
 
 English | [中文](README.zh.md)
@@ -8,6 +13,19 @@ Configurable registry service for package-owned runtime invariant checks. The ro
 
 `dsh-invariants` runs package-owned runtime checks — invariants — inside a DeepSeek Harness composition: any package can ship a `./invariant` companion that verifies its own durable relationships (authoritative event streams and mutable snapshots) while the composition runs. Checks run automatically, and a failed check reports an `InvariantError` attributed to the package that owns the violated relationship. Choose it for compositions that want self-checking diagnostics with a global switch and package-name filters; the standard agent composition already mounts it with the four core companions, and loading the service alone installs no checks.
 
+## Table of Contents
+
+- [Service: `InvariantRegistry` (`ctx.invariants`)](#service-invariantregistry-ctxinvariants)
+- [Package companions](#package-companions)
+- [Composition](#composition)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="service-invariantregistry-ctxinvariants"></a>
 ## Service: `InvariantRegistry` (`ctx.invariants`)
 
 ```ts
@@ -30,6 +48,7 @@ The service owns every registration fiber, while the returned disposer also belo
 
 Session itself owns immutable, surface-valid log storage in every composition: it takes one lossless JSON snapshot of each candidate, validates complete cited source-event coverage and positional replacement, restricts `tool/result` replacement to one current result's `content`, deep-freezes the accepted record, and exposes the log through immutable array snapshots. The `dsh-session` invariant companion checks the remaining cross-record rules that Session does not own.
 
+<a id="package-companions"></a>
 ## Package companions
 
 Publication and registration are exhaustive; runtime assertions are deliberately not synthetic. A companion installs a check only when its package owns an observable event relationship or relevant mutable-data relationship. Confirming a required method, plugin name, injection, effect, or fixed pure-function result is a type, load, or unit-test concern rather than a runtime invariant.
@@ -53,6 +72,7 @@ The root entrypoint of each owner remains independent of diagnostics. Loading th
 
 `pnpm run verify-package-invariants` discovers all workspace packages. It rejects generated markers, unexplained empty installers, non-empty installers that omit or ignore the reporter, incorrect registration names, and incomplete export, publication, dependency, TypeScript-reference, or bundle wiring. This source rule is a minimum ownership check; focused tests prove each executable companion's semantics.
 
+<a id="composition"></a>
 ## Composition
 
 ```ts
@@ -74,10 +94,12 @@ The standard agent composition mounts the service and its four core stateful com
 
 Every ordinary Vitest topology mounts an explicitly enabled service and the current test package's companion. Focused suites cover valid and invalid observations for executable companions, while one exhaustive topology mounts all companions to prove registration and disposal wiring.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The package is the registry that evaluates other packages' companions; it asserts no product-domain relation of its own.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the observer validates requests but never rewrites their context.
@@ -91,3 +113,13 @@ Checks observe assembled requests and durable state without mutating request con
 - Request reconstruction covers requests explicitly marked by the loop before freezing; direct one-shot LLM calls remain outside that marker contract even when callers freeze them or attach a session id.
 - Live-only lifecycle companions cannot reconstruct operations that began before their own reload. Standard and test compositions mount them before the corresponding operations begin.
 - Regular-expression filters are fixed for the service lifetime; changing them requires ordinary Cordis plugin reload.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

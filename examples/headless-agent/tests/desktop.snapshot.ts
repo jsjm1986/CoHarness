@@ -21,7 +21,7 @@ it.each([false, true])('runs the product desktop transcript with managed authori
     binArgs: ['--profile', 'headless', '--patch', overlay, 'Capture display zero, then report DONE.'],
     tsconfigPath: join(root, 'tsconfig.json'),
     env: {
-      DSH_SNAPSHOT_FILE: join(upstreamFixture, 'session.v3.jsonl'),
+      DSH_SNAPSHOT_FILE: join(upstreamFixture, 'session.v7.jsonl'),
       DSH_SNAPSHOT_OVERRIDE: join(upstreamFixture, 'replay.override.json'),
       DSH_TEST_MANAGED_DESKTOP: String(managed),
       DSH_PERMISSION_MODE: 'danger-full-access',

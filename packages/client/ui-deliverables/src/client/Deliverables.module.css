@@ -28,6 +28,7 @@
 .open:hover, .open:focus-visible, .chevron:hover:not(:disabled), .chevron:focus-visible { background: var(--dsw-alias-interactive-bg-hover); }
 .chevron:disabled { color: var(--dsw-alias-label-dimmed); cursor: not-allowed; }
 .menuActionIcon { display: block; width: 16px; height: 16px; }
+.appIcon { display: block; object-fit: contain; }
 .toggle { align-self: center; display: inline-flex; align-items: center; gap: 4px; min-width: 0; padding: 1px 11px; border: 0; border-radius: 8px; background: transparent; color: var(--dsw-alias-label-tertiary); cursor: pointer; font: inherit; font-size: 12px; line-height: 18px; }
 .toggle:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .toggle svg { flex: none; width: 14px; height: 14px; }

@@ -13,6 +13,17 @@ Zero-dependency browser-safe UUID and byte-encoding helpers. UUIDs use `crypto.g
 
 Zero-dependency browser-safe UUID and byte-encoding helpers. UUID minting uses `crypto.getRandomValues`, the one random primitive every shipped context provides. `crypto.randomUUID` is a secure-context Web API: a page or worker served over plain HTTP on a LAN address (the browser preview deployment) has no such method, so code that must run there cannot call it. The repository-wide `no-restricted-properties` lint rule points `crypto.randomUUID` callers here; Node-only code importing `randomUUID` from `node:crypto` stays as it is.
 
+## Table of Contents
+
+- [API](#api)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="api"></a>
 ## API
 
 ```ts
@@ -25,10 +36,12 @@ import { bytesToBase64, randomUUID, type Uuid } from '@deepseek-ai/dsh-util-cryp
 | `bytesToBase64(data)` | Canonical base64 encoding in bounded chunks. |
 | `Uuid` | Five-group UUID string type. |
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. A pure library owning no event stream or mutable runtime data; its encoding algebra is enforced by unit tests.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through consumers that mint request, session, and attachment identifiers with it, none of which enter prompts as semantic content.
@@ -41,3 +54,13 @@ No direct invalidation; identifier-minting consumers own any request changes.
 
 - **v4 only** — namespaces and other UUID versions are outside this utility.
 - **Probabilistic uniqueness** — collision detection remains the consumer's responsibility.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

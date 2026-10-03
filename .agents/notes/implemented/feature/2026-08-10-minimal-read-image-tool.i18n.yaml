@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-minimal-read-image-tool.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-10-minimal-read-image-tool.md
-2026-08-10-minimal-read-image-tool.md: 12085c276130fc885498157cf18b3bec5517938f
-2026-08-10-minimal-read-image-tool.zh.md: 58a76cacd05c63635da5ef2ad0e3682515e61a7f
+/agent-note-a-minimal-read-image-tool-over-existing-seams:
+  en: d091373923838282
+  zh: fafee78fec914416
+/agent-note-a-minimal-read-image-tool-over-existing-seams/problem:
+  en: 15170e0fa22bf252
+  zh: 55a477fbeba6588e
+/agent-note-a-minimal-read-image-tool-over-existing-seams/decision:
+  en: d566b49722157575
+  zh: 44caddbaa3ebdc6d
+/agent-note-a-minimal-read-image-tool-over-existing-seams/alternatives-considered:
+  en: 3d6199b313e010d3
+  zh: 11913d34b8466c47
+/agent-note-a-minimal-read-image-tool-over-existing-seams/consequences:
+  en: 6c5c3a7e1e83920e
+  zh: 12c5f0fb2689c4d6

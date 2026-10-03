@@ -58,7 +58,7 @@ function sameRound(source: GoalMessageSource, round: RoundIdentity): boolean {
 }
 
 /** Compare the complete queued record to the driver's reservation. */
-function sameQueued(content: ContentBlock[], source: MessageSource, attempt: RoundAttempt): boolean {
+function sameQueued(content: readonly ContentBlock[], source: MessageSource, attempt: RoundAttempt): boolean {
   return isGoalRoundSource(source) && sameRound(source, attempt) && isDeepStrictEqual(content, attempt.content)
 }
 
@@ -204,7 +204,7 @@ export function apply(ctx: Context): void {
     }
   }
 
-  /** Coalesce triggers onto one agent-local serialized driver. */
+  /** Retain the Session through coalesced checkpoints and transfer to an Agent turn. */
   function requestDrive(state: DriverState): void {
     /* v8 ignore next -- teardown may race a final trigger after synchronously closing the step fence */
     if (state.stopping) return
@@ -213,6 +213,7 @@ export function apply(ctx: Context): void {
     let run: Promise<void>
     try {
       run = ctx.agents.withoutInitiator(async () => {
+        using _admission = ctx.agents.reserveUse([state.agent.id])
         while (state.requested && !state.stopping) {
           state.requested = false
           try {
@@ -235,6 +236,7 @@ export function apply(ctx: Context): void {
     }
     void run.then(retire, (error: unknown) => {
       ctx.logger.warn(`goal-round-driver: driver task rejected for agent "${state.agent.id}": ${renderThrown(error)}`)
+      state.requested = false
       disarm(state)
       retire()
     })
@@ -339,7 +341,7 @@ export function apply(ctx: Context): void {
     /** Fail closed unless the queued prompt still owns the exact live revision. */
     function validReservation(
       state: DriverState,
-      content: ContentBlock[],
+      content: readonly ContentBlock[],
       source: GoalMessageSource,
     ): boolean {
       const attempt = state.attempt

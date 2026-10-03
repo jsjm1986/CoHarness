@@ -1,3 +1,8 @@
+---
+description: "Model-facing view, create, literal replace, and line insert tool over the Harness filesystem service"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-str-replace-editor
 
 English | [中文](README.zh.md)
@@ -8,6 +13,18 @@ Standalone model-facing `str_replace_editor` over `ctx.fs`. It can be composed w
 
 `dsh-tool-str-replace-editor` provides a standalone model-facing `str_replace_editor` tool over `ctx.fs`: `view` shows numbered file content or a shallow directory listing, `create` makes a new file, `str_replace` applies a unique literal replacement, and `insert` adds lines at a chosen boundary. It is composable with persistent Bash, one-shot Bash, sandboxed Bash, or another terminal surface. Mutations obey the same read-before-edit policy and sandbox fence as the rest of the fs family, enforced by whichever backend and policy plugins are mounted. Choose it when a deployment wants the Claude-Code-style single editor tool with absolute paths; the `dsh-tool-fs` package provides the alternative `read`/`write`/`edit` suite.
 
+## Table of Contents
+
+- [Config](#config)
+- [Tool](#tool)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 | Key | Default | Meaning |
@@ -15,14 +32,17 @@ Standalone model-facing `str_replace_editor` over `ctx.fs`. It can be composed w
 | `maxOutputChars` | `16000` | Prefix characters retained for file and directory views. |
 | `description` | Editor command guide | Model-facing tool description. |
 
+<a id="tool"></a>
 ## Tool
 
 The schema provides `view`, `create`, `str_replace`, and `insert` over absolute paths. File views use one-based line numbers and preserve content tabs, so displayed text remains valid literal replacement input; directory views omit hidden, dependency, and Python-cache entries and descend two levels. A metadata miss from `view`, `str_replace`, or `insert` records confirmed absence before returning `FS_NOT_FOUND`, so a later `create` can recover an externally deleted path through the mounted policy's guarded-create flow; absence never authorizes `str_replace` or `insert`. Replacement requires one unique literal match and reports errors only in the public `old_str` vocabulary. Insert follows the selected zero-based insertion boundary without adding an implicit trailing newline. Mutations preserve tabs outside the requested edit.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The editor adapts model calls onto `ctx.fs`; all file state belongs to the mounted provider.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Tool schema
@@ -58,3 +78,13 @@ Append-only tool results follow the reusable request prefix.
 - Operations target UTF-8 text; binary files are unsupported.
 - `str_replace` intentionally rejects zero or multiple matches and has no `replace_all` argument.
 - Every mutation goes through `fs/write-intent` or `fs/edit-intent`, resolves the current session sandbox policy, and delegates enforcement to the mounted filesystem and policy plugins.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

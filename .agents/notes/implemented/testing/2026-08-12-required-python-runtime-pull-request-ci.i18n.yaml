@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-12-required-python-runtime-pull-request-ci.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-08-12-required-python-runtime-pull-request-ci.md
-2026-08-12-required-python-runtime-pull-request-ci.md: b9495e411f9065669e3cbc34abf5a512ecb2b599
-2026-08-12-required-python-runtime-pull-request-ci.zh.md: b54c6c1af41bf1feccdf36b7b85abfb2c8cc78b6
+/agent-note-required-python-runtime-pull-request-validation:
+  en: cf6571253fd06756
+  zh: c0d0483a30cb10bc
+/agent-note-required-python-runtime-pull-request-validation/problem:
+  en: c458b8b556b14deb
+  zh: 0e26f7dde8ec58ec
+/agent-note-required-python-runtime-pull-request-validation/decision:
+  en: 0be995e94cf3c3b0
+  zh: ec9540dc6110e326
+/agent-note-required-python-runtime-pull-request-validation/alternatives-considered:
+  en: 229b5aa40266789e
+  zh: 2e51ec475df4cbcc
+/agent-note-required-python-runtime-pull-request-validation/consequences:
+  en: 6c805687ac493ff2
+  zh: 2156d9c780e7835e

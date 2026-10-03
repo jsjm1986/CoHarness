@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
+import { MemoryRouter } from 'react-router-dom'
 import { UsersPage } from './UsersPage.tsx'
 
 vi.mock('../api.ts', () => ({
@@ -40,7 +41,7 @@ describe('UsersPage', () => {
   })
 
   it('confirms account disabling in an accessible dialog before patching', async () => {
-    render(<UsersPage />)
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
     expect(await screen.findAllByText('@alice · ID 1')).toHaveLength(2)
     await userEvent.click(screen.getByRole('button', { name: '禁用用户' }))
     expect(screen.getByRole('heading', { name: '禁用用户' })).toBeTruthy()
@@ -51,7 +52,7 @@ describe('UsersPage', () => {
 
   it('creates a user through the dialog form', async () => {
     const user = userEvent.setup()
-    render(<UsersPage />)
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
     await screen.findAllByText('@alice · ID 1')
     await user.click(screen.getByRole('button', { name: '新建用户' }))
     const dialog = within(screen.getByRole('dialog', { name: '新建用户' }))
@@ -70,7 +71,7 @@ describe('UsersPage', () => {
 
   it('localizes the ready instance state returned by the gateway', async () => {
     vi.mocked(api.listUsers).mockResolvedValue([{ ...alice, instanceState: 'ready' }])
-    render(<UsersPage />)
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
 
     expect(await screen.findAllByText('运行中')).toHaveLength(2)
     expect(screen.queryAllByText('ready')).toHaveLength(0)
@@ -81,7 +82,7 @@ describe('UsersPage', () => {
     vi.mocked(api.patchUser).mockImplementation(async (_id, patch) => {
       vi.mocked(api.listUsers).mockResolvedValue([{ ...alice, autoReviewEligible: patch.autoReviewEligible ?? false }])
     })
-    render(<UsersPage />)
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
     expect(await screen.findAllByText('未授予')).toHaveLength(2)
     await user.click(screen.getByRole('button', { name: '编辑用户' }))
     const dialog = within(screen.getByRole('dialog', { name: '编辑 alice' }))
@@ -104,7 +105,7 @@ describe('UsersPage', () => {
   it('changes a name and role without rewriting an unchanged Auto grant', async () => {
     const user = userEvent.setup()
     vi.mocked(api.listUsers).mockResolvedValue([{ ...alice, autoReviewEligible: true }])
-    render(<UsersPage />)
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
     await screen.findAllByText('已授予')
     await user.click(screen.getByRole('button', { name: '编辑用户' }))
     const dialog = within(screen.getByRole('dialog', { name: '编辑 alice' }))
@@ -119,7 +120,7 @@ describe('UsersPage', () => {
     vi.mocked(api.deleteUser).mockImplementation(async () => {
       vi.mocked(api.listUsers).mockResolvedValue([])
     })
-    render(<UsersPage />)
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
     expect(await screen.findAllByText('@alice · ID 1')).toHaveLength(2)
     await userEvent.click(screen.getByRole('button', { name: '删除用户' }))
     expect(screen.getByRole('heading', { name: '删除用户' })).toBeTruthy()

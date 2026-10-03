@@ -1,17 +1,31 @@
 /** Gateway archive-state synchronization provider for Gateway-launched runtimes. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
+import Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { readGatewayResponseJson } from '@deepseek-ai/dsh-gateway-runtime'
 import type {} from '@deepseek-ai/dsh-gateway-runtime'
-import { SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
+import type {} from '@deepseek-ai/dsh-host-apiproxy'
+import type {} from '@deepseek-ai/dsh-workspace-changes'
 import { foldSessionTitle } from '@deepseek-ai/dsh-session-title'
 import type { ArchivedSessionEntry, WorkspaceArchiveSnapshot, WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
 
 export const name = 'archive-gateway'
 export const inject = ['connection', 'gatewayRuntime', 'workspaceRegistry']
+
+/** Online command delivery without periodic full-history synchronization. */
+export interface Config {
+  /** Milliseconds between completed pending-command probes; operations never overlap. */
+  commandPollMs?: number
+}
+
+/** Validated online polling interval; credentials and ownership stay with GatewayRuntime. */
+export const Config: Schema<Config> = Schema.object({
+  commandPollMs: Schema.natural().min(1).max(2_147_483_647).default(5_000),
+})
 
 const ARCHIVE_HTTP_PATH = '/api/internal/archive'
 const ARCHIVE_READ_LIMIT = 100_000
@@ -672,19 +686,62 @@ async function removeTree(
   registry: WorkspaceRegistry,
   rootSessionId: string,
   headerCache: ArchiveHeaderIndexCache,
+  acknowledge: () => Promise<void>,
+  signal: AbortSignal,
 ): Promise<void> {
   const { headers, parents, roots } = await headerCache.get()
   const tree = headers.filter(header => rootOf(String(header.id), parents, roots) === rootSessionId)
-  const live = ctx.get('sessions')
-  if (live !== undefined && tree.some(header => live.get(header.id) !== undefined)) {
-    throw new Error(`cannot purge live archive tree '${rootSessionId}'`)
+  const depth = (id: string): number => {
+    let count = 0, parent = parents.get(id)
+    while (parent !== undefined) { count++; parent = parents.get(parent) }
+    return count
   }
-  for (const header of tree) await ctx.sessionPersistence.remove(header.id)
-  for (const header of tree) {
-    if (registry.archivedSessionIds.includes(header.id)) await registry.restoreSession(header.id)
+  tree.sort((left, right) => depth(String(right.id)) - depth(String(left.id)))
+  const ids = [...new Set([SessionId(rootSessionId), ...tree.map(header => header.id)])]
+  const remove = async (): Promise<void> => {
+    const currentHeaders = await allSessionHeaders(ctx)
+    const currentParents = new Map(currentHeaders.map(header => [
+      String(header.id), header.parentSession === undefined ? undefined : String(header.parentSession),
+    ]))
+    const selected = new Set(ids)
+    if (currentHeaders.some(header => rootOf(String(header.id), currentParents) === rootSessionId && !selected.has(header.id))) {
+      throw new Error('Archive tree changed while releasing Sessions; retry purge')
+    }
+    const reviews = ctx.get('workspaceChanges')
+    if (reviews === undefined) {
+      for (const header of tree) {
+        let fromSeq = 0
+        for (;;) {
+          const page = await ctx.sessionPersistence.readPage(header.id, { fromSeq, maxEvents: 1000, maxBytes: 256 * 1024 }, signal)
+          if (page.events.some(event => event.type === 'workspace/changes')) throw new Error('Historical review cleanup provider is unavailable')
+          if (!page.hasMore) break
+          if (page.endSeq === null || page.endSeq < fromSeq) throw new Error('Historical review lookup made no progress')
+          fromSeq = page.endSeq + 1
+        }
+      }
+    } else {
+      for (const id of ids) await reviews.removeStored(id, signal)
+    }
+    // Every surviving descendant keeps its ancestors until its own local log is removed.
+    for (const header of tree) {
+      if (registry.archivedSessionIds.includes(header.id)) await registry.unarchiveSession(header.id)
+      if (ctx.gatewayRuntime.identity.kind === 'user') await ctx.sessionPersistence.remove(header.id, signal)
+    }
+    if (registry.archivedSessionIds.includes(SessionId(rootSessionId))) await registry.unarchiveSession(SessionId(rootSessionId))
+    // Project database removal is one Gateway transaction. Keep recreation fenced through its acknowledgement.
+    await acknowledge()
   }
-  headerCache.invalidate()
+  try {
+    const owner = ctx.get('hostSessionLifecycle')
+    if (owner !== undefined) await owner.withReleased(ids, remove)
+    else {
+      const live = ctx.get('sessions')
+      if (tree.some(header => live?.get(header.id) !== undefined)) throw new Error('Loaded archive Sessions require their lifecycle owner before purge')
+      await remove()
+    }
+  } finally { headerCache.invalidate() }
 }
+
 
 async function mutateTree(
   registry: WorkspaceRegistry,
@@ -697,7 +754,7 @@ async function mutateTree(
     const sessionId = header.id
     if (rootOf(String(sessionId), parents, roots) !== rootSessionId) continue
     if (action === 'restore') {
-      if (registry.archivedSessionIds.includes(sessionId)) await registry.restoreSession(sessionId)
+      if (registry.archivedSessionIds.includes(sessionId)) await registry.unarchiveSession(sessionId)
     } else {
       await registry.archiveSession(sessionId)
     }
@@ -705,7 +762,7 @@ async function mutateTree(
 }
 
 /** Synchronize bounded archive projection batches and replay pending Gateway commands. */
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, config: Config): void {
   ctx.inject(['connection', 'gatewayRuntime', 'workspaceRegistry', 'sessionPersistence'], (ctx) => {
     const gateway = ctx.gatewayRuntime
     const registry = ctx.workspaceRegistry
@@ -721,6 +778,8 @@ export function apply(ctx: Context): void {
     let requested = false
     let running = false
     let tail: Promise<void> = Promise.resolve()
+    let poll: Promise<void> = Promise.resolve()
+    let pollTimer: NodeJS.Timeout | undefined
 
     const synchronize = async (): Promise<boolean> => {
       const snapshot = registry.archiveSnapshot()
@@ -747,20 +806,28 @@ export function apply(ctx: Context): void {
         }
       }
       for (const command of commands.values()) {
+        const acknowledge = async (error?: string): Promise<void> => {
+          const ack = await gateway.request('/internal/runtime/archive/ack', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ commandId: command.id, revision: snapshot.revision, ...(error === undefined ? {} : { error }) }),
+            signal: abort.signal,
+          })
+          if (!ack.ok) { await ack.body?.cancel(); throw new Error(`archive command acknowledgement failed with HTTP ${String(ack.status)}`) }
+          const value: unknown = await readGatewayResponseJson(ack, 1024)
+          if (value === null || typeof value !== 'object' || !('acknowledged' in value) || value.acknowledged !== true) {
+            throw new Error('archive command acknowledgement was not confirmed')
+          }
+        }
         let error: string | undefined
         try {
           if (command.action === 'restore') await mutateTree(registry, command.rootSessionId, 'restore', headerCache)
           if (command.action === 'trash') await mutateTree(registry, command.rootSessionId, 'archive', headerCache)
-          if (command.action === 'purge') await removeTree(ctx, registry, command.rootSessionId, headerCache)
-        } catch (cause: unknown) {
-          error = cause instanceof Error ? cause.message : String(cause)
-        }
-        const ack = await gateway.request('/internal/runtime/archive/ack', {
-          method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ commandId: command.id, revision: snapshot.revision, ...(error === undefined ? {} : { error }) }),
-          signal: abort.signal,
-        })
-        if (!ack.ok) throw new Error(`archive command acknowledgement failed with HTTP ${String(ack.status)}`)
+          if (command.action === 'purge') {
+            await removeTree(ctx, registry, command.rootSessionId, headerCache, acknowledge, abort.signal)
+            continue
+          }
+        } catch (cause: unknown) { error = cause instanceof Error ? cause.message : String(cause) }
+        await acknowledge(error)
       }
       return commands.size > 0
     }
@@ -791,6 +858,26 @@ export function apply(ctx: Context): void {
       })
     }
 
+    const schedulePoll = (): void => {
+      pollTimer = setTimeout(() => {
+        poll = (async () => {
+          const response = await gateway.request('/internal/runtime/archive/pending', { method: 'GET', signal: abort.signal })
+          if (!response.ok) {
+            await response.body?.cancel()
+            throw new Error(`archive command probe rejected with HTTP ${String(response.status)}`)
+          }
+          const value: unknown = await readGatewayResponseJson(response, 1024)
+          if (value === null || typeof value !== 'object' || !('pending' in value) || typeof value.pending !== 'boolean') {
+            throw new Error('archive command probe returned an invalid response')
+          }
+          if (value.pending) sync()
+        })().catch(reportSyncError).finally(() => {
+          if (!abort.signal.aborted) schedulePoll()
+        })
+      }, config.commandPollMs ?? 5_000)
+      pollTimer.unref()
+    }
+
     ctx.on('workspace/archive-changed', (_snapshot: WorkspaceArchiveSnapshot) => { sync() })
     ctx.on('session/created', () => { headerCache.invalidate() }, { global: true })
     ctx.on('session/disposed', () => { headerCache.invalidate() }, { global: true })
@@ -804,13 +891,16 @@ export function apply(ctx: Context): void {
     })
     ctx.effect(() => {
       sync()
+      schedulePoll()
       return async () => {
         requested = false
         abort.abort()
-        await tail
+        clearTimeout(pollTimer)
+        await Promise.all([tail, poll])
       }
     }, 'archive-gateway:sync')
   })
 }
 
-export default apply
+/** Gateway archive projection and durable lifecycle-command synchronization. */
+export default { name, inject, Config, apply }

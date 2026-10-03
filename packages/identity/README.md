@@ -1,3 +1,8 @@
+---
+description: "Identity values shared across product domains. These values do not represent an authenticated account."
+kind: "package-group"
+---
+
 # identity/ — shared identity
 
 English | [中文](README.zh.md)

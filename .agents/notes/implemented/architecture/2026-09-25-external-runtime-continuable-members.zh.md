@@ -10,6 +10,8 @@ Agent Teams 经 `ctx.subagents.startContinuable` 生成队友，roster 按名选
 
 ## 决定
 
+持续成员模型调用必须通过 `GenerateOptions.sessionId` 找到实际注册的 Agent，使用其工作区及执行目标，不能捕获服务启动目录。SSH 从 standing realm 成套解析文件系统及子进程；目标缺少提供方或预装程序时拒绝，不回退本机。持久绑定在首次进程启动前固定规范 cwd 与目标；恢复拒绝目标变动、损坏存储和没有目标证明的旧绑定，并保留原数据。单次委派遵守相同的执行归属。
+
 外部持续成员是普通的进程内 continuation 管理子 Agent；外部运行时只充当其模型后端。provider 通过实现 `prepareContinuable` 标记能力（仅 detached 数据——Agent、句柄、prompt 递送函数都不越过边界），注册 `LlmAdapter` 路由，并声明 `agentRouteDefaults`，使未显式携带 `agentOptions` 的 Team 请求仍能解析出有效的 provider/model。成员的每次模型调用经 `GenerateOptions.sessionId` 映射到外部运行时耐用会话上的一个 turn，以子体 harness Session id 为键：
 
 - `subagent-claude-code`：每次调用一个 Agent SDK `query`，带 `persistSession`，已绑定时 `resume`；挂载 `llm` 服务即具备成员能力。
@@ -27,5 +29,7 @@ Agent Teams 经 `ctx.subagents.startContinuable` 生成队友，roster 按名选
 **自动重试未知结果的 turn。** 外部 transcript 并不总能证明 prompt 是否被消费；重发可能在耐用外部会话内重复用户 turn，因此成员改为上报未知结果，已消费游标照常推进。
 
 ## 后果
+
+Codex 在等待完成前把已确认的轮次 ID 与待决提示词绑定。其[固定版本协议](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/protocol/src/protocol.rs) 区分文本和 `task_complete`；恢复要求匹配的提示词、最终答案及成功终止事件。没有已确认 ID，或证据不可读、损坏、歧义、不完整时，结果保持未知。Claude SDK transcript 和通用 ACP `session/load` 消息块没有可关联到准确请求的终止证明，因此即使出现助手文本，中断请求仍保持未知。任何提供方都不能把 transcript 缺少内容当作未送达的证明。
 
 Team 成员保留全部 harness 侧保证——耐用身份、有序 inbox、Activation、冷恢复、处置——而其模型调用在外部产品的耐用会话内执行。成员的每次模型调用承担一次外部进程 spawn 与握手开销；不做连接池让每个调用的所有权保持独立，拆卸仍是 subprocess 缝的职责。辅助模型调用（compaction、标题、评审）在成员路由上被拒绝，因为外部会话无法应答——触发此类调用的成员响亮失败，而不是静默地寻址到错误的会话。崩溃恢复完全依赖外部运行时自身的耐用 transcript：JSONL 绑定存储只记录映射与待决 prompt，从不重放对话内容。没有 `llm` 服务（Claude Code、Codex）或未在具备 `loadSession` 能力的 ACP agent 上设置 `resume: true` 的部署中，provider 保持仅一次性能力，`startContinuable` 返回 `UNSUPPORTED_CAPABILITY`，而不是产生一个半能力的成员。

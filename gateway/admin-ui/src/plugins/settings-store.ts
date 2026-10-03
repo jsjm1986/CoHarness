@@ -35,7 +35,7 @@ export class ProfileSettingsController {
       .map(item => ({ ...item, writable: item.writable ?? result.value.writable }))
       .sort((a, b) => a.ns.localeCompare(b.ns))
     this.state.set({ loading: false, error: '', namespaces })
-    this.directory.set({ items: namespaces.map(item => ({ id: item.ns, label: item.ns })), bundles: new Set(), rows: new Set() })
+    this.directory.set({ items: namespaces.map(item => ({ id: item.ns, label: item.ns, ...item.label === undefined ? {} : { labelText: item.label } })), bundles: new Set(), rows: new Set() })
   }
 
   async save(ns: string, ops: SettingsPathOpView[], expectedRevision: number): Promise<Answer<SettingsNamespaceView>> {

@@ -1,6 +1,103 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/session/README.md
-README.md: 5614c311a981a47ac1f86d6e61498a936eb647fb
-README.zh.md: d4ab0a658ff0d75f5f0338f74cd90a1a6d82fab9
+/:
+  en: 1c8be05e4c02cbd0
+  zh: 61495d48365178df
+/dsh-session:
+  en: c40358565aab7975
+  zh: d87a93214212b08f
+/dsh-session/summary:
+  en: 311239677afd230a
+  zh: f2c575945baaa2a2
+/dsh-session/table-of-contents:
+  en: c1f6b6406da900d8
+  zh: 5237b8e716e5bb54
+/dsh-session/service-sessionstore-ctx-key-sessions:
+  en: 41fd14b47f2dd796
+  zh: 52378708b1bdf921
+/dsh-session/service-sessionstore-ctx-key-sessions/message-projections:
+  en: 636067728d20e32e
+  zh: 91640a5faedf4d58
+/dsh-session/service-sessionstore-ctx-key-sessions/public-api:
+  en: e071dc5d911fde36
+  zh: 9349467848dd927f
+/dsh-session/service-sessionstore-ctx-key-sessions/public-api/advanced-ordered-teardown-lifecycle-primitives:
+  en: 7b9c4b4c811c8fc1
+  zh: c86261fafc4ba806
+/dsh-session/service-sessionstore-ctx-key-sessions/live-service-events:
+  en: edbec19a7b97e5a0
+  zh: 3495313a3f9ad3e5
+/dsh-session/service-sessionstore-ctx-key-sessions/class-session:
+  en: 20cd567e87e1cb2a
+  zh: 3363ef7ade51d214
+/dsh-session/service-sessionstore-ctx-key-sessions/lossless-json-utilities:
+  en: 3d86d574b5c0cc37
+  zh: 42d879f69c079f9e
+/dsh-session/service-sessionstore-ctx-key-sessions/chunk-row-storage-codec-chunk-rows-ts:
+  en: 1cf935768c7ceeac
+  zh: c39b5fc377a48aed
+/dsh-session/service-sessionstore-ctx-key-sessions/surface-types:
+  en: ff27b7d81d83d637
+  zh: d43f3a14be632943
+/dsh-session/service-sessionstore-ctx-key-sessions/design-concept:
+  en: dabbe938e288c55a
+  zh: 6eb0ffcc8d9f511c
+/dsh-session/service-sessionstore-ctx-key-sessions/request-header-reconstruction-request-header-ts:
+  en: 64c984a8f4b5792e
+  zh: 13b8c51d1b3ac3dd
+/dsh-session/service-sessionstore-ctx-key-sessions/session-event-vocabulary-types-ts:
+  en: 6e2b151af415848b
+  zh: f7d9b2ba8c3dcc4b
+/dsh-session/service-sessionstore-ctx-key-sessions/metadata-types-types-ts:
+  en: 0bf1f70dc501165f
+  zh: 85a77c96d8074d08
+/dsh-session/service-sessionstore-ctx-key-sessions/extension-points:
+  en: c8f6be6dedad0d25
+  zh: 91dc0471f2d6d78d
+/dsh-session/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/dsh-session/model-experience/derived-message-history:
+  en: 3005f28ded3b28ea
+  zh: daaddc6df470b396
+/dsh-session/model-experience/derived-message-history/what-the-model-sees:
+  en: 232298b3c7819661
+  zh: 2ff081c385f3329e
+/dsh-session/model-experience/derived-message-history/token-effect:
+  en: 05e088199dac7f98
+  zh: 35868b5fb768e240
+/dsh-session/model-experience/derived-message-history/kv-cache-effect:
+  en: 6c8079c7de029ed4
+  zh: 634d6f93ce6373c4
+/dsh-session/model-experience/crash-repair-result:
+  en: f9d8372d3a36981c
+  zh: ef28f54125a9021d
+/dsh-session/model-experience/crash-repair-result/what-the-model-sees:
+  en: c70898adb3bbff65
+  zh: f93ae495b7a3f87e
+/dsh-session/model-experience/crash-repair-result/token-effect:
+  en: ac63e0f30175f72d
+  zh: 20f63deeffa249f2
+/dsh-session/model-experience/crash-repair-result/kv-cache-effect:
+  en: f5d5f97a153f7c70
+  zh: b84ef7f75f2e25d0
+/dsh-session/model-experience/logged-request-header:
+  en: 5397f067293a55cd
+  zh: 1dcc30d0c214f175
+/dsh-session/model-experience/logged-request-header/what-the-model-sees:
+  en: f22c66d2d6caed26
+  zh: 805bbf2c8fa69a3b
+/dsh-session/model-experience/logged-request-header/token-effect:
+  en: 310b8f36a86443e5
+  zh: 906c4da8d03c5966
+/dsh-session/model-experience/logged-request-header/kv-cache-effect:
+  en: 5eb30cfb410d52c0
+  zh: d25edaac6d6209e6
+/dsh-session/known-limitations-and-deferred-work:
+  en: 881570e434b64bbc
+  zh: 4c861fd43d71c240
+/dsh-session/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

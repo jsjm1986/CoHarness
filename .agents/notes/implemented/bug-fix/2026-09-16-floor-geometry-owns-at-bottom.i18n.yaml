@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-16-floor-geometry-owns-at-bottom.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-16-floor-geometry-owns-at-bottom.md
-2026-09-16-floor-geometry-owns-at-bottom.md: 3acfb171dab10e48f92a76e897e0be6bae0dbfb0
-2026-09-16-floor-geometry-owns-at-bottom.zh.md: 7ed1505ec8eb1ce683abc9e67f89003e3a5a74e9
+/agent-note-floor-geometry-owns-at-bottom-in-chat-scroll-ownership:
+  en: d514bf4718a5f252
+  zh: ae13128d054384d4
+/agent-note-floor-geometry-owns-at-bottom-in-chat-scroll-ownership/problem:
+  en: 3618015902fef5ac
+  zh: ca9a5d890308046c
+/agent-note-floor-geometry-owns-at-bottom-in-chat-scroll-ownership/decision:
+  en: e874afb043a9db81
+  zh: 4f3c35154537cd0b
+/agent-note-floor-geometry-owns-at-bottom-in-chat-scroll-ownership/alternatives-considered:
+  en: 23204beca1f410b0
+  zh: 5b2f090f588899f6
+/agent-note-floor-geometry-owns-at-bottom-in-chat-scroll-ownership/consequences:
+  en: 8049ed811f6a5446
+  zh: ffe8a00f1f25c914
+/agent-note-floor-geometry-owns-at-bottom-in-chat-scroll-ownership/verification:
+  en: d96575980275f9a3
+  zh: 112396c82e9f6353

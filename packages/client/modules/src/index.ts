@@ -213,20 +213,29 @@ function artifactRevision(bundle: Buffer, baseline: ClientArtifactBaseline): str
   return framedHash('plugin-artifact', [bundle, Buffer.from(String(baseline.mtimeMs))])
 }
 
-/** Address one ordered plugin-file list through the shared combo route. */
-function comboUrl(ids: readonly string[], rev: string, sourceMap = false): string {
+/** Absolute response key for one ordered plugin-file list on the shared combo route. */
+function comboPath(ids: readonly string[], rev: string, sourceMap = false): string {
   const resources = ids.map(id => `${id}/client.js${sourceMap ? '.map' : ''}`).join(',')
   return `/plugins/??${resources}&rev=${rev}`
 }
 
-/** Address one package-local chunk through the same revision as its entry. */
-function chunkUrl(id: string, fileName: string, rev: string, sourceMap = false): string {
+/**
+ * Document-relative browser reference for the same combo. Graph rows and batch
+ * descriptors carry this form so a shell mounted below the origin root resolves
+ * it against the document; response caches stay keyed by the absolute path.
+ */
+function comboUrl(ids: readonly string[], rev: string, sourceMap = false): string {
+  return comboPath(ids, rev, sourceMap).slice(1)
+}
+
+/** Absolute request path of one package-local chunk under the same revision as its entry. */
+function chunkPath(id: string, fileName: string, rev: string, sourceMap = false): string {
   return `/plugins/${id}/${fileName}${sourceMap ? '.map' : ''}?rev=${rev}`
 }
 
 /** Measure the longer map-form URL used to partition a startup resource list. */
 function projectedComboUrlBytes(records: readonly WebPluginRecord[]): number {
-  return Buffer.byteLength(comboUrl(
+  return Buffer.byteLength(comboPath(
     records.map(record => record.entry.id),
     COMBO_REVISION_PLACEHOLDER,
     true,
@@ -411,13 +420,15 @@ function buildCombo(
   const rev = revision ?? comboRevision(resources)
   const entries = resources.map(resource => resource.id)
   const url = comboUrl(entries, rev)
-  const sourceMapUrl = comboUrl(entries, rev, true)
+  const sourceMapUrl = comboPath(entries, rev, true)
   return {
     url,
     rev,
     entries,
     sourceMapUrl,
-    scriptBody: lazyBody(() => buildComboScript(resources, sourceMapUrl)),
+    // `??...` resolves against the loaded script's /plugins/ directory, so a
+    // mounted document reaches the same absolute map key.
+    scriptBody: lazyBody(() => buildComboScript(resources, sourceMapUrl.slice('/plugins/'.length))),
     sourceMapBody: lazyBody(() => buildComboSourceMap(resources, sourceMapOf)),
   }
 }
@@ -735,7 +746,7 @@ export class ClientModuleRegistry extends Service {
 
     const batchResponses = new Map<string, LazyResponse>()
     for (const artifact of artifacts) {
-      batchResponses.set(artifact.descriptor.url, this.responses.get(artifact.descriptor.url) ?? {
+      batchResponses.set(`/${artifact.descriptor.url}`, this.responses.get(`/${artifact.descriptor.url}`) ?? {
         body: artifact.scriptBody,
         contentType: 'text/javascript; charset=utf-8',
       })
@@ -747,7 +758,7 @@ export class ClientModuleRegistry extends Service {
     const responses = new Map(batchResponses)
     for (const record of this.table.values()) {
       const artifact = buildCombo([record], this.readSourceMap, record.entry.rev)
-      responses.set(artifact.url, responses.get(artifact.url) ?? this.responses.get(artifact.url) ?? {
+      responses.set(`/${artifact.url}`, responses.get(`/${artifact.url}`) ?? this.responses.get(`/${artifact.url}`) ?? {
         body: artifact.scriptBody,
         contentType: 'text/javascript; charset=utf-8',
       })
@@ -1054,7 +1065,7 @@ export class ClientModuleRegistry extends Service {
       const sourceMap = requested.endsWith('.map')
       const fileName = sourceMap ? requested.slice(0, -'.map'.length) : requested
       if (!CLIENT_CHUNK.test(fileName)) return undefined
-      if (resourceUrl !== chunkUrl(record.entry.id, fileName, record.entry.rev, sourceMap)) return undefined
+      if (resourceUrl !== chunkPath(record.entry.id, fileName, record.entry.rev, sourceMap)) return undefined
       return { record, fileName, sourceMap, resourceUrl }
     }
     return undefined
@@ -1067,7 +1078,7 @@ export class ClientModuleRegistry extends Service {
     const { record, fileName, sourceMap, resourceUrl } = request
     const clientPath = join(dirname(record.meta.clientPath), fileName)
     if (!existsSync(clientPath)) return undefined
-    const sourceMapUrl = chunkUrl(record.entry.id, fileName, record.entry.rev, true)
+    const mapKey = chunkPath(record.entry.id, fileName, record.entry.rev, true)
     const resource = (): ComboResource => ({
       id: record.entry.id,
       rev: record.entry.rev,
@@ -1081,7 +1092,8 @@ export class ClientModuleRegistry extends Service {
         contentType: 'application/json; charset=utf-8',
       }
       : {
-        body: lazyBody(() => buildComboScript([resource()], sourceMapUrl)),
+        // Filename-relative trailer resolves under the chunk's own directory.
+        body: lazyBody(() => buildComboScript([resource()], mapKey.slice(`/plugins/${record.entry.id}/`.length))),
         contentType: 'text/javascript; charset=utf-8',
       }
     this.responses.set(resourceUrl, response)

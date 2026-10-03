@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-08-subagent-output-backward-scan.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-08-subagent-output-backward-scan.md
-2026-09-08-subagent-output-backward-scan.md: 1d04059971ac64f567422450a419bf6301412ab2
-2026-09-08-subagent-output-backward-scan.zh.md: 6ec5a436c5fd9a5eb9d2d0c6b3d63b1b744c08f5
+/agent-note-backward-scan-for-final-subagent-output:
+  en: ff081972bd59ba93
+  zh: 0e1fa5b882659e21
+/agent-note-backward-scan-for-final-subagent-output/problem:
+  en: 0c5e29b3fb9ed062
+  zh: 34316b41192e9459
+/agent-note-backward-scan-for-final-subagent-output/decision:
+  en: 5e9ac7e37dd63d5b
+  zh: 973c8400f22c0e16
+/agent-note-backward-scan-for-final-subagent-output/alternatives-considered:
+  en: 32c3227b50635389
+  zh: 581e8e7fe4db7552
+/agent-note-backward-scan-for-final-subagent-output/consequences:
+  en: ec5772296c70ea3e
+  zh: 63683490af077b78

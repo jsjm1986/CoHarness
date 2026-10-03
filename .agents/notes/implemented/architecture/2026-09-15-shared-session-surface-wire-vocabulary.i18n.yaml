@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-15-shared-session-surface-wire-vocabulary.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-15-shared-session-surface-wire-vocabulary.md
-2026-09-15-shared-session-surface-wire-vocabulary.md: 80145ad9b1474ebc79f19ec0aeb006203c01ce39
-2026-09-15-shared-session-surface-wire-vocabulary.zh.md: a652cfe05ad0fcb2c891f01456978dfb9c1c094c
+/agent-note-the-session-surface-wire-vocabulary-is-single-sourced:
+  en: 1c74b13ed90215ae
+  zh: b021808f06df2cf4
+/agent-note-the-session-surface-wire-vocabulary-is-single-sourced/problem:
+  en: 52558917f7e515e7
+  zh: 26193f7f43575d32
+/agent-note-the-session-surface-wire-vocabulary-is-single-sourced/decision:
+  en: cbfd9cc5c41c7836
+  zh: 04a2842fd18468f9
+/agent-note-the-session-surface-wire-vocabulary-is-single-sourced/alternatives-considered:
+  en: 3a0e49a687bc194f
+  zh: 78b04fe174d1a1f4
+/agent-note-the-session-surface-wire-vocabulary-is-single-sourced/consequences:
+  en: 7cf5c8f0c209d452
+  zh: b9c4a00803110112
+/agent-note-the-session-surface-wire-vocabulary-is-single-sourced/verification:
+  en: 0100c06df0cc77a7
+  zh: a8e144df181e97c1

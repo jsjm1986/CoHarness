@@ -57,6 +57,20 @@ async function stubAgent(
 }
 
 describe('LocalFileReferenceService', () => {
+  it('finishes agent cleanup after the owning scope already disposed its prompt registration', async () => {
+    const ctx = await harness()
+    const warnings: unknown[][] = []
+    ctx.logger.exporter({ levels: { default: 2 }, export: ({ type, args }) => { if (type === 'warn') warnings.push(args) } })
+    try {
+      await ctx.plugin(LocalFileReferenceService)
+      const owner = ctx.plugin({ inject: ['agents', 'sessions'], apply() {} })
+      await owner
+      await stubAgent(owner.ctx, 'disposed-owner')
+      await owner.dispose()
+      expect(warnings).toEqual([])
+    } finally { await ctx.fiber.dispose() }
+  })
+
   it('serves the addressed workspace and installs read-tool guidance for existing agents', async () => {
     const ctx = await harness()
     const { agent } = await stubAgent(ctx)

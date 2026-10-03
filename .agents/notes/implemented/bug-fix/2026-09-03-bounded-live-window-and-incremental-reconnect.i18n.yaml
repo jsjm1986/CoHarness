@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-03-bounded-live-window-and-incremental-reconnect.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-03-bounded-live-window-and-incremental-reconnect.md
-2026-09-03-bounded-live-window-and-incremental-reconnect.md: c49e0d5e3f80a1bb39415f45dd89a96ad9980110
-2026-09-03-bounded-live-window-and-incremental-reconnect.zh.md: e251f1c2e980a1c75b40e652c2fc15ab413a2808
+/agent-note-bound-the-live-history-window-and-make-reconnect-catch-up-incremental:
+  en: ecff0ab01027318d
+  zh: 9d20e8871719a89f
+/agent-note-bound-the-live-history-window-and-make-reconnect-catch-up-incremental/problem:
+  en: 00e3b2315396b691
+  zh: 0f3b6c640c03c0df
+/agent-note-bound-the-live-history-window-and-make-reconnect-catch-up-incremental/decision:
+  en: 8ad5370e9a58e2d7
+  zh: 87782334213a2459
+/agent-note-bound-the-live-history-window-and-make-reconnect-catch-up-incremental/alternatives-considered:
+  en: 9b30ae6a7e223698
+  zh: ac7375ad922ef773
+/agent-note-bound-the-live-history-window-and-make-reconnect-catch-up-incremental/consequences:
+  en: 43c18584fd6665cd
+  zh: fbb57151006216f9

@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-31-session-sequence-and-log-offset-brands.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-31-session-sequence-and-log-offset-brands.md
-2026-08-31-session-sequence-and-log-offset-brands.md: 0efc7e308350c1dd549a3499b24e42005b6e1c5e
-2026-08-31-session-sequence-and-log-offset-brands.zh.md: 2c85a315827b8e2173b560d6061714faac25447a
+/agent-note-distinguish-session-event-identities-from-log-offsets:
+  en: 208988a481b2baa2
+  zh: 0f0c7e5014d5e966
+/agent-note-distinguish-session-event-identities-from-log-offsets/problem:
+  en: c1cfdbd494f0b550
+  zh: 723463f4b08eb4b8
+/agent-note-distinguish-session-event-identities-from-log-offsets/decision:
+  en: 9293287d9c8e6bd8
+  zh: 1f028b141fb4310b
+/agent-note-distinguish-session-event-identities-from-log-offsets/admission-and-ownership:
+  en: f4ee94a195714bdc
+  zh: 3999289e644abee9
+/agent-note-distinguish-session-event-identities-from-log-offsets/alternatives-considered:
+  en: b28120f9a700c9d3
+  zh: f7878f2baf829493
+/agent-note-distinguish-session-event-identities-from-log-offsets/consequences:
+  en: 3465e05bdaaea6c4
+  zh: f2949c5128fb6c6f
+/agent-note-distinguish-session-event-identities-from-log-offsets/testing:
+  en: 5411e0685b4fa23d
+  zh: a45282638d0d854c

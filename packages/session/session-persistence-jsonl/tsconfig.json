@@ -21,6 +21,9 @@
       "path": "../../../vendor/schemastery"
     },
     {
+      "path": "../session-format-v6-to-v7"
+    },
+    {
       "path": "../../llm/llm"
     },
     {
@@ -40,6 +43,9 @@
     },
     {
       "path": "../session-format-v3-to-v4"
+    },
+    {
+      "path": "../../util/managed-data"
     }
   ]
 }

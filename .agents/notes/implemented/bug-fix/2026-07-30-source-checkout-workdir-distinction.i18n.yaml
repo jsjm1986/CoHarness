@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-source-checkout-workdir-distinction.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-30-source-checkout-workdir-distinction.md
-2026-07-30-source-checkout-workdir-distinction.md: ba6d9dd12b55a54d4ae8d2e91ad83ac3c1dc47fd
-2026-07-30-source-checkout-workdir-distinction.zh.md: 06b09f82f294a70795090a9aec1b2220bd6e7512
+/agent-note-source-checkout-paths-do-not-define-working-directories:
+  en: 75e96568bc833a10
+  zh: 77dcdf4bbf8e2808
+/agent-note-source-checkout-paths-do-not-define-working-directories/problem:
+  en: 07744e558655eb6c
+  zh: 92fbc6ccbb39f853
+/agent-note-source-checkout-paths-do-not-define-working-directories/decision:
+  en: c627d9efd7491c0f
+  zh: efb9c4b09b39b215
+/agent-note-source-checkout-paths-do-not-define-working-directories/verification:
+  en: 30acec6f155a76fe
+  zh: 863f2b89c6415dee
+/agent-note-source-checkout-paths-do-not-define-working-directories/alternatives-considered:
+  en: c6a61661ea60b5d7
+  zh: 611d0d4ca01904f6
+/agent-note-source-checkout-paths-do-not-define-working-directories/consequences:
+  en: 15a49ce138a05c96
+  zh: 867ebf157feb91a8

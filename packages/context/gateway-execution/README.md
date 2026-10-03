@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Authorize managed Agent work using every verified human contributor's current permissions. Preserve those contributors across edits, delegation, delivery, and restoration, and stop active work when permission checks or authorization updates become unavailable. Gateway PostgreSQL records own identity and permissions; Session events preserve the references required to check them.
+Authorize each managed request and its inherited execution chain using the current permissions of its verified initiators. A new root request does not inherit unrelated historical participants. Edits, child work, queued deliveries, and delayed callbacks retain their own contributors. Gateway PostgreSQL records own identity and permissions; Session events preserve the references required after restoration.
 
 ## Table of Contents
 
@@ -26,12 +26,16 @@ Authorize managed Agent work using every verified human contributor's current pe
 
 Compose the provider with [Gateway Runtime](../gateway-runtime/README.md), Agent and Session services, Session Query, permission presets, and sandbox policy in a Gateway-owned runtime. Independent local profiles do not load it. Gateway Runtime marks the application as requiring execution authority; disposing this provider does not remove that requirement.
 
-The Gateway database requires [execution identity migration 030](../../../gateway/deploy/postgres/migrations/030_execution_identity.sql) and [Auto eligibility migration 031](../../../gateway/deploy/postgres/migrations/031_auto_review_eligibility.sql). Startup migration handling belongs to the [Gateway](../../../gateway/README.md).
+The managed webhook route uses the same Session-creation service dependencies as the webhook runtime. Its registration waits for those services; unloading one removes the route and cancels pending admission before a prompt can be submitted.
+
+Project delivery requires the collaboration provider and creates the root under the configured project or private visibility. The Gateway rechecks current write membership and binds persistence to the execution account; other restricted-purpose assertions cannot create roots.
+
+The Gateway database requires execution identity migrations 030, 031, and [immutable scopes migration 047](../../../gateway/deploy/postgres/migrations/047_execution_scopes.sql). Startup migration handling belongs to the [Gateway](../../../gateway/README.md).
 
 | Field | Default | Meaning |
 |---|---|---|
 | `reconnectDelayMs` | `1000` | Delay before reconnecting a lost authorization update stream; a positive integer no greater than `2147483647`. |
-| `jobStopTimeoutMs` | `30000` | Maximum wait for a revoked background job to release its resources; a positive integer no greater than `2147483647`. |
+| `jobStopTimeoutMs` | `30000` | Maximum wait for revoked jobs and detached tool calls to release resources; a positive integer no greater than `2147483647`. |
 | `desktop` | absent | Node-local desktop identifier; absence denies managed driver effects. Requires migrations 032 and 033. |
 | `desktopPollMs` | `1000` | Queue polling and maximum lease renewal interval in milliseconds; positive integer at most `2147483647`. |
 | `desktopCleanupMs` | `30000` | Desktop cleanup request timeout in milliseconds; positive integer at most `2147483647`. |
@@ -43,16 +47,16 @@ The Gateway launch composition supplies `desktop` when the node declares `HGW_DE
 
 Only a live, unrestricted HTTP principal can attest a human message or question answer. Attestation binds the exact input to the Gateway's immutable record. Entering that input checks its original content digest even when trusted context plugins subsequently render references. Queue edits preserve earlier editors; a claimed question answer adds its responder. Display participants and ordinary approval responses do not create authority.
 
-The provider records confirmed participant sets and explicit inheritance in `gateway/execution` events. Capture precedes asynchronous delegation, while restored inheritance and adjacent relays are verified with the Gateway before execution. Historical participants cannot be removed by selecting a shorter fork prefix or replacing display metadata. The [Service Definition](../execution-authority/README.md) owns consumer obligations.
+The provider records immutable execution scopes in `gateway/execution` events. A new root turn starts from its admitted input; edits retain all editors, and owned child input retains its actual inherited chain. Goal rounds, background-job results, Team messages, and PTC callbacks carry the scope captured at their origin. Late results cannot replace a newer request’s identity. Historical witnesses remain available for audit and delayed billing. The [Service Definition](../execution-authority/README.md) owns consumer obligations.
 
-Before a model request or allowed tool call, the provider checks the actual live Agent against the Gateway. Ordinary execution requires current write access; Full and profile management additionally require the complete participant set's administrator authority, while Auto requires every participant's separate eligibility grant. Unverified historical input prevents privileged execution. Explicit privileged preset selection also checks the live selector. [Permission presets](../../interaction/permission-presets/README.md) own the selection and default-setting rules.
+Before a model request or allowed tool call, the provider checks every participant in that exact execution scope. Ordinary execution requires current write access; Full and profile management require administrator authority, while Auto requires separate eligibility. Unknown input within the current chain prevents privileged execution. A fresh verified root request can proceed after unknown historical input. Preset selection checks the live selector; actual execution checks its complete chain again. [Permission presets](../../interaction/permission-presets/README.md) own selection and defaults.
 
 This provider owns `pluginManagementAuthorization` and `permissionPresetAuthorization`. Interactive profile operations use a fresh Gateway administrator check; Agent-initiated operations use the Agent's full participant set. Missing authorization does not fall back to an earlier HTTP request or browser role. [Profile management authorization](../../../.agents/notes/implemented/architecture/2026-09-22-gateway-profile-management-authority.md) defines the protected operations and cancellation behavior.
 
 <a id="revocation-and-cancellation"></a>
 ## Revocation and cancellation
 
-Authorization requires a ready Gateway update stream. A relevant invalidation rechecks active work; a failed check or stream loss cancels it. A response from an obsolete stream generation, disposed Agent, cancelled operation, or older authority revision cannot authorize execution. Reconnection restores the ability to check permissions; it does not replay cancelled model calls or tool effects.
+Authorization requires a ready Gateway update stream. A participant invalidation rechecks each affected execution scope and stops its current turn, jobs, and tool calls without cancelling an independent request by another qualified user. A lost stream stops every active scope. Responses from an obsolete stream generation, changed scope, disposed Agent, or cancelled operation cannot authorize execution. Accepted queue entries survive an individual actor’s cancellation and remain parked until a new waking send; reconnection does not replay effects.
 
 An idle Agent's owned running or stopping jobs retain their required qualifications until they settle. When its last owned job settles, the provider clears cached qualifications for that idle Agent. Revocation stops those jobs through the existing Jobs service and waits within `jobStopTimeoutMs`; a job that remains active produces a cleanup failure, not a successful-stop result.
 
@@ -61,7 +65,7 @@ Provider disposal aborts its transport lifetime and drains owned checks. Operati
 <a id="invariants"></a>
 ## Invariants
 
-No invariant companion is published because a local mirror cannot independently prove current PostgreSQL permissions. The provider validates monotonic revisions and retained participants when recording Gateway replies, and rechecks authority at execution admission.
+No invariant companion is published because a local mirror cannot independently prove current PostgreSQL permissions. The provider validates immutable scope references and rechecks authorization at execution admission.
 
 <a id="further-exploration"></a>
 ## Further Exploration
@@ -88,3 +92,13 @@ None; authorization references remain outside model request content and do not a
 - Provider and PostgreSQL tests establish identity and permission checks; complete assembled acceptance of every restored, delegated, and deployed Web path remains separate.
 - A verified participant set authorizes operations but does not confine trusted Host plugins or undo effects completed before cancellation.
 - Work outside the Jobs registry and unmanaged external processes require their own cancellation and isolation review.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

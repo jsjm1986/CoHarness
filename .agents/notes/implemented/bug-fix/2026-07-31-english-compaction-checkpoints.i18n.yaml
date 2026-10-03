@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-english-compaction-checkpoints.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-31-english-compaction-checkpoints.md
-2026-07-31-english-compaction-checkpoints.md: dc95ed187a6ba5b86800f06ebefb2776995f9421
-2026-07-31-english-compaction-checkpoints.zh.md: 1dc98b43e5bf2ca66cb3480b8124af6e7a9479b2
+/agent-note-compaction-checkpoints-use-an-english-engineering-register:
+  en: 8d7e83ff48fcb17c
+  zh: fa7604bee83a8eb4
+/agent-note-compaction-checkpoints-use-an-english-engineering-register/problem:
+  en: 2db6538010f16b10
+  zh: 55fa9e7f086ed9cf
+/agent-note-compaction-checkpoints-use-an-english-engineering-register/decision:
+  en: efda40681daa0155
+  zh: f50ec879c9941a6d
+/agent-note-compaction-checkpoints-use-an-english-engineering-register/alternatives-considered:
+  en: 99e85d7c85c8b722
+  zh: 0f05f87f71cfe396
+/agent-note-compaction-checkpoints-use-an-english-engineering-register/consequences:
+  en: 7695cdd06a9d5d0f
+  zh: 69d467242c0cde78

@@ -5,9 +5,11 @@ import { ErrorBanner, Field, PageHeader, Button, LoadingState, Section } from '.
 import { PluginManagerPage } from '../plugins/PluginManagerPage.tsx'
 import { PluginManagerController } from '../plugins/manager-store.ts'
 import { pluginManagementRemote } from '../plugins/transport.ts'
+import { resolveLocalized } from '../plugins/presentation.ts'
 import { zh } from '../plugins/locales.ts'
 import { ProfileSettingsController } from '../plugins/settings-store.ts'
 import { PluginConfiguration, SETTINGS_OWNER_LABELS } from '../plugins/PluginConfiguration.tsx'
+import { PluginPermissions } from '../components/PluginPermissions.tsx'
 
 function Manager({ target, invalidate }: { target: PluginManagementTarget; invalidate: (message: string) => void }) {
   const [owner, setOwner] = useState<{ controller: PluginManagerController; settings: ProfileSettingsController; abort: AbortController } | null>(null)
@@ -43,6 +45,7 @@ function ManagerView({ controller, settings }: { controller: PluginManagerContro
         ? `${SETTINGS_OWNER_LABELS[view.owner ?? 'deployment']} · ${view.applies === 'restart' ? '保存后需重启' : '即时配置'}`
         : <PluginConfiguration key={view.ns} view={view} controller={settings} />
     }}
+    resolveText={resolveLocalized}
     t={(key, parameters) => Object.entries(parameters ?? {}).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), zh[key])} /></>
 }
 
@@ -91,5 +94,6 @@ export function PluginsPage() {
       {binding === null ? null : <p className="muted">节点 {binding.nodeId} · {binding.generation === null ? '实例未运行；此页面不会启动实例。' : `实例代次 ${binding.generation}`}</p>}
     </div></Section>
     {binding?.generation == null ? null : <div className="adminPluginManager"><Manager key={`${binding.nodeId}:${selected}:${binding.generation}`} target={binding} invalidate={invalidate} /></div>}
+    <PluginPermissions />
   </div>
 }

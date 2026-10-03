@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-27-document-index-pagination-and-trash-lifecycle.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-27-document-index-pagination-and-trash-lifecycle.md
-2026-08-27-document-index-pagination-and-trash-lifecycle.md: 277d6c767df9d0030bc496a6ce5e42027460e6a8
-2026-08-27-document-index-pagination-and-trash-lifecycle.zh.md: 27333233841b568e4c31d2eee065f4d6dbe3f7ef
+/agent-note-document-index-pagination-and-recoverable-trash:
+  en: 1db4b68735aaf621
+  zh: b813714a5cc49fd7
+/agent-note-document-index-pagination-and-recoverable-trash/problem:
+  en: 7403c36610537e71
+  zh: f77cebba8c384016
+/agent-note-document-index-pagination-and-recoverable-trash/decision:
+  en: 3b04cc42ccb80a60
+  zh: d12d6f59c80578ca
+/agent-note-document-index-pagination-and-recoverable-trash/alternatives-considered:
+  en: 82c1423d4010d028
+  zh: 980f69f550d3918c
+/agent-note-document-index-pagination-and-recoverable-trash/consequences:
+  en: f326ce90df9dbd64
+  zh: ce50518b52841457
+/agent-note-document-index-pagination-and-recoverable-trash/verification:
+  en: 3b41949598d111d2
+  zh: 514ea236376d7b6e

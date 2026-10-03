@@ -64,6 +64,8 @@ interface SettingsRegisterOptions<T> {
    * object-prototype keys.
    */
   projectWritePaths?: readonly SettingsProjectWritePath[]
+  /** Localized display title for surfaces that list the namespace outside its owner's own UI. */
+  label?: LocalizedText
 }
 ```
 
@@ -150,6 +152,8 @@ interface SettingsDescriptor {
   projectWritePaths?: string[][]
   /** Schema-declared secret positions; present only under `redactSecrets`. */
   secrets?: RedactedSecret[]
+  /** Registrant's localized display title, when declared. */
+  label?: LocalizedText
 }
 ```
 
@@ -235,7 +239,7 @@ register<const Namespace extends string, T>( ns: Namespace & SettingsNamespaceIn
  * @param ns - consumer-owned settings namespace.
  * @param schema - schema resolving the namespace.
  * @param entry - composition entry used as the base and fallback value.
- * @param hooks - source sink, change notification, and optional validation.
+ * @param hooks - source sink, change notification, and optional validation and display title.
  * @throws {TypeError} when `ns` is not a lowercase hyphenated identifier.
  */
 installSection<const Namespace extends string, T>( owner: Context, ns: Namespace & SettingsNamespaceInput<Namespace>, schema: z<T>, entry: T, hooks: SettingsSectionHooks<T>, ): void

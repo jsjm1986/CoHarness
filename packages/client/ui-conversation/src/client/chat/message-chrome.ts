@@ -6,7 +6,13 @@ import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 export type ClockTranslate = Translate<'clock.md' | 'clock.ymd'>
 
 /** The elapsed-duration share of the conversation dictionary. */
-export type RunDurationTranslate = Translate<'duration.seconds' | 'duration.minutes' | 'duration.hours'>
+export type RunDurationTranslate = Translate<'duration.secondUnit' | 'duration.minuteUnit' | 'duration.hourUnit'>
+
+/** One display fragment of an elapsed-time label. */
+export interface RunDurationPart {
+  readonly text: string
+  readonly numeric: boolean
+}
 function pad2(n: number): string {
   return String(n).padStart(2, '0')
 }
@@ -34,21 +40,22 @@ export function msUntilNextLocalMidnight(ms: number): number {
 }
 
 /**
- * Localized elapsed-time label shared by running and settled turn chrome.
- * @param ms - Elapsed duration in milliseconds (negatives clamp to zero).
- * @param t - Translate seat supplying the duration templates.
- * @returns Display string in whole seconds; minutes and seconds after one
- * minute, and hours, minutes, and seconds after one hour.
+ * Build elapsed-time fragments for both live and settled turn chrome.
+ * @param ms - elapsed milliseconds; negatives clamp to zero and fractions floor.
+ * @param t - translate seat supplying units and their trailing spacing.
+ * @returns numbers and localized units in display order, without leading zeros;
+ * minutes start at 60 seconds and hours at 60 minutes.
  */
-export function formatRunDuration(ms: number, t: RunDurationTranslate): string {
+export function formatRunDuration(ms: number, t: RunDurationTranslate): RunDurationPart[] {
   const total = Math.max(0, Math.floor(ms / 1000))
   const hours = Math.floor(total / 3600)
   const minutes = Math.floor(total / 60) % 60
   const seconds = total % 60
-  if (hours > 0) return t('duration.hours', { hours, minutes: pad2(minutes), seconds: pad2(seconds) })
-  return minutes > 0
-    ? t('duration.minutes', { minutes, seconds: String(seconds).padStart(2, '0') })
-    : t('duration.seconds', { seconds })
+  const parts: RunDurationPart[] = []
+  if (hours > 0) parts.push({ text: String(hours), numeric: true }, { text: t('duration.hourUnit'), numeric: false })
+  if (total >= 60) parts.push({ text: String(minutes), numeric: true }, { text: t('duration.minuteUnit'), numeric: false })
+  parts.push({ text: String(seconds), numeric: true }, { text: t('duration.secondUnit'), numeric: false })
+  return parts
 }
 
 /**

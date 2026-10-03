@@ -27,7 +27,7 @@ import type {
   OpenState, PendingSubmission, PromptError,
 } from './conversation.ts'
 import { EMPTY_CHAT_SNAPSHOT } from './conversation.ts'
-import type { PendingInteraction } from './pending.ts'
+import type { PendingInteraction, SessionPendingEntry, SessionPublishedInteraction } from './pending.ts'
 import { PendingWait } from './pending.ts'
 import { Notifier } from './notifier.ts'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
@@ -144,8 +144,10 @@ export class Session implements SessionFace {
   private historyDetail: HistoryDetailState = 'conversation'
   private fillPromise: Promise<void> | null = null
   private pending = new Map<string, PendingInteraction>()
+  /** Plugin-published carriers merged into the pending feed after the wire waits. */
+  private publishedPending = new Map<string, SessionPublishedInteraction>()
   private pendingRev = 0
-  private pendingCache: { rev: number; value: PendingInteraction[] } | null = null
+  private pendingCache: { rev: number; value: SessionPendingEntry[] } | null = null
   /** Authoritative stream-only inbox snapshot; pending work never hits history. */
   private readonly queueMirror = new SessionQueueMirror()
   private readonly disposeInboxProjection: () => void
@@ -909,6 +911,25 @@ export class Session implements SessionFace {
     this.pendingRev++
   }
 
+  /**
+   * Publish one plugin-owned interaction carrier into the pending feed.
+   * Republishing a key replaces the earlier entry; the returned disposer
+   * withdraws only the entry it installed.
+   * @param entry - the publisher's carrier; `key` must not collide with a wire wait.
+   * @returns withdrawal for the publisher's hide/dispose path.
+   */
+  publishInteraction(entry: SessionPublishedInteraction): () => void {
+    this.publishedPending.set(entry.key, entry)
+    this.pendingRev++
+    this.notifier.markDirty()
+    return () => {
+      if (this.publishedPending.get(entry.key) !== entry) return
+      this.publishedPending.delete(entry.key)
+      this.pendingRev++
+      this.notifier.markDirty()
+    }
+  }
+
   /** Schedule the first index read after the initial history page has painted. */
   private scheduleHistoryNavigationRead(): void {
     if (this.address !== undefined || !this.stageActive || this.openState !== 'open') return
@@ -1562,7 +1583,8 @@ export class Session implements SessionFace {
 
   private buildSnapshot(): ConversationSnapshot {
     if (this.pendingCache === null || this.pendingCache.rev !== this.pendingRev) {
-      this.pendingCache = { rev: this.pendingRev, value: [...this.pending.values()] }
+      this.pendingCache = { rev: this.pendingRev,
+        value: [...this.pending.values(), ...this.publishedPending.values()] }
     }
     const chat = (this.conversation.snapshot('chat') as ChatSnapshot | undefined) ?? EMPTY_CHAT_SNAPSHOT
     const legacy = chat.legacy
@@ -1573,6 +1595,7 @@ export class Session implements SessionFace {
       nodes: legacy.nodes,
       turnTimings: legacy.turnTimings,
       turnEnds: legacy.turnEnds,
+      openTurn: this.conversation.openTurn(),
       partial: legacy.partial,
       runningCalls: legacy.runningCalls,
       pending: this.pendingCache.value,

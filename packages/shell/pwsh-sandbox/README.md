@@ -35,7 +35,7 @@ Choose it when a deployment needs file-level confinement for PowerShell commands
 
 | Mode | File effects |
 |---|---|
-| `read-only` (default) | Writes are denied; the boundary stays partial because the restricted token retains Everyone |
+| `read-only` (default) | Writes are denied; the boundary stays partial for the shared hard-link, unconfined-read, and AppContainer-ACL limits |
 | `workspace-write` | Writes under the policy's workspace root plus a private temp directory; `TMP`/`TEMP` are rewritten to it before spawning |
 | `danger-full-access` | No confinement; the provider is never consulted, and results carry `sandbox: { mode, denied: false }` |
 
@@ -88,7 +88,7 @@ The executor is the pwsh twin of `dsh-bash-sandbox`: it inherits `dsh-pwsh-local
 
 ### Main flow
 
-For a confined mode, `resolve()` stamps the per-call policy; `run` and `start` wrap the pwsh argv through the provider and hand the confined argv to the inherited subprocess path. At settlement the executor classifies the outcome: a runner failure outranks a denial because the command never ran, a failed run whose stderr carries the runner's denial dialect is reported `denied: true`, and every confined run carries its mode and enforcement facts. `danger-full-access` bypasses the provider entirely and stamps `denied: false`.
+For a confined mode, `resolve()` stamps the per-call policy; `execute` wraps the pwsh argv through the provider and hand the confined argv to the inherited subprocess path. At settlement the executor classifies the outcome: a runner failure outranks a denial because the command never ran, a failed run whose stderr carries the runner's denial dialect is reported `denied: true`, and every confined run carries its mode and enforcement facts. `danger-full-access` bypasses the provider entirely and stamps `denied: false`.
 
 ### Invariants
 
@@ -140,7 +140,7 @@ These limits define when this executor is only a partial boundary on Windows. Th
 
 - **Reads are unrestricted on Windows** — the ACL runner restricts writes only; the read boundary is documented in `@deepseek-ai/dsh-sandbox-windows-acl`.
 - **Windows workspace-write temp authority is private** — per live session/workspace pair; agentless calls receive a fresh private directory per invocation; the ambient temp root is never granted, and the runner rewrites `TMP`/`TEMP` to the private directory before spawning.
-- **Windows read-only grants no explicit writable root but remains partial** — the restricted token must retain Everyone; objects whose DACL grants Everyone write access — including compatible opens of the NUL device — remain ambient authority, while PowerShell's `> $null` redirection still works without opening NUL.
+- **Windows read-only grants no explicit writable root but remains partial** — NTFS hard links alias one file object across paths, reads stay unconfined, and a tree another AppContainer tool has ACL'd with a package SID is unreadable to the Low-integrity child. NUL stays writable in both modes because the device DACL grants Everyone write and carries no higher label; PowerShell's `> $null` redirection still works without opening it.
 
 <a id="dev-note"></a>
 ### Dev Note

@@ -1,0 +1,34 @@
+# Bilingual-pair consistency record for 2026-09-30-rc1-client-lane-audit.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-09-30-rc1-client-lane-audit.md
+/agent-note-rc1-client-lane-audit:
+  en: b0fb5be54a42b25d
+  zh: 9706d0a730a88b91
+/agent-note-rc1-client-lane-audit/problem:
+  en: 7142feae0f96d43d
+  zh: 13ed2e85714c4417
+/agent-note-rc1-client-lane-audit/proposal:
+  en: 841bf7086d12307e
+  zh: 11c37d0c6d71f469
+/agent-note-rc1-client-lane-audit/proposal/new-packages-client-packages:
+  en: e82bbe07f989b412
+  zh: c3383444de2d0062
+/agent-note-rc1-client-lane-audit/proposal/new-packages-api-controllers:
+  en: 976e367ce05a39f9
+  zh: e9b012b67d259eb9
+/agent-note-rc1-client-lane-audit/proposal/un-ported-upstream-behavior-inside-shared-packages:
+  en: 72d3d62f957bf181
+  zh: 8d6fbaede6671f4e
+/agent-note-rc1-client-lane-audit/alternatives-considered:
+  en: 1e9d65236064c90e
+  zh: 803225b0a98ce610
+/agent-note-rc1-client-lane-audit/acceptance-criteria:
+  en: abad22c5538c2ace
+  zh: bfbb0a6fdbdedc5f
+/agent-note-rc1-client-lane-audit/risks:
+  en: 43d9ddefb551959f
+  zh: 11b2e7f02258abb1
+/agent-note-rc1-client-lane-audit/verification:
+  en: 0a08c4dc61fe31d5
+  zh: c26ac20a70f8167e

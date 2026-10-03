@@ -1,3 +1,8 @@
+---
+description: "Shared in-process subagent run driver: drives a child agent on ctx.agents (used by the spawn and fork backends)"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-subagent-in-process-driver
 
 English | [中文](README.zh.md)
@@ -8,6 +13,20 @@ This package is the shared run driver for the two in-process providers. Spawn pa
 
 `dsh-subagent-in-process-driver` is the shared run driver behind the two in-process subagent backends: it creates one child agent through the host's agent factory, applies per-child customization, drives one task to completion, and returns the child's own final output with a single quiescent disposal path. Spawn calls it with no session seed; fork calls it with the parent's completed-turn prefix. It is a library, not a standalone feature: provider backends call `startInProcessRun`, and nothing in a composition configures it. Read this page to understand the run lifecycle both in-process backends share.
 
+## Table of Contents
+
+- [Start contract](#start-contract)
+- [Cancellation and ownership](#cancellation-and-ownership)
+- [Spawn and fork inputs](#spawn-and-fork-inputs)
+- [Structured output](#structured-output)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="start-contract"></a>
 ## Start contract
 
 `startInProcessRun(request, options): Promise<SubagentRun>` fulfills only after the child is published in `ctx.agents`. A rejected start has already quiesced the agent factory's unpublished creation transaction, so the caller never receives a half-created handle.
@@ -26,18 +45,21 @@ This result boundary is valid because the provider owns an isolated child lifecy
 
 The driver applies the seam's [delegated policy](../subagent/README.md#delegated-policy) through the shared child-agent helpers: it captures the parent's explicit sandbox override and the `'never'` approval pin before child creation and appends the source-tagged events during unpublished setup, after any fork history and before session publication. See the [delegation-policy decision](../../../.agents/notes/implemented/feature/2026-07-25-subagent-policy-inheritance.md).
 
+<a id="cancellation-and-ownership"></a>
 ## Cancellation and ownership
 
 The required request signal covers both startup and the live run. Before publication, `AgentCreationTransaction` observes it, rolls back, and rejects. The factory detaches that creation-only listener before returning; the driver immediately checks the signal once more before installing a minimal live-run listener, closing the handoff race. After publication, abort cancels the child.
 
 After fulfillment, the caller owns the run. Provider-plugin unload does not revoke it. `dispose()` removes the live abort listener, records cancellation, and delegates to the returned `AgentHandle.dispose()`, whose memoized quiescence transaction stops the loop, removes the agent and session, and unwinds scoped registrations. Cancellation owns every non-completed in-flight outcome and reports `aborted`; an already-completed turn remains completed.
 
+<a id="spawn-and-fork-inputs"></a>
 ## Spawn and fork inputs
 
 `InProcessRunOptions` is `{ seed?: SessionEvent[] }`. Spawn omits it. Fork supplies a balanced completed-turn prefix and records its length so the result reader never mistakes a seeded parent message for child output.
 
 Depth enforcement is internal to `startInProcessRun`: it reads the parent depth via `delegationDepthOf` (the persisted `SessionHeader.delegationDepth` is authoritative; runtime `AgentOptions.subagentDepth` may deepen but never lower it, so a resumed child keeps its budget), treats absence as top-level depth zero, rejects malformed stored values, and reports an attempted child depth above `maxDepth`. An unrepresentable depth above the safe-integer domain is a `RangeError`. The child depth is written to the child header, so it survives persistence and resume.
 
+<a id="structured-output"></a>
 ## Structured output
 
 `attachStructuredRuntime(childCtx, schema)` installs the whole contract in the child's scope:
@@ -50,10 +72,12 @@ Depth enforcement is internal to `startInProcessRun`: it reads the parent depth 
 
 A clean turn that never commits the required structured value reports `error`; the driver does not re-prompt. All registrations ride the child fiber and disappear with it.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The driver manages one child Agent per call through the host's agent factory; depth, seeding, and result reading are per-call state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Child-agent request
@@ -122,3 +146,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 - **Runs expose no `sendMessage`/`resume`** — the optional runtime capabilities are absent on in-process runs.
 - **Structured capture accepts the `defineTool` schema subset only** — unsupported JSON Schema constructs fail before the child is created; a provider needing a broader schema vocabulary requires a different runtime.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

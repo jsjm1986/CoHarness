@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-bounded-diff-and-terminal-state.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-bounded-diff-and-terminal-state.md
-2026-09-22-bounded-diff-and-terminal-state.md: b4df6b173f045072e6a598c22580d0ee3fc3b0a0
-2026-09-22-bounded-diff-and-terminal-state.zh.md: 1af1cc60983c96aef23b70ff0fb908974adda168
+/agent-note-bounded-diff-context-and-explicit-terminal-state:
+  en: 7dd1ed08956d2a68
+  zh: b87bd7fdb780dd6b
+/agent-note-bounded-diff-context-and-explicit-terminal-state/problem:
+  en: 17e3521f1ffa6abd
+  zh: c08983a3b9b3c1ff
+/agent-note-bounded-diff-context-and-explicit-terminal-state/decision:
+  en: f1b49f98939df2a8
+  zh: 0e24a047179267da
+/agent-note-bounded-diff-context-and-explicit-terminal-state/alternatives-considered:
+  en: 94ec9b578fba8f83
+  zh: 130ccef09cb9c9ea
+/agent-note-bounded-diff-context-and-explicit-terminal-state/consequences:
+  en: 0f85d110e47636ee
+  zh: 54f8823ae301647d
+/agent-note-bounded-diff-context-and-explicit-terminal-state/testing:
+  en: 11e8f9053ae79ba2
+  zh: 53a503b8bdd5d234

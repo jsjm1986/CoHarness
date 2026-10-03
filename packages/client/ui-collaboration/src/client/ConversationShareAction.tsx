@@ -1,3 +1,4 @@
+import { conversationProject } from './collaboration-client.ts'
 import { useEffect, useRef, useState } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -58,7 +59,7 @@ export function ConversationShareAction({
   })
   const previousTailNodeSeq = useRef(tailNodeSeq)
   const [open, setOpen] = useState(false)
-  const projectScoped = state.context?.scope.kind === 'project'
+  const projectScoped = conversationProject(state, sessionId) !== undefined
   const detailState = state.conversations[sessionId]
 
   useEffect(() => {

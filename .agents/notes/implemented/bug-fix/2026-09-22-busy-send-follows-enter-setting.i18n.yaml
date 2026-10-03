@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-busy-send-follows-enter-setting.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-busy-send-follows-enter-setting.md
-2026-09-22-busy-send-follows-enter-setting.md: 2f40c3354108a5100a64d63ef19bf99d1ef4196d
-2026-09-22-busy-send-follows-enter-setting.zh.md: 7aea89ea717aa2b12f14015283926f175f5bd1f2
+/agent-note-busy-send-follows-the-displayed-enter-preference:
+  en: 0b04c306ca9b2a60
+  zh: f849c2fd24bb4352
+/agent-note-busy-send-follows-the-displayed-enter-preference/problem:
+  en: 220d7b200344bda1
+  zh: 732d3869e7e5f139
+/agent-note-busy-send-follows-the-displayed-enter-preference/decision:
+  en: dba7e2df3abe52ce
+  zh: 9a68552eda1ec0fc
+/agent-note-busy-send-follows-the-displayed-enter-preference/verification:
+  en: 28eec8bf1082a4a0
+  zh: 6fae1204cd861a9a
+/agent-note-busy-send-follows-the-displayed-enter-preference/alternatives-considered:
+  en: 5ec52273810b396a
+  zh: 49445d0920e29eae
+/agent-note-busy-send-follows-the-displayed-enter-preference/consequences:
+  en: 399fdee0aa30325c
+  zh: f1cc4081d69e4532

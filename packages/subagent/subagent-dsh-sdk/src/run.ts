@@ -1,12 +1,11 @@
 /**
  * Fresh-process SDK subagent client. Drives one child DeepSeek Harness
  * runtime over stdio JSON-RPC through `@deepseek-ai/dsh-sdk-client` and owns
- * cancellation and quiescent disposal. Structure mirrors the ACP backend
- * (`@deepseek-ai/dsh-subagent-acp`): publish after the child handshake,
- * flatten child failures into stop reasons, tear down to quiescence. The
- * child is spawned BY the SDK client rather than through `ctx.subprocess` —
- * the subprocess seam's documented exception for SDK-managed transports —
- * so this driver applies the seam's shared env scrub itself.
+ * cancellation and quiescent disposal. It publishes after the child
+ * handshake, maps child failures to stop reasons, and tears down to
+ * quiescence. The SDK client spawns the child rather than using
+ * `ctx.subprocess` — the subprocess seam's documented exception for
+ * SDK-managed transports — so this driver applies the seam's shared env scrub.
  *
  * @module @deepseek-ai/dsh-subagent-dsh-sdk/run
  */
@@ -47,13 +46,13 @@ export interface SdkRunSpec {
   provider: string
   /** Model the child runtime initializes with. */
   model: string
-  /** Optional adapter-owned reasoning effort sent in the initialize handshake. */
+  /** Optional adapter-owned reasoning effort sent in the child runtime's initialize handshake. */
   reasoningEffort?: ReasoningEffortId
   /** Optional per-request output-token cap sent in the child runtime's initialize handshake. */
   maxTokens?: number
   /**
    * Extra environment variables to ADD for the child (e.g. the child
-   * runtime's own `DEEPSEEK_API_KEY`, or `DSH_CORDIS_CONFIG`). Merged after
+   * runtime's own `DEEPSEEK_API_KEY`). Merged after
    * the seam's `scrubbedParentEnv()` base, so an explicit credential or
    * current `DSH_*` fact survives while ambient namesakes never leak.
    */
@@ -65,10 +64,9 @@ export interface SdkRunSpec {
   /** Termination confirmation window (ms), including forced exit on every platform. */
   disposeGraceMs: number
   /**
-   * Sink for a child-level failure that the run flattened into a stop reason
-   * (the seam contract forbids `result` rejecting). A throw from the sink
-   * itself is contained. Optional — omitted in unit tests that assert the
-   * stop reason directly.
+   * Host sink for startup, published-run, or shutdown failures. Model-visible
+   * text uses fixed safe facts, while this callback retains the original Error.
+   * A throw from the sink itself is contained.
    */
   onError?: (error: Error, stopReason: SubagentStopReason) => void
 }
@@ -221,11 +219,15 @@ function sdkStartupFailure(spec: SdkRunSpec, error: unknown): Error {
 
 /**
  * Start and publish one SDK runtime child after its `initialize` handshake.
- * Child failures resolve through the run result; startup failures reject
- * after process reap. Disposal shuts the runtime down and reaps it.
+ * Child failures resolve through the run result. Startup rejects with fixed
+ * safe facts after SDK-owned cleanup; successful cleanup proves process reap.
+ * Cleanup failure preserves initialize plus shutdown for an ordinary failure,
+ * or shutdown alone after cancellation, without claiming quiescence. Disposal
+ * shuts the runtime down and reaps it.
  * @param request - the start request; its signal is the cancellation channel.
- * @param spec - the resolved spawn spec: command/args/cwd, the child's
- * provider/model route, env, timeouts, and the optional error sink.
+ * @param spec - the resolved spawn spec: profile/patches/home/cwd, the child's
+ * provider/model/reasoning route, output cap, env, timeouts, and the optional
+ * error sink.
  * @returns the ready run handle for the child subprocess.
  */
 export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpec): Promise<SubagentRun> {
@@ -301,7 +303,7 @@ export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpe
     if (notification.method !== 'session.event' || notification.params.sessionId !== childSessionId) return
     fold.push(notification.params.event as SessionEvent)
   }
-  const collectOutput = (): ContentBlock[] => fold.collect() ?? []
+  const collectOutput = (): readonly ContentBlock[] => fold.collect() ?? []
   const teardown = async (): Promise<void> => {
     try {
       await harness.close()

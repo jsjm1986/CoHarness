@@ -14,8 +14,10 @@
 /* Running sweep (deepsuite ShimmerText pattern): a fixed-width glare band —
    theme background at 60% — glides over the row content from off-left to
    off-right, washing glyphs and icon toward the background as it passes.
-   ease-out with a 10% end hold gives each pass a beat before the next. */
-.root[data-state='running'] .row::after {
+   ease-out with a 10% end hold gives each pass a beat before the next.
+   Preparation (arguments still streaming) carries the same in-flight signal. */
+.root[data-state='running'] .row::after,
+.root[data-state='preparing'] .row::after {
   content: '';
   position: absolute;
   top: 0;
@@ -231,15 +233,11 @@
   padding: var(--dsw-space-3) var(--dsw-space-4);
   max-height: 150px;
   overflow-y: auto;
-}
-
-/* Card-internal scrollbar: the shared transparent inset clips the thumb inward
-   so it floats off the rounded card edge instead of hugging it (the terminal
-   card's own output scroller carries the same treatment in TerminalBlock). */
-.ioSection::-webkit-scrollbar-thumb {
-  border: var(--dsh-scrollbar-thumb-inset) solid transparent;
-  background-clip: padding-box;
-  border-radius: var(--dsw-radius-sm);
+  /* Card-internal scrollbar: the transparent thumb border clips the thumb
+     inward so it floats off the rounded card edge instead of hugging it (the
+     terminal card's own output scroller carries the same treatment in
+     TerminalBlock). */
+  --dsh-scrollbar-thumb-border: 1px;
 }
 
 /* Track end-margins keep the thumb's travel out of the rounded corners. */

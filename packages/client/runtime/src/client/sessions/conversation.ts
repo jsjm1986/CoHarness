@@ -15,7 +15,7 @@ import type {
   RpcError, RpcId, SessionId, SubagentAddress, ToolCallView, ToolResultView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
-import type { PendingInteraction } from './pending.ts'
+import type { SessionPendingEntry } from './pending.ts'
 import type { ContextProducerView, KnownContextForm } from './context-producer.ts'
 import type {
   ChatConversationViewNode, ConversationTimelineSnapshot, ConversationViewSnapshotStore,
@@ -222,6 +222,8 @@ export interface ToolResultNode {
   /** Unix epoch ms from the tool/result session event. */
   time: number
   callId: string
+  /** Parent Tool call for a PTC dispatch result; absent on a root Session result. */
+  parentCallId?: string
   /** Call head backfilled from the in-window tool/call; null when window truncation left the call outside (card head shows callId). */
   call: { name: string; argsRaw: string } | null
   /** Unix epoch ms of the paired tool/call when the call is still in-window; used for call-row duration. */
@@ -326,22 +328,42 @@ export type ConversationNode =
   | CompactionSummaryNode
   | UnknownSurfaceNode
 
-/** In-flight tool card material: tool/call seen, tool/result not yet. */
-export interface RunningToolCall {
+/** Identity and placement shared by tool preparation and dispatch. */
+interface ToolCallHead {
   callId: string
+  /** Parent Tool call for a PTC dispatch start; absent on a root Session call. */
+  parentCallId?: string
   name: string
-  argsRaw: string
   turn: number
   step: number
-  /** Unix epoch ms when the tool/call event was logged. */
+  /** Unix epoch ms when this stage began. */
   time: number
-  /** Host-computed render intent riding the tool/call frame; null = generic JSON card. */
+  /** Host-computed render intent riding the call frame; null = generic JSON card. */
   callView: ToolCallView | null
   /** Child calls owned by this call, in dispatch order. */
   subCalls: readonly ToolCallBlock[]
 }
 
-/** One running or settled call, recursively owning its child calls. */
+/**
+ * A named model call whose arguments are still streaming. Preparation rows
+ * carry no dispatched arguments — the partial raw text lives on the owning
+ * Step's `assistant-step` Location data, not on this node.
+ */
+export interface PreparingToolCall extends ToolCallHead {
+  readonly phase: 'preparing'
+}
+
+/** A dispatched tool call with complete arguments and no result yet. */
+export interface StartedToolCall extends ToolCallHead {
+  readonly phase: 'start'
+  /** Verbatim argument JSON from the tool/call event. */
+  readonly argsRaw: string
+}
+
+/** A tool still preparing or awaiting its result. */
+export type RunningToolCall = PreparingToolCall | StartedToolCall
+
+/** One preparing, dispatched, or settled call, recursively owning its child calls. */
 export type ToolCallBlock = RunningToolCall | ToolResultNode
 
 /** One transient inbox occurrence from the authoritative `session/queue` snapshot. */
@@ -584,9 +606,11 @@ export interface ConversationSnapshot {
   turnTimings: ReadonlyMap<number, { readonly startTime: number; readonly endTime?: number }>
   /** In-window completed turn number -> its `turn/end` event seq. */
   turnEnds: ReadonlyMap<number, number>
+  /** Latest loaded turn while it remains open; undefined when no turn is in flight. */
+  openTurn: number | undefined
   partial: PartialAssistant | null
   runningCalls: readonly RunningToolCall[]
-  pending: readonly PendingInteraction[]
+  pending: readonly SessionPendingEntry[]
   /** Local prompt-submission echoes not yet observed as durable events or queue occurrences. */
   pendingSubmissions?: readonly PendingSubmission[]
   /** Authoritative transient inbox snapshot, including queued and steering placements. */

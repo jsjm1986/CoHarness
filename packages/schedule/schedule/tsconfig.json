@@ -9,19 +9,25 @@
   ],
   "references": [
     {
-      "path": "../../core/agent"
+      "path": "../../../vendor/cosmokit"
     },
     {
-      "path": "../../core/session"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../core/tools"
+      "path": "../../util/brand"
     },
     {
       "path": "../../llm/llm"
     },
     {
-      "path": "../../runtime-diagnostics/invariants"
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/tools"
     },
     {
       "path": "../../session/session-persistence"
@@ -30,16 +36,22 @@
       "path": "../../session/session-persistence-jsonl"
     },
     {
-      "path": "../../session/session-projection"
+      "path": "../../runtime-diagnostics/invariants"
     },
     {
-      "path": "../../util/brand"
+      "path": "../../api/remotes/tsconfig.session-controller.json"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../storage/storage-domain"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../workspace/workspace"
+    },
+    {
+      "path": "../../runtime-diagnostics/invariants"
     }
   ]
 }

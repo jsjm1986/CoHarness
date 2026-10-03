@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-25-windows-x64-python-runtime.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-25-windows-x64-python-runtime.md
-2026-09-25-windows-x64-python-runtime.md: af213383b2d48e5db1b3fdf2c2275d1d7eda0739
-2026-09-25-windows-x64-python-runtime.zh.md: e39742054c5c9e2aeba87fe3520a5ae982e314f3
+/agent-note-python-runtime-publishes-a-native-windows-x64-wheel:
+  en: e75f8cfe4945a341
+  zh: 0fc24e44af61971e
+/agent-note-python-runtime-publishes-a-native-windows-x64-wheel/problem:
+  en: 970d3a6afb3de7e7
+  zh: de8e9f56efc5aaa2
+/agent-note-python-runtime-publishes-a-native-windows-x64-wheel/decision:
+  en: f723985e4c1a97e6
+  zh: 5679e4458d639fcc
+/agent-note-python-runtime-publishes-a-native-windows-x64-wheel/alternatives-considered:
+  en: ed3f6c644cf38f36
+  zh: eb16369f57c5588e
+/agent-note-python-runtime-publishes-a-native-windows-x64-wheel/consequences:
+  en: d35da535ff91b10e
+  zh: 9b00da42824941f6
+/agent-note-python-runtime-publishes-a-native-windows-x64-wheel/verification:
+  en: 826ae231c210300b
+  zh: 705c11cdc6bd45cf

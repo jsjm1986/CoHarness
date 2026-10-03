@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # dsh-authorization
 
 [English](README.md) | 中文
@@ -6,7 +11,7 @@
 
 **flow 是某个插件"如何取得自己那份凭据"的知识。** 它以自己写入的 [`CredentialKey`](../credentials/README.zh.md#two-key-spaces-two-questions) 注册，因此 flow 声明了自己产出哪条记录，并通过该键的 scope 声明由哪个插件为记录内部的格式负责。第二种授权协议以另一个 flow 的形式到来，而不是另一个 seam。
 
-**写入由 flow 拥有。** `run()` 返回即表示记录已经通过 `ctx.credentials` 提交；seam 核实的是它在本次尝试期间观察到的提交——只看记录存在与否，会让重新授权把陈旧记录冒充成新鲜的——并拒绝那些返回时没提交记录的 flow。让提交发生在 flow 内部，才能使一个通过自有 store 适配器持久化的库保持为唯一写入方，而不是把凭据复制出来再写第二遍。
+**写入由 flow 拥有，经由 `session.commit`。** `run()` 返回即表示记录已经通过会话的 `commit(mutate)` 提交——固定在该 flow 键上的串行化读改写——seam 拒绝那些返回时没提交记录的 flow，因此无关的同键写入或陈旧记录都不能冒充新的提交。取消只在准入前撤回尝试：通过最后一个检查点的替换值不再理会撤销并写入存储——已准入的写入报告 `authorized`，存储失败作为尝试自身的错误传播，declined mutation 返回当前记录而不写入。调用方及时得到 `cancelled`，而 key 的保留持续到流程与其排队的提交静止为止。让提交发生在 flow 内部，才能使一个通过自有 store 适配器持久化的库保持为唯一写入方，而不是把凭据复制出来再写第二遍。
 
 **交互随请求传入，而非注册表。** 发起授权的一方才是能与人对话的一方，因此提示恰好抵达发问的那个界面，无头调用方则传入一个直接拒绝的交互实现。这样既不存在"环境提供方缺席"的问题，也不会出现某个提示该归两个已打开页面中哪一个的疑问。
 
@@ -14,15 +19,27 @@
 
 `dsh-authorization` 让配置 UI 或其他调用方通过人引导的登录、输入码或回答问题来获取凭据。每次尝试只把 notice 与 prompt 发送到发起它的界面。只有新凭据已存储时，它才报告 `authorized`；拒绝或撤销会报告 `cancelled`，而故障仍作为错误。当凭据无法通过配置提供时选择它。它需要凭据存储和一个定义可用授权方法的集成；本包自身不提供特定提供方的授权方法。
 
+## 目录
+
+- [接口](#surface)
+- [交互词汇](#the-interaction-vocabulary)
+- [模型体验](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="surface"></a>
 ## 接口
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
 import { AuthorizationDeclinedError, type AuthorizationSession } from '@deepseek-ai/dsh-authorization'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
+import type { CredentialRecord } from '@deepseek-ai/dsh-credentials'
 
 declare const ctx: Context
-declare const exchange: (signal: AbortSignal) => Promise<void>
+declare const exchange: (signal: AbortSignal) => Promise<CredentialRecord>
 
 const key = credentialKey('llm-pi-ai', 'openai-codex')
 
@@ -33,8 +50,8 @@ const dispose = ctx.authorization.registerFlow({
   async run(session: AuthorizationSession) {
     session.notify({ message: 'Continue in your browser', url: 'https://auth.example/start' })
     const code = await session.prompt({ kind: 'text', message: 'Paste the code' })
-    // Commits the record through ctx.credentials before resolving.
-    await exchange(session.signal)
+    const credential = await exchange(session.signal)
+    await session.commit(async () => credential)
     void code
   },
 })
@@ -59,11 +76,13 @@ dispose()
 
 `authorization/settled (key, settlement)` 在键释放之后触发，覆盖每一种终态。`settlement` 在 `begin()` 能返回的两种状态之外增加了 `failed`：失败以抛出的错误抵达其调用方，因此事件流是未发起该尝试的旁观者唯一能区分"被拒绝"与"出故障"的地方。监听器故障被就地遏制：每个监听器都会执行，抛错或拒绝只记录日志、不改变已结束尝试的结果，仅 `INVARIANT` 编码的故障在其余监听器执行完后重抛。
 
+<a id="the-interaction-vocabulary"></a>
 ## 交互词汇
 
 notice 是单向的，且从不携带机密：一条消息，以及可选的"人需要打开的页面"和"需要在该页面输入的码"。prompt 是 flow 无法自答的问题——`text`、`secret` 或 `select`——其中 `secret` 与 `text` 的差别仅在呈现方式。prompt 自带 `signal`，使得一个让手输码与浏览器回调赛跑的 flow 可以在尝试继续的同时撤下落败的那个问题；撤销整次尝试则用请求的 signal。
 
 这套词汇刻意小于任何单个 provider 的词汇：它描述的是界面必须渲染什么，因此能渲染一个 flow 的界面就能渲染全部 flow。
+
 
 ## 模型体验
 
@@ -73,8 +92,21 @@ notice 是单向的，且从不携带机密：一条消息，以及可选的"人
 
 不失效；任何授权状态都不会进入请求前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
 - **flow 不可恢复** —— 一次尝试只存活于发起它的进程中，因此登录途中刷新浏览器会丢弃它，人需要重来。可持久的尝试需要一个本 seam 并不具备的存储。
 - **没有吊销** —— 登出即 `ctx.credentials.deleteRecord(key)`，它只遗忘本地记录而不通知签发方。需要服务端吊销的 provider 目前无处声明这一点。
 - **没有 flow 的键是惰性的** —— seam 只报告已注册的内容，因此被卸载插件遗留的记录可以删除但无法重新授权。识别这种孤儿记录由调用方自行 join，与 [`listRecords()`](../credentials/README.zh.md#surface) 的情况相同。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>
+
+<a id="model-experience"></a>

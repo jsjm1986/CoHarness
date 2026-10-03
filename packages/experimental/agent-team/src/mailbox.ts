@@ -69,10 +69,12 @@ export class TeamMailbox {
   observeSessionEvent(session: Session, event: SessionEvent): void {
     if (this.lifecycle.disposed || event.type !== 'user/message' || event.data.source.kind !== 'team-message') return
     const source = event.data.source
-    const acknowledgement = Promise.resolve().then(async () => {
+    const acknowledgement = (async () => {
+      using _admission = this.ctx.agents.reserveUse([SessionId(source.teamId), session.id])
+      await Promise.resolve()
       const root = this.ctx.agents.get(SessionId(source.teamId))
       if (root !== undefined) await this.checkpointDelivered(root, session, source.messageId)
-    }).catch((error: unknown) => {
+    })().catch((error: unknown) => {
       this.ctx.logger.warn(`Team message "${source.messageId}" acknowledgement failed: ${errorMessage(error)}`)
     })
     void this.trackDispatch(acknowledgement)
@@ -115,6 +117,7 @@ export class TeamMailbox {
     const membership = this.roster.membership(caller)
     request.signal.throwIfAborted()
     const root = membership.root
+    using _admission = this.ctx.agents.reserveUse([caller.id, root.id])
     const content = structuredClone(request.content)
     const id = TeamMessageId(`team-message-${randomUUID()}`)
     const authority = executionAuthorityOf(this.ctx)
@@ -196,13 +199,19 @@ export class TeamMailbox {
     message: TeamMessageSnapshot,
     signal: AbortSignal,
   ): Promise<boolean> {
-    const active = this.activeDispatches.get(message.targetId)
-    const live = message.targetId === root.id ? root : this.ctx.agents.get(message.targetId)
-    if (active !== undefined && live !== undefined && message.delivery === 'quiet'
-      && this.messagePrecedes(root, message.id, active.id)) {
-      return await this.dispatchOnce(root, message, signal)
+    try {
+      using _admission = this.ctx.agents.reserveUse([root.id, message.targetId])
+      const active = this.activeDispatches.get(message.targetId)
+      const live = message.targetId === root.id ? root : this.ctx.agents.get(message.targetId)
+      if (active !== undefined && live !== undefined && message.delivery === 'quiet'
+        && this.messagePrecedes(root, message.id, active.id)) {
+        return await this.dispatchOnce(root, message, signal)
+      }
+      return await this.serializeDispatch(message, () => this.dispatchOnce(root, message, signal))
+    } catch (error) {
+      this.ctx.logger.warn(`team message "${message.id}" remains queued: ${errorMessage(error)}`)
+      return false
     }
-    return await this.serializeDispatch(message, () => this.dispatchOnce(root, message, signal))
   }
 
   /** Serialize delivery admission for one durable target in queued order. */

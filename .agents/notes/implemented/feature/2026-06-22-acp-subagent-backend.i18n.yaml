@@ -1,6 +1,49 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-22-acp-subagent-backend.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-22-acp-subagent-backend.md
-2026-06-22-acp-subagent-backend.md: 25fe5b06b1a53157baa29274fb96fafe27f66562
-2026-06-22-acp-subagent-backend.zh.md: e27aa5f598ca1c1bf78e6b668f47951c2b739ea2
+/agent-note-acp-subagent-backend-out-of-process-delegation:
+  en: c1810d9d50b3e5f1
+  zh: dfd6a4b8d615c958
+/agent-note-acp-subagent-backend-out-of-process-delegation/problem:
+  en: 876c75f692bbd2b4
+  zh: 64454c95491a3184
+/agent-note-acp-subagent-backend-out-of-process-delegation/decision:
+  en: ce622b2cacf0b52e
+  zh: 2eb8675c83bffa7b
+/agent-note-acp-subagent-backend-out-of-process-delegation/decision/fresh-process-per-run:
+  en: 9eea8dd927b8cd55
+  zh: 80630fe4b5c8b78b
+/agent-note-acp-subagent-backend-out-of-process-delegation/decision/minimal-client-stub:
+  en: 6809b4d9bc86322c
+  zh: 23ed072172c37cfc
+/agent-note-acp-subagent-backend-out-of-process-delegation/decision/no-start-time-capabilities:
+  en: 2e391b74a73a8ff1
+  zh: 3d5fc3ff08a8811c
+/agent-note-acp-subagent-backend-out-of-process-delegation/decision/workspace-cwd-resolution:
+  en: 5275a4729627a322
+  zh: 5691d9fb186839e8
+/agent-note-acp-subagent-backend-out-of-process-delegation/decision/stopreason-mapping:
+  en: f032f3bb11feb3b7
+  zh: f1f7448501bda4e6
+/agent-note-acp-subagent-backend-out-of-process-delegation/decision/security-scrubbed-child-environment:
+  en: 2afe03685aa81530
+  zh: 04176b238ed59d80
+/agent-note-acp-subagent-backend-out-of-process-delegation/testing:
+  en: 35d6cbb44012faa7
+  zh: 49cad19f0d8307ca
+/agent-note-acp-subagent-backend-out-of-process-delegation/alternatives-considered:
+  en: 6119e2aff3b6be5a
+  zh: 76136ef5249c23eb
+/agent-note-acp-subagent-backend-out-of-process-delegation/alternatives-considered/why-use-the-acp-sdk-1-4-0-typed-api:
+  en: fcfbc0968b33721b
+  zh: 11b039a359e85ef8
+/agent-note-acp-subagent-backend-out-of-process-delegation/alternatives-considered/why-not-a-persistent-child-process:
+  en: 2946114c2e77c73c
+  zh: 27dd3650ca84ef6a
+/agent-note-acp-subagent-backend-out-of-process-delegation/consequences:
+  en: 4b84c91a7a8d41c9
+  zh: a071d4fb58d07cb6
+/agent-note-acp-subagent-backend-out-of-process-delegation/product-provider-siblings:
+  en: 60614c0fcf681341
+  zh: e3a7b4ea5ccb4d25

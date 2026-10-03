@@ -84,6 +84,19 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     }, 'local subprocess teardown')
   }
 
+  /**
+   * Log one spill failure through the plugin logger. The collector keeps only
+   * its in-memory tail afterwards, so the model sees a truncated result with
+   * no spill path; the log line is the only trace of why.
+   */
+  private readonly reportSpillFailure = (error: unknown, label: string): void => {
+    this.ctx.logger.error(
+      `subprocess-local could not write the complete ${label} stream to its spill file; the tool result keeps only the in-memory tail and reports no full-output path. `
+      + 'A removed private spill directory under the OS temp dir (ENOENT) points at a temporary-file cleaner.',
+      error,
+    )
+  }
+
   private terminateForHostExit(): void {
     for (const handle of this.live) {
       try {
@@ -181,10 +194,11 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     const env = targetEnvironment(spec)
     const containmentMode = this.selectContainmentMode('ordinary')
     let handle: LocalSubprocessHandle
+    const internals: SpawnInternals = { ...this.internals, onSpillFailure: this.reportSpillFailure }
     if (containmentMode === 'fallback') {
-      handle = spawnSubprocess(spec, this.internals)
+      handle = spawnSubprocess(spec, internals)
     } else {
-      const binding = prepareManagedProcessBinding(this.internals)
+      const binding = prepareManagedProcessBinding(internals)
       const launch = containmentMode === 'linux-scope'
         ? launchLinuxScope(spec, env)
         : launchWindowsJob(spec, env)

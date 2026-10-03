@@ -1,5 +1,6 @@
 /** Verified ownership of browser-local Session presentation records. */
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { ISessions } from './contract/sessions.ts'
 
 /**
@@ -24,5 +25,6 @@ export function sessionPersistenceKey(
     ? { kind: 'personal' as const } : sessions.runtimeIdentityFor(sessionId)
   if (target === undefined) return undefined
   const runtime = target.kind === 'project' ? ['project', target.projectId] : ['personal']
-  return JSON.stringify([principal, runtime, sessionId])
+  const original = sessions.runtimeIdentityFor === undefined ? sessionId : parseClientSessionKey(sessionId)?.sessionId ?? sessionId
+  return JSON.stringify([principal, runtime, original])
 }

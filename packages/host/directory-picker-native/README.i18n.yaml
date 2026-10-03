@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/directory-picker-native/README.md
-README.md: cf590a535cb2c895e175f970c85391c43a5e22e2
-README.zh.md: 5e9f6e6b6afcded751978ab1df0a10de5153be8b
+/:
+  en: da76a4b2d2d7b566
+  zh: 61495d48365178df
+/deepseek-ai-dsh-host-directory-picker-native:
+  en: c10734413a09d791
+  zh: 7745a859aff648ab
+/deepseek-ai-dsh-host-directory-picker-native/summary:
+  en: d02a09798cbe9a37
+  zh: c0231f9dacf8f6d0
+/deepseek-ai-dsh-host-directory-picker-native/table-of-contents:
+  en: b59e55619aaa595f
+  zh: a120eb0c20991d39
+/deepseek-ai-dsh-host-directory-picker-native/invariants:
+  en: ad244d5158980b0b
+  zh: 09b1dbe5aed2704d
+/deepseek-ai-dsh-host-directory-picker-native/model-experience:
+  en: cdbb9c75fbb91bb5
+  zh: 35047dda1956f0ac
+/deepseek-ai-dsh-host-directory-picker-native/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: 2026c1566df4f78c
+/deepseek-ai-dsh-host-directory-picker-native/known-limitations-and-deferred-work:
+  en: fc3389336904a586
+  zh: b2cbd3694fe44538
+/deepseek-ai-dsh-host-directory-picker-native/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

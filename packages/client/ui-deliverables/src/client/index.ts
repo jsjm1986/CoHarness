@@ -6,19 +6,23 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { resolveWorkspacePath } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+// Type-only: the ctx.settingsScope Context merge (the developerTools member
+// supplies the changed-files gate). Cross-plugin collaboration goes through
+// the service, never a value import.
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { changesReviewAddress } from '../changes.ts'
 import { ChangesDiffStore } from './changes-diff.ts'
 import { ChangesSummaryStore } from './changes-summary.ts'
 import { PresentedOpenController } from './present-open.ts'
 import { PresentRow } from './PresentRow.tsx'
-import { DeliverablesTail, selectDeliverables, type DeliverablesInjected } from './Deliverables.tsx'
+import { DeliverablesTail, type DeliverablesInjected } from './Deliverables.tsx'
 import { ReviewTab, type ReviewInjected } from './ReviewTab.tsx'
 import { CHANGES_REVIEW_ID, changesReviewDefinition } from './review-definition.ts'
 import { createReviewStore } from './review-store.ts'
 import { ProducedFiles } from './ProducedFiles.tsx'
 import { en, NS, zh, type DeliverablesKey } from './locales.ts'
 import {
-  deliverablesDefinition, producedFileMentions, selectProducedFiles, presentedForClosing, changesForClosing,
+  deliverablesDefinition, producedFileMentions, selectProducedFiles, presentedForClosing,
 } from './turn-deliverables.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -32,7 +36,9 @@ export { ProducedFiles, type ProducedFilesProps } from './ProducedFiles.tsx'
 export { producedForClosing } from './turn-deliverables.ts'
 
 /** Required services for the tail-slot registration and its dictionaries. */
-export const inject = ['slots', 'locale', 'conversationEvents', 'connection', 'sessions', 'sidebarRightTabs', 'sidebarRight']
+export const inject = [
+  'slots', 'locale', 'conversationEvents', 'connection', 'sessions', 'sidebarRightTabs', 'sidebarRight', 'settingsScope',
+]
 
 /**
  * Client plugin body: register the dictionaries and the turn-tail entry.
@@ -46,7 +52,8 @@ export function apply(ctx: ClientContext): void {
     'conversation.chat.turnTail',
     () => ctx.slots.register({
       name: 'conversation.chat.turnTail',
-      select: owner => changesForClosing(owner) === null && presentedForClosing(owner).length === 0 ? selectProducedFiles(owner) : null,
+      id: '@deepseek-ai/dsh-client-ui-deliverables/produced-files',
+      order: 10,
       locale: NS,
       inject: () => ({
         isLoopback: connection.isLoopback,
@@ -84,15 +91,21 @@ export function apply(ctx: ClientContext): void {
       const description = transport.hostDescription.getSnapshot()
       return { name: '', available: target.kind === 'base' && transport.isLoopback
         && description?.executionAuthorityRequired === false && description.canOpenPath,
-      fileManager: 'directory' as const }
+      fileManager: description?.fileManager ?? null }
     }
-    const opener = new PresentedOpenController(desktop, async (path, action, signal) => {
+    const opener = new PresentedOpenController(desktop, async (path, action, application, signal) => {
       const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
       if (cwd === undefined) throw new Error('Session workspace is unavailable')
       const absolute = resolveWorkspacePath(cwd, path)
-      const parent = absolute.replace(/[^\\/]+$/u, '')
-      const result = await transport.api.host.openPath({ path: action === 'reveal' ? parent : absolute }, signal)
+      const result = await transport.api.host.openPath(
+        application === undefined ? { path: absolute, action } : { path: absolute, action, application }, signal)
       if (!result.result.ok) throw new Error(result.result.error.code)
+    }, async (path, signal) => {
+      const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
+      if (cwd === undefined) throw new Error('Session workspace is unavailable')
+      const result = await transport.api.host.fileApplications({ path: resolveWorkspacePath(cwd, path) }, signal)
+      if (!result.result.ok) throw new Error(result.result.error.code)
+      return result.result.value.applications
     })
     scope.effect(() => transport.hostDescription.subscribe(() => { opener.resetHost() }), 'ui-deliverables: desktop capability')
     const owned = { summaries, diffs, opener }
@@ -114,15 +127,21 @@ export function apply(ctx: ClientContext): void {
     }
   })
   ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
-    name: 'conversation.chat.turnTail', select: selectDeliverables, locale: NS,
+    name: 'conversation.chat.turnTail', id: '@deepseek-ai/dsh-client-ui-deliverables', locale: NS,
     inject: (sessionId): DeliverablesInjected => {
-      const { summaries, opener } = forSession(sessionId)
+      const { summaries, diffs, opener } = forSession(sessionId)
       return {
-        hooks: { presentedOpen: opener.state, presentedHost: opener.host, changesSummary: summaries.state },
+        hooks: {
+          presentedOpen: opener.state, presentedHost: opener.host, presentedApps: opener.apps,
+          changesSummary: summaries.state, changesDiff: diffs.state,
+          showCodeDiff: ctx.settingsScope.developerTools.enabled,
+        },
         reloadPresentedHost: () => opener.loadHost(),
         loadChangesSummary: (id, seq) => summaries.load(id, seq),
-        openPresented: (id, seq, index, action, path) => opener.open(id, seq, index, action, path),
-        openChanged: (id, seq, index, path) => opener.openChanged(id, seq, index, path),
+        loadChangesDiff: (id, seq, index) => diffs.load(id, seq, index),
+        loadPresentedApps: (key, path) => { opener.loadApplications(key, path) },
+        openPresented: (id, seq, index, action, path, application) => opener.open(id, seq, index, action, path, application),
+        openChanged: (id, seq, index, path, application) => opener.openChanged(id, seq, index, path, application),
         openChangesReview: (coordinates, index) => {
           if (coordinates.sessionId !== sessionId) throw new Error('Review navigation belongs to another Session')
           ctx.sidebarRight.openSessionResource(sessionId, changesReviewAddress(coordinates), { params: { index } })

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-api-gateway
 
 [English](README.md) | 中文
@@ -6,10 +11,24 @@
 
 生成描述符标记为 `acceptsUndefined` 的尾部业务参数可以省略。必需参数保持原有位置，包括作用域身份投影。取消信号仍位于声明的最后位置；在省略选项后提供信号时，调用方显式传入 `undefined` 占位。已提供和省略的值仍经过 Host 编解码校验。
 
+Client 调用根据已声明的 Session 地址或调用方 Agent Context 选择传输连接。JSON 参数中的 Session 字段仅由应用声明。地址解码保留无关字符串，并拒绝已声明的 Session 键指向不同 runtime 的请求；无作用域的根调用继续使用引导连接。
+
 ## 概述
 
 为 Host 与 Client 两侧的 Cordis 环境提供 Typert RPC endpoint。Host 入口提供 `ctx.typertGateway`，`@deepseek-ai/dsh-api-gateway/client` 则提供 `ctx.remote`；两者使用同一份生成的 `InvocationDescriptor` 约定，并将业务选择交给 API Remotes。Connection 承载一元调用的请求关联、信任和响应 envelope，Gateway 则拥有多路复用的 Remote 流。
 
+## 目录
+
+- [Host 服务：`TypertGatewayService`（ctx key：`typertGateway`）](#host-service-typertgatewayservice-ctx-key-typertgateway)
+- [Client 服务：`ClientRemote`（ctx key：`remote`）](#client-service-clientremote-ctx-key-remote)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="host-service-typertgatewayservice-ctx-key-typertgateway"></a>
 ## Host 服务：`TypertGatewayService`（ctx key：`typertGateway`）
 
 每次调用时，`ctx.typertGateway.invoke()` 都会解析当前的描述符和 Cordis 服务，校验具名参数是否完全匹配，解析已注册的对象或 Context 身份标识，调用公开的业务方法，并校验其结果。业务服务继承 [`dsh-typert-protocol`](../../typert/protocol/README.zh.md) 的 `TypertRemoteService`，并用 `@Remote` 或 `@RemoteScope` 标记方法；已有其他基类时仍可改用 `bindTypertRemote()`。
@@ -20,6 +39,7 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 
 支持取消的 Remote 方法会把 `signal: AbortSignal` 声明为最后一个 Host 参数。signal 是 descriptor 元数据，而不是 wire 参数：Connection 将它提供给 Gateway，Gateway 则在已解码的业务参数之后注入它。SRC 识别这个保留的末位参数名，严格生成还要求它具有全局 `AbortSignal` 类型。
 
+<a id="client-service-clientremote-ctx-key-remote"></a>
 ## Client 服务：`ClientRemote`（ctx key：`remote`）
 
 `ctx.remote.$mount()` 会校验并注册生成的 Host-for-Client 贡献项，然后为发起调用的 Cordis fiber 安装具体的直接方法和作用域方法。每个 namespace 都是可追踪的 `remote.<namespace>` 子 Service，并在最后一个方法撤回后卸载。新建 namespace 会等到本次挂载贡献项的全部方法安装完毕后才对声明注入的 fiber 可用；批次失败会直接回滚，不会激活依赖方。重复端点、命名空间冲突，以及缺少生成的严格编解码器的描述符，都会在方法可调用前报错。
@@ -30,10 +50,15 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 
 生成的声明合并通过共享的 `TypertClientRemote` 约定提供 TypeScript API。Client 入口不包含 Host 服务或 Host Cordis 接口合并；方法查找和调用使用普通对象与函数，而不使用 JavaScript Proxy。
 
+调用 waterfall 只包装已解析的业务方法。授权与 Agent 查找先完成，防止请求身份包装器把调用人的权限借给冷查找任务。
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每次调用都在调用时解析实时的描述符、业务 Service 与编解码器；网关不保留任何可能与已注册贡献产生分歧的按端点状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为该包分发应用调用，不注册任何提示词、工具或会话事件。
@@ -42,6 +67,7 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 
 无直接影响；被调用的业务服务负责产生任何模型可见结果。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - Connection 适配器将普通分发故障和业务异常映射为 RPC 的 `internal` 代码，且不附带详细信息；`TypertLookupFailure` 携带的 lookup 策略错误会原样返回。结构化的 `TypertGatewayError` 类别仅供同进程调用方使用。
@@ -50,3 +76,13 @@ Connection 可用时，Host 入口会在 Connection 共享的 `/api` FetchHandle
 - 该包只分发一元方法。增量会话数据通过同一个 Connection 上独立的具名流协议传输。
 - lookup resolver 按 key 配置；当前无法让单个 Remote 参数或 endpoint 在同一 `agent`/`session` key 下选择 live-only 策略。
 - 被转发的事件原样到达 `$on`：没有载荷投影或脱敏，不支持 Scope 化订阅，重连后也不重放。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

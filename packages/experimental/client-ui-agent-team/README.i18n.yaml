@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/client-ui-agent-team/README.md
-README.md: ab40e2de09406991c55160005f2f16cf6931e195
-README.zh.md: 2913ff65930f260d53a0bee3b3ed6cb9634fcd5a
+/:
+  en: 6deb254c416ff51b
+  zh: e0913c7be837da78
+/deepseek-ai-dsh-experimental-client-ui-agent-team:
+  en: 447e3c2bbf1ea3c6
+  zh: 25bba08497976d12
+/deepseek-ai-dsh-experimental-client-ui-agent-team/summary:
+  en: 5898b279acf51042
+  zh: 1276167d5a6eda20
+/deepseek-ai-dsh-experimental-client-ui-agent-team/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-experimental-client-ui-agent-team/use-this-package:
+  en: ba021754d3ae6d9e
+  zh: 18017b40f13e6ffd
+/deepseek-ai-dsh-experimental-client-ui-agent-team/use-this-package/inspect-and-navigate-the-roster:
+  en: 1a34fc011272e33b
+  zh: 192b04fbd6b7c613
+/deepseek-ai-dsh-experimental-client-ui-agent-team/use-this-package/manage-the-task-board:
+  en: 69c8bb2b1a39e393
+  zh: 266fb8f7f7da05ab
+/deepseek-ai-dsh-experimental-client-ui-agent-team/understand-the-implementation:
+  en: c05200d4127e32a7
+  zh: 1c893450a4dbfa0a
+/deepseek-ai-dsh-experimental-client-ui-agent-team/further-exploration:
+  en: 19c54ac31dc7a973
+  zh: d05d5bf4528b76f6
+/deepseek-ai-dsh-experimental-client-ui-agent-team/model-experience:
+  en: c03f022db4cf84d9
+  zh: 319a849ae70bb008
+/deepseek-ai-dsh-experimental-client-ui-agent-team/model-experience/kv-cache-effect:
+  en: b51b320f5e4dacfc
+  zh: 4acf283aee382639
+/deepseek-ai-dsh-experimental-client-ui-agent-team/known-limitations-and-deferred-work:
+  en: d4ce83757d77e795
+  zh: 6f0e6f1d581c566f
+/deepseek-ai-dsh-experimental-client-ui-agent-team/known-limitations-and-deferred-work/dev-note:
+  en: b17523238daa330d
+  zh: 3bb0c20c93f16f98

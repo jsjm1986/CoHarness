@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-android-remote-web-fcm-notifications.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-android-remote-web-fcm-notifications.md
-2026-08-17-android-remote-web-fcm-notifications.md: 8a4cb780d8664569750a0035a5d063e5778cc265
-2026-08-17-android-remote-web-fcm-notifications.zh.md: 709da728a59614ad27cb346b0c7645748a753d39
+/agent-note-android-remote-web-shell-and-fcm-completion-notifications:
+  en: fa691a2e98db6d52
+  zh: 767a2e96254eb055
+/agent-note-android-remote-web-shell-and-fcm-completion-notifications/problem:
+  en: 76c5cdbc5a08dbf2
+  zh: ff18edd7f88ef0cc
+/agent-note-android-remote-web-shell-and-fcm-completion-notifications/decision:
+  en: ddbbc18e0fc2a564
+  zh: 25b4aaf6d89f6acb
+/agent-note-android-remote-web-shell-and-fcm-completion-notifications/alternatives-considered:
+  en: f80d0ec213f5f87a
+  zh: 82e6890dec44e1e0
+/agent-note-android-remote-web-shell-and-fcm-completion-notifications/consequences:
+  en: 209fc4aef5b92661
+  zh: 9a6156020546f264
+/agent-note-android-remote-web-shell-and-fcm-completion-notifications/verification:
+  en: f6f7a8847334e099
+  zh: eab070ff74fc9343

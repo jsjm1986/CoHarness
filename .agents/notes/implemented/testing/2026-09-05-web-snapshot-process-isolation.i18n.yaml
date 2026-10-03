@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-05-web-snapshot-process-isolation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-05-web-snapshot-process-isolation.md
-2026-09-05-web-snapshot-process-isolation.md: 2fa12010d03b5be468cee1c791a863b030725d1d
-2026-09-05-web-snapshot-process-isolation.zh.md: 3aedf8aeb6976aa980e08853425995372808b2a5
+/agent-note-isolate-stateful-web-snapshot-suites-in-their-own-processes:
+  en: 33d8a744e985006d
+  zh: 3ab3b05151cc1a92
+/agent-note-isolate-stateful-web-snapshot-suites-in-their-own-processes/problem:
+  en: 1555affb1ae73d90
+  zh: 6d60840f5217d81a
+/agent-note-isolate-stateful-web-snapshot-suites-in-their-own-processes/decision:
+  en: 4469cc4e37b9b01e
+  zh: 8d1bfb7131908958
+/agent-note-isolate-stateful-web-snapshot-suites-in-their-own-processes/consequences:
+  en: 7ed09538d2bd6441
+  zh: 838302ec2c0025f7
+/agent-note-isolate-stateful-web-snapshot-suites-in-their-own-processes/alternatives-considered:
+  en: 2526ece7e76cdc0a
+  zh: 1957fdd9fdb79a99
+/agent-note-isolate-stateful-web-snapshot-suites-in-their-own-processes/testing:
+  en: 31469f4d5affbba7
+  zh: 31dd8f6c6de1ff5d

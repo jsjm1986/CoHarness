@@ -1,3 +1,8 @@
+---
+description: "Cordis dynamic-plugin definition card: the keyed cordis_define tool row with its run/stop switch"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-cordis
 
 English | [中文](README.zh.md)
@@ -6,6 +11,17 @@ English | [中文](README.zh.md)
 
 Historical generated-Plugin cards and a frame-wide panel for existing process-local definitions. Users operate definitions supplied by programmatic consumers through the Host runner's authorized endpoints. Creator installs persistent Plugins through Plugin Manager; the model toolset provides only inspection.
 
+## Table of Contents
+
+- [Presentation and ownership](#presentation-and-ownership)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="presentation-and-ownership"></a>
 ## Presentation and ownership
 
 Historical `cordis_define`, `cordis_run`, `cordis_stop`, and `cordis_undefine` records retain their source and outcomes. Rendering these records does not register tools, restore definitions, or execute code. Definition cards read the frozen call/result data; a recorded successful removal overrides transient running state.
@@ -16,10 +32,12 @@ Host activation and page-local loading are separate facts. A page may offer load
 
 The `/client` entry exports the plugin body and its injected face, run-state, port, and event types. [The Client runner](../cordis-client-runner/README.md) owns browser loading and cleanup; [the Host runner](../cordis-host-runner/README.md) owns definitions and execution.
 
+<a id="invariants"></a>
 ## Invariants
 
 No invariant companion is published. The panel consumes Host state and the cards project durable events; this package owns no independent definition state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through runner-owned outcome and diagnostic messages. This package adds no tools or prompt sections.
@@ -33,3 +51,13 @@ None directly; runner-originated messages append to Session history.
 - A historical card whose call arguments leave the loaded event window loses its labels and source until that history is loaded. A removal result outside the window also cannot determine the card's terminal state.
 - Client load and render errors belong to the observing page; another page can remain healthy.
 - Process restart discards dynamic definitions. Historical cards remain readable but cannot restore them.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

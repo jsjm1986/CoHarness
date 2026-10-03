@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-01-browser-auth-web-transport.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-01-browser-auth-web-transport.md
+/agent-note-browser-session-authentication-for-the-web-connection-carrier:
+  en: 71e2120d9c548187
+  zh: 0cc8a02f8a043da9
+/agent-note-browser-session-authentication-for-the-web-connection-carrier/problem:
+  en: b8823cc852afe3ec
+  zh: 8bb2e6b8e7984194
+/agent-note-browser-session-authentication-for-the-web-connection-carrier/decision:
+  en: bb60cf00c004e35a
+  zh: 8914fab59e745018
+/agent-note-browser-session-authentication-for-the-web-connection-carrier/alternatives-considered:
+  en: 3e1dfcb47dccbf04
+  zh: 2c9ba9c0cc6292df
+/agent-note-browser-session-authentication-for-the-web-connection-carrier/consequences:
+  en: df487838a6fe8c37
+  zh: e6d8b41b4e711a35
+/agent-note-browser-session-authentication-for-the-web-connection-carrier/testing:
+  en: 250c11707f9ebd1a
+  zh: 84dde9053b3c2093

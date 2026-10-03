@@ -717,7 +717,7 @@ describe('SubagentRuntime.listChildren', () => {
       time: 5,
       data: createUserMessage({
         content: [{ type: 'text', text: 'summary of everything' }],
-        source: { kind: 'plugin', plugin: 'compact' },
+        source: { kind: 'compact-checkpoint', compactionId: 'compaction-1' } as never,
       }),
       surfaceOp: { op: 'replace', startSeq: SessionSeq(1), endSeq: SessionSeq(1) },
       sourceEventSeqs: [SessionSeq(1)],

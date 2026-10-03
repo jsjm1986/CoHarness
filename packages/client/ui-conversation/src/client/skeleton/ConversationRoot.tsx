@@ -1,7 +1,7 @@
 // Root conversation viewport and its resident Session pane. The pane keeps
 // Hero/composer identity while the root owns explicit per-pane bindings.
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { SessionCreateError, type SessionId, type WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -15,6 +15,128 @@ import css from './ConversationRoot.module.css'
 function invokePointerCapture(target: HTMLElement, method: 'setPointerCapture' | 'releasePointerCapture', pointerId: number): void {
   const candidate: unknown = Reflect.get(target, method)
   if (typeof candidate === 'function') Reflect.apply(candidate, target, [pointerId])
+}
+
+function hasPointerCapture(target: HTMLElement, pointerId: number): boolean {
+  const candidate: unknown = Reflect.get(target, 'hasPointerCapture')
+  return typeof candidate === 'function' && Reflect.apply(candidate, target, [pointerId]) === true
+}
+
+/** Column budget the content must leave free: 88px per side keeps the width
+ * handles fully placeable (24px inset + 40px strip + 24px safe zone) — a
+ * larger dragged width would push its own handles off the column and leave no
+ * way to drag back. */
+const CONTENT_EDGE_BUDGET = 176
+
+/** Resolves the rendered content width for a column width.
+ * @param columnWidth - the conversation column's rendered width in px.
+ * @param preference - the stored width preference in px.
+ * @returns the preference clamped to the settings range and the column's edge budget. */
+function resolveContentWidth(columnWidth: number, preference: number): number {
+  const max = Math.max(
+    CHAT_CONTENT_WIDTH_RANGE.min,
+    Math.min(CHAT_CONTENT_WIDTH_RANGE.max, columnWidth - CONTENT_EDGE_BUDGET),
+  )
+  return Math.min(Math.max(preference, CHAT_CONTENT_WIDTH_RANGE.min), max)
+}
+
+/** One transcript width handle: pointer capture + rAF-throttled symmetric
+ * resize (both sides write the one centered width, so outward travel widens
+ * by 2× the pointer distance). pointermove publishes the pointer's Y as a CSS
+ * variable so the glow indicator rides it. Only a gesture with actual travel
+ * commits — a press-and-release on a column-clamped width must not overwrite
+ * the wider stored preference with the clamped display value. Mirrors
+ * ui-layout AppFrame's DragHandle capture model. */
+function WidthHandle(props: {
+  side: 'left' | 'right'
+  label: string
+  valueMin: number
+  valueMax: number
+  valueNow: number
+  valueText?: string | undefined
+  onKeyStep: (event: KeyboardEvent<HTMLDivElement>) => void
+  onStart: () => number
+  onDrag: (width: number) => void
+  onCommit: (width: number) => void
+  onEnd: () => void
+}) {
+  const [dragging, setDragging] = useState(false)
+  const base = useRef(0)
+  const origin = useRef(0)
+  const latest = useRef(0)
+  const frame = useRef<number | null>(null)
+  const callbacks = useRef(props)
+  callbacks.current = props
+
+  const outwardWidth = () => {
+    const dx = latest.current - origin.current
+    const outward = callbacks.current.side === 'right' ? dx : -dx
+    return base.current + outward * 2
+  }
+  const cancelFrame = () => {
+    if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
+  }
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    invokePointerCapture(e.currentTarget, 'setPointerCapture', e.pointerId)
+    origin.current = e.clientX
+    latest.current = e.clientX
+    base.current = callbacks.current.onStart()
+    setDragging(true)
+  }, [])
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const box = e.currentTarget.getBoundingClientRect()
+    e.currentTarget.style.setProperty('--dsh-width-handle-pointer-y', `${e.clientY - box.top}px`)
+    if (!hasPointerCapture(e.currentTarget, e.pointerId)) return
+    latest.current = e.clientX
+    frame.current ??= requestAnimationFrame(() => {
+      frame.current = null
+      callbacks.current.onDrag(outwardWidth())
+    })
+  }, [])
+  const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!hasPointerCapture(e.currentTarget, e.pointerId)) return
+    invokePointerCapture(e.currentTarget, 'releasePointerCapture', e.pointerId)
+    cancelFrame()
+    latest.current = e.clientX
+    if (latest.current !== origin.current) callbacks.current.onCommit(outwardWidth())
+    setDragging(false)
+    callbacks.current.onEnd()
+  }, [])
+  // Releasing the button outside the window delivers pointercancel (or drops
+  // the capture silently) instead of pointerup; without this the glow's
+  // data-dragging state sticks on. The gesture is abandoned uncommitted —
+  // onEnd republishes the stored preference. releasePointerCapture inside
+  // onPointerUp also fires lostpointercapture, so this runs (idempotently)
+  // after every normal drag end too; keep both paths.
+  const onPointerCancel = useCallback(() => {
+    cancelFrame()
+    setDragging(false)
+    callbacks.current.onEnd()
+  }, [])
+
+  return (
+    <div
+      className={css.widthHandle}
+      role="separator"
+      aria-orientation="vertical"
+      aria-valuemin={props.valueMin}
+      aria-valuemax={props.valueMax}
+      aria-valuenow={props.valueNow}
+      aria-valuetext={props.valueText}
+      aria-label={props.label}
+      tabIndex={0}
+      data-side={props.side}
+      data-width-handle={props.side}
+      data-dragging={dragging || undefined}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onLostPointerCapture={onPointerCancel}
+      onKeyDown={props.onKeyStep}
+    />
+  )
 }
 
 /** Full props composed from the slot contract. */
@@ -41,8 +163,9 @@ export function ConversationPane({
   // send; its reason is already localized by whoever raised it.
   const composerBlock = useComposerBlock(block => block)
   const displaySettings = useDisplaySettings(value => value)
+  const displaySettingsRef = useRef(displaySettings)
+  displaySettingsRef.current = displaySettings
   const rootRef = useRef<HTMLDivElement | null>(null)
-  const widthPointer = useRef<{ id: number; width: number } | null>(null)
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<WorkspaceId | undefined>()
@@ -242,17 +365,47 @@ export function ConversationPane({
   // on the fallback alone would leave Question/Approval panels at the content
   // end off-screen when the user is not pinned to the floor.
   const composerSeat = (
-    <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="">
+    <div ref={seatResizeRef} className={css.composerSeat} data-composer-seat="" data-conversation-region="composer">
       {composer}
     </div>
   )
 
   const widthStyle = {
-    '--dsh-chat-content-width': displaySettings.chatFullWidth
-      ? 'calc(100% - var(--dsh-composer-side-clearance) * 2)'
-      : `${displaySettings.chatContentWidth}px`,
     '--dsh-chat-font-size': `${displaySettings.chatFontSize}px`,
   } as CSSProperties
+
+  // The committed content width is published imperatively as
+  // --dsh-chat-user-width (the CSS axis resolves it into
+  // --dsh-chat-content-width): the ResizeObserver re-clamps a stored
+  // preference against a shrunken column WITHOUT rewriting the preference,
+  // so widening the window restores it — same rule as the AppFrame drags.
+  const columnWidth = (): number => rootRef.current?.getBoundingClientRect().width ?? 0
+  const publishCommittedWidth = useCallback((root: HTMLDivElement): void => {
+    const settings = displaySettingsRef.current
+    if (settings.chatFullWidth) {
+      root.style.setProperty('--dsh-chat-user-width', 'calc(100% - var(--dsh-composer-side-clearance) * 2)')
+      return
+    }
+    root.style.setProperty(
+      '--dsh-chat-user-width',
+      `${resolveContentWidth(root.getBoundingClientRect().width, settings.chatContentWidth)}px`,
+    )
+  }, [])
+  const rootObserver = useRef<ResizeObserver | null>(null)
+  const rootResizeRef = useCallback((root: HTMLDivElement | null): void => {
+    rootObserver.current?.disconnect()
+    rootObserver.current = null
+    rootRef.current = root
+    if (root === null) return
+    rootObserver.current = new ResizeObserver(() => { publishCommittedWidth(root) })
+    rootObserver.current.observe(root)
+    publishCommittedWidth(root)
+  }, [publishCommittedWidth])
+  useEffect(() => {
+    const root = rootRef.current
+    if (root !== null) publishCommittedWidth(root)
+  }, [displaySettings.chatContentWidth, displaySettings.chatFullWidth, publishCommittedWidth])
+
   // In fill mode the rendered column is the pane minus the side clearance, so
   // a width gesture starts from the measured width rather than the stored one.
   const renderedWidth = (): number | undefined => {
@@ -262,34 +415,32 @@ export function ConversationPane({
     const gutter = Number.isFinite(clearance) ? clearance * 2 : 0
     return root.getBoundingClientRect().width - gutter
   }
-  const dragOrigin = (): number => displaySettings.chatFullWidth
-    ? renderedWidth() ?? displaySettings.chatContentWidth
-    : displaySettings.chatContentWidth
-  const updateWidth = (clientX: number, startWidth?: number): void => {
+  const dragOrigin = (): number => displaySettingsRef.current.chatFullWidth
+    ? renderedWidth() ?? displaySettingsRef.current.chatContentWidth
+    : displaySettingsRef.current.chatContentWidth
+
+  // Drag plumbing for the two width handles: onStart snapshots the resolved
+  // rendered width (grabbing a clamped column must not jump back to the raw
+  // stored preference), onDrag publishes only the live clamped style,
+  // onCommit persists the width of a gesture that actually travelled, and
+  // onEnd republishes the committed value — an uncommitted press leaves the
+  // stored preference untouched.
+  const onHandleStart = useCallback((): number => {
+    if (rootRef.current === null) return displaySettingsRef.current.chatContentWidth
+    return resolveContentWidth(columnWidth(), dragOrigin())
+  }, [])
+  const onHandleDrag = useCallback((width: number): void => {
     const root = rootRef.current
     if (root === null) return
-    const rect = root.getBoundingClientRect()
-    const center = rect.left + rect.width / 2
-    const origin = startWidth ?? dragOrigin()
-    setDisplayWidth(origin + (clientX - (center + origin / 2)) * 2)
-  }
-  const beginWidthResize = (event: PointerEvent<HTMLDivElement>): void => {
-    event.preventDefault()
-    invokePointerCapture(event.currentTarget, 'setPointerCapture', event.pointerId)
-    const origin = dragOrigin()
-    widthPointer.current = { id: event.pointerId, width: origin }
-    updateWidth(event.clientX, origin)
-  }
-  const moveWidthResize = (event: PointerEvent<HTMLDivElement>): void => {
-    const active = widthPointer.current
-    if (active?.id !== event.pointerId) return
-    updateWidth(event.clientX, active.width)
-  }
-  const endWidthResize = (event: PointerEvent<HTMLDivElement>): void => {
-    if (widthPointer.current?.id !== event.pointerId) return
-    widthPointer.current = null
-    invokePointerCapture(event.currentTarget, 'releasePointerCapture', event.pointerId)
-  }
+    root.style.setProperty('--dsh-chat-user-width', `${resolveContentWidth(columnWidth(), width)}px`)
+  }, [])
+  const onHandleCommit = useCallback((width: number): void => {
+    setDisplayWidth(resolveContentWidth(columnWidth(), width))
+  }, [setDisplayWidth])
+  const onHandleEnd = useCallback((): void => {
+    const root = rootRef.current
+    if (root !== null) publishCommittedWidth(root)
+  }, [publishCommittedWidth])
   const onWidthKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     const step = event.shiftKey ? 64 : 16
     const current = dragOrigin()
@@ -304,32 +455,37 @@ export function ConversationPane({
   }
 
   return (
-    <div ref={rootRef} className={clsx(css.root, workbench && css.workbenchPane)} data-phase={phase} style={widthStyle}>
+    <div
+      ref={rootResizeRef}
+      className={clsx(css.root, workbench && css.workbenchPane)}
+      data-phase={phase}
+      data-chat-fill={displaySettings.chatFullWidth || undefined}
+      style={widthStyle}
+    >
       {renderSlot('conversation.session.header', { compact, leading: hero ? undefined : headerLeading })}
-      <div className={css.scrollRegion}>
+      <div className={css.scrollRegion} data-conversation-session={sessionId} data-conversation-region="chat">
         <div className={css.scrollBody} data-conversation-scroll="">
           {renderSlot('conversation.session', { compact })}
           {composerSeat}
         </div>
-        {!workbench && (
-          <div
-            className={css.widthHandle}
-            role="separator"
-            aria-orientation="vertical"
-            aria-valuemin={CHAT_CONTENT_WIDTH_RANGE.min}
-            aria-valuemax={CHAT_CONTENT_WIDTH_RANGE.max}
-            aria-valuenow={displaySettings.chatContentWidth}
-            aria-valuetext={displaySettings.chatFullWidth ? t('settings.display.fill') : undefined}
-            aria-label={t('settings.display.widthHandle')}
-            tabIndex={0}
-            data-conversation-width-handle=""
-            onPointerDown={beginWidthResize}
-            onPointerMove={moveWidthResize}
-            onPointerUp={endWidthResize}
-            onPointerCancel={endWidthResize}
-            onKeyDown={onWidthKeyDown}
+        {/* Width handles only while a transcript is on screen; the hero has no
+            content column to size. Both edges write the one centered width. */}
+        {phase === 'active' && !workbench && (['left', 'right'] as const).map(side => (
+          <WidthHandle
+            key={side}
+            side={side}
+            label={t('settings.display.widthHandle')}
+            valueMin={CHAT_CONTENT_WIDTH_RANGE.min}
+            valueMax={CHAT_CONTENT_WIDTH_RANGE.max}
+            valueNow={displaySettings.chatContentWidth}
+            valueText={displaySettings.chatFullWidth ? t('settings.display.fill') : undefined}
+            onKeyStep={onWidthKeyDown}
+            onStart={onHandleStart}
+            onDrag={onHandleDrag}
+            onCommit={onHandleCommit}
+            onEnd={onHandleEnd}
           />
-        )}
+        ))}
       </div>
       <Modal
         open={discardWorkspaceId !== undefined}
@@ -410,7 +566,7 @@ export function ConversationRoot(props: ConversationRootProps) {
   return (
     <div ref={root} className={css.workbenchRoot} data-workbench="" data-tabbed={tabbed || undefined} data-maximized={maximized !== undefined || undefined}>
       {props.renderSlot('conversation.workbench.toolbar', { viewport, tabbed })}
-      {paneIds.length === 0 ? props.renderSlot('conversation.workbench.empty', {}) : (
+      {paneIds.length === 0 ? props.renderSlot('conversation.workbench.empty', { viewport }) : (
         <div className={css.workbenchGrid} data-workbench-grid="">
           {rows.map((row, rowIndex) => {
             const ratioStart = rowIndex * columns
@@ -429,7 +585,7 @@ export function ConversationRoot(props: ConversationRootProps) {
                       onPointerDown={() => { props.onViewportFocus(id) }}
                       onFocusCapture={() => { props.onViewportFocus(id) }}
                     >
-                      <props.SessionProvider sessionId={id}>
+                      <props.SessionProvider sessionId={id} empty={() => <p className={css.workbenchUnavailable} role="status">{props.t('viewport.unavailable')}</p>}>
                         {() => (
                           <>
                             {props.renderSlot('conversation.workbench.pane.header', {

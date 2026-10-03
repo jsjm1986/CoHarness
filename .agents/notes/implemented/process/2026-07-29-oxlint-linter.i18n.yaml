@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-29-oxlint-linter.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-29-oxlint-linter.md
-2026-07-29-oxlint-linter.md: 15bdd4302745fdf3d1a2bd0d28fbc3d4b9fc50bb
-2026-07-29-oxlint-linter.zh.md: e2392c7ae04f28b16e28eb01da273a2fd08ef687
+/agent-note-oxlint-as-the-repository-linter:
+  en: 108cbadd07f2024d
+  zh: 465b2861fd0d21c2
+/agent-note-oxlint-as-the-repository-linter/problem:
+  en: cfa44df34a80472e
+  zh: e75d5d792587e113
+/agent-note-oxlint-as-the-repository-linter/decision:
+  en: 226fa47faf196b77
+  zh: 1d79d496616b2be6
+/agent-note-oxlint-as-the-repository-linter/verification:
+  en: 1eb3abaa1b4d977c
+  zh: 213ab7a3af025f63
+/agent-note-oxlint-as-the-repository-linter/alternatives-considered:
+  en: 7da880e8a7796d66
+  zh: edb51cc66d16902f
+/agent-note-oxlint-as-the-repository-linter/consequences:
+  en: 69f13eb391ab3d40
+  zh: 0f3358b31fe24551

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-spill
 
 [English](README.md) | 中文
@@ -18,6 +23,18 @@
 
 `dsh-spill` 让插件和工具通过公开的 `ctx.spillStore` API 保存超大文本，并取得不透明定位信息、精确字节数与取回指引。当完整结果必须保持可取回、同时又不能填满模型上下文时选择它。配置 `dsh-spill-local` 可获得本地持久化；当超大工具结果应变为有界预览时，再添加 `dsh-spill-policy`。该 API 不提供保留、替换、取回或搜索操作。存储故障会使保存操作拒绝，由调用方决定保留内联内容还是让操作失败。
 
+## 目录
+
+- [服务 API（`ctx.spillStore`）](#service-api-ctxspillstore)
+- [词汇](#vocabulary)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="service-api-ctxspillstore"></a>
 ## 服务 API（`ctx.spillStore`）
 
 | 成员 | 语义 |
@@ -26,16 +43,20 @@
 
 存储操作以请求的 `owner` 会话作为保存时命名空间进行分组；后端自行选择私有表示，并可以从调用方的 `suggestedName` 派生名称，但绝不能将其当作可信路径。该 seam 只负责存储：不提供保留策略（由 [`@deepseek-ai/dsh-output-retention`](../../util/output-retention) 负责），不替换工具结果（由 `@deepseek-ai/dsh-spill-policy` 负责），也不提供取回/搜索 API（后端的 `retrievalHint` 会告诉模型如何使用定位信息）。
 
+<a id="vocabulary"></a>
 ## 词汇
 
 `SaveTextSpill`（owner、source、suggestedName、content）是请求；`SpillRef`（locator、bytes、retrievalHint）是结果。`SpillLocator` 是[带品牌类型](../../util/brand)的值，并以不透明字符串的形式呈现给模型；对 `dsh-spill-local` 而言它是本地路径，但未来的后端可以返回 URI、键或命令 token，无需修改策略／工具消费方。`SpillOwner.sessionId` 是保存时存储命名空间：fork 后的会话会从种子日志继承现有定位信息，无需复制或更改其归属；fork 后新产生的 spill 使用子会话 id。`SpillSource` 记录产生该 spill 的 `toolName`、`callId` 和 `label`，供后端命名和检查使用，不用于访问控制。完整约定见 `src/types.ts`。
 
 设计原理见[工具输出 spill Agent Note](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.zh.md)，其中说明了为什么创建操作应由运行时 spill seam 而非面向模型的 `write` 工具承担。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该 seam 声明定位符与检索提示契约；存储由后端拥有。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 spill 消费方将后端的定位信息与取回指引渲染给模型，从而间接影响模型体验。
@@ -44,7 +65,18 @@ spill 消费方将后端的定位信息与取回指引渲染给模型，从而�
 
 不会直接导致 KV Cache 失效；请求前缀变更由上述消费方负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **该 seam 没有取回或删除 API**：消费方只能渲染后端的定位信息与指引；生命周期和访问语义仍由后端自行决定。
 - **存储不等于访问控制**：`SpillOwner` 会区分写入命名空间，但不会授予通过定位信息读取内容的权限；每个后端和取回消费方都必须自行强制执行访问边界。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

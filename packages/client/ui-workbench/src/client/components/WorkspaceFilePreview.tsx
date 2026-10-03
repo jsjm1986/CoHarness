@@ -1,9 +1,10 @@
 /** Bounded read-only Workspace text preview, retaining content only in its view. */
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceFileTextPage } from '@deepseek-ai/dsh-api-remotes/client'
-import { WorkspaceResourceError, isWorkspaceAccessFailure } from '@deepseek-ai/dsh-client-runtime/client'
-import type { WorkspaceResourceRegistry, WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
+import { isWorkspaceAccessFailure } from '@deepseek-ai/dsh-client-runtime/client'
+import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
+import type { WorkspacePreviewResource } from './WorkspaceFileTab.tsx'
 import css from './Workbench.module.css'
 
 /** Read one versioned page from the resource's explicit runtime. */
@@ -28,31 +29,40 @@ function imageMime(path: string): string | undefined {
 }
 
 /** Render one paginated file.
- * @param props - bound resource, reader, lifecycle, and labels.
+ * @param props - preview metadata/callbacks, readers, lifecycle, and labels.
  * @returns a read-only region inside its resource tab.
  */
-export function WorkspaceFilePreview({ request, read, readBytes, resources, close, labels, initialLine }: {
+export function WorkspaceFilePreview({ request, read, readBytes, resource, close, labels, initialLine }: {
   request: WorkspaceResourceOpenRequest
   initialLine?: number | undefined
   read: ReadWorkspacePreview
   readBytes?: ReadWorkspaceBytesPreview | undefined
-  resources: WorkspaceResourceRegistry
+  resource: WorkspacePreviewResource
   close: () => void
   labels: { close: string; reload: string; previous: string; next: string; loading: string; changed: string; binary: string }
 }) {
-  const source = useMemo(() => resources.source(request), [resources, request])
-  const state = useSyncExternalStore(source.subscribe, source.get, source.get)
+  const { metadata, revoke } = resource
   const [offset, setOffset] = useState(initialLine ?? 1)
   const [revision, setRevision] = useState(0)
   const [page, setPage] = useState<WorkspaceFileTextPage>()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<Error>()
   const [rawBytes, setRawBytes] = useState<string>()
+  const [reloading, setReloading] = useState(false)
+  const [source, setSource] = useState<{ version: string; bytes: number | undefined }>()
   const completed = useRef<string | undefined>(undefined)
-  const denied = isWorkspaceAccessFailure(state.error) || isWorkspaceAccessFailure(error)
-  const version = state.value?.changed === true && page !== undefined ? page.version : state.value?.version
+  const denied = metadata.accessDenied || isWorkspaceAccessFailure(error)
+  // A retained page or binary read keeps its own source version and size
+  // estimate while the resource reports a changed successor, so a revalidation
+  // publication cannot re-read the already displayed content.
+  const retained = metadata.value?.changed === true && source !== undefined
+  const version = retained ? source.version : metadata.value?.version
+  const byteEstimate = retained ? source.bytes : metadata.value?.bytes
   useEffect(() => {
-    if (denied) { setPage(undefined); completed.current = undefined; return }
+    if (denied) { setPage(undefined); setSource(undefined); completed.current = undefined; return }
+    // The user's metadata reload owns this transition: while its stat is open,
+    // the still-old snapshot cannot authorize a new content read.
+    if (reloading) return
     if (version === undefined) return
     const key = `${version}:${String(offset)}:${String(revision)}`
     /* v8 ignore next -- a completed key is only revisited after a parent changes its reader identity. */
@@ -66,44 +76,55 @@ export function WorkspaceFilePreview({ request, read, readBytes, resources, clos
       completed.current = key
       setRawBytes(undefined)
       setPage(value)
+      setSource({ version, bytes: byteEstimate })
     }, async (cause: unknown) => {
       if (isCancelled()) return
       const failure = cause instanceof Error ? cause : new Error(String(cause))
       const code = (failure as { code?: unknown }).code
-      if (code === 'workspace-file/not-text' && readBytes !== undefined && state.value?.bytes !== undefined) {
+      if (code === 'workspace-file/not-text' && readBytes !== undefined && byteEstimate !== undefined) {
         try {
-          const bytes = await readBytes({ resource: request, offset: 0, length: state.value.bytes, version }, abort.signal)
-          if (!isCancelled()) { setRawBytes(bytes.bytes); setError(undefined) }
+          const bytes = await readBytes({ resource: request, offset: 0, length: byteEstimate, version }, abort.signal)
+          if (!isCancelled()) {
+            setRawBytes(bytes.bytes)
+            setSource({ version, bytes: byteEstimate })
+            setError(undefined)
+          }
           return
         } catch (byteCause: unknown) {
           if (isCancelled()) return
           const byteFailure = byteCause instanceof Error ? byteCause : new Error(String(byteCause))
           setError(byteFailure)
-          if (isWorkspaceAccessFailure(byteFailure)) resources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', byteFailure.message))
+          if (isWorkspaceAccessFailure(byteFailure)) revoke(byteFailure.message)
           return
         }
       }
       setError(failure)
-      if (isWorkspaceAccessFailure(failure)) resources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', failure.message))
+      if (isWorkspaceAccessFailure(failure)) revoke(failure.message)
     }).finally(() => { if (!isCancelled()) setPending(false) })
     return () => { abort.abort() }
-  }, [denied, version, request, offset, read, readBytes, revision, resources, state.value?.bytes])
+  }, [denied, version, request, offset, read, readBytes, revision, revoke, byteEstimate, reloading])
   const reload = async (): Promise<void> => {
-    setError(undefined)
-    setRawBytes(undefined)
-    await source.reload()
-    setRevision(value => value + 1)
+    setReloading(true)
+    try {
+      await resource.reload()
+      setError(undefined)
+      setRawBytes(undefined)
+      setSource(undefined)
+      setRevision(value => value + 1)
+    } finally {
+      setReloading(false)
+    }
   }
-  const changed = state.value?.changed === true
+  const changed = metadata.value?.changed === true
   /* v8 ignore next -- CSS modules always provide this generated class in a built client. */
   const previewClass = css.filePreview ?? ''
-  const message = error?.message ?? state.error?.message
+  const message = error?.message ?? metadata.error?.message
   const imageType = imageMime(request.path)
   return (
     <section aria-label={request.path} className={previewClass}>
       <div className={css.filePreviewActions}>
         <Button size="sm" onClick={close}>{labels.close}</Button>
-        <Button size="sm" disabled={pending || state.status === 'loading' || denied}
+        <Button size="sm" disabled={pending || metadata.status === 'loading' || denied || reloading}
           onClick={() => { void reload() }}>{labels.reload}</Button>
         {page !== undefined && (
           <>
@@ -120,7 +141,7 @@ export function WorkspaceFilePreview({ request, read, readBytes, resources, clos
       </div>
       {message !== undefined && <p role="alert">{message}</p>}
       {changed && !denied && <p role="status" data-workspace-file-changed>{labels.changed}</p>}
-      {(pending || state.status === 'loading') && page === undefined && <p role="status">{labels.loading}</p>}
+      {(pending || metadata.status === 'loading') && page === undefined && <p role="status">{labels.loading}</p>}
       {rawBytes !== undefined && imageType !== undefined && !denied && (
         <img className={css.filePreviewImage} src={`data:${imageType};base64,${rawBytes}`} alt={request.path}
           data-workspace-file-image />
@@ -130,7 +151,7 @@ export function WorkspaceFilePreview({ request, read, readBytes, resources, clos
           {labels.binary}{'\n'}{rawBytes}
         </pre>
       )}
-      {!denied && state.value !== undefined && page !== undefined && rawBytes === undefined && (
+      {!denied && metadata.value !== undefined && page !== undefined && rawBytes === undefined && (
         <pre className={css.filePreviewText} data-workspace-file-preview>{page.text}</pre>
       )}
     </section>

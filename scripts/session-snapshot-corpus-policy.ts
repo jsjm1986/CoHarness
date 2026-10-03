@@ -21,7 +21,7 @@ export interface SnapshotCorpusGenerationSummary {
   readonly retainedScenarios: number
 }
 
-const MAX_RETAINED_ROLES = 13
+const MAX_RETAINED_ROLES = 14
 const REQUIRED_V0_COVERAGE = new Set([
   'multi-hop',
   'packed-row',

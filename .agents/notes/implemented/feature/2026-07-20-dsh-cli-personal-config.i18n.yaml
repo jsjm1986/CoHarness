@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-20-dsh-cli-personal-config.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-20-dsh-cli-personal-config.md
-2026-07-20-dsh-cli-personal-config.md: db1e5638f06b66f74d4761d1eab4e5248e6def0b
-2026-07-20-dsh-cli-personal-config.zh.md: d796d9887421aa7c8e9f3e8d1de66c74e10c139d
+/agent-note-the-dsh-cli-and-personal-config-overlays-from-the-harness-home:
+  en: bd00cfa442e15b81
+  zh: 176e54cf62ddbe50
+/agent-note-the-dsh-cli-and-personal-config-overlays-from-the-harness-home/problem:
+  en: 3cf252c0507aebae
+  zh: 9377cb360f8f07af
+/agent-note-the-dsh-cli-and-personal-config-overlays-from-the-harness-home/decision:
+  en: e49a6642371d96bb
+  zh: f0779a62113d6bbe
+/agent-note-the-dsh-cli-and-personal-config-overlays-from-the-harness-home/alternatives-considered:
+  en: 7f386ffad5ab9a22
+  zh: 92e08466cf2869ed
+/agent-note-the-dsh-cli-and-personal-config-overlays-from-the-harness-home/consequences:
+  en: b419e90994d1933e
+  zh: 1346c944bba896a8
+/agent-note-the-dsh-cli-and-personal-config-overlays-from-the-harness-home/testing:
+  en: 3d56d2e052da3ca9
+  zh: f1d938ce606f7c7b

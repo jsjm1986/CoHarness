@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-userdoc
 
 [English](README.md) | 中文
@@ -23,10 +28,22 @@
 使用 `dsh-userdoc` 作为文档接缝：`ctx.userDocs` 把文件与文件夹存入运行时的文档工作区并返回携带真实绝对路径的引用，代理因此用普通文件系统与 shell 工具即可读取文档。它与 `dsh-attachment` 有意相反——后者的对象内容寻址、对文件工具不可见；图片走附件路径，文档走文件系统路径。
 
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与待完成工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该 seam 把每次调用解析到已挂载后端并返回真实路径；文档状态完全位于提供方之后。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 经由宿主提示词组装消费方间接产生影响；文档以内联文本还是可读取路径到达模型由该消费方决定，本接缝只提供引用与内联大小阈值。
@@ -35,9 +52,20 @@
 
 无直接失效；消费方负责请求前缀的任何变化。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与待完成工作
 
 - **没有业务配额记账** —— Provider 可以不限制单文件大小，但具体 Provider 仍必须负责磁盘可用空间和临时会话安全。
 - **`list` 只遍历一个文档根目录** —— 没有索引或跨根视图，因此递归消费方会完整扫描很大的工作区。
 - **读取时不做内容校验** —— 与内容寻址的附件路径不同，文档是普通文件，任何拥有文件系统访问权的主体都可能在上传后修改它，而 `bytes` 是上传时记录的长度。
 - **快照复制不同步** —— 跨作用域复制是单向操作，目标文件提交后与源文件相互独立。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

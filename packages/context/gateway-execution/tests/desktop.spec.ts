@@ -1,4 +1,5 @@
 /** Desktop workflow isolation, cancellation and external lease observations. */
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
@@ -10,7 +11,7 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-function fixture(pollMs = 60_000) {
+function fixture(pollMs = 60_000, bind?: DesktopExecutionHost['bind']) {
   const root = {} as Agent, child = {} as Agent
   let idle = false
   const calls: Array<{ agent: Agent; action: string; body: object }> = []
@@ -23,13 +24,70 @@ function fixture(pollMs = 60_000) {
     return {}
   })
   const rootOf = vi.fn<DesktopExecutionHost['root']>(() => root)
-  const policy = new GatewayDesktopPolicy({ root: rootOf, authorize, request, idle: () => idle }, pollMs, 1000)
+  const policy = new GatewayDesktopPolicy({ root: rootOf, authorize, request, idle: () => idle,
+    ...(bind === undefined ? {} : { bind }) }, pollMs, 1000)
   onTestFinished(async () => { await policy.dispose() })
   const execution = (agent = child, signal = new AbortController().signal) => ({ agent, signal }) as ToolExecution
   return { policy, root, child, calls, request, authorize, granted, rootOf, execution, setIdle: () => { idle = true } }
 }
 
 describe('Gateway desktop workflow', () => {
+  it.each(['allow', 'refuse'] as const)('renews with the active caller scope after a superseded actor response (%s)', async (response) => {
+    const context = new AsyncLocalStorage<string>()
+    let rootIdentity = 'A'
+    const bindings: Array<{ source: 'caller' | 'root'; identity: string | undefined }> = []
+    const bind: NonNullable<DesktopExecutionHost['bind']> = (_agent, source) => {
+      const identity = source === 'caller' ? context.getStore() : rootIdentity
+      bindings.push({ source, identity })
+      return operation => context.run(identity ?? 'missing', operation)
+    }
+    const f = fixture(5, bind)
+    const oldMonitor = Promise.withResolvers<undefined>(), oldReply = Promise.withResolvers<undefined>()
+    const activeB = Promise.withResolvers<undefined>(), finishB = Promise.withResolvers<undefined>()
+    const renewedB = Promise.withResolvers<undefined>()
+    let delayOld = false, heldOld = false, refusedOld = false
+    f.authorize.mockImplementation(async () => {
+      const identity = context.getStore()
+      if (identity === 'A' && delayOld && !heldOld) {
+        heldOld = true
+        oldMonitor.resolve(undefined)
+        await oldReply.promise
+        refusedOld = true
+        if (response === 'refuse') throw new Error('A qualification was revoked')
+      }
+      if (identity === 'B' && refusedOld) renewedB.resolve(undefined)
+    })
+    await context.run('A', () => f.policy.run(f.execution(), async () => 'A result'))
+    delayOld = true
+    await oldMonitor.promise
+    rootIdentity = 'B'
+    let signalB: AbortSignal | undefined
+    const next = context.run('B', () => f.policy.run(f.execution(), async (signal) => {
+      signalB = signal
+      activeB.resolve(undefined)
+      await finishB.promise
+      return context.getStore()
+    }))
+    try {
+      await activeB.promise
+      oldReply.resolve(undefined)
+      await renewedB.promise
+      expect(signalB?.aborted).toBe(false)
+      finishB.resolve(undefined)
+      expect(await next).toBe('B')
+      expect(bindings).toEqual([
+        { source: 'caller', identity: 'A' }, { source: 'root', identity: 'A' },
+        { source: 'caller', identity: 'B' }, { source: 'root', identity: 'B' },
+      ])
+    } finally {
+      oldReply.resolve(undefined)
+      finishB.resolve(undefined)
+      await next.catch(() => {})
+      f.setIdle()
+      await f.policy.settled(f.root)
+    }
+  })
+
   it('retains one grant across calls and releases only when the root settles', async () => {
     const f = fixture()
     await expect(f.policy.run(f.execution(), async () => 'first')).resolves.toBe('first')

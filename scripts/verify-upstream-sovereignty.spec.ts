@@ -17,7 +17,7 @@ import {
 
 const root = resolve(import.meta.dirname, '..')
 
-const SYNCED_COMMIT = 'ddefc45fbc7f8e46dd73185e68295696d1297887'
+const SYNCED_COMMIT = '4878cdabd87d4041bdaff61d04c966883b9fd07a'
 
 function sourceFixture(run: (directory: string, commit: string, git: (...args: string[]) => string) => void): void {
   const directory = mkdtempSync(resolve(tmpdir(), 'dsh-sovereignty-test-'))
@@ -203,6 +203,22 @@ describe('manifest validation', () => {
     expect(manifest.packages['web/fetch']?.note).toBe('AGENTS.md')
   })
 
+  it('rejects upstreamShadowed on non-owned packages and non-true values', () => {
+    expect(() => validateUpstreamSyncManifest(synthetic({
+      packages: { 'core/session': { sovereignty: 'adapted', upstreamShadowed: true } },
+    }), root)).toThrow('only legal on "owned"')
+    expect(() => validateUpstreamSyncManifest(synthetic({
+      packages: { 'local/only': { sovereignty: 'owned', upstreamShadowed: false } },
+    }), root)).toThrow('must be true when present')
+  })
+
+  it('accepts upstreamShadowed on an owned package', () => {
+    const manifest = validateUpstreamSyncManifest(synthetic({
+      packages: { 'local/only': { sovereignty: 'owned', upstreamShadowed: true } },
+    }), root)
+    expect(manifest.packages['local/only']?.upstreamShadowed).toBe(true)
+  })
+
   it.each([
     ['an unknown top-level key', { packages: {}, extra: true }],
     ['an unknown package field', { packages: { 'a/b': { sovereignty: 'tracked', owner: 'x' } } }],
@@ -219,7 +235,7 @@ describe('checked-in manifest', () => {
 
   it('loads scripts/upstream-sync.json pinned at the mirrored release tag', () => {
     expect(manifest.version).toBe(2)
-    expect(manifest.syncedTag).toBe('dsh-v0.1.6-alpha.2')
+    expect(manifest.syncedTag).toBe('dsh-v0.2.0-rc.1')
     expect(manifest.syncedCommit).toBe(SYNCED_COMMIT)
   })
 
@@ -241,7 +257,7 @@ describe('checked-in manifest', () => {
     expect(resolveTagCommit(root, manifest.syncedTag)).toBe(manifest.syncedCommit)
   })
 
-  it.runIf(tagPresent)('partitions upstream packages into tracked|adapted|replaced and upstreamOnly', () => {
+  it.runIf(tagPresent)('partitions upstream packages into tracked|adapted|replaced|shadowed-owned and upstreamOnly', () => {
     const upstream = packageKeysAtCommit(root, manifest.syncedCommit)
     const upstreamOnly = new Set(manifest.upstreamOnly.map(item => item.package))
     for (const key of upstream) {
@@ -249,7 +265,10 @@ describe('checked-in manifest', () => {
       if (entry === undefined) {
         expect(upstreamOnly.has(key), `${key} must be upstreamOnly`).toBe(true)
       } else {
-        expect(entry.sovereignty, `${key} must not be owned`).not.toBe('owned')
+        expect(
+          entry.sovereignty !== 'owned' || entry.upstreamShadowed === true,
+          `${key} must not be owned unless it flags upstreamShadowed`,
+        ).toBe(true)
       }
     }
     for (const key of upstreamOnly) {

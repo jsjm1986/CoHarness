@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-retire-dynamic-cordis-model-tools.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-09-22-retire-dynamic-cordis-model-tools.md
-2026-09-22-retire-dynamic-cordis-model-tools.md: 1049ac7156414e8958b727eecd9e4886f9e9bdde
-2026-09-22-retire-dynamic-cordis-model-tools.zh.md: ccec059834091c4e500aedbd68912a3cc9670ff3
+/agent-note-retire-dynamic-cordis-model-execution-tools:
+  en: 6f4dbac7a702681e
+  zh: 96237d21c6f1c281
+/agent-note-retire-dynamic-cordis-model-execution-tools/problem:
+  en: bad1e4e3f73fecde
+  zh: e87a6dccc52c9a29
+/agent-note-retire-dynamic-cordis-model-execution-tools/decision:
+  en: 50091e2d3018481d
+  zh: a6978d1f08653daa
+/agent-note-retire-dynamic-cordis-model-execution-tools/alternatives-considered:
+  en: 05f5a998125104bc
+  zh: 6391eeae6aa3c698
+/agent-note-retire-dynamic-cordis-model-execution-tools/consequences:
+  en: 82a85e545b938a36
+  zh: d11c8d03a2ff0078

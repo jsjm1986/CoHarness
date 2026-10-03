@@ -1,5 +1,9 @@
 /** Per-turn workspace change summaries, the Session event announcing them, and the Host service serving them with their comparisons. */
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { Branded } from '@deepseek-ai/dsh-brand'
+
+/** Content identity of one immutable, Session-owned historical review. */
+export type WorkspaceReviewId = Branded<'WorkspaceReviewId'>
 
 /** One file changed during a turn, with line counts from git or from the whole-file captures around its file-tool edits. */
 export interface WorkspaceChangedFile {
@@ -21,8 +25,10 @@ export interface WorkspaceChangedFile {
   oversized?: true
 }
 
-/** Files changed during one top-level turn, kept on the Host until its Session is disposed. */
+/** Historical files changed during one top-level turn. */
 export interface WorkspaceChangesSummary {
+  /** Storage failed; file effects may have occurred and the comparison is incomplete. */
+  incomplete?: true
   /** The turn whose file changes this summary describes. */
   turn: number
   /** The Session working directory `path` values are relative to. */
@@ -53,7 +59,7 @@ export interface WorkspaceDiffHunk {
   lines: string[]
 }
 
-/** The comparison of one listed file's turn-start and turn-end contents, computed when asked for. */
+/** The comparison of one listed file's turn-start and turn-end contents, recorded before its announcement. */
 export type WorkspaceFileDiff =
   | {
     kind: 'text'
@@ -75,23 +81,32 @@ export type WorkspaceFileDiff =
   /** A side larger than the plugin's `maxFileBytes`; no lines are served. */
   | { kind: 'oversized'; path: string; display: string }
 
-/** Serves the summaries and file comparisons the recorder keeps for live Sessions. */
+/** Serves live and durably recorded historical comparisons. */
 export interface WorkspaceChanges {
+  /**
+   * Remove stored reviews for an explicitly purged, released Session.
+   * @param sessionId - identity selected by the authenticated archive owner.
+   * @param signal - purge cancellation.
+   * @returns after its immutable artifacts have been removed.
+   */
+  removeStored(sessionId: SessionId, signal?: AbortSignal): Promise<void>
   /**
    * The summary announced by one `workspace/changes` event.
    * @param sessionId - the Session that appended the event.
    * @param seq - the event's sequence number.
-   * @returns the summary, or undefined once its Session was disposed or when this Host never recorded it.
+   * @param signal - optional cancellation for a persisted read.
+   * @returns the summary, or undefined when no historical record is available.
    */
-  summary(sessionId: SessionId, seq: number): WorkspaceChangesSummary | undefined
+  summary(sessionId: SessionId, seq: number, signal?: AbortSignal):
+    WorkspaceChangesSummary | undefined | Promise<WorkspaceChangesSummary | undefined>
   /**
    * Compare one listed file's contents at turn start and turn end.
    * @param sessionId - the Session that appended the event.
    * @param seq - the event's sequence number.
    * @param index - the file's index in the summary's `files`.
    * @param signal - cancels the reads.
-   * @returns the comparison, or undefined once its Session was disposed, when this Host never recorded it, or when no file has that index.
-   * @throws when a snapshot read fails for a live Session.
+   * @returns the comparison, or undefined when the artifact or file index is unavailable.
+   * @throws when historical data is corrupt or storage cannot be read.
    */
   diff(sessionId: SessionId, seq: number, index: number, signal: AbortSignal): Promise<WorkspaceFileDiff | undefined>
 }
@@ -99,17 +114,17 @@ export interface WorkspaceChanges {
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     /**
-     * A completed top-level turn's changed files were summarized; the summary itself stays on the
-     * Host and is served by `workspaceChanges.summary` for the event's sequence while the Session
-     * lives. The latest event for one turn replaces earlier ones.
+     * A top-level turn's historical review was durably recorded, or storage failed.
+     * Old records without reviewId may depend on an unavailable temporary recorder.
+     * The latest event for one turn replaces earlier ones.
      */
-    'workspace/changes': { turn: number }
+    'workspace/changes': { turn: number; reviewId?: WorkspaceReviewId; incomplete?: true; requiredReviewBytes?: number }
   }
 }
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    /** Per-turn changed-file summaries and comparisons of live Sessions. */
+    /** Per-turn historical changed-file summaries and comparisons. */
     workspaceChanges: WorkspaceChanges
   }
 }

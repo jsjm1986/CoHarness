@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-web-config-plane.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-30-web-config-plane.md
-2026-07-30-web-config-plane.md: 1c25d14a0a943c1b24e5006629e0a4782a645864
-2026-07-30-web-config-plane.zh.md: 7d3dce4335ae7ba68fd25b1cdefaa60cb4d2d764
+/agent-note-the-web-configuration-plane:
+  en: 6e22948b42ebb858
+  zh: 56dc9341ef636e41
+/agent-note-the-web-configuration-plane/problem:
+  en: b84de6f0b77214f5
+  zh: 47bce10d23103f3a
+/agent-note-the-web-configuration-plane/decision:
+  en: 72a61cadd3de235c
+  zh: 0f2d9a9f44c83bcf
+/agent-note-the-web-configuration-plane/alternatives-considered:
+  en: 67d2bf4a633b3a02
+  zh: 6f5f28e417aec09c
+/agent-note-the-web-configuration-plane/consequences:
+  en: 074c3036e8090d29
+  zh: 5156cb08ae1e6b74

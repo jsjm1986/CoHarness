@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-lsp
 
 [English](README.md) | 中文
@@ -10,12 +15,25 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 
 `dsh-tool-lsp` 让模型通过单个只读 `lsp` 工具导航代码：打开符号定义、查找引用与实现，或阅读悬停文档。请求使用从 1 开始的 UTF-16 行列位置。导航结果数量有上限、按文件分组，并在省略位置或截断文本时显示标记；悬停结果经过规范化，且会区分信息缺失与错误。该包要求配置 LSP 提供方，并要求会话具有工作区根目录。当文本搜索有歧义，或修改需要精确的符号关系时选择它；普通导航应继续使用 `search` 与 `read`。
 
+## 目录
+
+- [工具](#the-tool)
+- [配置](#configuration)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="the-tool"></a>
 ## 工具
 
 `lsp` 接受 `operation`（`goToDefinition` | `findReferences` | `goToImplementation` | `hover`）、`file_path`、`line` 和 `character`。`line` 与 `character` 是正的、从 1 开始的 UTF-16 光标坐标；工具将其转换为 seam 从零开始的位置，并把渲染位置转换回来。`findReferences` 包含声明，因此影响分析不会遗漏定义位置。提供方、language id、工作区根目录、限制、超时、初始化和可执行文件均不进入模型输入。
 
 该工具要求从会话 `header.cwd` 取得工作区根目录，没有回退值：缺失时会在查询前以 `LSP_WORKSPACE_REQUIRED` 失败。其规范结果是完整的已规范化 Service Definition 联合类型：`{ kind: "locations", locations, resolvedWorkspaceUri }` 或 `{ kind: "hover", hover }`；PTC mode 可以直接检查每个已取得的位置和从零开始的范围。原生渲染以提供方的规范工作区 URI 为基准，投影按文件稳定分组的 `path:line:character` 条目，而不对会话 cwd 应用宿主平台路径规则。`file:` URI 落在该工作区 URI 内时成为工作区相对路径，位于其外时成为从 URI 派生的绝对路径；格式错误的 URI 与非 `file:` URI 保持原样。空位置和 `null` hover 都是成功的无结果响应；格式错误的提供方载荷仍是结构化错误。
 
+<a id="configuration"></a>
 ## 配置
 
 | Key | 默认值 | 含义 |
@@ -24,10 +42,13 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 | `maxResultChars` | `16000` | 完整渲染结果的最大长度，包括截断元数据。 |
 | `timeoutMs` | `60000` | 由 `dsh-tool-call-timeout-policy` 强制执行的工具调用超时预算；覆盖完整的排队打开／查询／关闭生命周期，且模型不可配置。 |
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。工具对 `ctx.lsp` 的每个请求做校验、转换与限界；提供方状态留在 seam 之后。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 系统提示词
@@ -92,7 +113,18 @@ Use search/read for ordinary navigation. Use lsp when textual matches are ambigu
 
 无；UI 呈现位于模型请求之外。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **UTF-16 光标坐标**：列坐标与协议精确一致，但模型难以在非 BMP 字符周围计数；未落在符号上的位置可能返回空结果，因此提示词解释了该约定，但不鼓励广泛使用 LSP（见 [seam Agent Note](../../../.agents/notes/implemented/architecture/2026-07-15-lsp-capability-seam.zh.md)）。
 - **不承诺跨服务器完整性**：受支持的服务器仍可能根据索引就绪情况返回空或部分结果；该工具不承诺跨语言或服务器的完整性。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

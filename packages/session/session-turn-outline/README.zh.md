@@ -94,6 +94,7 @@ wire 值是按 `turn` 严格递增的完整条目数组（整值规则）：消�
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -103,6 +104,7 @@ wire 值是按 `turn` 严格递增的完整条目数组（整值规则）：消�
 
 无；本包从不组装或发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

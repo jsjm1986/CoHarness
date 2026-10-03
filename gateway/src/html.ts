@@ -72,3 +72,17 @@ export function waitingPage(): string {
 @media (prefers-reduced-motion:reduce){.startup-spinner,.startup-progress span{animation-duration:2.4s}}
 </style>`)
 }
+
+/**
+ * Render an explicit, same-origin restart action without a polling refresh.
+ * @param target - authenticated runtime selected by the Gateway request context.
+ * @returns a page whose form is reauthorized when the user submits it.
+ */
+export function stoppedPage(target: { kind: 'user' | 'project'; id: number }): string {
+  return layout('工作台已停止 - CoHarness', `<div class="card">
+<h1>工作台已手动停止</h1><p>后台请求不会自动启动。您可以主动启动并打开工作台。</p>
+<form method="post" action="/account/runtime/start">
+<input type="hidden" name="kind" value="${target.kind === 'user' ? 'personal' : 'project'}">
+${target.kind === 'project' ? `<input type="hidden" name="projectId" value="${escapeHtml(String(target.id))}">` : ''}
+<button type="submit">启动并打开</button></form></div>`)
+}

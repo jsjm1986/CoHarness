@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-mobile-details-layer-stability.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-mobile-details-layer-stability.md
-2026-08-25-mobile-details-layer-stability.md: a9db48c40629baa20bd467107ce1d644dbb4481d
-2026-08-25-mobile-details-layer-stability.zh.md: 09ed6d45dc6cd98b2d943d4341cd60dadfa3044a
+/agent-note-compact-detail-sheets-keep-semantic-headers-and-cover-the-composer:
+  en: 6fcba5aff4b38dd4
+  zh: a7cee9b5f76f156b
+/agent-note-compact-detail-sheets-keep-semantic-headers-and-cover-the-composer/problem:
+  en: ee25a47221cc96b7
+  zh: 13563f3657e2d2d3
+/agent-note-compact-detail-sheets-keep-semantic-headers-and-cover-the-composer/decision:
+  en: 691126837d51adba
+  zh: d76d0ca4f3443c6e
+/agent-note-compact-detail-sheets-keep-semantic-headers-and-cover-the-composer/alternatives-considered:
+  en: 2a82847725e0e0dc
+  zh: d3da572c7e379f4f
+/agent-note-compact-detail-sheets-keep-semantic-headers-and-cover-the-composer/consequences:
+  en: d925b40057e09a53
+  zh: f2ae2eea39272bef
+/agent-note-compact-detail-sheets-keep-semantic-headers-and-cover-the-composer/testing:
+  en: e76b03dba3f9249b
+  zh: e19b2053ebdf6b96

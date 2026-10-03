@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-usage-alert
 
 [English](README.md) | 中文
@@ -9,9 +14,20 @@
 使用 `dsh-client-ui-usage-alert` 在 Web 外壳中显示 Gateway 配额告警。一个 `shell.overlay` 条目在挂载时读取已认证的 `/account/api/usage` 摘要，并展示网关已算出的自然月 80%/100% 跨越；告警读取失败时外壳保持不变。
 
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知局限与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。横幅展示 Gateway 经单次咨询性读取算出的持久配额越界；它不拥有用量状态。
+
 
 ## 模型体验
 
@@ -21,6 +37,19 @@
 
 无；本包从不组装或发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知局限与延后工作
 
 - **仅挂载时刷新**——标签页保持打开期间跨过的阈值会在下次页面加载后出现；网关始终是持久提醒的所有者。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>
+
+<a id="model-experience"></a>

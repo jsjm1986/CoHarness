@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-command-row-copy-contract.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-30-command-row-copy-contract.md
-2026-07-30-command-row-copy-contract.md: f6d5199389b3907780c501894e2861e6add85e77
-2026-07-30-command-row-copy-contract.zh.md: 86f0c044e841a6a0148b1f785582868bba5bb3d0
+/agent-note-command-row-copy-is-split-between-the-row-and-the-handler:
+  en: 9349beb196a3e170
+  zh: f5d8bc1dc74e759f
+/agent-note-command-row-copy-is-split-between-the-row-and-the-handler/problem:
+  en: 3d8772b4301db11c
+  zh: abbd85f95b752231
+/agent-note-command-row-copy-is-split-between-the-row-and-the-handler/decision:
+  en: 01fcd000bc02d2f7
+  zh: 2db413740dd63653
+/agent-note-command-row-copy-is-split-between-the-row-and-the-handler/alternatives-considered:
+  en: 5595b1fd4ac2c323
+  zh: 53cdaa6eb0579901
+/agent-note-command-row-copy-is-split-between-the-row-and-the-handler/consequences:
+  en: 599cee379fcfa011
+  zh: ff44fdc6f5d98878

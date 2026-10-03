@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   ConversationMatch, ConversationNodeContext, ConversationNodeDefinition,
-  RunningToolCall, ToolCallBlock, ToolResultNode,
+  StartedToolCall, ToolResultNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-tools/types'
 import { trajectoryNode } from './trajectory-definition-common.ts'
@@ -10,6 +10,9 @@ import { trajectoryNode } from './trajectory-definition-common.ts'
  * state machines independent; see ../../../../../.agents/notes/implemented/
  * architecture/2026-08-09-client-conversation-node-assembly.md. */
 const MAX_DEPTH = 256
+
+/** Trajectory tracks dispatched calls only; live-chunk preparation never reaches it. */
+type ToolCallBlock = StartedToolCall | ToolResultNode
 
 interface ToolState {
   readonly rootId: string
@@ -28,11 +31,12 @@ interface DispatchData {
   readonly content?: ToolResultNode['content']
 }
 
-function rootCall(match: ConversationMatch): RunningToolCall {
+function rootCall(match: ConversationMatch): StartedToolCall {
   if (match.event.type !== 'tool/call') {
     throw new Error('trajectory-tool-call start requires tool/call')
   }
   return {
+    phase: 'start',
     callId: String(match.event.data.callId),
     name: match.event.data.name,
     argsRaw: match.event.data.arguments,
@@ -46,15 +50,15 @@ function rootCall(match: ConversationMatch): RunningToolCall {
 
 function rootResult(
   match: ConversationMatch,
-  previous?: RunningToolCall,
+  previous?: StartedToolCall,
 ): ToolResultNode | undefined {
   if (match.event.type !== 'tool/result') return undefined
-  const result = match.event.data.message.content[0]
+  const result = match.event.data.message
   return {
     kind: 'tool-result',
     seq: match.event.seq,
     time: match.event.time,
-    callId: String(match.event.data.message.source.callId),
+    callId: String(result.toolCallId),
     call: previous === undefined ? null : { name: previous.name, argsRaw: previous.argsRaw },
     callTime: previous?.time ?? null,
     content: result.content,
@@ -77,9 +81,11 @@ function locationStep(match: ConversationMatch): number {
   return match.location.kind === 'step' ? match.location.step.step : 0
 }
 
-function childCall(match: ConversationMatch, data: DispatchData): RunningToolCall {
+function childCall(match: ConversationMatch, data: DispatchData): StartedToolCall {
   return {
+    phase: 'start',
     callId: data.subCallId,
+    parentCallId: data.parentCallId,
     name: data.name,
     argsRaw: JSON.stringify(data.arguments),
     turn: locationTurn(match),
@@ -100,6 +106,7 @@ function childResult(
     seq: match.event.seq,
     time: match.event.time,
     callId: data.subCallId,
+    parentCallId: data.parentCallId,
     call: { name: data.name, argsRaw: JSON.stringify(data.arguments) },
     callTime: previous === undefined || 'kind' in previous ? null : previous.time,
     content: data.content ?? [],
@@ -192,6 +199,7 @@ function projectCall(
     seq: interruptedAt.seq - 0.8,
     time: interruptedAt.time,
     callId: block.callId,
+    ...block.parentCallId === undefined ? {} : { parentCallId: block.parentCallId },
     call: { name: block.name, argsRaw: block.argsRaw },
     callTime: block.time,
     content: [],

@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-17-filesystem-tool-schemas.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-17-filesystem-tool-schemas.md
-2026-06-17-filesystem-tool-schemas.md: bbc95a19d04f912dfd58c7d00b591143e11aa406
-2026-06-17-filesystem-tool-schemas.zh.md: fdcf26eb39b7c5c268ef1e0798dcd2d3f827efca
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes:
+  en: 6191f7aa9b8d060b
+  zh: 1eec01f504a67b50
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes/problem:
+  en: 2fff402414f6a6b7
+  zh: c5c490b26eb53a0a
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes/decision:
+  en: 3b9bf25da108bb63
+  zh: 2d168f8561acc186
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes/tool-schemas:
+  en: 3b9d09b9a8b5d1a8
+  zh: 509bb6163a0d3e48
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes/tool-schemas/read:
+  en: 45f81f2c2e751f04
+  zh: 7d5cd5d62a9a4cee
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes/tool-schemas/write:
+  en: 5b27f152d4b30184
+  zh: 0a1c41677147de10
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes/tool-schemas/edit:
+  en: 35f9fd1bcecd1eb1
+  zh: 0a04f8571e72a428
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes/result-shape:
+  en: 2c22be521946b144
+  zh: 3513ed55d1e1bb56
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes/deferred:
+  en: b3760182cabb13f7
+  zh: 9c5c703e49e40cac
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes/testing:
+  en: 19a5a011fc394c97
+  zh: 0a9942ad6d12e291
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes/alternatives-considered:
+  en: 2c1d099bb32e24ab
+  zh: c778f41b1295f559
+/agent-note-filesystem-tool-schemas-model-facing-read-write-edit-shapes/consequences:
+  en: 274e22e1d549e27d
+  zh: 3d8abd01798393cd

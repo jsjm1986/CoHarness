@@ -48,7 +48,7 @@ async function seedReadOnlyParent(root: string, cwd: string): Promise<void> {
       data: {
         turn: 1,
         step: 1,
-        message: createSystemMessage('Seeded read-only parent system prompt.', '@deepseek-ai/dsh-system-prompt'),
+        message: createSystemMessage('Seeded read-only parent system prompt.'),
       },
       surfaceOp: 'append',
     },
@@ -114,11 +114,10 @@ describe('parent-only override inheritance snapshot', () => {
         const runtimeContexts = (content: string): string[] => content.trimEnd().split('\n').flatMap((line) => {
           const record = JSON.parse(line) as {
             type?: string
-            data?: { source?: { kind?: string; plugin?: string }; content?: Array<{ type?: string; text?: unknown }> }
+            data?: { source?: { kind?: string }; content?: Array<{ type?: string; text?: unknown }> }
           }
           if (record.type !== 'user/message'
-            || record.data?.source?.kind !== 'plugin'
-            || record.data.source.plugin !== '@deepseek-ai/dsh-system-prompt') return []
+            || record.data?.source?.kind !== 'runtime-context') return []
           return record.data.content?.flatMap(block => block.type === 'text' && typeof block.text === 'string' ? [block.text] : []) ?? []
         })
         const policyContexts = [...runtimeContexts(parent), ...runtimeContexts(child)]

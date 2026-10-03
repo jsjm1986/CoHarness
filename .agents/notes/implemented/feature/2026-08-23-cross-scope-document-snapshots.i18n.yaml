@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-cross-scope-document-snapshots.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-23-cross-scope-document-snapshots.md
-2026-08-23-cross-scope-document-snapshots.md: 50d852c5dda90169750491683c9ee58c5077def7
-2026-08-23-cross-scope-document-snapshots.zh.md: 812295f692a4331826a19ef7e2bb97e5f14956d9
+/agent-note-cross-scope-document-snapshots:
+  en: 8a30eeb31d4e3355
+  zh: 0a13809607945096
+/agent-note-cross-scope-document-snapshots/problem:
+  en: df0d8ac25dcddc43
+  zh: b7dfbc90a45d8e8a
+/agent-note-cross-scope-document-snapshots/decision:
+  en: 73ae058a73fbd883
+  zh: f9824027b588c2c1
+/agent-note-cross-scope-document-snapshots/verification:
+  en: 9148e412a8f90cd4
+  zh: 274fc98866ac23ef
+/agent-note-cross-scope-document-snapshots/alternatives-considered:
+  en: e88bb14819a0f327
+  zh: 33e4d2bfc333b71c
+/agent-note-cross-scope-document-snapshots/consequences:
+  en: bc5d7fe5dcf2855a
+  zh: cdf5914b3ca6f081

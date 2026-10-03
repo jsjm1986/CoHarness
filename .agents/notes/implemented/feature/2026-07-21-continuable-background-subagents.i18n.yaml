@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-21-continuable-background-subagents.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-21-continuable-background-subagents.md
-2026-07-21-continuable-background-subagents.md: 0a0496f72e6270e4de083d05d94580ba1668dd49
-2026-07-21-continuable-background-subagents.zh.md: 526b0f4a5b5f5de3dd6f5cdf0bfac8326aeea32c
+/agent-note-continuable-background-subagents:
+  en: 73e0be4776d5a569
+  zh: 8723642d563ce1f4
+/agent-note-continuable-background-subagents/problem:
+  en: 5ae94815b2e202c5
+  zh: 60b1763349259dee
+/agent-note-continuable-background-subagents/decision:
+  en: 385688729dd16fab
+  zh: 0c3b3d087ddaff8f
+/agent-note-continuable-background-subagents/decision/task-and-cancellation-ownership:
+  en: 594ca35a284b3482
+  zh: 69b214138db6fbde
+/agent-note-continuable-background-subagents/decision/active-run-association:
+  en: 59ef8c5130caaa6c
+  zh: 6fdffb192937f561
+/agent-note-continuable-background-subagents/decision/model-facing-send-message:
+  en: f75d00de525a9d1a
+  zh: ed49d74ecc99d746
+/agent-note-continuable-background-subagents/decision/durable-child-handle-and-cold-resume:
+  en: 0bd7fc2acd1470d2
+  zh: 9610a458569076e8
+/agent-note-continuable-background-subagents/decision/result-and-notification-ownership:
+  en: f0da64ddac21b258
+  zh: b1d46d3b144225ad
+/agent-note-continuable-background-subagents/alternatives-considered:
+  en: c14b3e30640b7ace
+  zh: 6088dbab1f4f67ad
+/agent-note-continuable-background-subagents/testing:
+  en: 5998009f161db677
+  zh: 54225c9b175111a5
+/agent-note-continuable-background-subagents/consequences:
+  en: 1ceea1c5e475c0c2
+  zh: f7af17b1f241ab8d

@@ -45,6 +45,7 @@ DeepSeek 适配器会在 HTTP 2xx 后、消费 SSE（Server-Sent Events）正文
 
 缺少存活会话的直接请求会省略 `dsh_session_log`。普通 agent（智能体）、压缩（compaction）与会话标题调用都会携带存活会话 id。
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -62,6 +63,7 @@ DeepSeek 适配器会在 HTTP 2xx 后、消费 SSE（Server-Sent Events）正文
 
 无；模型可见请求前缀保持不变。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -69,7 +71,6 @@ DeepSeek 适配器会在 HTTP 2xx 后、消费 SSE（Server-Sent Events）正文
 - **崩溃窗口重复**——2xx 后、接受水位持久化前进程丢失，会在恢复时触发保守重放。
 - **缺少存活会话就没有字段**——直接调用或陈旧会话调用没有可供快照的权威日志；显式缺失语义仍暂缓处理。
 - **没有独立请求大小上限**——完整交付会快速失败；提供方拒绝会保持游标不变，而非截断日志。
-
 
 <a id="dev-note"></a>
 ### 开发备注

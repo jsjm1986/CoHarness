@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-09-explicit-schedule-time-zone.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-09-explicit-schedule-time-zone.md
-2026-08-09-explicit-schedule-time-zone.md: 47f1adfd293616a07afbb053a9388da9f45b464e
-2026-08-09-explicit-schedule-time-zone.zh.md: 500067ece55a0f803231d00b514d27bb4738bc77
+/agent-note-explicit-schedule-time-zone-boundary:
+  en: 475b5512c7155605
+  zh: e564e8c4f718f0c0
+/agent-note-explicit-schedule-time-zone-boundary/problem:
+  en: c30c69ffeb8e9878
+  zh: 5a45920e58a2b20b
+/agent-note-explicit-schedule-time-zone-boundary/decision:
+  en: a2d1f86341517062
+  zh: 6a22b4811b8a4be1
+/agent-note-explicit-schedule-time-zone-boundary/alternatives-considered:
+  en: 217f52b666775246
+  zh: 31726759e8b72e35
+/agent-note-explicit-schedule-time-zone-boundary/verification:
+  en: 56dcb44f09be3713
+  zh: 59a6814a662458ad
+/agent-note-explicit-schedule-time-zone-boundary/consequences:
+  en: 6136ebee80ef8eff
+  zh: dfb95f7fe9841bc5

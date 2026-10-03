@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-09-oxlint-only-fix-workflow.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-09-oxlint-only-fix-workflow.md
-2026-08-09-oxlint-only-fix-workflow.md: bc38812db101499d980c38cb6c1dc5cba32e5cd6
-2026-08-09-oxlint-only-fix-workflow.zh.md: 350fe92bc1c028eabf1cd4e3791d92e9d0c6a949
+/agent-note-oxlint-only-fix-workflow:
+  en: 90b8072707c02e66
+  zh: 5d1d531b0567d615
+/agent-note-oxlint-only-fix-workflow/problem:
+  en: d36347f121b5ca88
+  zh: b555a02e35972506
+/agent-note-oxlint-only-fix-workflow/decision:
+  en: 2d2d452846983206
+  zh: 7f592099abc65882
+/agent-note-oxlint-only-fix-workflow/verification:
+  en: 0d8a6bbbccff872f
+  zh: f23405cbe392adcc
+/agent-note-oxlint-only-fix-workflow/alternatives-considered:
+  en: 2189a9fab8b38c75
+  zh: 95cfa2c215f2dad0
+/agent-note-oxlint-only-fix-workflow/consequences:
+  en: b8859b68f7692898
+  zh: bbf531853bb963ca

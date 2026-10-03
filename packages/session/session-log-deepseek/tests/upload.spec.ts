@@ -307,7 +307,7 @@ describe('incremental DeepSeek session-log upload', () => {
     })
     const wire = JSON.parse(JSON.stringify(prepared.fields.dsh_session_log)) as Record<string, unknown>
     expect(wire.session).toMatchObject({
-      version: 6,
+      version: 7,
       id: 'wire-child',
       parentSession: 'wire-parent',
       cwd: '/wire-workspace',

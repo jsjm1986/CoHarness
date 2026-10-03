@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-15-client-shells-and-dynamic-packages.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-15-client-shells-and-dynamic-packages.md
-2026-08-15-client-shells-and-dynamic-packages.md: a92300663bac3bfe04768cf2a4f0c354c4c0c66f
-2026-08-15-client-shells-and-dynamic-packages.zh.md: 5bd55558708f8e949ed3700f145c0725554f4d4b
+/agent-note-client-shell-layering-and-dynamic-package-boundaries:
+  en: c8976de4e5547fdd
+  zh: 3d1bcb3273993af4
+/agent-note-client-shell-layering-and-dynamic-package-boundaries/problem:
+  en: 1d2465953c2f98e4
+  zh: 9446bf4d54071ca0
+/agent-note-client-shell-layering-and-dynamic-package-boundaries/decision:
+  en: a15c7c13f167e5ac
+  zh: a15c7c13f167e5ac
+/agent-note-client-shell-layering-and-dynamic-package-boundaries/decision/layers-and-build-forms:
+  en: 963f3a544849fd0d
+  zh: dd2d97803c5e87b4
+/agent-note-client-shell-layering-and-dynamic-package-boundaries/decision/shared-module-requests:
+  en: d40e7621b6ac2738
+  zh: 80efbbab03f9c791
+/agent-note-client-shell-layering-and-dynamic-package-boundaries/decision/parser-preloading-and-react-handoff:
+  en: 7d33808c201bbe77
+  zh: 273a9b2b062e96c4
+/agent-note-client-shell-layering-and-dynamic-package-boundaries/decision/dependency-declarations:
+  en: 59c092a0e8b5e697
+  zh: 0ed5dd2dd6614610
+/agent-note-client-shell-layering-and-dynamic-package-boundaries/alternatives-considered:
+  en: 3b89e5c7e8cd881a
+  zh: 9e4b5f379220e92b
+/agent-note-client-shell-layering-and-dynamic-package-boundaries/consequences:
+  en: 961e4a410d3efbed
+  zh: 40af74d1e1322048

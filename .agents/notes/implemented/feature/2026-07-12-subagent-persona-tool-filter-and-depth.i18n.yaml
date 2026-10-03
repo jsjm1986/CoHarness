@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-12-subagent-persona-tool-filter-and-depth.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-12-subagent-persona-tool-filter-and-depth.md
-2026-07-12-subagent-persona-tool-filter-and-depth.md: 78c6a648126dc0ea5b7b826cb0607aa10875a788
-2026-07-12-subagent-persona-tool-filter-and-depth.zh.md: c73bda7ae86811a2ef9433eee5bb2cdf3b5b5da2
+/agent-note-configure-subagent-persona-tool-visibility-and-depth:
+  en: ea51f1e98afc88b7
+  zh: 6aa0101b8de5097f
+/agent-note-configure-subagent-persona-tool-visibility-and-depth/problem:
+  en: 311bc04b9c36ab53
+  zh: 0c52e6493e9350a5
+/agent-note-configure-subagent-persona-tool-visibility-and-depth/decision:
+  en: 9c817e5e06e6e029
+  zh: 42a286f806768194
+/agent-note-configure-subagent-persona-tool-visibility-and-depth/decision/persona-is-a-scoped-shadow:
+  en: 95c5c4df2c2da4e8
+  zh: 7d5a865efbd0de44
+/agent-note-configure-subagent-persona-tool-visibility-and-depth/decision/tool-filtering-is-one-live-global-view-rule:
+  en: 49948d16a4678599
+  zh: 4bb6b415e6531a33
+/agent-note-configure-subagent-persona-tool-visibility-and-depth/decision/depth-is-an-absolute-tree-cap:
+  en: 226a47fc2ee674b0
+  zh: 1fc2df3f47b8dd5a
+/agent-note-configure-subagent-persona-tool-visibility-and-depth/decision/capability-gating-keeps-providers-honest:
+  en: 5334afafefdb0f59
+  zh: 7e96c9a08bbc3d1a
+/agent-note-configure-subagent-persona-tool-visibility-and-depth/decision/unpublished-setup-makes-the-first-request-correct:
+  en: 3c988dfff07c8da3
+  zh: 8ce2fbcc438e7dd8
+/agent-note-configure-subagent-persona-tool-visibility-and-depth/visibility-is-not-authority:
+  en: d0db5310a87ff8e4
+  zh: 4b9f502238cd4bae
+/agent-note-configure-subagent-persona-tool-visibility-and-depth/alternatives-considered:
+  en: 78ae41331d8fcc3e
+  zh: a93ee10b3e30c267
+/agent-note-configure-subagent-persona-tool-visibility-and-depth/consequences:
+  en: d5f05d63b7a01dd8
+  zh: f0be1e88b06d8cc9

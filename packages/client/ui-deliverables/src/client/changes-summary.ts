@@ -6,13 +6,13 @@ import { HostReadStore } from './host-read-store.ts'
 /** A summary, `'missing'` once the Host no longer serves it, or `'loading'` while the request runs. */
 export type ChangesSummaryState = ChangesSummary | 'missing' | 'loading'
 
-/** One browser plugin's summary reads; a summary or a missing answer is kept until the connection is replaced. */
+/** One browser plugin's summary reads; unavailable records can be explicitly retried. */
 export class ChangesSummaryStore extends HostReadStore<ChangesSummaryState> {
   constructor(fetchRecord: (url: string, signal: AbortSignal) => Promise<Response>) {
     super({
       loading: 'loading',
       failed: 'missing',
-      retryable: () => false,
+      retryable: state => state === 'missing',
       decode: async (response) => {
         if (!response.ok) return 'missing'
         const value: unknown = await response.json()

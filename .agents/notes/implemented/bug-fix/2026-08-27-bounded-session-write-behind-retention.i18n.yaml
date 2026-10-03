@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-27-bounded-session-write-behind-retention.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-27-bounded-session-write-behind-retention.md
-2026-08-27-bounded-session-write-behind-retention.md: c86463dbae346a1449dfe47f70e7ad6c704227c5
-2026-08-27-bounded-session-write-behind-retention.zh.md: 6525001c82cf06a4e2d922189995a6cbc135b109
+/agent-note-bound-session-write-behind-retention-by-events-and-bytes:
+  en: 0883d6390d7cc498
+  zh: 32975415d6b6d131
+/agent-note-bound-session-write-behind-retention-by-events-and-bytes/problem:
+  en: 5a6352f127c3ab9f
+  zh: 99eb3830f0fa771f
+/agent-note-bound-session-write-behind-retention-by-events-and-bytes/decision:
+  en: 7e5330864c43388d
+  zh: e4ec87341a5b7277
+/agent-note-bound-session-write-behind-retention-by-events-and-bytes/alternatives-considered:
+  en: f5663cd3e062e2e9
+  zh: 057146c6a34d9724
+/agent-note-bound-session-write-behind-retention-by-events-and-bytes/verification:
+  en: 178da177da90f478
+  zh: 9ac8ddeca6b6a047
+/agent-note-bound-session-write-behind-retention-by-events-and-bytes/consequences:
+  en: eec0ca9bafaf7104
+  zh: 7f3ee10fe40ba43c

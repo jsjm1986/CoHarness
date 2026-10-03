@@ -24,6 +24,7 @@ const COLLAPSED_EXPECTED = join(SNAPSHOT_DIR, 'collapsed.expected.md')
 const EDITING_EXPECTED = join(SNAPSHOT_DIR, 'editing.expected.md')
 const LAYOUT_EXPECTED = join(SNAPSHOT_DIR, 'layout.expected.md')
 const PRESERVED_EXPECTED = join(SNAPSHOT_DIR, 'preserved.expected.md')
+const POLICY_PAUSED_EXPECTED = join(SNAPSHOT_DIR, 'policy-paused.expected.md')
 const UI_EXPECTED = join(SNAPSHOT_DIR, 'ui.expected.md')
 const MODE = webSnapshotMode()
 
@@ -81,7 +82,7 @@ describe('web e2e: queue row actions', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-queue-actions'))
@@ -188,6 +189,55 @@ describe('web e2e: queue row actions', () => {
     await expect.poll(() => page.locator('[data-queue-dock]').count()).toBe(0)
   }, 120_000)
 
+  it.skipIf(MODE === 'record')('shows a policy stop while retaining the queue for an explicit new send', async () => {
+    overrideDir = await mkdtemp(join(tmpdir(), 'dsh-web-policy-queue-'))
+    const readyFile = join(overrideDir, '.hang-ready'), overridePath = join(overrideDir, 'replay.override.json')
+    const recorded = deriveReplayScript(parseSessionLog(await readFile(FIXTURE, 'utf8')))
+    expect(recorded).toHaveLength(1)
+    await writeFile(overridePath, JSON.stringify([{ kind: 'hang', readyFile }, recorded[0], recorded[0]]))
+    const events: SessionEvent[] = []
+    scaffold = await launchWebScaffold({ replayFixture: FIXTURE, replayOverride: overridePath })
+    scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { events.push(event) })
+    browser = await chromium.launch()
+    page = await newEnglishPage(browser)
+    const tripwire = watchConsole(page)
+    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await connectFreshWorkspace(page, scaffold.workspaceCwd)
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-policy-queue'))
+    const input = page.locator('textarea').first(), stopped = scaffold.whenTurnSettled()
+    await input.fill(ACTIVE_PROMPT)
+    await input.press('Enter')
+    await expect.poll(() => existsSync(readyFile), { timeout: 15_000 }).toBe(true)
+    await input.fill(TAIL)
+    await input.press('Enter')
+    await expect.poll(() => page.locator('[data-queue-dock]').count()).toBe(1)
+    await expect.poll(() => input.inputValue()).toBe('')
+    const agents = scaffold.ctx.agents.roots()
+    expect(agents).toHaveLength(1)
+    expect(agents[0]!.inbox.nextTurn).toHaveLength(1)
+    const reason = 'Gateway execution authority was revoked or could not be verified. Remaining queued input is kept. Send a new message to continue.'
+    agents[0]!.cancel({ kind: 'hook', reason }, { keepInbox: true })
+    await stopped
+    const notice = page.getByRole('status').filter({ hasText: reason })
+    await notice.waitFor({ state: 'visible' })
+    expect(await page.getByText(TAIL, { exact: true }).count()).toBeGreaterThan(0)
+    expect(agents[0]!.inbox.nextTurn).toHaveLength(1)
+    const snapshot = `${await notice.ariaSnapshot()}\n${await captureStableAria(page, '[data-queue-dock]', scaffold.workspaceCwd)}`
+    await compareOrRefreshGolden(POLICY_PAUSED_EXPECTED, snapshot, MODE)
+    const settled = scaffold.whenTurnSettled()
+    await input.fill(WAKE)
+    await input.press('Enter')
+    await settled
+    await expect.poll(() => turnEndReasons(events), { timeout: 15_000 }).toEqual(['aborted', 'completed', 'completed'])
+    await expect.poll(() => page.locator('[data-queue-dock]').count()).toBe(0)
+    expect(events.flatMap(event => event.type === 'user/message' && event.data.source.kind === 'user'
+      ? event.data.content.flatMap(block => block.type === 'text' ? [block.text] : []) : []))
+      .toEqual([ACTIVE_PROMPT, TAIL, WAKE])
+    expect(tripwire.pageErrors).toEqual([])
+    expect(tripwire.warnings).toEqual([])
+  }, 120_000)
+
   it.skipIf(MODE === 'record')('orders Todo before Goal and Queue on one responsive card column', async () => {
     overrideDir = await mkdtemp(join(tmpdir(), 'dsh-web-context-layout-'))
     const readyFile = join(overrideDir, '.hang-ready')
@@ -200,7 +250,7 @@ describe('web e2e: queue row actions', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-context-layout'))
@@ -276,7 +326,7 @@ describe('web e2e: queue row actions', () => {
   it.skipIf(MODE === 'record')('keeps its snapshot inventory closed', async () => {
     await assertFixtureInventory(
       SNAPSHOT_DIR,
-      ['collapsed.expected.md', 'editing.expected.md', 'layout.expected.md', 'preserved.expected.md', 'ui.expected.md'],
+      ['collapsed.expected.md', 'editing.expected.md', 'layout.expected.md', 'policy-paused.expected.md', 'preserved.expected.md', 'ui.expected.md'],
     )
   })
 })

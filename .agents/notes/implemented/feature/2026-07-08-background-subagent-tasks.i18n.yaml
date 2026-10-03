@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-08-background-subagent-tasks.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-08-background-subagent-tasks.md
-2026-07-08-background-subagent-tasks.md: 4dcd961ee5a5db925f8f6ad83e97890eaedb8e63
-2026-07-08-background-subagent-tasks.zh.md: f35ac9e040b02c55694cfe5255b7f62ddbb40281
+/agent-note-background-subagent-tasks:
+  en: 81e6c52af991b288
+  zh: 338e4f208ff8113e
+/agent-note-background-subagent-tasks/problem:
+  en: 210b478d3338b92a
+  zh: 04ce3c704e1daf95
+/agent-note-background-subagent-tasks/decision:
+  en: 937913479ca57980
+  zh: 301df132c5562242
+/agent-note-background-subagent-tasks/lifecycle:
+  en: a9a43b6289582186
+  zh: a3c1e62a7a97e904
+/agent-note-background-subagent-tasks/model-guidance:
+  en: d36c82a820b8f95f
+  zh: 039aefba844c7ea9
+/agent-note-background-subagent-tasks/alternatives-considered:
+  en: 6119e2aff3b6be5a
+  zh: e01a6c669a9ec6aa
+/agent-note-background-subagent-tasks/alternatives-considered/subagent-specific-wait-output-and-stop-tools:
+  en: a839b292375f82c0
+  zh: 71f667e97e01054e
+/agent-note-background-subagent-tasks/alternatives-considered/survival-after-owner-closure:
+  en: 1aa60f5d83740335
+  zh: f3883bf2029353b7
+/agent-note-background-subagent-tasks/alternatives-considered/no-owner-checks-for-isolated-clients:
+  en: d4eb5c76604e0c94
+  zh: f5198c0d5b04fa3b
+/agent-note-background-subagent-tasks/alternatives-considered/incremental-child-transcript-output:
+  en: 104c21b6317be545
+  zh: ae3ac1785959d975
+/agent-note-background-subagent-tasks/testing:
+  en: b6ee9f1ac460a9d3
+  zh: 401eeeb6e3bda005
+/agent-note-background-subagent-tasks/consequences:
+  en: 3f859f7761d2e8dc
+  zh: 756eb30c1d9f8128

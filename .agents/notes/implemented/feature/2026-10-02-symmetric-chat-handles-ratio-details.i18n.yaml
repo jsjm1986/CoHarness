@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-02-symmetric-chat-handles-ratio-details.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-symmetric-chat-handles-ratio-details.md
+/agent-note-symmetric-chat-width-handles-and-ratio-sized-details-panel:
+  en: 45576607977a95d1
+  zh: fb36f9a7f78107b3
+/agent-note-symmetric-chat-width-handles-and-ratio-sized-details-panel/problem:
+  en: 325dddf9a15ec786
+  zh: 6ec149ee147dfb0c
+/agent-note-symmetric-chat-width-handles-and-ratio-sized-details-panel/decision:
+  en: 3ab2b8148b0c7e3d
+  zh: 139cee4524565a97
+/agent-note-symmetric-chat-width-handles-and-ratio-sized-details-panel/alternatives-considered:
+  en: 05b4214cb30b5199
+  zh: b056bcc740043b00
+/agent-note-symmetric-chat-width-handles-and-ratio-sized-details-panel/consequences:
+  en: 604b0acecad38126
+  zh: 495a25c5d6e3b17a
+/agent-note-symmetric-chat-width-handles-and-ratio-sized-details-panel/testing:
+  en: 28f6a0b0aad0f835
+  zh: c8dee586cf50f956

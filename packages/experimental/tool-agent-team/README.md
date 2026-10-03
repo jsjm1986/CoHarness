@@ -1,3 +1,8 @@
+---
+description: "Scoped model-facing Agent Teams tools over ctx.agentTeams"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-experimental-tool-agent-team
 
 English | [中文](README.zh.md)
@@ -8,6 +13,18 @@ Scoped model-facing adapter for [`ctx.agentTeams`](../agent-team/README.md). It 
 
 This package lets the model create named teammates, send them messages, inspect availability, wait for progress, interrupt stuck work, and coordinate through a shared task board. Every team member receives the same nine tools and guidance for coordinating in a shared workspace. Choose it when the model should operate a team only after you explicitly request one. It replaces legacy subagent controls with the same tool names, so compositions that need both must disable the legacy definitions. The package is published under its experimental name and provides no stability guarantee.
 
+## Table of Contents
+
+- [Config](#config)
+- [Tools and authority](#tools-and-authority)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 ```yaml
@@ -20,6 +37,7 @@ This package lets the model create named teammates, send them messages, inspect 
 
 `freshProvider` and `forkProvider` select registered continuable-subagent providers. Any provider advertising `prepareContinuable` works, including the external-runtime ones: `subagent-claude-code` and `subagent-codex` when the `llm` service is mounted, and `subagent-acp` with `resume: true` — each keeps the durable Team member as an in-process child while routing model calls through its external runtime's resumable session. A provider without the capability rejects the spawn with `UNSUPPORTED_CAPABILITY`. The fixed model policy creates teammates only when the user explicitly asks for Agent Teams or teammates.
 
+<a id="tools-and-authority"></a>
 ## Tools and authority
 
 The generated [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-agent-team) owns exact schemas. The adapter supplies teammate creation; quiet and waking peer delivery; roster listing, waiting, and Lead-only interruption; and task create/list/get/compare-and-set update operations.
@@ -30,10 +48,12 @@ Every tool requires the exact calling `Agent`. `spawn_teammate` and `interrupt_a
 
 The plugin listens to Agent publication and installs its registrations through that Agent's scope. Fresh creation and cold resume therefore receive the same tool/prompt set before the first model request. Agent disposal and plugin HMR remove every scoped registration; reloading the plugin installs one fresh set in each still-live member without changing its continuation Activation.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The adapter installs tool and policy registrations into team scopes; team definitions and lifecycle stay owned by `ctx.agentTeams`.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Team policy and tools
@@ -55,3 +75,13 @@ With the same provider/model, shared system policy, and tool schemas, a fork ret
 - **Prompt policy is coordination, not confinement** — it cannot stop Bash or external processes from writing overlapping files.
 - **No autonomous team creation** — ordinary tasks do not trigger delegation unless the user explicitly requests it.
 - **No Web controls** — browser roster and task-board presentation is outside this runtime package.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

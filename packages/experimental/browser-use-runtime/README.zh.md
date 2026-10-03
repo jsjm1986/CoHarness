@@ -66,6 +66,7 @@ MCP 提供方使用 `@deepseek-ai/dsh-experimental-browser-use-runtime/mcp` 中�
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -75,6 +76,7 @@ MCP 提供方使用 `@deepseek-ai/dsh-experimental-browser-use-runtime/mcp` 中�
 
 此库不添加提示文本。发现的工具 schema 与提供方指导决定请求前缀变化；常规浏览器资源复用不改变这些 schema。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

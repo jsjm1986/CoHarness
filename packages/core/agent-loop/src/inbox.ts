@@ -106,6 +106,7 @@ function resolveLimit(value: number | undefined, name: string): number | undefin
  * @param limits - optional admission quota applied before each durable commit.
  */
 export class ReactLoopInbox implements InboxContract {
+  private admissionClosed = false
   private readonly maxMessages: number | undefined
   private readonly maxBytes: number | undefined
 
@@ -118,6 +119,9 @@ export class ReactLoopInbox implements InboxContract {
     this.maxMessages = resolveLimit(limits.maxMessages, 'inbox maxMessages')
     this.maxBytes = resolveLimit(limits.maxBytes, 'inbox maxBytes')
   }
+
+  /** Refuse future inserted input while allowing disposal to clear pending messages. */
+  closeAdmission(): void { this.admissionClosed = true }
 
   /** Prompts awaiting individual turns. */
   get nextTurn(): readonly UserMessage[] {
@@ -243,6 +247,7 @@ export class ReactLoopInbox implements InboxContract {
     inserted: UserMessage[],
     discardRemoved: boolean,
   ): UserMessage[] {
+    if (this.admissionClosed && inserted.length > 0) throw new Error(`agent "${this.session.id}" input is closed`)
     const state = this.current()
     const inbox = state[target]
     const truncatedStart = Math.trunc(start)

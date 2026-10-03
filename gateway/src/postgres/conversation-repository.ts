@@ -1038,6 +1038,14 @@ export class ConversationRepository {
     await this.pool.query('DELETE FROM harness.conversation_draft_reservations WHERE organization_id=$1 AND session_id=$2', [organizationId, sessionId])
   }
 
+  /** Whether an unexpired draft lease binds this Session id to the project. */
+  async hasProjectDraftReservation(organizationId: string, sessionId: string, projectId: string): Promise<boolean> {
+    const result = await this.pool.query(`SELECT 1 FROM harness.conversation_draft_reservations
+      WHERE organization_id=$1 AND session_id=$2 AND project_id=$3 AND lease_expires_at > now()`,
+    [organizationId, sessionId, projectId])
+    return (result.rowCount ?? 0) > 0
+  }
+
   /** Append one contiguous batch. Retrying the same batch id and bytes is idempotent. */
   async append(
     sessionId: string,

@@ -50,12 +50,6 @@ function collectAttachments(blocks: readonly ContentBlock[]): SurfaceAttachmentF
     } else if (block.type === 'file') {
       files.push(block.attachment)
       fileStructuralTokens += estimateStructuralBlock(block)
-    } else if (block.type === 'tool-result') {
-      const nested = collectAttachments(block.content)
-      images.push(...nested.images)
-      files.push(...nested.files)
-      imageStructuralTokens += nested.imageStructuralTokens
-      fileStructuralTokens += nested.fileStructuralTokens
     }
   }
   return { images, imageStructuralTokens, files, fileStructuralTokens }

@@ -76,10 +76,13 @@ const manifest: DshPackageManifest = {
 
 <a id="model-experience"></a>
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。无运行时行为的纯类型声明；解析、校验与默认值由读取方拥有。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为本包仅导出类型。
@@ -88,6 +91,7 @@ const manifest: DshPackageManifest = {
 
 类型声明不增加模型输入，因此不影响提供方的缓存复用。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>

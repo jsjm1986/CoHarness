@@ -23,6 +23,7 @@
  * contract and the same occupant.
  */
 import type { HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
+import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { HostObservable, PropsHooks, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pull the owner SlotMap merges into programs that resolve the
 // runtime shares below.
@@ -32,6 +33,7 @@ import type {
   ConversationViewportSnapshot, DirectoryListing, SessionId, SessionListState, SessionSearchResultItem, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { createWorkspaceViewStore } from '../stores.ts'
+import type { WorkspaceShortcutState } from '../shortcuts.ts'
 
 /**
  * Owner share of the directory-flow holes: the complete conversation between
@@ -57,6 +59,12 @@ export interface SidebarWorkspacesWorkbenchOwnerProps {
   children?: never
 }
 
+/** Owner share of the ambient per-row schedule seats. */
+export interface SessionRowScheduleOwnerProps {
+  /** Session this row shows; the occupant addresses its own data by this id. */
+  readonly sessionId: SessionId
+}
+
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /** Directory-flow hole under the conversation empty-state picker (declared by the WorkspacePicker entry). */
@@ -65,6 +73,19 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'sidebar.workspaces.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
     /** Workbench panel hole under the sidebar browsing region (declared by the WorkspaceBrowser entry). */
     'sidebar.workspaces.workbench': { kind: 'single'; scope: 'root'; owner: SidebarWorkspacesWorkbenchOwnerProps }
+    /**
+     * Leading decoration of one Session row, in the 16px cell before the title
+     * that the row's own state dot otherwise occupies. A higher-priority state
+     * (a pending interaction, live activity) replaces the seat with that dot
+     * for the same row, so an occupant here never renders beside a status dot
+     * and is mounted only by a row whose primary state is idle.
+     */
+    'sidebar.session.row.leading': { kind: 'list'; scope: 'root'; owner: SessionRowScheduleOwnerProps }
+    /**
+     * Section of the Session row's hover card between its relative time and
+     * its trailing status line. Mounted only while that card is open.
+     */
+    'sidebar.session.row.hover': { kind: 'list'; scope: 'root'; owner: SessionRowScheduleOwnerProps }
   }
 }
 
@@ -111,6 +132,10 @@ export type WorkspaceBrowserInjected = {
     currentSessions: HostObservable<SessionListState>
     /** Current generation's Host description, bound by the slot renderer. */
     hostDescription: HostDescriptionSource
+    /** Browser-owned opening requests published by workspace commands. */
+    workspaceShortcuts: HostObservable<WorkspaceShortcutState>
+    /** Registered editable-command catalog rows for key labels and aria. */
+    shortcuts: HostObservable<readonly ShortcutCatalogEntry[]>
   }
   /**
    * Start a New Session in a Workspace: reuse-or-create its blank session and
@@ -150,6 +175,14 @@ export type WorkspaceBrowserInjected = {
    */
   archiveSession: (sessionId: SessionId) => Promise<void>
   /**
+   * Pin a Session so it leads its section: Host write plus the local order
+   * fronting. A rejection leaves the order unchanged and raises the pin
+   * notice channel.
+   */
+  pinSession: (sessionId: SessionId) => void
+  /** Drop a Session from the pin set; a rejection raises the unpin notice. */
+  unpinSession: (sessionId: SessionId) => void
+  /**
    * Reorder a session inside its Workspace account (DOM-insertBefore
    * semantics: omitted anchor appends to the end). The view refreshes from
    * the Host response/changed frame; failures leave the order unchanged.
@@ -159,12 +192,29 @@ export type WorkspaceBrowserInjected = {
   createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
   /** List one host directory level for workspace document management. */
   listDirectory?: ((path?: string, signal?: AbortSignal) => Promise<DirectoryListing>) | undefined
+  /** Open the browser search and focus its input. */
+  requestSearch: () => void
+  /** Request the existing directory picker. */
+  requestAddWorkspace: () => void
+  /** Consume the directory-picker opening request. */
+  closeAddWorkspace: () => void
+  /** Publish directory interaction occupancy for command availability. */
+  setDirectoryBusy: (busy: boolean) => void
+  /** Dismiss the command-driven fork-failure notification. */
+  dismissForkError: () => void
+  /** Dismiss the pin/unpin failure notification. */
+  dismissPinError: () => void
 }
 
 /** Full browser props: shell owner share + viewing store + injected actions + the locale seat. */
 export type WorkspaceBrowserProps =
   PropsRuntime<'sidebar.workspaces'>
-  & PropsRenderSlots<'sidebar.workspaces.directoryFlow' | 'sidebar.workspaces.workbench'>
+  & PropsRenderSlots<
+    | 'sidebar.workspaces.directoryFlow'
+    | 'sidebar.workspaces.workbench'
+    | 'sidebar.session.row.leading'
+    | 'sidebar.session.row.hover'
+  >
   & PropsStore<ReturnType<typeof createWorkspaceViewStore>>
   & Omit<WorkspaceBrowserInjected, 'hooks'>
   & PropsHooks<WorkspaceBrowserInjected['hooks']>

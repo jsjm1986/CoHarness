@@ -1,5 +1,6 @@
 /** Explicit human confirmation bound to the displayed root, node and desktop. */
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { DesktopConfirmation } from '@deepseek-ai/dsh-api-remotes/client'
@@ -17,13 +18,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 /** Session-owned transport supplied by the permission plugin. */
 export interface DesktopConfirmationInjected { connection: ConnectionHandle }
 /** Session kit, localized copy and its exact runtime transport. */
-export type DesktopConfirmationProps = PropsRuntime<'conversation.input.left'>
+export type DesktopConfirmationProps = PropsRuntime<'conversation.session.header.utilities'>
   & PropsLocale<'permission.desktop'> & InjectFace<DesktopConfirmationInjected>
 
 /**
  * Show personal confirmation and discard responses after scope or connection changes.
  * @param props - exact Session binding and runtime transport.
- * @returns a managed-runtime composer action and accessible confirmation dialog.
+ * @returns a managed-runtime header utility and accessible confirmation dialog.
  */
 export function DesktopConfirmationAction({ sessionId, connection, t }: DesktopConfirmationProps): React.JSX.Element | null {
   const connectionState = useSyncExternalStore(cb => connection.state.subscribe(cb), () => connection.state.getSnapshot())
@@ -62,7 +63,9 @@ export function DesktopConfirmationAction({ sessionId, connection, t }: DesktopC
     active.current = request
     setBusy(true); setError(false)
     try {
-      const response = await connection.api.desktop.confirm({ sessionId, rootSessionId: target.rootSessionId,
+      const address = parseClientSessionKey(sessionId)
+      const rootSessionId = address === undefined ? target.rootSessionId : clientSessionKey(address.runtime, target.rootSessionId)
+      const response = await connection.api.desktop.confirm({ sessionId, rootSessionId,
         nodeId: target.nodeId, desktop: target.desktop, confirmed }, request.signal)
       if (request.signal.aborted) return
       if (!response.result.ok) throw new Error('desktop confirmation refused')
@@ -89,29 +92,29 @@ export function DesktopConfirmationAction({ sessionId, connection, t }: DesktopC
           : error ? <p role="alert" className={css.desc}>{t('failed')}</p>
             : value === undefined ? <p role="status" className={css.desc}>{t('loading')}</p>
               : value === null ? <p className={css.desc}>{t('unavailable')}</p> : <>
-                <div className={css.meta}>
+                <dl className={css.meta}>
                   <div className={css.metaRow}>
-                    <span className={css.metaLabel}>{t('desktop')}</span>
-                    <span className={css.metaValue}>{value.desktop}</span>
+                    <dt className={css.metaLabel}>{t('desktop')}</dt>
+                    <dd className={css.metaValue}>{value.desktop}</dd>
                   </div>
                   <div className={css.metaRow}>
-                    <span className={css.metaLabel}>{t('node')}</span>
-                    <span className={css.metaValue}>{value.nodeId}</span>
+                    <dt className={css.metaLabel}>{t('node')}</dt>
+                    <dd className={css.metaValue}>{value.nodeId}</dd>
                   </div>
                   <div className={css.metaRow}>
-                    <span className={css.metaLabel}>{t('root')}</span>
-                    <span className={css.metaValue}>{value.rootSessionId}</span>
+                    <dt className={css.metaLabel}>{t('root')}</dt>
+                    <dd className={css.metaValue}>{value.rootSessionId}</dd>
                   </div>
                   <div className={css.metaRow}>
-                    <span className={css.metaLabel}>{t('account')}</span>
-                    <span className={css.metaValue}>{value.userId}</span>
+                    <dt className={css.metaLabel}>{t('account')}</dt>
+                    <dd className={css.metaValue}>{value.userId}</dd>
                   </div>
-                </div>
+                </dl>
                 {!value.eligible
-                  ? <div className={`${css.scopeNote} ${css.scopeNoteInfo}`}><span className={css.scopeNoteIcon}>ℹ️</span>{t('ineligible')}</div>
+                  ? <div role="status" className={`${css.scopeNote} ${css.scopeNoteInfo}`}><span className={css.scopeNoteIcon} aria-hidden />{t('ineligible')}</div>
                   : value.confirmed
-                    ? <div className={`${css.scopeNote} ${css.scopeNoteOk}`}><span className={css.scopeNoteIcon}>✓</span>{t('granted')}</div>
-                    : <div className={`${css.scopeNote} ${css.scopeNoteInfo}`}><span className={css.scopeNoteIcon}>ℹ️</span>{t('unconfirmed')}</div>}
+                    ? <div role="status" className={`${css.scopeNote} ${css.scopeNoteOk}`}><span className={css.scopeNoteIcon} aria-hidden />{t('granted')}</div>
+                    : <div role="status" className={`${css.scopeNote} ${css.scopeNoteInfo}`}><span className={css.scopeNoteIcon} aria-hidden />{t('unconfirmed')}</div>}
               </>}
       </div>
     </Modal>

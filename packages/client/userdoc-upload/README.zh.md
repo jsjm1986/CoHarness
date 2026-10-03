@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-userdoc-upload
 
 [English](README.md) | 中文
@@ -12,9 +17,20 @@
 
 使用 `dsh-client-userdoc-upload` 作为会话创作区与文档管理器共用的浏览器上传器。它以有界 XHR 分块执行 `resumable-v1` 协议、计算 SHA-256 摘要、重试瞬时失败，并保存不透明的会话元数据，使中断的上传在页面刷新后可续传——文件字节除上传本身外不离开浏览器。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。续传元数据是瞬态的浏览器侧协议状态；权威文档记录经 resumable-v1 协议落在 user-docs 后端。
+
 
 ## 模型体验
 
@@ -24,6 +40,7 @@
 
 无；本包从不组装或发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
 - **一次调用只处理一个文件**：多文件顺序、取消和界面状态由 Host UI 负责；本包刻意让每个选中文件拥有独立的可恢复状态机。
@@ -31,3 +48,15 @@
 - **认证和路由可用性由 Host 适配器负责**：上传器只使用消费方提供的回调，不负责刷新凭据或发现文档服务不可用。
 
 **运行时不变式：** 不发布伴生入口。上传器是仅浏览器侧的功能状态机，不拥有 Cordis 服务、事件流或跨插件可变关系；其行为由协议与取消测试覆盖。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>
+
+<a id="model-experience"></a>

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-26-ptc-chat-subcall-rows.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-26-ptc-chat-subcall-rows.md
-2026-07-26-ptc-chat-subcall-rows.md: ab0d796e5c44d4edefaf7be709c272a756043107
-2026-07-26-ptc-chat-subcall-rows.zh.md: c4dfc72a8f29de8c0eaf6b80e0788a6773df3d11
+/agent-note-ptc-mode-chat-rendering-sub-calls-as-native-rows-under-the-parent:
+  en: e3b52c6570465b4e
+  zh: 4222f9730960742d
+/agent-note-ptc-mode-chat-rendering-sub-calls-as-native-rows-under-the-parent/problem:
+  en: 5229ecef36fb3db7
+  zh: f4bc88e00e4781f5
+/agent-note-ptc-mode-chat-rendering-sub-calls-as-native-rows-under-the-parent/decision:
+  en: 9308b0ea4f2db0d2
+  zh: 845b50b3f9f5c5ad
+/agent-note-ptc-mode-chat-rendering-sub-calls-as-native-rows-under-the-parent/alternatives-considered:
+  en: c843cf8148a15ad1
+  zh: 95e37a5191aeae69
+/agent-note-ptc-mode-chat-rendering-sub-calls-as-native-rows-under-the-parent/consequences:
+  en: 2f0fdcd25193053a
+  zh: 9570d597fdede23a

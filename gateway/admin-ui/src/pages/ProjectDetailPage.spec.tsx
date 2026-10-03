@@ -6,6 +6,7 @@ import * as api from '../api.ts'
 import { ProjectDetailPage } from './ProjectDetailPage.tsx'
 
 vi.mock('../api.ts', () => ({
+  controlProjectInstance: vi.fn(),
   deleteProject: vi.fn(),
   getProjectModelAccess: vi.fn(),
   getProject: vi.fn(),
@@ -160,6 +161,24 @@ describe('ProjectDetailPage', () => {
     vi.mocked(api.setQuota).mockResolvedValue(undefined)
   })
 
+  it('keeps rename failures and the submitted name in the dialog, then permits correction', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.renameProject).mockRejectedValueOnce(new Error('项目名称已存在')).mockResolvedValueOnce(undefined)
+    renderPage()
+    await screen.findByRole('heading', { name: 'People' })
+    await user.click(screen.getByRole('button', { name: '重命名' }))
+    const dialog = within(screen.getByRole('dialog', { name: '重命名项目' }))
+    const name = dialog.getByLabelText('项目名称') as HTMLInputElement
+    await user.clear(name); await user.type(name, 'Duplicate')
+    await user.click(dialog.getByRole('button', { name: '保存名称' }))
+    expect((await dialog.findByRole('alert')).textContent).toContain('项目名称已存在')
+    expect(name.value).toBe('Duplicate')
+    await user.clear(name); await user.type(name, 'Available')
+    await user.click(dialog.getByRole('button', { name: '保存名称' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '重命名项目' })).toBeNull())
+    expect(api.renameProject).toHaveBeenLastCalledWith(7, 'Available')
+  })
+
   it('shows project usage and reloads it for the selected month', async () => {
     renderPage()
     expect(await screen.findByRole('heading', { name: 'People' })).toBeTruthy()
@@ -203,6 +222,42 @@ describe('ProjectDetailPage', () => {
     expect(config.getByText('继承普通成员额度')).toBeTruthy()
     expect(config.getByText('8,000')).toBeTruthy()
     expect(config.getByText('不限')).toBeTruthy()
+  })
+
+  it.each([
+    { tokenLimit: 12_345, companyCostMicrosLimit: 8_500_000, costText: '8.5' },
+    { tokenLimit: 0, companyCostMicrosLimit: 0, costText: '0' },
+  ])('preserves stored project limits when saving without edits: $tokenLimit', async ({ tokenLimit, companyCostMicrosLimit, costText }) => {
+    vi.mocked(api.getProject).mockResolvedValue({
+      ...project, quota: { source: 'independent', tokenLimit, companyCostMicrosLimit },
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('heading', { name: 'People' })
+    await user.click(screen.getByRole('button', { name: '配置额度' }))
+    const dialog = within(screen.getByRole('dialog', { name: '配置项目额度' }))
+    expect((dialog.getByLabelText('每月 Token') as HTMLInputElement).value).toBe(String(tokenLimit))
+    expect((dialog.getByLabelText('每月人民币元') as HTMLInputElement).value).toBe(costText)
+    await user.click(dialog.getByRole('button', { name: '保存额度' }))
+    await waitFor(() => expect(api.setQuota).toHaveBeenCalledWith({
+      subjectType: 'project', subjectId: '7', tokenLimit, companyCostMicrosLimit,
+    }))
+  })
+
+  it('keeps inherited limits inherited when saving without edits', async () => {
+    vi.mocked(api.getProject).mockResolvedValue({
+      ...project, quota: { source: 'inherit', tokenLimit: 8_000, companyCostMicrosLimit: null },
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('heading', { name: 'People' })
+    await user.click(screen.getByRole('button', { name: '配置额度' }))
+    const dialog = within(screen.getByRole('dialog', { name: '配置项目额度' }))
+    expect((dialog.getByLabelText(/继承普通成员额度/) as HTMLInputElement).checked).toBe(true)
+    await user.click(dialog.getByRole('button', { name: '保存额度' }))
+    await waitFor(() => expect(api.setQuota).toHaveBeenCalledWith({
+      subjectType: 'project', subjectId: '7', tokenLimit: 'inherit', companyCostMicrosLimit: 'inherit',
+    }))
   })
 
   it('defaults to independent unlimited quotas', async () => {

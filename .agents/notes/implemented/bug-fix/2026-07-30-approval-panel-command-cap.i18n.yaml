@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-approval-panel-command-cap.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-30-approval-panel-command-cap.md
-2026-07-30-approval-panel-command-cap.md: 1d74d790299522a0f1e6b23f342cd10b35192d27
-2026-07-30-approval-panel-command-cap.zh.md: 35263df4df4460ccfad4a0c11704997f4b2e27f2
+/agent-note-the-approval-takeover-shares-the-composer-s-text-cap:
+  en: e174fd6000691b84
+  zh: 2ed83359fc30250d
+/agent-note-the-approval-takeover-shares-the-composer-s-text-cap/problem:
+  en: e4efed86750f4ba6
+  zh: 385774a51296c6f5
+/agent-note-the-approval-takeover-shares-the-composer-s-text-cap/decision:
+  en: 2d6ff7af80272c12
+  zh: 80deb92ad7d69a0a
+/agent-note-the-approval-takeover-shares-the-composer-s-text-cap/alternatives-considered:
+  en: 5e27d47362986581
+  zh: 7f405c5eba226432
+/agent-note-the-approval-takeover-shares-the-composer-s-text-cap/consequences:
+  en: 2f7a40cfcd3ee2d5
+  zh: ea79e77d0b5f31f7
+/agent-note-the-approval-takeover-shares-the-composer-s-text-cap/verification:
+  en: dbb00fb8f0113f06
+  zh: 744489c55460a64a

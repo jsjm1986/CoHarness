@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-v5-draft-header-successor.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-v5-draft-header-successor.md
-2026-09-22-v5-draft-header-successor.md: c28b9fa4a681dad99556aa0df39651594a6ac461
-2026-09-22-v5-draft-header-successor.zh.md: 4cec38d164ce645e9de301a3cce63c92a39de6b6
+/agent-note-v5-successor-for-declared-draft-headers:
+  en: d342eaf54bf31a92
+  zh: 5fe2f85778680938
+/agent-note-v5-successor-for-declared-draft-headers/problem:
+  en: b63f594a62d3fed1
+  zh: b68be79b43f08732
+/agent-note-v5-successor-for-declared-draft-headers/decision:
+  en: 7e0949f304c4be15
+  zh: b7f89833d02642fb
+/agent-note-v5-successor-for-declared-draft-headers/alternatives-considered:
+  en: 6e34cf5b3b05f2ea
+  zh: 24ad84d339bb3db9
+/agent-note-v5-successor-for-declared-draft-headers/consequences:
+  en: 921d2c04aa2a2832
+  zh: 8c422aa9319ff47a
+/agent-note-v5-successor-for-declared-draft-headers/testing:
+  en: 19dd9f84584de90d
+  zh: 1504a690f5db8d4d

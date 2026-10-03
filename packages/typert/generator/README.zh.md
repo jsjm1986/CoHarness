@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-typert-generator
 
 [English](README.md) | 中文
@@ -10,6 +15,19 @@ TypeScript 项目分析器和模型驱动的 Typert 生成器。在生成任何�
 
 `dsh-typert-generator` 让维护者把公开的 TypeScript 类型转换为构建产物和与编译器无关的模型。包通过 `./typert` 和可选的 `./client/typert` 导出选择加入；如果声明、发布清单、Remote 导出或 Zod 投影无法被正确表示，生成过程就会失败。仓库构建会生成可执行 schema factory 与配套声明，工具也可以调用 `WorkspaceAnalyzer` 完成检查或目录生成而不发布产物。生成过程只在构建时运行，绝不会进入实时 agent（智能体）会话。
 
+## 目录
+
+- [分析模型](#analysis-model)
+- [产物生成与选择性发布](#emission-and-opt-in-publication)
+- [本仓库的 Cordis 投影](#repository-specific-cordis-projection)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="analysis-model"></a>
 ## 分析模型
 
 每个 face 包含包导出、Cordis 服务与事件、显式标记的对象与 schema，以及涵盖其可达声明的类型图。类型图保留声明标识、泛型参数及应用、显式继承、条件类型与映射类型、导入属性、abstract 修饰符和源码 JSDoc。服务和 `@typert object` 对外接口仅暴露公共实例成员；构造函数、静态成员与非公共成员均被排除。
@@ -18,6 +36,7 @@ TypeScript 项目分析器和模型驱动的 Typert 生成器。在生成任何�
 
 返回 `Iterable` 或 `AsyncIterable` 的 Remote 方法必须声明 `@Remote({ mode: 'stream' })`。缺少流元数据会在分析阶段失败；迭代器协议方法不会展开成线路载荷 schema。
 
+<a id="emission-and-opt-in-publication"></a>
 ## 产物生成与选择性发布
 
 `FaceModelEmitter` 只消费模型。它会生成可执行 JavaScript，其中包含受支持的 Zod schema 和一个 `TYPERT` contribution；同时生成声明文件，通过包的公开导出将其中的 schema 标注为 `z.ZodType<SourceType>`。遇到不支持的 Zod 投影时，生成会失败，不会展平或弱化源类型。
@@ -26,14 +45,18 @@ TypeScript 项目分析器和模型驱动的 Typert 生成器。在生成任何�
 
 各包可自行选择是否发布，未提供对应公开入口的业务包无需生成 Typert 产物。仓库的 Host tsdown 会以 `tsconfig.host.json` 为唯一 program 种子运行 workspace Typert 生成；它既生成 Host 反射产物，也把 Host Remote 约定投影为 Client 使用的 `typert.remote-client.*`。后续 Client tsdown 不启动 Typert，也不分析 `tsconfig.client.json`。静态消费方仍可直接调用 `WorkspaceAnalyzer`，显式选择 face 与包子集，并在不发布或加载运行时产物的情况下分批处理包。
 
+<a id="repository-specific-cordis-projection"></a>
 ## 本仓库的 Cordis 投影
 
 包根导出中包含本仓库 Cordis 目录使用的模型驱动提取逻辑、完整性检查和确定性文本渲染器。它们接受 `CordisCatalogPolicy`；由仓库持有的类型链接、基础类型／豁免类型分类和继承的 Cordis 条目仍位于 `scripts/gen-cordis-catalog.ts`，并由调用方显式传入。因此，生成器包只包含投影机制，不会隐式复制本仓库的文档分类体系。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。从源类型到 `FaceModel`/`TypeGraph` 数据的编译期变换；其输出由生成器规格断言，它不运行任何运行时状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为构建时生成器在任何 agent 运行时之外运行，不触及任何模型请求。
@@ -42,6 +65,7 @@ TypeScript 项目分析器和模型驱动的 Typert 生成器。在生成任何�
 
 无直接影响；生成产物只有在消费方将其放入请求时才会触及请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 系统会跳过包导出中的模式匹配；参与贡献的包需要具体的导出目标。
@@ -49,3 +73,13 @@ TypeScript 项目分析器和模型驱动的 Typert 生成器。在生成任何�
 - Zod 产物生成组件仅支持 TypeScript 类型图中有意限定的部分。泛型 schema 声明，以及以条件类型或映射类型为 schema 根的计算构造，都会失败，直到存在明确的 schema 工厂策略。
 - 跨 face 链接会在模型中表示以供分析，但当前生成的 schema 均不需要跨 face 的运行时 Zod 导入。
 - 发现过程会遍历从具体公开导出可达的源文件；既未导出、也未由该图导入的声明会按设计排除在包模型之外。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,6 +1,16 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-11-property-based-testing.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-06-11-property-based-testing.md
-2026-06-11-property-based-testing.md: 7ab6f2daeb65e603d055ad6127a91f6b76ebc26e
-2026-06-11-property-based-testing.zh.md: 36855c74f6de082b5307d4c1ed6e674410910003
+/agent-note-property-based-testing-for-protocol-shaped-code:
+  en: fd45ff57e4aeffbe
+  zh: c2198a8b24706c71
+/agent-note-property-based-testing-for-protocol-shaped-code/problem:
+  en: 9181f6004a32d1da
+  zh: 43f8ae6ae03d9c3e
+/agent-note-property-based-testing-for-protocol-shaped-code/decision:
+  en: a1c182eaf1fd70b1
+  zh: fc5531f3e6ea3fcd
+/agent-note-property-based-testing-for-protocol-shaped-code/consequences:
+  en: fabdbc9a264189b3
+  zh: c14a8ace32c5276f

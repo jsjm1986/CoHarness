@@ -13,3 +13,10 @@
   --ds-transition-duration-fast: 0.1s;
   --ds-transition-duration-slow: 0.3s;
 }
+
+/* focusWithoutRing marks automatic entry/return focus; keyboard traversal
+ * restores normal outlines by removing the attribute. */
+[data-dsh-automatic-focus]:focus,
+[data-dsh-automatic-focus]:focus:focus-visible {
+  outline: none;
+}

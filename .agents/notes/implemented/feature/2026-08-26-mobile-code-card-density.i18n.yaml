@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-26-mobile-code-card-density.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-26-mobile-code-card-density.md
-2026-08-26-mobile-code-card-density.md: ad0882f355dfde142154da397f53dd2bc26249d5
-2026-08-26-mobile-code-card-density.zh.md: 24844117ae780b44a1c6c0647686f6099343e76d
+/agent-note-compact-mobile-code-and-result-cards:
+  en: d46443279e76e32a
+  zh: 703ddb7863413885
+/agent-note-compact-mobile-code-and-result-cards/problem:
+  en: f8fb4cd1824d5294
+  zh: b97a471fe2daf713
+/agent-note-compact-mobile-code-and-result-cards/decision:
+  en: 90fc4cc411284437
+  zh: d3ad7685945e06bd
+/agent-note-compact-mobile-code-and-result-cards/alternatives-considered:
+  en: a991254a3c1ea01a
+  zh: d97bf5201edc8f1a
+/agent-note-compact-mobile-code-and-result-cards/consequences:
+  en: 8dc8992dde994dbf
+  zh: fd72ab2758f6bf1c

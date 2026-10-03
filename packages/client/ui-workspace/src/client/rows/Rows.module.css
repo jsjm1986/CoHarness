@@ -212,6 +212,19 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* Static pin marker occupying the same right-edge cell as the hover pin
+   button that replaces it. */
+.pinIndicator {
+  display: inline-flex;
+  flex: none;
+  width: 16px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  color: var(--dsw-alias-label-caption);
+}
+
 .dot {
   flex: none;
 }
@@ -234,6 +247,13 @@
 
 .sessionRow:hover .time,
 .sessionRow.menuOpen .time {
+  display: none;
+}
+
+/* Hover swaps the trailing cell to the action buttons, which already carry
+   the pin glyph — hide the static marker so they do not double. */
+.sessionRow:hover .pinIndicator,
+.sessionRow.menuOpen .pinIndicator {
   display: none;
 }
 

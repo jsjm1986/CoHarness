@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-04-pointer-revealed-sidebar-scrollbars.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-04-pointer-revealed-sidebar-scrollbars.md
-2026-08-04-pointer-revealed-sidebar-scrollbars.md: 5c6fff378932d3e63bc92ed27e9b0341effaf6b8
-2026-08-04-pointer-revealed-sidebar-scrollbars.zh.md: dd9528fec4bd24a53b17ecf888a9af03d457ce0e
+/agent-note-the-sidebar-s-scrollbars-follow-the-pointer:
+  en: cc958e2f2407ce4e
+  zh: 3935aad2da370bf5
+/agent-note-the-sidebar-s-scrollbars-follow-the-pointer/problem:
+  en: 069e15f77ce3ebd6
+  zh: 32959d38307d35f7
+/agent-note-the-sidebar-s-scrollbars-follow-the-pointer/decision:
+  en: 2fb2dc3422d0d456
+  zh: 45ab15812ee6e420
+/agent-note-the-sidebar-s-scrollbars-follow-the-pointer/alternatives-considered:
+  en: bd535a17ccb85c25
+  zh: 174cee060be6364c
+/agent-note-the-sidebar-s-scrollbars-follow-the-pointer/consequences:
+  en: 1e133701e42f399b
+  zh: 9db73803c8f9cf34
+/agent-note-the-sidebar-s-scrollbars-follow-the-pointer/testing:
+  en: 35333750ab2a1964
+  zh: 2a37cc20e835d93a

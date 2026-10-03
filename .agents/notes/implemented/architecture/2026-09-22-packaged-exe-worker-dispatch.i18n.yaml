@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-packaged-exe-worker-dispatch.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-packaged-exe-worker-dispatch.md
-2026-09-22-packaged-exe-worker-dispatch.md: 10ae7bb56d4f3557bae6f5acb49ff047a774241f
-2026-09-22-packaged-exe-worker-dispatch.zh.md: 36c364e372785d571dd2696781e66a545c2fe7f5
+/agent-note-the-packaged-json-rpc-executable-dispatches-worker-modes-by-environment-selector:
+  en: db424cd976b5f6da
+  zh: aa45064306e11f2f
+/agent-note-the-packaged-json-rpc-executable-dispatches-worker-modes-by-environment-selector/problem:
+  en: 461109c4e940c2b4
+  zh: 730a13526979c114
+/agent-note-the-packaged-json-rpc-executable-dispatches-worker-modes-by-environment-selector/decision:
+  en: 2977cd4aef43017c
+  zh: 2373d57740e4ca0b
+/agent-note-the-packaged-json-rpc-executable-dispatches-worker-modes-by-environment-selector/alternatives-considered:
+  en: eddb37401e344104
+  zh: fd03a0bb72689f04
+/agent-note-the-packaged-json-rpc-executable-dispatches-worker-modes-by-environment-selector/consequences:
+  en: 7f63fdaccd7989fc
+  zh: 6de143411018a628

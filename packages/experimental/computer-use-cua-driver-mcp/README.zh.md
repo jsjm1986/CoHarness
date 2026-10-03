@@ -91,6 +91,7 @@ pnpm run test:e2e packages/experimental/computer-use-cua-driver-mcp/tests/instal
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -108,6 +109,7 @@ pnpm run test:e2e packages/experimental/computer-use-cua-driver-mcp/tests/instal
 
 工具发现结果不变时，工具定义前缀保持稳定。目录变化可能从第一个变化的模式开始使缓存失效；追加的工具结果保留此前的请求前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 <a id="known-limitations-and-deferred-work"></a>

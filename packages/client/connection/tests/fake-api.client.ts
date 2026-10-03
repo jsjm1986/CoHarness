@@ -84,14 +84,19 @@ export class FakeApiClient implements IApiClient {
     attachedSessions: number
     home: string
     canOpenPath: boolean
+    fileManager?: 'finder' | 'explorer' | 'directory' | null
   }>> =
     () => Promise.resolve(ok({
-      version: '0-fake', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true,
+      version: '0-fake', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true, fileManager: 'directory',
     }))
   onPickDirectory: (payload: unknown) => Promise<RpcResponse<{ path: string | null }>> =
     () => Promise.resolve(ok({ path: null }))
   onOpenPath: (payload: unknown) => Promise<RpcResponse<{ opened: true }>> =
     () => Promise.resolve(ok({ opened: true as const }))
+  onFileApplications: (payload: unknown) => Promise<RpcResponse<{
+    applications: { id: string; name: string; default: boolean; icon: string | null }[]
+  }>> =
+    () => Promise.resolve(ok({ applications: [] }))
 
   onListDirectory: (payload: unknown) => Promise<RpcResponse<{
     path: string
@@ -141,16 +146,39 @@ export class FakeApiClient implements IApiClient {
     }))),
   }
 
+  onJobsOutput: (payload: { jobId: string; from?: number }) => Promise<RpcResponse<{
+    job: { id: never; kind: string; label: string; status: 'completed'; startedAt: number; output: { total: number; earliest: number } }
+    output: { total: number; earliest: number }
+    chunks: { at: number; text: string }[]
+    next: number
+    lossy?: true
+  }>> = payload => Promise.resolve(ok({
+    job: { id: payload.jobId as never, kind: 'fake', label: 'fake', status: 'completed', startedAt: 0, output: { total: 0, earliest: 0 } },
+    output: { total: 0, earliest: 0 },
+    chunks: [],
+    next: 0,
+  }))
+  onJobsKill: () => Promise<RpcResponse<{ outcome: 'requested' | 'already-finished' }>> =
+    () => Promise.resolve(ok({ outcome: 'already-finished' as const }))
+
+  readonly jobs: IApiClient['jobs'] = {
+    output: (payload: unknown) => this.record('jobs.output', payload, this.onJobsOutput(payload as { jobId: string })),
+    kill: (payload: unknown) => this.record('jobs.kill', payload, this.onJobsKill()),
+  }
+
   readonly host: IApiClient['host'] = {
     describe: payload => this.record('host.describe', payload, this.onDescribe(payload)),
     pickDirectory: payload => this.record('host.pickDirectory', payload, this.onPickDirectory(payload)),
     listDirectory: payload => this.record('host.listDirectory', payload, this.onListDirectory(payload)),
     createDirectory: payload => this.record('host.createDirectory', payload, this.onCreateDirectory(payload)),
     openPath: payload => this.record('host.openPath', payload, this.onOpenPath(payload)),
+    fileApplications: payload => this.record('host.fileApplications', payload, this.onFileApplications(payload)),
   }
 
   readonly workspace: IApiClient['workspace'] = {
-    list: (payload: unknown) => this.record('workspace.list', payload, Promise.resolve(ok({ items: [], archivedSessionIds: [] }))),
+    list: (payload: unknown) => this.record('workspace.list', payload, Promise.resolve(ok({
+      items: [], archivedSessionIds: [], pinnedSessionIds: [],
+    }))),
     create: (payload: unknown) => this.record('workspace.create', payload, Promise.resolve(ok({
       workspace: { workspaceId: 'fk-ws' as never, path: '/f/ws', title: 'ws', sessionIds: [], createdAt: '0', updatedAt: '0' },
       created: true,
@@ -170,6 +198,12 @@ export class FakeApiClient implements IApiClient {
     }))),
     unarchiveSession: (payload: unknown) => this.record('workspace.unarchiveSession', payload, Promise.resolve(ok({
       archivedSessionIds: [],
+    }))),
+    pinSession: (payload: unknown) => this.record('workspace.pinSession', payload, Promise.resolve(ok({
+      pinnedSessionIds: [(payload as { sessionId: SessionId }).sessionId],
+    }))),
+    unpinSession: (payload: unknown) => this.record('workspace.unpinSession', payload, Promise.resolve(ok({
+      pinnedSessionIds: [],
     }))),
   }
 

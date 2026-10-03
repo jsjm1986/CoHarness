@@ -1,3 +1,8 @@
+---
+description: "Shared wire protocol for the DeepSeek Harness SDK runtime: the newline-delimited JSON-RPC stdio transport and the named request, result, and notification types spoken between the runtime server and SDK clients"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-sdk-protocol
 
 English | [中文](README.zh.md)
@@ -8,10 +13,23 @@ The shared wire protocol for the DeepSeek Harness SDK runtime: one newline-delim
 
 `dsh-sdk-protocol` lets a DeepSeek Harness runtime and its SDK clients exchange JSON-RPC 2.0 messages over newline-delimited byte streams: one transport class plus the named request, result, and notification types both wire ends speak. The serving side is the [`dsh-sdk-jsonrpc-server`](../server/README.md) plugin; the clients are the TypeScript [`dsh-sdk-client`](../client/README.md) and the [Python SDK](../../../python/README.md), which mirrors these shapes without importing them. Use this package when you implement or debug a wire end: framing rules, method names, payload types, and error semantics all live here. It is a pure library — no plugin, no configuration, no registrations.
 
+## Table of Contents
+
+- [Transport](#transport)
+- [Wire types](#wire-types)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="transport"></a>
 ## Transport
 
 `JsonRpcLineTransport` frames JSON-RPC 2.0 over caller-owned byte streams, one compact JSON frame per `\n`-terminated line. Frames with `id` and `method` are requests, `id` alone is a response, `method` alone is a notification; malformed JSON lines are ignored. `start()` attaches stream listeners, `close()` detaches them and rejects pending requests without destroying the streams. Missing request handlers answer `-32601`; handler rejections answer `-32603` with the error message. An error response rejects the pending `request()` with `JsonRpcResponseError`, which preserves the wire `code` and optional `data`. `JsonRpcTransportPeer` is the outbound surface (request/notify) the server class is typed against. Input lines are retained as fragments and joined only when a newline completes them, so highly fragmented stdio does not repeatedly copy the prefix. Input lines, pending requests, concurrent inbound handlers, and queued output are bounded by positive options (defaults 1 MiB, 1,000, 100, and 8 MiB); crossing a bound fails the transport and rejects pending work.
 
+<a id="wire-types"></a>
 ## Wire types
 
 `types.ts` names every payload of the protocol served by `HarnessSdkJsonRpcServer`:
@@ -28,10 +46,12 @@ The shared wire protocol for the DeepSeek Harness SDK runtime: one newline-delim
 
 `HarnessSdkRequestMap` and `HarnessSdkNotificationMap` index these by method name. `SessionPromptResult.messageId` identifies the queued `UserMessage`; it does not identify a later assistant message, turn ending, or prompt result. Clients combine the open-ended `session.event` stream with agent-wide `session.status` according to their own activity ownership. `SubagentFinishedNotification.lastAssistantMessage` contains the child's last non-empty assistant message or, when no such message exists, its accumulated assistant text; the field is absent when the child produced neither. `InitializeParams.maxTokens` is an optional positive safe integer that caps each conversation-model output for SDK-created agents and their in-process descendants; omission allows the selected adapter's exact-model default to apply, or otherwise preserves provider behavior. The notification payload types depend on `SessionEvent` (`dsh-session`), `ContentBlock` (`dsh-llm`), and `SubagentStopReason` (`dsh-subagent`) — the protocol streams full session-log envelopes, so the session vocabulary is part of the wire contract. `serverInfo.name` stays the wire-stable `deepseek-harness-sdk-runtime`.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. A pure wire-format library; its codec and type algebra are enforced by unit specs.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this is a client-facing wire library; the runtime plugins behind the serving entry own all model-facing behavior.
@@ -45,3 +65,13 @@ None; this package neither assembles nor sends a provider request.
 - **No protocol-version negotiation** — the handshake carries only `serverInfo.version` (`0.0.1`, unvalidated by clients); pre-release stance, no compatibility promise.
 - **No cancel or session-close methods** — a client abandons a turn by closing the runtime process; see the [`dsh-sdk-jsonrpc-server` README](../server/README.md).
 - **Server→client requests are dead capability** — the transport supports them, but the server never sends one; the Python SDK's responder surface exists for future approval flows.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

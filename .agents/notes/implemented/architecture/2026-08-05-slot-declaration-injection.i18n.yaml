@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-05-slot-declaration-injection.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-05-slot-declaration-injection.md
-2026-08-05-slot-declaration-injection.md: 92f08efec288cc8844c664c2d6c2bf5e1f5933d2
-2026-08-05-slot-declaration-injection.zh.md: eed6873bb4f36b0ba4a5bf6a45681c555d4993fa
+/agent-note-slot-declaration-injection-and-reload-lifetimes:
+  en: 53d00c6a4c369ce3
+  zh: 3c241f36a6005860
+/agent-note-slot-declaration-injection-and-reload-lifetimes/problem:
+  en: b465994340de020a
+  zh: f522399a7abee6d0
+/agent-note-slot-declaration-injection-and-reload-lifetimes/decision:
+  en: c02f9d5e32e3f23f
+  zh: 57498443c8e654a2
+/agent-note-slot-declaration-injection-and-reload-lifetimes/failure-and-lifecycle-contract:
+  en: 56d7c86976cc5d23
+  zh: 89a710d6b176871c
+/agent-note-slot-declaration-injection-and-reload-lifetimes/alternatives-considered:
+  en: ef74589156d5c275
+  zh: a4e4a8ec029aa3e0
+/agent-note-slot-declaration-injection-and-reload-lifetimes/consequences:
+  en: 1422cd1745158098
+  zh: e0eae818b3582e16

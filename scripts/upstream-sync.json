@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "syncedTag": "dsh-v0.1.6-alpha.2",
-  "syncedCommit": "ddefc45fbc7f8e46dd73185e68295696d1297887",
+  "syncedTag": "dsh-v0.2.0-rc.1",
+  "syncedCommit": "4878cdabd87d4041bdaff61d04c966883b9fd07a",
   "packages": {
     "acp/acp": {
       "sovereignty": "adapted"
@@ -28,7 +28,8 @@
       "sovereignty": "tracked"
     },
     "attachment/attachment-local": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
     },
     "attachment/tool-userdoc": {
       "sovereignty": "owned"
@@ -81,7 +82,6 @@
     "client/connection": {
       "sovereignty": "adapted",
       "removedUpstreamPaths": [
-        "packages/client/connection/src/browser-auth.ts",
         "packages/client/connection/src/recovery-config.ts",
         "packages/client/connection/src/rpc-schema.ts"
       ]
@@ -98,6 +98,9 @@
     },
     "client/runtime": {
       "sovereignty": "owned"
+    },
+    "client/shortcuts": {
+      "sovereignty": "adapted"
     },
     "client/ui-agent-preset": {
       "sovereignty": "adapted"
@@ -178,7 +181,7 @@
       "sovereignty": "adapted"
     },
     "client/ui-dockkit": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "client/ui-documents": {
       "sovereignty": "owned"
@@ -250,8 +253,7 @@
         "packages/client/ui-primitives/src/FoldToggle.tsx",
         "packages/client/ui-primitives/src/SiteGlyph.tsx",
         "packages/client/ui-primitives/src/darwin-desktop.ts",
-        "packages/client/ui-primitives/src/file-size.ts",
-        "packages/client/ui-primitives/src/rank-by-name.ts"
+        "packages/client/ui-primitives/src/file-size.ts"
       ]
     },
     "client/ui-reference": {
@@ -270,16 +272,12 @@
       "sovereignty": "adapted"
     },
     "client/ui-settings": {
-      "sovereignty": "adapted",
-      "removedUpstreamPaths": [
-        "packages/client/ui-settings/src/client/settings-contract.ts"
-      ]
+      "sovereignty": "adapted"
     },
     "client/ui-settings-general": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
       "removedUpstreamPaths": [
-        "packages/client/ui-settings-general/src/client/desktop-update-bridge.ts",
         "packages/client/ui-settings-general/src/client/desktop-update-source.ts",
         "packages/client/ui-settings-general/src/client/DesktopUpdateIndicator.module.css",
         "packages/client/ui-settings-general/src/client/DesktopUpdateIndicator.tsx"
@@ -303,18 +301,14 @@
     },
     "client/ui-settings-plugins": {
       "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
-      "removedUpstreamPaths": [
-        "packages/client/ui-settings-plugins/src/client/PluginConfigForm.module.css",
-        "packages/client/ui-settings-plugins/src/client/PluginConfigForm.tsx",
-        "packages/client/ui-settings-plugins/src/client/subagent-card-controller.ts",
-        "packages/client/ui-settings-plugins/src/client/SubagentCard.module.css",
-        "packages/client/ui-settings-plugins/src/client/SubagentCard.tsx"
-      ]
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
     },
     "client/ui-settings-unarchive-sessions": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/feature/2026-09-25-session-unarchive-restore-surface.md"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.0-rc.1.md"
+    },
+    "client/ui-shortcuts": {
+      "sovereignty": "adapted"
     },
     "client/ui-sidebar": {
       "sovereignty": "adapted",
@@ -344,8 +338,7 @@
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
       "removedUpstreamPaths": [
         "packages/client/ui-subagent/src/client/sidebar-chat/SidebarChat.module.css",
-        "packages/client/ui-subagent/src/client/sidebar-chat/index.tsx",
-        "packages/client/ui-subagent/src/client/subagent-lineage.ts"
+        "packages/client/ui-subagent/src/client/sidebar-chat/index.tsx"
       ]
     },
     "client/ui-theme": {
@@ -383,8 +376,7 @@
       "removedUpstreamPaths": [
         "packages/client/ui-workspace/src/client/navigation.ts",
         "packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.module.css",
-        "packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx",
-        "packages/client/ui-workspace/src/client/subagent-lineage.ts"
+        "packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx"
       ]
     },
     "client/userdoc-upload": {
@@ -398,7 +390,7 @@
       "sovereignty": "tracked"
     },
     "compaction/compaction": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "compaction/compaction-basic": {
       "sovereignty": "tracked"
@@ -445,10 +437,7 @@
       "sovereignty": "owned"
     },
     "context/session-reference": {
-      "sovereignty": "adapted",
-      "removedUpstreamPaths": [
-        "packages/context/session-reference/src/spill.ts"
-      ]
+      "sovereignty": "adapted"
     },
     "context/time-context": {
       "sovereignty": "adapted"
@@ -470,7 +459,7 @@
       "note": ".agents/notes/implemented/bug-fix/2026-09-21-configured-agent-persistence-mount-race.md"
     },
     "core/agent-tool-presentation": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "core/scope": {
       "sovereignty": "adapted"
@@ -479,7 +468,7 @@
       "sovereignty": "adapted"
     },
     "core/system-prompt": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "core/tools": {
       "sovereignty": "adapted",
@@ -495,7 +484,7 @@
       "sovereignty": "adapted"
     },
     "deliverables/tool-present": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "deliverables/workspace-changes": {
       "sovereignty": "adapted"
@@ -523,9 +512,6 @@
     "experimental/agent-team-profile": {
       "sovereignty": "tracked"
     },
-    "experimental/agent-team-web-profile": {
-      "sovereignty": "tracked"
-    },
     "experimental/auto-review": {
       "sovereignty": "adapted"
     },
@@ -551,7 +537,7 @@
       "sovereignty": "adapted"
     },
     "experimental/ptc-runtime-python": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "experimental/tool-agent-team": {
       "sovereignty": "adapted"
@@ -590,10 +576,7 @@
       "sovereignty": "adapted"
     },
     "fs/tool-fs-search": {
-      "sovereignty": "adapted",
-      "removedUpstreamPaths": [
-        "packages/fs/tool-fs-search/src/ripgrep.d.ts"
-      ]
+      "sovereignty": "adapted"
     },
     "fs/tool-str-replace-editor": {
       "sovereignty": "adapted"
@@ -650,7 +633,7 @@
       "sovereignty": "adapted"
     },
     "host/plugin-inventory": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "host/userdoc-http": {
       "sovereignty": "owned"
@@ -659,7 +642,8 @@
       "sovereignty": "adapted"
     },
     "identity/anonymous-user-id": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
     },
     "interaction/commands": {
       "sovereignty": "tracked"
@@ -668,16 +652,18 @@
       "sovereignty": "adapted"
     },
     "interaction/tool-ask-user": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "interaction/user-approval": {
       "sovereignty": "tracked"
     },
     "interaction/user-questions": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/feature/2026-10-02-timed-user-questions-mux-port.md"
     },
     "jobs/jobs": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-27-current-request-execution-scopes.md"
     },
     "jobs/jobs-local": {
       "sovereignty": "adapted"
@@ -692,6 +678,9 @@
       "sovereignty": "adapted"
     },
     "llm/llm-deepseek": {
+      "sovereignty": "adapted"
+    },
+    "llm/llm-deepseek-api-key": {
       "sovereignty": "adapted"
     },
     "llm/llm-pi-ai": {
@@ -732,8 +721,8 @@
       "sovereignty": "tracked"
     },
     "preset/agent-presets": {
-      "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-21-preset-remote-contract-boundaries.md"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.0-rc.1.md"
     },
     "preset/persona": {
       "sovereignty": "tracked"
@@ -751,13 +740,13 @@
       "sovereignty": "tracked"
     },
     "sandbox/sandbox-local": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "sandbox/sandbox-policy": {
       "sovereignty": "tracked"
     },
     "sandbox/sandbox-windows-acl": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "schedule/schedule": {
       "sovereignty": "adapted"
@@ -800,20 +789,25 @@
       "note": ".agents/notes/implemented/feature/2026-08-15-project-collaborative-conversations.md"
     },
     "session/session-format-v1-to-v2": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "session/session-format-v2-to-v3": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-08-26-session-draft-lifecycle-and-content-watermarks.md"
     },
     "session/session-format-v3-to-v4": {
-      "sovereignty": "owned"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.0-rc.1.md",
+      "upstreamShadowed": true
     },
     "session/session-format-v4-to-v5": {
       "sovereignty": "owned",
       "note": "packages/session/session-format-v4-to-v5/README.md"
     },
     "session/session-format-v5-to-v6": {
+      "sovereignty": "owned"
+    },
+    "session/session-format-v6-to-v7": {
       "sovereignty": "owned"
     },
     "session/session-log-deepseek": {
@@ -842,7 +836,7 @@
       "sovereignty": "tracked"
     },
     "session/session-telemetry": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "session/session-telemetry-otel": {
       "sovereignty": "adapted"
@@ -866,19 +860,20 @@
       "sovereignty": "adapted"
     },
     "settings/settings-file": {
-      "sovereignty": "tracked"
+      "sovereignty": "owned",
+      "note": "upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.0-rc.1.md"
     },
     "shell/bash-local": {
       "sovereignty": "adapted"
     },
     "shell/bash-sandbox": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "shell/pwsh-local": {
       "sovereignty": "adapted"
     },
     "shell/pwsh-sandbox": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "shell/shell": {
       "sovereignty": "adapted"
@@ -890,13 +885,13 @@
       "sovereignty": "adapted"
     },
     "shell/tool-bash-persistent": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "shell/tool-pwsh": {
       "sovereignty": "adapted"
     },
     "shell/tool-pwsh-persistent": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "skill/skill": {
       "sovereignty": "adapted"
@@ -913,6 +908,9 @@
     "skill/tool-skill": {
       "sovereignty": "adapted"
     },
+    "skill/tool-workspace-dependencies": {
+      "sovereignty": "tracked"
+    },
     "spill/spill": {
       "sovereignty": "tracked"
     },
@@ -920,7 +918,7 @@
       "sovereignty": "adapted"
     },
     "spill/spill-policy": {
-      "sovereignty": "adapted"
+      "sovereignty": "tracked"
     },
     "ssh/fs-ssh": {
       "sovereignty": "adapted"
@@ -932,7 +930,7 @@
       "sovereignty": "adapted"
     },
     "ssh/subprocess-ssh": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted"
     },
     "storage/storage": {
       "sovereignty": "tracked"
@@ -1001,17 +999,7 @@
     },
     "test-support/client-runtime": {
       "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
-      "removedUpstreamPaths": [
-        "packages/test-support/client-runtime/src/assembly/bundle-roster.ts",
-        "packages/test-support/client-runtime/src/assembly/index.ts",
-        "packages/test-support/client-runtime/src/assembly/modules.ts",
-        "packages/test-support/client-runtime/src/assembly/remote-default-responses.ts",
-        "packages/test-support/client-runtime/src/assembly/remote-proxies.ts",
-        "packages/test-support/client-runtime/src/assembly/roster.ts",
-        "packages/test-support/client-runtime/src/assembly/test-client.ts",
-        "packages/test-support/client-runtime/src/assembly/vitest.ts"
-      ]
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
     },
     "test-support/llm-mock-server": {
       "sovereignty": "tracked"
@@ -1020,6 +1008,9 @@
       "sovereignty": "adapted"
     },
     "test-support/loader-smoke": {
+      "sovereignty": "adapted"
+    },
+    "test-support/remote-mock": {
       "sovereignty": "adapted"
     },
     "test-support/session-snapshot": {
@@ -1049,6 +1040,9 @@
     "util/chunked-list": {
       "sovereignty": "tracked"
     },
+    "util/code-language": {
+      "sovereignty": "tracked"
+    },
     "util/crypto": {
       "sovereignty": "adapted"
     },
@@ -1066,6 +1060,10 @@
     },
     "util/lazy-require": {
       "sovereignty": "tracked"
+    },
+    "util/managed-data": {
+      "sovereignty": "owned",
+      "note": ".agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md"
     },
     "util/native-command": {
       "sovereignty": "adapted"
@@ -1085,6 +1083,9 @@
     },
     "util/values": {
       "sovereignty": "adapted"
+    },
+    "util/workspace-path": {
+      "sovereignty": "tracked"
     },
     "web/tool-web": {
       "sovereignty": "tracked"
@@ -1124,12 +1125,46 @@
     },
     "workspace/workspace": {
       "sovereignty": "adapted"
+    },
+    "experimental/api-speech-to-text": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
+    "experimental/client-ui-voice-input": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
+    "experimental/schedule-bundle": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-24-schedule-opt-in-optional-bundle.md"
+    },
+    "experimental/speech-to-text": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
+    "experimental/speech-to-text-sensevoice": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
+    },
+    "experimental/voice-input-bundle": {
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/architecture/2026-09-16-experimental-voice-input.md"
     }
   },
   "upstreamOnly": [
     {
+      "package": "api/account-controller",
+      "reason": "official account lane excluded; CoHarness owns auth/quota governance",
+      "replacedBy": "host/apiproxy"
+    },
+    {
+      "package": "api/job-controller",
+      "reason": "job RPC surface folds into the single BFF per locked decision",
+      "replacedBy": "host/apiproxy"
+    },
+    {
       "package": "api/session-controller",
-      "reason": "CoHarness dispatches through host/apiproxy bound to Gateway principal and project ACL; the desktop session controller is not carried",
+      "reason": "CoHarness dispatches through host/apiproxy bound to Gateway principal and project ACL; the rc.1 ClientSessions/Session client type surface is rewritten onto client/runtime per adopted package, never carried",
       "replacedBy": "host/apiproxy"
     },
     {
@@ -1148,8 +1183,16 @@
       "replacedBy": "host/apiproxy"
     },
     {
+      "package": "boot/config-editor",
+      "reason": "upstream profile-patch editor excluded; settings stays on settings.yaml governance (revisit only if the settings port needs atomic patch editing)"
+    },
+    {
       "package": "client/file-upload",
       "reason": "attachment/userdoc-local plus host/userdoc-http provide resumable chunked upload with SHA-256 resume; the upstream transient file-upload receipt surface is deferred"
+    },
+    {
+      "package": "client/product-analytics",
+      "reason": "product analytics lane excluded"
     },
     {
       "package": "client/resources",
@@ -1158,7 +1201,7 @@
     },
     {
       "package": "client/store",
-      "reason": "Workbench multi-runtime client state replaces the single-session upstream store",
+      "reason": "single-session store is not carried; imports are rewritten onto client/runtime store exports per adopted package (no shim package)",
       "replacedBy": "client/runtime"
     },
     {
@@ -1181,6 +1224,36 @@
       "replacedBy": "client/ui-conversation"
     },
     {
+      "package": "client/ui-settings-account",
+      "reason": "account settings UI excluded; CoHarness account surface is separate",
+      "replacedBy": "client/ui-settings"
+    },
+    {
+      "package": "client/ui-settings-agent-loop",
+      "reason": "upstream settings section content lands inside the fork settings surface",
+      "replacedBy": "client/ui-settings"
+    },
+    {
+      "package": "client/ui-settings-session-log",
+      "reason": "upstream settings section content lands inside the fork settings surface",
+      "replacedBy": "client/ui-settings"
+    },
+    {
+      "package": "client/ui-settings-shell",
+      "reason": "upstream settings section content lands inside the fork settings surface",
+      "replacedBy": "client/ui-settings"
+    },
+    {
+      "package": "client/ui-settings-subagent",
+      "reason": "upstream settings section content lands inside the fork settings surface",
+      "replacedBy": "client/ui-settings"
+    },
+    {
+      "package": "client/ui-settings-web-search",
+      "reason": "upstream settings section content lands inside the fork settings surface",
+      "replacedBy": "client/ui-settings"
+    },
+    {
       "package": "client/ui-sidebar-documentpreview",
       "reason": "document preview is part of the rejected upstream sidebar tree; the Workbench document surface owns previews, including the Markdown and HTML bodies registered upstream",
       "replacedBy": "client/ui-workbench"
@@ -1188,6 +1261,14 @@
     {
       "package": "client/ui-sidebar-files",
       "reason": "the desktop file sidebar is part of the rejected upstream ui-package tree; workspace browsing is owned by the cloud Workbench"
+    },
+    {
+      "package": "credentials/deepseek-account",
+      "reason": "official account credentials excluded"
+    },
+    {
+      "package": "credentials/deepseek-account-platform",
+      "reason": "official account credentials excluded"
     },
     {
       "package": "experimental/inspector",
@@ -1202,13 +1283,29 @@
       "reason": "experimental prototype with no cloud consumer"
     },
     {
-      "package": "test-support/remote-mock",
-      "reason": "remote mock server is used by upstream remote tests the fork does not carry"
+      "package": "host/product-telemetry-otel",
+      "reason": "product telemetry lane excluded; session telemetry stays on the self-contained session-telemetry-otel",
+      "replacedBy": "session/session-telemetry-otel"
     },
     {
-      "package": "util/workspace-path",
-      "reason": "workspace path policy is owned by host/apiproxy containment plus the fs seam; the upstream helper is not carried"
+      "package": "llm/llm-deepseek-account",
+      "reason": "account provider excluded; the API-key provider split is carried without it"
+    },
+    {
+      "package": "preset/agent-preset",
+      "reason": "slated for P5 adoption in the two-package preset migration",
+      "replacedBy": "preset/agent-presets"
+    },
+    {
+      "package": "preset/agent-preset-registry",
+      "reason": "slated for P5 adoption in the two-package preset migration",
+      "replacedBy": "preset/agent-presets"
+    },
+    {
+      "package": "telemetry/otel",
+      "reason": "excluded; session telemetry stays on the self-contained session-telemetry-otel",
+      "replacedBy": "session/session-telemetry-otel"
     }
   ],
-  "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json"
+  "gateReplayRecord": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.2.0-rc.1.json"
 }

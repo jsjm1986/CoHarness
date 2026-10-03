@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-19-upstream-alpha2-durable-layer-replatform.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-19-upstream-alpha2-durable-layer-replatform.md
-2026-09-19-upstream-alpha2-durable-layer-replatform.md: b361d0cfac41538738640a98c32c7bf2a8db2c53
-2026-09-19-upstream-alpha2-durable-layer-replatform.zh.md: d8996e680dddd5cbdb60a145a9b03c66bf57b30b
+/agent-note-upstream-alpha-2-durable-layer-re-platform:
+  en: cbc3d790af47adf5
+  zh: b8f83ee8f84cb359
+/agent-note-upstream-alpha-2-durable-layer-re-platform/problem:
+  en: 9b8533780d7a4923
+  zh: 69ec71ca2bffb9b0
+/agent-note-upstream-alpha-2-durable-layer-re-platform/decision:
+  en: 210c2e0dfa69379b
+  zh: 0c233ba79ef73acd
+/agent-note-upstream-alpha-2-durable-layer-re-platform/alternatives-considered:
+  en: d77d9a74de33d537
+  zh: a42406c24b3231ca
+/agent-note-upstream-alpha-2-durable-layer-re-platform/shipped-surface-notes:
+  en: 3aee7d93975af76e
+  zh: e85c60ef17e95b8d
+/agent-note-upstream-alpha-2-durable-layer-re-platform/consequences:
+  en: 16fe419ec725004d
+  zh: 84e43da8e438c8c4
+/agent-note-upstream-alpha-2-durable-layer-re-platform/verification:
+  en: b3f47298c9a22e24
+  zh: 7b74e984b07e1c4f

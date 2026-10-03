@@ -32,13 +32,14 @@ const WEB_TITLE_KEYS = {
  * the completed retrieval's web card as the row's collapsed-by-default card
  * body. The row discriminates on `toolName` only to pick its icon and title.
  */
-export function WebRow({ toolName, block, inspect, openDetails, t }: WebRowProps) {
+export function WebRow({ useDisclosure, toolName, block, inspect, openDetails, t }: WebRowProps) {
   const model = toolRowModel(toolName, block)
   const web = webCardModel(block)
   // Web search uses a globe; local grep/glob keep the magnifier family.
   const icon = toolName === 'web_fetch' ? <IconBrowseOutline16 size={14} /> : <IconGlobeOutline14 size={14} />
   return (
     <ToolRow
+      useDisclosure={useDisclosure}
       t={t}
       variant={model.variant}
       toolName={toolName}

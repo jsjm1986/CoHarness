@@ -9,6 +9,8 @@ export interface AuditRow {
   status: number | null
   ip: string
   detail: string
+  /** Durable request result when the backing store records one. */
+  outcome?: string
 }
 
 export class AuditService {

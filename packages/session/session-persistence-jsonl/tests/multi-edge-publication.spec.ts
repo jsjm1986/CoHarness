@@ -150,7 +150,7 @@ function assertRequests(events: readonly SessionEvent[], header: SessionHeader) 
 
 function assertMigrated(result: Awaited<ReturnType<typeof readSession>>) {
   const { events, header, cut, session } = result
-  expect(header).toEqual({ version: 6, id, createdAt: 1, parentSession: 'parent', delegationDepth: 0, isSeeded: true })
+  expect(header).toEqual({ version: 7, id, createdAt: 1, parentSession: 'parent', delegationDepth: 0, isSeeded: true })
   expect(events.map(event => event.seq)).toEqual(Array.from({ length: 23 }, (_, seq) => seq))
   expect(events.filter(event => event.type.startsWith('assistant/'))).toEqual([{
     type: 'assistant/message', seq: 6, time: 108, surfaceOp: 'append',
@@ -200,7 +200,7 @@ async function publishedRows(path: string, compression: JsonlCompression) {
 }
 
 describe.each([0, 1] as const)('V%s multi-edge durable publication', (version) => {
-  it.each(['none', 'zstd'] as const)('publishes only V4 after chunk collapse, system changes, and reference remapping (%s)', async (compression) => {
+  it.each(['none', 'zstd'] as const)('publishes only V7 after chunk collapse, system changes, and reference remapping (%s)', async (compression) => {
     const { root, path } = await seed(version, compression)
     const source = await observe(path)
     const ctx = await mount(root, compression)
@@ -215,7 +215,7 @@ describe.each([0, 1] as const)('V%s multi-edge durable publication', (version) =
     expect(written.events).toEqual(prepared.events)
     await ctx.fiber.dispose()
     contexts.splice(contexts.indexOf(ctx), 1)
-    const successor = generationLogPath(root, undefined, id, 6, compression)
+    const successor = generationLogPath(root, undefined, id, 7, compression)
     expect((await readdir(dirname(path))).filter(name => name !== 'session.lock').sort())
       .toEqual([basename(path), basename(successor)].sort())
     expect(await publishedRows(successor, compression)).toEqual([{ type: 'session', ...prepared.header }, ...prepared.events])
@@ -263,7 +263,7 @@ describe.each([0, 1] as const)('V%s multi-edge durable publication', (version) =
     expect(retried.events).toEqual(expected)
     expect(retried.cut).toBe(prepared.cut)
     assertRequests(retried.events, retried.header)
-    const successor = generationLogPath(root, undefined, id, 6, compression)
+    const successor = generationLogPath(root, undefined, id, 7, compression)
     expect(await publishedRows(successor, compression)).toEqual([{ type: 'session', ...prepared.header }, ...expected])
     expect((await readdir(dirname(path))).filter(name => name !== 'session.lock').sort())
       .toEqual([basename(path), basename(successor)].sort())
@@ -277,7 +277,7 @@ describe.each([0, 1] as const)('V%s multi-edge durable publication', (version) =
     expect(await observe(path)).toEqual(changed)
   })
 
-  it.each(['none', 'zstd'] as const)('refuses a late V4 prompt outside a step without publishing earlier edges (%s)', async (compression) => {
+  it.each(['none', 'zstd'] as const)('refuses a late V7-era prompt outside a step without publishing earlier edges (%s)', async (compression) => {
     const { root, path, header, rows } = await seed(version, compression, true)
     const restoreV2 = v2Catalog.createRestore(header, { recovery: 'strict', validation: 'current' })
     for (const row of rows) restoreV2.decodeRow(row)

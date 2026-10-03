@@ -1,3 +1,8 @@
+---
+description: "The default executor-less/UI-less agent spine with fallback session titles, provider-routed retry, and optional persisted goals"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-agent-spine-demo
 
 English | [中文](README.zh.md)
@@ -11,6 +16,20 @@ Read this package for the whole plugin tree and its composition order.
 Use `dsh-agent-spine-demo` as the default executor-less, UI-less agent spine in one Cordis bundle plugin: the fixed services every harness agent needs, with the loop's `agents` list forwarded as config — an app composes a working agent by adding only an entry point and swappable backends.
 
 
+## Table of Contents
+
+- [The tree it loads](#the-tree-it-loads)
+- [What it deliberately leaves OUTSIDE the bundle](#what-it-deliberately-leaves-outside-the-bundle)
+- [Config](#config)
+- [Why a code bundle, not a shared YAML include](#why-a-code-bundle-not-a-shared-yaml-include)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="the-tree-it-loads"></a>
 ## The tree it loads
 
 `apply(ctx, config)` mounts each of these as a child of the bundle fiber:
@@ -44,6 +63,7 @@ Use `dsh-agent-spine-demo` as the default executor-less, UI-less agent spine in 
                                   (dsh-system-prompt gets the forwarded `persona`)
 ```
 
+<a id="what-it-deliberately-leaves-outside-the-bundle"></a>
 ## What it deliberately leaves OUTSIDE the bundle
 
 The spine is everything COMMON to every entry point. The swappable and entry-point-coupled pieces stay out, picked by whatever loads the bundle:
@@ -56,6 +76,7 @@ The spine is everything COMMON to every entry point. The swappable and entry-poi
 
 This applies the [Service Definition / Service Provider / Consumer separation](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md) at the composition level: the bundle owns the shared spine, the leaf owns the backends, the app package owns the entry point.
 
+<a id="config"></a>
 ## Config
 
 ```ts
@@ -68,16 +89,19 @@ The bundle forwards each field to the child that owns it. App packages supply an
 
 For example, `{ invariants: { enabled: true, package_allowlist: ['^@deepseek-ai/dsh-'], package_blocklist: ['agent-loop$'] } }` keeps the package-owned companions mounted but suppresses the blocked owner. Blocklist matches override allowlist matches; see [`dsh-invariants`](../../runtime-diagnostics/invariants/README.md) for regex and lifecycle rules.
 
+<a id="why-a-code-bundle-not-a-shared-yaml-include"></a>
 ## Why a code bundle, not a shared YAML include
 
 A YAML include can deduplicate config but cannot own a bin or provide entry-point defaults. The ACP app package makes protocol-pure stdout wiring the default, though a leaf can still add an unsafe logger. Bundle children register services in the root isolate-keyed store, so injected leaf siblings see them without load-order coupling.
 
 The retry policy may repeat a failed request in a new numbered step. Retry status, provider errors, and failed partial chunks stay outside model history; each provider attempt can still incur billing, always mode has no attempt limit, entry points derive usage across every logged step, and the reconstructed request preserves the prior prefix for provider cache reuse.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The spine is a static composition list; every loaded service owns its own runtime relationships.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the mounted child plugins, which own every model-facing behavior of the bundle.
@@ -90,3 +114,13 @@ No direct invalidation; the consumer owns any request-prefix changes.
 
 - **Most of the spine set is fixed in code** — `apply()` always mounts the core services; config can omit bundled goals, skills, bash, and task-control tools, but swapping the loop or dropping another spine member means composing a different bundle.
 - **The invariant service and companions remain fixed members** — `invariants.enabled: false` or package filters suppress checks but do not remove the service or companion registrations; Session's always-on validation and freezing are separate.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

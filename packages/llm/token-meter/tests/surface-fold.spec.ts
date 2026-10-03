@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SurfaceEvent } from '@deepseek-ai/dsh-session'
 import { estimateMessage } from '../src/estimate.ts'
 import { foldSurfaceTokens } from '../src/surface-fold.ts'
 import type { TokenSurfaceNode } from '../src/types.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'test': { kind: 'test' } & ContextFormed
+  }
+}
 
 function append(seq: number, text: string): SurfaceEvent {
   return {
@@ -26,7 +33,7 @@ function replace(seq: number, start: SessionSeq, end: SessionSeq, text = 'summar
     time: 0,
     data: createUserMessage({
       content: [{ type: 'text', text }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     }),
     surfaceOp: { op: 'replace', startSeq: start, endSeq: end },
     sourceEventSeqs: [start, end],

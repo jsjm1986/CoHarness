@@ -8,9 +8,16 @@ import GoalService, { GoalId } from '@deepseek-ai/dsh-goal'
 import type { GoalView } from '@deepseek-ai/dsh-goal'
 import { createUserMessage, LlmAdapter, LlmError  } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import * as goalSession from '../src/index.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'test': { kind: 'test' } & ContextFormed
+  }
+}
 
 type ScriptEntry = StreamChunk[] | Error | 'hang' | ((options: GenerateOptions) => StreamChunk[])
 
@@ -423,7 +430,7 @@ describe('same-session goal driving', () => {
     const test = await harness([textResponse('side contexts'), textResponse('revised goal')])
     const claimedContext = createUserMessage({
       content: [{ type: 'text', text: 'claimed context to restore' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     })
     const roundZeroContext = createUserMessage({
       content: [{ type: 'text', text: 'obsolete goal context' }],
@@ -431,11 +438,11 @@ describe('same-session goal driving', () => {
     })
     const queuedStepContext = createUserMessage({
       content: [{ type: 'text', text: 'context already queued for the next step' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     })
     const queuedTurnContext = createUserMessage({
       content: [{ type: 'text', text: 'context already queued for the next turn' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     })
     let staged = false
     const stopInserted = onInboxMessage(test.ctx, test.agent, (message) => {
@@ -535,6 +542,27 @@ describe('same-session goal driving', () => {
 
     expect(test.ctx.goals.get(test.agent)).toBeUndefined()
     expect(test.adapter.requests).toHaveLength(0)
+  })
+
+  it('retains an unfinished checkpoint during driver unload and releases it after the task settles', async () => {
+    const test = await harness([])
+    const entered = Promise.withResolvers<undefined>(), release = Promise.withResolvers<undefined>()
+    test.ctx.on('session/flush', async () => {
+      entered.resolve(undefined)
+      await release.promise
+    })
+    test.ctx.goals.create(test.agent, { objective: 'finish admitted persistence before teardown' })
+    await entered.promise
+    const disposal = Promise.resolve(test.driver.dispose())
+    try {
+      await waitForGoal(test.ctx, test.agent, goal => goal?.activation === 'disarmed')
+      expect(() => { using _reservation = test.ctx.agents.reserveRemoval([test.agent.id]) })
+        .toThrow('pending lifecycle operation')
+    } finally { release.resolve(undefined) }
+    await disposal
+    expect(test.adapter.requests).toHaveLength(0)
+    expect(test.ctx.goals.get(test.agent)).toMatchObject({ phase: 'active', activation: 'disarmed', roundsStarted: 0 })
+    using _reservation = test.ctx.agents.reserveRemoval([test.agent.id])
   })
 
   it('settles a goal round from its successful retry turn, not the failed original', async () => {
@@ -711,6 +739,23 @@ describe('same-session goal driving', () => {
 
     expect(goal?.phase).toBe('active')
     expect(test.adapter.requests).toHaveLength(0)
+  })
+
+  it('disarms a drive refused by permanent removal without repeatedly retrying admission', async () => {
+    const test = await harness([])
+    const admissions = vi.spyOn(test.ctx.agents, 'reserveUse')
+    const flushes = vi.fn()
+    test.ctx.on('session/flush', flushes)
+    {
+      using _reservation = test.ctx.agents.reserveRemoval([test.agent.id])
+      test.ctx.goals.create(test.agent, { objective: 'do not enter reserved removal' })
+      await waitForGoal(test.ctx, test.agent, goal => goal?.activation === 'disarmed')
+      expect(admissions).toHaveBeenCalledOnce()
+      expect(flushes).not.toHaveBeenCalled()
+      expect(test.adapter.requests).toHaveLength(0)
+    }
+    expect(test.ctx.goals.get(test.agent)).toMatchObject({ phase: 'active', activation: 'disarmed', roundsStarted: 0 })
+    using _reservation = test.ctx.agents.reserveRemoval([test.agent.id])
   })
 
   it('fails an initial pre-step read closed even when the first disarm attempt throws', async () => {

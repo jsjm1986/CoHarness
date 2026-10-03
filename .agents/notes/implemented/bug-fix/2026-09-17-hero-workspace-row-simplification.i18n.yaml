@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-hero-workspace-row-simplification.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-hero-workspace-row-simplification.md
-2026-09-17-hero-workspace-row-simplification.md: a688b66c675cdc904d69ee4c75ba0c15fe0d27cf
-2026-09-17-hero-workspace-row-simplification.zh.md: 95d1c56f679a90af046ddaf64418bbf5853d2200
+/agent-note-hero-workspace-row-keeps-only-the-workspace-selector:
+  en: eb3d377a7e549a65
+  zh: 27ed1136b0f28789
+/agent-note-hero-workspace-row-keeps-only-the-workspace-selector/problem:
+  en: 69a680e108a127b7
+  zh: 24059c3b65c42ff3
+/agent-note-hero-workspace-row-keeps-only-the-workspace-selector/decision:
+  en: a0d68466d9f4add9
+  zh: dff9030d932fca07
+/agent-note-hero-workspace-row-keeps-only-the-workspace-selector/alternatives-considered:
+  en: ac1983725dd2cec0
+  zh: 46142d894e76508b
+/agent-note-hero-workspace-row-keeps-only-the-workspace-selector/consequences:
+  en: 7a75a7df57c68422
+  zh: 327b23f5dd891c02
+/agent-note-hero-workspace-row-keeps-only-the-workspace-selector/verification:
+  en: d754a27a6b24c116
+  zh: ed364c4abe1f3e9e
+/agent-note-hero-workspace-row-keeps-only-the-workspace-selector/related:
+  en: 7251906272a1c7dd
+  zh: f4255536b2ef81b4

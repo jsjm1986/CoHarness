@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-04-websocket-downlink-carrier.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-04-websocket-downlink-carrier.md
-2026-08-04-websocket-downlink-carrier.md: f59e2c50b948fb8c93d698668571dff66a025cb5
-2026-08-04-websocket-downlink-carrier.zh.md: e261626de7700b8bd135b731d1b2eff612079250
+/agent-note-websocket-carrier-for-browser-downlinks:
+  en: 046870d865e35244
+  zh: 1eb4ba8c53ccede6
+/agent-note-websocket-carrier-for-browser-downlinks/problem:
+  en: a385def5f1e4b9db
+  zh: 69f8ef7ce6112154
+/agent-note-websocket-carrier-for-browser-downlinks/decision:
+  en: 240db651954235f7
+  zh: 424aec92a61fd73e
+/agent-note-websocket-carrier-for-browser-downlinks/upgrade-and-lifecycle-boundaries:
+  en: f0fa6eb6836ba213
+  zh: ee3eb84292c479d6
+/agent-note-websocket-carrier-for-browser-downlinks/verification:
+  en: 6e75aef8602cb826
+  zh: 7306181da4cc277e
+/agent-note-websocket-carrier-for-browser-downlinks/alternatives-considered:
+  en: 10cc02022e989928
+  zh: 0d29f780e246fac3
+/agent-note-websocket-carrier-for-browser-downlinks/consequences:
+  en: 31008624e72b1174
+  zh: 58c4542ed37ba8e5

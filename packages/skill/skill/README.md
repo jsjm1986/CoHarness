@@ -1,3 +1,8 @@
+---
+description: "Agent skill provider registry for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-skill
 
 English | [中文](README.zh.md)
@@ -12,6 +17,20 @@ The registry is host+per-scope layered over [`@deepseek-ai/dsh-scope`](../../cor
 
 Use this package to give agents and users one catalog of reusable, task-specific instructions collected from local directories, embedded plugin data, or remote services. It resolves duplicate names predictably, validates entries, tolerates unavailable sources without discarding usable results, and loads the selected skill's full instructions on demand. Mount it when a composition needs skills from multiple or non-filesystem sources; pair it with `dsh-skill-filesystem` for local discovery and `dsh-tool-skill` for model access, because it includes no skill content itself.
 
+## Table of Contents
+
+- [Service: `SkillRegistry` (ctx key: `skills`)](#service-skillregistry-ctx-key-skills)
+- [Provider Contract](#provider-contract)
+- [Runtime Skills](#runtime-skills)
+- [Consumer boundary](#consumer-boundary)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="service-skillregistry-ctx-key-skills"></a>
 ## Service: `SkillRegistry` (ctx key: `skills`)
 
 ### Public API
@@ -49,6 +68,7 @@ Use this package to give agents and users one catalog of reusable, task-specific
 
 `isModelInvocable(skill)` and `isUserInvocable(skill)` read the matching positive field directly. `ctx.skills.get()` remains the trusted, policy-neutral loading primitive, so every user- or model-facing consumer must enforce the predicate that matches its surface before exposing or loading a skill.
 
+<a id="provider-contract"></a>
 ## Provider Contract
 
 A provider factory runs synchronously and receives one registration-scoped control. `control.signal` aborts when registration fails or is disposed; `control.invalidate()` clears completed catalogs only while that exact registration remains active, so late callbacks cannot affect a replacement with the same name. Immutable providers may ignore the control. Remote setup, authentication, and discovery belong in the provider's awaited `list(options)` call. An array return is shorthand for complete discovery; a provider that collected usable candidates but could not establish an authoritative observation returns `{ candidates, complete: false }`. Provider objects, lookup options, candidates, and definitions are borrowed readonly rather than cloned or rebound. Providers should honor `options.signal`; the registry also stops awaiting uncooperative discovery or loading after cancellation.
@@ -59,18 +79,22 @@ Contract violations fail fast. A rejected provider `list()` is treated as a tran
 
 Definitions remain progressively loaded. `get()` asks the winning provider for the body on every call rather than caching it in this registry. If the returned definition has a different name from the selected candidate, the stale selection is rejected and the registry internally invalidates that exact provider so the next snapshot rediscovers its catalog.
 
+<a id="runtime-skills"></a>
 ## Runtime Skills
 
 `ctx.skills.register(...)` is a convenience for embedded runtime skills. Runtime skills use rank `250`: project providers can override them, while they override the shipped local provider's custom and user roots. Runtime definitions and nested resource metadata are borrowed readonly; the service materializes one top-level definition to supply omitted invocation and provider defaults. Registration is first-wins within runtime contributions, so a duplicate contribution cannot remove the active one through its disposer.
 
+<a id="consumer-boundary"></a>
 ## Consumer boundary
 
 The registry does not render model guidance or register model-facing tools. [`@deepseek-ai/dsh-tool-skill`](../tool-skill) consumes `ctx.skills` to provide durable session catalogs and the `skill` tool, so providers remain independent of model-facing behavior.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The registry is a contribution table over provider registrations with effect-scoped disposal; it owns no skill content.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through `dsh-tool-skill`, which renders provider summaries into durable initial or replacement catalog messages and loaded instruction bodies into retained tool results.
@@ -85,3 +109,13 @@ No direct prompt effect. The named consumer owns the durable initial catalog and
 - **Providers are queried sequentially** — one slow cooperative provider delays every provider registered after it; cancellation stops the caller's wait but cannot terminate work an uncooperative provider keeps running.
 - **Incomplete observations are not retained** — rejected providers are omitted and explicitly supplied candidates remain available only to the current lookup; the registry owns neither a last-good catalog nor per-provider diagnostics.
 - **Duplicate resolution is first-wins** — later lower-priority candidates within a layer are logged and hidden, and a nearer layer shadows a farther one silently; there is no API to inspect all shadowed definitions.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

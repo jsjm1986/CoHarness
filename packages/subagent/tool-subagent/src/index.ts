@@ -549,7 +549,7 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
             const id = jobs.start({
               kind: 'subagent',
               label: args.description,
-              owner: parent,
+              owner: parent.id,
               run: () => {
                 const controller = new AbortController()
                 const start = runtimeCtx.subagents.start(config.provider, { ...request, signal: controller.signal })
@@ -558,7 +558,7 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
                     controller.abort(reason ?? 'background subagent task killed')
                   },
                   done: settleStart(start, controller.signal),
-                  // No readOutput: the child session owns intermediate detail.
+                  // No output sources: the child session owns intermediate detail.
                 }
               },
             })

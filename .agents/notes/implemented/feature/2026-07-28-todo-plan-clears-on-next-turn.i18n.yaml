@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-todo-plan-clears-on-next-turn.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-28-todo-plan-clears-on-next-turn.md
-2026-07-28-todo-plan-clears-on-next-turn.md: 55a0d4f307bef5cd04add0baae220ea763772ee9
-2026-07-28-todo-plan-clears-on-next-turn.zh.md: c5fb809694c680951e1f2238d5596e771e8bcec8
+/agent-note-todo-plan-strip-clears-on-the-next-turn:
+  en: 983930903f28deed
+  zh: 262e6a51e63c611a
+/agent-note-todo-plan-strip-clears-on-the-next-turn/problem:
+  en: d4718dee49bcb3d6
+  zh: bd7640932c1eddac
+/agent-note-todo-plan-strip-clears-on-the-next-turn/decision:
+  en: 15779f9ef9507067
+  zh: f654306e276f20f3
+/agent-note-todo-plan-strip-clears-on-the-next-turn/decision/host-projection-web:
+  en: e63e6c79abc2cafd
+  zh: 6185cb66309badb4
+/agent-note-todo-plan-strip-clears-on-the-next-turn/decision/tui-live-path:
+  en: fcb7341b1dbba833
+  zh: 950848e32ce5869f
+/agent-note-todo-plan-strip-clears-on-the-next-turn/alternatives-considered:
+  en: cffaec185943c9ae
+  zh: 6e97e637e1641ffa
+/agent-note-todo-plan-strip-clears-on-the-next-turn/consequences:
+  en: fe2e11f7a5303205
+  zh: a7530c71cd3e7084

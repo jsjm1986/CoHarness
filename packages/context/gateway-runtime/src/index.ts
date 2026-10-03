@@ -9,7 +9,11 @@ import { readFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Branded } from '@deepseek-ai/dsh-brand'
-import type { ConnectionHttpHandler, ConnectionRequestBoundary } from '@deepseek-ai/dsh-client-connection'
+import type {
+  ConnectionAuthenticationRequest,
+  ConnectionHttpHandler,
+  ConnectionRequestBoundary,
+} from '@deepseek-ai/dsh-client-connection'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-execution-authority'
 
@@ -256,7 +260,11 @@ function proofEquals(expected: string, actual: unknown): boolean {
   return left.length === right.length && timingSafeEqual(left, right)
 }
 
-function headerString(headers: Record<string, string | string[] | undefined>, name: string): string | undefined {
+function headerString(
+  headers: Headers | Readonly<Record<string, string | readonly string[] | undefined>>,
+  name: string,
+): string | undefined {
+  if (headers instanceof Headers) return headers.get(name) ?? undefined
   const value = headers[name]
   return typeof value === 'string' ? value : undefined
 }
@@ -435,6 +443,28 @@ export class GatewayRuntime extends Service {
       ctx.root.effect(() => ctx.root.provide('executionAuthorityRequired', true),
         'gateway-runtime: managed application identity')
     }
+    // Connection consults this provider before its token exchange and cookie;
+    // a gateway-launched runtime admits only verified principal assertions, so
+    // every absent or invalid answer is a denial. The `connection/request`
+    // waterfall stays the sole owner of AsyncLocalStorage propagation.
+    ctx.on('connection/authenticate', (request: ConnectionAuthenticationRequest): 'allow' | 'deny' => {
+      const header = headerString(request.headers, GATEWAY_PRINCIPAL_HEADER)
+      if (header === undefined) return 'deny'
+      let claims: GatewayPrincipalClaims
+      try {
+        claims = verifyGatewayPrincipal(header, this.credential, this.publicKey)
+      } catch {
+        // Refuse invalid assertions without quoting any of their bytes.
+        return 'deny'
+      }
+      const pathname = new URL(request.url ?? '/', 'http://dsh.invalid').pathname
+      try {
+        this.assertPurposePermitted(claims, request.kind, request.method, pathname)
+      } catch {
+        return 'deny'
+      }
+      return 'allow'
+    })
     ctx.on('connection/request', (request: ConnectionRequestBoundary, next) => {
       const requestMeta = request as ConnectionRequestBoundary & { method?: string; pathname?: string }
       const header = request.headers[GATEWAY_PRINCIPAL_HEADER]
@@ -453,18 +483,7 @@ export class GatewayRuntime extends Service {
         assertion: header,
         claims: verifyGatewayPrincipal(header, this.credential, this.publicKey),
       }
-      if (principal.claims.purpose === 'terminal-admin' && (request.kind !== 'http' || requestMeta.method !== 'POST'
-        || (requestMeta.pathname !== '/api/terminal/adminList' && requestMeta.pathname !== '/api/terminal/adminClose'))) {
-        throw new Error('Terminal management assertions permit only inventory and termination.')
-      }
-      if (principal.claims.purpose === 'plugin-admin' && (request.kind !== 'http' || requestMeta.method !== 'POST'
-        || !PLUGIN_MANAGEMENT_PATHS.has(requestMeta.pathname ?? ''))) {
-        throw new Error('Plugin management assertions permit only profile management HTTP endpoints.')
-      }
-      if (principal.claims.purpose === 'webhook-dispatch' && (request.kind !== 'http' || requestMeta.method !== 'POST'
-        || requestMeta.pathname !== GATEWAY_WEBHOOK_DISPATCH_PATH)) {
-        throw new Error('Webhook dispatch assertions permit only the managed dispatch endpoint.')
-      }
+      this.assertPurposePermitted(principal.claims, request.kind, requestMeta.method, requestMeta.pathname)
       const requestScope = { principal, interactive: request.kind === 'http' }
       return this.requests.run(requestScope, async () => {
         try { await next() } finally { requestScope.interactive = false }
@@ -485,6 +504,39 @@ export class GatewayRuntime extends Service {
         ),
         'gateway-runtime: readiness endpoint',
       )
+    }
+  }
+
+  /**
+   * Bound a capability-purpose assertion to its declared HTTP operations.
+   * The three purposes with declared endpoints accept only those POST routes;
+   * every other defined purpose is an HTTP-only operation that never serves
+   * the index or opens an event stream.
+   * @param claims - verified assertion claims.
+   * @param kind - carrier the assertion arrives on: index, HTTP, or upgrade.
+   * @param method - request method, when the carrier reports one.
+   * @param pathname - request pathname, when the carrier reports one.
+   */
+  private assertPurposePermitted(
+    claims: GatewayPrincipalClaims,
+    kind: 'index' | 'http' | 'upgrade',
+    method: string | undefined,
+    pathname: string | undefined,
+  ): void {
+    if (claims.purpose === 'terminal-admin' && (method !== 'POST' || kind !== 'http'
+      || (pathname !== '/api/terminal/adminList' && pathname !== '/api/terminal/adminClose'))) {
+      throw new Error('Terminal management assertions permit only inventory and termination.')
+    }
+    if (claims.purpose === 'plugin-admin' && (method !== 'POST' || kind !== 'http'
+      || !PLUGIN_MANAGEMENT_PATHS.has(pathname ?? ''))) {
+      throw new Error('Plugin management assertions permit only profile management HTTP endpoints.')
+    }
+    if (claims.purpose === 'webhook-dispatch' && (method !== 'POST' || kind !== 'http'
+      || pathname !== GATEWAY_WEBHOOK_DISPATCH_PATH)) {
+      throw new Error('Webhook dispatch assertions permit only the managed dispatch endpoint.')
+    }
+    if (claims.purpose !== undefined && kind !== 'http') {
+      throw new Error('Purpose assertions permit only their declared HTTP operations.')
     }
   }
 

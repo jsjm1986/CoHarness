@@ -106,6 +106,24 @@ describe('registration', () => {
     })).toThrow(/project write paths must contain non-empty safe paths/)
   })
 
+  it('retains the registrant label in descriptors and omits it when undeclared', async () => {
+    const { ctx } = await boot()
+    ctx.settings.register(settingsNamespace('labelled'), ThemeSchema, {
+      label: { en: 'Theme', zh: '主题' },
+    })
+    ctx.settings.register(settingsNamespace('unlabelled'), ThemeSchema)
+    const descriptors = ctx.settings.describe()
+    expect(descriptors.find(entry => String(entry.ns) === 'labelled')).toMatchObject({
+      label: { en: 'Theme', zh: '主题' },
+    })
+    expect(descriptors.find(entry => String(entry.ns) === 'unlabelled')!.label).toBeUndefined()
+    expect(descriptors.find(entry => String(entry.ns) === 'labelled')!.ns).toBe('labelled')
+    const redacted = ctx.settings.describe({ redactSecrets: true })
+    expect(redacted.find(entry => String(entry.ns) === 'labelled')).toMatchObject({
+      label: { en: 'Theme', zh: '主题' },
+    })
+  })
+
   it('rejects a field allowlist without manager writes, an empty one, and a duplicated path', async () => {
     const { ctx } = await boot()
     expect(() => ctx.settings.register(settingsNamespace('never-writable'), ThemeSchema, {
@@ -919,6 +937,20 @@ describe('installSettingsSection', () => {
       expect(changes).toBe(3)
     })
     expect(current()).toEqual({ theme: 'entry' })
+  })
+
+  it('carries the section label into the namespace descriptor', async () => {
+    const ctx = new Context()
+    installSettingsSection(ctx, settingsNamespace('helper-ns'), HelperSchema, { theme: 'entry' }, {
+      label: { en: 'Helper', zh: '助手' },
+      setSource: () => {},
+      onChange: () => {},
+    })
+    const fiber = ctx.plugin(MemorySettings, {})
+    await fiber
+    expect(ctx.settings.describe().find(entry => String(entry.ns) === 'helper-ns'))
+      .toMatchObject({ label: { en: 'Helper', zh: '助手' } })
+    await fiber.dispose()
   })
 
   it('stays silent when the consumer itself unloads', async () => {

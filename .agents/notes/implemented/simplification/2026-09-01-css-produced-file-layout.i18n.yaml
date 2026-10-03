@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-01-css-produced-file-layout.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-09-01-css-produced-file-layout.md
-2026-09-01-css-produced-file-layout.md: fce7d70b21b05db8970fb249927c36f87abc6b23
-2026-09-01-css-produced-file-layout.zh.md: bc8ad941dbe33af3acc629f0da50e79c4a0954da
+/agent-note-replace-produced-file-probes-with-css-width-bands:
+  en: 9d66ea466b949c20
+  zh: 66e70bb5405f6435
+/agent-note-replace-produced-file-probes-with-css-width-bands/problem:
+  en: 38df0339d46099a3
+  zh: f7db6c60b3c36a5f
+/agent-note-replace-produced-file-probes-with-css-width-bands/decision:
+  en: ac61e92ab28c6038
+  zh: 19ab559ea8ff46f2
+/agent-note-replace-produced-file-probes-with-css-width-bands/alternatives-considered:
+  en: ff6de5c9d27f7351
+  zh: 8306340df3e04a78
+/agent-note-replace-produced-file-probes-with-css-width-bands/consequences:
+  en: a8ce02f927c95add
+  zh: 430424683341a6f9

@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-18-session-independent-automation-triggers.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-09-18-session-independent-automation-triggers.md
-2026-09-18-session-independent-automation-triggers.md: 8b54bcf8bb6a6f9892c2ca3a2b825082680021f1
-2026-09-18-session-independent-automation-triggers.zh.md: 9dd1d1b32a50cb1cfcfd2fd89994d3a2acba5758
+/agent-note-session-independent-durable-automation-triggers:
+  en: 9959fb43045d312f
+  zh: 3e4c7954fff6e27d
+/agent-note-session-independent-durable-automation-triggers/problem:
+  en: d88213b3c662bdec
+  zh: f4beab87da64949b
+/agent-note-session-independent-durable-automation-triggers/proposal:
+  en: 78fd9b639844693b
+  zh: 1a71cf7a45ab6d23
+/agent-note-session-independent-durable-automation-triggers/trigger-records-are-not-session-events:
+  en: 26b8269faf1beb6e
+  zh: 7446554baa23ddba
+/agent-note-session-independent-durable-automation-triggers/alternatives-considered:
+  en: d4ec7031af06ba70
+  zh: 6fee9d7b991dd95d
+/agent-note-session-independent-durable-automation-triggers/acceptance-criteria:
+  en: 30d420ec72995342
+  zh: 9a956c2214f2fcd5
+/agent-note-session-independent-durable-automation-triggers/risks:
+  en: cfceea30cceb8943
+  zh: 7cc1bf19642993d3

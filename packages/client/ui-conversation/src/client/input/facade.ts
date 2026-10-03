@@ -89,6 +89,15 @@ export class SessionInputShell implements SessionInput {
   /** The public provide-channel action face (one stable identity per session). */
   readonly actions: InputActions = {
     setDraft: (text) => { this.setDraft(text) },
+    captureInsertion: () => {
+      const snapshot = this.snapshot
+      const caret = this.lastCaret ?? snapshot.draft.length
+      return { start: caret, end: caret, draftRev: snapshot.draftRev }
+    },
+    insertText: (text, span) => {
+      if (this.snapshot.phase === 'adjudicating' || this.snapshot.phase === 'submitting' || this.disposed) return false
+      return this.insertText(text, span)
+    },
     addImages: ids => this.addImages(ids),
     removeImage: (id) => { this.removeImage(id) },
     pruneImages: (ids) => { this.pruneImages(ids) },
@@ -109,6 +118,8 @@ export class SessionInputShell implements SessionInput {
   private attachmentSendInFlight = false
   private attachmentSendController: AbortController | undefined
   private disposed = false
+  /** Last shell-reported caret (track()); undefined until the composer binds. */
+  private lastCaret: number | undefined
   /** Queue projection subscription owned by this shell's lifetime. */
   private queueUnsubscribe: (() => void) | undefined
   /** Draft persistence mirror (chat store write; receives the clipboard projection, never display-only ranges). */
@@ -128,6 +139,7 @@ export class SessionInputShell implements SessionInput {
    * (narrows the machine's occurrence math; absent → diff scan).
    */
   setDraft(text: string, editRange?: EditRange): void {
+    this.lastCaret = text.length
     this.run(this.core.dispatch({ type: 'draft-changed', draft: text, ...(editRange !== undefined ? { editRange } : {}) }))
   }
 
@@ -302,6 +314,7 @@ export class SessionInputShell implements SessionInput {
    * @param caret - caret position in draft coordinates.
    */
   track(draft: string, caret: number): void {
+    this.lastCaret = caret
     this.deps.inputTriggers?.()?.track(draft, caret, { tier: guardOf(this.snapshot.phase) }, this.snapshot.draftRev)
   }
 
@@ -423,6 +436,7 @@ export class SessionInputShell implements SessionInput {
     if (span.draftRev !== snapshot.draftRev) return false
     const draft = snapshot.draft
     this.setDraft(draft.slice(0, span.start) + text + draft.slice(span.end))
+    this.lastCaret = span.start + text.length
     if (keepCompleting) {
       // Machine-driven draft replacement never passes through onChange, so
       // re-track at the caret inside the still-open token (see space()).

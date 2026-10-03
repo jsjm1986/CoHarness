@@ -12,7 +12,7 @@ function harness() {
       id: id(value), displayTitle: value, running: false, blank: false, updatedAt: 0,
     }])),
     archivedById: {},
-    current: id('a'), phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+    current: id('a'), phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   })
   const opened: SessionId[] = []
   const staged: SessionId[][] = []
@@ -261,4 +261,109 @@ describe('ConversationViewportController', () => {
     expect(viewport.snapshot.getSnapshot().paneIds).toEqual([])
   })
 
+})
+
+it('migrates only catalog-proven legacy identities and persists same-ID panes separately', async () => {
+  const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
+  const h = harness()
+  const personal = clientSessionKey({ kind: 'personal' }, id('same'))
+  const project = clientSessionKey({ kind: 'project', projectId: 7 }, id('same'))
+  const unique = clientSessionKey({ kind: 'project', projectId: 8 }, id('unique'))
+  h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+  h.list.set({ ...h.list.getSnapshot(), ids: [personal, project, unique], current: personal,
+    byId: Object.fromEntries([personal, project, unique]
+      .map(key => [key, { id: key, displayTitle: key, running: false, blank: false, updatedAt: 1 }])),
+  })
+  localStorage.setItem('dsh.conversation.workbenches.v2.account%3A1', JSON.stringify({ version: 2, mode: 'workbench', activeId: 'default', workbenches: [
+    { id: 'default', name: 'Existing', paneIds: ['same', 'unique'], activePaneId: 'same', paneRatios: [0.3, 0.7], updatedAt: 1 },
+  ] }))
+  const view = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+  try {
+    view.setPersistenceScope('account:1')
+    view.reconcileSessionKeys(value => value === id('unique') ? unique : undefined)
+    expect(view.snapshot.getSnapshot()).toMatchObject({ paneIds: [unique], activePaneId: unique, paneRatios: [1] })
+    view.markCatalogReady()
+    expect(view.add(personal)).toEqual({ ok: true })
+    expect(view.add(project)).toEqual({ ok: true })
+    expect(view.snapshot.getSnapshot().paneIds).toEqual([unique, personal, project])
+    const saved = JSON.parse(localStorage.getItem('dsh.conversation.workbenches.v3.account%3A1')!) as { version: number; workbenches: { paneIds: string[] }[] }
+    expect(saved.version).toBe(3)
+    expect(saved.workbenches[0]?.paneIds).toEqual([unique, personal, project])
+    view.remove(project)
+    expect(view.snapshot.getSnapshot().paneIds).toContain(personal)
+  } finally { view.dispose() }
+})
+
+it('uses the saved v2 encoding for opaque IDs and never stages a lexical v3 lookalike before catalog verification', async () => {
+  const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
+  const h = harness()
+  const lookalike = clientSessionKey({ kind: 'project', projectId: 7 }, id('other'))
+  const correct = clientSessionKey({ kind: 'personal' }, lookalike)
+  h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+  h.list.set({ ...h.list.getSnapshot(), phase: 'pending', ids: [lookalike, correct], current: undefined,
+    byId: Object.fromEntries([lookalike, correct].map(key => [key, {
+      id: key, displayTitle: key, running: false, blank: false, updatedAt: 1,
+    }])),
+  })
+  const storageKey = 'dsh.conversation.workbenches.v2.local'
+  const saved = JSON.stringify({ version: 2, mode: 'workbench', activeId: 'default', workbenches: [
+    { id: 'default', name: 'Opaque ID', paneIds: [lookalike], activePaneId: lookalike, paneRatios: [1], updatedAt: 1 },
+  ] })
+  localStorage.setItem(storageKey, saved)
+  const view = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+  try {
+    view.setPersistenceScope('local')
+    view.setEnabled(true)
+    expect(view.sessionKeyVersion()).toBe(2)
+    expect(view.snapshot.getSnapshot().paneIds).toEqual([])
+    expect(h.opened).toEqual([])
+    expect(h.staged.flat()).not.toContain(lookalike)
+    expect(localStorage.getItem('dsh.conversation.workbenches.v3.local')).toBeNull()
+    expect(localStorage.getItem(storageKey)).toBe(saved)
+    view.markCatalogReady()
+    expect(view.currentWorkbench().paneIds).toEqual([lookalike])
+    h.list.set({ ...h.list.getSnapshot(), phase: 'ready' })
+    expect(view.sessionKeyVersion()).toBe(3)
+    expect(view.snapshot.getSnapshot().paneIds).toEqual([correct])
+    expect(h.staged.at(-1)).toEqual([correct])
+    expect(h.opened).not.toContain(lookalike)
+    expect(JSON.parse(localStorage.getItem('dsh.conversation.workbenches.v3.local')!)).toMatchObject({
+      version: 3, workbenches: [{ paneIds: [correct] }],
+    })
+  } finally { view.dispose() }
+})
+
+it('preserves hidden layout identities when unused runtimes unload and verifies them again before re-entry', async () => {
+  const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
+  const h = harness()
+  const personal = clientSessionKey({ kind: 'personal' }, id('same'))
+  const project = clientSessionKey({ kind: 'project', projectId: 7 }, id('same'))
+  h.sessions.keyFor = (value, target = { kind: 'personal' }) => clientSessionKey(target, value)
+  const byId = Object.fromEntries([personal, project].map(key => [key, {
+    id: key, displayTitle: key, running: false, blank: false, updatedAt: 1,
+  }]))
+  h.list.set({ ...h.list.getSnapshot(), ids: [personal, project], byId, current: personal })
+  const view = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+  try {
+    view.setPersistenceScope('account:1')
+    view.setEnabled(true)
+    view.add(personal)
+    view.add(project)
+    view.markCatalogReady()
+    view.setMode('single')
+    h.list.set({ ...h.list.getSnapshot(), ids: [personal], byId: { [personal]: byId[personal]! }, current: personal })
+    expect(view.currentWorkbench().paneIds).toEqual([personal, project])
+    expect(h.staged.at(-1)).toEqual([])
+    view.setMode('workbench')
+    expect(view.needsCatalogRestore()).toBe(true)
+    expect(view.snapshot.getSnapshot().paneIds).toEqual([personal, project])
+    h.opened.length = 0
+    expect(() => { view.focus(project) }).not.toThrow()
+    expect(h.opened).toEqual([])
+    h.list.set({ ...h.list.getSnapshot(), ids: [personal, project], byId })
+    view.reconcileSessionKeys(value => value)
+    view.markCatalogReady()
+    expect(h.staged.at(-1)).toEqual([personal, project])
+    expect(h.opened.at(-1)).toBe(project)
+  } finally { view.dispose() }
 })

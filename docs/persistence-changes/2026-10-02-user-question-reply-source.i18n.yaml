@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-02-user-question-reply-source.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-02-user-question-reply-source.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-02-user-question-reply-source:
+  en: f3ac08c89dcdf126
+  zh: 37c96c4ae8fd0374
+/2026-10-02-user-question-reply-source/summary:
+  en: c392ecb82210bd80
+  zh: 20f52a7653266d82
+/2026-10-02-user-question-reply-source/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-02-user-question-reply-source/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-02-user-question-reply-source/compatibility:
+  en: fd9d84141d03977e
+  zh: fedc98853ee0ce2b
+/2026-10-02-user-question-reply-source/verification:
+  en: 164a7be337393e74
+  zh: ad9af0fe9fee61be
+/2026-10-02-user-question-reply-source/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

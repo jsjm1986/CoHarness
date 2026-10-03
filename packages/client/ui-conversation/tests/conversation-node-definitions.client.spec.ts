@@ -117,8 +117,10 @@ function assistantMessage(id: string, text: string) {
 function toolResult(callId: string, text: string) {
   return {
     id: `result-${callId}`,
-    role: 'user',
+    role: 'tool',
     source: { kind: 'tool', callId },
+    toolCallId: callId,
+    isError: false,
     content: [{
       type: 'tool-result',
       toolCallId: callId,
@@ -193,9 +195,13 @@ describe('built-in conversation node Definitions', () => {
     const empty = assembler([
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
-      at(3, 'turn/end', { turn: 1, reason: { kind: 'aborted' } }),
+      at(3, 'turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'legacy' } } }),
     ])
-    expect(node(snapshot(empty), 'turn-process')).toBeUndefined()
+    // A closed turn owns a process row even without assistant evidence, so
+    // transcript members it leaves behind still fold under it.
+    expect(node(snapshot(empty), 'turn-process')?.data).toMatchObject({
+      turn: 1, messageCount: 0, toolCallCount: 0, subagentCount: 0, answerAnchorSeq: null,
+    })
 
     const value = assembler([
       at(10, 'turn/start', { turn: 2 }),
@@ -231,7 +237,7 @@ describe('built-in conversation node Definitions', () => {
       at(20, 'turn/start', { turn: 3 }),
       at(21, 'step/start', { turn: 3, step: 1 }),
       at(22, 'tool/call', { turn: 3, step: 1, callId: 'cancelled', name: 'read', arguments: '{}' }),
-      at(23, 'turn/end', { turn: 3, reason: { kind: 'aborted' } }),
+      at(23, 'turn/end', { turn: 3, reason: { kind: 'aborted', reason: { kind: 'legacy' } } }),
     ])
     expect(node(snapshot(interrupted), 'turn-process')?.data).toMatchObject({
       turn: 3,
@@ -416,7 +422,8 @@ describe('built-in conversation node Definitions', () => {
       }, { surfaceOp: 'append' }),
     ])
     const toolOnlySnapshot = snapshot(toolOnlyValue)
-    expect(toolOnlySnapshot.order.map(key => toolOnlySnapshot.nodes.get(key)?.kind)).toEqual(['turn-process'])
+    expect(toolOnlySnapshot.order.map(key => toolOnlySnapshot.nodes.get(key)?.kind)).toEqual(['turn-process', 'tool-call'])
+    expect(node(toolOnlySnapshot, 'tool-call')?.data).toMatchObject({ root: { phase: 'preparing' } })
     expect(node(toolOnlySnapshot, 'assistant-step')?.visibility).toBe('hidden')
     expect(toolOnlySnapshot.legacy.nodes).toMatchObject([{
       kind: 'assistant',
@@ -962,8 +969,7 @@ describe('built-in conversation node Definitions', () => {
       at(13, 'user/message', {
         ...textMessage('manual-checkpoint', 'checkpoint'),
         source: {
-          kind: 'plugin',
-          plugin: 'compact',
+          kind: 'compact-checkpoint',
           compactionId: 'manual-1',
           sourceCommandId: 'command-1',
         },
@@ -987,7 +993,7 @@ describe('built-in conversation node Definitions', () => {
       }),
       at(22, 'user/message', {
         ...textMessage('automatic-checkpoint', 'checkpoint'),
-        source: { kind: 'plugin', plugin: 'compact', compactionId: 'automatic-1' },
+        source: { kind: 'compact-checkpoint', compactionId: 'automatic-1' },
       }, { surfaceOp: { op: 'replace', startSeq: 3, endSeq: 4 } }),
       at(23, 'compaction/end', { compactionId: 'automatic-1', turn: null }),
     ])
@@ -1006,7 +1012,7 @@ describe('built-in conversation node Definitions', () => {
     const value = assembler([
       at(13, 'user/message', {
         ...textMessage('checkpoint', 'checkpoint'),
-        source: { kind: 'plugin', plugin: 'compact', compactionId: 'compact-1' },
+        source: { kind: 'compact-checkpoint', compactionId: 'compact-1' },
       }, { surfaceOp: { op: 'replace', startSeq: 1, endSeq: 8 } }),
     ], true)
     const before = node(snapshot(value), 'compaction')
@@ -1047,7 +1053,7 @@ describe('built-in conversation node Definitions', () => {
       }),
       at(11, 'user/message', {
         ...textMessage('checkpoint-windowed', 'checkpoint'),
-        source: { kind: 'plugin', plugin: 'compact', compactionId: 'compact-windowed' },
+        source: { kind: 'compact-checkpoint', compactionId: 'compact-windowed' },
       }, { surfaceOp: { op: 'replace', startSeq: 1, endSeq: 3 } }),
     ], true)
 
@@ -1121,6 +1127,22 @@ describe('built-in conversation node Definitions', () => {
 
     expect(node(snapshot(value), 'model-retry')).toBeUndefined()
     expect(node(snapshot(value), 'tool-call')).toBeUndefined()
+  })
+
+  it('renders an explicit policy cancellation and preserves its recovery instructions', () => {
+    const reason = 'Access was revoked. Remaining queued input is kept. Send a new message to continue.'
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'hook', reason } } }),
+    ])
+    expect(node(snapshot(value), 'turn-error')?.data).toMatchObject({ message: reason, turn: 1 })
+    const restored = assembler([at(2, 'turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'hook', reason } } })], true)
+    expect(node(snapshot(restored), 'turn-error')?.data).toMatchObject({ message: reason })
+    const stopped = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } }),
+    ])
+    expect(node(snapshot(stopped), 'turn-error')).toBeUndefined()
   })
 
   it('renders the terminal turn error when the loaded tail contains only a later retry attempt', () => {
@@ -1279,8 +1301,7 @@ describe('built-in conversation node Definitions', () => {
       at(21, 'user/message', {
         ...textMessage('manual-checkpoint', 'checkpoint'),
         source: {
-          kind: 'plugin',
-          plugin: 'compact',
+          kind: 'compact-checkpoint',
           compactionId: 'manual-1',
           sourceCommandId: 'command-1',
         },

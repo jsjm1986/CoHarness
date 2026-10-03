@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for session-format-status.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/session-format-status.md
-session-format-status.md: 776e4adcba7157ae03ff7e13ddc9f78196f0ea3a
-session-format-status.zh.md: b38b39705e12beeba0f697f29c6a3c2eaa676693
+/session-format-version-and-release-status:
+  en: 91b0700056e51bc2
+  zh: acf848640296be3a
+/session-format-version-and-release-status/summary:
+  en: 9264a5fd32e996c8
+  zh: 536e648f975991ed
+/session-format-version-and-release-status/table-of-contents:
+  en: 7a59e937ff8ad761
+  zh: 0e7f19f81ecd9fad
+/session-format-version-and-release-status/sources-of-truth:
+  en: f997aa8b9e5d5b12
+  zh: 449866f8901e3efe
+/session-format-version-and-release-status/release-record:
+  en: ee6e54ebc2b6dd37
+  zh: 928343edfd3fb943
+/session-format-version-and-release-status/updating-the-record:
+  en: 7cb0f4c6cb54442b
+  zh: 2a4eec2cfa84e6f7
+/session-format-version-and-release-status/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

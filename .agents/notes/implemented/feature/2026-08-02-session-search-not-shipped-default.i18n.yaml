@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-02-session-search-not-shipped-default.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-02-session-search-not-shipped-default.md
-2026-08-02-session-search-not-shipped-default.md: 60d1f424d5a9029a00b3f195d1f6e6baf2790d1e
-2026-08-02-session-search-not-shipped-default.zh.md: 47c4b28c23e40ee495f7dcebf0225d145ec90f78
+/agent-note-session-search-tools-are-not-a-shipped-default:
+  en: faef78dea1080219
+  zh: a0fa98fa04e641bc
+/agent-note-session-search-tools-are-not-a-shipped-default/problem:
+  en: fc97da81ad0e989d
+  zh: 37af8df7f5b16139
+/agent-note-session-search-tools-are-not-a-shipped-default/decision:
+  en: 808e8af446f5366d
+  zh: 56920dd397242667
+/agent-note-session-search-tools-are-not-a-shipped-default/alternatives-considered:
+  en: b422f280b0a5813d
+  zh: 07943e1cd6694609
+/agent-note-session-search-tools-are-not-a-shipped-default/consequences:
+  en: 3fc5c17b060da4d7
+  zh: cec6acea9c7cf0e3

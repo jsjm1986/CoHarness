@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-17-filesystem-capability-seam.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-17-filesystem-capability-seam.md
-2026-06-17-filesystem-capability-seam.md: 6265aebf5e7ffdd4ec4dc0083aa55adb34ee78a1
-2026-06-17-filesystem-capability-seam.zh.md: f0f1cb132fe06ebf669f0310f0066f4fdd36ad0b
+/agent-note-filesystem-capability-seam-ctx-fs-local-backend-and-model-facing-filesystem-tools:
+  en: 04b6710a7aec00c1
+  zh: ee50bcf8cc55758c
+/agent-note-filesystem-capability-seam-ctx-fs-local-backend-and-model-facing-filesystem-tools/problem:
+  en: 2595abeff9bb54ad
+  zh: a4530e8e55045482
+/agent-note-filesystem-capability-seam-ctx-fs-local-backend-and-model-facing-filesystem-tools/decision:
+  en: a6afae4570a0ba1a
+  zh: 3db56de7e6afada1
+/agent-note-filesystem-capability-seam-ctx-fs-local-backend-and-model-facing-filesystem-tools/package-topology:
+  en: 27beba964b3c5c74
+  zh: a53b0c158890bd99
+/agent-note-filesystem-capability-seam-ctx-fs-local-backend-and-model-facing-filesystem-tools/ctx-fs-contract:
+  en: 1f8e7ef4321aefe4
+  zh: 42d6c142fdff19ce
+/agent-note-filesystem-capability-seam-ctx-fs-local-backend-and-model-facing-filesystem-tools/tool-consumer-behavior:
+  en: 3b68677dc98d0487
+  zh: bcbd7e9ad5813337
+/agent-note-filesystem-capability-seam-ctx-fs-local-backend-and-model-facing-filesystem-tools/testing:
+  en: 951e6144dd735ee8
+  zh: 48fc8ce3064436ab
+/agent-note-filesystem-capability-seam-ctx-fs-local-backend-and-model-facing-filesystem-tools/alternatives-considered:
+  en: 534246babea4aeda
+  zh: 7ee6970e69c428cb
+/agent-note-filesystem-capability-seam-ctx-fs-local-backend-and-model-facing-filesystem-tools/consequences:
+  en: 5632bf7257761be2
+  zh: 425eca2d60b969a4

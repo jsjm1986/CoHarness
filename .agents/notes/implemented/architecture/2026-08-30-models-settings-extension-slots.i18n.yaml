@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-30-models-settings-extension-slots.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-30-models-settings-extension-slots.md
-2026-08-30-models-settings-extension-slots.md: 989859e3a32367a369cef355f1f893bf565deed0
-2026-08-30-models-settings-extension-slots.zh.md: 9b5c2588065f17a82729bed84414a8fb11f1932b
+/agent-note-expose-additive-models-settings-extension-slots:
+  en: 371ebeb2e6e14137
+  zh: 8f25e1dd78377c73
+/agent-note-expose-additive-models-settings-extension-slots/problem:
+  en: 01b75dd59a8f04ff
+  zh: 78b4484774f32d4f
+/agent-note-expose-additive-models-settings-extension-slots/decision:
+  en: f71a4330c935d326
+  zh: b3cd9109321398c3
+/agent-note-expose-additive-models-settings-extension-slots/alternatives-considered:
+  en: a24654ae30a914bd
+  zh: db1ce4718ccb728f
+/agent-note-expose-additive-models-settings-extension-slots/consequences:
+  en: c49c46c6c54993e9
+  zh: 51f8c42e293ca452
+/agent-note-expose-additive-models-settings-extension-slots/testing:
+  en: bfd743a015fed159
+  zh: da1c8b06751df370

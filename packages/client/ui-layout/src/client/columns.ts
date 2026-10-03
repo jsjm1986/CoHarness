@@ -11,7 +11,9 @@
  * fixed SIDEBAR_COLLAPSED control rail while closed details resolve to zero
  * width. The SIDEBAR_AUTO_COLLAPSE breakpoint is consumed by AppFrame, which
  * decides the effective sidebar preference before solving; the solver itself
- * stays breakpoint-free.
+ * stays breakpoint-free. Details widths are proportional: the default and
+ * drag ceiling are viewport ratios, so the panel tracks window size instead
+ * of pinning a pixel range that starves wide screens.
  */
 
 import { VIEWPORT_EXPANDED_MIN } from './viewport.ts'
@@ -21,7 +23,7 @@ export interface Columns { sidebar: number; center: number; details: number }
 
 // Contract-frozen geometry: the three-column concession chain's fixed points.
 /** Center column floor; only the final fallback may go below it. */
-export const CENTER_MIN = 640
+export const CENTER_MIN = 400
 /** Sidebar drag clamp floor. */
 export const SIDEBAR_MIN = 264
 /** Sidebar drag clamp ceiling. */
@@ -37,10 +39,12 @@ export const SIDEBAR_COLLAPSED = 56
 export const SIDEBAR_AUTO_COLLAPSE = VIEWPORT_EXPANDED_MIN
 /** Details drag clamp floor. */
 export const DETAILS_MIN = 300
-/** Details drag clamp ceiling. */
-export const DETAILS_MAX = 520
-/** Details width before any user drag. */
-export const DETAILS_DEFAULT = 360
+/** Details drag clamp ceiling as a viewport ratio: the panel may fill most of
+ * the window while a dragged width would still leave the handles and center
+ * reachable. */
+export const DETAILS_MAX_RATIO = 0.7
+/** Details width before any user drag, as a viewport ratio. */
+export const DETAILS_DEFAULT_RATIO = 0.45
 
 /**
  * Clamp a panel width into its contract range.
@@ -66,16 +70,18 @@ export function clampWidth(px: number, min: number, max: number): number {
 export function computeColumns(viewport: number, sidebar: number, details: number): Columns {
   // The sidebar is fixed at its preference (or the rail) — it never concedes.
   const s = sidebar === 0 ? SIDEBAR_COLLAPSED : clampWidth(sidebar, SIDEBAR_MIN, SIDEBAR_MAX)
-  const d0 = details === 0 ? 0 : clampWidth(details, DETAILS_MIN, DETAILS_MAX)
-
-  // Step 1: everything fits at preferred widths.
-  if (s + d0 + CENTER_MIN <= viewport) return { sidebar: s, center: viewport - s - d0, details: d0 }
-
-  // Step 2: shrink details toward its minimum.
-  const d1 = d0 === 0 ? 0 : Math.max(DETAILS_MIN, viewport - s - CENTER_MIN)
-  if (s + d1 + CENTER_MIN <= viewport) return { sidebar: s, center: CENTER_MIN, details: d1 }
-
-  // Step 3: auto-close details (derived — preferences untouched); center
-  // absorbs any remaining deficit (may drop below CENTER_MIN).
-  return { sidebar: s, center: Math.max(0, viewport - s), details: 0 }
+  // Details concedes everything beyond the center floor; the preference
+  // clamps against the viewport ratio before the available-space squeeze.
+  const available = viewport - s - CENTER_MIN
+  const d = details === 0 || available < DETAILS_MIN
+    ? 0
+    : Math.min(
+      available,
+      clampWidth(details, DETAILS_MIN, Math.max(DETAILS_MIN, viewport * DETAILS_MAX_RATIO)),
+    )
+  return {
+    sidebar: s,
+    center: Math.max(0, viewport - s - d),
+    details: d,
+  }
 }

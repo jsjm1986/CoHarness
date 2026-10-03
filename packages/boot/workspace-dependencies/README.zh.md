@@ -7,19 +7,20 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## Summary
+## 概述
 
 本插件提供 `load_workspace_dependencies` 工具：安装由部署提供的 Python、Node.js、pnpm 和文档库载荷，并返回绝对路径。它不操作桌面、不授予 computer-use 权限、不修改 PATH，也不替换 Office 技能和预览转换。
 
-## Table of Contents
+## 目录
 
-- [Configuration](#configuration)
-- [Installation](#installation)
-- [Dev Note](#dev-note)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [配置](#configuration)
+- [安装](#installation)
+- [开发备注](#dev-note)
+- [模型体验](#model-experience)
+- [已知限制与暂缓工作](#known-limitations-and-deferred-work)
 
-## Configuration
+<a id="configuration"></a>
+## 配置
 
 在 `tools` 和文件系统提供者旁挂载本插件。`source` 是内置载荷的绝对目录；`root` 是本运行时拥有的绝对安装目录。两条路径均不由模型控制，且源和目标不能重叠。
 
@@ -32,7 +33,8 @@ kind: "package-reference"
 
 当前 Agent 的文件系统必须能够把宿主路径映射到其执行环境。SSH 等无法映射的执行目标在安装前被拒绝。受管部署保留已有工具授权和沙箱政策；本工具不授予桌面、项目或命令执行权限。
 
-## Installation
+<a id="installation"></a>
+## 安装
 
 使用[固定版本构建器](../../../scripts/workspace-runtime/prepare.ts)构建载荷，再通过[安装后运行时检查](../../../scripts/workspace-runtime/verify-installed.ts)验证迁移到新路径的安装：
 
@@ -47,13 +49,17 @@ pnpm exec tsx scripts/workspace-runtime/verify-installed.ts --source .artifacts/
 
 安装器检查清单版本与平台身份，暂存完整副本，再在共享跨进程写入锁下替换安装树。替换中断后可以恢复前一棵树。复用同一清单会保留用户额外安装的包；返回的发行版本仅描述内置载荷。不发布运行期 invariant 伴生模块：安装检查在发布时执行，工具注册表负责注册释放。
 
-## Dev Note
+<a id="dev-note"></a>
+## 开发备注
 
 安装器源自固定 alpha.2 的 `desktop-host` 实现。CoHarness 将其作为 CLI 和 Gateway 运行时可使用的插件，增加跨进程安装串行化，并拒绝当前执行目标无法使用的路径。[Office 技能](../../skill/skill-office/README.zh.md)提供文档工作流；[computer-use](../../computer-use/computer-use/README.zh.md)负责桌面访问。
 
-## Model Experience
+<a id="model-experience"></a>
 
-### Request context and condition
+
+## 模型体验
+
+### 请求上下文与条件
 
 #### What the model sees
 
@@ -67,7 +73,8 @@ pnpm exec tsx scripts/workspace-runtime/verify-installed.ts --source .artifacts/
 
 挂载增加一个工具 schema。调用产生普通工具结果，不额外添加系统提示词。
 
-## Known Limitations and Deferred Work
+<a id="known-limitations-and-deferred-work"></a>
+## 已知限制与暂缓工作
 
 - **载荷获取由部署构建负责** — 载荷下载、平台打包和安装后解释器验证属于部署构建；安装器不下载缺失组件，也不向 SSH 目标安装。
 - **遗留写入锁由运维处理** — 遗留写入锁需要运维调查；竞争者不会仅因为锁较旧就删除它。

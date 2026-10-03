@@ -33,7 +33,7 @@ import { acknowledgeReloadConnectionLoss, launchWebScaffold, watchConsole, type 
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
 /** Wire path of the history round-trip the conversation root waits out (POST /api/session.history). */
-const HISTORY_ROUTE = '**/api/session.history'
+const HISTORY_ROUTE = /\/api\/session\.history(?:\?.*)?$/
 
 /**
  * The conversation root's own phase attribute. `div` disambiguates it from the
@@ -57,7 +57,7 @@ describe('web e2e: startup auto-selection', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 180_000)
 

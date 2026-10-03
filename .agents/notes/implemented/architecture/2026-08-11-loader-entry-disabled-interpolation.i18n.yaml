@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-loader-entry-disabled-interpolation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-11-loader-entry-disabled-interpolation.md
-2026-08-11-loader-entry-disabled-interpolation.md: fd760ea0f15f19e5f287aaddc36fb8eeb5f519ba
-2026-08-11-loader-entry-disabled-interpolation.zh.md: 41929a58b2e34974596ddb7f5b6748f14bd82e2d
+/agent-note-loader-interpolates-the-entry-disabled-field:
+  en: 95b58df5b2cb3222
+  zh: 61b16b7df540e5e2
+/agent-note-loader-interpolates-the-entry-disabled-field/problem:
+  en: 7f6d9cb4732680d5
+  zh: 6bdb6bc77e97daf0
+/agent-note-loader-interpolates-the-entry-disabled-field/decision:
+  en: 07cc5506fc6a9755
+  zh: bf990e8850c902bf
+/agent-note-loader-interpolates-the-entry-disabled-field/alternatives-considered:
+  en: 7c107da0f8f4d9bf
+  zh: 671eca64e5f8f2f9
+/agent-note-loader-interpolates-the-entry-disabled-field/consequences:
+  en: 84ea42597c4ae42f
+  zh: d81b67c8388163f1

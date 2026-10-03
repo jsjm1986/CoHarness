@@ -346,6 +346,26 @@ interface StandardPropsCache {
 
 const standardPropsCache = new WeakMap<SlotRendererHost, StandardPropsCache>()
 
+/** Revision the host's built root kit was synthesized from; rebuilt on roster ticks. */
+const rootKitRevision = new WeakMap<SlotRendererHost, number>()
+
+/**
+ * Root-scope standard kit: the framework's session/workspace hooks plus one
+ * `use<Name>` selector hook per contributed root source (slots.provideRoot).
+ * Rebuilt on the host's roster revision; hook identity per source is the
+ * observableHook cache, so an unchanged contribution never resubscribes.
+ */
+function buildRootStandard(host: SlotRendererHost): InjectedProps {
+  const root: InjectedProps = {
+    useSessions: observableHook(host.sessions.list),
+    useWorkspaces: observableHook(host.workspaces.list),
+  }
+  for (const [name, source] of Object.entries(host.rootSources())) {
+    root[standardHookPropName(name)] = observableHook(source)
+  }
+  return root
+}
+
 /** Stable official-props object used by contextual Hook factories. */
 function standardProps(
   host: SlotRendererHost,
@@ -354,15 +374,16 @@ function standardProps(
 ): InjectedProps {
   let cache = standardPropsCache.get(host)
   if (cache === undefined) {
-    cache = {
-      root: {
-        useSessions: observableHook(host.sessions.list),
-        useWorkspaces: observableHook(host.workspaces.list),
-      },
-      session: new WeakMap(),
-      sessionMaybe: new WeakMap(),
-    }
+    cache = { root: buildRootStandard(host), session: new WeakMap(), sessionMaybe: new WeakMap() }
     standardPropsCache.set(host, cache)
+    rootKitRevision.set(host, host.getRootRevision())
+  }
+  if (cache !== undefined && rootKitRevision.get(host) !== host.getRootRevision()) {
+    // A provideRoot install/dispose re-keys the root kit; session kits spread
+    // it at build, so the whole cache is rebuilt on the roster tick.
+    cache = { root: buildRootStandard(host), session: new WeakMap(), sessionMaybe: new WeakMap() }
+    standardPropsCache.set(host, cache)
+    rootKitRevision.set(host, host.getRootRevision())
   }
   if (scope === 'root') return cache.root
   if (info === undefined) throw new SlotAssemblyError(`scope '${scope}' rendered without session provide info`)
@@ -862,6 +883,13 @@ function RootOutlet({ ownerProps }: { ownerProps: object }) {
   useSyncExternalStore(
     fn => host.subscribe('root', fn),
     () => host.getVersion('root'),
+  )
+  // Root-contribution roster: a provideRoot install/dispose must reach entries
+  // rendered under every scope, so the tick re-renders the outlet and the next
+  // standardProps() call rebuilds the kits.
+  useSyncExternalStore(
+    fn => host.subscribeRootRevision(fn),
+    () => host.getRootRevision(),
   )
   useLocaleRevision(host.locale)
   const entry = host.entriesOfSlot('root')[0]

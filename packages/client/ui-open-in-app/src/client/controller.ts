@@ -5,12 +5,6 @@ import { OPEN_IN_APP_APPS_ROUTE, OPEN_IN_APP_OPEN_ROUTE, type OpenInAppAppsPaylo
 
 type Fetch = (input: string | URL, init?: RequestInit) => Promise<Response>
 
-/** Resolve the browser's Host base with the connection carrier's null-origin fallback. */
-function hostBase(): string {
-  const origin = (globalThis as { location?: { origin?: string } }).location?.origin
-  return origin !== undefined && origin !== 'null' ? origin : 'http://dsh.internal'
-}
-
 /**
  * Owns the once-per-page availability read, the persisted last choice, and
  * the launch POST. Availability and choice publish through uSES-safe sources
@@ -57,7 +51,7 @@ export class OpenInAppController {
    */
   async launch(appId: string, path: string): Promise<void> {
     const body: OpenInAppOpenPayload = { app: appId, path }
-    const response = await this.fetcher(new URL(OPEN_IN_APP_OPEN_ROUTE, hostBase()), {
+    const response = await this.fetcher(OPEN_IN_APP_OPEN_ROUTE, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
@@ -68,7 +62,7 @@ export class OpenInAppController {
   private async run(): Promise<void> {
     let apps: readonly string[] = []
     try {
-      const response = await this.fetcher(new URL(OPEN_IN_APP_APPS_ROUTE, hostBase()), {
+      const response = await this.fetcher(OPEN_IN_APP_APPS_ROUTE, {
         headers: { accept: 'application/json' },
       })
       if (response.ok) {

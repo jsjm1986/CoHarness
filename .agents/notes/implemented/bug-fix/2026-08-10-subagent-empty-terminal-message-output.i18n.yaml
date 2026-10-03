@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-subagent-empty-terminal-message-output.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-10-subagent-empty-terminal-message-output.md
-2026-08-10-subagent-empty-terminal-message-output.md: 24bab01ad844a5b48e0bf6fe0fc54df6403f4bb7
-2026-08-10-subagent-empty-terminal-message-output.zh.md: 28d8d85e316fe4770e55685e9d5641fda846c5c5
+/agent-note-one-selection-rule-keeps-subagent-output-past-an-empty-terminal-message:
+  en: e5a22b7a9474f2e1
+  zh: 3c51da306b0675b6
+/agent-note-one-selection-rule-keeps-subagent-output-past-an-empty-terminal-message/problem:
+  en: cfa79ee7098c63c3
+  zh: 6ea04e66754ddee2
+/agent-note-one-selection-rule-keeps-subagent-output-past-an-empty-terminal-message/decision:
+  en: f45625a867ce85c6
+  zh: 9ab91ae9ccca0905
+/agent-note-one-selection-rule-keeps-subagent-output-past-an-empty-terminal-message/verification:
+  en: 5f5f320b9923550f
+  zh: a6cb083d465aaf87
+/agent-note-one-selection-rule-keeps-subagent-output-past-an-empty-terminal-message/alternatives-considered:
+  en: 1c9b5c62c048cda4
+  zh: 8947eccad988fb13
+/agent-note-one-selection-rule-keeps-subagent-output-past-an-empty-terminal-message/consequences:
+  en: b645d95710633670
+  zh: 179f7cb7191c7426

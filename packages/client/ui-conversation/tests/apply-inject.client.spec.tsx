@@ -15,7 +15,7 @@
 // chat-toolview-slot.spec.tsx.
 
 import { describe, expect, it, vi } from 'vitest'
-import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionBehaviorOverrides } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { ISession, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -45,7 +45,7 @@ function sessionFakeFor() {
   } satisfies SessionBehaviorOverrides
 }
 
-async function bench(desktop = false) {
+async function bench(desktop = false, developerTools = stubDeveloperTools()) {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', {
     api: { settings: {} }, isLoopback: desktop,
@@ -54,7 +54,8 @@ async function bench(desktop = false) {
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
-  runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+  const settingsScopeStub = stubSettingsScope()
+  runtime.provide('settingsScope', { bind: () => settingsScopeStub.scope, developerTools: developerTools.preference } as never)
   const sessionFake = sessionFakeFor()
   await runtime.sessions.add({
     id: ROOT,
@@ -70,7 +71,7 @@ async function bench(desktop = false) {
   // The AppFrame role: the conversation-package slots must be declared by a
   // live entry before apply can contribute into them.
   await runtime.root.declare({
-    'conversation': { kind: 'single', scope: 'root' },
+    'main': { kind: 'keyed', scope: 'root' },
     'details': { kind: 'single', scope: 'session' },
   }, (_p: { renderSlot?: unknown }) => null)
 
@@ -79,7 +80,7 @@ async function bench(desktop = false) {
   // The host face (store resolution) exists only inside the installed
   // renderer, so materialize it the way the shell does.
   runtime.renderRoot()
-  const entryOf = (key: 'conversation' | 'conversation.pane' | 'conversation.session' | 'conversation.session.header' | 'conversation.composer.bar' | 'conversation.view' | 'details') =>
+  const entryOf = (key: 'main' | 'conversation.pane' | 'conversation.session' | 'conversation.session.header' | 'conversation.composer.bar' | 'conversation.view' | 'details') =>
     runtime.slots.entries(key)[0]!
   /** Resolve store instance + call the inject the way the outlet would. */
   const conversationApi = (id: SessionId) => {
@@ -128,7 +129,7 @@ async function bench(desktop = false) {
   return {
     runtime, feature, slots: runtime.slots, entryOf,
     conversationApi, conversationHeaderApi, residentApi, composerApi, chatViewApi, inputApi,
-    sessionFake, layoutFake,
+    sessionFake, layoutFake, settingsScopeStub,
   }
 }
 
@@ -284,6 +285,35 @@ describe('conversation slot inject API', () => {
     await b.runtime.dispose()
   })
 
+  it('routes external links to the browser bail or a new tab per the link-opening preference', async () => {
+    const b = await bench()
+    const windowOpen = vi.fn()
+    vi.stubGlobal('open', windowOpen)
+    const claimed: string[] = []
+    b.runtime.ctx.on('web/browser-open', ({ url }) => {
+      claimed.push(url)
+      return true
+    })
+    const { injected } = b.chatViewApi(ROOT)
+    expect(injected.openExternalLink).toBeDefined()
+    injected.openExternalLink?.('https://example.com/a')
+    expect(claimed).toEqual(['https://example.com/a'])
+    expect(windowOpen).not.toHaveBeenCalled()
+
+    b.settingsScopeStub.publish({
+      status: 'ready', writable: true,
+      value: {
+        busyEnter: 'queue', chatContentWidth: 700, chatFontSize: 13,
+        performanceUsage: 'detailed', linkOpening: 'new-tab',
+      },
+    })
+    injected.openExternalLink?.('https://example.com/b')
+    expect(claimed).toEqual(['https://example.com/a'])
+    expect(windowOpen).toHaveBeenCalledWith('https://example.com/b', '_blank', 'noopener,noreferrer')
+    vi.unstubAllGlobals()
+    await b.runtime.dispose()
+  })
+
   it('routes workspace switching through the history-first runtime owner and discards only when confirmed', async () => {
     const b = await bench()
     const resident = b.residentApi(ROOT)
@@ -422,6 +452,24 @@ describe('conversation slot inject API', () => {
     off()
     off2()
     unsub()
+    await b.runtime.dispose()
+  })
+
+  it('filters the trajectory view while developer tools are disabled', async () => {
+    const developerTools = stubDeveloperTools()
+    const b = await bench(false, developerTools)
+    const off = b.slots.register(
+      { name: 'conversation.view', id: 'trajectory', order: 4, label: 'T' } as never, (() => null) as never)
+    const { injected } = b.conversationApi(ROOT)
+    await Promise.resolve() // ledger notifications batch per microtask
+    expect(injected.views.list().map(v => v.id)).toEqual(['chat', 'trajectory'])
+    const version = injected.views.version()
+    developerTools.publish(false)
+    expect(injected.views.list().map(v => v.id)).toEqual(['chat'])
+    expect(injected.views.version()).toBeGreaterThan(version)
+    developerTools.publish(true)
+    expect(injected.views.list().map(v => v.id)).toEqual(['chat', 'trajectory'])
+    off()
     await b.runtime.dispose()
   })
 })

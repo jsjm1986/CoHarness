@@ -22,7 +22,14 @@ export default async function open(url) {
   if (process.env.BROWSER_OPEN_TEST_FAILURE !== undefined) {
     throw new Error(process.env.BROWSER_OPEN_TEST_FAILURE)
   }
-  const response = await fetch(url)
+  let response = await fetch(url, { redirect: 'manual' })
+  // The launch-token URL mints a session cookie and redirects; browsers follow
+  // with the cookie attached, while fetch's redirect mode drops it.
+  if (response.status >= 300 && response.status < 400) {
+    const cookie = response.headers.get('set-cookie')?.split(';')[0]
+    const target = new URL(response.headers.get('location') ?? './', url)
+    response = await fetch(target, { headers: cookie === undefined ? {} : { cookie } })
+  }
   const html = await response.text()
   console.log(`dsh browser-open: ${JSON.stringify({
     url,

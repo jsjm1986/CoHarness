@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/extensions/ui-cordis/README.md
-README.md: a1e004674aaeb6766a720480f14163553fac8de0
-README.zh.md: fb22af509ea1b35319d4c3838361ec8fcbbb04a2
+/:
+  en: c7dd9af70877ba4e
+  zh: 61495d48365178df
+/deepseek-ai-dsh-client-ui-cordis:
+  en: 63d8703a05312146
+  zh: 9e4c02908b65c417
+/deepseek-ai-dsh-client-ui-cordis/summary:
+  en: 809c3b554785957f
+  zh: 7d719a25692aecc7
+/deepseek-ai-dsh-client-ui-cordis/table-of-contents:
+  en: 129fecb46413a4af
+  zh: c711c63a89306b47
+/deepseek-ai-dsh-client-ui-cordis/presentation-and-ownership:
+  en: 3a6d5a927430ef2a
+  zh: b2f57f0177a2fee1
+/deepseek-ai-dsh-client-ui-cordis/invariants:
+  en: 51d543b78501ae37
+  zh: 19d6d68ff02a93fc
+/deepseek-ai-dsh-client-ui-cordis/model-experience:
+  en: dd230a84ce5fe6c8
+  zh: d3012ba6248bd80f
+/deepseek-ai-dsh-client-ui-cordis/model-experience/kv-cache-effect:
+  en: a3dad0e0fe53976a
+  zh: d4ff5e59e4d50fdc
+/deepseek-ai-dsh-client-ui-cordis/known-limitations-and-deferred-work:
+  en: 8abd27ee3cae1d27
+  zh: cebedac48791c7c1
+/deepseek-ai-dsh-client-ui-cordis/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

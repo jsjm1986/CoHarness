@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-release-session-format-payload.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-release-session-format-payload.md
-2026-09-17-release-session-format-payload.md: c5b41b165fb93578cd480a120c838cd630ccd6bc
-2026-09-17-release-session-format-payload.zh.md: 8aba1121df7aaeb8d4d6a676ce76bc1e2d6f481e
+/agent-note-release-validation-requires-the-session-format-payload:
+  en: 5a34288dfc6d3b6b
+  zh: 9ae9ff878b89fc91
+/agent-note-release-validation-requires-the-session-format-payload/problem:
+  en: bb584ddcbfb6235d
+  zh: a0697936201c1922
+/agent-note-release-validation-requires-the-session-format-payload/decision:
+  en: 52ae4267ba43566d
+  zh: d4f1a8298abb6a2e
+/agent-note-release-validation-requires-the-session-format-payload/alternatives-considered:
+  en: 1ba4746370e70e3c
+  zh: bb8f89908f7a7ac6
+/agent-note-release-validation-requires-the-session-format-payload/consequences:
+  en: d1bcfcd628c3c2b0
+  zh: f807bf6efc66a280
+/agent-note-release-validation-requires-the-session-format-payload/testing:
+  en: 883c4a6a7b3480c6
+  zh: e136df389ae92751
+/agent-note-release-validation-requires-the-session-format-payload/related:
+  en: edbaed1ece1ed0b8
+  zh: 68764e5cb2b6bf1e

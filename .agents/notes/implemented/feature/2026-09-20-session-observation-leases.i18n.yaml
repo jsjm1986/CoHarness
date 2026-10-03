@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-20-session-observation-leases.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-20-session-observation-leases.md
-2026-09-20-session-observation-leases.md: 235a7d5e896e91884272b6f7f4cb972b3e5d7b82
-2026-09-20-session-observation-leases.zh.md: defc40926e3478a12179ab1e535884ac3c3935df
+/agent-note-session-observation-leases:
+  en: 3a0f8d57613cd3dd
+  zh: 5301c0d185a4490f
+/agent-note-session-observation-leases/problem:
+  en: 162f638694c4fa4b
+  zh: c19af8027986c9bb
+/agent-note-session-observation-leases/decision:
+  en: ef44739b4be1b6d3
+  zh: 2dec711fb8874f19
+/agent-note-session-observation-leases/alternatives-considered:
+  en: 81762ff15378a1d8
+  zh: f3d49eb4b9bc09d8
+/agent-note-session-observation-leases/consequences:
+  en: 313d506b9154e531
+  zh: 444808bfc86f7806
+/agent-note-session-observation-leases/testing:
+  en: 5fc5e075f7dff80d
+  zh: 9ab59d9789ee97bd

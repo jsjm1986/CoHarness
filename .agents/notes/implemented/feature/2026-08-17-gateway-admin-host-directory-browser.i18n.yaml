@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-gateway-admin-host-directory-browser.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-gateway-admin-host-directory-browser.md
-2026-08-17-gateway-admin-host-directory-browser.md: 7d9842f74670b1b50dcc834a4ef3882ef169214b
-2026-08-17-gateway-admin-host-directory-browser.zh.md: 129113796b627ba5574ac91b3299607756d81a8b
+/agent-note-gateway-administrator-host-directory-browser:
+  en: e6fc7d96b1598817
+  zh: 8d5034a31fed9764
+/agent-note-gateway-administrator-host-directory-browser/problem:
+  en: ab91b81e61635d08
+  zh: 3a59a9200e39c0bb
+/agent-note-gateway-administrator-host-directory-browser/decision:
+  en: 8c9cea056823e13c
+  zh: e746617a37aea84d
+/agent-note-gateway-administrator-host-directory-browser/security-model:
+  en: eabef1c4249db089
+  zh: 9267bcf71d72572c
+/agent-note-gateway-administrator-host-directory-browser/verification:
+  en: b73a64cd1bc35c6b
+  zh: ef33b89bf2449a76
+/agent-note-gateway-administrator-host-directory-browser/alternatives-considered:
+  en: 4cbe79c360eb7202
+  zh: 8af33d3d6222ce5b
+/agent-note-gateway-administrator-host-directory-browser/consequences:
+  en: c50295765a7f026b
+  zh: f24c4811db3f97a7

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-skill-invocation-policy.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-28-skill-invocation-policy.md
-2026-07-28-skill-invocation-policy.md: 7a4f83ecae3dea82ab6864e748c9d8b8599f6bfc
-2026-07-28-skill-invocation-policy.zh.md: 8d66af69b7f45c5d76d18963df6921eaec2e1e8c
+/agent-note-independent-model-and-user-skill-invocation-policy:
+  en: d5f87e846ef041b1
+  zh: 273e87043d19a709
+/agent-note-independent-model-and-user-skill-invocation-policy/problem:
+  en: 9fc564115fca4b22
+  zh: 3a414ee5c1f7f842
+/agent-note-independent-model-and-user-skill-invocation-policy/decision:
+  en: 5484ee0c0d3c5c7c
+  zh: 651a3e70dfd050da
+/agent-note-independent-model-and-user-skill-invocation-policy/alternatives-considered:
+  en: fdffcd101a494c4a
+  zh: db802bf9bc04ae74
+/agent-note-independent-model-and-user-skill-invocation-policy/consequences:
+  en: 94071073367396eb
+  zh: 5afca22d8140b5c0

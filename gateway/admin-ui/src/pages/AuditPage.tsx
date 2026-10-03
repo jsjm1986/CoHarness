@@ -118,7 +118,7 @@ export function AuditPage() {
           <>
             <div className="tableWrap desktopOnly">
               <table className="dataTable auditTable">
-                <thead><tr><th>时间</th><th>用户</th><th>操作</th><th>请求</th><th>状态</th><th>来源 IP</th></tr></thead>
+                <thead><tr><th>时间</th><th>用户</th><th>操作</th><th>请求</th><th>请求结果</th><th>对象与执行信息</th><th>来源 IP</th></tr></thead>
                 <tbody>
                   {rows.map(row => (
                     <tr key={row.id}>
@@ -126,7 +126,8 @@ export function AuditPage() {
                       <td>{row.userId === null ? <span className="muted">系统</span> : <span className="codeText">#{row.userId}</span>}</td>
                       <td><span className="auditAction"><strong>{row.action}</strong><span>ID {row.id}</span></span></td>
                       <td><span className="pathText">{row.methodPath}</span></td>
-                      <td><HttpStatus status={row.status} /></td>
+                      <td><RequestResult row={row} /></td>
+                      <td><AuditMetadata metadata={row.metadata} /></td>
                       <td><span className="codeText">{row.ip}</span></td>
                     </tr>
                   ))}
@@ -138,7 +139,7 @@ export function AuditPage() {
                 <article className="mobileItem" key={row.id}>
                   <div className="mobileItemHeader">
                     <span className="auditAction"><strong>{row.action}</strong><span>{formatTime(row.ts)}</span></span>
-                    <HttpStatus status={row.status} />
+                    <RequestResult row={row} />
                   </div>
                   <div className="mobileItemBody">
                     <span className="pathText">{row.methodPath}</span>
@@ -146,6 +147,7 @@ export function AuditPage() {
                       <Definition label="用户">{row.userId === null ? '系统' : `#${row.userId}`}</Definition>
                       <Definition label="来源 IP"><span className="codeText">{row.ip}</span></Definition>
                     </dl>
+                    <AuditMetadata metadata={row.metadata} />
                   </div>
                 </article>
               ))}
@@ -164,10 +166,29 @@ export function AuditPage() {
   )
 }
 
-function HttpStatus({ status }: { status: number | null }) {
-  if (status === null) return <StatusBadge>无状态</StatusBadge>
-  const tone = status >= 500 ? 'danger' : status >= 400 ? 'warning' : status >= 300 ? 'info' : 'success'
-  return <StatusBadge tone={tone}>{status}</StatusBadge>
+const RESULT_LABELS = { success: '请求成功', failure: '请求失败', recorded: '已记录', unknown: '结果未知' } as const
+
+function RequestResult({ row }: { row: AuditEntry }) {
+  const tone = row.outcome === 'failure' ? 'danger' : row.outcome === 'success' ? 'success' : 'neutral'
+  return <StatusBadge tone={tone}>{RESULT_LABELS[row.outcome]}{row.status === null ? '' : ` · HTTP ${row.status}`}</StatusBadge>
+}
+
+const METADATA_LABELS: Record<string, string> = {
+  id: '对象 ID', targetId: '目标 ID', targetKind: '目标类型', userId: '用户 ID', ownerUserId: '所有者 ID',
+  projectId: '项目 ID', nodeId: '节点 ID', catalogId: '文档 ID', rootSessionId: '根会话', sessionId: '会话',
+  grantId: '授权 ID', backupId: '备份 ID', operationId: '操作 ID', receiptId: '原回执', redispatchId: '重派回执',
+  subjectId: '配额对象 ID', subjectType: '配额对象类型', revision: '配置代次', generation: '实例代次',
+  count: '数量', requested: '请求数量', succeeded: '成功数量', trashed: '回收数量', opCount: '配置操作数',
+  allowed: '允许', shared: '共享', enabled: '启用', autoReviewEligible: 'Auto 资格', terminalEnabled: '终端资格',
+  sshEligible: 'SSH 资格', desktopEligible: '桌面资格', status: '对象状态', state: '执行状态', mode: '访问模式', role: '角色', action: '动作',
+}
+
+function AuditMetadata({ metadata }: Pick<AuditEntry, 'metadata'>) {
+  const entries = Object.entries(metadata)
+  if (entries.length === 0) return <span className="muted">无附加信息</span>
+  return <dl className="definitionGrid">{entries.map(([key, value]) => (
+    <Definition key={key} label={METADATA_LABELS[key] ?? key}>{typeof value === 'boolean' ? value ? '是' : '否' : String(value)}</Definition>
+  ))}</dl>
 }
 
 function Definition({ label, children }: { label: string; children: React.ReactNode }) {

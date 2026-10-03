@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-tool-call-file-open-in-os.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-28-tool-call-file-open-in-os.md
-2026-07-28-tool-call-file-open-in-os.md: 08fc51cc3a5d2fb43b67dc158fd1ee789fafdb68
-2026-07-28-tool-call-file-open-in-os.zh.md: c99a99dcd91a8cfabbbc381af79bb3570f4295f6
+/agent-note-tool-call-file-open-in-os:
+  en: 404f35c514466b5d
+  zh: 9526f10ed1a032d9
+/agent-note-tool-call-file-open-in-os/problem:
+  en: de2ce95a8cdd349e
+  zh: 61d07b22ff778a45
+/agent-note-tool-call-file-open-in-os/decision:
+  en: c329e1e56c46216a
+  zh: 730479fa40908bc9
+/agent-note-tool-call-file-open-in-os/alternatives-considered:
+  en: c8da22ba11b6f82f
+  zh: 7140b4dd295419a9
+/agent-note-tool-call-file-open-in-os/consequences:
+  en: b26da9a102382c80
+  zh: 91fd9565d66a7c14
+/agent-note-tool-call-file-open-in-os/risks:
+  en: 9b3e5ef00db03c80
+  zh: ecc9a786d65ca8b0

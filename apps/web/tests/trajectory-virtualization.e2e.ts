@@ -213,7 +213,7 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser, 900)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     // The compact layout dropped group session counts; the seeded baseline is
     // the Ungrouped bucket once cold summaries load.
@@ -340,7 +340,7 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
       isMobile: true,
     })
     try {
-      await mobilePage.goto(scaffold.baseUrl, { waitUntil: 'load' })
+      await mobilePage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
       await mobilePage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
       // The desktop test leaves a streamed turn appended to the seed, so the
       // phone window mounts the stream tail rather than the seeded marker.

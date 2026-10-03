@@ -222,7 +222,7 @@ class SessionCatalogFace implements SessionPermissionCatalog {
   ) {}
 
   getSnapshot: () => PermissionCatalog | undefined = () =>
-    this.directory.mirrorFor(this.sessionId).getSnapshot()
+    this.directory.mirrorFor(this.sessionId)?.getSnapshot()
 
   subscribe: (listener: () => void) => (() => void) = (listener) => {
     this.listeners.add(listener)
@@ -248,8 +248,13 @@ class SessionCatalogFace implements SessionPermissionCatalog {
     return () => { this.invalidationListeners.delete(listener); this.release() }
   }
 
-  read(): Promise<PermissionCatalog> {
-    return this.directory.mirrorFor(this.sessionId).read()
+  async read(): Promise<PermissionCatalog> {
+    for (;;) {
+      const mirror = this.directory.mirrorFor(this.sessionId)
+      if (mirror === undefined) throw new Error('Session permission catalog has no owned runtime')
+      const value = await mirror.read()
+      if (this.directory.mirrorFor(this.sessionId) === mirror) return value
+    }
   }
 
   private attach(): void {
@@ -280,16 +285,16 @@ class SessionCatalogFace implements SessionPermissionCatalog {
     this.mirror = next
     this.unsubscribeMirror = this.listeners.size === 0
       ? undefined
-      : next.subscribe(() => { for (const current of [...this.listeners]) current() })
+      : next?.subscribe(() => { for (const current of [...this.listeners]) current() })
     this.unsubscribeMirrorInvalidations = this.invalidationListeners.size === 0
       ? undefined
-      : next.subscribeInvalidations(() => { for (const current of [...this.invalidationListeners]) current() })
+      : next?.subscribeInvalidations(() => { for (const current of [...this.invalidationListeners]) current() })
     // Ownership moved runtimes: the displayed options belong to the previous
     // runtime's catalog, so withdraw them even though no host notified.
     if (moved) for (const current of [...this.invalidationListeners]) current()
     // A different mirror can already hold a different catalog; value
     // subscribers' snapshots changed under them without a host publish.
-    if (moved && next.getSnapshot() !== previous) {
+    if (next?.getSnapshot() !== previous) {
       for (const current of [...this.listeners]) current()
     }
   }
@@ -305,7 +310,7 @@ class SessionCatalogFace implements SessionPermissionCatalog {
  */
 export class PermissionCatalogDirectory {
   /** Session-list publications re-key session→runtime ownership; faces rebind on each. */
-  readonly ownership: ObservableSnapshot<unknown>
+  readonly ownership: ObservableSnapshot<{ readonly byId: Readonly<Record<SessionId, unknown>> }>
   private readonly mirrors = new Map<ConnectionHandle, PermissionCatalogMirror>()
   private readonly faces = new Map<SessionId | '', SessionCatalogFace>()
   private disposed = false
@@ -318,14 +323,14 @@ export class PermissionCatalogDirectory {
    */
   constructor(
     private readonly connection: ConnectionHandle,
-    ownership: ObservableSnapshot<unknown>,
+    ownership: ObservableSnapshot<{ readonly byId: Readonly<Record<SessionId, unknown>> }>,
   ) {
     this.ownership = ownership
   }
 
   /**
-   * The catalog face for one Session. Base-owned and unresolved ids ride the
-   * root connection's mirror; pooled ids ride their runtime's.
+   * The catalog face for one Session. Owned ids use their runtime; a withdrawn
+   * Session exposes no options and cannot read another runtime's catalog.
    * @param id - Session identity, or undefined for the session-less surface.
    * @returns the session-scoped catalog face; stable per Session id.
    */
@@ -365,9 +370,9 @@ export class PermissionCatalogDirectory {
    * but it never pulls, so a late subscriber cannot resurrect catalog traffic
    * on a dead connection.
    * @param id - Session identity, or undefined for the root connection.
-   * @returns the owning runtime's catalog mirror.
+   * @returns the owning runtime's mirror, or undefined while that Session has no visible owner.
    */
-  mirrorFor(id: SessionId | undefined): PermissionCatalogMirror {
+  mirrorFor(id: SessionId | undefined): PermissionCatalogMirror | undefined {
     if (this.disposed) {
       this.deadMirror ??= (() => {
         const mirror = new PermissionCatalogMirror(
@@ -379,6 +384,7 @@ export class PermissionCatalogDirectory {
       })()
       return this.deadMirror
     }
+    if (id !== undefined && this.ownership.getSnapshot().byId[id] === undefined) return undefined
     const handle = (id === undefined ? undefined : this.connection.forSession?.(id)) ?? this.connection
     let mirror = this.mirrors.get(handle)
     if (mirror === undefined) {

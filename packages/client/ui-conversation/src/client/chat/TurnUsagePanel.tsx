@@ -144,7 +144,7 @@ export function TurnTimePanel({ runMs, tokensPerSecond, ttftMs, t }: TurnTimePan
         onClick={() => { setOpen(!open) }}
       >
         <IconClockOutline16 />
-        <span className={css.label}>{t('message.ranFor', { duration: formatRunDuration(runMs, t) })}</span>
+        <span className={css.label}>{t('message.ranFor', { duration: formatRunDuration(runMs, t).map(part => part.text).join('') })}</span>
       </button>
       {open && createPortal(
         <div
@@ -163,7 +163,7 @@ export function TurnTimePanel({ runMs, tokensPerSecond, ttftMs, t }: TurnTimePan
           <div className={dialogCss.titleRule} aria-hidden />
           <dl className={dialogCss.details} data-turn-time-details>
             <dt>{t('message.turnTime.duration')}</dt>
-            <dd>{formatRunDuration(runMs, t)}</dd>
+            <dd>{formatRunDuration(runMs, t).map(part => part.text).join('')}</dd>
             {tokensPerSecond !== undefined && (
               <>
                 <dt>{t('message.turnTime.speed')}</dt>

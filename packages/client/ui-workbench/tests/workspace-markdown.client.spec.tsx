@@ -10,6 +10,7 @@ import type { WorkspaceFileTextPage } from '@deepseek-ai/dsh-api-remotes/client'
 import { WorkspaceMarkdownPreview, isWorkspaceMarkdown } from '../src/client/components/WorkspaceMarkdownPreview.tsx'
 import type { ReadWorkspacePreview } from '../src/client/components/WorkspaceFilePreview.tsx'
 import { en } from '../src/client/markdown/locales.ts'
+import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 afterEach(cleanup)
 const id = 'markdown-session' as SessionId
@@ -26,9 +27,11 @@ function harness(read: ReadWorkspacePreview) {
     stat: async () => ({ sessionId: id, path: request.path, type: 'file', version, bytes: 10, changed: false }),
   }, 5)
   const close = vi.fn()
-  const view = render(<WorkspaceMarkdownPreview request={request} resources={resources} read={read}
-    markdownT={makeTranslate(en)} close={close}
-    labels={{ close: 'Close', reload: 'Reload', loading: 'Reading', changed: 'File changed' }} />)
+  const view = render(<PreviewResourceBinding resources={resources} request={request}>{resource =>
+    <WorkspaceMarkdownPreview request={request} resource={resource} read={read}
+      markdownT={makeTranslate(en)} close={close}
+      labels={{ close: 'Close', reload: 'Reload', loading: 'Reading', changed: 'File changed' }} />
+  }</PreviewResourceBinding>)
   return { ...view, resources, close, change() {
     version = 'v2'
     resources.handleChange(request.runtimeTarget, { sessionId: id, path: request.path, version })
@@ -100,7 +103,7 @@ describe('WorkspaceMarkdownPreview', () => {
     const read = vi.fn<ReadWorkspacePreview>().mockRejectedValue(new WorkspaceResourceError('access-revoked', 'Permission removed'))
     const view = harness(read)
     await waitFor(() => { expect(view.getByRole('alert').textContent).toBe('Permission removed') })
-    expect(view.resources.source(request).get().error?.message).toBe('Permission removed')
+    expect(view.resources.source(request).getSnapshot().error?.message).toBe('Permission removed')
     expect(view.container.querySelector('[data-workspace-markdown]')).toBeNull()
     expect(view.getByRole('button', { name: 'Reload' }).hasAttribute('disabled')).toBe(true)
     expect(read).toHaveBeenCalledOnce()

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-composer-text-layers-share-one-scrollport.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-31-composer-text-layers-share-one-scrollport.md
-2026-07-31-composer-text-layers-share-one-scrollport.md: d01231f706a7d3850ce1b3770ef351cb7e211384
-2026-07-31-composer-text-layers-share-one-scrollport.zh.md: 831e2434324ce0dea0e433bbede07e5536def962
+/agent-note-the-composer-s-two-text-layers-share-one-scrollport:
+  en: 2504babfe12ed4ff
+  zh: 79a899421893f6fd
+/agent-note-the-composer-s-two-text-layers-share-one-scrollport/problem:
+  en: 8151bf778394c7dc
+  zh: 40ababdc0716c5ea
+/agent-note-the-composer-s-two-text-layers-share-one-scrollport/decision:
+  en: 1af32e0ca4f91994
+  zh: dc4b6830b6d80193
+/agent-note-the-composer-s-two-text-layers-share-one-scrollport/alternatives-considered:
+  en: 0c8c2b66ab97fe04
+  zh: 2d304320b17b85ae
+/agent-note-the-composer-s-two-text-layers-share-one-scrollport/consequences:
+  en: 082393ac61735707
+  zh: 14c04b553952b2ff
+/agent-note-the-composer-s-two-text-layers-share-one-scrollport/testing:
+  en: 39315dd0042cd9a0
+  zh: 54b2bb51f221a2fd

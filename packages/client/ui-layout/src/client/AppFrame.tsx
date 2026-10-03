@@ -19,7 +19,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { computeColumns, DETAILS_DEFAULT, SIDEBAR_DEFAULT } from './columns.ts'
+import {
+  clampWidth, computeColumns, DETAILS_DEFAULT_RATIO, DETAILS_MAX_RATIO, DETAILS_MIN, SIDEBAR_DEFAULT,
+} from './columns.ts'
 import { isShortCompactViewport, viewportClassOf } from './viewport.ts'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
@@ -27,7 +29,7 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share + locale seat. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'conversation' | 'rightbar' | 'shell.overlay' | 'shell.mobile.header.actions'>
+  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.overlay' | 'shell.mobile.header.actions'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'layout'>
   & { dismissRightbar: () => void }
@@ -156,6 +158,8 @@ export function AppFrame({
   }, [actions, mode])
 
   // Track the frame's own box (not the window): rAF-throttled ResizeObserver.
+  // The store mirror feeds the ratio-based actions (details drag clamps,
+  // narrow toggle semantics) the measured width rather than window.innerWidth.
   useEffect(() => {
     const el = frameRef.current
     /* v8 ignore next -- the ref is always attached by effect time: the frame div renders unconditionally. */
@@ -167,6 +171,7 @@ export function AppFrame({
         const rect = el.getBoundingClientRect()
         if (rect.width > 0) {
           setViewport(rect.width)
+          actions.setViewportWidth(rect.width)
           if (rect.height > 0) setViewportHeight(rect.height)
         }
       })
@@ -176,7 +181,7 @@ export function AppFrame({
       observer.disconnect()
       if (raf !== null) cancelAnimationFrame(raf)
     }
-  }, [])
+  }, [actions])
 
   // Narrow viewports (compact + medium) auto-collapse the sidebar; the store
   // mirror keeps toggleSidebar's semantics right (narrow toggles flip the
@@ -185,19 +190,31 @@ export function AppFrame({
   // (or the default when the wide preference is closed) and the center
   // absorbs the squeeze, while compact renders the override as the drawer.
   const narrow = overlayPanels
-  useEffect(() => { actions.setNarrow(narrow) }, [actions, narrow])
   const sidebarCollapsed = narrow ? !panels.narrowExpanded : panels.sidebar === 0
   const sidebarPreference = sidebarCollapsed
     ? 0
     : panels.sidebar === 0 ? SIDEBAR_DEFAULT : panels.sidebar
+  // The details preference stays null until the user drags; while unset the
+  // resolved width tracks the live viewport ratio. The resolution feeds both
+  // the overlay width and the track solve, and an overlay's ceiling is the
+  // same viewport-ratio clamp the drag enforces.
+  const detailsPreference = panels.details ?? viewport * DETAILS_DEFAULT_RATIO
+  const detailsOverlayWidth = Math.min(
+    viewport,
+    clampWidth(detailsPreference, DETAILS_MIN, Math.max(DETAILS_MIN, viewport * DETAILS_MAX_RATIO)),
+  )
   // Overlay modes keep details out of the track solve (the chain would
   // auto-close it against the narrow width); its open state is the overlay's.
-  const rightbarTrack = overlayPanels || detailsSession === undefined || !panels.rightbarTrack ? 0 : panels.details
+  const rightbarTrack = overlayPanels || detailsSession === undefined || !panels.rightbarTrack ? 0 : detailsPreference
   const cols = computeColumns(viewport, sidebarPreference, rightbarTrack)
   const colsRef = useRef(cols)
   colsRef.current = cols
+  // The rightbar occupant reads its would-be width even while closed, so the
+  // mounted-but-hidden panel lays out against the width it will open at.
+  const normal = computeColumns(viewport, sidebarPreference, detailsPreference)
   const drawerOpen = mode === 'compact' && panels.narrowExpanded
   const detailsOpen = overlayPanels && detailsSession !== undefined && panels.rightbarShown
+  const detailsRendered = overlayPanels ? (detailsOpen ? detailsOverlayWidth : 0) : cols.details
 
   useEffect(() => {
     if (narrow && panels.narrowExpanded && panels.rightbarShown) dismissRightbar()
@@ -235,16 +252,19 @@ export function AppFrame({
   }, [drawerOpen])
 
   // The drag base is the rendered width captured at drag start (grabbing a
-  // concession-clamped panel must not jump back to the stored preference);
-  // it stays frozen for the whole gesture so dx deltas do not compound.
+  // concession-clamped or overlay-rendered panel must not jump back to the
+  // stored preference); it stays frozen for the whole gesture so dx deltas
+  // do not compound.
   const sidebarBase = useRef(0)
   const detailsBase = useRef(0)
+  const detailsRenderedRef = useRef(detailsRendered)
+  detailsRenderedRef.current = detailsRendered
   // Track-level transitions pause for the whole gesture: eased tracks would
   // detach the column edge from the pointer (AppFrame.module.css).
   const [dragging, setDragging] = useState(false)
   const onDragEnd = useCallback(() => { setDragging(false) }, [])
   const onSidebarStart = useCallback(() => { sidebarBase.current = colsRef.current.sidebar; setDragging(true) }, [])
-  const onDetailsStart = useCallback(() => { detailsBase.current = colsRef.current.details; setDragging(true) }, [])
+  const onDetailsStart = useCallback(() => { detailsBase.current = detailsRenderedRef.current; setDragging(true) }, [])
   const onSidebarDrag = useCallback((dx: number) => {
     actions.setSidebar(sidebarBase.current + dx)
   }, [actions])
@@ -322,15 +342,20 @@ export function AppFrame({
             })}
           </div>
         )}
-      {/* The conversation viewport is root-scoped; details use the selected
-          Session unless an explicit pane action pins their target. */}
-      <CenterColumn>{renderSlot('conversation', { compact: mode === 'compact' })}</CenterColumn>
+      {/* The center column is keyed between the Conversation and any
+          registered global panel; details use the selected Session unless an
+          explicit pane action pins their target. */}
+      <CenterColumn>
+        {renderSlot('main', { compact: mode === 'compact' }, {
+          entryKey: panels.panelInfo.activePanelId ?? 'conversation',
+        })}
+      </CenterColumn>
       {overlayPanels && <div className={css.scrim} data-open={detailsOpen || undefined} aria-hidden onClick={dismissRightbar} />}
       <DetailsColumn>
         {renderSlot('rightbar', {
-          width: overlayPanels ? Math.min(viewport, DETAILS_DEFAULT) : Math.max(cols.details, DETAILS_DEFAULT),
+          width: overlayPanels ? detailsOverlayWidth : normal.details,
           viewportWidth: viewport,
-          canShow: overlayPanels || computeColumns(viewport, sidebarPreference, panels.details || DETAILS_DEFAULT).details > 0,
+          canShow: overlayPanels || normal.details > 0,
           ...(panels.detailsSessionId === undefined ? {} : { targetSessionId: panels.detailsSessionId }),
         })}
       </DetailsColumn>
@@ -340,7 +365,7 @@ export function AppFrame({
       {/* The collapsed rail is fixed-width and the compact drawer is not a
           column: resize handles belong to the wider modes only. */}
       {mode !== 'compact' && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
-      {cols.details > 0 && !panels.rightbarFullscreen && <DragHandle side="details" left={viewport - cols.details} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
+      {detailsRendered > 0 && !panels.rightbarFullscreen && <DragHandle side="details" left={viewport - detailsRendered} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
     </div>
   )
 }

@@ -16,14 +16,20 @@ export interface ProfileSettingsRemote {
 }
 export interface PluginManagementRemote {
   settings: ProfileSettingsRemote
-  pluginManager: Answers<Pick<ClientRemote['pluginManager'], 'listPlugins' | 'listBundles' | 'inspect' | 'setPluginEnabled' | 'setBundleEnabled' | 'installBundle' | 'cancelInstall' | 'removeBundle'>>
+  pluginManager: Answers<Pick<ClientRemote['pluginManager'], 'listPlugins' | 'listBundles' | 'inspect' | 'setPluginEnabled' | 'setBundleEnabled' | 'installBundle' | 'cancelInstall' | 'removeBundle' | 'registries' | 'waitForInstall'>>
   pluginInventory: Answers<Pick<ClientRemote['pluginInventory'], 'list'>>
+  /** The gateway answers it locally; the managed runtime carries no such service. */
+  pluginRegistryProbe: { fastest(): Promise<Answer<string | null>> }
 }
 export type Answer<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } }
 const refused = (message: string): Answer<never> => ({ ok: false, error: { code: 'admin/management-interrupted', message } })
 const messageOf = (error: unknown) => error instanceof Error ? error.message : '插件操作未确认，请刷新后核对结果。'
 
 function decode<T>(endpoint: string, value: unknown): T {
+  if (endpoint === 'pluginRegistryProbe/fastest') {
+    if (value !== null && typeof value !== 'string') throw new Error('插件注册表探测结果无效。')
+    return value as T
+  }
   if (endpoint === 'settings.describe') return settingsDescribeValueSchema.parse(value) as T
   if (endpoint === 'settings.mutate') return settingsMutateValueSchema.parse(value) as T
   const descriptor = [...managerContribution.descriptors, ...inventoryContribution.descriptors]
@@ -58,14 +64,17 @@ export function pluginManagementRemote(target: PluginManagementTarget, lifetime:
   return {
     settings: { describe: () => call('settings.describe', {}), mutate: input => call('settings.mutate', input) },
     pluginInventory: { list: () => call('pluginInventory/list', {}) },
+    pluginRegistryProbe: { fastest: () => call('pluginRegistryProbe/fastest', {}) },
     pluginManager: {
       listPlugins: () => call('pluginManager/listPlugins', {}),
       listBundles: () => call('pluginManager/listBundles', {}),
-      inspect: (spec, signal) => call('pluginManager/inspect', { spec }, signal),
+      inspect: (spec, options, signal) => call('pluginManager/inspect', { spec, options }, signal),
       setPluginEnabled: (id, enabled) => call('pluginManager/setPluginEnabled', { id, enabled }),
       setBundleEnabled: (name, enabled) => call('pluginManager/setBundleEnabled', { name, enabled }),
       removeBundle: (name, signal) => call('pluginManager/removeBundle', { name }, signal),
       cancelInstall: requestId => call('pluginManager/cancelInstall', { requestId }),
+      registries: () => call('pluginManager/registries', {}),
+      waitForInstall: requestId => call('pluginManager/waitForInstall', { requestId }),
       async installBundle(spec, options, signal) {
         const input = request('pluginManager/installBundleStream', { spec, options })
         const abort = signal === undefined ? lifetime : AbortSignal.any([lifetime, signal])

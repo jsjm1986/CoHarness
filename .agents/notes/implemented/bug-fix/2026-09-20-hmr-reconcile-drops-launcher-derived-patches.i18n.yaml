@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-20-hmr-reconcile-drops-launcher-derived-patches.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-20-hmr-reconcile-drops-launcher-derived-patches.md
-2026-09-20-hmr-reconcile-drops-launcher-derived-patches.md: d0e8a5b4774af964eb08d9db2f7cceb7a8fb8fc9
-2026-09-20-hmr-reconcile-drops-launcher-derived-patches.zh.md: 95747ef3d2da43c9a31cc2526bab668def1b2b80
+/agent-note-hmr-reconciliation-re-derives-launcher-patches:
+  en: c5d73fc41c7d2abb
+  zh: a00fd31389cd18e4
+/agent-note-hmr-reconciliation-re-derives-launcher-patches/problem:
+  en: ff65c1f4ab6eff95
+  zh: ce188a269f77201b
+/agent-note-hmr-reconciliation-re-derives-launcher-patches/decision:
+  en: 3b761556d4700803
+  zh: e31c66eaf10cedca
+/agent-note-hmr-reconciliation-re-derives-launcher-patches/alternatives-considered:
+  en: c8e1a585ed723ec1
+  zh: 14ac5de621ae314f
+/agent-note-hmr-reconciliation-re-derives-launcher-patches/consequences:
+  en: cab92b8a57cda04b
+  zh: 037bd44e7b4e387a
+/agent-note-hmr-reconciliation-re-derives-launcher-patches/testing:
+  en: d1d9e495f16bac3d
+  zh: 15920322d5500946

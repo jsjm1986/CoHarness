@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-web-session-search.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-web-session-search.md
-2026-07-27-web-session-search.md: e467f4802e5a9b4b6bfef6b3f568b33c0b1fa7a6
-2026-07-27-web-session-search.zh.md: d440f0ce56668f34057959135791e9deca097b14
+/agent-note-web-past-session-search:
+  en: 691e96c7b1b6ac3d
+  zh: 6a3329f4bfc29d01
+/agent-note-web-past-session-search/problem:
+  en: 54f17d2e47998e63
+  zh: 501fdda6b47ac46e
+/agent-note-web-past-session-search/decision:
+  en: 9a6c97c75bc57a07
+  zh: a801263f1eb574a6
+/agent-note-web-past-session-search/failure-and-visibility-contract:
+  en: 7e4ec3fed842eaf0
+  zh: 3c695fe2f1dc60c1
+/agent-note-web-past-session-search/alternatives-considered:
+  en: 95b5f0c5692f4a6b
+  zh: fd59313e8e99b0bd
+/agent-note-web-past-session-search/consequences:
+  en: f368fa85afb15ee2
+  zh: f2c3affb58e44bed
+/agent-note-web-past-session-search/testing:
+  en: 8ec5844ed58e726b
+  zh: 005b61792035c2f7

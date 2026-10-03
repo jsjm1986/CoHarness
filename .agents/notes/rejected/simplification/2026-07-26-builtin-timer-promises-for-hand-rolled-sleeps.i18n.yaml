@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-26-builtin-timer-promises-for-hand-rolled-sleeps.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/rejected/simplification/2026-07-26-builtin-timer-promises-for-hand-rolled-sleeps.md
-2026-07-26-builtin-timer-promises-for-hand-rolled-sleeps.md: 280f394b1a57e1ef04cbd19de6838b125fdac400
-2026-07-26-builtin-timer-promises-for-hand-rolled-sleeps.zh.md: f9f21874d904b560d38276c5778159f342665f46
+/agent-note-use-node-timers-promises-for-hand-rolled-cancellable-sleeps:
+  en: 375b81101ea10ffd
+  zh: 4e63456174643d83
+/agent-note-use-node-timers-promises-for-hand-rolled-cancellable-sleeps/problem:
+  en: 47c4b1c25d179b2d
+  zh: b45c4f100e3344cd
+/agent-note-use-node-timers-promises-for-hand-rolled-cancellable-sleeps/proposal:
+  en: 610b20b046dec7ea
+  zh: 4e85ef0f63097c5d
+/agent-note-use-node-timers-promises-for-hand-rolled-cancellable-sleeps/alternatives-considered:
+  en: 1897b5c8c6179b6a
+  zh: e39724cb2160c679
+/agent-note-use-node-timers-promises-for-hand-rolled-cancellable-sleeps/acceptance-criteria:
+  en: 404ee98a6609d26a
+  zh: d9d8a3b055012132
+/agent-note-use-node-timers-promises-for-hand-rolled-cancellable-sleeps/risks:
+  en: a63132fb74c49961
+  zh: 166a88d947d555e3

@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-02-grouped-fuzzy-model-picker.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-grouped-fuzzy-model-picker.md
+/agent-note-grouped-fuzzy-model-picker-and-shared-popup-select-groups:
+  en: 1de677a6bcb71470
+  zh: f8df1901154ccbf4
+/agent-note-grouped-fuzzy-model-picker-and-shared-popup-select-groups/problem:
+  en: 8150f92e17bc7eb0
+  zh: d7958a300a95257d
+/agent-note-grouped-fuzzy-model-picker-and-shared-popup-select-groups/decision:
+  en: d2f1c730a011f96b
+  zh: 4c1820866f755211
+/agent-note-grouped-fuzzy-model-picker-and-shared-popup-select-groups/alternatives-considered:
+  en: 84841dca74e08e60
+  zh: a0e11892ac54a879
+/agent-note-grouped-fuzzy-model-picker-and-shared-popup-select-groups/consequences:
+  en: 921883fef6954c80
+  zh: 3f517180d87f5b53

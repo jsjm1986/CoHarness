@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-08-self-referential-cordis-toolset.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md
-2026-07-08-self-referential-cordis-toolset.md: dde0f860bc8946b4b952bd194879fdd2b91b7c4d
-2026-07-08-self-referential-cordis-toolset.zh.md: 03d6e8e6b0c7583772431a24691606dc70cf56fa
+/agent-note-the-self-referential-cordis-toolset:
+  en: a40ef3a00d9b112a
+  zh: 4dbb5717926cf838
+/agent-note-the-self-referential-cordis-toolset/problem:
+  en: a806a73138bfc694
+  zh: 2a343b63f3e1fd01
+/agent-note-the-self-referential-cordis-toolset/decision:
+  en: edbd5b9c3f0c815a
+  zh: c32347bedd200ce5
+/agent-note-the-self-referential-cordis-toolset/decision/the-three-tools:
+  en: 77c3b741a44f3061
+  zh: 1bb34bb72b872ec0
+/agent-note-the-self-referential-cordis-toolset/decision/sandbox-semantics:
+  en: 58290aeadf104400
+  zh: fb4dff6ae17d864f
+/agent-note-the-self-referential-cordis-toolset/decision/the-internal-group-and-temporary-plugin-lifecycle:
+  en: fbc5cb61c6bb3f27
+  zh: 7843b0eb30a6eb19
+/agent-note-the-self-referential-cordis-toolset/decision/cross-mount-composition-via-provide-inject:
+  en: c1b4b8f9ae167995
+  zh: 9fedf440aafdf75d
+/agent-note-the-self-referential-cordis-toolset/decision/the-generated-api-catalog:
+  en: d35f084af5ba82f8
+  zh: a9050ef750c643c1
+/agent-note-the-self-referential-cordis-toolset/decision/configuration-rendering-and-observability:
+  en: be0ad71ef410c47a
+  zh: ad8f1fd0a2052a5f
+/agent-note-the-self-referential-cordis-toolset/alternatives-considered:
+  en: f952c2d08667470d
+  zh: c784761cef3f8dba
+/agent-note-the-self-referential-cordis-toolset/consequences:
+  en: 579939998c245737
+  zh: fc8e0d9e288a81d5

@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-web-result-card.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-web-result-card.md
-2026-07-30-web-result-card.md: 591471d219295019d28b9eeaf2e57f6d2115d380
-2026-07-30-web-result-card.zh.md: c850c148ba32ca782fd1d6d7e5c3bbfa758391c5
+/agent-note-web-result-card-a-structured-render-intent-for-web-search-and-web-fetch:
+  en: 66268f081ba84a91
+  zh: 6ad8384db6c86e5d
+/agent-note-web-result-card-a-structured-render-intent-for-web-search-and-web-fetch/problem:
+  en: a7410d492cf9ff99
+  zh: 4be2b62a48c2f0eb
+/agent-note-web-result-card-a-structured-render-intent-for-web-search-and-web-fetch/decision:
+  en: 9f304b8f6be4d21b
+  zh: 1e5159823cce8b53
+/agent-note-web-result-card-a-structured-render-intent-for-web-search-and-web-fetch/consequences:
+  en: 48fee1fee97d236e
+  zh: c8487ac6b3d0f745
+/agent-note-web-result-card-a-structured-render-intent-for-web-search-and-web-fetch/alternatives-considered:
+  en: 054185faf04c084c
+  zh: 8cc1a96812218b71
+/agent-note-web-result-card-a-structured-render-intent-for-web-search-and-web-fetch/testing:
+  en: 51d5b50486e80565
+  zh: 4b60542cc81e8b51
+/agent-note-web-result-card-a-structured-render-intent-for-web-search-and-web-fetch/related:
+  en: 091654a4b731c0ea
+  zh: 9abe1873d515d653

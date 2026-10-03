@@ -91,7 +91,7 @@ export function MessageIconActions({
           {' '}
           <span className={css.runTimeDot} aria-hidden>·</span>
           {' '}
-          {t('message.ranFor', { duration: formatRunDuration(runMs, t) })}
+          {t('message.ranFor', { duration: formatRunDuration(runMs, t).map(part => part.text).join('') })}
         </>
       )}
       {ttftMs !== undefined && (

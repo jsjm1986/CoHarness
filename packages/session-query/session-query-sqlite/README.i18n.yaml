@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session-query/session-query-sqlite/README.md
-README.md: 2d16b9b80c0a546b803cff2b0fe793a385955013
-README.zh.md: 7b3842891b866e4dae6a7f807d29e4cd32e8a12c
+/:
+  en: bbbc2899a3463847
+  zh: 61495d48365178df
+/deepseek-ai-dsh-session-query-sqlite:
+  en: 3b4e0d04d33e84e3
+  zh: 73009d887838879e
+/deepseek-ai-dsh-session-query-sqlite/summary:
+  en: e8970d4d9500f484
+  zh: d96abbbe143b3ca9
+/deepseek-ai-dsh-session-query-sqlite/table-of-contents:
+  en: 5a96655d46586752
+  zh: a1d982da67104d1b
+/deepseek-ai-dsh-session-query-sqlite/search-contract:
+  en: a3a6d407fe4d8e66
+  zh: 6528f782e40ca922
+/deepseek-ai-dsh-session-query-sqlite/source-and-index-lifecycle:
+  en: 548e45e99a2cabba
+  zh: 95c73dae28407703
+/deepseek-ai-dsh-session-query-sqlite/configuration:
+  en: 0bc114bbf1a862b4
+  zh: ea2cbfe8978115bc
+/deepseek-ai-dsh-session-query-sqlite/tokenizer-and-limits:
+  en: 69dce5e246a4dc9c
+  zh: 93b3ad0dd919e1fd
+/deepseek-ai-dsh-session-query-sqlite/invariants:
+  en: bfde0a6a0c6b9a29
+  zh: e317d58082c8653b
+/deepseek-ai-dsh-session-query-sqlite/model-experience:
+  en: ff9dc9f0f67efd4d
+  zh: ad284a65c2091e0f
+/deepseek-ai-dsh-session-query-sqlite/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: ae5eece628147ab8
+/deepseek-ai-dsh-session-query-sqlite/known-limitations-and-deferred-work:
+  en: 63e3697a597a8e7a
+  zh: f9ee095fffdea64f
+/deepseek-ai-dsh-session-query-sqlite/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

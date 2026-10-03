@@ -1,3 +1,8 @@
+---
+description: "Client core services: SlotRegistry, SessionRuntime (scope tree + object layer)"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-runtime
 
 English | [中文](README.zh.md)
@@ -16,26 +21,62 @@ Settings owners share the React-free `SettingsScopeSpec`, `SettingsScope`, and s
 
 `Session.readCallHistory(callId, signal)` assembles an independent chat snapshot through the registered Conversation definitions. It uses the Session’s own ordinary or parent-addressed subagent transport, leaves the visible history untouched, and aborts with either the reader or Session lifetime. The caller owns this read result; it does not establish another Session or persistent cache.
 
+Pooled browser Session keys encode the owning runtime and original Host ID. Lists, scoped stores, Workbench panes, retained bindings, file observations and declared Remote event addresses use that key; the runtime keeps its original wire IDs and durable events. A bare ID shared by multiple runtimes is rejected instead of choosing an owner. `host.describe.runtimeTarget` fixes the bootstrap identity before history opens. A retained generation cannot be relabelled to another runtime.
+
+`usingRuntime` retains a target through discovery, asynchronous work and adoption of continuing Session references. It grants no authorization. Consumers combine their navigation and owner lifetimes; cancellation releases the operation’s hold without releasing other consumers. Both bootstrap and alternate targets await their own initial Session-list baseline.
+
+Explicit bootstrap authorization loss withdraws every pooled Session before the Connection-owned document cleanup and reload. An alternate runtime’s denial withdraws that runtime only. Ordinary reconnect failures retain the current account’s authorized caches.
+
+Session permission catalogs require a current owner. Withdrawing a runtime removes its Session-list ownership before connection teardown can publish further catalog changes. An unresolved or revoked Session has no catalog and never falls back to another runtime’s options; in-flight reads recheck ownership before returning.
+
 ## Summary
 
 Use `dsh-client-runtime` as the client-side object layer: it boots the Cordis browser context and owns `Session`/`Workspace` runtime objects, the shared Host event stream fan-out, projection stores, and history paging that conversation views subscribe to. Client sessions are always Host-born; domain packages read their owner events and projection slices through this layer instead of holding session state themselves.
 
+## Table of Contents
+
+- [Permission qualification](#permission-qualification)
+- [Workspace file resources](#workspace-file-resources)
+- [Slot declaration injection](#slot-declaration-injection)
+- [Session ownership](#session-ownership)
+- [Workspace and Session lists](#workspace-and-session-lists)
+- [New Session and the blank mirror](#new-session-and-the-blank-mirror)
+- [Pending queue projection](#pending-queue-projection)
+- [Conversation assembly](#conversation-assembly)
+- [Trajectory request data](#trajectory-request-data)
+- [PTC mode child-call tree](#ptc-mode-child-call-tree)
+- [Session title projection](#session-title-projection)
+- [Model retry projection](#model-retry-projection)
+- [Session forking](#session-forking)
+- [Session model selection](#session-model-selection)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="permission-qualification"></a>
 ## Permission qualification
 
 `SessionBinding.hostDescription` retains the description source of the connection that owns that Session, including separately staged workbench targets. The existing UI policy carries the current account's derived permission qualification. `permissionAvailabilitySource` observes those two sources without caching a second catalog; an unknown target never borrows another pane's standalone status.
 
+<a id="workspace-file-resources"></a>
 ## Workspace file resources
 
 `WorkspaceResourceRegistry` keeps metadata by explicit runtime target and Session-relative resource address. The bootstrap connection has a distinct `base` identity; each project connection registers `workspaceResourceProvider(api)` with its own API client after the Host handshake advertises file support. File requests never derive a target from the focused pane. The Host-configured `workspaceFileMaxResources` bounds retained records per runtime; idle records are evicted in usage order, while active resources refuse admission at the bound.
 
 Subscribers and pins share metadata loads. Releasing the last owner cancels pending reads. Existing Host streams deliver file observations, so opening more files creates no additional streams. Reconnect aborts old-generation requests and revalidates retained metadata; differing versions mark it changed until an explicit reload. Transient failures preserve metadata, while access denial, provider removal, or runtime removal discards it. Preview content stays in the view and is fetched through bounded, version-guarded RPCs.
 
+`source(request)` exposes the native `getSnapshot`/`subscribe` snapshot protocol, so consumers bind it through the renderer's `keyedHooks` machinery instead of holding the registry.
+
+<a id="slot-declaration-injection"></a>
 ## Slot declaration injection
 
 `ctx.slots.inject(name, callback)` makes a full `SlotMap` key the dependency for a contribution whose plugin can activate independently from the declaring entry. It runs `callback` synchronously when the declaration exists, otherwise waits; declaration collapse disposes the callback effect, and redeclaration reruns it. The controller belongs to the caller's plugin fiber, so unloading the contributor cancels either the wait or its active registrations. A direct `slots.register()` into an undeclared slot still throws.
 
 The callback returns one synchronous disposer or an iterable of disposers. A generator can therefore yield several `slots.register()` calls as one transaction: setup failure rolls earlier yields back and teardown runs them in reverse order. Declaration lifetimes use a dedicated monotonic epoch, so a collapse and redeclaration batched into one renderer notification still restarts the callback, while ordinary entry changes do not. Declaration-bound teardown runs synchronously with the ledger mutation, releasing runtime resources before subsequent same-tick registrations. See the [declaration-injection decision](../../../.agents/notes/implemented/architecture/2026-08-05-slot-declaration-injection.md).
 
+<a id="session-ownership"></a>
 ## Session ownership
 
 `retain(target, { source, signal? })` acquires an exact local generation and starts shared history opening. `binding` is immediately available; `ready` waits for that reference’s opening attempt. Aborting the waiter does not release its reference or cancel other consumers. Call `release()` in cleanup, use the disposal protocol, or use `using(target, options, operation)` to release after callback settlement. Root disposal invalidates every reference, including pending readiness waits.
@@ -48,6 +89,7 @@ Each scope carries an object identity distinct from its durable Session id. Scop
 
 `commitSessionNavigation()` retains the target while its opening attempt settles, requires usable history, and commits only the current intent. The receiving view acquires its own reference before the temporary reference is released. Failed loading preserves the old view; cancellation suppresses both stale commits and stale errors. This does not change `SessionReference.ready`, which reports attempt settlement rather than successful loading.
 
+<a id="workspace-and-session-lists"></a>
 ## Workspace and Session lists
 
 Workspace and Session lists have independent monotone `pending` → `ready` baseline phases and separate refresh activity/error state. Incremental upsert/removal/order frames and unary mutation echoes arriving during a list request replay over its response. Every successful Workspace baseline re-establishes Host-durable Workspace order so reconnects adopt changes committed while this client was offline. `WorkspaceRuntime.insertBefore` installs an optimistic order immediately; only the latest unary echo may replace it, a newer Host order frame outranks an older echo, and a latest rejected request restores the last Host-confirmed order rather than an earlier uncommitted drag. Removed Workspace ids retain process-local tombstones so late changed frames cannot resurrect them. Workspace recency is derived only after both baselines are ready and never changes Workspace list order.
@@ -66,13 +108,16 @@ SlotRegistry gives the renderer separate bare observables for `useSessions` and 
 
 `SessionListState.jobsBySession` mirrors the Host's `session/jobs` frames last-wins, keyed by session and needing no Session instance. An emptied set is stored as an absent key, so absence and `[]` are one representation and consumers never test a sentinel. Two clears keep it from outliving its truth: `session/subscribed` drops the session's mirror, because a fresh generation sends a baseline only for a non-empty set and a retained list would survive as a phantom, and `host/session-removed` drops it again, because owner disposal removed the records on the mux stream while the removal frame rides the host stream, leaving the two with no relative order.
 
+`SessionListState.observedJobs` carries the live output views `sessions.observeJob(sessionId, jobId)` accumulates: one reference-counted polling loop per job issues `jobs.output` reads at the observe cadence, advancing the `from` cursor per response and bounding the retained tail; a business refusal stores a terminal `error`, transport failures retry, and releasing the last observer aborts the loop and drops the entry. `sessions.killJob(sessionId, jobId)` issues `jobs.kill` and resolves with the admission alone — row convergence rides the next `session/jobs` frame.
+
 `SessionRuntime.search(query, signal)` is a stateless one-shot action over the `session.search` RPC. It returns ranked session/snippet pairs without putting query, loading, or error state into the shared Session list, so each UI owner controls debounce, cancellation, stale-response suppression, and fallback presentation. `searchResultLimit` re-exposes `SESSION_SEARCH_RESULT_LIMIT` — the bound the response schema itself enforces — as injected presentation data, so client plugins do not duplicate it. It is a protocol constant rather than per-connection state, so the connection handle does not carry it.
 
+<a id="new-session-and-the-blank-mirror"></a>
 ## New Session and the blank mirror
 
 While a newly reserved draft is still blank, its list row carries a client-local `workspaceId` hint so it remains under the target Workspace during a Host refresh; the hint is removed on visible content or removal and is never sent on the wire.
 
-`WorkspaceRuntime.connectWorkspace(workspaceId)` resolves the session a New Session flow lands in: it collects the workspace's existing blank sessions from the list mirror (`blank && cwd == workspace.path && sessionIds.includes(id)` — the Host's own membership rule, never cwd alone, so a cwd-matching unaccounted blank session is never hijacked), excludes archived rows, and asks `SessionRuntime.createOrReuse()` to return the first plugin-compatible candidate or create a fresh session. A fresh arm carries a stable draft id and preallocated Session id; the pair is retained in bounded browser storage until a visible message arrives, so reloads and concurrent New Session gestures reuse one reservation without storing credentials. The shared `startSession` action targets an explicit Workspace first, then the current Session's Workspace, then the derived recent Workspace; with no Workspace it clears into the blank New Session page. `SessionSummary.blank` mirrors the Host's no-visible-content bit: it is seeded by `session.list` / the `host/session-added` frame and converts only when a non-empty conversation event is observed, so an accepted or running-but-empty turn remains reusable. A list re-pull remains authoritative once local evidence has been reconciled. List surfaces hide blank rows; the store carries every row. `SessionRuntime.create` accepts an optional caller-preallocated SessionId and throws `SessionCreateError` (carrying `requestedSessionId`) on failure.
+`WorkspaceRuntime.connectWorkspace(workspaceId)` resolves the session a New Session flow lands in: it collects the workspace's existing blank sessions from the list mirror (`blank && cwd == workspace.path && sessionIds.includes(id)` — the Host's own membership rule, never cwd alone, so a cwd-matching unaccounted blank session is never hijacked), excludes archived rows, and asks `SessionRuntime.createOrReuse()` to return the first plugin-compatible candidate or create a fresh session. A fresh arm carries a stable draft id and preallocated Session id; the pair is retained in bounded browser storage until a visible message arrives, so reloads and concurrent New Session gestures reuse one reservation without storing credentials. Draft reservations store original Host IDs; only the pooled creation result is decoded back to that representation, preventing a repeated create from reserving a browser key as a new Session. The shared `startSession` action targets an explicit Workspace first, then the current Session's Workspace, then the derived recent Workspace; with no Workspace it clears into the blank New Session page. `SessionSummary.blank` mirrors the Host's no-visible-content bit: it is seeded by `session.list` / the `host/session-added` frame and converts only when a non-empty conversation event is observed, so an accepted or running-but-empty turn remains reusable. A list re-pull remains authoritative once local evidence has been reconciled. List surfaces hide blank rows; the store carries every row. `SessionRuntime.create` accepts an optional caller-preallocated SessionId and throws `SessionCreateError` (carrying `requestedSessionId`) on failure.
 
 `WorkspaceRuntime.openWorkspace(workspaceId)` selects the newest visible, non-blank, non-archived root Session in the Workspace from the existing list snapshots. It performs no additional list request; when no historical Session is eligible, it delegates to `connectWorkspace` so the caller receives the normal reusable or newly created blank Session. Startup and the Hero Workspace picker use this history-first entry, while the explicit New Session controls continue to call `connectWorkspace`.
 
@@ -80,10 +125,12 @@ While a newly reserved draft is still blank, its list row carries a client-local
 
 `Session.composerPhase` treats any visible non-command Chat Node as conversation content, so a client plugin can project durable human input without opening a turn while a window containing only generic command rows retains the Host blank posture. List hiding and blank-session reuse still follow the Host blank bit. A history window that lacks the plugin-owned input Node returns to that blank posture until an older page restores it.
 
+<a id="pending-queue-projection"></a>
 ## Pending queue projection
 
 `ConversationSnapshot.queue` is the Host's authoritative transient snapshot of `agent.inbox.nextTurn`; pending next-step steering stays outside this projection. Each row carries its `MessageId`, complete editable text when every content block is text, and a flattened preview that omits image blocks because the conversation dock renders their durable thumbnails separately. Local submissions record their expected transcript, queued, or steering placement until the matching Host `rpcId` observation. The Host derives whole `session/queue` snapshots from durable `agent/inbox/spliced` mutations and sends a baseline on reconnect; the message-local `agent/inbox/inserted`, `claimed`, and `discarded` notifications are not used to reconstruct this projection. `Session.updateQueue()` sends edit/remove operations through Host-side `Inbox.splice()` without optimistic client mutation, so the next Host snapshot is the sole visible commit and a claim race can surface `queue-item-not-found`.
 
+<a id="conversation-assembly"></a>
 ## Conversation assembly
 
 Each `Session` gives its contiguous event window to a `ConversationNodeAssembler`. `open()` and `loadOlder()` request `detail: 'conversation'` unless that session already filled; `ensureHistoryDetail()` fetches `detail: 'full'` and merges by seq. The window's `baseSeq` and tail include `omittedSpans`, so a conversation-tier hole is not a mux gap ([two-tier conversation history](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md)). A staged session starts in `historyWindowMode: 'tail'`; accepting a prompt or observing `running` expands up to `LIVE_HISTORY_RETAINED_PAGES` older pages in the background ([bounded live window](../../../.agents/notes/implemented/bug-fix/2026-09-03-bounded-live-window-and-incremental-reconnect.md)), while an idle staged reader automatically requests one older page when it nears the head. The older-page control remains an accessible retry when automatic paging fails or stops at a bound. Releasing the final reference drops the browser window and makes a later acquisition read a fresh tail. The model request and live event stream never wait for expansion. An ordinary session also requests a bounded `session.historyIndex` after the first page; the index contains only turn ranges and short previews, and a marker outside the resident window loads the required older pages before navigation. Plugins register business Definitions that map one event to a stable `{kind, id}`, create State at the unique start event, fold correlated updates, and build final nodes for registered view targets. The assembler owns the Context index, read-only predecessor lookup, and a reference-stable Turn/Step Location index. A live append evaluates each Definition once and updates only the matched Context; loading an older page preserves existing Context and node identities, matches only the newly prepended events, and replays Contexts whose predecessor or Location facts changed. Full replacement is reserved for initial open, stage re-entry, a resync of a window that was still loading, and a recovered tail that no longer touches the window; a resync of an open window and every other gap repair merge the recovered tail into the existing window so they cannot discard visible history.
@@ -98,34 +145,41 @@ Definition authors keep matching local to the current event, give every correlat
 
 The Chat builder keeps one mutable keyed store per Session. Content updates notify only the affected node key, structural changes rebuild order and Location membership, and a prepend adds rows without replacing existing keyed values. Assistant chunks update Definition State for every event but request at most one materialization per animation frame; final messages and Turn/Step closure publish immediately. See the [client Tool presentation decision](../../../.agents/notes/implemented/architecture/2026-08-08-client-tool-presentation-ownership.md).
 
+<a id="trajectory-request-data"></a>
 ## Trajectory request data
 
 Trajectory Definitions assemble one chronological, purpose-discriminated provider-request stream. Assistant requests always carry their numeric `turn` and `step`; compaction requests carry `step: 0` and a `turn` owner that may be `null`. That null owner means a manual compaction ran standalone between turns, not that it belongs to either adjacent turn. A cancellation-finalized `assistant/message` retains its durable result seq and provider metadata but does not complete the request; `step/end` classifies that request as an error. A `session/end-seed` boundary closes an unmatched compaction request as an error at the boundary time with `Compaction was interrupted before completion.`; a later start projects as an independent request instead of overwriting the orphan.
 
+<a id="ptc-mode-child-call-tree"></a>
 ## PTC mode child-call tree
 
 Every `ToolCallBlock` recursively owns its children through `subCalls`, in start order. Chat's Tool Definition correlates root calls and results by call id, folds Code Dispatch start/settlement records into that root Context, and projects one keyed recursive tree; child calls never become independent Chat roots. When a start falls outside the loaded window, its settlement remains renderable with `callTime: null`. A child update copies only its ancestor path, so unchanged siblings retain object identity. Edges that introduce a cycle or exceed the fixed 256-call depth limit are consumed without mutating the tree. Trajectory's Tool Definition independently assembles the same nested data contract for its target.
 
+<a id="session-title-projection"></a>
 ## Session title projection
 
 `SessionManager` retains the latest validated `session/title` control snapshot independently of list and session-instance arrival. Newer event seqs replace older snapshots, title timestamps contribute to list recency, and a subscription baseline discards any retained title beyond its `lastSeq` before the optional folded title arrives. Explicit session removal also clears the retained title. The client-facing `SessionSummary.title` is therefore only the actual durable title; `displayTitle` is always present and falls back through the cwd basename and session id. A cold persisted session keeps that fallback until opening or resuming it causes the host to fold and project its log-backed title. `ISession.rename` settles the `title` projection cell directly from the unary response's `{title, seq}` under the same higher-seq-wins rule — the list row and every `useProjection('title')` reader update ahead of the push frame, whose later replay of the same seq is a no-op.
 
+<a id="model-retry-projection"></a>
 ## Model retry projection
 
 The Host-owned LLM retry invariant validates provider-routed `llm/retry` and `llm/retry-started` records at the durable append boundary, including their identity, ordering, timer, integer, status, provider-delay, and non-empty diagnostic contracts. In the client, the Retry, Assistant, and Turn Error Definitions fold those records with Assistant and Turn/Step events: a failed step's streaming partial is removed and a durable retry notice appears at the retry event's sequence position. The notice is `scheduled` until the matching started record arrives; closing its owning Step or Turn first marks it `cancelled`, while the started record marks it `started`. Normal-mode notices carry their finite maximum; always-mode notices remain explicitly unbounded. A terminal `turn/end` error without a retry projects one `turn-error` node from its durable message and optional code; AUTH projections replace provider copy that may echo credential fragments with `API key is invalid`, while Gateway session-persistence and authorization internals use safe retry guidance and do not expose parser or storage details. A retried failure keeps only the retry notice for that attempt. Window rebuild and history replay use the same Definitions, so refresh neither resurrects discarded chunks nor loses terminal failure feedback. Visible unfinalized output is frozen as an interrupted Assistant node beside the terminal error.
 
 A `turn/end` whose reason is `max-tokens` projects one `turn-max-tokens` node at the turn position: a warning-styled localized notice that the reply stopped at the per-request output cap, with the truncated output kept in the flow and guidance that sending "continue" resumes in a new turn. The notice carries no token counts because the event reports none. The same Definition rebuilds it on window rebuild and history replay, so the reason survives refresh and restore.
 
+<a id="session-forking"></a>
 ## Session forking
 
 `ISessions.fork({sessionId, atSeq?, increaseTitle?})` resolves only after the child summary is locally addressable, carrying source lineage and cwd with `blank: false`; callers choose whether to open it. With `increaseTitle: true`, the client renames the child from the source session's persisted title: a trailing `(N)` or `（N）` is incremented without changing bracket style, while any other title gets ` (1)` appended; the rename is skipped when the source has no persisted title, and a rename failure rejects the promise but leaves the created child in place. This option is not sent in the Host fork request. A `workspace-attach-failed` response still identifies a child already published by the Host, so `SessionManager` reconciles that partial success before `SessionForkError` reaches the caller instead of making a retry create a duplicate child.
 
+<a id="session-model-selection"></a>
 ## Session model selection
 
 Each resident `Session` owns a `modelSelection` snapshot containing the current `ModelSelection`, provider-grouped directory, provider-local failures, and the `idle`/`loading`/`ready`/`selecting`/`error` state. History establishes or refreshes the current selection, opening a selector refreshes the directory, and selection failures preserve the last selection and usable groups. Directory and selection operations share a monotonically increasing generation so an older response cannot overwrite a newer selection. A reconnect rebuild restores the selection reported by the Host without replacing unchanged selection substructure.
 
 Each Session reads cold pending input from its own `inbox` projection store, retaining runtime isolation. Projection subscriptions close when the Session is disposed.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the session object layer selects the provider/model route used by a later Host request but adds no model-visible content.
@@ -138,3 +192,13 @@ Changing the model selection can change or invalidate provider-side cache reuse;
 
 - **`loader.unload` is a stub** — it throws not-implemented; the client has no unload chain from fiber disposal through registration and style removal.
 - **Value imports of this package from plugin bundles must use the `/client` subpath** — the bare package name is not in the loader externals table and inlines a second module instance, whose private scope-tag Symbol never matches.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

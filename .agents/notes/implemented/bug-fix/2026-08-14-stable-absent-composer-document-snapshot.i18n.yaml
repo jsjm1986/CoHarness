@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-stable-absent-composer-document-snapshot.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-14-stable-absent-composer-document-snapshot.md
-2026-08-14-stable-absent-composer-document-snapshot.md: 8c2eb771c23043f18e86ee6baaa066352d52691a
-2026-08-14-stable-absent-composer-document-snapshot.zh.md: 88d8a064ecb81231dc0c573f24bb6f76e6720af9
+/agent-note-keep-the-absent-composer-document-snapshot-stable:
+  en: bb30532a19bae3c2
+  zh: 90712faa3b1803b4
+/agent-note-keep-the-absent-composer-document-snapshot-stable/problem:
+  en: aecdeccfc8ef0477
+  zh: 3f7f7baca53ed2b9
+/agent-note-keep-the-absent-composer-document-snapshot-stable/decision:
+  en: 09957e83a4c1e1a7
+  zh: ff22010ef1d27696
+/agent-note-keep-the-absent-composer-document-snapshot-stable/alternatives-considered:
+  en: d8305ae95d93fe6a
+  zh: c5df1777cb4f7d9c
+/agent-note-keep-the-absent-composer-document-snapshot-stable/consequences:
+  en: a1e1fde2ed7e9283
+  zh: 558379c662e36e9e
+/agent-note-keep-the-absent-composer-document-snapshot-stable/testing:
+  en: a835b5d350396659
+  zh: ba414b3e441528d3

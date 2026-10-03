@@ -1,8 +1,11 @@
 /** Real Loader composition for the streaming document route and its disposal. */
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
+import { EventEmitter } from 'node:events'
+import type { IncomingMessage } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -10,6 +13,7 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
 import * as Connection from '@deepseek-ai/dsh-client-connection'
+import LocalCredentials from '@deepseek-ai/dsh-credentials-local'
 import LocalUserDocStore from '@deepseek-ai/dsh-userdoc-local'
 import * as UserDocHttp from '../src/index.ts'
 
@@ -33,6 +37,10 @@ async function load(compression: 'none' | 'gzip' = 'none'): Promise<Context> {
     "    host: '127.0.0.1'",
     '    port: 0',
     `    compression: ${compression}`,
+    "- name: '@deepseek-ai/dsh-credentials-local'",
+    '  config:',
+    `    path: '${join(root, '.credentials.yaml')}'`,
+    '    watch: false',
     "- name: '@deepseek-ai/dsh-client-connection'",
     "- name: '@deepseek-ai/dsh-userdoc-local'",
     '  config:',
@@ -46,6 +54,7 @@ async function load(compression: 'none' | 'gzip' = 'none'): Promise<Context> {
   context.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
     ['@deepseek-ai/dsh-host-webserver', WebServer],
+    ['@deepseek-ai/dsh-credentials-local', LocalCredentials],
     ['@deepseek-ai/dsh-client-connection', Connection],
     ['@deepseek-ai/dsh-userdoc-local', LocalUserDocStore],
     ['@deepseek-ai/dsh-host-userdoc-http', UserDocHttp],
@@ -63,10 +72,38 @@ async function load(compression: 'none' | 'gzip' = 'none'): Promise<Context> {
   return context
 }
 
+/**
+ * Exchange the process token in-process (no frontend row serves `/` here) and
+ * return a fetch attaching the session cookie.
+ */
+function authenticatedFetch(ctx: Context, origin: string): typeof fetch {
+  const url = new URL(ctx.connection.authenticatedUrl(origin))
+  const headers = { host: url.host }
+  const request = Readable.from([]) as unknown as IncomingMessage
+  Object.assign(request, { url: `${url.pathname}${url.search}`, method: 'GET', headers })
+  let setCookie: string | undefined
+  const response = Object.assign(new EventEmitter(), {
+    writeHead(_status: number, head?: Record<string, string>) {
+      setCookie = head?.['set-cookie']
+      return this
+    },
+    end() { return this },
+  })
+  ctx.connection.authorizeIndex(request, response)
+  if (setCookie === undefined) throw new Error('browser token exchange did not set a cookie')
+  const cookie = setCookie.split(';', 1)[0]!
+  return (input, init) => {
+    const requestHeaders = new Headers(init?.headers)
+    requestHeaders.set('cookie', cookie)
+    return globalThis.fetch(input, { ...init, headers: requestHeaders })
+  }
+}
+
 describe('real Loader composition', () => {
   it('serves through Connection and removes the subtree when its owning plugin unloads', { timeout: 60_000 }, async () => {
     const ctx = await load()
     const origin = `http://127.0.0.1:${String(ctx.webServer.port)}`
+    const fetch = authenticatedFetch(ctx, origin)
     const started = await fetch(`${origin}/api/documents/uploads`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ version: 1, name: 'loader.txt', directory: '', bytes: 6, fingerprint: 'loader' }),
@@ -105,6 +142,7 @@ describe('real Loader composition', () => {
   it('serves identity bytes with a declared length under gzip compression', { timeout: 60_000 }, async () => {
     const ctx = await load('gzip')
     const origin = `http://127.0.0.1:${String(ctx.webServer.port)}`
+    const fetch = authenticatedFetch(ctx, origin)
     const started = await fetch(`${origin}/api/documents/uploads`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ version: 1, name: 'loader.bin', directory: '', bytes: 6, fingerprint: 'loader' }),

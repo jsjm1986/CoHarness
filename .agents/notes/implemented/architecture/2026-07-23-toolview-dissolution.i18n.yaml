@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-23-toolview-dissolution.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-23-toolview-dissolution.md
-2026-07-23-toolview-dissolution.md: 173af01ff6cd5dc74f2f0916fd49ad278636d1bb
-2026-07-23-toolview-dissolution.zh.md: 23f6f5dd037531892fde93ea170f958b535d89db
+/agent-note-toolview-dissolution-tool-rows-are-per-view-keyed-slots:
+  en: ab2a2e1ab65bb730
+  zh: 2d4efdefb2be305d
+/agent-note-toolview-dissolution-tool-rows-are-per-view-keyed-slots/problem:
+  en: defed86896a85e07
+  zh: e6fa9dc7a4289faf
+/agent-note-toolview-dissolution-tool-rows-are-per-view-keyed-slots/decision:
+  en: 77269bd26f2769ad
+  zh: 97cf7d4d25c1f947
+/agent-note-toolview-dissolution-tool-rows-are-per-view-keyed-slots/accepted-semantic-changes:
+  en: e1be33e7bab3ffd2
+  zh: 392c30e81e892d3d
+/agent-note-toolview-dissolution-tool-rows-are-per-view-keyed-slots/alternatives-considered:
+  en: c6c56b23d10f2a4b
+  zh: b41e3c9866a1bf87
+/agent-note-toolview-dissolution-tool-rows-are-per-view-keyed-slots/consequences:
+  en: ed341167e888e973
+  zh: 10b8394c07980391

@@ -16,6 +16,7 @@ import type { SettingsApi } from './settings.ts'
 import type { CredentialsApi } from './credentials.ts'
 import type { LlmApi } from './llm.ts'
 import type { SubagentsApi } from './subagents.ts'
+import type { JobsApi } from './jobs.ts'
 import type { RpcResponse } from './rpc.ts'
 
 /**
@@ -40,11 +41,14 @@ export interface RpcMethodMap {
   'session.updateQueue': SessionsApi['updateQueue']
   'session.cancel': SessionsApi['cancel']
   'subagent.history': SubagentsApi['history']
+  'jobs.output': JobsApi['output']
+  'jobs.kill': JobsApi['kill']
   'host.describe': HostApi['describe']
   'host.pickDirectory': HostApi['pickDirectory']
   'host.listDirectory': HostApi['listDirectory']
   'host.createDirectory': HostApi['createDirectory']
   'host.openPath': HostApi['openPath']
+  'host.fileApplications': HostApi['fileApplications']
   'workspace.list': WorkspaceApi['list']
   'workspace.create': WorkspaceApi['create']
   'workspace.rename': WorkspaceApi['rename']
@@ -53,6 +57,8 @@ export interface RpcMethodMap {
   'workspace.insertSessionBefore': WorkspaceApi['insertSessionBefore']
   'workspace.archiveSession': WorkspaceApi['archiveSession']
   'workspace.unarchiveSession': WorkspaceApi['unarchiveSession']
+  'workspace.pinSession': WorkspaceApi['pinSession']
+  'workspace.unpinSession': WorkspaceApi['unpinSession']
   'workspaceChanges.summary': WorkspaceChangesApi['summary']
   'workspaceChanges.diff': WorkspaceChangesApi['diff']
   'workspaceFiles.list': WorkspaceFilesApi['list']

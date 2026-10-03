@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/examples/agent-spine-demo/README.md
-README.md: 70d61e946711c593374348a143e23feb21b1c890
-README.zh.md: d3235d4acabfcc6cc689b69e26dd6f4444ef2b05
+/:
+  en: ed066b9ec9cec537
+  zh: 61495d48365178df
+/deepseek-ai-dsh-agent-spine-demo:
+  en: af69eac80be405dc
+  zh: 5f74d8c98586fa37
+/deepseek-ai-dsh-agent-spine-demo/summary:
+  en: fd930ae4ce32ba2b
+  zh: c4d02425e01e94a7
+/deepseek-ai-dsh-agent-spine-demo/table-of-contents:
+  en: c94bc7bfd3fbf0fd
+  zh: 562f9d9e89a077a8
+/deepseek-ai-dsh-agent-spine-demo/the-tree-it-loads:
+  en: 54ca393b137ac1b6
+  zh: 8e78127dad6f295b
+/deepseek-ai-dsh-agent-spine-demo/what-it-deliberately-leaves-outside-the-bundle:
+  en: 072630ac5302c971
+  zh: f275c1bd4d5ae2b7
+/deepseek-ai-dsh-agent-spine-demo/config:
+  en: aa4c3ad746984314
+  zh: be312b73f7685928
+/deepseek-ai-dsh-agent-spine-demo/why-a-code-bundle-not-a-shared-yaml-include:
+  en: 23546eb39201fc42
+  zh: 691a0d3ede41d30e
+/deepseek-ai-dsh-agent-spine-demo/invariants:
+  en: 39dd6c9795ecedc7
+  zh: 76838cecdc79d76e
+/deepseek-ai-dsh-agent-spine-demo/model-experience:
+  en: 3c7097f6f09e1e8f
+  zh: 50358215012031c0
+/deepseek-ai-dsh-agent-spine-demo/model-experience/kv-cache-effect:
+  en: c62adaa305f773bb
+  zh: c7fd22d72743a759
+/deepseek-ai-dsh-agent-spine-demo/known-limitations-and-deferred-work:
+  en: 0239c436388149b8
+  zh: 6b20b5070e17b72e
+/deepseek-ai-dsh-agent-spine-demo/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

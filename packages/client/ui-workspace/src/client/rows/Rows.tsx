@@ -9,17 +9,26 @@ import { useState } from 'react'
 import clsx from 'clsx'
 import {
   HoverCard, IconArchiveOutline20, IconBranchOutline16, IconEditOutline16,
-  IconEllipsisOutline16, IconFolderClose16, IconFolderOpen16, IconPlusOutline16,
-  IconTrashOutline16, IconTriangleRightFill14, Menu, StateDot, relativeTime,
+  IconEllipsisOutline16, IconFolderClose16, IconFolderOpen16, IconPinFill16,
+  IconPinOutline16, IconPlusOutline16,
+  IconTrashOutline16, IconTriangleRightFill14, Menu, StateDot, Tooltip, relativeTime,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
+import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { GroupNode, SearchResultNode, SessionNode } from '../tree.ts'
 import css from './Rows.module.css'
 
 /** The standard locale seat, prop-passed from the browser root. */
 type RowTranslate = WorkspaceBrowserProps['t']
+
+/** The browser's `renderSlot` narrowed to the two ambient session-row seats. */
+type RowRenderSlots = PropsRenderSlots<
+  | 'sidebar.session.row.leading'
+  | 'sidebar.session.row.hover'
+>['renderSlot']
 
 /** Row display title: blank rows show the localized New Session label. */
 function displayTitle(node: SessionNode, t: RowTranslate): string {
@@ -109,7 +118,7 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
  * @param props.t - the browser root's locale seat.
  * @returns the row element.
  */
-export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home, t }: {
+export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home, newShortcut, t }: {
   group: GroupNode
   onToggle: () => void
   onCreate: () => void
@@ -119,6 +128,8 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
   drag?: WorkspaceRowDragProps | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
   home?: string | undefined
+  /** The `session.new` catalog row; the group's ＋ tooltip shows its effective keys. */
+  newShortcut?: ShortcutCatalogEntry | undefined
   t: RowTranslate
 }) {
   const row = group
@@ -134,6 +145,7 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
     <div
       className={clsx(css.projectRow, menuOpen && css.menuOpen)}
       role="treeitem"
+      data-row-key={`workspace:${group.key}`}
       aria-expanded={row.expanded}
       onClick={onToggle}
       draggable={drag !== undefined}
@@ -156,14 +168,17 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
         <span className={css.title}>{label}</span>
       </span>
       {row.workspaceId !== undefined && (
-        <button
-          type="button"
-          className={css.iconButton}
-          aria-label={t('actions.newSession.aria', { name: label })}
-          onClick={(e) => { e.stopPropagation(); onCreate() }}
-        >
-          <IconPlusOutline16 />
-        </button>
+        <Tooltip label={t('actions.newSession.aria', { name: label })} shortcutKeys={newShortcut?.keys} side="bottom" delayMs={500}>
+          <button
+            type="button"
+            className={css.iconButton}
+            aria-label={t('actions.newSession.aria', { name: label })}
+            aria-keyshortcuts={newShortcut?.aria}
+            onClick={(e) => { e.stopPropagation(); onCreate() }}
+          >
+            <IconPlusOutline16 />
+          </button>
+        </Tooltip>
       )}
       <span className={css.rowActions}>
         {actions !== undefined && (
@@ -224,6 +239,8 @@ function assertNever(value: never): never {
 interface SessionStatus {
   state: StateDotState
   label: string
+  /** Compact right-cell text replacing the timestamp while this status is primary. */
+  trailingLabel?: string
 }
 
 /**
@@ -248,13 +265,25 @@ function sessionStatuses(
   let pending: SessionStatus | undefined
   switch (node.pendingInteraction) {
     case 'approval':
-      pending = { state: 'warning', label: t('status.waitingApproval') }
+      pending = {
+        state: 'warning',
+        label: t('status.waitingApproval'),
+        trailingLabel: t('status.compact.approval'),
+      }
       break
     case 'plan-review':
-      pending = { state: 'warning', label: t('status.planReview') }
+      pending = {
+        state: 'warning',
+        label: t('status.planReview'),
+        trailingLabel: t('status.compact.planReview'),
+      }
       break
     case 'question':
-      pending = { state: 'warning', label: t('status.waitingAnswer') }
+      pending = {
+        state: 'warning',
+        label: t('status.waitingAnswer'),
+        trailingLabel: t('status.compact.answer'),
+      }
       break
     case undefined: break
     /* v8 ignore next -- closed PendingInteractionStatus union */
@@ -282,8 +311,23 @@ function SessionStatusDots({ statuses }: { statuses: readonly [SessionStatus, ..
   )
 }
 
+/** Non-interactive pinned-row marker; the enclosing row remains the only action. */
+function PinnedIndicator({ t }: { t: RowTranslate }) {
+  const label = t('row.pinned')
+  return (
+    <span className={css.pinIndicator} role="img" aria-label={label} title={label}>
+      <IconPinFill16 size={14} />
+    </span>
+  )
+}
+
 /** Hover-card body: full title, relative time, and every relevant live status. */
-function SessionHoverContent({ node, now, t }: { node: SessionNode; now: number; t: RowTranslate }) {
+function SessionHoverContent({ node, now, renderSlot, t }: {
+  node: SessionNode
+  now: number
+  renderSlot: RowRenderSlots
+  t: RowTranslate
+}) {
   const statuses = sessionStatuses(node, t)
   return (
     <div className={css.hoverContent}>
@@ -291,6 +335,7 @@ function SessionHoverContent({ node, now, t }: { node: SessionNode; now: number;
       {/* Same placeholder rule as the row's trailing cell: no timestamp
           before the first prompt. */}
       {!node.blank && <div className={css.hoverTime}>{hoverTimeLabel(node.updatedAt, now, t)}</div>}
+      {renderSlot('sidebar.session.row.hover', { sessionId: node.id })}
       {statuses.map(status => (
         <div className={css.hoverStatus} key={status.label}>
           <StateDot state={status.state} />
@@ -356,12 +401,16 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
  * @param props.onRename - open the session rename dialog (id + current title).
  * @param props.onFork - fork a session at its last completed turn.
  * @param props.onArchive - archive a session by id.
+ * @param props.onPin - pin a session so it leads its section (row menu and hover action).
+ * @param props.onUnpin - drop a session from the pin set (row menu and hover action).
  * @param props.drag - optional draggable-row wiring.
  * @param props.flat - omit the empty status slot in the hierarchy-free flat list.
  * @param props.t - the browser root's locale seat.
  * @returns the session row.
  */
-export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, drag, flat = false, t }: {
+export function SessionNodeItem({
+  node, currentId, now, onOpen, onRename, onFork, onArchive, onPin, onUnpin, drag, flat = false, renderSlot, t,
+}: {
   node: SessionNode
   currentId: string | undefined
   now: number
@@ -372,10 +421,16 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   onFork: (id: SessionNode['id']) => void
   /** Archive this session (row menu action; commits without a dialog). */
   onArchive: (id: SessionNode['id']) => void
+  /** Pin this session so it leads its section (row menu and hover action). */
+  onPin: (id: SessionNode['id']) => void
+  /** Drop this session from the pin set (row menu and hover action). */
+  onUnpin: (id: SessionNode['id']) => void
   /** Present only on draggable rows (workspace-group sessions outside search). */
   drag?: RowDragProps | undefined
   /** The row is rendered without a parent Workspace header. */
   flat?: boolean | undefined
+  /** Ambient per-row seats (schedule marks): leading cell and hover card. */
+  renderSlot: RowRenderSlots
   t: RowTranslate
 }) {
   const row = node
@@ -385,10 +440,17 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   const primaryStatus = statuses[0]
   const showStatus = primaryStatus.state !== 'done' || row.completed
   const [menuOpen, setMenuOpen] = useState(false)
+  // Blank rows are never drag sources: the provisional placeholder leads its
+  // section by rule, and the drag machine rejects blank sources regardless.
+  const draggable = drag !== undefined && !row.blank
   // Archive hides the row through the registry-global archive set and never
   // touches the session log, so it is not styled as destructive and needs no
   // confirmation dialog.
   const sessionMenuItems = [
+    // Pin leads the menu; the same row also carries the hover action.
+    row.pinned
+      ? { id: 'unpin', label: t('menu.unpinSession'), icon: <IconPinFill16 /> }
+      : { id: 'pin', label: t('menu.pinSession'), icon: <IconPinOutline16 /> },
     { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
     { id: 'fork', label: t('menu.fork'), icon: <IconBranchOutline16 /> },
     // 20-native glyph in the menu's 16px icon slot (Menu.module.css .itemIcon).
@@ -403,17 +465,21 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
         drag?.marker === 'before' && css.dropBefore, drag?.marker === 'after' && css.dropAfter,
       )}
       role="treeitem"
+      data-row-key={`session:${node.id}`}
       aria-selected={selected}
       onClick={() => { onOpen(node.id) }}
-      draggable={drag !== undefined}
-      onDragStart={drag === undefined
+      // The provisional New Session row keeps its section lead through the
+      // blank-pinning rules, so it is never a drag source; it remains a drop
+      // target (the browser normalizes that drop to below the placeholder).
+      draggable={draggable}
+      onDragStart={!draggable
         ? undefined
         : (e) => {
           e.dataTransfer.effectAllowed = 'move'
           e.dataTransfer.setData('text/plain', node.id)
           drag.start()
         }}
-      onDragEnd={drag?.end}
+      onDragEnd={draggable ? drag.end : undefined}
       onDragOver={drag === undefined
         ? undefined
         : (e) => {
@@ -435,7 +501,11 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
           and is cleared by opening the session. */}
       {(!flat || showStatus) && (
         <span className={css.slot}>
-          {showStatus && <SessionStatusDots statuses={statuses} />}
+          {/* A higher-priority state replaces the ambient leading seat; idle
+              rows lend the cell to it. Blank rows keep it empty. */}
+          {showStatus
+            ? <SessionStatusDots statuses={statuses} />
+            : !row.blank && renderSlot('sidebar.session.row.leading', { sessionId: node.id })}
         </span>
       )}
       <span className={css.title}>{title}</span>
@@ -446,15 +516,40 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
           happened in it yet, so a "now" timestamp and the row verbs
           (rename/fork/archive) would all act on content that does not
           exist — both trailing cells stay off until the first prompt. */}
-      {!row.blank && <span className={css.time}>{timeLabel(row.updatedAt, now, t)}</span>}
+      {!row.blank && (
+        <span
+          className={css.time}
+          aria-hidden={primaryStatus.trailingLabel === undefined ? undefined : true}
+        >
+          {primaryStatus.trailingLabel ?? timeLabel(row.updatedAt, now, t)}
+        </span>
+      )}
+      {/* Trails the time so the marker occupies the same right-edge cell as
+          the hover pin button that replaces it. */}
+      {row.pinned && !row.blank && <PinnedIndicator t={t} />}
       {!row.blank && (
         <span className={css.rowActions}>
+          <Tooltip label={t(row.pinned ? 'actions.unpin' : 'actions.pin')} side="bottom" align="end" delayMs={500}>
+            <button
+              type="button"
+              className={css.iconButton}
+              aria-label={t(row.pinned ? 'menu.unpinSession' : 'menu.pinSession')}
+              onClick={(e) => {
+                e.stopPropagation()
+                ;(row.pinned ? onUnpin : onPin)(node.id)
+              }}
+            >
+              {row.pinned ? <IconPinFill16 size={14} /> : <IconPinOutline16 size={14} />}
+            </button>
+          </Tooltip>
           <Menu
             open={menuOpen}
             onClose={() => { setMenuOpen(false) }}
             items={sessionMenuItems}
             onSelect={(id) => {
               setMenuOpen(false)
+              if (id === 'pin') onPin(node.id)
+              if (id === 'unpin') onUnpin(node.id)
               if (id === 'rename') onRename(node.id, row.title)
               if (id === 'fork') onFork(node.id)
               if (id === 'archive') onArchive(node.id)
@@ -479,7 +574,7 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   return (
     <HoverCard
       anchor={ownRow}
-      content={<SessionHoverContent node={node} now={now} t={t} />}
+      content={<SessionHoverContent node={node} now={now} renderSlot={renderSlot} t={t} />}
       disabled={menuOpen || drag?.active === true}
       copyText={row.blank ? undefined : row.title}
       copyLabel={t('copy')}

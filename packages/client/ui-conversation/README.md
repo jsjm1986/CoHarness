@@ -1,3 +1,8 @@
+---
+description: "Conversation domain: skeleton, ordered chat flow, account-backed composer/display preferences, and details host"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-conversation
 
 English | [中文](README.zh.md)
@@ -16,7 +21,9 @@ On compact viewports the AppFrame topbar owns the phone-level Session title, whi
 
 The conversation service exposes `IConversation.attachDocument` for the document manager: it adds an existing durable `docId` as a ready composer draft without another upload. Removing that manager attachment releases only browser draft metadata, so the stored document remains available to history and later conversations.
 
-The root-scoped `conversation` entry owns `conversation.pane`, the current-session-optional conversation tree, and the toolbar, empty-state, pane-header, and sidebar display-preferences slots used by the optional workbench. Its `conversationViewport` Cordis capability shares the entry-declared root store through `slots.bindStore()`. The provider validates restored Session ids against the current Session and archive lists, retains at most four panes, and coordinates additional history windows without cancelling tasks. Explicit SessionProvider instances preserve each pane's standard kit and stores; removing the workbench contributions restores single-session rendering. The [workbench package](../ui-workbench/README.md) owns the Workspace chooser and pane controls.
+Document uploads, completion references and draft removal follow the addressed Session’s runtime. All resumable HTTP and XHR requests carry the same verified account and runtime, and resume metadata is isolated by that owner. A lost Session owner cannot fall back to the page’s bootstrap document store.
+
+The root-scoped `conversation` entry owns `conversation.pane`, the current-session-optional conversation tree, and the toolbar, empty-state, pane-header, and sidebar display-preferences slots used by the optional workbench. Its `conversationViewport` Cordis capability shares the entry-declared root store through `slots.bindStore()`. The provider validates restored Session ids against the current Session and archive lists, retains at most four panes, and coordinates additional history windows without cancelling tasks. A legacy layout awaiting complete identity verification exposes `pendingIdentity` and rejects layout edits until reconciliation; it does not report unsaved changes as successful. Explicit SessionProvider instances preserve each pane's standard kit and stores; removing the workbench contributions restores single-session rendering. The [workbench package](../ui-workbench/README.md) owns the Workspace chooser and pane controls.
 
 Chat business rows are independent registry contributions rather than a closed built-in union. A client plugin declaration-merges its typed `ChatNodeDataMap` key, registers a `ConversationNodeDefinition` on `ctx.conversationEvents`, and registers the matching keyed renderer on `conversation.chat.node`; it does not modify Session folds or a central renderer switch. The [Conversation Node cookbook](../../../docs/cookbook/adding-a-conversation-node.md) covers stable event ids, append/prepend replay, Location data, and renderer constraints.
 
@@ -34,7 +41,7 @@ The session header renders the session-scoped `'conversation.session.header.acti
 interface ComposerChainProps {
   /** Whether this pane may request automatic input focus. */
   active?: boolean
-  interactions: readonly PendingInteraction[]
+  interactions: readonly SessionPendingEntry[]
   /** Current conversation facts for feature-owned takeover selectors. */
   session: ConversationSnapshot | undefined
 }
@@ -49,7 +56,7 @@ The chat view keeps Tool placement but delegates Tool presentation. Each ordered
 
 The chat flow projects consecutive model-retry nodes across retry turns into one stable, muted status row updated to the latest attempt; every retry event remains in the runtime snapshot and session log. Its frontend countdown anchors the scheduled delay to client receipt, avoiding host/browser clock skew, rounds remaining time up to seconds, and has a one-second floor. The latest unresolved retry uses a left-to-right text shimmer. Subsequent turn facts distinguish an attempt that started from one cancelled during backoff, while the Host running bit only controls the live animation; the row then shows a static completed or cancelled label. Normal policy rows show the finite retry maximum; always policy rows show `∞`. Activating the row reveals the latest exact retry delay and failure message. The client runtime removes each failed step's streaming tail before its retry node arrives, while the status remains visible after a later attempt succeeds. An unretried terminal failure renders as a persistent inline status at its turn boundary, showing display-safe copy and an optional actionable error code without offering an action the Host cannot fulfill; AUTH copy never echoes provider-supplied credential fragments, and Gateway session-persistence or authorization internals use localized retry guidance.
 
-`TurnErrorItem` replaces Gateway session-persistence and authorization internals with localized retry guidance and omits an `UNKNOWN` code; server-side diagnostics remain in the durable log and Gateway log.
+`TurnErrorItem` replaces Gateway session-persistence and authorization internals with localized retry guidance and omits an `UNKNOWN` code; server-side diagnostics remain in the durable log and Gateway log. Policy-hook cancellation also displays its explicit stopping reason and retained-queue recovery instructions; an ordinary user Stop adds no error row.
 
 `TodoDock` takes the `'conversation.input.dock'` list slot at `order: 0` — before Goal and Queue — and is the plan strip: it reads the host-computed `todos` projection via `useProjection` (standing plan: latest `todo/write` with no later `turn/start`) and renders `TodoPanel`, which takes the plain list, hides itself while the list is empty, and starts collapsed as a header of title plus its own `·`-joined per-status counts (localized, `1 completed · 2 in progress · 1 pending`, zero-count segments omitted). The dock adapter owns selection so the panel stays a pure function of its props. Anything the input-zone composer chain hides (a `conversation.composer` takeover such as ui-user-questions's) hides the whole dock, this strip included. The `todo_write` Tool row belongs to [`ui-tool`](../ui-tool/README.md).
 
@@ -62,6 +69,8 @@ The Host's placement-aware `session/queue` snapshot also carries pending steerin
 Composer message submission resolves delivery from the addressed session's running state and steering capability. While idle, Enter and Cmd/Ctrl+Enter both perform an ordinary Queue send. While a primary session is running, the Host-backed `ui-conversation.busyEnter` General Settings preference assigns plain Enter and the Send button to `Queue` (the default) or `Steer`, and Cmd/Ctrl+Enter performs the other behavior; the local settings provider stores it in `$DSH_HOME/settings.yaml`, so the choice follows the same user home across Web ports. Shift+Enter remains a newline. With an empty draft, Cmd/Ctrl+Enter instead steers every still-pending queued message into the running turn in FIFO order (the dock's per-row strict-steer action applied to the whole queue); plain Enter with an empty draft remains a no-op. While this whole-queue gesture is available, the textarea placeholder advertises it; a placeholder supplied by the owning surface still takes precedence. Continuable subagents follow the same delivery preference while their parent is available; one-shot children remain read-only. A running Send button labels an actionable plain-message draft as Queue message or Steer message; commands, unavailable inputs, and pending uploads keep the plain Send label. Other consumers of `InputActions.submit()` retain Queue delivery. Composer Steer uses the existing best-effort `session.prompt(mode: 'steer')` contract: if the current next-step window closes before acceptance, AgentLoop admits the message as the next waking Queue turn without surfacing a failure or losing the draft transaction. The [Host-backed preferences decision](../../../.agents/notes/implemented/bug-fix/2026-08-06-host-backed-web-preferences.md) owns the persistence boundary.
 
 An ordinary running composer keeps Stop as its primary pointer action while its draft is empty or an owner block makes input unavailable. Actionable text, images, or documents switch the same seat to the configured Send delivery; clearing or successfully submitting the draft restores Stop. Continuable subagents retain independent Send and Stop actions. The [busy Send decision](../../../.agents/notes/implemented/bug-fix/2026-09-22-busy-send-follows-enter-setting.md) keeps the button label and delivery tied to one live preference.
+
+Two independent Escape presses in the focused Chat or Composer stop its current running turn and preserve queued messages. The interval comes from the shortcuts service's `stopSequenceMs` configuration (500 ms by default). A menu, approval, modal, terminal, embedded webpage, composition, repeated key, changed input region, Session or turn breaks the sequence. The shortcut uses the same scoped cancellation as the Stop button. The plugin registers Stop as a fixed action in the `input` display group alongside the non-editable send/newline/queue/steer, slash-menu, and mention-menu gestures; the registration reserves plain Escape against editable shortcuts and supplies the `Esc Esc` sequence shown in the Stop button's hover and keyboard-focus tooltip.
 
 Per-session UI state for selection and the active view lives in the declared chat store (`stores.ts` `createChatStore`); the InputHub owns the composer state machine and mirrors its draft into that store for persistence. Apply passes one store handle to the strict session subtree and chat view registrations, so each session shares one instance and the framework owns its lifecycle. Tool details receive their explicit call address from the auxiliary tab owner. Components are pure: the framework standard kit supplies `useSession`/`sessionId`, global `useSessions`/`useWorkspaces`, and the input machine's `useInput`/`inputActions`; store faces and inject factories supply the remaining state and callbacks.
 
@@ -89,14 +98,27 @@ Unsent text, attachments, and active submission attempts retain their exact Clie
 
 `ui-conversation` owns target-neutral Conversation assembly and the shared browser shell. It consumes Session Controller `SessionEventLikeEntry` feeds, exposes React-free registries and per-Session bindings through `ctx.uiConversation`, and contributes the `useConversation`, `useInput`, and `inputActions` standard props through `ctx.uiSession`. It also owns the per-session durable image URL cache: `ctx.uiConversation.imageUrl(sessionId, attachment)` resolves one session-authorized browser URL per attachment and revokes it with the Session binding, so every Conversation target shares one `session.attachment` read. Concrete targets such as Chat are separate packages that register their own Definitions, snapshot builders, Views, and renderers.
 
+## Table of Contents
+
+- [Settings authority](#settings-authority)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="settings-authority"></a>
 ## Settings authority
 
-The busy-state Enter preference and transcript display preferences are account-owned settings fields. Their rows use the account transport while a project is active, refuse changes until a ready writable view exists, show provider restrictions inline, and adopt the recovered value after a failed latest write. Width and font-size writes are numeric and share the same account revision fence as the Enter preference, so one field cannot poison another field's write state. The policy and display controller release their scope subscriptions with the conversation plugin, so HMR and teardown do not retain settings listeners. A compact variant of the display row fills the `conversation.workbench.display` hole that the workbench sidebar panel declares, bound to the same controller and account scope.
+The busy-state Enter preference and the transcript display, work-details, performance-detail, and link-destination preferences are account-owned settings fields. Their rows use the account transport while a project is active, refuse changes until a ready writable view exists, show provider restrictions inline, and adopt the recovered value after a failed latest write. Width and font-size writes are numeric and share the same account revision fence as the Enter preference, so one field cannot poison another field's write state. The work-details mode resolves through a presentation-policy table into completed-turn folding, reasoning-preview, and process-detail switches consumed across the Chat view; the performance mode gates completed-turn usage panels and composer statistics detail; the link destination chooses between the built-in Browser tab (falling back to a new tab when no Browser consumer claims the `web/browser-open` bail) and a plain new tab, and its row hides itself when the assembly registers no Browser tab type. The policies and display controller release their scope subscriptions with the conversation plugin, so HMR and teardown do not retain settings listeners. A compact variant of the display row fills the `conversation.workbench.display` hole that the workbench sidebar panel declares, bound to the same controller and account scope.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Conversation nodes, turns, and composer state are projected by the runtime and Host seams; the package contributes the views and controllers that render them.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this package renders browser state and sends user-admitted inputs through Session Controller APIs without constructing model requests.
@@ -118,3 +140,13 @@ None; Conversation assembly and browser input state do not alter provider-side p
 - **TodoPanel truncates long item text to one ellipsized line** — the figma strip has no wrap or expand affordance; full text is not readable inline.
 - **Queue edit is text-only** — rows containing non-text blocks still show a flattened preview, but their edit control is disabled because the inline editor cannot preserve those blocks. A text row's edit mode replaces delete and strict steer with save and cancel; Enter saves and Escape cancels.
 - **Queue strict steer preserves complete messages** — while the Agent is running, the steer action atomically transfers the addressed Queue occurrence into the current next-step window. Mixed-content rows remain eligible because the action forwards the immutable message instead of the text projection. The placement-aware Host snapshot renders pending steering at the conversation tail until the consumed `user/message` folds into the durable transcript, so immediate display, reconnect, and replay share one linear authority.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

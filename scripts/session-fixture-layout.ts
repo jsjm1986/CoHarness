@@ -13,7 +13,8 @@ import {
   type SessionEvent,
   type SessionSeq,
 } from '@deepseek-ai/dsh-session'
-import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
+import { sessionFormatCatalog, sessionLogicalFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
+import type { SessionFormatArtifact, SessionFormatEvent, SessionFormatHeader } from '@deepseek-ai/dsh-session-format'
 import type { SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
 
 /** Whether a path intentionally preserves physical persistence bytes. */
@@ -199,6 +200,81 @@ export function canonicalSessionFixture(content: string, label = '<session-fixtu
   }
   if (renderFixture(headerLine, decoded, sourceEventForm) !== canonical) {
     throw new Error(`${label}: rewrite is not idempotent`)
+  }
+  return canonical
+}
+
+/**
+ * Publish one predecessor-generation fixture's current-format successor as
+ * canonical projected text. The released adjacent header migration preserves
+ * every field except `version`, so the committed header line is rewritten in
+ * place; body rows decode at their stored version and migrate event-for-event
+ * through the released logical chain. `{{token}}` placeholders survive because
+ * only the driver's header copy is realized for validation; the emitted header
+ * and event payloads keep the templated bytes. Current or non-session inputs
+ * return undefined; refusals and malformed rows throw.
+ *
+ * @param content - JSONL source text of the stored generation.
+ * @param label - path-like diagnostic label.
+ * @returns Canonical current-generation fixture text, otherwise undefined.
+ */
+export function migrateSessionFixtureToCurrent(content: string, label = '<session-fixture>'): string | undefined {
+  const headerLine = content.split(/\r?\n/).find(line => line.trim().length > 0)
+  if (headerLine === undefined) return undefined
+
+  let headerValue: unknown
+  try {
+    headerValue = JSON.parse(headerLine)
+  } catch {
+    return undefined
+  }
+  if (!isSessionHeader(headerValue)) return undefined
+  const stored = headerValue as Record<string, unknown>
+  const storedVersion = stored['version']
+  if (typeof storedVersion !== 'number' || storedVersion >= sessionFormatCatalog.currentVersion) {
+    return undefined
+  }
+  let events: SessionEvent[]
+  try {
+    events = parseFixtureRows(content, headerValue)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`${label}: ${detail}`, { cause: error })
+  }
+  const { type: _type, ...storedHeader } = stored
+  // `{{cwd}}`/`{{session:N}}` placeholders fail released header validation;
+  // the migration only reads `isSeeded`/`delegationDepth`, so realize tokens
+  // on the driver's copy while the emitted header keeps the templated bytes.
+  const realized = Object.fromEntries(Object.entries(storedHeader).map(([key, value]) => [
+    key,
+    key === 'cwd' && typeof value === 'string' && value.startsWith('{{') ? '/snapshot-fixture'
+      : key === 'id' && typeof value === 'string' && value.startsWith('{{') ? 'session-fixture'
+        : value,
+  ]))
+  let migrated: SessionFormatArtifact
+  try {
+    migrated = sessionLogicalFormatCatalog.migrate(
+      realized as SessionFormatHeader,
+      // Fixture rows decode into typed SessionEvents; the logical chain only
+      // consumes their JSON surface.
+      events as SessionFormatEvent[],
+      undefined,
+    )
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`${label}: ${detail}`, { cause: error })
+  }
+  const nextHeaderLine = JSON.stringify({ ...stored, version: migrated.header.version })
+  const canonical = renderFixture(
+    nextHeaderLine,
+    migrated.events as SessionEvent[],
+    usesSourceEventRanges(content) ? 'ranges' : 'flat',
+  )
+  const decoded = parseFixtureRows(canonical, JSON.parse(nextHeaderLine))
+  try {
+    deepStrictEqual(withoutEnvelope(decoded), withoutEnvelope(migrated.events as SessionEvent[]))
+  } catch (error) {
+    throw new Error(`${label}: migration rewrite changed the event payload stream`, { cause: error })
   }
   return canonical
 }

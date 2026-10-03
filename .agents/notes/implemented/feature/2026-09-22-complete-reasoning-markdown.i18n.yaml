@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-complete-reasoning-markdown.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-22-complete-reasoning-markdown.md
-2026-09-22-complete-reasoning-markdown.md: c494483b474162548da008027820584ecaf5a027
-2026-09-22-complete-reasoning-markdown.zh.md: 354f5cc277058aeb280ba97fb5107137f9cef12b
+/agent-note-complete-reasoning-markdown-in-the-web-disclosure:
+  en: 82641b8920a53899
+  zh: 72dc0bbce5d4b976
+/agent-note-complete-reasoning-markdown-in-the-web-disclosure/problem:
+  en: 265f71204879f6f5
+  zh: 08223339dcd8835a
+/agent-note-complete-reasoning-markdown-in-the-web-disclosure/decision:
+  en: b100566d8db58a9b
+  zh: 4eac15941909d8e5
+/agent-note-complete-reasoning-markdown-in-the-web-disclosure/alternatives-considered:
+  en: d50f26a516f4f290
+  zh: 9071f3cf6c86ede9
+/agent-note-complete-reasoning-markdown-in-the-web-disclosure/consequences:
+  en: 7a02090f8f7a3b8d
+  zh: 7d471722b3e7793b

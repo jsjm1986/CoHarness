@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-spill-local
 
 [English](README.md) | 中文
@@ -8,6 +13,19 @@
 
 `dsh-spill-local` 把调用方的超大文本保存到宿主文件系统中私有的会话级文件，并以该文件路径作为定位信息返回，同时给出告诉模型读取或搜索它的取回指引。只要组合需要在 agent（智能体）运行所在的同一台机器上进行 spill 存储，就挂载它。文件对当前用户私有、名称不可预测，且每个会话的文件归入稳定的目录，因此共享根目录既不会泄露输出，也不会被预置的符号链接重定向。配置选择根目录与启动清理保留期；预览与 spill 决策由其他包负责。
 
+## 目录
+
+- [存储布局](#storage-layout)
+- [配置](#config)
+- [启动清扫](#startup-cleanup)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="storage-layout"></a>
 ## 存储布局
 
 文件存放在 `<root>/session-<hash>/​<random>-<safeName>`：
@@ -16,6 +34,7 @@
 - **`session-<hash>`**：截短的 `sha256(sessionId)` 前缀，用于将同一会话的 spill 文件归在一起，以便未来的清理操作可按会话删除。
 - **`<random>-<safeName>`**：不可预测的十六进制前缀（防止在共享根目录中预置符号链接），加上经过清理的调用方 `suggestedName`，使其成为单个安全路径段（防路径遍历；与 JSONL 持久化后端的 `encodeSegment` 一致）。写入操作采用排他方式，且权限仅限所有者（`open(path, 'wx', 0o600)`）：如果路径已经存在，无论是否为符号链接，操作都会失败，因此预置的目标无法重定向写入。
 
+<a id="config"></a>
 ## 配置
 
 | 键 | 默认值 | 含义 |
@@ -25,16 +44,20 @@
 
 `saveText` 在发生真实存储故障（权限、ENOSPC）时返回拒绝；spill 策略会按尽力而为原则处理该拒绝，并保留内联结果。词汇见 seam README，设计见[工具输出 spill Agent Note](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.zh.md)。
 
+<a id="startup-cleanup"></a>
 ## 启动清扫
 
 激活后启动一次尽力而为的清扫，不会推迟服务可用。它扫描已配置的根目录以及操作系统临时目录下既往默认的 `dsh-spill-*` 根目录，删除修改时间严格早于配置截止点的普通文件，裁剪空的会话目录，并且只移除已清空的既往默认根目录。长期运行的进程在重启前不会再次清扫。释放时等待清扫结束；若清扫移除了某个会话目录，并发写入会重新创建它。
 
 清扫解析文件系统身份，从不跟随或删除符号链接，并跳过无关条目。在 POSIX 上，它只接纳由当前用户拥有、组和其他用户不可写、且沿祖先路径不会被替换的根目录和会话目录；`/tmp` 这类可写的 sticky 临时目录是允许的。不安全的路径会产生一条警告并保持原样。文件系统与警告接收器的失败都被包含在内，因此清扫不会让激活或并发的 spill 写入失败。保留期的决策记录在[启动清扫 Agent Note](../../../.agents/notes/implemented/feature/2026-09-14-spill-local-startup-cleanup.zh.md)。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每次 spill 写一个会话作用域文件，该文件本身就是记录；后端不保留可供比较的索引。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 间接地，通过把已保存文件路径与 read/grep 取回指引渲染给模型的 spill 消费方。
@@ -43,7 +66,18 @@
 
 无直接失效；请求前缀变更由上述消费方负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **不提供会话生命周期删除**：spill 文件在所属会话结束后会一直保留，直到按时间的启动清扫回收它，因为已持久化、已恢复和 fork 后的会话可能仍在引用某个路径；从不重启的进程也从不清扫。
 - **定位信息需要与其位于同一文件系统的消费方**：远程或虚拟部署需要另一个 `SpillStore` 后端，其定位信息和取回指引在该环境中有明确含义。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

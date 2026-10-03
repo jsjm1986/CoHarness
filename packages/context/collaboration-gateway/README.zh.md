@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-collaboration-gateway
 
 [English](README.md) | 中文
@@ -9,6 +14,17 @@
 使用 `dsh-collaboration-gateway` 作为 `dsh-collaboration` 服务定义的 Gateway 后端提供方。它从 `dsh-gateway-runtime` 派生参与者，把成员关系与根会话 ACL 决策委托给已认证的 Gateway 内部端点，并在向消费方发布前校验每个返回字段。
 
 
+## 目录
+
+- [运行时约定](#runtime-contract)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="runtime-contract"></a>
 ## 运行时约定
 
 - `capture()` 将当前已验证 principal 固化为一份 authority，其参与者、过期时间和提供方生命周期在该请求或流操作期间保持稳定。
@@ -17,10 +33,13 @@
 - 创建项目根对话要求 `rw` 成员身份，并在请求的可见性下运行。个人创建直接通过，不附加项目元数据。
 - 卸载提供方会中止其生命周期信号，并使每份已捕获 authority 在再次请求前失败关闭。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。参与者与 ACL 答案逐请求对照已认证的 Gateway 端点校验；本地不持有账户状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 经由 dsh-collaboration-context 间接产生影响；本提供方所授权操作的模型可见参与者归属由该消费方负责。
@@ -29,8 +48,19 @@
 
 无直接失效；消费方负责请求前缀的任何变化。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **Gateway 可用性具有权威性** — 内部授权请求失败或返回无效 JSON 时，项目操作会被拒绝；不存在陈旧的本地 ACL 缓存。
 - **按操作产生授权流量** — 会话操作和可见性过滤可能发出 loopback 请求；只有可读会话 id 支持批处理。
 - **没有离线项目模式** — Gateway 或提供方不可用后，项目运行时无法继续执行协作授权。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

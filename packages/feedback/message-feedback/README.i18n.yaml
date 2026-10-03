@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/feedback/message-feedback/README.md
-README.md: 3bcde2ea31e3c8e243687d2aec2c2585d550974b
-README.zh.md: 18c36cf7722552ea0a5ac4cbd5a39f05c0ea1d3d
+/:
+  en: 2bc887f2b78f4671
+  zh: 61495d48365178df
+/deepseek-ai-dsh-message-feedback:
+  en: f2463a6f7808f783
+  zh: fe4b28063864358f
+/deepseek-ai-dsh-message-feedback/summary:
+  en: 07fec1cc63536ffb
+  zh: 530c8f20786c7af6
+/deepseek-ai-dsh-message-feedback/table-of-contents:
+  en: 44b020febee1beaa
+  zh: 5a0fe1b0c61eee0b
+/deepseek-ai-dsh-message-feedback/configuration:
+  en: 5c2742a4cc2670de
+  zh: 8d5dd1739c5c248f
+/deepseek-ai-dsh-message-feedback/data-lifecycle-and-durability:
+  en: 0a8d1e48bbdbd6a6
+  zh: af733f7dab3e5f89
+/deepseek-ai-dsh-message-feedback/service-and-host-remote-contract:
+  en: d41d55a535cec164
+  zh: e0bb27ba4e1eed8e
+/deepseek-ai-dsh-message-feedback/compare-and-set-and-idempotency:
+  en: 246314a1bc7e1e08
+  zh: 361855a3342280dc
+/deepseek-ai-dsh-message-feedback/invariants:
+  en: 292971605043b772
+  zh: bf4f69cec964017e
+/deepseek-ai-dsh-message-feedback/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-message-feedback/model-experience/message-feedback:
+  en: 73eacb58a40342f6
+  zh: 1ee3049173128f61
+/deepseek-ai-dsh-message-feedback/model-experience/message-feedback/what-the-model-sees:
+  en: 3928187c2f20ec0f
+  zh: fd5273ee1a885bde
+/deepseek-ai-dsh-message-feedback/model-experience/message-feedback/token-effect:
+  en: 5ff6c3ac5017b3ef
+  zh: 4ccd5af39b37dd1c
+/deepseek-ai-dsh-message-feedback/model-experience/message-feedback/kv-cache-effect:
+  en: 2bdd13dcb4078358
+  zh: a031d9fea676ceef
+/deepseek-ai-dsh-message-feedback/known-limitations-and-deferred-work:
+  en: 6117bd0d94fb0688
+  zh: 4f7bb42d83599092
+/deepseek-ai-dsh-message-feedback/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 4438af76c19be347

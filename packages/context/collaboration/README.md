@@ -1,3 +1,8 @@
+---
+description: "Project collaboration Service Definition for DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-collaboration
 
 English | [中文](README.zh.md)
@@ -9,6 +14,17 @@ Service Definition for authenticated [project collaboration](../../../.agents/no
 Use `dsh-collaboration` as the Service Definition for authenticated project collaboration: Consumers capture one request-bound authority — participant identity and ACL decisions — instead of reading mutable account state from a process-global service.
 
 
+## Table of Contents
+
+- [Runtime contract](#runtime-contract)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="runtime-contract"></a>
 ## Runtime contract
 
 - `capture()` returns the authenticated participant, assertion expiry, provider lifetime signal, session authorization, batch readability filtering, and atomic approval/question claiming for the current request.
@@ -16,10 +32,12 @@ Use `dsh-collaboration` as the Service Definition for authenticated project coll
 - `withSessionCreation()` carries a project root conversation's `project` or `private` visibility through the asynchronous create operation; `currentCreation()` exposes it only inside that operation.
 - `CollaborationError` preserves stable denial codes for RPC and HTTP Consumers. Providers fail closed when membership, visibility, or their authorization backend cannot be established.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The package declares a request-bound authority contract only; providers carry whatever account state exists.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through consumers that own participant attribution and other model-visible behavior for the authorization operations this service defines.
@@ -33,3 +51,13 @@ No direct invalidation; the consumer owns any request-prefix changes.
 - **Root-owned visibility** — descendants cannot carry independent visibility; every read, write, manage, and approval decision resolves through the root conversation.
 - **No membership mutation API** — project membership remains a Gateway/admin responsibility, outside this Service Definition.
 - **One production provider** — `dsh-collaboration-gateway` is the only shipped provider; alternate deployments must implement all authority operations rather than bypass individual checks.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

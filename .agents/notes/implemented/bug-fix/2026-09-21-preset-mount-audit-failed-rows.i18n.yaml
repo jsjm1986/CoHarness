@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-21-preset-mount-audit-failed-rows.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-21-preset-mount-audit-failed-rows.md
-2026-09-21-preset-mount-audit-failed-rows.md: 3225ccaf6a2ba0c1bec1470fe7c4d8fa2b860de9
-2026-09-21-preset-mount-audit-failed-rows.zh.md: 33ba6a57b9e7800a7d0a4c80088fe5164d86d540
+/agent-note-preset-mount-audit-settles-rows-and-reports-failed-fibers:
+  en: 17f2a02380e8d2de
+  zh: 9abca69e43ba3d28
+/agent-note-preset-mount-audit-settles-rows-and-reports-failed-fibers/problem:
+  en: 73357a2cd0ba0ebf
+  zh: 5f0387b663ce74de
+/agent-note-preset-mount-audit-settles-rows-and-reports-failed-fibers/decision:
+  en: c2a7fac4f03deb8a
+  zh: 2787461279a41875
+/agent-note-preset-mount-audit-settles-rows-and-reports-failed-fibers/alternatives-considered:
+  en: 706e1b6ccc7a21bf
+  zh: b9c3c76e0e1787c8
+/agent-note-preset-mount-audit-settles-rows-and-reports-failed-fibers/consequences:
+  en: 49119a285df001fd
+  zh: 9d1323cbb99a4240

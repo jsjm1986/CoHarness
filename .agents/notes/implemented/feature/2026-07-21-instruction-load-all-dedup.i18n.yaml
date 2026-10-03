@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-21-instruction-load-all-dedup.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-21-instruction-load-all-dedup.md
-2026-07-21-instruction-load-all-dedup.md: 4cf8ae025cd04d02d00eba7b5b26a661a354e11a
-2026-07-21-instruction-load-all-dedup.zh.md: 2dbccc4ac6336ce48cabcfd2ab3842a2f86f152e
+/agent-note-load-all-instruction-candidates-with-per-directory-dedup:
+  en: 5b28f6062992186a
+  zh: 313f6540bf4d229b
+/agent-note-load-all-instruction-candidates-with-per-directory-dedup/problem:
+  en: 8dcbb63740c25d1c
+  zh: 1938b961e086113d
+/agent-note-load-all-instruction-candidates-with-per-directory-dedup/decision:
+  en: 3567813b0ef6b923
+  zh: 9f8f6c3e493dea7f
+/agent-note-load-all-instruction-candidates-with-per-directory-dedup/scope-keys-become-per-candidate:
+  en: 915426a8731ce462
+  zh: d84e42ab626a2aa3
+/agent-note-load-all-instruction-candidates-with-per-directory-dedup/alternatives-considered:
+  en: 30aca0cb6837b3d1
+  zh: 722b8c3d1743fc83
+/agent-note-load-all-instruction-candidates-with-per-directory-dedup/consequences:
+  en: c9928539fd60fba5
+  zh: efbd1351cf7631c3

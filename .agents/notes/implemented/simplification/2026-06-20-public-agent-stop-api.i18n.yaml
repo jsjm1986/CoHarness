@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-20-public-agent-stop-api.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-06-20-public-agent-stop-api.md
-2026-06-20-public-agent-stop-api.md: bb4a24e70656111510ce92f84c8e79e520f2b5aa
-2026-06-20-public-agent-stop-api.zh.md: 7673b680c18dd8d743a59f0452e1b259d8f7ed43
+/agent-note-keep-one-public-stop-primitive:
+  en: d196a36b7a33bd65
+  zh: 35dd23a7ae58165b
+/agent-note-keep-one-public-stop-primitive/problem:
+  en: f51cf3d72b852e6b
+  zh: 82d9b044c5cd37ac
+/agent-note-keep-one-public-stop-primitive/decision:
+  en: 9a36ee0a69ea5902
+  zh: dd6d017eb107cac7
+/agent-note-keep-one-public-stop-primitive/alternatives-considered:
+  en: 948f9519757cf472
+  zh: cbe67fd43f09f150
+/agent-note-keep-one-public-stop-primitive/verification:
+  en: 40cc94fb37b01e75
+  zh: d6f9047aa42101df
+/agent-note-keep-one-public-stop-primitive/consequences:
+  en: b1b478ea1ab759c7
+  zh: 128358705c17db73
+/agent-note-keep-one-public-stop-primitive/related:
+  en: 8c12532191463a33
+  zh: dad801ec36fcf734

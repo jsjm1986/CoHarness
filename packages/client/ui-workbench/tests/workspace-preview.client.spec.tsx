@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceFileTextPage, WorkspaceFileByteWindow } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
@@ -8,6 +8,7 @@ import {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import { WorkspaceFilePreview } from '../src/client/components/WorkspaceFilePreview.tsx'
+import { PreviewResourceBinding } from './workspace-preview-resource.fixture.tsx'
 
 afterEach(cleanup)
 const sessionId = 'preview-session' as SessionId
@@ -30,7 +31,15 @@ function harness(value: { version: string; bytes: number } = { version: 'v1', by
   resources.register({ kind: 'base' }, {
     stat: async () => ({ sessionId, path: request.path, type: 'file', ...current, changed: false }),
   }, 5)
-  return { resources, setVersion: (version: string) => { current = { ...current, version } } }
+  return {
+    resources,
+    setVersion: (version: string) => { current = { ...current, version } },
+    revalidate: (version: string, bytes: number) => {
+      current = { version, bytes }
+      resources.disconnect({ kind: 'base' })
+      resources.connected({ kind: 'base' })
+    },
+  }
 }
 function renderPreview(
   read: (
@@ -46,8 +55,10 @@ function renderPreview(
   const h = harness()
   return {
     ...h,
-    ...render(<WorkspaceFilePreview request={request} read={read} readBytes={options.readBytes}
-      resources={h.resources} close={vi.fn()} labels={labels} />),
+    ...render(<PreviewResourceBinding resources={h.resources} request={request}>{resource =>
+      <WorkspaceFilePreview request={request} read={read} readBytes={options.readBytes}
+        resource={resource} close={vi.fn()} labels={labels} />
+    }</PreviewResourceBinding>),
   }
 }
 
@@ -77,6 +88,50 @@ describe('WorkspaceFilePreview', () => {
     expect(view.getByText('v1')).toBeTruthy()
   })
 
+  it('retains the displayed page across a changed revalidation and re-reads the new size on reload', async () => {
+    const read = vi.fn(async ({ offset, version }: { offset: number; version: string }) => ({
+      path: request.path, offset, limit: 2, text: `${version}:${offset}`, eof: true, version,
+    }))
+    const view = renderPreview(read)
+    await waitFor(() => { expect(view.getByText('v1:1')).toBeTruthy() })
+    expect(read).toHaveBeenCalledTimes(1)
+    act(() => { view.revalidate('v2', 30) })
+    await waitFor(() => {
+      expect(view.resources.source(request).getSnapshot().value).toMatchObject({ version: 'v2', bytes: 30, changed: true })
+    })
+    expect(view.getByText('Changed; reload')).toBeTruthy()
+    expect(view.getByText('v1:1')).toBeTruthy()
+    expect(read).toHaveBeenCalledTimes(1)
+    fireEvent.click(view.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => { expect(view.getByText('v2:1')).toBeTruthy() })
+    expect(read.mock.calls[1]![0]).toMatchObject({ version: 'v2' })
+    expect(view.queryByText('Changed; reload')).toBeNull()
+  })
+
+  it('retains the displayed Base64 payload across a changed revalidation and re-reads the new size on reload', async () => {
+    const reads: { version: string; length: number }[] = []
+    const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
+    const readBytes = vi.fn(async ({ version, length }: { version: string; length: number }) => {
+      reads.push({ version, length })
+      return { path: request.path, offset: 0, bytes: 'AAEC', eof: true, version }
+    })
+    const view = renderPreview(read, { readBytes })
+    await waitFor(() => { expect(view.getByText(/AAEC/)).toBeTruthy() })
+    expect(reads).toEqual([{ version: 'v1', length: 10 }])
+    act(() => { view.revalidate('v2', 30) })
+    await waitFor(() => {
+      expect(view.resources.source(request).getSnapshot().value).toMatchObject({ version: 'v2', bytes: 30, changed: true })
+    })
+    expect(view.getByText('Changed; reload')).toBeTruthy()
+    expect(view.getByText(/AAEC/)).toBeTruthy()
+    expect(read).toHaveBeenCalledTimes(1)
+    expect(readBytes).toHaveBeenCalledTimes(1)
+    fireEvent.click(view.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => { expect(reads).toHaveLength(2) })
+    expect(reads[1]).toEqual({ version: 'v2', length: 30 })
+    expect(view.queryByText('Changed; reload')).toBeNull()
+  })
+
   it('falls back to a bounded Base64 window for a binary file', async () => {
     const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
     const readBytes = vi.fn(async () => ({ path: request.path, offset: 0, bytes: 'AAEC', eof: true, version: 'v1' }))
@@ -103,8 +158,10 @@ it('renders a fixed image MIME type from the bounded byte window', async () => {
   }, 5)
   const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
   const readBytes = vi.fn(async () => ({ path: imageRequest.path, offset: 0, bytes: 'AAEC', eof: true, version: 'v1' }))
-  render(<WorkspaceFilePreview request={imageRequest} read={read} readBytes={readBytes}
-    resources={resources} close={vi.fn()} labels={labels} />)
+  render(<PreviewResourceBinding resources={resources} request={imageRequest}>{resource =>
+    <WorkspaceFilePreview request={imageRequest} read={read} readBytes={readBytes}
+      resource={resource} close={vi.fn()} labels={labels} />
+  }</PreviewResourceBinding>)
   await waitFor(() => { expect(document.querySelector('[data-workspace-file-image]')).toBeTruthy() })
   expect(document.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AAEC')
 })
@@ -116,8 +173,10 @@ it('keeps unknown binary types in the Base64 fallback', async () => {
   }, 5)
   const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
   const readBytes = vi.fn(async () => ({ path: extensionlessRequest.path, offset: 0, bytes: 'AAE=', eof: true, version: 'v1' }))
-  render(<WorkspaceFilePreview request={extensionlessRequest} read={read} readBytes={readBytes}
-    resources={resources} close={vi.fn()} labels={labels} />)
+  render(<PreviewResourceBinding resources={resources} request={extensionlessRequest}>{resource =>
+    <WorkspaceFilePreview request={extensionlessRequest} read={read} readBytes={readBytes}
+      resource={resource} close={vi.fn()} labels={labels} />
+  }</PreviewResourceBinding>)
   await waitFor(() => { expect(document.querySelector('[data-workspace-file-bytes]')).toBeTruthy() })
 })
 
@@ -125,7 +184,9 @@ describe('WorkspaceFilePreview failure paths', () => {
   it('waits for a provider and keeps an unmounted request from publishing', async () => {
     const registry = new WorkspaceResourceRegistry()
     const read = vi.fn(() => new Promise<WorkspaceFileTextPage>(() => {}))
-    const view = render(<WorkspaceFilePreview request={request} read={read} resources={registry} close={vi.fn()} labels={labels} />)
+    const view = render(<PreviewResourceBinding resources={registry} request={request}>{resource =>
+      <WorkspaceFilePreview request={request} read={read} resource={resource} close={vi.fn()} labels={labels} />
+    }</PreviewResourceBinding>)
     expect(view.queryByRole('status')).toBeNull()
     view.unmount()
   })
@@ -147,7 +208,7 @@ describe('WorkspaceFilePreview failure paths', () => {
     const read = vi.fn(async () => { throw new WorkspaceResourceError('workspace-file/not-text', 'binary') })
     const readBytes = vi.fn(async () => { throw new WorkspaceResourceError('collaboration-forbidden', 'denied') })
     const view = renderPreview(read, { readBytes })
-    await waitFor(() => { expect(view.resources.source(request).get()).toMatchObject({ status: 'failed', error: { code: 'access-revoked' } }) })
+    await waitFor(() => { expect(view.resources.source(request).getSnapshot()).toMatchObject({ status: 'failed', error: { code: 'access-revoked' } }) })
     expect(view.getByRole('alert').textContent).toBe('denied')
   })
 
@@ -198,7 +259,7 @@ describe('WorkspaceFilePreview failure paths', () => {
   it('disconnects the target when a text read itself loses access', async () => {
     const read = vi.fn(async () => { throw new WorkspaceResourceError('collaboration-forbidden', 'denied') })
     const view = renderPreview(read)
-    await waitFor(() => { expect(view.resources.source(request).get()).toMatchObject({ status: 'failed', error: { code: 'access-revoked' } }) })
+    await waitFor(() => { expect(view.resources.source(request).getSnapshot()).toMatchObject({ status: 'failed', error: { code: 'access-revoked' } }) })
     expect(view.getByRole('alert').textContent).toBe('denied')
     expect(view.container.querySelector('[data-workspace-file-preview]')).toBeNull()
   })

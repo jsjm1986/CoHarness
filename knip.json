@@ -7,6 +7,7 @@
     "adb",
     "bwrap",
     "icacls",
+    "pwsh",
     "sandbox-exec",
     "uv",
     "where.exe"
@@ -23,7 +24,6 @@
     "@deepseek-ai/dsh-experimental-browser-use-runtime",
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp",
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native",
-    "@deepseek-ai/dsh-skill-office",
     "@yao-pkg/pkg",
     "@yarnpkg/cli-dist",
     "lightningcss"
@@ -504,14 +504,12 @@
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts",
-        "tests/messages/fixtures/history.ts"
+        "tests/fixtures/history.ts",
+        "tests/fixtures/input-history.ts"
       ],
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
-      ],
-      "ignoreDependencies": [
-        "@deepseek-ai/.+"
       ]
     },
     "packages/llm/llm-pi-ai": {
@@ -1298,11 +1296,6 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/experimental/agent-team-web-profile": {
-      "ignoreDependencies": [
-        "@deepseek-ai/dsh-experimental-client-ui-agent-team"
-      ]
-    },
     "packages/client/ui-settings-unarchive-sessions": {
       "entry": [
         "tests/**/*.spec.tsx"
@@ -1321,6 +1314,24 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ]
+    },
+    "packages/skill/skill-office": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/session/session-format-v6-to-v7": {
+      "entry": [
+        "src/**/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts"
       ]
     }
   }

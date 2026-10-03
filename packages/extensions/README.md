@@ -1,3 +1,8 @@
+---
+description: "Model-facing tools over the live cordis runtime the agent itself runs inside: inspect the loaded plugins and service API, define and run model-written dynamic packages, and retract them again — plus the restricted repository Plugin runtime. Both browser-half packages live here rather than under `packages/client/` because they are halves of this subsystem's dual-half packages; the host aggregate excludes them so each face keeps its own compiler program. Design home: the toolset Agent Note."
+kind: "package-group"
+---
+
 # extensions/ — the agent modifies its own runtime
 
 English | [中文](README.zh.md)

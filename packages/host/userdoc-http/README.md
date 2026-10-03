@@ -1,3 +1,8 @@
+---
+description: "Streaming browser HTTP consumer for user-uploaded documents"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-host-userdoc-http
 
 English | [中文](README.zh.md)
@@ -29,10 +34,21 @@ The Gateway's `document-admin` principal is accepted only by the trash, restore,
 Use `dsh-host-userdoc-http` as the streaming browser HTTP consumer for `ctx.userDocs`: it registers `/api/documents` through Host Connection so the Host/Origin trust check runs before the route while upload bytes bypass the buffered JSON bridge. The route family covers list, upload, move, trash, restore, purge, and folder operations with bounded pages and opaque cursors.
 
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The route streams each upload into `ctx.userDocs`; document state stays in the attachment backend.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the streaming browser transport stores and retrieves files; a session consumer owns any model-visible rendering.
@@ -47,3 +63,13 @@ None; the package never assembles or sends provider requests.
 - **The legacy current-runtime listing is not indexed** — the provider may scan the root for a complete response; scoped Gateway listings use bounded pages for large workspaces.
 - **Downloads default to attachment disposition** — the `inline=1` option is limited to images, PDFs, and text media and carries a restrictive content policy for the preview viewer.
 - **Temporary upload sessions are bounded, not published documents** — session records expire according to the local provider policy; the published document remains until deleted.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

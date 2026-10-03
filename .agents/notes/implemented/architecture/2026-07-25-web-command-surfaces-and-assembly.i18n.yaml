@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-25-web-command-surfaces-and-assembly.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-25-web-command-surfaces-and-assembly.md
-2026-07-25-web-command-surfaces-and-assembly.md: 4aa50af409687a0ba29388614e59ba4dc5a80bf4
-2026-07-25-web-command-surfaces-and-assembly.zh.md: db17b64e3729f658aed6cfa6c0c1fd8bf7470228
+/agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent:
+  en: 4dd9d2d0f3ae27fd
+  zh: 9b9f8a676f718250
+/agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent/problem:
+  en: bc32927b746d3912
+  zh: 049891cde20686c6
+/agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent/decision/ui-commands-a-commanduiruntime-a-session-keyed-commanddirectory-a-per-session-popupselectcontroller:
+  en: acdbc8b9de55acfa
+  zh: d418e3e753573816
+/agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent/decision/reference-sources-seeing-only-projections-plus-their-own-apply-closures-on-the-root-ctx:
+  en: 05dcbe136bc7c342
+  zh: 3a2252c7420fcee0
+/agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent/decision/fixture-command-routing-and-assembly:
+  en: f009f71ee20a8247
+  zh: 1744d5902488e83e
+/agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent/decision/assembly-level-acceptance-the-slash-flow-snapshot:
+  en: 3e5267d0ec7620e0
+  zh: 05abfe0280a8a774
+/agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent/alternatives-considered:
+  en: e2c72338defbd7d9
+  zh: ad75570ce59312d7
+/agent-note-web-command-business-surfaces-and-assembly-ui-commands-ui-skill-ui-subagent/consequences:
+  en: 715b28b900e4ecf9
+  zh: f250f0693d31cfd0

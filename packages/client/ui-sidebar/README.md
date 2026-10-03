@@ -1,3 +1,8 @@
+---
+description: "Sidebar plugin: session multi-level tree, search, grouping, state dots"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-sidebar
 
 English | [中文](README.zh.md)
@@ -22,10 +27,21 @@ The `/client` exports are the plugin body (`apply`/`inject`) plus the contract t
 
 The dsh web client sidebar lets users recognize the active build, start a new session, collapse navigation to a 56px rail, browse Workspaces and Sessions, and open Settings. It preserves a bottom-pinned Settings entry and hides idle scrollbars without moving browser rows. New Session uses an explicitly selected Workspace, then the current Session's Workspace, then the most recently active Workspace; if none exists, it opens a blank New Session page. Deployments can replace the brand mark or name while retaining the navigation controls and rail geometry.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The sidebar contributes shell seats and collapse chrome; Workspace and Session rows are owned by `ui-workspace` and their data by runtime mirrors.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -39,3 +55,13 @@ None; this package neither assembles nor sends a provider request.
 - **Session state-dot rendering is owned by [ui-workspace](../ui-workspace/README.md)** — no done/error notification sources are available.
 - **Workspace browser behavior is composition-owned** — grouping, ordering, search, and row state belong to [ui-workspace](../ui-workspace/README.md), not this shell.
 - **"New task completed" unread marking is local viewing state** — completion-time > last-seen never reaches the host.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-25-gateway-deployment-maintenance.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-25-gateway-deployment-maintenance.md
-2026-09-25-gateway-deployment-maintenance.md: c9fba4256cb49efd9c44cc5c6230175eb34f4830
-2026-09-25-gateway-deployment-maintenance.zh.md: 58f9f747a66290824d19d2c239b34c5c2f6d6096
+/agent-note-gateway-deployment-maintenance-control-plane:
+  en: f3b830c302725ee4
+  zh: c2626494cf61ef9a
+/agent-note-gateway-deployment-maintenance-control-plane/problem:
+  en: 212843a2b35461fa
+  zh: 8dcab785b7202aeb
+/agent-note-gateway-deployment-maintenance-control-plane/decision:
+  en: 65c807a92690bfc4
+  zh: 99b828658841e96a
+/agent-note-gateway-deployment-maintenance-control-plane/alternatives-considered:
+  en: 4bd6fc79196458eb
+  zh: b0aeaee1533a8c6a
+/agent-note-gateway-deployment-maintenance-control-plane/consequences:
+  en: f44381a28fbb73d1
+  zh: 6a39e06f60628694

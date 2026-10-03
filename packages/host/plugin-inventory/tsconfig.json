@@ -9,7 +9,13 @@
   ],
   "references": [
     {
+      "path": "../../boot/app-boot"
+    },
+    {
       "path": "../../preset/agent-presets"
+    },
+    {
+      "path": "../../util/package-manifest"
     },
     {
       "path": "../../typert/protocol"

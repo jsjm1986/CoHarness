@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-themed-scrollbars-and-reserved-gutter.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-28-themed-scrollbars-and-reserved-gutter.md
-2026-07-28-themed-scrollbars-and-reserved-gutter.md: 3dbaf73158d7c5182b0992d1120965b008aff649
-2026-07-28-themed-scrollbars-and-reserved-gutter.zh.md: fa90304d541d097c9aabad3c5448f9ead0a3a213
+/agent-note-the-scrollbar-tokens-get-their-consumer-and-the-workspace-list-reserves-its-gutter:
+  en: 6b7a2fc996c02058
+  zh: 75b4991ed827cd25
+/agent-note-the-scrollbar-tokens-get-their-consumer-and-the-workspace-list-reserves-its-gutter/problem:
+  en: a727e1f4e2566d45
+  zh: 258349e039ea17fe
+/agent-note-the-scrollbar-tokens-get-their-consumer-and-the-workspace-list-reserves-its-gutter/decision:
+  en: 80c446f8bacd1a70
+  zh: 8ae486aeb70420a1
+/agent-note-the-scrollbar-tokens-get-their-consumer-and-the-workspace-list-reserves-its-gutter/alternatives-considered:
+  en: d1675726d16c536b
+  zh: dabcaa7edcec40b4
+/agent-note-the-scrollbar-tokens-get-their-consumer-and-the-workspace-list-reserves-its-gutter/consequences:
+  en: 57a58fde14064d1e
+  zh: a26d729483c06e4e
+/agent-note-the-scrollbar-tokens-get-their-consumer-and-the-workspace-list-reserves-its-gutter/testing:
+  en: 0f3f820624f46def
+  zh: 7f95ffa166cc3727

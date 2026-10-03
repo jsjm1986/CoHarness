@@ -2,10 +2,12 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import agentPresetsRemote from '@deepseek-ai/dsh-agent-presets/remote'
+import userQuestionsRemote from '@deepseek-ai/dsh-user-questions/remote'
 import commandsRemote from '@deepseek-ai/dsh-commands/remote'
 import goalsRemote from '@deepseek-ai/dsh-goal/remote'
 import llmRemote from '@deepseek-ai/dsh-llm/remote'
 import dynamicRemote from '@deepseek-ai/dsh-cordis-host-runner/remote'
+import scheduleRemote from '@deepseek-ai/dsh-schedule/remote'
 import fileReferencesRemote from '@deepseek-ai/dsh-file-reference/remote'
 import pluginInventoryRemote from '@deepseek-ai/dsh-host-plugin-inventory/remote'
 import pluginManagerRemote from '@deepseek-ai/dsh-plugin-manager/remote'
@@ -22,6 +24,7 @@ export type { BundleInfo, ChangeResult, InstallBundleOptions, ManagementError, P
 export type {} from '@deepseek-ai/dsh-plugin-manager/remote'
 export type { PluginInventorySnapshot } from '@deepseek-ai/dsh-host-plugin-inventory/types'
 export type {} from '@deepseek-ai/dsh-agent-presets/remote'
+export type {} from '@deepseek-ai/dsh-user-questions/remote'
 export type {} from '@deepseek-ai/dsh-commands/remote'
 export type {} from '@deepseek-ai/dsh-file-reference/remote'
 export type {} from '@deepseek-ai/dsh-goal/remote'
@@ -31,6 +34,7 @@ export type {} from '@deepseek-ai/dsh-message-feedback/remote'
 export type {} from '@deepseek-ai/dsh-permission-presets/remote'
 export type {} from '@deepseek-ai/dsh-command-feedback/remote'
 export type {} from '@deepseek-ai/dsh-session-reference/remote'
+export type {} from '@deepseek-ai/dsh-schedule/remote'
 export type {} from '@deepseek-ai/dsh-subagent/remote'
 export type * from '@deepseek-ai/dsh-subagent/client'
 // The forwarded-event allowlist's selection seat: without it in the consumer's
@@ -47,6 +51,7 @@ export type {} from '@deepseek-ai/dsh-agent-presets/types'
 export type {} from '@deepseek-ai/dsh-command-feedback/types'
 export type {} from '@deepseek-ai/dsh-collaboration/types'
 export type {} from '@deepseek-ai/dsh-permission-presets/types'
+export type {} from '@deepseek-ai/dsh-schedule/client'
 export type {} from '@deepseek-ai/dsh-settings/types'
 
 /**
@@ -64,7 +69,9 @@ export type {
   RpcRequest, RpcResponse, RpcResult, SessionAssistantStreamBaseline, SessionAssistantStreamFrame,
   SessionDraftId, SessionId, SessionModels, SessionSearchItem,
   SessionSummary, SettingsNamespaceView, SettingsOwner, SettingsPathOpView, SettingsWritableReason, SkillEntry, StreamChunk,
-  SubagentAddress, SubagentCatalog, SubagentPromptContentPart, JobView, ToolCallView, ToolEventView, ToolResultView,
+  SubagentAddress, SubagentCatalog, SubagentPromptContentPart,
+  JobView, JobsApi, JobChannel, JobKillValue, JobOutputChunk, JobOutputCoords, JobOutputValue,
+  ToolCallView, ToolEventView, ToolResultView,
   WorkspaceId, WorkspaceView, WorkspaceFilesApi, WorkspaceFileByteWindow, WorkspaceOfficePreview, WorkspaceFileEntry,
   WorkspaceFileStat, WorkspaceFileTextPage,
 } from '@deepseek-ai/dsh-client-connection/client'
@@ -146,7 +153,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
       agentPresetsRemote, commandsRemote, goalsRemote, llmRemote, dynamicRemote,
       fileReferencesRemote, pluginInventoryRemote, pluginManagerRemote, messageFeedbackRemote,
       permissionPresetsRemote, sessionFeedbackRemote,
-      sessionReferencesRemote, subagentsRemote,
+      sessionReferencesRemote, subagentsRemote, scheduleRemote, userQuestionsRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

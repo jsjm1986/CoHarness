@@ -4,7 +4,7 @@ import type { WorkspaceChangesSummary, WorkspaceFileDiff } from '@deepseek-ai/ds
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 
 /** Public per-turn summary, excluding internal cwd and Git object identifiers. */
-export type WorkspaceReviewSummary = Pick<WorkspaceChangesSummary, 'turn' | 'files' | 'total' | 'added' | 'deleted'>
+export type WorkspaceReviewSummary = Pick<WorkspaceChangesSummary, 'turn' | 'files' | 'total' | 'added' | 'deleted' | 'incomplete'>
 
 /** Read historical snapshots without starting an Agent or reading current file contents. */
 export interface WorkspaceChangesApi {

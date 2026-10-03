@@ -103,6 +103,22 @@ describe('ReasoningRow', () => {
     expect(summary.hasAttribute('data-follow-end')).toBe(false)
   })
 
+  it('withholds the settled first-line preview while the presentation policy disables it', () => {
+    const text = 'Inspect the session\nCheck persistence'
+    const view = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[{ kind: 'reasoning', text }]}
+        streaming={false}
+        settledReasoningPreview={false}
+        renderMessageImages={renderMessageImages}
+      />,
+    )
+    expect(view.queryByText('Inspect the session')).toBeNull()
+    fireEvent.click(view.getByRole('button', { name: /思考/ }))
+    expect(view.container.querySelector('[class*="thinkBody"]')?.textContent).toBe(text)
+  })
+
   it('uses the first visible completed line when reasoning starts with formatting whitespace', () => {
     const text = '\n  Inspect the session\nCheck persistence'
     const view = render(

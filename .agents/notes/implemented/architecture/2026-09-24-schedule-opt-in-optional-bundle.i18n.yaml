@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-09-24-schedule-opt-in-optional-bundle.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-24-schedule-opt-in-optional-bundle.md
+/agent-note-schedule-as-an-opt-in-optional-bundle:
+  en: 8c2381fd778a9888
+  zh: 8877255cb980eea1
+/agent-note-schedule-as-an-opt-in-optional-bundle/problem:
+  en: bb23c2f7f93a462b
+  zh: 9fb600fc8e203323
+/agent-note-schedule-as-an-opt-in-optional-bundle/decision:
+  en: f20bcad3ed30ebe2
+  zh: 32d756d124eaac8c
+/agent-note-schedule-as-an-opt-in-optional-bundle/alternatives-considered:
+  en: 53101bd9db05f4e8
+  zh: d4574d994b5859d1
+/agent-note-schedule-as-an-opt-in-optional-bundle/consequences:
+  en: f4eb0ac375e5e216
+  zh: 133b2aa92d7966ee

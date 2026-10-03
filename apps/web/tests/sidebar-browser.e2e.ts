@@ -59,7 +59,7 @@ describe('web e2e: Session-owned Browser', () => {
     if (scaffold === undefined) throw new Error('Web scaffold is unavailable')
     onTestFailed(() => saveFailureShot(page, 'web-e2e-sidebar-browser'))
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.getByRole('link', { name: 'Local preview', exact: true }).click()
     const panel = page.locator('[data-sidebar-right-panel]')
     const iframe = panel.locator('[data-sidebar-browser-frame]')

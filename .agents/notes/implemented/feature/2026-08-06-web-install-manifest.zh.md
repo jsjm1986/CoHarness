@@ -12,6 +12,8 @@ Web 构建产物已有文档标题和 favicon，却没有可供浏览器发现�
 
 Web 入口链接 `/manifest.webmanifest`，Vite 会将其从 `apps/web/public/` 复制到生产构建产物。manifest 将产品命名为 `DeepSeek Harness`，为安装后的浏览器界面提供简称 `DSH`，并把 `id`、`start_url` 和 `scope` 固定为 `/`。它请求 `display: "fullscreen"`，使支持这一模式的浏览器能够把可用显示区域交给安装后的编辑器式界面，同时不改变普通标签页；浏览器可以应用用户覆盖设置，或回退到其他显示模式。其图标条目复用 `/favicon.svg`，将它作为尺寸为 `any`、用途为 `any` 的 SVG。
 
+manifest 链接设置 `crossorigin="use-credentials"`，让浏览器在 Gateway 保护静态资源时携带登录 Cookie。manifest 与应用遵循相同的鉴权策略。
+
 这一选择沿用了 code-server 的全屏方案，但没有照搬其 `window-controls-overlay` 显示覆盖项。DSH 没有自定义标题栏，也没有围绕原生窗口控件安排布局，因此使用这类覆盖项会在未落实所需安全布局的情况下取代全屏模式。
 
 manifest 有意不包含 `lang`、`theme_color` 或 `background_color`。产品界面支持双语，并不由 manifest 中的单一语言定义；任一静态颜色值都可能与应用解析后的一套调色板不一致。因此，主题元数据仍放在安装 manifest 之外。

@@ -23,11 +23,20 @@ function snapshot(nodes: ConversationSnapshot['nodes'] = []): ConversationSnapsh
 function renderPills(
   values: Record<string, unknown>,
   nodes: ConversationSnapshot['nodes'] = [],
+  performanceUsage: 'compact' | 'detailed' = 'detailed',
 ) {
   const current = snapshot(nodes)
   const useSession: StatsPillsProps['useSession'] = selector => selector(current)
   const useProjection = ((key: string) => values[key]) as StatsPillsProps['useProjection']
-  return render(<StatsPills useSession={useSession} useProjection={useProjection} t={t} />)
+  const usePerformanceUsage: StatsPillsProps['usePerformanceUsage'] = selector => selector(performanceUsage)
+  return render(
+    <StatsPills
+      useSession={useSession}
+      useProjection={useProjection}
+      usePerformanceUsage={usePerformanceUsage}
+      t={t}
+    />,
+  )
 }
 
 describe('StatsPills', () => {
@@ -66,5 +75,16 @@ describe('StatsPills', () => {
       sessionStats: { turns: 0, steps: 0, llmMs: 0, toolMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 },
     })
     expect(view.container.querySelector('[data-composer-stats]')).toBeNull()
+  })
+
+  it('compact mode reduces the row to non-interactive speed and cache-hit figures', () => {
+    const view = renderPills({
+      tokenUsage: { uncachedInputTokens: 100, outputTokens: 20, cacheReadTokens: 900, cacheWriteTokens: 0 },
+      sessionStats: { turns: 2, steps: 3, llmMs: 61_000, toolMs: 3_000, ttftMs: 400, ttftSteps: 2, decodeMs: 2_000, decodeTokens: 80 },
+    }, [], 'compact')
+    expect(view.getByText('40 tok/s')).toBeTruthy()
+    expect(view.getByText('Cache hit 90%')).toBeTruthy()
+    expect(view.queryByRole('button')).toBeNull()
+    expect(view.queryByRole('dialog')).toBeNull()
   })
 })

@@ -31,7 +31,7 @@ Status: implemented
 - `client/ui-deliverables`——轮次尾部交付物及不可变文件变更 Review 使用[授权工作区审阅](2026-09-23-authorized-workspace-review.zh.md)和共享侧栏。缺少上游同名文件不表示产品决定仍被延期。
 - `client/ui-permission-presets`（`PermissionSelect`/`catalog.ts`）——作曲区权限选择器本地住在 `ui-conversation` 骨架中。
 - `client/ui-plan`（9 个文件）——上游 PlanCard/PlanPreview/review-store 界面；本地计划评审是 `ui-user-questions` 的 `PlanReviewPanel` 作曲接管，由 `plan-review` 问题意图驱动。
-- `client/ui-primitives`（7 个文件）—— `darwin-desktop` 没有 Electron 消费方；`Checkbox` 与 `SiteGlyph` 尚未移植。`MarkdownDelegate` 与 `file-link` 已通过[账户隔离的辅助侧栏](2026-09-23-account-scoped-auxiliary-sidebar.zh.md)承接。`rank-by-name.ts`——上游共享的模糊 `/` 菜单排序（有序子序列打分、前缀优先，由 `ui-commands` 与 `ui-skill` 消费）不同于本地 `ui-commands` 的 `filterOptions`：后者按 label 与 detail 的大小写不敏感子串过滤行并保持源序。本地机制是有意的简化；模糊排序仍是待移植项，需适配 `SelectOption` 的 label/detail 模型。`FoldToggle.tsx`/`file-size.ts` 仅服务未携带的上游界面（FileCard 轨与折叠转写视图）。
+- `client/ui-primitives`（5 个文件）—— `darwin-desktop` 没有 Electron 消费方；`Checkbox` 与 `SiteGlyph` 尚未移植。`MarkdownDelegate` 与 `file-link` 已通过[账户隔离的辅助侧栏](2026-09-23-account-scoped-auxiliary-sidebar.zh.md)承接。`rank-by-name.ts` 现已移植——上游共享的有序子序列排序支撑 `ui-commands` 与 `ui-skill` 的菜单过滤。`FoldToggle.tsx`/`file-size.ts` 仅服务未携带的上游界面（FileCard 轨与折叠转写视图）。
 - `client/ui-settings-general`（4 个文件）——桌面更新指示器及其 bridge/source 仅属 Electron。
 - `client/ui-settings-models`（7 个文件）——`ModelRow`/`ModelInputTypes` 是上游目录编辑器的共享字段行，`WelcomeNotice`/`welcome-store`/`operations`/`onboarding-copy` 驱动上游首跑目录引导；本地编辑器保留各自内联字段且无首跑模型引导。
 - `client/ui-settings-plugins`——[Subagent 限制](2026-09-23-scoped-subagent-limits.zh.md)与上游字段帮助已适配到键控 `settings.plugin.item` 卡片。模型选择控件复用同一命名空间卡片所有者及 Host 原子写入；Admin 配置集成仍需本地消费者；设置外壳不同不免除这些要求。
@@ -41,7 +41,7 @@ Status: implemented
 - `client/ui-trajectory`（`code-program.ts`、`string-wrapping-store.ts`、`trajectory-event-projection.ts`）——结构化 `run_code` 检视页、供其使用的事件投影与持久化 JSON 字符串换行偏好服务于上游轨迹视图；本地轨迹展示子派发单元与原始 payload。结构化代码检视器仍属延期移植，需本地视图适配。
 - `client/ui-workspace`（4 个文件）——`rows/WorkspaceBrowser*`、`navigation.ts` 与 `subagent-lineage.ts` 是上游的浏览行布局；本地 `WorkspaceBrowser` 直接位于 `src/client/` 下，导航与谱系代码自有。
 - `client/ui-goal`、`client/ui-layout`、`client/ui-model-selection`、`client/ui-settings`、`host/directory-picker`、`sdk/client`、`session-query/session-log-export`、`context/session-reference`、`fs/tool-fs-search`——各一文件：上游界面由本地架构在别处覆盖（activation-source、DocumentTitle、模型目录、settings-contract、picker 类型、SDK 启动助手、日志归档写出器、session-reference spill、`ripgrep.d.ts` ambient 类型）或按设计不携带。
-- `test-support/client-runtime`（`assembly/`）——本地包测试直接组合插件，真实组装浏览器测试覆盖已采用的页面自有 Loader 条目。Cordis 前引导不能成为省略 Loader 生命周期验证的理由。
+- `test-support/client-runtime`（`config-form.ts`）——上游 config-forms 测试助手在本地没有消费方；`src/assembly/` 下的真实浏览器组装现已携带，其套件覆盖已采用的页面自有 Loader 条目。
 
 **保留的本地组装：**
 

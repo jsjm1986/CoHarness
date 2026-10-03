@@ -78,6 +78,7 @@ while (frames.size > 0) {
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -87,6 +88,7 @@ while (frames.size > 0) {
 
 这里的内容不会进入模型请求，因此不影响提供方缓存复用。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-07-userdoc-orphan-admission-lock.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-07-userdoc-orphan-admission-lock.md
-2026-09-07-userdoc-orphan-admission-lock.md: 84955ed523632278d8ced522426b684fabe017ad
-2026-09-07-userdoc-orphan-admission-lock.zh.md: 7da9ba8c88ce5ceaea1d4834d252275ed884e74a
+/agent-note-recover-orphaned-user-document-admission-locks:
+  en: dece0502d4931137
+  zh: 8ebad4d401174775
+/agent-note-recover-orphaned-user-document-admission-locks/problem:
+  en: 288c8d9beeb05a65
+  zh: 89c01234d4618b93
+/agent-note-recover-orphaned-user-document-admission-locks/decision:
+  en: c228fa1bcb51d1fc
+  zh: fc619d3aac39d9ab
+/agent-note-recover-orphaned-user-document-admission-locks/alternatives-considered:
+  en: bcea4e1cee5c7879
+  zh: 673a1c5cb4424009
+/agent-note-recover-orphaned-user-document-admission-locks/consequences:
+  en: ed7aa7e7b267721c
+  zh: 93558fc87a8112ff

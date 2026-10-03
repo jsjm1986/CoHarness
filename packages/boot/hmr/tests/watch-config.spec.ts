@@ -13,7 +13,9 @@ import Timer from '@deepseek-ai/cordis-plugin-timer'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { FSWatcher, type ChokidarOptions } from 'chokidar'
 
-const configWatch = vi.hoisted(() => ({ create: undefined as ((options?: ChokidarOptions) => FSWatcher) | undefined }))
+const configWatch = vi.hoisted(() => ({
+  create: undefined as ((options?: ChokidarOptions, paths?: string | string[]) => FSWatcher) | undefined,
+}))
 vi.mock('node:fs', async (importOriginal) => {
   const native = await importOriginal<typeof import('node:fs')>()
   return { ...native, realpathSync: vi.fn(native.realpathSync) }
@@ -25,7 +27,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 vi.mock('chokidar', async (importOriginal) => {
   const native = await importOriginal<typeof import('chokidar')>()
   return { ...native, watch: (paths: string | string[], options?: ChokidarOptions) =>
-    configWatch.create === undefined ? native.watch(paths, options) : configWatch.create(options) }
+    configWatch.create === undefined ? native.watch(paths, options) : configWatch.create(options, paths) }
 })
 
 /** Every per-test tree root, removed once the booted watcher has been disposed. */
@@ -140,7 +142,38 @@ describe('HMR exact config paths', () => {
     }
   })
 
-  it('observes creation when the config parent did not exist at registration', { timeout: 90_000 }, async () => {
+  it.each([false, true])('observes one parent/config creation after watcher readiness (polling=%s)', { timeout: 90_000 }, async (usePolling) => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-hmr-once-'))
+    hmrRoots.push(root)
+    const filename = join(root, 'later', 'plugins.yml')
+    const ctx = new Context()
+    const previousFactory = configWatch.create
+    let watcher: FSWatcher | undefined
+    let ready = false
+    configWatch.create = (options, paths) => {
+      const created = new FSWatcher(options)
+      watcher = created
+      created.once('ready', () => { ready = true })
+      return created.add(paths!)
+    }
+    const observed: string[] = []
+    try {
+      await watchConfig(ctx, filename, { usePolling, awaitWriteFinish: false }, () => {
+        observed.push(readFileSync(filename, 'utf8'))
+      })
+      expect(ready).toBe(true)
+      expect(watcher).toBeDefined()
+      expect(Object.keys(watcher!.getWatched())).toContain(await realpath(root))
+      mkdirSync(join(root, 'later'))
+      writeFileSync(filename, 'created-once', { flag: 'wx' })
+      await eventually(() => observed.includes('created-once'), 'HMR missed a single parent/config creation after ready', 60_000)
+    } finally {
+      configWatch.create = previousFactory
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('observes a new config parent amid repeated unrelated root activity', { timeout: 90_000 }, async () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-hmr-config-'))
     hmrRoots.push(root)
     const dir = join(root, 'later')
@@ -148,16 +181,8 @@ describe('HMR exact config paths', () => {
     const ctx = await bootHmr(root)
     const observed: string[] = []
     try {
-      // A not-yet-existing parent forces the watcher to notice the new
-      // directory, attach to it, and then observe the file. The watched root's
-      // stat changes only when its own entries do, so a lone mkdir is a
-      // one-shot diff: a coalesced or dropped tick forfeits the scan and
-      // nothing re-triggers it. Toggling a probe entry on every poll is the
-      // directory form of the rewrite loop above — each delivered event is a
-      // fresh chance to bind the new parent, whose first scan already sees the
-      // file. Native events come off the kernel queue; fs.watchFile polling
-      // would also need a UV-threadpool stat per tick, which starves under
-      // the coverage lane.
+      // Repeated root activity exercises discovery while unrelated entries change.
+      // The single-creation case independently owns detection without that activity.
       await watchConfig(ctx, filename, { awaitWriteFinish: false }, () => {
         observed.push(readFileSync(filename, 'utf8'))
       })

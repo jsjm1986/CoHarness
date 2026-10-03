@@ -10,6 +10,11 @@ const state = () => ({
 const scope = () => ({ parentSessionId: SessionId('parent'), inputs: [A], primaryActorUserId: 1, unverifiedHistory: false })
 
 describe('untrusted execution references', () => {
+  it('preserves an immutable scope identity in both response and delegated metadata', () => {
+    expect(executionState({ ...state(), scopeId: A }).scopeId).toBe(A)
+    expect(executionScope({ ...scope(), scopeId: A }).scopeId).toBe(A)
+  })
+
   it('hashes JSON content and refuses values JSON cannot encode', () => {
     expect(inputDigest([{ type: 'text', text: 'hello' }])).toMatch(/^[0-9a-f]{64}$/)
     expect(() => inputDigest(undefined)).toThrow(/must be JSON/)
@@ -25,6 +30,8 @@ describe('untrusted execution references', () => {
   it.each([
     null, [], 1,
     { ...state(), revision: '-1' },
+    { ...state(), scopeId: 'forged' },
+    { ...state(), scopeId: 1 },
     { ...state(), inputs: ['forged'] },
     { ...state(), actors: [{ userId: 0 }] },
     { ...state(), unverifiedHistory: 'false' },
@@ -43,6 +50,8 @@ describe('untrusted execution references', () => {
   it.each([
     null, [], 1,
     { ...scope(), parentSessionId: '' },
+    { ...scope(), scopeId: 'forged' },
+    { ...scope(), scopeId: 1 },
     { ...scope(), inputs: ['forged'] },
     { ...scope(), unverifiedHistory: 'false' },
     { ...scope(), primaryActorUserId: -1 },

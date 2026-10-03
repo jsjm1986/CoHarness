@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-slash-catalog-follows-preset-switch.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-10-slash-catalog-follows-preset-switch.md
-2026-08-10-slash-catalog-follows-preset-switch.md: 4015b2659ff65c676902bac940d493e0f55ffa99
-2026-08-10-slash-catalog-follows-preset-switch.zh.md: b77564f00b2d7de03779339bb4f0d0ba51fd42fa
+/agent-note-the-slash-catalog-follows-a-blank-session-s-preset-switch:
+  en: 28078f2246d4bf93
+  zh: 82aafd1bcfe52109
+/agent-note-the-slash-catalog-follows-a-blank-session-s-preset-switch/problem:
+  en: ca47be2b8ed95491
+  zh: 3f7febd1406534c1
+/agent-note-the-slash-catalog-follows-a-blank-session-s-preset-switch/decision:
+  en: 4f4a36bf5f83045d
+  zh: 0f62f0e2817b701c
+/agent-note-the-slash-catalog-follows-a-blank-session-s-preset-switch/alternatives-considered:
+  en: e4a64b93963fa209
+  zh: c03016888259f4a0
+/agent-note-the-slash-catalog-follows-a-blank-session-s-preset-switch/consequences:
+  en: 87755f88239a77bf
+  zh: dc7a7f4078d8d980
+/agent-note-the-slash-catalog-follows-a-blank-session-s-preset-switch/testing:
+  en: f2075ebd4282ac27
+  zh: f07500720b911137
+/agent-note-the-slash-catalog-follows-a-blank-session-s-preset-switch/related:
+  en: 044e10700c809443
+  zh: 0e05f47263d239e9

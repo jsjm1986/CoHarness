@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-plugin-surface-and-performance-gates.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-23-plugin-surface-and-performance-gates.md
-2026-08-23-plugin-surface-and-performance-gates.md: 9803f57407657bba7c29601620939d883e58202f
-2026-08-23-plugin-surface-and-performance-gates.zh.md: 52077154ac4c6aa44b363c052ffa4749357965a4
+/agent-note-build-time-plugin-surface-and-command-measurement-gates:
+  en: e651259838e1fac5
+  zh: 1d8d830ecea932a6
+/agent-note-build-time-plugin-surface-and-command-measurement-gates/problem:
+  en: 393dceab2a6c7595
+  zh: e70e87e84ee13dc1
+/agent-note-build-time-plugin-surface-and-command-measurement-gates/decision:
+  en: 889285631b5c3c11
+  zh: e6a130dbd049b7e1
+/agent-note-build-time-plugin-surface-and-command-measurement-gates/alternatives-considered:
+  en: d378411ac42929e8
+  zh: 478f8fad0ce43bd8
+/agent-note-build-time-plugin-surface-and-command-measurement-gates/consequences:
+  en: ef8d5f37359910e2
+  zh: 4ef34355e23a83c1

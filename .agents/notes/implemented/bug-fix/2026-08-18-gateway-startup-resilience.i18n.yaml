@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-gateway-startup-resilience.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-gateway-startup-resilience.md
-2026-08-18-gateway-startup-resilience.md: a7177ef5d4e9422c84542f46938471f9e769007a
-2026-08-18-gateway-startup-resilience.zh.md: 4bbb6dae306ecd3df47288e2a18c78b70a64ff46
+/agent-note-gateway-startup-resilience:
+  en: 7fe4934b5cbbf270
+  zh: 2cfbfe51339c416b
+/agent-note-gateway-startup-resilience/problem:
+  en: 1f8c362c46881089
+  zh: 8e54cfe798ff5c70
+/agent-note-gateway-startup-resilience/decision:
+  en: b72867bba4207be0
+  zh: d6f7c2b82fa5bba0
+/agent-note-gateway-startup-resilience/verification:
+  en: 1c7027d414951611
+  zh: 70fdd103546f93cb
+/agent-note-gateway-startup-resilience/alternatives-considered:
+  en: 86aafd92b245fdb6
+  zh: 53073a0343552837
+/agent-note-gateway-startup-resilience/consequences:
+  en: 0162615c9a61e957
+  zh: bc07ab41ebb297fd

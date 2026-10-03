@@ -18,8 +18,12 @@
      chat scroller and the takeover frames pad clearance + 16px per side while
      the input card clears the bare clearance, so the input card stays exactly
      content + 32px at every width. Declared on the root because the
-     transcript and the composer seat are sibling subtrees. */
-  --dsh-chat-content-width: 748px;
+     transcript and the composer seat are sibling subtrees.
+
+     --dsh-chat-user-width is the published preference (a pixel value the
+     component resolves against the live column, or the fill-mode clearance
+     calc); the width handles rewrite it during a gesture. */
+  --dsh-chat-content-width: var(--dsh-chat-user-width, 748px);
   --dsh-chat-font-size: 14px;
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
   --dsh-composer-side-clearance: 16px;
@@ -278,41 +282,108 @@
   scrollbar-gutter: stable;
 }
 
+/* Two 40px hit strips flank the content column, each inner edge 24px
+   outside the content column — the same offset the glow line paints at — and
+   the strip extends 40px outward from there; the outer edge is clamped to
+   keep a 24px safe zone against the column edges (sidebar side and scrollbar
+   side stay drag-free). When the margin cannot fit inset + strip + safe zone
+   the computed width goes negative and the strip resolves to zero — no
+   mispositioned hit area on narrow columns. */
 .widthHandle {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: clamp(8px, calc(50% + var(--dsh-chat-content-width) / 2), calc(100% - 8px));
   z-index: 9;
-  width: 12px;
-  margin-left: -6px;
-  border: 0;
-  background: transparent;
+  width: min(
+    40px,
+    calc((100% - var(--dsh-chat-content-width)) / 2 - 24px - 24px)
+  );
   cursor: col-resize;
   touch-action: none;
 }
 
-/* A centered grip reads as a resize affordance; the earlier full-height edge
-   pair looked like stray divider lines. */
+.widthHandle[data-side='left'] {
+  right: calc(50% + var(--dsh-chat-content-width) / 2 + 24px);
+}
+
+.widthHandle[data-side='right'] {
+  left: calc(50% + var(--dsh-chat-content-width) / 2 + 24px);
+}
+
+/* The glow: a short 3px bar riding the pointer's Y, inset 16px outward from
+   the strip's inner edge (40px from the content column), not a full-height
+   rule — a 24px solid core centered on the pointer (published by pointermove
+   as --dsh-width-handle-pointer-y), fading to transparent over 40px each
+   side (~104px total). A solid CORE, not a single solid stop: a lone peak
+   washes out over the fade. The scrollbar hover tint, not a border token:
+   this is a draggable bar and the border alphas (4-16%) disappear against
+   the base fill. Before the first move the fallback centers the glow at 50%
+   height. */
 .widthHandle::after {
   content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 4px;
-  height: 40px;
-  transform: translate(-50%, -50%);
-  border-radius: 2px;
-  background: transparent;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to bottom,
+    transparent calc(var(--dsh-width-handle-pointer-y, 50%) - 52px),
+    var(--dsw-alias-scrollbar-hover-l1) calc(var(--dsh-width-handle-pointer-y, 50%) - 12px),
+    var(--dsw-alias-scrollbar-hover-l1) calc(var(--dsh-width-handle-pointer-y, 50%) + 12px),
+    transparent calc(var(--dsh-width-handle-pointer-y, 50%) + 52px)
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+
+.widthHandle[data-side='left']::after {
+  right: 16px;
+}
+
+.widthHandle[data-side='right']::after {
+  left: 16px;
 }
 
 .widthHandle:hover::after,
-.widthHandle:focus-visible::after {
-  background: var(--dsw-alias-brand-primary);
+.widthHandle:focus-visible::after,
+.widthHandle[data-dragging]::after {
+  opacity: 1;
 }
 
 .widthHandle:focus-visible {
   outline: none;
+}
+
+/* Fill mode leaves no margin for the outward strips; park a 12px strip in
+   each 16px side clearance so the drag affordance survives, with the glow on
+   the content-facing edge. */
+.root[data-chat-fill] .widthHandle {
+  width: 12px;
+}
+
+.root[data-chat-fill] .widthHandle[data-side='left'] {
+  right: auto;
+  left: 4px;
+}
+
+.root[data-chat-fill] .widthHandle[data-side='right'] {
+  left: auto;
+  right: 4px;
+}
+
+.root[data-chat-fill] .widthHandle[data-side='left']::after {
+  right: 0;
+}
+
+.root[data-chat-fill] .widthHandle[data-side='right']::after {
+  left: 0;
+}
+
+/* Views that elect a composer overlay (trajectory etc.) own their full-bleed
+   scrollers; the strips would sit over their content and steal clicks. */
+.root:has([data-conversation-composer-overlay]) .widthHandle {
+  display: none;
 }
 
 .root[data-phase='active'] .viewArea {
@@ -618,6 +689,7 @@
 .workbenchRoot[data-maximized] .workbenchPane { flex: 1 1 100%; width: 100%; }
 .workbenchRow + .workbenchRow { border-top: 0.5px solid var(--dsw-alias-border-l1); }
 .workbenchPane { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.workbenchUnavailable { display: grid; flex: 1; place-content: center; margin: 0; padding: var(--dsw-space-5); color: var(--dsw-alias-label-tertiary); text-align: center; }
 .workbenchPane + .workbenchPane { border-left: 0.5px solid var(--dsw-alias-border-l1); }
 .workbenchRoot > .root, .workbenchPane > .root { flex: 1; min-height: 0; height: auto; overflow: hidden; }
 .paneSeparator { position: absolute; right: -3px; top: 0; bottom: 0; width: 6px; z-index: 5; cursor: col-resize; touch-action: none; }

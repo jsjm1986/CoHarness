@@ -19,9 +19,10 @@ export interface ConcreteTermViolation {
 
 function isExcluded(file: string): boolean {
   return excludedPrefixes.some(prefix => file.startsWith(prefix))
-    // Release snapshots retain the identifiers present in their pinned source.
+    // Release snapshots retain the identifiers present in their pinned source;
+    // historical-format pairing records key sections by those identifiers' headings.
     || /^docs\/persistence-changes\/releases\/dsh-v\d+\.\d+\.\d+-(?:alpha|rc)\.\d+\.schema\.json$/u.test(file)
-    || /^docs\/persistence-changes\/historical-formats\/v(?:0|[1-9]\d*)\.schema\.json$/u.test(file)
+    || /^docs\/persistence-changes\/historical-formats\/v(?:0|[1-9]\d*)\.(?:schema\.json|i18n\.yaml)$/u.test(file)
     // Alignment inventories record verbatim upstream commit subjects and file paths.
     || /^upgrades\/alignment\/UPSTREAM-[^/]+\.json$/u.test(file)
 }

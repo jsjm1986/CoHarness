@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-skill/README.md
-README.md: 893181f34b0b06bb0b3bc0b3b5223072c781bf76
-README.zh.md: e210da76555bead929e32c139c16d1cec9fcc41b
+/:
+  en: b356f495de79d68d
+  zh: 61495d48365178df
+/deepseek-ai-dsh-client-ui-skill:
+  en: c0f70b3725f755e2
+  zh: dadf493dfbeac4c2
+/deepseek-ai-dsh-client-ui-skill/summary:
+  en: fad7bff8d3371dfc
+  zh: c546189c87d6fbf2
+/deepseek-ai-dsh-client-ui-skill/table-of-contents:
+  en: df424db66cd96509
+  zh: 7b63f5f83378fcac
+/deepseek-ai-dsh-client-ui-skill/skill-tool-row:
+  en: f4cdb32480b03690
+  zh: 8d862b56a218cab8
+/deepseek-ai-dsh-client-ui-skill/invariants:
+  en: 2f7b82382bfb7ae9
+  zh: 8a37d86f783e9f88
+/deepseek-ai-dsh-client-ui-skill/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-client-ui-skill/model-experience/user-explicit-skill-invocation:
+  en: ae1928252b0ea55c
+  zh: 6c78cb51c6805a2d
+/deepseek-ai-dsh-client-ui-skill/model-experience/user-explicit-skill-invocation/what-the-model-sees:
+  en: 02313760445799a2
+  zh: 46007ed9e9f35b44
+/deepseek-ai-dsh-client-ui-skill/model-experience/user-explicit-skill-invocation/token-effect:
+  en: cb759321f8c62a96
+  zh: 6d479501856d9cd6
+/deepseek-ai-dsh-client-ui-skill/model-experience/user-explicit-skill-invocation/kv-cache-effect:
+  en: da53c649077dad7e
+  zh: e013432e5b73883b
+/deepseek-ai-dsh-client-ui-skill/known-limitations-and-deferred-work:
+  en: 864738069835efab
+  zh: 5f333906f87eaed3
+/deepseek-ai-dsh-client-ui-skill/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

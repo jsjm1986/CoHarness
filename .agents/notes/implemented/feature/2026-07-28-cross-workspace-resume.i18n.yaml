@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-cross-workspace-resume.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-28-cross-workspace-resume.md
-2026-07-28-cross-workspace-resume.md: e8a8636911015a5b300b45a30e268ee1be5d47d1
-2026-07-28-cross-workspace-resume.zh.md: c56641be35bb37fb8aafb7613bdf8b8158e198d9
+/agent-note-cross-workspace-session-resume:
+  en: d12f3ffe69472bb7
+  zh: bd3720f99116260d
+/agent-note-cross-workspace-session-resume/problem:
+  en: 1dbf72cf3529a91a
+  zh: 5e120e3f69bde9c8
+/agent-note-cross-workspace-session-resume/decision:
+  en: 837d1e468bbf4198
+  zh: 5db252efe653fb84
+/agent-note-cross-workspace-session-resume/alternatives-considered:
+  en: cfabd8e9b2651f9c
+  zh: 406ceaf18cc7be0d
+/agent-note-cross-workspace-session-resume/consequences:
+  en: 84495c4a41ac1f64
+  zh: 39a1b0ab9ccec99f
+/agent-note-cross-workspace-session-resume/testing:
+  en: 8b0c8f212734ffd9
+  zh: ca9b5c3b578131d2

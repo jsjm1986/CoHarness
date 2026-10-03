@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write gateway/deploy/node-configuration/README.md
+/current-node-configuration:
+  en: a2936bda2b7395d7
+  zh: 46fafec3c8888f82
+/current-node-configuration/summary:
+  en: 533b579ea4d5c65a
+  zh: 7f2880d34d3f1608
+/current-node-configuration/contents:
+  en: aa1569acb06678c7
+  zh: 418ccc0165f5ee63
+/current-node-configuration/settings-and-application:
+  en: fdf44a71fe40dba7
+  zh: 46e234fe54246a90
+/current-node-configuration/install-the-independent-worker:
+  en: 3ccc60f9b74979c0
+  zh: e6ebb69bacc7cd97
+/current-node-configuration/local-recovery:
+  en: d2003a4139340936
+  zh: 60a3f173a8cea9df
+/current-node-configuration/data-and-verification:
+  en: 2cf5290848dde4b1
+  zh: 61da9898db613149

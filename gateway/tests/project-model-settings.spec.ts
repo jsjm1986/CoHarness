@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AuditService } from '../src/audit.ts'
 import { AuthService } from '../src/auth.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ProjectService } from '../src/projects.ts'
@@ -19,7 +19,7 @@ afterEach(async () => { await close?.(); close = undefined })
 async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'hgw-project-models-'))
   const db = openDb(join(root, 'gateway.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_USER_PROJECTS_ROOT: join(root, 'user-projects') })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), HGW_USER_PROJECTS_ROOT: join(root, 'user-projects') })
   const users = new UserService(db, cfg)
   const projects = new ProjectService(db, cfg)
   const admin = await users.create({ username: 'admin', password: 'pw-12345678', role: 'admin' })

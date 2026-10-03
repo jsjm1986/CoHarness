@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-settings
 
 [English](README.md) | 中文
@@ -8,11 +13,23 @@
 
 当用户需要在运行时修改插件配置，而无需重启或重新读取 `cordis.yml` 时，请使用本包。每个 namespace 合并 schema 默认值、部署配置与用户覆盖；读取方会得到深冻结的解析值快照，并可观察已提交的变更。写入只影响用户覆盖、按 namespace 串行执行，并可拒绝陈旧 revision，避免覆盖较新的变更。持久化运行时编辑需要先配置设置存储；否则插件仍可继续使用组合配置。
 
+## 目录
+
+- [服务 API](#service-api)
+- [提供方约定](#provider-contract)
+- [事件](#events)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="service-api"></a>
 ## 服务 API
 
 - `documentPath` — 提供方拥有用户可编辑文件时，该字段是文件的绝对路径；非文件提供方保留 `undefined`。Host 配置适配器据此派生可用性，而浏览器协议只暴露一个布尔能力，绝不暴露文件系统目标。
 - `prepareDocument()` — 让文档做好供原生编辑器打开的准备后返回该路径。基类实现返回 `documentPath`；文件提供方可先创建缺失的文档。
-- `register(ns, schema, { base?, applies? })` — 返回 owner 的 `SettingsScope`（`get`/`watch`/`update`）。注册是调用方插件 fiber 上的 effect：dispose（资源释放）该 fiber 即移除 namespace 及其观察者。schema 拒绝的存量分节会使注册本身失败；重复 namespace 立即报错。
+- `register(ns, schema, { base?, applies?, label? })` — 返回 owner 的 `SettingsScope`（`get`/`watch`/`update`）。注册是调用方插件 fiber 上的 effect：dispose（资源释放）该 fiber 即移除 namespace 及其观察者。schema 拒绝的存量分节会使注册本身失败；重复 namespace 立即报错。`label` 是可选的本地化展示标题（`LocalizedText`），随 `describe()` 抵达在注册方自身界面之外为该 namespace 题名的界面；缺省这些界面回退到 namespace 键名。
 
 - 注册选项可通过 `authorizeWrite(value)` 执行实时授权。它在写入排到队首后收到不可变的解析候选值，完成后才能持久化。授权拒绝、等待期间 owner／服务卸载或外部版本改变时，不写入存储。启动、注册与提供方重载只运行同步 schema 与 `validate` 检查。
 - `describe(options?)` — 每个 namespace 一条描述（`schema.toJSON()` 封装、解析值、分离出的 `base`/`user` 层、`applies`），供配置界面使用；字段出现在 `user` 中即标记其被用户覆盖。`describe({ redactSecrets: true })` 从每一层剥离 `role('secret')` 字段，移除可能包含机密的 schema 节点默认值，并附加 `secrets` slot 列表（`{ path, set }`）；每个协议接口都必须传入它，纯遍历器 `redactSecrets(schema, value)` 与 `redactSchemaDefaults(schema)` 已导出，供其他 wire 使用。
@@ -24,10 +41,12 @@
 - 解析值是深冻结快照。每次提交后观察者收到 `(next, prev)`：同一回调的调用异步、逐次、按提交顺序执行（慢的旧调用绝不会晚于较新的调用生效），异常——同步抛出与异步拒绝——均被隔离。watch 的 disposer 返回后不再启动新的调用（已排队的那一次会被跳过）；已启动的调用仍会结算。`settings/updated` 事件逐监听器扇出，一个抛错的 listener 不会饿死其余 listener；异步 listener 的拒绝会被隔离并记入日志，这正是 `INVARIANT` 编码的失败只从同步 listener 重新抛出的原因。
 - 服务卸载先拒绝新写入与观察者调用的启动，再排干全部排队写入与已启动的观察者调用后才完成；已交给持久化的写入在 registrant 卸载后仍到达存储，但不会提交或通知；仍在等待授权的写入则在存储前拒绝。
 
+<a id="provider-contract"></a>
 ## 提供方约定
 
 子类实现 `writable`、`load()`、`persist(ns, section)`，可选择为一个本地用户可编辑文件重写 `documentPath` 与 `prepareDocument()`，并通过受保护的 `publish(doc)` 推入外部观察到的文档。基类服务 init 在服务可注入前加载并发布一次文档；拥有自有 init（watcher、连接）的提供方会先通过 `yield* super[Service.init]()` 委托给基类。publish 时每个已注册 namespace 独立重解析：非法分节保留该 namespace 的最后可用值并告警——热重载绝不拖垮进程；启动期与注册期校验则立即报错。
 
+<a id="events"></a>
 ## 事件
 
 `settings/updated (ns, next, prev, source)` 在每次提交后触发；`source` 为 `update`（进程内写入）或 `provider`（外部变更）。解析值深相等时绝不触发——它面向消费方，而消费方只关心自己的值有没有变。
@@ -36,6 +55,8 @@
 
 两条声明都住在 client-safe 的 `./types` 子路径出口，与其签名点名的 `SettingsNamespace`、`SettingsUpdateSource` 类型同处一处；包根继续 re-export 这些类型。于是 Host 编译面之外的消费方读到的正是 Host 发射的那一份签名，而不必再写一遍。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 间接生效：由设置值提供的所有面向模型的内容均由消费方插件负责；本服务只存储并解析用户设置，自身不注册任何面向模型的内容。
@@ -44,8 +65,19 @@
 
 无直接失效；把设置值纳入请求前缀的消费方负责该变更。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **单一用户层** — 解析只认识 schema 默认值、一个组合 `base` 与一个用户文档；它尚未记录每个解析值由哪一层提供。
 - **`redactSecrets` 会对不透明 schema 节点故意 fail-closed**：walker 只跟随 `object`/`dict`/`array`；union、intersection、tuple、transform 或 lazy 子树会被省略，并记录为不透明机密位置，而不是原样返回。schema 序列化仍由调用方负责：协议接口除了请求值脱敏，也必须从 `schema.toJSON()` 封装中移除机密默认值。
 - **跨进程并发由提供方定义** — seam 仅在进程内按 namespace 串行化写入；跨进程并发按提供方行为收敛（本地文件提供方在写锁下读-改-写，因此 namespace 在并发写入者下不会丢失，同 namespace 冲突按后写胜出解决）。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

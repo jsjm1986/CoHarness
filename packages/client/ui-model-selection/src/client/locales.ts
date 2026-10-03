@@ -10,6 +10,8 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'provider.account': 'DeepSeek 账号',
+  'command.label': '模型',
   'command.description': '选择本会话使用的模型',
   'option.loadError': '目录加载失败：{message}',
   'trigger.fallback': '选择模型',
@@ -29,6 +31,9 @@ export const zh = {
   'error.imageConflict': '当前对话含有图片，{model} 仅支持文本。请选择“支持图片”的模型，或新建纯文本对话。',
   'action.reload': '重新加载',
   'warning.groupLoad': '{name} 加载失败：{message}',
+  'search.placeholder': '搜索模型…',
+  'search.clear': '清除搜索',
+  'search.empty': '没有匹配的模型。',
   'empty.models': '没有可用的模型。',
   'blocked.composer': '当前模型不可用，请先选择模型',
   'empty.efforts': '当前模型未提供推理等级。',
@@ -39,6 +44,8 @@ export type ModelKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  'provider.account': 'DeepSeek Account',
+  'command.label': 'Model',
   'command.description': 'Select the model for this conversation',
   'option.loadError': 'Catalog failed to load: {message}',
   'trigger.fallback': 'Select model',
@@ -58,6 +65,9 @@ export const en = {
   'error.imageConflict': 'This conversation contains images, but {model} is text-only. Choose a model marked “Supports images”, or start a new text-only conversation.',
   'action.reload': 'Reload',
   'warning.groupLoad': '{name} failed to load: {message}',
+  'search.placeholder': 'Search models…',
+  'search.clear': 'Clear search',
+  'search.empty': 'No matching models.',
   'empty.models': 'No models available.',
   'blocked.composer': 'This model is unavailable — select one to continue',
   'empty.efforts': 'This model provides no reasoning effort levels.',

@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isIP } from 'node:net'
 import type { Duplex } from 'node:stream'
-import httpProxy from 'http-proxy'
+import * as httpProxy from 'http-proxy-3'
 import { writeRuntimeGrantsFile } from './apply-grants.ts'
 import {
   ensureModelGovernanceForProject,
@@ -10,8 +10,8 @@ import {
   writeProjectModelGovernanceFile,
 } from './apply-model-governance.ts'
 import type { UserRow } from './auth.ts'
-import { waitingPage } from './html.ts'
-import { RuntimeLeaseUnavailableError, type RuntimeTarget } from './instances.ts'
+import { waitingPage, stoppedPage } from './html.ts'
+import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayRequestContext, type ProxyHandler, type UpgradeHandler } from './server.ts'
@@ -89,8 +89,8 @@ export function createProxyHandlers(
   const unsubscribeAccess = deps.accessMonitor?.subscribe(async (subject) => {
     invalidateAccess(subject)
     if (subject.restartRuntime !== true) return
-    if (subject.userId !== undefined) await instances.stop({ kind: 'user', id: subject.userId })
-    if (subject.projectId !== undefined) await instances.stop({ kind: 'project', id: subject.projectId })
+    if (subject.userId !== undefined) await instances.stop({ kind: 'user', id: subject.userId }, 'access-change')
+    if (subject.projectId !== undefined) await instances.stop({ kind: 'project', id: subject.projectId }, 'access-change')
   })
 
   async function revalidate(token: string | undefined, context: GatewayRequestContext): Promise<boolean> {
@@ -157,6 +157,17 @@ export function createProxyHandlers(
     ? { kind: 'user', id: context.runtime.id }
     : { kind: 'project', id: context.runtime.id }
 
+  function refuseStopped(req: IncomingMessage, res: ServerResponse, target: RuntimeTarget): void {
+    res.setHeader('cache-control', 'no-store')
+    if (wantsHtml(req)) {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      res.end(stoppedPage(target))
+    } else {
+      res.writeHead(409, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: { code: 'INSTANCE_STOPPED', message: '工作台已手动停止。请主动启动并打开。' } }))
+    }
+  }
+
   async function ensureReady(
     req: IncomingMessage,
     res: ServerResponse | null,
@@ -166,6 +177,15 @@ export function createProxyHandlers(
     // Trust the live handle, not the `ready` row: an external kill or crash
     // leaves the row stale, and proxying that port yields instance-unreachable.
     if (!await instances.isLive(target)) {
+      if (await instances.stopReasonOf(target) === 'manual') {
+        if (res !== null) refuseStopped(req, res, target)
+        return null
+      }
+      const gate = await deps.maintenanceGate?.()
+      if (gate !== undefined && gate !== 'open') {
+        if (res !== null) { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: gate })) }
+        return null
+      }
       const pending = instances.ensureRunning(context.runtime)
       if (res !== null) {
         const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
@@ -235,7 +255,12 @@ export function createProxyHandlers(
         } else {
           await instances.touch(ready.target)
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof RuntimeStartBlockedError) {
+          if (error.code === 'INSTANCE_STOPPED') refuseStopped(req, res, ready.target)
+          else { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: error.reason })) }
+          return
+        }
         const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
         if (wantsHtml(req)) {
           res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...retryHeaders })
@@ -293,6 +318,14 @@ export function createProxyHandlers(
         }
         res.once('finish', finish)
         res.once('close', finish)
+        // Attribute client disconnects: the public tunnel logs a generic
+        // "context canceled" without the path, so a close before the response
+        // completes gets its own line naming the canceled request.
+        res.once('close', () => {
+          if (!res.writableFinished) {
+            console.error(`[gateway] client disconnected mid-response: ${req.method} ${pathname} -> ${ready.target.kind} ${String(ready.target.id)}`)
+          }
+        })
         try {
           server.web(req, res, targetOptions(ready.port, principal), () => {
             if (!res.headersSent) {

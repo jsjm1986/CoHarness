@@ -2,14 +2,14 @@ import { once } from 'node:events'
 import { generateKeyPairSync } from 'node:crypto'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { connect, createServer, type AddressInfo, type Socket } from 'node:net'
+import type { AddressInfo, Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { AuditService } from '../src/audit.ts'
 import { AuthService } from '../src/auth.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ProjectService } from '../src/projects.ts'
@@ -17,6 +17,7 @@ import { createProxyHandlers } from '../src/proxy.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
+import { runtimeRelay } from './runtime-relay.ts'
 import { barrier } from './barrier.ts'
 
 // Resolve from a real cwd path (not import.meta.url, which is a virtual URL
@@ -70,41 +71,6 @@ afterEach(async () => {
   if (failures.length) throw new AggregateError(failures, 'proxy fixture cleanup failed')
 })
 
-/** Hold the assigned Gateway endpoint while each real child binds its own ephemeral port. */
-async function runtimeRelay(portFile: string): Promise<number> {
-  const sockets = new Set<Socket>()
-  const relay = createServer((downstream) => {
-    sockets.add(downstream)
-    downstream.on('close', () => sockets.delete(downstream))
-    // The manager retries signed readiness while the child publishes its listener.
-    let port: number
-    try { port = Number(readFileSync(portFile, 'utf8')) } catch (error) {
-      downstream.destroy()
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-      return
-    }
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      downstream.destroy()
-      throw new Error('fixture child published an invalid listener')
-    }
-    const upstream = connect(port, '127.0.0.1')
-    sockets.add(upstream)
-    upstream.on('close', () => { sockets.delete(upstream); downstream.destroy() })
-    downstream.on('close', () => upstream.destroy())
-    upstream.on('error', () => downstream.destroy())
-    downstream.on('error', () => upstream.destroy())
-    downstream.pipe(upstream).pipe(downstream)
-  })
-  cleanup.push(async () => {
-    for (const socket of sockets) socket.destroy()
-    if (relay.listening) await new Promise<void>((resolve, reject) => {
-      relay.close(error => error ? reject(error) : resolve())
-    })
-  })
-  relay.listen(0, '127.0.0.1')
-  await once(relay, 'listening')
-  return (relay.address() as AddressInfo).port
-}
 
 async function setup(withPrincipal = false, env: Record<string, string> = {}) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
@@ -112,8 +78,8 @@ async function setup(withPrincipal = false, env: Record<string, string> = {}) {
   const db = openDb(join(root, 'g.sqlite'))
   cleanup.push(() => { db.close() })
   const portFile = join(root, 'child-port')
-  const port = await runtimeRelay(portFile)
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_READINESS_TIMEOUT_MS: '10000', HGW_INSTANCE_PORT_BASE: String(port), ...env })
+  const port = await runtimeRelay(portFile, dispose => { cleanup.push(dispose) })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), HGW_READINESS_TIMEOUT_MS: '10000', HGW_INSTANCE_PORT_BASE: String(port), ...env })
   cfg.dshCommand = [process.execPath, '-e', ECHO_DSH, '{port}', portFile]
   const deps: GatewayDeps = {
     cfg,
@@ -212,6 +178,37 @@ describe('proxy handlers', () => {
       redirect: 'manual',
     })
     expect(external.headers.get('location')).toBe('https://127.0.0.1.evil/landing')
+  })
+
+  it('keeps a manual stop through passive requests and starts only after the authorized form action', async () => {
+    const { deps, base, cookie, alice } = await setup()
+    await deps.instances.ensureRunning(alice)
+    await deps.instances.stop(alice.id)
+    const stopped = await fetch(`${base}/`, { headers: { cookie, accept: 'text/html' } })
+    expect(stopped.status).toBe(200)
+    const page = await stopped.text()
+    expect(page).toContain('启动并打开')
+    expect(page).not.toContain('http-equiv="refresh"')
+    const passive = await fetch(`${base}/api/echo`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: '{}',
+    })
+    expect(passive.status).toBe(409)
+    expect(await passive.json()).toMatchObject({ error: { code: 'INSTANCE_STOPPED' } })
+    expect(await deps.instances.isLive(alice.id)).toBe(false)
+    const request = { method: 'POST', redirect: 'manual' as const,
+      headers: { cookie, origin: base, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ kind: 'personal' }) }
+    const forged = await fetch(`${base}/account/runtime/start`, { ...request, headers: { ...request.headers, origin: 'https://unrelated.invalid' } })
+    expect(forged.status).toBe(403)
+    deps.maintenanceGate = async () => 'maintenance'
+    expect((await fetch(`${base}/account/runtime/start`, request)).status).toBe(503)
+    expect(await deps.instances.stopReasonOf(alice.id)).toBe('manual')
+    deps.maintenanceGate = async () => 'open'
+    const start = await fetch(`${base}/account/runtime/start`, request)
+    expect(start.status).toBe(302)
+    expect(start.headers.get('location')).toBe('/')
+    expect(await deps.instances.isLive(alice.id)).toBe(true)
+    expect(await deps.instances.stopReasonOf(alice.id)).toBeNull()
   })
 
   it('shows the waiting page and respawns when a ready child has exited', async () => {
@@ -318,6 +315,20 @@ describe('proxy handlers', () => {
     expect(response.status).toBe(200)
     const body = await response.text()
     expect(body).toBe('data: open\n\ndata: tick\n\n')
+  })
+
+  it('logs the request path when a client disconnects before the response completes', async () => {
+    const { deps, base, cookie, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    cleanup.push(() => spy.mockRestore())
+    const controller = new AbortController()
+    const pending = fetch(`${base}/api/hold`, { headers: { cookie }, signal: controller.signal })
+    await pending.then(response => expect(response.status).toBe(200))
+    controller.abort()
+    await vi.waitFor(() => {
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('client disconnected mid-response: GET /api/hold'))
+    }, { timeout: 5000 })
   })
 
   it('proxies websocket upgrades with rewritten host', async () => {

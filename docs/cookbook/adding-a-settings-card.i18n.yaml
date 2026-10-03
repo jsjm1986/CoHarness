@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for adding-a-settings-card.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/adding-a-settings-card.md
-adding-a-settings-card.md: 56ec3be578bbc489bbb979a50bcaed063a35ace5
-adding-a-settings-card.zh.md: 3167e397f17e42657a6250076199cf01956b94e5
+/cookbook-adding-a-settings-card:
+  en: 2b1de4712dfb6e96
+  zh: c1033c6abc65c6ea
+/cookbook-adding-a-settings-card/1-register-the-namespace-host-half:
+  en: 3ef3a78d33a67d50
+  zh: 2c67f620b8103515
+/cookbook-adding-a-settings-card/2-register-the-card-browser-half:
+  en: dad5dabe84206c3e
+  zh: 7472aae9bfb9dca8
+/cookbook-adding-a-settings-card/3-what-the-tab-does-with-it:
+  en: 6a957e6f18ca728b
+  zh: bfca06aaa66b8cbd
+/cookbook-adding-a-settings-card/packaging:
+  en: 19b48cb04b3af89d
+  zh: 8857931630909652

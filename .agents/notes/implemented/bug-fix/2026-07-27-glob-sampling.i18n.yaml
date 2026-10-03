@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-glob-sampling.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-27-glob-sampling.md
-2026-07-27-glob-sampling.md: 67912cf290b127a96819d57f30387197af68323d
-2026-07-27-glob-sampling.zh.md: b8d7bbe1bc70e94cc4239867244be554eaf33e63
+/agent-note-sample-over-cap-glob-results-across-the-tree:
+  en: ec26c3a558d50db2
+  zh: a81b67d0a940b92b
+/agent-note-sample-over-cap-glob-results-across-the-tree/problem:
+  en: dfc0d40171aaa832
+  zh: 7d53934937ef9e33
+/agent-note-sample-over-cap-glob-results-across-the-tree/decision:
+  en: 364b0516679c118f
+  zh: dd39932fd103cb4c
+/agent-note-sample-over-cap-glob-results-across-the-tree/alternatives-considered:
+  en: 9d9025acef0dd316
+  zh: 216231cc24d4621b
+/agent-note-sample-over-cap-glob-results-across-the-tree/consequences:
+  en: f0df5ef10c65a0ae
+  zh: 61f7bd8ea7faaa46
+/agent-note-sample-over-cap-glob-results-across-the-tree/testing:
+  en: 57a6844bc82399c5
+  zh: 26b86a7742826dad

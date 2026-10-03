@@ -133,7 +133,8 @@ registerAuto(admit: () => void): () => Promise<void>
 
 /**
  * Resolve the preset matching the effective knob values. A still-matching
- * last selection wins shared-bundle ties; otherwise the first configured
+ * last selection wins shared-bundle ties, and a still-selected Auto also
+ * matches the `never` approval policy; otherwise the first configured
  * match wins. Returns
  * {@link CUSTOM_PRESET} when no available preset matches.
  * @param session - the session whose knob state is read.

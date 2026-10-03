@@ -61,6 +61,7 @@ kind: "package-reference"
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -70,6 +71,7 @@ kind: "package-reference"
 
 注册不改变模型请求。提供方 拥有的工具与指导决定各自对请求前缀的影响。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

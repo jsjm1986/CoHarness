@@ -23,6 +23,9 @@ import { WorkspaceResourceRegistry } from './workspace-resources.ts'
 
 export { isAppendSurfaceEvent, isReplacementSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 
+export { clientSessionKey, parseClientSessionKey, runtimeTargetKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+export type { ClientSessionAddress, ClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
+
 export { NavigationController, commitSessionNavigation } from './navigation.ts'
 export { SlotRegistry } from './slots.ts'
 export { ConversationEventRegistry } from './conversation/event-registry.ts'
@@ -33,8 +36,8 @@ export { conversationContextKey } from './contract/conversation.ts'
 export type {
   AssistantLiveChunkEvent,
   ChatConversationViewNode, ConversationContextReader, ConversationEventInput,
-  ConversationLocationData, ConversationLocationDataScope, ConversationLocationDataStore,
-  ConversationStepDataMap,
+  ConversationLocationData, ConversationLocationDataScope, ConversationLocationDataSource,
+  ConversationLocationDataStore, ConversationStepDataMap,
   ConversationLocation, ConversationMatch, ConversationMatchResult,
   ConversationNodeContext, ConversationNodeDefinition, ConversationPreviousContext,
   ConversationPublication, ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewBuilder,
@@ -103,7 +106,8 @@ export type {
   SessionBinding, SessionListState, SessionProvideContribution, SessionProvideDescriptor, SessionSummary,
 } from './sessions/service.ts'
 export type { SessionListPhase, SessionSearchResultItem, SubagentCatalogSnapshot } from './sessions/manager.ts'
-export type { SubagentAddress, JobView } from '@deepseek-ai/dsh-client-connection/client'
+export type { SubagentAddress, JobView, JobOutputChunk, JobOutputCoords, JobOutputValue } from '@deepseek-ai/dsh-client-connection/client'
+export type { ObservedJob } from './sessions/manager.ts'
 export type { WorkspaceListPhase } from './workspaces/manager.ts'
 export type { WorkspaceListState } from './workspaces/service.ts'
 export type {
@@ -129,7 +133,7 @@ export type {
   ContextMessageNode, ConversationNode, ConversationSnapshot, HistoryDetailState, HistoryNavigationItem, HistoryNavigationSnapshot,
   HistoryNavigationState, HistoryWindowMode,
   ModelRetryNode, PendingSubmission, PendingSubmissionImage, PendingSubmissionPlacement, QueuedMessage,
-  LegacyConversationSlice, PartialAssistant, RunningToolCall,
+  LegacyConversationSlice, PartialAssistant, PreparingToolCall, RunningToolCall, StartedToolCall,
   SteeringMessageNode, TodoItem, ToolCallBlock, ToolResultNode, TurnErrorNode, TurnMaxTokensNode,
   UnknownSurfaceNode, UserMessageNode,
 } from './sessions/conversation.ts'
@@ -152,6 +156,7 @@ export type {
 export { PendingWait } from './sessions/pending.ts'
 export type {
   PendingInteraction, PendingInteractionStatus, PendingKind, PendingPayloads,
+  SessionPendingEntry, SessionPublishedInteraction,
 } from './sessions/pending.ts'
 // Projection value store (push model; see the session-projection subsystem
 // page, docs/subsystems/session-projection.md): host-computed
@@ -298,11 +303,23 @@ export function apply(ctx: Context): void {
     events: new ConversationEventRegistry(ctx),
     views: new ConversationViewRegistry(ctx),
   }
-  const baseSessions = new SessionRuntime(ctx, connection.api, ctx.remote, conversation, {
+  const baseSessions = new SessionRuntime(ctx, connection.wireApi ?? connection.api, ctx.remote, conversation, {
     provideService: false,
     hostDescription: connection.hostDescription,
   })
   const sessions = new SessionRuntimePool(ctx, baseSessions, connection, ctx.remote, conversation)
+  ctx.effect(() => {
+    const stopAccount = ctx.projectUiPolicy.subscribe(() => {
+      const id = ctx.projectUiPolicy.getSnapshot().verifiedAccountId
+      if (id !== undefined) connection.confirmPrincipal?.(id)
+    })
+    const stopIdentity = connection.onPrincipalChange?.(async () => {
+      try { ctx.projectUiPolicy.setVerifiedAccountId(undefined) }
+      finally { sessions.invalidateAccount() }
+      await ctx.fiber.dispose()
+    })
+    return () => { stopAccount(); stopIdentity?.() }
+  }, 'runtime: authenticated account lifetime')
   // One catalog mirror per pooled runtime connection; sinks attribute each
   // catalog-changed forward to the connection that delivered it, and each
   // mirror's own hostDescription subscription covers generation resets.
@@ -330,7 +347,7 @@ export function apply(ctx: Context): void {
       // `ctx.remote.$on` subscribers; no consumer reads a frame.
       const frame = envelope.payload
       if (frame.type === 'host/remote-event') {
-        ctx.remote.$dispatch(frame.event, frame.args)
+        sessions.dispatchRemoteEvent(frame.event, frame.args)
         if (frame.event === 'permission-presets/catalog-changed') permissionCatalog.invalidateFor(connection)
       }
     },

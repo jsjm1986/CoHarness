@@ -1,4 +1,4 @@
-/** Per-Session turn recorder: snapshots, captures around file-tool edits, the turn-end diff, and the records kept until disposal. */
+/** Per-Session turn recorder: snapshots, captures around file-tool edits, the turn-end diff, and durable review publication. */
 import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
@@ -10,10 +10,13 @@ import {
   blobText, diffTrees, gitlinkPaths, ignoredPaths, locateGitWorkspace, snapshotTree, treeBlob, type GitRunner, type GitWorkspace,
 } from './git.ts'
 import { canonicalPath, compareDisplay, displayPathOf, durablePathOf, isInside, isTemporaryPath, temporaryRoots, toPosix } from './paths.ts'
-import type { WorkspaceChangedFile, WorkspaceChangesSummary, WorkspaceFileDiff } from './types.ts'
+import type { WorkspaceChangedFile, WorkspaceChangesSummary, WorkspaceFileDiff, WorkspaceReviewId } from './types.ts'
+import { ReviewCapacityError, type ReviewStore } from './review-store.ts'
 
 /** Facts shared by every recorder of one plugin instance. */
 export interface RecorderEnvironment {
+  /** Host-owned immutable history; published before the Session announcement. */
+  reviewStore: ReviewStore
   /** POSIX target storage when workspace paths are not Host paths. */
   execution?: PosixRecorderExecution
 
@@ -27,7 +30,7 @@ export interface RecorderEnvironment {
   maxFileBytes: number
   /** Milliseconds a line comparison may run before it degrades to whole-file replacement. */
   diffTimeoutMs: number
-  /** Failure reporter; a failed turn records nothing and the next turn retries. */
+  /** Failure reporter; the affected turn is marked incomplete and cannot keep executing. */
   warn: (message: string) => void
 }
 
@@ -58,8 +61,7 @@ type ContentSource =
   | Exclude<Capture, { kind: 'oversized' }>
 
 /**
- * What a listed file's comparison is served from: a refusal decided when the
- * turn was recorded, or the two sides to read and compare when asked for.
+ * Captured inputs used to compute one immutable comparison before publication.
  */
 type FileSources =
   | { refusal: 'binary' | 'oversized' }
@@ -103,8 +105,8 @@ const OVERSIZED = Symbol('oversized')
  * whole-file capture before each file-tool mutation, the turn-end snapshot
  * with its diff, and the appended `workspace/changes` event whose summary and
  * comparisons this recorder keeps. Snapshot objects and captured copies live in
- * a temporary directory owned by the recorder; disposal removes it together
- * with the summaries. Tool execution waits for pending work so a snapshot or
+ * a temporary directory owned by the recorder; completed comparisons are
+ * persisted before that directory is removed. Tool execution waits for pending work so a snapshot or
  * capture never races a mutation. A working directory outside any repository,
  * or a Host without git, gets no snapshot; its summary lists the files the file
  * tools changed.
@@ -121,8 +123,9 @@ export class TurnRecorder {
   private scratch: Promise<string> | undefined
   private executionScratch: { storage: PosixRecorderExecution; directory: Promise<string> } | undefined
   /** Records by the sequence of the event that announced them. */
-  private readonly records = new Map<number, TurnRecord>()
+  private readonly records = new Map<number, { summary: WorkspaceChangesSummary; reviewId?: WorkspaceReviewId }>()
   private readonly lifetime = new AbortController()
+  private failure: { turn: number; cause: unknown } | undefined
 
   constructor(
     private readonly session: Session,
@@ -201,7 +204,7 @@ export class TurnRecorder {
   stopping(turn: number): Promise<void> {
     const state = this.state
     if (turn !== state.turn) return Promise.resolve()
-    return this.enqueue(signal => this.record(state, signal))
+    return this.enqueue(signal => this.record(state, signal)).then(() => this.settled())
   }
 
   /**
@@ -216,7 +219,34 @@ export class TurnRecorder {
 
   /** Resolves once every queued snapshot, capture, and record has settled. */
   settled(): Promise<void> {
-    return this.chain
+    return this.chain.then(() => {
+      if (this.failure?.turn === this.state.turn) {
+        throw new Error('Historical review storage failed. Resolve the storage problem before continuing; file changes were not undone.',
+          { cause: this.failure.cause })
+      }
+    })
+  }
+
+  /**
+   * Mark a turn incomplete and prevent further execution under its failed recording state.
+   * @param turn - affected turn, captured before the failing asynchronous operation.
+   * @param cause - storage or recording failure retained for diagnostics.
+   */
+  failStorage(turn: number, cause: unknown): void {
+    if (this.lifetime.signal.aborted || this.failure?.turn === turn) return
+    this.failure = { turn, cause }
+    const summary: WorkspaceChangesSummary = {
+      turn, cwd: this.cwd, incomplete: true, files: [], total: 0, added: 0, deleted: 0,
+    }
+    try {
+      const event = this.session.append('workspace/changes', { turn, incomplete: true,
+        ...(cause instanceof ReviewCapacityError ? { requiredReviewBytes: cause.requiredBytes } : {}),
+      })
+      this.records.set(event.seq, { summary })
+    } catch (appendError) {
+      this.warnUnlessDisposed(appendError)
+    }
+    this.warnUnlessDisposed(cause)
   }
 
   /**
@@ -233,27 +263,23 @@ export class TurnRecorder {
    * @param seq - the announcing event's sequence number.
    * @param index - the file's index in the summary's `files`.
    * @param signal - cancels the reads.
-   * @returns the comparison, or undefined for an unknown sequence or index, or once disposed.
-   * @throws when a read fails while the recorder lives.
+   * @returns the stored comparison, or undefined for an unknown sequence or index.
+   * @throws when stored data fails validation or cannot be read.
    */
   async diff(seq: number, index: number, signal: AbortSignal): Promise<WorkspaceFileDiff | undefined> {
     const record = this.records.get(seq)
-    const file = record?.summary.files[index]
-    const sources = record?.sources[index]
-    if (file === undefined || sources === undefined) return undefined
+    if (record?.reviewId === undefined) return undefined
+    return (await this.env.reviewStore.read(this.session.id, record.reviewId, signal))?.diffs[index]
+  }
+
+  private async compareFile({ file, sources }: Listed, signal: AbortSignal): Promise<WorkspaceFileDiff> {
     const { path, display } = file
     if (sources.refusal !== undefined) return { kind: sources.refusal, path, display }
     const combined = AbortSignal.any([signal, this.lifetime.signal])
-    try {
-      const [before, after] = await Promise.all([this.readSide(sources.before, combined), this.readSide(sources.after, combined)])
-      if (before === OVERSIZED || after === OVERSIZED) return { kind: 'oversized', path, display }
-      const { hunks, coarse } = compareText(before, after, this.env.diffTimeoutMs)
-      return { kind: 'text', path, display, before: before !== null, after: after !== null, hunks, coarse }
-    } catch (error: unknown) {
-      // Disposal removes the temporary directory under a running read; the Session is gone either way.
-      if (this.lifetime.signal.aborted) return undefined
-      throw error
-    }
+    const [before, after] = await Promise.all([this.readSide(sources.before, combined), this.readSide(sources.after, combined)])
+    if (before === OVERSIZED || after === OVERSIZED) return { kind: 'oversized', path, display }
+    const { hunks, coarse } = compareText(before, after, this.env.diffTimeoutMs)
+    return { kind: 'text', path, display, before: before !== null, after: after !== null, hunks, coarse }
   }
 
   /**
@@ -272,13 +298,13 @@ export class TurnRecorder {
     }
   }
 
-  private enqueue(task: (signal: AbortSignal) => Promise<void>): Promise<void> {
+  private enqueue(task: (signal: AbortSignal) => Promise<void>, turn = this.state.turn): Promise<void> {
     const run = this.chain.then(async () => {
       if (this.lifetime.signal.aborted) return
       try {
         await task(this.lifetime.signal)
       } catch (error: unknown) {
-        this.warnUnlessDisposed(error)
+        this.failStorage(turn, error)
       }
     })
     this.chain = run
@@ -320,6 +346,13 @@ export class TurnRecorder {
     if (git === null) return null
     const workspace = await locateGitWorkspace(git, paths.cwd, () => this.snapshotDir(paths.scratchRoot, signal), signal)
     if (workspace === null) return null
+    if (this.env.execution === undefined) {
+      const reviews = await canonicalPath(this.env.reviewStore.root)
+      if (isInside(reviews, paths.cwd)) throw new Error('Historical review storage cannot contain the Session workspace')
+      if (isInside(workspace.root, reviews)) {
+        workspace.excludes = [...workspace.excludes, toPosix(relative(workspace.root, reviews))]
+      }
+    }
     this.repository = { git, workspace }
     return this.repository
   }
@@ -340,6 +373,7 @@ export class TurnRecorder {
   }
 
   private async record(state: TurnState, signal: AbortSignal): Promise<void> {
+    if (this.failure?.turn === state.turn) return
     const paths = this.paths
     const { baseline } = state
     if (paths === undefined || baseline === 'failed' || state.lastToolResultSeq < 0) return
@@ -390,9 +424,8 @@ export class TurnRecorder {
     const sorted = [...listed.values()].sort((a, b) => compareDisplay(a.file, b.file))
     // An empty list after an earlier in-turn record supersedes that record.
     if (sorted.length === 0 && state.recordedAfterSeq < 0) return
-    const event = this.session.append('workspace/changes', { turn: state.turn })
     const kept = sorted.slice(0, this.env.maxFiles)
-    this.records.set(event.seq, {
+    const record: TurnRecord = {
       summary: {
         turn: state.turn,
         cwd: this.cwd,
@@ -403,7 +436,20 @@ export class TurnRecorder {
         ...snapshot === undefined ? {} : { snapshot },
       },
       sources: kept.map(entry => entry.sources),
-    })
+    }
+    const diffs: WorkspaceFileDiff[] = []
+    let bytes = Buffer.byteLength(JSON.stringify({ version: 1, sessionId: this.session.id, summary: record.summary, diffs }))
+    this.env.reviewStore.assertCapacity(bytes)
+    for (const [index, entry] of kept.entries()) {
+      const diff = await this.compareFile(entry, signal)
+      bytes += Buffer.byteLength(JSON.stringify(diff)) + (index === 0 ? 0 : 1)
+      this.env.reviewStore.assertCapacity(bytes)
+      diffs.push(diff)
+    }
+    const reviewId = await this.env.reviewStore.save({ version: 1, sessionId: this.session.id, summary: record.summary, diffs })
+    signal.throwIfAborted()
+    const event = this.session.append('workspace/changes', { turn: state.turn, reviewId })
+    this.records.set(event.seq, { summary: record.summary, reviewId })
     state.recordedAfterSeq = event.seq
   }
 

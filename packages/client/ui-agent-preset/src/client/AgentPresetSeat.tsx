@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ObservableSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconAgentPresetOutline16, IconChevronDownOutline14, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: pulls the ui-conversation SlotMap merge (the hero seat).
@@ -27,6 +27,8 @@ export interface AgentPresetSeatInjected {
   hooks: {
     /** Seat snapshot bound by the renderer as useAgentPresetSeat. */
     agentPresetSeat: SnapshotStore<AgentPresetSeatState>
+    /** Shared developer-tool enablement gating preset selection. */
+    developerTools: ObservableSnapshot<boolean>
   }
   /** Read the roster when the chip first renders. */
   load: () => Promise<void>
@@ -68,8 +70,9 @@ export type AgentPresetSeatProps =
  * @param props - composed slot props.
  * @returns the chip, or null when the deployment composes no presets.
  */
-export function AgentPresetSeat({ load, select, introduced, useAgentPresetSeat, t }: AgentPresetSeatProps) {
+export function AgentPresetSeat({ load, select, introduced, useAgentPresetSeat, useDeveloperTools, t }: AgentPresetSeatProps) {
   const state = useAgentPresetSeat(snapshot => snapshot)
+  const developerTools = useDeveloperTools(value => value)
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -80,9 +83,9 @@ export function AgentPresetSeat({ load, select, introduced, useAgentPresetSeat, 
   // state explicitly; otherwise an external off/on edit can revive an open
   // menu from before the policy moved.
   useEffect(() => {
-    if (state.showPicker) return
+    if (state.showPicker && developerTools) return
     setOpen(false)
-  }, [state.showPicker])
+  }, [state.showPicker, developerTools])
 
   const chosen = state.options.find(option => option.id === state.current)
   const chosenText = chosen === undefined ? undefined : presetDisplayText(chosen, t)
@@ -109,9 +112,10 @@ export function AgentPresetSeat({ load, select, introduced, useAgentPresetSeat, 
     return () => { window.clearTimeout(done) }
   }, [state.introduce, ready, label, introduced])
 
-  // Hidden by policy, or nothing to choose between: the deployment composes
-  // no presets and every session shares the host composition.
-  if (!state.showPicker || !ready) return null
+  // Hidden by policy, by the shared developer-tool preference, or with
+  // nothing to choose between: the deployment composes no presets and every
+  // session shares the host composition.
+  if (!state.showPicker || !ready || !developerTools) return null
 
   // One wrapper span: the chip is a flex row with a gap, so loose character
   // spans would each pick up the gap between them.

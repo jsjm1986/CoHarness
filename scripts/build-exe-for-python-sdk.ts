@@ -9,10 +9,12 @@
 import { spawn } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { chmod, copyFile, cp, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { parseArgs } from 'node:util'
 import { resolveLinuxNodePtyAddon, resolveWindowsNodePtyAddons } from './build-exe-for-python-sdk-native-pty.ts'
 import { copyOfficeSidecar, OFFICE_ASSET_IGNORES } from './build-exe-for-python-sdk-office.ts'
+import { preparePrimaryRuntime, smokePrimaryRuntime, type PrimaryRuntimeTarget } from './primary-runtime/prepare.ts'
 
 const root = resolve(import.meta.dirname, '..')
 
@@ -60,6 +62,8 @@ const ASSET_GLOBS = [
   'node_modules/@deepseek-ai/dsh-web-frontend/dist/**/*',
   // skill-badge resolves both Markdown and image resources through import.meta.url.
   'node_modules/@deepseek-ai/dsh-skill-badge/assets/**/*',
+  // The diagnosis provider extracts its PowerShell script for an external interpreter.
+  'node_modules/@deepseek-ai/dsh-sandbox-windows-acl/assets/**/*',
 ]
 
 const PLATFORMS = ['linux', 'macos', 'win'] as const
@@ -310,6 +314,15 @@ class SingleExeBuild {
   }
 
   /**
+   * Restore workspace devDependencies that `pnpm deploy --prod` removes through
+   * the shared lockfile's production install; the `pnpm exec pkg` step resolves
+   * pkg from the root devDependency bin.
+   */
+  async restoreDevDependencies(): Promise<void> {
+    await this.runPnpm('restore devDependencies', ['install'])
+  }
+
+  /**
    * Restore direct packages that pnpm's legacy hoister places beside the deploy
    * source instead of in the target. The runtime manifest supplies every peer,
    * so package-local node_modules trees are omitted to preserve one flat Cordis
@@ -419,7 +432,7 @@ class SingleExeBuild {
   /**
    * Package one target; SEA mode accepts one target per invocation.
    * @param target - the pkg target triple to build.
-   * @returns the executable, Office directory, ripgrep, and required macOS spawn helper paths.
+   * @returns the executable, resource directories, ripgrep, and required macOS spawn helper paths.
    */
   async pack(target: Target): Promise<string[]> {
     const productBase = join(this.outDir, `${OUTPUT_BASENAME}-${target.platform}-${target.arch}`)
@@ -448,7 +461,17 @@ class SingleExeBuild {
       console.log(`build-exe-for-python-sdk: copied ${packages.length} Office packages to ${office}`)
     }
     const ripgrep = await this.copyRipgrepSidecar(target, product)
-    if (target.platform !== 'macos') return [product, ripgrep, office]
+    const resources = join(this.outDir, `${target.platform}-${target.arch}`)
+    const runtimeTarget = `${target.platform === 'macos' ? 'mac' : target.platform}-${target.arch}` as PrimaryRuntimeTarget
+    if (this.cli.dryRun) {
+      console.log(`build-exe-for-python-sdk: [dry-run] prepare Python and Office skills for ${runtimeTarget} in ${resources}`)
+    } else {
+      const { version } = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { version: string }
+      await preparePrimaryRuntime({ target: runtimeTarget, output: resources,
+        cache: join(tmpdir(), 'dsh-primary-runtime-downloads'), version })
+      smokePrimaryRuntime(join(resources, 'primary-runtime'))
+    }
+    if (target.platform !== 'macos') return [product, ripgrep, office, resources]
     const spawnHelper = `${product}-spawn-helper`
     const source = join(this.staging, 'node_modules', 'node-pty', 'prebuilds', `darwin-${target.arch}`, 'spawn-helper')
     if (this.cli.dryRun) {
@@ -457,7 +480,7 @@ class SingleExeBuild {
       await copyFile(source, spawnHelper)
       await chmod(spawnHelper, 0o755)
     }
-    return [product, ripgrep, spawnHelper, office]
+    return [product, ripgrep, spawnHelper, office, resources]
   }
 
   /** Copy the target ripgrep binary beside the executable so Node can spawn it outside pkg's virtual filesystem. */
@@ -548,7 +571,7 @@ class SingleExeBuild {
         continue
       }
       if (statSync(path).isDirectory()) {
-        console.log(`  ${path}  (Office dependency directory)`)
+        console.log(`  ${path}  (resource directory)`)
         continue
       }
       const megabytes = statSync(path).size / (1024 * 1024)
@@ -631,6 +654,7 @@ async function main(): Promise<void> {
   await pipeline.verifyClosure()
   await pipeline.build()
   await pipeline.deployStaging()
+  await pipeline.restoreDevDependencies()
   await pipeline.injectPkgConfig()
   const products: string[] = []
   for (const target of cli.targets) products.push(...await pipeline.pack(target))

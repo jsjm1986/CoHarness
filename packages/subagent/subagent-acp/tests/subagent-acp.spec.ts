@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { chmodSync, existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
@@ -62,7 +62,7 @@ async function setup(mockEnv: SetupEnv = {}, permission: 'allow' | 'reject' = 'r
   return ctx
 }
 
-function text(blocks: { type: string; text?: string }[]): string {
+function text(blocks: readonly { type: string; text?: string }[]): string {
   return blocks.filter(b => b.type === 'text').map(b => b.text).join('')
 }
 
@@ -163,9 +163,9 @@ describe('child env layering (through the subprocess seam)', () => {
     // explicit entry merges after it and the child must see the value.
     const ctx = await setup({ MOCK_ECHO_ENV: 'DSH_ACP_TEST_FACT', DSH_ACP_TEST_FACT: 'managed' })
     const parent = { id: 'parent', session: { header: { cwd: process.cwd() } } } as unknown as Agent
-    const run = await ctx.subagents.start('acp', {
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, {
       label: 'p', prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal,
-    })
+    }))
     const result = await run.result
     await run.dispose()
     const text = result.output.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join('')
@@ -344,7 +344,7 @@ describe('cwd resolution', () => {
     try {
       const ctx = await setup({ MOCK_ECHO_CWD: '1' })
       const parent = { id: 'parent', session: { header: { cwd: workdir } } } as unknown as Agent
-      const run = await ctx.subagents.start('acp', { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal })
+      const run = await ctx.subagents.start('acp', withExecutionContext(ctx, { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal }))
       const result = await run.result
       await run.dispose()
       // Line 1: where the child process actually ran; line 2: the workspace the
@@ -365,7 +365,7 @@ describe('cwd resolution', () => {
       // A command that would create the sentinel if the child were ever spawned.
       await ctx.plugin(acp, { providerName: 'acp', command: 'touch', args: [sentinel], permission: 'reject', env: {} })
       const parent = { id: 'parent', session: { header: {} } } as unknown as Agent
-      await expect(ctx.subagents.start('acp', { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal }))
+      await expect(ctx.subagents.start('acp', withExecutionContext(ctx, { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal })))
         .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: configuration')}`)
       // Resolution failed BEFORE the process boundary — nothing was launched.
       expect(existsSync(sentinel)).toBe(false)
@@ -390,7 +390,7 @@ describe('cwd resolution', () => {
         env: { MOCK_ECHO_CWD: '1' },
       })
       const parent = { id: 'parent', session: { header: { cwd: parentDir } } } as unknown as Agent
-      const run = await ctx.subagents.start('acp', { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal })
+      const run = await ctx.subagents.start('acp', withExecutionContext(ctx, { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal }))
       const result = await run.result
       await run.dispose()
       expect(text(result.output)).toBe(`${configured}\n${configured}`)
@@ -417,7 +417,7 @@ describe('cwd resolution', () => {
       permission: 'reject',
       env: { MOCK_ECHO_CWD: '1' },
     })
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     await run.dispose()
     expect(text(result.output)).toBe(`${realpathSync(absolute)}\n${absolute}`)
@@ -441,7 +441,7 @@ describe('cwd resolution', () => {
   })
 
   // Windows ACLs do not expose the POSIX directory search-bit state this fixture creates.
-  it.skipIf(process.platform === 'win32')('rejects a config cwd directory without search permission at load', async () => {
+  it.skipIf(process.platform === 'win32')('refuses an inaccessible target workspace before spawning', async () => {
     // statSync().isDirectory() is true for a mode-600 directory, but a
     // subprocess cwd needs SEARCH permission — spawn would fail EACCES.
     const tmp = mkdtempSync(join(tmpdir(), 'acp-noexec-'))
@@ -450,14 +450,17 @@ describe('cwd resolution', () => {
       const ctx = new Context()
       await ctx.plugin(SubagentRuntime)
       await ctx.plugin(LocalSubprocessRuntime)
-      await expect(ctx.plugin(acp, {
+      await ctx.plugin(acp, {
         providerName: 'acp',
         command: 'true',
         args: [],
         cwd: tmp,
         permission: 'reject',
         env: {},
-      })).rejects.toThrow('not an accessible directory')
+      })
+      const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+      await expect(ctx.subagents.start('acp', withExecutionContext(ctx, request()))).rejects.toThrow()
+      expect(spawn).not.toHaveBeenCalled()
       await ctx.fiber.dispose()
     } finally {
       chmodSync(tmp, 0o700)
@@ -465,18 +468,21 @@ describe('cwd resolution', () => {
     }
   })
 
-  it('rejects a config cwd that is not an accessible directory at load', async () => {
+  it('refuses a missing target workspace before spawning', async () => {
     const ctx = new Context()
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
-    await expect(ctx.plugin(acp, {
+    await ctx.plugin(acp, {
       providerName: 'acp',
       command: 'true',
       args: [],
       cwd: '/nonexistent/acp-child-workspace',
       permission: 'reject',
       env: {},
-    })).rejects.toThrow('not an accessible directory')
+    })
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+    await expect(ctx.subagents.start('acp', withExecutionContext(ctx, request()))).rejects.toThrow()
+    expect(spawn).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
   })
 
@@ -486,7 +492,7 @@ describe('cwd resolution', () => {
     // re-introduce the launch-directory dependency this resolution removes.
     const ctx = await setup({})
     const parent = { id: 'parent', session: { header: { cwd: 'relative/workspace' } } } as unknown as Agent
-    await expect(ctx.subagents.start('acp', { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal }))
+    await expect(ctx.subagents.start('acp', withExecutionContext(ctx, { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal })))
       .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: configuration')}`)
   })
 
@@ -497,7 +503,7 @@ describe('cwd resolution', () => {
     try {
       const ctx = await setup({})
       const parent = { id: 'parent', session: { header: { cwd: file } } } as unknown as Agent
-      await expect(ctx.subagents.start('acp', { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal }))
+      await expect(ctx.subagents.start('acp', withExecutionContext(ctx, { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal })))
         .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: configuration')}`)
     } finally {
       rmSync(tmp, { recursive: true, force: true })
@@ -513,7 +519,7 @@ describe('cwd resolution', () => {
       await ctx.plugin(LocalSubprocessRuntime)
       await ctx.plugin(acp, { providerName: 'acp', command: 'touch', args: [sentinel], permission: 'reject', env: {} })
       const parent = { id: 'parent', session: { header: { cwd: join(tmp, 'vanished') } } } as unknown as Agent
-      await expect(ctx.subagents.start('acp', { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal }))
+      await expect(ctx.subagents.start('acp', withExecutionContext(ctx, { prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal })))
         .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: configuration')}`)
       expect(existsSync(sentinel)).toBe(false)
     } finally {
@@ -525,7 +531,7 @@ describe('cwd resolution', () => {
 describe('dsh-subagent-acp', () => {
   it('drives child processes with parent-unique run ids and returns streamed output', async () => {
     const ctx = await setup({ MOCK_TEXT: 'hello from acp child', MOCK_STOP: 'end_turn', MOCK_SESSION_ID: 'acp-child-session' })
-    const run = await ctx.subagents.start('acp', request('do X'))
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request('do X')))
     expect(run.id).not.toBe('acp-child-session')
     const result = await run.result
     expect(result.stopReason).toBe('completed')
@@ -535,7 +541,7 @@ describe('dsh-subagent-acp', () => {
     expect(run.dispose()).toBe(disposal)
     await disposal
 
-    const nextRun = await ctx.subagents.start('acp', request('do X again'))
+    const nextRun = await ctx.subagents.start('acp', withExecutionContext(ctx, request('do X again')))
     expect(nextRun.id).not.toBe(run.id)
     expect(nextRun.id).not.toBe('acp-child-session')
     await nextRun.result
@@ -544,7 +550,7 @@ describe('dsh-subagent-acp', () => {
 
   it('maps a max_tokens stop reason', async () => {
     const ctx = await setup({ MOCK_TEXT: 'cut off', MOCK_STOP: 'max_tokens' })
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     expect(result.stopReason).toBe('max-tokens')
     expect(result.diagnostic).toBeUndefined()
@@ -553,7 +559,7 @@ describe('dsh-subagent-acp', () => {
 
   it('maps a refusal stop reason', async () => {
     const ctx = await setup({ MOCK_TEXT: '', MOCK_STOP: 'refusal' })
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     expect(result.stopReason).toBe('refusal')
     expect(result.diagnostic).toBeUndefined()
@@ -570,7 +576,7 @@ describe('dsh-subagent-acp', () => {
       MOCK_TOOL_KIND: 'read',
       MOCK_STOP: remote,
     }, 'reject')
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     expect(result.stopReason).toBe(stopReason)
     expect(result.diagnostic).toBe(expectedPermission('reject', 'read', 'denied'))
@@ -579,14 +585,14 @@ describe('dsh-subagent-acp', () => {
 
   it('keeps an ordinary remote cancelled stop diagnostic-free', async () => {
     const ctx = await setup({ MOCK_STOP: 'cancelled' })
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     await expect(run.result).resolves.toEqual({ output: [{ type: 'text', text: 'mock child answer' }], stopReason: 'aborted' })
     await run.dispose()
   })
 
   it('preserves max_turn_requests as an actionable remote limit', async () => {
     const ctx = await setup({ MOCK_TEXT: 'partial', MOCK_STOP: 'max_turn_requests' })
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     expect(result).toEqual({
       output: [{ type: 'text', text: 'partial' }],
@@ -599,7 +605,7 @@ describe('dsh-subagent-acp', () => {
   it('uses a fixed fallback for an unknown remote stop reason', async () => {
     const rawReason = 'private/path/SECRET_TOKEN'
     const ctx = await setup({ MOCK_TEXT: 'partial', MOCK_STOP: rawReason })
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     expect(result.stopReason).toBe('error')
     expect(result.diagnostic).toBe(
@@ -611,7 +617,7 @@ describe('dsh-subagent-acp', () => {
 
   it('reports a dead child by exit facts with the partial output preserved', async () => {
     const ctx = await setup({ MOCK_TEXT: 'partial answer', MOCK_CRASH_AFTER_CHUNK: '1' })
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     expect(result.stopReason).toBe('error')
     expect(text(result.output)).toBe('partial answer')
@@ -623,7 +629,7 @@ describe('dsh-subagent-acp', () => {
 
   it('classifies a child that dies during initialize by exit facts', async () => {
     const ctx = await setup({ MOCK_CRASH_ON_INITIALIZE: '1' })
-    await expect(ctx.subagents.start('acp', request()))
+    await expect(ctx.subagents.start('acp', withExecutionContext(ctx, request())))
       .rejects.toThrow(`subagent-acp: ${expectedFailure('stage: initialize; category: process-exit; exit code: 11')}`)
   })
 
@@ -633,7 +639,7 @@ describe('dsh-subagent-acp', () => {
     try {
       const ctx = await setup({ MOCK_TEXT: 'partial', MOCK_HANG: '1', MOCK_READY_FILE: readyFile })
       const controller = new AbortController()
-      const run = await ctx.subagents.start('acp', request('p', controller.signal))
+      const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request('p', controller.signal)))
       // Wait until the child's prompt is in flight (condition, not a sleep),
       // then cancel — so we exercise the mid-run session/cancel path.
       await waitForFile(readyFile)
@@ -686,7 +692,7 @@ describe('dsh-subagent-acp', () => {
       contexts.push(ctx)
       const controller = new AbortController()
       controller.abort()
-      await expect(ctx.subagents.start('acp', request('p', controller.signal)))
+      await expect(ctx.subagents.start('acp', withExecutionContext(ctx, request('p', controller.signal))))
         .rejects.toThrow('subagent request was aborted before the ACP child started')
       expect(existsSync(sentinel)).toBe(false)
     } finally {
@@ -901,7 +907,7 @@ describe('dsh-subagent-acp', () => {
     try {
       const ctx = await setup({ MOCK_NEWSESSION_READY: ready, MOCK_NEWSESSION_GO: go, MOCK_TEXT: 'should not run' })
       const controller = new AbortController()
-      const starting = ctx.subagents.start('acp', request('p', controller.signal))
+      const starting = ctx.subagents.start('acp', withExecutionContext(ctx, request('p', controller.signal)))
       await waitForFile(ready) // newSession is now in flight, sessionId undefined
       controller.abort('early')
       writeFileSync(go, 'go') // let newSession resolve
@@ -917,7 +923,7 @@ describe('dsh-subagent-acp', () => {
     try {
       const controller = new AbortController()
       const ctx = await setup({ MOCK_TEXT: 'partial', MOCK_HANG: '1', MOCK_READY_FILE: readyFile })
-      const run = await ctx.subagents.start('acp', request('p', controller.signal))
+      const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request('p', controller.signal)))
       await waitForFile(readyFile)
       controller.abort()
       const result = await run.result
@@ -930,7 +936,7 @@ describe('dsh-subagent-acp', () => {
 
   it('auto-rejects a permission prompt by default (child settles cancelled→aborted)', async () => {
     const ctx = await setup({ MOCK_TEXT: 'x', MOCK_PERMISSION: '1' }, 'reject')
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     // The child asked permission, the backend rejected, the child returned cancelled.
     expect(result.stopReason).toBe('aborted')
@@ -939,7 +945,7 @@ describe('dsh-subagent-acp', () => {
 
   it('auto-approves a permission prompt under the allow policy', async () => {
     const ctx = await setup({ MOCK_TEXT: 'approved answer', MOCK_PERMISSION: '1', MOCK_STOP: 'end_turn' }, 'allow')
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     expect(result.stopReason).toBe('completed')
     expect(text(result.output)).toBe('approved answer')
@@ -950,7 +956,7 @@ describe('dsh-subagent-acp', () => {
     // The child asks permission but offers ONLY reject-shaped options, so an
     // allow-policy client finds nothing to select and must answer cancelled.
     const ctx = await setup({ MOCK_PERMISSION: '1', MOCK_NO_ALLOW: '1' }, 'allow')
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     expect(result.stopReason).toBe('aborted')
     await run.dispose()
@@ -960,7 +966,7 @@ describe('dsh-subagent-acp', () => {
     // The child streams an agent_thought_chunk before its answer; the backend
     // must consume it but NOT include it in the result output.
     const ctx = await setup({ MOCK_THOUGHT: '1', MOCK_TEXT: 'final answer', MOCK_STOP: 'end_turn' })
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     expect(result.stopReason).toBe('completed')
     // Only the message text, NOT the thought.
@@ -995,7 +1001,7 @@ describe('dsh-subagent-acp', () => {
         disposeEofGraceMs: 150,
         disposeGraceMs: 150,
       })
-      const run = await ctx.subagents.start('acp', request())
+      const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
       await waitForFile(ready)
       await expect(Promise.race([
         run.dispose(),
@@ -1036,7 +1042,7 @@ describe('dsh-subagent-acp', () => {
       permission: 'reject',
       env: {},
     })
-    await expect(ctx.subagents.start('acp', request())).rejects.toThrow()
+    await expect(ctx.subagents.start('acp', withExecutionContext(ctx, request()))).rejects.toThrow()
   })
 
   it('reports a flattened child failure through onError (preserved, not silently lost)', async () => {
@@ -1071,7 +1077,7 @@ describe('dsh-subagent-acp', () => {
     const ctx = await setup({ MOCK_CRASH_ON_PROMPT: '1' })
     const warnings: string[] = []
     ctx.logger.warn = ((message: unknown) => { warnings.push(String(message)) }) as typeof ctx.logger.warn
-    const run = await ctx.subagents.start('acp', request())
+    const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request()))
     const result = await run.result
     expect(result.stopReason).toBe('error')
     // Unsupported hosts can emit the subprocess provider's one-time fallback
@@ -1115,7 +1121,7 @@ describe('dsh-subagent-acp', () => {
     try {
       const ctx = await setup({ MOCK_TEXT: 'partial', MOCK_HANG: '1', MOCK_CRASH_ON_CANCEL: '1', MOCK_READY_FILE: ready })
       const controller = new AbortController()
-      const run = await ctx.subagents.start('acp', request('p', controller.signal))
+      const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request('p', controller.signal)))
       await waitForFile(ready)
       controller.abort('crash it')
       const result = await run.result
@@ -1136,7 +1142,7 @@ describe('dsh-subagent-acp', () => {
     try {
       const ctx = await setup({ MOCK_TEXT: 'partial', MOCK_HANG: '1', MOCK_IGNORE_CANCEL: '1', MOCK_READY_FILE: ready })
       const controller = new AbortController()
-      const run = await ctx.subagents.start('acp', request('p', controller.signal))
+      const run = await ctx.subagents.start('acp', withExecutionContext(ctx, request('p', controller.signal)))
       await waitForFile(ready)
       controller.abort('test')
       // Bound it: a regression (cancel only notifies the child, which ignores it)
@@ -1181,3 +1187,7 @@ describe('dsh-subagent-acp', () => {
     expect(typeof unwrapped.apply).toBe('function')
   })
 })
+
+function withExecutionContext<T extends { parent: Agent }>(ctx: Context, request: T): T {
+  return { ...request, parent: { ...request.parent, ctx } }
+}

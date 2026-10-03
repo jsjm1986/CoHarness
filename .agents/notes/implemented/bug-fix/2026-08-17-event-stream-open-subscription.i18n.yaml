@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-event-stream-open-subscription.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-event-stream-open-subscription.md
-2026-08-17-event-stream-open-subscription.md: 4b9f2df3babf853982a2116f12ed09126e6b889f
-2026-08-17-event-stream-open-subscription.zh.md: 129c7f2dcf02b7ea31cae2f9bce9e510f0159c34
+/agent-note-event-streams-subscribe-when-opened:
+  en: 6641e122efb06e63
+  zh: 91a67d0d6693d723
+/agent-note-event-streams-subscribe-when-opened/problem:
+  en: 4981300fb5ebd15c
+  zh: a41c988abf484180
+/agent-note-event-streams-subscribe-when-opened/decision:
+  en: e9aa2a2dc2561a3b
+  zh: 1a94c5a5685196d4
+/agent-note-event-streams-subscribe-when-opened/verification:
+  en: f66b49b6b4608466
+  zh: af272c4a00bab3eb
+/agent-note-event-streams-subscribe-when-opened/alternatives-considered:
+  en: c65f7387a50894a2
+  zh: aa2c354fe043c6b0
+/agent-note-event-streams-subscribe-when-opened/consequences:
+  en: de985deefb06a9e1
+  zh: 3e76b7ccc77255af

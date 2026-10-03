@@ -63,6 +63,10 @@ interface ReadOnlyCredentialLayer {
 }
 ```
 
+## 授权会话
+
+流程的 `run()` 收到一个 `AuthorizationSession`：携带所选 method、撤销 signal、notice/prompt 交互面，以及 `commit(mutate)`——seam 唯一认可的本次尝试凭据提交。`commit` 经凭据 provider 的 `modifyRecord` 在该流程自己的 key 上串行化。准入与成功是两回事：以 `undefined` 谢绝的 mutation 返回当前记录而不写入；通过最后一个检查点的替换值已越过撤回，必须完成存储——报告 `authorized`，或以存储错误使尝试失败——而仍在排队或处于 mutation 中的写入在撤回时被拒绝。调用方可以及时得到 `cancelled` 结果，而 key 的保留持续到该流程与其排队的提交工作静止为止；`authorization/settled` 在释放之后触发一次。
+
 ## 已提交的变更
 
 `credentials/reference-updated (ref)` 在提供方管理的来源发生已提交变更后发出——`set`、`unset` 或在存储中观察到的外部编辑。进程环境自身的变化不可观测，永不发出事件。消费方不需要该事件（它们按操作重新解析）；它服务于配置界面刷新「已配置」徽标。
@@ -110,6 +114,9 @@ describe(key: CredentialKey): AuthorizationEntry | undefined
  * Withdraw the attempt running for a key, if any. Separate from the
  * request's own signal because a request/response transport answers a Cancel
  * button on a second call, with no handle on the first one's signal.
+ * Cancellation has no effect once a commit's write was admitted to storage:
+ * the granted credential is allowed to land and the caller hears the write's
+ * own outcome rather than a revoked grant.
  * @param key - the credential record whose attempt should stop.
  */
 cancel(key: CredentialKey): void

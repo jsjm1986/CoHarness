@@ -1,24 +1,46 @@
 /** Dependency reads stay inside the source file's Session and workspace grammar. */
 import { workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
+import { MAX_ASSET_BYTES } from './pack.ts'
 import type { ReadHtmlRelative } from './pack.ts'
 
 /** Complete bytes for one workspace file on its owning runtime, including its freshness token. */
 export interface WorkspaceFileData {
-  readonly data: Uint8Array<ArrayBuffer>
+  /** Complete file bytes as one Base64 payload; decoding belongs to the private parser or packer. */
+  readonly bytes: string
   readonly version: string
 }
 
 /**
- * Read one file through the existing authorized Workspace service.
- * @param request - explicit runtime target, Session, and resource identity.
+ * Read one file through the existing authorized Workspace service, bounded
+ * before and during collection.
+ * @param request - explicit runtime target, Session, resource identity, and
+ *   the caller's complete-file byte cap.
  * @param signal - cancellation shared by the preview and packing operation.
- * @returns complete bytes and the version they were read under.
+ * @returns complete Base64 bytes and the version they were read under.
+ * @throws WorkspaceResourceError `workspace-file/too-large` the moment the
+ *   reported or accumulated size exceeds `maxBytes`.
  */
 export type ReadWorkspaceFileData = (
-  request: { resource: WorkspaceResourceOpenRequest; version?: string | undefined },
+  request: {
+    resource: WorkspaceResourceOpenRequest
+    version?: string
+    maxBytes: number
+  },
   signal: AbortSignal,
 ) => Promise<WorkspaceFileData>
+
+/**
+ * Decode the reader's complete Base64 payload into bytes for the private parser or packer.
+ * @param data - one completed workspace file read.
+ * @returns the decoded bytes.
+ */
+export function workspaceFileBytes(data: WorkspaceFileData): Uint8Array<ArrayBuffer> {
+  const binary = atob(data.bytes)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
+  return bytes
+}
 
 /**
  * Fold `.` and `..` inside a workspace-relative path without a filesystem.
@@ -71,8 +93,8 @@ export function createReadHtmlRelative(
       path,
       address: workspaceResourceAddress(request.sessionId, path),
     }
-    const file = await read({ resource }, combined)
+    const file = await read({ resource, maxBytes: MAX_ASSET_BYTES }, combined)
     combined.throwIfAborted()
-    return file.data
+    return workspaceFileBytes(file)
   }
 }

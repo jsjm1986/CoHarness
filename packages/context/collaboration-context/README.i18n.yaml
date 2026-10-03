@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/context/collaboration-context/README.md
-README.md: 89f1802f56575fa3540a15bd73e5d583c97b18ba
-README.zh.md: b884b508c0d3fdde5fe30cc74cd776984f1acf0b
+/:
+  en: a7f7beff13ad7b61
+  zh: 61495d48365178df
+/deepseek-ai-dsh-collaboration-context:
+  en: 3fbbd95da49b8f62
+  zh: 601efcec12d6508b
+/deepseek-ai-dsh-collaboration-context/summary:
+  en: 787b6efed7bf1a10
+  zh: 5a2bbc49bc565c47
+/deepseek-ai-dsh-collaboration-context/table-of-contents:
+  en: e57b6808315759d6
+  zh: b66d6b5ec6ece109
+/deepseek-ai-dsh-collaboration-context/runtime-contract:
+  en: 33c07a0bcaa7060a
+  zh: 589998f3364175da
+/deepseek-ai-dsh-collaboration-context/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-collaboration-context/model-experience/shared-project-participant-attribution:
+  en: 68f65617574d7521
+  zh: bf1688b0ea721bbb
+/deepseek-ai-dsh-collaboration-context/model-experience/shared-project-participant-attribution/what-the-model-sees:
+  en: 1cf83a31a46ef7a1
+  zh: 82f7554723fdc2a8
+/deepseek-ai-dsh-collaboration-context/model-experience/shared-project-participant-attribution/token-effect:
+  en: f06a008381d0031e
+  zh: 475f6f86070d9b9e
+/deepseek-ai-dsh-collaboration-context/model-experience/shared-project-participant-attribution/kv-cache-effect:
+  en: 44a04b2f9f49c9a3
+  zh: fdd51fa259539144
+/deepseek-ai-dsh-collaboration-context/known-limitations-and-deferred-work:
+  en: b4da3471bc444747
+  zh: 1b536618466d5ba9
+/deepseek-ai-dsh-collaboration-context/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

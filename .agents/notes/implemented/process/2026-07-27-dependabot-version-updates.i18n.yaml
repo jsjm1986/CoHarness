@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-dependabot-version-updates.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-27-dependabot-version-updates.md
-2026-07-27-dependabot-version-updates.md: bba83c9e720cf87f91638131d7f9580422ea7f76
-2026-07-27-dependabot-version-updates.zh.md: 7a615fb282cbf24b93c2b571a287f3b1853440bf
+/agent-note-dependabot-version-updates-with-a-30-day-cooldown:
+  en: b66af4da932f7ef5
+  zh: 9b4865e873790f56
+/agent-note-dependabot-version-updates-with-a-30-day-cooldown/problem:
+  en: 1a4f1d78d9e84fc1
+  zh: f617de73c2e45696
+/agent-note-dependabot-version-updates-with-a-30-day-cooldown/decision:
+  en: 85f52d9f50d4044f
+  zh: 5830462edec72b6e
+/agent-note-dependabot-version-updates-with-a-30-day-cooldown/alternatives-considered:
+  en: 1b137c3d1503de77
+  zh: e9abcee59732efe7
+/agent-note-dependabot-version-updates-with-a-30-day-cooldown/consequences:
+  en: 79d1a30779308cf0
+  zh: 415f2f40eeba441a

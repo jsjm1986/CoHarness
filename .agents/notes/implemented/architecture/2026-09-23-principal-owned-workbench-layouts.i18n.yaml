@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-23-principal-owned-workbench-layouts.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-principal-owned-workbench-layouts.md
-2026-09-23-principal-owned-workbench-layouts.md: 18ff9e5dbd3675a32924e123e2a8179aaf27d298
-2026-09-23-principal-owned-workbench-layouts.zh.md: 944eda1d21e97d78a1ad3bcc5eebe8faa42fde2b
+/agent-note-principal-owned-workbench-layouts:
+  en: b6d05497c1d2f60e
+  zh: 7bf6477fba6a0fc8
+/agent-note-principal-owned-workbench-layouts/problem:
+  en: 5917f4f9b16d7c4a
+  zh: d3422002a722b13f
+/agent-note-principal-owned-workbench-layouts/decision:
+  en: 4feef8a803335c0e
+  zh: d593d12975948f7b
+/agent-note-principal-owned-workbench-layouts/alternatives-considered:
+  en: 1efac8d1bbd6998a
+  zh: 6fab0eb67450563c
+/agent-note-principal-owned-workbench-layouts/consequences:
+  en: 98e3e81561f7db1a
+  zh: f24f9cec89c0ea69

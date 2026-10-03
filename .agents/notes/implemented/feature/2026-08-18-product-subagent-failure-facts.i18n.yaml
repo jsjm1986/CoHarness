@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-product-subagent-failure-facts.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-product-subagent-failure-facts.md
-2026-08-18-product-subagent-failure-facts.md: 50d8e918f288a6b8a9b90474499b2ed20731643f
-2026-08-18-product-subagent-failure-facts.zh.md: abdbf8c0ebddb1fb30cef3c7e80fcf7040e45d2d
+/agent-note-product-subagents-expose-bounded-structured-failure-facts:
+  en: 7266fd29daf40381
+  zh: 19ea8dc921448a26
+/agent-note-product-subagents-expose-bounded-structured-failure-facts/problem:
+  en: fa1fa1b1366e4613
+  zh: faa87e2b1624e14f
+/agent-note-product-subagents-expose-bounded-structured-failure-facts/decision:
+  en: 33f3f49efb8a1b6e
+  zh: 03860dbb663d4515
+/agent-note-product-subagents-expose-bounded-structured-failure-facts/decision/safe-diagnostic:
+  en: f8406faf91506958
+  zh: 2d69bf536004792c
+/agent-note-product-subagents-expose-bounded-structured-failure-facts/decision/claude-code-facts:
+  en: 2458e46bd25db2fc
+  zh: 11d84881dbb1c3da
+/agent-note-product-subagents-expose-bounded-structured-failure-facts/decision/codex-facts:
+  en: f1887987b15df25f
+  zh: 76771dbd894f4d82
+/agent-note-product-subagents-expose-bounded-structured-failure-facts/decision/ownership-and-lifecycle:
+  en: 20d1067b04efe184
+  zh: 4424cd1fe0678dbd
+/agent-note-product-subagents-expose-bounded-structured-failure-facts/verification:
+  en: 145dceaedf935ebf
+  zh: d1f20e056820e603
+/agent-note-product-subagents-expose-bounded-structured-failure-facts/alternatives-considered:
+  en: fa961e2c3e9551a0
+  zh: 4c82e2bf09477a69
+/agent-note-product-subagents-expose-bounded-structured-failure-facts/consequences:
+  en: f2511da31ec3bf91
+  zh: 6e00fee002d565cf

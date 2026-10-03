@@ -135,18 +135,35 @@ function writableStore(ctx: Context): CredentialProvider {
  * record, so reads answer "nothing stored" and a delete has nothing to remove;
  * only `modify` refuses it, because a write that cannot land must not report
  * that it did.
+ *
+ * A withdrawn `AuthOperationOptions.signal` refuses the operation before it
+ * reaches storage — checked once ahead of queueing and again inside the
+ * mutation itself for `modify`, whose queued work can outwait the signal.
  * @param ctx - the plugin context carrying the optional `ctx.credentials`.
+ * @param writer - `modifyRecord` overrides the serialized record write
+ *   `modify` delegates to; it defaults to the mounted credentials provider's
+ *   own method, so a caller may route the write through an attempt-scoped
+ *   commit instead.
  * @returns the store to hand `createModels()`.
  */
-export function credentialStoreFrom(ctx: Context): CredentialStore {
+export function credentialStoreFrom(
+  ctx: Context,
+  writer?: { modifyRecord?: CredentialProvider['modifyRecord'] },
+): CredentialStore {
+  // Resolved lazily at call time so a missing credentials service still
+  // surfaces its named rejection inside the store's promise.
+  const write: CredentialProvider['modifyRecord'] = writer?.modifyRecord
+    ?? ((key, mutate) => writableStore(ctx).modifyRecord(key, mutate))
   return {
-    async read(providerId) {
+    async read(providerId, options) {
+      options?.signal?.throwIfAborted()
       const credentials = ctx.get('credentials')
       if (credentials === undefined) return undefined
       if (!isCredentialKeySegment(providerId)) return undefined
       return toPiCredential(await credentials.readRecord(recordKeyFor(providerId)))
     },
-    async list(): Promise<readonly CredentialInfo[]> {
+    async list(options): Promise<readonly CredentialInfo[]> {
+      options?.signal?.throwIfAborted()
       const stored = await ctx.get('credentials')?.listRecords() ?? []
       const mine: CredentialInfo[] = []
       for (const entry of stored) {
@@ -160,7 +177,7 @@ export function credentialStoreFrom(ctx: Context): CredentialStore {
       }
       return mine
     },
-    async modify(providerId, mutate) {
+    async modify(providerId, mutate, options) {
       if (!isCredentialKeySegment(providerId)) {
         throw new LlmError(
           `llm-pi-ai: provider id "${providerId}" cannot address a stored credential record (a record id is a`
@@ -169,8 +186,14 @@ export function credentialStoreFrom(ctx: Context): CredentialStore {
           'UNSTORABLE_PROVIDER_ID',
         )
       }
-      const stored = await writableStore(ctx).modifyRecord(recordKeyFor(providerId), async (current) => {
+      // A withdrawn signal refuses before queueing, inside the mutation, and
+      // once more before the replacement returns: a write already admitted
+      // to storage is beyond recall, but a queued one never publishes.
+      options?.signal?.throwIfAborted()
+      const stored = await write(recordKeyFor(providerId), async (current) => {
+        options?.signal?.throwIfAborted()
         const next = await mutate(toPiCredential(current))
+        options?.signal?.throwIfAborted()
         return next === undefined ? undefined : toRecord(next)
       })
       return toPiCredential(stored)
@@ -178,7 +201,8 @@ export function credentialStoreFrom(ctx: Context): CredentialStore {
     // `async` so a missing service reaches the caller as a rejection: pi-ai's
     // store contract is promise-returning, and a synchronous throw would
     // escape the `ModelsError` wrapper every other storage failure gets.
-    async delete(providerId) {
+    async delete(providerId, options) {
+      options?.signal?.throwIfAborted()
       if (!isCredentialKeySegment(providerId)) return
       await writableStore(ctx).deleteRecord(recordKeyFor(providerId))
     },

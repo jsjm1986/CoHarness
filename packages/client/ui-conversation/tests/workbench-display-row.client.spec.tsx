@@ -16,12 +16,13 @@ function mount() {
   const settings = new ConversationDisplaySettings(scope.scope)
   const props: WorkbenchDisplayRowProps = {
     useSessions: bindSnapshotSelector(createSnapshotStore<SessionListState>({
-      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+      ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })),
     useWorkspaces: bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })),
+    usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
     useDisplaySettings: bindSnapshotSelector(settings),
     setWidth: vi.fn((value: number) => { settings.setWidth(value) }),
     setFullWidth: vi.fn((value: boolean) => { settings.setFullWidth(value) }),
@@ -36,7 +37,10 @@ function publishReady(scope: ReturnType<typeof stubSettingsScope<ConversationSet
   act(() => {
     scope.publish({
       status: 'ready', writable: true,
-      value: { chatContentWidth: 720, chatFontSize: 15, chatFullWidth: false, busyEnter: 'queue' },
+      value: {
+        chatContentWidth: 720, chatFontSize: 15, chatFullWidth: false, busyEnter: 'queue',
+        performanceUsage: 'detailed', linkOpening: 'sidebar',
+      },
     })
   })
 }

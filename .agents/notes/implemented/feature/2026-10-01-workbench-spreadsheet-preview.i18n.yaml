@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-01-workbench-spreadsheet-preview.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-01-workbench-spreadsheet-preview.md
+/agent-note-workbench-spreadsheet-preview:
+  en: b6a5bf5efeb444ae
+  zh: 4c2a8cf250a37610
+/agent-note-workbench-spreadsheet-preview/problem:
+  en: 354220f05348b88d
+  zh: af5816da38e73449
+/agent-note-workbench-spreadsheet-preview/decision:
+  en: 6adfef643ea80fe4
+  zh: c4c48de5c103c038
+/agent-note-workbench-spreadsheet-preview/alternatives-considered:
+  en: 467cd064421d63ba
+  zh: be2fac967e8f8537
+/agent-note-workbench-spreadsheet-preview/consequences:
+  en: 1f380cbf51705021
+  zh: 2acabb4a67276fcc
+/agent-note-workbench-spreadsheet-preview/testing:
+  en: a97072160fadf4d7
+  zh: 523a0812ce6c9396
+/agent-note-workbench-spreadsheet-preview/related:
+  en: 9396b143dc3546c7
+  zh: 4c1935d6ae207606

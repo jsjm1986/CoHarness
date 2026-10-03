@@ -20,7 +20,7 @@ import {
   boot,
   composeEntries,
   readProfilePatches,
-  createProfileResolutionGeneration,
+  createRuntimeResolution,
   healProfilesModuleFallback,
   healIsolatedProfileModuleFallback,
   initProfile,
@@ -28,12 +28,13 @@ import {
   loadOverlayPatches,
   loadProfile,
   PluginPackages,
+  reportSkippedBundles,
   PROFILE_PATCH_FILENAME,
   PROFILE_TEMPLATES,
   resolveProfileDir,
   type ProfileContext,
   type Profile,
-  type ProfileResolutionGeneration,
+  type RuntimeResolution,
   type ProfileResolutionMode,
 } from '@deepseek-ai/dsh-app-boot'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
@@ -171,6 +172,7 @@ export function initializeProfileFromDefault(
 export function prepareProfile(name: string, userLayer = true, fromDefaultProfile?: string): Profile {
   if (fromDefaultProfile !== undefined) initializeProfileFromDefault(name, fromDefaultProfile)
   const profile = loadProfile(NAME, name, INSTALL_ANCHOR, undefined, { userLayer })
+  reportSkippedBundles(NAME, profile)
   writeFileSync(join(profile.dir, PROFILE_ROOT_FILENAME), PROFILE_ROOT_CONFIG)
   return profile
 }
@@ -179,7 +181,7 @@ export function prepareProfile(name: string, userLayer = true, fromDefaultProfil
 interface ComposedProfile {
   profile: Profile
   /** Immutable package fallback selected before any plugin imports. */
-  resolution: ProfileResolutionGeneration
+  resolution: RuntimeResolution
   /** Command-line overlay contents, frozen for this invocation. */
   overlays: PatchOptions[]
 }
@@ -262,7 +264,7 @@ async function composeProfile(
   const resolutionOptions = { installAnchor: resolvedProfile?.installAnchor ?? INSTALL_ANCHOR, profile }
   if (resolvedProfile !== undefined && resolutionMode !== 'runtime') healIsolatedProfileModuleFallback(resolvedProfile)
   const resolution = resolutionMode === 'runtime' || resolvedProfile !== undefined
-    ? await createProfileResolutionGeneration(resolutionOptions)
+    ? await createRuntimeResolution(resolutionOptions)
     : await healProfilesModuleFallback(resolutionOptions)
   const overlays = patchFiles.flatMap(file => loadOverlayPatches(NAME, resolve(file)))
   return { profile, resolution, overlays }
@@ -371,7 +373,7 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       // environment values from the same immutable launch snapshot.
       hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, options.environment)
       await hostCtx.plugin(PluginPackages, resolutionMode === 'link' ? {} : {
-        generation: composed.resolution,
+        resolution: composed.resolution,
         behavior: resolutionMode === 'dual' ? 'verify' : 'enforce',
       })
       // The command line and bounded exit request are launcher facts available

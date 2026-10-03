@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-08-cold-inbox-projection.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-08-cold-inbox-projection.md
-2026-09-08-cold-inbox-projection.md: e349aa1b71241ed02defd6d23626db5ade1d5a10
-2026-09-08-cold-inbox-projection.zh.md: ea843a4c3f003238f98ec148ecdac75f44d55a9d
+/agent-note-agent-free-inbox-projection:
+  en: ab101ae88f8ac14e
+  zh: 803e76b985eb7bd9
+/agent-note-agent-free-inbox-projection/problem:
+  en: 05b857f697202d1a
+  zh: b4e61525f28deb12
+/agent-note-agent-free-inbox-projection/decision:
+  en: d009beb806fb340f
+  zh: c1ff833bf2f3d4e0
+/agent-note-agent-free-inbox-projection/alternatives-considered:
+  en: 7330c696cde3fe6a
+  zh: 34155c0b316ac2aa
+/agent-note-agent-free-inbox-projection/consequences:
+  en: 6f36db5991d73605
+  zh: 15de6f88fb339166

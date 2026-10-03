@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-14-canonical-session-event-ingress.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-14-canonical-session-event-ingress.md
-2026-09-14-canonical-session-event-ingress.md: a26f42ec0e2ea35671385ce5fd3d4bf1df49d78a
-2026-09-14-canonical-session-event-ingress.zh.md: 16de1d2a5b8870d606c4e0c174743e36564034e6
+/agent-note-canonical-session-event-ingress-validation:
+  en: f145df222ae0bfba
+  zh: 910da2f4e4356f2d
+/agent-note-canonical-session-event-ingress-validation/problem:
+  en: 0b958b0c43a711fd
+  zh: 81c7176c217407da
+/agent-note-canonical-session-event-ingress-validation/decision:
+  en: b2a4e636b698ec6d
+  zh: b88d6668095e0330
+/agent-note-canonical-session-event-ingress-validation/alternatives-considered:
+  en: a41cc7ce8a47b906
+  zh: b0355a850cb3f310
+/agent-note-canonical-session-event-ingress-validation/consequences:
+  en: 2f3e9026f9b933b3
+  zh: f1d8dbe370d1a163

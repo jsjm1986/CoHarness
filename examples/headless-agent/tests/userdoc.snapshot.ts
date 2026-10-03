@@ -9,11 +9,12 @@ import {
   type NormalizeContext,
 } from '@deepseek-ai/dsh-session-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
+import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from 'vitest'
 
 const scenarioDir = join(dirname(fileURLToPath(import.meta.url)), 'snapshots', 'userdoc-prompt')
 const replayFile = join(scenarioDir, 'replay.override.json')
-const sessionFixture = join(scenarioDir, 'session.jsonl')
+const sessionFixture = join(scenarioDir, `session.v${String(SESSION_FORMAT_VERSION)}.jsonl`)
 const streamFixture = join(scenarioDir, 'stream-json.expected.jsonl')
 const configPath = fileURLToPath(new URL('../userdoc.cordis.snapshot.yml', import.meta.url))
 const driver = fileURLToPath(new URL('./fixtures/userdoc-driver.ts', import.meta.url))

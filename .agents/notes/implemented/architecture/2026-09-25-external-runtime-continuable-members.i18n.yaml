@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-25-external-runtime-continuable-members.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-25-external-runtime-continuable-members.md
-2026-09-25-external-runtime-continuable-members.md: 7aa7cf85e0469037cf71492cff169dc5f26cb272
-2026-09-25-external-runtime-continuable-members.zh.md: ae87ab7ee4012c32d65b9051623c676a75e91f1b
+/agent-note-external-runtime-continuable-members-ride-one-shared-adapter-turn:
+  en: 51c80b96a01455d1
+  zh: bc7e9d9a993d059f
+/agent-note-external-runtime-continuable-members-ride-one-shared-adapter-turn/problem:
+  en: c96cac937e0faaf8
+  zh: 9424711879bd506c
+/agent-note-external-runtime-continuable-members-ride-one-shared-adapter-turn/decision:
+  en: 03eb33cbef606816
+  zh: 852a87d53393cee0
+/agent-note-external-runtime-continuable-members-ride-one-shared-adapter-turn/alternatives-considered:
+  en: 61d86e74e573c112
+  zh: 76d28add0d44ee7b
+/agent-note-external-runtime-continuable-members-ride-one-shared-adapter-turn/consequences:
+  en: b241b79fa33cfad2
+  zh: 0a4150ec619e36e1

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-18-structured-profile-boot-adoption.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-18-structured-profile-boot-adoption.md
-2026-09-18-structured-profile-boot-adoption.md: 2f13bff554a97f8cfe341f40631ff85e9cf89f67
-2026-09-18-structured-profile-boot-adoption.zh.md: b89f81a0ad1c4e9f225e48757b783cfc165c7399
+/agent-note-structured-profile-boot-replaces-the-patch-stack-launcher:
+  en: 37e0a1e849d6195b
+  zh: 01b109cfa176939a
+/agent-note-structured-profile-boot-replaces-the-patch-stack-launcher/problem:
+  en: 57cbbba4e1946df3
+  zh: 8d9b4b8a232dcb47
+/agent-note-structured-profile-boot-replaces-the-patch-stack-launcher/decision:
+  en: 20ebe4813e3d75db
+  zh: cc9642028eb0ee43
+/agent-note-structured-profile-boot-replaces-the-patch-stack-launcher/alternatives-considered:
+  en: da15764cd0c9f0d2
+  zh: 539a8aee16d3f57b
+/agent-note-structured-profile-boot-replaces-the-patch-stack-launcher/consequences:
+  en: 6b27469026c936e5
+  zh: f6d68b57233aa319

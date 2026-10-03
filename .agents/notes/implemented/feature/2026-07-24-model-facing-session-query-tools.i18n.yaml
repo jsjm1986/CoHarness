@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-24-model-facing-session-query-tools.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-24-model-facing-session-query-tools.md
-2026-07-24-model-facing-session-query-tools.md: 7dcb25fc4205442bd0b0743a6228427fa66ead1c
-2026-07-24-model-facing-session-query-tools.zh.md: cb2fa764177bacc3b4dc3db0202999835b2f7362
+/agent-note-model-facing-session-query-tools:
+  en: 088c7b51a620a66b
+  zh: 53ef2e24f605837d
+/agent-note-model-facing-session-query-tools/problem:
+  en: 79e6cc45ec58e050
+  zh: 0300157b78bbb84f
+/agent-note-model-facing-session-query-tools/decision:
+  en: 0a3c6f52503df345
+  zh: 1492e3570f9462a6
+/agent-note-model-facing-session-query-tools/workspace-authority:
+  en: f79033ea34d14377
+  zh: bec0d2489a90b4a8
+/agent-note-model-facing-session-query-tools/cursor-free-results-and-spill:
+  en: 830fc12219d3922b
+  zh: 9d92b7b6f406dc17
+/agent-note-model-facing-session-query-tools/host-composition:
+  en: 1ba81183cc4b639a
+  zh: 29e289489590f472
+/agent-note-model-facing-session-query-tools/alternatives-considered:
+  en: 199461929eab34c8
+  zh: 95f7f39831dd9edb
+/agent-note-model-facing-session-query-tools/verification:
+  en: 58dbb315aab5eef8
+  zh: 332d23af6526c4db
+/agent-note-model-facing-session-query-tools/consequences:
+  en: 7059544d56ae9a3c
+  zh: 2935ce0de3e9e7f0

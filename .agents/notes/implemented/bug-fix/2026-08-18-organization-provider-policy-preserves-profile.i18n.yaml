@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-organization-provider-policy-preserves-profile.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-organization-provider-policy-preserves-profile.md
-2026-08-18-organization-provider-policy-preserves-profile.md: 944632ed20a91047dd8e0da263acdb7c2cafcb7b
-2026-08-18-organization-provider-policy-preserves-profile.zh.md: 5d7d93a4f4877bedaae63a25de222f7a26906162
+/agent-note-preserve-complete-organization-provider-profiles-in-runtime-policy:
+  en: 1b40e66ebde892fe
+  zh: 474c96eea052298f
+/agent-note-preserve-complete-organization-provider-profiles-in-runtime-policy/problem:
+  en: 0d39e52ab8cd121f
+  zh: 9912d055bab18ba4
+/agent-note-preserve-complete-organization-provider-profiles-in-runtime-policy/decision:
+  en: e7a0352af3000406
+  zh: 1f887c5f4843bc56
+/agent-note-preserve-complete-organization-provider-profiles-in-runtime-policy/alternatives-considered:
+  en: 3c617bcc66e71d17
+  zh: 25264f7ed1fb824b
+/agent-note-preserve-complete-organization-provider-profiles-in-runtime-policy/consequences:
+  en: 66de51d6395c3d8b
+  zh: 445643717b8f45bb
+/agent-note-preserve-complete-organization-provider-profiles-in-runtime-policy/testing:
+  en: 7d97a28110c56881
+  zh: 67a19da0bafa3bca

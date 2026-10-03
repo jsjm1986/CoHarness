@@ -602,13 +602,10 @@ function migrateLegacyMessageEvent(
             id: inheritedId === undefined
               ? legacyMessageId(id, event.seq)
               : messageIds.get(inheritedId),
-            role: 'user',
-            content: [{
-              type: 'tool-result',
-              toolCallId: callId,
-              content,
-              isError,
-            }],
+            role: 'tool',
+            toolCallId: callId,
+            isError,
+            content,
             source: {
               kind: 'tool',
               callId,

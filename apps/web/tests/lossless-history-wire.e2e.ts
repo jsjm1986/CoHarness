@@ -591,7 +591,7 @@ describe('web e2e: lossless history wire pagination', () => {
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     observeHistoryPages(page, historyReads)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 
@@ -621,7 +621,7 @@ describe('web e2e: lossless history wire pagination', () => {
       (event.type === 'user/message' || event.type === 'assistant/message')
       && event.surfaceOp === 'append')).toHaveLength(seed.appendMessageCount)
 
-    const response = await fetch(`${scaffold.baseUrl}/api/session.history`, {
+    const response = await scaffold.hostFetch('/api/session.history', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -648,7 +648,7 @@ describe('web e2e: lossless history wire pagination', () => {
     expect(conversationLogical.result.value.omittedSpans?.length).toBeGreaterThan(0)
     expect(conversationLogical.result.value.events.length).toBeLessThan(seed.eventCount)
 
-    const conversationResponse = await fetch(`${scaffold.baseUrl}/api/session.history`, {
+    const conversationResponse = await scaffold.hostFetch('/api/session.history', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -848,7 +848,7 @@ describe('web e2e: lossless history wire pagination', () => {
         inspect: null,
       }))
     }, SEED_ID)
-    await bootPage.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await bootPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await bootPage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     const groupRow = bootPage.locator('[role="treeitem"]').first()
     await groupRow.waitFor({ timeout: 15_000 })

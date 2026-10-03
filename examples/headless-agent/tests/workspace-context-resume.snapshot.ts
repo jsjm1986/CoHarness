@@ -77,7 +77,7 @@ async function seedVisibleBaseline(
       data: {
         turn: 1,
         step: 1,
-        message: createSystemMessage('Seeded baseline system prompt.', '@deepseek-ai/dsh-system-prompt'),
+        message: createSystemMessage('Seeded baseline system prompt.'),
       },
       surfaceOp: 'append',
     },

@@ -1,3 +1,8 @@
+---
+description: "TypeScript client SDK for driving a DeepSeek Harness runtime subprocess over stdio JSON-RPC: the DeepSeekHarness high-level turns API and the lower-level HarnessClient"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-sdk-client
 
 English | [中文](README.zh.md)
@@ -10,6 +15,18 @@ The public launch options select `dshBin`, a runtime `profile` (default `sdk`), 
 
 `dsh-sdk-client` lets TypeScript programs start and drive a complete DeepSeek Harness runtime over stdio JSON-RPC. Use `DeepSeekHarness` to open sessions, send text or image prompts, collect event and notification streams, and obtain the last committed assistant response when the runtime becomes idle; use `HarnessClient` for direct protocol requests and subscriptions. Callers may provide `dshBin`; otherwise the client resolves the same-version `@deepseek-ai/dsh` executable. The client owns the subprocess across runs, exposes typed transport and protocol failures, and reaps it on `close()` or `await using`. It is suitable when the caller can choose the runtime profile and launch settings.
 
+## Table of Contents
+
+- [DeepSeekHarness](#deepseekharness)
+- [HarnessClient](#harnessclient)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="deepseekharness"></a>
 ## DeepSeekHarness
 
 ```ts
@@ -30,20 +47,23 @@ The subprocess starts lazily on first use and stays owned by the instance across
 
 `run(input, { sessionId?, onNotification? })` owns one activity interval: it queues the prompt, waits until its `MessageId` appears in a durable `agent/inbox/spliced` receipt, then collects through the next whole-agent `idle`. It returns `RunResult { sessionId, finalResponse, events, notifications }`. `finalResponse` is the last committed root-session assistant text in that interval, not a response causally assigned to the prompt; steering, injected context, and other queued work may contribute before idle. `events` contains root-session events, while `notifications` also contains descendants discovered from `subagent.started`, all in wire order. The result carries no prompt-level status or turn reason. Transport loss, timeout, and protocol violations reject; model outcomes remain observable in the event stream without being attributed to one input.
 
+<a id="harnessclient"></a>
 ## HarnessClient
 
 The protocol client under the owned-run API: explicit `start()`/`initialize()`/`prompt()`/`request()`/`close()`, plus notification subscriptions. `prompt()` returns the queued message id as soon as the runtime accepts it; it never waits for agent activity. `subscribe(filter?)` returns a `NotificationSubscription` (awaitable `next()`, non-blocking `tryNext()`, async iteration); `subscribeSessionTree(id)` scopes to one session and the descendants discovered from `subagent.started` lineage edges — the runtime notifies for every session in its context, and scoping is client-side, exactly like the Python SDK. Finished ancestry edges are released and an upper bound tied to the notification queue prevents a malicious runtime from growing the lineage map without limit. Error surfaces are typed and exported from this package: `JsonRpcResponseError` (wire error response, code/data preserved), `RequestTimeoutError` (a configured bound elapsed), `SdkProtocolError` (a response outside the documented protocol), `TransportClosedError` (the runtime is gone — message carries the exit code and a bounded stderr tail).
 
 `close()` requests protocol `shutdown` (bounded by `shutdownTimeoutMs`, default 1000 ms), then walks a stdin-EOF → SIGTERM → SIGKILL ladder (`disposeEofGraceMs` default 6000, `disposeGraceMs` default 3000) until the process has actually exited. The ladder is private to this client: it runs outside any harness context, so it cannot ride the [`dsh-subprocess`](../../subprocess/README.md) service — the seam's documented exception for SDK-managed transports. It is idempotent, and a closed client refuses reuse.
 
-`HarnessClientOptions.env` replaces the child environment entirely when given (`undefined` inherits the parent's); callers own credential policy — `scrubbedParentEnv` from `dsh-subprocess` is the shared scrub base for isolation-minded launches.
+`HarnessClientOptions.env` replaces the child environment entirely when given (`undefined` inherits the parent's); callers own credential policy — `scrubbedParentEnv` from `dsh-subprocess` is the shared scrub base for isolation-minded launches. Selecting a different `dshHome` removes an inherited `DSH_MANAGED_DATA_MANIFEST`, so an independent child does not claim files in its parent's backup inventory. A same-home launch retains it; an explicit complete `env` may name the child's own inventory.
 
 The client exposes the transport's line, pending-request, inbound-concurrency, output, and per-subscription notification-queue limits; each defaults to the protocol bounds and rejects non-positive values. Timeout and teardown grace values must be positive safe integer milliseconds no greater than Node's 2,147,483,647 ms timer limit. High-level `HarnessSession.run()` calls for the same session id are serialized, while different session ids may progress concurrently.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. A pure library with no plugin surface; request correlation and subscription delivery are covered by unit specs and it owns no harness-side state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this is a client-process library; model-facing behavior lives in the spawned runtime's composed plugins.
@@ -58,3 +78,13 @@ None in the client process. Profile, patch, provider, model, and history choices
 - **No mid-turn cancel** — the wire has no prompt-cancel method; abandoning a turn means closing the runtime (see the protocol's [Known Limitations](../protocol/README.md)).
 - **No per-prompt result or cancel** — low-level `prompt()` returns only an enqueue receipt; high-level `run()` owns receipt-to-idle collection, and abandoning it means closing the runtime.
 - **Client→server notifications and server→client requests are unimplemented** on both wire ends; the transport carries them for future approval flows.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

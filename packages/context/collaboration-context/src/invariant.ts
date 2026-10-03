@@ -12,8 +12,6 @@ import {
 } from './participant.ts'
 
 const PACKAGE_NAME = '@deepseek-ai/dsh-collaboration-context'
-const SOURCE_NAME = 'collaboration-context'
-
 /** Cordis companion plugin name. */
 export const name = 'collaboration-context-invariant'
 /** Service required before the companion can reserve package ownership. */
@@ -22,9 +20,7 @@ export const inject = ['invariants']
 function noticeSource(event: SessionEvent): CollaborationNoticeSource | undefined {
   if (event.type !== 'user/message') return undefined
   const source = event.data.source
-  return source.kind === 'plugin' && source.plugin === SOURCE_NAME
-    ? source as CollaborationNoticeSource
-    : undefined
+  return source.kind === 'collaboration-context' ? source : undefined
 }
 
 /** Validate one notice's self-contained snapshot and model-visible text. */

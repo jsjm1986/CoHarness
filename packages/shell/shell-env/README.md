@@ -1,3 +1,8 @@
+---
+description: "Tool-independent managed DSH_* shell environment registry"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-shell-env
 
 English | [中文](README.zh.md)
@@ -10,6 +15,18 @@ The package root exports the Cordis plugin contract (`name`, `inject`, `Config`,
 
 `dsh-shell-env` provides the trusted `DSH_*` environment that every model shell call — bash or pwsh — runs with: built-in facts such as `DSH_HOME`, `DSH_SHELL=1`, and the agent's `DSH_SESSION_ID`. Plugin authors can register their own facts with declared keys, collected per execution and disposed with their plugin; duplicate ownership or undeclared runtime keys fail loudly instead of silently overwriting. The registry changes nothing else the model sees — the shell tools own their own schemas and prompts. Choose it in any composition that mounts a model shell tool; configuration only picks the Harness home directory.
 
+## Table of Contents
+
+- [Config](#config)
+- [Managed environment](#managed-environment)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 ```yaml
@@ -19,6 +36,7 @@ The package root exports the Cordis plugin contract (`name`, `inject`, `Config`,
     dshHome: C:\Users\me\.dsh   # default: $DSH_HOME, then ~/.dsh
 ```
 
+<a id="managed-environment"></a>
 ## Managed environment
 
 Every foreground and background model shell call receives a newly collected trusted `DSH_*` environment. `DSH_HOME` is the absolute Harness home resolved by [`@deepseek-ai/dsh-home-paths`](../../util/home-paths/README.md) (`dshHome` config, then ambient `$DSH_HOME`, then `~/.dsh`) and `DSH_SHELL=1` identifies the managed child. Agent calls additionally receive `DSH_SESSION_ID=agent.session.header.id`; when the active persistence seam locates a JSONL artifact they also receive `DSH_SESSION_JSONL=<absolute target path>`. The JSONL path is a location hint: it may not exist before the first flush or contain the current buffered turn, and it is not an authorization credential.
@@ -42,10 +60,12 @@ export function apply(ctx: Context): void {
 
 The overlay is computed from the current `ToolExecution` and passed through the dedicated `ShellExecRequest.dshEnv` channel. The local executors remove all inherited `DSH_*` before merging that snapshot, so nested harnesses and concurrent parent/child agents cannot leak stale identities. `process.env` is never modified. The shell tools' descriptions teach the generic `$DSH_*` convention rather than naming persistence-specific variables or adding a permanent system-prompt section.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The registry is a contribution set with effect-scoped disposal; collected variables are computed per shell call from the registered facts.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the shell tools (`dsh-tool-bash`, `dsh-tool-pwsh`), which expose this registry's managed `DSH_*` facts in every shell-tool call.
@@ -57,3 +77,13 @@ The managed environment never enters the request prefix, so it does not invalida
 ## Known Limitations and Deferred Work
 
 - **`list()` enumerates contributor-declared variables only** — registry-owned built-ins (`DSH_HOME`, `DSH_SHELL`, `DSH_SESSION_ID`) are not included, so diagnostics, prompt, or UI code must not treat `list()` as an exhaustive environment catalog.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

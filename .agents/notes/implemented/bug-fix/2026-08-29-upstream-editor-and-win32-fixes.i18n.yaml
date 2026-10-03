@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-29-upstream-editor-and-win32-fixes.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-29-upstream-editor-and-win32-fixes.md
-2026-08-29-upstream-editor-and-win32-fixes.md: e0a3f2b47db701ebf0c0407c694c40d09591e35a
-2026-08-29-upstream-editor-and-win32-fixes.zh.md: 555528b48242ec8b9d938c865071c1e3ced6d761
+/agent-note-preserve-utf-16-paths-and-tolerate-editor-placeholders:
+  en: bcb3831b11e6ef71
+  zh: a0dcb2792a7e8c26
+/agent-note-preserve-utf-16-paths-and-tolerate-editor-placeholders/problem:
+  en: 6eb1901f2655f9d3
+  zh: 3101325d7aa4c3fe
+/agent-note-preserve-utf-16-paths-and-tolerate-editor-placeholders/decision:
+  en: 35d7627c12ebb560
+  zh: 2c012799ed1f66af
+/agent-note-preserve-utf-16-paths-and-tolerate-editor-placeholders/alternatives-considered:
+  en: efcc571d12caf85f
+  zh: ee9762acf4aeb7f0
+/agent-note-preserve-utf-16-paths-and-tolerate-editor-placeholders/consequences:
+  en: 9ff223c9bfb18fe8
+  zh: 2b21b06e5b133216
+/agent-note-preserve-utf-16-paths-and-tolerate-editor-placeholders/testing:
+  en: 5acb04aa3f5005bc
+  zh: 20760057ab3aae45

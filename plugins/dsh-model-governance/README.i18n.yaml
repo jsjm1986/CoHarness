@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/dsh-model-governance/README.md
-README.md: 96f3dc21d136761ce5dbd22cfc5a840a6c55e39c
-README.zh.md: b42ebe427fad11492cad20843697c6d211992548
+/dsh-model-governance:
+  en: 3d8d3206068b5b15
+  zh: 0854563a7e3604dc
+/dsh-model-governance/organization-providers-and-credentials:
+  en: 586b09e6271acfbe
+  zh: b897868b291f4b40
+/dsh-model-governance/authorization-decision-order:
+  en: 601b29ad15c8d856
+  zh: 26cb91e302629b65
+/dsh-model-governance/user-declared-provider-discovery:
+  en: 0504703114fa52b1
+  zh: f9c34e5dd40f9472
+/dsh-model-governance/model-experience:
+  en: 27804010c4ec7bd7
+  zh: 3f6e0cec6564368a
+/dsh-model-governance/model-experience/kv-cache-effect:
+  en: 60835eca1cee4e0e
+  zh: 3b5579ceccd5b5e7
+/dsh-model-governance/live-policy-reload:
+  en: 3314d35d40392231
+  zh: 3be0c071f9958731
+/dsh-model-governance/known-limitations-and-deferred-work:
+  en: 191422522a1a102f
+  zh: 5195988ccb0a3c8c

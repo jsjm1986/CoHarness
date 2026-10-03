@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-22-pi-ai-transport-truncation-classification.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-22-pi-ai-transport-truncation-classification.md
-2026-07-22-pi-ai-transport-truncation-classification.md: edd13544fe65f607c725d909d4a9eb6ee0f94c8d
-2026-07-22-pi-ai-transport-truncation-classification.zh.md: e377501650b462247a2207fa234bdd5dc0228f7a
+/agent-note-classify-pi-ai-transport-truncations-from-flattened-message-text:
+  en: 69a1170e3ddd1736
+  zh: ece60c74716f0917
+/agent-note-classify-pi-ai-transport-truncations-from-flattened-message-text/problem:
+  en: 5fb446be89d58e50
+  zh: affd748375718e69
+/agent-note-classify-pi-ai-transport-truncations-from-flattened-message-text/decision:
+  en: 1422a8ff8dea6353
+  zh: 8f28181a809e9e83
+/agent-note-classify-pi-ai-transport-truncations-from-flattened-message-text/alternatives-considered:
+  en: ee956d3c8632dde8
+  zh: f137cca010f79fee
+/agent-note-classify-pi-ai-transport-truncations-from-flattened-message-text/testing:
+  en: fe708ad2960aa57e
+  zh: 5358a1419ea91a32
+/agent-note-classify-pi-ai-transport-truncations-from-flattened-message-text/consequences:
+  en: e648b0c8d021fe32
+  zh: 6cf920eb4c5007ba

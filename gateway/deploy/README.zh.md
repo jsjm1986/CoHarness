@@ -166,4 +166,6 @@ Gateway 启动在 PostgreSQL 暂时不可用时采用有界指数退避等待（
 
 ## 升级与备份
 
+[当前节点配置](node-configuration/README.zh.md) 说明管理员设置、独立配置工作进程及本机恢复。保存与应用是分开的操作。
+
 升级 dsh：先在 Linux staging `npm install -g @deepseek-ai/dsh@<next>`，跑两个验收脚本和协作冒烟测试，然后逐个滚动生产运行时（`systemctl restart harness-<user>` / `systemctl restart harness-project-<id>`，或让闲置运行时在下次访问时使用新二进制）。Linux Gateway 升级会替换 `/srv/harness/gateway`、应用 PostgreSQL migration，再重启 `harness-gateway`；涉及协议或包变化时还要滚动重启运行时。macOS release 部署使用上面的控制器，使 Gateway 与本地运行时始终来自同一个不可变目录。数据库：把 `deploy/postgres/backup-postgres.sh` 挂进 cron，保留经过恢复校验的 dump，并把成功备份复制到第二台机器或 NAS。

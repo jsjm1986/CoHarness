@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for llm-streaming.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/llm-streaming.md
-llm-streaming.md: 0db2894e2e387864a0f82c408bc91462960253ec
-llm-streaming.zh.md: 6bc0ba1e921434e2a986e4376788bf258a884c58
+/llm-streaming:
+  en: d40ab180baf95513
+  zh: 93fddbf35c0d366a
+/llm-streaming/organization-provider-configuration:
+  en: f36cb1b567e1d192
+  zh: 9fca5168be9c6d0a
+/llm-streaming/content-blocks-and-messages:
+  en: 658d46f7afd72b6f
+  zh: 49dee45fe215aec5
+/llm-streaming/streamchunk-the-raw-protocol:
+  en: 4d015ef5ad52dc8c
+  zh: b73fdaaeb8f796b2
+/llm-streaming/llmfailure:
+  en: 13415501869b4ca9
+  zh: 723c7533cce3d1d6
+/llm-streaming/the-adapter-contract:
+  en: 5263ea4d7c2b311b
+  zh: 8c32d1e1fd098aef
+/llm-streaming/resolvedretrypolicy:
+  en: cbab49d689311d4d
+  zh: 76246140eabaa55e
+/llm-streaming/appidentity-app-attribution:
+  en: 7ff4b18ef82a959d
+  zh: 8a40e6c7c57258a4
+/llm-streaming/tokenusage:
+  en: af6877d580895c3d
+  zh: 4b28056465e2e0c7
+/llm-streaming/blockassembler:
+  en: 58dec2259b0b1c6f
+  zh: fc99fe965acaabf3
+/llm-streaming/the-model-request:
+  en: cfce4beb174daa85
+  zh: cf035b28655df958
+/llm-streaming/the-model-request/the-request-envelope-llmcallconfig-and-the-logged-header:
+  en: b9498964bba29cea
+  zh: 5e3170676a925734
+/llm-streaming/service-and-provider-contracts:
+  en: 8dc79d4cc82824c2
+  zh: d25d7b01031fcba1

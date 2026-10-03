@@ -1,3 +1,2 @@
-/** Browser-safe Schedule vocabulary and projection map augmentation. */
+/** Browser-safe Schedule vocabulary. @module @deepseek-ai/dsh-schedule/client */
 export type * from './types.ts'
-export type { ScheduleProjectionState } from './projection.ts'

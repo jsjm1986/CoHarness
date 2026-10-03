@@ -6,6 +6,8 @@ import css from './ChatView.module.css'
 
 interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly nodeKey: string
+  /** Mounted but collapsed behind the turn's process toggle. */
+  readonly folded?: boolean
   readonly useSession: ChatViewSlotProps['useSession']
   readonly renderSlot: ChatViewSlotProps['renderSlot']
   readonly t: ChatViewSlotProps['t']
@@ -17,8 +19,8 @@ type RoutedChatNodeOwner = {
 
 /** Subscribe and dispatch one stable Context key without observing sibling Nodes. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
-  nodeKey, selectedCallId, cwd, openFile, openCallDetails, inspectCall, forkAt,
-  renderMessageImages, fileMentions, turnProcess, useSession, renderSlot, t,
+  nodeKey, folded, selectedCallId, cwd, openFile, openCallDetails, inspectCall, forkAt,
+  renderMessageImages, fileMentions, turnProcess, presentation, useSession, renderSlot, t,
 }: ChatNodeSeatProps) {
   const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey))
   const routedNode = node as ChatNode | undefined
@@ -34,8 +36,10 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       renderMessageImages,
       fileMentions,
       ...(turnProcess === undefined ? {} : { turnProcess }),
+      ...(presentation === undefined ? {} : { presentation }),
     }, [
-    node, selectedCallId, cwd, openFile, openCallDetails, inspectCall, forkAt, renderMessageImages, fileMentions, turnProcess,
+    node, selectedCallId, cwd, openFile, openCallDetails, inspectCall, forkAt,
+    renderMessageImages, fileMentions, turnProcess, presentation,
   ])
   if (routedNode === undefined || owner === null) return null
   // Runtime dispatch owns the correlation: every Node's discriminant is the
@@ -45,6 +49,8 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   return (
     <div
       className={css.flowItem}
+      hidden={folded === true ? true : undefined}
+      data-turn-process-member={folded === true ? true : undefined}
       data-chat-anchor-key={routedNode.key}
       data-chat-flow-key={routedNode.key}
       data-chat-flow-kind={routedNode.kind}

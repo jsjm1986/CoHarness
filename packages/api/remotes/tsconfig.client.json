@@ -63,6 +63,9 @@
       "path": "../../preset/agent-presets"
     },
     {
+      "path": "../../schedule/schedule"
+    },
+    {
       "path": "../../settings/settings"
     },
     {

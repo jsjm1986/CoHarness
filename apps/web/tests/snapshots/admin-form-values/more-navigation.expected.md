@@ -1,0 +1,21 @@
+- dialog "更多管理功能":
+  - banner:
+    - heading "更多管理功能" [level=2]
+    - button "关闭"
+  - navigation "更多管理导航":
+    - link "文档":
+      - /url: /admin/documents
+    - link "归档":
+      - /url: /admin/archives
+    - link "终端":
+      - /url: /admin/terminals
+    - link "SSH":
+      - /url: /admin/ssh
+    - link "部署":
+      - /url: /admin/deployment
+    - link "Webhook":
+      - /url: /admin/webhooks
+    - link "桌面":
+      - /url: /admin/desktops
+    - link "审计":
+      - /url: /admin/audit

@@ -7,16 +7,24 @@ import AuthorizationService from '@deepseek-ai/dsh-authorization'
 import type { AuthorizationInteraction, AuthorizationNotice, AuthorizationPrompt } from '@deepseek-ai/dsh-authorization'
 import LocalCredentialProvider from '@deepseek-ai/dsh-credentials-local'
 import type { CredentialKey } from '@deepseek-ai/dsh-credentials'
-import type { AuthEvent, AuthInteraction, AuthPrompt, AuthType, Credential } from '@earendil-works/pi-ai'
+import type {
+  AuthEvent, AuthInteraction, AuthPrompt, AuthType, CreateModelsOptions, Credential, CredentialStore,
+} from '@earendil-works/pi-ai'
 
 const login = vi.hoisted(() => vi.fn())
 
 // The whole of what this module does with pi-ai is run one provider's login
 // against a collection built with the harness store, so the collection is the
-// boundary worth observing; a real login would open a browser.
+// boundary worth observing; a real login would open a browser. The store the
+// flow wired for the attempt is handed to the mock so the login's write still
+// travels through the session's commit.
 vi.mock('../src/models.ts', async importOriginal => ({
   ...await importOriginal<typeof import('../src/models.ts')>(),
-  createModels: () => ({ setProvider: () => {}, login }),
+  createModels: (options?: CreateModelsOptions) => ({
+    setProvider: () => {},
+    login: (providerId: string, type: AuthType, interaction: AuthInteraction): Promise<Credential> =>
+      login(providerId, type, interaction, options?.credentials) as Promise<Credential>,
+  }),
 }))
 
 const { credentialStoreFrom, authContextFrom, recordKeyFor } = await import('../src/auth.ts')
@@ -61,10 +69,12 @@ async function attempt(
   request: { key?: CredentialKey; method?: string } = {},
 ): Promise<ReturnType<typeof surface>> {
   const ui = surface()
-  login.mockImplementation(async (providerId: string, _type: AuthType, interaction: AuthInteraction) => {
+  login.mockImplementation(async (
+    providerId: string, _type: AuthType, interaction: AuthInteraction, store: CredentialStore,
+  ) => {
     await converse(interaction)
     const granted: Credential = { type: 'oauth', access: 'at', refresh: 'rt', expires: 1 }
-    await credentialStoreFrom(ctx).modify(providerId, () => Promise.resolve(granted))
+    await store.modify(providerId, () => Promise.resolve(granted))
     return granted
   })
   await expect(ctx.authorization.begin({
@@ -102,10 +112,10 @@ describe('pi-ai login flows', () => {
     const ctx = await harness()
 
     await attempt(ctx, () => Promise.resolve())
-    expect(login).toHaveBeenLastCalledWith('openai-codex', 'oauth', expect.anything())
+    expect(login).toHaveBeenLastCalledWith('openai-codex', 'oauth', expect.anything(), expect.anything())
 
     await attempt(ctx, () => Promise.resolve(), { key: recordKeyFor('anthropic'), method: 'api-key' })
-    expect(login).toHaveBeenLastCalledWith('anthropic', 'api_key', expect.anything())
+    expect(login).toHaveBeenLastCalledWith('anthropic', 'api_key', expect.anything(), expect.anything())
   })
 
   it('commits what the login produced, where the adapter reads it back', async () => {

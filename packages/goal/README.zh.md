@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # goal/：持久化的同会话目标
 
 [English](README.md) | 中文

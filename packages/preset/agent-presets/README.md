@@ -1,3 +1,8 @@
+---
+description: "Per-session agent composition from preset cordis.yml files for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # dsh-agent-presets
 
 English | [中文](README.zh.md)
@@ -10,6 +15,21 @@ The mechanism is two seams. Entry contexts chain to the context a subtree was pl
 
 Use `dsh-agent-presets` to give each session the tools, prompt sections, and skills named by one preset's `agent.cordis.yml`. One process can run sessions with different presets while keeping their state separate. The preset list combines shipped definitions with configured and user roots, reports why a preset cannot start, and can create a local preset by copying an existing one. Deployments and users can choose defaults and whether new-session surfaces offer the choice at all; only an empty session may switch presets. Treat every authored preset as trusted configuration because it grants the capabilities of the plugins it selects.
 
+## Table of Contents
+
+- [Service: `AgentPresets` (ctx key: `agentPresets`)](#service-agentpresets-ctx-key-agentpresets)
+- [Authoring](#authoring)
+- [Config](#config)
+- [What a mount rejects](#what-a-mount-rejects)
+- [A preset file is an input, never a persistence target](#a-preset-file-is-an-input-never-a-persistence-target)
+- [Trust](#trust)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="service-agentpresets-ctx-key-agentpresets"></a>
 ## Service: `AgentPresets` (ctx key: `agentPresets`)
 
 Discovery is unmemoized: `list()` and `resolve()` re-read the roots on every call, so a preset authored while the process runs is visible immediately and a deleted one disappears from the next read. Discovery also owns preset **health**: a directory whose composition is missing or unloadable (unparsable YAML — checked with the loader's own dialect, `!!js` included — or not a list of named plugin rows) is listed with a `broken` reason rather than skipped, because a skipped directory would still occupy its id on disk while every surface shows nothing to delete. A directory whose name is not a usable preset id (`[a-z0-9][a-z0-9-]*`) is skipped outright: no copy could ever claim it.
@@ -56,6 +76,7 @@ The header stays frozen because it is a creation fact. A switch is an `agent-pre
 
 The restriction to a produced-nothing agent is a product rule, not a mechanical one: swapping tools mid-conversation would leave logged tool calls the new composition cannot make. The gateway enforces it at the wire ([`dsh-apiproxy`](../../host/apiproxy/README.md) answers `agent-preset-locked`), which is where session history is in hand.
 
+<a id="authoring"></a>
 ## Authoring
 
 Authoring is copy-only. A new preset is a whole-directory copy of an existing one — composition, metadata, skill directories, assets — landed under the first `user` root; the inputs are two ids the service resolves against its own roots plus an optional display name, so no caller ever supplies composition text and a copy grants nothing the roster did not already carry. Everything after creation happens in the preset's own files. `copy()` refuses three things before anything lands:
@@ -87,6 +108,7 @@ It carries display text ONLY. `id` is the directory name and `trust` comes from 
 
 Every read failure degrades to no metadata — absent, malformed, wrongly typed, or blank all mean the same thing, and a picker falls back to the id. Presentation is not capability: a preset with a broken name still mounts.
 
+<a id="config"></a>
 ## Config
 
 | Field | Default | Meaning |
@@ -121,6 +143,7 @@ The default is read per resolution rather than snapshotted, so a hot-reloaded do
 
 `modeSelectionEnabled` (base `true`) decides whether an unnamed session consults the saved `default` at all: while `false` the effective default is `config.default` for every unnamed session and the saved value stays parked until the flag returns. The roster reports both halves of that answer — the flag itself and `isDefault` already resolved — so a client with no settings access stays consistent with the surfaces that have one. Running sessions keep their composition either way; the flag only removes the choice from new-session surfaces.
 
+<a id="what-a-mount-rejects"></a>
 ## What a mount rejects
 
 A directly-plugged subtree is absent from `ctx.loader.entries()`, so no boot audit covers it. `mount()` therefore proves the result usable itself, and rejects three things.
@@ -133,16 +156,19 @@ A directly-plugged subtree is absent from `ctx.loader.entries()`, so no boot aud
 
 The package invariant re-checks that last rule on every service notification, because a row that publishes from a timer or an asynchronous continuation would escape the one-shot audit.
 
+<a id="a-preset-file-is-an-input-never-a-persistence-target"></a>
 ## A preset file is an input, never a persistence target
 
 The Loader writes a tree back to its source file whenever it decides the config changed, and a row disposing its own fiber is enough to decide that: the entry is marked `disabled` and the tree is written. Inherited, that would burn one session's runtime state into a file every session shares — comments stripped by the YAML round trip, and a `writeFile` rejection inside a `setTimeout` for a read-only shipped preset.
 
 The mounted subtree therefore overrides `write()` as a no-op. Nothing in this package writes a composition; authoring one is a separate, explicit operation.
 
+<a id="trust"></a>
 ## Trust
 
 Presets are compositions, so a preset is exactly as privileged as the plugins it names. A `user` preset — authored by a person or by an agent — carries the same trust as shell access; the `trust` field exists so consumers can present that difference, not to enforce it.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the plugins a preset's standing composition installs, which own every tool schema, prompt section, and skill the preset makes visible to the agents joined to it.
@@ -153,6 +179,7 @@ Prefix-stable for the life of an agent: a composition is installed once, before 
 
 ## Known Limitations and Deferred Work
 
+- Managed launches with `DSH_MANAGED_DATA_MANIFEST` register resolved user-trusted preset roots before data writes. Shipped roots are not claimed. An invalid inventory refuses initialization; [inventory and backup rules](../../util/managed-data/README.md) govern retained roots and deployment approval.
 - **A preset outside the writable root is discoverable but not deletable** — `remove()` refuses anything that does not live under the FIRST `user` root, so a deployment that configures its own writable root while leaving `includeUserRoot` on lists the harness-home presets, mounts them, and then answers "it does not live under the writable preset root" for every delete. The roster carries one writable root by design; a deployment that wants only its own sets `includeUserRoot: false`.
 - **A preset cannot be changed once a session has produced anything** — `recompose` re-links a BLANK session's parent scope to another standing mount, and only a blank one: switching a composition that already ran would strand tools the model has called. Changing the default affects only sessions created afterwards.
 - **A generation is keyed on the composition file alone** — the stamp check notices `agent.cordis.yml` changing, not an edit to a skill file or asset beside it; those reach new sessions only once the composition file itself moves or the process restarts.
@@ -161,3 +188,13 @@ Prefix-stable for the life of an agent: a composition is installed once, before 
 - **Health checks installed modules without importing them** — discovery proves the composition parses in the loader dialect, holds named rows, and can resolve enabled package or file specifiers from the harness/preset roots. Plugins that throw or wait for a missing service still fail during mount and roll the session creation back.
 - **A copy is a snapshot that drifts** — upgrading the deployment does not update copies of shipped presets, and there is no patch semantics at this layer to express "standard plus one change" (that is the bundle layer's `cordis.patch.yml`); the shipped set itself accepts the same cost — `cordis` and `ptc` are full copies of `standard` — so the whole assembly stays readable in one file.
 - **Root scans are not watched** — every read hits the filesystem instead, which keeps the roster fresh but puts one `readdir` per root on each `list()`.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-preset-card-description-clamp.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-11-preset-card-description-clamp.md
-2026-08-11-preset-card-description-clamp.md: 16ebf371d5af7c9e54fcc37819696b380856d5cb
-2026-08-11-preset-card-description-clamp.zh.md: 5b7a18f41e4b3e8acd681a001f6826b19ca7026d
+/agent-note-preset-cards-clamp-their-description-instead-of-sizing-the-roster:
+  en: 827a6e2b323a0c39
+  zh: 79639549895a61b5
+/agent-note-preset-cards-clamp-their-description-instead-of-sizing-the-roster/problem:
+  en: f5218d3476dbf28c
+  zh: 27b4cfff127d64aa
+/agent-note-preset-cards-clamp-their-description-instead-of-sizing-the-roster/decision:
+  en: e7857dd927257db3
+  zh: 2825ba8628ae09a9
+/agent-note-preset-cards-clamp-their-description-instead-of-sizing-the-roster/alternatives-considered:
+  en: c54a4e6ed87eca88
+  zh: 19973bb2e1501e9f
+/agent-note-preset-cards-clamp-their-description-instead-of-sizing-the-roster/consequences:
+  en: 0566f46fb014ca26
+  zh: c9ec26721b43357b
+/agent-note-preset-cards-clamp-their-description-instead-of-sizing-the-roster/testing:
+  en: 8a41b00aa05e1f0b
+  zh: c816c7f4a56c8ecc

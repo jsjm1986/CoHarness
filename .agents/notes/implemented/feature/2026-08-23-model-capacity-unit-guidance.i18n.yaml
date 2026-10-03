@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-model-capacity-unit-guidance.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-23-model-capacity-unit-guidance.md
-2026-08-23-model-capacity-unit-guidance.md: 1eea0c6eed298769e382329eb1a2a73d4c110d57
-2026-08-23-model-capacity-unit-guidance.zh.md: 34aaa65f0088c56793ad480933aa5382ddbbea80
+/agent-note-model-capacity-unit-guidance:
+  en: 383e617085ccf2eb
+  zh: aed40b97a63e2a74
+/agent-note-model-capacity-unit-guidance/problem:
+  en: 41f9f136a56ea226
+  zh: a82216425d78cd34
+/agent-note-model-capacity-unit-guidance/decision:
+  en: 6cf9d06ae4e410e2
+  zh: 9ce1ffcfd16bdfdc
+/agent-note-model-capacity-unit-guidance/alternatives-considered:
+  en: 42214524d82a7266
+  zh: 6d172d46d15f9a9c
+/agent-note-model-capacity-unit-guidance/verification:
+  en: 607bccebb10c165c
+  zh: 68c44bae8383dcc9
+/agent-note-model-capacity-unit-guidance/consequences:
+  en: 9eb92a3e71d235e0
+  zh: 770d03bdf0788c1b

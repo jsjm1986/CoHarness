@@ -9,7 +9,7 @@ import { readApiResponseJson } from '@deepseek-ai/dsh-host-apiproxy/client'
 import type { ClientConnectionRpc } from '../rpc.ts'
 import type { ConnectionRuntimeTarget } from './api.ts'
 import { readRpcStream } from '../rpc-stream-reader.ts'
-import { RPC_STREAM_PATH } from '../rpc-stream.ts'
+import { RPC_STREAM_ROUTE } from '../rpc-stream.ts'
 import { randomUuid } from './random-uuid.ts'
 
 const INTERNAL_BASE = 'http://dsh.internal'
@@ -32,7 +32,7 @@ export function createWebConnectionRpc(doFetch?: RpcFetch, target?: ConnectionRu
       assertTarget(channel, endpoint)
       if (channel !== '/api') throw new Error('Streaming RPC requires the shared /api channel')
       const message: ClientRequest = { type: 'client-request', rpcId: RpcId(randomUuid()), method: endpoint, payload }
-      const url = new URL(`${RPC_STREAM_PATH}/${endpoint}`, resolveBase())
+      const url = new URL(`${RPC_STREAM_ROUTE}/${endpoint}`, resolveBase())
       if (target !== undefined) url.searchParams.set('dshTarget', target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`)
       return readRpcStream(send, url, message, signal)
     },
@@ -45,7 +45,9 @@ export function createWebConnectionRpc(doFetch?: RpcFetch, target?: ConnectionRu
         method: endpoint,
         payload,
       }
-      const url = new URL(`${channel}/${endpoint}`, resolveBase())
+      // The channel key is absolute; a page posts the document-relative form, and
+      // a carrier that resolves against the Host root accepts the same form.
+      const url = new URL(`${channel}/${endpoint}`.slice(1), resolveBase())
       if (target !== undefined) url.searchParams.set('dshTarget', target.kind === 'personal' ? 'personal' : `project:${String(target.projectId)}`)
       const response = await send(
         url,
@@ -69,6 +71,8 @@ export function createWebConnectionRpc(doFetch?: RpcFetch, target?: ConnectionRu
 }
 
 function resolveBase(): string {
+  const document = (globalThis as { document?: { baseURI?: string } }).document
+  if (document?.baseURI !== undefined) return document.baseURI
   const location = (globalThis as { location?: { origin?: string } }).location
   return location?.origin !== undefined && location.origin !== 'null' ? location.origin : INTERNAL_BASE
 }

@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/lsp/lsp-stdio/README.md
-README.md: 1c13cde9b253f805a0410aa559bb07e20421d626
-README.zh.md: ee12897741919f09f595c9e787b08e0d4c8f3882
+/:
+  en: 16eed1ff63af77b7
+  zh: 61495d48365178df
+/deepseek-ai-dsh-lsp-stdio:
+  en: f8e91b38ff090783
+  zh: f75c6195ba16f03e
+/deepseek-ai-dsh-lsp-stdio/summary:
+  en: 9bb3631289433c95
+  zh: 4b30c9a4aa5186b8
+/deepseek-ai-dsh-lsp-stdio/table-of-contents:
+  en: 4a8007b146756768
+  zh: f0c7beff241a74d2
+/deepseek-ai-dsh-lsp-stdio/what-it-does:
+  en: 66b4575f5b0a6840
+  zh: 041f2a086bdb8776
+/deepseek-ai-dsh-lsp-stdio/configuration:
+  en: 30e25133ecf55488
+  zh: cdadf7c48c59d769
+/deepseek-ai-dsh-lsp-stdio/protocol-behavior:
+  en: b43ec2dec8224423
+  zh: 096239413aa36c3a
+/deepseek-ai-dsh-lsp-stdio/security-boundary:
+  en: 2aad24eb4d81b0f9
+  zh: ce494c1fe9528f4f
+/deepseek-ai-dsh-lsp-stdio/invariants:
+  en: 24f19a89f10c3c95
+  zh: 85a1db538b3f6639
+/deepseek-ai-dsh-lsp-stdio/model-experience:
+  en: b366d0dfbfeb2d91
+  zh: 72a7a8d957b13eb4
+/deepseek-ai-dsh-lsp-stdio/model-experience/kv-cache-effect:
+  en: 64354484a5367fbc
+  zh: 3583c45b9080bc37
+/deepseek-ai-dsh-lsp-stdio/known-limitations-and-deferred-work:
+  en: 568f809aaae9f614
+  zh: 1495e25b82a3a36d
+/deepseek-ai-dsh-lsp-stdio/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

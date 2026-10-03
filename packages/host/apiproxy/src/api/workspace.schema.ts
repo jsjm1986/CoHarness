@@ -29,6 +29,7 @@ export const workspaceListRequestSchema = z.object({}) satisfies z.ZodType<Wire<
 export const workspaceListValueSchema = z.object({
   items: z.array(workspaceViewSchema),
   archivedSessionIds: z.array(sessionIdSchema),
+  pinnedSessionIds: z.array(sessionIdSchema),
   archiveRevision: z.number().int().nonnegative().optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'workspace.list'>>>
 
@@ -93,6 +94,7 @@ export const workspaceInsertSessionBeforeValueSchema = z.object({
 /** workspace.archiveSession request payload. */
 export const workspaceArchiveSessionRequestSchema = z.object({
   sessionId: sessionIdSchema,
+  stopActivity: z.boolean().optional(),
 }) satisfies z.ZodType<Wire<RequestPayload<'workspace.archiveSession'>>>
 
 /** workspace.archiveSession response value: the full updated archive set. */
@@ -111,3 +113,23 @@ export const workspaceUnarchiveSessionValueSchema = z.object({
   archivedSessionIds: z.array(sessionIdSchema),
   archiveRevision: z.number().int().nonnegative().optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'workspace.unarchiveSession'>>>
+
+/** workspace.pinSession request payload. */
+export const workspacePinSessionRequestSchema = z.object({
+  sessionId: sessionIdSchema,
+}) satisfies z.ZodType<Wire<RequestPayload<'workspace.pinSession'>>>
+
+/** workspace.pinSession response value: the full pin set, most recently pinned first. */
+export const workspacePinSessionValueSchema = z.object({
+  pinnedSessionIds: z.array(sessionIdSchema),
+}) satisfies z.ZodType<Wire<ResponseValue<'workspace.pinSession'>>>
+
+/** workspace.unpinSession request payload. */
+export const workspaceUnpinSessionRequestSchema = z.object({
+  sessionId: sessionIdSchema,
+}) satisfies z.ZodType<Wire<RequestPayload<'workspace.unpinSession'>>>
+
+/** workspace.unpinSession response value: the full pin set. */
+export const workspaceUnpinSessionValueSchema = z.object({
+  pinnedSessionIds: z.array(sessionIdSchema),
+}) satisfies z.ZodType<Wire<ResponseValue<'workspace.unpinSession'>>>

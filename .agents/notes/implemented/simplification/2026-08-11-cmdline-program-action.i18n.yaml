@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-cmdline-program-action.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-11-cmdline-program-action.md
-2026-08-11-cmdline-program-action.md: 40c4dae1d3461f25ac7f34dee7c166434e6cd24d
-2026-08-11-cmdline-program-action.zh.md: 1eb9746162f3b4eb8c43ca71f5abc3213d0203da
+/agent-note-parsecmdline-runs-the-program-s-own-commander-action:
+  en: 6bc1ee3338c6d96c
+  zh: 38b9b1790c4d80e7
+/agent-note-parsecmdline-runs-the-program-s-own-commander-action/problem:
+  en: ce69476df923f0ef
+  zh: 29f27acaabc684ec
+/agent-note-parsecmdline-runs-the-program-s-own-commander-action/decision:
+  en: 161a7806f07342b5
+  zh: 4380dee05014c2c1
+/agent-note-parsecmdline-runs-the-program-s-own-commander-action/alternatives-considered:
+  en: 9e24de68b37431ae
+  zh: 818da80de991571f
+/agent-note-parsecmdline-runs-the-program-s-own-commander-action/consequences:
+  en: 9cf244058e0cc4d6
+  zh: fe123c0f0fbd0597

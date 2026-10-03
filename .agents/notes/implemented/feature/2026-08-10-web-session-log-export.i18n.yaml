@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-web-session-log-export.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-10-web-session-log-export.md
-2026-08-10-web-session-log-export.md: 24703bd5c98a91bf8708ae243ef7a44df4afb8f1
-2026-08-10-web-session-log-export.zh.md: 9595ea25df927e49b34cde1ba83d6e1720db5095
+/agent-note-web-session-log-export-as-a-host-streamed-zip-download:
+  en: 1c35958136b807a5
+  zh: 1a19c33144aa7d7c
+/agent-note-web-session-log-export-as-a-host-streamed-zip-download/problem:
+  en: 19386fc18f64445c
+  zh: 6657efdd95dbc755
+/agent-note-web-session-log-export-as-a-host-streamed-zip-download/decision:
+  en: 8ba5bdd8881c0938
+  zh: 3c946ffe8a1c1cfb
+/agent-note-web-session-log-export-as-a-host-streamed-zip-download/alternatives-considered:
+  en: 0dcbf4e271d33ceb
+  zh: 4cf9b999ec710635
+/agent-note-web-session-log-export-as-a-host-streamed-zip-download/consequences:
+  en: 6a87baf59acf8757
+  zh: 246f7e95cf0d77b4

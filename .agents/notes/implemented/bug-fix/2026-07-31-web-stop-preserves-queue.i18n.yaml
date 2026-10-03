@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-web-stop-preserves-queue.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-31-web-stop-preserves-queue.md
-2026-07-31-web-stop-preserves-queue.md: b8bba45009c126495a8b03ee36d6eb2cccac9a93
-2026-07-31-web-stop-preserves-queue.zh.md: af9c114fd06452e58322f2554a0f2ccd861c81c9
+/agent-note-web-stop-preserves-pending-queue:
+  en: 624c33bf9eeca62c
+  zh: 2276e93863837ef2
+/agent-note-web-stop-preserves-pending-queue/problem:
+  en: 200099e21d40356c
+  zh: 9dde297ad381d492
+/agent-note-web-stop-preserves-pending-queue/decision:
+  en: 327227ca6a279e05
+  zh: 26615392c5f9465a
+/agent-note-web-stop-preserves-pending-queue/alternatives-considered:
+  en: b3177d4aed78c472
+  zh: 114162727d1d5c6f
+/agent-note-web-stop-preserves-pending-queue/verification:
+  en: 78248dd3e3aa6a33
+  zh: 8442f707c2b823cf
+/agent-note-web-stop-preserves-pending-queue/consequences:
+  en: 6a6e39e256b8621b
+  zh: 36b271978eb84ea1

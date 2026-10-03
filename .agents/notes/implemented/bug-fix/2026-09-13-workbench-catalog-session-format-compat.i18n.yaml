@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-13-workbench-catalog-session-format-compat.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-13-workbench-catalog-session-format-compat.md
-2026-09-13-workbench-catalog-session-format-compat.md: 3d277780560311dac922650ef0692513fce47b2d
-2026-09-13-workbench-catalog-session-format-compat.zh.md: dbaf67928d6986691000ffea817f83e886fea3e1
+/agent-note-workbench-catalog-survives-legacy-session-formats:
+  en: 1d8b70f06d0ec0c6
+  zh: 5c164110ff9254ce
+/agent-note-workbench-catalog-survives-legacy-session-formats/problem:
+  en: cf83b976f6228c73
+  zh: 69df1be202a9802b
+/agent-note-workbench-catalog-survives-legacy-session-formats/decision:
+  en: 3097f45a8d6cd35d
+  zh: bc12748ebc3ffdcd
+/agent-note-workbench-catalog-survives-legacy-session-formats/alternatives-considered:
+  en: 45feb86cc9508435
+  zh: a1b71835fbed9ab7
+/agent-note-workbench-catalog-survives-legacy-session-formats/consequences:
+  en: 53ae037775f4f31a
+  zh: 669a3cbfb32308d1
+/agent-note-workbench-catalog-survives-legacy-session-formats/verification:
+  en: cdd354737c3f0feb
+  zh: 88cad30590d337d8

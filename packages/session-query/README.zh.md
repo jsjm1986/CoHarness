@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # session-query/：会话检索能力家族
 
 [English](README.md) | 中文

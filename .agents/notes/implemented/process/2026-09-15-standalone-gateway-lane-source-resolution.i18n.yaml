@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-15-standalone-gateway-lane-source-resolution.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-15-standalone-gateway-lane-source-resolution.md
-2026-09-15-standalone-gateway-lane-source-resolution.md: d96a2dceaf371b42ffa1585d106c5fb2734e4615
-2026-09-15-standalone-gateway-lane-source-resolution.zh.md: f58c4238a1b526b92292fb615a3d5f07f36d4b00
+/agent-note-workspace-source-resolution-in-the-standalone-gateway-ci-lanes:
+  en: b7ca16a1b7f94f3a
+  zh: e115b3be030904e7
+/agent-note-workspace-source-resolution-in-the-standalone-gateway-ci-lanes/problem:
+  en: 1f98d43f09e20dbd
+  zh: 4562bf096905db71
+/agent-note-workspace-source-resolution-in-the-standalone-gateway-ci-lanes/decision:
+  en: 50adca66599b69ea
+  zh: f0f839a17ac0ada7
+/agent-note-workspace-source-resolution-in-the-standalone-gateway-ci-lanes/alternatives-considered:
+  en: 99ed14178738f806
+  zh: c692278e331c675d
+/agent-note-workspace-source-resolution-in-the-standalone-gateway-ci-lanes/consequences:
+  en: eb8a93f53b54d530
+  zh: 83d2d206e54d69a8
+/agent-note-workspace-source-resolution-in-the-standalone-gateway-ci-lanes/verification:
+  en: ff3540486ba87d23
+  zh: 5ac6ca1b3cb010fb

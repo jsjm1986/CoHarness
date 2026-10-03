@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-rail-search-outside-click-self-dismissal.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-rail-search-outside-click-self-dismissal.md
-2026-08-18-rail-search-outside-click-self-dismissal.md: 9893b3a2456b9a592e1feb107d21404e043dee78
-2026-08-18-rail-search-outside-click-self-dismissal.zh.md: 91e343b8843dc02ca9c1be2b145e79beb84e17b7
+/agent-note-rail-search-keeps-its-expansion-when-the-opening-click-reaches-document:
+  en: 4c04de3618942d2b
+  zh: 9f9152c80308b0be
+/agent-note-rail-search-keeps-its-expansion-when-the-opening-click-reaches-document/problem:
+  en: 425275abbe99a8ce
+  zh: 1dd3e9e5d007fca4
+/agent-note-rail-search-keeps-its-expansion-when-the-opening-click-reaches-document/decision:
+  en: a86d00c76871a2c6
+  zh: 764a03c3c1b2b3da
+/agent-note-rail-search-keeps-its-expansion-when-the-opening-click-reaches-document/alternatives-considered:
+  en: 95624b5b020ce477
+  zh: 7aab876d90c3120b
+/agent-note-rail-search-keeps-its-expansion-when-the-opening-click-reaches-document/consequences:
+  en: 9884e16d5ac7a357
+  zh: b1ab1ffe1688af91

@@ -17,6 +17,38 @@ export type ConnectionRpcResult<T> =
 /** Trust fence applied before a Host RPC channel reaches its handler. */
 export type ConnectionRpcAuthority = 'trusted-host' | 'loopback'
 
+/** HTTP request facts consumed by browser trust and authentication. */
+export interface ConnectionTrustRequest {
+  /** Request headers supplied by either the Fetch or node:http representation. */
+  readonly headers: Headers | Readonly<Record<string, string | readonly string[] | undefined>>
+}
+
+/** HTTP status returned before dispatch, or undefined when the request may proceed. */
+export type ConnectionRequestRejection = 401 | 403 | undefined
+
+/** Root/index request facts used by the browser-token exchange. */
+export interface ConnectionIndexRequest extends ConnectionTrustRequest {
+  readonly method?: string | undefined
+  readonly url?: string | undefined
+}
+
+/**
+ * One index, HTTP, or upgrade request offered to deployment authentication.
+ * `kind` names the carrier the request actually arrived on: the HTTP and
+ * upgrade handlers supply it explicitly, while the shared rejection helper
+ * infers it from the Upgrade header where the carrier cannot pass one in.
+ */
+export interface ConnectionAuthenticationRequest extends ConnectionIndexRequest {
+  /** Carrier this request arrived on. */
+  readonly kind: 'index' | 'http' | 'upgrade'
+}
+
+/** Root/index response operations owned by the browser-token exchange. */
+export interface ConnectionIndexResponse {
+  writeHead(status: number, headers?: Readonly<Record<string, string>>): unknown
+  end(body?: string): unknown
+}
+
 /** Registration policy for one logical RPC channel. */
 export interface ConnectionRpcHandlerOptions {
   /** Browser authority accepted by every endpoint in this channel. */

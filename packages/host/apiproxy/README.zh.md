@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-host-apiproxy
 
 [English](README.md) | 中文
@@ -12,15 +17,32 @@
 
 `session.history` 和 `subagent.history` 接受 `toolCallId`，独立读取调用所属的完整轮次。查询复用现有 Session 观察所有者，不激活 Agent 或计算投影；子会话读取保留目录及父子会话授权检查。该参数不能与分页选择或仅对话详情组合。Fetch 传输压缩轮次但不裁掉前缀；客户端响应大小限制仍会拒绝超大响应。调用不存在时返回空结果，授权、持久化与取消失败仍是错误。
 
-`workspaceChanges.summary` 与 `workspaceChanges.diff` 通过相同的 Session 和目录授权读取已记录的轮次差异。读取完成后重新核验权限；记录器已释放快照时返回 null。已删除的文件仍可审阅，不用当前内容替代历史证据，也不公开私有存储路径或 Git 对象标识。
+`workspaceChanges.summary` 与 `workspaceChanges.diff` 通过相同的 Session 和目录授权读取已记录的轮次差异。读取完成后重新核验权限，通过已加载或持久 Session 的通知定位不可变记录。内容缺失时返回 null；存储损坏仍作为错误返回。已删除的文件仍可审阅，不用当前内容替代历史证据，也不公开私有存储路径或 Git 对象标识。
 
 `desktop.status` 和 `desktop.confirm` 使用会话写入授权及部署的交互确认控制器，不启动模型回合。未配置控制器时，状态返回 null，写入被拒绝；确认绑定页面显示的根会话、节点和桌面。Host 在异步操作完成后复核访问权限，取消或卸载后不能返回迟到的成功响应。
+
+Host 为 `hostSessionLifecycle` 保存创建、恢复与 fork 句柄。永久清理只释放这些确切的空闲所有者，并将标识预留保持到存储删除和 Gateway 回执完成。忙碌或所有权不明时，在删除前拒绝。
+
+`host.describe.runtimeTarget` 根据受管启动凭据标识 runtime，独立 Host 则声明个人作用域。可在浏览器使用的 API 导出规范 Client Session 地址，以及与 Host 授权共用的显式 Remote Session 路径策略；这些辅助函数不改写任意载荷字符串，也不改变持久 ID。
 
 ## 概述
 
 使用 `dsh-host-apiproxy` 作为共享 API 网关：零依赖、浏览器可导入的 TypeScript API 契约、一对 fetch 载体，以及每个 HTTP 载体包装的宿主侧 `ApiProxyService`（`ctx.apiProxy`）。其 `workspaceFiles.*` 方法在授权、包含性与版本防护下按公开界限提供会话相对文件读取。
 
 
+## 目录
+
+- [共享 Agent 默认值（`agent-default-model` Settings 分节）](#the-shared-agent-default-agent-default-model-settings-section)
+- [约定层（`/api`）](#contract-layer-api)
+- [载体层（`/client` + 根路径）](#carrier-layer-client--root)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="the-shared-agent-default-agent-default-model-settings-section"></a>
 ## 共享 Agent 默认值（`agent-default-model` Settings 分节）
 
 `ApiProxyService` 消费 `ctx.agentDefaultModel`；它不持有提供方／模型配置或 Settings 分节。共享服务在 `agent-default-model` 下注册 `{provider, model, reasoningEffort?}`：base 组合包的组合条目是底层，`settings.yaml` 把用户选择叠加其上。
@@ -33,6 +55,7 @@ Settings 分节中的 `reasoningEffort` 在 agent-default-model 插件配置中�
 
 存储的选择独立于目录成员关系。默认值指向不可用的提供方时，它仍会作为会话的 `current` 送到 `session.models`，让选择器请求用户重新选择，而不是静默选用其他模型。反过来，适配器也可以服务其目录中未公布的模型。
 
+<a id="contract-layer-api"></a>
 ## 约定层（`/api`）
 
 协议消息组成一个四象限可辨识联合：发起方 × 请求／响应，与物理通道解耦。四种消息分别是 `ClientRequest`（POST `/api/<method>` 的请求体）、`ServerResponse`（该 POST 的响应体）、`ServerRequest`（SSE（Server-Sent Events）帧）和 `ClientResponse`（POST `/api/respond` 的请求体）。响应始终回显对应请求的 `rpcId`，绝不签发新值。方法的参数与返回值结构只存在于领域接口签名（`SessionsApi`、`HostApi`、`EventsApi`）中；`RpcMethodMap` 注册方法，其他所有位置均通过 `RequestPayload<K>`／`ResponseValue<K>` 派生。Zod schema 以 `satisfies z.ZodType<Wire<T>>` 锚定类型，并分两层解析：先解析信封，再解析业务载荷，随后按方法分发。业务错误由 `RpcResult` 的错误分支承载（`RpcErrorDetailsMap` 封闭错误码集合）；HTTP 状态只表达载体层结果。每个 `/api` POST 都必须声明 `application/json` 媒体类型——否则在分发前即以 415 拒绝，因此跨站「简单请求」（浏览器不经 CORS 预检就会发出）永远无法盲目执行有副作用的方法。
@@ -69,7 +92,7 @@ Mux 与 Host stream 仅合并尚未完成的授权请求。每批发布都会复
 
 待处理的 queued 输入属于实时控制平面约定，而非对话历史。网关根据持久 `agent/inbox/spliced` 变更派生完整的 `next-turn` 队列，并在每次变更后及重连时广播权威 `session/queue` 快照；待处理的 `next-step` steering（中途引导）不进入此 Web 投影。在 `next-step` 内，用户来源的消息携带 `steering` placement，而注入上下文（审批通知、任务完成、附加快照）携带 `context`，领取前不对外呈现。面向单条消息的 `agent/inbox/inserted`、`claimed` 与 `discarded` 通知仍供生命周期观察方使用，但不用于构建队列视图。`session.updateQueue` 通过 `MessageId` 寻址单个项；编辑和移除经已挂载 Agent 的 `Inbox.splice()` 修改队列。认领操作的纯删除 splice 会在 pre-step 准入前赢得竞态，因此之后的操作返回 `queue-item-not-found`。`session.cancel` 仅中止活动轮次并保留待处理 inbox 工作；取消达到完全停稳且结束中的轮次完成 flush 后，AgentLoop 按 FIFO 顺序认领下一条可唤醒消息，浏览器绝不重发或提升它。队列操作绝不恢复冷会话，客户端也绝不根据轮次或状态事件推断某项已退出队列。
 
-后台任务沿用同一种实时推送姿态。当组合中有 `ctx.jobs` 时，网关订阅它的变更订阅，并在注册表每一次改变某个会话可见内容的提交后——注册、转入 stopping、结算，以及 owner 销毁时的移除——广播一份完整的 `session/jobs` 快照，另外为每个已经有任务的会话发送订阅 baseline（没有 baseline 即表示空集；把集合清空的那次变更仍然发送 `[]`）。带 owner 的变更通过那个确切的 `Agent` 读取，因此推送在其 scope 拆除期间依然正确；baseline 读 `ctx.agents.get(sessionId)`，对没有活体 Agent 的会话只得到无主任务，且绝不恢复冷会话。无主变更向每一个已订阅会话扇出，因为无主任务对所有调用方可见。线路上的 `JobView` 丢弃 `ownerSession`、`reported` 和 `outputLimitBytes`：第一个由帧自身的 `sessionId` 携带，另外两个分别是内部通知位和模型呈现策略。没有该注册表的组合不发出这类帧。
+后台任务沿用同一种实时推送姿态。当组合中有 `ctx.jobs` 时，网关订阅它的变更订阅，并在注册表每一次改变某个会话可见内容的提交后——注册、转入 stopping、结算，以及 owner 销毁时的移除——广播一份完整的 `session/jobs` 快照，另外为每个已经有任务的会话发送订阅 baseline（没有 baseline 即表示空集；把集合清空的那次变更仍然发送 `[]`）。带 owner 的变更通过那个确切的 `Agent` 读取，因此推送在其 scope 拆除期间依然正确；baseline 读 `ctx.agents.get(sessionId)`，对没有活体 Agent 的会话只得到无主任务，且绝不恢复冷会话。无主变更向每一个已订阅会话扇出，因为无主任务对所有调用方可见。线路上的 `JobView` 丢弃 `owner` 和 `outputLimitBytes`：前者由帧自身的 `sessionId` 携带，后者是生产者拥有的模型呈现策略；`progress` 为活跃行透传。没有该注册表的组合不发出这类帧，并对两个一元方法应答 `internal`。`jobs.output({ sessionId?, jobId, from? })` 是非消费的环读取——走 `readAt` 而非 `read`，模型侧游标保持不动——返回新鲜视图、环坐标、自 `from` 起的保留块、续读游标 `next`，以及请求偏移低于 `earliest` 时的 `lossy`；带 sessionId 的读取要求该会话的 `read` 授权并看到其可见集（自有任务加无主任务），不带的只在 `captureCollaboration('read')` 下看到无主任务，未知或越权 id 收敛为 `job-not-found`。`jobs.kill({ sessionId, jobId })` 要求该会话的 `write` 授权，转发原因 `cancelled by the user`，应答注册表的受理结果（`requested`/`already-finished`），迁移由名册帧承载。
 
 Workspace 列表与 Session 列表是相互独立的重连基线。`workspace.create({ path })` 会接纳已有的规范目录，并允许由 basename 派生的标题重复。`workspace.insertBefore({ workspaceId, beforeWorkspaceId? })` 提交一次注册表顺序移动并应答完整顺序；单纯重排序会通过 `host/workspace-order-changed` 推送同一份完整顺序，而未知来源或锚点返回 `workspace-not-found`。`workspace.delete` 只移除 Workspace 注册记录，`session.create` 接受可选的预分配 Session id，`host/workspace-changed`、`host/workspace-removed` 与 `host/session-added` 则以任意到达顺序携带已提交的增量。`workspace.archiveSession` 向注册表级全局归档集合添加一个会话，并应答完整的更新后集合；`workspace.list` 携带该集合作为重连基线，`host/archived-sessions-changed` 在每次持久变更后推送完整快照。归档只把会话从各分组视图中隐藏，不触碰其日志和 workspace 记账；既非活动会话也未持久化的会话以 `session-not-found` 失败。`workspace.unarchiveSession` 是幂等的逆操作：它把会话移出集合、恢复其记录的 Workspace 位置，不在集合中的 id 以当前快照应答而非报错。删除注册记录会保留目录和会话日志；相关 Session 仍留在 `session.list` 中，并进入 Ungrouped。`SessionSummary.blank` 与 `host/session-added` 帧携带会话是否有可见对话内容：客户端隐藏空白会话并按 workspace 复用它们，收到可见消息事件后才转为非 blank，`session.list` 仍是重连权威。已附加摘要折叠实时日志。冷摘要信任缓存的 `blank: false`，但把缓存的 `true` 与 cache miss 都视为未经验证；当 `locate()` 报告的工件不大于 `coldBlankProbeMaxBytes` 资格阈值（默认 1 KiB）时，网关通过 `readFrom()` 读取该 Session，同时折叠空白状态与最新真人 prompt。更大、无位置、已消失或不可读的工件保持可见。异步冷读取结束后，期间已附加的 Session 会改用实时日志生成摘要。`updatedAt` 依次采用实时折叠、小工件精确折叠或 projection cache，缺失时回退到 `createdAt`；拾起边界及其他写入都不会提升 Session 排序。
 
@@ -79,7 +102,7 @@ Workspace 列表与 Session 列表是相互独立的重连基线。`workspace.cr
 
 目录选择委托给组合的 `ctx.directoryPicker` 后端（[目录选择 seam](../directory-picker/README.zh.md)）；调用组合能力 kind 之外的方法会以 `directory-picker-unavailable` 失败（客户端不需要广播——组合的选择器包自己的 client half 渲染匹配的交互）。在 `native` 下，`host.pickDirectory` 打开一个原生选择器并返回选中路径（取消为 `null`）；该方法需等待用户完成操作，不使用默认的 30 秒一元调用超时，而调用方与连接的中止仍会传播至原生进程。在 `browse` 下，`host.listDirectory` 返回一个按名称排序的目录层级，携带面包屑祖先链、`home` 锚点与宿主判定的 `hidden` 标志（不带路径即家目录），`host.createDirectory` 创建一个经校验的子段；后端的类型化失败 1:1 映射为 `directory-unreadable`／`directory-exists`／`directory-create-failed` 错误码。浏览器载体的前缀级信任栅栏（dsh-client-connection）像覆盖其他所有 `/api` 请求一样覆盖上述全部方法。
 
-`host.openPath` 会用操作系统的默认应用打开一个文件系统路径（macOS 为 `open`，Windows 为 `Invoke-Item`，桌面 Linux 为 `xdg-open`）。对于 `.html`、`.htm`、`.xhtml` 与 `.svg`，macOS 和桌面 Linux 会优先使用能够确定的默认浏览器；无法确定时回退到上述应用交接。WSL 会通过 `wslpath -w` 转换每个 Linux 路径，并将所得 Windows/UNC 路径交给 Windows `Invoke-Item`，浏览器可渲染的文档也不例外，而非假定存在 Linux 桌面文件关联。`host.describe.home` 是宿主账户的家目录。Web 客户端用它把 POSIX 家目录路径显示为 `~`；Windows 值仍会上报，但不会缩写。`host.describe.canOpenPath` 会宣告这次交接能否抵达用户可见的桌面：网关显式配置的 `nativeOpen` 优先，注入的 opener 按定义可用，否则平台检测接受 macOS、Windows、WSL 或带 display 的 Linux，并拒绝 headless／容器 Linux。浏览器载体对其施加与 `host.pickDirectory` 相同的回环、同源限制；客户端会组合这两个事实后再呈现原生操作。
+`host.openPath` 会用操作系统的默认应用打开一个文件系统路径（macOS 为 `open`，Windows 为 `Invoke-Item`，桌面 Linux 为 `xdg-open`）。`action: 'reveal'` 改为在原生文件管理器中选中该路径（Finder/Explorer 选中，Linux 上 `xdg-open` 其父目录），而 `application` 会启动该文件当前 `fileApplications` 应答中提供的某个 id——opener 会按实时处理器复核该 id，过期的菜单行会失败，而不是静默改用默认应用打开。`host.fileApplications` 按系统顺序列出这些操作系统注册的处理器及可选的 PNG/SVG data-URL 图标；原生打开不可用时应答为空列表。对于 `.html`、`.htm`、`.xhtml` 与 `.svg`，macOS 和桌面 Linux 会优先使用能够确定的默认浏览器；无法确定时回退到上述应用交接。WSL 会通过 `wslpath -w` 转换每个 Linux 路径，并将所得 Windows/UNC 路径交给 Windows `Invoke-Item`，浏览器可渲染的文档也不例外，而非假定存在 Linux 桌面文件关联。`host.describe.home` 是宿主账户的家目录。Web 客户端用它把 POSIX 家目录路径显示为 `~`；Windows 值仍会上报，但不会缩写。`host.describe.canOpenPath` 会宣告这次交接能否抵达用户可见的桌面：网关显式配置的 `nativeOpen` 优先，注入的 opener 按定义可用，否则平台检测接受 macOS、Windows、WSL 或带 display 的 Linux，并拒绝 headless／容器 Linux。`host.describe.fileManager` 报告服务端桌面支持的显示操作，未知时缺省。浏览器载体对其施加与 `host.pickDirectory` 相同的回环、同源限制；客户端会组合这两个事实后再呈现原生操作。
 
 preset 名单、按会话选择与创作接口由 [`dsh-agent-presets`](../../preset/agent-presets/README.zh.md) 生成的 `agentPresets` Remote 面承载：`agentPresets/list` 报告每个 preset 的 `trust`、默认值标记与 `broken` 原因；`agentPresets/select` 在会话没有可见对话内容时重组其 agent；`agentPresets/read`、`copy` 与 `deletePreset` 管理组装本身。项目协作向每位成员开放名单、把创作钉在 `canManage` 上、并直接拒绝 `agentPreset.openDocument`；`dsh-client-connection` 同样把创作 Remote 与 `openDocument` 固定在环回地址——组装指明了一个会话所运行的插件，因此读取它是侦察，而 copy/delete/openDocument 管理名单并驱动宿主桌面。`list` 与 `select` 保持为普通方法：名单只携带 id 与信任级别，每个 preset 选择器都需要它；而选择一个 preset 并不比 `session.create` 自带的 `agentPreset` 多给任何能力，何况默认 preset 本就带着 bash。
 
@@ -93,6 +116,7 @@ preset 名单、按会话选择与创作接口由 [`dsh-agent-presets`](../../pr
 
 `settings.describe` 在只读应答中标记 `writableReason`（`project` 或 `provider`），让浏览器说明限制来自共享项目运行时还是设置提供方。
 
+<a id="carrier-layer-client--root"></a>
 ## 载体层（`/client` + 根路径）
 
 `AbstractApiClient` 持有全部协议不变量：签发 rpcId、包装／解包信封、Zod 解析、SSE 帧解码、一元请求超时，以及按微任务批处理的信封观测（`subscribeEnvelopes`）；平台子类只提供 `doFetch` 传输环节。截止时间句柄只在宿主定时器提供 `unref` 时调用它，因此共享客户端同时支持浏览器数字句柄和 Node 超时对象。成功的一元 JSON 响应会在 schema 解析前通过可配置的 16 MiB 字节预算（最高 256 MiB）读取，超限 body 由 `ApiResponseTooLargeError` 标识。相同的有界 reader 也会导出给直接浏览器消费方读取文本响应。SSE reader 会拒绝未终止的分片，并在保留帧超过 8 MiB 时取消；分片 frame 文本每个 frame 只合并一次。Host mux／host 事件队列把积压输出限制为 64 KiB，溢出时发送一条 `internal` stream 错误后结束。`InProcessApiClient` 以 `toFetchHandler(api)` 为基础，仍是同构接点：它运行完整的协议序列化与校验路径而不经过网络，供需要该路径的调用方和载体测试使用。产品的 `dsh --profile headless` 是直连 core 的入口，不挂载本包。
@@ -101,10 +125,13 @@ preset 名单、按会话选择与创作接口由 [`dsh-agent-presets`](../../pr
 
 `inbox` 投影从 Session 自有的持久化 splice 重建待处理输入，不恢复 Agent。历史读取仍由 Gateway 授权控制；冷队列修改继续要求 live Agent。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。请求分发委托给所属会话服务与已注册处理器；网关组合传输与策略而不拥有领域状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 没有直接影响；线上契约与 fetch 载体只搬运已组装的消息，不注册任何模型可见内容。
@@ -113,6 +140,7 @@ preset 名单、按会话选择与创作接口由 [`dsh-agent-presets`](../../pr
 
 无；本包从不组装或发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **转发的 Remote 事件寄居在这套 legacy 帧联合里**：`host/remote-event` 住在 `HostFrame` 中，是为了让投递路径复用现有宿主流、不必新开第三条下行通道，因此读起来像是本包拥有 Remote 事件契约。并非如此：名单归 `dsh-api-remotes`，消费端动词是 `ctx.remote.$on`。将来宿主流整体搬离本包时，该帧随之搬走，消费端契约不受影响（[原委](../../../.agents/notes/implemented/architecture/2026-08-10-remote-event-delivery.zh.md)）。
@@ -122,3 +150,13 @@ preset 名单、按会话选择与创作接口由 [`dsh-agent-presets`](../../pr
 - **搜索失败会包含提供方诊断信息**：网关是单用户本地服务。将其暴露给多名用户的载体必须用可安全公开的诊断信息替代内部搜索细节。
 - **Linux 原生选择器依赖桌面工具**：在 `native` 能力下，Zenity 和 KDialog 均未安装时，`host.pickDirectory` 会给出包含解决建议的错误提示；组合层面的回退是 browse 后端（见 [native 后端 README](../directory-picker-native/README.zh.md)）。
 - **冷列表提示只向“保持可见、排序偏旧”降级**：projection cache miss 或陈旧的 `lastPromptAt` 会回退到 `createdAt`，除非符合资格的小工件提供精确折叠，因此最近工作过的大 Session 可能在下一个 checkpoint 前排得偏低。大于 `coldBlankProbeMaxBytes` 的空白工件，或来自不提供 `locate()` 的后端的空白工件会保持可见。该阈值在 `readFrom()` 前检查，而非由 persistence 强制，因此工件并发增长可能增加一次探测的读取成本，但不会改变空白状态的安全方向。[有界空白验证决策](../../../.agents/notes/implemented/bug-fix/2026-08-13-bounded-cold-blank-verification.zh.md)规定了这个安全方向；权威且精确的最近时间索引仍属于[最后活动索引提案](../../../.agents/notes/proposed/architecture/2026-07-29-durable-last-activity-index.zh.md)的范围。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

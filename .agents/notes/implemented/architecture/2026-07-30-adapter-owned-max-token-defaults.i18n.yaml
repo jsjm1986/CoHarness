@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-adapter-owned-max-token-defaults.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-30-adapter-owned-max-token-defaults.md
-2026-07-30-adapter-owned-max-token-defaults.md: ec6a68b74d0cdaefcd214be98efb32377721169a
-2026-07-30-adapter-owned-max-token-defaults.zh.md: 700d90125c125184625afc33ebf64add4ab9191c
+/agent-note-adapter-owned-max-token-defaults:
+  en: bf9d5b4ba5d7009d
+  zh: 1a727fec99e0481f
+/agent-note-adapter-owned-max-token-defaults/problem:
+  en: c28ca122a3ef2d30
+  zh: ec5677529b94fda8
+/agent-note-adapter-owned-max-token-defaults/decision:
+  en: 65130edc8346e0bd
+  zh: a0c8795c7f697217
+/agent-note-adapter-owned-max-token-defaults/alternatives-considered:
+  en: 693484a3282a44da
+  zh: a8588d59f56c403a
+/agent-note-adapter-owned-max-token-defaults/consequences:
+  en: 1f4981d708e95e33
+  zh: 258f2c8c089a7f3a

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-26-job-settle-notice-suppression-in-snapshots.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-26-job-settle-notice-suppression-in-snapshots.md
-2026-09-26-job-settle-notice-suppression-in-snapshots.md: bf431576412dc5653fd07b5699861da88dd92f25
-2026-09-26-job-settle-notice-suppression-in-snapshots.zh.md: 1b033d3d1d8e2561813ef9d50f1931c36667e105
+/agent-note-suppress-racing-job-completion-notices-in-replay-fixtures:
+  en: 4478b35efa110013
+  zh: 2b6a1ef3cbe25b96
+/agent-note-suppress-racing-job-completion-notices-in-replay-fixtures/problem:
+  en: 0e1c553d3146af9a
+  zh: fecc8ddb2a559869
+/agent-note-suppress-racing-job-completion-notices-in-replay-fixtures/decision:
+  en: 369ff929b5cdbd99
+  zh: cc44be40fb7863ec
+/agent-note-suppress-racing-job-completion-notices-in-replay-fixtures/alternatives-considered:
+  en: 0548206688e3d6e2
+  zh: a76f22ae09724587
+/agent-note-suppress-racing-job-completion-notices-in-replay-fixtures/consequences:
+  en: 2e0df5909ab9a41c
+  zh: 8290b81772a1c534
+/agent-note-suppress-racing-job-completion-notices-in-replay-fixtures/related:
+  en: 93145f05b1a8f3d4
+  zh: c36adc08bf78447d

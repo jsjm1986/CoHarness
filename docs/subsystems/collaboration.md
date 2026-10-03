@@ -55,7 +55,9 @@ Each root-conversation authorization and readable-session filter queries the Gat
 
 The Gateway launches a runtime with one private credential delivered through an inherited file descriptor or a systemd credential file. The bearer token authenticates loopback internal API calls, while the public key verifies browser principals; neither value belongs in browser configuration.
 
-The Connection carrier wraps every accepted `/api` HTTP dispatch and event-stream WebSocket opening in the `connection/request` waterfall after its browser-trust check and before any RPC or stream handler runs. Authentication and request-context listeners inspect the immutable-at-entry headers and must call `next()` to preserve later listeners and dispatch.
+The Connection carrier wraps every accepted `/api` HTTP dispatch, generic RPC channel call, and event-stream WebSocket opening in the `connection/request` waterfall after its browser-trust check and before any RPC or stream handler runs. Authentication and request-context listeners inspect the immutable-at-entry headers and must call `next()` to preserve later listeners and dispatch.
+
+Ahead of the waterfall, admission runs `connection/authenticate(request)` — a synchronous bail whose first defined answer decides: `'allow'` admits without a browser credential, `'deny'` refuses even a minted cookie or live launch token, and `undefined` falls back to the launch-token exchange and cookie. The request carries `kind: 'index' | 'http' | 'upgrade'` plus headers and optional method/url facts, so providers distinguish index, `/api`, generic channels, and upgrade openings. The Host/Origin fence always precedes it, and registered `loopback` subtrees never consult it. A provider must prove identity itself — observing a header is never an admission; GatewayRuntime is the shipped provider, verifying the proxy's signed `x-dsh-gateway-principal` before any cookie exists. `connection/request` still owns principal re-verification and request-local propagation.
 
 ```ts type-equiv
 /** One accepted HTTP request or WebSocket opening entering the Connection carrier. */
@@ -234,7 +236,7 @@ Deleting a project stops its shared runtime while the Gateway retains that runti
 
 ## Execution participants
 
-Managed execution retains verified human input references across queued edits, answers, forks, and delegation. The Gateway checks every retained participant before privileged execution; a display participant or approval response does not grant authority. Input without verified attribution prevents privileged execution. See the [execution identity service](../../packages/context/execution-authority/README.md) for consumer ownership and the [Gateway provider](../../packages/context/gateway-execution/README.md) for invalidation and recovery.
+Managed execution retains verified input references for each current request and its inherited work. The Gateway checks all participants in that chain; unrelated historical participants remain audit facts. Display identity and ordinary approval grant no privilege. The [execution identity service](../../packages/context/execution-authority/README.md) owns consumer obligations, and the [Gateway provider](../../packages/context/gateway-execution/README.md) owns invalidation and restoration.
 
 ```ts type-equiv
 /** Host RPC identity of the pending human question claimed by the Gateway. */
@@ -250,6 +252,7 @@ type ExecutionCapability = 'execute' | 'plugin-management' | 'auto-review' | 'de
 /** Gateway-confirmed participant set, with bounded identity witnesses. */
 interface ExecutionState {
   readonly revision: string
+  readonly scopeId?: ExecutionScopeId
   readonly inputs: readonly ExecutionInputId[]
   readonly actors: readonly { readonly userId: number }[]
   readonly primaryActorUserId?: number
@@ -261,6 +264,7 @@ interface ExecutionState {
 /** A delegation captures its parent before awaiting child creation. */
 interface ExecutionInheritance {
   readonly parentSessionId: SessionId
+  readonly scopeId?: ExecutionScopeId
   readonly inputs: readonly ExecutionInputId[]
   readonly unverifiedHistory: boolean
   readonly primaryActorUserId?: number
@@ -325,9 +329,28 @@ abstract stamp(session: Session, message: UserMessage): Promise<UserMessage>
  * @param session - Session owning the live question.
  * @param questionId - exact pending question identity verified by the transport.
  * @param answer - parser-validated answer.
+ * @param scope - exact execution captured when the question opened.
  * @returns whether the caller owns this answer, including an identical retry.
  */
-abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown): Promise<boolean>
+abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unknown, scope?: ExecutionInheritance): Promise<boolean>
+
+/**
+ * Preserve captured execution identity across an asynchronous callback.
+ * @param agent - exact lifecycle owner of the operation.
+ * @param scope - participants captured when the work was admitted.
+ * @param work - callback that must not borrow a later request's identity.
+ * @returns the callback result.
+ */
+abstract runCaptured<T>(agent: Agent, scope: ExecutionInheritance, work: () => T): T
+
+/**
+ * Attest a live human command before it creates background execution.
+ * @param agent - target authorized by the calling transport.
+ * @param input - exact command or Remote invocation to attribute.
+ * @param work - operation executed under the verified initiator.
+ * @returns the operation result.
+ */
+abstract runRequest<T>(agent: Agent, input: unknown, work: () => T): Promise<Awaited<T>>
 
 /**
  * Capture the current participants before awaiting delegated work.
@@ -337,9 +360,9 @@ abstract answer(session: Session, questionId: ExecutionQuestionId, answer: unkno
 abstract capture(agent: Agent): ExecutionInheritance
 
 /**
- * Capture the complete authority of a cold or live source for an explicit fork.
+ * Capture the current execution of a cold or live source for an explicit fork.
  * @param sessionId - source already authorized by the fork transport.
- * @returns current participant references, independently of the selected history cut.
+ * @returns current execution references, independently of the selected history cut.
  */
 abstract captureSession(sessionId: SessionId): Promise<ExecutionInheritance>
 
@@ -365,9 +388,10 @@ abstract relay(session: Session, scope: ExecutionInheritance, messageId: Message
  * @param capability - required privilege; identity alone grants none.
  * @param agent - actual executing Agent.
  * @param signal - operation-owned cancellation.
+ * @param execution - exact tool call when authorization precedes other execution wrappers.
  * @returns verified participants for attribution; one call incurs one charge.
  */
-abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal): Promise<ExecutionState>
+abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: AbortSignal, execution?: ToolExecution): Promise<ExecutionState>
 
 /**
  * Authorize an explicit preset selection before its synchronous commit.
@@ -377,7 +401,7 @@ abstract authorize(capability: ExecutionCapability, agent: Agent, signal?: Abort
 abstract authorizeSelection(agent: Agent, preset: string): Promise<void>
 ```
 
-Types: [Agent](core.md) · [MessageId](llm-streaming.md) · [Session](session.md) · [SessionId](core.md) · [UserMessage](session.md)
+Types: [Agent](core.md) · [MessageId](llm-streaming.md) · [Session](session.md) · [SessionId](core.md) · [ToolExecution](tools.md) · [UserMessage](session.md)
 
 Source: [`packages/context/execution-authority/src/index.ts`](../../packages/context/execution-authority/src/index.ts)
 
@@ -488,6 +512,23 @@ Authorize a validated Remote request before Context or lookup resolution.
  * @mode serial
  */
 'typert-gateway/authorize'(payload: TypertGatewayAuthorizationRequest): Promise<void> | void
+```
+
+Source: [`packages/typert/protocol/src/types.ts`](../../packages/typert/protocol/src/types.ts)
+
+<a id="typert-gatewayinvoke--waterfall"></a>
+
+#### `typert-gateway/invoke` — waterfall
+
+Wrap the resolved method after authorization and all lookups have completed.
+
+```ts cordis-catalog
+/**
+ * Wrap the resolved method after authorization and all lookups have completed.
+ * @param payload - decoded invocation whose receiver and arguments are ready.
+ * @mode waterfall
+ */
+'typert-gateway/invoke'(payload: TypertGatewayAuthorizationRequest, next: () => Promise<unknown>): Promise<unknown>
 ```
 
 Source: [`packages/typert/protocol/src/types.ts`](../../packages/typert/protocol/src/types.ts)

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-06-explicit-tool-order.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-06-explicit-tool-order.md
-2026-07-06-explicit-tool-order.md: 517e144e2cc2b7e438bb254a0d6962fbad75504c
-2026-07-06-explicit-tool-order.zh.md: bbc29e154f1fe27abb6a793319e6ee6e0bbad065
+/agent-note-explicit-model-facing-tool-order:
+  en: 5f1c972e50fa4192
+  zh: 49b19e767742d440
+/agent-note-explicit-model-facing-tool-order/problem:
+  en: 101a81ecdcc5349e
+  zh: 8d1dcda31143e600
+/agent-note-explicit-model-facing-tool-order/decision:
+  en: ed157f60260cd2b2
+  zh: c48b1f5ffc0af91b
+/agent-note-explicit-model-facing-tool-order/alternatives-considered:
+  en: b3e6e96c71dfbb4a
+  zh: d68f4c6238dde4c8
+/agent-note-explicit-model-facing-tool-order/consequences:
+  en: 318cbf5d776732e9
+  zh: 24c67eb881e05d78
+/agent-note-explicit-model-facing-tool-order/testing:
+  en: 6b39b5e5cf0aa28f
+  zh: 267947a8f3374852

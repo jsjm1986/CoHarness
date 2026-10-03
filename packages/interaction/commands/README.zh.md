@@ -112,6 +112,7 @@ ctx.commands.register({
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -129,6 +130,7 @@ ctx.commands.register({
 
 注册表元数据、命令输入和直接输出绝不会进入模型请求，也不会影响其缓存。发生变更的领域负责之后产生的所有缓存影响。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

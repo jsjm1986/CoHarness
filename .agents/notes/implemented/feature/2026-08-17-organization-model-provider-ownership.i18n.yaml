@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-organization-model-provider-ownership.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-organization-model-provider-ownership.md
-2026-08-17-organization-model-provider-ownership.md: 85a6bad51b640971b05f0b3c5943ad518e30bc7d
-2026-08-17-organization-model-provider-ownership.zh.md: 3f7a6966036ec7399b1121484b87e51f5092e5e3
+/agent-note-organization-provider-ownership-and-project-model-assignment:
+  en: c2f4a9941726e059
+  zh: 1289bec890b36f4e
+/agent-note-organization-provider-ownership-and-project-model-assignment/problem:
+  en: f17824a13fd9113a
+  zh: b8294b6c630ebe94
+/agent-note-organization-provider-ownership-and-project-model-assignment/decision:
+  en: 611e9d53464f9c4f
+  zh: df307933afbc48dc
+/agent-note-organization-provider-ownership-and-project-model-assignment/alternatives-considered:
+  en: c91a9facb31e7ea0
+  zh: c249054d6316d948
+/agent-note-organization-provider-ownership-and-project-model-assignment/consequences:
+  en: f74ad1078ecfb9e6
+  zh: 761885f1b7f9100e

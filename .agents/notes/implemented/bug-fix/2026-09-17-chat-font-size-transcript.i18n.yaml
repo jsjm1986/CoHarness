@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-chat-font-size-transcript.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-chat-font-size-transcript.md
-2026-09-17-chat-font-size-transcript.md: 4b6512922e9de4e6d67210d70fd491cd1239d0bb
-2026-09-17-chat-font-size-transcript.zh.md: d8e9ffed8e1e70782c134ece758cf658dd586f8f
+/agent-note-chat-font-size-preference-reaches-transcript-text:
+  en: 3998c146bf092a2f
+  zh: d9582eaed3389443
+/agent-note-chat-font-size-preference-reaches-transcript-text/problem:
+  en: be2e8599a1b90665
+  zh: 86e73eeccc084581
+/agent-note-chat-font-size-preference-reaches-transcript-text/decision:
+  en: 9a9c2f508ed110ab
+  zh: 882af00f1755720e
+/agent-note-chat-font-size-preference-reaches-transcript-text/alternatives-considered:
+  en: 726b75bb44b6a085
+  zh: 2ea2cfeef9280e8e
+/agent-note-chat-font-size-preference-reaches-transcript-text/consequences:
+  en: bec617f48af76b90
+  zh: 98689ac483ed350b
+/agent-note-chat-font-size-preference-reaches-transcript-text/testing:
+  en: 9ed9dd1c8fcb09ce
+  zh: 34797db3ef3ae9bd

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-storage-sqlite
 
 [English](README.md) | 中文
@@ -8,12 +13,25 @@
 
 `dsh-storage-sqlite` 是一个存储后端：把每个已路由单元托管在同一个 SQLite 数据库文件中，每条记录按行存储一份 JSON 文档，注册为后端 `sqlite`。单条记录更新恰好触碰一行，这正是它适合高频定点写入的原因。当领域数据变动频繁、或部署偏好单一可查询数据库时选择它；当数据需要以纯文本文件形式可读时选择 JSON 后端。本后端只面向宿主侧：它不贡献提示词、工具或 schema，因此模型与 agent loop（智能体循环）永远不会看到它。
 
+## 目录
+
+- [存储模型](#storage-model)
+- [配置（schemastery）](#configuration-schemastery)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="storage-model"></a>
 ## 存储模型
 
 每行一个文档：每个单元表都会成为一个物理 STRICT 表 `"u_<unit>_<table>" (key TEXT PRIMARY KEY, value TEXT)`，其中 `value` 是记录的 JSON 文本，因此一个 key 只更新一行（高频变更领域路由到这里而非 JSON 后端的原因）。单元标识位于两个元数据表中：`units` 在单元首次打开时标记其格式版本，描述符不同时以 `version-mismatch` 拒绝；`unit_globals` 保存每个单元的全局单例行。物理布局版本位于 `PRAGMA user_version`；其他任何标记值都会被拒绝（未发布格式，不迁移）。单元名和表名在进入 DDL 之前依据中心的 `UNIT_NAME_RE` 进行验证，因此不会把外部输入插值到 SQL 标识符中。
 
 每个写入原语都是一条预处理语句：SQLite 的逐语句原子性无需显式事务即可满足 KV 约定，写入顺序仍由调用方负责（领域层写入链）。缺失目录和数据库文件会以仅所有者可访问的权限创建（`0o700`／`0o600`），与会话持久化 SQLite 后端一致。
 
+<a id="configuration-schemastery"></a>
 ## 配置（schemastery）
 
 ```ts
@@ -23,10 +41,13 @@ interface Config {
 }
 ```
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。所有记录位于后端打开的单一数据库文件中；没有影子状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 已存领域记录
@@ -43,9 +64,20 @@ interface Config {
 
 无：本后端从不触碰实时请求前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **`DatabaseSync` 是同步的**：每次写入都会在单条语句执行期间阻塞事件循环；在领域数据规模下可以接受。
 - **没有忙等待或重试策略**：另一个连接持有写事务时，该操作会立即被拒绝；没有多进程写入保护。
 - **只打开当前的 `STORAGE_SQLITE_SCHEMA_VERSION`**：其他任何已标记版本都会被拒绝而不是迁移（预发布立场）。
 - **`openDatabase` 重复了会话持久化 SQLite 的打开顺序**：提取到共享介质层的工作暂缓至计划的会话后端迁移（见 Agent Note 的复用审计）。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

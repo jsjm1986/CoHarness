@@ -12,6 +12,7 @@ import type { HostObservable, PropsHooks, PropsLocale, PropsRenderSlots, PropsRu
 // Type-only: pulls ui-layout's SlotMap merge (the 'sidebar' entry) into every
 // program that sees this contract, so PropsRuntime<'sidebar'> resolves.
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ConversationViewportSnapshot, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -27,6 +28,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * package's `sidebar` entry; the shell supplies a generic text fallback.
      */
     'sidebar.brand.name': { kind: 'single'; scope: 'root'; owner: SidebarBrandNameOwnerProps }
+    /**
+     * Global panel icons. Each list id addresses the matching `main` panel;
+     * the sidebar owns the button and resolves its label from list metadata.
+     */
+    'sidebar.panellist': { kind: 'list'; scope: 'root'; owner: SidebarPanelIconOwnerProps }
     /**
      * The workspace/session browsing region: section header, search, the
      * grouped/flat session list, and every workspace dialog. Declared by this
@@ -64,6 +70,24 @@ export interface SidebarBrandMarkOwnerProps {
 export interface SidebarBrandNameOwnerProps {
   /** Marker field: the occupant owns its own content and width. */
   children?: never
+}
+
+/** Icon presentation supplied by the global panel row. */
+export interface SidebarPanelIconOwnerProps {
+  /** Requested square edge in pixels. */
+  size: number
+  /** Whether this panel is selected in the main column. */
+  active: boolean
+}
+
+/** Serializable metadata for one active global panel list registration. */
+export interface SidebarPanelMetadata {
+  /** List id and matching main panel key. */
+  id: MainPanelId
+  /** Ascending row order; ties retain registration order. */
+  order: number
+  /** Row title and accessible name: resolved label, or the id when omitted. */
+  label: string
 }
 
 /**
@@ -104,7 +128,11 @@ export interface SidebarFooterActionOwnerProps {
  * the New Session button and toggling the column.
  */
 export type SidebarRootInjected = {
-  hooks: { viewport: HostObservable<ConversationViewportSnapshot> }
+  hooks: {
+    viewport: HostObservable<ConversationViewportSnapshot>
+    /** Active global-panel registrations for the icon column. */
+    panels: HostObservable<readonly SidebarPanelMetadata[]>
+  }
   exitWorkbench?: () => void
   /**
    * Start a New Session: with a workspace, reuse-or-create its blank session
@@ -114,6 +142,8 @@ export type SidebarRootInjected = {
   startSession: (workspaceId?: WorkspaceId) => void
   /** Toggle the sidebar column through the layout service. */
   toggleSidebar: () => void
+  /** Select the global panel addressed by a sidebar row. */
+  selectPanel: (id: MainPanelId) => void
 }
 
 /**
@@ -126,6 +156,7 @@ export type SidebarRootComponentProps =
   & PropsRenderSlots<
     | 'sidebar.brand.mark'
     | 'sidebar.brand.name'
+    | 'sidebar.panellist'
     | 'sidebar.workspaces'
     | 'sidebar.settings'
     | 'sidebar.settings.action'

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-25-managed-desktop-launch-composition.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-25-managed-desktop-launch-composition.md
-2026-09-25-managed-desktop-launch-composition.md: 94c0469943136bc943270cf24c0f5dbf67634252
-2026-09-25-managed-desktop-launch-composition.zh.md: e506bf826255ca0b5c47677a8355bc33530fd69b
+/agent-note-compose-the-managed-desktop-driver-from-node-configuration:
+  en: 5c11c87c9409c51d
+  zh: 87f3f73c96006a32
+/agent-note-compose-the-managed-desktop-driver-from-node-configuration/problem:
+  en: faaa6d5e51d4f166
+  zh: e0e5b8d3cb8d0190
+/agent-note-compose-the-managed-desktop-driver-from-node-configuration/decision:
+  en: f45593cb76dc87ab
+  zh: 308b6b3db2a55c5f
+/agent-note-compose-the-managed-desktop-driver-from-node-configuration/alternatives-considered:
+  en: 9bc6bd81fa955fac
+  zh: bbf0ec0eae87e9a5
+/agent-note-compose-the-managed-desktop-driver-from-node-configuration/related-decisions:
+  en: 5f07a6bdc12177c8
+  zh: 3ad23ff924974b40
+/agent-note-compose-the-managed-desktop-driver-from-node-configuration/consequences:
+  en: dbd692c9e73d6ad3
+  zh: c79382596b0e3fc6

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-30-index-projection-restore-tail.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-30-index-projection-restore-tail.md
-2026-08-30-index-projection-restore-tail.md: 201a9fa773e529cf198457052eca7dc245e12be8
-2026-08-30-index-projection-restore-tail.zh.md: f2bbc7a9b36e136f5808d99d5dc706708b186f66
+/agent-note-index-projection-restore-tails-without-copying:
+  en: 819314abdb0a6fe3
+  zh: 9c1e284368155492
+/agent-note-index-projection-restore-tails-without-copying/problem:
+  en: 19a39b7e532d67d5
+  zh: d546f0557c535f04
+/agent-note-index-projection-restore-tails-without-copying/decision:
+  en: e172a46bfc28418e
+  zh: 383062f7a30c4a52
+/agent-note-index-projection-restore-tails-without-copying/alternatives-considered:
+  en: d0a2b27f2d809ad0
+  zh: dd599595fb86aa67
+/agent-note-index-projection-restore-tails-without-copying/consequences:
+  en: 91c22bb268c9c991
+  zh: 3a28ce08d1a6289f
+/agent-note-index-projection-restore-tails-without-copying/testing:
+  en: 36013115afa487f0
+  zh: f6a3832315e633a9

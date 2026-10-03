@@ -9,10 +9,13 @@
   ],
   "references": [
     {
-      "path": "../../core/tools"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../fs"
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../core/tools"
     },
     {
       "path": "../../sandbox/sandbox"
@@ -21,10 +24,10 @@
       "path": "../../sandbox/sandbox-policy"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../util/output-retention"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../fs"
     }
   ]
 }

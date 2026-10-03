@@ -5,7 +5,7 @@
 import {
   ToolCallId,
   createAssistantMessage,
-  createMessage,
+  createSystemMessage,
   createToolResultMessage,
   createUserMessage,
 } from '@deepseek-ai/dsh-llm'
@@ -69,11 +69,7 @@ function appendRequestHeader(session: Session, turn: number, step: number): void
   session.append('system/message', {
     turn,
     step,
-    message: createMessage({
-      role: 'system',
-      content: [{ type: 'text', text: `Synthetic chat-scroll request for turn ${String(turn)}, step ${String(step)}.` }],
-      source: { kind: 'plugin', plugin: 'test-fixture' },
-    }),
+    message: createSystemMessage(`Synthetic chat-scroll request for turn ${String(turn)}, step ${String(step)}.`),
   }, { surfaceOp: 'append' })
   session.append('request/header', {
     header: {

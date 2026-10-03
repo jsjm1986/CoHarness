@@ -5,12 +5,16 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { SettingsProvider, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import { agentCarrier } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionEventMap } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
-import * as toolSchedule from '@deepseek-ai/dsh-schedule'
+import ScheduleService from '@deepseek-ai/dsh-schedule'
+import Storage from '@deepseek-ai/dsh-storage'
+import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
+import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import * as SubagentFork from '@deepseek-ai/dsh-subagent-fork-in-process'
 import type { ContentBlock, GenerateOptions, MessageId, StreamChunk } from '@deepseek-ai/dsh-llm'
@@ -81,6 +85,25 @@ afterEach(async () => {
   if (errors.length > 1) throw new AggregateError(errors, 'temp-root cleanup failed')
 })
 
+/** Mount the real Schedule service for root-only tool-registration assertions. */
+async function mountScheduleForOwnership(ctx: Context): Promise<void> {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-subagent-schedule-'))
+  const fibers: Array<{ dispose(): Promise<void> }> = []
+  cleanups.unshift(async () => {
+    for (const fiber of fibers.toReversed()) await fiber.dispose()
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  })
+  fibers.push(await ctx.plugin(Storage))
+  fibers.push(await ctx.plugin(StorageJson, { root }))
+  fibers.push(await ctx.plugin(StorageDomain, { backend: 'json' }))
+  // This ownership test creates no reminders and invokes no Remote methods.
+  // Unexpected delivery must fail instead of activating an unrelated Session.
+  ctx.provide('sessionController', {
+    resolveAgent: async () => { throw new Error('ownership test must not dispatch reminders') },
+  } as never)
+  fibers.push(await ctx.plugin(ScheduleService))
+}
+
 /** Boot the full continuable stack: loop, persistence, providers, and subagents. */
 async function setupWith(
   adapter: LlmAdapter,
@@ -103,7 +126,7 @@ async function setupWith(
     })
   }
   await ctx.plugin(AgentLoop, { agents: [] })
-  if (options.schedule) await ctx.plugin(toolSchedule)
+  if (options.schedule) await mountScheduleForOwnership(ctx)
   await ctx.plugin(SubagentRuntime, options.subagent ?? {})
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(SubagentFork, { providerName: 'fork' })
@@ -148,7 +171,7 @@ function hasAssistantText(events: readonly SessionEvent[], text: string): boolea
 
 /** Caller-supplied user message texts in log order (runtime-context snapshots excluded). */
 function userTexts(events: readonly SessionEvent[]): string[] {
-  return events.flatMap(event => event.type === 'user/message' && event.data.source.kind !== 'plugin'
+  return events.flatMap(event => event.type === 'user/message' && event.data.source.kind !== 'runtime-context'
     ? event.data.content.flatMap(block => block.type === 'text'
       && !block.text.startsWith('Your parent agent id is ')
       ? [block.text]
@@ -507,6 +530,35 @@ describe('continuable activation capacity', () => {
 })
 
 describe('SubagentRuntime.startContinuable', () => {
+  it('keeps idle removal blocked through pending materialization and a resident child', async () => {
+    const release = Promise.withResolvers<undefined>()
+    const { ctx, parent } = await setupWith(new GatedAdapter([{ chunks: textResponse('complete'), gate: release.promise }]))
+    parkParent(ctx, parent)
+    const manager = continuationManager(ctx), registry = continuationActivations(ctx)
+    const agents = registry.ownerCtx.agents, create = agents.create.bind(agents)
+    const entered = Promise.withResolvers<undefined>(), publish = Promise.withResolvers<undefined>()
+    const spy = vi.spyOn(agents, 'create').mockImplementationOnce(async (options) => {
+      entered.resolve(undefined)
+      await publish.promise
+      return create(options)
+    })
+    try {
+      const starting = manager.startContinuable(startSpec(parent))
+      await entered.promise
+      expect(ctx.bail(agentCarrier(parent), 'agent/idle-release-check', { agent: parent })).toBe('busy')
+      const unrelated = await ctx.agentLoop.create(SessionId('unrelated-purge'), { provider: 'mock', model: 'mock' })
+      expect(ctx.bail(agentCarrier(unrelated), 'agent/idle-release-check', { agent: unrelated })).toBeUndefined()
+      publish.resolve(undefined)
+      const child = await starting
+      expect(ctx.bail(agentCarrier(parent), 'agent/idle-release-check', { agent: parent })).toBe('busy')
+      release.resolve(undefined)
+      await waitNoActivation(ctx, child.childId)
+      expect(ctx.bail(agentCarrier(parent), 'agent/idle-release-check', { agent: parent })).toBeUndefined()
+      using _removal = ctx.agents.reserveRemoval([parent.id])
+      await expect(manager.startContinuable(startSpec(parent))).rejects.toMatchObject({ code: 'DRAINING' })
+    } finally { publish.resolve(undefined); release.resolve(undefined); spy.mockRestore() }
+  })
+
   it('returns both identities at inbox acceptance, without waiting for the turn or the log', async () => {
     const { ctx, parent, adapter } = await setup([textResponse('first answer')])
     const enqueued: { id: MessageId; loggedYet: boolean }[] = []
@@ -2485,7 +2537,7 @@ describe('continuable review regressions', () => {
   })
 
   it.each([
-    { label: 'plugin', source: { kind: 'plugin' as const, plugin: 'tool-jobs' } },
+    { label: 'plugin', source: { kind: 'tool-jobs' as const } },
     { label: 'non-plugin', source: { kind: 'team-message', teamId: 't-1' } as never },
   ])('keeps an idle child resident while its Inbox holds $label injected context', async ({ source }) => {
     const release = Promise.withResolvers<undefined>()
@@ -2519,7 +2571,7 @@ describe('continuable review regressions', () => {
     // a driver, so residency must survive until that turn claims the message.
     const steered = createUserMessage({
       content: message('Cordis Host handler failed'),
-      source: { kind: 'plugin', plugin: 'cordis-host-runner' },
+      source: { kind: 'cordis-host-runner' },
     })
     child.steer(steered)
     ctx.subagents.interrupt(started.childId, { kind: 'user', parentSessionId: parent.id })

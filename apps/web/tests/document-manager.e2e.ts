@@ -104,7 +104,7 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-desktop'))
     await mockDocuments(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Documents', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })
@@ -121,7 +121,7 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-desktop-paged'))
     await mockDocuments(page, PAGED_PAYLOAD)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Documents', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })
@@ -138,13 +138,13 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-scope'))
     await mockDocuments(page)
-    await page.route('**/account/api/context', async (route) => {
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         scope: { kind: 'personal' },
         projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
       } })
     })
-    await page.route('**/api/documents/transfer/list', async (route) => {
+    await page.route(/\/api\/documents\/transfer\/list(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         version: 1,
         scope: { kind: 'project', label: 'Compiler' },
@@ -153,7 +153,7 @@ describe('web e2e: document manager', () => {
     })
     let popupOpened = false
     page.on('popup', () => { popupOpened = true })
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Documents', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })
@@ -173,13 +173,13 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-target-upload'))
     await mockDocuments(page)
-    await page.route('**/account/api/context', async (route) => {
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         scope: { kind: 'personal' },
         projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
       } })
     })
-    await page.route('**/api/documents/transfer/list', async (route) => {
+    await page.route(/\/api\/documents\/transfer\/list(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         version: 1,
         scope: { kind: 'project', label: 'Compiler' },
@@ -208,7 +208,7 @@ describe('web e2e: document manager', () => {
         fingerprint: 'fixture', chunkBytes: 8 * 1024 * 1024, receivedBytes: 0, expiresAt: Date.now() + 60_000, state: 'uploading',
       } })
     })
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Documents', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })
@@ -232,7 +232,7 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-compact'))
     await mockDocuments(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Open sidebar' }).click()
     await page.getByRole('button', { name: 'Documents', exact: true }).click()
@@ -327,7 +327,7 @@ describe('web e2e: document manager', () => {
     })
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-narrow'))
     await mockDocuments(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Open sidebar' }).click()
     await page.getByRole('button', { name: 'Documents', exact: true }).click()
@@ -406,7 +406,7 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-scope-compact'))
     await mockDocuments(page)
-    await page.route('**/account/api/context', async (route) => {
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         scope: { kind: 'personal' },
         projects: [
@@ -415,14 +415,14 @@ describe('web e2e: document manager', () => {
         ],
       } })
     })
-    await page.route('**/api/documents/transfer/list', async (route) => {
+    await page.route(/\/api\/documents\/transfer\/list(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         version: 1,
         scope: { kind: 'project', label: 'Compiler' },
         documents: [{ docId: 'shared.txt', name: 'shared.txt', bytes: 7, mediaType: 'text/plain', modifiedAt: 1 }],
       } })
     })
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Open sidebar' }).click()
     await page.getByRole('button', { name: 'Documents', exact: true }).click()
@@ -464,7 +464,7 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-overview-compact'))
     await mockDocuments(page)
-    await page.route('**/account/api/context', async (route) => {
+    await page.route(/\/account\/api\/context(?:\?.*)?$/, async (route) => {
       await route.fulfill({ json: {
         scope: { kind: 'personal' },
         projects: [{ projectId: 41, name: 'Compiler', mode: 'rw' }],
@@ -485,7 +485,7 @@ describe('web e2e: document manager', () => {
         }],
       } })
     })
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Open sidebar' }).click()
     await page.getByRole('button', { name: 'Documents', exact: true }).click()
@@ -514,7 +514,7 @@ describe('web e2e: document manager', () => {
     tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-document-manager-boundary'))
     await mockDocuments(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Documents', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Document Manager' })

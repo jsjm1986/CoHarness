@@ -11,8 +11,8 @@ const SESSION = SessionId('delivery-owner')
 describe('PresentedOpenController', () => {
   it('checks capability for every gesture, keeps actions distinct, and redacts provider errors', async () => {
     let available = false
-    const open = vi.fn<(path: string, action: 'open' | 'reveal', signal: AbortSignal) => Promise<void>>().mockResolvedValue()
-    const controller = new PresentedOpenController(() => ({ available, name: '', fileManager: 'directory' }), open)
+    const open = vi.fn<(path: string, action: 'open' | 'reveal', application: string | undefined, signal: AbortSignal) => Promise<void>>().mockResolvedValue()
+    const controller = new PresentedOpenController(() => ({ available, name: '', fileManager: 'directory' }), open, async () => [])
     await controller.loadHost()
     expect(controller.host.getSnapshot()).toMatchObject({ available: false })
     await controller.open(SESSION, 1, 0, 'open', 'report.txt')
@@ -20,7 +20,7 @@ describe('PresentedOpenController', () => {
     expect(controller.state.getSnapshot()[presentedFileUrl(SESSION, 1, 0)]).toBe('nativeUnavailable')
     available = true
     await controller.open(SESSION, 1, 0, 'reveal', 'report.txt')
-    expect(open).toHaveBeenCalledWith('report.txt', 'reveal', expect.any(AbortSignal))
+    expect(open).toHaveBeenCalledWith('report.txt', 'reveal', undefined, expect.any(AbortSignal))
     expect(controller.state.getSnapshot()[presentedFileUrl(SESSION, 1, 0)]).toBe('revealed')
     open.mockRejectedValueOnce(new Error('/private/provider-secret'))
     await controller.openChanged(SESSION, 2, 0, 'report.txt')
@@ -38,7 +38,7 @@ describe('PresentedOpenController', () => {
 
   it('reports a failed directory open and ignores host reads after disposal', async () => {
     const open = vi.fn().mockRejectedValue(new Error('desktop unavailable'))
-    const controller = new PresentedOpenController(() => ({ available: true, name: '', fileManager: 'directory' }), open)
+    const controller = new PresentedOpenController(() => ({ available: true, name: '', fileManager: 'directory' }), open, async () => [])
     await controller.open(SESSION, 1, 0, 'reveal', 'report.txt')
     expect(controller.state.getSnapshot()[presentedFileUrl(SESSION, 1, 0)]).toBe('revealError')
     await controller.open(SESSION, 1, 0)
@@ -51,13 +51,13 @@ describe('PresentedOpenController', () => {
 
   it('deduplicates an in-flight gesture and waits for disposal without publishing its late result', async () => {
     let settle!: () => void
-    const open = vi.fn<(path: string, action: 'open' | 'reveal', signal: AbortSignal) => Promise<void>>()
+    const open = vi.fn<(path: string, action: 'open' | 'reveal', application: string | undefined, signal: AbortSignal) => Promise<void>>()
       .mockImplementation(() => new Promise<void>((resolve) => { settle = resolve }))
-    const controller = new PresentedOpenController(() => ({ available: true, name: '', fileManager: 'directory' }), open)
+    const controller = new PresentedOpenController(() => ({ available: true, name: '', fileManager: 'directory' }), open, async () => [])
     const request = controller.open(SESSION, 1, 0, 'open', 'report.txt')
     await controller.open(SESSION, 1, 0, 'open', 'report.txt')
     expect(open).toHaveBeenCalledOnce()
-    const signal = open.mock.calls[0]![2]
+    const signal = open.mock.calls[0]![3]
     let disposed = false
     const disposal = controller.dispose().then(() => { disposed = true })
     expect(signal.aborted).toBe(true)
@@ -72,14 +72,14 @@ describe('PresentedOpenController', () => {
 
   it('invalidates desktop capability and old responses on connection replacement', async () => {
     let settle!: () => void
-    const open = vi.fn<(path: string, action: 'open' | 'reveal', signal: AbortSignal) => Promise<void>>()
+    const open = vi.fn<(path: string, action: 'open' | 'reveal', application: string | undefined, signal: AbortSignal) => Promise<void>>()
       .mockImplementationOnce(() => new Promise<void>((resolve) => { settle = resolve }))
       .mockResolvedValue()
-    const controller = new PresentedOpenController(() => ({ available: true, name: '', fileManager: 'directory' }), open)
+    const controller = new PresentedOpenController(() => ({ available: true, name: '', fileManager: 'directory' }), open, async () => [])
     await controller.loadHost()
     const stale = controller.open(SESSION, 1, 0, 'reveal', 'report.txt')
     controller.resetHost()
-    expect(open.mock.calls[0]![2].aborted).toBe(true)
+    expect(open.mock.calls[0]![3].aborted).toBe(true)
     expect(controller.host.getSnapshot()).toBeNull()
     await controller.open(SESSION, 1, 0, 'open', 'report.txt')
     settle()

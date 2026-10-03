@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { LlmRuntime, LlmAdapter, createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import {
+  LlmRuntime, LlmAdapter, createMessage, createToolResultMessage, createUserMessage, ToolCallId,
+} from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmImageRequestPricing, Message, StreamChunk, TokenUsage, UserMessage } from '@deepseek-ai/dsh-llm'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -191,29 +193,24 @@ describe('route-aware image pricing', () => {
     expect(() => meter.measure(session)).toThrow('route image pricing returned an invalid visual token count')
   })
 
-  it('prices nested tool-result images through the same route pricing', async () => {
+  it('prices tool-result images through the same route pricing', async () => {
     const { meter, session } = await harness(() => fixedPricing)
-    const nested = createUserMessage({
-      content: [{
-        type: 'tool-result',
-        toolCallId: 'call-1' as never,
-        content: [
-          { type: 'text', text: 'screenshot below' },
-          { type: 'image', attachment: imageRef('nested') },
-        ],
-      }],
-      source: { kind: 'user' },
+    const result = createToolResultMessage({
+      callId: ToolCallId('call-1'),
+      content: [
+        { type: 'text', text: 'screenshot below' },
+        { type: 'image', attachment: imageRef('nested') },
+      ],
+      isError: false,
     })
-    session.append('user/message', nested, { surfaceOp: 'append' })
+    session.append('tool/result', { turn: 1, step: 1, message: result }, { surfaceOp: 'append' })
     session.append('request/header', { header: header('vision'), reason: 'initial' })
     const measurement = meter.measure(session)
-    const imageFree = estimateMessage({
-      ...nested,
-      content: [{
-        ...nested.content[0] as Extract<Message['content'][number], { type: 'tool-result' }>,
-        content: [{ type: 'text', text: 'screenshot below' }],
-      }],
-    })
+    const imageFree = estimateMessage(createToolResultMessage({
+      callId: ToolCallId('call-1'),
+      content: [{ type: 'text', text: 'screenshot below' }],
+      isError: false,
+    }))
     expect(measurement.nodes[0]!.tokens)
       .toBe(imageFree + VISUAL_TOKENS + estimateContent([{ type: 'text', text: HANDLE_TEXT }]))
   })
@@ -274,31 +271,31 @@ describe('request-time file pricing', () => {
     expect(first.surfaceTokens).toBeLessThan(moved.surfaceTokens)
   })
 
-  it('prices every file and image occurrence inside mixed nested tool results', async () => {
+  it('prices every file and image occurrence inside a tool result', async () => {
     const { llm, meter, session } = await harness(() => fixedPricing)
-    const message = createUserMessage({
+    const message = createToolResultMessage({
+      callId: ToolCallId('nested-files'),
       content: [
         { type: 'file', attachment: file },
         { type: 'image', attachment: imageRef('outer') },
-        { type: 'tool-result', toolCallId: 'nested-files' as never, content: [
-          { type: 'text', text: 'attachments' },
-          { type: 'file', attachment: file },
-          { type: 'image', attachment: imageRef('inner') },
-        ] },
-      ], source: { kind: 'user' },
+        { type: 'text', text: 'attachments' },
+        { type: 'file', attachment: file },
+        { type: 'image', attachment: imageRef('inner') },
+      ],
+      isError: false,
     })
-    const projected = createUserMessage({
+    const projected = createToolResultMessage({
+      callId: ToolCallId('nested-files'),
       content: [
         { type: 'text', text: llm.fileRequestText(file) },
         { type: 'text', text: HANDLE_TEXT },
-        { type: 'tool-result', toolCallId: 'nested-files' as never, content: [
-          { type: 'text', text: 'attachments' },
-          { type: 'text', text: llm.fileRequestText(file) },
-          { type: 'text', text: HANDLE_TEXT },
-        ] },
-      ], source: { kind: 'user' },
+        { type: 'text', text: 'attachments' },
+        { type: 'text', text: llm.fileRequestText(file) },
+        { type: 'text', text: HANDLE_TEXT },
+      ],
+      isError: false,
     })
-    session.append('user/message', message, { surfaceOp: 'append' })
+    session.append('tool/result', { turn: 1, step: 1, message }, { surfaceOp: 'append' })
     session.append('request/header', { header: header('vision'), reason: 'initial' })
     expect(meter.measure(session).nodes[0]).toMatchObject({
       tokens: estimateMessage(projected) + 2 * VISUAL_TOKENS, heuristicTokens: estimateMessage(message),

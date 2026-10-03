@@ -1,3 +1,8 @@
+---
+description: "Workspace document manager UI: browse, preview, upload, and delete uploaded documents"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-documents
 
 Workspace document manager for the CoHarness Web UI. Organize, preview, upload, move, download, delete, and add stored documents to the conversation input box.
@@ -6,15 +11,31 @@ English | [中文](README.zh.md)
 
 Opening the document picker captures its destination Session. Switching panes while the dialog is open does not change which composer receives a selected document.
 
+Private image, PDF and download URLs carry the Connection’s confirmed account and runtime, including native iframe and anchor requests. The picker captures its destination runtime separately from its browsing scope: an attachment from another runtime is copied through the authorized transfer service before the new reference reaches the composer. Resumable upload chunks carry the same account and runtime conditions as their metadata requests.
+
 ## Summary
 
 Use `dsh-client-ui-documents` as the workspace document manager in the Web UI: organize folders, preview, upload, move, download, delete, and insert stored documents into the conversation input. The picker captures its destination Session when opened, so switching panes mid-dialog never sends a document to the wrong composer.
 
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+- [Scope isolation](#scope-isolation)
+- [License](#license)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="installation"></a>
 ## Installation
 
 This package is part of the `@deepseek-ai/dsh-client-ui-documents` bundle and is loaded automatically by the web-app profile.
 
+<a id="usage"></a>
 ## Usage
 
 The plugin adds a **Documents** button to the sidebar footer (alongside the workspace scope selector). The rail shows an icon with a tooltip; the expanded sidebar shows the Documents label beside the icon. Clicking it opens a manager dialog for the current scope (personal or project workspace).
@@ -41,6 +62,7 @@ Documents are filtered by name and type (image, PDF, text, other), sorted by dat
 
 Uploads use one resumable session protocol on desktop and mobile. Small files use one chunk; larger files use 8 MiB chunks with per-chunk and final SHA-256 verification. A network interruption does not discard completed chunks: selecting the same file again resumes the session while it is retained by the runtime. The browser stores only opaque session metadata, never document bytes.
 
+<a id="scope-isolation"></a>
 ## Scope isolation
 
 Documents are stored per-runtime scope:
@@ -50,10 +72,12 @@ Documents are stored per-runtime scope:
 
 Folders are real directories that the model can inspect through its ordinary filesystem tools. The backend API (`/api/documents`) is provided by `@deepseek-ai/dsh-host-userdoc-http` and `@deepseek-ai/dsh-userdoc-local`; the local backend documents legacy `uploads` migration in its [README](../../attachment/userdoc-local/README.md).
 
+<a id="license"></a>
 ## License
 
 MIT
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Document manager
@@ -81,3 +105,13 @@ The manager reads and writes the same durable `/api/documents` store that conver
 - Folder deletion is empty-only; the UI does not recursively delete a folder tree.
 
 **Runtime invariant:** No companion is published. Document UI state is owned by the client session and has no independent event or mutable-data relation for this package to assert.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

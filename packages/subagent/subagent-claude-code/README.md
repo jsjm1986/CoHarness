@@ -1,3 +1,8 @@
+---
+description: "One-shot Claude Code subagent provider over the official Agent SDK"
+kind: "package-bundle"
+---
+
 # @deepseek-ai/dsh-subagent-claude-code
 
 English | [中文](README.zh.md)
@@ -8,6 +13,22 @@ This package registers a Profile-named Claude Code subagent provider whose defau
 
 Install this Profile Bundle when a delegated task should run as a fresh, unattended Claude Code session in the parent workspace. Each run accepts one self-contained text task and returns the final answer or a safe failure diagnostic; reasoning, tool traffic, stderr, usage, and workspace diffs stay out of the parent Session. Native Claude settings and authentication remain authoritative, while Profile configuration selects the model, environment, and `permissionMode`. The platform-pinned runtime starts on demand and never falls back to the host `claude` executable. Choose it when isolation and genuine Claude Code behavior matter more than continuation or prompts.
 
+## Table of Contents
+
+- [Start and ownership](#start-and-ownership)
+- [Native settings and interaction](#native-settings-and-interaction)
+- [Capabilities and context](#capabilities-and-context)
+- [Configuration](#configuration)
+- [Persistent members](#persistent-members)
+- [Product compatibility and evidence](#product-compatibility-and-evidence)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="start-and-ownership"></a>
 ## Start and ownership
 
 `start(request)` accepts only a non-empty sequence of text blocks and derives the child cwd from the parent Session. It creates one private `AbortController`, calls the official SDK `query()`, and publishes the run only after the SDK's `spawnClaudeCodeProcess` hook has supplied a live CLI handle owned by [`dsh-subprocess`](../../subprocess/subprocess/README.md). A failure or cancellation before publication closes the query, terminates any acquired process tree, waits for it to exit, and rejects `start()`.
@@ -16,16 +37,19 @@ The SDK receives the exact concatenated text task. The provider iterates the com
 
 Local cancellation wins the result race and maps to `aborted` without a failure diagnostic. `dispose()` is idempotent: it aborts the run, asks the SDK query to close, invokes the shared process-tree termination escalation, and waits for whole-tree exit. SDK graceful close expresses protocol intent; the subprocess handle remains the authority for process quiescence. Startup and teardown rejections expose the same fixed safe stage and process facts through their Error message, while the original product or Host error remains on the internal cause chain and in the Provider's Host log. Result failure and independent teardown failure remain separate.
 
+<a id="native-settings-and-interaction"></a>
 ## Native settings and interaction
 
 The provider deliberately omits the SDK `settingSources` option. The official SDK therefore reads the host's normal user, project, and local Claude settings relative to the parent Session cwd, including native account state and product configuration. The provider neither copies nor filters those files and does not create or modify login state. The Profile-selected `permissionMode` is the one query-level override: Claude Code still owns its settings and sandbox, while the selected native mode decides how this unattended query handles permission checks.
 
 Each query sets `persistSession: false` and disables `AskUserQuestion`. Except in bypass mode, `canUseTool` immediately denies requests that still require human approval. Plan mode also places `ExitPlanMode` in the SDK's `disallowedTools`, so native settings cannot pre-approve a transition back to execution and the model must return the completed plan as its final answer. MCP elicitation is declined, the known refusal fallback dialog is cancelled, and undeclared dialog kinds use the SDK's no-dialog failure behavior. These decisions never wait for a user interface. When both facts contribute to a failed run, `SubagentResult.diagnostic` contains the structured failure line first and the latest safe permission decision second; the shared result boundary limits the complete text to 4096 UTF-8 bytes. Successful and locally cancelled runs expose neither captured fact.
 
+<a id="capabilities-and-context"></a>
 ## Capabilities and context
 
 The provider advertises no optional start-time capabilities and reports `inheritsParentContext: false`. Claude Code receives the standalone text task and the parent Session cwd, but not the parent conversation, persona, tool filter, depth policy, or structured-output contract. Every run has an independent SDK query, cancellation controller, CLI process, and non-persisted product session.
 
+<a id="configuration"></a>
 ## Configuration
 
 | Key | Default | Meaning |
@@ -35,15 +59,21 @@ The provider advertises no optional start-time capabilities and reports `inherit
 | `permissionMode` | `dontAsk` | Native non-interactive permission policy fixed for every run from this Provider instance. |
 | `disposeGraceMs` | `3000` | Positive finite grace in milliseconds, no greater than [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.md), between the shared process-tree owner's termination tiers; disposal then waits for whole-tree exit. |
 | `stateDir` | `~/.dsh/external-members` | Directory holding instance-specific binding stores; `claude-code.jsonl` belongs to the default instance. Used only by persistent members. |
-| `memberCwd` | harness launch directory | Workspace for member Claude sessions. Used only by persistent members. |
+| `memberCwd` | member Session cwd | Workspace override for persistent members, validated on their execution target. |
+| `remoteCommand` | `claude` | Preinstalled program resolved inside an SSH target; local execution keeps the bundled program. |
 
+<a id="persistent-members"></a>
 ## Persistent members
+
+SSH uses the target’s preinstalled `remoteCommand`. Its child receives only explicitly configured environment values, without Host HOME, PATH or SDK process environment; the target program reads its own user and project settings.
+
+Each call resolves its workspace and subprocess provider through the actual member Session. An SSH Session requires filesystem and subprocess providers in the same standing realm; missing providers refuse execution without Host fallback. Before first launch, the binding store pins the canonical cwd and execution target and rejects changes after restart. Corrupt or unreadable records cannot become new members. Legacy bindings without target evidence remain intact and require a new member before execution.
 
 The default `claude-code` instance keeps its existing model route and `claude-code.jsonl` store. Other names receive separate deterministic routes and files derived from the full provider name. Names remain distinct on case-insensitive filesystems; removing one instance releases only its route. Renaming an instance changes its persistent identity and does not adopt another instance's bindings.
 
 When the `llm` service is mounted this provider also advertises `prepareContinuable`, so `ctx.subagents.startContinuable` accepts it — the Team roster's provider-selection channel included. A member child is an ordinary in-process Agent owned by the continuation manager (durable identity, inbox, persistence, restart); this package contributes only the model route: every member model call runs one Claude Agent SDK `query` with `persistSession` on the member's durable Claude session (`resume` when bound), then releases the SDK process.
 
-The binding store records the harness child session ↔ Claude session mapping and the last issued prompt; a crash mid-turn leaves the prompt provable from the durable transcript under `~/.claude/projects/` on the next call: a settled answer replays without resending, a provably absent prompt resends once, and an unprovable one is dropped rather than duplicated. Without the `llm` service the provider stays one-shot only — no `prepareContinuable`, so continuable starts reject `UNSUPPORTED_CAPABILITY`.
+The binding store records the child ↔ Claude session mapping, pending prompt, and consumed cursor. Successful SDK result messages complete live turns. After interruption, transcript text cannot prove an exact request completed or was never delivered: the pending request reports `EXTERNAL_TURN_OUTCOME_UNKNOWN` without querying again. The durable member remains available for a new explicit prompt. Without `llm`, continuable starts reject `UNSUPPORTED_CAPABILITY`.
 
 | `permissionMode` value | Native behavior |
 |---|---|
@@ -110,6 +140,7 @@ The standalone composition below shows the complete explicit capability. A Profi
     maxDepth: provider-managed
 ```
 
+<a id="product-compatibility-and-evidence"></a>
 ## Product compatibility and evidence
 
 The runtime dependency is pinned to `@anthropic-ai/claude-agent-sdk@0.3.263`, whose eight platform packages carry Claude Code 2.1.263. A normal install selects one payload for the current OS, CPU, and Linux libc. For the current darwin-arm64 payload, `npm pack --dry-run --json` reports 92,295,035 packed bytes and 325,056,216 unpacked bytes; other platforms may differ, and these values are disclosure rather than an installation threshold. The keyless real-product test runs the SDK-selected CLI against a loopback Messages fixture and asserts that the shared subprocess argv begins with that platform package's native executable. Loader composition proves that installing the Bundle registers only the dormant Claude Code provider and starts no product process.
@@ -120,10 +151,12 @@ Loader composition proves that the Bundle default, two additional named Claude i
 
 The project owner's identity-scoped distribution authorization covers the official SDK and the official CLI/platform payloads declared by each SDK version. [`THIRD_PARTY_NOTICES.md`](../../../THIRD_PARTY_NOTICES.md) discloses the current optional payload closure without classifying its declared terms as permissive; unrelated non-permissive runtime dependencies continue to fail the notices gate.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Each run submits one task through the vendor SDK in the delegating workspace and returns its result; no session state is retained between runs.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Child request
@@ -165,3 +198,13 @@ Append-only: foreground adds one result after the reusable parent prefix, while 
 - **Assistant payload is final text only** — a failed run may additionally expose the separate safe diagnostic; reasoning, intermediate messages, tool traffic, usage, stderr, and workspace diffs remain product-local, while generic Job ids, notices, and status come from the shared job runtime.
 - **No optional shared capabilities** — output schemas, child personas, tool filtering, and harness depth enforcement are rejected by the shared service for this provider.
 - **No wall-clock timeout or side-effect rollback** — the caller cancels long work, and files or external systems changed before cancellation are not restored.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

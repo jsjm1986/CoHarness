@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-collapsible-ask-user-question-card.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-11-collapsible-ask-user-question-card.md
-2026-08-11-collapsible-ask-user-question-card.md: 5c7e62749e63a6042285b79751c400ba09038b49
-2026-08-11-collapsible-ask-user-question-card.zh.md: 5f4b5851e4b595e634841bf87827db70fe928afb
+/agent-note-collapsible-ask-user-question-card:
+  en: d3543dd9cc9b7df1
+  zh: d2e2c2e721d06ef6
+/agent-note-collapsible-ask-user-question-card/problem:
+  en: 9449f5b7b5723576
+  zh: 62e8860222cd8b99
+/agent-note-collapsible-ask-user-question-card/decision:
+  en: 4d1f6ddf2b895501
+  zh: bbbf1c3eb412421d
+/agent-note-collapsible-ask-user-question-card/consequences:
+  en: 8702913697ac3b08
+  zh: d39fdba332c9ff21
+/agent-note-collapsible-ask-user-question-card/alternatives-considered:
+  en: 999e29b3c78f9a55
+  zh: c027c6dbd5c7b18c

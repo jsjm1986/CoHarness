@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-projection-cache/README.md
-README.md: 46fad5781a158c23853423d95f0d35a6c3ac0656
-README.zh.md: 3875cf432fde90f85d521357d648602a28790397
+/:
+  en: 28998fd034337b27
+  zh: 61495d48365178df
+/deepseek-ai-dsh-session-projection-cache:
+  en: eb132a4a19424936
+  zh: 8984e4a3f607c004
+/deepseek-ai-dsh-session-projection-cache/summary:
+  en: bf8d9303afdc56ad
+  zh: b6d54b39b6411be5
+/deepseek-ai-dsh-session-projection-cache/table-of-contents:
+  en: f800276dbe0b7573
+  zh: 1ab455086662f515
+/deepseek-ai-dsh-session-projection-cache/write-policy:
+  en: 0eeb76feed438508
+  zh: def21d82b70876cb
+/deepseek-ai-dsh-session-projection-cache/listing-read-cachedsnapshot-meta-inheritedeventcount-keys:
+  en: bf16cbb71d5e4476
+  zh: 49e64fc7cb005ad1
+/deepseek-ai-dsh-session-projection-cache/cold-read-coldsnapshot-meta-inheritedeventcount-events:
+  en: daeeb96f34a382cb
+  zh: 5d9baec586a6534f
+/deepseek-ai-dsh-session-projection-cache/upgrade-compatibility:
+  en: 3f3d0a6355de87bc
+  zh: 812abb93dfb69bb1
+/deepseek-ai-dsh-session-projection-cache/composition:
+  en: ff64adea06c3c2ab
+  zh: bd6627082772ef10
+/deepseek-ai-dsh-session-projection-cache/invariants:
+  en: 968668d52fe63f7a
+  zh: 7cd6c012e6e02ed1
+/deepseek-ai-dsh-session-projection-cache/model-experience:
+  en: 25c9652e94565a76
+  zh: efd5ca7105d8a561
+/deepseek-ai-dsh-session-projection-cache/model-experience/kv-cache-effect:
+  en: d483aa4968fa1955
+  zh: 5572c7dcc5b5f79b
+/deepseek-ai-dsh-session-projection-cache/known-limitations-and-deferred-work:
+  en: 8b829b33178e3feb
+  zh: 54417433cc2c533d
+/deepseek-ai-dsh-session-projection-cache/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 4438af76c19be347

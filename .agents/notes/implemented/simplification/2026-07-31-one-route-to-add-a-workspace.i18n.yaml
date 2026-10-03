@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-one-route-to-add-a-workspace.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-31-one-route-to-add-a-workspace.md
-2026-07-31-one-route-to-add-a-workspace.md: bcbe77899d4050bd898b256e81f88183099bdebf
-2026-07-31-one-route-to-add-a-workspace.zh.md: edd17af03ca6454be321a4b267ff1761ece2d03f
+/agent-note-one-route-to-add-a-workspace:
+  en: 0787ebae62f569df
+  zh: 77b8584064a7ed35
+/agent-note-one-route-to-add-a-workspace/problem:
+  en: fc30c6b92c9dbf8e
+  zh: 3f0f15b9d70a4f86
+/agent-note-one-route-to-add-a-workspace/decision:
+  en: 1dd818c2d69ab10c
+  zh: 9b8c6e8057a086f2
+/agent-note-one-route-to-add-a-workspace/wire-and-cli-surface:
+  en: 2c8d13058b5f4a77
+  zh: 00887ee517bc715d
+/agent-note-one-route-to-add-a-workspace/testing:
+  en: 94b2be7f265d9276
+  zh: 349a2e78f18ae0c5
+/agent-note-one-route-to-add-a-workspace/alternatives-considered:
+  en: f05e90d03f119fef
+  zh: 6cb648cf838c8a08
+/agent-note-one-route-to-add-a-workspace/consequences:
+  en: 3134c1dfe8bc1c26
+  zh: 7b7539ca4a1d64c6

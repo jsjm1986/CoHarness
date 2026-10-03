@@ -12,6 +12,12 @@
       "path": "../../api/remotes/tsconfig.client.json"
     },
     {
+      "path": "../../interaction/user-questions"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
       "path": "../locale"
     },
     {
@@ -24,7 +30,16 @@
       "path": "../ui-primitives"
     },
     {
+      "path": "../ui-renderer"
+    },
+    {
       "path": "../ui-slots"
+    },
+    {
+      "path": "../ui-tool"
+    },
+    {
+      "path": "../../llm/llm"
     },
     {
       "path": "../../../vendor/cordis"

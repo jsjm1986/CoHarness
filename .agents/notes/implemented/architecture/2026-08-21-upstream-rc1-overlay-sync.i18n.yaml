@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-21-upstream-rc1-overlay-sync.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-21-upstream-rc1-overlay-sync.md
-2026-08-21-upstream-rc1-overlay-sync.md: 467c328d4e701ea04dfb240596fd58ed39b53d56
-2026-08-21-upstream-rc1-overlay-sync.zh.md: 7d8c0be86f47bd0b38b714c054df0f8faf17f95b
+/agent-note-upstream-rc-1-overlay-synchronization-with-local-governance:
+  en: 15e080d7c8339df9
+  zh: 580c6ecf8edaf2b0
+/agent-note-upstream-rc-1-overlay-synchronization-with-local-governance/problem:
+  en: c246bf4db62b4552
+  zh: 0953cc3b52a13400
+/agent-note-upstream-rc-1-overlay-synchronization-with-local-governance/decision:
+  en: 5381e7f4ece6fa74
+  zh: 5a4900aaaa83168c
+/agent-note-upstream-rc-1-overlay-synchronization-with-local-governance/verification:
+  en: 9f86ad48a5d580e4
+  zh: 442d2e869308f6c4
+/agent-note-upstream-rc-1-overlay-synchronization-with-local-governance/alternatives-considered:
+  en: 741bd4c9d8584c93
+  zh: 3c8bbf91f5d81319
+/agent-note-upstream-rc-1-overlay-synchronization-with-local-governance/consequences:
+  en: b98f9180b942723e
+  zh: e0368d6739b38df7

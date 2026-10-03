@@ -5,7 +5,11 @@ import { createWorkbenchStore } from '../src/client/stores.ts'
 describe('workbench chooser store', () => {
   it('tracks picker and browser state independently', () => {
     const inst = createWorkbenchStore().create()
-    expect(inst.store.getSnapshot()).toEqual({ pickerOpen: false, replace: false, browser: undefined })
+    expect(inst.store.getSnapshot()).toEqual({ workbenchMenuOpen: false, pickerOpen: false, replace: false, browser: undefined })
+    inst.actions.toggleWorkbenchMenu()
+    expect(inst.store.getSnapshot().workbenchMenuOpen).toBe(true)
+    inst.actions.closeWorkbenchMenu()
+    expect(inst.store.getSnapshot().workbenchMenuOpen).toBe(false)
     inst.actions.openPicker(true)
     expect(inst.store.getSnapshot()).toMatchObject({ pickerOpen: true, replace: true })
     inst.actions.closePicker()

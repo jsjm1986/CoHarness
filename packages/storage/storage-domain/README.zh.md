@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-storage-domain
 
 [English](README.md) | 中文
@@ -12,6 +17,16 @@ DeepSeek Harness 存储中心的领域数据形式：在所有已配置的后端
 
 使用本包声明经过 schema 校验的键值领域，并通过 `ctx.storageDomain` 在已配置的存储后端上打开它们。读取同步返回经过校验的内存状态；每次写入在完成前都已达到持久状态，并按顺序发出 `domain/changed`。产品包使用领域句柄，而不直接访问存储后端。这些宿主侧状态不会添加工具、提示词或会话事件，因此模型与 agent loop（智能体循环）无法看到它们。
 
+## 目录
+
+- [配置](#configuration)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="configuration"></a>
 ## 配置
 
 | key | 含义 |
@@ -19,6 +34,8 @@ DeepSeek Harness 存储中心的领域数据形式：在所有已配置的后端
 | `backend` | 每个领域的默认后端名称（必填；不存在普遍适用的存储介质）。 |
 | `routes` | 逐领域覆盖：领域名称 → 后端名称。 |
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 持久领域状态
@@ -35,7 +52,18 @@ DeepSeek Harness 存储中心的领域数据形式：在所有已配置的后端
 
 相互独立：领域读写绝不触碰请求前缀，因此这里没有任何内容能使提供方缓存复用失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **变更只在单进程内可见**：`domain/changed` 是进程内事件；在 Agent Note 暂缓的跨进程修订模式落地前，第二个主机进程或重新连接的 GUI 无法观察变更。
 - **没有跨表事务、二级索引或多段键**：每次写入只触碰一条记录；这些扩展的触发点和返工点列在 Agent Note 的暂缓工作清单中。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

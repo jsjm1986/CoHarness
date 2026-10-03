@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-25-web-client-session-scope-and-provide-channel.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-25-web-client-session-scope-and-provide-channel.md
-2026-07-25-web-client-session-scope-and-provide-channel.md: 92990b87aa2dadfcc2823ae4bccfb5970635b80f
-2026-07-25-web-client-session-scope-and-provide-channel.zh.md: bdd43b7e80cfc0fa91cabdae6506e448e6b86c9e
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide:
+  en: 18c843f8d8bfdb52
+  zh: bd878ce3b2f126ff
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/problem:
+  en: 1738c071cb9824bc
+  zh: 7af7770739d5430a
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/decision/the-parity-model-client-and-host-share-one-root-state-axis:
+  en: 9706e291132def28
+  zh: 6166b7ca760608d3
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/decision/agent-scope-the-actx-is-the-sole-session-carrier-in-the-client-side-cordis-world:
+  en: 6e6488b3eab757c2
+  zh: 4ee3d1cc415234df
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/decision/scope-lifecycle-anchored-to-the-list-mirror-birth-is-entering-view-death-is-prune:
+  en: ca8920392ed26284
+  zh: 848e17a32fad6dee
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/decision/the-blank-bit-the-empty-session-s-visible-projection-conversion-and-reuse:
+  en: 1bb641a87f1a7b49
+  zh: 238b4a40fe4a5350
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/decision/connectworkspace-the-sole-entry-point-of-new-session:
+  en: d5cc933f608f1c60
+  zh: edf162b18d2be5e2
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/decision/per-session-provisioning-the-sessions-provide-standard-kit-channel:
+  en: 3830bc620045e841
+  zh: 431f924642f3e13e
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/decision/the-read-only-queue-mirror:
+  en: aa28f4d40bb0c0c8
+  zh: dcde2f18cee10c5e
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/decision/host-wire-smalls:
+  en: 04d5c2bd59c5ba0a
+  zh: 7986fcd281e1339b
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/alternatives-considered:
+  en: 82b84009491ae278
+  zh: 96cb157aa81b98a1
+/agent-note-web-client-agent-scope-parity-model-and-the-provisioning-channel-agents-scope-blank-reuse-provide/consequences:
+  en: 851d296bdd08eeb2
+  zh: 0f4bb838ff691ead

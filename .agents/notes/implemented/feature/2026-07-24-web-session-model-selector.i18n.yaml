@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-24-web-session-model-selector.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-24-web-session-model-selector.md
-2026-07-24-web-session-model-selector.md: d10e139e48ec2448bc7e7f0fda583d7980d23c96
-2026-07-24-web-session-model-selector.zh.md: c4f1f569360de3244afeb3aa084895172c6b9eda
+/agent-note-session-model-selection-in-the-web-composer:
+  en: 9edf52da1a6f4053
+  zh: 90dcb2299cdc7efe
+/agent-note-session-model-selection-in-the-web-composer/problem:
+  en: fcbde2846c9e2b43
+  zh: cbe951ec54699af0
+/agent-note-session-model-selection-in-the-web-composer/decision:
+  en: bc99ae76e4530731
+  zh: eb06b518c9634c19
+/agent-note-session-model-selection-in-the-web-composer/alternatives-considered:
+  en: 7a8d3c0ac87300d0
+  zh: c6a0b3e4f9279cba
+/agent-note-session-model-selection-in-the-web-composer/consequences:
+  en: 0e05a1b614d9074a
+  zh: 89d773dd7452752d
+/agent-note-session-model-selection-in-the-web-composer/testing:
+  en: f8fd244e7133bd19
+  zh: d44bb736dbdbfa25

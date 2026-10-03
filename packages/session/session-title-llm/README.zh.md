@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-session-title-llm
 
 [English](README.md) | 中文
@@ -10,6 +15,18 @@
 
 `dsh-session-title-llm` 使用一致的模型请求策略，根据选中的用户消息生成简洁的会话标题。调用方选择每次修订包含哪些消息，以及成对提供 `provider`／`model` 路由，还是使用当前会话记录的路由。必填上限约束封装后的输入、生成输出与端到端时长，调用方取消在整个流式处理期间持续生效。无效、空、迟到、包含工具调用或其他非纯文本的结果会在替换标题前被拒绝。
 
+## 目录
+
+- [路由与失败约定](#route-and-failure-contract)
+- [配置](#configuration)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="route-and-failure-contract"></a>
 ## 路由与失败约定
 
 `provider` 和 `model` 覆盖项都是可选的，但必须同时作为非空字符串提供。如果没有这一对取值，辅助模块会使用当前会话已记录 `request/header` 中捕获的确切提供方／模型路由；因此，在任何路由出现前显式刷新时必须提供覆盖项。辅助模块在记录或分发前，依据 `maxInputBytes` 检查最终 JSON 封装用户提示词的大小，包括 seq 字段、包装层与 JSON 转义，而不是将其截断。消费流期间和流完成后都会重新检查超时与调用方取消，因此即使拦截器或适配器忽略 abort，也不能接受迟到的成功结果。格式错误或空输出、工具调用和非 stop 结束原因同样会导致调用被拒绝；会话标题服务决定该拒绝属于自动警告还是显式调用方失败。
@@ -18,6 +35,7 @@
 
 <a id="configuration"></a>
 
+<a id="configuration"></a>
 ## 配置
 
 除成对的路由覆盖项外，每个字段都必填；库不提供默认值。
@@ -31,10 +49,13 @@
 | `timeoutMs` | 运行时定时器限制内的正数端到端时限。 |
 | `provider`, `model` | 可选显式路由；二者同时提供或同时省略。 |
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。本包是共享的逐请求策略——取景、预算、组装——返回规范化文本；它不拥有持久标题状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 辅助标题请求
@@ -51,7 +72,18 @@
 
 不会使主请求的 KV Cache 失效。辅助缓存复用由提供方决定；固定指令可复用，而 JSON 消息数组会随每次修订变化。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 辅助模块只接受文本输出，并拒绝工具调用；不公开结构化输出适配器或提供方专用提示词变体。
 - 它对整个封装用户提示词强制执行字节上限，不会剪裁单条消息或应用保留策略。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

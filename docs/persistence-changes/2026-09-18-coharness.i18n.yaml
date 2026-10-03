@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-18-coharness.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-09-18-coharness.md
-2026-09-18-coharness.md: 5b3ce350f12583ee38ff016257794f889272d913
-2026-09-18-coharness.zh.md: f48d43c99a4b14e91121d8524ee27283c989876c
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-09-18-coharness:
+  en: 3e287c41d0912255
+  zh: e69b5af1cd1041e6
+/2026-09-18-coharness/summary:
+  en: 1fa3188ec4c90e88
+  zh: 5a0f1bea7f09804c
+/2026-09-18-coharness/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-09-18-coharness/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-09-18-coharness/compatibility:
+  en: 85aa01a067d5252f
+  zh: 276d33f7b728a141
+/2026-09-18-coharness/verification:
+  en: 3dad973d212cfd31
+  zh: 85566839e3240877
+/2026-09-18-coharness/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

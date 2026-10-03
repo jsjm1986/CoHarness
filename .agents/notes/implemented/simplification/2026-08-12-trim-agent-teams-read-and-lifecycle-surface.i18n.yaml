@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-12-trim-agent-teams-read-and-lifecycle-surface.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-12-trim-agent-teams-read-and-lifecycle-surface.md
-2026-08-12-trim-agent-teams-read-and-lifecycle-surface.md: 69a54dae6e43ac4a93ebcf825bdeb1bad29a23fe
-2026-08-12-trim-agent-teams-read-and-lifecycle-surface.zh.md: f43dc680069855651a9087776987e8998790d829
+/agent-note-trim-the-agent-teams-read-and-lifecycle-surface:
+  en: 0e0a1e574b1c1762
+  zh: 389e29c4d3be9cd1
+/agent-note-trim-the-agent-teams-read-and-lifecycle-surface/problem:
+  en: c7e277337160d80c
+  zh: 94ff67f47551dbaa
+/agent-note-trim-the-agent-teams-read-and-lifecycle-surface/decision:
+  en: ad4172bab36044a1
+  zh: a1762fd8686ea300
+/agent-note-trim-the-agent-teams-read-and-lifecycle-surface/alternatives-considered:
+  en: 4cf49945a84f1c42
+  zh: 720f7cac761836c0
+/agent-note-trim-the-agent-teams-read-and-lifecycle-surface/testing:
+  en: eeadc9929a48f65f
+  zh: e57ddbadaf700d08
+/agent-note-trim-the-agent-teams-read-and-lifecycle-surface/consequences:
+  en: 4b00f955ab91cde8
+  zh: 61672a47bfda48f9

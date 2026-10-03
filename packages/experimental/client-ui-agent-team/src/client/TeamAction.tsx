@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   TeamMemberView as TeamRosterMember,
@@ -10,7 +10,7 @@ import type {
 } from '@deepseek-ai/dsh-experimental-agent-team/client'
 import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import {
-  IconCheckOutline14, IconCloseOutline16, IconEditOutline16, IconPlusOutline16,
+  IconCheckOutline14, IconChevronDownOutline14, IconCloseOutline16, IconEditOutline16, IconPlusOutline16,
   IconRefreshOutline14, IconTrashOutline16, IconUserOutline16, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -331,63 +331,22 @@ export function TeamAction({
                       />
                     )
                     : (
-                      <article key={task.id} className={css.task}>
-                        <div className={css.taskTitle}>
-                          <strong>{task.subject}</strong>
-                          <span>{t(statusKey(task.status))}</span>
-                        </div>
-                        <p>{task.description}</p>
-                        <div className={css.meta}>
-                          <span>{task.id}</span>
-                          {task.status === 'pending' && <span>{task.ready ? t('ready') : t('blocked')}</span>}
-                          {task.blockedBy.length > 0 && <span>{t('blockedBy')}: {task.blockedBy.join(', ')}</span>}
-                          {task.writeScopes.length > 0 && <span>{t('writeScopes')}: {task.writeScopes.join(', ')}</span>}
-                          {task.writeScopeWarnings.map(warning => <span key={warning} className={css.warning}>{warning}</span>)}
-                        </div>
-                        <div className={css.taskActions}>
-                          <label>
-                            {t('owner')}
-                            <select
-                              value={task.ownerName ?? ''}
-                              disabled={pendingTasks.has(task.id) || task.status === 'completed'}
-                              onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                                const owner = event.target.value
-                                void settleTask(task.id, () => updateTask(sessionId, {
-                                  taskId: task.id,
-                                  expectedRevision: task.revision,
-                                  action: 'reassign',
-                                  ...owner === '' ? {} : { owner },
-                                }))
-                              }}
-                            >
-                              <option value="">{t('unowned')}</option>
-                              {assignable.map(member => <option key={member.id} value={member.name}>{member.name}</option>)}
-                            </select>
-                          </label>
-                          <button type="button" onClick={() => { startEdit(task) }} disabled={pendingTasks.has(task.id)}>
-                            <IconEditOutline16 size={13} /> {t('edit')}
-                          </button>
-                          {task.status === 'in_progress' && (
-                            <button type="button" disabled={pendingTasks.has(task.id)} onClick={() => {
-                              void settleTask(task.id, () => updateTask(sessionId, {
-                                taskId: task.id, expectedRevision: task.revision, action: 'complete',
-                              }))
-                            }}><IconCheckOutline14 /> {t('complete')}</button>
-                          )}
-                          {task.status === 'completed' && (
-                            <button type="button" disabled={pendingTasks.has(task.id)} onClick={() => {
-                              void settleTask(task.id, () => updateTask(sessionId, {
-                                taskId: task.id, expectedRevision: task.revision, action: 'reopen',
-                              }))
-                            }}>{t('reopen')}</button>
-                          )}
-                          <button type="button" disabled={pendingTasks.has(task.id)} onClick={() => {
-                            void settleTask(task.id, () => updateTask(sessionId, {
-                              taskId: task.id, expectedRevision: task.revision, action: 'delete',
-                            }))
-                          }}><IconTrashOutline16 size={13} /> {t('delete')}</button>
-                        </div>
-                      </article>
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        pending={pendingTasks.has(task.id)}
+                        assignable={assignable}
+                        t={t}
+                        onEdit={() => { startEdit(task) }}
+                        onAction={(action, owner) => {
+                          void settleTask(task.id, () => updateTask(sessionId, {
+                            taskId: task.id,
+                            expectedRevision: task.revision,
+                            action,
+                            ...owner === undefined ? {} : { owner },
+                          }))
+                        }}
+                      />
                     ))}
                 </div>
               </section>
@@ -396,6 +355,93 @@ export function TeamAction({
         </div>
       )}
     </div>
+  )
+}
+
+interface TaskCardProps {
+  task: TeamTask
+  pending: boolean
+  assignable: readonly TeamRosterMember[]
+  t: TeamActionProps['t']
+  onEdit: () => void
+  onAction: (action: TeamTaskAction, owner?: string) => void
+}
+
+/** Task card with a two-line description clamp expanded from a toggle in the meta row. */
+function TaskCard({ task, pending, assignable, t, onEdit, onAction }: TaskCardProps) {
+  const [expanded, setExpanded] = useState(false)
+  const [clamped, setClamped] = useState(false)
+  const textRef = useRef<HTMLParagraphElement>(null)
+  useLayoutEffect(() => {
+    if (expanded) return
+    const paragraph = textRef.current
+    /* v8 ignore next -- the paragraph mounts in the same commit as the effect. */
+    if (paragraph === null) return
+    const measure = (): void => { setClamped(paragraph.scrollHeight > paragraph.clientHeight + 1) }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(paragraph)
+    return () => { observer.disconnect() }
+  }, [task.description, expanded])
+  return (
+    <article className={css.task}>
+      <div className={css.taskTitle}>
+        <strong>{task.subject}</strong>
+        <span>{t(statusKey(task.status))}</span>
+      </div>
+      <p ref={textRef} className={expanded ? undefined : css.clampedDescription}>{task.description}</p>
+      <div className={css.meta}>
+        {(clamped || expanded) && (
+          <button
+            type="button"
+            className={css.expandToggle}
+            aria-expanded={expanded}
+            onClick={() => { setExpanded(current => !current) }}
+          >
+            {t(expanded ? 'task.collapse' : 'task.expand')}
+            <IconChevronDownOutline14 size={12} className={expanded ? css.expandToggleOpen : undefined} />
+          </button>
+        )}
+        <span>{task.id}</span>
+        {task.status === 'pending' && <span>{task.ready ? t('ready') : t('blocked')}</span>}
+        {task.blockedBy.length > 0 && <span>{t('blockedBy')}: {task.blockedBy.join(', ')}</span>}
+        {task.writeScopes.length > 0 && <span>{t('writeScopes')}: {task.writeScopes.join(', ')}</span>}
+        {task.writeScopeWarnings.map(warning => <span key={warning} className={css.warning}>{warning}</span>)}
+      </div>
+      <div className={css.taskActions}>
+        <label>
+          {t('owner')}
+          <select
+            value={task.ownerName ?? ''}
+            disabled={pending || task.status === 'completed'}
+            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+              const owner = event.target.value
+              onAction('reassign', owner === '' ? undefined : owner)
+            }}
+          >
+            <option value="">{t('unowned')}</option>
+            {assignable.map(member => <option key={member.id} value={member.name}>{member.name}</option>)}
+          </select>
+        </label>
+        <button type="button" onClick={onEdit} disabled={pending}>
+          <IconEditOutline16 size={13} /> {t('edit')}
+        </button>
+        {task.status === 'in_progress' && (
+          <button type="button" disabled={pending} onClick={() => { onAction('complete') }}>
+            <IconCheckOutline14 /> {t('complete')}
+          </button>
+        )}
+        {task.status === 'completed' && (
+          <button type="button" disabled={pending} onClick={() => { onAction('reopen') }}>
+            {t('reopen')}
+          </button>
+        )}
+        <button type="button" disabled={pending} onClick={() => { onAction('delete') }}>
+          <IconTrashOutline16 size={13} /> {t('delete')}
+        </button>
+      </div>
+    </article>
   )
 }
 

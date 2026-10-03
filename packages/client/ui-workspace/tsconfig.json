@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
       "path": "../connection/tsconfig.client.json"
     },
     {
@@ -18,7 +21,13 @@
       "path": "../runtime"
     },
     {
+      "path": "../shortcuts/tsconfig.client.json"
+    },
+    {
       "path": "../ui-conversation"
+    },
+    {
+      "path": "../ui-layout"
     },
     {
       "path": "../ui-primitives"
@@ -28,9 +37,6 @@
     },
     {
       "path": "../ui-slots"
-    },
-    {
-      "path": "../../../vendor/cordis"
     }
   ]
 }

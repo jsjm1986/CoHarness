@@ -5,12 +5,13 @@
 // (service unprovided + declarations gone + registration cleared).
 
 import { Context } from '@deepseek-ai/cordis'
-import { stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply as themeApply, inject as themeInject, ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
 import { apply, inject, LayoutController } from '@deepseek-ai/dsh-client-ui-layout/client'
+import { createLayoutStore } from '@deepseek-ai/dsh-client-ui-layout/src/client/stores.ts'
 import { apply as nodeApply } from '@deepseek-ai/dsh-client-ui-layout'
 
 beforeEach(() => {
@@ -28,9 +29,15 @@ async function bench() {
   // seam for persistence; model this bench as a remote, memory-only browser.
   ctx.provide('locale', new LocaleRuntime(ctx))
   ctx.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
+  ctx.provide('shortcuts', { register: vi.fn(() => () => {}) } as never)
   // ui-theme's Appearance row binds a durable scope through these two.
   ctx.provide('remote', { $on: () => () => {} } as never)
-  ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+  ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
+  // ui-layout watches ctx.sessions.list for selection changes that return the
+  // center to the Conversation; a static empty list satisfies the wiring.
+  ctx.provide('sessions', {
+    list: { getSnapshot: () => ({ current: undefined }), subscribe: () => () => {} },
+  } as never)
   await ctx.plugin({ inject: themeInject, apply: themeApply }).await()
   await slotsFiber.await()
   return { ctx, slots: ctx.get('slots') as SlotRegistry }
@@ -38,7 +45,7 @@ async function bench() {
 
 describe('ui-layout client apply', () => {
   it('declares its service dependencies', () => {
-    expect(inject).toEqual(['slots', 'theme', 'locale'])
+    expect(inject).toEqual(['slots', 'theme', 'locale', 'shortcuts', 'sessions'])
   })
 
   it('provides ctx.layout and registers AppFrame with the shell child declarations', async () => {
@@ -50,23 +57,45 @@ describe('ui-layout client apply', () => {
     expect(slots.entries('root')).toHaveLength(1)
     // …and declared the shell children in the ledger.
     expect(slots.spec('sidebar')).toEqual({ kind: 'single', scope: 'root' })
-    expect(slots.spec('conversation')).toEqual({ kind: 'single', scope: 'root' })
+    expect(slots.spec('main')).toEqual({ kind: 'keyed', scope: 'root' })
     expect(slots.spec('rightbar')).toEqual({ kind: 'single', scope: 'root' })
     expect(slots.spec('shell.mobile.header.actions')).toEqual({ kind: 'list', scope: 'session' })
   })
 
-  it('injects no business face and attaches the layout actions', async () => {
+  it('publishes the frame\'s measured viewport width from the root store', async () => {
     const { ctx, slots } = await bench()
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    const actions = {
-      toggleSidebar: vi.fn(), openDetails: vi.fn(), closeDetails: vi.fn(),
-    }
-    const injected = (slots.entries('root')[0]!.inject as (actions: never) => object)(actions as never)
-    expect(typeof (injected as { dismissRightbar: unknown }).dismissRightbar).toBe('function')
+    const instance = (slots.entries('root')[0]!.store as ReturnType<typeof createLayoutStore>).create()
     const layout = ctx.get('layout') as LayoutController
+    const seen: number[] = []
+    const unsubscribe = layout.viewportWidth.subscribe(() => { seen.push(layout.viewportWidth.getSnapshot()) })
+    try {
+      instance.actions.setViewportWidth(700)
+      expect(layout.viewportWidth.getSnapshot()).toBe(700)
+      expect(seen).toContain(700)
+    } finally {
+      unsubscribe()
+      await fiber.dispose()
+    }
+  })
+
+  it('injects only the dismissRightbar hook while the service drives the shared store instance', async () => {
+    const { ctx, slots } = await bench()
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const entry = slots.entries('root')[0]!
+    const injected = (entry.inject as () => object)()
+    expect(injected).toEqual({ dismissRightbar: expect.any(Function) })
+    const handle = entry.store as ReturnType<typeof createLayoutStore>
+    const instance = handle.create()
+    expect(handle.create()).toBe(instance)
+    const layout = ctx.get('layout') as LayoutController
+    instance.actions.setViewportWidth(1440)
+    const before = instance.getSnapshot().sidebar
     layout.toggleSidebar()
-    expect(actions.toggleSidebar).toHaveBeenCalledOnce()
+    expect(instance.getSnapshot().sidebar).not.toBe(before)
+    await fiber.dispose()
   })
 
   it('theme presenter applies the initial snapshot, follows theme/change, and unwinds on dispose', async () => {

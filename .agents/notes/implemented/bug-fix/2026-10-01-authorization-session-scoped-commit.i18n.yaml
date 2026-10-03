@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-01-authorization-session-scoped-commit.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-01-authorization-session-scoped-commit.md
+/agent-note-session-scoped-credential-commit-for-authorization-flows:
+  en: 93eb7bb8ddd775e5
+  zh: e367649ce807b1f3
+/agent-note-session-scoped-credential-commit-for-authorization-flows/problem:
+  en: d6b582adbf61f944
+  zh: d8755b913a41679e
+/agent-note-session-scoped-credential-commit-for-authorization-flows/decision:
+  en: 7cf8c1d3d94e7185
+  zh: c8b3a5fe498f707b
+/agent-note-session-scoped-credential-commit-for-authorization-flows/alternatives-considered:
+  en: 4f8f436f78f7ae94
+  zh: 4ebe1b9acba71c5e
+/agent-note-session-scoped-credential-commit-for-authorization-flows/consequences:
+  en: f57b6337be972280
+  zh: 33c81a80549649c3
+/agent-note-session-scoped-credential-commit-for-authorization-flows/testing:
+  en: 5d2ffe54e8fe282e
+  zh: e01433271669bd67

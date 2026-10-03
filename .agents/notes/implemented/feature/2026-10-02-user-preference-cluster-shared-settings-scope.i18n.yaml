@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-02-user-preference-cluster-shared-settings-scope.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-user-preference-cluster-shared-settings-scope.md
+/agent-note-user-preference-cluster-on-the-shared-settings-scope:
+  en: 9e3e8a7bfe2c9214
+  zh: 97f829d8cca3c90d
+/agent-note-user-preference-cluster-on-the-shared-settings-scope/problem:
+  en: 8056546ad82d26dc
+  zh: 53cb7d739b270d5a
+/agent-note-user-preference-cluster-on-the-shared-settings-scope/decision:
+  en: e13d31a84ab6eecc
+  zh: 70b24ec3eab41276
+/agent-note-user-preference-cluster-on-the-shared-settings-scope/alternatives-considered:
+  en: f4bbe31e7a3bd70b
+  zh: 7be9a96a23a7c6cd
+/agent-note-user-preference-cluster-on-the-shared-settings-scope/consequences:
+  en: 06235306f397d58c
+  zh: 07eda7a1e0286a6b
+/agent-note-user-preference-cluster-on-the-shared-settings-scope/testing:
+  en: 7b89640a97a3a501
+  zh: 173dc4eedfadc72a

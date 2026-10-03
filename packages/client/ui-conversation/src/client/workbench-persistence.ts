@@ -1,3 +1,4 @@
+import { parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 /** Versioned browser metadata for one verified principal's named workbenches. */
 import type { ConversationViewportMode, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 
@@ -13,7 +14,7 @@ export interface SavedWorkbench {
 
 /** The sole durable workbench document for a principal. */
 export interface WorkbenchRecord {
-  version: 2
+  version: 2 | 3
   mode: ConversationViewportMode
   activeId: string
   workbenches: SavedWorkbench[]
@@ -44,16 +45,18 @@ function row(value: unknown): SavedWorkbench | undefined {
  * @returns a structurally valid record, or undefined for corrupt metadata.
  */
 export function parseWorkbenchRecord(value: unknown): WorkbenchRecord | undefined {
-  if (!object(value) || value.version !== 2 || (value.mode !== 'single' && value.mode !== 'workbench')
+  if (!object(value) || (value.version !== 2 && value.version !== 3) || (value.mode !== 'single' && value.mode !== 'workbench')
     || typeof value.activeId !== 'string' || !Array.isArray(value.workbenches)) return undefined
   const workbenches: SavedWorkbench[] = []
   for (const item of value.workbenches) {
     const parsed = row(item)
-    if (parsed === undefined || workbenches.some(existing => existing.id === parsed.id)) return undefined
+    if (parsed === undefined
+      || (value.version === 3 && parsed.paneIds.some(id => parseClientSessionKey(id) === undefined))
+      || workbenches.some(existing => existing.id === parsed.id)) return undefined
     workbenches.push(parsed)
   }
   if (!workbenches.some(item => item.id === value.activeId)) return undefined
-  return { version: 2, mode: value.mode, activeId: value.activeId, workbenches }
+  return { version: value.version, mode: value.mode, activeId: value.activeId, workbenches }
 }
 
 /** Read only the requested principal's record.
@@ -62,7 +65,8 @@ export function parseWorkbenchRecord(value: unknown): WorkbenchRecord | undefine
  */
 export function readWorkbenchRecord(principal: string): WorkbenchRecord | undefined {
   let raw: string | null
-  try { raw = globalThis.localStorage.getItem(`dsh.conversation.workbenches.v2.${encodeURIComponent(principal)}`) }
+  try { raw = globalThis.localStorage.getItem(`dsh.conversation.workbenches.v3.${encodeURIComponent(principal)}`)
+    ?? globalThis.localStorage.getItem(`dsh.conversation.workbenches.v2.${encodeURIComponent(principal)}`) }
   catch { return undefined /* Browser policy can deny localStorage. */ }
   if (raw === null) return undefined
   let value: unknown
@@ -76,7 +80,7 @@ export function readWorkbenchRecord(principal: string): WorkbenchRecord | undefi
  * @param record - current named layouts and active selection.
  */
 export function writeWorkbenchRecord(principal: string, record: WorkbenchRecord): void {
-  try { globalThis.localStorage.setItem(`dsh.conversation.workbenches.v2.${encodeURIComponent(principal)}`, JSON.stringify(record)) }
+  try { globalThis.localStorage.setItem(`dsh.conversation.workbenches.v${record.version}.${encodeURIComponent(principal)}`, JSON.stringify(record)) }
   catch { /* Storage denial or quota exhaustion leaves the current in-memory layout usable. */ }
 }
 

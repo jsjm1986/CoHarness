@@ -2,7 +2,9 @@
 /** todo_write atomic Tool presentation and its plan-summary model. */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { TodoItem, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
+import { useState } from 'react'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
+import type { ConversationSnapshot, TodoItem, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { TodoRow, todoToolview } from '../src/client/tool/toolviews/todo-row.tsx'
@@ -29,6 +31,11 @@ const PARALLEL: TodoItem[] = [
   { content: '读源码', status: 'in_progress' },
   { content: '补测试', status: 'pending' },
 ]
+
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
 
 describe('planSummary', () => {
   it('counts done/total and names the single active item with no extra count', () => {
@@ -65,12 +72,17 @@ const resultNode = (argsRaw: string, over?: Partial<ToolResultNode>): ToolResult
 })
 
 function rowProps(block: unknown): TodoRowProps {
+  const snapshot = {
+    views: { get: () => undefined },
+    hasMore: false,
+  } as unknown as ConversationSnapshot
   return {
     callId: 'c1', toolName: 'todo_write', block,
     openFile: vi.fn(),
     sessionId: 's1',
     useSessions: () => undefined,
-    t,
+    useSession: ((selector: (value: ConversationSnapshot) => unknown) => selector(snapshot)) as TodoRowProps['useSession'],
+    t, useDisclosure,
   } as unknown as TodoRowProps
 }
 
@@ -93,7 +105,7 @@ describe('TodoRow', () => {
 
   it('omits the active clause when no item is in progress and reads running-call args', () => {
     const args = JSON.stringify({ todos: [{ content: 'x', status: 'completed' }] })
-    render(<TodoRow {...rowProps({ callId: 'c1', name: 'todo_write', argsRaw: args, turn: 1, step: 1, time: 1_000, callView: null })} />)
+    render(<TodoRow {...rowProps({ phase: 'start', callId: 'c1', name: 'todo_write', argsRaw: args, turn: 1, step: 1, time: 1_000, callView: null })} />)
     expect(screen.getByText('1/1 已完成')).toBeTruthy()
   })
 
@@ -106,7 +118,7 @@ describe('TodoRow', () => {
 
   it('keeps non-ok execution states visible through the shared row states', () => {
     const args = JSON.stringify({ todos: LIST })
-    const running = render(<TodoRow {...rowProps({ callId: 'c1', name: 'todo_write', argsRaw: args, turn: 1, step: 1, time: 1_000, callView: null, subCalls: [] })} />)
+    const running = render(<TodoRow {...rowProps({ phase: 'start', callId: 'c1', name: 'todo_write', argsRaw: args, turn: 1, step: 1, time: 1_000, callView: null, subCalls: [] })} />)
     expect(running.container.querySelector('[data-state="running"]')).not.toBeNull()
     expect(running.container.querySelector('[data-state="running"] svg')).not.toBeNull()
     running.unmount()
@@ -117,19 +129,23 @@ describe('TodoRow', () => {
   it('falls back to the generic summary on malformed args and marks the error state', () => {
     const view = render(<TodoRow {...rowProps(resultNode('not json', { isError: true }))} />)
     expect(view.container.querySelector('[data-state="error"]')).not.toBeNull()
-    expect(screen.getByText('todo_write · not json')).toBeTruthy()
+    expect(screen.getByText('not json')).toBeTruthy()
   })
 
   it('falls back when parsed args carry no todos array', () => {
     render(<TodoRow {...rowProps(resultNode('{"other":1}'))} />)
-    expect(screen.getByText('todo_write · {"other":1}')).toBeTruthy()
+    expect(screen.getByText('{"other":1}')).toBeTruthy()
   })
 
-  it('leading toggle expands the raw args body', () => {
+  it('leading toggle expands a read-only checklist when no recorded predecessor is loaded', () => {
     render(<TodoRow {...rowProps(resultNode(ARGS))} />)
     fireEvent.click(screen.getByRole('button', { expanded: false }))
     expect(screen.getByRole('button', { expanded: true })).toBeTruthy()
-    expect(screen.getByText(/搭骨架/)).toBeTruthy()
+    expect(screen.getByText('搭骨架')).toBeTruthy()
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    expect(screen.getByLabelText('进行中')).toBeTruthy()
+    expect(screen.getByText('旧清单不可用')).toBeTruthy()
+    expect(screen.queryByText('输入')).toBeNull()
   })
 
   it.each([
@@ -138,20 +154,24 @@ describe('TodoRow', () => {
     { label: 'null items', argsRaw: '{"todos":[null]}' },
   ])('falls back to the generic summary on valid JSON with an invalid shape ($label)', ({ argsRaw }) => {
     render(<TodoRow {...rowProps(resultNode(argsRaw))} />)
-    expect(screen.getByText(`todo_write · ${argsRaw}`)).toBeTruthy()
+    expect(screen.getByText(argsRaw)).toBeTruthy()
   })
 
   it('window-truncated result falls back to the callId summary', () => {
     render(<TodoRow {...rowProps(resultNode('', { call: null }))} />)
-    expect(screen.getByText('todo_write · c1')).toBeTruthy()
+    expect(screen.getByText('c1')).toBeTruthy()
   })
 
-  it('injects the keyed toolview declaration directly', () => {
+  it('injects the keyed toolview declaration directly and installs the recorded history', () => {
     expect(todoToolview.name).toBe('todo-toolview')
-    expect(todoToolview.inject).toEqual(['slots'])
+    expect(todoToolview.inject).toEqual(['slots', 'conversationEvents', 'conversationViews'])
     const register = vi.fn(() => () => undefined)
     const inject = vi.fn((_name: string, callback: () => () => void) => callback())
-    todoToolview.apply({ slots: { inject, register } } as never)
+    const events = { register: vi.fn(() => () => undefined) }
+    const views = { register: vi.fn(() => () => undefined) }
+    todoToolview.apply({ slots: { inject, register }, conversationEvents: events, conversationViews: views } as never)
+    expect(events.register).toHaveBeenCalledTimes(2)
+    expect(views.register).toHaveBeenCalledTimes(1)
     expect(inject).toHaveBeenCalledWith('tool.call.toolview', expect.any(Function))
     expect(register).toHaveBeenCalledWith({ name: 'tool.call.toolview', key: 'todo_write', locale: NS }, TodoRow)
   })

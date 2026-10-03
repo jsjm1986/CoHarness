@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-checkpoint-policy/README.md
-README.md: 0aab8483bc0916cca85454daa3111501c94dc047
-README.zh.md: ee212d5c6ba867c26b8cbb62cc1927e9ad210704
+/:
+  en: e1933877dd46d32e
+  zh: 61495d48365178df
+/dsh-session-checkpoint-policy:
+  en: f9281ceae7918408
+  zh: dc062991835cca1c
+/dsh-session-checkpoint-policy/summary:
+  en: 4c422b2080e00d23
+  zh: a3a19de29dee904f
+/dsh-session-checkpoint-policy/table-of-contents:
+  en: e39206ff6a9b605e
+  zh: 9d20b0a29cc9be51
+/dsh-session-checkpoint-policy/plugin-namespace-session-checkpoint-policy:
+  en: 311c7a64d2294754
+  zh: b47984662813402f
+/dsh-session-checkpoint-policy/invariants:
+  en: 0cd7204cffb8e80d
+  zh: 61f26ea8b0f1e5fe
+/dsh-session-checkpoint-policy/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/dsh-session-checkpoint-policy/model-experience/interrupted-calls:
+  en: 5cb4bf82d559c081
+  zh: 649c4c50efbd84c7
+/dsh-session-checkpoint-policy/model-experience/interrupted-calls/what-the-model-sees:
+  en: 11ab6b8e058fd0f5
+  zh: 962d12789d6ee01a
+/dsh-session-checkpoint-policy/model-experience/interrupted-calls/token-effect:
+  en: f40f910529dce107
+  zh: 39564b13a8263e9b
+/dsh-session-checkpoint-policy/model-experience/interrupted-calls/kv-cache-effect:
+  en: b99544650c31f190
+  zh: 45d845fa2b0fe502
+/dsh-session-checkpoint-policy/known-limitations-and-deferred-work:
+  en: 9f8243ef672eec60
+  zh: 947cd16a5fe3878f
+/dsh-session-checkpoint-policy/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

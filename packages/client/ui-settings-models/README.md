@@ -1,3 +1,8 @@
+---
+description: "Models settings and shared product-onboarding dialogs over existing settings and credential joins"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings-models
 
 English | [中文](README.zh.md)
@@ -18,6 +23,17 @@ Every edit lands as `settings.mutate` path ops against the stored section — a 
 
 `dsh-client-ui-settings-models` is the Models settings page of the dsh web client: users configure API keys (stored write-only under the profile's credential reference), edit each provider's model list, and hand-declare custom pi-ai routes, with provider rows and one editor card at a time. The page joins the provider directory, the settings document, and the credential descriptions into one shared snapshot, so a row's state stays consistent across all three. It also walks first-run users through two ordered dialogs — a versioned internal-testing notice and the conditional official-DeepSeek credential step.
 
+## Table of Contents
+
+- [Model list and endpoint interrogation](#model-list-and-endpoint-interrogation)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="model-list-and-endpoint-interrogation"></a>
 ## Model list and endpoint interrogation
 
 A pi-ai profile's `models` list is edited on the card: one row per model showing its id and display name, with the context window, output cap, image-input checkbox, and per-model reasoning declaration behind a per-row disclosure and two label-free actions — expand and delete — on the right. The image checkbox writes `input: ['text', 'image']` when selected and `['text']` when cleared. An empty list means "serve this route's built-in catalog", so a row is only ever added deliberately; clearing a capacity drops it rather than storing a value the schema would reject, and the adapter's route-level fallbacks size whatever configuration leaves out — an empty capacity shows the provider fallback as its placeholder, while an explicitly entered value remains an exact token count. The field uses decimal `K` and `M` (`K` = 1,000; `M` = 1,000,000), and a capacity that is not a positive integer is not stored.
@@ -26,10 +42,12 @@ A pi-ai profile's `models` list is edited on the card: one row per model showing
 
 **Add a custom provider** declares a route pi-ai does not ship. It is its own card rather than the editor with extra fields, because the route id is being chosen here and the settings address does not exist until it is: one `settings.mutate` sets the whole profile at `providers.<route>`, and the key travels separately through `credentials.set`. Provider IDs are accepted as non-empty names without a catalog or shell-identifier restriction; the `org-` and `project-` namespaces remain reserved for managed routes, credential references are derived independently, and unusual names receive a stable suffix. The create button still requires an endpoint, a supported protocol, and at least one uniquely identified model because those are the minimum facts the adapter needs to route a request. Capacities do not gate it: the adapter's fallbacks size a model the endpoint described by id alone. The protocol choices come from the namespace schema, so they stay aligned with the adapter. Leaving the key blank preserves provider-native authentication. When a profile write succeeds but the key write fails, the provider remains visible and the retry writes only the credential.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The page joins the `llm.providers`, `settings.describe`, and `credentials.describe` wire domains at render time; provider and credential state remain owned on the Host.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -45,3 +63,13 @@ None; this package neither assembles nor sends a provider request.
 - **Only pi-ai routes can be hand-declared** — the custom-provider card writes into `llm-pi-ai`, the one namespace whose profiles describe a whole provider. A `llm-deepseek` route is a composition fact, not something this page can create.
 - **Interrogation covers OpenAI-compatible and Anthropic Messages listings** — other protocol families report that they cannot be asked and their models are entered by hand. A relay may still require manual entry when it exposes neither `/models` variant or returns a non-listing response.
 - **Undeclared live routes render nowhere** — a route registered without a configurable-provider declaration has no settings address; it stays visible in pickers but not on this page's rows.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

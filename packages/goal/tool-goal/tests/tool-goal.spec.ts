@@ -7,6 +7,7 @@ import GoalService, { GoalId } from '@deepseek-ai/dsh-goal'
 import type { GoalRef } from '@deepseek-ai/dsh-goal'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { MessageSource } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import {
   SESSION_FORMAT_VERSION,
   Session,
@@ -19,6 +20,12 @@ import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import * as toolGoal from '@deepseek-ai/dsh-tool-goal'
 import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 import type { ReactLoopInbox } from '../../../core/agent-loop/src/inbox.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'test': { kind: 'test' } & ContextFormed
+  }
+}
 
 const testToolSignal = new AbortController().signal
 
@@ -234,7 +241,7 @@ describe('goal tool execution authority', () => {
     expect(driverless.error?.info?.code).toBe('GOAL_TOOL_DRIVER_REQUIRED')
     closeTurn(root, 1)
 
-    openTurn(root, { kind: 'plugin', plugin: 'test' })
+    openTurn(root, { kind: 'test' })
     const nonHuman = await execute(ctx, 'create_goal', { objective: 'forged' }, root.agent)
     expect(nonHuman.error?.info?.code).toBe('GOAL_TOOL_AUTHORITY_REQUIRED')
     closeTurn(root, 2)
@@ -298,7 +305,7 @@ describe('goal tool execution authority', () => {
 
   it('rejects terminal reporting without human input or a current goal round', async () => {
     const { ctx, root } = await harness()
-    openTurn(root, { kind: 'plugin', plugin: 'test' })
+    openTurn(root, { kind: 'test' })
     const result = await execute(ctx, 'update_goal', {
       goal_id: 'goal-missing', revision: 1, action: 'complete',
     }, root.agent)
@@ -384,8 +391,7 @@ describe('goal tool state transitions', () => {
     const contexts = complete.additionalContexts ?? []
     expect(contexts).toHaveLength(1)
     expect(contexts[0]?.source).toEqual({
-      kind: 'plugin',
-      plugin: 'tool-goal',
+      kind: 'tool-goal',
       form: 'notice',
       summary: 'complete: pause cleanly',
     })

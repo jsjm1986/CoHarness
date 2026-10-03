@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-dispose-ladder-to-consumer.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-27-dispose-ladder-to-consumer.md
-2026-07-27-dispose-ladder-to-consumer.md: 58d835864d2f6544152fdf09cf6e93380793a2ae
-2026-07-27-dispose-ladder-to-consumer.zh.md: dc7413e85fa6e52de14f51fd175c7b37b43029a4
+/agent-note-the-dispose-ladder-belongs-to-its-consumer-not-the-subprocess-seam:
+  en: 96bb0ebf7496b0ed
+  zh: 849fe09eb37a9ef6
+/agent-note-the-dispose-ladder-belongs-to-its-consumer-not-the-subprocess-seam/problem:
+  en: 959dd29c8eff6831
+  zh: bc2d41d12a112358
+/agent-note-the-dispose-ladder-belongs-to-its-consumer-not-the-subprocess-seam/decision:
+  en: 55f9beeba00af2e2
+  zh: ce38304022308476
+/agent-note-the-dispose-ladder-belongs-to-its-consumer-not-the-subprocess-seam/alternatives-considered:
+  en: 602c4ca22668222a
+  zh: ab1f4a462a12f8bb
+/agent-note-the-dispose-ladder-belongs-to-its-consumer-not-the-subprocess-seam/consequences:
+  en: 00d28e6d66a8aa85
+  zh: a230c0b444685a3c

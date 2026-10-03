@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-18-session-surface.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-18-session-surface.md
-2026-06-18-session-surface.md: 703121ce70f2521ca1906f4dd151567168217e43
-2026-06-18-session-surface.zh.md: c6f195a79e105ac40e247e34d0dfd48c4ae6259a
+/agent-note-session-surface-an-ordered-projection-over-the-event-log:
+  en: 9ea7a8765e7f3259
+  zh: 17e0d51645f01edd
+/agent-note-session-surface-an-ordered-projection-over-the-event-log/problem:
+  en: 4f7a9d20d71a6ab3
+  zh: 958abbdfefec4f21
+/agent-note-session-surface-an-ordered-projection-over-the-event-log/decision:
+  en: a9944b568ec51fad
+  zh: 6717d30db31b81d7
+/agent-note-session-surface-an-ordered-projection-over-the-event-log/decision/two-new-top-level-fields-on-sessionevent:
+  en: 6c7be8c4884a9a51
+  zh: 842a49198c1d7148
+/agent-note-session-surface-an-ordered-projection-over-the-event-log/decision/surfaceop-two-operations:
+  en: fe9a1c5f15d35304
+  zh: b32ed93ba3ac4c6d
+/agent-note-session-surface-an-ordered-projection-over-the-event-log/decision/surfacemanager-delta-based-not-full-rebuild:
+  en: 92347390b64de7de
+  zh: e9b5a4987887ae34
+/agent-note-session-surface-an-ordered-projection-over-the-event-log/decision/persistence:
+  en: 3d483bdbc53be2c5
+  zh: a48b03855ae35048
+/agent-note-session-surface-an-ordered-projection-over-the-event-log/decision/crash-recovery:
+  en: ee71f9c0f12b6a0e
+  zh: 403b1723f808391d
+/agent-note-session-surface-an-ordered-projection-over-the-event-log/decision/invariants:
+  en: e1ce685d46d16b12
+  zh: 5882e2b108cb83d4
+/agent-note-session-surface-an-ordered-projection-over-the-event-log/alternatives-considered:
+  en: 193157129e65e487
+  zh: a0a73b8a9cbd78e6
+/agent-note-session-surface-an-ordered-projection-over-the-event-log/consequences:
+  en: 722608c6082c32fa
+  zh: 615e305efa0099c6

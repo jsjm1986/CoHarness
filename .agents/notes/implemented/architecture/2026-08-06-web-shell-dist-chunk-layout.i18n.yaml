@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-web-shell-dist-chunk-layout.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-06-web-shell-dist-chunk-layout.md
-2026-08-06-web-shell-dist-chunk-layout.md: 1c7b4273dc243685317b149e2fd7fddf2a6c18d1
-2026-08-06-web-shell-dist-chunk-layout.zh.md: d1435215d3c077efc3afaac7b3a7a1c2e2ffdae7
+/agent-note-web-shell-dist-chunk-split-and-directory-layout:
+  en: 66e4e679b16bb003
+  zh: 41f4553f85b364cd
+/agent-note-web-shell-dist-chunk-split-and-directory-layout/problem:
+  en: 9ac3163da6a7a506
+  zh: 067a50bc89535024
+/agent-note-web-shell-dist-chunk-split-and-directory-layout/decision:
+  en: 0abc312cefbf8df1
+  zh: 54b2a8bae63dcd8d
+/agent-note-web-shell-dist-chunk-split-and-directory-layout/alternatives-considered:
+  en: 52fc334884bc5cdc
+  zh: c386f42f9d696f40
+/agent-note-web-shell-dist-chunk-split-and-directory-layout/verification:
+  en: 1d0ed67863c4ed08
+  zh: ee3b061c20f4723d
+/agent-note-web-shell-dist-chunk-split-and-directory-layout/consequences:
+  en: cd4aad2f948502e3
+  zh: e35185dbd7099338

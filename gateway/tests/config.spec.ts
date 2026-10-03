@@ -10,6 +10,12 @@ import {
 } from '../src/config.ts'
 
 describe('loadConfig', () => {
+  it('accepts an explicit SQL executor wrapper and rejects an empty command', () => {
+    expect(loadConfig({ HGW_PSQL_COMMAND: '/opt/postgres/bin/psql' }).psqlCommand).toEqual(['/opt/postgres/bin/psql'])
+    expect(loadConfig({}).psqlCommand).toBeUndefined()
+    expect(() => loadConfig({ HGW_PSQL_COMMAND: '' })).toThrow('HGW_PSQL_COMMAND')
+  })
+
   it('provides workable defaults', () => {
     const cfg = loadConfig({})
     expect(cfg.port).toBe(8899)

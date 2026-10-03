@@ -1,4 +1,5 @@
 import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
 import { DatabaseSync } from 'node:sqlite'
@@ -26,6 +27,12 @@ import {
   type SessionQueryErrorCode,
   type SessionSearchRequest,
 } from '@deepseek-ai/dsh-session-query'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'test': { kind: 'test' } & ContextFormed
+  }
+}
 
 const temporaryDirectories: string[] = []
 
@@ -444,7 +451,7 @@ describe('SQLite session search', () => {
       }), surfaceOp: 'append' },
       { type: 'assistant/attempt', seq: SessionSeq(1), time: 11, data: { turn: 1, step: 1, stream: [{ type: 'chunk', time: 11, chunk: { type: 'text-delta', index: 0, text: 'needle raw' } }] } },
       { type: 'user/message', seq: SessionSeq(2), time: 12, data: createUserMessage({
-        content: [{ type: 'text', text: 'needle summary' }], source: { kind: 'plugin', plugin: 'test' },
+        content: [{ type: 'text', text: 'needle summary' }], source: { kind: 'test' },
       }), surfaceOp: { op: 'replace', startSeq: SessionSeq(0), endSeq: SessionSeq(0) }, sourceEventSeqs: [SessionSeq(0)] },
       { type: 'turn/end', seq: SessionSeq(3), time: 13, data: { turn: 1, reason: { kind: 'error', error: { message: 'needle failure', code: 'UNKNOWN' } } } },
     ]

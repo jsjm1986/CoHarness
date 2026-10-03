@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # session/：持久会话数据平面
 
 [English](README.md) | 中文

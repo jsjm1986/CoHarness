@@ -64,8 +64,8 @@ export const muxFrameSchema = z.discriminatedUnion('type', [
   // Non-empty by wire contract: the user-questions service rejects empty
   // batches at ask() (EMPTY_QUESTIONS), so an empty frame is host breakage
   // and must fail loud here, not reach the composer.
-  z.object({ type: z.literal('question/requested'), sessionId: sessionIdSchema, questions: z.array(askUserQuestionItemSchema).min(1) }),
-  z.object({ type: z.literal('question/resolved'), sessionId: sessionIdSchema, questionRpcId: rpcIdSchema, outcome: z.union([z.literal('answered'), z.literal('cancelled')]) }),
+  z.object({ type: z.literal('question/requested'), sessionId: sessionIdSchema, questions: z.array(askUserQuestionItemSchema).min(1), wait: z.object({ callId: z.string(), timed: z.boolean().optional() }).optional() }),
+  z.object({ type: z.literal('question/resolved'), sessionId: sessionIdSchema, questionRpcId: rpcIdSchema, outcome: z.union([z.literal('answered'), z.literal('cancelled'), z.literal('pending')]) }),
   z.object({
     type: z.literal('session/queue'),
     sessionId: sessionIdSchema,
@@ -101,6 +101,7 @@ export const hostFrameSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('host/workspace-removed'), workspaceId: workspaceIdSchema }),
   z.object({ type: z.literal('host/workspace-order-changed'), workspaceIds: z.array(workspaceIdSchema) }),
   z.object({ type: z.literal('host/archived-sessions-changed'), archivedSessionIds: z.array(sessionIdSchema), archiveRevision: z.number().int().nonnegative().optional() }),
+  z.object({ type: z.literal('host/pinned-sessions-changed'), pinnedSessionIds: z.array(sessionIdSchema) }),
   z.object({ type: z.literal('host/workspace-file-changed'), sessionId: sessionIdSchema, path: z.string().min(1), present: z.boolean(), version: z.string().min(1).optional() }),
   // args stays wide, the same posture as session/projection's value: the frame
   // arrives from JSON.parse, so every element is already a JSON value, and the

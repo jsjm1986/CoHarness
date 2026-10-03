@@ -7,6 +7,7 @@
  * @module @deepseek-ai/dsh-settings-file
  */
 
+import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { watch as chokidarWatch } from 'chokidar'
@@ -138,6 +139,7 @@ export class FileSettingsProvider extends SettingsProvider {
     // Programmatic construction may bypass Schemastery normalization; resolve
     // the same defaults in one explicit step either way.
     this.spec = resolveSpec(config)
+    registerManagedDataPath({ owner: '@deepseek-ai/dsh-settings-file', kind: 'file', path: this.spec.filename }, process.env.DSH_MANAGED_DATA_MANIFEST)
   }
 
   /** The local document is always writable through {@link SettingsProvider.update}. */

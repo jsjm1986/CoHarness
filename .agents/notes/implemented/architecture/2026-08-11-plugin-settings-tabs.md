@@ -32,6 +32,6 @@ Both registrations use `ctx.slots.inject()`. If the section declarer unloads, th
 
 Settings has one Plugins navigation row, ordered before Agent Presets, with **Plugin configuration** and **Plugin list** tabs. Agent Presets remains an independent section because it edits per-session agent compositions rather than the live Host Loader tree.
 
-Feature ownership remains explicit: `ui-settings-plugins` owns the Plugins page and editable cards, `ui-settings-plugin-inventory` owns the read-only inventory view, and the Host/RPC path does not change. A new Plugins view can join by registering one `settings.plugins.tab` contribution.
+Feature ownership remains explicit: `ui-settings-plugins` owns the Plugins page and editable cards, `ui-settings-plugin-inventory` owns the inventory view — including its grant-gated enablement switches ([Grant-gated plugin enablement](../feature/2026-10-02-grant-gated-plugin-enablement.md)) — and the Host/RPC path does not change. A new Plugins view can join by registering one `settings.plugins.tab` contribution.
 
 The aggregation depends on the section owner being composed: without `ui-settings-plugins`, `ui-settings-plugin-inventory` waits for a tab declaration and renders nothing. That is an intentional composition dependency carried by the slot registry rather than a static package import.

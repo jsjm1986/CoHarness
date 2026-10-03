@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-06-backend-continuation-performance.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-06-backend-continuation-performance.md
-2026-09-06-backend-continuation-performance.md: a30c7a47a93f0a8827d1cb4d0857aeabe9dd2fee
-2026-09-06-backend-continuation-performance.zh.md: c703ea70e496d279e5965295d308a2919ed2b445
+/agent-note-performance-baselines-for-tool-heavy-backend-continuation:
+  en: 542fea07db8861a3
+  zh: 3a9d381c2366f5ec
+/agent-note-performance-baselines-for-tool-heavy-backend-continuation/problem:
+  en: c6a89dac7dea293a
+  zh: b10610932d55996c
+/agent-note-performance-baselines-for-tool-heavy-backend-continuation/decision:
+  en: b481ee7960d5589b
+  zh: 94a1d912ac7da718
+/agent-note-performance-baselines-for-tool-heavy-backend-continuation/calibration-evidence:
+  en: e82b2817b47034a7
+  zh: 59b43e5644e133db
+/agent-note-performance-baselines-for-tool-heavy-backend-continuation/alternatives-considered:
+  en: 14e10a47f61aff0a
+  zh: f640659ff782d4a9
+/agent-note-performance-baselines-for-tool-heavy-backend-continuation/consequences:
+  en: 0ffe42f70b26de41
+  zh: 367038e53dc04ff4

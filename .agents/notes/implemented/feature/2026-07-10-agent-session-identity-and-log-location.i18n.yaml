@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-10-agent-session-identity-and-log-location.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-10-agent-session-identity-and-log-location.md
-2026-07-10-agent-session-identity-and-log-location.md: 29b0e6c7d26d6d9dd000dfc7d55943de628c6169
-2026-07-10-agent-session-identity-and-log-location.zh.md: 86d93ff237b9394624220f71c7a174f8a945d9d2
+/agent-note-expose-agent-session-identity-and-jsonl-location-to-tools-and-hooks:
+  en: 598fc741cf81b225
+  zh: 276f5ce85d010701
+/agent-note-expose-agent-session-identity-and-jsonl-location-to-tools-and-hooks/problem:
+  en: 8ad8ff14c8204aa6
+  zh: c06e775f72d4c019
+/agent-note-expose-agent-session-identity-and-jsonl-location-to-tools-and-hooks/decision:
+  en: bac01e6fd1cd59a4
+  zh: bc98c1a9dcccf55b
+/agent-note-expose-agent-session-identity-and-jsonl-location-to-tools-and-hooks/peer-product-findings:
+  en: 75573dc43b80675e
+  zh: 471e4acac7b709bb
+/agent-note-expose-agent-session-identity-and-jsonl-location-to-tools-and-hooks/lifecycle-and-persistence-semantics:
+  en: f4b40036ec372652
+  zh: 076fc4bb84210e17
+/agent-note-expose-agent-session-identity-and-jsonl-location-to-tools-and-hooks/testing:
+  en: 88ff0bf46b724640
+  zh: 386f291e0e57cdfd
+/agent-note-expose-agent-session-identity-and-jsonl-location-to-tools-and-hooks/alternatives-considered:
+  en: 39244b6aaf93bdae
+  zh: dad959a84946bf00
+/agent-note-expose-agent-session-identity-and-jsonl-location-to-tools-and-hooks/consequences:
+  en: a3e7e07deefd4334
+  zh: 04ae8ed69c8269b7

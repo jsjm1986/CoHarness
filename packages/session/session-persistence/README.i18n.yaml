@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-persistence/README.md
-README.md: b282b101ceb5efd87532cb60f04a129d2a68e470
-README.zh.md: 2102847827f3a86b298de2854c7045bc03f2f800
+/:
+  en: 79f97239370fedab
+  zh: 61495d48365178df
+/deepseek-ai-dsh-session-persistence:
+  en: 9446a32a50d55cef
+  zh: f9bad7b35196157d
+/deepseek-ai-dsh-session-persistence/summary:
+  en: 31d5eec7694aa83f
+  zh: b91ea5b6daaec8a5
+/deepseek-ai-dsh-session-persistence/table-of-contents:
+  en: 40024cdc24e57b12
+  zh: a4f781540173c18a
+/deepseek-ai-dsh-session-persistence/service-api-ctx-sessionpersistence:
+  en: 38e96c10402aa864
+  zh: 54b9462c802729d0
+/deepseek-ai-dsh-session-persistence/invariants-every-backend-must-honor:
+  en: 2bd1269a71b6683e
+  zh: 26936deecece938e
+/deepseek-ai-dsh-session-persistence/the-write-coordinator:
+  en: 4440a3fac432c467
+  zh: a7bef588bbdfd99d
+/deepseek-ai-dsh-session-persistence/metadata-and-location-types:
+  en: 861d8d04bbc51cbd
+  zh: 6e5ef51feccefa0b
+/deepseek-ai-dsh-session-persistence/invariants:
+  en: 4741059a4871cd5f
+  zh: a1c7a044c0fdcbdb
+/deepseek-ai-dsh-session-persistence/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-session-persistence/model-experience/resumed-conversation-history:
+  en: 062875aab7f3f138
+  zh: c7285918227e6f5c
+/deepseek-ai-dsh-session-persistence/model-experience/resumed-conversation-history/what-the-model-sees:
+  en: f697ddcf1a13c439
+  zh: a3b5050484be4b9b
+/deepseek-ai-dsh-session-persistence/model-experience/resumed-conversation-history/token-effect:
+  en: 375253768652244e
+  zh: c5bf6c3dcf707ab2
+/deepseek-ai-dsh-session-persistence/model-experience/resumed-conversation-history/kv-cache-effect:
+  en: 70a8139de5fd1cec
+  zh: cce5e5371d8e8bcd
+/deepseek-ai-dsh-session-persistence/known-limitations-and-deferred-work:
+  en: 244b39d1ddb60e8f
+  zh: 01a9c2a855510d8e
+/deepseek-ai-dsh-session-persistence/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

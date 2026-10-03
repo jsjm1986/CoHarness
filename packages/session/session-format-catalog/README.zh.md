@@ -9,7 +9,7 @@ kind: "package-library"
 
 ## 概述
 
-`dsh-session-format-catalog` 为持久化提供一个确定性的 Session 格式读取器，且无需查询已挂载插件。它装配从最早受支持格式到[当前写入格式](../../../docs/session-format-status.zh.md)的编解码器与相邻迁移边，在模块初始化时校验完整且无缺口的迁移链，并通过 `sessionFormatCatalog` 暴露物理分派、仅 header 分类、单遍行还原和当前格式逐记录编码。存储已解码 header 与事件行而非发布版 JSONL 的后端（SQLite、Gateway/PostgreSQL、脱离对象的协调器读取）使用 `sessionLogicalFormatCatalog`：它把存储元数据投影到发布版要求上，归一化声明的 CoHarness v2 数据库方言，并运行同一套发布版迁移边与当前产物校验。
+`dsh-session-format-catalog` 装配已发布 Session 格式的读取器及其到[当前写入格式](../../../docs/session-format-status.zh.md)的相邻迁移。持久化读取方在插件挂载前使用这份静态清单。它支持已发布 JSONL、CoHarness 历史 JSONL 和已解码数据库行，校验还原数据并拒绝不支持的格式。
 
 ## 目录
 
@@ -31,9 +31,14 @@ kind: "package-library"
 
 ### 入口
 
+`dsh-session-format-catalog` 为持久化提供一个确定性的 Session 格式读取器，且无需查询已挂载插件。它装配从最早受支持格式到[当前写入格式](../../../docs/session-format-status.zh.md)的编解码器与相邻迁移边，在模块初始化时校验完整且无缺口的迁移链，并通过 `sessionFormatCatalog` 暴露物理分派、仅 header 分类、单遍行还原和当前格式逐记录编码。存储已解码 header 与事件行而非发布版 JSONL 的后端（SQLite、Gateway/PostgreSQL、脱离对象的协调器读取）使用 `sessionLogicalFormatCatalog`：它把存储元数据投影到发布版要求上，归一化声明的 CoHarness v2 数据库方言，并运行同一套发布版迁移边与当前产物校验。
+
+CoHarness JSONL 持久化使用 `coharnessJsonlFormatCatalog`。其已发布 v0–v3 编码保留头部 `seedLength`、可选 `draft` 和压缩的 Assistant chunk。生成清单仍拥有全部相邻迁移边与当前编码器；读取器在不改变原存储版本的情况下选择历史方言。采用 `isSeeded` 的已发布头部和当前代次保留原生准入规则。未知来源字段、矛盾的种子边界、缺失的消息身份及未来版本均被拒绝。
+
 ```text
 const descriptor = sessionFormatCatalog.readHeader(physicalHeader)
-const restore = sessionFormatCatalog.createRestore(physicalHeader, { recovery: 'recoverable', validation: 'transformed' })
+const catalog = createSessionFormatCatalogWithChildren(childFacts)
+const restore = catalog.createRestore(physicalHeader, { recovery: 'recoverable', validation: 'transformed' })
 for (const row of physicalRows) restore.decodeRow(row)
 const current = restore.finish()
 const headerRecord = sessionFormatCatalog.encodeCurrentHeader(current.header, current.inheritedEventCount)
@@ -45,6 +50,8 @@ const eventRecords = current.events.map(sessionFormatCatalog.encodeCurrentEvent)
 Production 历史读取使用 `{ recovery: 'recoverable', validation: 'transformed' }`。Worker 与 fixture 校验使用 `{ recovery: 'strict', validation: 'current' }`。Transformed validation 会在迁移后执行已发布 current 规则，但对已经是 current 的输入有意跳过已安装语义校验。
 
 该目录直接包含所有受支持的历史读取器。Profile 无法通过挂载功能插件来添加、移除或重新排列迁移边。它通过对 `dsh-session` 的对等依赖（peer dependency）获得已安装的当前事件词表与当前还原规则，而历史迁移边校验器保持冻结。浏览器安全的 `./message-projections` 导出为独立构造函数和 surface 折叠装配当前插件拥有的处理器，不挂载恢复监听器。
+
+`createSessionFormatCatalogWithChildren(childFacts)` 在组装时将显式的子 Session 证据绑定到 V3→V4，见[目录补齐规范](../session-format-v3-to-v4/README.zh.md)。`historicalSessionFormatCatalog` 使用固定的已发布 V3 事件词汇恢复 V0–V3，收集子日志前置事实而不递归补齐其目录。即使已安装写入方认识事件名，可忽略 V3 扩展仍保持不透明。独立转录回放显式提供空数组；持久化必须收集完整的可用直属子 Session 集合。在 catalog 的生命周期内保持传入证据不变。每次恢复各自拥有独立的 stage 状态。静态 `sessionFormatCatalog` 支持 header 和原生当前格式读取；历史正文读取必须使用已绑定子 Session 的 catalog。
 
 -----
 
@@ -67,9 +74,11 @@ Production 历史读取使用 `{ recovery: 'recoverable', validation: 'transform
 - [已发布 v0 到 v1 迁移边](../session-format-v0-to-v1/README.zh.md)——编解码器与校验器所有权。
 - [已发布 v1 到 v2 迁移边](../session-format-v1-to-v2/README.zh.md)——Assistant 流嵌入与基数变化引用重映射。
 - [已发布 V2 到 V3 规范](../session-format-v2-to-v3/README.zh.md#v2-to-v3-specification)——转换、保留与拒绝。
+- [V3 到 V4 规范](../session-format-v3-to-v4/README.zh.md#v3-to-v4-specification)——转换、引用重映射与 delivery generation 校验。
 - [JSONL 持久化](../session-persistence-jsonl/README.zh.md)——不可变 generation 命名与排他发布。
 
 -----
+
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -88,6 +97,7 @@ Production 历史读取使用 `{ recovery: 'recoverable', validation: 'transform
 
 没有直接影响；还原后的历史在其消费方中决定缓存身份。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

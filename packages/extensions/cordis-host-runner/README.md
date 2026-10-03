@@ -1,3 +1,8 @@
+---
+description: "Dynamic package registry, authorized Host execution, and read-only runtime inspection"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-cordis-host-runner
 
 English | [中文](README.zh.md)
@@ -8,6 +13,21 @@ The Host service for programmatically defined dynamic packages: the definition r
 
 `dsh-cordis-host-runner` exposes runtime inspection and keeps process-local dynamic definitions available to programmatic callers and browser controls. Host halves run in a `node:vm` realm; browser halves use the Client runner and approval UI. Definitions disappear on restart. Agents discover APIs through `tool-cordis` and install persistent bundles through Plugin Manager; no model tool creates dynamic definitions.
 
+## Table of Contents
+
+- [What it does](#what-it-does)
+- [Storage stance](#storage-stance)
+- [Trust stance](#trust-stance)
+- [Config](#config)
+- [Export shape](#export-shape)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="what-it-does"></a>
 ## What it does
 
 Two phases: `define` only records, and everything with an effect hangs off a run.
@@ -27,32 +47,46 @@ A definition another session defined reads as absent rather than forbidden, so n
 
 Six forwarded event families belong to this feature: request start and resolution, package activation and retraction, and inspect query and resolution. This package declares both the official `cordis/*` names and the current `@deepseek-ai/cordis/*` names on its client-safe [`./types`](src/types.ts) subpath; [`@deepseek-ai/dsh-api-remotes`](../../api/remotes/README.md) allowlists both, and the Gateway Client treats each pair as one subscription family. This Host runner emits only the rescoped name, so each state change produces one frame. Payloads remain identical and carry metadata or JSON query data, never dynamic package source.
 
+<a id="storage-stance"></a>
 ## Storage stance
 
 The registry is process memory and the only source of truth. Historical tool calls retain submitted source and result metadata, but never restore executable definitions, so a restarted process legitimately has no definitions, and a card whose id no longer resolves says exactly that rather than pretending it can run. Nothing here is written to disk, and no definition is restored automatically; a reloaded page holds nothing until someone runs a package again, which is what makes it bind the live host half and re-fetch the browser half.
 
+<a id="trust-stance"></a>
 ## Trust stance
 
 Managed deployments require `pluginManagementAuthorization` for Host evaluation, actual Plugin activation (including a later dependency reactivation), registered dynamic Tool execution, Host handler invocation, and successful browser settlement. Missing policy fails closed when `executionAuthorityRequired` is set. The runner rechecks after awaited cleanup; authority is not cached on a Package or Run. Session ownership and browser collaboration ACL checks remain independent. Rejection and owner cleanup can still terminate work after execution authority is revoked. Independent local deployments without the managed marker retain local execution.
 
 The vm sandbox isolates globals but is not a security boundary: Node globals are absent or redirect to Cordis services (`ctx.fs`, `ctx.web`, `ctx.bash`, the timer helpers), and a host half receives a façade without framework internals, yet the services it declares reach the live runtime. Treat a dynamic package like bash access — see the [self-referential toolset Agent Note](../../../.agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md).
 
+<a id="config"></a>
 ## Config
 
 | Field | Default | Meaning |
 |---|---|---|
 | `vmTimeoutMs` | `5000` | Milliseconds allowed for host-half evaluation and activation; synchronous vm work and async completion are both bounded |
+| `clientInspectTimeoutMs` | `10000` | Maximum wait for a valid Client inspect response; an integer from 1 to 2147483647 milliseconds |
 
-One field is all there is: a run request waits for a person, so the round trip has no deadline of its own. Disposal closes admission before retracting definitions, and a definition removed while activation is pending cannot publish a late fiber back into the registry.
+A run request waits for a person, so the round trip has no deadline of its own. Disposal closes admission before retracting definitions, and a definition removed while activation is pending cannot publish a late fiber back into the registry.
 
+<a id="client-inspection"></a>
+### Client inspection
+
+When Gateway is mounted, a Client query with no live event stream fails before dispatch. This check does not subscribe to disconnections: queries already dispatched retain their original deadline. Standalone event transports without Gateway retain the same timeout behavior.
+
+Client queries accept the first valid page response within `clientInspectTimeoutMs`. A failed page does not prevent another page from answering successfully. If no valid result arrives, the query rejects with the first Client failure or output-validation diagnostic; when no page answers, it asks the caller to open or reconnect the Harness page and retry. Cancellation and registry disposal also end pending queries. Reconnecting a page does not replay a missed request, so retry after the connection is restored. Host queries are unaffected by this timeout.
+
+<a id="export-shape"></a>
 ## Export shape
 
 Service package: default-exports `DynamicCordisRunnerService` (service key `dynamicCordisRunner`), with `./types` carrying the payload shapes the `dynamicCordisRunner` remote namespace and its consumers share. The `define` / `undefine` shapes stay inside the package, because they never cross the wire.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Definitions and their sandboxed fibers are private registry state whose mount/invoke/retract lifecycle is asserted by the runner's specs; no independently observable projection is published.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Run outcomes, refusals, and diagnostics relayed to the owning session
@@ -75,3 +109,13 @@ None of its own. A host half that registers tools changes the next request's too
 - Dynamic definitions are process-local. Historical source and outcomes remain readable without restoring executable code.
 - The VM is not an operating-system isolation boundary. Programmatic and browser execution paths require their own service authorization independently from the retired model tools.
 - **`zod` is a runtime dependency of the generated TypeRT faces, not of `src`.** `./typert` and `./remote` resolve to `lib/typert.*.js`, which `tsc` emits unbundled with a bare `import { z } from 'zod'`, so the package must declare it (the `@deepseek-ai/dsh-goal` precedent). `knip.config.ts` adds a workspace-scoped exception only when neither generated JavaScript face exists; a built checkout lets Knip observe the import directly. Nothing in `src` imports zod.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

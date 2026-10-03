@@ -19,8 +19,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
-  LiveSlotNode, LocaleFace, OwnerOf, SlotEntryDef, SlotMap, SlotRenderer, SlotRendererHost,
-  SlotScope, SlotSpec, StoreDecl, StoreFactory, StoredEntry, StoreInstanceLike,
+  HostObservable, LiveSlotNode, LocaleFace, OwnerOf, RootStandardSourceContribution, SlotEntryDef, SlotMap,
+  SlotRenderer, SlotRendererHost, SlotScope, SlotSpec, StoreDecl, StoreFactory, StoredEntry, StoreInstanceLike,
 } from '@deepseek-ai/dsh-client-ui-slots'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -98,6 +98,10 @@ export class SlotRegistry extends Service {
   private _renderer: SlotRenderer | undefined
   private _locale: LocaleFace | undefined
   private _host: SlotRendererHost | undefined
+  /** Contributed root hook sources by bare name; each provideRoot owns its keys. */
+  private readonly _rootSources = new Map<string, HostObservable<unknown>>()
+  private _rootRevision = 0
+  private readonly _rootListeners = new Set<() => void>()
 
   /**
    * @param ctx - owning root context.
@@ -249,6 +253,55 @@ export class SlotRegistry extends Service {
         if (this._locale === face) this._locale = undefined
       }
     }, 'slots.installLocale()')
+  }
+
+  /**
+   * Contribute domain-owned root-scope data. Hook names are global: the
+   * rendered prop is `use<Name>` under every scope, so a second contributor
+   * of the same name fails loud at registration. Installation and disposal
+   * each bump the roster revision once; the renderer rebuilds the root
+   * standard kit on that tick.
+   * @param contribution - bare hook sources keyed by bare name.
+   * @returns disposer owned by the caller's Cordis fiber.
+   */
+  provideRoot(contribution: RootStandardSourceContribution): () => void {
+    const hooks = contribution.hooks ?? {}
+    const names = Object.keys(hooks)
+    for (const name of names) {
+      if (this._rootSources.has(name)) throw new Error(`slots.provideRoot: root hook '${name}' is already contributed`)
+    }
+    const dispose = this.ctx.effect(() => {
+      for (const name of names) this._rootSources.set(name, hooks[name] as HostObservable<unknown>)
+      this._publishRootRevision()
+      return () => {
+        let removed = false
+        for (const name of names) {
+          if (this._rootSources.get(name) === hooks[name]) {
+            this._rootSources.delete(name)
+            removed = true
+          }
+        }
+        if (removed) this._publishRootRevision()
+      }
+    }, 'slots.provideRoot()')
+    return () => { void dispose() }
+  }
+
+  /**
+   * Bump the contributed-root roster and wake subscribed outlets. Soft-private
+   * like the rest of this class: `ctx.slots.*` calls reach us through the
+   * Cordis traceable proxy, where `this` is the shadow receiver and a `#`
+   * field would fail its brand check.
+   */
+  _publishRootRevision(): void {
+    this._rootRevision += 1
+    for (const listener of [...this._rootListeners]) {
+      try {
+        listener()
+      } catch (error) {
+        console.error('root-contribution subscriber failed:', error)
+      }
+    }
   }
 
   /**
@@ -429,6 +482,16 @@ export class SlotRegistry extends Service {
         provideInfoFor: id => sessions.provideInfoFor(id as SessionId),
       },
       workspaces: { list: workspaces.list },
+      getRootRevision: () => this._rootRevision,
+      subscribeRootRevision: (fn) => {
+        this._rootListeners.add(fn)
+        return () => { this._rootListeners.delete(fn) }
+      },
+      rootSources: () => {
+        const record: Record<string, HostObservable<unknown>> = {}
+        for (const [name, source] of this._rootSources) record[name] = source
+        return record
+      },
       get locale() { return service._locale },
     }
     return this._host

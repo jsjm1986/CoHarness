@@ -2,6 +2,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
+import { parseClientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type {
   DirectoryListing, IApiClient, RpcError,
   SessionDraftId, SessionId, WorkspaceId, WorkspaceView,
@@ -77,6 +78,12 @@ export interface WorkspaceListState {
    * build their own transient Set.
    */
   archivedSessionIds: readonly SessionId[]
+  /**
+   * Registry-global pin set in Host pin order (most recently pinned first):
+   * pinned sessions lead their grouping-surface section. Same plain-array
+   * posture as `archivedSessionIds`.
+   */
+  pinnedSessionIds: readonly SessionId[]
   /** Versioned archive snapshot revision, when supplied by the Host. */
   archiveRevision?: number
   state: 'idle' | 'loading' | 'error'
@@ -125,7 +132,7 @@ export class WorkspaceRuntime implements IWorkspaces {
   constructor(ctx: Context, private readonly api: IApiClient, private readonly sessions: SessionsPort) {
     this.manager = new WorkspaceManager(api)
     this.list = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'pending', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'pending', error: null,
       archiveRevision: 0,
       baselinesReady: false, recentWorkspaceId: undefined,
     })
@@ -185,7 +192,11 @@ export class WorkspaceRuntime implements IWorkspaces {
           this.activeDrafts.delete(workspaceId)
         } else {
           const current = this.activeDrafts.get(workspaceId)
-          if (current !== undefined) this.activeDrafts.set(workspaceId, { ...current, sessionId })
+          if (current !== undefined) {
+            const original = this.sessions.keyFor === undefined ? sessionId : parseClientSessionKey(sessionId)?.sessionId
+            if (original === undefined) throw new Error('Pooled Session creation returned no runtime-qualified identity')
+            this.activeDrafts.set(workspaceId, { ...current, sessionId: original })
+          }
         }
         saveActiveDrafts(this.activeDrafts)
         return sessionId
@@ -323,7 +334,7 @@ export class WorkspaceRuntime implements IWorkspaces {
   async create(input: { path: string }): Promise<WorkspaceView> {
     const result = await this.manager.create(input)
     if (!result.ok) throw new WorkspaceCreateError(result.error)
-    return result.value.workspace
+    return this.presentWorkspace(result.value.workspace)
   }
 
   /**
@@ -382,7 +393,7 @@ export class WorkspaceRuntime implements IWorkspaces {
   async rename(workspaceId: WorkspaceId, title: string): Promise<WorkspaceView> {
     const result = await this.manager.rename(workspaceId, title)
     if (!result.ok) throw new Error(`workspace rename failed: ${result.error.code}: ${result.error.message}`)
-    return result.value.workspace
+    return this.presentWorkspace(result.value.workspace)
   }
 
   /**
@@ -428,6 +439,30 @@ export class WorkspaceRuntime implements IWorkspaces {
   }
 
   /**
+   * Pin a session so it leads its grouping-surface section in Host pin
+   * order. The echoed pin set re-orders every grouping surface; a
+   * superseded echo (a later pin request, a pushed pin frame, or a refresh
+   * baseline) installs nothing.
+   * @param sessionId - session to pin.
+   */
+  async pinSession(sessionId: SessionId): Promise<void> {
+    const result = await this.manager.pinSession(sessionId)
+    if (!result.ok) throw new Error(`session pin failed: ${result.error.code}: ${result.error.message}`)
+  }
+
+  /**
+   * Drop a session from the registry-global pin set, restoring it to the
+   * ordinary part of every grouping-surface section. Idempotent: an id
+   * that is not pinned resolves as a no-op, and a superseded echo installs
+   * nothing — the same race posture as {@link pinSession}.
+   * @param sessionId - pinned session to unpin.
+   */
+  async unpinSession(sessionId: SessionId): Promise<void> {
+    const result = await this.manager.unpinSession(sessionId)
+    if (!result.ok) throw new Error(`session unpin failed: ${result.error.code}: ${result.error.message}`)
+  }
+
+  /**
    * Move a session within its Workspace's manual order (DOM-insertBefore-like).
    * @param workspaceId - owning workspace.
    * @param sessionId - accounted session to move.
@@ -441,7 +476,7 @@ export class WorkspaceRuntime implements IWorkspaces {
   ): Promise<WorkspaceView> {
     const result = await this.manager.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     if (!result.ok) throw new Error(`workspace move failed: ${result.error.code}: ${result.error.message}`)
-    return result.value.workspace
+    return this.presentWorkspace(result.value.workspace)
   }
 
   /**
@@ -465,11 +500,20 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.manager.handleConnected()
   }
 
+  private presentWorkspace(workspace: WorkspaceView): WorkspaceView {
+    return { ...workspace, sessionIds: workspace.sessionIds.map(id => this.sessions.keyFor?.(id) ?? id) }
+  }
+
   private project(): void {
-    const workspace = this.manager.getSnapshot()
+    const raw = this.manager.getSnapshot()
+    const key = (id: SessionId): SessionId => this.sessions.keyFor?.(id) ?? id
+    const workspace = { ...raw,
+      items: raw.items.map(item => this.presentWorkspace(item)),
+      archivedSessionIds: raw.archivedSessionIds.map(key),
+    }
     const sessions = this.sessions.list.getSnapshot()
     for (const [workspaceId, draft] of this.activeDrafts) {
-      const summary = sessions.byId[draft.sessionId]
+      const summary = sessions.byId[key(draft.sessionId)]
       if (summary !== undefined && !summary.blank) this.activeDrafts.delete(workspaceId)
     }
     saveActiveDrafts(this.activeDrafts)
@@ -485,6 +529,7 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.list.set({
       items: workspace.items,
       archivedSessionIds: workspace.archivedSessionIds,
+      pinnedSessionIds: workspace.pinnedSessionIds,
       ...(workspace.archiveRevision === undefined ? {} : { archiveRevision: workspace.archiveRevision }),
       state: workspace.state,
       phase: workspace.phase,

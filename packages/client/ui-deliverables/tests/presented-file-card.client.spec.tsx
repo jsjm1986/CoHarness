@@ -12,7 +12,9 @@ const props = () => ({
   file: { path: 'out/report.pdf', description: 'Final report', seq: 4, index: 1 },
   host: { name: 'remote-desktop', available: true, fileManager: 'finder' as const },
   phase: undefined,
+  apps: undefined,
   onPreview: vi.fn(),
+  onLoadApps: vi.fn(),
   onAction: vi.fn(),
   t: makeTranslate(en),
 })
@@ -24,11 +26,11 @@ it.each([
   const view = render(<PresentedFileCard {...p} host={{ ...p.host, fileManager }} />)
   fireEvent.click(view.getByRole('button', { name: 'More file actions for out/report.pdf' }))
   fireEvent.click(view.getByRole('menuitem', { name: new RegExp(label) }))
-  expect(p.onAction).toHaveBeenCalledWith('reveal')
+  expect(p.onAction).toHaveBeenCalledWith('reveal', undefined)
   expect(view.queryByRole('menu')).toBeNull()
   fireEvent.click(view.getByRole('button', { name: 'More file actions for out/report.pdf' }))
   fireEvent.click(view.getByRole('menuitem', { name: /Open in default app/ }))
-  expect(p.onAction).toHaveBeenLastCalledWith('open')
+  expect(p.onAction).toHaveBeenLastCalledWith('open', undefined)
   expect(p.onAction).toHaveBeenCalledTimes(2)
 })
 
@@ -113,7 +115,7 @@ it('shows the basename while retaining the full location for hover and actions',
   expect(view.getByText('result.pdf')).toBeTruthy()
   fireEvent.click(view.getByRole('button', { name: `More file actions for ${path}` }))
   fireEvent.click(view.getByRole('menuitem', { name: 'Open in default app' }))
-  expect(p.onAction).toHaveBeenCalledWith('open')
+  expect(p.onAction).toHaveBeenCalledWith('open', undefined)
   view.rerender(<PresentedFileCard {...p} cwd="/work" />)
   expect(view.getByTitle('/work/out/report.pdf')).toBeTruthy()
   expect(view.getByText('report.pdf')).toBeTruthy()

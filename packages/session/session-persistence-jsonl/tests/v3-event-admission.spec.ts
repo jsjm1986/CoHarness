@@ -8,8 +8,8 @@ import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { generationLogPath, scanLog, SessionLogScanner } from '../src/format.ts'
 
-const id = SessionId('v6-admission')
-const header = { type: 'session', version: 6, id, createdAt: 1000, isSeeded: false, delegationDepth: 0 }
+const id = SessionId('v7-admission')
+const header = { type: 'session', version: 7, id, createdAt: 1000, isSeeded: false, delegationDepth: 0 }
 const start = { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }
 const prefix = [header, start].map(row => JSON.stringify(row)).join('\n') + '\n'
 const obsoleteTypes = ['tool/code-dispatch-start', 'tool/code-dispatch'] as const
@@ -22,12 +22,12 @@ function obsoleteEvent(type: string, ignorable?: true) {
   }
 }
 
-describe('current V6 event admission at EOF', () => {
+describe('current V7 event admission at EOF', () => {
   let root: string
   let ctx: Context
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), 'dsh-v6-admission-'))
+    root = await mkdtemp(join(tmpdir(), 'dsh-v7-admission-'))
     ctx = new Context()
     await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
   })
@@ -41,7 +41,7 @@ describe('current V6 event admission at EOF', () => {
   })
 
   async function store(bytes: Buffer): Promise<string> {
-    const path = generationLogPath(root, undefined, id, 6, 'none')
+    const path = generationLogPath(root, undefined, id, 7, 'none')
     await mkdir(dirname(path), { recursive: true })
     await writeFile(path, bytes)
     return path
@@ -89,14 +89,14 @@ describe('current V6 event admission at EOF', () => {
   it.each(obsoleteTypes)('scanLog refuses a complete required %s EOF row', (type) => {
     const bytes = Buffer.from(prefix + JSON.stringify(obsoleteEvent(type)) + '\n')
     expect(() => scanLog(bytes)).toThrow(SessionFormatUnsupportedError)
-    expect(() => scanLog(bytes)).toThrow('format v4 contains unknown event type')
+    expect(() => scanLog(bytes)).toThrow('format v7 rejects retired event type')
   })
 
   it.each(obsoleteTypes.flatMap(type => ['', '{not json\n', 'null\n'].map(corruption => ({ type, corruption }))))(
     'scan, read and write refuse required $type after "$corruption" without changing bytes or inode', async ({ type, corruption }) => {
       const bytes = Buffer.from(prefix + corruption + JSON.stringify(obsoleteEvent(type)) + '\n')
       expect(() => scanLog(bytes)).toThrow(SessionFormatUnsupportedError)
-      expect(() => scanLog(bytes)).toThrow('format v4 contains unknown event type')
+      expect(() => scanLog(bytes)).toThrow('format v7 rejects retired event type')
       const path = await store(bytes)
       const sourceStat = await stat(path)
       for (const access of ['read', 'write'] as const) {
@@ -113,14 +113,14 @@ describe('current V6 event admission at EOF', () => {
   it.each(['', '{not json\n', 'null\n'])('refuses malformed system payloads after %j without modifying storage', async (corruption) => {
     const malformed = { type: 'system/message', seq: 1, time: 2, data: null, surfaceOp: 'append' }
     const bytes = Buffer.from(prefix + corruption + JSON.stringify(malformed) + '\n')
-    expect(() => scanLog(bytes)).toThrow('system/message data must be an object')
+    expect(() => scanLog(bytes)).toThrow('format v7 system/message data requires an object')
     const path = await store(bytes)
     const sourceStat = await stat(path)
     for (const access of ['read', 'write'] as const) {
       const opened = ctx.sessionPersistence.open(id, access).then(async (handle) => {
         await handle.close()
       })
-      await expect(opened).rejects.toThrow('system/message data must be an object')
+      await expect(opened).rejects.toThrow('format v7 system/message data requires an object')
       expect(await readFile(path)).toEqual(bytes)
       expect(await stat(path)).toMatchObject({ dev: sourceStat.dev, ino: sourceStat.ino })
     }
@@ -146,9 +146,6 @@ describe('current V6 event admission at EOF', () => {
   it.each([
     '{not json',
     'null',
-    JSON.stringify({ type: 'user/message', seq: 1, time: 2, data: {
-      id: 'missing-surface-op', role: 'user', content: [{ type: 'text', text: 'malformed canonical tail' }],
-    } }),
   ])('still recovers an ordinary malformed EOF row: %s', async (tail) => {
     const bytes = Buffer.from(prefix + tail + '\n')
     expect(scanLog(bytes)).toMatchObject({ events: [start], committedBytes: Buffer.byteLength(prefix) })

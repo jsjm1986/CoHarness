@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-per-subsystem-cordis-surface-regions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-28-per-subsystem-cordis-surface-regions.md
-2026-07-28-per-subsystem-cordis-surface-regions.md: 66973223ec443fdd2a150fdd32d722ae3cad261b
-2026-07-28-per-subsystem-cordis-surface-regions.zh.md: de000402bd20018c423a391dfefca4a3a9d65bdf
+/agent-note-per-subsystem-generated-cordis-surface-regions:
+  en: 6c98c2008acb70d8
+  zh: 7db5d39ee2ce4359
+/agent-note-per-subsystem-generated-cordis-surface-regions/problem:
+  en: c2f85000090eb9f8
+  zh: 10105eb1947e7960
+/agent-note-per-subsystem-generated-cordis-surface-regions/decision:
+  en: 2469f6f0cf06a339
+  zh: 1263e64601ca7cb2
+/agent-note-per-subsystem-generated-cordis-surface-regions/alternatives-considered:
+  en: 4635b411ac0aeec1
+  zh: 20da4c63c3380b4e
+/agent-note-per-subsystem-generated-cordis-surface-regions/consequences:
+  en: 44a5d96b9b7337fb
+  zh: 3f9c9e0d26cc1240

@@ -1,6 +1,58 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/tool-str-replace-editor/README.md
-README.md: f7057f3b9ecc99385f22758a7b06ab95440b4e20
-README.zh.md: 465ec6aeb80ac6bf7b09cbb788568edd4fd09bf5
+/:
+  en: 0dbcaa94fbbc788e
+  zh: 61495d48365178df
+/deepseek-ai-dsh-tool-str-replace-editor:
+  en: d500ee1284551c4b
+  zh: bf21c828fea57659
+/deepseek-ai-dsh-tool-str-replace-editor/summary:
+  en: f7423308d3241a02
+  zh: 84255466399391f2
+/deepseek-ai-dsh-tool-str-replace-editor/table-of-contents:
+  en: dc4eb510ce8633d3
+  zh: f87c1f68f66a2c92
+/deepseek-ai-dsh-tool-str-replace-editor/config:
+  en: 2d832ea9bff608ba
+  zh: 979e40a21532bbc1
+/deepseek-ai-dsh-tool-str-replace-editor/tool:
+  en: 7932e5040e4cb56d
+  zh: 8a218ece3a561658
+/deepseek-ai-dsh-tool-str-replace-editor/invariants:
+  en: 9f6599e44b897dd4
+  zh: 11af968dbab5942a
+/deepseek-ai-dsh-tool-str-replace-editor/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-tool-str-replace-editor/model-experience/tool-schema:
+  en: e4c7376d4f29dbd5
+  zh: 6b7a9eaf69c9ea53
+/deepseek-ai-dsh-tool-str-replace-editor/model-experience/tool-schema/what-the-model-sees:
+  en: a2fc5c779d44c5b3
+  zh: a5c045c8017fcfb5
+/deepseek-ai-dsh-tool-str-replace-editor/model-experience/tool-schema/token-effect:
+  en: b4009b2b48c27168
+  zh: f8692c0c87c7ce69
+/deepseek-ai-dsh-tool-str-replace-editor/model-experience/tool-schema/kv-cache-effect:
+  en: 7d9323583a83cb95
+  zh: 726ba31a296c1b5e
+/deepseek-ai-dsh-tool-str-replace-editor/model-experience/tool-results:
+  en: beaabb79f229692a
+  zh: 8573891441963be4
+/deepseek-ai-dsh-tool-str-replace-editor/model-experience/tool-results/what-the-model-sees:
+  en: 2ce8dee1a9711311
+  zh: aed7d8e758710c1e
+/deepseek-ai-dsh-tool-str-replace-editor/model-experience/tool-results/token-effect:
+  en: b60b4bccff75a5e3
+  zh: 100e97b019030507
+/deepseek-ai-dsh-tool-str-replace-editor/model-experience/tool-results/kv-cache-effect:
+  en: ba6a48888c3361e5
+  zh: c55623f72106dfbc
+/deepseek-ai-dsh-tool-str-replace-editor/known-limitations-and-deferred-work:
+  en: 257b08013798bbb0
+  zh: 423d7418e864e733
+/deepseek-ai-dsh-tool-str-replace-editor/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-30-hook-protocol-lib.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-30-hook-protocol-lib.md
-2026-06-30-hook-protocol-lib.md: db00d0f880a073fbdd53a591e5d2412f620ecedc
-2026-06-30-hook-protocol-lib.zh.md: 7b0208ec95a8e6ecdf9ebca5badab871a9747b43
+/agent-note-dsh-hook-protocol-the-shared-claude-code-codex-hook-wire-protocol-core:
+  en: d792c9ec725f8a51
+  zh: 7d9c016124d269f3
+/agent-note-dsh-hook-protocol-the-shared-claude-code-codex-hook-wire-protocol-core/problem:
+  en: 18d7144bd3821be9
+  zh: a4d2208c705ae76c
+/agent-note-dsh-hook-protocol-the-shared-claude-code-codex-hook-wire-protocol-core/decision:
+  en: aa7cca439c780c61
+  zh: a4c45c07db047fa3
+/agent-note-dsh-hook-protocol-the-shared-claude-code-codex-hook-wire-protocol-core/alternatives-considered:
+  en: e9fccfc994170aa1
+  zh: cfd84f5abc16cb6d
+/agent-note-dsh-hook-protocol-the-shared-claude-code-codex-hook-wire-protocol-core/consequences:
+  en: 2ac7036a46e26b30
+  zh: 60ad6366040c6f45

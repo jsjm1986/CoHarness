@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-26-scoped-document-upload.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-26-scoped-document-upload.md
-2026-08-26-scoped-document-upload.md: d1a3be2e887949df9ae42616c75385169b720592
-2026-08-26-scoped-document-upload.zh.md: 818a0dd7750c57ae2f9524c088d2639c518dcfed
+/agent-note-target-scope-document-uploads:
+  en: 6c984fc5b976f430
+  zh: def3ef8194841f43
+/agent-note-target-scope-document-uploads/problem:
+  en: f103c49f4dceaad2
+  zh: b245aea930b65105
+/agent-note-target-scope-document-uploads/decision:
+  en: 1f6ab1bd7a81c87a
+  zh: 7aaf444cc11753c1
+/agent-note-target-scope-document-uploads/alternatives-considered:
+  en: fb56bb9bf8fea208
+  zh: 14074a7b0680cc5f
+/agent-note-target-scope-document-uploads/consequences:
+  en: ce1b052735da690a
+  zh: b9e92b5082691b2b

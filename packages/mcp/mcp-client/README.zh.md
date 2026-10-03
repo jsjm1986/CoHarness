@@ -157,6 +157,7 @@ SDK 通过旧版通知或现代协议订阅接收工具列表变化。监督器�
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -202,6 +203,7 @@ SDK 通过旧版通知或现代协议订阅接收工具列表变化。监督器�
 
 未变化的指令保留相同提示词文本。更新或移除指令会改变下一次组装的系统消息及其可复用前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

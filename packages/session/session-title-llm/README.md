@@ -1,3 +1,8 @@
+---
+description: "Shared LLM generation policy for DeepSeek Harness session-title providers"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-session-title-llm
 
 English | [中文](README.zh.md)
@@ -10,12 +15,25 @@ This package is a library, not a Cordis plugin. The provider plugins call `regis
 
 `dsh-session-title-llm` generates concise session titles from selected human messages with a consistent model request policy. Callers choose which messages contribute to each revision and may either supply a provider and model route together or use the route recorded for the current session. Required limits cap the framed input, generated output, and end-to-end duration, while caller cancellation remains effective throughout streaming. Invalid, empty, late, tool-call, or otherwise non-text results are rejected before they can replace a title.
 
+## Table of Contents
+
+- [Route and failure contract](#route-and-failure-contract)
+- [Configuration](#configuration)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="route-and-failure-contract"></a>
 ## Route and failure contract
 
 `provider` and `model` overrides are optional but must be supplied together as non-empty strings. Without that pair, the helper uses the exact provider/model route captured from the current session's logged `request/header`; an explicit refresh before any route exists therefore needs overrides. The helper measures the final JSON-framed user prompt, including seq fields, wrappers, and JSON escaping, against `maxInputBytes` before logging or dispatch instead of truncating it. Timeout and caller cancellation are rechecked while consuming the stream and after it completes, so a late successful result cannot be accepted even if an interceptor or adapter ignores abort. Malformed or empty output, tool calls, and non-stop finish reasons also reject; the session-title service decides whether that rejection is an automatic warning or an explicit caller failure.
 
 After route and input validation, the helper appends a log-only `session/title-llm-request` event directly through `Session` before model dispatch. It contains the title-provider id, exact source seqs, route, system prompt, message list, and output-token cap used by the call. Persistence observes the record eagerly; the append does not need a title-specific marker, cast, settlement queue, or flush. The dispatched envelope is deep-frozen, carries `purpose: 'session-title'`, and deliberately lacks dsh-agent-loop's process-local request identity. Interceptors stay aligned with the record while loop-only reconstruction observers do not compare it with the conversation header. The DeepSeek adapter maps that purpose to thinking-disabled so the small output budget is reserved for visible title text; other adapters own their purpose-specific behavior. A later model failure leaves the request record intact; validation failures that never become dispatchable requests do not create one. The event stays outside derived model history.
 
+<a id="configuration"></a>
 ## Configuration
 
 Every field is required except the paired route override; there are no library defaults.
@@ -29,10 +47,12 @@ Every field is required except the paired route override; there are no library d
 | `timeoutMs` | Positive end-to-end deadline within the runtime timer limit. |
 | `provider`, `model` | Optional explicit route; both or neither. |
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The package is shared per-request policy — framing, budgets, assembly — returning normalized text; it owns no durable title state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Auxiliary title request
@@ -53,3 +73,13 @@ No main-request invalidation. Auxiliary cache reuse is provider-specific; the fi
 
 - The helper accepts text output only and rejects tool calls; structured-output adapters and provider-specific prompt variants are not exposed.
 - It enforces a byte ceiling for the whole framed user prompt rather than clipping individual messages or applying a retention policy.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

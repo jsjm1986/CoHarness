@@ -1,8 +1,8 @@
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type {
   ConversationEventInput, ConversationLocation, ConversationLocationData,
-  ConversationLocationDataStore, ConversationStepDataMap, ConversationTimelineSnapshot,
-  ConversationTurnDataMap, SessionEventLike, StepLocation, TurnLocation,
+  ConversationLocationDataSource, ConversationLocationDataStore, ConversationStepDataMap,
+  ConversationTimelineSnapshot, ConversationTurnDataMap, SessionEventLike, StepLocation, TurnLocation,
 } from '../contract/conversation.ts'
 
 interface OwnedLocationData {
@@ -17,17 +17,63 @@ export interface ConversationLocationDataChange {
   readonly next: ConversationLocationData | null
 }
 
+/**
+ * One key's observable face inside a Location data store. Notification is
+ * pull-based: the store records dirty keys during a transaction and the
+ * Engine drains them at the flush commit point, so subscribers observe only
+ * committed snapshots and at most once per flush.
+ */
+class MutableLocationDataSource implements ConversationLocationDataSource<unknown> {
+  private readonly listeners = new Set<() => void>()
+  private published: unknown
+
+  constructor(
+    private readonly store: MutableLocationDataStore,
+    private readonly key: string,
+  ) {
+    this.published = store.get(key)
+  }
+
+  readonly getSnapshot = (): unknown => this.store.get(this.key)
+
+  readonly subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
+  }
+
+  publish(): void {
+    const next = this.getSnapshot()
+    if (this.published === next) return
+    this.published = next
+    for (const listener of [...this.listeners]) listener()
+  }
+}
+
 class MutableLocationDataStore {
   private entries = new Map<string, OwnedLocationData>()
+  private readonly sources = new Map<string, MutableLocationDataSource>()
+  private readonly dirtyKeys = new Set<string>()
+
+  constructor(private readonly markDirty: (store: MutableLocationDataStore) => void) {}
 
   get(key: string): unknown {
     return this.entries.get(key)?.value
+  }
+
+  source(key: string): ConversationLocationDataSource<unknown> {
+    let source = this.sources.get(key)
+    if (source === undefined) {
+      source = new MutableLocationDataSource(this, key)
+      this.sources.set(key, source)
+    }
+    return source
   }
 
   remove(owner: string, key: string): boolean {
     const current = this.entries.get(key)
     if (current?.owner !== owner) return false
     this.entries.delete(key)
+    this.changed(key)
     return true
   }
 
@@ -38,22 +84,33 @@ class MutableLocationDataStore {
     }
     if (current?.value === value) return false
     this.entries.set(key, { owner, value })
+    this.changed(key)
     return true
   }
 
   replace(entries: ReadonlyMap<string, OwnedLocationData>): boolean {
-    let changed = this.entries.size !== entries.size
-    if (!changed) {
-      for (const [key, value] of entries) {
-        const current = this.entries.get(key)
-        if (current?.owner !== value.owner || current.value !== value.value) {
-          changed = true
-          break
-        }
-      }
+    const changedKeys: string[] = []
+    for (const key of new Set([...this.entries.keys(), ...entries.keys()])) {
+      const current = this.entries.get(key)
+      const next = entries.get(key)
+      if (current?.owner !== next?.owner || current?.value !== next?.value) changedKeys.push(key)
     }
-    if (changed) this.entries = new Map(entries)
-    return changed
+    if (changedKeys.length === 0) return false
+    this.entries = new Map(entries)
+    for (const key of changedKeys) this.changed(key)
+    return true
+  }
+
+  /** Notify the keys dirtied since the preceding drain, at the flush commit. */
+  publish(): void {
+    const dirty = [...this.dirtyKeys]
+    this.dirtyKeys.clear()
+    for (const key of dirty) this.sources.get(key)?.publish()
+  }
+
+  private changed(key: string): void {
+    this.dirtyKeys.add(key)
+    this.markDirty(this)
   }
 }
 
@@ -128,6 +185,7 @@ export class ConversationLocationIndex {
   private timeline: ConversationTimelineSnapshot = { turnOrder: [], turns: new Map() }
   private readonly turnDataStores = new Map<number, MutableLocationDataStore>()
   private readonly stepDataStores = new Map<string, MutableLocationDataStore>()
+  private readonly dirtyDataStores = new Set<MutableLocationDataStore>()
   private currentTurn: number | undefined
   private currentStep: number | undefined
 
@@ -187,6 +245,13 @@ export class ConversationLocationIndex {
       changed = this.storeFor(next).set(change.owner, next.key, next.value) || changed
     }
     return changed
+  }
+
+  /** Publish committed Location-data changes to their keyed sources. */
+  publishData(): void {
+    const dirty = [...this.dirtyDataStores]
+    this.dirtyDataStores.clear()
+    for (const store of dirty) store.publish()
   }
 
   /**
@@ -478,13 +543,15 @@ export class ConversationLocationIndex {
   }
 
   private mutableTurnData(turn: number): MutableLocationDataStore {
-    const current = this.turnDataStores.get(turn) ?? new MutableLocationDataStore()
+    const current = this.turnDataStores.get(turn)
+      ?? new MutableLocationDataStore((store) => { this.dirtyDataStores.add(store) })
     this.turnDataStores.set(turn, current)
     return current
   }
 
   private mutableStepData(key: string): MutableLocationDataStore {
-    const current = this.stepDataStores.get(key) ?? new MutableLocationDataStore()
+    const current = this.stepDataStores.get(key)
+      ?? new MutableLocationDataStore((store) => { this.dirtyDataStores.add(store) })
     this.stepDataStores.set(key, current)
     return current
   }

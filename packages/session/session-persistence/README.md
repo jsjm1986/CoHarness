@@ -1,3 +1,8 @@
+---
+description: "Abstract durable session persistence seam (ctx.sessionPersistence) for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-persistence
 
 English | [中文](README.zh.md)
@@ -10,6 +15,20 @@ The persisted unit IS the existing `SessionEvent` (event-sourced model — the l
 
 This package lets applications persist and resume session event logs through a backend-independent API. Readers can create, open, inspect, list, append to, read, flush, and close stored sessions while preserving contiguous append-only history. A completed flush is the durability barrier; readers never receive torn tails or invalid records, and only one writer per session is allowed within a backend instance. Use the shipped [JSONL backend](../session-persistence-jsonl/README.md) for one compressed log per session, or implement another backend with the same observable guarantees.
 
+## Table of Contents
+
+- [Service API (`ctx.sessionPersistence`)](#service-api-ctxsessionpersistence)
+- [Invariants every backend must honor](#invariants-every-backend-must-honor)
+- [The write coordinator](#the-write-coordinator)
+- [Metadata and location types](#metadata-and-location-types)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="service-api-ctxsessionpersistence"></a>
 ## Service API (`ctx.sessionPersistence`)
 
 `create`/`open` return the per-session {@link SessionHandle} — the canonical channel with `read`/`write` access, offset/length reads, append, per-handle `flush`, and idempotent `close`/`AsyncDisposable`. A write handle claims single-writer ownership; a second writer rejects with `SESSION_ALREADY_OWNED`, and a read handle rejects `append`/`flush` with `SESSION_READ_ONLY`. `create` is lazy: the session is observable through `stat`/`list`/`open` in this process immediately, but no durable artifact exists until the first `append` or `flush`; closing a still-pending write handle erases the reservation. `createHandle`/`openHandleAsync`/`openHandle` remain as the legacy ownership seam while providers and Consumers migrate.
@@ -41,6 +60,7 @@ This package lets applications persist and resume session event logs through a b
 | `reserveDraft(request): Promise<SessionDraftReservation \| undefined>` | Optionally reserve a browser draft before Agent creation. Gateway providers return one scope-qualified canonical Session id and an expiring lease; local providers return `undefined`. The request contains only ids, cwd, visibility, and preset metadata. |
 | `heartbeatDraft(request): Promise<void>` / `releaseDraft(request): Promise<void>` | Renew or release a provider-owned draft lease. Both operations are idempotent and never persist prompt text or credentials. |
 
+<a id="invariants-every-backend-must-honor"></a>
 ## Invariants every backend must honor
 
 - **Append-only; a crashed turn is closed, not truncated.** Flushed events are never rewritten. A crash can leave an unclosed final turn whose events are real and possibly large; `load` preserves them and durably appends synthetic closers (a risk-classified error `tool/result` per unanswered assistant call, then `step/end?`+`turn/end {interrupted}`) to balance the log and keep the rehydrated history a valid provider transcript. Only a never-fully-written torn tail fragment is discarded.
@@ -48,6 +68,7 @@ This package lets applications persist and resume session event logs through a b
 - **JSON-serializable data.** `append` materializes each direct/replay batch through the shared one-pass lossless-JSON boundary. Live `Session` events are already deep-frozen, but the write coordinator still copies each event into a persistence-owned buffer.
 - **Durability.** `append` returns only once the batch is durable.
 
+<a id="the-write-coordinator"></a>
 ## The write coordinator
 
 `PersistenceCoordinator` owns per-id state and serialization, one bounded write controller per live session, lazy materialization, crash-tail repair, session adoption, and quiescent disposal. A browser draft buffers policy and boundary events in memory; the first non-empty message materializes the complete buffered prefix atomically, while a command/goal/plan state event materializes a hidden command-only record. Disposing an unmaterialized draft drops its buffer. A first-party backend composes one, implements the small `PersistenceBackend` storage hook interface, and delegates its stateful methods. JSONL and SQLite therefore share lifecycle correctness while retaining different storage primitives; see the [coordinator Agent Note](../../../.agents/notes/implemented/architecture/2026-06-18-shared-persistence-write-coordinator.md), [flush-controller simplification](../../../.agents/notes/implemented/simplification/2026-07-23-collapse-persistence-flush-state.md), and [bounded batching decision](../../../.agents/notes/implemented/architecture/2026-08-08-bounded-session-persistence-write-batching.md).
@@ -77,14 +98,17 @@ The `PersistenceBackend<TornMarker>` hooks (the only contract between the coordi
 
 The coordinator asserts the stored id and compares stored/live cwd before repair or live adoption. Its `inspect()` path takes ownership of fresh backend values, validates and freezes them once, and retains at most the configured number of unpublished Sessions without calling `commitRepair`. A retained source is reused or repaired only when its revision still equals `readStoredRevision`; otherwise the coordinator reloads it. This freshness check does not add cross-process writer exclusion. Revision retries converge when the durable log remains unchanged for one read/check round trip; continuous external writers can delay `load`, `inspect`, or `prepare`. The `tornMarker` is fully OPAQUE: the coordinator only tests `!== undefined` and round-trips it to `commitRepair`, never inspecting its value (the JSONL backend uses the byte offset to truncate to, the SQLite backend the seq to delete from). A third-party backend MAY implement the abstract service directly without the coordinator, but it must provide the same non-mutating inspection and trustworthy lightweight snapshot revisions. See [the write-coordinator Agent Note](../../../.agents/notes/implemented/architecture/2026-06-18-shared-persistence-write-coordinator.md).
 
+<a id="metadata-and-location-types"></a>
 ## Metadata and location types
 
 Re-exported from `dsh-session`: `SessionHeader` (immutable session metadata: `version`, `id`, `createdAt`, `cwd?`, `parentSession?`, `seedLength?`, `origin?`, `delegationDepth?`, `draft?`). `SessionPersistenceSnapshot.content`, when supplied by an authoritative backend, carries `blank`, `visibleContentSeq`, and `lastPromptAt` for cold list projections. `SessionLocation` is `{ readonly kind: string; readonly path: string }`; its path is an absolute backend target, not proof that the artifact exists or contains an unflushed turn.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The write coordinator's per-session controllers are private serialization state; durable truth is the stored log, and batching, repair, and adoption are asserted by coordinator specs.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Resumed conversation history
@@ -106,3 +130,13 @@ Persistence does not mutate live request prefixes. A resumed loop can reuse prov
 - **No deletion or retention API** — pruning stored sessions is out-of-band backend maintenance.
 - **`list()` is unpaginated and unfiltered** — it returns every stored session's header; fine for local stores, unindexed at scale.
 - **Repair-time synthetic closers are the only crash story** — a backend must synthesize `tool/result`/`step/end`/`turn/end` closers on load; there is no partial-turn resume that continues an interrupted turn instead of closing it.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -43,10 +43,12 @@ The version-1 `dsh_plugin_packages` field contains only `{ name, version }` pair
 
 <a id="model-experience"></a>
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The `dsh_plugin_packages` field is computed per request from the live Loader inventory; no inventory copy is retained.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Package inventory metadata

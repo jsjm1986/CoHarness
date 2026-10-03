@@ -5,7 +5,7 @@
  * on the same row administrators read.
  */
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
-import type { ManagedFileEntry } from '../deployment-commands.ts'
+import { parseManagedSnapshot, type ManagedSnapshot } from '../managed-files.ts'
 
 export type BackupStatus = 'recording' | 'verified' | 'failed' | 'restored'
 
@@ -18,7 +18,7 @@ export interface BackupRecordView {
   writeEpoch: string
   sizeBytes: number | null
   sha256: string | null
-  managedFiles: ManagedFileEntry[]
+  managedSnapshot: ManagedSnapshot | null
   status: BackupStatus
   createdBy: number | null
   createdAt: string
@@ -42,7 +42,7 @@ function view(row: Record<string, unknown>): BackupRecordView {
     writeEpoch: String(row.write_epoch),
     sizeBytes: row.size_bytes === null ? null : Number(row.size_bytes),
     sha256: row.sha256 as string | null,
-    managedFiles: Array.isArray(files) ? files as ManagedFileEntry[] : [],
+    managedSnapshot: Array.isArray(files) ? null : parseManagedSnapshot(files),
     status: row.status as BackupStatus,
     createdBy: row.created_by === null ? null : publicNumber(row.created_by as string | number, 'backup actor'),
     createdAt: String(row.created_at),
@@ -92,7 +92,7 @@ export class PostgresBackupService {
     writeEpoch: bigint
     sizeBytes: number
     sha256: string
-    managedFiles: ManagedFileEntry[]
+    managedSnapshot: ManagedSnapshot
     /** Public user number of the administrator, or null for the applier. */
     actor: number | null
   }): Promise<BackupRecordView> {
@@ -108,7 +108,7 @@ export class PostgresBackupService {
       `INSERT INTO harness.backup_records(organization_id,path,migration_version,write_epoch,size_bytes,sha256,managed_files,created_by)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
       [this.context.organizationId, input.path, input.migrationVersion, input.writeEpoch.toString(),
-        input.sizeBytes, input.sha256, JSON.stringify(input.managedFiles), actorUuid],
+        input.sizeBytes, input.sha256, JSON.stringify(parseManagedSnapshot(input.managedSnapshot)), actorUuid],
     )
     return this.get(inserted.rows[0]!.id)
   }
@@ -116,8 +116,8 @@ export class PostgresBackupService {
   /** Mark a dump verified (`pg_restore --list` succeeded) or failed. */
   async setVerified(id: string, verified: boolean, error?: string): Promise<BackupRecordView> {
     const updated = await this.context.pool.query(
-      `UPDATE harness.backup_records SET status=$3, verified_at=CASE WHEN $3='verified' THEN now() ELSE verified_at END, error=$4
-       WHERE organization_id=$1 AND id=$2 AND status IN ('recording','verified','failed')`,
+      `UPDATE harness.backup_records SET status=CASE WHEN status='restored' AND $3='verified' THEN 'restored' ELSE $3 END, verified_at=CASE WHEN $3='verified' THEN now() ELSE verified_at END, error=$4
+       WHERE organization_id=$1 AND id=$2 AND status IN ('recording','verified','failed','restored')`,
       [this.context.organizationId, id, verified ? 'verified' : 'failed', error ?? null],
     )
     if (updated.rowCount !== 1) throw new BackupError(409, 'backup-state-conflict')

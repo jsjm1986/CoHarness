@@ -1,13 +1,35 @@
+---
+description: "JSONL durable session persistence backend for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-persistence-jsonl
 
 English | [中文](README.zh.md)
 
 The JSONL durable session-persistence backend — a concrete `SessionPersistence` (the `dsh-session-persistence` seam). Each session has one append-only logical JSONL log, stored as `.jsonl.zstd` by default or raw `.jsonl` when compression is disabled.
 
+Historical CoHarness headers and packed streams are decoded by `coharnessJsonlFormatCatalog`. Read handles prepare migration without publishing; a write handle publishes a verified current generation beside the unchanged source. Recognized permission origins, document references, stream credential attribution and draft metadata survive conversion. Missing historical message sources or turn coordinates are corruption, not values the reader invents.
+
 ## Summary
 
 `dsh-session-persistence-jsonl` stores each session in a current append-only JSONL log and retains immutable historical format generations — checksummed Zstandard frames by default, raw newline-delimited lines when compression is disabled. It serves the current logical `SessionEvent` stream through persistence handles, so format migration, compression, historical decoding, and crash recovery remain storage-internal details. Choose it when consumers need a per-session file on disk; the logs are readable as plain lines when `compression: 'none'` is selected. A root directory is the one required configuration; durability, lazy materialization, [supported historical-format migration](../session-format-catalog/README.md), and torn-tail crash recovery come with the backend.
 
+## Table of Contents
+
+- [On-disk layout](#on-disk-layout)
+- [Config](#config)
+- [Physical encoding](#physical-encoding)
+- [Durability and crash semantics](#durability-and-crash-semantics)
+- [Write path](#write-path)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="on-disk-layout"></a>
 ## On-disk layout
 
 ```
@@ -19,11 +41,12 @@ The JSONL durable session-persistence backend — a concrete `SessionPersistence
 ```
 
 - The current artifact is `session.v5.jsonl.zstd` or `session.v5.jsonl`; older committed generations retain their versioned names. Its first logical line is a header tagged `{ type: 'session', version: 5, id, cwd?, createdAt, parentSession?, isSeeded, origin?, delegationDepth, agentPreset?, draft? }`. `isSeeded` is explicit; the inherited prefix length is carried by the inherited `session/end-seed` marker. `delegationDepth` is required on disk and is `0` for a top-level Session. The optional `draft` field accepts only a boolean and retains both explicit values through listing, inspection, and cold reads; omission stays absent. Unknown header fields remain invalid. `agentPreset` is durable because it determines the resumed tools and prompt. Each subsequent current-format line stores one settled Session event, including its nested Assistant stream data, with contiguous event sequences.
-- A storage record is one `SessionEvent` JSON verbatim. Released v0/v1 artifacts may instead contain **packed chunk rows** (`text-chunks` / `reasoning-chunks` / `tool-call-chunks`; bare slash-less tags like the header's `session`): one line holding a run of ≥3 consecutive same-block `assistant/chunk` delta events, `seq0`/`time0` plus per-member `dt` gaps reconstructing every member's `seq`/`time` exactly. The lossless codec lives in `@deepseek-ai/dsh-session` (`packChunkRuns`/`decodeStorageRecord`); the current writer never packs — packed rows reach this backend only inside the historical generations its catalog decodes, which load identically to unpacked rows.
+- A storage record is one `SessionEvent` JSON verbatim. Released v0/v1 and CoHarness v2/v3 artifacts may instead contain **packed chunk rows** (`text-chunks` / `reasoning-chunks` / `tool-call-chunks`; bare slash-less tags like the header's `session`): one line holding a run of ≥3 consecutive same-block `assistant/chunk` delta events, `seq0`/`time0` plus per-member `dt` gaps reconstructing every member's `seq`/`time` exactly. The lossless codec lives in `@deepseek-ai/dsh-session` (`packChunkRuns`/`decodeStorageRecord`); the current writer never packs — packed rows reach this backend only inside the historical generations its catalog decodes, which load identically to unpacked rows.
 - Surface `sourceEventSeqs` arrays use lossless inclusive ranges for profitable consecutive runs; readers accept both range and legacy number-array forms.
 - The project directory keeps the normalized cwd readable for navigation and is bounded for filesystem component limits. Separator replacement and truncation are intentionally lossy, so cwd strings that normalize alike share a project directory; session ids still select distinct session directories. On a case-insensitive filesystem, identity validation accepts an alternate path spelling only when filesystem canonicalization resolves both spellings to the same transcript. The configured root remains deployment-controlled: it may be project-local, shared, temporary, or centralized. The [project-session directory decision](../../../.agents/notes/implemented/architecture/2026-07-24-project-session-directories.md) records this tradeoff.
 - Session ids are unvalidated branded strings, so they are injectively escaped to a single safe path segment before use (no traversal, no collision). The resulting directory is reserved for additional session-owned artifacts; discovery reads only the fixed transcript filename.
 
+<a id="config"></a>
 ## Config
 
 | Key | Type | Notes |
@@ -33,12 +56,14 @@ The JSONL durable session-persistence backend — a concrete `SessionPersistence
 
 `locate(meta)` returns `{ kind: 'jsonl', path }` for the fixed transcript inside the resolved project/session directories. It performs no filesystem I/O: the target can be returned before the directory or file exists, and an existing file contains only the last flushed prefix.
 
+<a id="physical-encoding"></a>
 ## Physical encoding
 
 The default artifact is a standard concatenation of independent [Zstandard frames](../../../.agents/notes/implemented/architecture/2026-07-19-zstandard-jsonl-session-logs.md): one checksummed frame containing only the header line, followed by one checksummed frame per durable append batch. The backend uses Node's built-in Zstandard API with its default compression level and exposes no level knob. Listing reads and validates only the header frame. `compression: 'none'` keeps the same logical lines in the original raw representation.
 
 A root belongs to one encoding. Startup discovery and targeted lookup reject the opposite suffix with an error naming the incompatible artifact and instructing the caller to select the matching mode or a separate root. Flat `<project>/<id>.jsonl*` artifacts are also rejected instead of ignored. Format migration preserves the configured encoding; compression conversion, mixed-root fallback, and dual write remain unsupported.
 
+<a id="durability-and-crash-semantics"></a>
 ## Durability and crash semantics
 
 - **Bound storage identity.** Lookup requires one matching session directory across the readable project directories, then verifies that the header id equals the requested id and that the header's id/cwd derive the selected transcript path. Listing applies the same path check and rejects duplicate ids. Identity failures occur before repair or append.
@@ -49,16 +74,19 @@ A root belongs to one encoding. Startup discovery and targeted lookup reject the
 - **Contiguous-seq.** `append` rejects a batch whose first `seq` does not continue the stored log, and rejects non-JSON-serializable `event.data` naming the offending event type.
 - **Lightweight revisions.** `revision(id, signal?)` resolves only the requested artifact and identifies it by device, inode, size, and nanosecond timestamps without parsing the log; `listSnapshots(signal?)` applies the same identity to every discovered artifact. The identity changes after append, repair, replacement, or store changes. A full-prefix read requires the same identity before and after reading the bytes, and `readStoredRevision()` also uses it to validate retained preparations. Snapshot listing forwards the exact signal through artifact discovery and checks cancellation around every `stat`; because filesystem `stat` is not interruptible, cancellation waits for the active call to settle, then rejects without starting another.
 
+<a id="write-path"></a>
 ## Write path
 
 The plugin copies frozen session events into one write handle per live session. Live-event write batching is the seam's internal scheduling policy, not configuration: a batching window inside each handle coalesces the live buffer into one durable append, and `session/flush` or disposal drains current and pending batches. A per-session cursor prevents resumed sessions from re-appending stored events, and live sessions are seeded when the plugin loads. The owning backend instance serializes operations for one session; disposal drains every retained handle before teardown. Every logical event remains present: batching only lets one compressed frame or raw fsync carry more records.
 
 Plaintext body reads scan bounded byte windows and retain decoded events without a complete raw-file buffer. They check cancellation between reads and retry changed revisions. Successor publication rechecks the source revision after writing the temporary file; a changed or missing source refuses publication. Successors are encoded in bounded batches with cancellation checks between events and writes. Compressed reads and logical preparation still retain complete input or event arrays.
 
+<a id="invariants"></a>
 ## Invariants
 
 No runtime invariant companion is published: immutable-generation and append ordering are enforced by the storage coordinator and checked against files in persistence tests; this provider keeps no independent domain index.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Resumed conversation history
@@ -77,9 +105,20 @@ JSONL storage does not mutate live request prefixes. A resumed loop can reuse pr
 
 ## Known Limitations and Deferred Work
 
-- **Only the configured encoding and catalogued generations load** — this backend migrates released v0/v1/v2/v3/v4 artifacts to current v5 beside the preserved source; changing compression requires a separate root, and retained predecessors do not provide automatic fallback or downgrade support.
+- Managed launches with `DSH_MANAGED_DATA_MANIFEST` register the resolved Session directory, including all committed generations before data writes. An invalid inventory refuses initialization; [inventory and backup rules](../../util/managed-data/README.md) govern retained roots and deployment approval.
+- **Only the configured encoding and catalogued generations load** — this backend migrates released v0–v5 artifacts, including the declared CoHarness v0–v3 dialect, to current v6 beside the preserved source; changing compression requires a separate root, and retained predecessors do not provide automatic fallback or downgrade support.
 - **The flat-file storage layout does not load** — use a separate root or move pre-release artifacts into the project/session directory layout before loading.
 - **Compressed files are not directly line-readable** — use the backend to load them, or select `compression: 'none'` before writing a fresh root when external line readers are required.
 - **Nothing deletes session files** — logs accumulate under `root` until removed externally (the seam has no deletion API).
 - **One live writer per session** — a write handle holds a kernel lease on `<root>/.locks/<id>.lock` for its whole life (non-blocking POSIX `flock`; a named kernel semaphore on Windows), so a second backend instance or process fails write-open with `SessionAlreadyOwnedError` until the owner releases or its process exits. A live but wedged holder keeps blocking until it exits — removing the lock file is the explicit POSIX forfeit — and advisory `flock` is unreliable on NFSv3, where exclusion degrades to in-process. Initial same-id publication remains collision-safe through the POSIX no-overwrite hard link or Windows write-through rename without replacement.
 - **POSIX materialization requires hard-link support** — first append uses `link()` so same-id races fail instead of overwriting a committed log; Windows uses write-through rename without replacement.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

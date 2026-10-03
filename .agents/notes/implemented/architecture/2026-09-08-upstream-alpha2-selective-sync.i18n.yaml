@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-08-upstream-alpha2-selective-sync.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-08-upstream-alpha2-selective-sync.md
-2026-09-08-upstream-alpha2-selective-sync.md: c39fdc0dffabcd6b0cf8f4049c6c299c05907b0b
-2026-09-08-upstream-alpha2-selective-sync.zh.md: 3c522ff06df924617ac6621ba0a28fbd9bf5f9db
+/agent-note-selective-upstream-alpha-2-synchronization-for-cloud-coharness:
+  en: 7519f2986d7abbb9
+  zh: 889c8aaf0bd85b83
+/agent-note-selective-upstream-alpha-2-synchronization-for-cloud-coharness/problem:
+  en: 620b012ad04d9861
+  zh: e2407503daba721d
+/agent-note-selective-upstream-alpha-2-synchronization-for-cloud-coharness/decision:
+  en: 837f9714aaa58a86
+  zh: 62e27b9697a9efa3
+/agent-note-selective-upstream-alpha-2-synchronization-for-cloud-coharness/alternatives-considered:
+  en: 76d30262d2b99926
+  zh: 8a7ac609c8343c63
+/agent-note-selective-upstream-alpha-2-synchronization-for-cloud-coharness/consequences:
+  en: f6473233990fdfb6
+  zh: ff19a5dee3823305

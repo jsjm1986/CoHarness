@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-native-workspace-directory-picker.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-native-workspace-directory-picker.md
-2026-07-27-native-workspace-directory-picker.md: d63ab0b4b59adfa6c7f053c376e0469a75e131e3
-2026-07-27-native-workspace-directory-picker.zh.md: eef4948b1f6c0e7d1e74ae96fdec6e3ce37eedee
+/agent-note-native-workspace-directory-picker:
+  en: 40a953cb72af9fc2
+  zh: d6c870c8af825a03
+/agent-note-native-workspace-directory-picker/problem:
+  en: 449ebd18377631e4
+  zh: a46891fcb88b3d20
+/agent-note-native-workspace-directory-picker/decision:
+  en: 303d18fd3b5d7a54
+  zh: 7d47164148d094cb
+/agent-note-native-workspace-directory-picker/interaction-contract:
+  en: 8060588eb079836a
+  zh: 3cf3b9ec8e920cb1
+/agent-note-native-workspace-directory-picker/host-boundary:
+  en: 7bc7a3036a4fba65
+  zh: a93e220bcc529928
+/agent-note-native-workspace-directory-picker/alternatives-considered:
+  en: 6043d9da80aee607
+  zh: 57d81d979aa25b88
+/agent-note-native-workspace-directory-picker/consequences:
+  en: 9ab377a8562e6717
+  zh: b215aa625f7aa14b
+/agent-note-native-workspace-directory-picker/risks:
+  en: c9cd4e165ead55dc
+  zh: e0859ed5bf4822be

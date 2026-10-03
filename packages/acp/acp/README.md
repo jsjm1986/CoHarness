@@ -1,3 +1,8 @@
+---
+description: "Automation-only Agent Client Protocol server for driving DeepSeek Harness agents over JSON-RPC stdio"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-acp
 
 English | [中文](README.zh.md)
@@ -10,6 +15,20 @@ This package is a transport adapter, not a UI integration or a capability seam. 
 
 `dsh-acp` lets trusted programs automate persistent DeepSeek Harness agents through the standard [ACP](https://agentclientprotocol.com): create or resume sessions, select a model and reasoning effort, attach MCP servers, submit or cancel work, receive semantic updates, and close sessions independently. Choose it for out-of-process subagents, test runners, and scripted controllers; it intentionally omits DSH-specific presentation data and interactive UI features. Persistence supports listing, resuming, and closing sessions across process restarts, but deletion, forks, transcript replay, and additional directories are unsupported. Run `pnpm dsh --profile acp` to start the server; use `dsh-subagent-acp` as the repository client.
 
+## Table of Contents
+
+- [Plugin](#plugin)
+- [Protocol contract](#protocol-contract)
+- [Lifecycle](#lifecycle)
+- [Running](#running)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="plugin"></a>
 ## Plugin
 
 `apply(ctx, config)` builds a typed ACP `agent()` app, connects it to stdin/stdout, and drives `ctx.agents`. Stdout is reserved for protocol frames.
@@ -21,6 +40,7 @@ This package is a transport adapter, not a UI integration or a capability seam. 
 
 Both fields are optional so another agent/request listener may supply the target. The runnable ACP composition requires both.
 
+<a id="protocol-contract"></a>
 ## Protocol contract
 
 | Method | Behavior |
@@ -41,20 +61,24 @@ One connection may own several sessions. The bridge keys records by branded sess
 
 Committed-message output intentionally trades token-by-token latency for a clean automation result. Uncommitted provider chunks and retry attempts cannot leak partial text or images; reasoning and tool activity remain in the session log for observability through other interfaces. Per-session delivery is serialized because attachment reads are asynchronous, and a missing or corrupt committed image fails the prompt response instead of emitting a placeholder.
 
+<a id="lifecycle"></a>
 ## Lifecycle
 
 Client disconnect and Cordis disposal share one memoized teardown. The bridge first rejects new sessions and prompts, cancels and quiesces prompt admission, agent activity, and ordered output delivery, then drains continuable descendants only below this connection's exact owned Agents before disposing those handles in parallel and awaiting every result before reporting any failure. Other frontends sharing the Context retain their continuable forests and admission. An ACP-only plugin reload therefore leaves no orphan agent.
 
 ACP requires each prompt response to carry a `stopReason`, but the bridge does not claim a prompt-specific turn outcome. The operation interval starts when the prompt enters the Agent inbox and ends after admission, whole-Agent idle, and ordered output delivery all quiesce; failures from unrelated Agent work before that inbox receipt are not attributed to the prompt. Committed assistant messages stream across the owned interval, and steering or injected work may contribute before idle. Settlement precedence is explicit cancellation, output-delivery failure, interval-wide Agent failure, then the correlated turn ending. Token-limit endings settle as `end_turn`; a correlated model error rejects only at the same quiescence boundary.
 
+<a id="running"></a>
 ## Running
 
 `pnpm --dir /path/to/deepseek-harness run demo:acp` boots the repository's automation server composition. A parent harness can spawn it through [`@deepseek-ai/dsh-subagent-acp`](../../subagent/subagent-acp/README.md); other ACP clients need only the core methods above.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The server translates each ACP frame into `ctx.agents` operations; session lifecycle stays owned by the runtime it drives, so there is no adapter-owned relation to compare.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Prompt content
@@ -91,3 +115,13 @@ Append-only through the owning tool result.
 - **Raster images and one workspace only** — image prompts require a durable store plus an exact route that declares image input; only PNG, JPEG, WebP, and GIF are accepted. Audio, embedded resources, and non-empty additional directories reject; resource links flatten to textual references rather than fetched content. Session MCP mounts are limited to ACP stdio and Streamable HTTP declarations.
 - **Committed answers only** — live progress, reasoning, tool activity, plans, titles, and usage stay off the wire.
 - **Connection-owned lifetime** — one connection releases all of its active sessions during teardown; `session/close` is available while the connection is open.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

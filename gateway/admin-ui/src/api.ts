@@ -54,6 +54,8 @@ export type ProjectDirectoryListing = {
 }
 
 export type AuditEntry = {
+  outcome: 'success' | 'failure' | 'recorded' | 'unknown'
+  metadata: Record<string, string | number | boolean>
   id: number
   ts: number
   userId: number | null
@@ -88,6 +90,7 @@ export type ConversationArchiveRow = {
   trashedAt: number | null
   purgeAfter: number | null
   syncState: 'pending' | 'synced' | 'conflict' | 'unavailable'
+  lastSyncError?: string
   childCount: number
   messageCount: number
   updatedAt: number
@@ -261,6 +264,22 @@ export function listUsers(): Promise<AdminUser[]> {
   return request('/admin/api/users')
 }
 
+export function getUser(id: number): Promise<AdminUser> {
+  return request(`/admin/api/users/${id}`)
+}
+
+/** One stored project membership row as seen from the member's account side. */
+export type UserMembership = {
+  projectId: number
+  name: string
+  path: string
+  mode: GrantMode
+}
+
+export function listUserMemberships(userId: number): Promise<{ memberships: UserMembership[] }> {
+  return request(`/admin/api/users/${userId}/memberships`)
+}
+
 export function createUser(body: {
   username: string
   password: string
@@ -289,6 +308,42 @@ export function resetPassword(id: number, password: string): Promise<void> {
 
 export function controlInstance(id: number, op: 'start' | 'stop' | 'restart'): Promise<void> {
   return request(`/admin/api/users/${id}/instance/${op}`, { method: 'POST' })
+}
+
+/** Operate this node's project runtime without changing project membership or ownership. */
+export function controlProjectInstance(id: number, op: 'start' | 'stop' | 'restart'): Promise<void> {
+  return request(`/admin/api/projects/${id}/instance/${op}`, { method: 'POST' })
+}
+
+export type { NodeConfigurationView, NodeSettingValues } from '../../src/node-config-fields.ts'
+
+/** Read current-node effective and pending settings; no credential contents are returned. */
+export function getNodeConfiguration(signal?: AbortSignal): Promise<import('../../src/node-config-fields.ts').NodeConfigurationView> {
+  return request('/admin/api/deployment/configuration', { ...(signal === undefined ? {} : { signal }) })
+}
+
+/** Save or explicitly apply the reviewed node and revision. */
+export function mutateNodeConfiguration(input: {
+  action: 'save' | 'apply'
+  organizationId: string
+  nodeId: string
+  revision: number
+  values?: import('../../src/node-config-fields.ts').NodeSettingValues
+}): Promise<import('../../src/node-config-fields.ts').NodeConfigurationView> {
+  return request('/admin/api/deployment/configuration', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export interface BackupNodeConfigurationPreview {
+  backupId: string
+  configFile: string | null
+  appliedRevision: number | null
+  values: import('../../src/node-config-fields.ts').NodeSettingValues | null
+  incompatibleFields: string[]
+}
+
+/** Read only declared node settings from a verified backup without applying them. */
+export function inspectBackupNodeConfiguration(id: string): Promise<BackupNodeConfigurationPreview> {
+  return request('/admin/api/backups/node-configuration', { method: 'POST', body: JSON.stringify({ id }) })
 }
 
 export function listProjects(origin?: 'admin' | 'user'): Promise<Project[]> {
@@ -383,6 +438,10 @@ export function trashEmptyDrafts(ids: string[]): Promise<{ trashed: string[] }> 
 export function getArchive(rootSessionId: string, fromSeq = 0, limit = 200): Promise<ConversationArchiveDetail> {
   const query = new URLSearchParams({ fromSeq: String(fromSeq), limit: String(limit) })
   return request(`/admin/api/archives/${encodeURIComponent(rootSessionId)}?${query.toString()}`)
+}
+
+export function getArchiveStatus(rootSessionId: string): Promise<ConversationArchiveRow> {
+  return request(`/admin/api/archives/${encodeURIComponent(rootSessionId)}/status`)
 }
 
 export function exportArchive(rootSessionId: string): string {
@@ -568,6 +627,14 @@ export function setSshPolicy(policy: AdminResourcePolicy): Promise<AdminResource
   return request('/admin/api/ssh/permissions', { method: 'POST', body: JSON.stringify(policy) })
 }
 
+export function getPluginPolicy(kind: AdminResourcePolicy['kind'], id: number, signal?: AbortSignal): Promise<AdminResourcePolicy> {
+  return request(`/admin/api/plugins/permissions?kind=${kind}&id=${String(id)}`, { signal })
+}
+
+export function setPluginPolicy(policy: AdminResourcePolicy): Promise<AdminResourcePolicy> {
+  return request('/admin/api/plugins/permissions', { method: 'POST', body: JSON.stringify(policy) })
+}
+
 /** Administrator-registered OpenSSH target with its project shares. */
 export interface AdminSshTarget {
   publicId: number
@@ -579,6 +646,7 @@ export interface AdminSshTarget {
   workspace: string
   bootstrapPath: string | null
   bootstrapHash: string | null
+  passwordRef: string | null
   requestTimeoutMs: number | null
   maxFrameBytes: number | null
   maxPending: number | null
@@ -591,7 +659,7 @@ export interface AdminSshTarget {
 /** Editable connection coordinates; ids and revisions are server-owned. */
 export type AdminSshTargetFields = Pick<AdminSshTarget,
   'name' | 'host' | 'node' | 'helper' | 'helperHash' | 'workspace'
-  | 'bootstrapPath' | 'bootstrapHash' | 'requestTimeoutMs' | 'maxFrameBytes' | 'maxPending' | 'leaseMs'>
+  | 'bootstrapPath' | 'bootstrapHash' | 'passwordRef' | 'requestTimeoutMs' | 'maxFrameBytes' | 'maxPending' | 'leaseMs'>
 
 export function listSshTargets(): Promise<{ targets: AdminSshTarget[] }> {
   return request('/admin/api/ssh-targets')
@@ -615,6 +683,8 @@ export function shareSshTarget(targetId: number, projectId: number, shared: bool
 
 /** Administrator-registered webhook endpoint; the signing secret is write-only. */
 export interface AdminWebhookEndpoint {
+  /** Visibility of roots created in a project runtime. */
+  projectVisibility: 'project' | 'private'
   id: string
   publicId: number
   name: string
@@ -647,7 +717,7 @@ export type AdminWebhookEndpointFields = Pick<AdminWebhookEndpoint,
   'name' | 'provider' | 'source' | 'events' | 'actions' | 'repositories' | 'titleTemplate' | 'promptTemplate' | 'workspacePath'
   | 'agentPreset' | 'permissionPreset' | 'modelProvider' | 'modelId' | 'modelMaxTokens'
   | 'executionUserId' | 'runtimeKind' | 'runtimePublicId' | 'intakeLimit' | 'intakeWindowMs'
-  | 'replayWindowMs' | 'maxBodyBytes'>
+  | 'replayWindowMs' | 'maxBodyBytes' | 'projectVisibility'>
 
 export function listWebhookEndpoints(): Promise<{ endpoints: AdminWebhookEndpoint[] }> {
   return request('/admin/api/webhook-endpoints')
@@ -1004,6 +1074,21 @@ export function setQuota(body: {
   return request('/admin/api/quotas', { method: 'PUT', body: JSON.stringify(body) })
 }
 
+/** Per-metric user quota setting: role inheritance, unlimited, or an explicit monthly cap. */
+export type UserQuotaMode = 'inherit' | 'unlimited' | 'custom'
+
+/** Stored per-user quota modes; limits are set only for `custom` entries. */
+export type UserQuotaView = {
+  tokenMode: UserQuotaMode
+  tokenLimit: number | null
+  companyCostMode: UserQuotaMode
+  companyCostMicrosLimit: number | null
+}
+
+export function getUserQuota(userId: number): Promise<UserQuotaView> {
+  return request(`/admin/api/quotas?subjectType=user&subjectId=${userId}`)
+}
+
 export function listUsageOverview(month?: string): Promise<UsageOverview> {
   return request(`/admin/api/usage/overview${month === undefined || month === '' ? '' : `?month=${encodeURIComponent(month)}`}`)
 }
@@ -1073,6 +1158,7 @@ export interface DeploymentNode {
   maintenanceAppliedEpoch: string
   /** -1 means the node's build predates inflight reporting; it cannot quiesce. */
   inflightWrites: number
+  activeRuntimes: number
   quiesced: boolean
 }
 
@@ -1110,7 +1196,13 @@ export interface DeploymentBackup {
   writeEpoch: string
   sizeBytes: number | null
   sha256: string | null
-  managedFiles: Array<{ member: string; sourcePath: string; sizeBytes: number; sha256: string }>
+  managedSnapshot: {
+    version: 1
+    roots: Array<{ owner: string; kind: 'file' | 'directory'; path: string }>
+    files: Array<{ member: string; sourcePath: string; sizeBytes: number; sha256: string; mode: number; uid: number; gid: number }>
+    directories: Array<{ path: string; mode: number; uid: number; gid: number }>
+    absent: string[]
+  } | null
   status: 'recording' | 'verified' | 'failed' | 'restored'
   createdBy: number | null
   createdAt: string

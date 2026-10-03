@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-session-format-catalog` gives persistence one deterministic Session format reader without consulting mounted plugins. It assembles codecs and adjacent edges from the earliest supported format through the [current writer format](../../../docs/session-format-status.md), checks the complete gap-free chain at module initialization, and exposes physical dispatch, header-only classification, single-pass row restoration, and current record encoding through `sessionFormatCatalog`. Backends that store decoded headers and event rows instead of released JSONL (SQLite, Gateway/PostgreSQL, detached coordinator reads) use `sessionLogicalFormatCatalog`, which projects stored metadata onto the released requirements, normalizes the declared CoHarness v2 database dialect, and runs the same released edges and current-artifact validation.
+`dsh-session-format-catalog` assembles the released Session readers and adjacent migrations through the [current writer format](../../../docs/session-format-status.md). Persistence readers use this static inventory before plugins mount. It supports released JSONL, CoHarness historical JSONL and decoded database rows, validates restored data, and refuses unsupported formats.
 
 ## Table of Contents
 
@@ -31,9 +31,14 @@ Import this library from persistence and test-support readers that need the comp
 
 ### Entry point
 
+`dsh-session-format-catalog` gives persistence one deterministic Session format reader without consulting mounted plugins. It assembles codecs and adjacent edges from the earliest supported format through the [current writer format](../../../docs/session-format-status.md), checks the complete gap-free chain at module initialization, and exposes physical dispatch, header-only classification, single-pass row restoration, and current record encoding through `sessionFormatCatalog`. Backends that store decoded headers and event rows instead of released JSONL (SQLite, Gateway/PostgreSQL, detached coordinator reads) use `sessionLogicalFormatCatalog`, which projects stored metadata onto the released requirements, normalizes the declared CoHarness v2 database dialect, and runs the same released edges and current-artifact validation.
+
+CoHarness JSONL persistence uses `coharnessJsonlFormatCatalog`. Its declared v0–v3 framing retains header `seedLength`, optional `draft`, and packed Assistant chunks. The generated inventory still owns every adjacent edge and the current encoder; the reader selects the historical dialect without changing the stored version. Released `isSeeded` headers and current generations retain native admission. Unknown source fields, contradictory cuts, missing message identity, and future versions are refused.
+
 ```text
 const descriptor = sessionFormatCatalog.readHeader(physicalHeader)
-const restore = sessionFormatCatalog.createRestore(physicalHeader, { recovery: 'recoverable', validation: 'transformed' })
+const catalog = createSessionFormatCatalogWithChildren(childFacts)
+const restore = catalog.createRestore(physicalHeader, { recovery: 'recoverable', validation: 'transformed' })
 for (const row of physicalRows) restore.decodeRow(row)
 const current = restore.finish()
 const headerRecord = sessionFormatCatalog.encodeCurrentHeader(current.header, current.inheritedEventCount)
@@ -45,6 +50,8 @@ Import `sessionFormatCatalog` from the package root. JSONL and fixture readers c
 Production historical reads select `{ recovery: 'recoverable', validation: 'transformed' }`. Worker and fixture verification select `{ recovery: 'strict', validation: 'current' }`. Transformed validation runs the released-current rules after migration but deliberately skips installed semantic validation for input that is already current.
 
 The catalog contains all supported historical readers directly. A profile cannot add, remove, or reorder an edge by mounting a feature plugin. Its peer dependency on `dsh-session` supplies the installed current event vocabulary and current restoration rules, while historical edge validators remain frozen. The browser-safe `./message-projections` export assembles current plugin-owned interpreters for detached constructors and surface folds; it does not mount recovery listeners.
+
+`createSessionFormatCatalogWithChildren(childFacts)` binds explicit child evidence to V3→V4 during assembly; see the [catalog-completion specification](../session-format-v3-to-v4/README.md). `historicalSessionFormatCatalog` restores V0–V3 using the fixed released-V3 event vocabulary to collect child prerequisites without recursively completing their catalogs. An ignorable V3 extension remains opaque even when the installed writer knows its name. Isolated transcript replay explicitly supplies an empty array; persistence must collect the complete available direct-child set. Keep the supplied evidence unchanged for the catalog’s lifetime. Each restore owns independent stage state. The static `sessionFormatCatalog` supports header and native current-format reads; historical body reads require the child-bound catalog.
 
 -----
 
@@ -67,6 +74,7 @@ The catalog contains all supported historical readers directly. A profile cannot
 - [Released v0 to v1 edge](../session-format-v0-to-v1/README.md) — codec and validator ownership.
 - [Released v1 to v2 edge](../session-format-v1-to-v2/README.md) — Assistant stream embedding and cardinality-changing reference remapping.
 - [Released V2 to V3 specification](../session-format-v2-to-v3/README.md#v2-to-v3-specification) — transformations, preservation, and refusal.
+- [V3 to V4 specification](../session-format-v3-to-v4/README.md#v3-to-v4-specification) — conversion, reference remapping, and delivery-generation validation.
 - [JSONL persistence](../session-persistence-jsonl/README.md) — immutable generation naming and exclusive publication.
 
 -----

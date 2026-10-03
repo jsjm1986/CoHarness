@@ -7,10 +7,13 @@
 // narrow row never clips it; the durable list itself renders in the TodoPanel
 // above the composer, so the row stays one line until expanded.
 
+import { useMemo } from 'react'
 import { IconChecklistOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
+import { registerTodoHistory } from '../models/todo-history.ts'
+import { todoDiffModel } from '../models/todo-diff-model.ts'
 import { toolRowModel } from '../models/tool-call-model.ts'
 import { ToolRow } from '../components/ToolRow.tsx'
 import { CONVERSATION_NS as NS } from '../../locale.ts'
@@ -33,7 +36,8 @@ interface RowSummary {
   extra: number
 }
 
-function summarize(argsRaw: string, t: TodoRowProps['t']): RowSummary | null {
+function summarize(argsRaw: string | null, t: TodoRowProps['t']): RowSummary | null {
+  if (argsRaw === null) return null
   let parsed: unknown
   try {
     parsed = JSON.parse(argsRaw)
@@ -54,25 +58,31 @@ function summarize(argsRaw: string, t: TodoRowProps['t']): RowSummary | null {
   }
 }
 
-/** One-line plan update row (the whole row toggles the call's Input/Output
- *  sections, ToolRow's unified expand). Non-ok execution states keep the
- *  shared row's dot semantics — a cancelled call wrote no todo/write, so it
- *  must not read as a completed update. */
-export function TodoRow({ toolName, block, inspect, openDetails, t }: TodoRowProps) {
+/** One-line plan update row (the whole row toggles the call's detail body —
+ *  the recorded-list diff when a predecessor write is loaded, else the row's
+ *  Input/Output sections). Non-ok execution states keep the shared row's dot
+ *  semantics — a cancelled call wrote no todo/write, so it must not read as a
+ *  completed update. */
+export function TodoRow({ useDisclosure, toolName, block, inspect, openDetails, useSession, t }: TodoRowProps) {
+  const baseline = useSession(snapshot => snapshot.views.get('tool-todo-history')?.get(block.callId))
+  const hasMore = useSession(snapshot => snapshot.hasMore)
+  const diff = useMemo(() => todoDiffModel(block, baseline, hasMore, t), [block, baseline, hasMore, t])
   const model = toolRowModel(toolName, block)
-  const argsRaw = ('kind' in block ? block.call?.argsRaw : block.argsRaw) ?? ''
-  const summary = summarize(argsRaw, t) ?? { text: model.summary, extra: 0 }
+  const summary = summarize(model.bodyRaw, t) ?? { text: model.summary, extra: 0 }
   return (
     <ToolRow
+      useDisclosure={useDisclosure}
       t={t}
       variant={model.variant}
       toolName={toolName}
       icon={<IconChecklistOutline14 />}
       title={t('todo.rowTitle')}
       summary={summary.text}
-      summarySuffix={summary.extra > 0 ? `+${summary.extra}` : null}
+      summarySuffix={[diff?.summary, summary.extra > 0 ? `+${summary.extra}` : null]
+        .filter((part): part is string => part !== null && part !== undefined).join(' · ') || null}
       bodyRaw={model.bodyRaw}
       output={model.output}
+      details={diff?.details}
       errorSummary={model.errorSummary}
       state={model.state}
       openDetails={openDetails}
@@ -87,12 +97,14 @@ export function TodoRow({ toolName, block, inspect, openDetails, t }: TodoRowPro
  */
 export const todoToolview = {
   name: 'todo-toolview',
-  inject: ['slots'],
+  inject: ['slots', 'conversationEvents', 'conversationViews'],
   /**
-   * Register the todo row into the Tool-owned keyed view slot.
+   * Install the recorded todo history and register the todo row into the
+   * Tool-owned keyed view slot.
    * @param ctx - registrant context (disposal rides ctx.effect inside slots.register).
    */
   apply(ctx: Context): void {
+    registerTodoHistory(ctx)
     ctx.slots.inject('tool.call.toolview', () =>
       ctx.slots.register({ name: 'tool.call.toolview', key: 'todo_write', locale: NS }, TodoRow))
   },

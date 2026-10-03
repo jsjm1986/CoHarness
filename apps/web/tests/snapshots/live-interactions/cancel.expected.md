@@ -11,13 +11,21 @@
     - img
   - button "Open right sidebar":
     - img
-- button "1 intermediate message":
+- button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - text: Reply with a one-sentence description of event sourcing, then stop.
 - group "Message timing": "{{clock}}"
 - button "Copy":
   - img
+- button "Context injection runtime-context":
+  - img
+  - img
+  - text: Context injection runtime-context
 - paragraph: partial
 - text: Stopped
 - button "Copy":
@@ -49,4 +57,5 @@
   - button "1 turns · 1 steps":
     - img
     - text: 1 turns · 1 steps
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

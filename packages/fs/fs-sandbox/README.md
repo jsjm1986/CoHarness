@@ -1,3 +1,8 @@
+---
+description: "Sandbox-enforcing implementation of the DeepSeek Harness filesystem seam: fences write/edit by the per-call sandbox mode (read-only denies mutation, workspace-write contains it to the workspace + temp roots) while reads pass through"
+kind: "package-reference"
+---
+
 # dsh-fs-sandbox — the sandbox-enforcing filesystem backend
 
 English | [中文](README.zh.md)
@@ -12,6 +17,18 @@ Loading it INSTEAD OF `dsh-fs-local`, together with a [`ctx.sandboxPolicy`](../.
 
 `dsh-fs-sandbox` confines model file writes and edits according to each session's sandbox mode while preserving the local filesystem's read behavior. In `read-only`, it rejects every mutation; in `workspace-write`, it permits targets only inside the session workspace or a platform temporary root; in `danger-full-access`, it does not restrict mutations. Use it instead of `fs-local` with `ctx.sandboxPolicy` when sessions need workspace-confined file changes. Denied operations return `FS_SANDBOX_DENIED`, which filesystem tools present with the active mode and a same-turn escalation hint.
 
+## Table of Contents
+
+- [The fence](#the-fence)
+- [Threat model: a policy fence, not a kernel boundary](#threat-model-a-policy-fence-not-a-kernel-boundary)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="the-fence"></a>
 ## The fence
 
 The per-call policy carries the effective mode (session override or escalation grant) together with the calling session's immutable cwd root, falling back to deployment policy only for calls without one:
@@ -20,16 +37,19 @@ The per-call policy carries the effective mode (session override or escalation g
 - `workspace-write` — allows a mutation only when the target canonicalizes under a writable root: the workspace root plus the platform temp areas (`/tmp`, `os.tmpdir()`), the SAME set the Seatbelt profile grants, derived from the one [`writableRoots`](../../sandbox/README.md) function so the fs fence and the bash runner cannot drift. Canonical spellings use a lexical fast path; an identity-based ancestor fallback recognizes alias-equivalent roots such as Windows long names and 8.3 names without treating unrelated prefixes as contained. The target is re-canonicalized immediately before delegating, so an ancestor symlink swapped since the tool resolved it is caught.
 - `danger-full-access` — delegates unfenced.
 
+<a id="threat-model-a-policy-fence-not-a-kernel-boundary"></a>
 ## Threat model: a policy fence, not a kernel boundary
 
 The fence is a check in TRUSTED code over a MODEL-CONTROLLED path — the operations are the seam's own (open, rename), only the target path is untrusted, so canonicalize-then-contain is the complete answer to this surface. This mirrors the `ptc-runtime` stance: containment, not a security boundary. Kernel-grade isolation of untrusted CODE stays `ctx.shell`'s job ([`dsh-bash-sandbox`](../../shell/bash-sandbox/README.md)). The residual TOCTOU (an ancestor symlink swapped between the containment re-check and the syscall) is narrowed by re-canonicalizing immediately before the write and is accepted for this threat model; a kernel-tight boundary needs `openat2`-class primitives not worth their portability cost here.
 
 A denial is a structured `FsError` (`FS_SANDBOX_DENIED`, carrying the effective mode) — no stderr text inference (unlike bash's kernel denials), because an in-process fence knows exactly what it refused. The model-facing `[sandbox: file access denied under <mode> mode]` marker and the one-approved-wider retry live in the tool layer (`dsh-tool-fs`), exactly as bash's do. See [the cross-family fs sandbox Agent Note](../../../.agents/notes/implemented/feature/2026-07-14-cross-family-fs-sandbox.md).
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The fence is a per-call mode check against the injected policy; storage mechanics are inherited and the filesystem stays authoritative.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Filesystem policy and refusals
@@ -51,3 +71,13 @@ A standing-policy change appends an owner-rendered superseding runtime-context s
 - **A policy fence, not a kernel boundary** — the check is trusted code over a model-controlled path, so the residual resolve-to-syscall TOCTOU is narrowed (by the in-place re-canonicalization) but not eliminated; adversarial host processes are out of scope. Kernel-grade isolation of untrusted code stays `ctx.shell`'s.
 - **Fence-vs-runner parity is derived from one owner** — the writable set comes from `writableRoots`, shared with the Seatbelt profile; a runner profile that defines its writable set elsewhere would drift.
 - **Requires `ctx.sandboxPolicy`** — tools use it to resolve each session policy and the backend uses it for agentless-call fallbacks; the backend does not confine without it composed.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -1,6 +1,103 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/core/tools/README.md
-README.md: 91e200d582cd549b3784700c745f07c0b21151e7
-README.zh.md: 478b32a3fd48437e2f6ee8bdfd85166a57570ed4
+/:
+  en: fab100837d641f85
+  zh: 61495d48365178df
+/dsh-tools:
+  en: 4eeb46552dda7fc5
+  zh: 91feaea3326fe043
+/dsh-tools/summary:
+  en: 19679f9c1953baaf
+  zh: 65dec1ccab4e532b
+/dsh-tools/table-of-contents:
+  en: 5a203bd4ee50a995
+  zh: 0547dbfef2bc2437
+/dsh-tools/service-toolruntime-ctx-key-tools:
+  en: 865a7c4b99798db9
+  zh: fbbeac098ef8d930
+/dsh-tools/service-toolruntime-ctx-key-tools/config:
+  en: 49d3e9eb20a5341e
+  zh: ea820ff4829ed5ff
+/dsh-tools/service-toolruntime-ctx-key-tools/public-api:
+  en: 0165751a44af8686
+  zh: 86e8fa9f5f32aa84
+/dsh-tools/service-toolruntime-ctx-key-tools/injected-services:
+  en: 88966a112f94b32b
+  zh: a384cf7079eb6be4
+/dsh-tools/service-toolruntime-ctx-key-tools/cancellation:
+  en: 54a4155019004ebb
+  zh: 8f88f997f9e72b07
+/dsh-tools/service-toolruntime-ctx-key-tools/live-events:
+  en: 6070700fe80681d7
+  zh: 44da574387118db6
+/dsh-tools/service-toolruntime-ctx-key-tools/key-types:
+  en: f9aeb8b218d0e66b
+  zh: 1caa4f59844358c3
+/dsh-tools/service-toolruntime-ctx-key-tools/extension-points:
+  en: 24885acaf0c68c3e
+  zh: 1b9abeb8efea836f
+/dsh-tools/service-toolruntime-ctx-key-tools/typed-tool-parameter-schemas:
+  en: 0664c3db3baaf31a
+  zh: 62b29ce1b2b4f7ba
+/dsh-tools/service-toolruntime-ctx-key-tools/enforced-raw-json-schema-subset:
+  en: 41d35539d33e50e1
+  zh: bbfe9c9dba4be551
+/dsh-tools/service-toolruntime-ctx-key-tools/tool-owned-ui-presentation:
+  en: c2b88769f183e8c9
+  zh: 7840bf3b6dab2bfa
+/dsh-tools/service-toolruntime-ctx-key-tools/ptc-mode:
+  en: 652477f5691afd4b
+  zh: 78912f758aa3da39
+/dsh-tools/service-toolruntime-ctx-key-tools/parallel-execution:
+  en: 2761c50026965892
+  zh: 3b6aee27f794d9ab
+/dsh-tools/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/dsh-tools/model-experience/normal-tool-schemas:
+  en: 483b01d9bb2cb49a
+  zh: 1d95095e76fb0996
+/dsh-tools/model-experience/normal-tool-schemas/what-the-model-sees:
+  en: beda295a874b30a1
+  zh: 253c4cf007c4db3f
+/dsh-tools/model-experience/normal-tool-schemas/token-effect:
+  en: d594b71ff5e4cc87
+  zh: dcec1ea0dd2a0fa6
+/dsh-tools/model-experience/normal-tool-schemas/kv-cache-effect:
+  en: 7c5e75964e020b2c
+  zh: d50d0402d15232d9
+/dsh-tools/model-experience/ptc-mode-schema-and-system-prompt:
+  en: eaefd7303f22977d
+  zh: 9c425f9501128224
+/dsh-tools/model-experience/ptc-mode-schema-and-system-prompt/what-the-model-sees:
+  en: ded2d4fca7d15cab
+  zh: befc42f701394a00
+/dsh-tools/model-experience/ptc-mode-schema-and-system-prompt/what-the-model-sees/typescript-ptc-mode-sdk-instructions-with-bash:
+  en: 3a8df15e4ae32f9e
+  zh: fc4a800ba363e835
+/dsh-tools/model-experience/ptc-mode-schema-and-system-prompt/token-effect:
+  en: 12296fcafc14562c
+  zh: f8e9351bb8c6437d
+/dsh-tools/model-experience/ptc-mode-schema-and-system-prompt/kv-cache-effect:
+  en: 78906628d634441f
+  zh: c10e5df748f5e0da
+/dsh-tools/model-experience/tool-call-history-and-results:
+  en: a8503137ad03720c
+  zh: 611a2dadf7c0c706
+/dsh-tools/model-experience/tool-call-history-and-results/what-the-model-sees:
+  en: 493cc0826cfec514
+  zh: f7e8d798a5e11c09
+/dsh-tools/model-experience/tool-call-history-and-results/token-effect:
+  en: 8fe3f024f364ed9f
+  zh: 8468693e081defdb
+/dsh-tools/model-experience/tool-call-history-and-results/kv-cache-effect:
+  en: f5d5f97a153f7c70
+  zh: 3df78525d1db9020
+/dsh-tools/known-limitations-and-deferred-work:
+  en: b4360828806a37dc
+  zh: 335f0537bea31c4b
+/dsh-tools/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

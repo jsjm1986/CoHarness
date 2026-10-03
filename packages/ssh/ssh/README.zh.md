@@ -78,6 +78,7 @@ OpenSSH 主连接承载私有管理 RPC。每条程序流使用独立转发的 U
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -87,6 +88,7 @@ OpenSSH 主连接承载私有管理 RPC。每条程序流使用独立转发的 U
 
 本提供方不贡献请求前缀内容。面向模型的工具与结果由消费方负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 <a id="known-limitations-and-deferred-work"></a>

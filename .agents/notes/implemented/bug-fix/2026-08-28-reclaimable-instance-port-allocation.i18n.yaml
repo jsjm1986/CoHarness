@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-28-reclaimable-instance-port-allocation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-28-reclaimable-instance-port-allocation.md
-2026-08-28-reclaimable-instance-port-allocation.md: c674a2ee600f63679573623a5c6b78dd5cd6bcf8
-2026-08-28-reclaimable-instance-port-allocation.zh.md: a5a236acc65bf725ad10297991d19d3bd63843ad
+/agent-note-reclaim-node-local-instance-ports:
+  en: d2c0b5cc4201c799
+  zh: a095586c26d11089
+/agent-note-reclaim-node-local-instance-ports/problem:
+  en: fa2351055e22bd61
+  zh: ebb50371949c24b9
+/agent-note-reclaim-node-local-instance-ports/decision:
+  en: 62b1cfd83f83abf8
+  zh: 9b1826854dc0c5f3
+/agent-note-reclaim-node-local-instance-ports/alternatives-considered:
+  en: 09987f30788c84f2
+  zh: caef3f56b45c8365
+/agent-note-reclaim-node-local-instance-ports/consequences:
+  en: 3e5bb8692c525323
+  zh: 80cd7afa04405db4
+/agent-note-reclaim-node-local-instance-ports/verification:
+  en: 28d1ab93ad7b30cb
+  zh: 36f7f4000733bfea

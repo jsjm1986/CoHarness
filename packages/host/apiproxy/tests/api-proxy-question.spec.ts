@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore from '@deepseek-ai/dsh-session'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
+import type { ExecutionInheritance, ExecutionInputId, ExecutionScopeId } from '@deepseek-ai/dsh-execution-authority'
 import type { ApiProxy, MuxFrame, RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { createApiProxy } from '../src/api-proxy.ts'
@@ -20,7 +21,7 @@ async function harness(): Promise<{ ctx: Context; api: ApiProxy }> {
 
 async function agent(ctx: Context): Promise<Agent> {
   const session = ctx.sessions.create()
-  const value = { id: session.id, session, status: 'idle', ctx } as Agent
+  const value = { id: session.id, session, status: 'idle', ctx, inbox: { nextStep: [], nextTurn: [] } } as unknown as Agent
   await ctx.agents.register(value)
   return value
 }
@@ -70,6 +71,29 @@ function answer(
 }
 
 describe('question response validation', () => {
+  it('answers under the execution captured when the question opened after a newer request becomes current', async () => {
+    const { ctx, api } = await harness()
+    onTestFinished(async () => { await ctx.fiber.dispose() })
+    const target = await agent(ctx)
+    const original: ExecutionInheritance = { parentSessionId: target.id,
+      scopeId: '10000000-0000-4000-8000-000000000001' as ExecutionScopeId,
+      inputs: ['10000000-0000-4000-8000-000000000002' as ExecutionInputId], primaryActorUserId: 1, unverifiedHistory: false }
+    let current = original
+    const capture = vi.fn(() => current), claim = vi.fn(async () => true)
+    ctx.provide('executionAuthority', { capture, answer: claim } as never)
+    const abort = new AbortController()
+    onTestFinished(() => { abort.abort() })
+    const mux = openMux(api, abort)
+    const asked = ctx.userQuestions.ask({ agent: target, questions: [{ id: 'decision', question: 'Continue?', options: [{ label: 'Yes' }] }] })
+    const envelope = await mux.waitForQuestion()
+    current = { ...original, scopeId: '20000000-0000-4000-8000-000000000001' as ExecutionScopeId, primaryActorUserId: 2 }
+    expect(await api.respond(answer(envelope, ['Yes']))).toEqual({ accepted: true })
+    await expect(asked).resolves.toEqual({ answers: [{ id: 'decision', selected: ['Yes'] }] })
+    expect(capture).toHaveBeenCalledOnce()
+    expect(claim).toHaveBeenCalledWith(target.session, envelope.rpcId, { answers: [{ id: 'decision', selected: ['Yes'] }] }, original)
+    abort.abort()
+  })
+
   it('accepts selected options with custom text for multi-select questions', async () => {
     const { ctx, api } = await harness()
     const abort = new AbortController()

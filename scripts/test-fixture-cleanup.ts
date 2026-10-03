@@ -15,7 +15,7 @@ import { join } from 'node:path'
  * Recursively unlink every symbolic link (junction) under `path`.
  * @param path - the fixture tree whose reparse points are unlinked.
  */
-export function unlinkFixtureLinks(path: string): void {
+function unlinkFixtureLinks(path: string): void {
   const visit = (entry: string): void => {
     let stat: ReturnType<typeof lstatSync>
     try {

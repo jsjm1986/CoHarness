@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-admin-auto-review-eligibility.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-admin-auto-review-eligibility.md
-2026-09-22-admin-auto-review-eligibility.md: f3823d8e648b67981c7908d99c9df424ae07c2e3
-2026-09-22-admin-auto-review-eligibility.zh.md: 376e85384d76c6922345c0575800d3f992eb4a80
+/agent-note-administrator-owned-auto-review-eligibility:
+  en: af0eb07770976fd6
+  zh: 03d3f686d43cfca8
+/agent-note-administrator-owned-auto-review-eligibility/problem:
+  en: 60f5758ed513f8f2
+  zh: 079a7415346fc91f
+/agent-note-administrator-owned-auto-review-eligibility/decision:
+  en: 79faa13a206d7fb0
+  zh: fa44fa50fa537162
+/agent-note-administrator-owned-auto-review-eligibility/alternatives-considered:
+  en: 2f19a8d02cf1445f
+  zh: 3eda5af8dd6b6bae
+/agent-note-administrator-owned-auto-review-eligibility/consequences:
+  en: 1f046fac934f25dc
+  zh: 3395da28f46ed67b
+/agent-note-administrator-owned-auto-review-eligibility/testing:
+  en: 8849c252715aa695
+  zh: da7487030551486c

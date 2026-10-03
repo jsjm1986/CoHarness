@@ -7,11 +7,13 @@ import type { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createPostgresPool, runMigrations } from '../src/postgres/database.ts'
 import type { UserRow } from '../src/auth.ts'
-import type { ProjectDetail } from '../src/projects.ts'
+import { PostgresCollaborationService } from '../src/postgres/collaboration-service.ts'
 import { createExecutionFixture } from './execution-fixture.ts'
 import { PostgresWebhookEndpointService, WebhookEndpointError, WebhookSecretCipher } from '../src/postgres/webhook-endpoint-service.ts'
 import { PostgresWebhookDeliveryService, type WebhookEndpointId } from '../src/postgres/webhook-delivery-service.ts'
 import { GatewayWebhookIntake, WEBHOOK_DISPATCH_PATH } from '../src/webhook-intake.ts'
+import { PostgresInstanceRepository } from '../src/postgres/instance-repository.ts'
+import { RuntimeStartBlockedError, type RuntimeStopReason } from '../src/instances.ts'
 import { PRINCIPAL_HEADER } from '../src/principal.ts'
 
 const databaseUrl = process.env.HGW_TEST_DATABASE_URL
@@ -44,7 +46,7 @@ function githubRequest(body: string, secret = SECRET, headers: Record<string, st
 }
 
 /** Minimal runtime dispatch stub capturing the request and answering sessionId. */
-async function stubRuntime(answer: (body: string, assertion: string | undefined) => { status: number; body?: unknown }) {
+async function stubRuntime(answer: (body: string, assertion: string | undefined) => { status: number; body?: unknown } | Promise<{ status: number; body?: unknown }>) {
   const requests: Array<{ body: string; assertion: string | undefined }> = []
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     void (async () => {
@@ -52,7 +54,7 @@ async function stubRuntime(answer: (body: string, assertion: string | undefined)
       for await (const chunk of req) chunks.push(Buffer.from(chunk))
       const body = Buffer.concat(chunks).toString('utf8')
       requests.push({ body, assertion: req.headers[PRINCIPAL_HEADER] as string | undefined })
-      const reply = answer(body, req.headers[PRINCIPAL_HEADER] as string | undefined)
+      const reply = await answer(body, req.headers[PRINCIPAL_HEADER] as string | undefined)
       res.writeHead(reply.status, { 'content-type': 'application/json' })
       res.end(JSON.stringify(reply.body ?? {}))
     })().catch(() => { res.writeHead(500); res.end() })
@@ -65,19 +67,30 @@ async function stubRuntime(answer: (body: string, assertion: string | undefined)
   return { requests, port: (server.address() as AddressInfo).port }
 }
 
-async function intakeFor(f: Awaited<ReturnType<typeof createExecutionFixture>>, port: number | null) {
+async function intakeFor(f: Awaited<ReturnType<typeof createExecutionFixture>>, port: number | null, options: { offline?: boolean; stopReason?: RuntimeStopReason } = {}) {
   const endpoints = new PostgresWebhookEndpointService(f.context, cipher)
   const deliveries = new PostgresWebhookDeliveryService(f.context)
+  const starts: string[] = []
   const instances = {
-    isLive: async () => port !== null,
+    isLive: async () => port !== null && options.offline !== true,
+    ensureRunning: async (_subject: unknown, intent?: string) => {
+      starts.push(intent ?? 'passive')
+      if (intent !== 'webhook' || options.stopReason !== 'idle' || port === null) throw new RuntimeStartBlockedError(options.stopReason ?? null)
+      return { port, generation: f.project.generation }
+    },
     generationOf: async () => f.project.generation,
     portOf: async () => port ?? 0,
     operationRef: async () => {},
   }
-  const users = { getById: async (id: number) => (id === f.member.id ? f.member as UserRow : null) }
-  const projects = { getById: async (id: number) => (id === f.project.id ? { name: 'Project' } as ProjectDetail : null) }
+  const users = { getById: async (id: number): Promise<UserRow | null> => {
+    if (id !== f.member.id) return null
+    const row = (await pool.query<{ status: UserRow['status']; auto_review_eligible: boolean }>(
+      'SELECT status,auto_review_eligible FROM harness.users WHERE id=$1', [f.member.uuid])).rows[0]
+    return row === undefined ? null : { ...f.member, status: row.status, autoReviewEligible: row.auto_review_eligible }
+  } }
+  const collaboration = new PostgresCollaborationService(f.context)
   const intake = new GatewayWebhookIntake(
-    { cfg: { upstreamTimeoutMs: 5_000 }, users, projects, instances }, endpoints, deliveries, f.principals)
+    { cfg: { upstreamTimeoutMs: 5_000 }, users, collaboration, instances }, endpoints, deliveries, f.principals)
   const server = createServer((req, res) => { void intake.handle(req, res) })
   await new Promise<void>(ready => { server.listen(0, '127.0.0.1', ready) })
   cleanup.push(async () => {
@@ -85,7 +98,7 @@ async function intakeFor(f: Awaited<ReturnType<typeof createExecutionFixture>>, 
     await new Promise<void>((closed, reject) => { server.close(error => { if (error) reject(error); else closed() }) })
   })
   const base = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`
-  return { endpoints, deliveries, intake, base }
+  return { endpoints, deliveries, intake, base, starts }
 }
 
 const post = (base: string, path: string, headers: Record<string, string>, body: string) =>
@@ -109,7 +122,7 @@ describePg('Gateway webhook endpoints and intake', () => {
     const f = await fixture()
     const service = new PostgresWebhookEndpointService(f.context, cipher)
     const created = await service.create(f.admin.id, endpointInput(f))
-    expect(created).toMatchObject({ name: expect.any(String), provider: 'github', source: 'acme', enabled: false, revision: '1' })
+    expect(created).toMatchObject({ name: expect.any(String), provider: 'github', source: 'acme', enabled: false, revision: '1', projectVisibility: 'project' })
     expect(created).not.toHaveProperty('secret')
     expect(await service.list()).toHaveLength(1)
 
@@ -120,6 +133,7 @@ describePg('Gateway webhook endpoints and intake', () => {
     expect(resolved.secret).toBe(SECRET)
     expect(resolved.endpointId).toBe(created.id)
 
+    await expect(service.create(f.admin.id, { ...endpointInput(f), projectVisibility: 'public' })).rejects.toMatchObject({ status: 400 })
     await expect(service.create(f.admin.id, { ...endpointInput(f), name: '' })).rejects.toMatchObject({ status: 400 })
     await expect(service.create(f.admin.id, { ...endpointInput(f), secret: '' })).rejects.toMatchObject({ status: 400 })
     await expect(service.create(f.admin.id, { ...endpointInput(f), name: created.name })).rejects.toMatchObject({ status: 409 })
@@ -129,9 +143,9 @@ describePg('Gateway webhook endpoints and intake', () => {
 
     const renamed = await service.update({
       targetId: created.publicId, revision: enabled!.revision,
-      fields: { ...fields, name: 'renamed', events: ['push', 'pull_request'], repositories: ['acme/widget'] },
+      fields: { ...fields, name: 'renamed', projectVisibility: 'private', events: ['push', 'pull_request'], repositories: ['acme/widget'] },
     })
-    expect(renamed).toMatchObject({ name: 'renamed', revision: '3', events: ['push', 'pull_request'],
+    expect(renamed).toMatchObject({ name: 'renamed', revision: '3', projectVisibility: 'private', events: ['push', 'pull_request'],
       repositories: ['acme/widget'] })
     await expect(service.intake(created.publicId).then(config => config.events)).resolves.toEqual(['push', 'pull_request'])
     await expect(service.intake(created.publicId).then(config => config.repositories)).resolves.toEqual(['acme/widget'])
@@ -174,8 +188,9 @@ describePg('Gateway webhook endpoints and intake', () => {
     assert.ok(dispatched.delivery.event.payload.ref === 'refs/heads/main')
     expect(typeof runtime.requests[0]!.assertion).toBe('string')
     const claims = JSON.parse(Buffer.from(runtime.requests[0]!.assertion!.split('.')[0]!, 'base64url').toString()) as {
-      purpose?: string; user: { id: number }; runtime: { kind: string; id: number } }
+      purpose?: string; user: { id: number }; scope: { kind: string; mode: string }; runtime: { kind: string; id: number } }
     expect(claims.purpose).toBe('webhook-dispatch')
+    expect(claims.scope).toMatchObject({ kind: 'project', mode: 'rw' })
     expect(claims.user.id).toBe(f.member.id)
     expect(claims.runtime).toMatchObject({ kind: 'project', id: f.project.id })
 
@@ -205,6 +220,58 @@ describePg('Gateway webhook endpoints and intake', () => {
     expect((await post(base, '/webhook/999999', githubRequest(body), body)).status).toBe(404)
     expect((await post(base, `/webhook/${String(endpoint.publicId)}`,
       githubRequest('not json'), 'not json')).status).toBe(400)
+  })
+
+  it.each(['project', 'private'] as const)('persists a project webhook root with the signed creator and %s ACL', async (visibility) => {
+    const f = await fixture()
+    let sessionId = ''
+    const runtime = await stubRuntime(async (raw, assertion) => {
+      const input = JSON.parse(raw) as { request: { projectVisibility: string } }
+      sessionId = `webhook-${randomUUID()}`
+      const createdAt = Date.now()
+      const response = await fetch(`${f.base}/internal/runtime/session/create`, {
+        method: 'POST', headers: { ...f.headers(f.project), [PRINCIPAL_HEADER]: assertion! },
+        body: JSON.stringify({ visibility: input.request.projectVisibility,
+          header: { id: sessionId, version: 0, createdAt, cwd: '/tmp/workspace' } }),
+      })
+      expect(response.status).toBe(200)
+      const { authorization } = await response.json() as { authorization: string }
+      const persisted = await f.call('/internal/runtime/session/append', {
+        sessionId, batchId: randomUUID(), creationAuthorization: authorization,
+        events: [{ type: 'user/message', seq: 0, time: createdAt,
+          data: { content: [{ type: 'text', text: 'Webhook input' }] }, surfaceOp: 'append' }],
+      })
+      expect(persisted.status).toBe(200)
+      return { status: 200, body: { sessionId } }
+    })
+    const { endpoints, deliveries, base } = await intakeFor(f, runtime.port)
+    const endpoint = await endpoints.create(f.admin.id, { ...endpointInput(f), projectVisibility: visibility })
+    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    const body = JSON.stringify({ ref: 'refs/heads/main', after: 'created' })
+    expect((await post(base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
+    expect((await deliveries.list(endpoint.id)).items[0]).toMatchObject({ state: 'submitted', sessionId })
+    expect((await pool.query('SELECT creator_user_id,project_id,visibility FROM harness.conversation_sessions WHERE id=$1', [sessionId])).rows)
+      .toEqual([{ creator_user_id: f.member.uuid, project_id: f.project.uuid, visibility }])
+    const access = new PostgresCollaborationService(f.context)
+    const creator = await access.access(f.member.id, sessionId, 'read')
+    expect(creator.canRead).toBe(true)
+  })
+
+  it.each(['ro', 'removed'] as const)('rechecks current project membership before dispatch (%s)', async (access) => {
+    const f = await fixture()
+    const runtime = await stubRuntime(() => ({ status: 200, body: { sessionId: 'unexpected' } }))
+    const { endpoints, deliveries, base } = await intakeFor(f, runtime.port)
+    const endpoint = await endpoints.create(f.admin.id, endpointInput(f))
+    await endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    if (access === 'ro') {
+      await pool.query("UPDATE harness.project_members SET access_mode='ro' WHERE project_id=$1 AND user_id=$2", [f.project.uuid, f.member.uuid])
+    } else {
+      await pool.query('DELETE FROM harness.project_members WHERE project_id=$1 AND user_id=$2', [f.project.uuid, f.member.uuid])
+    }
+    const body = JSON.stringify({ ref: 'refs/heads/main', after: 'revoked' })
+    expect((await post(base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
+    expect(runtime.requests).toHaveLength(0)
+    expect((await deliveries.list(endpoint.id)).items[0]).toMatchObject({ state: 'rejected', errorCode: 'execution-project-access' })
   })
 
   it('applies the structured repository filter before dispatch', async () => {
@@ -250,6 +317,74 @@ describePg('Gateway webhook endpoints and intake', () => {
     await second.endpoints.mutate({ targetId: other.publicId, revision: other.revision, action: 'enable' })
     expect((await post(second.base, `/webhook/${String(other.publicId)}`, githubRequest(body), body)).status).toBe(202)
     expect((await second.deliveries.list(other.id)).items[0]).toMatchObject({ state: 'unknown', errorCode: 'dispatch-failed' })
+  })
+
+  it('carries preset-invalid through to the receipt when the runtime reports it', async () => {
+    const f = await fixture()
+    const refusing = await stubRuntime(() => ({ status: 400, body: { error: 'preset-invalid' } }))
+    const intake = await intakeFor(f, refusing.port)
+    const endpoint = await intake.endpoints.create(f.admin.id, endpointInput(f))
+    await intake.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    const body = JSON.stringify({ ref: 'refs/heads/main', after: 'abc' })
+    expect((await post(intake.base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
+    expect((await intake.deliveries.list(endpoint.id)).items[0]).toMatchObject({ state: 'rejected', errorCode: 'preset-invalid' })
+  })
+
+  it('retains a manual stop after Gateway startup reconciliation and fences automatic start claims', async () => {
+    const f = await fixture()
+    const repository = new PostgresInstanceRepository(f.context, 48000)
+    await repository.markStopping(f.project, 'manual')
+    await repository.markStopped(f.project)
+    await repository.initialize(false)
+    await repository.markStopping(f.project, 'access-change')
+    await repository.markStopped(f.project)
+    expect(await repository.stopReasonOf(f.project)).toBe('manual')
+    const hash = randomBytes(32)
+    await expect(repository.beginStart(f.project, Date.now(), hash, 'passive')).rejects.toBeInstanceOf(RuntimeStartBlockedError)
+    await expect(repository.beginStart(f.project, Date.now(), hash, 'webhook')).rejects.toBeInstanceOf(RuntimeStartBlockedError)
+    const generation = await repository.beginStart(f.project, Date.now(), hash, 'explicit')
+    expect(generation).toBe(f.project.generation + 1)
+    expect(await repository.stopReasonOf(f.project)).toBeNull()
+    await repository.markReady(f.project, generation)
+    await repository.markStopping(f.project, 'idle')
+    await repository.markStopped(f.project)
+    expect(await repository.beginStart(f.project, Date.now(), randomBytes(32), 'webhook')).toBe(generation + 1)
+    await pool.query("UPDATE harness.users SET status='disabled' WHERE id=$1", [f.admin.uuid])
+    await expect(repository.beginStart(f.personal, Date.now(), hash, 'explicit')).rejects.toBeInstanceOf(RuntimeStartBlockedError)
+  })
+
+  it.each(['idle', 'manual', 'shutdown', 'failed'] as const)('wakes only an idle-stopped runtime (%s)', async (stopReason) => {
+    const f = await fixture()
+    const runtime = await stubRuntime(() => ({ status: 200, body: { sessionId: 'woken-session' } }))
+    const intake = await intakeFor(f, runtime.port, { offline: true, stopReason })
+    const endpoint = await intake.endpoints.create(f.admin.id, endpointInput(f))
+    await intake.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    const body = JSON.stringify({ ref: 'refs/heads/main', after: 'wake' })
+    expect((await post(intake.base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
+    expect(intake.starts).toEqual(['webhook'])
+    const receipt = (await intake.deliveries.list(endpoint.id)).items[0]
+    if (stopReason === 'idle') {
+      expect(runtime.requests).toHaveLength(1)
+      expect(receipt).toMatchObject({ state: 'submitted', sessionId: 'woken-session' })
+    } else {
+      expect(runtime.requests).toHaveLength(0)
+      expect(receipt).toMatchObject({ state: 'rejected', errorCode: stopReason === 'manual' ? 'runtime-manually-stopped' : 'runtime-offline' })
+    }
+  })
+
+  it.each(['auto', 'disabled'] as const)('checks eligibility before waking the runtime (%s)', async (condition) => {
+    const f = await fixture()
+    const runtime = await stubRuntime(() => ({ status: 200, body: { sessionId: 'unexpected' } }))
+    const intake = await intakeFor(f, runtime.port, { offline: true, stopReason: 'idle' })
+    const endpoint = await intake.endpoints.create(f.admin.id, { ...endpointInput(f), permissionPreset: condition === 'auto' ? 'auto' : 'default' })
+    await intake.endpoints.mutate({ targetId: endpoint.publicId, revision: endpoint.revision, action: 'enable' })
+    if (condition === 'disabled') await pool.query("UPDATE harness.users SET status='disabled' WHERE id=$1", [f.member.uuid])
+    const body = JSON.stringify({ ref: 'refs/heads/main', after: 'denied' })
+    expect((await post(intake.base, `/webhook/${String(endpoint.publicId)}`, githubRequest(body), body)).status).toBe(202)
+    expect(intake.starts).toEqual([])
+    expect(runtime.requests).toHaveLength(0)
+    expect((await intake.deliveries.list(endpoint.id)).items[0]).toMatchObject({ state: 'rejected',
+      errorCode: condition === 'auto' ? 'execution-auto-ineligible' : 'execution-account' })
   })
 
   it('redispatches a settled receipt under current configuration with audit-safe unique identity', async () => {

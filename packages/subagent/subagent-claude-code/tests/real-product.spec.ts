@@ -222,6 +222,7 @@ async function realHarness(
   })
   const parent = {
     id: 'real-parent',
+    ctx,
     session: { header: { cwd: instance.workspace } },
   } as unknown as Agent
   return {
@@ -401,10 +402,12 @@ describe('real Claude Agent SDK 0.3.263 and its distributed Claude Code 2.1.263 
     })
     const safeParent = {
       id: 'safe-parent',
+      ctx,
       session: { header: { cwd: safeInstance.workspace } },
     } as unknown as Agent
     const bypassParent = {
       id: 'bypass-parent',
+      ctx,
       session: { header: { cwd: bypassInstance.workspace } },
     } as unknown as Agent
     const safeController = new AbortController()

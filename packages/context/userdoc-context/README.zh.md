@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-userdoc-context
 
 [English](README.md) | 中文
@@ -9,12 +14,24 @@
 使用 `dsh-userdoc-context` 获得 `ctx.userDocs` 的提示词侧上下文：它在提示词被受理前校验上传文档 id，按文档选择内联文本或仅路径表示，并把已受理快照记入会话日志，让模型看到稳定视图。
 
 
+## 目录
+
+- [公共 API](#public-api)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="public-api"></a>
 ## 公共 API
 
 `prepareUserDocAttachments()` 在 Host 调用 `followup()` 或 `steer()` 前解析整批文档。它强制执行 `UserDocLimits.maxFilesPerMessage` 与 `maxMessageBytes`；不超过 `maxInlineTextBytes` 的文件会读取一次，只有严格 UTF-8 字节才会内联。其他文件保留为路径引用，由 agent 已有的文件系统工具读取。`renderUserDocAttachment()` 把冻结后的表示渲染为文本块。
 
 确切的 `user/message` 事件追加后，插件为每个文档追加一个 `userdoc/attached` 事件。每个事件包含所引用的消息标识、文档索引、元数据，以及出现在用户消息中的表示，因此重放可以验证模型可见的文档上下文由 Host 准入，而不是由浏览器提供。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 已准入的文档上下文
@@ -44,8 +61,19 @@ Uploaded document "report.pdf" is available at "/workspace/uploads/2026-08-14/re
 
 渲染后的文档文本属于追加式用户消息后缀。复用会话会保留更早的提示历史；新上传只改变新消息后缀，而仅路径文档不会把文件字节载入模型请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 - **不解析文档**——插件不抽取 PDF、表格、图片或压缩包文本。二进制与无法解码的文件保持路径引用，由 agent 的工具决定如何检查。
 - **准入时冻结快照**——内联字节与引用元数据在提示进入 Session 前冻结；普通文件在准入后的变化不会改写那条历史消息。
 - **没有历史浏览器库**——浏览器 rail 只管理当前草稿，持久文件仍在工作区内，通过 Host 文档服务列举或删除。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-sdk-max-output-tokens.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-28-sdk-max-output-tokens.md
-2026-07-28-sdk-max-output-tokens.md: 72a9e87484ca87e0a750f52d7e46db7aee436d21
-2026-07-28-sdk-max-output-tokens.zh.md: 820008ec7293cfee20c0a9c26037f746c9e081c2
+/agent-note-sdk-max-output-tokens:
+  en: edf7002dd118a633
+  zh: 491f3145e4b6e40d
+/agent-note-sdk-max-output-tokens/problem:
+  en: aeb97394c9dbc347
+  zh: e48eced4ddeec16f
+/agent-note-sdk-max-output-tokens/decision:
+  en: b02c2622b694cf12
+  zh: 7cf5c4702535a503
+/agent-note-sdk-max-output-tokens/alternatives-considered:
+  en: 4ca9f6cade1469b8
+  zh: 249830c995d53082
+/agent-note-sdk-max-output-tokens/consequences:
+  en: d9e2b32d9562d174
+  zh: fff58385ca051d49

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-directory-picker-native
 
 [English](README.md) | 中文
@@ -12,10 +17,22 @@ node 半边是一个空 `apply`：它的存在只为让插件出现在 host 的 
 
 本包提供 Web GUI 的原生目录拾取表面：当工作区流程请求一个目录时，一个无渲染的浏览器填充会在本地机器上打开操作系统自带的选择器，并回报唯一结果——拾取的路径、取消或失败。它填充 `ui-workspace` 声明的两个目录流程 slot，用一行 `cordis.yml` 组合出原生拾取交互的客户端一侧。当浏览器与 Host 运行在同一台机器上时选择它；进程内与远程浏览器部署则需要 [`-browse`](../ui-directory-picker-browse/README.zh.md) 表面。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。OS 选择器属于 host 后端；无渲染占位内容只转发每次打开请求并上报一个结果，不保留目录状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为目录选择器属于浏览器界面；本包中的任何内容都不会进入模型请求。
@@ -24,7 +41,18 @@ node 半边是一个空 `apply`：它的存在只为让插件出现在 host 的 
 
 无；本包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **无法取消已打开的选择框** —— wire 上没有按请求的中止通道，因此已经出现在 Host 显示器上的选择框无法从浏览器关闭；被丢弃的结果只是被忽略。
 - **仅限本地 Host 载体** —— 系统对话框开在运行 Host 的机器上，所以进程内与远程浏览器部署需要改用 `-browse` 组合。平台失败通过 owner 的可重试文件夹对话框呈现。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

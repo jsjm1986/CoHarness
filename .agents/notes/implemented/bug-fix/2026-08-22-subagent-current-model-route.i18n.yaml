@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-22-subagent-current-model-route.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-22-subagent-current-model-route.md
-2026-08-22-subagent-current-model-route.md: dd0fa52b493e05e4c635b20284455002935d884b
-2026-08-22-subagent-current-model-route.zh.md: 90e9b0f8844a35307b551c8cdefda13db9dc2f13
+/agent-note-subagent-route-follows-the-parent-s-current-session-target:
+  en: e9d69da089e8fb72
+  zh: a145d11d3dbe8852
+/agent-note-subagent-route-follows-the-parent-s-current-session-target/problem:
+  en: 5a4d32f7140fe2be
+  zh: b09abb0113daeb28
+/agent-note-subagent-route-follows-the-parent-s-current-session-target/decision:
+  en: 969aae7cf1b064f7
+  zh: 2442224e00832aa9
+/agent-note-subagent-route-follows-the-parent-s-current-session-target/alternatives-considered:
+  en: 3f79b3332dd3bbad
+  zh: cc0b9b8f82a84836
+/agent-note-subagent-route-follows-the-parent-s-current-session-target/consequences:
+  en: 3cf099feba0d9c11
+  zh: f96abc6a6af7b1dc

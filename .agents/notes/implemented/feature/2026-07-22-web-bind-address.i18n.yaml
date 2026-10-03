@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-22-web-bind-address.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-22-web-bind-address.md
-2026-07-22-web-bind-address.md: 3332176c0cee940648ad334a44edd30879225503
-2026-07-22-web-bind-address.zh.md: 5ad73b8916d9cedce1073f4a2d025f40197b7d65
+/agent-note-explicit-web-bind-address:
+  en: 88903f0a232e6960
+  zh: a4c6334791e91f3b
+/agent-note-explicit-web-bind-address/problem:
+  en: 5866cc20fc6d70e4
+  zh: b48e3e9be9be98c1
+/agent-note-explicit-web-bind-address/decision:
+  en: 2322c5cb53609d7a
+  zh: 948d2c1fac4c738c
+/agent-note-explicit-web-bind-address/alternatives-considered:
+  en: 7b3352af4aa0646e
+  zh: debdd11c4c8d6a7a
+/agent-note-explicit-web-bind-address/consequences:
+  en: 6e1ffe5c1987d3e6
+  zh: af64dacf29e10502

@@ -1,3 +1,8 @@
+---
+description: "Shared subprocess and direct-agent harness for keyless real-Loader example smoke tests"
+kind: "package-library"
+---
+
 # `@deepseek-ai/dsh-loader-smoke`
 
 English | [中文](README.zh.md)
@@ -16,10 +21,21 @@ This is support-tier test infrastructure, not product API.
 
 Use `dsh-loader-smoke` to boot an application fixture from its real bin and `cordis.yml` in an isolated temporary directory, with captured output and cleanup. `runFixtureTurn` drives one task through the configured root agent and returns the final assistant text plus token usage. Tests can select zero-build source execution or built-package execution, so local and CI smoke tests use the intended consumer path for each environment. This support-tier library is for test authors, not product integrations.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. A test-support launcher selecting source or built mode; it owns no product state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the test harness submits only the consuming test's ordinary user task and delegates prompt and tool composition to the loaded tree.
@@ -33,3 +49,13 @@ None beyond the loaded tree; the helper neither changes the request prefix nor r
 - **Built mode requires a prior build** — the config must also resolve every named package upward through `examples/node_modules`.
 - **Captured stdout and stderr are bounded only by execa's default 100 MB `maxBuffer`** — a runaway child is terminated at that ceiling rather than at a smoke-chosen budget.
 - **Timeout kills only the direct child** — a process tree spawned by a faulty fixture can outlive the smoke and needs external cleanup.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

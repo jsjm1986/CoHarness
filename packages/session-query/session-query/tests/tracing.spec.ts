@@ -1,4 +1,5 @@
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore, {
@@ -12,6 +13,12 @@ import SessionPersistence from '@deepseek-ai/dsh-session-persistence'
 import type { SessionEventSuffix, SessionInspection , SessionStorageMetadata } from '@deepseek-ai/dsh-session-persistence'
 import { type SessionQueryErrorCode } from '@deepseek-ai/dsh-session-query'
 import { TestSessionQueryEngine } from './test-service.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'test': { kind: 'test' } & ContextFormed
+  }
+}
 
 type MutableSessionHeader = { -readonly [K in keyof SessionHeader]: SessionHeader[K] }
 
@@ -139,7 +146,7 @@ function appendTraceEvents(session: Session): void {
     'user/message',
     createUserMessage({
       content: [{ type: 'text', text: 'summary one' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     }),
     {
       surfaceOp: { op: 'replace', startSeq: SessionSeq(3), endSeq: SessionSeq(3) },
@@ -149,7 +156,7 @@ function appendTraceEvents(session: Session): void {
   session.append(
     'user/message',
     createUserMessage({
-      content: [{ type: 'text', text: 'context' }], source: { kind: 'plugin', plugin: 'test' },
+      content: [{ type: 'text', text: 'context' }], source: { kind: 'test' },
     }),
     { surfaceOp: 'append' },
   )
@@ -159,7 +166,7 @@ function appendTraceEvents(session: Session): void {
     'user/message',
     createUserMessage({
       content: [{ type: 'text', text: 'summary two' }],
-      source: { kind: 'plugin', plugin: 'test' },
+      source: { kind: 'test' },
     }),
     {
       surfaceOp: { op: 'replace', startSeq: SessionSeq(4), endSeq: SessionSeq(4) },
@@ -359,7 +366,7 @@ describe('session event tracing', () => {
     live.append(
       'user/message',
       createUserMessage({
-        content: [{ type: 'text', text: 'live' }], source: { kind: 'plugin', plugin: 'test' },
+        content: [{ type: 'text', text: 'live' }], source: { kind: 'test' },
       }),
       { surfaceOp: 'append' },
     )
@@ -395,7 +402,7 @@ describe('session event tracing', () => {
       time: 2,
       data: createUserMessage({
         content: [],
-        source: { kind: 'plugin', plugin: 'test' },
+        source: { kind: 'test' },
       }),
       surfaceOp: { op: 'replace', startSeq: SessionSeq(9), endSeq: SessionSeq(9) },
       sourceEventSeqs: [],
