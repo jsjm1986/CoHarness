@@ -170,4 +170,18 @@ describe('PluginMatrix', () => {
     expect(screen.getByText(/未装载/)).toBeTruthy()
     expect(screen.getByLabelText('启动时 managed')).toHaveProperty('value', 'off')
   })
+
+  it('renders the English dictionary when the persisted language is en', async () => {
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => key === 'coharness-admin-language' ? 'en' : null,
+      setItem: () => {},
+      removeItem: () => {},
+    })
+    api.pluginManagementState.mockResolvedValue(view())
+    render(<Harness kind="user" id={7} target={stopped} />)
+    await waitFor(() => expect(screen.getByText(/Saved startup configuration · revision 3/)).toBeTruthy())
+    expect(screen.getByText(/applies at the next start/)).toBeTruthy()
+    expect(screen.getByLabelText('managed at startup')).toHaveProperty('value', 'off')
+    vi.unstubAllGlobals()
+  })
 })
