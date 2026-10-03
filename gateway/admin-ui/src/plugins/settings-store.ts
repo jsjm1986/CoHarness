@@ -35,7 +35,17 @@ export class ProfileSettingsController {
       .map(item => ({ ...item, writable: item.writable ?? result.value.writable }))
       .sort((a, b) => a.ns.localeCompare(b.ns))
     this.state.set({ loading: false, error: '', namespaces })
-    this.directory.set({ items: namespaces.map(item => ({ id: item.ns, label: item.ns, ...item.label === undefined ? {} : { labelText: item.label } })), bundles: new Set(), rows: new Set() })
+    const items = namespaces.map(item => ({ id: item.ns, label: item.ns, ...item.label === undefined ? {} : { labelText: item.label } }))
+    // Configuration keys follow `rowConfigKey`: `bundle#rowId` marks a row
+    // and its package, a bare `bundle` marks the package alone.
+    const bundles = new Set<string>()
+    const rows = new Set<string>()
+    for (const item of items) {
+      const split = item.id.indexOf('#')
+      if (split < 0) bundles.add(item.id)
+      else { bundles.add(item.id.slice(0, split)); rows.add(item.id) }
+    }
+    this.directory.set({ items, bundles, rows })
   }
 
   async save(ns: string, ops: SettingsPathOpView[], expectedRevision: number): Promise<Answer<SettingsNamespaceView>> {

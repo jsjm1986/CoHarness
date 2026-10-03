@@ -49,29 +49,52 @@ function draftOf(target: AdminSshTarget): TargetDraft {
 }
 
 const text = (value: string) => value.trim() === '' ? null : value.trim()
-const limit = (value: string) => {
+const limit = (value: string, label: string, max: number, min = 1) => {
   if (value.trim() === '') return null
   const parsed = Number(value)
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new Error('数值字段必须是正整数')
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(`${label}必须是 ${min} 到 ${max} 之间的整数`)
+  }
   return parsed
 }
+const boundedText = (value: string, label: string, max: number): string => {
+  const trimmed = value.trim()
+  if (trimmed === '') throw new Error(`${label}不能为空`)
+  if (trimmed.length > max) throw new Error(`${label}不能超过 ${max} 字符`)
+  return trimmed
+}
+const absolutePath = (value: string, label: string): string => {
+  const trimmed = boundedText(value, label, 1024)
+  if (!trimmed.startsWith('/')) throw new Error(`${label}必须是绝对路径`)
+  return trimmed
+}
+const HOST_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.@-]*$/u
 
 function fieldsOf(draft: TargetDraft): AdminSshTargetFields {
   const bootstrapPath = text(draft.bootstrapPath)
   const bootstrapHash = text(draft.bootstrapHash)
   const passwordRef = text(draft.passwordRef)
   if ((bootstrapPath === null) !== (bootstrapHash === null)) throw new Error('PTC 引导路径与摘要必须同时填写')
+  if (bootstrapPath !== null && (!bootstrapPath.startsWith('/') || bootstrapPath.length > 1024)) {
+    throw new Error('PTC 引导路径必须是不超过 1024 字符的绝对路径')
+  }
+  const host = boundedText(draft.host, '主机别名', 256)
+  if (!HOST_PATTERN.test(host)) throw new Error('主机别名必须以字母或数字开头，只能包含字母、数字、_、.、@、-')
   if (!HASH_PATTERN.test(draft.helperHash.trim())) throw new Error('助手摘要必须是 64 位小写十六进制')
   if (bootstrapHash !== null && !HASH_PATTERN.test(bootstrapHash)) throw new Error('引导摘要必须是 64 位小写十六进制')
   if (passwordRef !== null && !/^[A-Za-z_][A-Za-z0-9_]{0,255}$/u.test(passwordRef)) {
     throw new Error('密码凭据引用必须以字母或下划线开头，只能包含字母、数字和下划线，最长 256 字符')
   }
   return {
-    name: draft.name.trim(), host: draft.host.trim(), node: draft.node.trim(), helper: draft.helper.trim(),
-    helperHash: draft.helperHash.trim(), workspace: draft.workspace.trim(),
+    name: boundedText(draft.name, '名称', 128), host,
+    node: absolutePath(draft.node, '远端 Node 可执行文件'),
+    helper: absolutePath(draft.helper, '助手入口'),
+    helperHash: draft.helperHash.trim(), workspace: absolutePath(draft.workspace, '远端默认工作区'),
     bootstrapPath, bootstrapHash, passwordRef,
-    requestTimeoutMs: limit(draft.requestTimeoutMs), maxFrameBytes: limit(draft.maxFrameBytes),
-    maxPending: limit(draft.maxPending), leaseMs: limit(draft.leaseMs),
+    requestTimeoutMs: limit(draft.requestTimeoutMs, '请求超时', 2_147_483_647),
+    maxFrameBytes: limit(draft.maxFrameBytes, '单帧上限', 67_108_864),
+    maxPending: limit(draft.maxPending, '并发请求上限', 128),
+    leaseMs: limit(draft.leaseMs, '远端租约', 600_000, 3_000),
   }
 }
 

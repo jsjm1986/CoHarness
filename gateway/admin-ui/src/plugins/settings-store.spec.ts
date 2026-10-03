@@ -35,6 +35,18 @@ it('carries the registrant label onto ledger items and keeps the namespace fallb
     { id: 'unlabelled', label: 'unlabelled' },
   ])
 })
+it('derives configured bundles and rows from configuration keys', async () => {
+  const { controller, remote } = fixture()
+  vi.mocked(remote.describe).mockResolvedValueOnce(described([
+    view,
+    { ...view, ns: 'dsh-pack' },
+    { ...view, ns: 'dsh-pack#sidebar' },
+    { ...view, ns: 'unrelated-key' },
+  ]))
+  await controller.load()
+  expect(controller.ledger.getSnapshot().bundles).toEqual(new Set(['shell', 'dsh-pack', 'unrelated-key']))
+  expect(controller.ledger.getSnapshot().rows).toEqual(new Set(['dsh-pack#sidebar']))
+})
 it('discards old reads when a newer load or accepted mutation has superseded them', async () => {
   const { controller, remote } = fixture()
   await controller.load()

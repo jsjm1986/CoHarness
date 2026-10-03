@@ -51,12 +51,20 @@ const EMPTY_DRAFT: EndpointDraft = {
 const names = (value: string): string[] =>
   value.split(/[,\n]/u).map(entry => entry.trim()).filter(entry => entry !== '')
 const text = (value: string) => value.trim() === '' ? null : value.trim()
-const limit = (value: string, label: string): number => {
+const limit = (value: string, label: string, max?: number): number => {
   const parsed = Number(value)
   if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new Error(`${label}必须是正整数`)
+  if (max !== undefined && parsed > max) throw new Error(`${label}不能超过 ${max}`)
   return parsed
 }
 const optionalLimit = (value: string, label: string): number | null => value.trim() === '' ? null : limit(value, label)
+const boundedText = (value: string, label: string, max: number): string => {
+  const trimmed = value.trim()
+  if (trimmed === '') throw new Error(`${label}不能为空`)
+  if (trimmed.length > max) throw new Error(`${label}不能超过 ${max} 字符`)
+  return trimmed
+}
+const REPOSITORY_NAME = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u
 
 function draftOf(endpoint: AdminWebhookEndpoint): EndpointDraft {
   return {
@@ -81,21 +89,35 @@ function fieldsOf(draft: EndpointDraft): AdminWebhookEndpointFields {
   const modelId = text(draft.modelId)
   if ((modelProvider === null) !== (modelId === null)) throw new Error('模型提供方与模型标识必须同时填写')
   const executionUserId = Number(draft.executionUserId)
-  const runtimePublicId = Number(draft.runtimePublicId)
   if (!Number.isSafeInteger(executionUserId) || executionUserId <= 0) throw new Error('必须选择执行账号')
-  if (!Number.isSafeInteger(runtimePublicId) || runtimePublicId <= 0) throw new Error('必须选择目标运行时')
+  // 个人运行时的目标固定为执行账号本人；服务端按此约束校验每次投递。
+  const runtimePublicId = draft.runtimeKind === 'user' ? executionUserId : Number(draft.runtimePublicId)
+  if (draft.runtimeKind === 'project' && (!Number.isSafeInteger(runtimePublicId) || runtimePublicId <= 0)) {
+    throw new Error('必须选择目标运行时')
+  }
+  const events = names(draft.events)
+  const actions = names(draft.actions)
+  const repositories = names(draft.repositories)
+  if (events.length > 64 || actions.length > 64 || repositories.length > 64) throw new Error('每种筛选最多 64 项')
+  if (events.some(entry => entry.length > 128) || actions.some(entry => entry.length > 128)) {
+    throw new Error('筛选项不能超过 128 字符')
+  }
+  if (repositories.some(entry => !REPOSITORY_NAME.test(entry))) throw new Error('仓库筛选必须是 owner/repo 完整名')
   return {
-    name: draft.name.trim(), provider: 'github', source: draft.source.trim(),
-    events: names(draft.events), actions: names(draft.actions), repositories: names(draft.repositories),
-    titleTemplate: draft.titleTemplate.trim(), promptTemplate: draft.promptTemplate,
-    workspacePath: draft.workspacePath.trim(), agentPreset: draft.agentPreset.trim(),
-    permissionPreset: draft.permissionPreset.trim(), projectVisibility: draft.projectVisibility,
+    name: boundedText(draft.name, '名称', 128), provider: 'github', source: boundedText(draft.source, '来源标识', 128),
+    events, actions, repositories,
+    titleTemplate: boundedText(draft.titleTemplate, '会话标题模板', 512),
+    promptTemplate: boundedText(draft.promptTemplate, '提示词模板', 16_384),
+    workspacePath: boundedText(draft.workspacePath, '工作区路径', 1024),
+    agentPreset: boundedText(draft.agentPreset, '代理预设', 128),
+    permissionPreset: boundedText(draft.permissionPreset, '权限预设', 128),
+    projectVisibility: draft.projectVisibility,
     modelProvider, modelId, modelMaxTokens: optionalLimit(draft.modelMaxTokens, '模型令牌上限'),
     executionUserId, runtimeKind: draft.runtimeKind, runtimePublicId,
-    intakeLimit: limit(draft.intakeLimit, '接收限值'),
-    intakeWindowMs: limit(draft.intakeWindowMs, '接收窗口'),
-    replayWindowMs: limit(draft.replayWindowMs, '重放窗口'),
-    maxBodyBytes: limit(draft.maxBodyBytes, '请求体上限'),
+    intakeLimit: limit(draft.intakeLimit, '接收限值', 1_000_000),
+    intakeWindowMs: limit(draft.intakeWindowMs, '接收窗口', 86_400_000),
+    replayWindowMs: limit(draft.replayWindowMs, '重放窗口', 2_592_000_000),
+    maxBodyBytes: limit(draft.maxBodyBytes, '请求体上限', 1_048_576),
   }
 }
 
@@ -104,7 +126,7 @@ const RECEIPT_LABEL = { submitted: '已受理', ignored: '已忽略', rejected: 
 
 export function WebhooksPage() {
   const [endpoints, setEndpoints] = useState<AdminWebhookEndpoint[] | null>(null)
-  const [users, setUsers] = useState<Array<{ id: number; username: string }>>([])
+  const [users, setUsers] = useState<Array<{ id: number; username: string; active: boolean }>>([])
   const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([])
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -122,7 +144,7 @@ export function WebhooksPage() {
     void Promise.all([listWebhookEndpoints(), listUsers(), listProjects()]).then(([listed, userRows, projectRows]) => {
       if (disposed) return
       setEndpoints(listed.endpoints)
-      setUsers(userRows.map(user => ({ id: user.id, username: user.username })))
+      setUsers(userRows.map(user => ({ id: user.id, username: user.username, active: user.status === 'active' })))
       setProjects(projectRows.map(project => ({ id: project.id, name: project.name })))
       setError('')
     }).catch((cause: unknown) => { if (!disposed) setError(messageOf(cause)) })
@@ -296,7 +318,7 @@ export function WebhooksPage() {
             <Field label="执行账号" hint="投递创建的会话归属此账号。">
               <select className="input" value={editing.draft.executionUserId} onChange={event => { patchDraft({ executionUserId: event.target.value }) }}>
                 <option value="">选择账号</option>
-                {users.map(user => <option key={user.id} value={String(user.id)}>{user.username}</option>)}
+                {users.filter(user => user.active).map(user => <option key={user.id} value={String(user.id)}>{user.username}</option>)}
               </select>
             </Field>
             <Field label="运行时类型">
@@ -305,12 +327,14 @@ export function WebhooksPage() {
                 <option value="project">项目运行时</option>
               </select>
             </Field>
-            <Field label="目标运行时" hint="空闲回收的实例可自动唤醒；手动停止、停用或维护时不派发。">
-              <select className="input" value={editing.draft.runtimePublicId} onChange={event => { patchDraft({ runtimePublicId: event.target.value }) }}>
-                <option value="">选择目标</option>
-                {(editing.draft.runtimeKind === 'user' ? users : projects).map(owner => <option key={owner.id} value={String(owner.id)}>{'username' in owner ? owner.username : owner.name}</option>)}
-              </select>
-            </Field>
+            {editing.draft.runtimeKind === 'project' && (
+              <Field label="目标运行时" hint="空闲回收的实例可自动唤醒；手动停止、停用或维护时不派发。">
+                <select className="input" value={editing.draft.runtimePublicId} onChange={event => { patchDraft({ runtimePublicId: event.target.value }) }}>
+                  <option value="">选择目标</option>
+                  {projects.map(project => <option key={project.id} value={String(project.id)}>{project.name}</option>)}
+                </select>
+              </Field>
+            )}
             {editing.draft.runtimeKind === 'project' && (
               <Field label="新会话可见性" hint="私有会话仅执行账号及管理员可见；项目成员仍受原有读写权限限制。">
                 <select className="input" value={editing.draft.projectVisibility} onChange={event => { patchDraft({ projectVisibility: event.target.value === 'private' ? 'private' : 'project' }) }}>

@@ -1194,7 +1194,7 @@ export interface DeploymentOperation {
   error: string | null
 }
 
-export interface DeploymentState {
+export interface ClusterState {
   mode: ClusterMode
   maintenanceEpoch: string
   writeEpoch: string
@@ -1203,6 +1203,9 @@ export interface DeploymentState {
   updatedAt: string
   nodes: DeploymentNode[]
   writersQuiesced: boolean
+}
+
+export interface DeploymentState extends ClusterState {
   migrations: { applied: number[]; pending: Array<{ version: number; name: string }>; drifted: number[]; current: number } | null
   operations: DeploymentOperation[]
 }
@@ -1233,7 +1236,7 @@ export interface DeploymentBackup {
 export function getDeployment(): Promise<DeploymentState> {
   return request('/admin/api/deployment')
 }
-export function setMaintenance(action: 'enter' | 'exit', reason?: string): Promise<DeploymentState> {
+export function setMaintenance(action: 'enter' | 'exit', reason?: string): Promise<ClusterState> {
   return request('/admin/api/deployment/maintenance', { method: 'POST', body: JSON.stringify({ action, reason }) })
 }
 export function setDeploymentNodeStatus(nodeId: string, status: DeploymentNodeStatus): Promise<DeploymentNode> {
