@@ -90,7 +90,20 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(MANAGER_NS, { zh: managerZh, en: managerEn }), 'ui-schedule: manager dictionaries')
   const t = ctx.locale.bind(MANAGER_NS)
   const manager: CatalogInjected<ScheduleCatalogEntry> = createCatalogSource<ScheduleCatalogEntry>({
-    list: () => ctx.remote.schedule.catalog(),
+    // Catalog rows name their owning Session by Host identity; client surfaces
+    // address Sessions through runtime-qualified keys, so the read translates
+    // them once for every consumer downstream.
+    list: async () => {
+      const result = await ctx.remote.schedule.catalog()
+      if (!result.ok) return result
+      return {
+        ...result,
+        value: result.value.map(entry => ({
+          ...entry,
+          sessionId: ctx.sessions.keyFor?.(entry.sessionId) ?? entry.sessionId,
+        })),
+      }
+    },
     remove: async (id) => {
       const record = manager.hooks.catalog.getSnapshot().records.find(item => item.id === id)
       if (record === undefined) return { ok: true, value: { id, deleted: false, code: 'schedule_not_found' } }

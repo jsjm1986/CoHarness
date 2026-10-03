@@ -16,6 +16,20 @@ it('addresses child delivery through its parent without interpreting message con
   expect(remoteSessionId('commands/execute', { agentId: 'source', line: '/feedback text' })).toBe('source')
 })
 
+it.each(['schedule/list', 'schedule/history', 'schedule/delete', 'schedule/update'])(
+  'addresses %s through its request Session', (endpoint) => {
+    const args = { request: { sessionId: 'task-session', id: 'schedule-1' } }
+    expect(remoteSessionId(endpoint, args)).toBe('task-session')
+  },
+)
+
+it('rewrites Session addresses nested inside Schedule requests', async () => {
+  const { mapRemoteSessionIds } = await import('../src/api/remote-session-routing.ts')
+  const map = (id: import('@deepseek-ai/dsh-session/types').SessionId) => `host:${id}` as typeof id
+  const args = { request: { sessionId: 'client-session', id: 'schedule-1' } }
+  expect(mapRemoteSessionIds('schedule/delete', args, map)).toEqual({ request: { sessionId: 'host:client-session', id: 'schedule-1' } })
+})
+
 it('does not infer a Session from undeclared, missing, inherited or invalid request fields', () => {
   expect(remoteSessionId('llm/discoverModels', { request: { sessionId: 'unrelated' } })).toBeUndefined()
   for (const request of [undefined, null, [], { sessionId: 1 }, { sessionId: '' }, Object.create({ sessionId: 'inherited' }) as object]) {
