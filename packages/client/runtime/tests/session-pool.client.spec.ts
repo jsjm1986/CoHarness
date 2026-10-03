@@ -361,6 +361,56 @@ describe('SessionRuntimePool', () => {
     expect(pool.list.getSnapshot().byId[id]).toBeUndefined()
     expect(pool.list.getSnapshot().ids).not.toContain(id)
   })
+
+  it('re-projects the archived partition on an archived-sessions-changed frame within one generation', async () => {
+    const ctx = new Context()
+    const baseApi = new FakeApiClient()
+    const id = 'session-1' as SessionId
+    const key = clientSessionKey({ kind: 'personal' }, id)
+    baseApi.onList = () => Promise.resolve(ok({ items: [{
+      sessionId: id, updatedAt: 1, running: false, blank: false, cwd: '/home/test',
+    }] }))
+    baseApi.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [] }))
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const pool = new SessionRuntimePool(ctx, base, connection(baseApi), fakeRemote())
+    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true })
+    await vi.waitFor(() => { expect(pool.list.getSnapshot().ids).toEqual([key]) })
+
+    pool.handleHostEnvelope({ rpcId: 'frame-1' as never, payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [id] } })
+    expect(pool.list.getSnapshot().ids).toEqual([])
+    expect(pool.list.getSnapshot().archivedById[key]?.id).toBe(key)
+
+    pool.handleHostEnvelope({ rpcId: 'frame-2' as never, payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [] } })
+    expect(pool.list.getSnapshot().ids).toEqual([key])
+    expect(pool.list.getSnapshot().archivedById[key]).toBeUndefined()
+  })
+
+  it('fans a search out to every established target and re-keys each hit', async () => {
+    const ctx = new Context()
+    const baseApi = new FakeApiClient()
+    const projectApi = new FakeApiClient()
+    const projectSession = 'project-hit' as SessionId
+    projectApi.onList = () => Promise.resolve(ok({ items: [{
+      sessionId: projectSession, updatedAt: 1, running: false, blank: false, cwd: '/projects/demo',
+    }] }))
+    baseApi.onSearch = () => Promise.resolve(ok({ items: [{ sessionId: 'base-hit' as SessionId, snippet: 'b' }], hasMore: false }))
+    projectApi.onSearch = () => Promise.resolve(ok({ items: [{ sessionId: projectSession, snippet: 'p' }], hasMore: true }))
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    const targetConnection = connection(projectApi, (sinks) => {
+      queueMicrotask(() => sinks.onConnected?.({
+        version: 'test', cwd: '/projects/demo', attachedSessions: 0, home: '/home/test', canOpenPath: true,
+      }))
+    })
+    const pool = new SessionRuntimePool(ctx, base, { ...connection(baseApi), forTarget: () => targetConnection }, fakeRemote())
+    await pool.ensureSession({ kind: 'project', projectId: 7 }, projectSession)
+
+    const result = await pool.search('hit', new AbortController().signal)
+    expect(result.ok && result.value.items.map(item => item.sessionId)).toEqual([
+      clientSessionKey({ kind: 'personal' }, 'base-hit' as SessionId),
+      clientSessionKey({ kind: 'project', projectId: 7 }, projectSession),
+    ])
+    expect(result.ok && result.value.hasMore).toBe(true)
+  })
 })
 
 describe('SessionRuntimePool Workspace resources', () => {

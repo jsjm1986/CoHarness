@@ -27,10 +27,16 @@ export interface SessionsPortSummary {
   updatedAt: number
 }
 
-/** Session-list facts sibling domains read: readiness, selection, and the row map. */
+/** Session-list facts sibling domains read: readiness, selection, and the row maps. */
 export interface SessionsPortList {
   ids: SessionId[]
   byId: Record<SessionId, SessionsPortSummary>
+  /**
+   * Archived summaries partitioned out of `byId`, merged across every pooled
+   * runtime; an archived-elsewhere check that reads only `byId` or one
+   * runtime's mirror mis-classifies the session.
+   */
+  archivedById: Record<SessionId, SessionsPortSummary>
   current: SessionId | undefined
   phase: 'pending' | 'ready'
 }

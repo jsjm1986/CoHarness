@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-04-pooled-session-archive-consistency.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-pooled-session-archive-consistency.md
+/agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror:
+  en: 19c7c7b6872c6cab
+  zh: e928b709b81ce86c
+/agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror/problem:
+  en: 61bc1c112fe8f177
+  zh: 33f7b6d73b52eb54
+/agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror/decision:
+  en: d03573121f9941f2
+  zh: bb0541d7ca446bda
+/agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror/files:
+  en: 648f50a287a1aa60
+  zh: ed7bf724e78ada27
+/agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror/consequences:
+  en: 41156280999e865c
+  zh: a1c2dd555bc04f48

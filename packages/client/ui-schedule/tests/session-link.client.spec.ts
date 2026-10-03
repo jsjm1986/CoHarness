@@ -2,20 +2,21 @@ import { describe, expect, it } from 'vitest'
 import type { SessionListState, WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { workspaceListState } from '@deepseek-ai/dsh-client-test-runtime'
-import { sessionLinkState } from '../src/client/session-link.ts'
+import { sessionLabel, sessionLinkState } from '../src/client/session-link.ts'
 
 const id = 'session-original' as SessionId
 
 const ready: WorkspaceListState = workspaceListState()
 
-/** Session list whose Host-list projection is `ids` and whose rows are `byId`. */
-function sessions(ids: SessionId[], rows: SessionId[]): SessionListState {
+/** Session list whose Host-list projection is `ids`, live rows are `byId`, and archived rows `archivedById`. */
+function sessions(ids: SessionId[], rows: SessionId[], archived: SessionId[] = []): SessionListState {
+  const summary = (row: SessionId) => ({
+    id: row, displayTitle: row, running: false, blank: false, updatedAt: 0,
+  })
   return {
     ids,
-    byId: Object.fromEntries(rows.map(row => [row, {
-      id: row, displayTitle: row, running: false, blank: false, updatedAt: 0,
-    }] as const)),
-    archivedById: {},
+    byId: Object.fromEntries(rows.map(row => [row, summary(row)] as const)),
+    archivedById: Object.fromEntries(archived.map(row => [row, summary(row)] as const)),
     current: undefined,
     phase: 'ready',
     subagentsByParent: {},
@@ -39,8 +40,17 @@ describe('linked Session availability', () => {
   })
 
   it('reports archived and loading ahead of membership', () => {
-    expect(sessionLinkState(id, sessions([], []), { ...ready, archivedSessionIds: [id] })).toBe('archived')
+    // The archived partition merges every pooled runtime's set, including
+    // runtimes the base Workspace mirror does not cover.
+    expect(sessionLinkState(id, sessions([], [], [id]), ready)).toBe('archived')
     expect(sessionLinkState(id, { ...sessions([], []), phase: 'pending' }, ready)).toBe('loading')
     expect(sessionLinkState(id, sessions([id], [id]), { ...ready, phase: 'pending' })).toBe('loading')
+  })
+
+  it('labels an archived linked Session from the archived partition', () => {
+    const titled = sessions([], [], [id])
+    titled.archivedById[id] = { ...titled.archivedById[id]!, title: 'Retained task' }
+    expect(sessionLabel(id, titled)).toEqual({ text: 'Retained task', titled: true })
+    expect(sessionLabel(id, sessions([], []))).toEqual({ text: id, titled: false })
   })
 })

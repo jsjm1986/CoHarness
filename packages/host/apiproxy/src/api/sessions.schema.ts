@@ -67,6 +67,8 @@ export const sessionSummarySchema = z.object({
   agentPreset: z.string().optional(),
   sshTarget: z.number().int().positive().optional(),
   projections: z.lazy(() => sessionProjectionsBlockSchema).optional(),
+  visibility: z.union([z.literal('project'), z.literal('private')]).optional(),
+  projectId: z.number().int().positive().optional(),
 }) as unknown as z.ZodType<Wire<SessionSummary>>
 
 /** session.list request payload (cursor is a reserved seat, unimplemented in v1). */

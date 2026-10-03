@@ -107,11 +107,16 @@ export function WorkbenchToolbar({
   const selectedProject = workspace === 'personal' || workspace === ''
     ? undefined
     : catalog?.projects.find(project => String(project.projectId) === workspace)
+  // `archivedById` merges every pooled runtime's archive set; the Workspace
+  // mirror covers a non-pooled runtime whose sessions list keeps archived rows
+  // unpartitioned.
+  const isArchived = (id: SessionId): boolean => sessions.archivedById[id] !== undefined
+    || workspaces.archivedSessionIds.includes(id)
   const fallbackCandidates: WorkbenchConversation[] = sessions.ids.flatMap((id) => {
     const summary = sessions.byId[id]
     if (summary === undefined || summary.origin === 'subagent'
       || (summary.blank && summary.id !== sessions.current)
-      || workspaces.archivedSessionIds.includes(summary.id)) return []
+      || isArchived(summary.id)) return []
     const address = parseClientSessionKey(summary.id)
     const runtime: SessionRuntimeTarget = address?.runtime ?? (summary.projectId === undefined
       ? { kind: 'personal' } : { kind: 'project', projectId: summary.projectId })
@@ -134,7 +139,7 @@ export function WorkbenchToolbar({
   const candidates = catalogItems.filter((item) => {
     const projectId = item.runtime.kind === 'project' ? String(item.runtime.projectId) : 'personal'
     return (!item.blank || browserKey(item) === sessions.current)
-      && !workspaces.archivedSessionIds.includes(browserKey(item))
+      && !isArchived(browserKey(item))
       && (workspace === '' || workspace === projectId)
       && `${item.title ?? item.sessionId} ${item.cwd ?? ''} ${item.runtime.kind === 'project'
         ? item.runtime.projectName

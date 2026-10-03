@@ -37,7 +37,7 @@ import {
 import { pinOrderAccounts, pinOrderSource } from './pin-order.ts'
 import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './shortcuts.ts'
 import { createWorkspaceViewStore } from './stores.ts'
-import { derive } from './session-actions/derived.ts'
+import { derive, derivePair } from './session-actions/derived.ts'
 import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmDialog } from './session-actions/ArchiveSession.tsx'
 import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from './session-actions/PinSession.tsx'
@@ -161,7 +161,8 @@ export function apply(ctx: ClientContext): void {
     navigation = AbortSignal.any([ctx.sessions.beginNavigation(), lifetime.signal]),
   ): Promise<void> => {
     await commitSessionNavigation(ctx.sessions, sessionId, navigation, () => {
-      if (ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
+      if (ctx.sessions.list.getSnapshot().archivedById[sessionId] !== undefined
+        || ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
       // A single-mode open must not materialize a workbench pane: on an empty
       // pane list `replaceActive` falls back to `add`, which switches the
       // viewport into workbench mode and collapses the session list. Route
@@ -196,6 +197,16 @@ export function apply(ctx: ClientContext): void {
   const rowToast = createSnapshotStore<RowToastState | null>(null)
   let toastSeq = 0
   const notify = (toast: RowToast): void => { rowToast.set({ ...toast, seq: ++toastSeq }) }
+  // Error classes do not cross plugin bundle boundaries; read the wire code
+  // structurally so the notice keeps the stable `code: message` form.
+  const createFailureMessage = (reason: unknown): string => {
+    if (reason instanceof Error) {
+      const rpc = (reason as unknown as { rpcError?: { code?: string; message?: string } }).rpcError
+      if (rpc?.code !== undefined) return `${rpc.code}: ${rpc.message ?? reason.message}`
+      return reason.message
+    }
+    return String(reason)
+  }
   const uiWorkspace: UiWorkspace = {
     openSession: (sessionId) => {
       void openSession(sessionId).catch((reason: unknown) => {
@@ -203,7 +214,11 @@ export function apply(ctx: ClientContext): void {
         console.warn('session navigation failed:', reason)
       })
     },
-    startSession: (workspaceId) => { ctx.workspaces.startSession(workspaceId) },
+    startSession: (workspaceId) => {
+      ctx.workspaces.startSession(workspaceId, (reason) => {
+        notify({ kind: 'createFailed', message: createFailureMessage(reason) })
+      })
+    },
     forkSession,
     archiveSession: (sessionId, options) => ctx.workspaces.archiveSession(sessionId, options),
     unarchiveSession: sessionId => ctx.workspaces.unarchiveSession(sessionId),
@@ -224,7 +239,13 @@ export function apply(ctx: ClientContext): void {
   const shortcutControls = createWorkspaceShortcutControls()
   // Registry-global sets as Sets, rebuilt only when the Workspace snapshot changes.
   const pinnedSet = derive(ctx.workspaces.list, snapshot => new Set<SessionId>(snapshot.pinnedSessionIds))
-  const archivedSet = derive(ctx.workspaces.list, snapshot => new Set<SessionId>(snapshot.archivedSessionIds))
+  // The Session list's archived partition merges every pooled runtime's set;
+  // the Workspace mirror covers a non-pooled runtime whose sessions list keeps
+  // archived rows unpartitioned. The union of both marks membership.
+  const archivedSet = derivePair(ctx.sessions.list, ctx.workspaces.list, (sessions, workspaces) => new Set<SessionId>([
+    ...(Object.keys(sessions.archivedById) as SessionId[]),
+    ...workspaces.archivedSessionIds,
+  ]))
   // Plugin-private facts the row actions and their overlay surfaces share:
   // the pending rename request, the pending stop-and-archive confirmation,
   // and the notice on display. Each business writes through its own injected

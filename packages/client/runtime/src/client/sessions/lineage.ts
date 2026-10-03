@@ -35,6 +35,10 @@ export interface SessionListEntry {
   agentPreset?: string
   /** Registered SSH target the session executes on (summary passthrough); absent for host-local. */
   sshTarget?: number
+  /** Collaboration visibility in a project runtime (summary passthrough); personal scope omits it. */
+  visibility?: 'project' | 'private'
+  /** Owning project id when the session belongs to a project runtime (summary passthrough). */
+  projectId?: number
   /** Current host-computed projection values for list consumers. */
   projectionValues?: Readonly<Partial<SessionProjectionMap>>
   /** User interaction currently blocking this session, derived from live mux frames. */

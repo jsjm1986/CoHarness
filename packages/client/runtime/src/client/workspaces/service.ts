@@ -310,11 +310,12 @@ export class WorkspaceRuntime implements IWorkspaces {
    * then the current Session's Workspace, then the recent-Workspace
    * projection — connect its blank session and navigate there; with no
    * Workspace at all, clear the selection into the New Session view state.
-   * Connect failures are non-fatal (console diagnostics; the current view
-   * stays usable).
+   * Connect failures are non-fatal (console diagnostics plus `onFailure`;
+   * the current view stays usable).
    * @param workspaceId - explicit target Workspace for scoped actions.
+   * @param onFailure - observer for the rejected connect/open.
    */
-  startSession(workspaceId?: WorkspaceId): void {
+  startSession(workspaceId?: WorkspaceId, onFailure?: (reason: unknown) => void): void {
     const workspace = this.list.getSnapshot()
     const sessions = this.sessions.list.getSnapshot()
     const current = sessions.current
@@ -331,13 +332,18 @@ export class WorkspaceRuntime implements IWorkspaces {
     void this.connectWorkspace(target).then(
       (sessionId) => {
         if (navigation.aborted) return
-        if (this.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
+        if (this.sessions.list.getSnapshot().archivedById[sessionId] !== undefined
+          || this.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
         return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
-          if (this.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
+          if (this.sessions.list.getSnapshot().archivedById[sessionId] !== undefined
+            || this.list.getSnapshot().archivedSessionIds.includes(sessionId)) throw new Error('Session was archived during navigation')
           this.sessions.open(sessionId)
         })
       },
-    ).catch((reason: unknown) => { console.warn('new session failed:', reason) })
+    ).catch((reason: unknown) => {
+      console.warn('new session failed:', reason)
+      onFailure?.(reason)
+    })
   }
 
   /**

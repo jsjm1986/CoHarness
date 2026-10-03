@@ -24,3 +24,39 @@ export function derive<S, T>(source: HostObservable<S>, project: (snapshot: S) =
     subscribe: listener => source.subscribe(listener),
   }
 }
+
+/**
+ * Project two observables into one, recomputing only when either source
+ * snapshot changes identity — the same projection contract as {@link derive}
+ * over a pair.
+ * @param first - first observable.
+ * @param second - second observable.
+ * @param project - pure projection of both snapshots.
+ * @returns the projected observable, subscribing through both sources.
+ */
+export function derivePair<A, B, T>(
+  first: HostObservable<A>,
+  second: HostObservable<B>,
+  project: (firstSnapshot: A, secondSnapshot: B) => T,
+): HostObservable<T> {
+  let seenFirst: A | undefined
+  let seenSecond: B | undefined
+  let value: T | undefined
+  return {
+    getSnapshot: () => {
+      const firstSnapshot = first.getSnapshot()
+      const secondSnapshot = second.getSnapshot()
+      if (value === undefined || firstSnapshot !== seenFirst || secondSnapshot !== seenSecond) {
+        seenFirst = firstSnapshot
+        seenSecond = secondSnapshot
+        value = project(firstSnapshot, secondSnapshot)
+      }
+      return value
+    },
+    subscribe: (listener) => {
+      const offFirst = first.subscribe(listener)
+      const offSecond = second.subscribe(listener)
+      return () => { offFirst(); offSecond() }
+    },
+  }
+}

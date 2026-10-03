@@ -33,8 +33,8 @@ const listState = (ids: string[], current?: string): SessionListState => ({
 // Client plugin bundles do not share error-class identity: the command checks
 // the name plus the wire code, so the test fabricates the same structural row.
 const forkUnavailable = () => Object.assign(
-  new Error('session fork failed: session/fork-unavailable: no completed turn'),
-  { name: 'SessionForkError', rpcError: { code: 'session/fork-unavailable' } },
+  new Error('session fork failed: fork-unavailable: no completed turn'),
+  { name: 'SessionForkError', rpcError: { code: 'fork-unavailable' } },
 )
 
 async function bench(runtime: 'web' | 'desktop' = 'desktop') {

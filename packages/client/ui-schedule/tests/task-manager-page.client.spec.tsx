@@ -103,6 +103,17 @@ const sessions: SessionListState = {
 }
 const workspaces: WorkspaceListState = workspaceListState()
 
+/** Session list with `id` in the archived partition, out of `ids`/`byId`. */
+function sessionsArchived(id: SessionId): SessionListState {
+  const { [id]: row, ...rest } = sessions.byId
+  return {
+    ...sessions,
+    ids: sessions.ids.filter(item => item !== id),
+    byId: rest,
+    archivedById: row === undefined ? {} : { [id]: row },
+  }
+}
+
 /**
  * Session list whose catalog rows carry the given titles.
  * @param titles - title one Session id carries; an omitted id keeps its untitled row.
@@ -553,7 +564,7 @@ describe.each([['English', en], ['Chinese', zh]] as const)('original Session ava
   it.each([
     ['Session list pending', { ...sessions, phase: 'pending' as const }, workspaces, 'Loading original session information.', '正在加载原会话信息'],
     ['Workspace list pending', sessions, { ...workspaces, phase: 'pending' as const }, 'Loading original session information.', '正在加载原会话信息'],
-    ['archived', sessions, { ...workspaces, archivedSessionIds: [at.sessionId] }, 'The original session is archived.', '原会话已归档'],
+    ['archived', sessionsArchived(at.sessionId), workspaces, 'The original session is archived.', '原会话已归档'],
     ['missing', { ...sessions, ids: [], byId: {} }, workspaces, 'The original session is unavailable.', '原会话当前不可用'],
     ['archive read failed', sessions, { ...workspaces, state: 'error' as const, error: { code: 'session-not-found', message: 'Archive unavailable', details: { sessionId: at.sessionId } } }, 'The original session is unavailable.', '原会话当前不可用'],
   ] satisfies [string, SessionListState, WorkspaceListState, string, string][])('disables navigation while %s without hiding the task', (_reason, sessionState, workspaceState, english, chinese) => {
@@ -595,15 +606,15 @@ describe.each([['English', en], ['Chinese', zh]] as const)('linked-Session contr
 })
 
 it('updates original Session navigation as metadata arrives and archive state changes', () => {
-  let state: WorkspaceListState = { ...workspaces, phase: 'pending' }
-  const mounted = mount({ records: [ended] }, en, { useWorkspaces: select => select(state) })
+  let sessionState: SessionListState = { ...sessions, phase: 'pending' }
+  const mounted = mount({ records: [ended] }, en, { useSessions: select => select(sessionState) })
   fireEvent.click(screen.getByRole('button', { name: 'Review release' }))
   const link = () => screen.getByRole('button', { name: en['detail.openSession'] })
   expect(link().hasAttribute('disabled')).toBe(true)
-  state = { ...workspaces, archivedSessionIds: [at.sessionId] }
+  sessionState = sessionsArchived(at.sessionId)
   mounted.update({})
   expect(screen.getByText(en['detail.sessionArchived'])).toBeDefined()
-  state = workspaces
+  sessionState = sessions
   mounted.update({})
   expect(link().hasAttribute('disabled')).toBe(false)
   expect(screen.queryByText(en['detail.sessionArchived'])).toBeNull()

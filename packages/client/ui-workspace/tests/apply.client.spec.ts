@@ -31,10 +31,10 @@ const sid = (id: string) => id as SessionId
 const summary = (id: string, updatedAt: number, extra: Partial<SessionSummary> = {}): SessionSummary => ({
   id: sid(id), displayTitle: id, running: false, blank: false, updatedAt, retainedBy: {}, ...extra,
 })
-const sessionState = (items: readonly SessionSummary[]): SessionListState => ({
+const sessionState = (items: readonly SessionSummary[], archived: readonly SessionSummary[] = []): SessionListState => ({
   ids: items.map(item => item.id),
   byId: Object.fromEntries(items.map(item => [item.id, item])),
-  archivedById: {},
+  archivedById: Object.fromEntries(archived.map(item => [item.id, item])),
   current: undefined,
   phase: 'ready',
   subagentsByParent: {},
@@ -277,9 +277,10 @@ describe('ui-workspace apply', () => {
     }
   })
 
-  it('derives the pinned and archived Sets from the Workspace snapshot, rebuilt only when it changes', async () => {
+  it('derives the pinned Set from the Workspace snapshot and the archived Set from the Session list', async () => {
     const b = await bench()
-    b.setWorkspaces(workspaceState([workspace('alpha', ['one', 'two'])], [sid('two')], [sid('one')]))
+    b.setWorkspaces(workspaceState([workspace('alpha', ['one', 'two'])], [], [sid('one')]))
+    b.setSessions(sessionState([summary('one', 1)], [summary('two', 0)]))
     declare(b.slots, 'sidebar.workspaces')
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const pin = faceOf(entry(b.slots, MENU_ITEM, 'pin')) as PinSessionInjected
@@ -293,13 +294,14 @@ describe('ui-workspace apply', () => {
     expect(pin.hooks.pinned.getSnapshot()).toBe(pinned)
     expect(pinButton.hooks.pinned.getSnapshot()).toBe(pinned)
     expect(archive.hooks.archived.getSnapshot()).toBe(archived)
-    // Subscriptions ride the Workspace Controller's list source.
+    // The pinned subscription rides the Workspace Controller's list source.
     const listener = vi.fn()
     const unsubscribe = pin.hooks.pinned.subscribe(listener)
     expect(b.workspacesSubscribe).toHaveBeenCalledWith(listener)
     unsubscribe()
 
     b.setWorkspaces(workspaceState([workspace('alpha', ['one', 'two'])], [], [sid('one'), sid('two')]))
+    b.setSessions(sessionState([summary('one', 1), summary('two', 0)]))
     expect(pin.hooks.pinned.getSnapshot()).toEqual(new Set(['one', 'two']))
     expect(pin.hooks.pinned.getSnapshot()).not.toBe(pinned)
     expect(archive.hooks.archived.getSnapshot()).toEqual(new Set())
@@ -388,6 +390,32 @@ describe('ui-workspace apply', () => {
     pin.unpinSession(sid('one'))
     await vi.waitFor(() => { expect(toast.hooks.toast.getSnapshot()).toEqual({ kind: 'unpinFailed', seq: 2 }) })
     expect(view.getSnapshot().sessionOrderByAccount).toEqual({})
+  })
+
+  it('raises the create failure notice when a New Session connect is refused', async () => {
+    const b = await bench()
+    declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const toast = faceOf(entry(b.slots, 'shell.overlay', 'workspace.row-toast')) as RowToastInjected
+
+    // A Host refusal keeps the stable `code: message` form in the notice.
+    b.startSession.mockImplementationOnce((_workspaceId: unknown, onFailure?: (reason: unknown) => void) => {
+      onFailure?.(Object.assign(new Error('workspace connect failed: workspace-archived: gone'), {
+        name: 'WorkspaceConnectError', rpcError: { code: 'workspace-archived', message: 'gone' },
+      }))
+    })
+    b.ctx.uiWorkspace.startSession()
+    await vi.waitFor(() => {
+      expect(toast.hooks.toast.getSnapshot()).toEqual({ kind: 'createFailed', message: 'workspace-archived: gone', seq: 1 })
+    })
+    // Any other failure reports its own message.
+    b.startSession.mockImplementationOnce((_workspaceId: unknown, onFailure?: (reason: unknown) => void) => {
+      onFailure?.(new Error('plain failure'))
+    })
+    b.ctx.uiWorkspace.startSession()
+    await vi.waitFor(() => {
+      expect(toast.hooks.toast.getSnapshot()).toEqual({ kind: 'createFailed', message: 'plain failure', seq: 2 })
+    })
   })
 
   it('archives through the navigation service and raises the archived notice; Host rejections are console diagnostics', async () => {

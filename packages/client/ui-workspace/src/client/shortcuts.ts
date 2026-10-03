@@ -104,7 +104,7 @@ export function installWorkspaceShortcuts(
       void navigation.forkSession(target.id).catch((error: unknown) => {
         // Client plugin bundles do not share error-class identity.
         const unavailable = error instanceof Error && error.name === 'SessionForkError'
-          && (error as unknown as { rpcError: { code: string } }).rpcError.code === 'session/fork-unavailable'
+          && (error as unknown as { rpcError: { code: string } }).rpcError.code === 'fork-unavailable'
         controls.forkFailed(unavailable ? 'unavailable' : 'failed')
         if (!unavailable) console.warn('session fork rejected:', error)
       })

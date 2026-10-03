@@ -444,9 +444,11 @@ export function apply(ctx: Context): void {
         const navigation = AbortSignal.any([sessions.beginNavigation(), lifetime.signal])
         const nextId = await workspaces.openWorkspace(workspaceId)
         if (navigation.aborted) return
-        if (workspaces.list.getSnapshot().archivedSessionIds.includes(nextId)) throw new Error(t('placeholder.unavailable'))
+        const archived = (id: SessionId): boolean => sessions.list.getSnapshot().archivedById[id] !== undefined
+          || workspaces.list.getSnapshot().archivedSessionIds.includes(id)
+        if (archived(nextId)) throw new Error(t('placeholder.unavailable'))
         await commitSessionNavigation(sessions, nextId, navigation, () => {
-          if (workspaces.list.getSnapshot().archivedSessionIds.includes(nextId)) throw new Error(t('placeholder.unavailable'))
+          if (archived(nextId)) throw new Error(t('placeholder.unavailable'))
           sessions.open(nextId)
           if (options.discardDraft === true && sessionId !== undefined && nextId !== sessionId) {
             inputHub.discardDraft(sessionId)

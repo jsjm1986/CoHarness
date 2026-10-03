@@ -25,7 +25,11 @@ function validSession(sessions: ISessions, id: SessionId, workspaces?: IWorkspac
   const list = sessions.list.getSnapshot()
   const summary = list.byId[id]
   if (!list.ids.includes(id) || summary === undefined || summary.origin === 'subagent') return false
-  return workspaces?.list.getSnapshot().archivedSessionIds.includes(id) !== true
+  // `archivedById` merges every pooled runtime's archive set; the Workspace
+  // mirror covers a non-pooled runtime whose sessions list keeps archived rows
+  // unpartitioned.
+  return list.archivedById[id] === undefined
+    && workspaces?.list.getSnapshot().archivedSessionIds.includes(id) !== true
 }
 
 function normalizedRatios(count: number, ratios: readonly number[]): number[] {

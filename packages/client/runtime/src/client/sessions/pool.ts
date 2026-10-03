@@ -328,6 +328,10 @@ export class SessionRuntimePool implements ISessions {
           if (this.accountInvalidated || this.entries.get(establishedEntry.key) !== establishedEntry) return
           runtime.handleHostEnvelope(envelope)
           const frame = envelope.payload
+          if (frame.type === 'host/archived-sessions-changed') {
+            this.archivedByTarget.set(establishedEntry.key, new Set(frame.archivedSessionIds))
+            this.rebuild()
+          }
           if (frame.type === 'host/remote-event') {
             this.dispatchRemoteEvent(frame.event, frame.args, establishedEntry.target)
             // The delivering connection's catalog alone repulls; other runtime
@@ -449,6 +453,10 @@ export class SessionRuntimePool implements ISessions {
       throw new Error(result.error.message)
     }
     if (this.entries.get(entry.key) !== entry) throw new Error('target runtime was released during Session verification')
+    // The repull is also the freshest archive set for this target; folding it
+    // keeps list.ids/byId correct when a change lands between push frames.
+    this.archivedByTarget.set(entry.key, new Set(result.value.archivedSessionIds))
+    this.rebuild()
     return !result.value.archivedSessionIds.includes(original)
   }
 
@@ -532,6 +540,11 @@ export class SessionRuntimePool implements ISessions {
   handleHostEnvelope(envelope: Parameters<Runtime['handleHostEnvelope']>[0]): void {
     if (this.accountInvalidated) return
     this.base.handleHostEnvelope(envelope)
+    if (envelope.payload.type === 'host/archived-sessions-changed') {
+      const entry = [...this.entries.values()].find(candidate => candidate.runtime === this.base)
+      this.archivedByTarget.set(entry?.key ?? 'personal', new Set(envelope.payload.archivedSessionIds))
+      this.rebuild()
+    }
     if (envelope.payload.type === 'host/workspace-file-changed') this.rootCtx.get('workspaceResources')?.handleChange({ kind: 'base' }, { ...envelope.payload, sessionId: this.keyFor(envelope.payload.sessionId) })
   }
   /** Mark the base runtime connection as ready.
@@ -908,10 +921,26 @@ export class SessionRuntimePool implements ISessions {
     owner?.runtime.noteAgentPreset(this.originalId(id, owner), preset)
   }
   async search(query: string, signal: AbortSignal): Promise<RpcResult<{ items: SessionSearchResultItem[]; hasMore: boolean }>> {
-    const result = await this.base.search(query, signal)
-    return result.ok ? { ...result, value: { ...result.value,
-      items: result.value.items.map(item => ({ ...item, sessionId: this.keyFor(item.sessionId) })),
-    } } : result
+    // Every established target keeps its own search index, so the merged
+    // sidebar query fans out to all of them and re-keys each hit into
+    // presentation space. A target that refuses is dropped from this result
+    // unless every target failed, which reports the first error.
+    const settled = await Promise.all([...this.entries.values()].map(async (entry) => {
+      const result = await entry.runtime.search(query, signal)
+      return { entry, result }
+    }))
+    const items: SessionSearchResultItem[] = []
+    let hasMore = false
+    let failure: (typeof settled)[number]['result'] | undefined
+    for (const { entry, result } of settled) {
+      if (!result.ok) { failure ??= result; continue }
+      hasMore = hasMore || result.value.hasMore
+      for (const item of result.value.items) {
+        items.push({ ...item, sessionId: clientSessionKey(entry.target, item.sessionId) })
+      }
+    }
+    if (items.length === 0 && !hasMore && failure !== undefined) return failure
+    return { ok: true, value: { items, hasMore } }
   }
   fork(opts: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId> {
     const owner = this.ownerFor(opts.sessionId)

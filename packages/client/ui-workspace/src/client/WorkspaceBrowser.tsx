@@ -1001,7 +1001,15 @@ export function WorkspaceBrowser({
   const [navigationError, setNavigationError] = useState<string | null>(null)
   const navigationAttempt = useRef(0)
   useEffect(() => () => { navigationAttempt.current++ }, [])
-  const archivedSessionIds = useWorkspaces(state => state.archivedSessionIds)
+  // The Session list's archived partition merges every pooled runtime's set;
+  // the Workspace mirror covers a non-pooled runtime whose sessions list keeps
+  // archived rows unpartitioned. The union of both marks membership.
+  const archivedById = useCurrentSessions(state => state.archivedById)
+  const workspaceArchivedIds = useWorkspaces(state => state.archivedSessionIds)
+  const archivedSessionIds = useMemo(
+    () => [...new Set([...(Object.keys(archivedById) as SessionId[]), ...workspaceArchivedIds])],
+    [archivedById, workspaceArchivedIds],
+  )
   // Archived sessions are not openable: the row stays visible under the
   // filter but a click explains instead of navigating.
   const guardedOpen = (sessionId: SessionId): void => {

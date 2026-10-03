@@ -28,12 +28,15 @@ export interface IWorkspaces {
   openWorkspace(workspaceId: WorkspaceId): Promise<SessionId>
   /**
    * The New Session flow: connect the explicit, current-Session, or recent
-   * Workspace and open the resulting session; failures surface on the session
-   * list state.
+   * Workspace and open the resulting session. Connect and navigation failures
+   * are non-fatal — they log and reach `onFailure` when supplied; the current
+   * view stays usable.
    * @param workspaceId - explicit target; omitted inherits the current
    * Session's Workspace before falling back to the recency projection.
+   * @param onFailure - observer for the rejected connect/open, for surfaces
+   * that turn an explicit New Session click into a notice.
    */
-  startSession(workspaceId?: WorkspaceId): void
+  startSession(workspaceId?: WorkspaceId, onFailure?: (reason: unknown) => void): void
   /**
    * Register an existing path as a Workspace.
    * @param input - the Host create payload.

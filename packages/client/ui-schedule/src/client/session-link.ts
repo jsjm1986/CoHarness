@@ -20,7 +20,10 @@ export type SessionLinkState = 'available' | 'loading' | 'archived' | 'unavailab
 export function sessionLinkState(id: SessionId, sessions: SessionListState, workspaces: WorkspaceListState): SessionLinkState {
   if (workspaces.state === 'error') return 'unavailable'
   if (sessions.phase === 'pending' || workspaces.phase === 'pending') return 'loading'
-  if (workspaces.archivedSessionIds.includes(id)) return 'archived'
+  // `archivedById` merges every pooled runtime's archive set; the Workspace
+  // mirror covers a non-pooled runtime whose sessions list keeps archived rows
+  // unpartitioned.
+  if (sessions.archivedById[id] !== undefined || workspaces.archivedSessionIds.includes(id)) return 'archived'
   if (!sessions.ids.includes(id)) return 'unavailable'
   return 'available'
 }
@@ -47,7 +50,7 @@ export interface SessionLabel {
  * @returns the resolved label and whether a catalog title produced it.
  */
 export function sessionLabel(id: SessionId, sessions: SessionListState): SessionLabel {
-  const title = sessions.byId[id]?.title
+  const title = sessions.byId[id]?.title ?? sessions.archivedById[id]?.title
   if (title === undefined || title.trim() === '') return { text: id, titled: false }
   return { text: title, titled: true }
 }

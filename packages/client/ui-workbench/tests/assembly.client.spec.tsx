@@ -122,6 +122,9 @@ describe('assembled workbench sidebar panel', () => {
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)
+    // In production the layout plugin contributes this root share; the Session
+    // tree reads it to dim the list while a global panel is selected.
+    runtime.ctx.slots.provideRoot({ hooks: { panelInfo: createSnapshotStore({ activePanelId: null }) } })
     for (const [id, title, path] of [[A, 'Alpha', '/work/alpha'], [B, 'Beta', '/work/beta']] as const) {
       await runtime.sessions.add({
         id,

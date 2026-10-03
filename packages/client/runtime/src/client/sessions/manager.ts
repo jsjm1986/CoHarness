@@ -1462,6 +1462,11 @@ function applyMutation(summaries: readonly ClientSessionSummary[], mutation: Ses
         // create echo, the select echo, a list row) reports the CURRENT one.
         ...(mutation.summary.agentPreset !== undefined
           ? { agentPreset: mutation.summary.agentPreset } : {}),
+        // Visibility mutates through setVisibility; the freshest list row wins.
+        ...(mutation.summary.visibility !== undefined
+          ? { visibility: mutation.summary.visibility } : {}),
+        ...(existing.projectId === undefined && mutation.summary.projectId !== undefined
+          ? { projectId: mutation.summary.projectId } : {}),
       }
       if (!filled.blank && filled.workspaceId !== undefined) {
         const { workspaceId: _workspaceId, ...engaged } = filled

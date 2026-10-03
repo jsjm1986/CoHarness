@@ -1031,6 +1031,8 @@ export class SessionRuntime implements ISessions {
         ...(entry.parentSessionId !== undefined ? { parentId: entry.parentSessionId } : {}),
         ...(entry.origin !== undefined ? { origin: entry.origin } : {}),
         ...(entry.agentPreset !== undefined ? { agentPreset: entry.agentPreset } : {}),
+        ...(entry.visibility !== undefined ? { visibility: entry.visibility } : {}),
+        ...(entry.projectId !== undefined ? { projectId: entry.projectId } : {}),
       }
     }
     if (current !== undefined && currentAddress !== undefined) {

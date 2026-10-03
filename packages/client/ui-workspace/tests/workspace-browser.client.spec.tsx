@@ -493,9 +493,12 @@ describe('WorkspaceBrowser', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '归档会话' }))
     expect(archiveSession).toHaveBeenCalledWith(sid('gone-s'))
 
-    // The archive-set echo hides the row in grouped and flat modes.
+    // The archived partition echo hides the row in grouped and flat modes.
     archivedSet.current = new Set([sid('gone-s')])
-    rerender(b, { useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])], [sid('gone-s')])) })
+    rerender(b, {
+      useSessions: hook(sessionState([summary('kept-s', 2)], { archivedById: { 'gone-s': summary('gone-s', 1) } })),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])])),
+    })
     expect(screen.queryByText('gone-s')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '单列表' }))
@@ -505,8 +508,8 @@ describe('WorkspaceBrowser', () => {
 
   it('surfaces the shipped archive filter rows, restoring them in place', async () => {
     const b = mount({
-      useSessions: hook(sessionState([summary('live-s', 2), summary('gone-s', 1)])),
-      useWorkspaces: hook(workspaceState([workspace('alpha', ['live-s', 'gone-s'])], [sid('gone-s')])),
+      useSessions: hook(sessionState([summary('live-s', 2)], { archivedById: { 'gone-s': summary('gone-s', 1) } })),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['live-s', 'gone-s'])])),
       renderSlot: ((name: string, owner: { open: boolean }) =>
         name === 'sidebar.workspaces.directoryFlow' && owner.open
           ? <div data-testid="directory-flow" />
