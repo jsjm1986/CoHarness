@@ -9,8 +9,7 @@ import {
 import { zh } from '../../../../packages/client/ui-settings-models/src/client/locales.ts'
 import { createSettingsSchemaOperations } from '../../../../packages/client/ui-settings-models/src/client/schema-operations.ts'
 import { SettingsSchemaService } from '../../../../packages/client/ui-settings/src/client/schema.ts'
-import { SettingsDescribeMirror } from '../../../../packages/client/ui-settings/src/client/settings-mirror.ts'
-import { createOrganizationModelsApi } from '../model-settings-api.ts'
+import { createOrganizationModelsMirror } from '../model-settings-api.ts'
 
 const ORGANIZATION_PROVIDER_PATTERN = /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 
@@ -46,17 +45,16 @@ function bindSnapshot(controller: ModelsSettingsStore): SnapshotHook {
 
 /** Shared Models settings plugin mounted against the organization REST facade. */
 export function OrganizationModelsEditor({ onChanged }: { onChanged: () => void }) {
-  const api = useMemo(() => createOrganizationModelsApi({ onChanged }), [onChanged])
-  const { schema, describeFace } = useMemo(() => {
+  const { schema, describeFace, api } = useMemo(() => {
     // The admin surface reuses the shared editor outside the Cordis client
     // plugin graph, so it must provide the same schema and settings mirror
     // faces that ui-settings-models receives from its host plugin.
     const schemaService = new SettingsSchemaService(new Context())
     return {
       schema: createSettingsSchemaOperations(schemaService),
-      describeFace: new SettingsDescribeMirror(api as never),
+      ...createOrganizationModelsMirror({ onChanged }),
     }
-  }, [api])
+  }, [onChanged])
   const controller = useMemo(
     () => new ModelsSettingsStore(api as never, schema, describeFace),
     [api, describeFace, schema],

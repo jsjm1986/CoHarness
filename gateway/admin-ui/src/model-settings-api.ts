@@ -1,3 +1,4 @@
+import { SettingsDescribeMirror } from '../../../packages/client/ui-settings/src/client/settings-mirror.ts'
 import {
   AdminRequestError,
   describeOrganizationCredentials,
@@ -244,3 +245,42 @@ export function createOrganizationModelsApi(options: OrganizationModelsApiOption
 
 /** Structural facade type used by the admin editor wrapper and its tests. */
 export type OrganizationModelsApi = ReturnType<typeof createOrganizationModelsApi>
+
+/**
+ * Settings mirror plus folded facade pair for the organization editor.
+ * Organization settings and credential writes share one server-side
+ * revision, so every write answer must fold through the mirror: a stale
+ * `namespace.revision` makes the next mutate self-conflict with a 409.
+ * @param options - facade options; `onChanged` fires per successful write.
+ * @returns the describe face and the api the editor should consume.
+ */
+export function createOrganizationModelsMirror(options: OrganizationModelsApiOptions = {}) {
+  const rest = createOrganizationModelsApi(options)
+  const describeFace = new SettingsDescribeMirror(rest as never)
+  const api: OrganizationModelsApi = {
+    ...rest,
+    settings: {
+      describe: rest.settings.describe,
+      async mutate(payload) {
+        const response = await rest.settings.mutate(payload)
+        if (response.result.ok) describeFace.acceptView(response.result.value as Parameters<SettingsDescribeMirror['acceptView']>[0])
+        else if (response.result.error.code === 'settings-conflict') void describeFace.load()
+        return response
+      },
+    },
+    credentials: {
+      describe: rest.credentials.describe,
+      async set(payload) {
+        const response = await rest.credentials.set(payload)
+        if (response.result.ok) void describeFace.load()
+        return response
+      },
+      async unset(payload) {
+        const response = await rest.credentials.unset(payload)
+        if (response.result.ok) void describeFace.load()
+        return response
+      },
+    },
+  }
+  return { describeFace, api }
+}

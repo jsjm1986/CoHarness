@@ -80,13 +80,14 @@ export function UsagePage() {
     try {
       const parsedToken = Number(tokenLimit)
       const parsedCost = Number(costLimit)
+      const costMicros = Math.round(parsedCost * 1_000_000)
       if (tokenMode === 'custom' && (!Number.isSafeInteger(parsedToken) || parsedToken < 0)) throw new Error('Token 额度必须是非负整数')
-      if (costMode === 'custom' && (!Number.isFinite(parsedCost) || parsedCost < 0)) throw new Error('成本额度必须是非负数')
+      if (costMode === 'custom' && (!Number.isFinite(parsedCost) || parsedCost < 0 || !Number.isSafeInteger(costMicros))) throw new Error('成本额度必须是有效的非负数')
       await setQuota({
         subjectType,
         subjectId,
         tokenLimit: tokenMode === 'inherit' ? 'inherit' : tokenMode === 'unlimited' ? null : parsedToken,
-        companyCostMicrosLimit: costMode === 'inherit' ? 'inherit' : costMode === 'unlimited' ? null : Math.round(parsedCost * 1_000_000),
+        companyCostMicrosLimit: costMode === 'inherit' ? 'inherit' : costMode === 'unlimited' ? null : costMicros,
       })
       setQuotaOpen(false)
       await reload()

@@ -830,7 +830,6 @@ export type ModelProviderInput = {
   authMode: ModelProviderAuthMode
   status: ModelProviderStatus
   credential?: string | null
-  profile?: Record<string, unknown>
 }
 
 export type OrganizationModelSettingsView = {

@@ -124,6 +124,21 @@ describe('admin JSON API', () => {
     expect(upsertProvider).not.toHaveBeenCalled()
   })
 
+  it('rejects a provider profile carried on the row route before invoking the storage service', async () => {
+    const { deps, base, cookie } = await setup()
+    const upsertProvider = vi.fn(async () => {})
+    Object.assign(deps.governance!, { upsertProvider })
+    const response = await fetch(`${base}/admin/api/model-providers`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'org-primary', displayName: 'Primary', driver: 'pi-ai',
+        protocol: 'openai-completions', baseURL: 'https://example.com/v1', authMode: 'none', status: 'draft',
+        profile: { models: [{ id: 'chat' }] } }),
+    })
+    expect(response.status).toBe(400)
+    expect((await response.json() as { error: string }).error).toContain('model-settings')
+    expect(upsertProvider).not.toHaveBeenCalled()
+  })
+
   it('restricts bounded webhook delivery diagnostics to authenticated administrators', async () => {
     const { deps, base, cookie } = await setup()
     const url = `${base}/admin/api/webhook-deliveries?endpointId=70ee10ba-3cb9-4e4f-91dd-03606a5527cb&limit=10`

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as adminApi from './api.ts'
-import { createOrganizationModelsApi } from './model-settings-api.ts'
+import { createOrganizationModelsApi, createOrganizationModelsMirror } from './model-settings-api.ts'
 
 vi.mock('./api.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./api.ts')>()
@@ -110,6 +110,34 @@ describe('organization models RPC facade', () => {
       code: 'settings-conflict',
       details: { ns: 'llm-pi-ai', expected: 4, actual: 9 },
     } } })
+  })
+
+  it('folds write answers and credential revision bumps into the describe mirror', async () => {
+    const { describeFace, api } = createOrganizationModelsMirror()
+    await describeFace.ensure()
+    const revision = () => describeFace.getSnapshot().view?.namespaces
+      .find(namespace => namespace.ns === 'llm-pi-ai')?.revision
+    expect(revision()).toBe(4)
+
+    // A mutate answer carries the fresh namespace and folds without a re-read.
+    vi.mocked(adminApi.mutateOrganizationModelSettings).mockResolvedValueOnce(settingsView(5))
+    await api.settings.mutate({ ns: 'llm-pi-ai', ops: [], expectedRevision: 4 })
+    expect(revision()).toBe(5)
+    expect(adminApi.describeOrganizationModelSettings).toHaveBeenCalledTimes(1)
+
+    // A credential write bumps the same server revision; the mirror re-reads
+    // so a follow-up mutate does not self-conflict on a stale expectedRevision.
+    vi.mocked(adminApi.describeOrganizationModelSettings).mockResolvedValueOnce(settingsView(6))
+    await api.credentials.set({ ref: 'DSH_ORG_PRIMARY_API_KEY', value: 'sk-secret' })
+    await vi.waitFor(() => { expect(revision()).toBe(6) })
+
+    // A conflict answer also refreshes the mirror so the next write can retry.
+    vi.mocked(adminApi.mutateOrganizationModelSettings)
+      .mockRejectedValueOnce(new adminApi.AdminRequestError(409, 'settings-conflict'))
+    vi.mocked(adminApi.describeOrganizationModelSettings).mockResolvedValue(settingsView(7))
+    const conflict = await api.settings.mutate({ ns: 'llm-pi-ai', ops: [], expectedRevision: 6 })
+    expect(conflict).toMatchObject({ result: { ok: false, error: { code: 'settings-conflict' } } })
+    await vi.waitFor(() => { expect(revision()).toBe(7) })
   })
 
   it('forwards credential and discovery operations without exposing key values', async () => {

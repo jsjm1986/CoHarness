@@ -1150,6 +1150,13 @@ async function dispatch(
         sendError(res, 400, 'organization provider must use an org- prefix and lowercase letters, digits, and single hyphens')
         return true
       }
+      // Provider profiles (including their model lists) are written through
+      // /admin/api/model-settings; forwarding one here would desynchronize the
+      // section from the catalog this route's sibling endpoints maintain.
+      if (input.profile !== undefined) {
+        sendError(res, 400, 'provider profile is managed through /admin/api/model-settings')
+        return true
+      }
       await deps.governance.upsertProvider({
         provider,
         displayName,
