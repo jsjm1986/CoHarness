@@ -529,7 +529,7 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.list.set({
       items: workspace.items,
       archivedSessionIds: workspace.archivedSessionIds,
-      pinnedSessionIds: workspace.pinnedSessionIds,
+      pinnedSessionIds: workspace.pinnedSessionIds.map(key),
       ...(workspace.archiveRevision === undefined ? {} : { archiveRevision: workspace.archiveRevision }),
       state: workspace.state,
       phase: workspace.phase,

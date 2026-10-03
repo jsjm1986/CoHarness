@@ -55,6 +55,8 @@ export function sessionAddressApi(
       insertSessionBefore: method(a => a.workspace.insertSessionBefore.bind(a.workspace), ['sessionId', 'beforeSessionId']),
       archiveSession: method(a => a.workspace.archiveSession.bind(a.workspace), ['sessionId']),
       unarchiveSession: method(a => a.workspace.unarchiveSession.bind(a.workspace), ['sessionId']),
+      pinSession: method(a => a.workspace.pinSession.bind(a.workspace), ['sessionId']),
+      unpinSession: method(a => a.workspace.unpinSession.bind(a.workspace), ['sessionId']),
     },
     workspaceChanges: {
       summary: method(a => a.workspaceChanges.summary.bind(a.workspaceChanges), ['sessionId']),

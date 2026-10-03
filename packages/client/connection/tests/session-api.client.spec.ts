@@ -37,6 +37,7 @@ it.each([
   ['sessions', 'history'], ['sessions', 'historyIndex'], ['sessions', 'selectModel'], ['sessions', 'rename'], ['sessions', 'fork'],
   ['sessions', 'attachment'], ['sessions', 'updateQueue'], ['sessions', 'cancel'], ['desktop', 'status'], ['desktop', 'confirm'],
   ['workspace', 'archiveSession'], ['workspace', 'unarchiveSession'], ['workspace', 'insertSessionBefore'],
+  ['workspace', 'pinSession'], ['workspace', 'unpinSession'],
   ['workspaceChanges', 'summary'], ['workspaceChanges', 'diff'], ['workspaceFiles', 'list'], ['workspaceFiles', 'stat'],
   ['workspaceFiles', 'read'], ['workspaceFiles', 'readBytes'], ['workspaceFiles', 'renderOffice'], ['skills', 'list'],
   ['subagents', 'history'],
