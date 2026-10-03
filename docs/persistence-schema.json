@@ -12783,7 +12783,7 @@
       "kind": "event",
       "event": "schedule/change",
       "surface": false,
-      "digest": "2a7f86849ae54b3398ee49661a757c4fcb59a6192b7036ee2ff514617e13fb42",
+      "digest": "a0a2e5c42e1c929445ecd1cd70f49be6b66441894ec72c08e8ae332821d4a3cb",
       "schema": {
         "root": 0,
         "nodes": [
@@ -12971,6 +12971,11 @@
                 "name": "scheduledAt",
                 "type": 3,
                 "optional": false
+              },
+              {
+                "name": "title",
+                "type": 3,
+                "optional": true
               }
             ],
             "indices": []
@@ -13010,6 +13015,11 @@
                 "name": "scheduledAt",
                 "type": 3,
                 "optional": false
+              },
+              {
+                "name": "title",
+                "type": 3,
+                "optional": true
               }
             ],
             "indices": []
@@ -13040,6 +13050,11 @@
                 "name": "scheduledAt",
                 "type": 3,
                 "optional": false
+              },
+              {
+                "name": "title",
+                "type": 3,
+                "optional": true
               }
             ],
             "indices": []
@@ -24920,7 +24935,7 @@
         "packages/schedule/schedule/src/types.ts#ScheduleDeleteChange"
       ],
       "sources": [
-        "packages/schedule/schedule/src/types.ts:81"
+        "packages/schedule/schedule/src/types.ts:230"
       ]
     },
     {
@@ -25177,15 +25192,6 @@
       ]
     },
     {
-      "digest": "27e337d3d6b402b221e50c247a3f518a70d0c474cc60beee15fac3e9c5cbfcbe",
-      "names": [
-        "packages/schedule/schedule/src/types.ts#AfterScheduleRecord"
-      ],
-      "sources": [
-        "packages/schedule/schedule/src/types.ts:15"
-      ]
-    },
-    {
       "digest": "287211846beea1eccb5f9acee00d20388a38fcb2e95858fa2332d6f58529379a",
       "names": [],
       "sources": [
@@ -25213,11 +25219,6 @@
       "sources": [
         "packages/core/session/src/types.ts:400"
       ]
-    },
-    {
-      "digest": "2a7f86849ae54b3398ee49661a757c4fcb59a6192b7036ee2ff514617e13fb42",
-      "names": [],
-      "sources": []
     },
     {
       "digest": "2aad1179f957631477b582e57cd8f538cb82618fc3fb816bde1171154235b065",
@@ -25277,6 +25278,15 @@
       "digest": "2da725e554cd89301d829ed9dc45a572c3cd1b93b5e91d0d71f007976d8a0863",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "2e3523541e942ef6cc9fbc5b91f242e0ca4c6ada479b79b96025b797f6e41f3f",
+      "names": [
+        "packages/schedule/schedule/src/types.ts#ScheduleChange"
+      ],
+      "sources": [
+        "packages/schedule/schedule/src/types.ts:256"
+      ]
     },
     {
       "digest": "2e4debca12f2c449f96dc6574f3fbf2fb346193443114a241d01a236362ec48c",
@@ -25563,6 +25573,15 @@
       "sources": []
     },
     {
+      "digest": "3fdf9582c3b5597df104d32d97dab6c6ee3a93794f3034ec6ada6272404ea27f",
+      "names": [
+        "packages/schedule/schedule/src/types.ts#LegacyAfterScheduleRecord"
+      ],
+      "sources": [
+        "packages/schedule/schedule/src/types.ts:161"
+      ]
+    },
+    {
       "digest": "408927267422a7b2beb6df354ff7c1406d929a5646554f48adf85eb8372f811c",
       "names": [],
       "sources": []
@@ -25677,6 +25696,15 @@
       "sources": []
     },
     {
+      "digest": "4b1e632e05776982a2d21c25a50c7c04c199d311c5675218fa73ff9fe30d22cd",
+      "names": [
+        "packages/schedule/schedule/src/types.ts#LegacyScheduleRecord"
+      ],
+      "sources": [
+        "packages/schedule/schedule/src/types.ts:185"
+      ]
+    },
+    {
       "digest": "4b259f7f8f0a44ad5e90b70a73553ced1df27012d126921d397ff403b6c86731",
       "names": [
         "packages/llm/llm/src/message.ts#ToolResultMessage"
@@ -25748,7 +25776,7 @@
         "packages/llm/llm/src/brand.ts:31",
         "packages/llm/llm/src/brand.ts:43",
         "packages/llm/llm/src/brand.ts:67",
-        "packages/schedule/schedule/src/types.ts:12",
+        "packages/schedule/schedule/src/types.ts:14",
         "packages/session/session-title/src/index.ts:29",
         "packages/webhook/webhook/src/brand.ts:12",
         "packages/webhook/webhook/src/brand.ts:6",
@@ -26098,15 +26126,6 @@
       ]
     },
     {
-      "digest": "658d895d187b26d83f3b53109a3bf77bbfba9f6f9a6d4bc4ee4315b4eb36239e",
-      "names": [
-        "packages/schedule/schedule/src/types.ts#AtScheduleRecord"
-      ],
-      "sources": [
-        "packages/schedule/schedule/src/types.ts:29"
-      ]
-    },
-    {
       "digest": "6598cd6da253948d6b207c6374a45335804c79b576866d6215649c2d1bc85e25",
       "names": [
         "packages/experimental/agent-team/src/types.ts#TeamMemberSnapshot"
@@ -26131,15 +26150,6 @@
       ],
       "sources": [
         "packages/llm/llm/src/types.ts:485"
-      ]
-    },
-    {
-      "digest": "66ece68282d8c06330fb83329a24ae54c386d5ccfab296bbf18369da8beb7d14",
-      "names": [
-        "packages/schedule/schedule/src/types.ts#EveryScheduleRecord"
-      ],
-      "sources": [
-        "packages/schedule/schedule/src/types.ts:41"
       ]
     },
     {
@@ -26826,7 +26836,7 @@
         "packages/schedule/schedule/src/types.ts#OneShotScheduleDispatchChange"
       ],
       "sources": [
-        "packages/schedule/schedule/src/types.ts:88"
+        "packages/schedule/schedule/src/types.ts:237"
       ]
     },
     {
@@ -27115,6 +27125,11 @@
       "sources": []
     },
     {
+      "digest": "a0a2e5c42e1c929445ecd1cd70f49be6b66441894ec72c08e8ae332821d4a3cb",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "a0baff42eb900561f91032b6950a3925cf19c5c8d9ba33948ac69e4ac7dee573",
       "names": [],
       "sources": []
@@ -27261,6 +27276,15 @@
       "digest": "a9059a81430b320792bbb7c2ee1f8f6c77ff71e40ee44c18aec72e157c522694",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "a926dc71814edd01a4f041eb5fc766d153db3407ef4704e98f4c1b6527309ebb",
+      "names": [
+        "packages/schedule/schedule/src/types.ts#LegacyEveryScheduleRecord"
+      ],
+      "sources": [
+        "packages/schedule/schedule/src/types.ts:173"
+      ]
     },
     {
       "digest": "a99ec0993c62c058e50af9f68922202a3b54f5e259bc2abf1915a73381d2316d",
@@ -27544,6 +27568,15 @@
       ]
     },
     {
+      "digest": "b63b089a00b3b9357675b3e0c3d3e9aa4fdbda1fba9c91a6b0c59ffdbb89f505",
+      "names": [
+        "packages/schedule/schedule/src/types.ts#LegacyAtScheduleRecord"
+      ],
+      "sources": [
+        "packages/schedule/schedule/src/types.ts:167"
+      ]
+    },
+    {
       "digest": "b69e707168b0aa8877a2e4d9705d48cffaed4900465c81382fde0ea9f58c216f",
       "names": [],
       "sources": [
@@ -27809,15 +27842,6 @@
       ]
     },
     {
-      "digest": "ca6425edd20afe34d0cedc6ad1abad1ad7b32e2fbc4c1d24db53939e80bf887f",
-      "names": [
-        "packages/schedule/schedule/src/types.ts#ScheduleCreateChange"
-      ],
-      "sources": [
-        "packages/schedule/schedule/src/types.ts:74"
-      ]
-    },
-    {
       "digest": "cb1c8959e1726f82f9a3d2ef2bc90bf8c451a98fd56175e956022124c770c818",
       "names": [],
       "sources": []
@@ -27950,15 +27974,6 @@
       ]
     },
     {
-      "digest": "d8f868c6b3e7189de6c1ffe2ea04794ea2aa31315b6347d12536e46020afac87",
-      "names": [
-        "packages/schedule/schedule/src/types.ts#ScheduleRecord"
-      ],
-      "sources": [
-        "packages/schedule/schedule/src/types.ts:71"
-      ]
-    },
-    {
       "digest": "d9196086e41e4dd5c2ce87f5c25529c8112a1731d258cf0728747d41a9ee3241",
       "names": [],
       "sources": []
@@ -28078,15 +28093,6 @@
       "sources": []
     },
     {
-      "digest": "e1d0e52dcd1855ffb803efc18f8f7b776c48d1c25757e8a75c0281fa298c02e1",
-      "names": [
-        "packages/schedule/schedule/src/types.ts#ScheduleChange"
-      ],
-      "sources": [
-        "packages/schedule/schedule/src/types.ts:107"
-      ]
-    },
-    {
       "digest": "e27e11509225509cf8759545c7a2b3f8f4907ed83b9990220ed2d433a43abccc",
       "names": [],
       "sources": []
@@ -28161,7 +28167,7 @@
         "packages/schedule/schedule/src/types.ts#EveryScheduleDispatchChange"
       ],
       "sources": [
-        "packages/schedule/schedule/src/types.ts:95"
+        "packages/schedule/schedule/src/types.ts:244"
       ]
     },
     {
@@ -28258,6 +28264,15 @@
       "digest": "ee577a0cc18664c9daee50e9455153321155604f8f1817362f8f4a4b6fb9e1ad",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "eea687d437880bd5f55fb447a561112800ca34334c0724d9cecb98493059d9e4",
+      "names": [
+        "packages/schedule/schedule/src/types.ts#ScheduleCreateChange"
+      ],
+      "sources": [
+        "packages/schedule/schedule/src/types.ts:223"
+      ]
     },
     {
       "digest": "eefbea819caeeea91ccb02dfafc16c68dd7f961cf9c1b2be25a2084509cf5c5a",
