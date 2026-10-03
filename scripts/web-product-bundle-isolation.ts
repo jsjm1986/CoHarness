@@ -88,8 +88,9 @@ export class WebProductBundleIsolation {
         modules: { ...item.modules },
         imports: [...item.imports],
         dynamicImports: [...item.dynamicImports],
-        implicitlyLoadedBefore: [...item.implicitlyLoadedBefore],
-        referencedFiles: [...item.referencedFiles],
+        // Rolldown emits these fields only when a chunk actually uses them.
+        implicitlyLoadedBefore: [...item.implicitlyLoadedBefore ?? []],
+        referencedFiles: [...item.referencedFiles ?? []],
         ...(item.viteMetadata === undefined ? {} : { viteMetadata: {
           importedCss: new Set(item.viteMetadata.importedCss),
           importedAssets: new Set(item.viteMetadata.importedAssets),
@@ -116,7 +117,7 @@ export class WebProductBundleIsolation {
   /** Reject experimental ownership in everything the emitted index page can load. */
   verify(bundle: WebOutputBundle, moduleInfo: (id: string) => WebModuleInfo | null): void {
     const html = bundle['index.html']
-    if (html?.type !== 'asset' || !html.originalFileNames.some(file =>
+    if (html?.type !== 'asset' || !(html.originalFileNames ?? []).some(file =>
       resolve(this.webRoot, file) === resolve(this.webRoot, 'index.html'))) {
       throw new Error('Web product isolation: emitted index.html is missing its original HTML input')
     }
@@ -133,7 +134,7 @@ export class WebProductBundleIsolation {
     }
     for (const item of Object.values(bundle)) {
       if (item.type === 'asset') {
-        for (const name of item.names) aliases.set(name, item.fileName)
+        for (const name of item.names ?? []) aliases.set(name, item.fileName)
       }
     }
     const outputName = (name: string): string => outputs.has(name) ? name
@@ -154,6 +155,9 @@ export class WebProductBundleIsolation {
     const checkModule = (id: string): void => {
       if (visitedModules.has(id)) return
       visitedModules.add(id)
+      // Bundler-internal helpers (the \0-virtual space and rolldown's runtime)
+      // are emitted, not input, so they own no module record or input proof.
+      if (id.startsWith('\0') || /^[\s\0]*rolldown\//.test(id)) return
       this.inputs.assertInput(id)
       const info = moduleInfo(id)
       if (info === null) throw new Error(`Web product isolation: module ${id} has no Rollup module record`)
@@ -163,8 +167,10 @@ export class WebProductBundleIsolation {
       }
       if (/[?&](?:sharedworker|worker)(?:&|$)/.test(id)) checkWorker(physicalBundleInput(id) ?? id)
       for (const file of this.cssInputs.get(id) ?? []) this.inputs.assertInput(file)
-      for (const child of [...info.importedIds, ...info.dynamicallyImportedIds]) {
+      for (const child of [...info.importedIds ?? [], ...info.dynamicallyImportedIds ?? []]) {
         const childInfo = moduleInfo(child)
+        // Bundler-internal children own no record, same as virtual parents.
+        if (childInfo === null && (child.startsWith('\0') || /^[\s\0]*rolldown\//.test(child))) continue
         if (childInfo === null) throw new Error(`Web product isolation: module ${child} has no Rollup module record`)
         if (childInfo.isIncluded || childInfo.isExternal) checkModule(child)
       }
@@ -178,15 +184,19 @@ export class WebProductBundleIsolation {
       if (this.workerInputs.has(file)) checkWorker(file)
       else if (item.type === 'chunk') {
         for (const id of Object.keys(item.modules)) checkModule(id)
-        queue.push(...item.imports, ...item.dynamicImports, ...item.implicitlyLoadedBefore, ...item.referencedFiles)
+        // Rolldown emits these fields only when a chunk actually uses them.
+        queue.push(
+          ...item.imports ?? [], ...item.dynamicImports ?? [],
+          ...item.implicitlyLoadedBefore ?? [], ...item.referencedFiles ?? [],
+        )
         queue.push(...item.viteMetadata?.importedCss ?? [], ...item.viteMetadata?.importedAssets ?? [])
       } else if (cssOwners.has(file)) {
         for (const id of cssOwners.get(file) ?? []) checkModule(id)
       } else {
-        if (item.originalFileNames.length === 0) {
+        if ((item.originalFileNames ?? []).length === 0) {
           throw new Error(`Web product isolation: asset ${file} has no recorded original files`)
         }
-        for (const original of item.originalFileNames) this.inputs.assertInput(resolve(this.webRoot, original))
+        for (const original of item.originalFileNames ?? []) this.inputs.assertInput(resolve(this.webRoot, original))
       }
       for (const reference of references.get(file) ?? []) {
         if (reference.type === 'public') this.inputs.assertInput(resolve(this.webRoot, 'public', reference.file))
