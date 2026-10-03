@@ -153,30 +153,6 @@
   outline-offset: 1px;
 }
 
-.cards {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.cards {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.card {
-  min-width: 0;
-  /* The hover surface reaches 8px past the content on both sides while the
-     row's content stays aligned with the page header. */
-  margin: 0 -8px;
-  border-radius: 12px;
-  /* The page itself scrolls on the base surface. Anything that scrolls inside
-     a card draws the l2 thumb (ui-theme styles/scrollbar.css rebinding contract). */
-  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
-  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
-}
-
 .cardHead {
   display: flex;
   align-items: center;
@@ -223,18 +199,9 @@
 }
 
 /*
- * A package card opens its page: the title button stretches over the whole
- * card, and the controls at the card's end sit above that stretch, so the
- * switch and the Add to… menu keep their own clicks.
+ * An entity row opens its detail: the title button stretches over the whole
+ * head, and the controls sit in their own row below that stretch.
  */
-.cardLink {
-  position: relative;
-}
-
-.cardLink:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
 .cardOpen {
   max-width: 100%;
   padding: 0;
@@ -280,6 +247,129 @@
   flex: none;
   align-items: center;
   gap: 8px;
+}
+
+/* Unified plugin list: one entity per row with inline controls and an expandable detail. */
+.entityList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.entity {
+  min-width: 0;
+  margin: 0 -8px;
+  border-radius: 12px;
+}
+
+.entity[data-plugin-highlight] {
+  background: var(--dsw-alias-bg-surface-brand-subtle, var(--dsw-alias-interactive-bg-hover));
+}
+
+/* The head's toggle button stretches over it; the chevron stays decorative. */
+.entity > .cardHead {
+  position: relative;
+  border-radius: 12px;
+}
+
+.entity > .cardHead:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.entityChevron {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  color: var(--dsw-alias-label-caption);
+  transition: transform 0.15s ease;
+}
+
+.entity > .cardHead[data-expanded] > .entityChevron {
+  transform: rotate(180deg);
+}
+
+.entityControls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding: 0 8px 10px 70px;
+}
+
+.entityControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.entityControlLabel {
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.entityNoLive {
+  font-size: 12px;
+  color: var(--dsw-alias-label-caption);
+}
+
+.entityDetail {
+  margin: 2px 8px 12px 62px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l3);
+}
+
+.entityDetail .detailHead {
+  margin-top: 8px;
+}
+
+.entityDetail .detailMain {
+  margin-top: 10px;
+}
+
+.entityDetail .detailSections {
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.listFilter {
+  flex: 1;
+  min-width: 160px;
+  max-width: 280px;
+}
+
+.statusFilter {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.startupCheck {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--dsw-alias-brand-primary);
+}
+
+.startupSelect {
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
 }
 
 /* The toolbar's icon action, round like the message-row actions. */

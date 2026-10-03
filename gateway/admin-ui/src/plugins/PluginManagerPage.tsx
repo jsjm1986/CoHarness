@@ -1,12 +1,9 @@
 /**
- * Global plugin management: the Official group's cards for the bundles the
- * installation ships switched off and for the official plugins that register
- * their configuration, the Installed group's cards for the profile's bundles,
- * their row switches, the install dialog with its guide and folded pnpm
- * output, the uninstall confirmation, and the toasts an action's outcome
- * becomes. A bundle's page lists the rows it contributes as the Host runs
- * them; a plugin's configuration renders on its own page through the slots
- * the page declares.
+ * The friendly plugin list: every package the profile installed or the
+ * installation ships beside every official plugin that registered a page,
+ * one row per plugin with its live switch, its startup choice, and its
+ * expandable detail. The entry-level composition stays in the matrix view
+ * the page folds below this list.
  */
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
@@ -16,10 +13,9 @@ import {
   Button, IconCheckOutline16, IconChevronDownOutline14, IconChevronLeftOutline14, IconChevronRightOutline14, IconCloseOutline16,
   IconPlusOutline16, IconRefreshOutline16, IconTrashOutline16, IconWarningOutline16, Input, Modal, pointerModality,
   PluginArtworkDefault, PluginArtworkLoop, PluginArtworkSearch, PluginArtworkSubagent, PluginArtworkTerminal,
-  StateDot, Switch, Tag, TerminalBlock, Toast, Tooltip, useAnchoredPosition, useDismissOnOutsidePointer,
+  StateDot, Switch, Tag, TerminalBlock, Toast, useAnchoredPosition, useDismissOnOutsidePointer,
   type IconProps, type StateDotState, type TerminalBlockLabels,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { Info } from 'lucide-react'
 
 import { rowConfigKey, type OfficialItem } from './config-ledger.ts'
 import { INSTALL_GIT_EXAMPLE, INSTALL_PATH_EXAMPLE, type PluginManagerLocaleKey } from './locales.ts'
@@ -29,6 +25,7 @@ import {
   type PluginManagerFace, type RegistryChoice,
 } from './manager-store.ts'
 import { managementText, noticeText, packageText, registryText, rowText, type ResolveText, type Translate } from './presentation.ts'
+import { effective, ENTRY_CHOICES, type EntryChoice, type PluginComposition } from './composition.ts'
 
 import css from './PluginManagerPage.module.css'
 
@@ -38,6 +35,8 @@ export type PluginManagerPageProps =
     t: Translate
     /** Current-locale package metadata resolver, supplied with `t`. */
     resolveText: ResolveText
+    /** The shared target composition the page edits through its row controls. */
+    composition: PluginComposition
     usePluginManager<T>(selector: (state: import('./manager-store.ts').PluginManagerState) => T): T
     useConfigLedger<T>(selector: (state: import('./config-ledger.ts').ConfigLedger) => T): T
     renderSlot(name: string, props: { view: 'page' | 'summary' }, selection: { only?: string; entryKey?: string }): ReactNode
@@ -275,7 +274,7 @@ function RowsSection({ rows, t, resolveText, toggle, configure }: {
 }
 
 /**
- * A bundle's enable switch on its card and its page: locked, saying why, for
+ * A bundle's live enable switch on its row: locked, saying why, for
  * one the Host protects; off and locked for one it cannot read.
  */
 function EnableSwitch({ pkg, title, t, busy, onSetEnabled }: {
@@ -296,50 +295,59 @@ function EnableSwitch({ pkg, title, t, busy, onSetEnabled }: {
   )
 }
 
-/** The status one card carries: running, off, or a problem the Host reported. */
+/** The status one package row carries: running, off, or a problem the Host reported. */
 function packageStatus(pkg: PackageView): 'running' | 'disabled' | 'problem' {
   if (pkg.error !== undefined) return 'problem'
   return pkg.enabled ? 'running' : 'disabled'
 }
 
-/** The head every card shares: the artwork, the name that opens the page beside its tags, its one-liner, and what sits at the end. */
-function CardHead({ title, t, onOpen, icon, tags, description, end }: {
-  readonly title: string
-  readonly t: Translate
-  readonly onOpen: () => void
+/** The head every entity row shares: the artwork, the toggle title with its badges, the one-liner, and the expand chevron. */
+function EntityHead({ icon, title, badges, description, expanded, toggleLabel, onToggle }: {
   readonly icon: ReactNode
-  readonly tags?: ReactNode
+  readonly title: string
+  readonly badges?: ReactNode
   readonly description: ReactNode
-  readonly end?: ReactNode
+  readonly expanded: boolean
+  readonly toggleLabel: string
+  readonly onToggle: () => void
 }): ReactNode {
   const descriptionId = useId()
   return (
-    <div className={css.cardHead}>
+    <div className={css.cardHead} {...expanded ? { 'data-expanded': '' } : {}}>
       <span className={css.cardIcon} aria-hidden="true">{icon}</span>
       <div className={css.cardMain}>
         <div className={css.titleRow}>
-          <button type="button" className={`${css.cardTitle} ${css.cardOpen}`} aria-label={t('openDetail', { name: title })} aria-describedby={description === undefined ? undefined : descriptionId} onClick={onOpen}>{title}</button>
-          {tags}
+          <button
+            type="button"
+            className={`${css.cardTitle} ${css.cardOpen}`}
+            aria-label={toggleLabel}
+            aria-expanded={expanded}
+            aria-describedby={description === undefined ? undefined : descriptionId}
+            onClick={onToggle}
+          >
+            {title}
+          </button>
+          {badges}
         </div>
         {description === undefined ? null : <span className={css.cardDesc} id={descriptionId}>{description}</span>}
       </div>
-      {end === undefined ? null : <div className={css.cardEnd}>{end}</div>}
+      <span className={css.entityChevron} aria-hidden="true"><IconChevronDownOutline14 /></span>
     </div>
   )
 }
 
-/** First-read placeholders share the Official group's card and text-line layout. */
+/** One labeled control pair in an entity row: the facet name, then its widget. */
+function EntityControl({ label, children }: { readonly label: string; readonly children: ReactNode }): ReactNode {
+  return <span className={css.entityControl}><span className={css.entityControlLabel}>{label}</span>{children}</span>
+}
+
+/** First-read placeholders share the list's row and text-line layout. */
 function ListSkeleton({ label }: { readonly label: string }): ReactNode {
   return (
     <section className={css.group} role="status" aria-label={label} data-plugin-loading>
-      <div className={css.groupHead} aria-hidden="true">
-        <span className={`${css.groupTitle} ${css.skeletonText} ${css.skeletonHeading}`}>
-          <span className={`${css.skeletonFill} ${css.skeletonBar}`} />
-        </span>
-      </div>
-      <ul className={css.cards} aria-hidden="true">
+      <ul className={css.entityList} aria-hidden="true">
         {[0, 1, 2, 3].map(index => (
-          <li key={index} className={css.card}>
+          <li key={index} className={css.entity}>
             <div className={css.cardHead}>
               <span className={`${css.cardIcon} ${css.skeletonFill} ${css.skeletonIcon}`} />
               <div className={css.cardMain}>
@@ -361,20 +369,22 @@ function ListSkeleton({ label }: { readonly label: string }): ReactNode {
   )
 }
 
-/** The top every page shares: the crumb that leads back, then the icon with the page's actions at its right. */
+/** The top every detail shares: the crumb that collapses when one is given, then the icon with the detail's actions at its right. */
 function DetailTop({ crumbLabel, crumbText, onBack, icon, actions }: {
-  readonly crumbLabel: string
-  readonly crumbText: string
-  readonly onBack: () => void
+  readonly crumbLabel?: string
+  readonly crumbText?: string
+  readonly onBack?: (() => void) | undefined
   readonly icon: ReactNode
   readonly actions?: ReactNode
 }): ReactNode {
   return (
     <>
-      <button type="button" className={css.crumb} aria-label={crumbLabel} onClick={onBack}>
-        <IconChevronDownOutline14 className={css.crumbIcon} aria-hidden="true" />
-        <span>{crumbText}</span>
-      </button>
+      {onBack === undefined || crumbLabel === undefined ? null : (
+        <button type="button" className={css.crumb} aria-label={crumbLabel} onClick={onBack}>
+          <IconChevronDownOutline14 className={css.crumbIcon} aria-hidden="true" />
+          <span>{crumbText}</span>
+        </button>
+      )}
       <div className={css.detailHead}>
         <span className={css.cardIcon} aria-hidden="true">{icon}</span>
         {actions}
@@ -383,75 +393,43 @@ function DetailTop({ crumbLabel, crumbText, onBack, icon, actions }: {
   )
 }
 
-/** One package as a card that opens its page: its name, its one-liner, its tags, and its bundle switch. */
-function PackageCard({ pkg, t, resolveText, busy, highlighted, onOpen, onSetEnabled }: {
-  readonly pkg: PackageView
-  readonly t: Translate
-  readonly resolveText: ResolveText
-  readonly busy: boolean
-  readonly highlighted: boolean
-  readonly onOpen: () => void
-  readonly onSetEnabled: (enabled: boolean) => void
-}): ReactNode {
-  const { title, description, beta } = packageText(pkg, resolveText)
-  const status = packageStatus(pkg)
-  return (
-    <li
-      className={`${css.card} ${css.cardLink}`}
-      data-plugin-package={pkg.name}
-      data-plugin-status={status}
-      {...highlighted ? { 'data-plugin-highlight': '' } : {}}
-    >
-      <CardHead
-        title={title}
-        t={t}
-        onOpen={onOpen}
-        icon={<PackageArtwork key={pkg.meta?.icon} src={pkg.meta?.icon} />}
-        tags={(
-          <>
-            {beta ? <Tag className={css.statusTag} tone="info">{t('statusBeta')}</Tag> : null}
-            {status === 'problem' ? <Tag className={css.statusTag} tone="danger">{t('statusProblem')}</Tag> : null}
-          </>
-        )}
-        description={description}
-        end={<EnableSwitch pkg={pkg} title={title} t={t} busy={busy} onSetEnabled={onSetEnabled} />}
-      />
-      <MetadataError error={pkg.meta?.error} t={t} />
-    </li>
-  )
-}
-
 /**
- * One official plugin as a card that opens its page: its icon, its title from
- * the registration, and the one-liner the entry renders in its summary view.
+ * One plugin in the unified list: the head with its kind, state, and pending
+ * badges, the live and startup controls, and the detail that unfolds in place.
  */
-function ItemCard({ item, t, resolveText, onOpen, renderSlot }: {
-  readonly item: OfficialItem
-  readonly t: Translate
-  readonly resolveText: ResolveText
-  readonly onOpen: () => void
-  readonly renderSlot: RenderConfig
+function EntityRow({ icon, title, badges, description, expanded, toggleLabel, onToggle, controls, detail, attrs }: {
+  readonly icon: ReactNode
+  readonly title: string
+  readonly badges?: ReactNode
+  readonly description: ReactNode
+  readonly expanded: boolean
+  readonly toggleLabel: string
+  readonly onToggle: () => void
+  readonly controls?: ReactNode
+  readonly detail?: ReactNode
+  readonly attrs?: Record<string, string | undefined>
 }): ReactNode {
-  const title = item.labelText === undefined ? item.label : resolveText(item.labelText) ?? item.label
   return (
-    <li className={`${css.card} ${css.cardLink}`} data-plugin-item={item.id}>
-      <CardHead title={title} t={t} onOpen={onOpen} icon={itemArtwork(item.id)} description={renderSlot('plugins.item', { view: 'summary' }, { only: item.id })} />
+    <li className={css.entity} {...attrs}>
+      <EntityHead icon={icon} title={title} badges={badges} description={description} expanded={expanded} toggleLabel={toggleLabel} onToggle={onToggle} />
+      {controls === undefined ? null : <div className={css.entityControls}>{controls}</div>}
+      {expanded && detail !== undefined ? <div className={css.entityDetail}>{detail}</div> : null}
     </li>
   )
 }
 
-/** An official plugin's page: the crumb back to the cards, its icon, its title over its one-liner, and the form the entry renders. */
-function ItemDetail({ item, t, resolveText, onBack, renderSlot }: {
+/** An official plugin's detail: the icon, its title over its one-liner, and the form the entry renders. */
+function ItemDetail({ item, t, resolveText, renderSlot, onBack }: {
   readonly item: OfficialItem
   readonly t: Translate
   readonly resolveText: ResolveText
-  readonly onBack: () => void
   readonly renderSlot: RenderConfig
+  readonly onBack?: (() => void) | undefined
 }): ReactNode {
   const title = item.labelText === undefined ? item.label : resolveText(item.labelText) ?? item.label
   return (
     <div className={css.detail} data-plugin-item-detail={item.id}>
-      <DetailTop crumbLabel={t('backToList')} crumbText={t('crumbRoot')} onBack={onBack} icon={itemArtwork(item.id)} />
+      <DetailTop icon={itemArtwork(item.id)} crumbLabel={t('backToList')} crumbText={t('crumbRoot')} onBack={onBack} />
       <div className={css.detailMain}>
         <div className={css.titleRow}>
           <h3 className={css.detailTitle}>{title}</h3>
@@ -505,16 +483,17 @@ function RowDetail({ pkg, row, t, resolveText, onBack, renderSlot }: {
 }
 
 /**
- * One package's page: the crumb back to the list; its icon with its switch
- * and, for a package the profile installed, uninstall; its title beside its
+ * One package's detail inside its row: the crumb that collapses; its icon
+ * with, for a package the profile installed, uninstall; its title beside its
  * version tag, its beta tag, and its problem tag; the package name the title
  * stands for, which is what installs it elsewhere; its one-liner; the Host's
  * problem when it reports one; the configuration the bundle registered for
- * itself; and its rows with their switches and configure controls.
+ * itself; and its rows with their switches and configure controls. Its live
+ * switch stays on the row above.
  */
 function PackageDetail({
   pkg, t, resolveText, busy, rowBusy, configured, configure, renderSlot,
-  onBack, onSetEnabled, onUninstall, onSetRowEnabled,
+  onBack, onUninstall, onSetRowEnabled,
 }: {
   readonly pkg: PackageView
   readonly t: Translate
@@ -526,8 +505,7 @@ function PackageDetail({
   readonly configured: boolean
   readonly configure: RowConfigure
   readonly renderSlot: RenderConfig
-  readonly onBack: () => void
-  readonly onSetEnabled: (enabled: boolean) => void
+  readonly onBack?: (() => void) | undefined
   readonly onUninstall: () => void
   readonly onSetRowEnabled: (row: PackageRow, enabled: boolean) => void
 }): ReactNode {
@@ -540,26 +518,23 @@ function PackageDetail({
         crumbText={t('crumbRoot')}
         onBack={onBack}
         icon={<PackageArtwork key={pkg.meta?.icon} src={pkg.meta?.icon} />}
-        actions={(
-          <div className={css.detailActions}>
-            {pkg.installed
-              ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={css.danger}
-                  icon={<IconTrashOutline16 size={13} />}
-                  aria-label={t('uninstallLabel', { name: title })}
-                  disabled={busy || pkg.readOnlyReason !== undefined}
-                  onClick={onUninstall}
-                >
-                  {t('uninstall')}
-                </Button>
-              )
-              : null}
-            <EnableSwitch pkg={pkg} title={title} t={t} busy={busy} onSetEnabled={onSetEnabled} />
-          </div>
-        )}
+        actions={pkg.installed
+          ? (
+            <div className={css.detailActions}>
+              <Button
+                variant="outline"
+                size="sm"
+                className={css.danger}
+                icon={<IconTrashOutline16 size={13} />}
+                aria-label={t('uninstallLabel', { name: title })}
+                disabled={busy || pkg.readOnlyReason !== undefined}
+                onClick={onUninstall}
+              >
+                {t('uninstall')}
+              </Button>
+            </div>
+          )
+          : undefined}
       />
       <div className={css.detailMain}>
         <div className={css.titleRow}>
@@ -1218,11 +1193,13 @@ function ConfirmDialog({ name, t, onConfirm, onCancel }: {
 
 /** Render the plugin manager: the official plugins and installed bundles, their pages, the install dialog, and the confirmation. */
 export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
-  const { t, resolveText, ensure, renderSlot } = props
+  const { t, resolveText, ensure, renderSlot, composition } = props
   const state = props.usePluginManager(snapshot => snapshot)
   const ledger = props.useConfigLedger(snapshot => snapshot)
-  // What is open; a package that leaves the list (uninstalled) drops back to the cards.
+  // What is expanded; a package that leaves the list (uninstalled) collapses back to the rows.
   const [view, setView] = useState<View>({ kind: 'list' })
+  const [filter, setFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'enabled' | 'disabled' | 'pending'>('all')
   useEffect(() => { ensure() }, [ensure])
   // A package an install just enabled: scroll it into view and mark it for a moment.
   const { highlight, clearHighlight } = { highlight: state.highlight, clearHighlight: props.clearHighlight }
@@ -1240,14 +1217,11 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
   // Plugins section's Plugin list tab.
   const listed = state.packages.filter(pkg => !BUILTIN_PROFILE_BUNDLES.has(pkg.name)
     && (pkg.installed || pkg.optional || pkg.error !== undefined))
-  const mine = listed.filter(pkg => pkg.installed || !pkg.optional)
-  const official = listed.filter(pkg => pkg.optional && !pkg.installed)
   const loaded = state.status === 'ready' || state.status === 'error'
   const refreshing = state.refreshStatus === 'refreshing'
   const openPkg = view.kind === 'package' || view.kind === 'row' ? listed.find(pkg => pkg.name === view.name) : undefined
   const openItem = view.kind === 'item' ? ledger.items.find(item => item.id === view.id) : undefined
   const openRow = view.kind === 'row' && openPkg !== undefined ? openPkg.rows.find(row => row.rowId === view.rowId) : undefined
-  const showsCards = openPkg === undefined && openItem === undefined
   const setRowEnabled = (row: PackageRow, enabled: boolean): void => {
     /* v8 ignore next -- a row without a live entry has its switch disabled */
     if (row.entryId !== undefined) props.setRowEnabled(row.entryId, enabled)
@@ -1256,67 +1230,216 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
     has: row => ledger.rows.has(rowConfigKey(pkg.name, row.rowId)),
     open: (row) => { setView({ kind: 'row', name: pkg.name, rowId: row.rowId }) },
   })
-  const packageCard = (pkg: PackageView): ReactNode => (
-    <PackageCard
-      key={pkg.name}
-      pkg={pkg}
-      t={t}
-      resolveText={props.resolveText}
-      busy={state.busy.includes(pkg.name)}
-      highlighted={state.highlight === pkg.name}
-      onOpen={() => { setView({ kind: 'package', name: pkg.name }) }}
-      onSetEnabled={(enabled) => { props.setEnabled(pkg.name, enabled) }}
-    />
-  )
-  // The Official group: the bundles the installation ships, then the plugins that registered their configuration.
-  const officialCards = [
-    ...official.map(packageCard),
-    ...ledger.items.map(item => (
-      <ItemCard key={`item:${item.id}`} item={item} t={t} resolveText={resolveText} renderSlot={renderSlot} onOpen={() => { setView({ kind: 'item', id: item.id }) }} />
-    )),
-  ]
-  // One group of cards under its heading and count; the Official group comes first, and a group with nothing in it takes no room.
-  const renderGroup = (id: 'official' | 'bundles', heading: string, cards: readonly ReactNode[]): ReactNode => cards.length === 0
-    ? null
-    : (
-      <section className={css.group} data-plugin-scope="global" data-plugin-group={id}>
-        <div className={css.groupHead}>
-          <h3 className={css.groupTitle}>{heading}</h3>
-          <span className={css.count} data-plugin-count={cards.length}>{cards.length}</span>
-        </div>
-        <ul className={css.cards}>{cards}</ul>
-      </section>
+
+  // One list, one entity per row: the bundles the Host lists beside the official plugins that registered a page.
+  type Entity = { readonly kind: 'package'; readonly pkg: PackageView } | { readonly kind: 'item'; readonly item: OfficialItem }
+  const itemTitle = (item: OfficialItem): string => item.labelText === undefined ? item.label : resolveText(item.labelText) ?? item.label
+  const itemEntry = (item: OfficialItem) => composition.entries.find(entry => entry.id === item.id)
+  const entityTitle = (entity: Entity): string => entity.kind === 'package' ? packageText(entity.pkg, resolveText).title : itemTitle(entity.item)
+  const entityPending = (entity: Entity): boolean => {
+    if (entity.kind === 'package') {
+      const row = composition.bundleRows.find(bundle => bundle.name === entity.pkg.name)
+      return row !== undefined && row.desired !== row.observed
+    }
+    const entry = itemEntry(entity.item)
+    return entry !== undefined && effective(entry.desired) !== effective(entry.observed)
+  }
+  const entityEnabled = (entity: Entity): boolean => entity.kind === 'package'
+    ? entity.pkg.enabled
+    : itemEntry(entity.item)?.live?.enabled === true
+  const entities: readonly Entity[] = [
+    ...listed.map((pkg): Entity => ({ kind: 'package', pkg })),
+    ...ledger.items.map((item): Entity => ({ kind: 'item', item })),
+  ].sort((a, b) => entityTitle(a).localeCompare(entityTitle(b)))
+  const needle = filter.trim().toLowerCase()
+  const matches = (entity: Entity): boolean => {
+    if (statusFilter === 'pending' && !entityPending(entity)) return false
+    if (statusFilter === 'enabled' && !entityEnabled(entity)) return false
+    if (statusFilter === 'disabled' && entityEnabled(entity)) return false
+    if (needle === '') return true
+    const haystack = entity.kind === 'package'
+      ? [entityTitle(entity), entity.pkg.name, packageText(entity.pkg, resolveText).description ?? '']
+      : [entityTitle(entity), entity.item.id]
+    return haystack.some(value => value.toLowerCase().includes(needle))
+  }
+  const shown = entities.filter(matches)
+
+  const toggleLabel = (expanded: boolean, title: string) => expanded ? t('listCollapse', { name: title }) : t('openDetail', { name: title })
+  const pendingTag = <Tag className={css.statusTag} tone="warning">{t('listPending')}</Tag>
+
+  const packageRow = (pkg: PackageView): ReactNode => {
+    const { title, description, beta } = packageText(pkg, resolveText)
+    const status = packageStatus(pkg)
+    const startup = composition.bundleRows.find(bundle => bundle.name === pkg.name)
+    const expanded = openPkg?.name === pkg.name
+    const busy = state.busy.includes(pkg.name)
+    const stateKey = status === 'problem' ? 'problem' : pkg.enabled ? 'enabled' : pkg.installed ? 'idle' : 'available'
+    return (
+      <EntityRow
+        key={`pkg:${pkg.name}`}
+        icon={<PackageArtwork key={pkg.meta?.icon} src={pkg.meta?.icon} />}
+        title={title}
+        description={description}
+        expanded={expanded}
+        toggleLabel={toggleLabel(expanded, title)}
+        onToggle={() => { setView(expanded ? { kind: 'list' } : { kind: 'package', name: pkg.name }) }}
+        badges={(
+          <>
+            <Tag className={css.statusTag} tone="neutral">{t('listKindBundle')}</Tag>
+            {beta ? <Tag className={css.statusTag} tone="info">{t('statusBeta')}</Tag> : null}
+            {status === 'problem' ? <Tag className={css.statusTag} tone="danger">{t('statusProblem')}</Tag> : null}
+            {status === 'problem' ? null : <Tag className={css.statusTag} tone={stateKey === 'enabled' ? 'success' : 'outline'}>{t(stateKey === 'enabled' ? 'listEnabled' : stateKey === 'available' ? 'listAvailable' : 'listIdle')}</Tag>}
+            {startup !== undefined && startup.desired !== startup.observed ? pendingTag : null}
+          </>
+        )}
+        attrs={{
+          'data-plugin-package': pkg.name,
+          'data-plugin-status': status,
+          ...state.highlight === pkg.name ? { 'data-plugin-highlight': '' } : {},
+        }}
+        controls={(
+          <>
+            <EntityControl label={t('listCurrent')}>
+              <EnableSwitch pkg={pkg} title={title} t={t} busy={busy} onSetEnabled={enabled => { props.setEnabled(pkg.name, enabled) }} />
+            </EntityControl>
+            {composition.persist
+              ? (
+                <EntityControl label={t('listStartup')}>
+                  <input
+                    type="checkbox"
+                    className={css.startupCheck}
+                    aria-label={t('listStartupBundle', { name: title })}
+                    checked={startup?.desired ?? pkg.enabled}
+                    onChange={event => { composition.setBundleDesired(pkg.name, event.target.checked) }}
+                  />
+                </EntityControl>
+              )
+              : null}
+          </>
+        )}
+        detail={openRow !== undefined
+          ? (
+            <RowDetail
+              pkg={pkg}
+              row={openRow}
+              t={t}
+              resolveText={resolveText}
+              renderSlot={renderSlot}
+              onBack={() => { setView({ kind: 'package', name: pkg.name }) }}
+            />
+          )
+          : (
+            <PackageDetail
+              pkg={pkg}
+              t={t}
+              resolveText={resolveText}
+              busy={busy}
+              rowBusy={row => row.entryId !== undefined && state.busy.includes(rowKey(row.entryId))}
+              configured={ledger.bundles.has(pkg.name)}
+              configure={configure(pkg)}
+              renderSlot={renderSlot}
+              onUninstall={() => { props.uninstall(pkg.name) }}
+              onSetRowEnabled={setRowEnabled}
+              onBack={() => { setView({ kind: 'list' }) }}
+            />
+          )}
+      />
     )
+  }
+
+  const itemRow = (item: OfficialItem): ReactNode => {
+    const title = itemTitle(item)
+    const entry = itemEntry(item)
+    const expanded = openItem?.id === item.id
+    return (
+      <EntityRow
+        key={`item:${item.id}`}
+        icon={itemArtwork(item.id)}
+        title={title}
+        description={renderSlot('plugins.item', { view: 'summary' }, { only: item.id })}
+        expanded={expanded}
+        toggleLabel={toggleLabel(expanded, title)}
+        onToggle={() => { setView(expanded ? { kind: 'list' } : { kind: 'item', id: item.id }) }}
+        badges={(
+          <>
+            <Tag className={css.statusTag} tone="neutral">{t('listKindItem')}</Tag>
+            {entry?.live === undefined ? null : <Tag className={css.statusTag} tone={entry.live.enabled ? 'success' : 'outline'}>{t(entry.live.enabled ? 'listRunning' : 'listStopped')}</Tag>}
+            {entry !== undefined && effective(entry.desired) !== effective(entry.observed) ? pendingTag : null}
+          </>
+        )}
+        attrs={{ 'data-plugin-item': item.id }}
+        controls={entry === undefined ? undefined : (
+          <>
+            {(() => {
+              const liveEntry = entry.live
+              return liveEntry === undefined
+                ? <span className={css.entityControl}><span className={css.entityControlLabel}>{t('listCurrent')}</span><span className={css.entityNoLive}>{t('listNoLiveEntry')}</span></span>
+                : (
+                  <EntityControl label={t('listCurrent')}>
+                    <Switch
+                      checked={liveEntry.enabled}
+                      label={t('listCurrentEnable', { name: title })}
+                      disabled={liveEntry.readOnly}
+                      onChange={enabled => { props.setRowEnabled(liveEntry.entryId, enabled) }}
+                    />
+                  </EntityControl>
+                )
+            })()}
+            {composition.persist
+              ? (
+                <EntityControl label={t('listStartup')}>
+                  <select
+                    className={css.startupSelect}
+                    aria-label={t('listStartupEntry', { name: title })}
+                    value={entry.desired}
+                    onChange={event => { composition.setEntryDesired(item.id, event.target.value as EntryChoice, entry.moduleName) }}
+                  >
+                    {ENTRY_CHOICES.map(choice => <option key={choice} value={choice}>{t(choice === 'default' ? 'listStartupDefault' : choice === 'on' ? 'listStartupOn' : 'listStartupOff')}</option>)}
+                  </select>
+                </EntityControl>
+              )
+              : null}
+          </>
+        )}
+        detail={<ItemDetail item={item} t={t} resolveText={resolveText} renderSlot={renderSlot} onBack={() => { setView({ kind: 'list' }) }} />}
+      />
+    )
+  }
 
   return (
     <section className={css.page} data-plugin-panel aria-busy={state.status === 'loading' || refreshing}>
-      {showsCards
-        ? (
-          <header className={css.pageHead}>
-            <div>
-              <h2 className={css.pageTitle}>{t('title')}</h2>
-              <div className={css.pageIntro}>
-                <span>{t('intro')}</span>
-                <Tooltip label={t('infoDescription')} side="bottom" delayMs={300} maxWidth={300} portal openOnClick>
-                  <Button variant="ghost" size="sm" className={css.infoButton} aria-label={t('infoLabel')}>
-                    <Info size={11} aria-hidden="true" />
-                  </Button>
-                </Tooltip>
-              </div>
-            </div>
-            <div className={css.toolbar}>
-              <button type="button" className={css.iconButton} aria-label={t('refresh')} title={t('refresh')} aria-busy={refreshing} disabled={!loaded || refreshing} onClick={props.refresh}>
-                <span className={css.iconWrap} aria-hidden="true">
-                  {refreshing ? <StateDot state="ongoing" size={18} /> : <IconRefreshOutline16 />}
-                </span>
-              </button>
-              <Button variant="primary" size="sm" icon={<IconPlusOutline16 size={13} />} disabled={!loaded} onClick={props.openInstall}>{t(state.install.requestId === undefined ? 'addPlugin' : 'installViewTask')}</Button>
-            </div>
-          </header>
-        )
-        : null}
-      {showsCards && state.status === 'loading' ? <ListSkeleton label={t('loading')} /> : null}
-      {showsCards && state.status === 'unavailable' ? (
+      <header className={css.pageHead}>
+        <div className={css.toolbar}>
+          {loaded && entities.length > 4
+            ? (
+              <>
+                <Input
+                  type="search"
+                  className={css.listFilter as string}
+                  placeholder={t('listFilter')}
+                  aria-label={t('listFilter')}
+                  value={filter}
+                  onChange={event => { setFilter(event.target.value) }}
+                />
+                <select className={css.statusFilter} aria-label={t('listStatusAll')} value={statusFilter} onChange={event => { setStatusFilter(event.target.value as typeof statusFilter) }}>
+                  <option value="all">{t('listStatusAll')}</option>
+                  <option value="enabled">{t('listStatusEnabled')}</option>
+                  <option value="disabled">{t('listStatusDisabled')}</option>
+                  <option value="pending">{t('listStatusPending')}</option>
+                </select>
+              </>
+            )
+            : null}
+          <button type="button" className={css.iconButton} aria-label={t('refresh')} title={t('refresh')} aria-busy={refreshing} disabled={!loaded || refreshing} onClick={props.refresh}>
+            <span className={css.iconWrap} aria-hidden="true">
+              {refreshing ? <StateDot state="ongoing" size={18} /> : <IconRefreshOutline16 />}
+            </span>
+          </button>
+          <Button variant="primary" size="sm" icon={<IconPlusOutline16 size={13} />} disabled={!loaded} onClick={props.openInstall}>{t(state.install.requestId === undefined ? 'addPlugin' : 'installViewTask')}</Button>
+        </div>
+      </header>
+      {state.status === 'loading' ? <ListSkeleton label={t('loading')} /> : null}
+      {state.status === 'unavailable' ? (
         <p className={`${css.status} ${css.statusWithDot}`} role="status">
           <StateDot state="idle" />{t('unavailable')}
         </p>
@@ -1332,48 +1455,16 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
             onDone={props.dismissNotice}
           />
         )}
-      {loaded && openPkg !== undefined && openRow !== undefined
-        ? (
-          <RowDetail
-            pkg={openPkg}
-            row={openRow}
-            t={t}
-            resolveText={props.resolveText}
-            renderSlot={renderSlot}
-            onBack={() => { setView({ kind: 'package', name: openPkg.name }) }}
-          />
-        )
-        : null}
-      {loaded && openPkg !== undefined && openRow === undefined
-        ? (
-          <PackageDetail
-            pkg={openPkg}
-            t={t}
-            resolveText={props.resolveText}
-            busy={state.busy.includes(openPkg.name)}
-            rowBusy={row => row.entryId !== undefined && state.busy.includes(rowKey(row.entryId))}
-            configured={ledger.bundles.has(openPkg.name)}
-            configure={configure(openPkg)}
-            renderSlot={renderSlot}
-            onBack={() => { setView({ kind: 'list' }) }}
-            onSetEnabled={(enabled) => { props.setEnabled(openPkg.name, enabled) }}
-            onUninstall={() => { props.uninstall(openPkg.name) }}
-            onSetRowEnabled={setRowEnabled}
-          />
-        )
-        : null}
-      {loaded && openItem !== undefined
-        ? <ItemDetail item={openItem} t={t} resolveText={resolveText} renderSlot={renderSlot} onBack={() => { setView({ kind: 'list' }) }} />
-        : null}
-      {loaded && showsCards
-        ? officialCards.length === 0 && mine.length === 0 && state.status !== 'error'
+      {loaded
+        ? entities.length === 0 && state.status !== 'error'
           ? <p className={css.empty}>{t('empty')}</p>
           : (
             <>
-              {renderGroup('official', t('officialTitle'), officialCards)}
-              {renderGroup('bundles', t('bundlesTitle'), mine.map(packageCard))}
-              {/* A failed package read trails the groups it left incomplete: right under Official on a
-                  first-load failure, and after the kept cards when a refresh fails over stale data. */}
+              <ul className={css.entityList} data-plugin-list>
+                {shown.map(entity => entity.kind === 'package' ? packageRow(entity.pkg) : itemRow(entity.item))}
+              </ul>
+              {shown.length === 0 && entities.length > 0 ? <p className={css.empty}>{t('listEmptyFiltered')}</p> : null}
+              {/* A failed package read trails the list it left incomplete. */}
               {state.status === 'error' && !refreshing
                 ? (
                   <div className={css.failure}>

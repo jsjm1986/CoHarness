@@ -3634,6 +3634,51 @@ a {
   gap: 10px;
 }
 
+/* Plugin lifecycle explainer and the shared startup-draft bar on the Plugins page. */
+.pluginLifecycle {
+  margin-bottom: 10px;
+}
+
+.draftBar {
+  position: sticky;
+  bottom: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-raised, var(--bg));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.draftBarText {
+  font-size: 13px;
+}
+
+.draftBarActions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.pluginAdvanced {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.pluginAdvanced > summary {
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  padding: 4px 0;
+}
+
 /* Plugin configuration field cards on the plugin detail page. */
 .configPanel .configHead {
   display: flex;

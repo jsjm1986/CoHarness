@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-03-admin-plugin-entity-list.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-03-admin-plugin-entity-list.md
+/agent-note-one-plugin-entity-list-replaces-the-split-composition-and-install-sections-on-the-admin-plugins-page:
+  en: 6194290872842810
+  zh: 26c7d352b18915f3
+/agent-note-one-plugin-entity-list-replaces-the-split-composition-and-install-sections-on-the-admin-plugins-page/problem:
+  en: 14c4d77578dbd5bc
+  zh: 5062840ee9bb7cbe
+/agent-note-one-plugin-entity-list-replaces-the-split-composition-and-install-sections-on-the-admin-plugins-page/decision:
+  en: 0313ef168f3051f3
+  zh: 94b76e716cf45fe1
+/agent-note-one-plugin-entity-list-replaces-the-split-composition-and-install-sections-on-the-admin-plugins-page/alternatives-considered:
+  en: ce0693e906ce0a48
+  zh: c95f2815afe43608
+/agent-note-one-plugin-entity-list-replaces-the-split-composition-and-install-sections-on-the-admin-plugins-page/consequences:
+  en: 9ae20f227e13fee9
+  zh: de8a6fe74f58c4ad

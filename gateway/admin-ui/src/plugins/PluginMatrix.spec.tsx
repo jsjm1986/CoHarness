@@ -1,10 +1,11 @@
-/** The fused matrix renders observed and desired columns, edits the draft, and drives live switches. */
+/** The shared composition edits the draft and drives live switches; the matrix view renders its columns. */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminRequestError, type PluginManagementState, type PluginManagementTarget } from '../api.ts'
 import type { PluginInfo } from '../../../../packages/boot/plugin-manager/src/types.ts'
 import { pluginManagementRemote } from './transport.ts'
 import { PluginMatrix } from './PluginMatrix.tsx'
+import { usePluginComposition } from './composition.ts'
 
 vi.mock('../api.ts', async (importOriginal) => {
   const original = await importOriginal<typeof import('../api.ts')>()
@@ -55,11 +56,30 @@ const plugin = (patchId: string, enabled: boolean, title?: string): PluginInfo =
   meta: title === undefined ? undefined : { title },
 })
 
+/** The page arrangement under test: the matrix over the shared composition, its error and notice, and the draft actions. */
+function Harness({ kind, id, target }: { kind: 'user' | 'project'; id: number; target: PluginManagementTarget }) {
+  const composition = usePluginComposition(kind, id, target)
+  return <>
+    {composition.error === '' ? null : <p role="alert">{composition.error}</p>}
+    {composition.notice === '' ? null : <p role="status">{composition.notice}</p>}
+    {composition.dirty
+      ? <>
+        <button onClick={() => { void composition.save(composition.draft) }}>保存插件组成</button>
+        <button onClick={() => { composition.discard() }}>放弃修改</button>
+      </>
+      : null}
+    <PluginMatrix composition={composition} />
+    {composition.persist && composition.view?.state != null
+      ? <button onClick={() => { void composition.save(null) }}>清除启动配置</button>
+      : null}
+  </>
+}
+
 describe('PluginMatrix', () => {
   it('renders observed and desired columns for a stopped instance and saves edits under its revision', async () => {
     api.pluginManagementState.mockResolvedValue(view())
     api.pluginManagementSaveState.mockImplementation(async input => view({ revision: '4', state: input.state }))
-    render(<PluginMatrix kind="user" id={7} target={stopped} />)
+    render(<Harness kind="user" id={7} target={stopped} />)
     await waitFor(() => expect(screen.getByText(/已存启动配置 · 版本 3/)).toBeTruthy())
     expect(screen.getByText(/将于下次启动应用/)).toBeTruthy()
     expect(remote).not.toHaveBeenCalled()
@@ -79,7 +99,7 @@ describe('PluginMatrix', () => {
   it('materializes the draft from the current composition when nothing is saved', async () => {
     api.pluginManagementState.mockResolvedValue(view({ revision: '0', state: null, appliedRevision: '0' }))
     api.pluginManagementSaveState.mockResolvedValue(view({ revision: '1' }))
-    render(<PluginMatrix kind="project" id={9} target={{ ...stopped, target: { kind: 'project', id: 9 } }} />)
+    render(<Harness kind="project" id={9} target={{ ...stopped, target: { kind: 'project', id: 9 } }} />)
     await waitFor(() => expect(screen.getByText(/尚无保存的启动配置/)).toBeTruthy())
     // Disabling a bundle drafts the whole current selection, never an empty list.
     fireEvent.click(screen.getByLabelText('启动时启用 observed-only'))
@@ -94,7 +114,7 @@ describe('PluginMatrix', () => {
     api.pluginManagementSaveState.mockRejectedValue(new AdminRequestError(409, 'plugin state changed'))
     api.pluginManagementState.mockResolvedValueOnce(view())
       .mockResolvedValue(view({ revision: '6', state: { entries: [], bundles: ['core'] } }))
-    render(<PluginMatrix kind="user" id={7} target={stopped} />)
+    render(<Harness kind="user" id={7} target={stopped} />)
     await waitFor(() => expect(screen.getByText(/已存启动配置 · 版本 3/)).toBeTruthy())
     fireEvent.click(screen.getByLabelText('启动时启用 extra'))
     fireEvent.click(screen.getByRole('button', { name: '保存插件组成' }))
@@ -106,7 +126,7 @@ describe('PluginMatrix', () => {
   it('clears the saved state', async () => {
     api.pluginManagementState.mockResolvedValue(view())
     api.pluginManagementSaveState.mockResolvedValue(view({ revision: '0', state: null, appliedRevision: '0' }))
-    render(<PluginMatrix kind="user" id={7} target={stopped} />)
+    render(<Harness kind="user" id={7} target={stopped} />)
     await waitFor(() => expect(screen.getByText(/已存启动配置 · 版本 3/)).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '清除启动配置' }))
     await waitFor(() => expect(api.pluginManagementSaveState).toHaveBeenCalledWith(
@@ -118,7 +138,7 @@ describe('PluginMatrix', () => {
     api.pluginManagementState.mockResolvedValue(view())
     api.pluginManagementState.mockResolvedValueOnce(view())
       .mockResolvedValue(view({ revision: '4', appliedRevision: '4', generation: 3 }))
-    render(<PluginMatrix kind="user" id={7} target={running} />)
+    render(<Harness kind="user" id={7} target={running} />)
     await waitFor(() => expect(screen.getByText('语言模型')).toBeTruthy())
     fireEvent.click(screen.getByLabelText('当前启用 llm'))
     await waitFor(() => expect(calls.setPluginEnabled).toHaveBeenCalledWith('include:llm', false))
@@ -129,7 +149,7 @@ describe('PluginMatrix', () => {
   it('degrades to live-only switches when the deployment has no state store', async () => {
     const calls = liveRemote([plugin('llm', true)])
     api.pluginManagementState.mockRejectedValue(new AdminRequestError(503, 'plugin state store unavailable'))
-    render(<PluginMatrix kind="user" id={7} target={running} />)
+    render(<Harness kind="user" id={7} target={running} />)
     await waitFor(() => expect(screen.getByText(/未启用启动配置存储/)).toBeTruthy())
     await waitFor(() => expect(screen.getByLabelText('当前启用 llm')).toBeTruthy())
     // The startup column and the saved-state controls stay out; live switches still fire.
@@ -143,7 +163,7 @@ describe('PluginMatrix', () => {
   it('keeps managed rows visible but unmounted when the live inventory skips them', async () => {
     liveRemote([plugin('other', true)])
     api.pluginManagementState.mockResolvedValue(view())
-    render(<PluginMatrix kind="user" id={7} target={running} />)
+    render(<Harness kind="user" id={7} target={running} />)
     await waitFor(() => expect(screen.getByLabelText('当前启用 other')).toBeTruthy())
     // The saved entry has no live row: static observed text, still editable at startup.
     expect(screen.queryByLabelText('当前启用 managed')).toBeNull()

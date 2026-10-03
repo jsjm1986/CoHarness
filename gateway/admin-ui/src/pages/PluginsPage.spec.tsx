@@ -1,5 +1,5 @@
 /** Scope changes discard private workflow state before the next runtime can answer. */
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
@@ -93,6 +93,26 @@ it('aborts the previous workflow on a scope switch and aborts the next on unmoun
   expect(last[0].target).toEqual({ kind: 'project', id: 7 })
   view.unmount()
   expect(vi.mocked(pluginManagementRemote).mock.calls.every(call => call[1].aborted)).toBe(true)
+})
+it('shares one startup draft between the folded matrix and the save bar', async () => {
+  vi.mocked(api.pluginManagementSaveState).mockResolvedValue({ ...stateView, revision: '3' })
+  render(<PluginsPage />)
+  await chooseUser()
+  // The entry-level matrix folds behind the advanced summary; the lifecycle line leads the section.
+  expect(document.querySelector('details.pluginAdvanced > summary')?.textContent).toContain('高级：组成视图')
+  expect(screen.getByText(/插件的生命周期/)).toBeTruthy()
+  await waitFor(() => expect(screen.getByLabelText('启动时启用 core')).toBeTruthy())
+  // A startup edit on the matrix raises the shared draft bar the friendly list writes to as well.
+  fireEvent.click(screen.getByLabelText('启动时启用 core'))
+  await waitFor(() => expect(screen.getByText('启动时 · 1 项变更待保存')).toBeTruthy())
+  fireEvent.click(screen.getByRole('button', { name: '放弃修改' }))
+  await waitFor(() => expect(screen.queryByText(/项变更待保存/)).toBeNull())
+  fireEvent.click(screen.getByLabelText('启动时启用 core'))
+  await waitFor(() => expect(screen.getByText('启动时 · 1 项变更待保存')).toBeTruthy())
+  fireEvent.click(screen.getByRole('button', { name: '保存插件组成' }))
+  await waitFor(() => expect(api.pluginManagementSaveState).toHaveBeenCalledWith(
+    { target: { kind: 'user', id: 1 }, revision: '2', state: { entries: [], bundles: [] } }))
+  await waitFor(() => expect(screen.queryByText(/项变更待保存/)).toBeNull())
 })
 it('rejects a different target before exposing any management action', async () => {
   vi.mocked(api.pluginManagementTarget).mockResolvedValue({ ...target, target: { kind: 'project', id: 7 } })

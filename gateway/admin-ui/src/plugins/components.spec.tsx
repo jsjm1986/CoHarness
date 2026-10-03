@@ -12,6 +12,7 @@ import type { PluginManagerPageProps } from './PluginManagerPage.tsx'
 import type { ConfigLedger } from './config-ledger.ts'
 import { rowKey, type InstallState, type PackageRow, type PackageView, type PluginManagerState } from './manager-store.ts'
 import { en, zh, type PluginManagerLocaleKey } from './locales.ts'
+import type { PluginComposition } from './composition.ts'
 
 afterEach(cleanup)
 
@@ -84,7 +85,19 @@ type SlotBodies = Record<string, (view: 'summary' | 'page') => ReactNode>
 
 const NO_CONFIG: ConfigLedger = { items: [], bundles: new Set(), rows: new Set() }
 
-function renderTab(state: Partial<PluginManagerState> = {}, config: Partial<ConfigLedger> = {}, bodies: SlotBodies = {}) {
+/** A quiet shared composition: the row startup controls bind to it; tests override what they drive. */
+function mockComposition(overrides: Partial<PluginComposition> = {}): PluginComposition {
+  return {
+    live: true, persist: true, view: null, plugins: null, bundles: null,
+    entries: [], bundleRows: [], error: '', notice: '', busy: false, busyRow: '',
+    draft: null, dirty: false, applied: false, pending: 0,
+    setEntryDesired: vi.fn(), setBundleDesired: vi.fn(), applyLive: vi.fn(async () => {}),
+    save: vi.fn(async () => {}), discard: vi.fn(), refresh: vi.fn(),
+    ...overrides,
+  }
+}
+
+function renderTab(state: Partial<PluginManagerState> = {}, config: Partial<ConfigLedger> = {}, bodies: SlotBodies = {}, composition: PluginComposition = mockComposition()) {
   const store = createSnapshotStore<PluginManagerState>({ ...READY, ...state })
   const ledger = createSnapshotStore<ConfigLedger>({ ...NO_CONFIG, ...config })
   const actions = {
@@ -110,6 +123,7 @@ function renderTab(state: Partial<PluginManagerState> = {}, config: Partial<Conf
   const props = {
     t,
     resolveText: enText,
+    composition,
     ...actions,
     usePluginManager: bindSnapshotSelector(store),
     useConfigLedger: bindSnapshotSelector(ledger),
@@ -169,16 +183,14 @@ describe('PluginManagerPage', () => {
       ],
       busy: ['dsh-protected'],
     })
-    const cards = screen.getAllByRole('listitem')
-    // The Official group comes first.
+    const cards = screen.getAllByRole('listitem').filter(item => item.hasAttribute('data-plugin-package'))
+    // One list in display-title order: the scoped name first, the official beta next, then the rest.
     expect(cards.map(card => card.getAttribute('data-plugin-package'))).toEqual([
-      '@deepseek-ai/dsh-experimental-agent-team-profile', 'dsh-better-sidebar', 'dsh-broken', 'dsh-protected', '@acme/dsh-tool', 'dsh-selected',
+      '@acme/dsh-tool', '@deepseek-ai/dsh-experimental-agent-team-profile', 'dsh-better-sidebar', 'dsh-broken', 'dsh-protected', 'dsh-selected',
     ])
-    expect(cards.map(card => card.getAttribute('data-plugin-status'))).toEqual(['disabled', 'running', 'problem', 'running', 'disabled', 'problem'])
-    // Each group heads with its title and its bare count; the official bundle carries its beta tag, no official tag.
-    expect(screen.getByRole('heading', { name: en.bundlesTitle })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: en.officialTitle })).toBeTruthy()
-    expect([...document.querySelectorAll('[data-plugin-count]')].map(count => count.textContent)).toEqual(['1', '5'])
+    expect(cards.map(card => card.getAttribute('data-plugin-status'))).toEqual(['disabled', 'disabled', 'running', 'problem', 'running', 'problem'])
+    // Every row carries its kind tag; the official bundle adds its beta tag.
+    expect(screen.getAllByText(en.listKindBundle)).toHaveLength(6)
     expect(screen.getAllByText(en.statusBeta)).toHaveLength(1)
     // A scoped name keeps its scope as its technical identity.
     expect(screen.getByRole('switch', { name: en.enableToggle.replace('{name}', '@acme/dsh-tool') })).toHaveProperty('disabled', false)
@@ -209,10 +221,9 @@ describe('PluginManagerPage', () => {
         pkg({ name: '@deepseek-ai/dsh-experimental-agent-team-profile', installed: false, optional: true }),
       ],
     })
-    expect(screen.getAllByRole('listitem').map(card => card.getAttribute('data-plugin-package'))).toEqual([
-      '@deepseek-ai/dsh-experimental-agent-team-profile', '@acme/dsh-base', 'dsh-better-sidebar',
+    expect(screen.getAllByRole('listitem').filter(item => item.hasAttribute('data-plugin-package')).map(card => card.getAttribute('data-plugin-package'))).toEqual([
+      '@acme/dsh-base', '@deepseek-ai/dsh-experimental-agent-team-profile', 'dsh-better-sidebar',
     ])
-    expect([...document.querySelectorAll('[data-plugin-count]')].map(count => count.textContent)).toEqual(['1', '2'])
   })
 
   it.each([false, true])('shows an empty list for built-in bundles with errors and installed=%s', (installed) => {
@@ -223,7 +234,53 @@ describe('PluginManagerPage', () => {
     })
     expect(screen.getByText(en.empty)).toBeTruthy()
     expect(screen.queryAllByRole('listitem')).toHaveLength(0)
-    expect(document.querySelectorAll('[data-plugin-count]')).toHaveLength(0)
+    expect(document.querySelectorAll('[data-plugin-package]')).toHaveLength(0)
+  })
+
+  it('edits the startup draft from a package row and flags the pending difference', () => {
+    const composition = mockComposition({
+      bundleRows: [{ name: 'dsh-better-sidebar', observed: true, desired: false }],
+    })
+    renderTab({ packages: [pkg()] }, {}, {}, composition)
+    const startup = screen.getByRole('checkbox', { name: en.listStartupBundle.replace('{name}', 'dsh-better-sidebar') })
+    expect(startup).toHaveProperty('checked', false)
+    // A desired position that differs from the file's reads as pending on the row itself.
+    expect(screen.getByText(en.listPending)).toBeTruthy()
+    fireEvent.click(startup)
+    expect(composition.setBundleDesired).toHaveBeenCalledWith('dsh-better-sidebar', true)
+  })
+
+  it('drives an official plugin\'s live switch and startup choice through its composition entry', () => {
+    const composition = mockComposition({
+      entries: [{ id: 'bash', observed: 'on', desired: 'off', live: { entryId: 'include:bash' as PluginEntryId, enabled: true, readOnly: false } }],
+    })
+    const { actions } = renderTab({ packages: [] }, { items: [{ id: 'bash', label: 'Shell' }] }, {}, composition)
+    expect(screen.getByText(en.listRunning)).toBeTruthy()
+    expect(screen.getByText(en.listPending)).toBeTruthy()
+    fireEvent.click(screen.getByRole('switch', { name: en.listCurrentEnable.replace('{name}', 'Shell') }))
+    expect(actions.setRowEnabled).toHaveBeenCalledWith('include:bash', false)
+    fireEvent.change(screen.getByRole('combobox', { name: en.listStartupEntry.replace('{name}', 'Shell') }), { target: { value: 'on' } })
+    expect(composition.setEntryDesired).toHaveBeenCalledWith('bash', 'on', undefined)
+  })
+
+  it('filters the unified list by text and by status', () => {
+    const composition = mockComposition({
+      bundleRows: [{ name: 'dsh-better-sidebar', observed: false, desired: true }],
+    })
+    renderTab({
+      packages: [pkg(), pkg({ name: 'dsh-second', enabled: false }), pkg({ name: 'dsh-third' }), pkg({ name: 'dsh-fourth' })],
+    }, { items: [{ id: 'bash', label: 'Shell' }] }, {}, composition)
+    const packages = () => screen.getAllByRole('listitem').filter(item => item.hasAttribute('data-plugin-package'))
+    expect(packages()).toHaveLength(4)
+    fireEvent.change(screen.getByRole('searchbox', { name: en.listFilter }), { target: { value: 'second' } })
+    expect(packages().map(item => item.getAttribute('data-plugin-package'))).toEqual(['dsh-second'])
+    fireEvent.change(screen.getByRole('searchbox', { name: en.listFilter }), { target: { value: '' } })
+    fireEvent.change(screen.getByRole('combobox', { name: en.listStatusAll }), { target: { value: 'disabled' } })
+    expect(packages().map(item => item.getAttribute('data-plugin-package'))).toEqual(['dsh-second'])
+    fireEvent.change(screen.getByRole('combobox', { name: en.listStatusAll }), { target: { value: 'pending' } })
+    expect(packages().map(item => item.getAttribute('data-plugin-package'))).toEqual(['dsh-better-sidebar'])
+    fireEvent.change(screen.getByRole('combobox', { name: en.listStatusAll }), { target: { value: 'enabled' } })
+    expect(packages()).toHaveLength(3)
   })
 
   it('opens an official bundle\'s page with its beta tag and no uninstall, and switches it on', () => {
@@ -235,7 +292,8 @@ describe('PluginManagerPage', () => {
     const detail = document.querySelector('[data-plugin-detail]') as HTMLElement
     expect(within(detail).getByText(en.statusBeta)).toBeTruthy()
     expect(within(detail).queryByRole('button', { name: en.uninstallLabel.replace('{name}', meta.title.en) })).toBeNull()
-    fireEvent.click(within(detail).getByRole('switch', { name: en.enableToggle.replace('{name}', meta.title.en) }))
+    // The live switch sits on the row; the detail repeats none of the row's controls.
+    fireEvent.click(screen.getByRole('switch', { name: en.enableToggle.replace('{name}', meta.title.en) }))
     expect(actions.setEnabled).toHaveBeenCalledExactlyOnceWith('@deepseek-ai/dsh-experimental-agent-team-profile', true)
   })
 
@@ -257,14 +315,15 @@ describe('PluginManagerPage', () => {
     fireEvent.click(screen.getByRole('switch', { name: zh.enableToggle.replace('{name}', meta.title.zh) }))
     expect(actions.setEnabled).toHaveBeenCalledExactlyOnceWith(name, false)
     fireEvent.click(screen.getByRole('button', { name: zh.openDetail.replace('{name}', meta.title.zh) }))
+    const detail = document.querySelector('[data-plugin-detail]') as HTMLElement
     for (const dict of [zh, en]) {
       const meta_ = dict === zh ? { title: meta.title.zh, description: meta.description.zh } : { title: meta.title.en, description: meta.description.en }
       setLanguage(dict)
-      expect(screen.getByRole('heading', { level: 3 }).textContent).toBe(meta_.title)
-      expect(screen.getByText(meta_.description)).toBeTruthy()
-      expect(document.querySelector('[data-plugin-name]')?.textContent).toBe(name)
+      expect(within(detail).getByRole('heading', { level: 3 }).textContent).toBe(meta_.title)
+      expect(within(detail).getByText(meta_.description)).toBeTruthy()
+      expect(within(detail).getByText(name, { selector: 'code' })).toBeTruthy()
       expect(screen.getByRole('switch', { name: dict.enableToggle.replace('{name}', meta_.title) })).toBeTruthy()
-      expect(screen.getByRole('button', { name: dict.uninstallLabel.replace('{name}', meta_.title) })).toBeTruthy()
+      expect(within(detail).getByRole('button', { name: dict.uninstallLabel.replace('{name}', meta_.title) })).toBeTruthy()
     }
     fireEvent.click(screen.getByRole('button', { name: en.uninstallLabel.replace('{name}', meta.title.en) }))
     expect(actions.uninstall).toHaveBeenCalledExactlyOnceWith(name)
@@ -289,21 +348,20 @@ describe('PluginManagerPage', () => {
         { items: [{ id: 'bash', label: 'Shell' }] },
         bodies,
       )
-      const official = document.querySelector('[data-plugin-group="official"]') as HTMLElement
-      expect(within(official).getAllByRole('listitem').map(card => card.getAttribute('data-plugin-item') ?? card.getAttribute('data-plugin-package')))
+      const list = document.querySelector('[data-plugin-list]') as HTMLElement
+      expect(within(list).getAllByRole('listitem').map(card => card.getAttribute('data-plugin-item') ?? card.getAttribute('data-plugin-package')))
         .toEqual(['@deepseek-ai/dsh-experimental-agent-team-profile', 'bash'])
-      expect(document.querySelector('[data-plugin-count]')?.textContent).toBe('2')
-      expect(within(official).getByText('Limits every command.')).toBeTruthy()
-      // An official plugin has no switch of its own: the Host composes it.
-      expect(within(official).queryByRole('switch', { name: en.enableToggle.replace('{name}', 'Shell') })).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: en.openDetail.replace('{name}', 'Shell') }))
+      expect(within(list).getByText('Limits every command.')).toBeTruthy()
+      expect(within(list).getByText(en.listKindItem)).toBeTruthy()
+      // An official plugin without a composition entry carries no switch of its own: the Host composes it.
+      expect(within(list).queryByRole('switch', { name: en.enableToggle.replace('{name}', 'Shell') })).toBeNull()
+      fireEvent.click(within(list).getByRole('button', { name: en.openDetail.replace('{name}', 'Shell') }))
       const detail = document.querySelector('[data-plugin-item-detail="bash"]') as HTMLElement
       expect(within(detail).getByRole('heading', { level: 3 }).textContent).toBe('Shell')
       expect(within(detail).getByText('Limits every command.')).toBeTruthy()
       expect(within(detail).getByRole('form', { name: 'bash form' })).toBeTruthy()
       fireEvent.click(within(detail).getByRole('button', { name: en.backToList }))
       expect(document.querySelector('[data-plugin-item-detail]')).toBeNull()
-      expect(screen.getByRole('heading', { name: en.officialTitle })).toBeTruthy()
     })
 
     it('renders the registrant label in the current locale and falls back to the namespace', () => {
@@ -360,9 +418,10 @@ describe('PluginManagerPage', () => {
     const { setLanguage } = renderTab({ packages: [pkg({ name, meta: { description: { en: 'Third-party description.' } } })] })
     setLanguage(zh)
     fireEvent.click(screen.getByRole('button', { name: zh.openDetail.replace('{name}', name) }))
-    expect(screen.getByRole('heading', { level: 3 }).textContent).toBe(name)
-    expect(screen.getByText('Third-party description.')).toBeTruthy()
-    expect(document.querySelector('[data-plugin-name]')?.textContent).toBe(name)
+    const detail = document.querySelector('[data-plugin-detail]') as HTMLElement
+    expect(within(detail).getByRole('heading', { level: 3 }).textContent).toBe(name)
+    expect(within(detail).getByText('Third-party description.')).toBeTruthy()
+    expect(within(detail).getByText(name, { selector: 'code' })).toBeTruthy()
   })
 
   it('opens a guide under the field and drops an example into it', () => {
@@ -409,7 +468,8 @@ describe('PluginManagerPage', () => {
     expect(within(detail).getByText(en.partOff)).toBeTruthy()
     fireEvent.click(within(detail).getByRole('button', { name: en.uninstallLabel.replace('{name}', 'dsh-better-sidebar') }))
     expect(actions.uninstall).toHaveBeenCalledWith('dsh-better-sidebar')
-    fireEvent.click(within(detail).getByRole('switch', { name: en.enableToggle.replace('{name}', 'dsh-better-sidebar') }))
+    // The live switch sits on the row.
+    fireEvent.click(screen.getByRole('switch', { name: en.enableToggle.replace('{name}', 'dsh-better-sidebar') }))
     expect(actions.setEnabled).toHaveBeenCalledWith('dsh-better-sidebar', false)
     // A problem and a protection the Host reports read on the page in the dictionary's words; the page leaves with the crumb.
     set({ packages: [pkg({ error: { code: 'operation-error', diagnostic: 'unreadable' }, readOnlyReason: 'management-required' })] })

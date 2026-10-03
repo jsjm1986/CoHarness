@@ -145,6 +145,9 @@
     "gateway/admin-ui/src/plugins/config-ledger.ts": [
       "plugin-administration.e2e.ts"
     ],
+    "gateway/admin-ui/src/plugins/composition.ts": [
+      "plugin-administration.e2e.ts"
+    ],
     "gateway/admin-ui/src/plugins/PluginManagerPage.module.css": [
       "plugin-administration.e2e.ts"
     ],

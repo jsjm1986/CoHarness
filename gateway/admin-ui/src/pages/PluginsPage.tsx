@@ -1,4 +1,4 @@
-/** Per-owner plugin composition and live instance management around the upstream plugin workflow. */
+/** Per-owner plugin management: one friendly plugin list over the shared composition, with the entry-level matrix folded below. */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { AdminRequestError, getPluginPolicy, listProjects, listUsers, pluginManagementTarget, setPluginPolicy, type AdminResourcePolicy, type PluginManagementTarget } from '../api.ts'
 import { ErrorBanner, Field, PageHeader, Button, LoadingState, Section, StatusBadge, Switch } from '../components/ui.tsx'
@@ -6,13 +6,14 @@ import { PluginManagerPage } from '../plugins/PluginManagerPage.tsx'
 import { PluginManagerController } from '../plugins/manager-store.ts'
 import { pluginManagementRemote } from '../plugins/transport.ts'
 import { PluginMatrix } from '../plugins/PluginMatrix.tsx'
+import { usePluginComposition, type PluginComposition } from '../plugins/composition.ts'
 import { resolveLocalized } from '../plugins/presentation.ts'
 import { zh } from '../plugins/locales.ts'
 import { ProfileSettingsController } from '../plugins/settings-store.ts'
 import { PluginConfiguration, SETTINGS_OWNER_LABELS } from '../plugins/PluginConfiguration.tsx'
 import { PluginPermissions } from '../components/PluginPermissions.tsx'
 
-function Manager({ target, invalidate }: { target: PluginManagementTarget; invalidate: (message: string) => void }) {
+function Manager({ target, invalidate, composition }: { target: PluginManagementTarget; invalidate: (message: string) => void; composition: PluginComposition }) {
   const [owner, setOwner] = useState<{ controller: PluginManagerController; settings: ProfileSettingsController; abort: AbortController } | null>(null)
   useEffect(() => {
     const abort = new AbortController()
@@ -27,18 +28,22 @@ function Manager({ target, invalidate }: { target: PluginManagementTarget; inval
     window.addEventListener('focus', refresh)
     return () => { controller.dispose(); settings.dispose(); abort.abort(); window.removeEventListener('focus', refresh) }
   }, [target, invalidate])
-  return owner === null ? <LoadingState label="正在连接插件管理" /> : <ManagerView controller={owner.controller} settings={owner.settings} />
+  return owner === null ? <LoadingState label="正在连接插件管理" /> : <ManagerView controller={owner.controller} settings={owner.settings} composition={composition} />
 }
-function ManagerView({ controller, settings }: { controller: PluginManagerController; settings: ProfileSettingsController }) {
+function ManagerView({ controller, settings, composition }: { controller: PluginManagerController; settings: ProfileSettingsController; composition: PluginComposition }) {
   const { hooks, ...actions } = useMemo(() => controller.inject(settings.ledger), [controller, settings])
   const state = useSyncExternalStore(hooks.pluginManager.subscribe, hooks.pluginManager.getSnapshot, hooks.pluginManager.getSnapshot)
   const configuration = useSyncExternalStore(settings.state.subscribe, settings.state.getSnapshot, settings.state.getSnapshot)
   const ledger = useSyncExternalStore(settings.ledger.subscribe, settings.ledger.getSnapshot, settings.ledger.getSnapshot)
   useEffect(() => { if (state.status !== 'idle' && state.status !== 'loading') void settings.load() }, [state.packages, state.status, settings])
+  // A manager-side write moves the same composition the matrix and row controls display.
+  const compositionRef = useRef(composition)
+  useEffect(() => { compositionRef.current = composition })
+  useEffect(() => { if (state.busy.length === 0) compositionRef.current.refresh() }, [state.busy])
   return <><ErrorBanner message={configuration.error} />
     {configuration.error ? <Button onClick={() => { void settings.load() }}>重新读取配置</Button> : null}
     {configuration.loading ? <LoadingState label="正在读取插件配置" /> : null}
-    <PluginManagerPage {...actions}
+    <PluginManagerPage {...actions} composition={composition}
     usePluginManager={selector => selector(state)} useConfigLedger={selector => selector(ledger)} renderSlot={(_name, props, selection) => {
       const view = configuration.namespaces.find(item => item.ns === selection.only)
       if (view === undefined) return <p>此配置已不可用，请重新读取实例。</p>
@@ -101,6 +106,34 @@ function TargetPolicy({ kind, id }: { kind: 'user' | 'project'; id: number }) {
   </div>
 }
 
+/** The startup draft shared by every control on the page, with its save and discard actions. */
+function DraftBar({ composition }: { readonly composition: PluginComposition }) {
+  if (!composition.persist || !composition.dirty) return null
+  return <div className="draftBar" role="status">
+    <span className="draftBarText">启动时 · {composition.pending} 项变更待保存</span>
+    <span className="draftBarActions">
+      <Button disabled={composition.busy} onClick={() => { void composition.save(composition.draft) }}>保存插件组成</Button>
+      <Button variant="secondary" disabled={composition.busy} onClick={() => { composition.discard() }}>放弃修改</Button>
+    </span>
+  </div>
+}
+
+/** The plugin lifecycle as the page teaches it: install code, join the composition, run, then configure. */
+function LifecycleLine() {
+  return <p className="muted pluginLifecycle">插件的生命周期：安装 → 启用 → 运行 → 配置。「当前」开关立即生效并写回文件；「启动时」草稿保存后于下次启动生效。</p>
+}
+
+/** The entry-level matrix the friendly list folds away, open by default while the instance is stopped. */
+function CompositionView({ composition, open }: { readonly composition: PluginComposition; readonly open: boolean }) {
+  return <details className="pluginAdvanced" open={open}>
+    <summary>高级：组成视图（条目级）</summary>
+    <PluginMatrix composition={composition} />
+    {composition.persist && composition.view?.state != null
+      ? <p><Button variant="secondary" disabled={composition.busy} onClick={() => { void composition.save(null) }}>清除启动配置</Button></p>
+      : null}
+  </details>
+}
+
 export function PluginsPage() {
   const [targets, setTargets] = useState<Array<{ key: string; kind: 'user' | 'project'; id: number; label: string }>>([])
   const [selected, setSelected] = useState('')
@@ -135,7 +168,7 @@ export function PluginsPage() {
     return () => { generation.current++; abort.abort() }
   }, [selected, targets])
   return <div className="page">
-    <PageHeader title="插件" description="为用户或项目配置插件组成与授权。「当前」列反映运行或文件中的状态并可即时启停；「启动时」列保存下次启动的插件组成。" />
+    <PageHeader title="插件" description="为用户或项目安装、启用并配置插件。「当前」开关立即生效；「启动时」草稿保存后于下次启动生效。" />
     <Section title="管理对象"><div className="sectionBody">
       <ErrorBanner message={error} />
       <Field label="用户或项目"><select className="select" aria-label="插件管理对象" value={selected} onChange={event => {
@@ -145,29 +178,30 @@ export function PluginsPage() {
       {loading ? <LoadingState label="正在读取插件实例" /> : null}
       {binding === null ? null : <p className="muted">
         {binding.generation === null
-          ? '实例未运行：「当前」列为其文件中的插件组成，此页面不会启动实例。'
+          ? '实例未运行：下方显示其文件中的插件组成，此页面不会启动实例。'
           : `实例运行中 · 代次 ${binding.generation}`}
       </p>}
       {binding === null ? null : <TargetPolicy kind={binding.target.kind} id={binding.target.id} />}
     </div></Section>
-    {binding === null ? null : (
-      <Section title="插件组成">
-        <div className="sectionBody">
-          <PluginMatrix key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} kind={binding.target.kind} id={binding.target.id} target={binding} />
-        </div>
-      </Section>
-    )}
-    {binding === null ? null : binding.generation === null ? (
-      <Section title="安装与实例详情">
-        <div className="sectionBody"><p className="muted">实例未运行：安装、移除与插件详情需实例启动后可用。上方保存的插件组成将于下次启动生效。</p></div>
-      </Section>
-    ) : (
-      <Section title="安装与实例详情">
-        <div className="sectionBody">
-          <div className="adminPluginManager"><Manager key={`${binding.nodeId}:${selected}:${binding.generation}`} target={binding} invalidate={invalidate} /></div>
-        </div>
-      </Section>
-    )}
+    {binding === null ? null : <BoundPlugins key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} binding={binding} invalidate={invalidate} />}
     <PluginPermissions />
   </div>
+}
+
+/** The plugins section once a target binds: the friendly list, the shared draft bar, and the folded composition view. */
+function BoundPlugins({ binding, invalidate }: { readonly binding: PluginManagementTarget; readonly invalidate: (message: string) => void }) {
+  const composition = usePluginComposition(binding.target.kind, binding.target.id, binding, invalidate)
+  const stopped = binding.generation === null
+  return <Section title="插件">
+    <div className="sectionBody">
+      <LifecycleLine />
+      <ErrorBanner message={composition.error} />
+      {composition.notice === '' ? null : <p role="status" className="muted">{composition.notice}</p>}
+      {stopped
+        ? <p className="muted">实例未运行：安装、卸载、当前启停与详情需实例启动后可用；下方「启动时」仍可编辑并于下次启动生效。</p>
+        : <div className="adminPluginManager"><Manager target={binding} invalidate={invalidate} composition={composition} /></div>}
+      <DraftBar composition={composition} />
+      <CompositionView composition={composition} open={stopped} />
+    </div>
+  </Section>
 }
