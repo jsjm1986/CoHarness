@@ -10,7 +10,7 @@
 
 ## 决定
 
-组合作用域现在按 `ACCOUNT_FIELDS` 路由每次 `set`/`unset`：白名单字段走当前权威源（账户，或 404/501 回退后的 Host），其余字段直接走 Host 作用域。账户层激活期间 Host 订阅保持安装，发布的快照合并两个分区：`value`/`base`/`user` 的白名单键取账户层、其余取 Host 层，`write` 上浮两个写状态中更紧急者（error > blocked > saving > idle）。`ACCOUNT_FIELDS` 放在 `account-scope.ts`，与已硬编码同一 wire 契约的镜像命名空间投影相邻；client bundle 纯度门禁止与 `dsh-client-connection` 共享该常量。
+组合作用域现在按 `ACCOUNT_FIELDS` 路由每次 `set`/`unset`：白名单字段走当前权威源，其余字段直接走 Host 作用域。权威源在每次发布时从 `mirror.unsupported` 派生——正常为账户作用域，端点应答 404/501 期间为 Host 作用域——端点恢复后即恢复账户持久化，不会把会话钉在第一次瞬时失败上。两侧订阅保持安装，发布的快照合并两个分区：`value`/`base`/`user` 的白名单键取账户层、其余取 Host 层，`write` 发布最近被替换的一侧状态，任一通道的后续写入都能清除先前的失败而不是把第一个终态错误钉在行上，真实失败也照常上浮。`ACCOUNT_FIELDS` 放在 `account-scope.ts`，与已硬编码同一 wire 契约的镜像命名空间投影相邻；client bundle 纯度门禁止与 `dsh-client-connection` 共享该常量。
 
 ## 文件
 

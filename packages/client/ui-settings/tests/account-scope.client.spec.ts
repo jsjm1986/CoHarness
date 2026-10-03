@@ -473,6 +473,10 @@ describe('account settings scope', () => {
     hostSnapshot.write = { status: 'error', code: 'host-write', message: 'host write failed' }
     hostListener?.()
     expect(composite.getSnapshot().write).toEqual({ status: 'error', code: 'host-write', message: 'host write failed' })
+    // A later write on the account leg supersedes the earlier terminal state
+    // instead of leaving the merged row pinned to the stale error.
+    await composite.set('chatFontSize', 16)
+    expect(composite.getSnapshot().write).toEqual({ status: 'idle' })
     await composite.dispose()
   })
 

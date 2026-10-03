@@ -357,10 +357,11 @@ export class AccountOrHostSettingsScopeController<T> implements SettingsScope<T>
   private readonly store: SnapshotStore<SettingsScopeSnapshot<T>>
   private readonly account: AccountSettingsScopeController<T>
   private readonly accountFields: readonly string[]
-  private active: SettingsScope<T>
   private accountStop: (() => void) | undefined
   private readonly hostStop: () => void
   private disposed = false
+  /** Per-source sequence of the latest write-state replacement, for merging by recency. */
+  private writeRecency = { account: { state: { status: 'idle' } as SettingsWriteState, seq: 0 }, host: { state: { status: 'idle' } as SettingsWriteState, seq: 0 }, next: 0 }
 
   constructor(
     account: AccountSettingsScopeController<T>,
@@ -369,23 +370,14 @@ export class AccountOrHostSettingsScopeController<T> implements SettingsScope<T>
     namespace: string,
   ) {
     this.account = account
-    this.active = account
     this.accountFields = ACCOUNT_FIELDS[namespace] ?? []
     this.store = createSnapshotStore(this.mergedSnapshot())
-    this.accountStop = account.subscribe(() => {
-      if (this.mirror.getSnapshot().unsupported) {
-        this.switchToHost()
-        return
-      }
-      this.publish()
-    })
+    this.accountStop = account.subscribe(() => { this.publish() })
     // Fields the account endpoint does not own read and write through the Host
     // scope even while the account layer is active, so the Host subscription
     // stays installed rather than arriving with a fallback switch.
     this.hostStop = host.subscribe(() => { this.publish() })
-    void this.mirror.ensure().then(() => {
-      if (!this.disposed && this.mirror.getSnapshot().unsupported) this.switchToHost()
-    })
+    void this.mirror.ensure().then(() => { this.publish() })
   }
 
   /* jscpd:ignore-start -- parallel SettingsScope implementations share the
@@ -419,12 +411,14 @@ export class AccountOrHostSettingsScopeController<T> implements SettingsScope<T>
     return this.accountFields.includes(field) ? this.active : this.host
   }
 
-  private switchToHost(): void {
-    if (this.active === this.host || this.disposed) return
-    this.active = this.host
-    this.accountStop?.()
-    this.accountStop = undefined
-    this.publish()
+  /**
+   * The authoritative source for account-owned fields: Host while the mirror
+   * marks the endpoint unsupported, the account scope otherwise. Deriving it
+   * per publication lets a recovered endpoint resume account persistence
+   * instead of pinning the session to the first transient failure.
+   */
+  private get active(): SettingsScope<T> {
+    return this.mirror.getSnapshot().unsupported ? this.host : this.account
   }
 
   private publish(): void {
@@ -445,8 +439,20 @@ export class AccountOrHostSettingsScopeController<T> implements SettingsScope<T>
       value: mergeSectionLayer(host.value, account.value, this.accountFields) as T | undefined,
       base: mergeSectionLayer(host.base, account.base, this.accountFields),
       user: mergeSectionLayer(host.user, account.user, this.accountFields),
-      write: mergeWrite(account.write, host.write),
+      write: this.mergedWrite(account.write, host.write),
     }
+  }
+
+  /**
+   * Publish the write state most recently replaced on either source. Recency
+   * lets a later write clear an earlier terminal error instead of pinning
+   * the worst state forever on the merged row.
+   */
+  private mergedWrite(account: SettingsWriteState, host: SettingsWriteState): SettingsWriteState {
+    const recency = this.writeRecency
+    if (!Object.is(account, recency.account.state)) recency.account = { state: account, seq: ++recency.next }
+    if (!Object.is(host, recency.host.state)) recency.host = { state: host, seq: ++recency.next }
+    return recency.host.seq > recency.account.seq ? recency.host.state : recency.account.state
   }
 }
 
@@ -465,12 +471,6 @@ function mergeSectionLayer(host: unknown, account: unknown, fields: readonly str
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-/** Surface the more urgent of the two source write states to the row. */
-function mergeWrite(account: SettingsWriteState, host: SettingsWriteState): SettingsWriteState {
-  const rank = { idle: 0, saving: 1, blocked: 2, error: 3 } as const
-  return rank[host.status] > rank[account.status] ? host : account
 }
 
 async function disposeScope(scope: SettingsScope<unknown>): Promise<void> {
