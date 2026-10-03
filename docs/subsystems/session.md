@@ -793,6 +793,25 @@ The backends that consume this contract are on [persistence.md](persistence.md).
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxsessioncontroller--apisessioncontroller"></a>
+
+### `ctx.sessionController` — `ApiSessionController`
+
+The Host Session-resolution surface published as the `sessionController` cordis service.
+
+```ts cordis-catalog
+/**
+ * Resolve one Session identity to its live Agent.
+ * @param sessionId - the Session identity to resolve.
+ * @returns the live Agent, or a typed refusal preserving the resolver's code.
+ */
+resolveAgent(sessionId: SessionId): Promise<ApiRemoteAgentResult>
+```
+
+Types: [SessionId](core.md)
+
+Source: [`packages/api/remotes/src/session-controller.ts`](../../packages/api/remotes/src/session-controller.ts)
+
 <a id="ctxsessions--sessionstore"></a>
 
 ### `ctx.sessions` — `SessionStore`

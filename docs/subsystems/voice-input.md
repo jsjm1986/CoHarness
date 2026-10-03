@@ -124,9 +124,10 @@ async *follow(caller: AbortSignal): AsyncIterable<SpeechSnapshot>
 snapshot(): SpeechSnapshot
 
 /**
- * Persist changed selection fields into this plugin's profile entry; the resulting language must be accepted by the selected provider.
+ * Persist changed selection fields into the `speech-to-text` settings section; the resulting
+ * language must be accepted by the selected provider.
  * @param patch - explicit provider or language changes.
- * @returns after the profile write and the live update it applies.
+ * @returns after the settings write commits.
  */
 async configure(patch: SpeechSelectionPatch): Promise<void>
 
