@@ -6,8 +6,8 @@ import { createClientTest, webApp } from '@deepseek-ai/dsh-client-test-runtime/s
 import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { DesktopKeyboardApi, DesktopShortcutInput, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/protocol'
-import type { createSettingsShellStore } from '../../ui-settings-general/src/client/shell-store.ts'
-import type { createLayoutStore } from '../../ui-layout/src/client/stores.ts'
+import type { createSettingsShellStore } from '@deepseek-ai/dsh-client-ui-settings-general/src/client/shell-store.ts'
+import type { createLayoutStore } from '@deepseek-ai/dsh-client-ui-layout/src/client/stores.ts'
 import type { ReferenceInjected } from '../src/client/Reference.tsx'
 import type { createShortcutsStore } from '../src/client/store.ts'
 

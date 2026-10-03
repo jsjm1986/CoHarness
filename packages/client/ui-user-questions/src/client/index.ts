@@ -66,7 +66,7 @@ const REJECTION_WIRE: Record<'ASK_CANCELLED' | 'ASK_TIMED_OUT', 'cancelled' | 't
   ASK_CANCELLED: 'cancelled',
   ASK_TIMED_OUT: 'timed-out',
 }
-const REJECTION_MESSAGE: Record<'ASK_CANCELLED' | 'ASK_TIMED_OUT', string> = {
+const REJECTION_DETAIL: Record<'ASK_CANCELLED' | 'ASK_TIMED_OUT', string> = {
   ASK_CANCELLED: 'the user cancelled ask_user_question',
   ASK_TIMED_OUT: 'ask_user_question timed out before the user answered',
 }
@@ -336,7 +336,7 @@ function respondRejection(wait: PendingWait<'question'>, code: WireRejection): v
   try {
     void wait.respond({
       ok: false,
-      error: { code: REJECTION_WIRE[code], message: REJECTION_MESSAGE[code], details: {} },
+      error: { code: REJECTION_WIRE[code], message: REJECTION_DETAIL[code], details: {} },
     })
   } catch {
     // A wait already settled by its resolved frame rejects nothing twice.

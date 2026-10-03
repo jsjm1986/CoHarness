@@ -83,7 +83,6 @@
     "@deepseek-ai/dsh-tool-terminal": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-user-questions": "workspace:*",
-    "@deepseek-ai/dsh-util-workspace-path": "workspace:*",
     "@testing-library/react": "^16.1.0",
     "@types/react": "~19.2.7",
     "react": "^19.3.0",

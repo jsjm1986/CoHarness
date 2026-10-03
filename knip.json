@@ -89,7 +89,8 @@
         "*/tests/**/*.e2e.ts",
         "*/tests/**/*.snapshot.ts",
         "acp-agent/tests/fixtures/subagent-activation-limit.ts",
-        "headless-agent/tests/fixtures/serial-preset.ts"
+        "headless-agent/tests/fixtures/serial-preset.ts",
+        "acp-agent/tests/fixtures/shell/tool-pwsh/driver.ts"
       ],
       "project": [
         "**/*.ts"
@@ -396,6 +397,18 @@
         "src/**/*.ts"
       ]
     },
+    "packages/util/native-command": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreBinaries": [
+        "gio"
+      ]
+    },
     "packages/attachment/attachment": {
       "project": [
         "src/**/*.ts"
@@ -498,6 +511,47 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ]
+    },
+    "packages/experimental/agent-team": {
+      "entry": [
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/experimental/speech-to-text-sensevoice": {
+      "entry": [
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "sherpa-onnx-node"
+      ]
+    },
+    "packages/experimental/schedule-bundle": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/experimental/voice-input-bundle": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
       ]
     },
     "packages/llm/llm-deepseek": {
@@ -838,6 +892,9 @@
         "@deepseek-ai/.+",
         "ws",
         "@types/ws"
+      ],
+      "ignore": [
+        "tests/profiles/headless/tests/profile-resolution.ts"
       ]
     },
     "packages/client/modules": {
@@ -952,6 +1009,10 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app"
       ]
     },
     "packages/session/session-persistence-sqlite": {
@@ -1056,18 +1117,22 @@
         "@deepseek-ai/cordis-plugin-timer",
         "metadata-lib",
         "resolution-lib",
-        "@scope/resolution-lib",
         "real-name",
         "missing-local",
         "undeclared-local",
         "conditional-lib",
         "broken-lib",
         "added-lib",
-        "legacy-missing"
+        "legacy-missing",
+        "@deepseek-ai/dsh-core",
+        "@scope/tools",
+        "left-pad",
+        "my-plugin"
       ],
       "ignoreUnresolved": [
         "./relative.cjs",
-        "#.+"
+        "#.+",
+        "./caller.cjs"
       ]
     },
     "packages/bundle/sdk-minimal": {
@@ -1125,8 +1190,14 @@
     },
     "packages/experimental/agent-team-profile": {
       "ignoreDependencies": [
-        "@deepseek-ai/dsh-experimental-agent-team",
-        "@deepseek-ai/dsh-experimental-tool-agent-team"
+        "@deepseek-ai/.+"
+      ],
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
       ]
     },
     "packages/experimental/auto-review": {
@@ -1332,6 +1403,33 @@
       ],
       "project": [
         "src/**/*.ts"
+      ]
+    },
+    "packages/client/ui-plugin-manager": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+      ],
+      "ignoreDependencies": [
+        "zod"
+      ]
+    },
+    "packages/experimental/api-speech-to-text": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "zod"
       ]
     }
   }

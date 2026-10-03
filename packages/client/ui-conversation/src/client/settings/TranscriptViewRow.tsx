@@ -27,12 +27,19 @@ export type TranscriptViewRowProps =
   & PropsLocale<'conversation'>
   & InjectFace<TranscriptViewRowInjected>
 
+const OPTION_LABELS: Record<TranscriptViewMode, ConversationKey> = {
+  compact: 'settings.transcript.compact',
+  standard: 'settings.transcript.standard',
+  detailed: 'settings.transcript.detailed',
+  verbose: 'settings.transcript.verbose',
+}
+
 const OPTIONS: readonly {
   id: TranscriptViewMode
   label: ConversationKey
 }[] = TRANSCRIPT_VIEW_MODES.map(id => ({
   id,
-  label: `settings.transcript.${id}` as const,
+  label: OPTION_LABELS[id],
 }))
 
 /**

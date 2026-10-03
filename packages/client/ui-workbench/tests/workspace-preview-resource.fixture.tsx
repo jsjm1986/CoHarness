@@ -16,7 +16,7 @@ export function previewRequest(
 }
 
 /** The test stand-in for the tab's `useWorkspaceResource` hook plus callbacks. */
-export function usePreviewResource(
+function usePreviewResource(
   resources: WorkspaceResourceRegistry,
   request: WorkspaceResourceOpenRequest,
 ): WorkspacePreviewResource {

@@ -474,9 +474,9 @@ export function createUserDocClient(privateResourceUrl: (url: string) => string 
       })
     },
     uploadToScope: (scope, file, directoryId, signal, onProgress) => {
-      const query = new URL(privateResourceUrl(`${SCOPED_UPLOAD_PATH}${scopeQuery(scope)}`), 'http://dsh.internal').search
+      const query = new URL(privateResourceUrl(`${SCOPED_UPLOAD_PATH.slice(1)}${scopeQuery(scope)}`), 'http://dsh.internal').search
       return resumableUpload(file, directoryId, signal, onProgress, {
-        root: SCOPED_UPLOAD_PATH, query, resumeNamespace: query,
+        root: SCOPED_UPLOAD_PATH.slice(1), query, resumeNamespace: query,
         requestJson,
         networkError: uploadNetworkError,
         responseError: errorFrom,

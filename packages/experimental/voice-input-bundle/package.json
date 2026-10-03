@@ -42,9 +42,7 @@
     "@deepseek-ai/cordis": "workspace:~"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "workspace:~",
-    "@deepseek-ai/cordis-plugin-include": "workspace:~",
-    "js-yaml": "^5.2.3"
+    "@deepseek-ai/cordis": "workspace:~"
   },
   "dsh": {
     "bundle": {

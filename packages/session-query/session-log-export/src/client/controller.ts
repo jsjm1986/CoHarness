@@ -2,7 +2,7 @@
 
 import { createSnapshotStore, type SessionId, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { readApiResponseText, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
-import { SESSION_LOG_EXPORT_PATH } from '../routes.ts'
+import { SESSION_LOG_EXPORT_ROUTE } from '../routes.ts'
 
 /** Download phases presented by the shared modal. */
 export type SessionLogDownloadStatus = 'downloading' | 'success' | 'error'
@@ -115,7 +115,7 @@ export class SessionLogDownloadController {
   private async run(sessionId: SessionId, signal: AbortSignal): Promise<void> {
     this.publish(sessionId, { open: true, status: 'downloading', error: null })
     try {
-      const url = new URL(SESSION_LOG_EXPORT_PATH, hostBase())
+      const url = new URL(SESSION_LOG_EXPORT_ROUTE, hostBase())
       const address = parseClientSessionKey(sessionId)
       const original = address?.sessionId ?? sessionId
       url.searchParams.set('sessionId', original)

@@ -73,7 +73,7 @@ export interface PersistenceSchemaInventory {
 }
 
 /** Type metadata with an explicit graph when roots cannot reconstruct it exactly. */
-export interface PersistenceTypeIndex extends Omit<PersistenceType, 'schema'> {
+interface PersistenceTypeIndex extends Omit<PersistenceType, 'schema'> {
   readonly schema?: CanonicalSchema
 }
 

@@ -62,7 +62,6 @@
     "@deepseek-ai/dsh-managed-data": "workspace:*",
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
-    "@types/js-yaml": "^4.0.9",
     "@types/semver": "^7.8.0"
   }
 }

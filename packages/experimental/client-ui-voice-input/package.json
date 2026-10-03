@@ -31,7 +31,6 @@
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",
-  "dependencies": {},
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-api-gateway": "workspace:*",

@@ -81,6 +81,10 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'packages/examples/acp-demo/tests/built-bin.e2e.ts', upstream: ['cordis', 'cosmokit', 'schemastery'] },
   // `Symbol.for('schemastery')` and the `vendor:` metadata field are upstream identifiers.
   { file: 'vendor/schemastery/src/index.ts', upstream: ['schemastery'] },
+  // The vendored package marks its Config schemas with `Symbol.for('schemastery')`;
+  // detecting that marker keeps the upstream identifier or interop breaks.
+  { file: 'packages/boot/app-boot/src/config-schema/native.ts', upstream: ['schemastery'] },
+  { file: 'packages/boot/app-boot/tests/config-schema.spec.ts', upstream: ['schemastery'] },
   // The `~standard.vendor` spec identifier is the upstream name, not a package specifier.
   { file: 'vendor/loader/src/config/diff.ts', upstream: ['schemastery'] },
   // Asserts the vendored-manifest table, which gains an upstream-name column.
@@ -94,6 +98,8 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'packages/client/ui-agent-preset/tests/apply.client.spec.ts', upstream: ['cordis'] },
   { file: 'packages/client/ui-agent-preset/tests/locales.client.spec.ts', upstream: ['cordis'] },
   { file: 'packages/client/ui-agent-preset/tests/section.client.spec.tsx', upstream: ['cordis'] },
+  // The guide dialog keys its preset blurbs by the `cordis` preset id, not a package.
+  { file: 'packages/client/ui-agent-preset/src/client/PresetGuideDialog.tsx', upstream: ['cordis'] },
   // TODO(alpha.2): restore apps/cli/tests/web-agent-presets.e2e.ts with the
   // shipped-presets port that exports SHIPPED_PRESET_ROOT.
   { file: 'apps/web/tests/agent-preset-authoring.e2e.ts', upstream: ['cordis'] },

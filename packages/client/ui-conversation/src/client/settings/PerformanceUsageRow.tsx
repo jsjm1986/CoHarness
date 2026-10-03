@@ -27,12 +27,17 @@ export type PerformanceUsageRowProps =
   & PropsLocale<'conversation'>
   & InjectFace<PerformanceUsageRowInjected>
 
+const OPTION_LABELS: Record<PerformanceUsageMode, ConversationKey> = {
+  compact: 'settings.performance.compact',
+  detailed: 'settings.performance.detailed',
+}
+
 const OPTIONS: readonly {
   id: PerformanceUsageMode
   label: ConversationKey
 }[] = PERFORMANCE_USAGE_MODES.map(id => ({
   id,
-  label: `settings.performance.${id}` as const,
+  label: OPTION_LABELS[id],
 }))
 
 /**

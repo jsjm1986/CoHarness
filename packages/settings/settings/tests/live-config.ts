@@ -1,6 +1,5 @@
 /** Test fixtures using the same Loader updates as profile reconciliation. */
-import { Context, resolveConfig, type Fiber, type Plugin } from '@deepseek-ai/cordis'
-import { expect, vi } from 'vitest'
+import { Context, resolveConfig, type Plugin } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 
 function merge(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
@@ -38,23 +37,4 @@ export async function liveConfig(ctx: Context, plugin: Plugin, initial: object =
     update: (patch: Record<string, unknown>) => replace(merge(entry.options.config as Record<string, unknown>, patch)),
     replace,
   }
-}
-
-/** Assert a plugin keeps its own fiber off the generated pages while Settings is mounted and withdraws on disposal.
- * @param mount Starts the plugin under test in the supplied context and returns its fiber.
- */
-export async function omitsGeneratedPage(mount: (ctx: Context) => Fiber | Promise<Fiber>): Promise<void> {
-  const ctx = new Context()
-  const release = vi.fn()
-  const configure = vi.fn(() => release)
-  ctx.provide('settings', { configure } as never)
-  const fiber = await mount(ctx)
-  await ctx.fiber.await()
-  expect(configure).toHaveBeenCalledOnce()
-  const [policy, owner] = configure.mock.calls[0] as unknown[]
-  expect(policy).toEqual({ auto: false })
-  // Identity only: printing a Fiber walks Context proxies.
-  expect(Object.is(owner, fiber)).toBe(true)
-  await fiber.dispose()
-  expect(release).toHaveBeenCalledOnce()
 }
