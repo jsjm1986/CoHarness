@@ -14,7 +14,7 @@ import type {} from '@deepseek-ai/dsh-jobs/view'
 import type {} from '@deepseek-ai/dsh-schedule/client'
 import type {} from '@deepseek-ai/dsh-subagent/client'
 import {
-  Button, IconArchiveOutline20, IconUnarchiveOutline16, MenuItemButton, Modal, Tooltip,
+  Button, IconArchiveOutline16, IconUnarchiveOutline16, MenuItemButton, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   ArchiveSessionInjected, SessionArchiveConfirmInjected, SessionArchiveConfirmProps, SessionArchiveConfirmRequest,
@@ -37,7 +37,7 @@ export function ArchiveSessionMenuItem({
   return (
     <MenuItemButton
       shortcut={archived ? undefined : shortcut}
-      icon={archived ? <IconUnarchiveOutline16 size={14} /> : <IconArchiveOutline20 size={14} />}
+      icon={archived ? <IconUnarchiveOutline16 size={14} /> : <IconArchiveOutline16 size={14} />}
       onSelect={() => {
         setMenuOpen(false)
         ;(archived ? unarchiveSession : archiveSession)(sessionId)
@@ -65,7 +65,7 @@ export function ArchiveSessionRowButton({
         aria-label={t(archived ? 'menu.unarchiveSession' : 'menu.archiveSession')}
         onClick={() => { (archived ? unarchiveSession : archiveSession)(sessionId) }}
       >
-        {archived ? <IconUnarchiveOutline16 size={14} /> : <IconArchiveOutline20 size={14} />}
+        {archived ? <IconUnarchiveOutline16 size={14} /> : <IconArchiveOutline16 size={14} />}
       </button>
     </Tooltip>
   )

@@ -932,30 +932,31 @@ export const IconArchiveOutline20 = ({ size = 20, className }: IconProps) => (
   </svg>
 )
 
-/** Sixteen-pixel companion of IconArchiveOutline20 for row and menu glyphs. */
+/** ic_ds_archive_outline_16 — upstream 16-grid outline box; 1px strokes sit on half-pixel centers. */
 export const IconArchiveOutline16 = ({ size = 16, className }: IconProps) => (
-  <IconArchiveOutline20 size={size} className={className} />
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" strokeWidth={1}>
+    <path d="M13.5 2.5H2.5C1.94772 2.5 1.5 2.94772 1.5 3.5V4.5C1.5 5.05228 1.94772 5.5 2.5 5.5H13.5C14.0523 5.5 14.5 5.05228 14.5 4.5V3.5C14.5 2.94772 14.0523 2.5 13.5 2.5Z" stroke="currentColor" />
+    <path d="M2.5 5.5V13.5C2.5 13.7652 2.60536 14.0196 2.79289 14.2071C2.98043 14.3946 3.23478 14.5 3.5 14.5H12.5C12.7652 14.5 13.0196 14.3946 13.2071 14.2071C13.3946 14.0196 13.5 13.7652 13.5 13.5V5.5" stroke="currentColor" />
+    <path d="M6.5 9.5H9.5" stroke="currentColor" />
+  </svg>
 )
 
+/** IconArchiveOutline16's restore companion: same box, the handle replaced by an up arrow. */
 export const IconUnarchiveOutline16 = ({ size = 16, className }: IconProps) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      fillRule="evenodd"
-      clipRule="evenodd"
-      d="M15.8659 2.05975C17.2603 2.05995 18.3913 3.19096 18.3914 4.58527V5.4874C18.3914 6.02747 18.2192 6.52672 17.9303 6.93735C17.9336 6.96524 17.9388 6.99318 17.9388 7.02195V12.8884C17.9388 13.6345 17.9395 14.2379 17.8996 14.7254C17.8642 15.1593 17.7936 15.5499 17.6373 15.9141L17.5654 16.0685C17.278 16.6328 16.8405 17.1046 16.3038 17.434L16.0679 17.5661C15.66 17.7739 15.2196 17.8598 14.7237 17.9003C14.2362 17.9401 13.6327 17.9405 12.8867 17.9405H7.11122C6.36511 17.9405 5.76171 17.9401 5.27418 17.9003C4.84051 17.8649 4.44949 17.7952 4.08545 17.6391L3.93104 17.5661C3.36673 17.2785 2.89392 16.8414 2.56465 16.3044L2.43245 16.0685C2.22473 15.6608 2.13878 15.2211 2.09825 14.7254C2.05841 14.2379 2.05912 13.6345 2.05912 12.8884V7.02195C2.05912 6.99284 2.06422 6.96449 2.06758 6.93629C1.77931 6.52592 1.60858 6.02687 1.60858 5.4874V4.58527C1.60876 3.19084 2.73962 2.05975 4.1341 2.05975H15.8659ZM16.4984 7.92936C16.296 7.98169 16.0847 8.01288 15.8659 8.01291H4.1341C3.91478 8.01291 3.70246 7.98194 3.49955 7.92936V12.8884C3.49955 13.6582 3.50053 14.1927 3.53445 14.608C3.56769 15.0146 3.62923 15.244 3.71635 15.415L3.7925 15.5514C3.98339 15.8627 4.25749 16.1165 4.58464 16.2833L4.72529 16.3435C4.88095 16.3993 5.08638 16.4402 5.39158 16.4651C5.80685 16.4991 6.34138 16.5001 7.11122 16.5001H12.8867C13.6564 16.5001 14.1911 16.499 14.6063 16.4651C15.0128 16.432 15.2423 16.3703 15.4133 16.2833L15.5508 16.2061C15.8618 16.0152 16.116 15.7419 16.2827 15.415L16.3429 15.2732C16.3985 15.1177 16.4396 14.9128 16.4645 14.608C16.4985 14.1927 16.4984 13.6583 16.4984 12.8884V7.92936ZM4.1341 3.50019C3.53511 3.50019 3.0492 3.98631 3.04902 4.58527V5.4874C3.04902 6.08649 3.535 6.57248 4.1341 6.57248H15.8659C16.4648 6.57228 16.951 6.08638 16.951 5.4874V4.58527C16.9509 3.98644 16.4647 3.50038 15.8659 3.50019H4.1341Z"
-      fill="currentColor"
-    />
-    <path d="M10 14.1V10.1M7.85 12.05L10 9.9L12.15 12.05" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" strokeWidth={1}>
+    <path d="M13.5 2.5H2.5C1.94772 2.5 1.5 2.94772 1.5 3.5V4.5C1.5 5.05228 1.94772 5.5 2.5 5.5H13.5C14.0523 5.5 14.5 5.05228 14.5 4.5V3.5C14.5 2.94772 14.0523 2.5 13.5 2.5Z" stroke="currentColor" />
+    <path d="M2.5 5.5V13.5C2.5 13.7652 2.60536 14.0196 2.79289 14.2071C2.98043 14.3946 3.23478 14.5 3.5 14.5H12.5C12.7652 14.5 13.0196 14.3946 13.2071 14.2071C13.3946 14.0196 13.5 13.7652 13.5 13.5V5.5" stroke="currentColor" />
+    <path d="M8 12V8.5M6.25 10.25 8 8.5l1.75 1.75" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 )
 
 /** Archived-filter menu glyph: archive box with a check, the "only archived" choice. */
 export const IconArchiveCheckOutline16 = ({ size = 16, className }: IconProps) => (
   <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none"
-    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" strokeWidth="1.25">
-    <rect x="1.9" y="2.1" width="12.2" height="3.4" rx="1.1" />
-    <path d="M2.95 5.7v4.8a2.9 2.9 0 0 0 2.9 2.9h4.3a2.9 2.9 0 0 0 2.9-2.9V5.7" />
-    <path d="m6 9.35 1.4 1.4 2.6-2.6" />
+    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" strokeWidth={1}>
+    <path d="M13.5 2.5H2.5C1.94772 2.5 1.5 2.94772 1.5 3.5V4.5C1.5 5.05228 1.94772 5.5 2.5 5.5H13.5C14.0523 5.5 14.5 5.05228 14.5 4.5V3.5C14.5 2.94772 14.0523 2.5 13.5 2.5Z" />
+    <path d="M2.5 5.5V13.5C2.5 13.7652 2.60536 14.0196 2.79289 14.2071C2.98043 14.3946 3.23478 14.5 3.5 14.5H12.5C12.7652 14.5 13.0196 14.3946 13.2071 14.2071C13.3946 14.0196 13.5 13.7652 13.5 13.5V5.5" />
+    <path d="m5.75 10 1.5 1.5 3-3" />
   </svg>
 )
 
@@ -966,16 +967,16 @@ export const IconArchiveOffOutline16 = ({ size = 16, className }: IconProps) => 
   const maskId = `dsh-archive-off-${useId().replaceAll(':', '')}`
   return (
     <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none"
-      stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" strokeWidth="1.25">
+      stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" strokeWidth={1}>
       <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16">
         <rect x="0" y="0" width="16" height="16" fill="white" stroke="none" />
-        <path d="m2.2 1.3 11.6 12.8" stroke="black" strokeWidth="4.25" />
+        <path d="m2.5 13.5 11-11" stroke="black" strokeWidth="3.5" />
       </mask>
       <g mask={`url(#${maskId})`}>
-        <rect x="1.9" y="2.1" width="12.2" height="3.4" rx="1.1" />
-        <path d="M2.95 5.7v4.8a2.9 2.9 0 0 0 2.9 2.9h4.3a2.9 2.9 0 0 0 2.9-2.9V5.7" />
+        <path d="M13.5 2.5H2.5C1.94772 2.5 1.5 2.94772 1.5 3.5V4.5C1.5 5.05228 1.94772 5.5 2.5 5.5H13.5C14.0523 5.5 14.5 5.05228 14.5 4.5V3.5C14.5 2.94772 14.0523 2.5 13.5 2.5Z" />
+        <path d="M2.5 5.5V13.5C2.5 13.7652 2.60536 14.0196 2.79289 14.2071C2.98043 14.3946 3.23478 14.5 3.5 14.5H12.5C12.7652 14.5 13.0196 14.3946 13.2071 14.2071C13.3946 14.0196 13.5 13.7652 13.5 13.5V5.5" />
       </g>
-      <path d="m2.2 1.3 11.6 12.8" />
+      <path d="m2.5 13.5 11-11" />
     </svg>
   )
 }
@@ -983,27 +984,27 @@ export const IconArchiveOffOutline16 = ({ size = 16, className }: IconProps) => 
 /** View-options menu glyph: a Workspace folder carrying a child branch. */
 export const IconWorkspaceTreeOutline16 = ({ size = 16, className }: IconProps) => (
   <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none"
-    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" strokeWidth="1.25">
-    <path d="M14 12.05c0 .8-.65 1.45-1.46 1.45H3.46C2.65 13.5 2 12.85 2 12.05v-8.1c0-.8.65-1.45 1.46-1.45h2.4c.49 0 .94.24 1.21.65l.5.73c.27.4.73.65 1.21.65h3.76c.8 0 1.46.65 1.46 1.45v6.02Z" />
-    <path d="M8.7 8.1v3M11.2 8.1v3" />
+    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" strokeWidth={1}>
+    <path d="M14.5 12.05c0 .8-.65 1.45-1.46 1.45H3.46c-.8 0-1.46-.65-1.46-1.45v-8.1c0-.8.65-1.45 1.46-1.45h2.4c.49 0 .94.24 1.21.65l.5.73c.27.4.73.65 1.21.65h4.26c.8 0 1.46.65 1.46 1.45v6.02Z" />
+    <path d="M8.7 8.1v3M11.7 8.1v3" />
   </svg>
 )
 
 /** View-options menu glyph: one flat bulleted list. */
 export const IconFlatListOutline16 = ({ size = 16, className }: IconProps) => (
   <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none"
-    stroke="currentColor" strokeLinecap="round" aria-hidden="true" strokeWidth="1.25">
+    stroke="currentColor" strokeLinecap="round" aria-hidden="true" strokeWidth={1}>
     <path d="M6 3.5h7.5M6 8h7.5M6 12.5h7.5" />
-    <path d="M2.6 3.5h.01M2.6 8h.01M2.6 12.5h.01" />
+    <path d="M2.5 3.5h.01M2.5 8h.01M2.5 12.5h.01" />
   </svg>
 )
 
 /** Order menu glyph: up/down chevron pair for the manual-order choice. */
 export const IconChevronsUpDownOutline16 = ({ size = 16, className }: IconProps) => (
   <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none"
-    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" strokeWidth="1.25">
-    <path d="m5.1 6 2.9-2.9L10.9 6" />
-    <path d="m5.1 10 2.9 2.9 2.9-2.9" />
+    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" strokeWidth={1}>
+    <path d="m5 6.5 3-3 3 3" />
+    <path d="m5 9.5 3 3 3-3" />
   </svg>
 )
 
