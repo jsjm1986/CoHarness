@@ -184,20 +184,23 @@ export function Field({
 
 export function Switch({
   label,
+  ariaLabel,
   checked,
   onChange,
   disabled = false,
 }: {
-  label: string
+  label?: string
+  /** Accessible name for icon-less toggles whose cell context already labels them. */
+  ariaLabel?: string
   checked: boolean
   onChange: (checked: boolean) => void
   disabled?: boolean
 }) {
   return (
     <label className="switchControl">
-      <input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} disabled={disabled} />
+      <input type="checkbox" aria-label={ariaLabel} checked={checked} onChange={event => onChange(event.target.checked)} disabled={disabled} />
       <span className="switchTrack" aria-hidden="true"><span /></span>
-      <span>{label}</span>
+      {label === undefined ? null : <span>{label}</span>}
     </label>
   )
 }

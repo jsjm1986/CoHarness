@@ -1,4 +1,4 @@
 - listitem:
-  - button "查看 admin-install": admin-install
+  - button "查看 @fixture/admin-install": "@fixture/admin-install"
   - text: Administrative installation acceptance
-  - switch "启用 admin-install"
+  - switch "启用 @fixture/admin-install"

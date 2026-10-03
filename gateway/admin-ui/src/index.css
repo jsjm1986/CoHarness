@@ -3563,3 +3563,73 @@ a {
   display: flex;
   justify-content: flex-end;
 }
+
+/* Plugin composition matrix: fused live and startup columns on the Plugins page. */
+.pluginMatrix .tableWrap {
+  margin-top: 10px;
+}
+
+.pluginMatrix .matrixFilter {
+  max-width: 260px;
+  margin-top: 4px;
+}
+
+.matrixGroup td {
+  padding-top: 14px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+
+.matrixName {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.matrixName .muted {
+  font-size: 11px;
+}
+
+.matrixModule {
+  font-size: 11px;
+}
+
+.matrixAdvanced {
+  margin-top: 10px;
+}
+
+.matrixAdvanced summary {
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.inlineFields {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.inlineFields .input {
+  max-width: 220px;
+}
+
+.buttonRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.targetPolicy {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.targetPolicyRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

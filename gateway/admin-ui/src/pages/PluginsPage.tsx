@@ -1,11 +1,11 @@
-/** Current-node profile selection around the upstream plugin management workflow. */
+/** Per-owner plugin composition and live instance management around the upstream plugin workflow. */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { listProjects, listUsers, pluginManagementTarget, type PluginManagementTarget } from '../api.ts'
-import { ErrorBanner, Field, PageHeader, Button, LoadingState, Section } from '../components/ui.tsx'
+import { AdminRequestError, getPluginPolicy, listProjects, listUsers, pluginManagementTarget, setPluginPolicy, type AdminResourcePolicy, type PluginManagementTarget } from '../api.ts'
+import { ErrorBanner, Field, PageHeader, Button, LoadingState, Section, StatusBadge, Switch } from '../components/ui.tsx'
 import { PluginManagerPage } from '../plugins/PluginManagerPage.tsx'
 import { PluginManagerController } from '../plugins/manager-store.ts'
 import { pluginManagementRemote } from '../plugins/transport.ts'
-import { DesiredStateEditor } from '../plugins/DesiredStateEditor.tsx'
+import { PluginMatrix } from '../plugins/PluginMatrix.tsx'
 import { resolveLocalized } from '../plugins/presentation.ts'
 import { zh } from '../plugins/locales.ts'
 import { ProfileSettingsController } from '../plugins/settings-store.ts'
@@ -50,6 +50,57 @@ function ManagerView({ controller, settings }: { controller: PluginManagerContro
     t={(key, parameters) => Object.entries(parameters ?? {}).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), zh[key])} /></>
 }
 
+/** The selected owner's plugin-management qualification, editable in place. */
+function TargetPolicy({ kind, id }: { kind: 'user' | 'project'; id: number }) {
+  const [policy, setPolicy] = useState<AdminResourcePolicy | null>(null)
+  const [enabled, setEnabled] = useState(false)
+  const [error, setError] = useState('')
+  const [unavailable, setUnavailable] = useState(false)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    const abort = new AbortController()
+    setPolicy(null); setError(''); setUnavailable(false)
+    void getPluginPolicy(kind, id, abort.signal).then((value) => {
+      if (abort.signal.aborted) return
+      setPolicy(value); setEnabled(value.enabled)
+    }).catch((cause: unknown) => {
+      // Deployments without the PostgreSQL access store have no policies to show.
+      if (abort.signal.aborted) return
+      if (cause instanceof AdminRequestError && cause.status === 503) setUnavailable(true)
+      else setError(String(cause))
+    })
+    return () => { abort.abort() }
+  }, [kind, id])
+  const save = async (next: boolean) => {
+    if (policy === null) return
+    setSaving(true); setError('')
+    try {
+      const result = await setPluginPolicy({ ...policy, enabled: next })
+      setPolicy(result); setEnabled(result.enabled)
+    } catch (cause) {
+      const latest = await getPluginPolicy(kind, id).catch(() => null)
+      if (latest !== null) { setPolicy(latest); setEnabled(latest.enabled) }
+      setError(cause instanceof Error ? `${cause.message}；授权已重置为最新版本。` : String(cause))
+    } finally { setSaving(false) }
+  }
+  if (unavailable) return <p className="muted">此部署未启用授权策略存储，无法在此管理插件资格。</p>
+  if (policy === null) return error === '' ? null : <ErrorBanner message={error} />
+  return <div className="targetPolicy">
+    <div className="targetPolicyRow">
+      <Switch
+        label={kind === 'user' ? '允许此用户在个人空间管理插件' : '允许此项目空间的插件管理'}
+        checked={enabled}
+        disabled={saving}
+        onChange={next => { void save(next) }} />
+      {enabled ? <StatusBadge tone="success">已授权</StatusBadge> : <StatusBadge>未授权</StatusBadge>}
+    </div>
+    <p className="muted">{kind === 'user'
+      ? '项目空间中的插件管理另需对应项目授权（页面底部）。'
+      : '项目成员还需各自的插件管理资格（在「用户」详情页授予）；实例运行中的撤销立即生效。'}</p>
+    <ErrorBanner message={error} />
+  </div>
+}
+
 export function PluginsPage() {
   const [targets, setTargets] = useState<Array<{ key: string; kind: 'user' | 'project'; id: number; label: string }>>([])
   const [selected, setSelected] = useState('')
@@ -84,25 +135,34 @@ export function PluginsPage() {
     return () => { generation.current++; abort.abort() }
   }, [selected, targets])
   return <div className="page">
-    <PageHeader title="插件" description="管理当前节点上正在运行的 Profile。操作会影响这个实例中的全部会话；更换范围会取消当前页面的安装请求。" />
-    <Section title="目标实例"><div className="sectionBody">
+    <PageHeader title="插件" description="为用户或项目配置插件组成与授权。「当前」列反映运行或文件中的状态并可即时启停；「启动时」列保存下次启动的插件组成。" />
+    <Section title="管理对象"><div className="sectionBody">
       <ErrorBanner message={error} />
-      <Field label="运行范围"><select className="select" aria-label="插件运行范围" value={selected} onChange={event => {
+      <Field label="用户或项目"><select className="select" aria-label="插件管理对象" value={selected} onChange={event => {
         generation.current++; setBinding(null); setSelected(event.target.value)
       }}><option value="">请选择用户或项目</option>{targets.map(target => <option key={target.key} value={target.key}>{target.label}</option>)}</select></Field>
-      <Button onClick={() => { setBinding(null); setReload(value => value + 1) }}>重新读取实例</Button>
+      <Button onClick={() => { setBinding(null); setReload(value => value + 1) }}>重新读取</Button>
       {loading ? <LoadingState label="正在读取插件实例" /> : null}
-      {binding === null ? null : <p className="muted">节点 {binding.nodeId} · {binding.generation === null ? '实例未运行；此页面不会启动实例。' : `实例代次 ${binding.generation}`}</p>}
+      {binding === null ? null : <p className="muted">
+        {binding.generation === null
+          ? '实例未运行：「当前」列为其文件中的插件组成，此页面不会启动实例。'
+          : `实例运行中 · 代次 ${binding.generation}`}
+      </p>}
+      {binding === null ? null : <TargetPolicy kind={binding.target.kind} id={binding.target.id} />}
     </div></Section>
     {binding === null ? null : (
-      <Section title="期望插件状态">
+      <Section title="插件组成">
         <div className="sectionBody">
-          <DesiredStateEditor key={`${binding.target.kind}:${binding.target.id}`} kind={binding.target.kind} id={binding.target.id} />
+          <PluginMatrix key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} kind={binding.target.kind} id={binding.target.id} target={binding} />
         </div>
       </Section>
     )}
-    {binding?.generation == null ? null : (
-      <Section title="运行中的实例">
+    {binding === null ? null : binding.generation === null ? (
+      <Section title="安装与实例详情">
+        <div className="sectionBody"><p className="muted">实例未运行：安装、移除与插件详情需实例启动后可用。上方保存的插件组成将于下次启动生效。</p></div>
+      </Section>
+    ) : (
+      <Section title="安装与实例详情">
         <div className="sectionBody">
           <div className="adminPluginManager"><Manager key={`${binding.nodeId}:${selected}:${binding.generation}`} target={binding} invalidate={invalidate} /></div>
         </div>

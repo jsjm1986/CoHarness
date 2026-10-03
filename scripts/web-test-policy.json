@@ -163,6 +163,9 @@
     "gateway/admin-ui/src/plugins/PluginManagerPage.tsx": [
       "plugin-administration.e2e.ts"
     ],
+    "gateway/admin-ui/src/plugins/PluginMatrix.tsx": [
+      "plugin-administration.e2e.ts"
+    ],
     "gateway/admin-ui/src/pages/PluginsPage.tsx": [
       "plugin-administration.e2e.ts"
     ],
