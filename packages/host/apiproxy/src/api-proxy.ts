@@ -250,6 +250,7 @@ export const USER_TERMINAL_ENDPOINTS = new Set(['environment', 'shells', 'list',
 export const ADMIN_TERMINAL_ENDPOINTS: ReadonlySet<string> = new Set(['terminal/adminList', 'terminal/adminClose'])
 const TERMINAL_REQUEST_SIGNAL = new AbortController().signal
 
+/** Registry-inspection endpoints every project participant may call (read-only plugin/preset introspection). */
 export const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
   'dynamicCordisRunner/resolveRequestRun',
   'dynamicCordisRunner/invoke',

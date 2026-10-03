@@ -15,14 +15,14 @@ The registry-global archive set had a write path (`workspace.archiveSession` + `
 - RPC: `workspace.unarchiveSession({sessionId}) → {archivedSessionIds, archiveRevision?}` mirrors the archive signature — same full-snapshot answer, same `host/archived-sessions-changed` frame, same visibility filtering. It is idempotent at the handler level: `workspaceRegistry.restoreSession` already returns silently for an id outside the set, so a lost race with another surface resolves with the current snapshot instead of an error.
 - Registry: `restoreSession` bumps `archiveRevision` on removal just as `archiveSession` does on append, so the client's versioned install path replaces the set wholesale — the merge path is reserved for unversioned legacy carriers, where union is the safe append-only default. A shrinking unversioned echo would be swallowed by that merge, which is why the fixture now tracks `archiveRevision` like the real host.
 - Client: `IWorkspaces.unarchiveSession` delegates to the manager, which installs the echoed set; no selection sweep is needed because an archived session was never current.
-- UI: a new `ui-settings-unarchive-sessions` plugin contributes one `settings.section` (id `archived-sessions`, order 25 — last) listing the archive set newest-first joined with loaded Session summaries, with a search box and one Unarchive button per row. Members whose summary never loads have no row; an all-unresolvable set reports itself as unrestorable rather than empty. The plugin injects `workspaces` directly — there is no navigation coupling on restore, so the upstream `ctx.uiWorkspace` indirection has no local counterpart.
+- UI: a new `ui-settings-unarchive-sessions` plugin contributes one `settings.section` (id `archived-sessions`, order 25 — last) listing the archive set newest-first joined with loaded Session summaries, with a search box and one Unarchive button per row. Members whose summary never loads have no row; an all-unresolvable set reports itself as unrestorable rather than empty. The plugin injects `workspaces` directly — there is no navigation coupling on restore, so the upstream `ctx.uiWorkspace` indirection has no local counterpart. The sidebar's archived filter later added row-level restore as a second surface ([sidebar-session-actions-archive-filter](2026-10-03-sidebar-session-actions-archive-filter.md)); this page stays as the bulk-view entry.
 - `relativeTime` moved from `ui-workspace`'s tree derivation to `ui-primitives` so the sidebar rows and the settings page share one bucketing; copy stays in each plugin's dictionary.
 
 ## Alternatives considered
 
 **A new per-id incremental protocol.** Rejected for the same reason the archive side rejected it: the set is tiny and every carrier already answers the full snapshot.
 
-**Sidebar row-menu unarchive.** Rejected: archived rows are hidden from the tree by definition, so there is no row to hang the action on; the Settings page is the only restore surface, matching upstream.
+**Sidebar row-menu unarchive.** Rejected at the time: archived rows were hidden from the tree by definition, so there was no row to hang the action on. Superseded: the sidebar's archived filter now renders those rows and ships row-level restore ([sidebar-session-actions-archive-filter](2026-10-03-sidebar-session-actions-archive-filter.md)).
 
 ## Consequences
 

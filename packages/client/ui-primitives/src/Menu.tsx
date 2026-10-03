@@ -13,6 +13,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import { IconCheckOutline16 } from './icons/index.tsx'
+import { ShortcutKeys } from './ShortcutKeys.tsx'
 import { MobileSheetBackdrop } from './MobileSheetBackdrop.tsx'
 import { usePointerGrace } from './pointer-grace.ts'
 import css from './Menu.module.css'
@@ -26,6 +27,8 @@ export interface MenuItem {
   icon?: ReactNode
   /** Destructive row: error-colored text/icon and danger hover fill. */
   danger?: boolean
+  /** Trailing key hint (effective labels plus the accessible combination). */
+  shortcut?: { keys: readonly string[]; aria?: string | undefined }
   /** Nested card opened to the right on hover/focus. */
   submenu?: readonly MenuItem[]
 }
@@ -45,6 +48,64 @@ export interface MenuLabel {
 
 /** One primary-menu entry: a row, a separator, or a heading label. */
 export type MenuEntry = MenuItem | MenuSeparator | MenuLabel
+
+/** Props for one component-rendered menu row. */
+export interface MenuItemButtonProps {
+  /** Visible row label. */
+  children: ReactNode
+  /** Leading icon (same slot a data row's icon occupies). */
+  icon?: ReactNode
+  /** Trailing key hint (same slot a data row's shortcut occupies). */
+  shortcut?: MenuItem['shortcut']
+  /** Whether the row cannot be activated. */
+  disabled?: boolean
+  /** Destructive row: error-colored text/icon and danger hover fill. */
+  danger?: boolean
+  /**
+   * Start a new group: a hairline above this row, the same one a
+   * `{ type: 'separator' }` data entry draws. It comes and goes with the row,
+   * so a row that renders nothing leaves no stray line.
+   */
+  separatorBefore?: boolean
+  /** Row activation callback; closing the menu stays the owner's decision. */
+  onSelect: () => void
+}
+
+/**
+ * Render one `role="menuitem"` row for a {@link Menu} whose rows are
+ * components rather than `items` data: the same markup and styling as a data
+ * row, so it joins the list's DOM keyboard walk and post-selection focus
+ * return without any shared state.
+ * @param props.children - visible row label.
+ * @param props.icon - optional leading icon.
+ * @param props.shortcut - optional trailing key hint.
+ * @param props.disabled - whether the row cannot be activated.
+ * @param props.danger - whether to use the destructive row colors.
+ * @param props.separatorBefore - whether this row starts a new group (hairline above it).
+ * @param props.onSelect - row activation callback.
+ * @returns one menu-item row.
+ */
+export function MenuItemButton({
+  children, icon, shortcut, disabled = false, danger = false, separatorBefore = false, onSelect,
+}: MenuItemButtonProps) {
+  return (
+    <div className={css.itemWrap}>
+      {separatorBefore && <div className={css.separator} role="separator" />}
+      <button
+        type="button"
+        role="menuitem"
+        className={clsx(css.item, danger && css.danger)}
+        disabled={disabled}
+        aria-keyshortcuts={shortcut?.aria}
+        onClick={onSelect}
+      >
+        {icon !== undefined && <span className={css.itemIcon}>{icon}</span>}
+        <span className={css.itemLabel}>{children}</span>
+        {shortcut !== undefined && <span aria-hidden="true" className={css.shortcut}><ShortcutKeys keys={shortcut.keys} className={css.shortcutKeys} /></span>}
+      </button>
+    </div>
+  )
+}
 
 function isSeparator(entry: MenuEntry): entry is MenuSeparator {
   return 'type' in entry && entry.type === 'separator'
@@ -91,16 +152,19 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * @param props.listClassName - optional class applied to the floating list rather than its trigger wrapper.
  * @returns anchor wrapper with the conditional list.
  */
-export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, autoFocus = false, getAnchorRect, header, footer, listClassName, className }: {
+export function Menu({ open, anchor, items = [], children, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, autoFocus = false, getAnchorRect, header, footer, listClassName, className }: {
   open: boolean
   autoFocus?: boolean
   anchor: ReactNode
-  items: readonly MenuEntry[]
+  items?: readonly MenuEntry[] | undefined
+  /** Component rows rendered after `items`: `role="menuitem"` buttons (see {@link MenuItemButton})
+   *  that join the same DOM keyboard walk and focus return. */
+  children?: ReactNode
   header?: ReactNode
   footer?: readonly MenuEntry[]
   selectedId?: string | undefined
   selectedIds?: readonly string[] | undefined
-  onSelect: (id: string) => void
+  onSelect?: ((id: string) => void) | undefined
   onClose: () => void
   align?: 'start' | 'end'
   side?: 'bottom' | 'top' | 'right'
@@ -368,6 +432,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
           role="menuitem"
           className={clsx(css.item, selected && css.selected, entry.danger === true && css.danger)}
           disabled={entry.disabled}
+          aria-keyshortcuts={entry.shortcut?.aria}
           aria-haspopup={hasSub ? 'menu' : undefined}
           aria-expanded={hasSub ? subOpen : undefined}
           onFocus={() => { setOpenSubmenuId(hasSub ? entry.id : null) }}
@@ -376,12 +441,13 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
               setOpenSubmenuId(entry.id)
               return
             }
-            onSelect(entry.id)
+            onSelect?.(entry.id)
             refocusAfterSelection()
           }}
         >
           {entry.icon !== undefined && <span className={css.itemIcon}>{entry.icon}</span>}
           <span className={css.itemLabel}>{entry.label}</span>
+          {entry.shortcut !== undefined && <span aria-hidden="true" className={css.shortcut}><ShortcutKeys keys={entry.shortcut.keys} className={css.shortcutKeys} /></span>}
           {/* Selection marker is a trailing check (figma .Menu_cell), not a fill. */}
           {selected && <IconCheckOutline16 className={css.check} />}
         </button>
@@ -394,7 +460,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
                 role="menuitem"
                 className={css.item}
                 disabled={sub.disabled}
-                onClick={() => { onSelect(sub.id); refocusAfterSelection() }}
+                onClick={() => { onSelect?.(sub.id); refocusAfterSelection() }}
               >
                 {sub.icon !== undefined && <span className={css.itemIcon}>{sub.icon}</span>}
                 <span className={css.itemLabel}>{sub.label}</span>
@@ -418,14 +484,22 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       role="menu"
       // React portals bubble synthetic events through the REACT tree: without
       // this stop, an item click re-fires the anchor row's own onClick
-      // (open/toggle) after onSelect.
-      onClick={(e) => { e.stopPropagation() }}
+      // (open/toggle) after onSelect. The same bubble is where every row's
+      // activation lands — data rows and component rows alike — so the
+      // post-selection focus return is decided once here, after the row's
+      // own handler ran; a submenu parent only opened its card.
+      onClick={(e) => {
+        e.stopPropagation()
+        const row = e.target instanceof Element ? e.target.closest('button[role="menuitem"]') : null
+        if (row !== null && row.getAttribute('aria-haspopup') !== 'menu') refocusAfterSelection()
+      }}
     >
       {header !== undefined && header !== null && (
         <div className={css.header} role="presentation">{header}</div>
       )}
       <div className={css.viewport} role="presentation">
         {items.map(renderEntry)}
+        {children}
       </div>
       {footer !== undefined && footer.length > 0 && (
         <div className={css.footer} role="presentation">

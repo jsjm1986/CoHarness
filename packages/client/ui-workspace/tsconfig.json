@@ -37,6 +37,24 @@
     },
     {
       "path": "../ui-slots"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../jobs/jobs"
+    },
+    {
+      "path": "../../schedule/schedule"
+    },
+    {
+      "path": "../../subagent/subagent"
+    },
+    {
+      "path": "../../workspace/workspace"
+    },
+    {
+      "path": "../../util/values"
     }
   ]
 }

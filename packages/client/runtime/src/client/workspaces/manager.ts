@@ -231,10 +231,16 @@ export class WorkspaceManager {
    * Archive one session in the registry-global set, then install the
    * returned full set without waiting for the changed frame.
    * @param sessionId - session to archive.
+   * @param options - `stopActivity` asks the Host to stop the session's running work instead of refusing.
    * @returns the wire result.
    */
-  async archiveSession(sessionId: SessionId): Promise<RpcResult<{ archivedSessionIds: SessionId[]; archiveRevision?: number }>> {
-    const { result } = await this.api.workspace.archiveSession({ sessionId })
+  async archiveSession(
+    sessionId: SessionId,
+    options: { readonly stopActivity?: boolean } = {},
+  ): Promise<RpcResult<{ archivedSessionIds: SessionId[]; archiveRevision?: number }>> {
+    const { result } = await this.api.workspace.archiveSession(
+      options.stopActivity === true ? { sessionId, stopActivity: true } : { sessionId },
+    )
     if (result.ok) {
       this.installArchived(result.value.archivedSessionIds, result.value.archiveRevision)
       // The Host drops an archived session's pin in the same durable write;

@@ -10,7 +10,6 @@ export interface WorkspaceShortcutState {
   readonly directoryBusy: boolean
   readonly renameTarget: { readonly sessionId: SessionId; readonly currentTitle: string } | null
   readonly forkError: { readonly reason: 'unavailable' | 'failed'; readonly seq: number } | null
-  readonly pinError: { readonly kind: 'pin' | 'unpin'; readonly seq: number } | null
 }
 
 interface WorkspaceShortcutControls {
@@ -23,9 +22,6 @@ interface WorkspaceShortcutControls {
   closeRename: () => void
   forkFailed: (reason: 'unavailable' | 'failed') => void
   dismissForkError: () => void
-  /** Report a rejected pin or unpin write through the browser's notice channel. */
-  pinFailed: (kind: 'pin' | 'unpin') => void
-  dismissPinError: () => void
 }
 
 /**
@@ -34,10 +30,9 @@ interface WorkspaceShortcutControls {
  */
 export function createWorkspaceShortcutControls(): WorkspaceShortcutControls {
   const state = createSnapshotStore<WorkspaceShortcutState>({
-    searchRequest: 0, addRequested: false, directoryBusy: false, renameTarget: null, forkError: null, pinError: null,
+    searchRequest: 0, addRequested: false, directoryBusy: false, renameTarget: null, forkError: null,
   })
   let forkErrorSeq = 0
-  let pinErrorSeq = 0
   return {
     state,
     search: () => { state.set({ ...state.getSnapshot(), searchRequest: state.getSnapshot().searchRequest + 1 }) },
@@ -53,11 +48,6 @@ export function createWorkspaceShortcutControls(): WorkspaceShortcutControls {
       state.set({ ...state.getSnapshot(), forkError: { reason, seq: forkErrorSeq } })
     },
     dismissForkError: () => { state.set({ ...state.getSnapshot(), forkError: null }) },
-    pinFailed: (kind) => {
-      pinErrorSeq += 1
-      state.set({ ...state.getSnapshot(), pinError: { kind, seq: pinErrorSeq } })
-    },
-    dismissPinError: () => { state.set({ ...state.getSnapshot(), pinError: null }) },
   }
 }
 
@@ -66,7 +56,7 @@ export function createWorkspaceShortcutControls(): WorkspaceShortcutControls {
  * @param ctx - plugin context with the shortcut, slot, session, and locale services.
  * @param navigation - session creation and forking from the pointer controls' navigation path.
  * @param controls - browser-owned opening requests.
- * @param archiveSession - the browser's archive action (dialog-free locally).
+ * @param archiveSession - shared archive action, including running-work confirmation and notices.
  */
 export function installWorkspaceShortcuts(
   ctx: ClientContext,

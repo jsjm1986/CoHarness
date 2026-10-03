@@ -95,8 +95,11 @@ export interface IWorkspaces {
    * surfaces; session log and accounting slot remain). Archiving the current
    * session clears the selection into the New Session view state.
    * @param sessionId - session to archive.
+   * @param options - `stopActivity` asks the Host to stop the session's running work
+   *   instead of refusing; without it a session with running work rejects with a
+   *   `session-active` error whose details name that activity.
    */
-  archiveSession(sessionId: SessionId): Promise<void>
+  archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>
   /**
    * Drop a session from the registry-global archive set, restoring it to its
    * recorded Workspace position and to every grouping surface. Idempotent:

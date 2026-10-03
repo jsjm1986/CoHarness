@@ -7,7 +7,7 @@
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
-import { reconcileManualOrder, type SessionRowState } from './tree.ts'
+import { reconcileManualOrder, type ArchivedFilter, type SessionRowState } from './tree.ts'
 
 /** Browser-local order account for the hierarchy-free flat Session list. */
 export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
@@ -19,8 +19,8 @@ type SessionOrderSource = {
   rowState: Pick<SessionRowState, 'pinnedSessionIds' | 'archivedSessionIds'>
 }
 
-/** Session-list grouping mode: workspace sections or one flat recency list. */
-export type SessionGroupBy = 'workspace' | 'flat'
+/** Session-list grouping mode: workspace sections, a directory-nested workspace tree, or one flat recency list. */
+export type SessionGroupBy = 'workspace' | 'workspace-tree' | 'flat'
 /** Session order: user-arranged only, or user-arranged plus activity promotion. */
 export type SessionOrderBy = 'manual' | 'updated'
 
@@ -34,6 +34,8 @@ type WorkspaceViewState = {
   sessionOrderByAccount: Record<string, string[]>
   /** Last observed update timestamps per order account for one-time promotion events. */
   sessionUpdatedAtByAccount: Record<string, Record<string, number>>
+  /** Archived-row visibility; omitted in pre-filter v5 snapshots and read as 'default'. */
+  archivedFilter?: ArchivedFilter
 }
 
 /**
@@ -58,6 +60,7 @@ type WorkspaceViewActions = {
     accountKeys: readonly string[],
     source: SessionOrderSource,
   ) => void
+  setArchivedFilter: (draft: WorkspaceViewState, filter: ArchivedFilter) => void
 }
 
 /**
@@ -72,6 +75,7 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       groupExpansion: {},
       sessionOrderByAccount: {},
       sessionUpdatedAtByAccount: {},
+      archivedFilter: 'default',
     }),
     persist: 'dsh.workspace.view.v5',
     actions: {
@@ -104,6 +108,7 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
           return [key, selected.has(key) ? [sessionId, ...order.filter(id => id !== sessionId)] : order]
         }))
       },
+      setArchivedFilter: (d, filter: ArchivedFilter) => { d.archivedFilter = filter },
     },
   })
 }

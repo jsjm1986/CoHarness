@@ -96,7 +96,7 @@ describe('remote endpoint policy coverage', () => {
   it.each(endpoints.map(endpoint => [endpoint] as const))(
     'classifies %s for project participants',
     (endpoint) => {
-      expect(classified.has(endpoint as string), `${endpoint} has no project-scope policy`).toBe(true)
+      expect(classified.has(endpoint), `${endpoint} has no project-scope policy`).toBe(true)
     },
   )
 

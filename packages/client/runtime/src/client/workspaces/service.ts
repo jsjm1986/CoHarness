@@ -111,6 +111,20 @@ export class DirectoryBrowseError extends Error {
   }
 }
 
+/**
+ * Archive failed on the Host. `rpcError.code` distinguishes the active-session
+ * refusal (`session-active`, whose details name what still runs) from a
+ * missing session or a carrier fault. Client plugin bundles do not share
+ * error-class identity: consumers branch on `name` and `rpcError`, not
+ * `instanceof`.
+ */
+export class WorkspaceArchiveError extends Error {
+  constructor(readonly rpcError: RpcError) {
+    super(`session archive failed: ${rpcError.code}: ${rpcError.message}`)
+    this.name = 'WorkspaceArchiveError'
+  }
+}
+
 /** Real Workspace object layer and Host actions. */
 export class WorkspaceRuntime implements IWorkspaces {
   /** UI-facing immutable projection; the manager remains wire truth. */
@@ -421,10 +435,13 @@ export class WorkspaceRuntime implements IWorkspaces {
    * current selection is the projection sweep's job (one rule for the local
    * echo and a remote tab's frame alike).
    * @param sessionId - session to archive.
+   * @param options - `stopActivity` asks the Host to stop the session's running work instead of refusing.
+   * @throws {WorkspaceArchiveError} when the Host refuses; without `stopActivity` a session with
+   *   running work fails as `session-active`, its details naming what runs.
    */
-  async archiveSession(sessionId: SessionId): Promise<void> {
-    const result = await this.manager.archiveSession(sessionId)
-    if (!result.ok) throw new Error(`session archive failed: ${result.error.code}: ${result.error.message}`)
+  async archiveSession(sessionId: SessionId, options: { readonly stopActivity?: boolean } = {}): Promise<void> {
+    const result = await this.manager.archiveSession(sessionId, options)
+    if (!result.ok) throw new WorkspaceArchiveError(result.error)
   }
 
   /**

@@ -9,6 +9,7 @@ import {
   type SessionSearchResultItem, type SessionSummary, type SubagentDescendantSummary,
   type WorkspaceId, type WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
+import { assertNever } from '@deepseek-ai/dsh-util-values'
 
 /** Group key for Sessions outside every Workspace. */
 export const UNGROUPED_KEY = ''
@@ -43,6 +44,8 @@ export interface SessionNode {
   completed: boolean
   /** In the registry-global pin set: leads its section, reorderable only among pinned rows. */
   pinned: boolean
+  /** In the registry-global archive set: grayed, non-draggable, not openable until restored. */
+  archived: boolean
   updatedAt: number
   /** Client-local Workspace hint for a blank draft before Host attachment. */
   workspaceId?: WorkspaceId
@@ -86,6 +89,8 @@ export interface SearchResultNode {
   runningSubagentCount: number
   /** Finished running while not selected and not yet opened (the green "done" reminder dot). */
   completed: boolean
+  /** In the registry-global archive set: grayed row with a restore action. */
+  archived: boolean
   snippet?: string
 }
 
@@ -123,6 +128,33 @@ export function workspaceLabel(cwd: string | undefined): string {
   return base !== undefined && base !== '' ? base : cwd
 }
 
+/** Normalize separators for comparison without interpreting POSIX backslashes as separators. */
+function folderPath(path: string): string {
+  const windows = /^[A-Za-z]:[/\\]/.test(path) || path.startsWith('\\\\')
+  return (windows ? path.replaceAll('\\', '/') : path).replace(/\/+$/, '')
+}
+
+/**
+ * Find the nearest registered ancestor, excluding the Workspace directory itself.
+ * Paths use Host spelling; matching is case-sensitive, like Workspace identity.
+ * @param path - Workspace directory.
+ * @param parents - registered Workspace directory paths.
+ * @returns the owning parent path, or undefined when no parent contains the Workspace.
+ */
+export function owningParentFolder(path: string, parents: readonly string[]): string | undefined {
+  const child = folderPath(path)
+  let owner: string | undefined
+  let length = -1
+  for (const parent of parents) {
+    const root = folderPath(parent)
+    if (root.length > length && child !== root && child.startsWith(`${root}/`)) {
+      owner = parent
+      length = root.length
+    }
+  }
+  return owner
+}
+
 /** Recency comparator: newest first, id as the deterministic tiebreak (ids are unique per group). */
 function byRecency(a: SessionSummary, b: SessionSummary): number {
   if (b.updatedAt !== a.updatedAt) return b.updatedAt - a.updatedAt
@@ -151,12 +183,21 @@ export function orderByRecency(
     .map(member => member.id)
 }
 
+/**
+ * Archived-row visibility choice: the default hides archived rows, `show`
+ * mixes them into their kept slots, and `only` restricts the view (and
+ * search) to archived rows.
+ */
+export type ArchivedFilter = 'default' | 'show' | 'only'
+
 /** Registry-global row state consumed by every tree derivation. */
 export interface SessionRowState {
   /** Registry-global pin ids in Host pin order; pinned rows lead their section in the local order. */
   pinnedSessionIds: readonly SessionId[]
-  /** Archive set; members keep their account slots and are hidden from grouping surfaces. */
+  /** Archive set; members keep their account slots and show grayed while visible. */
   archivedSessionIds: readonly SessionId[]
+  /** Archived-row visibility choice applied to lists and search alike. */
+  archivedFilter: ArchivedFilter
 }
 
 /**
@@ -234,13 +275,28 @@ export function pinCurrentBlank(
 /**
  * Ordinary sessions are visible; among blank sessions, only the current one
  * is visible. Subagent children use their parent header catalog; archived
- * sessions are visible nowhere, while their accounting slots remain so
- * unarchiving restores position.
+ * sessions follow the archived filter, while their accounting slots remain
+ * either way so unarchiving restores position.
  */
-function sessionVisible(session: SessionSummary, current: SessionId | undefined, archived: ReadonlySet<SessionId>): boolean {
-  return session.origin !== 'subagent'
-    && !archived.has(session.id)
-    && (!session.blank || session.id === current)
+function sessionVisible(
+  session: SessionSummary,
+  current: SessionId | undefined,
+  archived: ReadonlySet<SessionId>,
+  archivedFilter: ArchivedFilter,
+): boolean {
+  if (session.origin === 'subagent') return false
+  if (session.blank && session.id !== current) return false
+  switch (archivedFilter) {
+    case 'default':
+      return !archived.has(session.id)
+    case 'show':
+      return true
+    case 'only':
+      return archived.has(session.id)
+    /* v8 ignore next 2 -- closed-union backstop; only reached if the filter is forged */
+    default:
+      return assertNever(archivedFilter)
+  }
 }
 
 /**
@@ -321,6 +377,7 @@ function groupByWorkspace(
   list: SessionListState,
   workspaces: readonly WorkspaceView[],
   archived: ReadonlySet<SessionId>,
+  archivedFilter: ArchivedFilter,
   ungroupedOrder: readonly string[] | undefined,
 ): Group[] {
   const groups: Group[] = []
@@ -340,7 +397,7 @@ function groupByWorkspace(
       const summary = list.byId[id]
       if (summary === undefined) continue // account may lead the list pull; the row appears when the summary lands
       accounted.add(id)
-      if (!sessionVisible(summary, list.current, archived)) continue
+      if (!sessionVisible(summary, list.current, archived, archivedFilter)) continue
       members.push(summary)
     }
     // A newly reserved draft is not attached by the Host until its first
@@ -348,12 +405,15 @@ function groupByWorkspace(
     // placeholder in the intended group during that short interval.
     if (currentHint !== undefined && currentHint.workspaceId === workspace.workspaceId
       && workspaceMembers?.has(currentHint.id) !== true && !accounted.has(currentHint.id)
-      && sessionVisible(currentHint, list.current, archived)) {
+      && sessionVisible(currentHint, list.current, archived, archivedFilter)) {
       accounted.add(currentHint.id)
       // Keep the current provisional row at the top even before Workspace
       // membership arrives, matching the render-time pin for attached drafts.
       members.unshift(currentHint)
     }
+    // The archived-only view lists archives, not the Workspace inventory, so
+    // a Workspace without archived Sessions contributes no group.
+    if (archivedFilter === 'only' && members.length === 0) continue
     groups.push(buildGroup(
       workspace.workspaceId, workspace.workspaceId, workspace.path,
       Date.parse(workspace.createdAt), workspace.title, members, 'account',
@@ -362,7 +422,7 @@ function groupByWorkspace(
   const stray = list.ids
     .map(id => list.byId[id])
     .filter((s): s is SessionSummary =>
-      s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived))
+      s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived, archivedFilter))
   if (stray.length > 0) {
     groups.push(buildGroup(
       UNGROUPED_KEY,
@@ -391,6 +451,7 @@ function sessionNode(
     runningSubagentCount: descendants.get(s.id)?.runningCount ?? 0,
     completed: s.completed === true,
     pinned: !archived.has(s.id) && pinned.has(s.id),
+    archived: archived.has(s.id),
     updatedAt: s.updatedAt,
     ...(s.workspaceId === undefined ? {} : { workspaceId: s.workspaceId }),
     ...(s.pendingInteraction === undefined ? {} : { pendingInteraction: s.pendingInteraction }),
@@ -402,15 +463,16 @@ function sessionNode(
 /**
  * Derive the workspace browser groups with every session as a top-level row.
  *
- * Every group shows; sessions populate under expanded groups in the selected
- * local order with pinned rows leading each section. Blank sessions are
+ * Every group shows, except that the archived-only filter drops groups
+ * without archived members; sessions populate under expanded groups in the
+ * selected local order with pinned rows leading each section. Blank sessions are
  * excluded except for the selected provisional New Session row, which leads
- * its section ahead of the pinned block; archived sessions are excluded
- * everywhere. Content search lives outside this derivation
- * (see {@link deriveSearchResults}).
+ * its section ahead of the pinned block; archived sessions keep their slots
+ * and appear per the archived filter. Content search lives outside this
+ * derivation (see {@link deriveSearchResults}).
  * @param list - sessions list snapshot (`current` feeds containsCurrent).
  * @param workspaces - real workspaces in stable Host order.
- * @param rowState - registry-global pin and archive sets.
+ * @param rowState - registry-global pin and archive sets plus the archived filter.
  * @param view - local expansion arrays.
  * @returns group sections in render order.
  */
@@ -431,7 +493,7 @@ export function deriveGroups(
         ?? currentSummary?.workspaceId
         ?? UNGROUPED_KEY
   const groups: GroupNode[] = []
-  for (const g of groupByWorkspace(list, workspaces, archived, view.ungroupedOrder)) {
+  for (const g of groupByWorkspace(list, workspaces, archived, rowState.archivedFilter, view.ungroupedOrder)) {
     const expanded = expandedGroups.has(g.key)
     groups.push({
       key: g.key,
@@ -486,7 +548,7 @@ export function deriveFlat(
   const descendants = indexSubagentDescendants(list.byId)
   const members = sessionIds.flatMap((id) => {
     const s = list.byId[id]
-    return s !== undefined && sessionVisible(s, list.current, archived) ? [s] : []
+    return s !== undefined && sessionVisible(s, list.current, archived, rowState.archivedFilter) ? [s] : []
   })
   return sectionMembers(members, pinned, archived)
     .map(session => sessionNode(session, descendants, pinned, archived))
@@ -499,7 +561,8 @@ export function deriveFlat(
  * @param list - session metadata authority.
  * @param workspaces - Workspace membership and display labels.
  * @param query - caller text; surrounding whitespace is ignored.
- * @param archivedSessionIds - registry-global archive set (members never match).
+ * @param archivedSessionIds - registry-global archive set (members match per the archived filter).
+ * @param archivedFilter - archived-row visibility choice; search follows it.
  * @param content - ranked Host content-search page.
  * @param limit - protocol-owned maximum merged row count.
  * @returns bounded deduplicated flat rows and a refine-query hint bit.
@@ -509,6 +572,7 @@ export function deriveSearchResults(
   workspaces: readonly WorkspaceView[],
   query: string,
   archivedSessionIds: readonly SessionId[],
+  archivedFilter: ArchivedFilter,
   content: { items: readonly SessionSearchResultItem[]; hasMore: boolean },
   limit: number,
 ): SearchResultSet {
@@ -535,7 +599,7 @@ export function deriveSearchResults(
     const summary = list.byId[id]
     // Blank placeholders never match a query (their canonical title displays
     // localized, so matching it would tie search to one language).
-    if (summary === undefined || summary.blank || !sessionVisible(summary, list.current, archived)) continue
+    if (summary === undefined || summary.blank || !sessionVisible(summary, list.current, archived, archivedFilter)) continue
     if (
       sessionTitle(summary).toLowerCase().includes(q)
       || labelOf(summary).toLowerCase().includes(q)
@@ -555,7 +619,7 @@ export function deriveSearchResults(
   for (const summary of local) include(summary)
   for (const item of content.items) {
     const summary = list.byId[item.sessionId]
-    if (summary !== undefined && !summary.blank && sessionVisible(summary, list.current, archived)) include(summary)
+    if (summary !== undefined && !summary.blank && sessionVisible(summary, list.current, archived, archivedFilter)) include(summary)
   }
 
   return {
@@ -571,6 +635,7 @@ export function deriveSearchResults(
           ? {}
           : { pendingInteraction: summary.pendingInteraction }),
         completed: summary.completed === true,
+        archived: archived.has(summary.id),
         ...match === undefined ? {} : { snippet: match.snippet },
       }
     }),

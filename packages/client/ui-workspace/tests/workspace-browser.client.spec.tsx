@@ -12,10 +12,17 @@ import { createWorkspaceShortcutControls } from '../src/client/shortcuts.ts'
 import { createWorkspaceViewStore, FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
 import { UNGROUPED_KEY } from '../src/client/tree.ts'
 import { WorkspaceBrowser } from '../src/client/WorkspaceBrowser.tsx'
+import { ArchiveSessionMenuItem } from '../src/client/session-actions/ArchiveSession.tsx'
 import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
-beforeEach(() => { localStorage.clear(); createWorkspaceViewStore().create().actions.setOrderBy('manual') })
+const scrollIntoView = vi.fn()
+beforeEach(() => {
+  localStorage.clear()
+  createWorkspaceViewStore().create().actions.setOrderBy('manual')
+  Element.prototype.scrollIntoView = scrollIntoView
+  scrollIntoView.mockClear()
+})
 
 // The seat's key domain is workspace ∪ common; the stub mirrors the real
 // lookup chain (namespace, then common vocabulary, then the key).
@@ -84,13 +91,11 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     open: vi.fn(),
     searchSessions: vi.fn(async () => ({ items: [], hasMore: false })),
     searchResultLimit: 20,
-    renameSession: vi.fn(async () => {}),
-    forkSession: vi.fn(),
+    requestSessionRename: controls.rename,
+    notifyArchivedNotOpenable: vi.fn(),
     renameWorkspace: vi.fn(async () => {}),
     deleteWorkspace: vi.fn(async () => {}),
-    archiveSession: vi.fn(async () => {}),
-    pinSession: vi.fn(),
-    unpinSession: vi.fn(),
+    unarchiveSession: vi.fn(async () => {}),
     insertWorkspaceBefore: vi.fn(async () => {}),
     insertSessionBefore: vi.fn(async () => {}),
     createWorkspace: vi.fn(async () => workspace('created', [])),
@@ -103,7 +108,6 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     closeAddWorkspace: controls.closeAdd,
     setDirectoryBusy: controls.directoryBusy,
     dismissForkError: controls.dismissForkError,
-    dismissPinError: controls.dismissPinError,
     renderSlot: ((_name: string, owner: { open: boolean }) => (owner.open ? <div data-testid="directory-flow" /> : null)) as never,
     t,
     ...overrides,
@@ -149,12 +153,23 @@ describe('WorkspaceBrowser', () => {
     expect(screen.getByTestId('directory-flow')).toBeTruthy()
   })
 
-  it('opens the session rename dialog through a command request', () => {
+  it('a title double-click asks for the rename dialog with the row title', () => {
+    const requestSessionRename = vi.fn()
+    const open = vi.fn()
     const b = mount({
-      useSessions: hook(sessionState([summary('s1', 0, { title: '旧标题' })])),
+      useSessions: hook(sessionState([summary('alpha-s', 1, { displayTitle: 'Alpha session' })])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-s'])])),
+      requestSessionRename,
+      open,
     })
-    act(() => { b.controls.rename(sid('s1'), '旧标题') })
-    expect(screen.getByLabelText('会话名称')).toHaveProperty('value', '旧标题')
+    fireEvent.click(screen.getByText('alpha'))
+    fireEvent.doubleClick(screen.getByText('Alpha session'))
+    expect(requestSessionRename).toHaveBeenCalledWith(sid('alpha-s'), 'Alpha session')
+    expect(open).not.toHaveBeenCalled()
+    // The flat list threads the same request.
+    act(() => { b.store.actions.setGroupBy('flat') })
+    fireEvent.doubleClick(screen.getByText('Alpha session'))
+    expect(requestSessionRename).toHaveBeenCalledTimes(2)
   })
 
   it('workspace hover card shows a POSIX home descendant as ~', () => {
@@ -171,7 +186,7 @@ describe('WorkspaceBrowser', () => {
         }),
       })
       fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
-      act(() => { vi.advanceTimersByTime(500) })
+      act(() => { vi.advanceTimersByTime(800) })
       expect(screen.getByText('~/Documents/project')).toBeTruthy()
     } finally {
       vi.useRealTimers()
@@ -213,9 +228,10 @@ describe('WorkspaceBrowser', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     expect(screen.getByText('分组方式')).toBeTruthy() // the menu heading label
-    expect(screen.getByRole('separator')).toBeTruthy()
+    expect(screen.getByText('筛选会话')).toBeTruthy()
+    expect(screen.getAllByRole('separator')).toHaveLength(2)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '按工作区', '单列表', '手动排序', '最近更新',
+      '按工作区', '按工作区目录树', '单列表', '手动排序', '最近更新', '隐藏已归档', '全部对话（显示已归档）', '仅显示已归档',
     ])
     expect(screen.getByRole('menuitem', { name: '按工作区' }).querySelector('svg')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '手动排序' }).querySelector('svg')).toBeTruthy()
@@ -440,11 +456,37 @@ describe('WorkspaceBrowser', () => {
   })
 
   it('archives a session from the row menu and hides archived rows in both modes', async () => {
+    // The menu list's entries are slot occupants: mount the shipped archive
+    // item with a mock face, the way the renderer composes it.
     const archiveSession = vi.fn(async () => {})
+    const archivedSet = { current: new Set<SessionId>() }
+    const menuOpenState: readonly [boolean, (open: boolean) => void] = [true, () => {}]
+    const renderSlot: WorkspaceBrowserProps['renderSlot'] = (name, owner, extra) => {
+      if (name === 'sidebar.workspaces.directoryFlow') {
+        return (owner as { open: boolean }).open ? <div data-testid="directory-flow" /> : null
+      }
+      if (name === 'sidebar.workspaces.session.menu.item') {
+        const row = owner as { sessionId: SessionId; displayTitle: string }
+        const openState = (extra as { hookContext?: typeof menuOpenState } | undefined)?.hookContext ?? menuOpenState
+        return (
+          <ArchiveSessionMenuItem
+            sessionId={row.sessionId}
+            displayTitle={row.displayTitle}
+            t={t}
+            useArchived={selector => selector(archivedSet.current)}
+            useMenuOpenState={() => openState}
+            useShortcuts={selector => selector([])}
+            archiveSession={(sessionId) => { void archiveSession(sessionId) }}
+            unarchiveSession={vi.fn()}
+          />
+        )
+      }
+      return null
+    }
     const b = mount({
       useSessions: hook(sessionState([summary('kept-s', 2), summary('gone-s', 1)])),
       useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])])),
-      archiveSession,
+      renderSlot,
     })
     fireEvent.click(screen.getByText('alpha'))
     fireEvent.click(screen.getByRole('button', { name: '会话“gone-s”的操作' }))
@@ -452,6 +494,7 @@ describe('WorkspaceBrowser', () => {
     expect(archiveSession).toHaveBeenCalledWith(sid('gone-s'))
 
     // The archive-set echo hides the row in grouped and flat modes.
+    archivedSet.current = new Set([sid('gone-s')])
     rerender(b, { useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])], [sid('gone-s')])) })
     expect(screen.queryByText('gone-s')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
@@ -460,26 +503,27 @@ describe('WorkspaceBrowser', () => {
     expect(screen.queryByText('gone-s')).toBeNull()
   })
 
-  it('logs and keeps the tree when the archive call rejects', async () => {
-    const rejection = new Error('archive exploded')
-    const archiveSession = vi.fn(async () => { throw rejection })
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    try {
-      mount({
-        useSessions: hook(sessionState([summary('alpha-s', 1)])),
-        useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-s'])])),
-        archiveSession,
-      })
-      fireEvent.click(screen.getByText('alpha'))
-      fireEvent.click(screen.getByRole('button', { name: '会话“alpha-s”的操作' }))
-      fireEvent.click(screen.getByRole('menuitem', { name: '归档会话' }))
-      await Promise.resolve()
-      await Promise.resolve()
-      expect(warn).toHaveBeenCalledWith('session archive rejected:', rejection)
-      expect(screen.getByText('alpha-s')).toBeTruthy()
-    } finally {
-      warn.mockRestore()
-    }
+  it('surfaces the shipped archive filter rows, restoring them in place', async () => {
+    const b = mount({
+      useSessions: hook(sessionState([summary('live-s', 2), summary('gone-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['live-s', 'gone-s'])], [sid('gone-s')])),
+      renderSlot: ((name: string, owner: { open: boolean }) =>
+        name === 'sidebar.workspaces.directoryFlow' && owner.open
+          ? <div data-testid="directory-flow" />
+          : null) as never,
+    })
+    // The default filter hides the archived row; 'show' restores it in place.
+    expect(screen.queryByText('gone-s')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '全部对话（显示已归档）' }))
+    expect(b.store.getSnapshot().archivedFilter).toBe('show')
+    fireEvent.click(screen.getByText('alpha'))
+    expect(screen.getByText('gone-s')).toBeTruthy()
+    // 'only' keeps just the archived rows.
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '仅显示已归档' }))
+    expect(screen.getByText('gone-s')).toBeTruthy()
+    expect(screen.queryByText('live-s')).toBeNull()
   })
 
   it('renders a fork child as a top-level row without a session twist', () => {
@@ -743,7 +787,7 @@ describe('WorkspaceBrowser', () => {
       expect(screen.getByText('仅显示前 20 条结果，请缩小搜索范围。')).toBeTruthy()
       fireEvent.click(screen.getByRole('treeitem'))
       expect(open).toHaveBeenCalledWith(sid('body-hit'))
-      expect(input.value).toBe('waterfall token')
+      expect(input.value).toBe('')
     } finally {
       vi.useRealTimers()
     }
@@ -1305,24 +1349,6 @@ describe('WorkspaceBrowser', () => {
     fireEvent.dragEnd(three)
     expect(b.store.getSnapshot().sessionOrderByAccount[FLAT_SESSION_ORDER_KEY])
       .toEqual(['two', 'one', 'three'])
-  })
-
-  it('shows and dismisses the pin failure toast; unpin failure uses its own copy', () => {
-    vi.useFakeTimers()
-    try {
-      const b = mount()
-      act(() => { b.controls.pinFailed('pin') })
-      const first = screen.getByRole('alert')
-      expect(first.textContent).toBe(zh['toast.pinFailed'])
-      act(() => { b.controls.dismissPinError(); b.controls.pinFailed('pin') })
-      expect(screen.getByRole('alert')).not.toBe(first)
-      act(() => { b.controls.pinFailed('unpin') })
-      expect(screen.getByRole('alert').textContent).toBe(zh['toast.unpinFailed'])
-      act(() => { b.controls.dismissPinError() })
-      expect(screen.queryByRole('alert')).toBeNull()
-    } finally {
-      vi.useRealTimers()
-    }
   })
 
   it('ignores a drag whose source left the group in flight', () => {

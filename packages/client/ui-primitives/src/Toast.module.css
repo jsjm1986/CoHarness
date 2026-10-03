@@ -47,6 +47,22 @@
   min-width: 0;
 }
 
+.action {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-static-deepseek-400, var(--dsw-alias-state-info-primary));
+  font: inherit;
+  cursor: pointer;
+  margin-inline: 3px;
+  pointer-events: auto;
+}
+
+.action:hover {
+  opacity: 0.8;
+}
+
 @keyframes dsh-toast-in {
   from {
     opacity: 0;
