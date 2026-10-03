@@ -575,6 +575,24 @@ describe('Host Workspace increments', () => {
     abort.abort()
   })
 
+  it('refuses prompts on an archived session', async () => {
+    const { api, root } = await harness()
+    const workspace = expectOk(await api.workspace.create(request({ path: stageDir(root, 'archive-prompt') }))).workspace
+    const sessionId = SessionId('session-prompt-archived')
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId })))
+    expectOk(await api.workspace.archiveSession(request({ sessionId })))
+
+    // A client may hold a stale mounted view until the archive baseline
+    // lands; the admission check is the durable refusal.
+    const refused = await api.sessions.prompt(request({
+      sessionId, mode: 'queue', content: [{ type: 'text', text: 'still typing' }],
+    }))
+    expect(refused.result).toMatchObject({
+      ok: false,
+      error: { code: 'session-archived', details: { sessionId } },
+    })
+  })
+
   it('unarchives a session, streams the set once, and no-ops ids outside the set', async () => {
     const { api, root } = await harness()
     const workspace = expectOk(await api.workspace.create(request({ path: stageDir(root, 'unarchive-home') }))).workspace

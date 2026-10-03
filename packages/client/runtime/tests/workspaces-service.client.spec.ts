@@ -1067,6 +1067,35 @@ describe('startInitialSelection', () => {
     }
   })
 
+  it('does not open a session that lands in the archive set mid-commit', async () => {
+    const b = bench()
+    const historyGate = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    b.api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('recent', [sid('s-history')], '2026-01-02T00:00:00.000Z')] as never[],
+    }))
+    b.api.onList = () => Promise.resolve(ok({
+      items: [{ sessionId: sid('s-history'), updatedAt: 3, running: false, blank: false, cwd: '/w/recent' }] as never[],
+    }))
+    b.api.onHistory = () => historyGate.promise
+    const stop = b.workspaces.startInitialSelection()
+    try {
+      await b.workspaces.refresh()
+      await b.sessions.refresh()
+      await vi.waitFor(() => { expect(b.api.callsOf('session.history')).toHaveLength(1) })
+      // The archive frame lands while the retained open is in flight; the
+      // commit must recheck the union before selecting.
+      b.workspaces.handleHostEnvelope({
+        rpcId: 'archive-mid-open' as never,
+        payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [sid('s-history')] },
+      } as never)
+      historyGate.resolve(ok({ events: [], hasMore: false }))
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(b.sessions.list.getSnapshot().current).toBeUndefined()
+    } finally {
+      stop()
+    }
+  })
+
   it('a failed connect returns to waiting and retries on the next list change', async () => {
     const b = bench()
     b.api.onWorkspaceList = () => Promise.resolve(ok({

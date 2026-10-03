@@ -287,7 +287,12 @@ export class WorkspaceRuntime implements IWorkspaces {
       void this.openWorkspace(target).then((sessionId) => {
         if (disposed || navigation.aborted) return
         return commitSessionNavigation(this.sessions, sessionId, navigation, () => {
-          if (this.sessions.list.getSnapshot().current === undefined) this.sessions.open(sessionId)
+          const snapshot = this.sessions.list.getSnapshot()
+          if (snapshot.archivedById[sessionId] !== undefined
+            || this.list.getSnapshot().archivedSessionIds.includes(sessionId)) {
+            throw new Error('Session was archived during initial selection')
+          }
+          if (snapshot.current === undefined) this.sessions.open(sessionId)
           state = 'done'
         })
       }).catch((reason: unknown) => {

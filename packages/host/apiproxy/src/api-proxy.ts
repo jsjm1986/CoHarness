@@ -4659,6 +4659,16 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         const authorized = await authorizeSession(sessionId, 'write')
         if ('error' in authorized) return err(request, authorized.error)
+        // An archived session admits no input; clients may hold a stale
+        // mounted view until the archive baseline lands. Minimal
+        // compositions without a Workspace Registry have no archive set.
+        if (ctx.workspaceRegistry?.archivedSessionIds.includes(sessionId) === true) {
+          return err(request, {
+            code: 'session-archived',
+            message: `session ${sessionId} is archived; unarchive it before sending input`,
+            details: { sessionId },
+          })
+        }
         const canonicalTimeZone = clientTimeZone === undefined
           ? undefined
           : canonicalClientTimeZone(clientTimeZone)

@@ -653,6 +653,17 @@ export class SessionRuntime implements ISessions {
     this.manager.clearSelection()
   }
 
+  /**
+   * Drop the current selection when a list-side partition (archive
+   * baseline) masks it. Unlike {@link clear}, no navigation intent is
+   * superseded — masking is not a user clear, and an in-flight open must
+   * still own the next selection.
+   */
+  releaseSelection(): void {
+    this.watched = undefined
+    this.manager.clearSelection()
+  }
+
   /** Replace the additional staged sessions retained by a multi-pane view. */
   setAdditionalStaged(ids: readonly SessionId[]): void {
     this.additionalStaged.clear()

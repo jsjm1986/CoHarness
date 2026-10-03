@@ -210,6 +210,7 @@ export class SessionRuntimePool implements ISessions {
     const subagentsByParent: SessionListState['subagentsByParent'] = {}
     const jobsBySession: SessionListState['jobsBySession'] = {}
     const observedJobs: Record<string, SessionListState['observedJobs'][string]> = {}
+    const maskedSelections: Runtime[] = []
     for (const entry of this.entries.values()) {
       const state = this.projectEntry(entry)
       ids.push(...state.ids)
@@ -224,6 +225,11 @@ export class SessionRuntimePool implements ISessions {
         observedJobs[`${entry.key}:${jobId}`] = view
       }
       if (entry.runtime === this.base) this.currentScopeList.set(state)
+      const rawCurrent = entry.runtime.list.getSnapshot().current
+      if (rawCurrent !== undefined
+        && this.archivedByTarget.get(entry.key)?.has(rawCurrent) === true) {
+        maskedSelections.push(entry.runtime)
+      }
     }
     const current = this.activeSession !== undefined && byId[this.activeSession] !== undefined
       ? this.activeSession
@@ -242,6 +248,12 @@ export class SessionRuntimePool implements ISessions {
       subagentsByParent, jobsBySession, observedJobs,
       currentAddress: owner === undefined ? undefined : this.projectEntry(owner).currentAddress,
     })
+    // A runtime still selecting an archived id re-publishes it on every
+    // rebuild and re-persists it as the startup selection; deselect at the
+    // owner so the mask holds instead of remounting a zombie each reload.
+    // releaseSelection keeps in-flight navigation intents alive — masking
+    // is not a user clear.
+    for (const runtime of maskedSelections) runtime.releaseSelection()
   }
 
   private projectEntry(entry: RuntimeEntry): SessionListState {

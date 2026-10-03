@@ -362,6 +362,28 @@ describe('SessionRuntimePool', () => {
     expect(pool.list.getSnapshot().ids).not.toContain(id)
   })
 
+  it('deselects a runtime selection that the archive baseline masks', async () => {
+    const ctx = new Context()
+    const baseApi = new FakeApiClient()
+    const id = 'archived-session' as SessionId
+    const key = clientSessionKey({ kind: 'personal' }, id)
+    baseApi.onList = () => Promise.resolve(ok({ items: [{
+      sessionId: id, updatedAt: 1, running: false, blank: false, cwd: '/home/test',
+    }] }))
+    baseApi.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [id] }))
+    const base = new SessionRuntime(ctx, baseApi, fakeRemote(), undefined, { provideService: false })
+    await base.refresh()
+    const pool = new SessionRuntimePool(ctx, base, connection(baseApi), fakeRemote())
+    base.open(id)
+    expect(base.list.getSnapshot().current).toBe(id)
+    pool.handleConnected({ version: 'test', cwd: '/home/test', attachedSessions: 0, home: '/home/test', canOpenPath: true })
+    // The mask alone hides the row; the owner must also deselect or the
+    // persisted selection remounts the archived session on the next reload.
+    await vi.waitFor(() => { expect(base.list.getSnapshot().current).toBeUndefined() })
+    expect(pool.list.getSnapshot().current).toBeUndefined()
+    expect(pool.list.getSnapshot().archivedById[key]?.id).toBe(key)
+  })
+
   it('re-projects the archived partition on an archived-sessions-changed frame within one generation', async () => {
     const ctx = new Context()
     const baseApi = new FakeApiClient()
