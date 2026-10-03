@@ -35,14 +35,12 @@ export function AccountBadge({ status }: { status: AdminUser['status'] }) {
 
 export function InstanceState({ state }: { state: string }) {
   const labels: Record<string, string> = {
-    running: '运行中',
     ready: '运行中',
     starting: '启动中',
     stopping: '停止中',
     stopped: '已停止',
-    failed: '异常',
   }
-  const tone = state === 'running' || state === 'ready' ? 'success' : state === 'starting' ? 'info' : state === 'failed' ? 'danger' : state === 'stopping' ? 'warning' : 'neutral'
+  const tone = state === 'ready' ? 'success' : state === 'starting' ? 'info' : state === 'stopping' ? 'warning' : 'neutral'
   return <StatusBadge tone={tone}>{labels[state] ?? state}</StatusBadge>
 }
 
@@ -62,21 +60,21 @@ export function InstanceControls({ user, pending, run }: { user: AdminUser; pend
       <IconButton
         label="启动实例"
         icon={Play}
-        disabled={busy || user.instanceState === 'running'}
+        disabled={busy || user.instanceState === 'ready' || user.instanceState === 'starting'}
         loading={pending === `instance:${user.id}:start`}
         onClick={() => void run(`instance:${user.id}:start`, () => controlInstance(user.id, 'start'))}
       />
       <IconButton
         label="停止实例"
         icon={Square}
-        disabled={busy || user.instanceState === 'stopped'}
+        disabled={busy || user.instanceState === 'stopped' || user.instanceState === 'stopping'}
         loading={pending === `instance:${user.id}:stop`}
         onClick={() => void run(`instance:${user.id}:stop`, () => controlInstance(user.id, 'stop'))}
       />
       <IconButton
         label="重启实例"
         icon={RefreshCw}
-        disabled={busy || user.instanceState !== 'running'}
+        disabled={busy || user.instanceState !== 'ready'}
         loading={pending === `instance:${user.id}:restart`}
         onClick={() => void run(`instance:${user.id}:restart`, () => controlInstance(user.id, 'restart'))}
       />

@@ -7,9 +7,11 @@ import {
   listAdminDocuments,
   listAdminDocumentsPage,
   listDocumentMetrics,
+  getProject,
   listProjects,
   listUsers,
   transferAdminDocumentOwnership,
+  AdminRequestError,
   type AdminDocument,
   type AdminDocumentDetail,
   type AdminDocumentMetrics,
@@ -55,6 +57,7 @@ export function DocumentsPage() {
   const [purgeOpen, setPurgeOpen] = useState(false)
   const [batchPurgeOpen, setBatchPurgeOpen] = useState(false)
   const [ownerId, setOwnerId] = useState('')
+  const [memberIds, setMemberIds] = useState<Set<number> | null>(null)
   const [ownerSaving, setOwnerSaving] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [batchAction, setBatchAction] = useState(false)
@@ -78,7 +81,9 @@ export function DocumentsPage() {
         const pageResult = await listAdminDocumentsPage({ ...requestFilter, ...(cursor === undefined ? {} : { cursor }) })
         nextRows = pageResult.documents
         receivedCursor = pageResult.nextCursor
-      } catch {
+      } catch (cause) {
+        // A stale cursor answers 400; retry that one case from the page offset.
+        if (cursor === undefined || !(cause instanceof AdminRequestError) || cause.status !== 400) throw cause
         nextRows = await listAdminDocuments({ ...requestFilter, offset: pageOffset * PAGE_SIZE })
         receivedCursor = nextRows.length === PAGE_SIZE ? `offset:${String((pageOffset + 1) * PAGE_SIZE)}` : undefined
       }
@@ -128,9 +133,15 @@ export function DocumentsPage() {
 
   async function openDetail(row: AdminDocument) {
     setDetailLoading(true)
+    setMemberIds(null)
     try {
-      setDetail(await getAdminDocument(row.catalogId))
-      setOwnerId(row.owner === null ? '' : String(row.owner.id))
+      const next = await getAdminDocument(row.catalogId)
+      setDetail(next)
+      setOwnerId(next.document.owner === null ? '' : String(next.document.owner.id))
+      if (next.document.scope.kind === 'project' && next.document.scope.id !== undefined) {
+        const project = await getProject(next.document.scope.id)
+        setMemberIds(new Set(project.members.map(member => member.userId)))
+      }
     } catch (cause) {
       setError(messageFrom(cause))
     } finally {
@@ -262,7 +273,7 @@ export function DocumentsPage() {
       </Section>
 
       <Dialog open={detail !== null || detailLoading} title={detail?.document.name ?? '文档详情'} description="默认仅显示元数据；回收、恢复、永久清理和所有权变更都会写入审计日志。" wide onClose={() => { if (!deleteLoading && !ownerSaving) setDetail(null) }} footer={detail === null ? undefined : <><>{detail.document.state === 'active' && <Button type="button" onClick={() => setDeleteOpen(true)} variant="danger" icon={Trash2} disabled={deleteLoading}>移入回收站</Button>}{detail.document.state === 'trash' && <><Button type="button" onClick={() => void changeState('restore')} variant="secondary" disabled={deleteLoading}>恢复</Button><Button type="button" onClick={requestPurge} variant="danger" disabled={deleteLoading}>永久清理</Button></>}{detail.document.state === 'purged' && <StatusBadge tone="danger">已永久清理</StatusBadge>}</><Button type="button" onClick={() => setDetail(null)}>关闭</Button></>}>
-        {detailLoading || detail === null ? <LoadingState label="正在加载文档详情" /> : <div className="documentDetail"><dl className="definitionGrid"><Definition label="目录 ID"><span className="codeText">{detail.document.catalogId}</span></Definition><Definition label="作用域">{detail.document.scope.label}</Definition><Definition label="文件 ID"><span className="codeText">{detail.document.docId}</span></Definition><Definition label="大小">{formatBytes(detail.document.bytes)}</Definition><Definition label="状态">{documentStateLabel(detail.document.state)}</Definition><Definition label="来源">{documentOwnerSourceLabel(detail.document)}</Definition><Definition label="谱系根">{detail.document.lineageRootId === null ? '当前根文档' : <span className="codeText">{detail.document.lineageRootId}</span>}</Definition>{detail.document.purgeAfter !== undefined && detail.document.purgeAfter !== null && <Definition label="自动清理">{formatTime(detail.document.purgeAfter)}</Definition>}</dl>{detail.document.scope.kind === 'project' && detail.document.state === 'active' ? (<form className="ownershipForm" onSubmit={event => void transferOwner(event)}><Field label="所有者"><select className="select" value={ownerId} onChange={event => setOwnerId(event.target.value)} disabled={ownerSaving}>{users.map(user => <option key={user.id} value={user.id}>{user.displayName}（#{user.id}）</option>)}</select></Field><Button type="submit" variant="secondary" icon={ShieldCheck} loading={ownerSaving}>转移所有权</Button></form>) : <p className="muted">所有者：{detail.document.owner?.displayName ?? '未分配'}{detail.document.scope.kind === 'personal' ? '（个人文档归属其所在账号）' : ''}</p>}<div className="detailDivider" /><h3><History aria-hidden="true" />操作历史</h3>{detail.history.length === 0 ? <p className="muted">暂无历史记录。</p> : <ol className="historyList">{detail.history.map(item => <li key={item.id}><span><strong>{item.eventKind}</strong><small>{item.actor?.displayName ?? '系统'} · {formatTime(item.createdAt)}</small></span><span className="codeText">{item.operationId ?? '—'}</span></li>)}</ol>}<h3><FileText aria-hidden="true" />复制记录</h3>{detail.copies.length === 0 ? <p className="muted">暂无复制记录。</p> : <ul className="historyList">{detail.copies.map((item, index) => <li key={`${item.operationId}-${String(index)}`}><span><strong>{item.status}</strong><small>{item.source.name} → {item.targetDocId ?? '未生成'} · {formatTime(item.createdAt)}</small></span><span className="codeText">{item.operationId}</span></li>)}</ul>}</div>}
+        {detailLoading || detail === null ? <LoadingState label="正在加载文档详情" /> : <div className="documentDetail"><dl className="definitionGrid"><Definition label="目录 ID"><span className="codeText">{detail.document.catalogId}</span></Definition><Definition label="作用域">{detail.document.scope.label}</Definition><Definition label="文件 ID"><span className="codeText">{detail.document.docId}</span></Definition><Definition label="大小">{formatBytes(detail.document.bytes)}</Definition><Definition label="状态">{documentStateLabel(detail.document.state)}</Definition><Definition label="来源">{documentOwnerSourceLabel(detail.document)}</Definition><Definition label="谱系根">{detail.document.lineageRootId === null ? '当前根文档' : <span className="codeText">{detail.document.lineageRootId}</span>}</Definition>{detail.document.purgeAfter !== undefined && detail.document.purgeAfter !== null && <Definition label="自动清理">{formatTime(detail.document.purgeAfter)}</Definition>}</dl>{detail.document.scope.kind === 'project' && detail.document.state === 'active' ? (<form className="ownershipForm" onSubmit={event => void transferOwner(event)}><Field label="所有者"><select className="select" value={ownerId} onChange={event => setOwnerId(event.target.value)} disabled={ownerSaving || memberIds === null}>{(memberIds === null ? [] : users.filter(user => memberIds.has(user.id))).map(user => <option key={user.id} value={user.id}>{user.displayName}（#{user.id}）</option>)}</select></Field><Button type="submit" variant="secondary" icon={ShieldCheck} loading={ownerSaving}>转移所有权</Button></form>) : <p className="muted">所有者：{detail.document.owner?.displayName ?? '未分配'}{detail.document.scope.kind === 'personal' ? '（个人文档归属其所在账号）' : ''}</p>}<div className="detailDivider" /><h3><History aria-hidden="true" />操作历史</h3>{detail.history.length === 0 ? <p className="muted">暂无历史记录。</p> : <ol className="historyList">{detail.history.map(item => <li key={item.id}><span><strong>{item.eventKind}</strong><small>{item.actor?.displayName ?? '系统'} · {formatTime(item.createdAt)}</small></span><span className="codeText">{item.operationId ?? '—'}</span></li>)}</ol>}<h3><FileText aria-hidden="true" />复制记录</h3>{detail.copies.length === 0 ? <p className="muted">暂无复制记录。</p> : <ul className="historyList">{detail.copies.map((item, index) => <li key={`${item.operationId}-${String(index)}`}><span><strong>{item.status}</strong><small>{item.source.name} → {item.targetDocId ?? '未生成'} · {formatTime(item.createdAt)}</small></span><span className="codeText">{item.operationId}</span></li>)}</ul>}</div>}
       </Dialog>
       <Dialog open={deleteOpen} title="确认移入回收站" description="文档会从作用域中移入可恢复回收站，并写入审计日志。保留期结束后才会永久清理。" danger onClose={() => { if (!deleteLoading) setDeleteOpen(false) }} footer={<><Button type="button" onClick={() => setDeleteOpen(false)} disabled={deleteLoading}>取消</Button><Button type="button" variant="danger" loading={deleteLoading} onClick={() => void remove()}>移入回收站</Button></>} />
       <ConfirmDialog

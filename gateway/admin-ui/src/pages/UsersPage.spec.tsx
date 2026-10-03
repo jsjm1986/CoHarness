@@ -77,6 +77,25 @@ describe('UsersPage', () => {
     expect(screen.queryAllByText('ready')).toHaveLength(0)
   })
 
+  it('enables restart only while the instance is ready', async () => {
+    vi.mocked(api.listUsers).mockResolvedValue([{ ...alice, instanceState: 'ready' }])
+    const { unmount } = render(<MemoryRouter><UsersPage /></MemoryRouter>)
+    await screen.findAllByText('运行中')
+    const restart = screen.getAllByRole('button', { name: '重启实例' })[0]! as HTMLButtonElement
+    const start = screen.getAllByRole('button', { name: '启动实例' })[0]! as HTMLButtonElement
+    expect(restart.disabled).toBe(false)
+    expect(start.disabled).toBe(true)
+    await userEvent.click(restart)
+    await waitFor(() => expect(api.controlInstance).toHaveBeenCalledWith(1, 'restart'))
+    unmount()
+
+    vi.mocked(api.listUsers).mockResolvedValue([alice])
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
+    await screen.findAllByText('已停止')
+    expect((screen.getAllByRole('button', { name: '重启实例' })[0]! as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getAllByRole('button', { name: '启动实例' })[0]! as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it('shows Auto eligibility in both layouts and edits it without selecting a preset', async () => {
     const user = userEvent.setup()
     vi.mocked(api.patchUser).mockImplementation(async (_id, patch) => {

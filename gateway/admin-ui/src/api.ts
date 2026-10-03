@@ -280,12 +280,15 @@ export function listUserMemberships(userId: number): Promise<{ memberships: User
   return request(`/admin/api/users/${userId}/memberships`)
 }
 
+/** Row shape POST /admin/api/users answers — no instance join until the account is listed. */
+export type CreatedUser = Omit<AdminUser, 'port' | 'instanceState'>
+
 export function createUser(body: {
   username: string
   password: string
   role?: 'admin' | 'user'
   displayName?: string
-}): Promise<AdminUser> {
+}): Promise<CreatedUser> {
   return request('/admin/api/users', { method: 'POST', body: JSON.stringify(body) })
 }
 
