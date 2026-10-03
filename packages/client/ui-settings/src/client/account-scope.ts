@@ -335,59 +335,88 @@ export class AccountSettingsScopeController<T> implements SettingsScope<T> {
   }
 }
 
-/** A source that starts with account storage and falls back only on 404/501. */
+/**
+ * Fields the account preference endpoint accepts per namespace — the routing
+ * table of {@link AccountOrHostSettingsScopeController}. Mirrors the wire
+ * union on `AccountPreferenceMutation['field']`; client bundle purity forbids
+ * sharing the value across plugins.
+ */
+const ACCOUNT_FIELDS: Record<string, readonly string[]> = {
+  locale: ['preference'],
+  'ui-theme': ['preference'],
+  'ui-conversation': ['busyEnter', 'chatContentWidth', 'chatFullWidth', 'chatFontSize'],
+}
+
+/**
+ * A source that starts with account storage and falls back only on 404/501.
+ * The account endpoint accepts a fixed field whitelist per namespace; fields
+ * outside it keep reading and writing Host settings while the account layer
+ * stays authoritative for the whitelisted remainder.
+ */
 export class AccountOrHostSettingsScopeController<T> implements SettingsScope<T> {
   private readonly store: SnapshotStore<SettingsScopeSnapshot<T>>
   private readonly account: AccountSettingsScopeController<T>
+  private readonly accountFields: readonly string[]
   private active: SettingsScope<T>
   private accountStop: (() => void) | undefined
-  private hostStop: (() => void) | undefined
+  private readonly hostStop: () => void
   private disposed = false
 
   constructor(
     account: AccountSettingsScopeController<T>,
     private readonly host: SettingsScope<T>,
     private readonly mirror: AccountPreferencesMirror,
+    namespace: string,
   ) {
     this.account = account
     this.active = account
-    this.store = createSnapshotStore(account.getSnapshot())
+    this.accountFields = ACCOUNT_FIELDS[namespace] ?? []
+    this.store = createSnapshotStore(this.mergedSnapshot())
     this.accountStop = account.subscribe(() => {
-      const state = account.getSnapshot()
       if (this.mirror.getSnapshot().unsupported) {
         this.switchToHost()
         return
       }
-      this.publish(state)
+      this.publish()
     })
+    // Fields the account endpoint does not own read and write through the Host
+    // scope even while the account layer is active, so the Host subscription
+    // stays installed rather than arriving with a fallback switch.
+    this.hostStop = host.subscribe(() => { this.publish() })
     void this.mirror.ensure().then(() => {
       if (!this.disposed && this.mirror.getSnapshot().unsupported) this.switchToHost()
     })
-  /* jscpd:ignore-start -- the account and settings scopes intentionally keep
-   * the same delegation surface to their authoritative source. */
   }
-  /** @returns the active source snapshot. */
+
+  /* jscpd:ignore-start -- parallel SettingsScope implementations share the
+   * getSnapshot/subscribe/set/unset face by contract while their routing and
+   * publication differ. */
+  /** @returns the merged or fallback source snapshot. */
   getSnapshot(): SettingsScopeSnapshot<T> { return this.store.getSnapshot() }
 
-  /** @param listener - called after active-source changes. @returns disposer. */
+  /** @param listener - called after snapshot changes. @returns disposer. */
   subscribe(listener: () => void): () => void { return this.store.subscribe(listener) }
 
-  /** Write through the currently authoritative source. */
-  set(field: string, value: unknown): Promise<void> { return this.active.set(field, value) }
+  /** Write through the source owning the field. */
+  set(field: string, value: unknown): Promise<void> { return this.route(field).set(field, value) }
 
-  /** Clear through the currently authoritative source. */
-  unset(field: string): Promise<void> { return this.active.unset(field) }
+  /** Clear through the source owning the field. */
+  unset(field: string): Promise<void> { return this.route(field).unset(field) }
   /* jscpd:ignore-end */
 
   /** Dispose both source scopes. */
   async dispose(): Promise<void> {
     this.disposed = true
     this.accountStop?.()
-    this.hostStop?.()
+    this.hostStop()
     await Promise.all([
       disposeScope(this.account),
       disposeScope(this.host),
     ])
+  }
+
+  private route(field: string): SettingsScope<T> {
+    return this.accountFields.includes(field) ? this.active : this.host
   }
 
   private switchToHost(): void {
@@ -395,14 +424,53 @@ export class AccountOrHostSettingsScopeController<T> implements SettingsScope<T>
     this.active = this.host
     this.accountStop?.()
     this.accountStop = undefined
-    this.hostStop = this.host.subscribe(() => { this.publish(this.host.getSnapshot()) })
-    this.publish(this.host.getSnapshot())
+    this.publish()
   }
 
-  private publish(snapshot: SettingsScopeSnapshot<T>): void {
-    /* v8 ignore next -- the composite detaches its host listener during disposal. */
-    if (!this.disposed) this.store.set(snapshot)
+  private publish(): void {
+    /* v8 ignore next -- the composite detaches its listeners during disposal. */
+    if (this.disposed) return
+    this.store.set(this.active === this.account ? this.mergedSnapshot() : this.host.getSnapshot())
   }
+
+  /**
+   * Publish the account snapshot with the layers it does not own refilled
+   * from Host storage and the more urgent of the two write states.
+   */
+  private mergedSnapshot(): SettingsScopeSnapshot<T> {
+    const account = this.account.getSnapshot()
+    const host = this.host.getSnapshot()
+    return {
+      ...account,
+      value: mergeSectionLayer(host.value, account.value, this.accountFields) as T | undefined,
+      base: mergeSectionLayer(host.base, account.base, this.accountFields),
+      user: mergeSectionLayer(host.user, account.user, this.accountFields),
+      write: mergeWrite(account.write, host.write),
+    }
+  }
+}
+
+/** Overlay the account-owned fields of one section layer onto Host storage. */
+function mergeSectionLayer(host: unknown, account: unknown, fields: readonly string[]): unknown {
+  if (!isRecord(host) || !isRecord(account)) return account
+  const merged: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(host)) {
+    if (!fields.includes(key)) merged[key] = value
+  }
+  for (const field of fields) {
+    if (field in account) merged[field] = account[field]
+  }
+  return merged
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Surface the more urgent of the two source write states to the row. */
+function mergeWrite(account: SettingsWriteState, host: SettingsWriteState): SettingsWriteState {
+  const rank = { idle: 0, saving: 1, blocked: 2, error: 3 } as const
+  return rank[host.status] > rank[account.status] ? host : account
 }
 
 async function disposeScope(scope: SettingsScope<unknown>): Promise<void> {

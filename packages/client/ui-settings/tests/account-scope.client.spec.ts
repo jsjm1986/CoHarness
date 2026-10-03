@@ -366,7 +366,7 @@ describe('account settings scope', () => {
       mutate: () => Promise.resolve(initial),
     }, { namespace: 'locale' }, mirror)
     const host = hostScope()
-    const composite = new AccountOrHostSettingsScopeController(account, host, mirror)
+    const composite = new AccountOrHostSettingsScopeController(account, host, mirror, 'locale')
     await mirror.ensure()
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(composite.getSnapshot().mode).toBe('host')
@@ -389,7 +389,7 @@ describe('account settings scope', () => {
         return () => { hostListener = undefined }
       },
     }
-    const composite = new AccountOrHostSettingsScopeController(account, host, mirror)
+    const composite = new AccountOrHostSettingsScopeController(account, host, mirror, 'ui-theme')
     await mirror.ensure()
     await composite.set('preference', 'dark')
     expect(accountApi.calls).toHaveLength(1)
@@ -398,7 +398,7 @@ describe('account settings scope', () => {
       mutate: async () => initial,
     })
     const fallbackAccount = new AccountSettingsScopeController(accountApi, { namespace: 'ui-theme' }, unsupported)
-    const fallback = new AccountOrHostSettingsScopeController(fallbackAccount, host, unsupported)
+    const fallback = new AccountOrHostSettingsScopeController(fallbackAccount, host, unsupported, 'ui-theme')
     await unsupported.ensure()
     await new Promise(resolve => setTimeout(resolve, 0))
     await fallback.set('preference', 'light')
@@ -411,5 +411,92 @@ describe('account settings scope', () => {
     await fallback.dispose()
     await composite.dispose()
     retainedHostListener?.()
+  })
+
+  it('routes fields outside the account whitelist to the Host scope and merges both layers', async () => {
+    const accountApi = transport()
+    const mirror = new AccountPreferencesMirror(accountApi)
+    const account = new AccountSettingsScopeController(accountApi, { namespace: 'ui-conversation' }, mirror)
+    const hostSet = vi.fn(async () => {})
+    const hostUnset = vi.fn(async () => {})
+    const hostSnapshot: SettingsScopeSnapshot<unknown> = {
+      status: 'ready',
+      value: {
+        busyEnter: 'steer',
+        chatContentWidth: 640,
+        chatFullWidth: true,
+        chatFontSize: 16,
+        transcriptView: 'compact',
+        performanceUsage: 'detailed',
+        linkOpening: 'new-tab',
+      },
+      base: { transcriptView: 'detailed' },
+      user: { transcriptView: 'compact', busyEnter: 'steer' },
+      revision: 3,
+      writable: true, writableReason: undefined, write: { status: 'idle' }, mode: 'host',
+    }
+    let hostListener: (() => void) | undefined
+    const host: SettingsScope<unknown> = {
+      ...hostScope(),
+      getSnapshot: () => hostSnapshot,
+      set: hostSet,
+      unset: hostUnset,
+      subscribe: (listener: () => void) => {
+        hostListener = listener
+        return () => { hostListener = undefined }
+      },
+    }
+    const composite = new AccountOrHostSettingsScopeController(account, host, mirror, 'ui-conversation')
+    await mirror.ensure()
+    // Whitelisted fields carry the account layer while the Host-only fields
+    // the endpoint rejects keep their stored values and override marks.
+    expect(composite.getSnapshot().value).toEqual({
+      busyEnter: 'queue',
+      chatContentWidth: 748,
+      chatFullWidth: false,
+      chatFontSize: 14,
+      transcriptView: 'compact',
+      performanceUsage: 'detailed',
+      linkOpening: 'new-tab',
+    })
+    expect(composite.getSnapshot().user).toEqual({ transcriptView: 'compact' })
+    await composite.set('transcriptView', 'standard')
+    expect(hostSet).toHaveBeenCalledWith('transcriptView', 'standard')
+    expect(accountApi.calls).toHaveLength(0)
+    await composite.unset('performanceUsage')
+    expect(hostUnset).toHaveBeenCalledWith('performanceUsage')
+    await composite.set('busyEnter', 'steer')
+    expect(accountApi.calls).toHaveLength(1)
+    expect(accountApi.calls[0]?.field).toBe('busyEnter')
+    expect(composite.getSnapshot().user).toEqual({ transcriptView: 'compact', busyEnter: 'steer' })
+    // A Host-routed write failure still reaches the rendered write state.
+    hostSnapshot.write = { status: 'error', code: 'host-write', message: 'host write failed' }
+    hostListener?.()
+    expect(composite.getSnapshot().write).toEqual({ status: 'error', code: 'host-write', message: 'host write failed' })
+    await composite.dispose()
+  })
+
+  it('keeps the account layer whole for unmapped namespaces and unloaded Host sections', async () => {
+    const accountApi = transport()
+    const mirror = new AccountPreferencesMirror(accountApi)
+    const account = new AccountSettingsScopeController(accountApi, { namespace: 'ui-theme' }, mirror)
+    const unloaded: SettingsScopeSnapshot<unknown> = {
+      status: 'loading', value: undefined, base: undefined, user: undefined, revision: undefined,
+      writable: false, writableReason: 'account', write: { status: 'idle' }, mode: 'host',
+    }
+    const host: SettingsScope<unknown> = { ...hostScope(), getSnapshot: () => unloaded }
+    const composite = new AccountOrHostSettingsScopeController(account, host, mirror, 'ui-theme')
+    await mirror.ensure()
+    expect(composite.getSnapshot().value).toEqual({ preference: 'system' })
+    const unmapped = new AccountOrHostSettingsScopeController(
+      new AccountSettingsScopeController(accountApi, { namespace: 'unmapped' }, mirror),
+      host,
+      mirror,
+      'unmapped',
+    )
+    await unmapped.set('preference', 'dark')
+    expect(unmapped.getSnapshot().value).toBeUndefined()
+    await composite.dispose()
+    await unmapped.dispose()
   })
 })

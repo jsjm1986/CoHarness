@@ -386,6 +386,7 @@ export class SettingsScopeBinder extends Service {
           account as AccountSettingsScopeController<T>,
           host as SettingsScope<T>,
           this.accountMirror,
+          spec.namespace,
         )
         : host as SettingsScope<T>
     ctx.effect(() => {
