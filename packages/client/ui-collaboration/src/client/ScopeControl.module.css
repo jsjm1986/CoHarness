@@ -86,6 +86,15 @@
   --dsh-menu-max-height: min(480px, calc(100vh - 24px));
 }
 
+/* Panel-style header above the search field. */
+.menuHeader {
+  padding: 0 var(--dsw-space-1) var(--dsw-space-1);
+  color: var(--dsw-alias-label-caption);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
 .menuSearch {
   display: flex;
   align-items: center;
@@ -201,6 +210,48 @@
   display: flex;
   align-items: center;
   gap: var(--dsw-space-2);
+}
+
+/* Scope rows: a status dot, a single-line name, and a mode pill pinned to
+   the row's end so long project names truncate instead of wrapping. */
+.scopeRow {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+}
+
+.scopeName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scopeMode {
+  flex: none;
+  padding: 0 var(--dsw-space-1);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.scopeDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 5px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-tertiary);
+}
+
+.scopeDotOn {
+  composes: scopeDot;
+  background: var(--dsw-alias-brand-primary);
 }
 
 .badge {

@@ -152,7 +152,7 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * @param props.listClassName - optional class applied to the floating list rather than its trigger wrapper.
  * @returns anchor wrapper with the conditional list.
  */
-export function Menu({ open, anchor, items = [], children, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, autoFocus = false, getAnchorRect, header, footer, listClassName, className }: {
+export function Menu({ open, anchor, items = [], children, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, autoFocus = false, getAnchorRect, header, footer, listClassName, listStyle, className }: {
   open: boolean
   autoFocus?: boolean
   anchor: ReactNode
@@ -174,6 +174,8 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
   compact?: boolean
   getAnchorRect?: () => DOMRect | null
   listClassName?: string | undefined
+  /** Inline overrides on the list box (e.g. a measured width); merged under the portal's placement. */
+  listStyle?: CSSProperties | undefined
   className?: string | undefined
 }) {
   const rootRef = useRef<HTMLSpanElement>(null)
@@ -480,7 +482,7 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
     <div
       ref={listRef}
       className={clsx(css.list, listClassName, dense && css.denseList, compact && css.compactList, scrollable && css.scrollable, portal && css.portal, side === 'top' && !portal && css.sideTop, align === 'end' && !portal && css.alignEnd)}
-      style={portal ? fixedPos ?? MEASURE_STYLE : undefined}
+      style={portal ? { ...(fixedPos ?? MEASURE_STYLE), ...listStyle } : listStyle}
       role="menu"
       // React portals bubble synthetic events through the REACT tree: without
       // this stop, an item click re-fires the anchor row's own onClick

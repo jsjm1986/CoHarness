@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-03-scope-control-panel-menu.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-03-scope-control-panel-menu.md
+/agent-note-scope-switcher-as-a-sidebar-width-adaptive-panel-menu:
+  en: d9563dc5f434570b
+  zh: ca4b783217090a87
+/agent-note-scope-switcher-as-a-sidebar-width-adaptive-panel-menu/problem:
+  en: c601151766996ca6
+  zh: a13178728e963030
+/agent-note-scope-switcher-as-a-sidebar-width-adaptive-panel-menu/decision:
+  en: e4ee430152174e46
+  zh: 1ce79e15d8688caa
+/agent-note-scope-switcher-as-a-sidebar-width-adaptive-panel-menu/alternatives-considered:
+  en: 2bbdbb3dbf734329
+  zh: fdc83189166bd38a
+/agent-note-scope-switcher-as-a-sidebar-width-adaptive-panel-menu/consequences:
+  en: d809a2aaf57d728e
+  zh: 11f8b1336ace07b8

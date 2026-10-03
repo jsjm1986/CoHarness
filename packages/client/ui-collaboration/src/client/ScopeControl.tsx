@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconChevronDownOutline14, IconCloseFill14, IconGlobeOutline14, IconSearchOutline16,
@@ -70,6 +70,22 @@ export function ScopeControl({
 }: ScopeControlProps) {
   const state = useCollaboration(snapshot => snapshot)
   const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  // The menu tracks the trigger's rendered width — the sidebar is draggable,
+  // so the floating list re-measures on every layout change instead of
+  // pinning a fixed width.
+  const [menuWidth, setMenuWidth] = useState<number>()
+  useLayoutEffect(() => {
+    const trigger = triggerRef.current
+    if (trigger === null) return
+    const measure = (): void => {
+      setMenuWidth(Math.min(Math.max(trigger.offsetWidth, 240), 400))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(trigger)
+    return () => { observer.disconnect() }
+  }, [])
   const [managerMode, setManagerMode] = useState<ProjectManagerMode>()
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false)
   const [invitationCount, setInvitationCount] = useState(0)
@@ -103,14 +119,20 @@ export function ScopeControl({
   const projectEntries: MenuEntry[] = visibleProjects.map(project => ({
     id: `scope:project:${project.projectId}`,
     label: (
-      <span className={css.menuText}>
-        <span className={css.menuTitle}>{project.name}</span>
-        <span className={css.menuDescription}>
+      <span className={css.scopeRow}>
+        <span className={css.scopeName}>{project.name}</span>
+        <span className={css.scopeMode}>
           {project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
         </span>
       </span>
     ),
-    icon: <IconShareOutline16 size={16} />,
+    icon: (
+      <span
+        className={projectScope !== undefined && project.projectId === projectScope.projectId
+          ? css.scopeDotOn : css.scopeDot}
+        aria-hidden="true"
+      />
+    ),
     disabled: state.scopeBusy,
   }))
   if (visibleProjects.length === 0 && normalizedProjectQuery !== '') {
@@ -122,8 +144,14 @@ export function ScopeControl({
     { type: 'label', id: 'personal-label', text: t('scope.personal') },
     {
       id: 'scope:personal',
-      label: t('scope.personal'),
-      icon: <IconUserOutline16 size={16} />,
+      label: (
+        <span className={css.scopeRow}>
+          <span className={css.scopeName}>{t('scope.personal')}</span>
+        </span>
+      ),
+      icon: (
+        <span className={projectScope === undefined ? css.scopeDotOn : css.scopeDot} aria-hidden="true" />
+      ),
       disabled: state.scopeBusy,
     },
     { type: 'separator', id: 'scope-separator' },
@@ -197,31 +225,36 @@ export function ScopeControl({
     ? state.scopeBusy ? t('scope.switching') : t('scope.aria')
     : t('scope.failed')
   const iconSize = wide ? 16 : 18
-  const projectSearch = context.projects.length > 0 ? (
-    <div className={css.menuSearch}>
-      <span className={css.menuSearchIcon} aria-hidden="true">
-        <IconSearchOutline16 size={16} />
-      </span>
-      <input
-        type="search"
-        className={css.menuSearchInput}
-        aria-label={t('scope.searchAria')}
-        placeholder={t('scope.searchPlaceholder')}
-        value={projectQuery}
-        onChange={(event) => { setProjectQuery(event.currentTarget.value) }}
-      />
-      {projectQuery.length > 0 && (
-        <button
-          type="button"
-          className={css.menuSearchClear}
-          aria-label={t('scope.searchClear')}
-          onClick={() => { setProjectQuery('') }}
-        >
-          <span aria-hidden="true"><IconCloseFill14 size={14} /></span>
-        </button>
+  const projectSearch = (
+    <>
+      <div className={css.menuHeader}>{t('scope.menuTitle')}</div>
+      {context.projects.length > 0 && (
+        <div className={css.menuSearch}>
+          <span className={css.menuSearchIcon} aria-hidden="true">
+            <IconSearchOutline16 size={16} />
+          </span>
+          <input
+            type="search"
+            className={css.menuSearchInput}
+            aria-label={t('scope.searchAria')}
+            placeholder={t('scope.searchPlaceholder')}
+            value={projectQuery}
+            onChange={(event) => { setProjectQuery(event.currentTarget.value) }}
+          />
+          {projectQuery.length > 0 && (
+            <button
+              type="button"
+              className={css.menuSearchClear}
+              aria-label={t('scope.searchClear')}
+              onClick={() => { setProjectQuery('') }}
+            >
+              <span aria-hidden="true"><IconCloseFill14 size={14} /></span>
+            </button>
+          )}
+        </div>
       )}
-    </div>
-  ) : undefined
+    </>
+  )
 
   return (
     <>
@@ -232,6 +265,7 @@ export function ScopeControl({
         header={projectSearch}
         {...managerEntries.length > 0 ? { footer: managerEntries } : {}}
         listClassName={css.scopeMenu}
+        listStyle={menuWidth === undefined ? undefined : { width: menuWidth }}
         selectedIds={[
           currentScopeId,
           ...(projectScope?.mode === 'rw' ? [`visibility:${state.stagedVisibility}`] : []),
@@ -266,6 +300,7 @@ export function ScopeControl({
         anchor={(
           <button
             type="button"
+            ref={triggerRef}
             className={wide ? `${css.trigger} ${css.context}` : `${css.trigger} ${css.rail}`}
             aria-label={t('scope.aria')}
             aria-haspopup="menu"
