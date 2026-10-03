@@ -98,7 +98,7 @@ export function readLegacyWorkbenchRecord(visible: (id: SessionId) => boolean): 
   if (!object(view) && !object(catalog)) return undefined
   const activeId = object(catalog) && typeof catalog.activeId === 'string' ? catalog.activeId : 'default'
   const rows = object(catalog) && Array.isArray(catalog.workbenches) ? catalog.workbenches : []
-  if (!rows.some(item => object(item) && item.id === activeId)) rows.push({ id: activeId, name: '我的工作台' })
+  if (!rows.some(item => object(item) && item.id === activeId)) rows.push({ id: activeId, name: '' })
   const workbenches: SavedWorkbench[] = []
   for (const item of rows) {
     if (!object(item) || typeof item.id !== 'string' || !item.id || typeof item.name !== 'string'

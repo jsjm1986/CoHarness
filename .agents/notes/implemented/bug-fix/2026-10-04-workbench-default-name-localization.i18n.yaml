@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-04-workbench-default-name-localization.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-workbench-default-name-localization.md
+/agent-note-localize-workbench-default-and-copy-names-at-the-display-layer:
+  en: e629247be39726ff
+  zh: 04b189f097d3c312
+/agent-note-localize-workbench-default-and-copy-names-at-the-display-layer/problem:
+  en: e8680806f755c852
+  zh: 7d990318e6a7c170
+/agent-note-localize-workbench-default-and-copy-names-at-the-display-layer/decision:
+  en: 18b78d3e3d94deeb
+  zh: a981e8784545cd2c
+/agent-note-localize-workbench-default-and-copy-names-at-the-display-layer/files:
+  en: f432467763f84aee
+  zh: 4e7606a6b7fe0bdc
+/agent-note-localize-workbench-default-and-copy-names-at-the-display-layer/consequences:
+  en: 312faf7cfeabfb54
+  zh: 0ebc83e89f47bb1b

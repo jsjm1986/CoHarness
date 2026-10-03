@@ -179,12 +179,12 @@ export function WorkbenchToolbar({
           actions.closeWorkbenchMenu()
           if (id === '__new') { setWorkbenchName(''); setWorkbenchDialog('create') }
           else if (id === '__rename') { setWorkbenchName(currentWorkbench?.()?.name ?? ''); setWorkbenchDialog('rename') }
-          else if (id === '__duplicate') { setWorkbenchName(`${currentWorkbench?.()?.name ?? '我的工作台'} 副本`); setWorkbenchDialog('duplicate') }
+          else if (id === '__duplicate') { setWorkbenchName(t('workbenchCopy', { name: currentWorkbench?.()?.name || t('defaultWorkbenchName') })); setWorkbenchDialog('duplicate') }
           else if (id === '__delete') setDeleteWorkbenchOpen(true)
           else if (id === '__exit') setMode('single')
           else { setMode('workbench'); switchWorkbench?.(id) }
         }} items={[
-          ...(listWorkbenches?.() ?? [{ id: 'default', name: '我的工作台', paneIds: [], updatedAt: Date.now() }]).map(item => ({ id: item.id, label: `${item.name} · ${item.paneIds.length}/4` })),
+          ...(listWorkbenches?.() ?? [{ id: 'default', name: '', paneIds: [], updatedAt: Date.now() }]).map(item => ({ id: item.id, label: `${item.name || t('defaultWorkbenchName')} · ${item.paneIds.length}/4` })),
           { type: 'separator' as const, id: 'workbench-actions-separator' },
           { id: '__new', label: t('newWorkbench'), icon: <IconPlusOutline16 />, disabled: viewport.pendingIdentity === true },
           { id: '__rename', label: t('renameWorkbench'), icon: <IconEditOutline16 />, disabled: viewport.pendingIdentity === true },
@@ -192,7 +192,7 @@ export function WorkbenchToolbar({
           { id: '__delete', label: t('deleteWorkbench'), icon: <IconTrashOutline16 />, danger: true, disabled: viewport.pendingIdentity === true },
           { type: 'separator' as const, id: 'workbench-exit-separator' },
           { id: '__exit', label: t('exitWorkbench'), icon: <IconLogoutOutline16 /> },
-        ]} selectedId={viewport.mode === 'workbench' ? currentWorkbench?.()?.id : undefined} anchor={<button type="button" className={css.workbenchTrigger} aria-label={t('select')} aria-haspopup="menu" aria-expanded={workbenchMenuOpen} onClick={() => { actions.toggleWorkbenchMenu() }}>{viewport.mode === 'workbench' ? currentWorkbench?.()?.name ?? t('mode') : t('mode')} <IconChevronDownOutline14 /></button>} />
+        ]} selectedId={viewport.mode === 'workbench' ? currentWorkbench?.()?.id : undefined} anchor={<button type="button" className={css.workbenchTrigger} aria-label={t('select')} aria-haspopup="menu" aria-expanded={workbenchMenuOpen} onClick={() => { actions.toggleWorkbenchMenu() }}>{viewport.mode === 'workbench' ? currentWorkbench?.()?.name || t('defaultWorkbenchName') : t('mode')} <IconChevronDownOutline14 /></button>} />
         {viewport.mode === 'workbench' && <span className={css.paneCount} aria-label={`${viewport.paneIds.length}/4`}>{viewport.paneIds.length}/4</span>}
       </div>
       <div className={css.toolbarActions}>

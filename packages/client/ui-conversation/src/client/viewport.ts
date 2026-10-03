@@ -343,7 +343,7 @@ export class ConversationViewportController implements ConversationViewport {
   }
 
   listWorkbenches() { return [...this.workbenches.values()].map(item => ({ ...item, paneIds: [...item.paneIds] })) }
-  currentWorkbench() { const item = this.workbenches.get(this.activeWorkbenchId); return item === undefined ? { id: 'default', name: '我的工作台', paneIds: [], updatedAt: Date.now() } : { ...item, paneIds: [...item.paneIds] } }
+  currentWorkbench() { const item = this.workbenches.get(this.activeWorkbenchId); return item === undefined ? { id: 'default', name: '', paneIds: [], updatedAt: Date.now() } : { ...item, paneIds: [...item.paneIds] } }
   switchWorkbench(id: string): void {
     this.sessions.beginNavigation()
     const target = this.workbenches.get(id)
@@ -366,7 +366,9 @@ export class ConversationViewportController implements ConversationViewport {
     this.sessions.beginNavigation()
     const id = `workbench-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
     this.saveActiveWorkbench()
-    this.workbenches.set(id, { id, name: name.trim() || '我的工作台', paneIds: [], paneRatios: [], updatedAt: Date.now() })
+    // An empty stored name marks the row unnamed; the display layer renders
+    // its localized default label instead of a fixed-language fallback.
+    this.workbenches.set(id, { id, name: name.trim(), paneIds: [], paneRatios: [], updatedAt: Date.now() })
     this.activeWorkbenchId = id
     this.store.update((draft) => { draft.mode = 'workbench'; draft.paneIds = []; delete draft.activePaneId; draft.paneRatios = [] })
     this.persistWorkbenches()
@@ -381,7 +383,7 @@ export class ConversationViewportController implements ConversationViewport {
     this.saveActiveWorkbench()
     const target: SavedWorkbench = {
       id: nextId,
-      name: name.trim() || `${source?.name ?? '我的工作台'} 副本`,
+      name: name.trim(),
       paneIds: source === undefined ? [] : [...source.paneIds],
       paneRatios: source === undefined ? [] : [...source.paneRatios],
       updatedAt: Date.now(),
