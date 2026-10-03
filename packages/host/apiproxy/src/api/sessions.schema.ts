@@ -362,13 +362,9 @@ export const sessionPromptRequestSchema = z.object({
   requestId: rpcIdSchema.optional(),
 }) as unknown as z.ZodType<RequestPayload<'session.prompt'>>
 
-/** session.prompt response value (the command slot appears only when the prompt dispatched a slash command). */
+/** session.prompt response value. */
 export const sessionPromptValueSchema = z.object({
   accepted: z.literal(true),
-  command: z.object({
-    kind: z.literal('success'),
-    text: z.string().optional(),
-  }).optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'session.prompt'>>>
 
 /** Opaque attachment id after string-shape validation. */

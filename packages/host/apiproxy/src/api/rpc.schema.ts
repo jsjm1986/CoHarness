@@ -97,8 +97,6 @@ const rpcDomainErrorSchema = z.discriminatedUnion('code', [
   z.object({ code: z.literal('document-error'), message: z.string(), details: z.object({ reason: z.string() }) }),
   z.object({ code: z.literal('queue-item-not-found'), message: z.string(), details: z.object({ itemId: z.string() }) }),
   z.object({ code: z.literal('steer-unavailable'), message: z.string(), details: z.object({ itemId: z.string() }) }),
-  z.object({ code: z.literal('command-error'), message: z.string(), details: z.object({}) }),
-  z.object({ code: z.literal('unknown-command'), message: z.string(), details: z.object({}) }),
   z.object({
     code: z.literal('settings-rejected'), message: z.string(), details: z.object({
       ns: z.string(),

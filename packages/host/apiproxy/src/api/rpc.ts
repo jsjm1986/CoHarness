@@ -87,10 +87,6 @@ export interface RpcErrorDetailsMap {
   'document-error': { reason: string }
   'queue-item-not-found': { itemId: MessageId }
   'steer-unavailable': { itemId: MessageId }
-  /** A known slash command reported a usage/state error; the message is the command's own text. */
-  'command-error': {}
-  /** A leading-/ prompt named no registered command; the message names the token. */
-  'unknown-command': {}
   /**
    * A settings write was refused (schema validation, unknown namespace,
    * read-only provider, or storage failure); the message is the seam's text.
