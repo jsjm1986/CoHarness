@@ -222,20 +222,22 @@ export class AccountSettingsScopeController<T> implements SettingsScope<T> {
         return
       }
       this.setWrite({ status: 'saving' })
-      const revision = this.pendingRevision ?? this.getSnapshot().revision
       const mutation: AccountPreferenceMutation = {
         namespace: this.spec.namespace as AccountPreferenceMutation['namespace'],
         field: input.field as AccountPreferenceMutation['field'],
         operation: input.operation,
         ...(input.operation === 'set' ? { value: input.value as string | number } : {}),
-        /* v8 ignore next -- a ready account namespace always carries the mirror revision. */
-        ...(revision === undefined ? {} : { expectedRevision: revision }),
       }
-      try {
-        const transport = this.transport
-        /* v8 ignore next -- enqueue returns immediately when transport is absent. */
-        if (transport === undefined) return
-        const view = await transport.mutate(mutation)
+      const transport = this.transport
+      /* v8 ignore next -- enqueue returns immediately when transport is absent. */
+      if (transport === undefined) return
+      const attempt = async (): Promise<void> => {
+        const revision = this.pendingRevision ?? this.getSnapshot().revision
+        const view = await transport.mutate({
+          ...mutation,
+          /* v8 ignore next -- a ready account namespace always carries the mirror revision. */
+          ...(revision === undefined ? {} : { expectedRevision: revision }),
+        })
         if (this.disposed) return
         if (generation === this.generation) {
           this.pendingRevision = undefined
@@ -247,17 +249,43 @@ export class AccountSettingsScopeController<T> implements SettingsScope<T> {
           // still-pending value from the account UI.
           this.pendingRevision = view.revision
         }
+      }
+      try {
+        await attempt()
       } catch (error: unknown) {
-        // A failed latest write invalidates the response fence retained for a
-        // predecessor; the recovery read below supplies the only current
-        // revision. Keeping that predecessor would make the next edit send a
-        // stale expectedRevision after recovery.
+        // A stale expectedRevision is only a fence against concurrent
+        // writers: reload the mirror and retry once on the fresh revision
+        // before reporting a save failure to the row.
+        if (errorCode(error) !== 'account-preferences-conflict') {
+          await this.failWrite(generation, error)
+          return
+        }
         if (generation === this.generation) this.pendingRevision = undefined
         await this.mirror.load()
         if (this.disposed || generation !== this.generation) return
-        this.setWrite({ status: 'error', code: errorCode(error), message: messageOf(error) })
+        try {
+          await attempt()
+        } catch (retryError: unknown) {
+          await this.failWrite(generation, retryError)
+        }
       }
     })
+  }
+
+  /**
+   * Recover the mirror after a rejected write and publish the error state.
+   * @param generation - the write generation that failed; superseded failures publish nothing.
+   * @param error - the transport rejection being reported.
+   */
+  private async failWrite(generation: number, error: unknown): Promise<void> {
+    // A failed latest write invalidates the response fence retained for a
+    // predecessor; the recovery read below supplies the only current
+    // revision. Keeping that predecessor would make the next edit send a
+    // stale expectedRevision after recovery.
+    if (generation === this.generation) this.pendingRevision = undefined
+    await this.mirror.load()
+    if (this.disposed || generation !== this.generation) return
+    this.setWrite({ status: 'error', code: errorCode(error), message: messageOf(error) })
   }
 
   private enqueue(operation: () => Promise<void>): Promise<void> {

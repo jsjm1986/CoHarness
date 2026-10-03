@@ -322,6 +322,40 @@ describe('account settings scope', () => {
     await scope.dispose()
   })
 
+  it('retries a stale-revision write once on the recovered revision', async () => {
+    let current = structuredClone(initial)
+    const requests: AccountPreferenceMutation[] = []
+    const api: AccountPreferencesTransport = {
+      describe: async () => structuredClone(current),
+      mutate: async (mutation) => {
+        requests.push(mutation)
+        if (mutation.expectedRevision !== current.revision) {
+          throw Object.assign(new Error('stale'), { status: 409, code: 'account-preferences-conflict' })
+        }
+        current = {
+          ...current,
+          revision: current.revision + 1,
+          values: { ...current.values, 'ui-theme': { preference: mutation.value as 'light' | 'dark' | 'system' } },
+          overrides: { ...current.overrides, 'ui-theme': { preference: mutation.value as 'light' | 'dark' | 'system' } },
+        }
+        return structuredClone(current)
+      },
+    }
+    const mirror = new AccountPreferencesMirror(api)
+    const scope = new AccountSettingsScopeController(api, { namespace: 'ui-theme' }, mirror)
+    await mirror.ensure()
+    // A concurrent writer moves the shared revision between the mirror's read
+    // and this scope's write.
+    current = { ...current, revision: current.revision + 1 }
+    await scope.set('preference', 'dark')
+    expect(requests).toHaveLength(2)
+    expect(requests[0]?.expectedRevision).toBe(0)
+    expect(requests[1]?.expectedRevision).toBe(1)
+    expect(scope.getSnapshot().value).toEqual({ preference: 'dark' })
+    expect(scope.getSnapshot().write).toEqual({ status: 'idle' })
+    await scope.dispose()
+  })
+
   it('falls back to the Host scope only for an unsupported account endpoint', async () => {
     const mirror = new AccountPreferencesMirror({
       describe: async () => { throw Object.assign(new Error('missing'), { status: 404 }) },

@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-03-account-preferences-conflict-retry.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-03-account-preferences-conflict-retry.md
+/agent-note-retry-account-preference-writes-on-a-stale-revision-fence:
+  en: a99a46e31b7a29dd
+  zh: 69c21d1e2ea853e9
+/agent-note-retry-account-preference-writes-on-a-stale-revision-fence/problem:
+  en: 64f8d06139ddefc7
+  zh: 1aaf9a1041a3a058
+/agent-note-retry-account-preference-writes-on-a-stale-revision-fence/decision:
+  en: af03acc348345543
+  zh: bf25a1b3efed3a01
+/agent-note-retry-account-preference-writes-on-a-stale-revision-fence/alternatives-considered:
+  en: f6d0e5c6a9476bbb
+  zh: 22f2d427ccf9a480
+/agent-note-retry-account-preference-writes-on-a-stale-revision-fence/consequences:
+  en: 9288ffb67add4048
+  zh: a7c98df725ba9eff
