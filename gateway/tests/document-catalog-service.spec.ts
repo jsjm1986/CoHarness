@@ -29,8 +29,8 @@ describe('PostgresDocumentCatalogService sync', () => {
         return { rows: [], rowCount: 0 }
       }),
       release: vi.fn(),
-    } as unknown as PoolClient
-    const pool = { connect: vi.fn(async () => client) } as unknown as Pool
+    } as PoolClient
+    const pool = { connect: vi.fn(async () => client) } as Pool
     const service = new PostgresDocumentCatalogService({ ...context, pool })
 
     await service.sync({
@@ -53,7 +53,7 @@ describe('PostgresDocumentCatalogService sync', () => {
   })
 
   it('rejects duplicate runtime ids before opening a transaction', async () => {
-    const pool = { connect: vi.fn() } as unknown as Pool
+    const pool = { connect: vi.fn() } as Pool
     const service = new PostgresDocumentCatalogService({ ...context, pool })
     await expect(service.sync({
       actorUserId: 7, scope: { kind: 'personal', userId: 7 },
@@ -83,8 +83,8 @@ describe('PostgresDocumentCatalogService sync', () => {
         return { rows: [], rowCount: 0 }
       }),
       release: vi.fn(),
-    } as unknown as PoolClient
-    const pool = { connect: vi.fn(async () => client) } as unknown as Pool
+    } as PoolClient
+    const pool = { connect: vi.fn(async () => client) } as Pool
     const service = new PostgresDocumentCatalogService({ ...context, pool })
 
     await service.sync({
@@ -114,8 +114,8 @@ describe('PostgresDocumentCatalogService sync', () => {
         return { rows: [], rowCount: 0 }
       }),
       release: vi.fn(),
-    } as unknown as PoolClient
-    const pool = { connect: vi.fn(async () => client) } as unknown as Pool
+    } as PoolClient
+    const pool = { connect: vi.fn(async () => client) } as Pool
     const service = new PostgresDocumentCatalogService({ ...context, pool })
 
     await service.markDeletedBatch(7, { kind: 'personal', userId: 7 }, ['a.txt', 'b.txt', 'a.txt'])

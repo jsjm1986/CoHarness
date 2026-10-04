@@ -116,7 +116,7 @@ function terminalLabels(t: TranslateNS<typeof NS>): TerminalBlockLabels {
     // passes exit facts, so TerminalBlock never invokes them.
     /* v8 ignore next */
     signal: signal => t('terminal.signal', { signal }),
-    /* v8 ignore next */
+    /* v8 ignore next -- the panel never passes exit facts */
     exitCode: code => t('terminal.exitCode', { code }),
     noExitCode: t('terminal.noExitCode'),
     running: t('terminal.running'),
@@ -131,7 +131,7 @@ function terminalLabels(t: TranslateNS<typeof NS>): TerminalBlockLabels {
     // would invoke these stay unrendered.
     /* v8 ignore next */
     expandAria: hidden => t('terminal.expandAria', { n: hidden }),
-    /* v8 ignore next */
+    /* v8 ignore next -- the fold controls stay unrendered */
     expand: hidden => t('terminal.expand', { n: hidden }),
   }
 }

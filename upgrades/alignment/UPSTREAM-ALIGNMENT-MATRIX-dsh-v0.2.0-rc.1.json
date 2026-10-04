@@ -6332,7 +6332,7 @@
     },
     {
       "area": "packages/client/ui-plugin-manager",
-      "status": "reject",
+      "status": "adapt",
       "localOwner": "packages/client/ui-plugin-manager",
       "commitScope": [
         "packages/client/ui-plugin-manager/"
@@ -6340,7 +6340,7 @@
       "reviewState": "implemented-local-tests-passing",
       "phase": "P6",
       "phaseAssignment": "cross-audit-dsh-v0.2.0-rc.1",
-      "targetAssessment": "not-carried",
+      "targetAssessment": "increment-review-required",
       "cumulativeFiles": [
         "packages/client/ui-plugin-manager/README.i18n.yaml",
         "packages/client/ui-plugin-manager/README.md",
@@ -6368,17 +6368,13 @@
         "packages/client/ui-plugin-manager/tsconfig.json",
         "packages/client/ui-plugin-manager/tsdown.config.ts"
       ],
-      "localSovereignty": "upstreamOnly",
-      "upstreamOnly": {
-        "reason": "plugin management surfaces live in client/ui-settings-plugins"
-      },
-      "rejectReason": "plugin management surfaces live in client/ui-settings-plugins",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
         "area": "packages/client/ui-plugin-manager",
         "reviewState": "local-tests-passing-browser-unverified"
       },
-      "notes": "Cumulative dsh-v0.1.6-alpha.2→dsh-v0.2.0-rc.1 review 2026-10-02: 0/28 target files byte-identical locally; 0 carry fork diffs; 28 not carried; 0 removed upstream this round."
+      "notes": "Carried as the user-side plugin manager page (.agents/notes/implemented/feature/2026-10-03-user-side-plugin-manager-page.md); adapted from the upstream surface while settings-plugins keeps admin inventory."
     },
     {
       "area": "packages/client/ui-primitives",
