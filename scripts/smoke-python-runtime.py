@@ -282,6 +282,7 @@ def write_advanced_profile_patch(root: Path, name: str, sessions: Path) -> Path:
         },
         {"insert": [
             {"id": "cordis-host-runner", "name": "@deepseek-ai/dsh-cordis-host-runner"},
+            {"id": "cordis-inspect-providers", "name": "@deepseek-ai/dsh-tool-cordis/host"},
             {"id": "cordis-tool", "name": "@deepseek-ai/dsh-tool-cordis"},
         ]},
     ])
