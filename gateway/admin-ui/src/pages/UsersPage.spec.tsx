@@ -135,6 +135,21 @@ describe('UsersPage', () => {
     expect(api.patchUser).toHaveBeenCalledWith(1, { displayName: 'Renamed', role: 'admin' })
   })
 
+  it('renders in English when the persisted language selects it', async () => {
+    const storage = new Map<string, string>([['coharness-admin-language', 'en']])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+      removeItem: (key: string) => { storage.delete(key) },
+    })
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
+    expect(await screen.findAllByText('Stopped')).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Edit user' })).not.toHaveLength(0)
+    expect(screen.getAllByRole('button', { name: 'Disable user' })).not.toHaveLength(0)
+    expect(screen.getAllByRole('button', { name: 'Start instance' })).not.toHaveLength(0)
+    vi.unstubAllGlobals()
+  })
+
   it('confirms user deletion and removes the account from the list', async () => {
     vi.mocked(api.deleteUser).mockImplementation(async () => {
       vi.mocked(api.listUsers).mockResolvedValue([])
