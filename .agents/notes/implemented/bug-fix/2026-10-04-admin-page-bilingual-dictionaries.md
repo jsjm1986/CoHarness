@@ -17,6 +17,14 @@ One dictionary file per surface — `*.copy.ts` colocated with its page or compo
 - New dictionaries: `pages/{project-detail,webhooks,deployment,users,user-detail,models-page,ssh,terminals,archives,usage-page,audit,project-list,documents,desktops,node-configuration}.copy.ts`, `components/{models,resource-permissions,usage,archive-conversation,users,project-directory-browser,user-qualification-card,permissions}.copy.ts` — about 1,100 keys total.
 - Consumers: the matching `.tsx` files, each wired through `translateCopy(adminLanguage(), …)`; no component API changed.
 
+## Alternatives considered
+
+**One monolithic dictionary file for the whole admin.** Keys colocate with their consuming page or component; a shared thousand-key file would cross every page boundary and create merge churn on each page edit.
+
+**Translate the wire-delivered labels as well.** `node-config-fields.ts` `label`/`help`/`unit` and server error text ship over the wire without a per-request preference; keying them requires a protocol change, so they stay Chinese as a product boundary rather than client debt.
+
+**Wrap `t` ad hoc at render call sites.** `translateCopy` is a pure factory; binding it once with `useMemo` per component keeps parity cost at zero and matches the reload-on-switch contract instead of rebuilding a seat per render.
+
 ## Consequences
 
 Every admin page and shared component renders English when `coharness-admin-language` is `en`; default remains Chinese and all zh assertions pass unchanged. Any new admin copy must enter a dictionary as a `zh` key with an `en` entry — inline literals re-break parity. Wire-delivered copy (node configuration field labels, webhook API error messages, audit metadata values) is intentionally out of scope and stays server-language.

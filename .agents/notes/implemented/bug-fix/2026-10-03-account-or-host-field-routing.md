@@ -18,6 +18,14 @@ The composite routes each `set`/`unset` through `ACCOUNT_FIELDS`: whitelisted fi
 - `packages/client/ui-settings/src/client/settings-scope.ts` — passes `spec.namespace` to the composite.
 - `packages/client/ui-settings/tests/account-scope.client.spec.ts` — routing and merge regressions.
 
+## Alternatives considered
+
+**Route by namespace instead of by field.** One namespace mixes account-owned and Host-owned fields (`ui-conversation` carries `busyEnter` beside `transcriptView` and `linkOpening`), so a per-namespace route still misroutes rows inside the same section; only a field whitelist splits them correctly.
+
+**Keep a single source and let rejected fields report errors.** A field the endpoint cannot store rejects the whole namespace's write and reads never surface the Host-persisted value, so rows would show a permanent save failure for a field that is correctly stored elsewhere.
+
+**Share the whitelist constant with `dsh-client-connection`.** The client bundle purity gate forbids that import direction; duplicating `ACCOUNT_FIELDS` beside the namespace projection, which already hardcodes the same wire contract, keeps both literals at the contract edge.
+
 ## Consequences
 
 Settings rows backed by `account-or-host` write Host-only fields through the Host settings document; genuine Host write failures still surface as the row error state. Adding a field to the account endpoint whitelist requires updating `ACCOUNT_FIELDS`, the `AccountPreferenceMutation` union, and the mirror namespace projection together.

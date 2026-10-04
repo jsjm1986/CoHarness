@@ -17,6 +17,14 @@ Status: implemented
 - 新词典：`pages/{project-detail,webhooks,deployment,users,user-detail,models-page,ssh,terminals,archives,usage-page,audit,project-list,documents,desktops,node-configuration}.copy.ts`、`components/{models,resource-permissions,usage,archive-conversation,users,project-directory-browser,user-qualification-card,permissions}.copy.ts`，合计约 1,100 个键。
 - 消费方：对应 `.tsx` 文件各自接入 `translateCopy(adminLanguage(), …)`；组件 API 无变化。
 
+## 考虑过的替代方案
+
+**整个 admin 共用一份巨型词典。** 键与消费它的页面或组件就近放置；上千键集中在一份文件会跨越每个页面边界，每次页面修改都会在这里制造合并冲突。
+
+**连同 wire 下发的标签一起翻译。** `node-config-fields.ts` 的 `label`/`help`/`unit` 与服务端错误文本经 wire 下发，不携带逐请求偏好；对它们键化需要协议层改动，因此作为产品边界保持中文，而非客户端欠债。
+
+**在渲染调用点临时构造 `t`。** `translateCopy` 是纯工厂；每个组件用 `useMemo` 绑定一次翻译位让 parity 成本为零，并符合切换后重载生效的契约，而不是每次渲染重建。
+
 ## 影响
 
 `coharness-admin-language` 为 `en` 时全部管理页面与共享件渲染英文；默认仍为中文，全部 zh 断言原样通过。新管理文案必须以 `zh` 键加 `en` 词条进入词典——内联字面量会重新破坏键位对齐。经报文下发的文案（节点配置字段标签、Webhook API 错误消息、审计元数据值）刻意不在范围内，保持服务端语言。

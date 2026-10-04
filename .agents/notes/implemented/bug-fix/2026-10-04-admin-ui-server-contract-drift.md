@@ -29,6 +29,14 @@ Mirror server constraints at the form boundary and derive ledger facts from wire
 - `gateway/admin-ui/src/plugins/settings-store.ts` — `bundles`/`rows` derived from namespace keys.
 - `gateway/admin-ui/src/pages/WebhooksPage.spec.tsx`, `gateway/admin-ui/src/pages/UsersPage.spec.tsx`, `gateway/admin-ui/src/pages/DocumentsPage.spec.tsx`, `gateway/admin-ui/src/plugins/settings-store.spec.ts` — coverage for the new derivation, disabled-account filter, restart gating, and member filter.
 
+## Alternatives considered
+
+**Echo raw server errors verbatim.** The server's generic 400 names no field and arrives only after save; mirroring bounds at the form boundary points at the actual constraint before the request is sent.
+
+**Derive form validation from a shared generated schema.** No shared schema module exists between the admin SPA's plain-fetch layer and the gateway services; hand-mirrored bounds match the actual seam today, and the consequence section records that service-schema changes must update the validators in pairs.
+
+**Silently drop the `profile` field on the model-providers row.** A field the endpoint cannot honor must not disappear silently — the caller believes it was persisted while the catalog diverges; the route rejects it explicitly with a pointer to the owning endpoint.
+
 ## Consequences
 
 Forms refuse locally what the service would reject remotely, so save errors describe the actual constraint instead of `invalid webhook endpoint`/`invalid ssh target`. Editing an endpoint whose execution account was later disabled presents an empty select and forces a new active account, matching the delivery check. Adding a constraint to either service schema still requires updating the matching form validator by hand.

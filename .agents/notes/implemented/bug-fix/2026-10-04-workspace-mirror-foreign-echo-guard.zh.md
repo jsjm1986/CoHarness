@@ -19,6 +19,12 @@ Status: implemented
 - `packages/client/runtime/src/client/contract/sessions-port.ts` — port 的 Pick 增补 `runtimeTargetFor`。
 - `packages/client/runtime/tests/workspaces-service.client.spec.ts` — 外来回写拒绝与限定 key pin-drop 覆盖。
 
+## 考虑过的替代方案
+
+**把外来回写按 base 限定键重键后合并。** 返回的集合是外来注册表的完整 id 列表；按 base 键合并等于凭空编造 base 侧从未存在的成员关系。属主运行时自己的 `archived-sessions-changed`/池 `archivedByTarget` 路径才是该分区的权威——镜像丢弃外来回写而不是翻译它们。
+
+**在镜像内部逐集合追踪归属。** 归属是池经 `runtimeTargetFor` 已能回答的逐会话事实；在 `WorkspaceManager` 内建第二份归属索引只是复制同一知识，且随运行时增减或重绑而漂移。
+
 ## 后果
 
 项目运行时上的置顶/归档变更不再破坏 base 镜像的集合与归档版本；镜像丢弃外来回写，而该集合对所属运行时自己的池分区仍然权威。遗留缺口保持记录：外部运行时的 `pinned-sessions-changed` 帧仍无消费方，因此置顶只在 base 镜像覆盖的面内有意义——产品面不变。

@@ -21,6 +21,14 @@ A generic copy pair — `CopyPair<K>` plus `translateCopy(language, { zh, en })`
 - `gateway/admin-ui/src/plugins/locales.ts` — `wire*`/`composition*`/`settings*` error keys in both languages.
 - `gateway/admin-ui/src/plugins/{transport,composition,settings-store}.ts(x)` — every thrown or surfaced message resolved through `translatePlugin(adminLanguage())`.
 
+## Alternatives considered
+
+**A separate dictionary file per infrastructure module.** The infrastructure errors render through the plugins surface's existing notice plumbing, so their keys live beside the dictionary that surface already consumes; extra files only duplicate the parity boilerplate without a second renderer.
+
+**Translate the pages but leave the shell inline.** The chrome is the first surface rendered in every language and belongs to no page; keeping it inline leaves an English frame permanently impossible.
+
+**Detect `navigator.language` as the default.** The preference is an explicit per-admin choice and every spec pins Chinese as the default; a browser-locale default would flip those environments unpredictably and surprise shared machines.
+
 ## Consequences
 
 An English preference now renders the shell and the plugin management error channel in English; per-page bodies remain Chinese until their dictionaries land in the follow-up extraction. `translateCopy` is the single seat factory for new surface dictionaries — new copy files must keep `zh` as the key source so parity stays a compile-time property.

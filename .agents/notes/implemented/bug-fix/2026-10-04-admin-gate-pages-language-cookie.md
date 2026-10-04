@@ -19,6 +19,14 @@ The admin language seam lives in `localStorage`, which server-rendered pages can
 - `gateway/src/server.ts` — login/lockout/invalid and password-length errors through `gateCopy`; both pages receive the request's language.
 - `gateway/src/proxy.ts` — `stoppedPage`/`waitingPage` and the `INSTANCE_STOPPED` message through `gateLanguage`/`gateCopy`.
 
+## Alternatives considered
+
+**Keep the gate pages Chinese unconditionally.** Login, password, runtime-starting, and runtime-stopped are the first admin surfaces an operator sees; an English preference would still open on Chinese before the SPA could apply it.
+
+**Swap the text client-side after load.** The gate pages are server-rendered HTML outside the SPA; a post-load replacement flashes Chinese first and still leaves the `INSTANCE_STOPPED` JSON message and login/lockout errors untranslated.
+
+**Translate every server-emitted string.** `node-config-fields` labels, archive/document fallback titles, and push-notification bodies are wire or operator data with no per-request preference attached; the boundary is the server-rendered page, not every string the gateway produces.
+
 ## Consequences
 
 With `hgw_lang=en` the login, password, runtime-starting, and runtime-stopped pages render in English — verified live against the gateway. A browser that never opened the admin selector defaults to Chinese, matching the localStorage default.

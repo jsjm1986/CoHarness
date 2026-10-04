@@ -19,6 +19,12 @@ Whole-set unary echoes install only when the mutated session owns to the runtime
 - `packages/client/runtime/src/client/contract/sessions-port.ts` — `runtimeTargetFor` added to the port's Pick.
 - `packages/client/runtime/tests/workspaces-service.client.spec.ts` — foreign-echo rejection and qualified-key pin-drop coverage.
 
+## Alternatives considered
+
+**Re-key foreign echoes into the base qualified space and merge.** The returned set is the foreign registry's complete id list; merging it under base keys fabricates membership that never existed there. The owning runtime's own `archived-sessions-changed`/pool `archivedByTarget` path is the authority for its partition — the mirror discards foreign echoes rather than translating them.
+
+**Track per-set ownership inside the mirror.** Ownership is a per-session fact the pool already answers via `runtimeTargetFor`; a second ownership index inside `WorkspaceManager` duplicates that knowledge and drifts whenever runtimes are added or rebound.
+
 ## Consequences
 
 Pin/archive mutations on project-runtime sessions no longer clobber the base mirror's sets or its archive revision; the foreign registry's echo is discarded by the mirror while remaining authoritative for its own runtime's pool partition. The residual gap stays documented: a foreign runtime's `pinned-sessions-changed` frame still has no consumer, so pinning is only meaningful where the base mirror covers it — unchanged product surface.

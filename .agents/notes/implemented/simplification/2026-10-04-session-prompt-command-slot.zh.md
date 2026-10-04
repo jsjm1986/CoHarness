@@ -19,6 +19,12 @@
 - `packages/host/apiproxy/src/api/rpc.ts` / `rpc.schema.ts` — 错误目录移除 `command-error` 与 `unknown-command`。
 - `packages/host/apiproxy/tests/rpc-schemas.spec.ts` — 删除已移除码的目录断言。
 
+## 考虑过的替代方案
+
+**为前向兼容保留槽位。** 一个从未产出的可选成员和两个不可达错误码今天就误导 API 消费方与生成目录；将来伴随真实产生方重新加回，比现在维护死表面代价更低。
+
+**在 `session.prompt` 内实现命令分发以匹配文档契约。** 斜杠命令已经由 `remote.commands.execute` 走自己的 `command/run`/`command/done` 事件流执行；第二条分发路径会重复执行逻辑并把可观测性拆到两个通道。
+
 ## 影响
 
 wire 契约现在只声明 handler 实际产出的内容。今后进入该域的错误码必须在同一改动中指名活着的产生方；schema 成员必须有发射点。

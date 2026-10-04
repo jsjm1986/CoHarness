@@ -18,6 +18,14 @@
 - `packages/client/ui-settings/src/client/settings-scope.ts` — 向组合作用域传 `spec.namespace`。
 - `packages/client/ui-settings/tests/account-scope.client.spec.ts` — 路由与合并回归。
 
+## 考虑过的替代方案
+
+**按命名空间而不是按字段路由。** 一个命名空间混有账户字段与 Host 字段（`ui-conversation` 同时携带 `busyEnter` 与 `transcriptView`、`linkOpening`），按命名空间路由仍会把同区段内的行送错通道；只有字段白名单才能正确拆分。
+
+**保持单一数据源并让被拒字段报错。** 端点无法存储的字段会让整个命名空间的写入失败，读取也永远拿不到 Host 侧持久化的值，行会一直显示保存失败——尽管该字段其实在别处被正确存储。
+
+**与 `dsh-client-connection` 共享白名单常量。** 客户端产物纯净门禁禁止这个方向的导入；把 `ACCOUNT_FIELDS` 复制到命名空间投影旁边（那里本来就硬编码同一份 wire 契约），让两处字面量都停在契约边界上。
+
 ## 影响
 
 `account-or-host` 支撑的设置行把 Host 专属字段写入 Host 设置文档；真实的 Host 写失败仍会以行错误态上浮。向账户端点白名单新增字段需要同时更新 `ACCOUNT_FIELDS`、`AccountPreferenceMutation` 联合与镜像命名空间投影。

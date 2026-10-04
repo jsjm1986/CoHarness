@@ -21,6 +21,14 @@ Status: implemented
 - `gateway/admin-ui/src/plugins/locales.ts` — 双语的 `wire*`/`composition*`/`settings*` 错误键。
 - `gateway/admin-ui/src/plugins/{transport,composition,settings-store}.ts(x)` — 所有抛出或上抛的消息经 `translatePlugin(adminLanguage())` 解析。
 
+## 考虑过的替代方案
+
+**为每个基础设施模块建独立词典文件。** 这些错误本就经插件面的既有 notice 通道渲染，键应放在该面已消费的词典旁；新增文件只会重复 parity 样板，没有第二个渲染方。
+
+**只翻译页面、外壳保持内联。** 外壳是每种语言下最先渲染的面，不属于任何页面；保持内联意味着英文界面框架永远不可能出现。
+
+**以 `navigator.language` 作为默认值。** 语言是管理员显式选择的偏好，且全部规格测试钉死中文为默认；按浏览器语言默认会让这些环境变得不可预测，也会让共用机器上的管理员困惑。
+
 ## 影响
 
 英文偏好下外壳与插件管理错误通道均渲染英文；各页面正文在后续词典提取落地前保持中文。`translateCopy` 是新面词典的唯一翻译位工厂——新文案文件必须以 `zh` 为键源，使键位对齐保持编译期性质。

@@ -23,6 +23,14 @@ One persisted language seam, `adminLanguage()` in `src/language.ts`, reads a `co
 - `gateway/admin-ui/src/App.tsx` — `LanguageSelect` in the sidebar footer.
 - `gateway/admin-ui/src/language.spec.ts` — seam, interpolation, and fallback coverage.
 
+## Alternatives considered
+
+**Default to `navigator.language`.** The choice is an explicit per-admin preference and the spec corpus pins Chinese as the default; a browser-locale default would surprise shared machines and flip every zh assertion in non-English environments.
+
+**Add a translation overlay over the inline literals.** Roughly a hundred literals lived outside the dictionary, so parity could never be compile-time-enforced; extracting them into `locales.ts` makes `satisfies Record<PluginManagerLocaleKey, string>` the guard for every future key.
+
+**Localize every admin page in the same pass.** The dictionary is the boundary: pages without one stay Chinese rather than shipping half-translated surfaces; page extraction is follow-up work, not a partial rewrite here.
+
 ## Consequences
 
 The plugins page and the organization models editor render in English when the preference is set; everything else stays Chinese by design until its own dictionary exists. The translate seat is memoized once per component — language changes apply on reload, matching the persisted-preference contract.

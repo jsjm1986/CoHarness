@@ -20,6 +20,14 @@ Three gaps let a session archived while the client was away behave as a live con
 - `packages/client/runtime/src/client/workspaces/service.ts` — archive-union recheck in the initial-selection commit.
 - `packages/host/apiproxy/tests/api-proxy-workspace.spec.ts`, `packages/client/runtime/tests/{session-pool,workspaces-service}.client.spec.ts` — prompt refusal, owner deselection, and mid-commit archive coverage.
 
+## Alternatives considered
+
+**Client-side guards only.** A stale reconnect baseline, or any direct `session.prompt` caller, still submits before client state catches up; only the server-side admission check enforces the boundary at the write edge.
+
+**Reuse `clear()` for the deselection.** `clear()` begins a navigation and would abort an in-flight initial-selection intent, deadlocking the session in `opening`; `releaseSelection` drops only the selection and the persisted cell, letting a racing navigation retry through its `waiting` path.
+
+**Sweep at the pooled aggregate level.** The masked aggregate already hides the archived id from `workspaceRegistry.current`, so a Workspace-level sweep reads nothing to act on — the zombie lives in the owning runtime's raw `current`, which is exactly where `maskedSelections` releases it.
+
 ## Consequences
 
 A session archived elsewhere can no longer accept a prompt or remount after reload: the persisted selection cell clears when the baseline masks it, and the server refuses input during the connect window with a code the client already understands. In-flight navigation is never cancelled by masking — `releaseSelection` deliberately omits `beginNavigation`, so an initial selection racing an archive frame retries through its existing `waiting` path instead of deadlocking in `opening`. Read paths (`session.history`, attach) remain admitted on archived sessions; only input admission changed.

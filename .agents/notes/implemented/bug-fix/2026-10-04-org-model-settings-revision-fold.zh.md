@@ -21,6 +21,12 @@
 - `gateway/admin-ui/src/api.ts` — `ModelProviderInput` 去掉被静默忽略的 `profile` 成员。
 - `gateway/admin-ui/src/pages/UsagePage.tsx` — 成本微额 safe-integer 校验。
 
+## 考虑过的替代方案
+
+**每次写后重读整份文档。** mutate 应答本身就携带已接受的命名空间，一律重描使 wire 流量翻倍；加载只留给两种无返回视图的情形——冲突与凭证写入。
+
+**按修订号在客户端串行所有写入。** 共享修订号的排序已由服务端 `expectedRevision` 检查承担；客户端队列只会掩盖真实的并发管理员冲突，而不是把它们浮出来供重试。
+
 ## 影响
 
 包在 describe mirror 外的 REST facade 必须折叠每一个可能推动共享修订号的写答案，包括不返回视图的凭据写入。端点无法兑现的字段在路由处拒绝，不得静默丢弃。

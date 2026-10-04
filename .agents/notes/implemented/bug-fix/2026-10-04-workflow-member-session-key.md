@@ -16,7 +16,13 @@ The panel re-keys durable ids before touching the sessions list, following the u
 
 - `packages/client/ui-workflow-run/src/client/index.ts` — `sessionKey` injected from `ctx.sessions`.
 - `packages/client/ui-workflow-run/src/client/WorkflowRunPanel.tsx` — `navigableMembers`, `PhaseSection`, and `MemberRow` operate on presentation keys.
-- `packages/client/ui-workflow-run/tests/workflow-run.client.spec.ts` — regression covering a raw `childId` against a runtime-qualified list.
+- `packages/client/ui-workflow-run/tests/workflow-run.client.spec.tsx` — regression covering a raw `childId` against a runtime-qualified list.
+
+## Alternatives considered
+
+**Store qualified presentation keys in the durable event.** `workflow/agent-start` events are host-owned wire data; the runtime-identity re-keying is a client view projection and must not leak into the durable log, which stays raw.
+
+**Strip key prefixes at each consumer.** Re-implementing key parsing per surface duplicates the pool's canonical `keyFor` and silently drifts when the qualified-key format changes; asking the sessions service keeps the projection in one place.
 
 ## Consequences
 

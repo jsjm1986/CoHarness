@@ -19,6 +19,12 @@ Delete the dead surface: the orphaned doc block, the `command` member from the `
 - `packages/host/apiproxy/src/api/rpc.ts` / `rpc.schema.ts` — `command-error` and `unknown-command` removed from the error catalog.
 - `packages/host/apiproxy/tests/rpc-schemas.spec.ts` — domain-catalog assertions for the removed codes dropped.
 
+## Alternatives considered
+
+**Keep the slot for forward compatibility.** An unproduced optional member and two unreachable error codes mislead API consumers and generated catalogs today; re-adding the surface alongside a real producer later costs less than defending dead surface now.
+
+**Implement command dispatch inside `session.prompt` to match the documented contract.** Slash commands already execute through `remote.commands.execute` with its own `command/run`/`command/done` event stream; a second dispatch path would duplicate execution and split observability across two channels.
+
 ## Consequences
 
 The wire contract now states only what the handler produces. Error codes that re-enter this domain must name a live producer in the same change; schema members must have an emitter.

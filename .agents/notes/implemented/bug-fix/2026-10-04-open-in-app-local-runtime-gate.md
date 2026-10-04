@@ -18,6 +18,12 @@ Host-local actions resolve runtime ownership before offering themselves. The inj
 - `packages/client/ui-open-in-app/src/client/index.ts` — production injection via `ctx.sessions.runtimeTargetFor`.
 - `packages/client/ui-open-in-app/tests/open-in-app-action.client.spec.tsx` — foreign-target fixture renders nothing.
 
+## Alternatives considered
+
+**Probe whether the path exists on the page host.** Existence is not ownership: a foreign `cwd` can coincide with a local path, and filesystem probing from the UI leaks path information across runtimes; the runtime target is the authoritative ownership answer.
+
+**Forward the open request to the owning runtime.** The application catalog and the `open-in-app/open` route live on the page host; routing the request cross-runtime would need an execution protocol for what is a local convenience action.
+
 ## Consequences
 
 A remote session's `cwd` can no longer reach the page host's opener. The same gate pattern applies to any future action whose target route or catalog lives on the page host rather than the session's owning runtime: check `runtimeTargetFor` (or the equivalent ownership projection) before rendering, not just whether display fields happen to be populated.

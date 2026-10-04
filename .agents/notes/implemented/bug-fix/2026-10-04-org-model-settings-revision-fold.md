@@ -21,6 +21,12 @@ The admin organization models editor created a `SettingsDescribeMirror` over the
 - `gateway/admin-ui/src/api.ts` — `ModelProviderInput` drops the silently ignored `profile` member.
 - `gateway/admin-ui/src/pages/UsagePage.tsx` — safe-integer guard on cost micros.
 
+## Alternatives considered
+
+**Re-describe the whole document after every write.** The mutate answer already carries the accepted namespace, so a blanket reload doubles wire traffic where the answer suffices; loads stay reserved for the two cases that return no view — conflicts and credential writes.
+
+**Queue all writes client-side keyed by revision.** Ordering on the shared revision already lives in the server's `expectedRevision` check; a client queue would mask genuine concurrent-admin conflicts instead of surfacing them for retry.
+
 ## Consequences
 
 A REST facade wrapped in a describe mirror must fold every write answer that can move the shared revision, including credential writes that return no view. Fields that an endpoint cannot honor are rejected at the route, not dropped.

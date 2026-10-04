@@ -19,6 +19,14 @@ Status: implemented
 - `gateway/src/server.ts` — 登录/锁定/无效与密码长度错误走 `gateCopy`；两个页面按请求语言渲染。
 - `gateway/src/proxy.ts` — `stoppedPage`/`waitingPage` 与 `INSTANCE_STOPPED` 消息走 `gateLanguage`/`gateCopy`。
 
+## 考虑过的替代方案
+
+**闸口页无条件保持中文。** 登录、改密、启动中与已停止页是运维人员最先看到的 admin 面；即使偏好为英文，SPA 生效前仍会先命中中文页面。
+
+**加载后在客户端替换文案。** 闸口页是 SPA 之外的服务端渲染 HTML；加载后替换会先闪一遍中文，且 `INSTANCE_STOPPED` JSON 消息与登录/锁定错误仍是中文。
+
+**翻译服务端产出的全部字符串。** `node-config-fields` 标签、归档/文档回退标题、推送正文都是 wire 或运维数据，不携带逐请求偏好；边界是服务端渲染页，而不是网关产出的每一条字符串。
+
 ## 影响
 
 `hgw_lang=en` 时登录、改密、运行时启动中、已停止页均渲染英文——已对线上网关实证。从未打开过管理语言选择器的浏览器按 localStorage 默认回落到中文。

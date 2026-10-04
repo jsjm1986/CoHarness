@@ -19,6 +19,12 @@ Status: implemented
 - `packages/client/ui-conversation/src/client/viewport.ts` — `currentWorkbench`、`createWorkbench`、`duplicateWorkbench` 使用空名哨兵。
 - `packages/client/ui-conversation/src/client/workbench-persistence.ts` — 目录恢复使用空名哨兵。
 
+## 考虑过的替代方案
+
+**创建时持久化本地化名称。** 那会把创建时的语言写进持久数据：中文环境下建的工作台在切换到英文后仍渲染中文，且该字符串与用户手输的名字无法区分。
+
+**把既有的中文默认值迁移为空。** 已存的「我的工作台」无法与用户刻意输入的同名相区分；凭猜测改写用户数据比保留旧字面量更糟，新代码把它当作普通名字处理。
+
 ## 后果
 
 英文模式显示 "My workbench"/"… copy"，中文模式渲染文本与此前一致，因此现有中文模式测试钉住的渲染文本不变。持久化名称现在与语言无关：未输入名称创建的工作台按当前语言环境显示，而不是按创建时的语言环境。展示 `SavedWorkbench.name` 的调用方必须套用同样的空名映射；目前工具栏是唯一消费方。

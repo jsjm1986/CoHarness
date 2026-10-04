@@ -20,6 +20,14 @@ Status: implemented
 - `packages/client/runtime/src/client/workspaces/service.ts` — 初始选择提交中的归档并集复查。
 - `packages/host/apiproxy/tests/api-proxy-workspace.spec.ts`、`packages/client/runtime/tests/{session-pool,workspaces-service}.client.spec.ts` — prompt 拒绝、持有方去选、提交中归档的覆盖。
 
+## 考虑过的替代方案
+
+**只做客户端侧守卫。** 过期的重连基线、或任何直接调用 `session.prompt` 的方，仍会在客户端状态追上来之前提交输入；只有服务端准入检查在写边界上真正强制。
+
+**复用 `clear()` 做去选。** `clear()` 会开始导航，把在途初始选择意图中止成永久 `opening` 死锁；`releaseSelection` 只丢弃选择与持久化格子，让竞态导航沿 `waiting` 路径重试。
+
+**在池聚合层清扫。** 掩码后的聚合已经把归档 id 从 `workspaceRegistry.current` 中隐藏，Workspace 级清扫读不到任何可处理的对象——僵尸活在属主运行时的原始 `current` 里，正是 `maskedSelections` 释放它的位置。
+
 ## 后果
 
 在他处被归档的会话不再能接受 prompt 或在刷新后重新挂载：基线掩掉时持久化选择单元被清除，服务端在连接窗口内用客户端已认识的错误码拒绝输入。掩码永远不会取消在途导航——`releaseSelection` 刻意不调用 `beginNavigation`，因此与归档帧竞速的初始选择通过既有 `waiting` 路径重试，而不是死锁在 `opening`。读取路径（`session.history`、attach）对已归档会话仍然放行；只有输入准入发生了变化。

@@ -16,7 +16,13 @@
 
 - `packages/client/ui-workflow-run/src/client/index.ts` — 从 `ctx.sessions` 注入 `sessionKey`。
 - `packages/client/ui-workflow-run/src/client/WorkflowRunPanel.tsx` — `navigableMembers`、`PhaseSection`、`MemberRow` 改为操作展示键。
-- `packages/client/ui-workflow-run/tests/workflow-run.client.spec.ts` — 覆盖原始 `childId` 命中限定键列表的回归。
+- `packages/client/ui-workflow-run/tests/workflow-run.client.spec.tsx` — 覆盖原始 `childId` 命中限定键列表的回归。
+
+## 考虑过的替代方案
+
+**在持久事件中存限定表示键。** `workflow/agent-start` 事件是 Host 侧持有的 wire 数据；按运行时身份重键是客户端视图投影，不能漏进持久日志——日志保持原始 id。
+
+**在每个消费方剥离键前缀。** 各面各自重实现键解析会复制池中权威的 `keyFor`，并在限定键格式变化时静默漂移；向 sessions 服务索取键让投影保持单点。
 
 ## 影响
 

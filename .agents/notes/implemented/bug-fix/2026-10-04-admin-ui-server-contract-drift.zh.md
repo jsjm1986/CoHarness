@@ -29,6 +29,14 @@
 - `gateway/admin-ui/src/plugins/settings-store.ts` — 从命名空间键推导 `bundles`/`rows`。
 - `gateway/admin-ui/src/pages/WebhooksPage.spec.tsx`、`gateway/admin-ui/src/pages/UsersPage.spec.tsx`、`gateway/admin-ui/src/pages/DocumentsPage.spec.tsx`、`gateway/admin-ui/src/plugins/settings-store.spec.ts` — 覆盖新推导、停用账号过滤、重启门控与成员过滤。
 
+## 考虑过的替代方案
+
+**原样上抛服务端错误。** 服务端笼统的 400 不指名字段，且只在保存后到达；在表单边界镜像约束能在请求发出前指向真实的限制项。
+
+**从共享生成 schema 推导表单校验。** admin SPA 的裸 fetch 层与网关服务之间没有共享 schema 模块；手工镜像的边界匹配当前真实的接缝，影响一节已记录服务 schema 变更必须成对更新校验器。
+
+**在 model-providers 行路由上静默丢弃 `profile`。** 端点无法兑现的字段不能静默消失——调用方以为已持久化而目录发生分叉；路由显式拒绝并指向所属端点。
+
 ## 影响
 
 表单在本地拒绝服务端会远程拒绝的值，保存错误描述真实约束而不是笼统的 `invalid webhook endpoint`/`invalid ssh target`。编辑执行账号后来被停用的端点会呈现空选择并强制重选一个活跃账号，与投递校验一致。任一服务 schema 新增约束仍需手工同步对应表单校验。
