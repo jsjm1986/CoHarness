@@ -246,6 +246,7 @@
   height: 6px;
   margin: 0 5px;
   border-radius: 50%;
+  corner-shape: round;
   background: var(--dsw-alias-label-tertiary);
 }
 

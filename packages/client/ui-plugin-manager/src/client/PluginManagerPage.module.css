@@ -1204,7 +1204,7 @@ label.registryOption {
 }
 
 .detailName code {
-  font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--ds-font-family-code);
 }
 
 /* The unknown-package note under the name block. */
@@ -1308,7 +1308,7 @@ label.registryOption {
 }
 
 .rowModule {
-  font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--ds-font-family-code);
   font-size: 11.5px;
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary);

@@ -520,7 +520,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--dsw-alias-text-link, var(--dsw-alias-label-secondary));
+  color: var(--dsw-alias-label-secondary);
   font-size: 13px;
   cursor: pointer;
 }
