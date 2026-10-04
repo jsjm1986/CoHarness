@@ -1,0 +1,53 @@
+/** Shared resource-permission editor copy: subject picker, grant switch, save, and revision notes. */
+
+export const zh = {
+  updateFailed: '无法更新授权',
+  ownerUser: '用户 · {name} (@{username})',
+  ownerProject: '项目 · {name}',
+  noticeRevoked: '准入资格已撤销，已通知运行中的会话重新核验。',
+  errorReread: '{error}。请重新读取当前授权。',
+  titleUser: '{name}准入资格',
+  titleProject: '{name}项目授权',
+  projectOnlyHint: '用户主体的{name}准入资格在「用户」详情页按用户管理。',
+  loadingOwners: '正在加载授权对象',
+  ownerField: '授权对象',
+  ownerAria: '{name}授权对象',
+  ownerPlaceholderUser: '请选择用户或项目',
+  ownerPlaceholderProject: '请选择项目',
+  ownersReload: '重新加载授权对象',
+  loadingPolicy: '正在读取{name}授权',
+  grantUserLabel: '授予此用户{name}资格',
+  grantProjectLabel: '允许此项目使用{name}',
+  sourceDefault: '来源：默认拒绝；保存后按当前权限核验，不改变模型权限模式。',
+  sourceAdmin: '来源：管理员设置 · 版本 {revision}；保存后按当前权限核验，不改变模型权限模式。',
+  saving: '正在保存',
+  saveLabel: '保存{name}授权',
+  reread: '重新读取授权',
+} satisfies Record<string, string>
+
+export type ResourcePermissionsCopyKey = keyof typeof zh
+
+export const en = {
+  updateFailed: 'The grant could not be updated',
+  ownerUser: 'User · {name} (@{username})',
+  ownerProject: 'Project · {name}',
+  noticeRevoked: 'The qualification has been revoked and running sessions have been notified to re-verify.',
+  errorReread: '{error} Reload the current grant.',
+  titleUser: '{name} qualification',
+  titleProject: '{name} project grant',
+  projectOnlyHint: 'The {name} qualification for user subjects is managed per user on the user detail page.',
+  loadingOwners: 'Loading grant subjects',
+  ownerField: 'Grant subject',
+  ownerAria: '{name} grant subject',
+  ownerPlaceholderUser: 'Select a user or project',
+  ownerPlaceholderProject: 'Select a project',
+  ownersReload: 'Reload grant subjects',
+  loadingPolicy: 'Loading the {name} grant',
+  grantUserLabel: 'Grant this user the {name} qualification',
+  grantProjectLabel: 'Allow this project to use {name}',
+  sourceDefault: 'Source: denied by default. Access is re-verified against the current permission after saving; the model permission mode does not change.',
+  sourceAdmin: 'Source: set by an administrator · revision {revision}. Access is re-verified against the current permission after saving; the model permission mode does not change.',
+  saving: 'Saving',
+  saveLabel: 'Save the {name} grant',
+  reread: 'Reload grant',
+} satisfies Record<ResourcePermissionsCopyKey, string>

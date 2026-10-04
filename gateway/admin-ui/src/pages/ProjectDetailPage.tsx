@@ -26,6 +26,7 @@ import {
   type UsageSummary,
   type UsageContributorReport,
 } from '../api.ts'
+import { adminLanguage, translateCopy } from '../language.ts'
 import {
   Button,
   ConfirmDialog,
@@ -40,6 +41,7 @@ import {
   Switch,
 } from '../components/ui.tsx'
 import { formatCompact, formatMoney, Metric, PricingState, QuotaSummary } from '../components/usage.tsx'
+import { zh as copyZh, en as copyEn, type ProjectDetailCopyKey } from './project-detail.copy.ts'
 
 type MatrixMode = GrantMode | 'none'
 type ProjectQuotaSource = 'inherit' | 'independent'
@@ -82,10 +84,11 @@ export function ProjectDetailPage() {
   const [modelPending, setModelPending] = useState('')
   const [runtimeAction, setRuntimeAction] = useState<'start' | 'stop' | 'restart' | null>(null)
   const [runtimeError, setRuntimeError] = useState('')
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
 
   const reload = useCallback(async (showLoading = false) => {
     if (!Number.isInteger(projectId) || projectId <= 0) {
-      setError('项目 ID 无效')
+      setError(t('invalidProjectId'))
       setLoading(false)
       return
     }
@@ -101,13 +104,13 @@ export function ProjectDetailPage() {
     } finally {
       if (showLoading) setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, t])
 
   useEffect(() => { void reload(true) }, [reload])
 
   const reloadUsage = useCallback(async (showLoading = false) => {
     if (!Number.isInteger(projectId) || projectId <= 0) {
-      setUsageError('项目 ID 无效')
+      setUsageError(t('invalidProjectId'))
       setUsageLoading(false)
       return
     }
@@ -129,13 +132,13 @@ export function ProjectDetailPage() {
     } finally {
       if (showLoading) setUsageLoading(false)
     }
-  }, [month, projectId])
+  }, [month, projectId, t])
 
   useEffect(() => { void reloadUsage(true) }, [reloadUsage])
 
   const reloadModelAccess = useCallback(async (showLoading = false) => {
     if (!Number.isInteger(projectId) || projectId <= 0) {
-      setModelsError('项目 ID 无效')
+      setModelsError(t('invalidProjectId'))
       setModelsLoading(false)
       return
     }
@@ -157,7 +160,7 @@ export function ProjectDetailPage() {
     } finally {
       if (showLoading) setModelsLoading(false)
     }
-  }, [projectId])
+  }, [projectId, t])
 
   useEffect(() => { void reloadModelAccess(true) }, [reloadModelAccess])
 
@@ -286,11 +289,11 @@ export function ProjectDetailPage() {
         const parsedToken = Number(tokenLimit)
         const parsedCost = Number(costLimit)
         if (tokenMode === 'custom' && (!Number.isSafeInteger(parsedToken) || parsedToken < 0)) {
-          throw new Error('Token 额度必须是非负整数')
+          throw new Error(t('quotaTokenInvalid'))
         }
         const costMicros = Math.round(parsedCost * 1_000_000)
         if (costMode === 'custom' && (!Number.isFinite(parsedCost) || parsedCost < 0 || !Number.isSafeInteger(costMicros))) {
-          throw new Error('成本额度必须是有效的非负数')
+          throw new Error(t('quotaCostInvalid'))
         }
         nextTokenLimit = tokenMode === 'unlimited' ? null : parsedToken
         nextCostLimit = costMode === 'unlimited' ? null : costMicros
@@ -312,124 +315,127 @@ export function ProjectDetailPage() {
 
   return (
     <div className="page projectDetailPage">
-      <Link className="breadcrumb" to="/projects"><ArrowLeft aria-hidden="true" />返回项目</Link>
+      <Link className="breadcrumb" to="/projects"><ArrowLeft aria-hidden="true" />{t('backToProjects')}</Link>
       <PageHeader
-        title={project?.name ?? '项目详情'}
+        title={project?.name ?? t('pageTitle')}
         description={project?.path}
-        meta={project === null ? undefined : `${project.memberCount} 位成员`}
-        actions={project === null ? undefined : <Button icon={Pencil} onClick={() => { setRenameError(''); setProjectName(project.name); setRenameOpen(true) }}>重命名</Button>}
+        meta={project === null ? undefined : t('membersCount', { count: String(project.memberCount) })}
+        actions={project === null ? undefined : <Button icon={Pencil} onClick={() => { setRenameError(''); setProjectName(project.name); setRenameOpen(true) }}>{t('rename')}</Button>}
       />
       <ErrorBanner message={error} />
-      {loading ? <Section><LoadingState label="正在加载项目" /></Section> : project === null ? (
-        <Section><EmptyState title="无法加载项目" detail="请返回项目列表后重试。" /></Section>
+      {loading ? <Section><LoadingState label={t('loadingProject')} /></Section> : project === null ? (
+        <Section><EmptyState title={t('loadFailedTitle')} detail={t('loadFailedDetail')} /></Section>
       ) : (
         <>
-          <div className="projectMetadata" aria-label="项目来源信息">
-            <StatusBadge tone={project.origin === 'user' ? 'info' : 'neutral'}>{project.origin === 'user' ? '用户发起' : '管理员发起'}</StatusBadge>
-            <span>所有者：{project.owner?.displayName || project.owner?.username || '组织管理'}</span>
-            <span>创建者：{project.createdBy?.displayName || project.createdBy?.username || '未知'}</span>
+          <div className="projectMetadata" aria-label={t('metadataAria')}>
+            <StatusBadge tone={project.origin === 'user' ? 'info' : 'neutral'}>{project.origin === 'user' ? t('originUser') : t('originAdmin')}</StatusBadge>
+            <span>{t('ownerValue', { name: project.owner?.displayName || project.owner?.username || t('ownerFallback') })}</span>
+            <span>{t('creatorValue', { name: project.createdBy?.displayName || project.createdBy?.username || t('creatorFallback') })}</span>
           </div>
-          <Section className="projectConfigurationSection" title="项目配置归属" meta="用户前端管理" actions={(
+          <Section className="projectConfigurationSection" title={t('configSectionTitle')} meta={t('configSectionMeta')} actions={(
             <a className="button button-secondary" href={`/admin/projects/${String(project.id)}/settings`}>
-              <ExternalLink size={15} aria-hidden="true" />打开项目设置
+              <ExternalLink size={15} aria-hidden="true" />{t('openProjectSettings')}
             </a>
           )}>
-            <div className="projectConfigurationSummary" aria-label="项目配置归属摘要">
+            <div className="projectConfigurationSummary" aria-label={t('configSummaryAria')}>
               <div>
-                <span className="definitionLabel">项目设置</span>
-                <strong>由用户前端的项目设置面板管理</strong>
-                <p>这里仅展示服务器资源和当前生效摘要，不提供用户个人偏好或项目逻辑配置编辑。</p>
+                <span className="definitionLabel">{t('settingsLabel')}</span>
+                <strong>{t('settingsValue')}</strong>
+                <p>{t('settingsNote')}</p>
               </div>
               <div>
-                <span className="definitionLabel">项目主题策略</span>
+                <span className="definitionLabel">{t('themePolicyField')}</span>
                 <StatusBadge tone={project.configurationSummary?.themePolicy === 'follow-user' ? 'neutral' : 'info'}>
                   {themePolicyLabel(project.configurationSummary?.themePolicy ?? project.uiThemePolicy)}
                 </StatusBadge>
               </div>
               <div>
-                <span className="definitionLabel">共享运行时</span>
+                <span className="definitionLabel">{t('sharedRuntimeLabel')}</span>
                 <span>{project.configurationSummary === undefined
-                  ? '状态未知'
+                  ? t('runtimeStateUnknown')
                   : `${project.configurationSummary.runtimeState} · generation ${String(project.configurationSummary.runtimeGeneration)}`}</span>
-                <div className="formActions" aria-label="项目实例操作">
+                <div className="formActions" aria-label={t('runtimeActionsAria')}>
                   {(['start', 'stop', 'restart'] as const).map(action => (
                     <Button key={action} disabled={pending !== ''} onClick={() => { setRuntimeError(''); setRuntimeAction(action) }}>
-                      {action === 'start' ? '启动实例' : action === 'stop' ? '停止实例' : '重启实例'}
+                      {action === 'start' ? t('instanceStart') : action === 'stop' ? t('instanceStop') : t('instanceRestart')}
                     </Button>
                   ))}
                 </div>
               </div>
               <div>
-                <span className="definitionLabel">项目 Provider</span>
+                <span className="definitionLabel">{t('providerLabel')}</span>
                 <span>{project.configurationSummary?.projectModels === undefined
-                  ? '未启用项目 Provider'
-                  : `${String(project.configurationSummary.projectModels.providerCount)} 个 · revision ${String(project.configurationSummary.projectModels.revision)}`}</span>
+                  ? t('providerNone')
+                  : t('providerCount', {
+                    count: String(project.configurationSummary.projectModels.providerCount),
+                    revision: String(project.configurationSummary.projectModels.revision),
+                  })}</span>
               </div>
               <div>
-                <span className="definitionLabel">服务器目录</span>
-                <span>仅管理员可在 /admin 管理</span>
+                <span className="definitionLabel">{t('serverDirectoryLabel')}</span>
+                <span>{t('serverDirectoryValue')}</span>
               </div>
             </div>
-            <p className="sectionHint">管理员需要修改项目 Provider、运行时策略或界面策略时，请在用户端切换到该项目后打开「项目设置」；普通成员只能查看说明。</p>
+            <p className="sectionHint">{t('configSectionHint')}</p>
           </Section>
           <Section
             className="projectUsageSection"
-            title="项目用量"
+            title={t('usageSectionTitle')}
             meta={usage?.month}
             actions={(
               <div className="projectUsageToolbar">
-                <label className="monthPicker"><span>月份</span><input className="input" type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
-                <Button icon={Settings2} onClick={openQuotaDialog}>配置额度</Button>
+                <label className="monthPicker"><span>{t('monthLabel')}</span><input className="input" type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
+                <Button icon={Settings2} onClick={openQuotaDialog}>{t('configureQuota')}</Button>
               </div>
             )}
           >
             <ErrorBanner message={usageError} />
-            {usageLoading ? <LoadingState label="正在加载项目用量" /> : usage === null ? (
-              <EmptyState title="无法加载项目用量" detail="请稍后重试或选择其他月份。" />
+            {usageLoading ? <LoadingState label={t('loadingUsage')} /> : usage === null ? (
+              <EmptyState title={t('usageFailedTitle')} detail={t('usageFailedDetail')} />
             ) : (
               <>
-                <div className="projectUsageMetrics" aria-label="项目用量汇总">
-                  <Metric label="调用次数" value={usage.calls.toLocaleString()} />
-                  <Metric label="Token 总量" value={formatCompact(usage.totalTokens)} />
-                  <Metric label="公司成本" value={formatMoney(usage.companyCostMicros, 2)} />
-                  <Metric label="计量状态" value={usage.missingUsageCalls === 0 ? '完整' : `缺失 ${usage.missingUsageCalls} 次`} tone={usage.missingUsageCalls > 0 ? 'warning' : undefined} />
+                <div className="projectUsageMetrics" aria-label={t('usageSummaryAria')}>
+                  <Metric label={t('metricCalls')} value={usage.calls.toLocaleString()} />
+                  <Metric label={t('metricTokens')} value={formatCompact(usage.totalTokens)} />
+                  <Metric label={t('metricCost')} value={formatMoney(usage.companyCostMicros, 2)} />
+                  <Metric label={t('metricMetering')} value={usage.missingUsageCalls === 0 ? t('meteringComplete') : t('meteringMissing', { count: String(usage.missingUsageCalls) })} tone={usage.missingUsageCalls > 0 ? 'warning' : undefined} />
                 </div>
                 <div className="projectUsageDetails">
                   <div className="projectUsagePanel">
-                    <h3>计量明细</h3>
+                    <h3>{t('meteringDetail')}</h3>
                     <dl className="definitionGrid projectUsageDefinitions">
-                      <Definition label="输入 Token">{usage.inputTokens.toLocaleString()}</Definition>
-                      <Definition label="输出 Token">{usage.outputTokens.toLocaleString()}</Definition>
-                      <Definition label="缓存读取">{usage.cacheReadTokens.toLocaleString()}</Definition>
-                      <Definition label="缓存写入">{usage.cacheWriteTokens.toLocaleString()}</Definition>
-                      <Definition label="估算成本">{formatMoney(usage.estimatedCostMicros)}</Definition>
-                      <Definition label="缺失计量">{usage.missingUsageCalls.toLocaleString()} 次</Definition>
-                      <Definition label="价格"><PricingState pricing={usage.pricing} /></Definition>
+                      <Definition label={t('inputTokensLabel')}>{usage.inputTokens.toLocaleString()}</Definition>
+                      <Definition label={t('outputTokensLabel')}>{usage.outputTokens.toLocaleString()}</Definition>
+                      <Definition label={t('cacheReadLabel')}>{usage.cacheReadTokens.toLocaleString()}</Definition>
+                      <Definition label={t('cacheWriteLabel')}>{usage.cacheWriteTokens.toLocaleString()}</Definition>
+                      <Definition label={t('estimatedCostLabel')}>{formatMoney(usage.estimatedCostMicros)}</Definition>
+                      <Definition label={t('missingCallsLabel')}>{t('missingCallsValue', { count: usage.missingUsageCalls.toLocaleString() })}</Definition>
+                      <Definition label={t('priceLabel')}><PricingState pricing={usage.pricing} /></Definition>
                     </dl>
                   </div>
-                  <div className="projectUsagePanel projectQuotaPanel" aria-label="生效额度">
-                    <div className="projectUsagePanelHeading"><h3>生效额度</h3><span>告警不阻断调用</span></div>
+                  <div className="projectUsagePanel projectQuotaPanel" aria-label={t('effectiveQuotaTitle')}>
+                    <div className="projectUsagePanelHeading"><h3>{t('effectiveQuotaTitle')}</h3><span>{t('effectiveQuotaNote')}</span></div>
                     <QuotaSummary summary={usage} />
                     <p className="quotaEffectiveNote">{quotaSourceLabel(project.quota)}</p>
                   </div>
-                  <div className="projectUsagePanel projectConfigPanel" aria-label="项目配置">
-                    <h3>项目配置</h3>
+                  <div className="projectUsagePanel projectConfigPanel" aria-label={t('projectConfigTitle')}>
+                    <h3>{t('projectConfigTitle')}</h3>
                     <dl className="definitionGrid projectConfigDefinitions">
-                      <Definition label="额度来源">{quotaSourceLabel(project.quota)}</Definition>
-                      <Definition label="Token 额度">{formatQuotaTokens(project.quota?.tokenLimit)}</Definition>
-                      <Definition label="成本额度">{formatQuotaCost(project.quota?.companyCostMicrosLimit)}</Definition>
-                      <Definition label="路径">{project.path}</Definition>
-                      <Definition label="来源">{project.origin === 'user' ? '用户发起' : '管理员发起'}</Definition>
-                      <Definition label="所有者">{project.owner?.displayName || project.owner?.username || '组织管理'}</Definition>
-                      <Definition label="创建者">{project.createdBy?.displayName || project.createdBy?.username || '未知'}</Definition>
-                      <Definition label="成员">{`${project.memberCount} 位`}</Definition>
-                      <Definition label="模型默认规则">
-                        {projectDefaultAllowed ? '自动授权全部可用组织模型' : '仅授权项目明确选择的模型'}
+                      <Definition label={t('quotaSourceField')}>{quotaSourceLabel(project.quota)}</Definition>
+                      <Definition label={t('tokenQuotaLabel')}>{formatQuotaTokens(project.quota?.tokenLimit)}</Definition>
+                      <Definition label={t('costQuotaLabel')}>{formatQuotaCost(project.quota?.companyCostMicrosLimit)}</Definition>
+                      <Definition label={t('pathLabel')}>{project.path}</Definition>
+                      <Definition label={t('originLabel')}>{project.origin === 'user' ? t('originUser') : t('originAdmin')}</Definition>
+                      <Definition label={t('ownerLabel')}>{project.owner?.displayName || project.owner?.username || t('ownerFallback')}</Definition>
+                      <Definition label={t('creatorLabel')}>{project.createdBy?.displayName || project.createdBy?.username || t('creatorFallback')}</Definition>
+                      <Definition label={t('memberLabel')}>{t('memberCountValue', { count: String(project.memberCount) })}</Definition>
+                      <Definition label={t('modelDefaultLabel')}>
+                        {projectDefaultAllowed ? t('modelDefaultAll') : t('modelDefaultExplicit')}
                       </Definition>
-                      <Definition label="模型权限">
+                      <Definition label={t('modelAccessLabel')}>
                         <div className="projectConfigModels">
                           <span>{`${assignedModelCount} / ${assignableModels.length}`}</span>
-                          {assignedModels.length === 0 ? <span>未授权</span> : assignedModels.map(model => (
+                          {assignedModels.length === 0 ? <span>{t('modelNotGranted')}</span> : assignedModels.map(model => (
                             <span className="projectConfigModel" key={modelKey(model)}>{model.displayName}</span>
                           ))}
                         </div>
@@ -440,17 +446,17 @@ export function ProjectDetailPage() {
               </>
             )}
           </Section>
-          <Section className="responsiveSection" title="成员贡献" meta={contributors === null ? undefined : `${contributors.rows.length} 位已确认成员`}>
-            {contributors === null ? <LoadingState label="正在加载成员贡献" /> : (
+          <Section className="responsiveSection" title={t('contributorsTitle')} meta={contributors === null ? undefined : t('contributorsMeta', { count: String(contributors.rows.length) })}>
+            {contributors === null ? <LoadingState label={t('loadingContributors')} /> : (
               <>
-                <p className="sectionHint">贡献统计用于活动分析，不会重复计入项目账务或成员额度。历史未拆分调用：{contributors.unattributed.totalTokens.toLocaleString()} Token。</p>
-                {contributors.rows.length === 0 ? <EmptyState title="暂无已确认成员贡献" detail="项目调用仍会计入项目总量；没有 participant 身份的历史调用会保留为未拆分。" /> : (
+                <p className="sectionHint">{t('contributorsHint', { tokens: contributors.unattributed.totalTokens.toLocaleString() })}</p>
+                {contributors.rows.length === 0 ? <EmptyState title={t('contributorsEmptyTitle')} detail={t('contributorsEmptyDetail')} /> : (
                   <div className="tableWrap">
                     <table className="dataTable usageTable">
-                      <thead><tr><th>成员</th><th>调用</th><th>Token</th><th>涉及项目</th><th>价格</th></tr></thead>
+                      <thead><tr><th>{t('memberLabel')}</th><th>{t('callsColumn')}</th><th>Token</th><th>{t('projectsColumn')}</th><th>{t('priceLabel')}</th></tr></thead>
                       <tbody>{contributors.rows.map(row => (
                         <tr key={row.userId}>
-                          <td>{row.username}{row.archived ? '（已归档）' : ''}</td>
+                          <td>{row.username}{row.archived ? t('archivedSuffix') : ''}</td>
                           <td>{row.calls.toLocaleString()}</td>
                           <td>{row.totalTokens.toLocaleString()}</td>
                           <td>{row.projectCount.toLocaleString()}</td>
@@ -465,33 +471,37 @@ export function ProjectDetailPage() {
           </Section>
           <Section
             className="responsiveSection"
-            title="项目模型权限"
-            meta={`${assignedModelCount} / ${assignableModels.length} 个模型已授权 · ${projectDefaultAllowed ? '新增组织模型自动授权' : '按项目单独授权'} · 所有成员共享`}
+            title={t('modelAccessTitle')}
+            meta={t('modelAccessMeta', {
+              assigned: String(assignedModelCount),
+              total: String(assignableModels.length),
+              mode: projectDefaultAllowed ? t('modelModeAuto') : t('modelModeManual'),
+            })}
             actions={assignableModels.length === 0 && !hasProjectOverrides ? undefined : (
               <div className="projectModelAccessToolbar">
                 <Button
                   disabled={modelPending !== '' || assignableModels.length === 0 || assignedModelCount === assignableModels.length}
                   onClick={() => { void changeAllModelAssignments(true) }}
                 >
-                  全部开启
+                  {t('enableAll')}
                 </Button>
                 <Button
                   disabled={modelPending !== '' || (!projectDefaultAllowed && assignedModelCount === 0 && !hasProjectOverrides)}
                   onClick={() => { void changeAllModelAssignments(false) }}
                 >
-                  全部关闭
+                  {t('disableAll')}
                 </Button>
               </div>
             )}
           >
             <ErrorBanner message={modelsError} />
-            {modelsLoading ? <LoadingState label="正在加载项目模型权限" /> : assignableModels.length === 0 ? (
-              <EmptyState icon={Sparkles} title="没有可分配的组织模型" detail="请先在模型治理中配置完整的组织 Provider 和模型。" />
+            {modelsLoading ? <LoadingState label={t('loadingModels')} /> : assignableModels.length === 0 ? (
+              <EmptyState icon={Sparkles} title={t('modelsEmptyTitle')} detail={t('modelsEmptyDetail')} />
             ) : (
               <>
                 <div className="tableWrap desktopOnly">
-                  <table className="dataTable projectModelAccessTable" aria-label="项目模型权限">
-                    <thead><tr><th>模型</th><th>运行状态</th><th>项目权限</th></tr></thead>
+                  <table className="dataTable projectModelAccessTable" aria-label={t('modelAccessTitle')}>
+                    <thead><tr><th>{t('modelColumn')}</th><th>{t('statusColumn')}</th><th>{t('projectAccessColumn')}</th></tr></thead>
                     <tbody>{assignableModels.map(model => {
                       const key = modelKey(model)
                       const assignedToProject = modelAssignments.has(key)
@@ -499,8 +509,8 @@ export function ProjectDetailPage() {
                       return (
                         <tr key={key}>
                           <td><ProjectModelIdentity model={model} /></td>
-                          <td><StatusBadge tone={providerEnabled && model.enabled ? 'success' : 'warning'}>{providerEnabled && model.enabled ? '可用' : '暂不可用'}</StatusBadge></td>
-                          <td><Switch label={assignedToProject ? '已授权' : '未授权'} checked={assignedToProject} disabled={modelPending !== ''} onChange={value => { void changeModelAssignment(model, value) }} /></td>
+                          <td><StatusBadge tone={providerEnabled && model.enabled ? 'success' : 'warning'}>{providerEnabled && model.enabled ? t('modelAvailable') : t('modelUnavailable')}</StatusBadge></td>
+                          <td><Switch label={assignedToProject ? t('modelGranted') : t('modelNotGranted')} checked={assignedToProject} disabled={modelPending !== ''} onChange={value => { void changeModelAssignment(model, value) }} /></td>
                         </tr>
                       )
                     })}</tbody>
@@ -515,10 +525,10 @@ export function ProjectDetailPage() {
                       <article className="mobileItem" key={key}>
                         <div className="mobileItemHeader">
                           <ProjectModelIdentity model={model} />
-                          <StatusBadge tone={providerEnabled && model.enabled ? 'success' : 'warning'}>{providerEnabled && model.enabled ? '可用' : '暂不可用'}</StatusBadge>
+                          <StatusBadge tone={providerEnabled && model.enabled ? 'success' : 'warning'}>{providerEnabled && model.enabled ? t('modelAvailable') : t('modelUnavailable')}</StatusBadge>
                         </div>
                         <div className="mobileItemBody">
-                          <Switch label={assignedToProject ? '已授权给项目' : '未授权给项目'} checked={assignedToProject} disabled={modelPending !== ''} onChange={value => { void changeModelAssignment(model, value) }} />
+                          <Switch label={assignedToProject ? t('modelGrantedToProject') : t('modelNotGrantedToProject')} checked={assignedToProject} disabled={modelPending !== ''} onChange={value => { void changeModelAssignment(model, value) }} />
                         </div>
                       </article>
                     )
@@ -527,21 +537,21 @@ export function ProjectDetailPage() {
               </>
             )}
           </Section>
-          <Section className="responsiveSection" title="成员权限" meta={`${users.length} 位可分配用户`}>
+          <Section className="responsiveSection" title={t('membersTitle')} meta={t('membersMeta', { count: String(users.length) })}>
             {users.length === 0 ? (
-              <EmptyState icon={Users} title="没有可分配用户" detail="先在用户页面创建账号，再配置项目权限。" />
+              <EmptyState icon={Users} title={t('membersEmptyTitle')} detail={t('membersEmptyDetail')} />
             ) : (
               <>
                 <div className="tableWrap desktopOnly">
                   <table className="dataTable permissionTable">
-                    <thead><tr><th>用户</th><th>账号</th><th>目录权限</th></tr></thead>
+                    <thead><tr><th>{t('userColumn')}</th><th>{t('accountColumn')}</th><th>{t('directoryAccessLabel')}</th></tr></thead>
                     <tbody>
                       {users.map(user => {
                         const mode: MatrixMode = assigned.get(user.id) ?? 'none'
                         return (
                           <tr key={user.id}>
                             <td><MemberIdentity user={user} /></td>
-                            <td><StatusBadge tone={user.status === 'active' ? 'success' : 'danger'}>{user.status === 'active' ? '正常' : '已禁用'}</StatusBadge></td>
+                            <td><StatusBadge tone={user.status === 'active' ? 'success' : 'danger'}>{user.status === 'active' ? t('userActive') : t('userDisabled')}</StatusBadge></td>
                             <td><PermissionControl user={user} mode={mode} pending={pending === `member:${user.id}`} onChange={value => changeMode(user, mode, value, setRemoveTarget, applyMode)} /></td>
                           </tr>
                         )
@@ -556,10 +566,10 @@ export function ProjectDetailPage() {
                       <article className="mobileItem" key={user.id}>
                         <div className="mobileItemHeader">
                           <MemberIdentity user={user} />
-                          <StatusBadge tone={user.status === 'active' ? 'success' : 'danger'}>{user.status === 'active' ? '正常' : '已禁用'}</StatusBadge>
+                          <StatusBadge tone={user.status === 'active' ? 'success' : 'danger'}>{user.status === 'active' ? t('userActive') : t('userDisabled')}</StatusBadge>
                         </div>
                         <div className="mobileItemBody">
-                          <span className="fieldLabel">目录权限</span>
+                          <span className="fieldLabel">{t('directoryAccessLabel')}</span>
                           <PermissionControl user={user} mode={mode} pending={pending === `member:${user.id}`} onChange={value => changeMode(user, mode, value, setRemoveTarget, applyMode)} />
                         </div>
                       </article>
@@ -570,47 +580,47 @@ export function ProjectDetailPage() {
             )}
           </Section>
           <div className="dangerZone">
-            <div><strong>删除项目</strong><p>删除授权记录，不会删除宿主机上的项目目录或文件。</p></div>
-            <Button variant="danger" icon={Trash2} onClick={() => setDeleteOpen(true)}>删除项目</Button>
+            <div><strong>{t('deleteProject')}</strong><p>{t('deleteHint')}</p></div>
+            <Button variant="danger" icon={Trash2} onClick={() => setDeleteOpen(true)}>{t('deleteProject')}</Button>
           </div>
         </>
       )}
 
       <Dialog
         open={quotaOpen}
-        title="配置项目额度"
-        description="额度按自然月统计，在 80% 和 100% 产生告警，但不会阻断模型调用。"
+        title={t('quotaDialogTitle')}
+        description={t('quotaDialogDescription')}
         onClose={() => { if (!quotaSaving) setQuotaOpen(false) }}
         footer={(
           <>
-            <Button type="button" disabled={quotaSaving} onClick={() => setQuotaOpen(false)}>取消</Button>
-            <Button type="submit" form="project-quota-form" variant="primary" loading={quotaSaving}>保存额度</Button>
+            <Button type="button" disabled={quotaSaving} onClick={() => setQuotaOpen(false)}>{t('cancel')}</Button>
+            <Button type="submit" form="project-quota-form" variant="primary" loading={quotaSaving}>{t('saveQuota')}</Button>
           </>
         )}
       >
         <form id="project-quota-form" onSubmit={event => void saveQuota(event)}>
           <ErrorBanner message={quotaError} />
           <fieldset className="projectQuotaSource">
-            <legend>额度来源</legend>
+            <legend>{t('quotaSourceField')}</legend>
             <div className="quotaSourceOptions">
               <label className="quotaSourceOption" data-selected={quotaSource === 'inherit'}>
                 <input type="radio" name="project-quota-source" checked={quotaSource === 'inherit'} onChange={() => setQuotaSource('inherit')} />
-                <span><strong>继承普通成员额度</strong><small>跟随普通用户角色的默认额度</small></span>
+                <span><strong>{t('quotaInherit')}</strong><small>{t('quotaInheritHint')}</small></span>
               </label>
               <label className="quotaSourceOption" data-selected={quotaSource === 'independent'}>
                 <input type="radio" name="project-quota-source" checked={quotaSource === 'independent'} onChange={() => setQuotaSource('independent')} />
-                <span><strong>项目独立额度</strong><small>为此项目单独设置 Token 和成本额度</small></span>
+                <span><strong>{t('quotaIndependent')}</strong><small>{t('quotaIndependentHint')}</small></span>
               </label>
             </div>
           </fieldset>
           {quotaSource === 'independent' ? (
             <div className="quotaEditorGrid projectQuotaEditors">
-              <ProjectQuotaEditor label="Token 额度" mode={tokenMode} value={tokenLimit} inputLabel="每月 Token" inputMode="numeric" onMode={setTokenMode} onValue={setTokenLimit} />
-              <ProjectQuotaEditor label="公司成本额度" mode={costMode} value={costLimit} inputLabel="每月人民币元" inputMode="decimal" onMode={setCostMode} onValue={setCostLimit} />
+              <ProjectQuotaEditor label={t('tokenQuotaLabel')} mode={tokenMode} value={tokenLimit} inputLabel={t('monthlyTokensLabel')} inputMode="numeric" onMode={setTokenMode} onValue={setTokenLimit} />
+              <ProjectQuotaEditor label={t('companyCostQuotaLabel')} mode={costMode} value={costLimit} inputLabel={t('monthlyCostLabel')} inputMode="decimal" onMode={setCostMode} onValue={setCostLimit} />
             </div>
           ) : (
             <div className="quotaModeNote projectQuotaModeNote">
-              此项目将使用普通成员角色的月度额度。
+              {t('quotaInheritNote')}
             </div>
           )}
         </form>
@@ -618,30 +628,30 @@ export function ProjectDetailPage() {
 
       <Dialog
         open={renameOpen}
-        title="重命名项目"
-        description="项目路径和成员权限不会改变。"
+        title={t('renameDialogTitle')}
+        description={t('renameDialogDescription')}
         onClose={() => { if (pending !== 'rename') setRenameOpen(false) }}
         footer={(
           <>
-            <Button type="button" disabled={pending === 'rename'} onClick={() => setRenameOpen(false)}>取消</Button>
-            <Button type="submit" form="rename-project-form" variant="primary" loading={pending === 'rename'}>保存名称</Button>
+            <Button type="button" disabled={pending === 'rename'} onClick={() => setRenameOpen(false)}>{t('cancel')}</Button>
+            <Button type="submit" form="rename-project-form" variant="primary" loading={pending === 'rename'}>{t('saveName')}</Button>
           </>
         )}
       >
         <form id="rename-project-form" onSubmit={event => void onRename(event)}>
           <ErrorBanner message={renameError} />
-          <Field label="项目名称"><input className="input" required autoFocus value={projectName} onChange={event => setProjectName(event.target.value)} /></Field>
+          <Field label={t('projectNameLabel')}><input className="input" required autoFocus value={projectName} onChange={event => setProjectName(event.target.value)} /></Field>
         </form>
       </Dialog>
 
       <Dialog
         open={runtimeAction !== null}
-        title={runtimeAction === 'start' ? '启动项目实例' : runtimeAction === 'stop' ? '停止项目实例' : '重启项目实例'}
-        description={runtimeAction === 'start' ? '启动本节点的共享运行时。维护窗口中不允许启动。'
-          : `此操作影响项目 ${project?.name ?? ''} 的所有在线成员，并会中断正在执行的 Agent、子任务和终端。停止后后台任务不会自动唤醒实例。`}
+        title={runtimeAction === 'start' ? t('runtimeStartTitle') : runtimeAction === 'stop' ? t('runtimeStopTitle') : t('runtimeRestartTitle')}
+        description={runtimeAction === 'start' ? t('runtimeStartDescription')
+          : t('runtimeStopDescription', { name: project?.name ?? '' })}
         onClose={() => { if (pending !== 'runtime') setRuntimeAction(null) }}
         footer={<>
-          <Button disabled={pending === 'runtime'} onClick={() => { setRuntimeAction(null) }}>取消</Button>
+          <Button disabled={pending === 'runtime'} onClick={() => { setRuntimeAction(null) }}>{t('cancel')}</Button>
           <Button variant="primary" loading={pending === 'runtime'} onClick={() => {
             const action = runtimeAction
             if (action === null) return
@@ -649,24 +659,24 @@ export function ProjectDetailPage() {
             void controlProjectInstance(projectId, action).then(async () => { setRuntimeAction(null); await reload() })
               .catch((cause: unknown) => { setRuntimeError(messageFrom(cause)) })
               .finally(() => { setPending('') })
-          }}>确认执行</Button>
+          }}>{t('confirmExecute')}</Button>
         </>}
       ><ErrorBanner message={runtimeError} /></Dialog>
 
       <ConfirmDialog
         open={removeTarget !== null}
-        title="移除项目成员"
-        description={`移除 ${removeTarget?.username ?? ''} 后，该用户将失去此项目目录的访问权限。`}
-        confirmLabel="确认移除"
+        title={t('removeMemberTitle')}
+        description={t('removeMemberDescription', { name: removeTarget?.username ?? '' })}
+        confirmLabel={t('confirmRemove')}
         pending={removeTarget !== null && pending === `member:${removeTarget.id}`}
         onClose={() => { if (!pending.startsWith('member:')) setRemoveTarget(null) }}
         onConfirm={() => void confirmRemove()}
       />
       <ConfirmDialog
         open={deleteOpen}
-        title="删除项目"
-        description={`删除 ${project?.name ?? ''} 的授权记录？宿主机目录不会被删除。`}
-        confirmLabel="确认删除"
+        title={t('deleteProject')}
+        description={t('deleteDialogDescription', { name: project?.name ?? '' })}
+        confirmLabel={t('confirmDelete')}
         pending={pending === 'delete'}
         onClose={() => { if (pending !== 'delete') setDeleteOpen(false) }}
         onConfirm={() => void onDelete()}
@@ -676,10 +686,11 @@ export function ProjectDetailPage() {
 }
 
 function MemberIdentity({ user }: { user: AdminUser }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
   return (
     <div className="userIdentity">
       <span className="avatar" aria-hidden="true">{(user.displayName || user.username).slice(0, 1)}</span>
-      <span className="identityText"><strong>{user.displayName || user.username}</strong><span>@{user.username} · {user.role === 'admin' ? '管理员' : '普通用户'}</span></span>
+      <span className="identityText"><strong>{user.displayName || user.username}</strong><span>@{user.username} · {user.role === 'admin' ? t('roleAdmin') : t('roleUser')}</span></span>
     </div>
   )
 }
@@ -699,13 +710,15 @@ function PermissionControl({ user, mode, pending, onChange }: {
   pending: boolean
   onChange: (mode: MatrixMode) => void
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
+  const options: Array<[MatrixMode, string]> = [
+    ['none', t('permissionNone')],
+    ['ro', t('permissionRo')],
+    ['rw', t('permissionRw')],
+  ]
   return (
-    <div className="segmented permissionControl" aria-label={`${user.username} 目录权限`}>
-      {([
-        ['none', '无权限'],
-        ['ro', '只读'],
-        ['rw', '读写'],
-      ] as const).map(([value, label]) => (
+    <div className="segmented permissionControl" aria-label={t('permissionAria', { name: user.username })}>
+      {options.map(([value, label]) => (
         <button key={value} type="button" aria-pressed={mode === value} disabled={pending} onClick={() => onChange(value)}>{label}</button>
       ))}
     </div>
@@ -721,20 +734,21 @@ function ProjectQuotaEditor({ label, mode, value, inputLabel, inputMode, onMode,
   onMode: (mode: ProjectLimitMode) => void
   onValue: (value: string) => void
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
   return (
     <fieldset className="quotaEditor">
       <legend>{label}</legend>
-      <Field label="额度模式">
+      <Field label={t('quotaModeLabel')}>
         <select className="select" value={mode} onChange={event => onMode(event.target.value as ProjectLimitMode)}>
-          <option value="unlimited">无限制</option>
-          <option value="custom">自定义</option>
+          <option value="unlimited">{t('quotaUnlimited')}</option>
+          <option value="custom">{t('quotaCustom')}</option>
         </select>
       </Field>
       {mode === 'custom' ? (
         <Field label={inputLabel}>
           <input className="input" required min="0" inputMode={inputMode} value={value} onChange={event => onValue(event.target.value)} />
         </Field>
-      ) : <div className="quotaModeNote">不设置月度上限。</div>}
+      ) : <div className="quotaModeNote">{t('quotaNoCap')}</div>}
     </fieldset>
   )
 }
@@ -743,22 +757,27 @@ function Definition({ label, children }: { label: string; children: React.ReactN
   return <div className="definitionRow"><dt>{label}</dt><dd>{children}</dd></div>
 }
 
+/** The translate seat for module-level helpers that cannot memoize inside a component. */
+function translate(key: ProjectDetailCopyKey, parameters?: Record<string, string>): string {
+  return translateCopy(adminLanguage(), { zh: copyZh, en: copyEn })(key, parameters)
+}
+
 function quotaSourceLabel(quota: ProjectQuota | undefined): string {
-  return quota?.source === 'independent' ? '项目独立额度' : '继承普通成员额度'
+  return quota?.source === 'independent' ? translate('quotaIndependent') : translate('quotaInherit')
 }
 
 function formatQuotaTokens(limit: number | null | undefined): string {
-  return limit === null || limit === undefined ? '不限' : limit.toLocaleString('zh-CN')
+  return limit === null || limit === undefined ? translate('quotaNoLimit') : limit.toLocaleString('zh-CN')
 }
 
 function formatQuotaCost(limit: number | null | undefined): string {
-  return limit === null || limit === undefined ? '不限' : formatMoney(limit, 2)
+  return limit === null || limit === undefined ? translate('quotaNoLimit') : formatMoney(limit, 2)
 }
 
 function themePolicyLabel(policy: 'follow-user' | 'light' | 'dark' | undefined): string {
-  if (policy === 'light') return '强制浅色'
-  if (policy === 'dark') return '强制深色'
-  return '跟随成员偏好'
+  if (policy === 'light') return translate('themeLight')
+  if (policy === 'dark') return translate('themeDark')
+  return translate('themeFollowUser')
 }
 
 function changeMode(

@@ -60,10 +60,13 @@ import {
   UserPasswordDialog,
   type UserRole,
 } from '../components/users.tsx'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { zh as userDetailZh, en as userDetailEn } from './user-detail.copy.ts'
 
 const messageFrom = (cause: unknown): string => cause instanceof Error ? cause.message : String(cause)
 
 export function UserDetailPage() {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
   const params = useParams()
   const navigate = useNavigate()
   const userId = Number(params.id)
@@ -131,18 +134,18 @@ export function UserDetailPage() {
   if (notFound) {
     return (
       <div className="page">
-        <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />返回用户列表</Link>
-        <EmptyState icon={UserRound} title="用户不存在" detail="该账号可能已被删除。" />
+        <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</Link>
+        <EmptyState icon={UserRound} title={t('notFoundTitle')} detail={t('notFoundDetail')} />
       </div>
     )
   }
 
   return (
     <div className="page">
-      <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />返回用户列表</Link>
+      <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</Link>
       <PageHeader
-        title={user === null ? '用户详情' : `用户 · ${user.displayName || user.username}`}
-        description={user === null ? undefined : `@${user.username} · ID ${user.id} · 端口 ${user.port}`}
+        title={user === null ? t('pageTitle') : t('pageTitleUser', { name: user.displayName || user.username })}
+        description={user === null ? undefined : t('pageDescription', { username: user.username, id: String(user.id), port: String(user.port) })}
         meta={user === null ? undefined : (
           <span className="pageBadges">
             <RoleBadge role={user.role} />
@@ -152,69 +155,69 @@ export function UserDetailPage() {
         )}
         actions={user === null ? undefined : (
           <div className="rowActions">
-            <Button icon={Pencil} onClick={() => setEditOpen(true)}>编辑账号</Button>
-            <Button icon={KeyRound} onClick={() => setPasswordOpen(true)}>重置密码</Button>
+            <Button icon={Pencil} onClick={() => setEditOpen(true)}>{t('editAccount')}</Button>
+            <Button icon={KeyRound} onClick={() => setPasswordOpen(true)}>{t('resetPassword')}</Button>
             <Button
               variant={user.status === 'active' ? 'danger' : 'secondary'}
               icon={Power}
               loading={pending === `status:${userId}`}
               onClick={() => { if (user.status === 'active') setDisableOpen(true); else void run(`status:${userId}`, () => patchUser(userId, { status: 'active' })) }}
             >
-              {user.status === 'active' ? '禁用' : '启用'}
+              {user.status === 'active' ? t('disable') : t('enable')}
             </Button>
-            <Button variant="danger" icon={Trash2} onClick={() => setDeleteOpen(true)}>删除</Button>
+            <Button variant="danger" icon={Trash2} onClick={() => setDeleteOpen(true)}>{t('deleteAction')}</Button>
           </div>
         )}
       />
       <ErrorBanner message={error} />
-      {loading && user === null ? <LoadingState label="正在加载用户" /> : user === null ? null : (
+      {loading && user === null ? <LoadingState label={t('loadingUser')} /> : user === null ? null : (
         <>
-          <Section title="账号与实例">
+          <Section title={t('sectionAccount')}>
             <div className="sectionBody">
               <dl className="definitionGrid">
-                <Definition label="用户名"><span className="codeText">@{user.username}</span></Definition>
-                <Definition label="显示名">{user.displayName === '' ? '未设置' : user.displayName}</Definition>
-                <Definition label="Auto 审查资格"><AutoReviewBadge eligible={user.autoReviewEligible} /></Definition>
-                <Definition label="实例">
+                <Definition label={t('defUsername')}><span className="codeText">@{user.username}</span></Definition>
+                <Definition label={t('defDisplayName')}>{user.displayName === '' ? t('notSet') : user.displayName}</Definition>
+                <Definition label={t('defAutoReview')}><AutoReviewBadge eligible={user.autoReviewEligible} /></Definition>
+                <Definition label={t('defInstance')}>
                   <div className="instanceBlock">
                     <InstanceState state={user.instanceState} />
                     <InstanceControls user={user} pending={pending} run={run} />
                   </div>
                 </Definition>
-                <Definition label="端口"><span className="codeText">{user.port}</span></Definition>
-                <Definition label="宿主目录"><span className="codeText">{user.homePath}</span></Definition>
+                <Definition label={t('defPort')}><span className="codeText">{user.port}</span></Definition>
+                <Definition label={t('defHomePath')}><span className="codeText">{user.homePath}</span></Definition>
               </dl>
             </div>
           </Section>
 
-          <Section title="能力准入" className="responsiveSection">
+          <Section title={t('sectionQualifications')} className="responsiveSection">
             <div className="sectionBody">
-              <p className="muted">个人空间的能力资格按用户授予；项目空间同时要求项目授权，在项目详情页和各资源频道管理。</p>
+              <p className="muted">{t('qualificationsHint')}</p>
               <div className="qualificationGrid">
                 <UserQualificationCard
                   name="SSH"
-                  description="远程 SSH 目标上的文件与命令执行资格。"
+                  description={t('qualSshDescription')}
                   userId={userId}
                   read={getSshPolicy}
                   write={setSshPolicy}
                 />
                 <UserQualificationCard
-                  name="终端"
-                  description="在个人空间打开交互式终端会话的资格。"
+                  name={t('qualTerminalName')}
+                  description={t('qualTerminalDescription')}
                   userId={userId}
                   read={getTerminalPolicy}
                   write={setTerminalPolicy}
                 />
                 <UserQualificationCard
-                  name="桌面"
-                  description="申请交互桌面授权的资格，不替代会话内的桌面确认。"
+                  name={t('qualDesktopName')}
+                  description={t('qualDesktopDescription')}
                   userId={userId}
                   read={getDesktopPolicy}
                   write={setDesktopPolicy}
                 />
                 <UserQualificationCard
-                  name="插件管理"
-                  description="在个人空间管理插件（启用、安装、移除）的资格；项目空间另需项目授权。"
+                  name={t('qualPluginName')}
+                  description={t('qualPluginDescription')}
                   userId={userId}
                   read={getPluginPolicy}
                   write={setPluginPolicy}
@@ -240,6 +243,7 @@ export function UserDetailPage() {
 }
 
 function UserModelAccess({ userId, role }: { userId: number; role: UserRole }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
   const [models, setModels] = useState<ModelGovernanceRow[] | null>(null)
   const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map())
   const [effective, setEffective] = useState<Map<string, boolean>>(new Map())
@@ -288,21 +292,21 @@ function UserModelAccess({ userId, role }: { userId: number; role: UserRole }) {
   return (
     <Section
       className="responsiveSection"
-      title="模型权限"
-      meta={models === null ? undefined : `${models.length} 个组织模型 · ${overrideCount} 条例外`}
+      title={t('sectionModels')}
+      meta={models === null ? undefined : t('modelsMeta', { count: String(models.length), overrides: String(overrideCount) })}
     >
       <div className="sectionBody">
-        <p className="muted">角色默认与计价在「模型」频道维护；此处只管理该用户的逐模型例外。例外立即生效。</p>
+        <p className="muted">{t('modelsHint')}</p>
         <ErrorBanner message={error} />
       </div>
-      {loading ? <LoadingState label="正在加载模型权限" /> : models === null || models.length === 0 ? (
-        <EmptyState title="还没有组织模型" detail="完整模型目录由组织 Provider 配置统一维护。" />
+      {loading ? <LoadingState label={t('loadingModels')} /> : models === null || models.length === 0 ? (
+        <EmptyState title={t('modelsEmptyTitle')} detail={t('modelsEmptyDetail')} />
       ) : (
         <>
           <div className="tableWrap desktopOnly">
             <table className="dataTable">
               <thead>
-                <tr><th>模型</th><th>该账号角色默认</th><th>此用户例外</th><th>生效</th></tr>
+                <tr><th>{t('colModel')}</th><th>{t('colRoleDefault')}</th><th>{t('userOverride')}</th><th>{t('colEffective')}</th></tr>
               </thead>
               <tbody>
                 {models.map(row => {
@@ -313,16 +317,16 @@ function UserModelAccess({ userId, role }: { userId: number; role: UserRole }) {
                   return (
                     <tr key={key}>
                       <td><ModelIdentity row={row} /></td>
-                      <td><StatusBadge tone={roleAllowed ? 'success' : 'neutral'}>{roleAllowed ? '允许' : '拒绝'}</StatusBadge></td>
+                      <td><StatusBadge tone={roleAllowed ? 'success' : 'neutral'}>{roleAllowed ? t('allowed') : t('denied')}</StatusBadge></td>
                       <td>
                         <OverrideSelect
-                          label={`此用户例外`}
+                          label={t('userOverride')}
                           disabled={pendingKey !== ''}
                           value={override}
                           onChange={value => { void changeOverride(row, value) }}
                         />
                       </td>
-                      <td><StatusBadge tone={available ? 'success' : 'danger'}>{available ? '可用' : '拒绝'}</StatusBadge></td>
+                      <td><StatusBadge tone={available ? 'success' : 'danger'}>{available ? t('available') : t('denied')}</StatusBadge></td>
                     </tr>
                   )
                 })}
@@ -339,17 +343,17 @@ function UserModelAccess({ userId, role }: { userId: number; role: UserRole }) {
                 <article className="mobileItem" key={key}>
                   <div className="mobileItemHeader">
                     <ModelIdentity row={row} />
-                    <StatusBadge tone={available ? 'success' : 'danger'}>{available ? '可用' : '拒绝'}</StatusBadge>
+                    <StatusBadge tone={available ? 'success' : 'danger'}>{available ? t('available') : t('denied')}</StatusBadge>
                   </div>
                   <div className="mobileItemBody">
                     <div className="mobileStatusRow">
-                      <span className="fieldLabel">角色默认</span>
-                      <StatusBadge tone={roleAllowed ? 'success' : 'neutral'}>{roleAllowed ? '允许' : '拒绝'}</StatusBadge>
+                      <span className="fieldLabel">{t('roleDefault')}</span>
+                      <StatusBadge tone={roleAllowed ? 'success' : 'neutral'}>{roleAllowed ? t('allowed') : t('denied')}</StatusBadge>
                     </div>
                     <div>
-                      <span className="fieldLabel">此用户例外</span>
+                      <span className="fieldLabel">{t('userOverride')}</span>
                       <OverrideSelect
-                        label="此用户例外"
+                        label={t('userOverride')}
                         disabled={pendingKey !== ''}
                         value={override}
                         onChange={value => { void changeOverride(row, value) }}
@@ -367,6 +371,7 @@ function UserModelAccess({ userId, role }: { userId: number; role: UserRole }) {
 }
 
 function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
   const [memberships, setMemberships] = useState<UserMembership[] | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -445,26 +450,26 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
   return (
     <Section
       className="responsiveSection"
-      title="项目成员"
-      meta={memberships === null ? undefined : `${memberships.length} 个项目`}
+      title={t('sectionMemberships')}
+      meta={memberships === null ? undefined : t('membershipsMeta', { count: String(memberships.length) })}
     >
       <div className="sectionBody">
         <p className="muted">
           {role === 'admin'
-            ? '管理员角色对所有项目拥有隐式全权；成员行只为审计与成员列表记录明确授权。'
-            : '成员行决定该用户在各项目中的目录权限；项目的模型授权在项目详情页管理。'}
+            ? t('membershipsHintAdmin')
+            : t('membershipsHintUser')}
         </p>
         <ErrorBanner message={error} />
       </div>
-      {loading ? <LoadingState label="正在加载项目成员" /> : (
+      {loading ? <LoadingState label={t('loadingMemberships')} /> : (
         <>
           {memberships === null || memberships.length === 0 ? (
-            <EmptyState title="不属于任何项目" detail="使用下方表单将此用户加入项目。" />
+            <EmptyState title={t('membershipsEmptyTitle')} detail={t('membershipsEmptyDetail')} />
           ) : (
             <>
               <div className="tableWrap desktopOnly">
                 <table className="dataTable">
-                  <thead><tr><th>项目</th><th>路径</th><th>目录权限</th><th aria-label="操作" /></tr></thead>
+                  <thead><tr><th>{t('colProject')}</th><th>{t('colPath')}</th><th>{t('permission')}</th><th aria-label={t('colActions')} /></tr></thead>
                   <tbody>
                     {memberships.map(row => (
                       <tr key={row.projectId}>
@@ -473,16 +478,16 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
                         <td>
                           <select
                             className="select selectCompact"
-                            aria-label={`${row.name} 目录权限`}
+                            aria-label={t('permissionAria', { name: row.name })}
                             value={row.mode}
                             disabled={pendingKey !== ''}
                             onChange={event => { void changeMode(row, event.target.value as GrantMode) }}
                           >
-                            <option value="rw">读写</option>
-                            <option value="ro">只读</option>
+                            <option value="rw">{t('modeReadWrite')}</option>
+                            <option value="ro">{t('modeReadOnly')}</option>
                           </select>
                         </td>
-                        <td><div className="rowActions"><IconButton label={`移出 ${row.name}`} icon={Trash2} variant="danger" onClick={() => setRemoveTarget(row)} /></div></td>
+                        <td><div className="rowActions"><IconButton label={t('removeLabel', { name: row.name })} icon={Trash2} variant="danger" onClick={() => setRemoveTarget(row)} /></div></td>
                       </tr>
                     ))}
                   </tbody>
@@ -493,21 +498,21 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
                   <article className="mobileItem" key={row.projectId}>
                     <div className="mobileItemHeader">
                       <Link className="projectLink" to={`/projects/${row.projectId}`}><strong>{row.name}</strong></Link>
-                      <IconButton label={`移出 ${row.name}`} icon={Trash2} variant="danger" onClick={() => setRemoveTarget(row)} />
+                      <IconButton label={t('removeLabel', { name: row.name })} icon={Trash2} variant="danger" onClick={() => setRemoveTarget(row)} />
                     </div>
                     <div className="mobileItemBody">
                       <span className="codeText">{row.path}</span>
                       <div>
-                        <span className="fieldLabel">目录权限</span>
+                        <span className="fieldLabel">{t('permission')}</span>
                         <select
                           className="select"
-                          aria-label={`${row.name} 目录权限`}
+                          aria-label={t('permissionAria', { name: row.name })}
                           value={row.mode}
                           disabled={pendingKey !== ''}
                           onChange={event => { void changeMode(row, event.target.value as GrantMode) }}
                         >
-                          <option value="rw">读写</option>
-                          <option value="ro">只读</option>
+                          <option value="rw">{t('modeReadWrite')}</option>
+                          <option value="ro">{t('modeReadOnly')}</option>
                         </select>
                       </div>
                     </div>
@@ -518,24 +523,24 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
           )}
           <div className="sectionBody">
             <form className="memberAddRow" onSubmit={event => void onAdd(event)}>
-              <select className="select" aria-label="要加入的项目" value={addProjectId} disabled={pendingKey !== ''} onChange={event => setAddProjectId(event.target.value)}>
-                <option value="">选择项目</option>
+              <select className="select" aria-label={t('joinProjectAria')} value={addProjectId} disabled={pendingKey !== ''} onChange={event => setAddProjectId(event.target.value)}>
+                <option value="">{t('selectProject')}</option>
                 {joinable.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
-              <select className="select selectCompact" aria-label="目录权限" value={addMode} disabled={pendingKey !== ''} onChange={event => setAddMode(event.target.value as GrantMode)}>
-                <option value="rw">读写</option>
-                <option value="ro">只读</option>
+              <select className="select selectCompact" aria-label={t('permission')} value={addMode} disabled={pendingKey !== ''} onChange={event => setAddMode(event.target.value as GrantMode)}>
+                <option value="rw">{t('modeReadWrite')}</option>
+                <option value="ro">{t('modeReadOnly')}</option>
               </select>
-              <Button type="submit" variant="secondary" loading={pendingKey === 'member:add'} disabled={addProjectId === ''}>加入项目</Button>
+              <Button type="submit" variant="secondary" loading={pendingKey === 'member:add'} disabled={addProjectId === ''}>{t('joinProject')}</Button>
             </form>
           </div>
         </>
       )}
       <ConfirmDialog
         open={removeTarget !== null}
-        title="移出项目"
-        description={`将 ${removeTarget?.name ?? ''} 的成员关系移除此用户；该用户在该项目的私有会话保留但不再可访问。`}
-        confirmLabel="确认移出"
+        title={t('removeTitle')}
+        description={t('removeDescription', { name: removeTarget?.name ?? '' })}
+        confirmLabel={t('removeConfirm')}
         pending={pendingKey.startsWith('member:')}
         onClose={() => { if (!pendingKey.startsWith('member:')) setRemoveTarget(null) }}
         onConfirm={() => void onRemove()}
@@ -545,6 +550,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
 }
 
 function UserQuota({ userId }: { userId: number }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
   const [quota, setQuotaView] = useState<UserQuotaView | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -581,11 +587,11 @@ function UserQuota({ userId }: { userId: number }) {
       const parsedToken = Number(tokenLimit)
       const parsedCost = Number(costLimit)
       if (tokenMode === 'custom' && (!Number.isSafeInteger(parsedToken) || parsedToken < 0)) {
-        throw new Error('Token 额度必须是非负整数')
+        throw new Error(t('quotaTokenInvalid'))
       }
       const costMicros = Math.round(parsedCost * 1_000_000)
       if (costMode === 'custom' && (!Number.isFinite(parsedCost) || parsedCost < 0 || !Number.isSafeInteger(costMicros))) {
-        throw new Error('成本额度必须是有效的非负数')
+        throw new Error(t('quotaCostInvalid'))
       }
       const nextTokenLimit: number | null | 'inherit' = tokenMode === 'inherit' ? 'inherit' : tokenMode === 'unlimited' ? null : parsedToken
       const nextCostLimit: number | null | 'inherit' = costMode === 'inherit' ? 'inherit' : costMode === 'unlimited' ? null : costMicros
@@ -604,37 +610,37 @@ function UserQuota({ userId }: { userId: number }) {
   }
 
   const quotaSummary = quota === null ? '' : [
-    quota.tokenMode === 'inherit' ? 'Token 继承角色' : quota.tokenMode === 'unlimited' ? 'Token 不限' : `Token ${quota.tokenLimit?.toLocaleString() ?? ''}`,
-    quota.companyCostMode === 'inherit' ? '成本继承角色' : quota.companyCostMode === 'unlimited' ? '成本不限' : `成本 元 ${((quota.companyCostMicrosLimit ?? 0) / 1_000_000).toLocaleString()}`,
+    quota.tokenMode === 'inherit' ? t('quotaTokenInherit') : quota.tokenMode === 'unlimited' ? t('quotaTokenUnlimited') : t('quotaTokenCustom', { limit: quota.tokenLimit?.toLocaleString() ?? '' }),
+    quota.companyCostMode === 'inherit' ? t('quotaCostInherit') : quota.companyCostMode === 'unlimited' ? t('quotaCostUnlimited') : t('quotaCostCustom', { amount: ((quota.companyCostMicrosLimit ?? 0) / 1_000_000).toLocaleString() }),
   ].join(' · ')
 
   return (
-    <Section title="配额" meta={quota === null ? undefined : quotaSummary}>
+    <Section title={t('sectionQuota')} meta={quota === null ? undefined : quotaSummary}>
       <div className="sectionBody">
-        <p className="muted">额度按自然月统计，在 80% 和 100% 产生告警，但不会阻断模型调用。继承表示跟随其角色的月度额度。</p>
+        <p className="muted">{t('quotaHint')}</p>
         <ErrorBanner message={error} />
-        {loading ? <LoadingState label="正在加载配额" /> : (
+        {loading ? <LoadingState label={t('loadingQuota')} /> : (
           <form className="userQuotaForm" onSubmit={event => void save(event)}>
             <QuotaMetricEditor
-              label="Token 额度"
+              label={t('quotaTokenLabel')}
               mode={tokenMode}
               value={tokenLimit}
-              inputLabel="每月 Token"
+              inputLabel={t('quotaTokenInput')}
               inputMode="numeric"
               onMode={setTokenMode}
               onValue={setTokenLimit}
             />
             <QuotaMetricEditor
-              label="公司成本额度"
+              label={t('quotaCostLabel')}
               mode={costMode}
               value={costLimit}
-              inputLabel="每月人民币元"
+              inputLabel={t('quotaCostInput')}
               inputMode="decimal"
               onMode={setCostMode}
               onValue={setCostLimit}
             />
             <div className="quotaSaveRow">
-              <Button type="submit" variant="primary" loading={saving}>保存配额</Button>
+              <Button type="submit" variant="primary" loading={saving}>{t('quotaSave')}</Button>
             </div>
           </form>
         )}
@@ -652,14 +658,15 @@ function QuotaMetricEditor({ label, mode, value, inputLabel, inputMode, onMode, 
   onMode: (mode: UserQuotaMode) => void
   onValue: (value: string) => void
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
   return (
     <fieldset className="quotaEditor">
       <legend>{label}</legend>
-      <Field label="额度模式">
+      <Field label={t('quotaMode')}>
         <select className="select" value={mode} onChange={event => onMode(event.target.value as UserQuotaMode)}>
-          <option value="inherit">继承角色额度</option>
-          <option value="unlimited">无限制</option>
-          <option value="custom">自定义</option>
+          <option value="inherit">{t('quotaModeInherit')}</option>
+          <option value="unlimited">{t('quotaModeUnlimited')}</option>
+          <option value="custom">{t('quotaModeCustom')}</option>
         </select>
       </Field>
       {mode === 'custom' ? (
@@ -667,7 +674,7 @@ function QuotaMetricEditor({ label, mode, value, inputLabel, inputMode, onMode, 
           <input className="input" required min="0" inputMode={inputMode} value={value} onChange={event => onValue(event.target.value)} />
         </Field>
       ) : (
-        <div className="quotaModeNote">{mode === 'inherit' ? '跟随其角色的月度额度。' : '不设置月度上限。'}</div>
+        <div className="quotaModeNote">{mode === 'inherit' ? t('quotaInheritNote') : t('quotaUnlimitedNote')}</div>
       )}
     </fieldset>
   )

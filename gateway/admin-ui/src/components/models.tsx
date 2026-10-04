@@ -1,6 +1,9 @@
 /** Shared model identity and access-override pieces used by catalog and per-user editors. */
 import { Sparkles } from 'lucide-react'
+import { useMemo } from 'react'
 import type { ModelGovernanceRow } from '../api.ts'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { en as modelsEn, zh as modelsZh } from './models.copy.ts'
 
 export function modelKey(row: { provider: string; model: string }): string {
   return `${row.provider}\0${row.model}`
@@ -16,10 +19,11 @@ export function ModelIdentity({ row }: { row: ModelGovernanceRow }) {
 }
 
 export function RoleDefaults({ row }: { row: ModelGovernanceRow }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: modelsZh, en: modelsEn }), [])
   return (
     <div className="roleDefaults">
-      <span className={row.adminAllowed ? 'allowed' : 'denied'}>管理员 {row.adminAllowed ? '允许' : '拒绝'}</span>
-      <span className={row.userAllowed ? 'allowed' : 'denied'}>用户 {row.userAllowed ? '允许' : '拒绝'}</span>
+      <span className={row.adminAllowed ? 'allowed' : 'denied'}>{t('roleAdmin')} {row.adminAllowed ? t('decisionAllow') : t('decisionDeny')}</span>
+      <span className={row.userAllowed ? 'allowed' : 'denied'}>{t('roleUser')} {row.userAllowed ? t('decisionAllow') : t('decisionDeny')}</span>
     </div>
   )
 }
@@ -30,11 +34,12 @@ export function OverrideSelect({ label, value, disabled, onChange }: {
   disabled: boolean
   onChange: (value: string) => void
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: modelsZh, en: modelsEn }), [])
   return (
     <select aria-label={label} className="select selectCompact overrideSelect" disabled={disabled} value={value === undefined ? 'inherit' : value ? 'allow' : 'deny'} onChange={event => onChange(event.target.value)}>
-      <option value="inherit">继承角色</option>
-      <option value="allow">允许</option>
-      <option value="deny">拒绝</option>
+      <option value="inherit">{t('overrideInherit')}</option>
+      <option value="allow">{t('overrideAllow')}</option>
+      <option value="deny">{t('overrideDeny')}</option>
     </select>
   )
 }

@@ -1,5 +1,5 @@
 /** Registered SSH targets, project sharing, and account qualification. */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pencil, Plus, RefreshCw, Share2, Trash2 } from 'lucide-react'
 import {
   createSshTarget, listProjects, listSshTargets, mutateSshTarget, shareSshTarget, updateSshTarget,
@@ -10,8 +10,11 @@ import {
   PageHeader, Section, StatusBadge, Switch,
 } from '../components/ui.tsx'
 import { SshPermissions } from '../components/SshPermissions.tsx'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { zh as sshZh, en as sshEn } from './ssh.copy.ts'
 
-const messageOf = (error: unknown): string => error instanceof Error ? error.message : '无法完成 SSH 操作'
+const sshCopy = () => translateCopy(adminLanguage(), { zh: sshZh, en: sshEn })
+const messageOf = (error: unknown): string => error instanceof Error ? error.message : sshCopy()('operationFailed')
 const HASH_PATTERN = /^[0-9a-f]{64}$/u
 
 interface TargetDraft {
@@ -53,52 +56,54 @@ const limit = (value: string, label: string, max: number, min = 1) => {
   if (value.trim() === '') return null
   const parsed = Number(value)
   if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error(`${label}必须是 ${min} 到 ${max} 之间的整数`)
+    throw new Error(sshCopy()('errorIntegerRange', { label, min: String(min), max: String(max) }))
   }
   return parsed
 }
 const boundedText = (value: string, label: string, max: number): string => {
   const trimmed = value.trim()
-  if (trimmed === '') throw new Error(`${label}不能为空`)
-  if (trimmed.length > max) throw new Error(`${label}不能超过 ${max} 字符`)
+  if (trimmed === '') throw new Error(sshCopy()('errorRequired', { label }))
+  if (trimmed.length > max) throw new Error(sshCopy()('errorTooLong', { label, max: String(max) }))
   return trimmed
 }
 const absolutePath = (value: string, label: string): string => {
   const trimmed = boundedText(value, label, 1024)
-  if (!trimmed.startsWith('/')) throw new Error(`${label}必须是绝对路径`)
+  if (!trimmed.startsWith('/')) throw new Error(sshCopy()('errorAbsolutePath', { label }))
   return trimmed
 }
 const HOST_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.@-]*$/u
 
 function fieldsOf(draft: TargetDraft): AdminSshTargetFields {
+  const t = sshCopy()
   const bootstrapPath = text(draft.bootstrapPath)
   const bootstrapHash = text(draft.bootstrapHash)
   const passwordRef = text(draft.passwordRef)
-  if ((bootstrapPath === null) !== (bootstrapHash === null)) throw new Error('PTC 引导路径与摘要必须同时填写')
+  if ((bootstrapPath === null) !== (bootstrapHash === null)) throw new Error(t('errorBootstrapPair'))
   if (bootstrapPath !== null && (!bootstrapPath.startsWith('/') || bootstrapPath.length > 1024)) {
-    throw new Error('PTC 引导路径必须是不超过 1024 字符的绝对路径')
+    throw new Error(t('errorBootstrapPath'))
   }
-  const host = boundedText(draft.host, '主机别名', 256)
-  if (!HOST_PATTERN.test(host)) throw new Error('主机别名必须以字母或数字开头，只能包含字母、数字、_、.、@、-')
-  if (!HASH_PATTERN.test(draft.helperHash.trim())) throw new Error('助手摘要必须是 64 位小写十六进制')
-  if (bootstrapHash !== null && !HASH_PATTERN.test(bootstrapHash)) throw new Error('引导摘要必须是 64 位小写十六进制')
+  const host = boundedText(draft.host, t('labelHostAlias'), 256)
+  if (!HOST_PATTERN.test(host)) throw new Error(t('errorHostAlias'))
+  if (!HASH_PATTERN.test(draft.helperHash.trim())) throw new Error(t('errorHelperHash'))
+  if (bootstrapHash !== null && !HASH_PATTERN.test(bootstrapHash)) throw new Error(t('errorBootstrapHash'))
   if (passwordRef !== null && !/^[A-Za-z_][A-Za-z0-9_]{0,255}$/u.test(passwordRef)) {
-    throw new Error('密码凭据引用必须以字母或下划线开头，只能包含字母、数字和下划线，最长 256 字符')
+    throw new Error(t('errorPasswordRef'))
   }
   return {
-    name: boundedText(draft.name, '名称', 128), host,
-    node: absolutePath(draft.node, '远端 Node 可执行文件'),
-    helper: absolutePath(draft.helper, '助手入口'),
-    helperHash: draft.helperHash.trim(), workspace: absolutePath(draft.workspace, '远端默认工作区'),
+    name: boundedText(draft.name, t('labelName'), 128), host,
+    node: absolutePath(draft.node, t('labelNode')),
+    helper: absolutePath(draft.helper, t('labelHelper')),
+    helperHash: draft.helperHash.trim(), workspace: absolutePath(draft.workspace, t('labelWorkspace')),
     bootstrapPath, bootstrapHash, passwordRef,
-    requestTimeoutMs: limit(draft.requestTimeoutMs, '请求超时', 2_147_483_647),
-    maxFrameBytes: limit(draft.maxFrameBytes, '单帧上限', 67_108_864),
-    maxPending: limit(draft.maxPending, '并发请求上限', 128),
-    leaseMs: limit(draft.leaseMs, '远端租约', 600_000, 3_000),
+    requestTimeoutMs: limit(draft.requestTimeoutMs, t('labelRequestTimeout'), 2_147_483_647),
+    maxFrameBytes: limit(draft.maxFrameBytes, t('labelMaxFrame'), 67_108_864),
+    maxPending: limit(draft.maxPending, t('labelMaxPending'), 128),
+    leaseMs: limit(draft.leaseMs, t('labelLease'), 600_000, 3_000),
   }
 }
 
 export function SshPage() {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: sshZh, en: sshEn }), [])
   const [targets, setTargets] = useState<AdminSshTarget[] | null>(null)
   const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([])
   const [error, setError] = useState('')
@@ -135,7 +140,7 @@ export function SshPage() {
       if (editing.target === null) await createSshTarget(fields)
       else await updateSshTarget(editing.target.publicId, editing.target.revision, fields)
       if (attempt !== generation.current) return
-      setNotice(editing.target === null ? 'SSH 目标已注册。' : 'SSH 目标已更新。')
+      setNotice(editing.target === null ? t('noticeCreated') : t('noticeUpdated'))
       setEditing(null); refresh()
     } catch (cause) {
       if (attempt === generation.current) setError(messageOf(cause))
@@ -149,7 +154,7 @@ export function SshPage() {
     try {
       await mutateSshTarget(target.publicId, target.revision, target.enabled ? 'disable' : 'enable')
       if (attempt !== generation.current) return
-      setNotice(target.enabled ? `已停用 ${target.name}。` : `已启用 ${target.name}。`)
+      setNotice(target.enabled ? t('noticeDisabled', { name: target.name }) : t('noticeEnabled', { name: target.name }))
       refresh()
     } catch (cause) {
       if (attempt === generation.current) setError(messageOf(cause))
@@ -163,7 +168,7 @@ export function SshPage() {
     try {
       await mutateSshTarget(removing.publicId, removing.revision, 'remove')
       if (attempt !== generation.current) return
-      setNotice(`已删除 ${removing.name} 及其项目共享。`); setRemoving(null); refresh()
+      setNotice(t('noticeRemoved', { name: removing.name })); setRemoving(null); refresh()
     } catch (cause) {
       if (attempt === generation.current) setError(messageOf(cause))
     } finally { if (attempt === generation.current) setActing(false) }
@@ -184,35 +189,35 @@ export function SshPage() {
 
   return (
     <>
-      <PageHeader title="SSH" description="登记的 OpenSSH 目标、项目共享和账号资格。" />
+      <PageHeader title="SSH" description={t('pageDescription')} />
       {error === '' ? null : <ErrorBanner message={error} />}
       {notice === '' ? null : <p role="status">{notice}</p>}
       <Section
-        title="连接目标"
+        title={t('sectionTargets')}
         actions={<>
-          <IconButton label="刷新" icon={RefreshCw} onClick={refresh} />
-          <Button icon={Plus} onClick={() => { setEditing({ target: null, draft: EMPTY_DRAFT }) }}>注册目标</Button>
+          <IconButton label={t('refresh')} icon={RefreshCw} onClick={refresh} />
+          <Button icon={Plus} onClick={() => { setEditing({ target: null, draft: EMPTY_DRAFT }) }}>{t('registerTarget')}</Button>
         </>}
       >
-        {targets === null ? <LoadingState label="正在加载 SSH 目标" /> : targets.length === 0 ? (
-          <EmptyState title="尚无 SSH 目标" detail="登记部署拥有的 OpenSSH 别名后，具备资格的账号才能在受管运行时挂载远端执行环境。" />
+        {targets === null ? <LoadingState label={t('loading')} /> : targets.length === 0 ? (
+          <EmptyState title={t('emptyTitle')} detail={t('emptyDetail')} />
         ) : (
-          <div className="tableWrap" role="region" aria-label="SSH 连接目标，可横向滚动" tabIndex={0}>
+          <div className="tableWrap" role="region" aria-label={t('tableAria')} tabIndex={0}>
             <table className="dataTable">
-              <thead><tr><th>名称</th><th>主机别名</th><th>远端工作区</th><th>共享项目</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th>{t('labelName')}</th><th>{t('labelHostAlias')}</th><th>{t('columnWorkspace')}</th><th>{t('columnShared')}</th><th>{t('columnStatus')}</th><th>{t('columnActions')}</th></tr></thead>
               <tbody>
                 {targets.map(target => (
                   <tr key={target.publicId}>
                     <td>{target.name}</td>
                     <td><code>{target.host}</code></td>
                     <td><code>{target.workspace}</code></td>
-                    <td>{target.sharedProjects.length === 0 ? '—' : target.sharedProjects.map(id => projects.find(project => project.id === id)?.name ?? `#${String(id)}`).join('、')}</td>
-                    <td><StatusBadge tone={target.enabled ? 'success' : 'neutral'}>{target.enabled ? '已启用' : '已停用'}</StatusBadge></td>
+                    <td>{target.sharedProjects.length === 0 ? '—' : target.sharedProjects.map(id => projects.find(project => project.id === id)?.name ?? `#${String(id)}`).join(t('projectSeparator'))}</td>
+                    <td><StatusBadge tone={target.enabled ? 'success' : 'neutral'}>{target.enabled ? t('statusEnabled') : t('statusDisabled')}</StatusBadge></td>
                     <td>
-                      <IconButton label="编辑" icon={Pencil} onClick={() => { setEditing({ target, draft: draftOf(target) }) }} />
-                      <IconButton label="项目共享" icon={Share2} onClick={() => { setSharing(target) }} />
-                      <Button variant="ghost" onClick={() => void toggle(target)} disabled={acting}>{target.enabled ? '停用' : '启用'}</Button>
-                      <IconButton label="删除" icon={Trash2} onClick={() => { setRemoving(target) }} />
+                      <IconButton label={t('edit')} icon={Pencil} onClick={() => { setEditing({ target, draft: draftOf(target) }) }} />
+                      <IconButton label={t('shareAction')} icon={Share2} onClick={() => { setSharing(target) }} />
+                      <Button variant="ghost" onClick={() => void toggle(target)} disabled={acting}>{target.enabled ? t('disable') : t('enable')}</Button>
+                      <IconButton label={t('delete')} icon={Trash2} onClick={() => { setRemoving(target) }} />
                     </td>
                   </tr>
                 ))}
@@ -224,41 +229,41 @@ export function SshPage() {
       <SshPermissions />
       <Dialog
         open={editing !== null}
-        title={editing === null || editing.target === null ? '注册 SSH 目标' : `编辑 ${editing.target.name}`}
-        description="全部字段来自部署拥有的 OpenSSH 与已安装助手坐标；连接值只下发给通过资格校验的受管运行时。"
+        title={editing === null || editing.target === null ? t('titleRegister') : t('titleEdit', { name: editing.target.name })}
+        description={t('editDescription')}
         onClose={() => { if (!acting) setEditing(null) }}
         footer={<>
-          <Button type="button" onClick={() => { setEditing(null) }} disabled={acting}>取消</Button>
-          <Button type="button" variant="primary" onClick={() => void save()} disabled={acting}>保存</Button>
+          <Button type="button" onClick={() => { setEditing(null) }} disabled={acting}>{t('cancel')}</Button>
+          <Button type="button" variant="primary" onClick={() => void save()} disabled={acting}>{t('save')}</Button>
         </>}
         wide
       >
         {editing === null ? null : (
           <div className="formGrid">
             <div className="formSpanFull"><ErrorBanner message={error} /></div>
-            <Field label="名称" hint="组织内唯一的管理显示名。"><input className="input" value={editing.draft.name} onChange={event => { patchDraft({ name: event.target.value }) }} /></Field>
-            <Field label="主机别名" hint="包含既有用户、密钥和 known-hosts 配置的 OpenSSH 别名。"><input className="input" value={editing.draft.host} onChange={event => { patchDraft({ host: event.target.value }) }} /></Field>
-            <Field label="密码凭据引用" hint="可选；填写连接运行时能解析的凭据名称，不填写密码。留空使用 OpenSSH 配置。"><input className="input" autoComplete="off" value={editing.draft.passwordRef} onChange={event => { patchDraft({ passwordRef: event.target.value }) }} /></Field>
-            <Field label="远端 Node 可执行文件" hint="绝对路径。"><input className="input" value={editing.draft.node} onChange={event => { patchDraft({ node: event.target.value }) }} /></Field>
-            <Field label="助手入口" hint="已安装打包助手的绝对路径。"><input className="input" value={editing.draft.helper} onChange={event => { patchDraft({ helper: event.target.value }) }} /></Field>
-            <Field label="助手摘要" hint="助手包的 SHA-256；不匹配拒绝连接。"><input className="input" value={editing.draft.helperHash} onChange={event => { patchDraft({ helperHash: event.target.value }) }} /></Field>
-            <Field label="远端默认工作区" hint="绝对路径。"><input className="input" value={editing.draft.workspace} onChange={event => { patchDraft({ workspace: event.target.value }) }} /></Field>
-            <Field label="PTC 引导路径" hint="可选；与摘要同时填写。"><input className="input" value={editing.draft.bootstrapPath} onChange={event => { patchDraft({ bootstrapPath: event.target.value }) }} /></Field>
-            <Field label="PTC 引导摘要" hint="可选；64 位小写十六进制。"><input className="input" value={editing.draft.bootstrapHash} onChange={event => { patchDraft({ bootstrapHash: event.target.value }) }} /></Field>
-            <Field label="请求超时（毫秒）"><input className="input" inputMode="numeric" value={editing.draft.requestTimeoutMs} onChange={event => { patchDraft({ requestTimeoutMs: event.target.value }) }} /></Field>
-            <Field label="单帧上限（字节）"><input className="input" inputMode="numeric" value={editing.draft.maxFrameBytes} onChange={event => { patchDraft({ maxFrameBytes: event.target.value }) }} /></Field>
-            <Field label="并发请求上限"><input className="input" inputMode="numeric" value={editing.draft.maxPending} onChange={event => { patchDraft({ maxPending: event.target.value }) }} /></Field>
-            <Field label="远端租约（毫秒）"><input className="input" inputMode="numeric" value={editing.draft.leaseMs} onChange={event => { patchDraft({ leaseMs: event.target.value }) }} /></Field>
+            <Field label={t('labelName')} hint={t('hintName')}><input className="input" value={editing.draft.name} onChange={event => { patchDraft({ name: event.target.value }) }} /></Field>
+            <Field label={t('labelHostAlias')} hint={t('hintHostAlias')}><input className="input" value={editing.draft.host} onChange={event => { patchDraft({ host: event.target.value }) }} /></Field>
+            <Field label={t('labelPasswordRef')} hint={t('hintPasswordRef')}><input className="input" autoComplete="off" value={editing.draft.passwordRef} onChange={event => { patchDraft({ passwordRef: event.target.value }) }} /></Field>
+            <Field label={t('labelNode')} hint={t('hintAbsolutePath')}><input className="input" value={editing.draft.node} onChange={event => { patchDraft({ node: event.target.value }) }} /></Field>
+            <Field label={t('labelHelper')} hint={t('hintHelper')}><input className="input" value={editing.draft.helper} onChange={event => { patchDraft({ helper: event.target.value }) }} /></Field>
+            <Field label={t('labelHelperHash')} hint={t('hintHelperHash')}><input className="input" value={editing.draft.helperHash} onChange={event => { patchDraft({ helperHash: event.target.value }) }} /></Field>
+            <Field label={t('labelWorkspace')} hint={t('hintAbsolutePath')}><input className="input" value={editing.draft.workspace} onChange={event => { patchDraft({ workspace: event.target.value }) }} /></Field>
+            <Field label={t('labelBootstrapPath')} hint={t('hintBootstrapPath')}><input className="input" value={editing.draft.bootstrapPath} onChange={event => { patchDraft({ bootstrapPath: event.target.value }) }} /></Field>
+            <Field label={t('labelBootstrapHash')} hint={t('hintBootstrapHash')}><input className="input" value={editing.draft.bootstrapHash} onChange={event => { patchDraft({ bootstrapHash: event.target.value }) }} /></Field>
+            <Field label={t('labelRequestTimeoutMs')}><input className="input" inputMode="numeric" value={editing.draft.requestTimeoutMs} onChange={event => { patchDraft({ requestTimeoutMs: event.target.value }) }} /></Field>
+            <Field label={t('labelMaxFrameBytes')}><input className="input" inputMode="numeric" value={editing.draft.maxFrameBytes} onChange={event => { patchDraft({ maxFrameBytes: event.target.value }) }} /></Field>
+            <Field label={t('labelMaxPending')}><input className="input" inputMode="numeric" value={editing.draft.maxPending} onChange={event => { patchDraft({ maxPending: event.target.value }) }} /></Field>
+            <Field label={t('labelLeaseMs')}><input className="input" inputMode="numeric" value={editing.draft.leaseMs} onChange={event => { patchDraft({ leaseMs: event.target.value }) }} /></Field>
           </div>
         )}
       </Dialog>
       <Dialog
         open={sharing !== null}
-        title={sharing === null ? '' : `共享 ${sharing.name}`}
-        description="共享使项目运行时能够解析该目标；每位执行用户仍需独立 SSH 资格。"
+        title={sharing === null ? '' : t('titleShare', { name: sharing.name })}
+        description={t('shareDescription')}
         onClose={() => { if (!acting) setSharing(null) }}
       >
-        {sharing === null ? null : projects.length === 0 ? <EmptyState title="没有可共享的项目" /> : (
+        {sharing === null ? null : projects.length === 0 ? <EmptyState title={t('shareEmpty')} /> : (
           projects.map(project => (
             <Switch
               key={project.id}
@@ -272,9 +277,9 @@ export function SshPage() {
       </Dialog>
       <ConfirmDialog
         open={removing !== null}
-        title={removing === null ? '' : `删除 ${removing.name}`}
-        description="删除会同时移除全部项目共享；已挂载的连接在访问失效传播后被切断。"
-        confirmLabel="删除"
+        title={removing === null ? '' : t('titleRemove', { name: removing.name })}
+        description={t('removeDescription')}
+        confirmLabel={t('delete')}
         pending={acting}
         onConfirm={() => void remove()}
         onClose={() => { if (!acting) setRemoving(null) }}

@@ -15,6 +15,8 @@ import {
 } from '../api.ts'
 import { OrganizationModelsEditor } from '../components/OrganizationModelsEditor.tsx'
 import { ModelIdentity, modelKey, OverrideSelect, RoleDefaults } from '../components/models.tsx'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { en as modelsPageEn, zh as modelsPageZh, type ModelsPageCopyKey } from './models-page.copy.ts'
 import {
   Button,
   Dialog,
@@ -44,15 +46,20 @@ const EMPTY_REGISTRATION_FILTERS: RegistrationFilters = {
   user: '', provider: '', model: '', action: '', from: '', to: '',
 }
 
-const PRICE_LABELS = ['输入', '输出', '缓存读取', '缓存写入'] as const
+const PRICE_LABEL_KEYS = ['priceInput', 'priceOutput', 'priceCacheRead', 'priceCacheWrite'] as const
 const REGISTRATION_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
+function modelsPageT() {
+  return translateCopy(adminLanguage(), { zh: modelsPageZh, en: modelsPageEn })
+}
+
 function yuanToMicros(value: string): number {
+  const t = modelsPageT()
   const yuan = Number(value)
-  if (!Number.isFinite(yuan) || yuan < 0) throw new Error('单价必须是非负数')
+  if (!Number.isFinite(yuan) || yuan < 0) throw new Error(t('priceNotNegative'))
   const text = value.trim()
   const micros = /^\d+(?:\.\d+)?$/u.test(text) ? decimalToMicros(text) : Math.round(yuan * 1_000_000)
-  if (!Number.isSafeInteger(micros)) throw new Error('单价超过可精确保存的范围')
+  if (!Number.isSafeInteger(micros)) throw new Error(t('priceTooLarge'))
   return micros
 }
 
@@ -63,18 +70,19 @@ function microsToYuan(value: number): string {
 function registrationDate(value: string, endOfDay: boolean): number | undefined {
   if (value === '') return undefined
   const parts = REGISTRATION_DATE_PATTERN.exec(value)
-  if (parts === null) throw new Error('日期格式必须为 YYYY-MM-DD')
+  if (parts === null) throw new Error(modelsPageT()('dateFormatInvalid'))
   const year = Number(parts[1])
   const month = Number(parts[2])
   const day = Number(parts[3])
   const date = new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00'}`)
   if (!Number.isFinite(date.getTime()) || date.getFullYear() !== year || date.getMonth() + 1 !== month || date.getDate() !== day) {
-    throw new Error('日期无效，请输入真实日期')
+    throw new Error(modelsPageT()('dateInvalid'))
   }
   return endOfDay ? date.getTime() + 1 : date.getTime()
 }
 
 export function ModelsPage() {
+  const t = useMemo(() => modelsPageT(), [])
   const [view, setView] = useState<ModelsView>('catalog')
   const [models, setModels] = useState<ModelGovernanceRow[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -225,10 +233,10 @@ export function ModelsPage() {
 
   const actions = (
     <div className="pageToolbar modelPageToolbar">
-      <div className="segmented modelViewTabs" role="group" aria-label="模型治理视图">
-        <button type="button" aria-pressed={view === 'catalog'} onClick={() => setView('catalog')}>组织模型</button>
-        <button type="button" aria-pressed={view === 'governance'} onClick={() => setView('governance')}>权限与计价</button>
-        <button type="button" aria-pressed={view === 'personal'} onClick={() => setView('personal')}>个人登记</button>
+      <div className="segmented modelViewTabs" role="group" aria-label={t('viewTabsAria')}>
+        <button type="button" aria-pressed={view === 'catalog'} onClick={() => setView('catalog')}>{t('tabCatalog')}</button>
+        <button type="button" aria-pressed={view === 'governance'} onClick={() => setView('governance')}>{t('tabGovernance')}</button>
+        <button type="button" aria-pressed={view === 'personal'} onClick={() => setView('personal')}>{t('tabPersonal')}</button>
       </div>
     </div>
   )
@@ -236,9 +244,9 @@ export function ModelsPage() {
   return (
     <div className="page">
       <PageHeader
-        title="模型治理"
-        description="统一管理组织 Provider、模型权限与计价；个人 BYOK 仅在个人运行时可用。"
-        meta={loading ? undefined : `${models.length} 个组织模型`}
+        title={t('pageTitle')}
+        description={t('pageDescription')}
+        meta={loading ? undefined : t('pageMeta', { count: String(models.length) })}
         actions={actions}
       />
       <ErrorBanner message={error} />
@@ -273,8 +281,8 @@ export function ModelsPage() {
 
       <Dialog
         open={editingModel !== null && modelDraft !== null}
-        title="配置模型治理"
-        description="Provider 和模型身份由组织模型插件维护；此处只配置运行权限和计价。"
+        title={t('editGovernance')}
+        description={t('governanceDialogDescription')}
         onClose={() => {
           if (modelSaving) return
           setEditingModel(null)
@@ -285,8 +293,8 @@ export function ModelsPage() {
             <Button type="button" disabled={modelSaving} onClick={() => {
               setEditingModel(null)
               setModelDraft(null)
-            }}>取消</Button>
-            <Button type="submit" form="model-governance-form" variant="primary" loading={modelSaving}>保存治理配置</Button>
+            }}>{t('cancel')}</Button>
+            <Button type="submit" form="model-governance-form" variant="primary" loading={modelSaving}>{t('saveGovernance')}</Button>
           </>
         )}
       >
@@ -299,15 +307,15 @@ export function ModelsPage() {
             </div>
             <div className="formDivider" />
             <div className="toggleGrid">
-              <Switch label="启用模型" checked={modelDraft.enabled} onChange={enabled => setModelDraft({ ...modelDraft, enabled })} />
-              <Switch label="管理员默认允许" checked={modelDraft.adminAllowed} onChange={adminAllowed => setModelDraft({ ...modelDraft, adminAllowed })} />
-              <Switch label="普通用户默认允许" checked={modelDraft.userAllowed} onChange={userAllowed => setModelDraft({ ...modelDraft, userAllowed })} />
+              <Switch label={t('switchEnabled')} checked={modelDraft.enabled} onChange={enabled => setModelDraft({ ...modelDraft, enabled })} />
+              <Switch label={t('switchAdminDefault')} checked={modelDraft.adminAllowed} onChange={adminAllowed => setModelDraft({ ...modelDraft, adminAllowed })} />
+              <Switch label={t('switchUserDefault')} checked={modelDraft.userAllowed} onChange={userAllowed => setModelDraft({ ...modelDraft, userAllowed })} />
             </div>
             <div className="formDivider" />
-            <span className="fieldLabel">单价（人民币元 / 百万 Token）</span>
+            <span className="fieldLabel">{t('priceLabel')}</span>
             <div className="priceGrid formSectionSpacing">
-              {PRICE_LABELS.map((label, index) => (
-                <Field key={label} label={label}>
+              {PRICE_LABEL_KEYS.map((labelKey, index) => (
+                <Field key={labelKey} label={t(labelKey)}>
                   <input
                     className="input"
                     required
@@ -346,67 +354,68 @@ function PersonalRegistrationAudit({
   onReset: () => void
   onRefresh: () => void
 }) {
+  const t = useMemo(() => modelsPageT(), [])
   const summary = report?.summary
   return (
     <Section
       className="responsiveSection"
-      title="个人 Provider 与模型登记"
-      meta={summary === undefined ? undefined : `${summary.providerCount} 个 Provider · ${summary.modelCount} 个模型`}
-      actions={<Button type="button" icon={RefreshCw} onClick={onRefresh}>刷新</Button>}
+      title={t('personalTitle')}
+      meta={summary === undefined ? undefined : t('personalMeta', { providerCount: String(summary.providerCount), modelCount: String(summary.modelCount) })}
+      actions={<Button type="button" icon={RefreshCw} onClick={onRefresh}>{t('refresh')}</Button>}
     >
-      <p className="inlineNotice">个人可以自由添加和管理 Provider 与模型；此页仅记录登记变化，不参与审批或权限限制。</p>
-      <form className="registrationFilterPanel" onSubmit={onApply} aria-label="个人登记筛选">
+      <p className="inlineNotice">{t('personalNotice')}</p>
+      <form className="registrationFilterPanel" onSubmit={onApply} aria-label={t('filterAria')}>
         <div className="registrationFilters">
-          <Field label="用户">
-            <select className="select" value={draft.user} onChange={event => onDraft({ ...draft, user: event.target.value })} aria-label="筛选用户">
-              <option value="">全部用户</option>
+          <Field label={t('filterUser')}>
+            <select className="select" value={draft.user} onChange={event => onDraft({ ...draft, user: event.target.value })} aria-label={t('filterUserAria')}>
+              <option value="">{t('filterAllUsers')}</option>
               {users.map(item => <option key={item.id} value={item.id}>{item.username}</option>)}
             </select>
           </Field>
-          <Field label="Provider">
-            <input className="input" value={draft.provider} onChange={event => onDraft({ ...draft, provider: event.target.value })} placeholder="按 Provider 筛选" aria-label="筛选 Provider" />
+          <Field label={t('filterProvider')}>
+            <input className="input" value={draft.provider} onChange={event => onDraft({ ...draft, provider: event.target.value })} placeholder={t('filterProviderPlaceholder')} aria-label={t('filterProviderAria')} />
           </Field>
-          <Field label="模型">
-            <input className="input" value={draft.model} onChange={event => onDraft({ ...draft, model: event.target.value })} placeholder="按模型筛选" aria-label="筛选模型" />
+          <Field label={t('filterModel')}>
+            <input className="input" value={draft.model} onChange={event => onDraft({ ...draft, model: event.target.value })} placeholder={t('filterModelPlaceholder')} aria-label={t('filterModelAria')} />
           </Field>
-          <Field label="开始日期">
-            <input className="input" type="text" inputMode="numeric" maxLength={10} value={draft.from} onChange={event => onDraft({ ...draft, from: event.target.value })} placeholder="YYYY-MM-DD" aria-label="开始日期" />
+          <Field label={t('filterFrom')}>
+            <input className="input" type="text" inputMode="numeric" maxLength={10} value={draft.from} onChange={event => onDraft({ ...draft, from: event.target.value })} placeholder="YYYY-MM-DD" aria-label={t('filterFrom')} />
           </Field>
-          <Field label="结束日期">
-            <input className="input" type="text" inputMode="numeric" maxLength={10} value={draft.to} onChange={event => onDraft({ ...draft, to: event.target.value })} placeholder="YYYY-MM-DD" aria-label="结束日期" />
+          <Field label={t('filterTo')}>
+            <input className="input" type="text" inputMode="numeric" maxLength={10} value={draft.to} onChange={event => onDraft({ ...draft, to: event.target.value })} placeholder="YYYY-MM-DD" aria-label={t('filterTo')} />
           </Field>
-          <Field label="动作">
-            <select className="select" value={draft.action} onChange={event => onDraft({ ...draft, action: event.target.value as ModelRegistrationAction | '' })} aria-label="筛选动作">
-              <option value="">全部动作</option>
-              {Object.entries(REGISTRATION_ACTION_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          <Field label={t('filterAction')}>
+            <select className="select" value={draft.action} onChange={event => onDraft({ ...draft, action: event.target.value as ModelRegistrationAction | '' })} aria-label={t('filterActionAria')}>
+              <option value="">{t('filterAllActions')}</option>
+              {(Object.keys(REGISTRATION_ACTION_KEYS) as ModelRegistrationAction[]).map(action => <option key={action} value={action}>{t(REGISTRATION_ACTION_KEYS[action])}</option>)}
             </select>
           </Field>
         </div>
         <div className="filterActions registrationFilterActions">
-          <Button type="button" icon={RotateCcw} onClick={onReset}>重置</Button>
-          <Button type="submit" variant="primary" icon={Filter}>应用筛选</Button>
+          <Button type="button" icon={RotateCcw} onClick={onReset}>{t('filterReset')}</Button>
+          <Button type="submit" variant="primary" icon={Filter}>{t('filterApply')}</Button>
         </div>
       </form>
-      {loading ? <LoadingState label="正在加载个人登记记录" /> : report === null || report.rows.length === 0 ? (
-        <EmptyState icon={ClipboardList} title="暂无个人登记记录" detail="个人新增 Provider 或模型后，记录会显示在这里。" />
+      {loading ? <LoadingState label={t('personalLoading')} /> : report === null || report.rows.length === 0 ? (
+        <EmptyState icon={ClipboardList} title={t('personalEmptyTitle')} detail={t('personalEmptyDetail')} />
       ) : (
         <>
           <div className="roleDefaults registrationSummary">
-            <span>事件 {summary?.eventCount ?? 0}</span>
-            <span className="allowed">新增 {summary?.createdCount ?? 0}</span>
-            <span>修改 {summary?.modifiedCount ?? 0}</span>
-            <span className="denied">删除 {summary?.deletedCount ?? 0}</span>
+            <span>{t('summaryEvents', { count: String(summary?.eventCount ?? 0) })}</span>
+            <span className="allowed">{t('summaryCreated', { count: String(summary?.createdCount ?? 0) })}</span>
+            <span>{t('summaryModified', { count: String(summary?.modifiedCount ?? 0) })}</span>
+            <span className="denied">{t('summaryDeleted', { count: String(summary?.deletedCount ?? 0) })}</span>
           </div>
           <div className="tableWrap desktopOnly">
             <table className="dataTable modelTable">
-              <thead><tr><th>时间</th><th>用户</th><th>Provider</th><th>模型</th><th>动作</th></tr></thead>
+              <thead><tr><th>{t('columnTime')}</th><th>{t('columnUser')}</th><th>{t('columnProvider')}</th><th>{t('columnModel')}</th><th>{t('columnAction')}</th></tr></thead>
               <tbody>{report.rows.map(row => <RegistrationRow key={row.eventId} row={row} users={users} />)}</tbody>
             </table>
           </div>
           <div className="mobileList">
             {report.rows.map(row => (
               <article className="mobileItem" key={row.eventId}>
-                <div className="mobileItemHeader"><strong>{REGISTRATION_ACTION_LABELS[row.action]}</strong><span>{formatRegistrationTime(row.occurredAt)}</span></div>
+                <div className="mobileItemHeader"><strong>{t(REGISTRATION_ACTION_KEYS[row.action])}</strong><span>{formatRegistrationTime(row.occurredAt)}</span></div>
                 <div className="mobileItemBody"><span>{userName(row.userId, users)}</span><span className="codeText">{row.provider}{row.model === null ? '' : `/${row.model}`}</span></div>
               </article>
             ))}
@@ -418,32 +427,33 @@ function PersonalRegistrationAudit({
 }
 
 function RegistrationRow({ row, users }: { row: ModelRegistrationReport['rows'][number]; users: AdminUser[] }) {
+  const t = useMemo(() => modelsPageT(), [])
   return (
     <tr>
       <td>{formatRegistrationTime(row.occurredAt)}</td>
       <td>{userName(row.userId, users)}</td>
       <td className="codeText">{row.provider}</td>
       <td className="codeText">{row.model ?? '—'}</td>
-      <td><StatusBadge tone={row.action.endsWith('deleted') ? 'danger' : row.action.endsWith('created') ? 'success' : 'neutral'}>{REGISTRATION_ACTION_LABELS[row.action]}</StatusBadge></td>
+      <td><StatusBadge tone={row.action.endsWith('deleted') ? 'danger' : row.action.endsWith('created') ? 'success' : 'neutral'}>{t(REGISTRATION_ACTION_KEYS[row.action])}</StatusBadge></td>
     </tr>
   )
 }
 
-const REGISTRATION_ACTION_LABELS: Record<ModelRegistrationAction, string> = {
-  'provider-created': '新增 Provider',
-  'provider-modified': '修改 Provider',
-  'provider-deleted': '删除 Provider',
-  'model-created': '新增模型',
-  'model-modified': '修改模型',
-  'model-deleted': '删除模型',
+const REGISTRATION_ACTION_KEYS: Record<ModelRegistrationAction, ModelsPageCopyKey> = {
+  'provider-created': 'actionProviderCreated',
+  'provider-modified': 'actionProviderModified',
+  'provider-deleted': 'actionProviderDeleted',
+  'model-created': 'actionModelCreated',
+  'model-modified': 'actionModelModified',
+  'model-deleted': 'actionModelDeleted',
 }
 
 function userName(id: number, users: AdminUser[]): string {
-  return users.find(user => user.id === id)?.username ?? `用户 ${String(id)}`
+  return users.find(user => user.id === id)?.username ?? modelsPageT()('userFallback', { id: String(id) })
 }
 
 function formatRegistrationTime(value: number): string {
-  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short' }).format(value)
+  return new Intl.DateTimeFormat(modelsPageT()('dateLocale'), { dateStyle: 'short', timeStyle: 'short' }).format(value)
 }
 
 function ModelDirectory({
@@ -471,39 +481,40 @@ function ModelDirectory({
   onEdit: (model: ModelGovernanceRow) => void
   onOverride: (model: ModelGovernanceRow, value: string) => Promise<void>
 }) {
+  const t = useMemo(() => modelsPageT(), [])
   return (
     <Section
       className="responsiveSection"
-      title="组织模型权限与计价"
-      meta={loading ? undefined : `${models.length} 个模型`}
+      title={t('directoryTitle')}
+      meta={loading ? undefined : t('directoryMeta', { count: String(models.length) })}
       actions={users.length === 0 ? undefined : (
         <div className="modelUserPicker">
-          <span>用户例外</span>
-          <select className="select selectCompact" value={selectedUser} onChange={event => onSelectUser(event.target.value)} aria-label="用户例外">
-            {users.map(user => <option key={user.id} value={user.id}>{user.username}（{user.role === 'admin' ? '管理员' : '用户'}）</option>)}
+          <span>{t('userException')}</span>
+          <select className="select selectCompact" value={selectedUser} onChange={event => onSelectUser(event.target.value)} aria-label={t('userException')}>
+            {users.map(user => <option key={user.id} value={user.id}>{t(user.role === 'admin' ? 'userOptionAdmin' : 'userOptionUser', { name: user.username })}</option>)}
           </select>
         </div>
       )}
     >
-      {loading ? <LoadingState label="正在加载模型治理配置" /> : models.length === 0 ? (
+      {loading ? <LoadingState label={t('directoryLoading')} /> : models.length === 0 ? (
         <EmptyState
           icon={Sparkles}
-          title="还没有组织模型"
-          detail="完整模型目录由组织 Provider 配置统一维护。"
+          title={t('directoryEmptyTitle')}
+          detail={t('directoryEmptyDetail')}
         />
       ) : (
         <>
-          {users.length === 0 ? <div className="inlineNotice">暂无用户；角色默认与计价仍可配置。</div> : null}
+          {users.length === 0 ? <div className="inlineNotice">{t('noUsersNotice')}</div> : null}
           <div className="tableWrap desktopOnly">
             <table className="dataTable modelTable">
               <thead>
                 <tr>
-                  <th>模型</th>
-                  <th>状态</th>
-                  <th>角色默认</th>
-                  <th>{selected === undefined ? '用户例外' : `${selected.username} 的例外`}</th>
-                  <th>价格（元 / 百万 Token）</th>
-                  <th aria-label="操作" />
+                  <th>{t('columnModel')}</th>
+                  <th>{t('columnStatus')}</th>
+                  <th>{t('columnRoleDefaults')}</th>
+                  <th>{selected === undefined ? t('userException') : t('userExceptionFor', { name: selected.username })}</th>
+                  <th>{t('columnPrice')}</th>
+                  <th aria-label={t('columnActionsAria')} />
                 </tr>
               </thead>
               <tbody>
@@ -513,18 +524,18 @@ function ModelDirectory({
                   return (
                     <tr key={key}>
                       <td><ModelIdentity row={row} /></td>
-                      <td><StatusBadge tone={row.enabled ? 'success' : 'danger'}>{row.enabled ? '已启用' : '已停用'}</StatusBadge></td>
+                      <td><StatusBadge tone={row.enabled ? 'success' : 'danger'}>{row.enabled ? t('statusEnabled') : t('statusDisabled')}</StatusBadge></td>
                       <td><RoleDefaults row={row} /></td>
                       <td>
                         <OverrideSelect
-                          label={selected === undefined ? '用户例外' : `${selected.username} 的例外`}
+                          label={selected === undefined ? t('userException') : t('userExceptionFor', { name: selected.username })}
                           disabled={selectedUser === '' || accessLoading || overridePending === key}
                           value={override}
                           onChange={value => { void onOverride(row, value) }}
                         />
                       </td>
                       <td><PriceSummary row={row} /></td>
-                      <td><div className="rowActions"><IconButton label="配置模型治理" icon={Pencil} onClick={() => onEdit(row)} /></div></td>
+                      <td><div className="rowActions"><IconButton label={t('editGovernance')} icon={Pencil} onClick={() => onEdit(row)} /></div></td>
                     </tr>
                   )
                 })}
@@ -539,23 +550,23 @@ function ModelDirectory({
                 <article className="mobileItem" key={key}>
                   <div className="mobileItemHeader">
                     <ModelIdentity row={row} />
-                    <IconButton label="配置模型治理" icon={Pencil} onClick={() => onEdit(row)} />
+                    <IconButton label={t('editGovernance')} icon={Pencil} onClick={() => onEdit(row)} />
                   </div>
                   <div className="mobileItemBody">
                     <div className="mobileStatusRow">
-                      <StatusBadge tone={row.enabled ? 'success' : 'danger'}>{row.enabled ? '已启用' : '已停用'}</StatusBadge>
+                      <StatusBadge tone={row.enabled ? 'success' : 'danger'}>{row.enabled ? t('statusEnabled') : t('statusDisabled')}</StatusBadge>
                       <RoleDefaults row={row} />
                     </div>
                     <div>
-                      <span className="fieldLabel">{selected === undefined ? '用户例外' : `${selected.username} 的例外`}</span>
+                      <span className="fieldLabel">{selected === undefined ? t('userException') : t('userExceptionFor', { name: selected.username })}</span>
                       <OverrideSelect
-                        label={selected === undefined ? '用户例外' : `${selected.username} 的例外`}
+                        label={selected === undefined ? t('userException') : t('userExceptionFor', { name: selected.username })}
                         disabled={selectedUser === '' || accessLoading || overridePending === key}
                         value={override}
                         onChange={value => { void onOverride(row, value) }}
                       />
                     </div>
-                    <div><span className="fieldLabel">价格（元 / 百万 Token）</span><PriceSummary row={row} /></div>
+                    <div><span className="fieldLabel">{t('columnPrice')}</span><PriceSummary row={row} /></div>
                   </div>
                 </article>
               )
@@ -568,10 +579,11 @@ function ModelDirectory({
 }
 
 function PriceSummary({ row }: { row: ModelGovernanceRow }) {
+  const t = useMemo(() => modelsPageT(), [])
   const values = [row.inputMicrosPerMillion, row.outputMicrosPerMillion, row.cacheReadMicrosPerMillion, row.cacheWriteMicrosPerMillion]
   return (
     <div className="priceSummary">
-      {PRICE_LABELS.map((label, index) => <span key={label}><b>{label}</b><span>{microsToYuan(values[index] ?? 0)}</span></span>)}
+      {PRICE_LABEL_KEYS.map((labelKey, index) => <span key={labelKey}><b>{t(labelKey)}</b><span>{microsToYuan(values[index] ?? 0)}</span></span>)}
     </div>
   )
 }

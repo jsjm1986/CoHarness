@@ -8,7 +8,7 @@ import {
   UserRound,
   Users,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   createUser,
@@ -44,8 +44,11 @@ import {
   type UserDraft,
   type UserRole,
 } from '../components/users.tsx'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { zh as usersZh, en as usersEn } from './users.copy.ts'
 
 export function UsersPage() {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: usersZh, en: usersEn }), [])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -121,19 +124,19 @@ export function UsersPage() {
   return (
     <div className="page">
       <PageHeader
-        title="用户管理"
-        description="管理账号权限、登录状态和每位用户的独立 Harness 实例。点击用户进入详情页管理准入资格、模型例外、项目成员和配额。"
-        meta={loading ? undefined : `${users.length} 位用户`}
-        actions={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>新建用户</Button>}
+        title={t('pageTitle')}
+        description={t('pageDescription')}
+        meta={loading ? undefined : t('userCount', { count: String(users.length) })}
+        actions={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>{t('createUser')}</Button>}
       />
       <ErrorBanner message={error} />
-      <Section className="responsiveSection" title="账号与实例" meta={loading ? undefined : `${users.length} 条记录`}>
-        {loading ? <LoadingState label="正在加载用户" /> : users.length === 0 ? (
+      <Section className="responsiveSection" title={t('sectionTitle')} meta={loading ? undefined : t('recordCount', { count: String(users.length) })}>
+        {loading ? <LoadingState label={t('loadingUsers')} /> : users.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="还没有用户"
-            detail="创建第一个账号后，可在这里配置角色并控制其 Harness 实例。"
-            action={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>新建用户</Button>}
+            title={t('emptyTitle')}
+            detail={t('emptyDetail')}
+            action={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>{t('createUser')}</Button>}
           />
         ) : (
           <>
@@ -141,13 +144,13 @@ export function UsersPage() {
               <table className="dataTable">
                 <thead>
                   <tr>
-                    <th>用户</th>
-                    <th>角色</th>
-                    <th>Auto 审查资格</th>
-                    <th>账号</th>
-                    <th>实例</th>
-                    <th>端口</th>
-                    <th aria-label="操作" />
+                    <th>{t('colUser')}</th>
+                    <th>{t('colRole')}</th>
+                    <th>{t('colAutoReview')}</th>
+                    <th>{t('colAccount')}</th>
+                    <th>{t('colInstance')}</th>
+                    <th>{t('colPort')}</th>
+                    <th aria-label={t('colActions')} />
                   </tr>
                 </thead>
                 <tbody>
@@ -184,9 +187,9 @@ export function UsersPage() {
                   </div>
                   <div className="mobileItemBody">
                     <dl className="definitionGrid">
-                      <Definition label="角色"><RoleBadge role={user.role} /></Definition>
-                      <Definition label="Auto 审查资格"><AutoReviewBadge eligible={user.autoReviewEligible} /></Definition>
-                      <Definition label="端口"><span className="codeText">{user.port}</span></Definition>
+                      <Definition label={t('colRole')}><RoleBadge role={user.role} /></Definition>
+                      <Definition label={t('colAutoReview')}><AutoReviewBadge eligible={user.autoReviewEligible} /></Definition>
+                      <Definition label={t('colPort')}><span className="codeText">{user.port}</span></Definition>
                     </dl>
                     <div className="mobileControlRow">
                       <InstanceState state={user.instanceState} />
@@ -229,40 +232,41 @@ function UserActions({ user, pending, onEdit, onPassword, onDisable, onDelete, o
   onEnable: () => void
   mobile?: boolean
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: usersZh, en: usersEn }), [])
   const statusPending = pending === `status:${user.id}`
   const deletePending = pending === `delete:${user.id}`
   if (mobile) {
     return (
       <div className="mobileActions">
-        <Link className="button button-secondary" to={`/users/${user.id}`}>详情</Link>
-        <Button icon={Pencil} onClick={onEdit}>编辑</Button>
-        <Button icon={KeyRound} onClick={onPassword}>密码</Button>
+        <Link className="button button-secondary" to={`/users/${user.id}`}>{t('detail')}</Link>
+        <Button icon={Pencil} onClick={onEdit}>{t('edit')}</Button>
+        <Button icon={KeyRound} onClick={onPassword}>{t('password')}</Button>
         <Button
           variant={user.status === 'active' ? 'danger' : 'secondary'}
           icon={Power}
           loading={statusPending}
           onClick={user.status === 'active' ? onDisable : onEnable}
         >
-          {user.status === 'active' ? '禁用' : '启用'}
+          {user.status === 'active' ? t('disable') : t('enable')}
         </Button>
-        <Button variant="danger" icon={Trash2} loading={deletePending} onClick={onDelete}>删除</Button>
+        <Button variant="danger" icon={Trash2} loading={deletePending} onClick={onDelete}>{t('deleteAction')}</Button>
       </div>
     )
   }
   return (
     <div className="rowActions">
-      <Link className="iconButton iconButton-ghost" to={`/users/${user.id}`} aria-label="管理详情" title="管理详情"><ChevronRight /></Link>
-      <IconButton label="编辑用户" icon={Pencil} onClick={onEdit} />
-      <IconButton label="重置密码" icon={KeyRound} onClick={onPassword} />
+      <Link className="iconButton iconButton-ghost" to={`/users/${user.id}`} aria-label={t('manageDetail')} title={t('manageDetail')}><ChevronRight /></Link>
+      <IconButton label={t('editUser')} icon={Pencil} onClick={onEdit} />
+      <IconButton label={t('resetPassword')} icon={KeyRound} onClick={onPassword} />
       <IconButton
-        label={user.status === 'active' ? '禁用用户' : '启用用户'}
+        label={user.status === 'active' ? t('disableUser') : t('enableUser')}
         icon={user.status === 'active' ? Power : UserRound}
         variant={user.status === 'active' ? 'danger' : 'ghost'}
         loading={statusPending}
         onClick={user.status === 'active' ? onDisable : onEnable}
       />
       <IconButton
-        label="删除用户"
+        label={t('deleteUser')}
         icon={Trash2}
         variant="danger"
         loading={deletePending}
