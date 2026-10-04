@@ -67,7 +67,7 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   if (waitingRow === null) throw new Error('fixture Session title must belong to a tree row')
   expect(waitingRow.querySelector('[data-state="warning"]')).not.toBeNull()
   expect(waitingRow.querySelector('[data-state="ongoing"]')).toBeNull()
-  within(waitingRow).getByText('Waiting for answer')
+  within(waitingRow).getByText('Waiting for an answer')
 
   // Opening a session reaches chat content through the fixture transport.
   fireEvent.click(waitingTitle)

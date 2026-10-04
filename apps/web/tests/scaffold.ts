@@ -882,6 +882,21 @@ export function systemPromptTexts(events: readonly SessionEvent[]): string[] {
  * @returns the seeded id.
  */
 /**
+ * Realize one canonical `{{kind:ordinal}}` fixture token to the deterministic
+ * UUID {@link realizeSeedFixture} writes in place of the token. Tests that
+ * address a seeded identity use this instead of pinning a literal UUID.
+ * @param kind - the token's identity kind (`message`, `approval`, ...).
+ * @param ordinal - the token's 1-based ordinal within that kind.
+ * @returns the realized UUIDv4-shaped string.
+ */
+export function realizedTokenId(kind: string, ordinal: number): string {
+  const hex = createHash('sha256').update(`${kind}:${ordinal}`).digest('hex').slice(0, 32).split('')
+  hex[12] = '4'
+  hex[16] = ['8', '9', 'a', 'b'][Number.parseInt(hex[16] as string, 16) % 4] as string
+  return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex.slice(12, 16).join('')}-${hex.slice(16, 20).join('')}-${hex.slice(20).join('')}`
+}
+
+/**
  * Realize a recorded seed fixture against one scaffold: substitute the
  * `{{sessionId}}`/`{{cwd}}` placeholders and rewrite the recorded cwd to the
  * scaffold's workspace. Idempotent, so a caller may realize early (e.g. to
@@ -908,12 +923,7 @@ export function realizeSeedFixture(scaffold: Pick<WebScaffold, 'workspaceCwd' | 
       .replace(/\{\{session:([1-9]\d*)\}\}/g, (_token, ordinal: string) =>
         ordinal === '1' ? id : `${id}-child-${ordinal}`)
       .replace(/\{\{(message|approval|workflow|command|rpc|retry|principal|project|runtime|target|resource|id):([1-9]\d*)\}\}/g,
-        (_token, kind: string, ordinal: string) => {
-          const hex = createHash('sha256').update(`${kind}:${ordinal}`).digest('hex').slice(0, 32).split('')
-          hex[12] = '4'
-          hex[16] = ['8', '9', 'a', 'b'][Number.parseInt(hex[16] as string, 16) % 4] as string
-          return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex.slice(12, 16).join('')}-${hex.slice(16, 20).join('')}-${hex.slice(20).join('')}`
-        })
+        (_token, kind: string, ordinal: string) => realizedTokenId(kind, Number(ordinal)))
       .split('{{harnessHome}}').join(scaffold.harnessHome)
       .split('{{cwd}}').join(scaffold.workspaceCwd)
   }

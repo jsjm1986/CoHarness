@@ -224,12 +224,12 @@ it('renders a host dimension rejection with the projected 2000px limit', async (
   })
   fireEvent.keyDown(textarea, { key: 'Enter' })
 
-  const message = 'Image sides must be at most 2000px; downscale it and try again'
+  const message = 'Image dimensions must not exceed 2000px; downscale it and try again'
   const toast = await screen.findByText(message)
   expect({ role: toast.closest('[role="alert"]')?.getAttribute('role'), text: toast.textContent }).toMatchInlineSnapshot(`
     {
       "role": "alert",
-      "text": "Image sides must be at most 2000px; downscale it and try again",
+      "text": "Image dimensions must not exceed 2000px; downscale it and try again",
     }
   `)
   expect(document.querySelector('[role="group"][aria-label="Pending images"]')).not.toBeNull()
