@@ -91,8 +91,9 @@ export function syntheticHistory(turns: number): SessionEvent[] {
         session.append('tool/result', {
           turn, step,
           message: {
-            id: MessageId('result-' + block.id), role: 'user', source: { kind: 'tool', callId: block.id },
-            content: [{ type: 'tool-result', toolCallId: block.id, content: [{ type: 'text', text: resultText(turn) }], isError: false }],
+            id: MessageId('result-' + block.id), role: 'tool', source: { kind: 'tool', callId: block.id },
+            toolCallId: block.id, isError: false,
+            content: [{ type: 'text', text: resultText(turn) }],
           },
         }, { surfaceOp: 'append', sourceEventSeqs: [call.seq] })
       }
