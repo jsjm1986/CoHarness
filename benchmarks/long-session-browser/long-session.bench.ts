@@ -148,7 +148,7 @@ it('opens, pages, navigates and streams into a 240-turn browser history', async 
           const page = await newEnglishPage(browser)
           const consoleWatch = watchConsole(page)
           page.setDefaultTimeout(30000)
-          await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+          await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
           expect(new URL(page.url()).origin).toBe(scaffold.baseUrl)
           console.log(JSON.stringify({ benchmark: 'long-session-browser/server', url: scaffold.baseUrl, browser: browser.version(), sample }))
           await page.waitForSelector('[class*="frame"]')
