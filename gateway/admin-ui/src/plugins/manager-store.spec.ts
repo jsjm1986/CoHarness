@@ -3,7 +3,7 @@
  * outcomes become toasts, and how the install run folds its output.
  */
 
-import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { BundleInfo, ChangeResult, ManagementError, PluginEntryId, PluginInfo, PluginInstallRequestId } from '../../../../packages/boot/plugin-manager/src/types.ts'
 import type { HostObservable } from './config-ledger.ts'
 import type { ConfigLedger } from './config-ledger.ts'
@@ -101,6 +101,18 @@ function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
   }
   return { plugins, inventory, probe, controller, face, state, started }
 }
+
+// Persisted registry memory starts empty for every spec. A functional stub
+// keeps the store's real read and write paths exercised; the ambient storage
+// differs across runtimes (Node's disabled localStorage shadows happy-dom's).
+beforeEach(() => {
+  const storage = new Map<string, string>()
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => { storage.set(key, value) },
+    removeItem: (key: string) => { storage.delete(key) },
+  })
+})
 
 describe('packageView', () => {
   it('joins a bundle with the entries its rows run as', () => {
