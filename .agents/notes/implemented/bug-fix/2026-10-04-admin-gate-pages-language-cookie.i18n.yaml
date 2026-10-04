@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-04-admin-gate-pages-language-cookie.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-admin-gate-pages-language-cookie.md
+/agent-note-carry-the-admin-language-choice-into-gateway-gate-pages:
+  en: ce09e59b048b39c4
+  zh: c573a37d2c65bc52
+/agent-note-carry-the-admin-language-choice-into-gateway-gate-pages/problem:
+  en: 0e3fd57e16da8c41
+  zh: c853fb78d6ec839f
+/agent-note-carry-the-admin-language-choice-into-gateway-gate-pages/decision:
+  en: e302cb4328548029
+  zh: d1783a7226a77019
+/agent-note-carry-the-admin-language-choice-into-gateway-gate-pages/files:
+  en: 7316e20814ea5dd0
+  zh: f49cc6b490246034
+/agent-note-carry-the-admin-language-choice-into-gateway-gate-pages/consequences:
+  en: e98b033b3da1d362
+  zh: a84cc12d0e521fc1

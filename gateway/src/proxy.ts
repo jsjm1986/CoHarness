@@ -10,7 +10,7 @@ import {
   writeProjectModelGovernanceFile,
 } from './apply-model-governance.ts'
 import type { UserRow } from './auth.ts'
-import { waitingPage, stoppedPage } from './html.ts'
+import { gateCopy, gateLanguage, stoppedPage, waitingPage } from './html.ts'
 import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
@@ -168,12 +168,13 @@ export function createProxyHandlers(
 
   function refuseStopped(req: IncomingMessage, res: ServerResponse, target: RuntimeTarget): void {
     res.setHeader('cache-control', 'no-store')
+    const lang = gateLanguage(req.headers.cookie)
     if (wantsHtml(req)) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-      res.end(stoppedPage(target))
+      res.end(stoppedPage(target, lang))
     } else {
       res.writeHead(409, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ error: { code: 'INSTANCE_STOPPED', message: '工作台已手动停止。请主动启动并打开。' } }))
+      res.end(JSON.stringify({ error: { code: 'INSTANCE_STOPPED', message: `${gateCopy(lang)('stoppedHeading')} ${gateCopy(lang)('stoppedBody')}` } }))
     }
   }
 
@@ -200,7 +201,7 @@ export function createProxyHandlers(
         const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
         if (wantsHtml(req)) {
           res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...retryHeaders })
-          res.end(waitingPage())
+          res.end(waitingPage(gateLanguage(req.headers.cookie)))
         } else {
           res.writeHead(503, { 'content-type': 'application/json', ...retryHeaders })
           res.end(JSON.stringify({
@@ -273,7 +274,7 @@ export function createProxyHandlers(
         const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
         if (wantsHtml(req)) {
           res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...retryHeaders })
-          res.end(waitingPage())
+          res.end(waitingPage(gateLanguage(req.headers.cookie)))
         } else {
           res.writeHead(503, { 'content-type': 'application/json', ...retryHeaders })
           res.end(JSON.stringify({

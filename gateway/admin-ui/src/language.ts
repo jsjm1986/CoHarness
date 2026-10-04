@@ -29,6 +29,10 @@ export function setAdminLanguage(language: AdminLanguage): void {
   } catch {
     // Storage may deny access under privacy modes; the choice stays in memory nowhere.
   }
+  // The gateway reads this cookie to render its pre-auth pages (login, password,
+  // runtime waiting/stopped) in the same language; it is not HttpOnly because
+  // only this client writes it.
+  document.cookie = `hgw_lang=${language}; Path=/; SameSite=Lax; Max-Age=31536000`
 }
 
 /** A copy dictionary pair over one key set; `zh` is the key source of truth, `en` its checked counterpart. */

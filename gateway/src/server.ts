@@ -12,7 +12,7 @@ import type { GatewayConfig } from './config.ts'
 import { RuntimeStartBlockedError, type ProjectRuntime } from './instances.ts'
 import type { PrincipalScope } from './principal.ts'
 import type { GatewayPushService, PushProvider } from './push-notifications.ts'
-import { loginPage, passwordPage } from './html.ts'
+import { gateCopy, gateLanguage, loginPage, passwordPage } from './html.ts'
 import { MIN_PASSWORD_LENGTH } from './password.ts'
 import {
   DOCUMENT_TRANSFER_UPLOADS_PATH,
@@ -697,13 +697,14 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     if (!csrfOk(req, cfg, pathname)) { sendAdminGate(res, pathname, 'origin not allowed'); return }
 
     if (pathname === '/login') {
-      if (req.method === 'GET') { send(res, 200, loginPage()); return }
+      const gateT = gateCopy(gateLanguage(req.headers.cookie))
+      if (req.method === 'GET') { send(res, 200, loginPage('', gateLanguage(req.headers.cookie))); return }
       if (req.method === 'POST') {
         const form = new URLSearchParams(await readBody(req))
         const username = form.get('username') ?? ''
         const result = await auth.login(username, form.get('password') ?? '', clientIp(req), req.headers['user-agent'] ?? '')
-        if (result === 'locked') { await audit.write({ action: 'login.locked', ip: clientIp(req), detail: username }); send(res, 429, loginPage('尝试过于频繁，请 10 分钟后再试')); return }
-        if (result === 'invalid') { await audit.write({ action: 'login.failed', ip: clientIp(req), detail: username }); send(res, 401, loginPage('用户名或密码错误')); return }
+        if (result === 'locked') { await audit.write({ action: 'login.locked', ip: clientIp(req), detail: username }); send(res, 429, loginPage(gateT('loginLocked'), gateLanguage(req.headers.cookie))); return }
+        if (result === 'invalid') { await audit.write({ action: 'login.failed', ip: clientIp(req), detail: username }); send(res, 401, loginPage(gateT('loginInvalid'), gateLanguage(req.headers.cookie))); return }
         await audit.write({ userId: result.user.id, action: 'login', ip: clientIp(req) })
         redirect(res, '/', [sessionCookie(result.token, cfg)])
         return
@@ -754,10 +755,11 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     }
 
     if (pathname === '/account/password') {
-      if (req.method === 'GET') { send(res, 200, passwordPage()); return }
+      const gateLang = gateLanguage(req.headers.cookie)
+      if (req.method === 'GET') { send(res, 200, passwordPage('', gateLang)); return }
       if (req.method === 'POST') {
         const password = new URLSearchParams(await readBody(req)).get('password') ?? ''
-        if (password.length < MIN_PASSWORD_LENGTH) { send(res, 400, passwordPage(`密码至少 ${String(MIN_PASSWORD_LENGTH)} 位`)); return }
+        if (password.length < MIN_PASSWORD_LENGTH) { send(res, 400, passwordPage(gateCopy(gateLang)('passwordTooShort', { min: String(MIN_PASSWORD_LENGTH) }), gateLang)); return }
         await users.changeOwnPassword(user.id, password)
         handlers.invalidateAccess?.({ userId: user.id })
         await removeBootstrapAdminPassword(cfg.bootstrapAdminPasswordFile).catch((error: unknown) => {
