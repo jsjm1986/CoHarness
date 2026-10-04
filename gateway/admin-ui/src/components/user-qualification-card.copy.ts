@@ -24,7 +24,7 @@ export const en = {
   updateFailed: 'The grant could not be updated',
   noticeGranted: 'The qualification has been granted.',
   noticeRevoked: 'The qualification has been revoked and running sessions have been notified to re-verify.',
-  errorReread: '{error} Reload the current grant.',
+  errorReread: '{error}. Reload the current grant.',
   granted: 'Granted',
   notGranted: 'Not granted',
   loadingPolicy: 'Loading the {name} grant…',

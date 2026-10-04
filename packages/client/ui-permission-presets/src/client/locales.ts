@@ -35,7 +35,7 @@ export const en = {
 
   'title': 'Permission',
   'description': 'Choose the default permission mode for new sessions',
-  'managedByProject': 'The project owner or an organization administrator manages the default for new sessions.',
+  'managedByProject': 'The project owner or an organization administrator manages the default permission for new sessions.',
   'managedByAccount': 'This account manages the default permission mode for new sessions.',
   'managedByOrganization': 'An organization administrator manages the default permission mode for new sessions.',
   'managedByDeployment': 'This deployment manages the default permission mode.',
@@ -45,7 +45,7 @@ export const en = {
   'preset.workspaceWrite': 'Workspace Write',
   'preset.fullAccess': 'Full access',
   'confirm.title': 'Enable Full access?',
-  'confirm.description': 'Full access lets new sessions reduce confirmation steps and perform more actions directly, including sensitive operations, file changes, or external commands. Only use it when you trust subsequent tasks.',
+  'confirm.description': 'With Full access, new sessions need fewer confirmation steps and can perform more actions directly, including sensitive operations, file changes, or external commands. Only use it when you trust subsequent tasks.',
   'confirm.acknowledge': 'I understand the risks and want to continue',
   'confirm.cancel': 'Cancel',
   'confirm.enable': 'Enable Full access',

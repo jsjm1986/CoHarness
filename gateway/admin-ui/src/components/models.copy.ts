@@ -19,7 +19,7 @@ export const en = {
   roleUser: 'Users',
   decisionAllow: 'allowed',
   decisionDeny: 'denied',
-  overrideInherit: 'Inherit role',
+  overrideInherit: 'Inherit from role',
   overrideAllow: 'Allow',
   overrideDeny: 'Deny',
 } satisfies Record<ModelsCopyKey, string>

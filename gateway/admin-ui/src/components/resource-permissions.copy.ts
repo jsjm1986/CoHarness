@@ -32,7 +32,7 @@ export const en = {
   ownerUser: 'User · {name} (@{username})',
   ownerProject: 'Project · {name}',
   noticeRevoked: 'The qualification has been revoked and running sessions have been notified to re-verify.',
-  errorReread: '{error} Reload the current grant.',
+  errorReread: '{error}. Reload the current grant.',
   titleUser: '{name} qualification',
   titleProject: '{name} project grant',
   projectOnlyHint: 'The {name} qualification for user subjects is managed per user on the user detail page.',

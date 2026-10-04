@@ -23,7 +23,7 @@ export const zh = {
   exitMaintenance: '退出维护窗口',
   restoringHint: '恢复尚未完成，写入保持关闭。检查下方操作台账；失败时先处理原因，再由独立应用器重试。',
   nodesTitle: '计算节点',
-  nodesMeta: '写者收敛要求实例已停止，且活跃节点心跳新鲜、已确认维护纪元、在途写者归零。请先处理运行回合、终端和任务，再停止实例。',
+  nodesMeta: '写者收敛要求实例已停止，且活跃节点心跳新鲜、已确认维护纪元、在途写者归零。请先处理运行会话、终端和任务，再停止实例。',
   nodesEmpty: '没有登记节点',
   nodesTableAria: '计算节点，可横向滚动',
   columnName: '名称',
@@ -113,7 +113,7 @@ export type DeploymentCopyKey = keyof typeof zh
 
 export const en = {
   operationFailed: 'The deployment operation could not be completed',
-  pageTitle: 'Deployment & migration',
+  pageTitle: 'Deployment and migration',
   pageDescription: 'The maintenance window quiesces every writer before migrations or restores run; a completed restore advances the write epoch so processes started before it stop writing.',
   refresh: 'Refresh',
   clusterTitle: 'Cluster status',
@@ -142,7 +142,7 @@ export const en = {
   columnHeartbeat: 'Heartbeat',
   columnEpoch: 'Acknowledged epoch',
   columnInflight: 'In-flight writers',
-  columnRuntimes: 'Unstopped instances',
+  columnRuntimes: 'Instances still running',
   columnQuiesced: 'Quiesced',
   columnActions: 'Actions',
   nodeActive: 'Online',
@@ -215,7 +215,7 @@ export const en = {
   restoreDescription: 'The standalone applier runs inside the maintenance window: pg:deploy restore. It fully preserves current managed data before restoring the selected backup; the current node configuration and database connection stay unchanged, and incompatible storage locations are rejected. The write epoch advances after restore, so old processes must restart. Administrators clean up the protection copy separately.',
   restoreConfirm: 'Register restore request',
   noticeRestoreRequested: 'Restore request registered; enter the maintenance window and run pg:deploy restore',
-  exitDescription: 'After exit, change requests are accepted again. Confirm the migration or restore has been verified complete.',
+  exitDescription: 'After exiting, change requests are accepted again. Confirm the migration or restore has been verified as complete.',
   exitConfirm: 'Exit maintenance',
   noticeExitedMaintenance: 'Exited the maintenance window',
 } satisfies Record<DeploymentCopyKey, string>

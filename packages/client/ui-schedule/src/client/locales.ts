@@ -46,7 +46,7 @@ export const en: Record<ScheduleCatalogKey, string> = {
   'frequency.every': 'Every {value} {unit}',
   ...frequencyEn,
   'mark.aria': '{count} scheduled tasks',
-  'hover.more': '{count} more',
+  'hover.more': '{count} more tasks',
 }
 
 /** Key domain of the Schedule catalog namespace. */

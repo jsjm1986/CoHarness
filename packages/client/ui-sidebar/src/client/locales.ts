@@ -14,7 +14,7 @@ export type SidebarKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
-  'session.new': 'New Session',
+  'session.new': 'New session',
   'session.new.label': 'New session',
   'panels.label': 'Panels',
   'toggle.open': 'Open sidebar',

@@ -45,7 +45,7 @@ export const en = {
   emptyDetail: 'After creating the first account, you can configure its role and control its Harness instance here.',
   colUser: 'User',
   colRole: 'Role',
-  colAutoReview: 'Auto review eligibility',
+  colAutoReview: 'Auto review qualification',
   colAccount: 'Account',
   colInstance: 'Instance',
   colPort: 'Port',

@@ -140,7 +140,7 @@ export const en: Record<VoiceKey, string> = {
   'downloadProgress': 'Download progress',
   'downloadBytes': 'Download: {completed} / {total} MB, {percent}%',
   'downloadUnknown': 'Downloaded {completed} MB',
-  'elapsed': 'Waiting {seconds} seconds',
+  'elapsed': 'Waited {seconds} seconds',
   'preparationFailed': 'Preparation failed: {message}',
   'download.network': 'Cannot download {resource}: connection to the download service failed.',
   'download.dns': 'Cannot download {resource}: the download address could not be resolved.',
@@ -187,10 +187,10 @@ export const en: Record<VoiceKey, string> = {
   local: 'Audio is recognized on the machine running DSH. If models need downloading, that machine must be able to reach the selected source and its file services. Configure a proxy on that machine if needed.',
   cloud: 'Audio will be sent to the selected cloud service.',
   empty: 'No speech recognized', cancelled: 'Voice input cancelled.',
-  conflict: 'Your draft changed. The transcript is preserved and can be inserted at the current cursor.',
+  conflict: 'Your draft changed. The transcript is preserved and can be inserted at the cursor position.',
   failed: 'Speech recognition failed: {message}',
   unavailable: 'This browser cannot record audio. Use a browser with microphone support.',
-  permission: 'Microphone access is disabled. Allow it in browser and system settings.',
+  permission: 'Microphone access is disabled. Allow it in your browser and system settings.',
   tooLarge: 'The recording exceeds the service limit. Try a shorter recording.',
 }
 

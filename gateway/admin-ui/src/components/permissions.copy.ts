@@ -22,14 +22,14 @@ export type PermissionsCopyKey = keyof typeof zh
 export const en = {
   sshName: 'SSH',
   sshDescription: 'Denied by default. A project space additionally requires the user qualification, the project grant, and a shared connection. SSH connects under deployment-owned OpenSSH aliases, and each user still needs an independent qualification. Revocation severs the connection for the affected runtime.',
-  sshSaved: 'The SSH grant was saved; project spaces still require the user qualification, the project grant, and a shared connection together.',
+  sshSaved: 'The SSH grant was saved; project spaces still require the user qualification, the project grant, and a shared connection.',
   terminalName: 'Terminal',
   terminalDescription: 'Denied by default. A project space additionally requires the user qualification, the project grant, and writable membership. Only the creator can read and write a terminal; administrators can only list and close other users\' terminals. After revocation, processes are left to be cleaned up; hidden tabs do not terminate processes.',
-  terminalSaved: 'The terminal grant was saved; project spaces still require the user qualification, the project grant, and writable membership together.',
+  terminalSaved: 'The terminal grant was saved; project spaces still require the user qualification, the project grant, and writable membership.',
   desktopName: 'Desktop',
   desktopDescription: 'Denied by default. A project space additionally requires the user qualification, the project grant, and writable membership. The qualification does not replace the user\'s confirmation of a specific session and desktop, and does not mean the running node already has desktop capability.',
   desktopSaved: 'The desktop grant was saved; the user still has to confirm the session and desktop.',
   pluginName: 'Plugin management',
   pluginDescription: 'Denied by default. A project space additionally requires the user qualification and the project grant; a personal space only requires the user qualification. The grant does not replace the plugin\'s own management constraints or runtime confirmations.',
-  pluginSaved: 'The plugin-management grant was saved; project spaces still require the user qualification and the project grant together.',
+  pluginSaved: 'The plugin-management grant was saved; project spaces still require the user qualification and the project grant.',
 } satisfies Record<PermissionsCopyKey, string>

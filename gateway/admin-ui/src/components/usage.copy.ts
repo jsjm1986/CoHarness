@@ -29,7 +29,7 @@ export const en = {
   pricingHistoricalUnknown: 'Historical pricing unknown',
   pricingPartial: 'Pricing partially missing',
   quotaCost: 'Cost',
-  alertTokens: 'Token',
+  alertTokens: 'Tokens',
   alertCost: 'Cost',
   quotaNoLimit: 'Unlimited',
 } satisfies Record<UsageCopyKey, string>

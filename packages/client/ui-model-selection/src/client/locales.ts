@@ -46,7 +46,7 @@ export type ModelKey = keyof typeof zh
 export const en = {
   'provider.account': 'DeepSeek Account',
   'command.label': 'Model',
-  'command.description': 'Select the model for this conversation',
+  'command.description': 'Select the model for this session',
   'option.loadError': 'Catalog failed to load: {message}',
   'trigger.fallback': 'Select model',
   'trigger.loading': 'Loading model…',

@@ -20,7 +20,7 @@ export type GoalKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
-  'phase.active': 'Ongoing Goal',
+  'phase.active': 'Ongoing goal',
   'phase.paused': 'Paused Goal',
   'phase.blocked': 'Blocked Goal',
   'objective.aria': 'Goal objective',

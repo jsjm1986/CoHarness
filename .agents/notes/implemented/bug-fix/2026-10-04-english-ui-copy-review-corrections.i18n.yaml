@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-english-ui-copy-review-corrections.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-english-ui-copy-review-corrections.md
+/agent-note-english-ui-copy-review-corrections:
+  en: 2b02fa561436e73e
+  zh: 901bacc6145a7c83
+/agent-note-english-ui-copy-review-corrections/problem:
+  en: 9d1e7c775e67175b
+  zh: 0947dad5e992660c
+/agent-note-english-ui-copy-review-corrections/decision:
+  en: b660854ca605eddb
+  zh: ca97daccacb71054
+/agent-note-english-ui-copy-review-corrections/files:
+  en: 622ed511f9577d4a
+  zh: c2d00f578d6226c9
+/agent-note-english-ui-copy-review-corrections/alternatives-considered:
+  en: 591c2c8fc27da216
+  zh: eca45748f2031216
+/agent-note-english-ui-copy-review-corrections/consequences:
+  en: 132fb8bd3edb0a2a
+  zh: f49d257531054634

@@ -54,7 +54,7 @@ export const en = {
   noticeClosed: 'The process finished cleanup.',
   closeUnconfirmed: '{message}. Cleanup was not confirmed; read the inventory again and retry.',
   pageTitle: 'Terminals',
-  pageDescription: 'Manage admission qualification, view terminals on the current node, and close them explicitly. Administrators cannot read or type into other users\' terminals.',
+  pageDescription: 'Manage qualifications, view terminals on the current node, and close them explicitly. Administrators cannot read or type into other users\' terminals.',
   sectionProcesses: 'Terminal processes',
   scopeLabel: 'Scope',
   scopeAria: 'Terminal scope',
@@ -77,5 +77,5 @@ export const en = {
   retryCleanup: 'Retry cleanup',
   closeTerminal: 'Close terminal',
   closeDescription: 'This terminates terminal {id} and the process behind it; running commands are interrupted. Hidden tabs do not perform this action.',
-  confirmClose: 'Confirm close',
+  confirmClose: 'Confirm closing',
 } satisfies Record<TerminalsCopyKey, string>

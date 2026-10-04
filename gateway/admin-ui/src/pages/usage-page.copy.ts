@@ -62,6 +62,8 @@ export const zh = {
   quotaUnlimitedNote: '不设置月度上限。',
   quotaTokenInvalid: 'Token 额度必须是非负整数',
   quotaCostInvalid: '成本额度必须是有效的非负数',
+  quotaLoading: '读取已保存的额度',
+  retry: '重试',
 } satisfies Record<string, string>
 
 /** Usage page locale key union. */
@@ -70,7 +72,7 @@ export type UsagePageCopyKey = keyof typeof zh
 /** English dictionary checked against the Chinese key set. */
 export const en = {
   pageTitle: 'Model usage',
-  pageDescription: 'Personal usage drives quotas and billing; project contributions support activity analysis and are not added into project totals.',
+  pageDescription: 'Personal usage drives quotas and billing; project contributions support activity analysis and are not counted again toward project totals.',
   monthLabel: 'Month',
   configureQuota: 'Configure quota',
   summaryAria: 'Usage summary',
@@ -98,7 +100,7 @@ export const en = {
   healthUnattributedCalls: 'Unattributed project calls',
   healthUnpriced: 'Unpriced calls',
   healthHistoricalUnknown: 'Historical pricing unknown',
-  healthMaxLag: 'Max intake lag',
+  healthMaxLag: 'Max reporting lag',
   callsValue: '{count} calls',
   lagValue: '{value} s',
   quotaDialogTitle: 'Configure monthly quota',
@@ -130,4 +132,6 @@ export const en = {
   quotaUnlimitedNote: 'No monthly cap.',
   quotaTokenInvalid: 'The token quota must be a non-negative integer',
   quotaCostInvalid: 'The cost quota must be a valid non-negative number',
+  quotaLoading: 'Reading stored quota',
+  retry: 'Retry',
 } satisfies Record<UsagePageCopyKey, string>
