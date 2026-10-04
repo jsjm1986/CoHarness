@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-client-connection'
 import { launchWebScaffold, seedSession, fixtureUserPrompts, watchConsole,
   captureStableAria, compareOrRefreshGolden, webSnapshotMode, type WebScaffold } from './scaffold.ts'
 
@@ -36,6 +37,7 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
         await seedSession(runtime, seed, id)
       }
       const personal = runtimes[0]!, project = runtimes[1]!
+      const sessionCookies = new Map<string, string>()
       const selected = (url: string | undefined): string => {
         const target = new URL(url ?? '/', 'http://fixture').searchParams.get('dshTarget')
         return target === 'project:7' || (target === null && bootstrap === 'project') ? project.baseUrl : personal.baseUrl
@@ -55,7 +57,14 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
           res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(pathname.endsWith('context') ? context : catalog)); return
         }
         if (pathname.startsWith('/account/')) { res.writeHead(501, { 'content-type': 'application/json' }); res.end('{"error":"fixture-endpoint-unavailable"}'); return }
-        const headers = pathname === '/api/host.describe' ? { ...req.headers, 'accept-encoding': 'identity' } : req.headers
+        // The router terminates browser authentication: each upstream minted a
+        // session cookie bound to this router's authority, and the proxy swaps
+        // the selected runtime's cookie into every forwarded request.
+        const headers = {
+          ...req.headers,
+          cookie: sessionCookies.get(selected(req.url)) ?? '',
+          ...(pathname === '/api/host.describe' ? { 'accept-encoding': 'identity' } : {}),
+        }
         const upstream = request(new URL(req.url ?? '/', selected(req.url)), { method: req.method, headers }, (response) => {
           if (pathname === '/api/host.describe') {
           // Independent Hosts supply real APIs; the router owns their fixed browser runtime aliases, not Gateway authorization.
@@ -85,7 +94,9 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       })
       server.on('connection', (socket) => { sockets.add(socket); socket.on('close', () => { sockets.delete(socket) }) })
       server.on('upgrade', (req, socket, head) => {
-        const upstream = request(new URL(req.url ?? '/', selected(req.url)), { headers: req.headers })
+        const upstream = request(new URL(req.url ?? '/', selected(req.url)), {
+          headers: { ...req.headers, cookie: sessionCookies.get(selected(req.url)) ?? '' },
+        })
         requests.add(upstream)
         upstream.on('close', () => { requests.delete(upstream) })
         upstream.on('error', () => { socket.destroy() })
@@ -100,6 +111,23 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
         upstream.end()
       })
       await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve))
+      const routerAuthority = `127.0.0.1:${String((server.address() as AddressInfo).port)}`
+      for (const runtime of runtimes) {
+        const exchange = new URL(runtime.ctx.connection.authenticatedUrl(`http://${routerAuthority}`))
+        let setCookie: string | undefined
+        const authorized = runtime.ctx.connection.authorizeIndex({
+          method: 'GET',
+          url: `${exchange.pathname}${exchange.search}`,
+          headers: { host: exchange.host },
+        }, {
+          writeHead(_status, headers) { setCookie = headers?.['set-cookie'] },
+          end() {},
+        })
+        if (authorized || setCookie === undefined) {
+          throw new Error('runtime-identity: router-authority token exchange did not return a session cookie')
+        }
+        sessionCookies.set(runtime.baseUrl, setCookie.split(';', 1)[0] ?? '')
+      }
       const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, locale: 'en-US' })
       const tripwire = watchConsole(page)
       const listed = async (target: string): Promise<void> => {
@@ -113,7 +141,7 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       await page.goto(`http://127.0.0.1:${String((server.address() as AddressInfo).port)}`, { waitUntil: 'load' })
       const toolbar = page.locator('[data-workbench-toolbar]')
       await toolbar.getByRole('button', { name: 'Select workbench' }).click()
-      await page.getByRole('menuitem', { name: /我的工作台/ }).click()
+      await page.getByRole('menuitem', { name: /My workbench/ }).click()
       for (const title of titles) {
         await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
         const picker = page.getByRole('dialog', { name: 'Add conversation', exact: true })
@@ -184,12 +212,9 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
       await page.getByRole('menuitem', { name: 'Exit workbench', exact: true }).click()
       await expect.poll(() => page.locator('[data-session-pane]').count()).toBe(0)
       await toolbar.getByRole('button', { name: 'Select workbench' }).click()
-      await Promise.all([
-        listed(bootstrap === 'personal' ? 'project:7' : 'personal'),
-        page.getByRole('menuitem', { name: /我的工作台/ }).click(),
-      ])
+      await page.getByRole('menuitem', { name: /My workbench/ }).click()
       await page.waitForLoadState('networkidle')
-      expect(await page.locator('[data-session-pane]').evaluateAll(nodes =>
+      await expect.poll(() => page.locator('[data-session-pane]').evaluateAll(nodes =>
         nodes.map(node => node.getAttribute('data-session-pane')))).toEqual([personalKey, projectKey])
       await page.locator(`[data-session-pane="${projectKey}"]`).getByRole('button', { name: 'Close pane', exact: true }).click()
       expect(await page.locator(`[data-session-pane="${personalKey}"]`).count()).toBe(1)
@@ -205,12 +230,12 @@ it.skipIf(webSnapshotMode() === 'record').each(['personal', 'project'] as const)
         }))
       }, id)
       await page.reload({ waitUntil: 'load' })
-      await toolbar.getByRole('button', { name: 'Retry directory', exact: true }).waitFor()
+      await toolbar.getByRole('button', { name: 'Reload directory', exact: true }).waitFor()
       expect(await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).isDisabled()).toBe(true)
       expect(await page.locator('[data-session-pane]').count()).toBe(0)
       await compareOrRefreshGolden(LEGACY_PENDING, await captureStableAria(page, '[data-workbench-toolbar]', personal.workspaceCwd), webSnapshotMode())
       personalComplete = true
-      await toolbar.getByRole('button', { name: 'Retry directory', exact: true }).click()
+      await toolbar.getByRole('button', { name: 'Reload directory', exact: true }).click()
       await expect.poll(() => toolbar.getByRole('button', { name: 'Add conversation', exact: true }).isEnabled()).toBe(true)
       expect(await page.locator('[data-session-pane]').count()).toBe(0)
       expect(tripwire.pageErrors).toEqual([])
