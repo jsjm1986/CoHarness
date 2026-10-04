@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-src-export-erasable-syntax.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-04-src-export-erasable-syntax.md
+/agent-note-src-exports-must-carry-erasable-only-typescript:
+  en: 78d74b43b68f1224
+  zh: 084404eea49b338e
+/agent-note-src-exports-must-carry-erasable-only-typescript/problem:
+  en: a99f6606db39cb12
+  zh: 0ca58fbd932a4558
+/agent-note-src-exports-must-carry-erasable-only-typescript/decision:
+  en: ba828917fbd64fa4
+  zh: f1a5f1272b453860
+/agent-note-src-exports-must-carry-erasable-only-typescript/alternatives-considered:
+  en: 95b2468aa1959e28
+  zh: 44c1f2506432a1fe
+/agent-note-src-exports-must-carry-erasable-only-typescript/consequences:
+  en: 1880ff2062ba4a7f
+  zh: dad3e3198e6f816a
+/agent-note-src-exports-must-carry-erasable-only-typescript/related:
+  en: a37b15e6932961e6
+  zh: f0cb53ebc3b80353

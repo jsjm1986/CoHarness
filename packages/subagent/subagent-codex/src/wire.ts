@@ -220,12 +220,19 @@ export class CodexAppServerWire {
   private terminalObserved = false
   private closed = false
 
+  private readonly input: Readable
+  private readonly permissionMode: CodexPermissionMode
+  private readonly model: string | undefined
+
   constructor(
-    private readonly input: Readable,
+    input: Readable,
     output: Writable,
-    private readonly permissionMode: CodexPermissionMode,
-    private readonly model?: string,
+    permissionMode: CodexPermissionMode,
+    model?: string,
   ) {
+    this.input = input
+    this.permissionMode = permissionMode
+    this.model = model
     this.transport = new JsonRpcLineTransport(input, output)
     // Fatal protocol state can arrive after the current guarded operation has
     // already settled. Keep the shared rejection observed without inserting

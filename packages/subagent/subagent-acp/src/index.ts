@@ -138,12 +138,19 @@ class AcpProvider implements SubagentProvider {
   readonly inheritsParentContext = false
   readonly agentRouteDefaults?: Readonly<{ provider: string; model: string }>
 
+  readonly name: string
+  private readonly ctx: Context
+  private readonly config: ResolvedConfig
+
   constructor(
-    readonly name: string,
-    private readonly ctx: Context,
-    private readonly config: ResolvedConfig,
+    name: string,
+    ctx: Context,
+    config: ResolvedConfig,
     prepareMember?: (request: ContinuableCreateRequest) => Promise<void>,
   ) {
+    this.name = name
+    this.ctx = ctx
+    this.config = config
     if (prepareMember !== undefined) {
       this.agentRouteDefaults = {
         provider: ACP_MEMBER_ROUTE,

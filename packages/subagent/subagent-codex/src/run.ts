@@ -103,15 +103,15 @@ function failureDiagnostic(facts: CodexFailureFacts): string {
 }
 
 class CodexRunFailure extends Error {
-  constructor(
-    readonly facts: CodexFailureFacts,
-    cause?: unknown,
-  ) {
+  readonly facts: CodexFailureFacts
+
+  constructor(facts: CodexFailureFacts, cause?: unknown) {
     super(
       `subagent-codex: ${failureDiagnostic(facts)}`,
       cause === undefined ? undefined : { cause },
     )
     this.name = 'CodexRunFailure'
+    this.facts = facts
   }
 }
 

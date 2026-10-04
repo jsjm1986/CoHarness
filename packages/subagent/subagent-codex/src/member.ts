@@ -59,13 +59,19 @@ class CodexMemberSession implements ExternalMemberSession {
   externalId: string | undefined
   private child: SubprocessHandle | undefined
   private wire: CodexAppServerWire | undefined
+  private readonly config: CodexMemberConfig
+  private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle
+  private readonly signal: AbortSignal
 
   constructor(
-    private readonly config: CodexMemberConfig,
-    private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle,
+    config: CodexMemberConfig,
+    spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle,
     externalId: string | undefined,
-    private readonly signal: AbortSignal,
+    signal: AbortSignal,
   ) {
+    this.config = config
+    this.spawn = spawn
+    this.signal = signal
     this.externalId = externalId
   }
 
@@ -141,10 +147,16 @@ class CodexMemberSession implements ExternalMemberSession {
 
 /** Transport factory for Codex member sessions. */
 export class CodexMemberTransport implements ExternalMemberTransport {
+  private readonly config: CodexMemberConfig
+  private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle
+
   constructor(
-    private readonly config: CodexMemberConfig,
-    private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle,
-  ) {}
+    config: CodexMemberConfig,
+    spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle,
+  ) {
+    this.config = config
+    this.spawn = spawn
+  }
 
   open(externalId: string | undefined, signal: AbortSignal): Promise<ExternalMemberSession> {
     return Promise.resolve(new CodexMemberSession(this.config, this.spawn, externalId, signal))
@@ -153,11 +165,13 @@ export class CodexMemberTransport implements ExternalMemberTransport {
 
 /** LLM adapter owning the member route; each model call becomes one external turn. */
 export class CodexMemberAdapter extends LlmAdapter {
-  constructor(
-    private readonly transport: ExternalMemberTransportSource,
-    private readonly store: ExternalBindingStore,
-  ) {
+  private readonly transport: ExternalMemberTransportSource
+  private readonly store: ExternalBindingStore
+
+  constructor(transport: ExternalMemberTransportSource, store: ExternalBindingStore) {
     super()
+    this.transport = transport
+    this.store = store
   }
 
   override providerInfo(provider: string): { readonly id: string; readonly name: string } {

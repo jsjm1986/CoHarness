@@ -80,11 +80,15 @@ class AcpMemberSession implements ExternalMemberSession {
   private loading = false
   private disposed = false
 
-  constructor(
-    private readonly child: SubprocessHandle,
-    private readonly conn: ClientContext,
-    private readonly config: AcpMemberConfig,
-  ) {}
+  private readonly child: SubprocessHandle
+  private readonly conn: ClientContext
+  private readonly config: AcpMemberConfig
+
+  constructor(child: SubprocessHandle, conn: ClientContext, config: AcpMemberConfig) {
+    this.child = child
+    this.conn = conn
+    this.config = config
+  }
 
   get externalId(): string | undefined {
     return this.liveSessionId
@@ -173,10 +177,13 @@ interface MemberConnection {
  * one; the caller disposes the returned session after its turn.
  */
 export class AcpMemberTransport implements ExternalMemberTransport {
-  constructor(
-    private readonly config: AcpMemberConfig,
-    private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle,
-  ) {}
+  private readonly config: AcpMemberConfig
+  private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle
+
+  constructor(config: AcpMemberConfig, spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle) {
+    this.config = config
+    this.spawn = spawn
+  }
 
   /**
    * Verify the configured ACP agent advertises `loadSession` — the continuable
@@ -319,11 +326,13 @@ export class AcpMemberTransport implements ExternalMemberTransport {
  * recovery, prompt window, and consumed cursor all live in the store.
  */
 export class AcpMemberAdapter extends LlmAdapter {
-  constructor(
-    private readonly transport: ExternalMemberTransportSource,
-    private readonly store: ExternalBindingStore,
-  ) {
+  private readonly transport: ExternalMemberTransportSource
+  private readonly store: ExternalBindingStore
+
+  constructor(transport: ExternalMemberTransportSource, store: ExternalBindingStore) {
     super()
+    this.transport = transport
+    this.store = store
   }
 
   override providerInfo(provider: string): { readonly id: string; readonly name: string } {
