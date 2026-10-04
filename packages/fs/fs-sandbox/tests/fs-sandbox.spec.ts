@@ -8,7 +8,7 @@
  * denied write leaves no file on disk.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest'
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
@@ -100,7 +100,9 @@ describe('workspace-write containment', () => {
   })
 
   it('a write to the platform temp area lands (parity with the bash runner grant)', async () => {
-    const path = join(await mkdtemp(join(tmpdir(), 'dsh-fssbx-tmp-')), 'temp.txt')
+    const root = await mkdtemp(join(tmpdir(), 'dsh-fssbx-tmp-'))
+    onTestFinished(() => rm(root, { recursive: true, force: true }))
+    const path = join(root, 'temp.txt')
     await fs.writeText(await target(path), 'temp')
     expect(await readFile(path, 'utf8')).toBe('temp')
   })

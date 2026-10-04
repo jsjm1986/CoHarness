@@ -708,10 +708,6 @@
   "packages/client/ui-open-in-app/tests/browser-plugin.client.spec.ts": {
     "eee35b4d8641824c6eaacfe03ed60d353d81d5257d1111132f34d46a7b13ef35": 2
   },
-  "packages/client/ui-open-in-app/tests/open-in-app-action.client.spec.tsx": {
-    "df1a877579ede4e682328df993be0bd574927498eae744bcb9b7e00796b27d90": 1,
-    "fdc0ec545dc17a50bdc1c64102915706cfbfdbb65a2165ae4691f29d577063cd": 1
-  },
   "packages/client/ui-permission-presets/src/client/settings-store.ts": {
     "b2df49a6ee30fc9061526ed8bcd8f32a8e011e38e0e378615637c3f41e130669": 1
   },
@@ -997,9 +993,6 @@
   },
   "packages/client/ui-workspace/src/client/shortcuts.ts": {
     "fe253828aac689a136be6451c37ff9590ef8c67f7f7e9162686ec4457ff996c9": 1
-  },
-  "packages/client/ui-workspace/tests/apply.client.spec.ts": {
-    "40e9ee1de56e250fda1d699baabfc71bb098852d7ed4efe8f721575fe2f1f134": 2
   },
   "packages/client/userdoc-upload/src/index.ts": {
     "8751bf2b55d31b3f41555daebfbbfe68fef3be1f14f30dbaf887a476f693aeca": 1
@@ -1577,7 +1570,6 @@
     "40e66e60e5d5d8384efc6b2913bd540ab7a2b73bf5ad9271edb164d4902a566f": 1,
     "5bbe9bdd82c0ab07ec12a4157ba2a5a9fa69940108c953b7fba4c17fd230e7f0": 1,
     "634ea12b67c444379693ac225d25f8e1ddd41da78a2d456a35e338cdcacaef6a": 1,
-    "73d065bb56dffeb5baec703c92e01fe783eee2c08f94c53225e03c4e2efdbd7b": 1,
     "893eba2a3a0cb7242bc9060dc83316b79b7d3415c755f82d975acbc532244015": 1,
     "a288679a4dcd49ed1fea620d9f3442c1f518406ad8d2d49dba1fafe8a45fbcbd": 1,
     "c91242106532428ca88ceb95e4b0632e7220fb992224bc740f1f21a1fad42e99": 1,
@@ -2426,9 +2418,6 @@
   "packages/storage/storage-sqlite/src/unit.ts": {
     "c09156ebe0e8eaa23eac06d9cf5549b67ee038f2bf2e4fa77a5f9ca63e0416ec": 1
   },
-  "packages/subagent/subagent-acp/tests/subagent-acp.e2e.ts": {
-    "daa15206e19d6a8fbae646d678889b2e6933ece824e48dd06c95d2096861d5c1": 1
-  },
   "packages/subagent/subagent-acp/tests/subagent-acp.spec.ts": {
     "3b530b6b250a0ea0e48b5802ae6ad5cf361cd7ead3046d9e5d09087abd735fce": 1,
     "7f8d86b28f8d58460ec0a1efc0dc3b2333a3dce0bddbfb5461761258795bb87f": 1,
@@ -2448,9 +2437,6 @@
     "cdcbd6cc73a09b6613864cdfb5b14d0cf66dc2484d26916cb32929deca1032de": 1,
     "e8b1ee15c333c589be9f08e0558110b71dc17dbb142681682306a9abe48b8d2e": 1,
     "ecca47886cd459f9d7384fad6e7050593542c9a84efcadd29609babbb2d71857": 1
-  },
-  "packages/subagent/subagent-claude-code/tests/real-deepseek.e2e.ts": {
-    "dee4487a97778a2383f1b378d59b3dae098152273d956dc360f23c69680fe0ea": 1
   },
   "packages/subagent/subagent-claude-code/tests/real-product.spec.ts": {
     "09bd38f3fe818937752cd9aa5f114b6ad07df4bbdd36b0ab157324f17a37e4d6": 1,
@@ -2472,9 +2458,6 @@
   },
   "packages/subagent/subagent-codex/tests/member.spec.ts": {
     "0df9ce961f91bd4fc22c73c9a5f947b99fd3e9ac8575d295052252e2ec51eb69": 1
-  },
-  "packages/subagent/subagent-codex/tests/real-deepseek.e2e.ts": {
-    "dee4487a97778a2383f1b378d59b3dae098152273d956dc360f23c69680fe0ea": 1
   },
   "packages/subagent/subagent-codex/tests/real-product.spec.ts": {
     "09bd38f3fe818937752cd9aa5f114b6ad07df4bbdd36b0ab157324f17a37e4d6": 1,

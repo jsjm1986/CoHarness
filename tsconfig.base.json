@@ -371,7 +371,6 @@
       "@deepseek-ai/dsh-http-proxy": ["./packages/util/http-proxy/src"],
       "@deepseek-ai/dsh-jobs": ["./packages/jobs/jobs/src"],
       "@deepseek-ai/dsh-jobs/invariant": ["./packages/jobs/jobs/src/invariant.ts"],
-      "@deepseek-ai/dsh-jobs/view": ["./packages/jobs/jobs/src/view.ts"],
       "@deepseek-ai/dsh-jobs-local": ["./packages/jobs/jobs-local/src"],
       "@deepseek-ai/dsh-launch-environment": ["./packages/util/launch-environment/src"],
       "@deepseek-ai/dsh-lazy-require": ["./packages/util/lazy-require/src"],

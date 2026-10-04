@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { LocalBashExecutor } from '@deepseek-ai/dsh-bash-local'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
@@ -21,7 +21,11 @@ function start(x: { execute(spec: ShellExecSpec): Promise<ShellExecution> }, spe
 }
 
 
-const spillDir = mkdtempSync(join(tmpdir(), 'dsh-bash-exec-spec-'))
+let spillDir: string
+
+beforeAll(() => {
+  spillDir = mkdtempSync(join(tmpdir(), 'dsh-bash-exec-spec-'))
+})
 
 afterAll(() => {
   rmSync(spillDir, { recursive: true, force: true })
@@ -29,6 +33,7 @@ afterAll(() => {
 
 async function setup(config: Parameters<typeof LocalBashExecutor.Config>[0] = {}) {
   const ctx = new Context()
+  onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(LocalSubprocessRuntime)
   ;(ctx.subprocess as LocalSubprocessRuntime).internals = { spillDir }
   // A short kill grace via the REAL config path, so escalation tests stay fast.
@@ -459,6 +464,7 @@ describe('LocalBashExecutor.start (background process handles)', () => {
 describe('process lifecycle ownership (the subprocess service, not the executor)', () => {
   it('a background process survives executor-fiber disposal and dies with the subprocess service', async () => {
     const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
     const managerFiber = await ctx.plugin(LocalSubprocessRuntime)
     ;(ctx.subprocess as LocalSubprocessRuntime).internals = { spillDir }
     const executorFiber = await ctx.plugin(LocalBashExecutor, { graceMs: 200 })
@@ -486,6 +492,7 @@ describe('process lifecycle ownership (the subprocess service, not the executor)
 
   it('service disposal escalates to SIGKILL for TERM-trapping children and settles handles', async () => {
     const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
     const managerFiber = await ctx.plugin(LocalSubprocessRuntime)
     ;(ctx.subprocess as LocalSubprocessRuntime).internals = { spillDir }
     await ctx.plugin(LocalBashExecutor, { graceMs: 200 })
@@ -532,6 +539,7 @@ describe('cancellation against a hanging backend', () => {
 
   it('a caller abort before the deadline stays the first cause when the process outlives the deadline', async () => {
     const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
     const subprocess = new HangingSubprocessRuntime(ctx)
     await ctx.plugin(LocalBashExecutor)
     const controller = new AbortController()

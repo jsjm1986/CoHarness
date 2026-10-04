@@ -30,15 +30,18 @@ function bench(over: {
   launch?: (appId: string, path: string) => Promise<void>
   localTarget?: (sessionId: SessionId) => boolean
 } = {}): Bench {
-  const state = {
+  const state: SessionListState = {
     ids: [SESSION],
-    byId: over.cwd === undefined ? {} : { [SESSION]: { cwd: over.cwd } },
+    byId: over.cwd === undefined ? {} : {
+      [SESSION]: { id: SESSION, displayTitle: 'session', running: false, blank: false, updatedAt: 0, cwd: over.cwd },
+    },
+    archivedById: {},
     current: SESSION,
     phase: 'ready',
     subagentsByParent: {},
     jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
-  } as unknown as SessionListState
+  }
   const apps = createSnapshotStore<readonly string[] | null>(over.apps ?? null)
   const choice = createSnapshotStore<string>(over.choice ?? '')
   const launch = vi.fn(over.launch ?? (async () => {}))
@@ -49,9 +52,17 @@ function bench(over: {
   function useSelector<T, R>(source: { getSnapshot(): T }): (select: (value: T) => R) => R {
     return select => select(source.getSnapshot())
   }
-  const props = {
+  const props: OpenInAppActionProps = {
     sessionId: SESSION,
+    // Standard-kit feeds this contribution never reads; the slots contract
+    // requires them and `as never` marks them intentionally unread.
+    useSession: vi.fn() as never,
+    useProjection: vi.fn() as never,
+    usePanelInfo: vi.fn() as never,
+    useInput: vi.fn() as never,
+    inputActions: vi.fn() as never,
     useSessions,
+    useWorkspaces: vi.fn() as never,
     useOpenInAppApps: useSelector(apps),
     useOpenInAppChoice: useSelector(choice),
     launch,
@@ -59,7 +70,7 @@ function bench(over: {
     iconUrl: (appId: string) => `open-in-app/icon/${appId}`,
     localTarget: over.localTarget ?? (() => true),
     t,
-  } as unknown as OpenInAppActionProps
+  }
   return { props, launch, choose }
 }
 

@@ -126,6 +126,19 @@ describe('project document ACL', () => {
     }
   })
 
+  it('keeps a read-only listing available when the catalog sync reports forbidden', async () => {
+    let syncAttempted!: () => void
+    const attempted = new Promise<void>((resolve) => { syncAttempted = resolve })
+    const ctx = context('ro', async () => {
+      syncAttempted()
+      throw new Error('catalog sync refused: 403')
+    })
+    const listed = response()
+    await handleUserDocHttp(ctx, request('GET', USERDOC_HTTP_PATH), listed.res)
+    expect(listed.status()).toBe(200)
+    await attempted
+  })
+
   it('keeps writes enabled for rw members and fails closed when collaboration is absent', async () => {
     const allowed = response()
     await handleUserDocHttp(context('rw'), bodyRequest('POST', USERDOC_UPLOADS_PATH, JSON.stringify({ version: 1, name: 'x.txt', directory: '', bytes: 1, fingerprint: 'x' })), allowed.res)

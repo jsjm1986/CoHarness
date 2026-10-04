@@ -8,7 +8,7 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { CollectedOutput, ShellExecSpec, ShellExecution, ShellRunResult } from '@deepseek-ai/dsh-shell'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -31,7 +31,11 @@ function start(x: { execute(spec: ShellExecSpec): Promise<ShellExecution> }, spe
 }
 
 
-const spillDir = mkdtempSync(join(tmpdir(), 'dsh-bash-sandbox-spec-'))
+let spillDir: string
+
+beforeAll(() => {
+  spillDir = mkdtempSync(join(tmpdir(), 'dsh-bash-sandbox-spec-'))
+})
 
 afterAll(() => {
   rmSync(spillDir, { recursive: true, force: true })
@@ -77,6 +81,7 @@ async function setup(
     }
   }
   const ctx = new Context()
+  onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(FakeSandboxProvider)
   await ctx.plugin(SandboxPolicyService, {

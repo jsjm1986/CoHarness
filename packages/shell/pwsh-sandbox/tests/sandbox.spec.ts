@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { SandboxProvider, SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox'
 import type { ConfinedArgv, RunnerFailureRule, SandboxExecutionPolicy, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
@@ -40,7 +40,15 @@ function pwshAvailable(): boolean {
   return spawnSync(resolvePwshPath(), ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '$true'], { encoding: 'utf8' }).status === 0
 }
 
-const spillDir = mkdtempSync(join(tmpdir(), 'dsh-pwsh-sandbox-spec-'))
+let spillDir: string
+
+beforeAll(() => {
+  spillDir = mkdtempSync(join(tmpdir(), 'dsh-pwsh-sandbox-spec-'))
+})
+
+afterAll(() => {
+  rmSync(spillDir, { recursive: true, force: true })
+})
 
 /** One recorded provider call: the argv handed over and the policy it rode with. */
 interface ConfineCall {
@@ -77,6 +85,7 @@ async function setup(
     }
   }
   const ctx = new Context()
+  onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(FakeSandboxProvider)
   await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: spillDir })
@@ -255,14 +264,18 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
   // unit tests never attempt writes outside the system temp directory. On
   // win32 there is no POSIX mode denial; the real-sandbox denial coverage
   // lives in tests/acl.e2e.ts, where the ACL runner denies scratch paths.
-  const readOnlyDir = mkdtempSync(join(tmpdir(), 'dsh-pwsh-sandbox-ro-'))
-  if (process.platform !== 'win32') chmodSync(readOnlyDir, 0o555)
-  const deniedWriteCommand = `[IO.File]::WriteAllText('${join(readOnlyDir, 'probe.txt')}', 'x')`
+  let readOnlyDir: string
+  let deniedWriteCommand: string
+
+  beforeAll(() => {
+    readOnlyDir = mkdtempSync(join(tmpdir(), 'dsh-pwsh-sandbox-ro-'))
+    if (process.platform !== 'win32') chmodSync(readOnlyDir, 0o555)
+    deniedWriteCommand = `[IO.File]::WriteAllText('${join(readOnlyDir, 'probe.txt')}', 'x')`
+  })
 
   afterAll(() => {
     if (process.platform !== 'win32') chmodSync(readOnlyDir, 0o755)
     rmSync(readOnlyDir, { recursive: true, force: true })
-    rmSync(spillDir, { recursive: true, force: true })
   })
 
   const RO: SandboxExecutionPolicy = { mode: 'read-only', workspaceRoot: '/ws' }

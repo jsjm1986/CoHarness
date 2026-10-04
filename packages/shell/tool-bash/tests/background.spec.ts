@@ -1,7 +1,7 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -29,11 +29,19 @@ const pollingTimeout = setTimeout
 const silentReader = { readFrom: (fromByte: number) => ({ text: '', nextOffset: fromByte, lossy: false }) }
 
 const testToolSignal = new AbortController().signal
-const spillDir = mkdtempSync(join(tmpdir(), 'dsh-tool-bash-background-spec-'))
+let spillDir: string
+
+beforeAll(() => {
+  spillDir = mkdtempSync(join(tmpdir(), 'dsh-tool-bash-background-spec-'))
+})
+afterAll(() => {
+  if (spillDir) rmSync(spillDir, { recursive: true, force: true })
+})
 
 /** Job harness with a fast registry pump for tests. */
 async function setup() {
   const ctx = new Context()
+  onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
@@ -418,6 +426,7 @@ describe('foreground commands as jobs', () => {
 
   it('keeps the plain timeout kill when keeping timed-out commands is configured off', async () => {
     const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(AgentRegistry)
