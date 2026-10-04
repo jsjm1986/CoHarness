@@ -1317,7 +1317,8 @@
     "packages/api/terminal-controller": {
       "entry": [
         "tests/**/*.spec.ts",
-        "tests/**/*.e2e.ts"
+        "tests/**/*.e2e.ts",
+        "tests/remote-standin.ts"
       ],
       "project": [
         "src/**/*.ts",

@@ -21,7 +21,7 @@ interface DigestLock {
  * @param lock - Runtime lock under test.
  * @param artifact - Locked artifact of the target being checked.
  */
-export function expectLockedDistributions(lock: RuntimeLock, artifact: { readonly wheels: readonly { readonly url: string }[] }): void {
+function expectLockedDistributions(lock: RuntimeLock, artifact: { readonly wheels: readonly { readonly url: string }[] }): void {
   const normalize = (name: string): string => name.toLowerCase().replace(/[-_.]+/gu, '-')
   const distributions = [...artifact.wheels, ...lock.wheels].map(({ url }) => {
     const [name = '', version] = basename(new URL(url).pathname).split('-')
@@ -38,7 +38,7 @@ export function expectLockedDistributions(lock: RuntimeLock, artifact: { readonl
  * @param lock - Runtime lock under test.
  * @param payloadDigest - Digest implementation of the prepare variant under test.
  */
-export function expectPayloadDigestIsolation<T extends DigestLock>(
+function expectPayloadDigestIsolation<T extends DigestLock>(
   lock: T,
   payloadDigest: (target: never, runtimeLock: T, pnpmVersion: string) => string,
 ): void {
@@ -56,7 +56,7 @@ export function expectPayloadDigestIsolation<T extends DigestLock>(
  * @param lock - Runtime lock under test.
  * @param payloadDigest - Digest implementation of the prepare variant under test.
  */
-export function expectPayloadDigestInvalidation<T extends DigestLock>(
+function expectPayloadDigestInvalidation<T extends DigestLock>(
   lock: T,
   payloadDigest: (target: never, runtimeLock: T, pnpmVersion: string) => string,
 ): void {
