@@ -30,6 +30,8 @@ This package lets web-client features expose editable preferences backed by the 
 
 Project-scoped mirrors expose the effective project value and carry per-namespace ownership metadata. A namespace marked `projectWrite: manager` is writable for the project owner or organization administrator; all other project namespaces set `writable: false` with an owner-specific `writableReason`. Provider read-only mode uses `provider`. Account-owned locale, theme, busy-Enter, transcript width, and transcript font-size scopes use the account preference transport even while a project is active, with a Host fallback only when the account route is explicitly unsupported. A scope refuses mutations while its first view is loading or when the authority is read-only, so these states produce zero mutation RPCs. Each accepted write publishes `saving`, folds a successful response into the shared mirror, and records `error` after recovery on a rejected or failed latest write; feature rows render those states and do not persist a blocked choice.
 
+Account reads coalesce behind the current request. Forced refresh or an accepted equal-or-newer mutation answer retires that request; the accepted answer makes `ensure()` complete from the ready view without waiting for a retired GET. Neither mutation answers nor current GETs can reduce the held revision. Disposal stops transport admission and publication; every disposal call waits for all retained GETs to settle, including aborted or superseded requests that ignore cancellation.
+
 <a id="invariants"></a>
 ## Invariants
 

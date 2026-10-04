@@ -109,7 +109,7 @@ JSONL 存储不修改实时请求前缀。只有重建历史、当前 envelope �
 - **只加载已配置编码和 catalog 中的 generation**：此 backend 会把发布版 v0–v5 artifact 迁移到当前 v6，并保留源文件；更改压缩需要独立 root，保留的旧 generation 不提供自动回退或降级。
 - **平铺文件存储布局不加载**：加载前使用独立根，或将预发布产物移入项目/会话目录布局。
 - **压缩文件不能直接按行读取**：使用后端加载；或在写入新根前选择 `compression: 'none'`，以便外部行 reader 使用。
-- **不删除会话文件**：日志在 `root` 下累积，直到外部移除（seam 无删除接口）。
+- **显式永久移除** — 日志持续保留，直到生命周期所有者调用 `SessionPersistenceBackend.remove(id)`。归档永久清理所有者会释放空闲运行时资源，并先移除后代、再移除其根会话；普通读取与迁移保留已提交代次。
 - **每会话一个活动 writer**：写句柄在整个生命期持有 `<root>/.locks/<id>.lock` 上的内核租约（POSIX 非阻塞 `flock`；Windows 命名内核信号量），因此第二个后端实例或进程写打开同一会话时以 `SessionAlreadyOwnedError` 失败，直到所有者释放或其进程退出。活着但卡死的持有者会一直阻塞到进程退出——删除锁文件是 POSIX 上的显式放弃手段——且咨询式 `flock` 在 NFSv3 上不可靠，此类根目录上的排他会退化为仅进程内。初始同 id 发布仍通过 POSIX 无覆盖硬链接或 Windows 无替换 write-through rename 保持冲突安全。
 - **POSIX 实体化需要硬链接支持**：第一次 append 使用 `link()`，使同 id 竞态失败，而不覆盖已提交日志；Windows 使用无替换 write-through rename。
 

@@ -15,8 +15,8 @@
   en: 2f40066ae7df62b1
   zh: ec92138f3e81c7e0
 /deepseek-ai-dsh-client-ui-settings/write-authority:
-  en: f8aeee5d2fc7ce19
-  zh: f6c7475304bb48f1
+  en: f3dd207c8e5d8b06
+  zh: 2ddd1ae1f92d06e3
 /deepseek-ai-dsh-client-ui-settings/invariants:
   en: 1492ee0760313199
   zh: 4614e050831510ac
@@ -25,10 +25,10 @@
   zh: 1d9f365d091d0d2a
 /deepseek-ai-dsh-client-ui-settings/model-experience/kv-cache-effect:
   en: ca75c51c89c2c9b0
-  zh: 2026c1566df4f78c
+  zh: de54f3467ef3b9be
 /deepseek-ai-dsh-client-ui-settings/known-limitations-and-deferred-work:
   en: 5b9fee8a7cf41a11
-  zh: 9650f4125178220c
+  zh: 0778019c628439cd
 /deepseek-ai-dsh-client-ui-settings/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

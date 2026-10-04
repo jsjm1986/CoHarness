@@ -55,7 +55,7 @@ export const sessionEventSchema = z.object({
 }) as unknown as z.ZodType<SessionEvent>
 
 /** SessionSummary row of session.list (`projections` reuses the history block's shape and schema). */
-export const sessionSummarySchema = z.object({
+export const sessionSummarySchema: z.ZodType<Wire<SessionSummary>> = z.object({
   sessionId: sessionIdSchema,
   updatedAt: z.number(),
   running: z.boolean(),
@@ -69,7 +69,7 @@ export const sessionSummarySchema = z.object({
   projections: z.lazy(() => sessionProjectionsBlockSchema).optional(),
   visibility: z.union([z.literal('project'), z.literal('private')]).optional(),
   projectId: z.number().int().positive().optional(),
-}) as unknown as z.ZodType<Wire<SessionSummary>>
+})
 
 /** session.list request payload (cursor is a reserved seat, unimplemented in v1). */
 export const sessionListRequestSchema = z.object({

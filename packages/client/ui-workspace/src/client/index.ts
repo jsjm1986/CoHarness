@@ -201,8 +201,11 @@ export function apply(ctx: ClientContext): void {
   // structurally so the notice keeps the stable `code: message` form.
   const createFailureMessage = (reason: unknown): string => {
     if (reason instanceof Error) {
-      const rpc = (reason as unknown as { rpcError?: { code?: string; message?: string } }).rpcError
-      if (rpc?.code !== undefined) return `${rpc.code}: ${rpc.message ?? reason.message}`
+      const rpc = 'rpcError' in reason ? reason.rpcError : undefined
+      if (typeof rpc === 'object' && rpc !== null && 'code' in rpc && typeof rpc.code === 'string') {
+        const message = 'message' in rpc && typeof rpc.message === 'string' ? rpc.message : reason.message
+        return `${rpc.code}: ${message}`
+      }
       return reason.message
     }
     return String(reason)

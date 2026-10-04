@@ -321,9 +321,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the selected historical or fallback blank Session id.',
       },
       {
-        signature: 'startSession(workspaceId?: WorkspaceId): void',
-        description: 'The New Session flow: connect the explicit, current-Session, or recent Workspace and open the resulting session; failures surface on the session list state.',
-        parameters: [{ name: 'workspaceId', description: 'explicit target; omitted inherits the current Session\'s Workspace before falling back to the recency projection.' }],
+        signature: 'startSession(workspaceId?: WorkspaceId, onFailure?: (reason: unknown) => void): void',
+        description: 'The New Session flow: connect the explicit, current-Session, or recent Workspace and open the resulting session. Connect and navigation failures are non-fatal — they log and reach `onFailure` when supplied; the current view stays usable.',
+        parameters: [{ name: 'workspaceId', description: 'explicit target; omitted inherits the current Session\'s Workspace before falling back to the recency projection.' }, { name: 'onFailure', description: 'observer for the rejected connect/open, for surfaces that turn an explicit New Session click into a notice.' }],
       },
       {
         signature: 'create(input: { path: string }): Promise<WorkspaceView>',
@@ -372,9 +372,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the updated Workspace view.',
       },
       {
-        signature: 'archiveSession(sessionId: SessionId): Promise<void>',
+        signature: 'archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>',
         description: 'Archive a session into the registry-global set (hidden from grouping surfaces; session log and accounting slot remain). Archiving the current session clears the selection into the New Session view state.',
-        parameters: [{ name: 'sessionId', description: 'session to archive.' }],
+        parameters: [{ name: 'sessionId', description: 'session to archive.' }, { name: 'options', description: '`stopActivity` asks the Host to stop the session\'s running work instead of refusing; without it a session with running work rejects with a `session-active` error whose details name that activity.' }],
       },
     ],
   },

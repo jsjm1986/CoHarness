@@ -11,7 +11,6 @@ kind: "package-reference"
 
 该插件注入 `connection` 与 `remote`，并持有浏览器中唯一的 `settings.describe` 读取方：一面持有完整应答的共享镜像，在每次转发的 `settings/document-updated` 事件与 `connection/reset` 时刷新（首次连接也包含在内——这次读取关闭了「提交落在急切读取与 SSE 订阅之间、其失效通知丢失」的窗口）。schema 操作为同步调用，由 `settingsSchema` 服务承载。`ctx.settingsScope.bind(spec)` 在**调用方**的 context 上返回一个由镜像**派生**的按命名空间 scope——scope 的 disposer 归调用方 fiber 所有，绑定不新增任何线路读取，某一行的激活绝不会阻塞在设置传输层上，且任一时刻每个派生面看到的都是同一份文档 revision。跨命名空间的表面（schema 内省、已服务命名空间目录、`hasDocument`）通过 `ctx.settingsScope.describe()` 读同一面镜像，这是一个读取／折叠面（`getSnapshot`／`subscribe`／`ensure`，另有把写应答折入的 `acceptView`）。binder 还持有 `developerTools`——`ui-settings` 命名空间上那份共享的开发者偏好，所有受其门控的表面（轨迹视图、Agent 预设选择器、改动文件差异）都读同一份已接受值。scope 快照携带解析后的分区、组合 `base`、原始 `user`、revision、可写性以及 host／内存模式；字段只要出现在 `user` 中即视为覆盖，即使其值与 `base` 相等，`unset` 会清除该覆盖。写入仍归各 scope：`set` 与 `unset` 操作单个字段，Host scope 还提供 `mutate(ops, expectedRevision)`，以草稿 revision 为围栏原子修改多个字段；提交成功的写入将应答折回镜像、不再重读，被拒绝或失败的最新写入触发一次镜像恢复读取，被取代的写入则把恢复留给后继者。若 spec 未提供 `decode`，则分区不是普通对象、未通过其重建后的 schema 校验、或携带本客户端无法重建的 schema 信封时，一律不发布任何值，于是行渲染自己的缺失状态，而不是一份半解码的值。冷启动读取次数由 `apps/web/tests/startup-rpc-budget.e2e.ts` 钉住；客户端代码中新增直连 `settings.describe` 调用即是对它的回归。
 
-
 ## 概述
 
 本包使 Web 客户端功能能够公开由宿主设置文档支持的可编辑偏好设置，而无需自行实现传输或 schema 处理。每项功能都可按命名空间读写、原子更新多个字段、校验 schema，并避免静默覆盖并发更改。它还为设置界面框架、页面、标题栏操作、插件标签页和引导流程提供标准扩展点，但自身不渲染任何界面。任何持有偏好设置的功能都可在不依赖呈现包的情况下使用它；设置外壳由单独的包提供。
@@ -31,11 +30,12 @@ kind: "package-reference"
 
 项目空间的镜像会暴露当前有效值以及每个 namespace 的所有权元数据。标记为 `projectWrite: manager` 的 namespace 可由项目 owner 或组织管理员写入；其他项目 namespace 会以 `writable: false` 和对应所有者的 `writableReason` 标记只读，设置提供方只读时使用 `provider`。语言、主题、忙碌 Enter、对话宽度和字号等账户级 scope 即使处于项目空间，也会使用账户偏好 transport；只有账户路由明确不支持时才回退到 Host。scope 在首次视图仍处于 loading 或当前权限只读时拒绝 mutation，因此这些状态不会产生任何 mutation RPC。每次接受的写入会发布 `saving`，成功应答折入共享镜像；最新写入被拒绝或失败后先恢复再记录 `error`。功能行渲染这些状态，不会持久化被阻止的选择。
 
+账户读取共用当前请求。强制刷新或接受相同或更高 revision 的 mutation 应答都会使当前请求失效；接受应答后，`ensure()` 从 ready 视图完成，而不等待已失效的 GET。mutation 应答与当前 GET 都不能降低已持有的 revision。释放镜像会阻止传输准入与发布；每次释放调用都会等待所有仍保留的 GET 实际结束，包括已中止或被取代但忽略取消的请求。
+
 <a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。schema 服务对 Host 拥有的文档执行水合与校验，scope 传输层转发各 namespace 分节；该层不拥有偏好值。
-
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -46,8 +46,7 @@ kind: "package-reference"
 
 无；该包既不组装也不发送提供方请求。
 
-<a id="known-limitations-and-deferred-work"></a>
-## 已知限制与暂缓事项
+## 已知限制与暂缓事项 <a id="known-limitations-and-deferred-work"></a>
 
 - **失败或被拒绝的 settings.describe 保持 unavailable**：binder 一律使用 Host 持久化；`settings.describe` 抛错或非 ok 会发布 `unavailable`，插件卡片隐藏而不是停在 `loading`。Host 特权方法栅栏仍要求回环 `Host` 头；网关把 `Host`/`Origin` 改写成实例回环后，公网页才能成功。`settings.openDocument` 仍只在 loopback 页面出现，因为它打开的是宿主桌面上的文件。
 - **原子写入仅限 Host**：账户偏好 scope 保留标量 transport。Host `mutate` 共用命名空间队列，校验或 revision 失败会拒绝整个 mutation；不同命名空间使用独立事务。

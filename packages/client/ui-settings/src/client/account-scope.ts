@@ -32,7 +32,10 @@ export interface AccountPreferencesMirrorSnapshot {
 /** A single account preference read/fold source. */
 export class AccountPreferencesMirror {
   private readonly store: SnapshotStore<AccountPreferencesMirrorSnapshot>
-  private inFlight: Promise<void> | undefined
+  private readonly lifetime = new AbortController()
+  private readSlot: { controller: AbortController; promise: Promise<void> } | undefined
+  /** Reads remain owned through transport settlement, even after losing the slot. */
+  private readonly pendingReads = new Set<Promise<void>>()
 
   constructor(private readonly transport: AccountPreferencesTransport | undefined) {
     this.store = createSnapshotStore({
@@ -58,28 +61,61 @@ export class AccountPreferencesMirror {
     return this.store.subscribe(listener)
   }
 
-  /** Load account preferences once, coalescing concurrent callers. */
+  /** Load account preferences once, coalescing current readers.
+   * @returns readiness without waiting for a read retired by an accepted view.
+   */
   ensure(): Promise<void> {
-    if (this.transport === undefined) return Promise.resolve()
-    if (this.inFlight !== undefined) return this.inFlight
+    if (this.transport === undefined || this.lifetime.signal.aborted) return Promise.resolve()
+    if (this.readSlot !== undefined) return this.readSlot.promise
     if (this.store.getSnapshot().status === 'ready') return Promise.resolve()
     return this.load()
   }
 
-  /** Refresh account preferences, preserving the last good answer on failure. */
-  load(): Promise<void> {
-    if (this.transport === undefined) return Promise.resolve()
-    if (this.inFlight !== undefined) return this.inFlight
-    const run = this.read()
-    this.inFlight = run
-    return run
+  /**
+   * Refresh account preferences, preserving the last good answer on failure.
+   * A force refresh invalidates the pending read: a caller that needs a
+   * post-mutation answer must not join a request issued before that mutation.
+   * @param force - supersede and abort any in-flight read instead of joining it.
+   * @returns settlement of the current or newly owned read.
+   */
+  load(force = false): Promise<void> {
+    const transport = this.transport
+    if (transport === undefined || this.lifetime.signal.aborted) return Promise.resolve()
+    const current = this.readSlot
+    if (current !== undefined && !force) return current.promise
+    const controller = new AbortController()
+    const promise = Promise.resolve().then(() => this.read(controller, transport)).finally(() => {
+      this.pendingReads.delete(promise)
+    })
+    // Publication eligibility and settlement ownership precede deferred wire admission.
+    this.readSlot = { controller, promise }
+    this.pendingReads.add(promise)
+    current?.controller.abort()
+    return promise
   }
 
-  /** Fold a successful mutation response into the held mirror.
+  /** Fold an equal or newer successful mutation response and retire the current read.
    * @param view - validated account preference response.
    */
   accept(view: AccountPreferencesView): void {
+    if (this.lifetime.signal.aborted) return
+    const held = this.store.getSnapshot().view
+    if (held !== undefined && view.revision < held.revision) return
+    const current = this.readSlot
+    this.readSlot = undefined
     this.store.set({ status: 'ready', view, error: null, unsupported: false })
+    current?.controller.abort()
+  }
+
+  /** Stop publication and wait for every retained read, including on repeated calls.
+   * @returns settlement after all owned transports settle, even when they ignore abort.
+   */
+  async dispose(): Promise<void> {
+    this.lifetime.abort()
+    const slot = this.readSlot
+    this.readSlot = undefined
+    slot?.controller.abort()
+    await Promise.allSettled([...this.pendingReads])
   }
 
   /** Project one namespace into the shared Host-like view.
@@ -117,21 +153,30 @@ export class AccountPreferencesMirror {
     return { ns, value, base, user, revision: view.revision, writable: true, owner: 'account' }
   }
 
-  private async read(): Promise<void> {
-    const transport = this.transport
+  private async read(controller: AbortController, transport: AccountPreferencesTransport): Promise<void> {
+    const owns = (): boolean =>
+      this.readSlot?.controller === controller
+      && !controller.signal.aborted
+      && !this.lifetime.signal.aborted
     try {
+      if (!owns()) return
       this.store.update((state) => {
         state.status = 'loading'
         state.error = null
         state.unsupported = false
       })
-      // `load()` returns early when the optional carrier is absent; optional
-      // chaining keeps that invariant local without adding a second state.
-      const view = await transport?.describe()
-      /* v8 ignore next -- load() returns before read() when the carrier is absent. */
-      if (view === undefined) return
-      this.accept(view)
+      if (!owns()) return
+      const view = await transport.describe(controller.signal)
+      if (!owns()) return
+      const held = this.store.getSnapshot().view
+      this.store.set({
+        status: 'ready',
+        view: held !== undefined && view.revision < held.revision ? held : view,
+        error: null,
+        unsupported: false,
+      })
     } catch (error: unknown) {
+      if (!owns()) return
       const unsupported = isUnsupported(error)
       const held = this.store.getSnapshot().view
       this.store.set({
@@ -141,7 +186,7 @@ export class AccountPreferencesMirror {
         unsupported,
       })
     } finally {
-      this.inFlight = undefined
+      if (this.readSlot?.controller === controller) this.readSlot = undefined
     }
   }
 }
@@ -261,7 +306,7 @@ export class AccountSettingsScopeController<T> implements SettingsScope<T> {
           return
         }
         if (generation === this.generation) this.pendingRevision = undefined
-        await this.mirror.load()
+        await this.mirror.load(true)
         if (this.disposed || generation !== this.generation) return
         try {
           await attempt()
@@ -283,7 +328,7 @@ export class AccountSettingsScopeController<T> implements SettingsScope<T> {
     // revision. Keeping that predecessor would make the next edit send a
     // stale expectedRevision after recovery.
     if (generation === this.generation) this.pendingRevision = undefined
-    await this.mirror.load()
+    await this.mirror.load(true)
     if (this.disposed || generation !== this.generation) return
     this.setWrite({ status: 'error', code: errorCode(error), message: messageOf(error) })
   }

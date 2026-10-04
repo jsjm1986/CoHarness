@@ -458,10 +458,10 @@ describe('WorkspaceBrowser', () => {
   it('archives a session from the row menu and hides archived rows in both modes', async () => {
     // The menu list's entries are slot occupants: mount the shipped archive
     // item with a mock face, the way the renderer composes it.
-    const archiveSession = vi.fn(async () => {})
+    const archiveSession = vi.fn<(sessionId: SessionId) => Promise<void>>(async () => {})
     const archivedSet = { current: new Set<SessionId>() }
     const menuOpenState: readonly [boolean, (open: boolean) => void] = [true, () => {}]
-    const renderSlot: WorkspaceBrowserProps['renderSlot'] = (name, owner, extra) => {
+    const renderSlot: WorkspaceBrowserProps['renderSlot'] = (name: string, owner: unknown, extra?: unknown) => {
       if (name === 'sidebar.workspaces.directoryFlow') {
         return (owner as { open: boolean }).open ? <div data-testid="directory-flow" /> : null
       }
@@ -473,6 +473,9 @@ describe('WorkspaceBrowser', () => {
             sessionId={row.sessionId}
             displayTitle={row.displayTitle}
             t={t}
+            useSessions={hook(sessionState([]))}
+            useWorkspaces={hook(workspaceState([]))}
+            usePanelInfo={hook({ activePanelId: null })}
             useArchived={selector => selector(archivedSet.current)}
             useMenuOpenState={() => openState}
             useShortcuts={selector => selector([])}
@@ -496,7 +499,7 @@ describe('WorkspaceBrowser', () => {
     // The archived partition echo hides the row in grouped and flat modes.
     archivedSet.current = new Set([sid('gone-s')])
     rerender(b, {
-      useSessions: hook(sessionState([summary('kept-s', 2)], { archivedById: { 'gone-s': summary('gone-s', 1) } })),
+      useSessions: hook(sessionState([summary('kept-s', 2)], { archivedById: { [sid('gone-s')]: summary('gone-s', 1) } })),
       useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])])),
     })
     expect(screen.queryByText('gone-s')).toBeNull()
@@ -508,7 +511,7 @@ describe('WorkspaceBrowser', () => {
 
   it('surfaces the shipped archive filter rows, restoring them in place', async () => {
     const b = mount({
-      useSessions: hook(sessionState([summary('live-s', 2)], { archivedById: { 'gone-s': summary('gone-s', 1) } })),
+      useSessions: hook(sessionState([summary('live-s', 2)], { archivedById: { [sid('gone-s')]: summary('gone-s', 1) } })),
       useWorkspaces: hook(workspaceState([workspace('alpha', ['live-s', 'gone-s'])])),
       renderSlot: ((name: string, owner: { open: boolean }) =>
         name === 'sidebar.workspaces.directoryFlow' && owner.open

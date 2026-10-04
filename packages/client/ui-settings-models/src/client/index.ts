@@ -142,9 +142,13 @@ export function apply(ctx: ClientContext): void {
       ctx.remote.$on('llm/adapters-updated', refreshModels),
       ctx.on('connection/reset', refreshModels),
     ]
-    return () => {
+    return async () => {
+      // Detach first so no pushed invalidation can start another read, then
+      // retire every bridge before awaiting its quiescence.
       for (const dispose of disposers) dispose()
+      const pending = [...projectBindings.values()].map(({ bridge }) => bridge.dispose())
       projectBindings.clear()
+      await Promise.all(pending)
     }
   }, 'ui-settings-models: pushed invalidations')
 

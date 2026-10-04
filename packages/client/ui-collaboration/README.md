@@ -40,6 +40,8 @@ Use `dsh-client-ui-collaboration` for Gateway collaboration UI in the Web client
 
 Account context also publishes the current account's Full and Auto choice qualifications into the existing runtime UI policy. Refresh starts by withdrawing verification; a failed request keeps display context but does not retain permission eligibility. Connection reset aborts and discards the previous context request. Consumers combine that account value with their own connection's deployment facts, following the [permission UI rules](../ui-permission-presets/README.md).
 
+Context loads coalesce only non-forced calls; a forced post-mutation refresh supersedes and aborts the old context read, and neither obsolete success nor failure publishes. The request slot is assigned before deferred transport runs or subscribers are notified. Conversation-detail forced refresh retains its coalesced trailing-read semantics.
+
 <a id="invariants"></a>
 ## Invariants
 

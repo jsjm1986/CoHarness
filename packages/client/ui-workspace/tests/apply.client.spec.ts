@@ -1,8 +1,8 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import {
-  NavigationController, SlotRegistry,
-  type AddPaneResult, type SessionId, type SessionListState, type SessionReference, type SessionSummary,
+  NavigationController, SlotRegistry, WorkspaceArchiveError,
+  type AddPaneResult, type SessionId, type SessionListState, type SessionSummary,
   type WorkspaceId, type WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
@@ -29,7 +29,7 @@ import { apply as nodeApply } from '../src/index.ts'
 
 const sid = (id: string) => id as SessionId
 const summary = (id: string, updatedAt: number, extra: Partial<SessionSummary> = {}): SessionSummary => ({
-  id: sid(id), displayTitle: id, running: false, blank: false, updatedAt, retainedBy: {}, ...extra,
+  id: sid(id), displayTitle: id, running: false, blank: false, updatedAt, ...extra,
 })
 const sessionState = (items: readonly SessionSummary[], archived: readonly SessionSummary[] = []): SessionListState => ({
   ids: items.map(item => item.id),
@@ -51,7 +51,8 @@ const workspaceState = (
   archivedSessionIds: readonly SessionId[] = [],
   pinnedSessionIds: readonly SessionId[] = [],
 ): WorkspaceListState => ({
-  items, archivedSessionIds, pinnedSessionIds, state: 'idle', phase: 'ready', error: null,
+  items, archivedSessionIds, pinnedSessionIds, state: 'idle', phase: 'ready', error: null, baselinesReady: true,
+  recentWorkspaceId: items[0]?.workspaceId,
 })
 
 async function bench() {
@@ -80,7 +81,7 @@ async function bench() {
     const resolved = binding(target)
     const release = vi.fn()
     return {
-      sessionId: target,
+      sessionId: sid(target),
       binding: resolved,
       ready: Promise.resolve({
         ...resolved,
@@ -88,12 +89,12 @@ async function bench() {
       }),
       release,
       [Symbol.dispose]: release,
-    } as unknown as SessionReference
+    }
   })
   const using = vi.fn(async (
     target: string,
     _options: unknown,
-    operation: (reference: SessionReference) => unknown,
+    operation: (reference: ReturnType<typeof retain>) => unknown,
   ) => await operation(retain(target)))
   const fork = vi.fn(async () => 'forked' as never)
   const archiveSession = vi.fn(async () => undefined)
@@ -360,7 +361,9 @@ describe('ui-workspace apply', () => {
     // The Workspace disappears while the pin is in flight; the write lands on
     // the memberships that are live at completion (s1 is now ungrouped).
     let resolvePin: () => void = () => {}
-    b.pinSession.mockImplementationOnce(() => new Promise<void>((resolve) => { resolvePin = resolve }))
+    b.pinSession.mockImplementationOnce(() => new Promise<undefined>((resolve) => {
+      resolvePin = () => { resolve(undefined) }
+    }))
     const pin = faceOf(entry(b.slots, MENU_ITEM, 'pin')) as PinSessionInjected
     pin.pinSession(sid('s1'))
     b.setWorkspaces(workspaceState([], [], [sid('s1')]))
@@ -462,9 +465,10 @@ describe('ui-workspace apply', () => {
     declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const activity = [{ kind: 'turn' as const }, { kind: 'job' as const, items: [{ id: 'bash-1', label: 'pnpm run build' }] }]
-    const refusal = Object.assign(new Error('session archive failed: session-active: active'), {
-      name: 'WorkspaceArchiveError',
-      rpcError: new RemoteError('session-active', 'active', { sessionId: sid('busy'), activity }),
+    const refusal = new WorkspaceArchiveError({
+      code: 'session-active',
+      message: 'active',
+      details: { sessionId: sid('busy'), activity },
     })
     const archiveSession = vi.spyOn(b.ctx.uiWorkspace, 'archiveSession')
       .mockRejectedValueOnce(refusal)

@@ -2180,6 +2180,35 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return sessionIds.filter(sessionId => readable.has(sessionId))
   }
 
+  /**
+   * Filter the archived set and its revision as one snapshot captured before
+   * the authorization await: the emitted revision describes exactly the id
+   * set it is paired with, even when the registry changes mid-filter.
+   */
+  async function readableArchivedSessionSet(
+    authority: CollaborationAuthority | undefined,
+  ): Promise<{ archivedSessionIds: SessionId[]; archiveRevision: number }> {
+    const snapshot = ctx.workspaceRegistry.archiveSnapshot()
+    return {
+      archivedSessionIds: await readableSessionList(snapshot.archivedSessionIds, authority),
+      archiveRevision: snapshot.revision,
+    }
+  }
+
+  /**
+   * The archived-input refusal, or undefined when the session is writable.
+   * Minimal compositions without a Workspace Registry have no archive set.
+   */
+  function archivedInputError(sessionId: SessionId):
+    { code: 'session-archived'; message: string; details: { sessionId: SessionId } } | undefined {
+    if (ctx.get('workspaceRegistry')?.archivedSessionIds.includes(sessionId) !== true) return undefined
+    return {
+      code: 'session-archived',
+      message: `session ${sessionId} is archived; unarchive it before sending input`,
+      details: { sessionId },
+    }
+  }
+
   /** Filter a workspace order to paths owned by the captured project runtime. */
   async function readableWorkspaceOrder(
     workspaceIds: readonly WorkspaceId[],
@@ -4660,16 +4689,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const authorized = await authorizeSession(sessionId, 'write')
         if ('error' in authorized) return err(request, authorized.error)
         // An archived session admits no input; clients may hold a stale
-        // mounted view until the archive baseline lands. Minimal
-        // compositions without a Workspace Registry have no archive set.
-        const workspaceRegistry = ctx.get('workspaceRegistry')
-        if (workspaceRegistry?.archivedSessionIds.includes(sessionId) === true) {
-          return err(request, {
-            code: 'session-archived',
-            message: `session ${sessionId} is archived; unarchive it before sending input`,
-            details: { sessionId },
-          })
-        }
+        // mounted view until the archive baseline lands.
+        const archived = archivedInputError(sessionId)
+        if (archived !== undefined) return err(request, archived)
         const canonicalTimeZone = clientTimeZone === undefined
           ? undefined
           : canonicalClientTimeZone(clientTimeZone)
@@ -4712,6 +4734,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             let message: UserMessage = createUserMessage({ content: durable.blocks, source: messageSource })
             const execution = executionAuthorityOf(ctx)
             if (execution !== undefined) message = await execution.stamp(agent.session, message)
+            // Re-decide after the awaited conversion/stamp: a session archived
+            // mid-request admits no input.
+            const archived = archivedInputError(sessionId)
+            if (archived !== undefined) return err(request, archived)
             if (mode === 'steer') agent.steer(message)
             else agent.followup(message)
           } catch (error: unknown) {
@@ -4809,6 +4835,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { issues: [] },
           })
         }
+        // Edit and steer admit input; removal stays allowed so queued work
+        // can still be released from an archived session.
+        if (action.kind !== 'remove') {
+          const archived = archivedInputError(sessionId)
+          if (archived !== undefined) return err(request, archived)
+        }
         let agent = ctx.agents.get(sessionId)
         if (agent === undefined) {
           // A restored Session's pending Inbox rows live in its durable
@@ -4863,6 +4895,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const execution = executionAuthorityOf(ctx)
         if (action.kind !== 'remove' && execution !== undefined) {
           replacement = await execution.stamp(agent.session, replacement)
+        }
+        if (action.kind !== 'remove') {
+          const archived = archivedInputError(sessionId)
+          if (archived !== undefined) return err(request, archived)
         }
         const current = (target === 'next-turn' ? agent.inbox.nextTurn : agent.inbox.nextStep)
           .find(candidate => candidate.id === itemId)
@@ -5016,17 +5052,15 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             const visible = await readableWorkspaceView(workspaceView(workspace), captured.authority)
             if (visible !== undefined) items.push(visible)
           }
+          const archived = await readableArchivedSessionSet(captured.authority)
           return ok(request, {
             items,
-            archivedSessionIds: await readableSessionList(
-              ctx.workspaceRegistry.archivedSessionIds,
-              captured.authority,
-            ),
+            archivedSessionIds: archived.archivedSessionIds,
             pinnedSessionIds: await readableSessionList(
               ctx.workspaceRegistry.pinnedSessionIds,
               captured.authority,
             ),
-            archiveRevision: ctx.workspaceRegistry.archiveRevision,
+            archiveRevision: archived.archiveRevision,
           })
         } catch (error: unknown) {
           return err(request, collaborationRefusal(error, 'read'))
@@ -5224,12 +5258,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           })
         }
         try {
+          const archived = await readableArchivedSessionSet(authorized.authority)
           return ok(request, {
-            archivedSessionIds: await readableSessionList(
-              ctx.workspaceRegistry.archivedSessionIds,
-              authorized.authority,
-            ),
-            archiveRevision: ctx.workspaceRegistry.archiveRevision,
+            archivedSessionIds: archived.archivedSessionIds,
+            archiveRevision: archived.archiveRevision,
           })
         } catch (error: unknown) {
           return err(request, collaborationRefusal(error, 'read', sessionId))
@@ -5245,12 +5277,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // current set, not as an error.
         await ctx.workspaceRegistry.unarchiveSession(sessionId)
         try {
+          const archived = await readableArchivedSessionSet(authorized.authority)
           return ok(request, {
-            archivedSessionIds: await readableSessionList(
-              ctx.workspaceRegistry.archivedSessionIds,
-              authorized.authority,
-            ),
-            archiveRevision: ctx.workspaceRegistry.archiveRevision,
+            archivedSessionIds: archived.archivedSessionIds,
+            archiveRevision: archived.archiveRevision,
           })
         } catch (error: unknown) {
           return err(request, collaborationRefusal(error, 'read', sessionId))

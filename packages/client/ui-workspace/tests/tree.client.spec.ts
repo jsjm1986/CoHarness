@@ -779,7 +779,7 @@ describe('createWorkspaceViewStore', () => {
         [FLAT_SESSION_ORDER_KEY]: orderByRecency(sessions.ids, sessions.byId),
       },
       summaries: sessions.byId,
-      rowState: { pinnedSessionIds: [sid('three')], archivedSessionIds: [], archivedFilter: 'default' },
+      rowState: { pinnedSessionIds: [sid('three')], archivedSessionIds: [] },
     })
 
     expect(store.getSnapshot().sessionOrderByAccount).toEqual({

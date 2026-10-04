@@ -117,6 +117,7 @@ async function harness(
     list: () => [],
     archivedSessionIds: [],
     pinnedSessionIds: [],
+    archiveSnapshot: () => ({ revision: 0, archivedSessionIds: [] }),
   }) as never)
   if (options.directoryPicker !== undefined) {
     ctx.provide('directoryPicker', options.directoryPicker as never)
@@ -522,6 +523,7 @@ describe('project collaboration streams', () => {
       get: (id: string) => workspaces.get(id),
       archivedSessionIds: [],
       pinnedSessionIds: [],
+      archiveSnapshot: () => ({ revision: 0, archivedSessionIds: [] }),
     })
     ctx.sessions.create(visibleId)
     ctx.sessions.create(privateId)
@@ -895,6 +897,7 @@ describe('project collaboration read ACL', () => {
       list: () => [workspace],
       archivedSessionIds: [childId, privateId],
       pinnedSessionIds: [privateId, childId],
+      archiveSnapshot: () => ({ revision: 1, archivedSessionIds: [childId, privateId] }),
     })
     const root = ctx.sessions.create(rootId, { meta: { cwd: PROJECT_DIR } })
     ctx.sessions.create(childId, { meta: { cwd: PROJECT_DIR, parentSession: rootId } })
@@ -946,6 +949,53 @@ describe('project collaboration read ACL', () => {
       sessionId: privateId,
       includeDescendants: true,
     }, new AbortController().signal)).status).toBe(403)
+  })
+
+  it('pairs the filtered archived set with the revision captured before its authorization await', async () => {
+    const archivedA = SessionId('archived-a')
+    const archivedB = SessionId('archived-b')
+    let listedSettled: Promise<void> | undefined
+    const controlled = controlledAuthority()
+    try {
+      const workspace = {
+        id: 'workspace-1',
+        path: PROJECT_DIR,
+        title: 'Project',
+        sessionIds: [] as SessionId[],
+        createdAt: '2026-08-15T00:00:00.000Z',
+        updatedAt: '2026-08-15T00:00:00.000Z',
+      }
+      // The registry starts at archived {A}/revision 1 and mutates to {A,B}/2
+      // while the first authorization read is parked.
+      let archived: SessionId[] = [archivedA]
+      let revision = 1
+      const registry = {
+        list: () => [workspace],
+        archivedSessionIds: archived,
+        pinnedSessionIds: [] as SessionId[],
+        archiveSnapshot: () => ({ revision, archivedSessionIds: [...archived] }),
+      }
+      const { api } = await harness(controlled.authority, registry)
+      const listed = api.workspace.list(request({}))
+      listedSettled = listed.then(() => undefined, () => undefined)
+      const filteringIds = await Promise.race([
+        controlled.firstReadStarted,
+        listed.then(() => { throw new Error('workspace list completed before the archive authorization read') }),
+      ])
+      expect(filteringIds).toEqual([archivedA])
+      archived = [archivedA, archivedB]
+      revision = 2
+      controlled.firstRead.resolve(new Set([archivedA, archivedB]))
+      expect(await listed).toMatchObject({
+        result: {
+          ok: true,
+          value: { archivedSessionIds: [archivedA], archiveRevision: 1 },
+        },
+      })
+    } finally {
+      controlled.firstRead.resolve(new Set([archivedA, archivedB]))
+      await listedSettled
+    }
   })
 })
 
@@ -1090,6 +1140,7 @@ describe('read-write project scope containment', () => {
       list: () => [inside, outside],
       archivedSessionIds: [],
       pinnedSessionIds: [],
+      archiveSnapshot: () => ({ revision: 0, archivedSessionIds: [] }),
       resolveByPath: async () => inside,
       create: async () => { throw new Error('unexpected create') },
       get: (workspaceId: string) => workspaceId === inside.id

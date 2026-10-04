@@ -16,6 +16,15 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void; reje
   return { promise, resolve, reject }
 }
 
+function tracked<T>(work: Promise<unknown>[], promise: Promise<T>): Promise<T> {
+  work.push(Promise.allSettled([promise]))
+  return promise
+}
+
+async function microtaskBarrier(): Promise<void> {
+  await new Promise<void>((resolve) => { queueMicrotask(resolve) })
+}
+
 const initial: AccountPreferencesView = {
   revision: 0,
   migrated: true,
@@ -25,6 +34,21 @@ const initial: AccountPreferencesView = {
     'ui-conversation': { busyEnter: 'queue', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14 },
   },
   overrides: { locale: {}, 'ui-theme': {}, 'ui-conversation': {} },
+}
+
+function themeView(revision: number, preference: 'light' | 'dark'): AccountPreferencesView {
+  return {
+    ...initial,
+    revision,
+    values: { ...initial.values, 'ui-theme': { preference } },
+    overrides: { ...initial.overrides, 'ui-theme': { preference } },
+  }
+}
+
+function conflictError(): Error {
+  return Object.assign(new Error('stale account preference revision'), {
+    status: 409, code: 'account-preferences-conflict',
+  })
 }
 
 function transport(): AccountPreferencesTransport & { calls: AccountPreferenceMutation[] } {
@@ -136,6 +160,301 @@ describe('account settings scope', () => {
     pending.resolve(initial)
     await first
     await expect(mirror.ensure()).resolves.toBeUndefined()
+  })
+
+  it('claims the read slot before publishing loading, so reentrant callers join one wire call', async () => {
+    const pending = deferred<AccountPreferencesView>()
+    const describe = vi.fn(() => pending.promise.then(value => structuredClone(value)))
+    const mirror = new AccountPreferencesMirror({
+      describe,
+      mutate: async () => structuredClone(initial),
+    })
+    const calls: Promise<void>[] = []
+    mirror.subscribe(() => {
+      if (mirror.getSnapshot().status === 'loading') calls.push(mirror.ensure(), mirror.load())
+    })
+    const first = mirror.load()
+    pending.resolve(initial)
+    await first
+    await Promise.all(calls)
+    expect(describe).toHaveBeenCalledOnce()
+    expect(calls.length).toBeGreaterThan(0)
+  })
+
+  it('retires a same-turn predecessor before admission and coalesces behind the sole started GET', async () => {
+    const pending = deferred<AccountPreferencesView>()
+    const started = deferred<undefined>()
+    const describe = vi.fn<AccountPreferencesTransport['describe']>(() => {
+      started.resolve(undefined)
+      return pending.promise
+    })
+    const mirror = new AccountPreferencesMirror({ describe, mutate: async () => initial })
+    const work: Promise<unknown>[] = []
+    try {
+      const old = tracked(work, mirror.load())
+      const fresh = tracked(work, mirror.load(true))
+      expect(mirror.load()).toBe(fresh)
+      expect(mirror.ensure()).toBe(fresh)
+      await started.promise
+      await old
+      expect(describe).toHaveBeenCalledOnce()
+      expect(describe.mock.calls[0]?.[0]?.aborted).toBe(false)
+      expect(mirror.load()).toBe(fresh)
+      expect(mirror.ensure()).toBe(fresh)
+      pending.resolve(themeView(3, 'light'))
+      await fresh
+      expect(mirror.getSnapshot()).toMatchObject({ status: 'ready', error: null, view: { revision: 3 } })
+    } finally {
+      pending.resolve(initial)
+      await Promise.allSettled([...work, mirror.dispose()])
+    }
+  })
+
+  it.each(['refresh', 'dispose', 'accept'] as const)(
+    'retires a read before wire admission after loading subscriber %s',
+    async (action) => {
+      const pending = deferred<AccountPreferencesView>()
+      const started = deferred<undefined>()
+      const describe = vi.fn<AccountPreferencesTransport['describe']>(() => {
+        started.resolve(undefined)
+        return pending.promise
+      })
+      const mirror = new AccountPreferencesMirror({ describe, mutate: async () => initial })
+      const work: Promise<unknown>[] = []
+      const disposals: Promise<void>[] = []
+      const settlements: string[] = []
+      const snapshots: Array<ReturnType<typeof mirror.getSnapshot>> = []
+      let acted = false
+      let successor: Promise<void> | undefined
+      const unsubscribe = mirror.subscribe(() => {
+        const snapshot = mirror.getSnapshot()
+        snapshots.push(snapshot)
+        if (snapshot.status !== 'loading' || acted) return
+        acted = true
+        if (action === 'refresh') successor = tracked(work, mirror.load(true))
+        else if (action === 'dispose') {
+          disposals.push(tracked(work, mirror.dispose().then(() => { settlements.push('dispose-1') })))
+          disposals.push(tracked(work, mirror.dispose().then(() => { settlements.push('dispose-2') })))
+        } else mirror.accept(themeView(5, 'dark'))
+      })
+      try {
+        const old = tracked(work, mirror.load().then(() => { settlements.push('read') }))
+        await microtaskBarrier()
+        expect(acted).toBe(true)
+        if (action === 'refresh') {
+          await started.promise
+          expect(describe).toHaveBeenCalledOnce()
+          expect(describe.mock.calls[0]?.[0]?.aborted).toBe(false)
+          await old
+          expect(mirror.load()).toBe(successor)
+          pending.resolve(themeView(4, 'light'))
+          await successor
+          expect(mirror.getSnapshot()).toMatchObject({ status: 'ready', error: null, view: { revision: 4 } })
+          expect(snapshots.map(snapshot => snapshot.status)).toEqual(['loading', 'ready'])
+        } else {
+          expect(describe).not.toHaveBeenCalled()
+          await old
+          await Promise.all(disposals)
+          if (action === 'dispose') {
+            expect(settlements).toEqual(['read', 'dispose-1', 'dispose-2'])
+            expect(mirror.getSnapshot()).toMatchObject({ status: 'loading', view: undefined, error: null })
+            expect(snapshots.map(snapshot => snapshot.status)).toEqual(['loading'])
+          } else {
+            expect(mirror.getSnapshot()).toMatchObject({ status: 'ready', error: null, view: { revision: 5 } })
+            expect(snapshots.map(snapshot => snapshot.status)).toEqual(['loading', 'ready'])
+            await mirror.ensure()
+          }
+        }
+        expect(snapshots.every(snapshot => snapshot.error === null)).toBe(true)
+      } finally {
+        unsubscribe()
+        pending.resolve(themeView(100, 'light'))
+        await Promise.allSettled([...work, mirror.dispose()])
+      }
+    },
+  )
+
+  it.each([
+    { revision: 0, outcome: 'resolve' },
+    { revision: 0, outcome: 'reject' },
+    { revision: 9, outcome: 'resolve' },
+    { revision: 9, outcome: 'reject' },
+  ] as const)('serves accepted revision $revision while a retired GET waits to $outcome', async ({ revision, outcome }) => {
+    const pending = deferred<AccountPreferencesView>()
+    const started = deferred<undefined>()
+    const describe = vi.fn<AccountPreferencesTransport['describe']>(() => {
+      started.resolve(undefined)
+      return pending.promise
+    })
+    const api: AccountPreferencesTransport = { describe, mutate: async () => structuredClone(initial) }
+    const mirror = new AccountPreferencesMirror(api)
+    const work: Promise<void>[] = []
+    try {
+      mirror.accept(initial)
+      const stale = mirror.load()
+      work.push(stale)
+      await started.promise
+      mirror.accept({
+        ...initial,
+        revision,
+        values: { ...initial.values, 'ui-theme': { preference: 'dark' } },
+      })
+      const accepted = mirror.getSnapshot()
+      expect(describe.mock.calls[0]?.[0]?.aborted).toBe(true)
+      const ensured = vi.fn()
+      work.push(mirror.ensure().then(() => { ensured() }))
+      const firstDisposed = vi.fn()
+      const secondDisposed = vi.fn()
+      work.push(mirror.dispose().then(() => { firstDisposed() }))
+      work.push(mirror.dispose().then(() => { secondDisposed() }))
+      await microtaskBarrier()
+      expect(ensured).toHaveBeenCalledOnce()
+      expect(firstDisposed).not.toHaveBeenCalled()
+      expect(secondDisposed).not.toHaveBeenCalled()
+      const listener = vi.fn()
+      const unsubscribe = mirror.subscribe(listener)
+      try {
+        if (outcome === 'resolve') pending.resolve({ ...initial, revision: 100 })
+        else pending.reject(new Error('retired account read failed'))
+        await Promise.all(work)
+        expect(firstDisposed).toHaveBeenCalledOnce()
+        expect(secondDisposed).toHaveBeenCalledOnce()
+        expect(mirror.getSnapshot()).toBe(accepted)
+        expect(listener).not.toHaveBeenCalled()
+        await mirror.ensure()
+        expect(describe).toHaveBeenCalledOnce()
+      } finally {
+        unsubscribe()
+      }
+    } finally {
+      pending.resolve(initial)
+      await Promise.allSettled([...work, mirror.dispose()])
+    }
+  })
+
+  it('ignores a mutation answer carrying an older revision than the held view', async () => {
+    const mirror = new AccountPreferencesMirror({
+      describe: async () => structuredClone(initial),
+      mutate: async () => structuredClone(initial),
+    })
+    mirror.accept({ ...initial, revision: 9 })
+    mirror.accept({ ...initial, revision: 8 })
+    expect(mirror.getSnapshot().view?.revision).toBe(9)
+  })
+
+  it('does not retire a current read for an older accept or regress the held revision with its GET', async () => {
+    const pending = deferred<AccountPreferencesView>()
+    const started = deferred<undefined>()
+    const describe = vi.fn<AccountPreferencesTransport['describe']>(() => {
+      started.resolve(undefined)
+      return pending.promise
+    })
+    const mirror = new AccountPreferencesMirror({ describe, mutate: async () => structuredClone(initial) })
+    const work: Promise<void>[] = []
+    try {
+      mirror.accept({ ...initial, revision: 9 })
+      const read = mirror.load()
+      work.push(read)
+      await started.promise
+      mirror.accept({ ...initial, revision: 8 })
+      expect(describe.mock.calls[0]?.[0]?.aborted).toBe(false)
+      expect(mirror.load()).toBe(read)
+      pending.resolve({ ...initial, revision: 7 })
+      await read
+      expect(mirror.getSnapshot()).toMatchObject({ status: 'ready', error: null, view: { revision: 9 } })
+      expect(describe).toHaveBeenCalledOnce()
+    } finally {
+      pending.resolve(initial)
+      await Promise.allSettled([...work, mirror.dispose()])
+    }
+  })
+
+  it.each(['resolve', 'reject'] as const)('keeps the successor slot after a started predecessor %s', async (outcome) => {
+    const first = deferred<AccountPreferencesView>()
+    const second = deferred<AccountPreferencesView>()
+    const firstStarted = deferred<undefined>()
+    const secondStarted = deferred<undefined>()
+    const describe = vi.fn<AccountPreferencesTransport['describe']>()
+      .mockImplementationOnce(() => { firstStarted.resolve(undefined); return first.promise })
+      .mockImplementationOnce(() => { secondStarted.resolve(undefined); return second.promise })
+    const mirror = new AccountPreferencesMirror({ describe, mutate: async () => structuredClone(initial) })
+    const work: Promise<void>[] = []
+    try {
+      const old = mirror.load()
+      work.push(old)
+      await firstStarted.promise
+      const fresh = mirror.load(true)
+      work.push(fresh)
+      await secondStarted.promise
+      expect(fresh).not.toBe(old)
+      expect(describe.mock.calls[0]?.[0]?.aborted).toBe(true)
+      expect(describe.mock.calls[1]?.[0]?.aborted).toBe(false)
+      if (outcome === 'resolve') first.resolve(initial)
+      else first.reject(new Error('retired account read failed'))
+      await old
+      expect(mirror.load()).toBe(fresh)
+      expect(mirror.ensure()).toBe(fresh)
+      second.resolve({ ...initial, revision: 4 })
+      await fresh
+      expect(mirror.getSnapshot()).toMatchObject({ status: 'ready', error: null, view: { revision: 4 } })
+      expect(describe).toHaveBeenCalledTimes(2)
+    } finally {
+      first.resolve(initial)
+      second.resolve({ ...initial, revision: 4 })
+      await Promise.allSettled([...work, mirror.dispose()])
+    }
+  })
+
+  it.each(['resolve', 'reject'] as const)('both disposals await a retired GET after its successor settles: %s', async (outcome) => {
+    const first = deferred<AccountPreferencesView>()
+    const second = deferred<AccountPreferencesView>()
+    const firstStarted = deferred<undefined>()
+    const secondStarted = deferred<undefined>()
+    const describe = vi.fn<AccountPreferencesTransport['describe']>()
+      .mockImplementationOnce(() => { firstStarted.resolve(undefined); return first.promise })
+      .mockImplementationOnce(() => { secondStarted.resolve(undefined); return second.promise })
+    const mirror = new AccountPreferencesMirror({ describe, mutate: async () => structuredClone(initial) })
+    const work: Promise<void>[] = []
+    try {
+      const old = mirror.load()
+      work.push(old)
+      await firstStarted.promise
+      const fresh = mirror.load(true)
+      work.push(fresh)
+      await secondStarted.promise
+      second.resolve({ ...initial, revision: 4 })
+      await fresh
+      const accepted = mirror.getSnapshot()
+      const listener = vi.fn()
+      const unsubscribe = mirror.subscribe(listener)
+      try {
+        const firstDisposed = vi.fn()
+        const secondDisposed = vi.fn()
+        work.push(mirror.dispose().then(() => { firstDisposed() }))
+        work.push(mirror.dispose().then(() => { secondDisposed() }))
+        await microtaskBarrier()
+        expect(firstDisposed).not.toHaveBeenCalled()
+        expect(secondDisposed).not.toHaveBeenCalled()
+        if (outcome === 'resolve') first.resolve({ ...initial, revision: 100 })
+        else first.reject(new Error('retired account read failed'))
+        await Promise.all(work)
+        expect(firstDisposed).toHaveBeenCalledOnce()
+        expect(secondDisposed).toHaveBeenCalledOnce()
+        mirror.accept({ ...initial, revision: 100 })
+        await mirror.ensure()
+        await mirror.load()
+        await mirror.load(true)
+        expect(mirror.getSnapshot()).toBe(accepted)
+        expect(describe).toHaveBeenCalledTimes(2)
+        expect(listener).not.toHaveBeenCalled()
+      } finally {
+        unsubscribe()
+      }
+    } finally {
+      first.resolve(initial)
+      second.resolve({ ...initial, revision: 4 })
+      await Promise.allSettled([...work, mirror.dispose()])
+    }
   })
 
   it('keeps malformed account values unavailable and reports blocked or invalid writes', async () => {
@@ -354,6 +673,160 @@ describe('account settings scope', () => {
     expect(scope.getSnapshot().value).toEqual({ preference: 'dark' })
     expect(scope.getSnapshot().write).toEqual({ status: 'idle' })
     await scope.dispose()
+  })
+
+  it('does not retry a superseded conflict and fences the queued successor against recovery', async () => {
+    const first = deferred<AccountPreferencesView>()
+    const mutationStarted = deferred<undefined>()
+    const recovery = deferred<AccountPreferencesView>()
+    const recoveryStarted = deferred<undefined>()
+    const recovered = themeView(1, 'dark')
+    const committed = themeView(2, 'light')
+    const describe = vi.fn<AccountPreferencesTransport['describe']>()
+      .mockResolvedValue(recovered)
+      .mockResolvedValueOnce(initial)
+      .mockImplementationOnce(() => { recoveryStarted.resolve(undefined); return recovery.promise })
+    const mutate = vi.fn<AccountPreferencesTransport['mutate']>()
+      .mockResolvedValue(committed)
+      .mockImplementationOnce(() => { mutationStarted.resolve(undefined); return first.promise })
+    const api: AccountPreferencesTransport = { describe, mutate }
+    const mirror = new AccountPreferencesMirror(api)
+    const scope = new AccountSettingsScopeController(api, { namespace: 'ui-theme' }, mirror)
+    const work: Promise<unknown>[] = []
+    const writeStates: string[] = []
+    const unsubscribe = scope.subscribe(() => { writeStates.push(scope.getSnapshot().write.status) })
+    try {
+      await tracked(work, mirror.ensure())
+      const dark = tracked(work, scope.set('preference', 'dark'))
+      await mutationStarted.promise
+      const light = tracked(work, scope.set('preference', 'light'))
+      first.reject(conflictError())
+      await recoveryStarted.promise
+      expect(mutate).toHaveBeenCalledOnce()
+      recovery.resolve(recovered)
+      await Promise.all([dark, light])
+      expect(mutate.mock.calls.map(([mutation]) => ({
+        value: mutation.value, expectedRevision: mutation.expectedRevision,
+      }))).toEqual([
+        { value: 'dark', expectedRevision: 0 },
+        { value: 'light', expectedRevision: 1 },
+      ])
+      expect(describe).toHaveBeenCalledTimes(2)
+      expect(scope.getSnapshot()).toMatchObject({
+        status: 'ready', revision: 2, value: { preference: 'light' }, write: { status: 'idle' },
+      })
+      expect(writeStates).not.toContain('error')
+    } finally {
+      unsubscribe()
+      first.resolve(initial)
+      recovery.resolve(recovered)
+      await Promise.allSettled([...work, scope.dispose()])
+      await mirror.dispose()
+    }
+  })
+
+  it('does not retry or publish when the scope is disposed during conflict recovery', async () => {
+    const first = deferred<AccountPreferencesView>()
+    const mutationStarted = deferred<undefined>()
+    const recovery = deferred<AccountPreferencesView>()
+    const recoveryStarted = deferred<undefined>()
+    const recovered = themeView(1, 'dark')
+    const describe = vi.fn<AccountPreferencesTransport['describe']>()
+      .mockResolvedValue(recovered)
+      .mockResolvedValueOnce(initial)
+      .mockImplementationOnce(() => { recoveryStarted.resolve(undefined); return recovery.promise })
+    const mutate = vi.fn<AccountPreferencesTransport['mutate']>(() => {
+      mutationStarted.resolve(undefined)
+      return first.promise
+    })
+    const api: AccountPreferencesTransport = { describe, mutate }
+    const mirror = new AccountPreferencesMirror(api)
+    const scope = new AccountSettingsScopeController(api, { namespace: 'ui-theme' }, mirror)
+    const work: Promise<unknown>[] = []
+    let unsubscribe: (() => void) | undefined
+    try {
+      await tracked(work, mirror.ensure())
+      const write = tracked(work, scope.set('preference', 'dark'))
+      await mutationStarted.promise
+      first.reject(conflictError())
+      await recoveryStarted.promise
+      const held = scope.getSnapshot()
+      const listener = vi.fn()
+      unsubscribe = scope.subscribe(listener)
+      const settled = vi.fn()
+      const disposed = tracked(work, scope.dispose().then(() => { settled() }))
+      await microtaskBarrier()
+      expect(settled).not.toHaveBeenCalled()
+      recovery.resolve(recovered)
+      await Promise.all([write, disposed])
+      expect(settled).toHaveBeenCalledOnce()
+      expect(mutate).toHaveBeenCalledOnce()
+      expect(mutate.mock.calls[0]?.[0]).toMatchObject({ value: 'dark', expectedRevision: 0 })
+      expect(describe).toHaveBeenCalledTimes(2)
+      expect(scope.getSnapshot()).toBe(held)
+      expect(listener).not.toHaveBeenCalled()
+      expect(mirror.getSnapshot()).toMatchObject({ status: 'ready', view: { revision: 1 } })
+    } finally {
+      unsubscribe?.()
+      first.resolve(initial)
+      recovery.resolve(recovered)
+      await Promise.allSettled([...work, scope.dispose()])
+      await mirror.dispose()
+    }
+  })
+
+  it('recovers the held value and reports a coded rejection of the single conflict retry', async () => {
+    const first = deferred<AccountPreferencesView>()
+    const mutationStarted = deferred<undefined>()
+    const recovery = deferred<AccountPreferencesView>()
+    const recoveryStarted = deferred<undefined>()
+    const failureRead = deferred<AccountPreferencesView>()
+    const failureReadStarted = deferred<undefined>()
+    const current = themeView(1, 'light')
+    const denied = Object.assign(new Error('retry denied'), { code: 'account-preferences-forbidden' })
+    const describe = vi.fn<AccountPreferencesTransport['describe']>()
+      .mockResolvedValue(current)
+      .mockResolvedValueOnce(initial)
+      .mockImplementationOnce(() => { recoveryStarted.resolve(undefined); return recovery.promise })
+      .mockImplementationOnce(() => { failureReadStarted.resolve(undefined); return failureRead.promise })
+    const mutate = vi.fn<AccountPreferencesTransport['mutate']>()
+      .mockRejectedValue(denied)
+      .mockImplementationOnce(() => { mutationStarted.resolve(undefined); return first.promise })
+    const api: AccountPreferencesTransport = { describe, mutate }
+    const mirror = new AccountPreferencesMirror(api)
+    const scope = new AccountSettingsScopeController(api, { namespace: 'ui-theme' }, mirror)
+    const work: Promise<unknown>[] = []
+    try {
+      await tracked(work, mirror.ensure())
+      const write = tracked(work, scope.set('preference', 'dark'))
+      await mutationStarted.promise
+      first.reject(conflictError())
+      await recoveryStarted.promise
+      recovery.resolve(current)
+      await failureReadStarted.promise
+      expect(mutate).toHaveBeenCalledTimes(2)
+      expect(describe).toHaveBeenCalledTimes(3)
+      expect(scope.getSnapshot().write).toEqual({ status: 'saving' })
+      failureRead.resolve(current)
+      await write
+      expect(mutate.mock.calls.map(([mutation]) => ({
+        value: mutation.value, expectedRevision: mutation.expectedRevision,
+      }))).toEqual([
+        { value: 'dark', expectedRevision: 0 },
+        { value: 'dark', expectedRevision: 1 },
+      ])
+      expect(scope.getSnapshot()).toMatchObject({
+        status: 'ready', revision: 1, value: { preference: 'light' },
+        write: { status: 'error', code: 'account-preferences-forbidden', message: 'retry denied' },
+      })
+      expect(describe).toHaveBeenCalledTimes(3)
+    } finally {
+      first.resolve(initial)
+      recovery.resolve(current)
+      failureRead.resolve(current)
+      await Promise.allSettled([...work, scope.dispose()])
+      await mirror.dispose()
+    }
   })
 
   it('falls back to the Host scope only for an unsupported account endpoint', async () => {

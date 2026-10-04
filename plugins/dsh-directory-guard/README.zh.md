@@ -21,6 +21,7 @@ Workspace 文件 RPC 通过 Host 的 `workspace-files/authorize` 事件使用同
 | `read` | `file_path` | 读 |
 | `write`、`edit` | `file_path` | 写 |
 | `str_replace_editor` | `path` | `view` = 读；`create`/`str_replace`/`insert` = 写 |
+| `grep`、`glob` | `path`（缺省为会话 cwd；pattern 与 include 过滤仍交给搜索引擎） | 读 |
 
 - **写**目标不在任何 `rw` 授权内 → 拒绝。
 - **读**目标在所有授权之外 → 拒绝。

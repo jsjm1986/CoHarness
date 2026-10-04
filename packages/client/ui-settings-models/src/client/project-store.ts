@@ -42,32 +42,72 @@ class ProjectSettingsMirror implements SettingsDescribeFace {
     view: SettingsDescribeView | undefined
     error: string | null
   }> = createSnapshotStore({ status: 'idle', view: undefined, error: null })
-  private inFlight: Promise<void> | undefined
+  /** Document revision of the held full view, for stale-echo rejection. */
+  private heldRevision: number | undefined
 
-  constructor(private readonly read: () => Promise<SettingsDescribeView>) {}
+  /**
+   * @param read - the bridge's single shared read; the mirror is a projection
+   * and owns no read slot of its own.
+   * @param isLive - whether the owning bridge still permits publication.
+   */
+  constructor(
+    private readonly read: () => Promise<SettingsDescribeView>,
+    private readonly isLive: () => boolean,
+  ) {}
 
   getSnapshot() { return this.store.getSnapshot() }
   subscribe(listener: () => void): () => void { return this.store.subscribe(listener) }
   ensure(): Promise<void> {
-    if (this.inFlight !== undefined) return this.inFlight
-    return this.getSnapshot().status === 'ready' ? Promise.resolve() : this.load()
-  }
-  load(): Promise<void> {
-    if (this.inFlight !== undefined) return this.inFlight
+    if (!this.isLive() || this.getSnapshot().status === 'ready') return Promise.resolve()
     this.store.update((snapshot) => { snapshot.status = 'loading' })
-    const operation = this.read().then((view) => {
-      this.store.set({ status: 'ready', view, error: null })
-    }, (error: unknown) => {
+    return this.read().then(() => {}, (error: unknown) => {
+      if (!this.isLive()) return
+      // A successful read landing between the loading mark and this failure
+      // keeps its publication; a stale failure only reports while still loading.
       this.store.update((snapshot) => {
+        if (snapshot.status !== 'loading') return
         snapshot.status = snapshot.view === undefined ? 'idle' : 'ready'
         snapshot.error = error instanceof Error ? error.message : String(error)
       })
-    }).finally(() => { this.inFlight = undefined })
-    this.inFlight = operation
-    return operation
+    })
   }
+
+  /**
+   * Publish one full validated project view (GET or accepted mutation
+   * response). Reads accept an equal revision — policy metadata such as
+   * `writable` can move without a document revision bump — while a mutation
+   * echo never replaces an equal or newer held view.
+   * @param view - the transport's validated full view.
+   * @param allowEqual - whether an equal document revision may republish.
+   * @returns whether the view was accepted as current.
+   */
+  acceptFull(view: ProjectModelSettingsView, allowEqual: boolean): boolean {
+    if (!this.isLive()) return false
+    if (this.heldRevision !== undefined
+      && (view.revision < this.heldRevision
+        || (!allowEqual && view.revision === this.heldRevision))) return false
+    this.heldRevision = view.revision
+    this.store.set({
+      status: 'ready',
+      error: null,
+      view: {
+        namespaces: view.namespaces,
+        writable: view.writable,
+        ...(view.writable ? {} : { writableReason: 'project' as const }),
+        hasDocument: false,
+      },
+    })
+    return true
+  }
+
   acceptView(view: SettingsNamespaceView): void {
+    if (!this.isLive()) return
     const current = this.getSnapshot()
+    // A partial namespace echo carrying an equal or older revision than the
+    // held row cannot replace it; it must not resurrect stale metadata such
+    // as writable state the newer full view already revoked.
+    const held = current.view?.namespaces.find(row => row.ns === view.ns)
+    if (held !== undefined && view.revision <= held.revision) return
     if (current.view === undefined) {
       this.store.set({
         status: 'ready',
@@ -195,16 +235,21 @@ function providerOps(before: unknown, after: unknown, replace = false): ProjectS
 
 /**
  * Bridge the project-owned HTTP API to the existing settings/Models editor
- * protocol. The bridge keeps one in-flight read and updates the shared mirror
- * after every successful mutation, so project and personal cards use the same
- * schema operations and credential write semantics.
+ * protocol. The current read owns publication; every read and admitted
+ * transport operation stays retained until settlement. Disposal stops new
+ * admission and publication without cancelling writes that may have committed.
  */
 export class ProjectModelsBridge {
   /** Settings mirror projected from the project transport. */
   readonly mirror: ProjectSettingsMirror
   /** API face adapted for the shared Provider editor. */
   readonly api: ProjectApi
-  private loading: Promise<ProjectModelSettingsView> | undefined
+  private readonly lifetime = new AbortController()
+  private readSlot: { controller: AbortController; promise: Promise<ProjectModelSettingsView> } | undefined
+  /** Settlement ownership is independent of the current read's publication eligibility. */
+  private readonly pendingOperations = new Set<Promise<unknown>>()
+  /** Retired callers use this full view only when no successor read is pending. */
+  private held: ProjectModelSettingsView | undefined
 
   constructor(
     private readonly projectId: number,
@@ -218,12 +263,13 @@ export class ProjectModelsBridge {
         ...(view.writable ? {} : { writableReason: 'project' as const }),
         hasDocument: view.hasDocument,
       }
-    })
+    }, () => !this.lifetime.signal.aborted)
     const mutateNamespace = async (
       payload: { expectedRevision?: number },
       opsFor: (namespace: SettingsNamespaceView) => ProjectSettingsOp[],
     ): Promise<RpcResponse<SettingsNamespaceView>> => {
       const current = await this.read()
+      this.requireLive()
       const namespace = current.namespaces[0]
       if (namespace === undefined) throw new Error('project model settings namespace is unavailable')
       if (payload.expectedRevision !== undefined && payload.expectedRevision !== namespace.revision) {
@@ -231,9 +277,9 @@ export class ProjectModelsBridge {
       }
       const ops = opsFor(namespace)
       if (ops.length === 0) return ok(namespace)
-      const result = await this.transport.mutate(this.projectId, {
+      const result = await this.ownOperation(() => this.transport.mutate(this.projectId, {
         ops, expectedRevision: payload.expectedRevision ?? namespace.revision,
-      })
+      }))
       this.publish(result)
       return ok(result.namespaces[0] as SettingsNamespaceView)
     }
@@ -258,24 +304,25 @@ export class ProjectModelsBridge {
         namespace => providerOps(namespace.user, payload.section, true),
       ),
       mutate: async (payload: { ns: string; ops: Array<{ op: 'set' | 'unset'; path: string[]; value?: unknown }>; expectedRevision?: number }) => {
-        const next = await this.transport.mutate(this.projectId, payload)
+        const next = await this.ownOperation(() => this.transport.mutate(this.projectId, payload))
         this.publish(next)
         return ok(next.namespaces[0] as SettingsNamespaceView)
       },
     } as ProjectApi['settings']
     const credentials = {
       describe: async (payload: { refs: string[] }) => {
-        const value = await this.transport.describeCredentials(this.projectId, payload.refs)
+        const value = await this.ownOperation(() =>
+          this.transport.describeCredentials(this.projectId, payload.refs, this.lifetime.signal))
         return ok(value)
       },
       set: async (payload: { ref: string; value: string }) => {
-        await this.transport.setCredential(this.projectId, payload.ref, payload.value)
-        await this.mirror.load()
+        await this.ownOperation(() => this.transport.setCredential(this.projectId, payload.ref, payload.value))
+        if (!this.lifetime.signal.aborted) await this.refresh()
         return ok({})
       },
       unset: async (payload: { ref: string }) => {
-        await this.transport.unsetCredential(this.projectId, payload.ref)
-        await this.mirror.load()
+        await this.ownOperation(() => this.transport.unsetCredential(this.projectId, payload.ref))
+        if (!this.lifetime.signal.aborted) await this.refresh()
         return ok({})
       },
     } as ProjectApi['credentials']
@@ -291,12 +338,14 @@ export class ProjectModelsBridge {
         api?: string
         apiKey?: string
         settingsNs: string
-      }) => ok(await this.transport.discover(this.projectId, {
-        ...payload.provider === undefined ? {} : { provider: payload.provider },
-        ...payload.baseURL === undefined ? {} : { baseURL: payload.baseURL },
-        ...payload.api === undefined ? {} : { api: payload.api },
-        ...payload.apiKey === undefined ? {} : { apiKey: payload.apiKey },
-      })),
+      }) => {
+        return ok(await this.ownOperation(() => this.transport.discover(this.projectId, {
+          ...payload.provider === undefined ? {} : { provider: payload.provider },
+          ...payload.baseURL === undefined ? {} : { baseURL: payload.baseURL },
+          ...payload.api === undefined ? {} : { api: payload.api },
+          ...payload.apiKey === undefined ? {} : { apiKey: payload.apiKey },
+        }, this.lifetime.signal)))
+      },
     } as ProjectApi['llm']
     this.api = { settings, credentials, llm }
   }
@@ -306,23 +355,95 @@ export class ProjectModelsBridge {
    */
   describe(): SettingsDescribeFace { return this.mirror }
 
-  /** Refresh after a pushed project policy change. */
+  /** Force a fresh read after a pushed project policy change, retiring the pending one.
+   * @returns settlement of the refresh, or immediate completion after disposal.
+   */
   async refresh(): Promise<void> {
-    await this.read()
+    if (this.lifetime.signal.aborted) return
+    await this.read(true)
   }
 
-  private async read(): Promise<ProjectModelSettingsView> {
-    if (this.loading !== undefined) return this.loading
-    const operation = this.transport.get(this.projectId)
-      .then((value) => { this.publish(value); return value })
-      .finally(() => { this.loading = undefined })
-    this.loading = operation
-    return operation
+  /**
+   * Stop admission and publication, abort eligible reads, and await every
+   * retained operation. Admitted writes keep their real acknowledgement.
+   * @returns settlement after all retained work, including on repeated calls.
+   */
+  async dispose(): Promise<void> {
+    this.lifetime.abort()
+    const slot = this.readSlot
+    this.readSlot = undefined
+    slot?.controller.abort()
+    await Promise.allSettled([...this.pendingOperations])
+  }
+
+  private requireLive(): void {
+    if (this.lifetime.signal.aborted) throw new Error('project model settings bridge is disposed')
+  }
+
+  /** Retain one deferred transport operation and check lifetime immediately before admission. */
+  private ownOperation<T>(operation: () => Promise<T>): Promise<T> {
+    this.requireLive()
+    const promise = Promise.resolve().then(() => {
+      this.requireLive()
+      return operation()
+    }).finally(() => {
+      this.pendingOperations.delete(promise)
+    })
+    this.pendingOperations.add(promise)
+    return promise
+  }
+
+  private read(force = false): Promise<ProjectModelSettingsView> {
+    this.requireLive()
+    const current = this.readSlot
+    if (current !== undefined && !force) return current.promise
+    const controller = new AbortController()
+    const promise = Promise.resolve().then(() => this.readOnce(controller)).finally(() => {
+      if (this.readSlot?.controller === controller) this.readSlot = undefined
+      this.pendingOperations.delete(promise)
+    })
+    this.readSlot = { controller, promise }
+    this.pendingOperations.add(promise)
+    current?.controller.abort()
+    return promise
+  }
+
+  private owns(controller: AbortController): boolean {
+    return this.readSlot?.controller === controller
+      && !controller.signal.aborted
+      && !this.lifetime.signal.aborted
+  }
+
+  private async readOnce(controller: AbortController): Promise<ProjectModelSettingsView> {
+    if (!this.owns(controller)) return this.retiredRead(controller)
+    let view: ProjectModelSettingsView
+    try {
+      view = await this.transport.get(this.projectId, controller.signal)
+    } catch (cause: unknown) {
+      if (!this.owns(controller)) return await this.retiredRead(controller)
+      throw cause
+    }
+    if (!this.owns(controller)) return this.retiredRead(controller)
+    // A current GET is authoritative at equal revision: policy metadata can
+    // move without a document revision bump.
+    if (this.mirror.acceptFull(view, true)) this.held = view
+    return this.held ?? view
+  }
+
+  /** A retired read joins its successor, uses held data, or rejects without admitting another GET. */
+  private retiredRead(controller: AbortController): Promise<ProjectModelSettingsView> {
+    const successor = this.readSlot
+    if (successor !== undefined && successor.controller !== controller) return successor.promise
+    if (this.held !== undefined) return Promise.resolve(this.held)
+    return Promise.reject(new Error(this.lifetime.signal.aborted
+      ? 'project model settings bridge is disposed'
+      : 'project model settings read is retired'))
   }
 
   private publish(value: ProjectModelSettingsView): void {
-    const namespace = value.namespaces[0]
-    if (namespace !== undefined) this.mirror.acceptView(namespace)
+    if (this.lifetime.signal.aborted) return
+    // A mutation echo never replaces an equal or newer held view.
+    if (this.mirror.acceptFull(value, false)) this.held = value
   }
 
 }

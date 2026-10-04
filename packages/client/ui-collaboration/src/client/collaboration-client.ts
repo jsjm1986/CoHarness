@@ -669,16 +669,19 @@ export class CollaborationClient {
    * @returns settlement after the current coalesced request.
    */
   load(force = false): Promise<void> {
-    if (this.contextLoad !== undefined) return this.contextLoad.promise
     if (this.disposed) return Promise.resolve()
+    const pending = this.contextLoad
+    if (pending !== undefined && !force) return pending.promise
+    // A forced read invalidates the pending one: a caller that needs the
+    // post-mutation context must not join a request issued before it.
+    pending?.controller.abort()
     const controller = new AbortController()
-    this.store.update((draft) => { draft.contextVerified = false })
-    if (!force && this.getSnapshot().status !== 'ready') {
-      this.store.update((draft) => { draft.status = 'loading' })
-    }
-    const operation = this.transport.loadContext(controller.signal)
+    // Own the slot before the deferred wire call and the publications below
+    // can reenter load() through a subscriber.
+    const operation = Promise.resolve()
+      .then(() => this.transport.loadContext(controller.signal))
       .then((context) => {
-        if (this.disposed || controller.signal.aborted) return
+        if (this.disposed || controller.signal.aborted || this.contextLoad?.controller !== controller) return
         this.store.update((draft) => {
           draft.status = 'ready'
           draft.contextVerified = true
@@ -690,7 +693,7 @@ export class CollaborationClient {
         })
       })
       .catch((_contextLoadFailure: unknown) => {
-        if (this.disposed || controller.signal.aborted) return
+        if (this.disposed || controller.signal.aborted || this.contextLoad?.controller !== controller) return
         this.store.update((draft) => {
           draft.contextVerified = false
           if (draft.status !== 'ready') draft.status = 'unavailable'
@@ -700,6 +703,10 @@ export class CollaborationClient {
         if (this.contextLoad?.controller === controller) this.contextLoad = undefined
       })
     this.contextLoad = { promise: operation, controller }
+    this.store.update((draft) => { draft.contextVerified = false })
+    if (!force && this.getSnapshot().status !== 'ready') {
+      this.store.update((draft) => { draft.status = 'loading' })
+    }
     return operation
   }
 

@@ -72,6 +72,36 @@ describe('ConversationViewportController', () => {
     viewport.dispose()
   })
 
+  it('seeds the unnamed sentinel as an empty name and preserves a deliberately saved name', () => {
+    const h = harness()
+    const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    // Fresh scopes seed the unnamed sentinel; the display layer renders its
+    // localized default label for whichever locale is active.
+    viewport.setPersistenceScope('local')
+    expect(viewport.currentWorkbench().name).toBe('')
+    viewport.setPersistenceScope('account:7')
+    expect(viewport.currentWorkbench().name).toBe('')
+    viewport.dispose()
+
+    localStorage.setItem('dsh.conversation.workbenches.v3.account%3A7', JSON.stringify({
+      version: 3, mode: 'workbench', activeId: 'default',
+      workbenches: [{ id: 'default', name: '', paneIds: [], paneRatios: [], updatedAt: 1 }],
+    }))
+    const restored = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    restored.setPersistenceScope('account:7')
+    expect(restored.currentWorkbench().name).toBe('')
+    restored.dispose()
+
+    localStorage.setItem('dsh.conversation.workbenches.v3.local', JSON.stringify({
+      version: 3, mode: 'workbench', activeId: 'default',
+      workbenches: [{ id: 'default', name: '我的工作台', paneIds: [], paneRatios: [], updatedAt: 1 }],
+    }))
+    const saved = new ConversationViewportController(h.sessions, createConversationViewportStore().create())
+    saved.setPersistenceScope('local')
+    expect(saved.currentWorkbench().name).toBe('我的工作台')
+    saved.dispose()
+  })
+
   it('removes the active pane, selects its neighbor, and persists ratios', () => {
     const h = harness()
     const viewport = new ConversationViewportController(h.sessions, createConversationViewportStore().create())

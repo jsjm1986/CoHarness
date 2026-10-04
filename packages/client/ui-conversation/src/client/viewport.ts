@@ -463,7 +463,7 @@ export class ConversationViewportController implements ConversationViewport {
     this.workbenches.clear()
     this.activeWorkbenchId = record?.activeId ?? 'default'
     for (const item of record?.workbenches ?? []) this.workbenches.set(item.id, item)
-    if (this.workbenches.size === 0) this.workbenches.set('default', { id: 'default', name: '我的工作台', paneIds: [], paneRatios: [], updatedAt: Date.now() })
+    if (this.workbenches.size === 0) this.workbenches.set('default', { id: 'default', name: '', paneIds: [], paneRatios: [], updatedAt: Date.now() })
     const active = this.workbenches.get(this.activeWorkbenchId)
     this.store.update((draft) => {
       draft.mode = record?.mode ?? 'single'
