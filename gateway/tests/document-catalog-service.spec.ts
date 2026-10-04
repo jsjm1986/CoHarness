@@ -13,7 +13,7 @@ describe('PostgresDocumentCatalogService sync', () => {
     const client = {
       query: vi.fn(async (text: string, values?: readonly unknown[]) => {
         calls.push({ text, values })
-        if (text.includes('SELECT id FROM harness.users')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
+        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
         if (text.includes('SELECT id,public_id::text,display_name')) {
           return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'Owner' }], rowCount: 1 }
         }
@@ -70,7 +70,7 @@ describe('PostgresDocumentCatalogService sync', () => {
     const client = {
       query: vi.fn(async (text: string) => {
         calls.push(text)
-        if (text.includes('SELECT id FROM harness.users')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
+        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
         if (text.includes('SELECT id,public_id::text,display_name')) {
           return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'Owner' }], rowCount: 1 }
         }
@@ -104,7 +104,7 @@ describe('PostgresDocumentCatalogService sync', () => {
     const client = {
       query: vi.fn(async (text: string, values?: readonly unknown[]) => {
         calls.push({ text, values })
-        if (text.includes('SELECT id FROM harness.users')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
+        if (text.includes('FROM harness.users u')) return { rows: [{ id: 'actor-id' }], rowCount: 1 }
         if (text.includes('SELECT id,public_id::text,display_name')) {
           return { rows: [{ id: 'owner-id', public_id: '7', display_name: 'Owner' }], rowCount: 1 }
         }

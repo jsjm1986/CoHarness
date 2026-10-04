@@ -150,7 +150,8 @@ describe('ConversationArchiveService', () => {
             { id: 'root', root_session_id: 'root', owned: true },
           ], rowCount: 2,
         }
-        if (text.includes('SELECT state,sync_revision')) return { rows: [], rowCount: 0 }
+        if (text.includes('SELECT state,runtime_kind')) return { rows: [], rowCount: 0 }
+        if (text.includes('INSERT INTO harness.conversation_archive_records')) return { rows: [], rowCount: 1 }
         if (text.includes('SELECT c.id::text')) return { rows: [], rowCount: 0 }
         return { rows: [], rowCount: 0 }
       }),
@@ -170,7 +171,7 @@ describe('ConversationArchiveService', () => {
       search: [{ sessionId: 'child', seq: 0, role: 'user', content: 'hello', occurredAt: 10 }],
     }, { kind: 'project', id: 4 })
     const ownership = calls.find(([text]) => text.includes('SELECT s.id'))
-    expect(ownership?.[1]?.[1]).toEqual(['child', 'root'])
+    expect(ownership?.[1]?.[1]).toEqual(['child', 'root', 'middle'])
     const insert = calls.find(([text]) => text.includes('INSERT INTO harness.conversation_archive_records'))
     expect(insert?.[1]).toEqual(expect.arrayContaining(['root', 7]))
     const searchInsert = calls.find(([text]) => text.includes('INSERT INTO harness.conversation_archive_search'))
