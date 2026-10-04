@@ -8,10 +8,13 @@ import {
 import {
   useEffect,
   useId,
+  useMemo,
   useRef,
   type ButtonHTMLAttributes,
   type ReactNode,
 } from 'react'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { zh as chromeZh, en as chromeEn } from '../chrome.copy.ts'
 
 export function PageHeader({
   title,
@@ -137,8 +140,9 @@ export function ErrorBanner({ message }: { message: string }) {
   )
 }
 
-export function LoadingState({ label = '正在加载' }: { label?: string }) {
-  return <div className="loadingState" role="status"><LoaderCircle className="spin" aria-hidden="true" />{label}</div>
+export function LoadingState({ label }: { label?: string }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
+  return <div className="loadingState" role="status"><LoaderCircle className="spin" aria-hidden="true" />{label ?? t('loading')}</div>
 }
 
 export function EmptyState({
@@ -227,6 +231,7 @@ export function Dialog({
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const descriptionId = useId()
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
 
   useEffect(() => {
     const dialog = ref.current
@@ -250,7 +255,7 @@ export function Dialog({
             <h2 id={titleId}>{title}</h2>
             {description === undefined ? null : <p id={descriptionId}>{description}</p>}
           </div>
-          <IconButton label="关闭" icon={X} onClick={onClose} />
+          <IconButton label={t('dialogClose')} icon={X} onClick={onClose} />
         </header>
         {children === undefined ? null : <div className="dialogBody">{children}</div>}
         {footer === undefined ? null : <footer className={`dialogFooter ${danger ? 'dialogFooterDanger' : ''}`}>{footer}</footer>}
@@ -276,6 +281,7 @@ export function ConfirmDialog({
   onConfirm: () => void
   onClose: () => void
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
   return (
     <Dialog
       open={open}
@@ -285,7 +291,7 @@ export function ConfirmDialog({
       danger
       footer={(
         <>
-          <Button type="button" onClick={onClose} disabled={pending}>取消</Button>
+          <Button type="button" onClick={onClose} disabled={pending}>{t('cancel')}</Button>
           <Button type="button" variant="danger" loading={pending} onClick={onConfirm}>{confirmLabel}</Button>
         </>
       )}

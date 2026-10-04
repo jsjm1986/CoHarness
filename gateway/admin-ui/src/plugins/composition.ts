@@ -13,7 +13,7 @@ import {
 } from '../api.ts'
 import type { BundleInfo, PluginEntryId, PluginInfo } from '../../../../packages/boot/plugin-manager/src/types.ts'
 import { pluginManagementRemote, type PluginManagementRemote } from './transport.ts'
-import { resolveLocalized } from './presentation.ts'
+import { resolveLocalized, translatePlugin } from './presentation.ts'
 import { adminLanguage } from '../language.ts'
 
 /** The three persistent positions an entry can take; 'default' writes no managed row. */
@@ -103,6 +103,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
   const [busyRow, setBusyRow] = useState('')
   const remoteRef = useRef<PluginManagementRemote | null>(null)
   const language = adminLanguage()
+  const t = translatePlugin(language)
 
   useEffect(() => {
     setView(null); setStorageDown(false); setDraft(null); setPlugins(null); setBundles(null); setError(''); setNotice('')
@@ -198,7 +199,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
     setBusyRow(key); setError(''); setNotice('')
     try {
       const answer = await call(remote)
-      if (!answer.ok) { setError(answer.error?.message ?? '插件操作未确认，请刷新后核对结果。'); return }
+      if (!answer.ok) { setError(answer.error?.message ?? t('wireUnconfirmed')); return }
       const hadDraft = dirty
       // The live change already applied; a refresh failure must not mask that fact.
       const nextView = await pluginManagementState(kind, id).catch((cause: unknown) => {
@@ -209,7 +210,7 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
       setDraft(null)
       // The runtime already reloaded its inventory; the columns resync on the next paint.
       void remote.pluginManager.listPlugins().then((answer) => { if (answer.ok) setPlugins(answer.value) })
-      setNotice(hadDraft ? '实例已应用改动并写回插件组成；未保存的「启动时」修改已重置。' : '实例已应用改动并写回插件组成。')
+      setNotice(hadDraft ? t('compositionAppliedReset') : t('compositionApplied'))
     } finally { setBusyRow('') }
   }
 
@@ -219,12 +220,12 @@ export function usePluginComposition(kind: 'user' | 'project', id: number, targe
     try {
       const next = await pluginManagementSaveState({ target: { kind, id }, revision: view.revision, state })
       setView(next); setDraft(null); setError('')
-      setNotice(state === null ? '已清除保存的启动配置；实例恢复沿用其文件中的插件组成。' : `插件组成已保存为版本 ${next.revision}；实例下次启动时生效，运行中的实例在其下一次变更时收敛。`)
+      setNotice(state === null ? t('compositionCleared') : t('compositionSaved', { revision: next.revision }))
     } catch (cause) {
       if (cause instanceof AdminRequestError && cause.status === 409) {
         const latest = await pluginManagementState(kind, id).catch(() => null)
         if (latest !== null) { setView(latest); setDraft(null) }
-        setError('插件组成已被并发修改；表单已重置为最新版本，请再次保存。')
+        setError(t('compositionConflict'))
       } else setError(String(cause))
     } finally { setBusy(false) }
   }

@@ -3,6 +3,8 @@ import { createSnapshotStore } from '../../../../packages/client/runtime/src/cli
 import type { SettingsNamespaceView, SettingsPathOpView } from '../../../../packages/host/apiproxy/src/api/settings.ts'
 import type { ConfigLedger, HostObservable } from './config-ledger.ts'
 import type { Answer, ProfileSettingsRemote } from './transport.ts'
+import { adminLanguage } from '../language.ts'
+import { translatePlugin } from './presentation.ts'
 
 export interface ProfileSettingsState {
   loading: boolean
@@ -49,11 +51,12 @@ export class ProfileSettingsController {
   }
 
   async save(ns: string, ops: SettingsPathOpView[], expectedRevision: number): Promise<Answer<SettingsNamespaceView>> {
-    if (this.disposed) return { ok: false, error: { code: 'disposed', message: '所选实例已变化，请重新打开配置。' } }
+    const t = translatePlugin(adminLanguage())
+    if (this.disposed) return { ok: false, error: { code: 'disposed', message: t('settingsStale') } }
     const result = await this.remote.mutate({ ns, ops, expectedRevision })
-    if (this.disposed) return { ok: false, error: { code: 'disposed', message: '所选实例已变化，请重新打开配置。' } }
+    if (this.disposed) return { ok: false, error: { code: 'disposed', message: t('settingsStale') } }
     if (result.ok && result.value.ns !== ns) {
-      return { ok: false, error: { code: 'wrong-namespace', message: '配置响应与当前插件不一致，请重新读取实例。' } }
+      return { ok: false, error: { code: 'wrong-namespace', message: t('settingsMismatch') } }
     }
     if (result.ok) {
       this.generation++
