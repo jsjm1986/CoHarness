@@ -194,10 +194,6 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // unpublished, as everywhere else in the repository.
   '@deepseek-ai/dsh-client-ui-primitives': ['lib/**/*.css'],
   '@deepseek-ai/dsh-client-ui-dockkit': ['lib/**/*.css'],
-  // The Client plugin lazy-loads its generated Remote contribution only when
-  // the assembly has not already provided `remote.terminal`; the mount chunk
-  // stays beside the client entry like the sidebar chunks below.
-  '@deepseek-ai/dsh-api-terminal-controller': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-sidebar-documentpreview': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-ui-sidebar-terminal': ['lib/client.*.js'],
   // Workbench loads its PDF renderer and spreadsheet parser/renderer on demand, including licensed Worker assets.

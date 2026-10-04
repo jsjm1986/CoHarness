@@ -116,7 +116,7 @@ export function clientBundle(
   return ({ env }) => {
     const face = buildFace(env?.DSH_BUILD_FACE)
     const clientEntry = face === undefined ? 'src/client/index.ts' : 'lib/types/client/index.js'
-    const client = clientConfig(id, clientEntry, options.clientBanner)
+    const client = clientConfig(id, clientEntry, options.clientBanner, options.codeSplitting)
     const node = [lib, ...(options.companions ?? [])]
     if (face === 'host') return options.hostPhase === true ? node : [SKIP_WORKSPACE_BUILD]
     if (face === 'client') {
@@ -205,6 +205,13 @@ interface ClientBundleOptions {
   readonly companions?: readonly UserConfig[]
   /** Overrides for the package's primary Node-side library config. */
   readonly lib?: UserConfig
+  /**
+   * Whether the client entry's dynamic imports split into `client.*.js`
+   * chunks; `false` inlines them so a lazily mounted contribution still ships
+   * inside `client.js` (a generated `/remote` import has no src-plane file, so
+   * it must stay a dynamic import in source while remaining bundle-internal).
+   */
+  readonly codeSplitting?: boolean
   /** Optional legal or attribution text selected by emitted client filename. */
   readonly clientBanner?: (fileName: string) => string | undefined
 }
@@ -470,7 +477,7 @@ function asyncChunkRequirePlugin(): TsdownPlugin {
   }
 }
 
-function clientConfig(id: string, entry: string, clientBanner?: (fileName: string) => string | undefined): UserConfig {
+function clientConfig(id: string, entry: string, clientBanner?: (fileName: string) => string | undefined, codeSplitting?: boolean): UserConfig {
   const isRequested = (specifier: string): boolean => clientExternals(id).has(specifier)
   const isolation = clientInputIsolation(id)
   return {
@@ -606,6 +613,7 @@ function clientConfig(id: string, entry: string, clientBanner?: (fileName: strin
       // The imported source basename becomes the published chunk name; package
       // files lists and artifact tests pin every intentional chunk.
       chunkFileNames: 'client.[name].js',
+      ...(codeSplitting === undefined ? {} : { codeSplitting }),
       sourcemapExcludeSources: false,
       // The map is served from /plugins/<scoped-package>/client.js.map. The
       // browser resolves its local sources back into URLs that mirror the
