@@ -96,6 +96,19 @@ describe('UsersPage', () => {
     expect((screen.getAllByRole('button', { name: '启动实例' })[0]! as HTMLButtonElement).disabled).toBe(false)
   })
 
+  it('blocks start for a disabled account while stop stays available', async () => {
+    vi.mocked(api.listUsers).mockResolvedValue([{ ...alice, status: 'disabled', instanceState: 'ready' }])
+    render(<MemoryRouter><UsersPage /></MemoryRouter>)
+    await screen.findAllByText('运行中')
+    const start = screen.getAllByRole('button', { name: '启动实例' })[0]! as HTMLButtonElement
+    const stop = screen.getAllByRole('button', { name: '停止实例' })[0]! as HTMLButtonElement
+    expect(start.disabled).toBe(true)
+    expect(stop.disabled).toBe(false)
+    await userEvent.click(start)
+    await userEvent.click(stop)
+    await waitFor(() => expect(api.controlInstance).toHaveBeenCalledWith(1, 'stop'))
+  })
+
   it('shows Auto eligibility in both layouts and edits it without selecting a preset', async () => {
     const user = userEvent.setup()
     vi.mocked(api.patchUser).mockImplementation(async (_id, patch) => {

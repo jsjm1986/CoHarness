@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { StrictMode } from 'react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../api.ts'
 import { ProjectDetailPage } from './ProjectDetailPage.tsx'
@@ -139,6 +140,42 @@ function renderPage() {
 
 describe('ProjectDetailPage', () => {
   afterEach(() => cleanup())
+
+  it('remounts per route id: a settling old read cannot overwrite the new target', async () => {
+    const other = { ...project, id: 8, name: 'Second' }
+    let resolveA!: (value: typeof project) => void
+    vi.mocked(api.getProject).mockImplementation(async id => (
+      id === 8 ? other : new Promise<typeof project>(resolve => { resolveA = resolve })
+    ))
+    render(
+      <MemoryRouter initialEntries={['/projects/7']}>
+        <Link to="/projects/8">next-project</Link>
+        <Routes><Route path="/projects/:id" element={<ProjectDetailPage />} /></Routes>
+      </MemoryRouter>,
+    )
+    await userEvent.click(screen.getByRole('link', { name: 'next-project' }))
+    expect(await screen.findByRole('heading', { name: 'Second' })).toBeTruthy()
+    resolveA(project)
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'People' })).toBeNull())
+    expect(screen.getByRole('heading', { name: 'Second' })).toBeTruthy()
+  })
+
+  it('closes the first target’s rename dialog when the route id changes', async () => {
+    const other = { ...project, id: 8, name: 'Second' }
+    vi.mocked(api.getProject).mockImplementation(async id => id === 8 ? other : project)
+    render(
+      <MemoryRouter initialEntries={['/projects/7']}>
+        <Link to="/projects/8">next-project</Link>
+        <Routes><Route path="/projects/:id" element={<ProjectDetailPage />} /></Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('heading', { name: 'People' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '重命名' }))
+    expect(screen.getByRole('dialog', { name: '重命名项目' })).toBeTruthy()
+    await userEvent.click(screen.getByRole('link', { name: 'next-project' }))
+    expect(await screen.findByRole('heading', { name: 'Second' })).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -414,5 +451,158 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => expect(api.setProjectModelAccess).toHaveBeenCalledWith(
       7, 'org-primary', 'deepseek-chat', false,
     ))
+  })
+
+  it('ignores usage and contributor reads that settle after a newer month loaded', async () => {
+    const oldUsage = { ...usage, month: '2026-08', totalTokens: 1 }
+    const newUsage = { ...usage, month: '2026-07', totalTokens: 222 }
+    const oldContributors = { ...contributors, month: '2026-08' }
+    const newContributors = { ...contributors, month: '2026-07' }
+    let resolveOldUsage!: (value: typeof usage) => void
+    let resolveOldContributors!: (value: typeof contributors) => void
+    vi.mocked(api.getProjectUsage)
+      .mockImplementationOnce(() => new Promise(resolve => { resolveOldUsage = resolve }))
+      .mockResolvedValue(newUsage)
+    vi.mocked(api.listUsageContributors)
+      .mockImplementationOnce(() => new Promise(resolve => { resolveOldContributors = resolve }))
+      .mockResolvedValue(newContributors)
+    renderPage()
+    await screen.findByRole('heading', { name: 'People' })
+    fireEvent.change(screen.getByLabelText('月份'), { target: { value: '2026-07' } })
+    const summary = within(await screen.findByLabelText('项目用量汇总'))
+    await summary.findByText('222')
+    await act(async () => {
+      resolveOldUsage(oldUsage)
+      resolveOldContributors(oldContributors)
+    })
+    expect(api.getProjectUsage).toHaveBeenCalledTimes(2)
+    expect(summary.getByText('222')).toBeTruthy()
+    expect(summary.queryByText('1')).toBeNull()
+    expect(screen.queryByText('正在加载项目用量')).toBeNull()
+  })
+
+  it('keeps the newest month read when an earlier usage read fails late', async () => {
+    let rejectOldUsage!: (cause: unknown) => void
+    let rejectOldContributors!: (cause: unknown) => void
+    vi.mocked(api.getProjectUsage)
+      .mockImplementationOnce(() => new Promise((_ok, reject) => { rejectOldUsage = reject }))
+      .mockResolvedValue(usage)
+    vi.mocked(api.listUsageContributors)
+      .mockImplementationOnce(() => new Promise((_ok, reject) => { rejectOldContributors = reject }))
+      .mockResolvedValue(contributors)
+    renderPage()
+    await screen.findByRole('heading', { name: 'People' })
+    fireEvent.change(screen.getByLabelText('月份'), { target: { value: '2026-07' } })
+    const summary = within(await screen.findByLabelText('项目用量汇总'))
+    await summary.findByText('1070')
+    await act(async () => {
+      rejectOldUsage(new Error('stale usage failure'))
+      rejectOldContributors(new Error('stale contributor failure'))
+    })
+    expect(api.getProjectUsage).toHaveBeenCalledTimes(2)
+    expect(summary.getByText('1070')).toBeTruthy()
+    expect(screen.queryByText('stale usage failure')).toBeNull()
+    expect(screen.queryByText('正在加载项目用量')).toBeNull()
+  })
+
+  it('does not navigate when a pending delete resolves after the route changed', async () => {
+    const other = { ...project, id: 8, name: 'Second' }
+    let resolveDelete!: () => void
+    vi.mocked(api.deleteProject).mockImplementation(() => new Promise(resolve => { resolveDelete = () => resolve(undefined) }))
+    vi.mocked(api.getProject).mockImplementation(async id => id === 8 ? other : project)
+    render(
+      <MemoryRouter initialEntries={['/projects/7']}>
+        <Link to="/projects/8">next-project</Link>
+        <Routes>
+          <Route path="/projects/:id" element={<ProjectDetailPage />} />
+          <Route path="/projects" element={<div>projects home</div>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await screen.findByRole('heading', { name: 'People' })
+    await userEvent.click(screen.getByRole('button', { name: '删除项目' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '确认删除' }))
+    await userEvent.click(screen.getByRole('link', { name: 'next-project' }))
+    expect(await screen.findByRole('heading', { name: 'Second' })).toBeTruthy()
+    const projectReads = vi.mocked(api.getProject).mock.calls.filter(([id]) => id === 7).length
+    await act(async () => { resolveDelete() })
+    expect(api.deleteProject).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(api.getProject).mock.calls.filter(([id]) => id === 7).length).toBe(projectReads)
+    await waitFor(() => expect(screen.queryByText('projects home')).toBeNull())
+    expect(screen.getByRole('heading', { name: 'Second' })).toBeTruthy()
+  })
+
+  it('rejects empty and unsafe cost inputs without posting a fallback write', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.getProject).mockResolvedValue({
+      ...project, quota: { source: 'independent', tokenLimit: 12_345, companyCostMicrosLimit: 9_250_001 },
+    })
+    renderPage()
+    await screen.findByRole('heading', { name: 'People' })
+    await user.click(screen.getByRole('button', { name: '配置额度' }))
+    const dialog = within(screen.getByRole('dialog', { name: '配置项目额度' }))
+    const costInput = dialog.getByLabelText('每月人民币元') as HTMLInputElement
+    // Stored micro-precision cost renders exactly and survives a tokens-only edit.
+    expect(costInput.value).toBe('9.250001')
+    const tokenInput = dialog.getByLabelText('每月 Token') as HTMLInputElement
+    await user.clear(tokenInput)
+    await user.type(tokenInput, '777')
+    await user.click(dialog.getByRole('button', { name: '保存额度' }))
+    await waitFor(() => expect(api.setQuota).toHaveBeenCalledWith({
+      subjectType: 'project', subjectId: '7', tokenLimit: 777, companyCostMicrosLimit: 9_250_001,
+    }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '配置项目额度' })).toBeNull())
+    vi.mocked(api.setQuota).mockClear()
+    await user.click(screen.getByRole('button', { name: '配置额度' }))
+    const again = within(screen.getByRole('dialog', { name: '配置项目额度' }))
+    const form = document.getElementById('project-quota-form') as HTMLFormElement
+    await user.clear(again.getByLabelText('每月 Token'))
+    fireEvent.submit(form)
+    expect(await again.findByText('Token 额度必须是非负整数')).toBeTruthy()
+    expect(api.setQuota).not.toHaveBeenCalled()
+    await user.type(again.getByLabelText('每月 Token'), '777')
+    await user.clear(again.getByLabelText('每月人民币元'))
+    fireEvent.submit(form)
+    expect(await again.findByText('成本额度必须是有效的非负数')).toBeTruthy()
+    expect(api.setQuota).not.toHaveBeenCalled()
+    await user.type(again.getByLabelText('每月人民币元'), '-1')
+    fireEvent.submit(form)
+    expect(await again.findByText('成本额度必须是有效的非负数')).toBeTruthy()
+    expect(api.setQuota).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: '配置项目额度' })).toBeTruthy()
+  })
+
+  it('settles reads, a valid write, and the post-write reload under StrictMode', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.getProject).mockResolvedValue({
+      ...project, quota: { source: 'independent', tokenLimit: 12_345, companyCostMicrosLimit: 8_500_000 },
+    })
+    render(
+      <StrictMode>
+        <MemoryRouter initialEntries={['/projects/7']}>
+          <Routes><Route path="/projects/:id" element={<ProjectDetailPage />} /></Routes>
+        </MemoryRouter>
+      </StrictMode>,
+    )
+    await screen.findByRole('heading', { name: 'People' })
+    // StrictMode replay already satisfies these counts; only increments after
+    // the settled baseline prove the post-write reload ran.
+    const projectReads = vi.mocked(api.getProject).mock.calls.length
+    const usageReads = vi.mocked(api.getProjectUsage).mock.calls.length
+    const contributorReads = vi.mocked(api.listUsageContributors).mock.calls.length
+    await user.click(screen.getByRole('button', { name: '配置额度' }))
+    const dialog = within(await screen.findByRole('dialog', { name: '配置项目额度' }))
+    await user.click(dialog.getByRole('button', { name: '保存额度' }))
+    await waitFor(() => expect(api.setQuota).toHaveBeenCalledWith({
+      subjectType: 'project', subjectId: '7', tokenLimit: 12_345, companyCostMicrosLimit: 8_500_000,
+    }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '配置项目额度' })).toBeNull())
+    await waitFor(() => expect(vi.mocked(api.getProject).mock.calls.length).toBeGreaterThan(projectReads))
+    await waitFor(() => expect(vi.mocked(api.getProjectUsage).mock.calls.length).toBeGreaterThan(usageReads))
+    await waitFor(() => expect(vi.mocked(api.listUsageContributors).mock.calls.length).toBeGreaterThan(contributorReads))
+    await screen.findByRole('heading', { name: 'People' })
+    await waitFor(() => expect(screen.queryByText('正在加载成员贡献')).toBeNull())
+    expect(await screen.findByRole('heading', { name: '成员贡献' })).toBeTruthy()
+    expect(screen.queryByText('正在加载项目用量')).toBeNull()
   })
 })

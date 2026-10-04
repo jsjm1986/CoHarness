@@ -1,6 +1,16 @@
 import { Gauge, Settings2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { getUsageHealth, listUsageOverview, listUsers, setQuota, type AdminUser, type UsageHealth, type UsageOverview } from '../api.ts'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import {
+  getRoleQuota,
+  getUsageHealth,
+  getUserQuota,
+  listUsageOverview,
+  listUsers,
+  setQuota,
+  type AdminUser,
+  type UsageHealth,
+  type UsageOverview,
+} from '../api.ts'
 import {
   Button,
   Dialog,
@@ -13,6 +23,7 @@ import {
 } from '../components/ui.tsx'
 import { formatCompact, formatMoney, MeteringState, Metric, PricingState, QuotaSummary } from '../components/usage.tsx'
 import { adminLanguage, translateCopy } from '../language.ts'
+import { formatCostInput, parseCostInput } from '../money.ts'
 import { en as usagePageEn, zh as usagePageZh } from './usage-page.copy.ts'
 
 type QuotaMode = 'inherit' | 'unlimited' | 'custom'
@@ -29,43 +40,117 @@ export function UsagePage() {
   const [quotaSaving, setQuotaSaving] = useState(false)
   const [subjectType, setSubjectType] = useState<'role' | 'user'>('role')
   const [subjectId, setSubjectId] = useState('user')
+  const [quotaReadyFor, setQuotaReadyFor] = useState('')
+  const [quotaLoading, setQuotaLoading] = useState(false)
+  const [quotaLoadError, setQuotaLoadError] = useState('')
+  const [quotaSaveError, setQuotaSaveError] = useState('')
+  const [quotaRetry, setQuotaRetry] = useState(0)
   const [tokenMode, setTokenMode] = useState<QuotaMode>('unlimited')
   const [costMode, setCostMode] = useState<QuotaMode>('unlimited')
   const [tokenLimit, setTokenLimit] = useState('')
   const [costLimit, setCostLimit] = useState('')
 
+  const monthRef = useRef('')
+  const requestGeneration = useRef(0)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
+
   const reload = useCallback(async (showLoading = false) => {
+    const requestMonth = monthRef.current
+    const generation = ++requestGeneration.current
     if (showLoading) setLoading(true)
     try {
       const [nextOverview, nextUsers, nextHealth] = await Promise.all([
-        listUsageOverview(month || undefined), listUsers(), getUsageHealth(month || undefined),
+        listUsageOverview(requestMonth || undefined), listUsers(), getUsageHealth(requestMonth || undefined),
       ])
+      if (!alive.current || requestGeneration.current !== generation) return
       setOverview(nextOverview)
       setHealth(nextHealth)
-      if (month === '') setMonth(current => current === '' ? nextOverview.month : current)
+      if (requestMonth === '') setMonth(current => current === '' ? nextOverview.month : current)
       setUsers(nextUsers)
       setError('')
     } catch (cause) {
-      setError(messageFrom(cause))
+      if (alive.current && requestGeneration.current === generation) setError(messageFrom(cause))
     } finally {
-      if (showLoading) setLoading(false)
+      // The latest read always settles the spinner; a stale read touches nothing.
+      if (alive.current && requestGeneration.current === generation) setLoading(false)
     }
-  }, [month])
+  }, [])
 
-  useEffect(() => { void reload(true) }, [reload])
+  useEffect(() => {
+    monthRef.current = month
+    void reload(true)
+    return () => { requestGeneration.current += 1 }
+  }, [month, reload])
 
-  const rows = overview?.users ?? []
-  const totals = useMemo(() => ({
-    personalCalls: overview?.personal.calls ?? 0,
-    personalTokens: overview?.personal.totalTokens ?? 0,
-    projectTokens: overview?.projects.totalTokens ?? 0,
-    unattributedTokens: overview?.unattributedProjects.totalTokens ?? 0,
-    companyCost: overview?.personal.companyCostMicros ?? 0,
-    alerts: rows.reduce((sum, row) => sum + row.personal.alerts.length, 0),
-  }), [overview, rows])
+  const subjectKey = `${subjectType}:${subjectId}`
+
+  // The user list only repairs an invalid selection; a still-valid id and the
+  // draft survive unrelated list refreshes.
+  useEffect(() => {
+    if (subjectType !== 'user') return
+    if (users.some(row => row.id === Number(subjectId))) return
+    const first = users[0]
+    setSubjectId(first === undefined ? '' : String(first.id))
+    setQuotaReadyFor('')
+  }, [users, subjectType, subjectId])
+
+  // Quota reads run only on open, subject, or retry changes — never on an
+  // unrelated overview/users refresh.
+  useEffect(() => {
+    if (!quotaOpen) return
+    setQuotaReadyFor('')
+    setQuotaLoadError('')
+    setQuotaSaveError('')
+    const numericId = Number(subjectId)
+    if (subjectType === 'user' && !(Number.isSafeInteger(numericId) && numericId > 0)) {
+      setQuotaLoading(false)
+      return
+    }
+    const key = `${subjectType}:${subjectId}`
+    let cancelled = false
+    setQuotaLoading(true)
+    const settled = (view: { token: QuotaMode; tokenValue: string; cost: QuotaMode; costValue: string }) => {
+      setTokenMode(view.token)
+      setTokenLimit(view.tokenValue)
+      setCostMode(view.cost)
+      setCostLimit(view.costValue)
+      setQuotaReadyFor(key)
+      setQuotaLoadError('')
+    }
+    const failed = (cause: unknown) => { if (!cancelled) setQuotaLoadError(messageFrom(cause)) }
+    const finished = () => { if (!cancelled) setQuotaLoading(false) }
+    const request = subjectType === 'role'
+      ? getRoleQuota(subjectId === 'admin' ? 'admin' : 'user').then(view => ({
+        token: (view.tokenLimit === null ? 'unlimited' : 'custom') as QuotaMode,
+        tokenValue: view.tokenLimit === null ? '' : String(view.tokenLimit),
+        cost: (view.companyCostMicrosLimit === null ? 'unlimited' : 'custom') as QuotaMode,
+        costValue: view.companyCostMicrosLimit === null ? '' : formatCostInput(view.companyCostMicrosLimit),
+      }))
+      : getUserQuota(numericId).then(view => ({
+        token: view.tokenMode,
+        tokenValue: view.tokenLimit === null ? '' : String(view.tokenLimit),
+        cost: view.companyCostMode,
+        costValue: view.companyCostMicrosLimit === null ? '' : formatCostInput(view.companyCostMicrosLimit),
+      }))
+    void request.then(view => { if (!cancelled) settled(view) }).catch(failed).finally(finished)
+    return () => { cancelled = true }
+  }, [quotaOpen, subjectType, subjectId, quotaRetry])
+
+  function openQuotaDialog() {
+    // A reopen must not inherit the previous read's ready marker.
+    setQuotaReadyFor('')
+    setQuotaSaveError('')
+    setQuotaOpen(true)
+  }
 
   function changeSubjectType(next: 'role' | 'user') {
+    if (next === subjectType) return
     setSubjectType(next)
+    setQuotaReadyFor('')
     if (next === 'role') {
       setSubjectId('user')
       if (tokenMode === 'inherit') setTokenMode('unlimited')
@@ -77,27 +162,55 @@ export function UsagePage() {
     }
   }
 
+  function changeSubjectId(next: string) {
+    // Only an actual subject change invalidates quota readiness.
+    if (next === subjectId) return
+    setSubjectId(next)
+    setQuotaReadyFor('')
+  }
+
+  const rows = overview?.users ?? []
+  const totals = useMemo(() => ({
+    personalCalls: overview?.personal.calls ?? 0,
+    personalTokens: overview?.personal.totalTokens ?? 0,
+    projectTokens: overview?.projects.totalTokens ?? 0,
+    unattributedTokens: overview?.unattributedProjects.totalTokens ?? 0,
+    companyCost: overview?.personal.companyCostMicros ?? 0,
+    alerts: rows.reduce((sum, row) => sum + row.personal.alerts.length, 0),
+  }), [overview, rows])
+
   async function save(event: FormEvent) {
     event.preventDefault()
+    // Only the loaded subject may write: pending or mismatched reads never POST.
+    if (quotaSaving || quotaLoading || quotaReadyFor !== subjectKey) return
+    setQuotaSaveError('')
     setQuotaSaving(true)
     try {
       const parsedToken = Number(tokenLimit)
-      const parsedCost = Number(costLimit)
-      const costMicros = Math.round(parsedCost * 1_000_000)
-      if (tokenMode === 'custom' && (!Number.isSafeInteger(parsedToken) || parsedToken < 0)) throw new Error(t('quotaTokenInvalid'))
-      if (costMode === 'custom' && (!Number.isFinite(parsedCost) || parsedCost < 0 || !Number.isSafeInteger(costMicros))) throw new Error(t('quotaCostInvalid'))
+      if (tokenMode === 'custom' && (tokenLimit.trim() === '' || !Number.isSafeInteger(parsedToken) || parsedToken < 0)) {
+        throw new Error(t('quotaTokenInvalid'))
+      }
+      let costMicros = 0
+      if (costMode === 'custom') {
+        try {
+          costMicros = parseCostInput(costLimit)
+        } catch {
+          throw new Error(t('quotaCostInvalid'))
+        }
+      }
       await setQuota({
         subjectType,
         subjectId,
         tokenLimit: tokenMode === 'inherit' ? 'inherit' : tokenMode === 'unlimited' ? null : parsedToken,
         companyCostMicrosLimit: costMode === 'inherit' ? 'inherit' : costMode === 'unlimited' ? null : costMicros,
       })
+      if (!alive.current) return
       setQuotaOpen(false)
-      await reload()
+      void reload()
     } catch (cause) {
-      setError(messageFrom(cause))
+      if (alive.current) setQuotaSaveError(messageFrom(cause))
     } finally {
-      setQuotaSaving(false)
+      if (alive.current) setQuotaSaving(false)
     }
   }
 
@@ -109,7 +222,7 @@ export function UsagePage() {
         actions={(
           <div className="pageToolbar">
             <label className="monthPicker"><span>{t('monthLabel')}</span><input className="input" type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
-            <Button icon={Settings2} onClick={() => setQuotaOpen(true)}>{t('configureQuota')}</Button>
+            <Button icon={Settings2} onClick={openQuotaDialog}>{t('configureQuota')}</Button>
           </div>
         )}
       />
@@ -205,25 +318,34 @@ export function UsagePage() {
         footer={(
           <>
             <Button type="button" disabled={quotaSaving} onClick={() => setQuotaOpen(false)}>{t('cancel')}</Button>
-            <Button type="submit" form="quota-form" variant="primary" loading={quotaSaving}>{t('saveQuota')}</Button>
+            <Button type="submit" form="quota-form" variant="primary" loading={quotaSaving}
+              disabled={quotaSaving || quotaLoading || quotaReadyFor !== subjectKey}>{t('saveQuota')}</Button>
           </>
         )}
       >
         <form id="quota-form" onSubmit={event => void save(event)}>
+          {quotaLoading ? <LoadingState label={t('quotaLoading')} /> : null}
+          {quotaLoadError === '' ? null : (
+            <div className="stackedValue">
+              <ErrorBanner message={quotaLoadError} />
+              <Button type="button" disabled={quotaLoading} onClick={() => { setQuotaReadyFor(''); setQuotaRetry(n => n + 1) }}>{t('retry')}</Button>
+            </div>
+          )}
+          <ErrorBanner message={quotaSaveError} />
           <div className="formGrid">
             <Field label={t('subjectField')}>
-              <select className="select" value={subjectType} onChange={event => changeSubjectType(event.target.value as 'role' | 'user')}>
+              <select className="select" value={subjectType} disabled={quotaSaving} onChange={event => changeSubjectType(event.target.value as 'role' | 'user')}>
                 <option value="role">{t('subjectRole')}</option>
                 <option value="user">{t('subjectUser')}</option>
               </select>
             </Field>
             <Field label={subjectType === 'role' ? t('fieldRole') : t('fieldUser')}>
               {subjectType === 'role' ? (
-                <select className="select" value={subjectId} onChange={event => setSubjectId(event.target.value)}>
+                <select className="select" value={subjectId} disabled={quotaSaving} onChange={event => changeSubjectId(event.target.value)}>
                   <option value="user">{t('roleUser')}</option><option value="admin">{t('roleAdmin')}</option>
                 </select>
               ) : (
-                <select className="select" required value={subjectId} onChange={event => setSubjectId(event.target.value)}>
+                <select className="select" required value={subjectId} disabled={quotaSaving} onChange={event => changeSubjectId(event.target.value)}>
                   {users.length === 0 ? <option value="">{t('noUsers')}</option> : users.map(user => <option key={user.id} value={user.id}>{t('userOption', { name: user.username, id: String(user.id) })}</option>)}
                 </select>
               )}
@@ -238,6 +360,7 @@ export function UsagePage() {
               value={tokenLimit}
               inputLabel={t('monthlyTokensLabel')}
               inputMode="numeric"
+              disabled={quotaReadyFor !== subjectKey || quotaSaving}
               onMode={setTokenMode}
               onValue={setTokenLimit}
             />
@@ -248,6 +371,7 @@ export function UsagePage() {
               value={costLimit}
               inputLabel={t('monthlyCostLabel')}
               inputMode="decimal"
+              disabled={quotaReadyFor !== subjectKey || quotaSaving}
               onMode={setCostMode}
               onValue={setCostLimit}
             />
@@ -280,13 +404,14 @@ function ContributionValue({ value, calls }: { value: number; calls: number }) {
   return <div className="stackedValue"><strong>{value.toLocaleString()}</strong><span className="muted">{t('contributionNote', { count: calls.toLocaleString() })}</span></div>
 }
 
-function QuotaEditor({ label, mode, subjectType, value, inputLabel, inputMode, onMode, onValue }: {
+function QuotaEditor({ label, mode, subjectType, value, inputLabel, inputMode, disabled, onMode, onValue }: {
   label: string
   mode: QuotaMode
   subjectType: 'role' | 'user'
   value: string
   inputLabel: string
   inputMode: 'numeric' | 'decimal'
+  disabled: boolean
   onMode: (mode: QuotaMode) => void
   onValue: (value: string) => void
 }) {
@@ -295,7 +420,7 @@ function QuotaEditor({ label, mode, subjectType, value, inputLabel, inputMode, o
     <fieldset className="quotaEditor">
       <legend>{label}</legend>
       <Field label={t('quotaModeLabel')}>
-        <select className="select" value={mode} onChange={event => onMode(event.target.value as QuotaMode)}>
+        <select className="select" value={mode} disabled={disabled} onChange={event => onMode(event.target.value as QuotaMode)}>
           {subjectType === 'user' ? <option value="inherit">{t('quotaModeInherit')}</option> : null}
           <option value="unlimited">{t('quotaModeUnlimited')}</option>
           <option value="custom">{t('quotaModeCustom')}</option>
@@ -303,7 +428,7 @@ function QuotaEditor({ label, mode, subjectType, value, inputLabel, inputMode, o
       </Field>
       {mode === 'custom' ? (
         <Field label={inputLabel}>
-          <input className="input" required min="0" inputMode={inputMode} value={value} onChange={event => onValue(event.target.value)} />
+          <input className="input" required min="0" inputMode={inputMode} disabled={disabled} value={value} onChange={event => onValue(event.target.value)} />
         </Field>
       ) : <div className="quotaModeNote">{mode === 'inherit' ? t('quotaInheritNote') : t('quotaUnlimitedNote')}</div>}
     </fieldset>

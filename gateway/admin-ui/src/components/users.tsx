@@ -67,7 +67,7 @@ export function InstanceControls({ user, pending, run }: { user: AdminUser; pend
       <IconButton
         label={t('instanceStart')}
         icon={Play}
-        disabled={busy || user.instanceState === 'ready' || user.instanceState === 'starting'}
+        disabled={busy || user.status !== 'active' || user.instanceState === 'ready' || user.instanceState === 'starting'}
         loading={pending === `instance:${user.id}:start`}
         onClick={() => void run(`instance:${user.id}:start`, () => controlInstance(user.id, 'start'))}
       />

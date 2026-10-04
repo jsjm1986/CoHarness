@@ -1,5 +1,5 @@
 import { ArrowLeft, ExternalLink, Pencil, Settings2, Sparkles, Trash2, Users } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   controlProjectInstance,
@@ -27,6 +27,7 @@ import {
   type UsageContributorReport,
 } from '../api.ts'
 import { adminLanguage, translateCopy } from '../language.ts'
+import { formatCostInput, parseCostInput } from '../money.ts'
 import {
   Button,
   ConfirmDialog,
@@ -49,8 +50,22 @@ type ProjectLimitMode = 'unlimited' | 'custom'
 
 export function ProjectDetailPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
   const projectId = Number(id)
+  if (!Number.isSafeInteger(projectId) || projectId <= 0) {
+    return (
+      <div className="page projectDetailPage">
+        <Link className="breadcrumb" to="/projects"><ArrowLeft aria-hidden="true" />{t('backToProjects')}</Link>
+        <PageHeader title={t('pageTitle')} />
+        <ErrorBanner message={t('invalidProjectId')} />
+      </div>
+    )
+  }
+  return <ProjectDetail key={id} projectId={projectId} />
+}
+
+function ProjectDetail({ projectId }: { projectId: number }) {
+  const navigate = useNavigate()
   const [project, setProject] = useState<ProjectDetail | null>(null)
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -87,11 +102,6 @@ export function ProjectDetailPage() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: copyZh, en: copyEn }), [])
 
   const reload = useCallback(async (showLoading = false) => {
-    if (!Number.isInteger(projectId) || projectId <= 0) {
-      setError(t('invalidProjectId'))
-      setLoading(false)
-      return
-    }
     if (showLoading) setLoading(true)
     try {
       const [nextProject, nextUsers] = await Promise.all([getProject(projectId), listUsers()])
@@ -108,40 +118,46 @@ export function ProjectDetailPage() {
 
   useEffect(() => { void reload(true) }, [reload])
 
+  const monthRef = useRef('')
+  const usageGeneration = useRef(0)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
+
   const reloadUsage = useCallback(async (showLoading = false) => {
-    if (!Number.isInteger(projectId) || projectId <= 0) {
-      setUsageError(t('invalidProjectId'))
-      setUsageLoading(false)
-      return
-    }
+    const requestMonth = monthRef.current
+    const generation = ++usageGeneration.current
     if (showLoading) {
       setUsageLoading(true)
       setContributors(null)
     }
     try {
       const [nextUsage, nextContributors] = await Promise.all([
-        getProjectUsage(projectId, month || undefined),
-        listUsageContributors(projectId, month || undefined),
+        getProjectUsage(projectId, requestMonth || undefined),
+        listUsageContributors(projectId, requestMonth || undefined),
       ])
+      if (!alive.current || usageGeneration.current !== generation) return
       setUsage(nextUsage)
       setContributors(nextContributors)
-      if (month === '') setMonth(current => current === '' ? nextUsage.month : current)
+      if (requestMonth === '') setMonth(current => current === '' ? nextUsage.month : current)
       setUsageError('')
     } catch (cause) {
-      setUsageError(messageFrom(cause))
+      if (alive.current && usageGeneration.current === generation) setUsageError(messageFrom(cause))
     } finally {
-      if (showLoading) setUsageLoading(false)
+      // The latest read always settles the spinner; a stale read touches nothing.
+      if (alive.current && usageGeneration.current === generation) setUsageLoading(false)
     }
-  }, [month, projectId, t])
+  }, [projectId])
 
-  useEffect(() => { void reloadUsage(true) }, [reloadUsage])
+  useEffect(() => {
+    monthRef.current = month
+    void reloadUsage(true)
+    return () => { usageGeneration.current += 1 }
+  }, [month, reloadUsage])
 
   const reloadModelAccess = useCallback(async (showLoading = false) => {
-    if (!Number.isInteger(projectId) || projectId <= 0) {
-      setModelsError(t('invalidProjectId'))
-      setModelsLoading(false)
-      return
-    }
     if (showLoading) setModelsLoading(true)
     try {
       const [nextModels, nextProviders, access] = await Promise.all([
@@ -187,11 +203,12 @@ export function ProjectDetailPage() {
     setPending(`member:${userId}`)
     try {
       await setMember(projectId, userId, mode)
+      if (!alive.current) return
       await reload()
     } catch (cause) {
-      setError(messageFrom(cause))
+      if (alive.current) setError(messageFrom(cause))
     } finally {
-      setPending('')
+      if (alive.current) setPending('')
     }
   }
 
@@ -200,12 +217,13 @@ export function ProjectDetailPage() {
     setPending(`member:${removeTarget.id}`)
     try {
       await removeMember(projectId, removeTarget.id)
+      if (!alive.current) return
       setRemoveTarget(null)
       await reload()
     } catch (cause) {
-      setError(messageFrom(cause))
+      if (alive.current) setError(messageFrom(cause))
     } finally {
-      setPending('')
+      if (alive.current) setPending('')
     }
   }
 
@@ -219,11 +237,12 @@ export function ProjectDetailPage() {
         model.model,
         assigned ? true : projectDefaultAllowed ? false : null,
       )
+      if (!alive.current) return
       await reloadModelAccess()
     } catch (cause) {
-      setModelsError(messageFrom(cause))
+      if (alive.current) setModelsError(messageFrom(cause))
     } finally {
-      setModelPending('')
+      if (alive.current) setModelPending('')
     }
   }
 
@@ -231,11 +250,12 @@ export function ProjectDetailPage() {
     setModelPending('all')
     try {
       await setAllProjectModelAccess(projectId, assigned ? true : null)
+      if (!alive.current) return
       await reloadModelAccess()
     } catch (cause) {
-      setModelsError(messageFrom(cause))
+      if (alive.current) setModelsError(messageFrom(cause))
     } finally {
-      setModelPending('')
+      if (alive.current) setModelPending('')
     }
   }
 
@@ -245,12 +265,13 @@ export function ProjectDetailPage() {
     setRenameError('')
     try {
       await renameProject(projectId, projectName)
+      if (!alive.current) return
       setRenameOpen(false)
       await reload()
     } catch (cause) {
-      setRenameError(messageFrom(cause))
+      if (alive.current) setRenameError(messageFrom(cause))
     } finally {
-      setPending('')
+      if (alive.current) setPending('')
     }
   }
 
@@ -258,10 +279,14 @@ export function ProjectDetailPage() {
     setPending('delete')
     try {
       await deleteProject(projectId)
+      // A stale instance's delete cannot navigate away from a remounted detail.
+      if (!alive.current) return
       navigate('/projects')
     } catch (cause) {
-      setError(messageFrom(cause))
-      setPending('')
+      if (alive.current) {
+        setError(messageFrom(cause))
+        setPending('')
+      }
     }
   }
 
@@ -273,7 +298,7 @@ export function ProjectDetailPage() {
     setTokenMode(storedTokens === null ? 'unlimited' : 'custom')
     setCostMode(storedCost === null ? 'unlimited' : 'custom')
     setTokenLimit(storedTokens === null ? '' : String(storedTokens))
-    setCostLimit(storedCost === null ? '' : String(storedCost / 1_000_000))
+    setCostLimit(storedCost === null ? '' : formatCostInput(storedCost))
     setQuotaError('')
     setQuotaOpen(true)
   }
@@ -287,13 +312,16 @@ export function ProjectDetailPage() {
       let nextCostLimit: number | null | 'inherit' = 'inherit'
       if (quotaSource === 'independent') {
         const parsedToken = Number(tokenLimit)
-        const parsedCost = Number(costLimit)
-        if (tokenMode === 'custom' && (!Number.isSafeInteger(parsedToken) || parsedToken < 0)) {
+        if (tokenMode === 'custom' && (tokenLimit.trim() === '' || !Number.isSafeInteger(parsedToken) || parsedToken < 0)) {
           throw new Error(t('quotaTokenInvalid'))
         }
-        const costMicros = Math.round(parsedCost * 1_000_000)
-        if (costMode === 'custom' && (!Number.isFinite(parsedCost) || parsedCost < 0 || !Number.isSafeInteger(costMicros))) {
-          throw new Error(t('quotaCostInvalid'))
+        let costMicros = 0
+        if (costMode === 'custom') {
+          try {
+            costMicros = parseCostInput(costLimit)
+          } catch {
+            throw new Error(t('quotaCostInvalid'))
+          }
         }
         nextTokenLimit = tokenMode === 'unlimited' ? null : parsedToken
         nextCostLimit = costMode === 'unlimited' ? null : costMicros
@@ -304,12 +332,13 @@ export function ProjectDetailPage() {
         tokenLimit: nextTokenLimit,
         companyCostMicrosLimit: nextCostLimit,
       })
+      if (!alive.current) return
       setQuotaOpen(false)
       await Promise.all([reload(), reloadUsage()])
     } catch (cause) {
-      setQuotaError(messageFrom(cause))
+      if (alive.current) setQuotaError(messageFrom(cause))
     } finally {
-      setQuotaSaving(false)
+      if (alive.current) setQuotaSaving(false)
     }
   }
 

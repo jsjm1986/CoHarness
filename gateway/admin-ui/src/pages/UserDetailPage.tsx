@@ -1,6 +1,6 @@
 /** User-centric administration: account, qualifications, model overrides, memberships, and quota. */
 import { ArrowLeft, KeyRound, Pencil, Power, Trash2, UserRound } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   AdminRequestError,
@@ -61,6 +61,7 @@ import {
   type UserRole,
 } from '../components/users.tsx'
 import { adminLanguage, translateCopy } from '../language.ts'
+import { formatCostInput, parseCostInput } from '../money.ts'
 import { zh as userDetailZh, en as userDetailEn } from './user-detail.copy.ts'
 
 const messageFrom = (cause: unknown): string => cause instanceof Error ? cause.message : String(cause)
@@ -68,8 +69,26 @@ const messageFrom = (cause: unknown): string => cause instanceof Error ? cause.m
 export function UserDetailPage() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
   const params = useParams()
-  const navigate = useNavigate()
   const userId = Number(params.id)
+  if (!Number.isSafeInteger(userId) || userId <= 0) {
+    return (
+      <div className="page">
+        <Link className="backLink" to="/"><ArrowLeft aria-hidden="true" />{t('backToUsers')}</Link>
+        <EmptyState icon={UserRound} title={t('notFoundTitle')} detail={t('notFoundDetail')} />
+      </div>
+    )
+  }
+  return <UserDetail key={params.id} userId={userId} />
+}
+
+function UserDetail({ userId }: { userId: number }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: userDetailZh, en: userDetailEn }), [])
+  const navigate = useNavigate()
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
 
   const [user, setUser] = useState<AdminUser | null>(null)
   const [loading, setLoading] = useState(true)
@@ -101,34 +120,37 @@ export function UserDetailPage() {
     setPending(key)
     try {
       await action()
+      // A stale instance's committed write must not follow up on a remount.
+      if (!alive.current) return true
       await reload()
       return true
     } catch (cause) {
-      setError(messageFrom(cause))
+      if (alive.current) setError(messageFrom(cause))
       return false
     } finally {
-      setPending('')
+      if (alive.current) setPending('')
     }
   }
 
   async function onEdit(patch: { displayName?: string; role?: UserRole; autoReviewEligible?: boolean }) {
     const saved = await run(`edit:${userId}`, () => patchUser(userId, patch))
-    if (saved) setEditOpen(false)
+    if (saved && alive.current) setEditOpen(false)
   }
 
   async function onResetPassword(password: string) {
     const saved = await run(`password:${userId}`, () => resetPassword(userId, password))
-    if (saved) setPasswordOpen(false)
+    if (saved && alive.current) setPasswordOpen(false)
   }
 
   async function onDisable() {
     const saved = await run(`status:${userId}`, () => patchUser(userId, { status: 'disabled' }))
-    if (saved) setDisableOpen(false)
+    if (saved && alive.current) setDisableOpen(false)
   }
 
   async function onDelete() {
     const saved = await run(`delete:${userId}`, () => deleteUser(userId))
-    if (saved) { setDeleteOpen(false); navigate('/') }
+    // A stale instance's delete cannot navigate away from a remounted detail.
+    if (saved && alive.current) { setDeleteOpen(false); navigate('/') }
   }
 
   if (notFound) {
@@ -230,7 +252,7 @@ export function UserDetailPage() {
 
           <UserMemberships userId={userId} role={user.role} />
 
-          <UserQuota userId={userId} />
+          <UserQuota key={userId} userId={userId} />
         </>
       )}
 
@@ -568,7 +590,7 @@ function UserQuota({ userId }: { userId: number }) {
       setTokenMode(value.tokenMode)
       setCostMode(value.companyCostMode)
       setTokenLimit(value.tokenLimit === null ? '' : String(value.tokenLimit))
-      setCostLimit(value.companyCostMicrosLimit === null ? '' : String(value.companyCostMicrosLimit / 1_000_000))
+      setCostLimit(value.companyCostMicrosLimit === null ? '' : formatCostInput(value.companyCostMicrosLimit))
       setError('')
     } catch (cause) {
       setError(messageFrom(cause))
@@ -585,13 +607,16 @@ function UserQuota({ userId }: { userId: number }) {
     setError('')
     try {
       const parsedToken = Number(tokenLimit)
-      const parsedCost = Number(costLimit)
-      if (tokenMode === 'custom' && (!Number.isSafeInteger(parsedToken) || parsedToken < 0)) {
+      if (tokenMode === 'custom' && (tokenLimit.trim() === '' || !Number.isSafeInteger(parsedToken) || parsedToken < 0)) {
         throw new Error(t('quotaTokenInvalid'))
       }
-      const costMicros = Math.round(parsedCost * 1_000_000)
-      if (costMode === 'custom' && (!Number.isFinite(parsedCost) || parsedCost < 0 || !Number.isSafeInteger(costMicros))) {
-        throw new Error(t('quotaCostInvalid'))
+      let costMicros = 0
+      if (costMode === 'custom') {
+        try {
+          costMicros = parseCostInput(costLimit)
+        } catch {
+          throw new Error(t('quotaCostInvalid'))
+        }
       }
       const nextTokenLimit: number | null | 'inherit' = tokenMode === 'inherit' ? 'inherit' : tokenMode === 'unlimited' ? null : parsedToken
       const nextCostLimit: number | null | 'inherit' = costMode === 'inherit' ? 'inherit' : costMode === 'unlimited' ? null : costMicros

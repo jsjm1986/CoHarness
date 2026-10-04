@@ -155,12 +155,10 @@ export function DesktopsPage() {
             <EmptyState icon={Monitor} title={t('detailErrorTitle')} detail={t('detailErrorDetail')} />
           ) : (
             <>
-              {detail.resource?.state === 'unavailable' ? (
-                <div className="filterActions">
-                  <Button type="button" variant="danger" icon={ShieldOff} onClick={() => setConfirm({ kind: 'clear', resource: detail.resource! })}>{t('clearUnavailable')}</Button>
-                  {detail.resource.stateNote === null ? null : <span className="muted">{detail.resource.stateNote}</span>}
-                </div>
-              ) : null}
+              <div className="filterActions">
+                <Button type="button" variant="danger" icon={ShieldOff} disabled={detail.resource?.state !== 'unavailable'} onClick={() => setConfirm({ kind: 'clear', resource: detail.resource! })}>{t('clearUnavailable')}</Button>
+                {detail.resource?.stateNote === null || detail.resource?.stateNote === undefined ? null : <span className="muted">{detail.resource.stateNote}</span>}
+              </div>
               <div className="tableWrap">
                 <table className="dataTable">
                   <thead><tr><th>{t('columnHolder')}</th><th>{t('columnRuntime')}</th><th>{t('labelState')}</th><th>{t('columnFencing')}</th><th>{t('columnHeartbeat')}</th><th>{t('columnAcquired')}</th><th /></tr></thead>

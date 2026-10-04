@@ -431,10 +431,10 @@ export function previewEmptyDrafts(options: { olderThanMs?: number; limit?: numb
   return request(`/admin/api/archives/empty-drafts/preview${suffix === '' ? '' : `?${suffix}`}`)
 }
 
-export function trashEmptyDrafts(ids: string[]): Promise<{ trashed: string[] }> {
+export function trashEmptyDrafts(ids: string[], cutoff?: number): Promise<{ trashed: string[] }> {
   return request('/admin/api/archives/empty-drafts/trash', {
     method: 'POST',
-    body: JSON.stringify({ ids }),
+    body: JSON.stringify({ ids, ...(cutoff === undefined ? {} : { cutoff }) }),
   })
 }
 
@@ -1089,6 +1089,22 @@ export type UserQuotaView = {
 
 export function getUserQuota(userId: number): Promise<UserQuotaView> {
   return request(`/admin/api/quotas?subjectType=user&subjectId=${userId}`)
+}
+
+/** Stored role limits; a missing role row means unlimited limits. */
+export type RoleQuotaView = {
+  tokenLimit: number | null
+  companyCostMicrosLimit: number | null
+}
+
+/**
+ * Read a role's stored monthly limits.
+ * @param role - the `admin` or `user` quota subject.
+ * @returns the stored limits; null means the role is unlimited. Rejects when
+ * the admin API cannot serve the read.
+ */
+export function getRoleQuota(role: 'admin' | 'user'): Promise<RoleQuotaView> {
+  return request(`/admin/api/quotas?subjectType=role&subjectId=${role}`)
 }
 
 export function listUsageOverview(month?: string): Promise<UsageOverview> {

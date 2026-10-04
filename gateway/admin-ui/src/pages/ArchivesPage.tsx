@@ -62,6 +62,9 @@ export function ArchivesPage() {
   const [emptyCandidates, setEmptyCandidates] = useState<EmptyDraftCandidate[]>([])
   const [emptyScanned, setEmptyScanned] = useState(false)
   const [emptySelected, setEmptySelected] = useState<Set<string>>(new Set())
+  const [emptyCutoff, setEmptyCutoff] = useState<number | null>(null)
+  const [emptyConfirm, setEmptyConfirm] = useState<{ ids: readonly string[]; cutoff: number | null } | null>(null)
+  const [emptyResult, setEmptyResult] = useState('')
   const [emptyLoading, setEmptyLoading] = useState(false)
   const [emptyError, setEmptyError] = useState('')
   const rowsGeneration = useRef(0)
@@ -166,8 +169,10 @@ export function ArchivesPage() {
     try {
       const result = await previewEmptyDrafts({ limit: 200 })
       setEmptyCandidates(result.candidates)
+      setEmptyCutoff(result.cutoff)
       setEmptyScanned(true)
       setEmptySelected(new Set())
+      setEmptyResult('')
     } catch (cause) {
       setEmptyError(messageFrom(cause))
     } finally {
@@ -175,13 +180,22 @@ export function ArchivesPage() {
     }
   }
 
-  async function moveEmptyDraftsToTrash() {
+  function requestEmptyTrash() {
     if (emptySelected.size === 0) return
+    setEmptyConfirm({ ids: [...emptySelected], cutoff: emptyCutoff })
+  }
+
+  async function confirmEmptyTrash() {
+    const intent = emptyConfirm
+    if (intent === null || intent.ids.length === 0) return
     setEmptyLoading(true)
     setEmptyError('')
     try {
-      await trashEmptyDrafts([...emptySelected])
+      const result = await trashEmptyDrafts([...intent.ids], intent.cutoff ?? undefined)
+      const skipped = Math.max(0, intent.ids.length - result.trashed.length)
+      setEmptyConfirm(null)
       await scanEmptyDrafts()
+      setEmptyResult(t('emptyTrashResult', { count: String(result.trashed.length), skipped: String(skipped) }))
     } catch (cause) {
       setEmptyError(messageFrom(cause))
     } finally {
@@ -266,10 +280,11 @@ export function ArchivesPage() {
           <span>{t('emptyHint')}</span>
           <div className="pageActionGroup">
             <Button icon={SearchCheck} onClick={() => { void scanEmptyDrafts() }} loading={emptyLoading}>{t('scan')}</Button>
-            {emptySelected.size > 0 ? <Button icon={Trash2} variant="danger" disabled={emptyLoading} onClick={() => { void moveEmptyDraftsToTrash() }}>{t('trashSelectedEmpty')}</Button> : null}
+            {emptySelected.size > 0 ? <Button icon={Trash2} variant="danger" disabled={emptyLoading} onClick={requestEmptyTrash}>{t('trashSelectedEmpty')}</Button> : null}
           </div>
         </div>
         <ErrorBanner message={emptyError} />
+        {emptyResult === '' ? null : <p className="emptyTrashResult">{emptyResult}</p>}
         {emptyCandidates.length === 0 ? <div className="emptyDraftState">
           <span className="emptyDraftStateIcon" aria-hidden="true"><Archive /></span>
           <strong>{emptyScanned ? t('emptyScannedTitle') : t('emptyNotScannedTitle')}</strong>
@@ -357,6 +372,15 @@ export function ArchivesPage() {
         pending={pendingAction !== null}
         onClose={() => { if (pendingAction === null) setConfirmAction(null) }}
         onConfirm={() => { if (confirmAction !== null) { const action = confirmAction; setConfirmAction(null); void runAction(action) } }}
+      />
+      <ConfirmDialog
+        open={emptyConfirm !== null}
+        title={t('emptyConfirmTitle')}
+        description={t('emptyConfirmBody', { count: String(emptyConfirm?.ids.length ?? 0) })}
+        confirmLabel={t('trashSelectedEmpty')}
+        pending={emptyLoading}
+        onClose={() => { if (!emptyLoading) setEmptyConfirm(null) }}
+        onConfirm={() => { void confirmEmptyTrash() }}
       />
     </div>
   )

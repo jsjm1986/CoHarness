@@ -23,7 +23,7 @@ import { ProjectDetailPage } from './pages/ProjectDetailPage.tsx'
 import { ProjectListPage } from './pages/ProjectListPage.tsx'
 import { UsersPage } from './pages/UsersPage.tsx'
 import { UserDetailPage } from './pages/UserDetailPage.tsx'
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Dialog } from './components/ui.tsx'
 import { adminLanguage, setAdminLanguage, translateCopy, type AdminLanguage } from './language.ts'
 import { zh as chromeZh, en as chromeEn, type ChromeCopyKey } from './chrome.copy.ts'
@@ -39,6 +39,11 @@ import { WebhooksPage } from './pages/WebhooksPage.tsx'
 import { TerminalsPage } from './pages/TerminalsPage.tsx'
 
 export function App() {
+  useEffect(() => {
+    const previous = document.documentElement.lang
+    document.documentElement.lang = adminLanguage()
+    return () => { document.documentElement.lang = previous }
+  }, [])
   return (
     <Router basename="/admin">
       <div className="adminShell" data-testid="admin-app">
@@ -120,7 +125,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
   )
 }
 
-/** The persisted surface-language choice; English renders the pages that carry a dictionary, the rest stay Chinese. */
+/** The persisted surface-language choice; it writes localStorage and the `hgw_lang` cookie, then reloads to apply everywhere. */
 function LanguageSelect() {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
   return <select className="select selectCompact languageSelect" aria-label={t('languageAria')} value={adminLanguage()}
@@ -176,6 +181,7 @@ function AdminNav({ className }: { className: string }) {
             <Icon aria-hidden="true" /><span>{t(labelKey)}</span>
           </NavLink>)}
         </nav>
+        <LanguageSelect />
       </Dialog> : null}
     </>
   )

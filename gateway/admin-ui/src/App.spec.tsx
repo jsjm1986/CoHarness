@@ -43,12 +43,33 @@ describe('App', () => {
     await userEvent.click(within(mobile!).getByRole('button', { name: '更多管理功能' }))
     const menu = within(screen.getByRole('dialog', { name: '更多管理功能' }))
     expect(menu.getAllByRole('link')).toHaveLength(8)
+    expect(menu.getByLabelText('界面语言')).toBeTruthy()
+    expect(document.documentElement.lang).toBe('zh')
     expect(menu.getByRole('link', { name: '桌面' })).toBeTruthy()
     expect(menu.getByRole('link', { name: '审计' })).toBeTruthy()
     await userEvent.click(menu.getByRole('link', { name: '终端' }))
     expect(screen.getByRole('heading', { name: '终端页面' })).toBeTruthy()
     expect(screen.queryByRole('dialog', { name: '更多管理功能' })).toBeNull()
     expect(within(mobile!).getByRole('button', { name: '更多管理功能' }).classList.contains('active')).toBe(true)
+  })
+
+  it('mirrors the persisted language onto the document element and restores it on unmount', () => {
+    const previousLang = document.documentElement.lang
+    const storage = new Map<string, string>([['coharness-admin-language', 'en']])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value) },
+      removeItem: (key: string) => { storage.delete(key) },
+    })
+    try {
+      const view = render(<App />)
+      expect(document.documentElement.lang).toBe('en')
+      view.unmount()
+      expect(document.documentElement.lang).toBe(previousLang)
+    } finally {
+      vi.unstubAllGlobals()
+      document.documentElement.lang = previousLang
+    }
   })
 
   it('redirects /users to the users list', async () => {

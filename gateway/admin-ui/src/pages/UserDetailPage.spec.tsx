@@ -1,7 +1,8 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { StrictMode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import * as api from '../api.ts'
 import { UserDetailPage } from './UserDetailPage.tsx'
 
@@ -79,6 +80,42 @@ function renderPage(path = '/users/1') {
 
 describe('UserDetailPage', () => {
   afterEach(cleanup)
+
+  it('remounts per route id: a settling old read cannot overwrite the new target', async () => {
+    const bob: api.AdminUser = { ...alice, id: 2, username: 'bob', displayName: 'Bob', port: 9102 }
+    let resolveAlice!: (value: api.AdminUser) => void
+    vi.mocked(api.getUser).mockImplementation(async id => (
+      id === 2 ? bob : new Promise<api.AdminUser>(resolve => { resolveAlice = resolve })
+    ))
+    render(
+      <MemoryRouter initialEntries={['/users/1']}>
+        <Link to="/users/2">next-user</Link>
+        <Routes><Route path="/users/:id" element={<UserDetailPage />} /></Routes>
+      </MemoryRouter>,
+    )
+    await userEvent.click(screen.getByRole('link', { name: 'next-user' }))
+    expect(await screen.findByText('用户 · Bob')).toBeTruthy()
+    resolveAlice(alice)
+    await waitFor(() => expect(screen.queryByText('用户 · Alice')).toBeNull())
+    expect(screen.getByText('用户 · Bob')).toBeTruthy()
+  })
+
+  it('closes the first target’s dialogs when the route id changes', async () => {
+    const bob: api.AdminUser = { ...alice, id: 2, username: 'bob', displayName: 'Bob', port: 9102 }
+    vi.mocked(api.getUser).mockImplementation(async id => id === 2 ? bob : alice)
+    render(
+      <MemoryRouter initialEntries={['/users/1']}>
+        <Link to="/users/2">next-user</Link>
+        <Routes><Route path="/users/:id" element={<UserDetailPage />} /></Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('用户 · Alice')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '编辑账号' }))
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    await userEvent.click(screen.getByRole('link', { name: 'next-user' }))
+    expect(await screen.findByText('用户 · Bob')).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
 
   beforeEach(() => {
     vi.resetAllMocks()
@@ -203,5 +240,118 @@ describe('UserDetailPage', () => {
     vi.mocked(api.getUser).mockRejectedValue(new api.AdminRequestError(404, 'user not found'))
     renderPage('/users/99')
     expect(await screen.findByText('用户不存在')).toBeTruthy()
+  })
+
+  it('does not navigate when a pending delete resolves after the route changed', async () => {
+    const bob: api.AdminUser = { ...alice, id: 2, username: 'bob', displayName: 'Bob', port: 9102 }
+    vi.mocked(api.getUser).mockImplementation(async id => id === 2 ? bob : alice)
+    let resolveDelete!: () => void
+    vi.mocked(api.deleteUser).mockImplementation(() => new Promise(resolve => { resolveDelete = () => resolve(undefined) }))
+    render(
+      <MemoryRouter initialEntries={['/users/1']}>
+        <Link to="/users/2">next-user</Link>
+        <Routes>
+          <Route path="/users/:id" element={<UserDetailPage />} />
+          <Route path="/" element={<div>用户列表</div>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await screen.findByText('用户 · Alice')
+    await userEvent.click(screen.getByRole('button', { name: '删除' }))
+    await userEvent.click(await screen.findByRole('button', { name: '确认删除' }))
+    await userEvent.click(screen.getByRole('link', { name: 'next-user' }))
+    expect(await screen.findByText('用户 · Bob')).toBeTruthy()
+    const aliceReads = vi.mocked(api.getUser).mock.calls.filter(([id]) => id === 1).length
+    await act(async () => { resolveDelete() })
+    expect(api.deleteUser).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(api.getUser).mock.calls.filter(([id]) => id === 1).length).toBe(aliceReads)
+    await waitFor(() => expect(screen.queryByText('用户列表')).toBeNull())
+    expect(screen.getByText('用户 · Bob')).toBeTruthy()
+  })
+
+  it('keeps the stored micro-precision cost on a tokens-only write and rejects invalid input', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.getUserQuota).mockResolvedValue({
+      tokenMode: 'custom', tokenLimit: 42_000, companyCostMode: 'custom', companyCostMicrosLimit: 9_250_001,
+    })
+    vi.mocked(api.setQuota).mockResolvedValue(undefined)
+    renderPage()
+    const tokenFieldset = within(await screen.findByRole('group', { name: 'Token 额度' }))
+    const costFieldset = within(screen.getByRole('group', { name: '公司成本额度' }))
+    const tokenInput = tokenFieldset.getByLabelText('每月 Token') as HTMLInputElement
+    const costInput = costFieldset.getByLabelText('每月人民币元') as HTMLInputElement
+    await waitFor(() => expect(costInput.value).toBe('9.250001'))
+    // A tokens-only edit preserves the stored micro-precision cost.
+    await user.clear(tokenInput)
+    await user.type(tokenInput, '777')
+    await user.click(screen.getByRole('button', { name: '保存配额' }))
+    await waitFor(() => expect(api.setQuota).toHaveBeenCalledWith({
+      subjectType: 'user', subjectId: '1', tokenLimit: 777, companyCostMicrosLimit: 9_250_001,
+    }))
+    vi.mocked(api.setQuota).mockClear()
+    const form = document.querySelector('.userQuotaForm') as HTMLFormElement
+    await user.clear(tokenInput)
+    fireEvent.submit(form)
+    expect(await screen.findByText('Token 额度必须是非负整数')).toBeTruthy()
+    expect(api.setQuota).not.toHaveBeenCalled()
+    await user.type(tokenInput, '777')
+    await user.clear(costInput)
+    fireEvent.submit(form)
+    expect(await screen.findByText('成本额度必须是有效的非负数')).toBeTruthy()
+    expect(api.setQuota).not.toHaveBeenCalled()
+    await user.type(costInput, '-1')
+    fireEvent.submit(form)
+    expect(await screen.findByText('成本额度必须是有效的非负数')).toBeTruthy()
+    expect(api.setQuota).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { tokenLimit: 0, costMicros: 0 },
+    { tokenLimit: 5_000, costMicros: 1_250_000 },
+  ])('saves explicit user quota values: $tokenLimit/$costMicros', async ({ tokenLimit, costMicros }) => {
+    const user = userEvent.setup()
+    vi.mocked(api.getUserQuota).mockResolvedValue({
+      tokenMode: 'custom', tokenLimit, companyCostMode: 'custom', companyCostMicrosLimit: costMicros,
+    })
+    vi.mocked(api.setQuota).mockResolvedValue(undefined)
+    renderPage()
+    await screen.findByRole('group', { name: 'Token 额度' })
+    await waitFor(() => expect((screen.getAllByLabelText('每月 Token')[0] as HTMLInputElement).value).toBe(String(tokenLimit)))
+    await user.click(screen.getByRole('button', { name: '保存配额' }))
+    await waitFor(() => expect(api.setQuota).toHaveBeenCalledWith({
+      subjectType: 'user', subjectId: '1', tokenLimit, companyCostMicrosLimit: costMicros,
+    }))
+  })
+
+  it('settles reads, a role write, and the follow-up reads under StrictMode', async () => {
+    const user = userEvent.setup()
+    render(
+      <StrictMode>
+        <MemoryRouter initialEntries={['/users/1']}>
+          <Routes><Route path="/users/:id" element={<UserDetailPage />} /></Routes>
+        </MemoryRouter>
+      </StrictMode>,
+    )
+    await screen.findAllByText('DeepSeek Chat')
+    expect(screen.queryByText('可用')).toBeNull()
+    // StrictMode replay already satisfies these counts; only increments after
+    // the settled baseline prove the mutation's follow-up reads ran.
+    const userReads = vi.mocked(api.getUser).mock.calls.length
+    const accessReads = vi.mocked(api.getModelAccess).mock.calls.length
+    await user.click(screen.getByRole('button', { name: '编辑账号' }))
+    const dialog = await screen.findByRole('dialog', { name: '编辑 alice' })
+    await user.selectOptions(within(dialog).getByLabelText('角色'), 'admin')
+    vi.mocked(api.patchUser).mockResolvedValue(undefined)
+    vi.mocked(api.getUser).mockResolvedValue({ ...alice, role: 'admin' })
+    vi.mocked(api.getModelAccess).mockResolvedValue({
+      effective: { version: 2, defaultAllowed: false, models: [{ provider: model.provider, model: model.model, allowed: true }] },
+      overrides: [],
+    })
+    await user.click(within(dialog).getByRole('button', { name: '保存更改' }))
+    await waitFor(() => expect(api.patchUser).toHaveBeenCalledWith(1, { role: 'admin' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '编辑 alice' })).toBeNull())
+    await waitFor(() => expect(vi.mocked(api.getUser).mock.calls.length).toBeGreaterThan(userReads))
+    await waitFor(() => expect(vi.mocked(api.getModelAccess).mock.calls.length).toBeGreaterThan(accessReads))
+    await waitFor(() => expect(screen.getAllByText('可用')).toHaveLength(2))
   })
 })

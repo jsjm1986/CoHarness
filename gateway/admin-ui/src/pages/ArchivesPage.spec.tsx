@@ -67,7 +67,7 @@ describe('ArchivesPage', () => {
     expect(within(emptyTable).getByRole('columnheader', { name: '归属' })).toBeTruthy()
   })
 
-  it('disables cleanup until selected and refreshes after cleanup', async () => {
+  it('disables cleanup until selected, submits the preview cutoff, and reports a partial skip', async () => {
     vi.mocked(api.previewEmptyDrafts)
       .mockResolvedValueOnce({ cutoff: 1, candidates: emptyCandidates })
       .mockResolvedValueOnce({ cutoff: 2, candidates: [] })
@@ -76,12 +76,28 @@ describe('ArchivesPage', () => {
     await userEvent.click(screen.getByRole('button', { name: '扫描' }))
     expect(screen.queryByRole('button', { name: '清理选中空草稿' })).toBeNull()
     await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
-    const cleanupButton = screen.getByRole('button', { name: '清理选中空草稿' })
-    expect(cleanupButton.hasAttribute('disabled')).toBe(false)
-    await userEvent.click(cleanupButton)
-    expect(api.trashEmptyDrafts).toHaveBeenCalledWith(['draft-project'])
+    await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-personal' })[0]!)
+    await userEvent.click(screen.getByRole('button', { name: '清理选中空草稿' }))
+    const confirm = screen.getByRole('dialog', { name: '确认清理空草稿' })
+    expect(within(confirm).getByText(/选中的 2 个空草稿/)).toBeTruthy()
+    expect(api.trashEmptyDrafts).not.toHaveBeenCalled()
+    await userEvent.click(within(confirm).getByRole('button', { name: '清理选中空草稿' }))
+    expect(api.trashEmptyDrafts).toHaveBeenCalledWith(['draft-project', 'draft-personal'], 1)
     await waitFor(() => expect(api.previewEmptyDrafts).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('已移入回收站 1 个草稿；1 个草稿已不符合清理条件。')).toBeTruthy()
     expect(await screen.findByText('当前没有符合条件的空白会话')).toBeTruthy()
+  })
+
+  it('cancels the empty-draft confirmation without posting', async () => {
+    vi.mocked(api.previewEmptyDrafts).mockResolvedValue({ cutoff: 1, candidates: emptyCandidates })
+    render(<ArchivesPage />)
+    await userEvent.click(screen.getByRole('button', { name: '扫描' }))
+    await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
+    await userEvent.click(screen.getByRole('button', { name: '清理选中空草稿' }))
+    const confirm = screen.getByRole('dialog', { name: '确认清理空草稿' })
+    await userEvent.click(within(confirm).getByRole('button', { name: '取消' }))
+    expect(api.trashEmptyDrafts).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: '确认清理空草稿' })).toBeNull()
   })
 
   it('shows scan and cleanup errors', async () => {
@@ -96,6 +112,8 @@ describe('ArchivesPage', () => {
     await userEvent.click(screen.getAllByRole('checkbox', { name: '选择 draft-project' })[0]!)
     vi.mocked(api.trashEmptyDrafts).mockRejectedValueOnce(new Error('清理失败'))
     await userEvent.click(screen.getByRole('button', { name: '清理选中空草稿' }))
+    const confirm = screen.getByRole('dialog', { name: '确认清理空草稿' })
+    await userEvent.click(within(confirm).getByRole('button', { name: '清理选中空草稿' }))
     expect(await screen.findByText('清理失败')).toBeTruthy()
   })
 

@@ -63,7 +63,7 @@ function QuotaLine({ label, used, limit, format }: {
 }
 
 export function formatCompact(value: number): string {
-  return new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
+  return new Intl.NumberFormat(adminLanguage() === 'en' ? 'en-US' : 'zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
 }
 
 export function formatMoney(micros: number, digits = 4): string {
