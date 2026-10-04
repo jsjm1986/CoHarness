@@ -68,8 +68,8 @@ export async function pickNativeDirectory(
 
   if (platform === 'win32') {
     // The koffi-backed IFileOpenDialog child process — the modern picker with
-    // per-monitor-v2 DPI and abort support. koffi is a packaged dependency
-    // whose availability the install guarantees, so there is no fallback
+    // per-monitor-v2 DPI and abort support. koffi is a packaged optional
+    // dependency — a normal install provides it, so there is no fallback
     // tier: any failure surfaces as-is (no PowerShell fallback tier; see
     // .agents/notes/implemented/simplification/2026-08-04-drop-windows-powershell-picker-fallback.md).
     const pickDialog = internals.pickWin32Dialog ?? pickWin32Directory
