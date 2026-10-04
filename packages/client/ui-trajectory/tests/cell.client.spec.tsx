@@ -78,7 +78,7 @@ describe('TrajectoryCell', () => {
         think={155}
       />,
     )
-    expect(screen.getByText('Message')).toBeTruthy()
+    expect(screen.getByText('MESSAGE')).toBeTruthy()
     expect(screen.getByText('136')).toBeTruthy()
     expect(screen.getByText('381')).toBeTruthy()
     expect(screen.getByText('155')).toBeTruthy()

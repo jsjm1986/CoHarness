@@ -1156,7 +1156,7 @@ describe('ModelsSection', () => {
     fireEvent.click(screen.getByText(en.add))
     const pick = await screen.findByLabelText<HTMLSelectElement>(en.provider)
     fireEvent.change(pick, { target: { value: 'broken' } })
-    await screen.findByText(/unresolvable settings path/)
+    await screen.findByText(/Settings path cannot be resolved/)
     fireEvent.change(pick, { target: { value: 'plain' } })
     await waitFor(() => {
       expect(screen.getAllByText(content => content.includes(en.advancedHint)).length).toBeGreaterThan(0)

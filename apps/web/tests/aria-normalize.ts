@@ -4,7 +4,7 @@ import { isMap, isScalar, isSeq, parseDocument } from 'yaml'
 type RuntimeScope = 'timing' | 'clock' | 'ago' | 'elapsed' | undefined
 
 function runtimeScope(key: string): RuntimeScope {
-  if (/^group "(?:Message timing|消息时间与速度)"$/.test(key)) return 'clock'
+  if (/^group "(?:Message time and speed|消息时间与速度)"$/.test(key)) return 'clock'
   // The reply row's trailing label prints the late answer's wall-clock time.
   if (/^group "(?:Reply to earlier pending questions|Dismissed earlier pending questions|回答先前等待中的问题|放弃回答先前等待中的问题)"$/.test(key)) return 'clock'
   if (/^(?:group|dialog) "(?:Session statistics|会话统计|Turn time and speed|本轮用时和速度)"$/.test(key)) return 'timing'

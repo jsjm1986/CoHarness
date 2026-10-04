@@ -901,7 +901,7 @@ describe('PluginManagerPage', () => {
   })
 
   it.each([
-    { locale: en, placeholder: 'for example dsh-plugin-whale-pet' },
+    { locale: en, placeholder: 'e.g., dsh-plugin-whale-pet' },
     { locale: zh, placeholder: '例如 dsh-plugin-whale-pet' },
   ])('uses the package example in $placeholder and the install guide', ({ locale, placeholder }) => {
     const { actions, setLanguage } = renderTab({ install: { ...IDLE_INSTALL, open: true } })

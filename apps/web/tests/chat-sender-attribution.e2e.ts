@@ -36,7 +36,8 @@ function noticeSource(
   speaker: ReturnType<typeof participant>,
 ) {
   return {
-    kind: 'collaboration-context',
+    kind: 'plugin',
+    plugin: 'collaboration-context',
     form: 'notice',
     summary: `Message from ${speaker.displayName}`,
     participantMessageId,
@@ -173,7 +174,7 @@ describe('web e2e: Chat labels project senders on bubbles', () => {
     await expect.poll(() => page.getByText('LIN_REPLY', { exact: true }).count(), { timeout: 15_000 }).toBe(1)
     expect(await page.getByText('Zhou', { exact: true }).count()).toBe(1)
     expect(await page.getByText('Lin', { exact: true }).count()).toBe(1)
-    expect(await page.getByText('admin', { exact: true }).count()).toBe(1)
+    expect(await page.getByText('Admin', { exact: true }).count()).toBe(1)
     expect(await page.getByText(NOTICE_PREFIX, { exact: false }).count()).toBe(0)
     const snapshot = (await captureStableAria(page, '[data-conversation-scroll]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')

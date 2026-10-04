@@ -965,7 +965,7 @@ async function expandSessionSearch(page: Page): Promise<Locator> {
   // Search collapsed into a header action; expand it before filling.
   const searchButton = page.getByRole('button', { name: 'Search sessions' })
   if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
-  return page.getByRole('textbox', { name: /Search sessions\.\.\.|Search name, keywords\.\.\./ })
+  return page.getByRole('textbox', { name: /Search sessions…|Search name, keywords\.\.\./ })
 }
 
 async function openPerformancePage(

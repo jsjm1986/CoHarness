@@ -102,18 +102,18 @@ describe('web: Cordis Workspace workbench', () => {
       }
       await route.continue()
     })
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await requestedHistory.promise
     const toolbar = page.locator('[data-workbench-toolbar]')
     await toolbar.waitFor({ timeout: 30_000 })
     // History completion moves the same root controls from Hero to title row;
     // an already-open menu must survive without a second opening gesture.
     await toolbar.getByRole('button', { name: 'Select workbench' }).click()
-    await page.getByRole('menuitem', { name: /我的工作台/ }).waitFor()
+    await page.getByRole('menuitem', { name: /My workbench/ }).waitFor()
     releasedHistory.resolve(undefined)
     await page.locator('[class*="titleRow"] [data-workbench-toolbar]').waitFor()
     expect(await toolbar.getByRole('button', { name: 'Select workbench' }).getAttribute('aria-expanded')).toBe('true')
-    await page.getByRole('menuitem', { name: /我的工作台/ }).click()
+    await page.getByRole('menuitem', { name: /My workbench/ }).click()
     await page.locator('[data-workbench-empty-content]').waitFor({ timeout: 30_000 })
     for (const workspaceId of workspaceIds) {
       await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
@@ -128,7 +128,7 @@ describe('web: Cordis Workspace workbench', () => {
     const [a, b, c, d] = ids.map(id => page.locator(`[data-session-pane="${id}"]`)) as [Locator, Locator, Locator, Locator]
     await d.locator('textarea').first().fill('Delta draft survives pane changes')
     await a.locator('[aria-label^="Access mode"]').click()
-    await page.getByRole('menuitem', { name: 'Read Only', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Read only', exact: true }).click()
     const approvalPrompt = fixtureUserPrompts(await readFile(APPROVAL, 'utf8'))[0]!
     const replyPrompt = fixtureUserPrompts(await readFile(REPLY, 'utf8'))[0]!
     await prompt(a, approvalPrompt)
@@ -165,7 +165,7 @@ describe('web: Cordis Workspace workbench', () => {
     expect(await page.locator('[data-session-pane]').count()).toBe(0)
     expect(await page.locator('textarea').first().inputValue()).toBe('Delta draft survives pane changes')
     await toolbar.getByRole('button', { name: 'Select workbench' }).click()
-    await page.getByRole('menuitem', { name: /我的工作台/ }).click()
+    await page.getByRole('menuitem', { name: /My workbench/ }).click()
     expect(await toolbar.getByRole('tab').count()).toBe(3)
     expect(tripwire.pageErrors).toEqual([])
   }, 240_000)

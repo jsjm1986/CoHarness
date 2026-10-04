@@ -16,13 +16,13 @@
   - button "Jump to turn 8"
 - button "Load earlier"
 - text: WIRE_USER_05
-- group "Message timing": "{{date}} {{clock}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
-- button "Think WIRE_REASONING_05":
+- button "Thinking WIRE_REASONING_05":
   - img
   - img
-  - text: Think WIRE_REASONING_05
+  - text: Thinking WIRE_REASONING_05
 - paragraph: WIRE_ASSISTANT_05
 - text: <!--文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文-->
 - button "Copy":
@@ -33,18 +33,18 @@
   - img
 - button "Branch into a new conversation":
   - img
-- group "Message timing": "{{date}} {{clock}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
 - text: WIRE_USER_06
-- group "Message timing": "{{date}} {{clock}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
-- button "Think WIRE_REASONING_06":
+- button "Thinking WIRE_REASONING_06":
   - img
   - img
-  - text: Think WIRE_REASONING_06
+  - text: Thinking WIRE_REASONING_06
 - paragraph: WIRE_ASSISTANT_06
 - text: <!--文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文文-->
 - button "Copy":
@@ -62,18 +62,18 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{date}} {{clock}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - button "1 tool call · 2 intermediate messages" [expanded]:
   - text: 1 tool call · 2 intermediate messages
   - img
 - text: WIRE_USER_TOOL
-- group "Message timing": "{{date}} {{clock}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
-- button "Think WIRE_REASONING_TOOL_CALL":
+- button "Thinking WIRE_REASONING_TOOL_CALL":
   - img
   - img
-  - text: Think WIRE_REASONING_TOOL_CALL
+  - text: Thinking WIRE_REASONING_TOOL_CALL
 - paragraph: WIRE_ASSISTANT_TOOL_CALL
 - button "Bash Verify history wire pagination" [expanded]:
   - img
@@ -83,10 +83,10 @@
 - text: WIRE_TOOL_OUTPUT
 - button "Open details in sidebar"
 - button "Inspect"
-- button "Think WIRE_REASONING_TOOL_DONE":
+- button "Thinking WIRE_REASONING_TOOL_DONE":
   - img
   - img
-  - text: Think WIRE_REASONING_TOOL_DONE
+  - text: Thinking WIRE_REASONING_TOOL_DONE
 - paragraph: WIRE_ASSISTANT_TOOL_DONE
 - button "Copy":
   - img
@@ -103,18 +103,18 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{date}} {{clock}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
 - text: WIRE_USER_INTERRUPTED
-- group "Message timing": "{{date}} {{clock}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
-- button "Think WIRE_INTERRUPTED_REASONING":
+- button "Thinking WIRE_INTERRUPTED_REASONING":
   - img
   - img
-  - text: Think WIRE_INTERRUPTED_REASONING
+  - text: Thinking WIRE_INTERRUPTED_REASONING
 - paragraph: WIRE_INTERRUPTED_TEXT
 - text: <!--未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未未--> Stopped
 - button "Copy":
@@ -132,7 +132,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{date}} {{clock}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - button "Back to bottom":
   - img
 - textbox "Message the agent"
@@ -142,7 +142,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -154,4 +154,5 @@
   - button "4.1K tok · Cache hit 75%":
     - img
     - text: 4.1K tokCache hit 75%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

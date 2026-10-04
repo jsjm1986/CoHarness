@@ -83,7 +83,7 @@ describe('independent Tool details', () => {
     const view = render(<DetailsPanel {...props(readCall)} />)
     expect((await view.findByRole('alert')).textContent).toBe('Access revoked')
     expect(view.queryByText('This call was not found in the Session log')).toBeNull()
-    fireEvent.click(view.getByRole('button', { name: 'Retry read' }))
+    fireEvent.click(view.getByRole('button', { name: 'Retry loading' }))
     expect(await view.findByText('allowed output')).toBeTruthy()
     expect(readCall).toHaveBeenCalledTimes(2)
   })

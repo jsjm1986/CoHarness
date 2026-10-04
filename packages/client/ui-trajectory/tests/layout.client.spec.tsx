@@ -38,7 +38,7 @@ describe('TrajectoryTurnHeader', () => {
     expect(screen.getByText('Turn 1')).toBeTruthy()
     expect(screen.getByText('Input')).toBeTruthy()
     expect(screen.getByText('Output')).toBeTruthy()
-    expect(screen.getByText('Think')).toBeTruthy()
+    expect(screen.getByText('Thinking')).toBeTruthy()
     expect(screen.getByText('Time')).toBeTruthy()
   })
 })

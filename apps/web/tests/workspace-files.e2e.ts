@@ -97,7 +97,7 @@ describe('web e2e: Workspace file browsing and Host change convergence', () => {
     const toolbar = page.locator('[data-workbench-toolbar]')
     await toolbar.waitFor({ timeout: 30_000 })
     await toolbar.getByRole('button', { name: 'Select workbench' }).click()
-    await page.getByRole('menuitem', { name: /我的工作台/ }).click()
+    await page.getByRole('menuitem', { name: /My workbench/ }).click()
     await toolbar.getByRole('button', { name: 'Add conversation', exact: true }).click()
     const picker = page.getByRole('dialog', { name: 'Add conversation', exact: true })
     await picker.getByRole('button', { name: /Use the read tool twice/ }).click()

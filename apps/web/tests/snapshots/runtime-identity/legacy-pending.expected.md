@@ -6,5 +6,5 @@
   - img
   - text: Add conversation
 - status:
-  - text: Saved conversation ownership is not verified, so layout edits are disabled. Start any stopped Workspace, then retry the directory.
-  - button "Retry directory"
+  - text: Saved conversation ownership is not verified, so layout edits are disabled. Start any stopped Workspace, then reload the directory.
+  - button "Reload directory"

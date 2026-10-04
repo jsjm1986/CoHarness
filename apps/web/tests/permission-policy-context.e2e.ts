@@ -29,7 +29,7 @@ const PROMPTS = [
   'Create the relative path policy-neutral.txt in the current workspace containing exactly POLICY_NEUTRAL_OK, verify its contents, then report completion.',
 ] as const
 
-const PRESET_LABELS = ['Read Only', 'Full access', 'Workspace Write'] as const
+const PRESET_LABELS = ['Read only', 'Full access', 'Workspace write'] as const
 
 function runtimeContexts(events: readonly SessionEvent[]): string[] {
   return events.flatMap((event) => {
@@ -104,7 +104,7 @@ describe('web e2e: current sandbox policy reaches the model before tools', () =>
 
     await input.fill('/permission read-only')
     await input.press('Enter')
-    await page.getByRole('button', { name: 'Access mode, current: Read Only' }).waitFor({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Access mode, current: Read only' }).waitFor({ timeout: 10_000 })
     const settled = scaffold.whenTurnSettled()
     await input.fill(PROMPTS[3])
     await input.press('Enter')

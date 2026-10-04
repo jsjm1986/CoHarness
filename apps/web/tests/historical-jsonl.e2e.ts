@@ -25,7 +25,7 @@ it.each([2, 3])('opens persisted CoHarness v%s history without rewriting its ori
     append('turn/start', { turn: 1 })
     append('step/start', { turn: 1, step: 1 })
     if (version === 3) append('system/message', { turn: 1, step: 1,
-      message: { id: 'old-system', role: 'system', source: { kind: 'plugin', plugin: 'prompt' }, content: [] },
+      message: { id: 'old-system', role: 'system', source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' }, content: [] },
     }, { surfaceOp: 'append' })
     append('user/message', { id: 'old-question', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'Recover this historical conversation.' }] }, { surfaceOp: 'append' })
     append('assistant/message', { turn: 1, step: 1, message: { id: 'old-answer', role: 'assistant',
@@ -35,12 +35,16 @@ it.each([2, 3])('opens persisted CoHarness v%s history without rewriting its ori
     append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     const sourcePath = generationLogPath(scaffold.persistenceRoot, cwd, id, version, 'zstd')
     const source = Buffer.concat(await Promise.all([
-      compressZstdFrame(JSON.stringify({ type: 'session', version, id, createdAt: 1_789_000_000_000, cwd, delegationDepth: 0 }) + '\n'),
+      compressZstdFrame(JSON.stringify({
+        type: 'session', version, id, createdAt: 1_789_000_000_000, cwd, delegationDepth: 0,
+        // `isSeeded` entered the physical header at v3 and is absent at v2.
+        ...(version >= 3 ? { isSeeded: false } : {}),
+      }) + '\n'),
       compressZstdFrame(rows.map(row => JSON.stringify(row)).join('\n') + '\n'),
     ]))
     await mkdir(dirname(sourcePath), { recursive: true })
     await writeFile(sourcePath, source, { flag: 'wx' })
-    const response = await fetch(`${scaffold.baseUrl}/api/session.history`, {
+    const response = await scaffold.hostFetch('/api/session.history', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ type: 'client-request', rpcId: 'historical-read', method: 'session.history', payload: { sessionId: id, maxMessages: 20 } }),
     })
@@ -53,7 +57,7 @@ it.each([2, 3])('opens persisted CoHarness v%s history without rewriting its ori
     browser = await chromium.launch()
     const page = await newEnglishPage(browser)
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     const group = page.locator('[role="treeitem"]').first()
     await group.waitFor({ timeout: 15_000 }); await group.click()
     const session = page.locator('[role="treeitem"]').nth(1)

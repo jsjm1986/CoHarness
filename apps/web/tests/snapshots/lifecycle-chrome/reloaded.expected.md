@@ -14,14 +14,18 @@
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - text: Reply with the single word LIGHTHOUSE and stop.
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Think The user wants me to reply with a single word. Let me comply.":
+- button "Thinking The user wants me to reply with a single word. Let me comply.":
   - img
   - img
-  - text: Think The user wants me to reply with a single word. Let me comply.
+  - text: Thinking The user wants me to reply with a single word. Let me comply.
 - paragraph: LIGHTHOUSE
 - button "Copy":
   - img
@@ -35,7 +39,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -43,7 +47,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -56,4 +60,5 @@
   - button "7.8K tok · Cache hit 99%":
     - img
     - text: 7.8K tokCache hit 99%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

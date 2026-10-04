@@ -497,9 +497,9 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // where neither half repeats the other (the dispatched `/` and its
     // argument stay out of the title, and the settlement text never restates
     // the command's own name).
-    await page.getByRole('button', { name: 'Access mode, current: Workspace Write' }).click()
-    await page.getByRole('menuitem', { name: 'Read Only' }).click()
-    await page.getByRole('button', { name: 'Access mode, current: Read Only' }).waitFor({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Access mode, current: Workspace write' }).click()
+    await page.getByRole('menuitem', { name: 'Read only' }).click()
+    await page.getByRole('button', { name: 'Access mode, current: Read only' }).waitFor({ timeout: 10_000 })
     // Scoped to the row itself, so unrelated page text that happens to read
     // `permission` (a future resident slash menu) cannot satisfy or break it.
     const row = page.locator('[data-variant="others"]').filter({ hasText: 'preset read-only' })
@@ -585,7 +585,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     const actual = normalizeAria(raw, scaffold.workspaceCwd)
     expect(actual).toBe(raw)
     expect(normalizeAria(raw.replace('45s', '46s'), scaffold.workspaceCwd)).not.toBe(actual)
-    expect(await page.getByRole('group', { name: 'Message timing', exact: true }).count()).toBeGreaterThan(0)
+    expect(await page.getByRole('group', { name: 'Message time and speed', exact: true }).count()).toBeGreaterThan(0)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'literal-values.expected.md'), actual, MODE)
   })
 

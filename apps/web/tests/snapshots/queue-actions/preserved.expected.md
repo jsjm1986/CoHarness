@@ -4,7 +4,6 @@
     - text: Edited queue item
     - button "Edit queued message":
       - img
-    - tooltip "Edit queued message"
     - button "Remove queued message":
       - img
     - button "Steer queued message" [disabled]:

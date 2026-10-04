@@ -119,7 +119,7 @@ async function openSeededSession(page: Page, scaffold: WebScaffold): Promise<voi
   await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   const searchButton = page.getByRole('button', { name: 'Search sessions' })
   if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
-  await page.getByRole('textbox', { name: 'Search sessions...', exact: true }).fill(SEEDED_PROMPT)
+  await page.getByRole('textbox', { name: 'Search sessions…', exact: true }).fill(SEEDED_PROMPT)
   const results = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
   await expect.poll(() => results.count(), { timeout: 60_000 }).toBe(1)
   await results.click()

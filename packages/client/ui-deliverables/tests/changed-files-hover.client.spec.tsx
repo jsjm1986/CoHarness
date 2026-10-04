@@ -72,7 +72,7 @@ it('keeps a status note for a comparison with no hunks', () => {
   } })
   fireEvent.pointerEnter(row)
   act(() => { vi.advanceTimersByTime(500) })
-  expect(document.querySelector('[data-changes-hover-preview] [data-diff-note="empty"]')?.textContent).toBe('Both sides hold the same lines')
+  expect(document.querySelector('[data-changes-hover-preview] [data-diff-note="empty"]')?.textContent).toBe('Both sides are identical')
 })
 
 it('cancels a short hover and the pending dwell when unmounted', () => {

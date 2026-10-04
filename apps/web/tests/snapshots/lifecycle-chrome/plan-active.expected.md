@@ -3,22 +3,22 @@
   - img
 - button "New session":
   - img
-  - text: New Session
+  - text: New session
+- navigation "Panels":
+  - button "Plugins"
 - text: Workspaces
 - button "Search sessions":
   - img
-- textbox "Search sessions..."
+- textbox "Search sessions…"
 - button "View options":
   - img
 - button "Add workspace":
   - img
 - tree "Sessions":
-  - treeitem "workspace New session in workspace" [expanded]:
+  - treeitem "workspace" [expanded]:
     - img
     - text: workspace
-    - button "New session in workspace":
-      - img
-  - treeitem "New Session" [selected]
+  - treeitem "New session" [selected]
 - button "Documents":
   - img
   - text: Documents
@@ -41,7 +41,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Plan mode on, press to turn off": Plan
 - button "Open right sidebar":
   - img
@@ -49,4 +49,3 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- separator "Adjust transcript content width"

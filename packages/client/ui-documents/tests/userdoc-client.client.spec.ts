@@ -289,8 +289,8 @@ describe('createUserDocClient', () => {
     })
     await createUserDocClient().uploadToScope({ kind: 'project', projectId: 41 }, new File(['x'], 'a.txt'), rootDirectoryId)
     expect(calls).toEqual([
-      'POST /api/documents/transfer/uploads?scope=project%3A41',
-      'POST /api/documents/transfer/uploads/00000000-0000-4000-8000-000000000000/complete?scope=project%3A41',
+      'POST api/documents/transfer/uploads?scope=project%3A41',
+      'POST api/documents/transfer/uploads/00000000-0000-4000-8000-000000000000/complete?scope=project%3A41',
     ])
   })
 

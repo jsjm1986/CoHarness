@@ -9,6 +9,7 @@ import type { Browser, Page, Response as PlaywrightResponse } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { DEFAULT_HISTORY_PAGE_TARGET_BYTES, RpcId } from '@deepseek-ai/dsh-host-apiproxy'
+import { clientSessionKey } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import {
@@ -561,7 +562,7 @@ async function stableUiEvidence(page: Page, scaffold: WebScaffold): Promise<Stab
     tool: await captureStableAria(page, '[data-sample="bash"]', scaffold.workspaceCwd),
     interruptedTextCount: await page.getByText(INTERRUPTED_TEXT, { exact: true }).count(),
     interruptedReasoningCount: await page.getByRole('button', {
-      name: new RegExp(`^Think ${INTERRUPTED_REASONING}`),
+      name: new RegExp(`^Thinking ${INTERRUPTED_REASONING}`),
     }).count(),
     stoppedCount: await page.getByText('Stopped', { exact: true }).count(),
   }
@@ -800,7 +801,7 @@ describe('web e2e: lossless history wire pagination', () => {
       expect(await transcript(page).getByText(marker, { exact: true }).count(), marker).toBe(1)
     }
     for (const marker of REASONING_MARKERS) {
-      expect(await page.getByRole('button', { name: new RegExp(`^Think ${marker}`) }).count(), marker)
+      expect(await page.getByRole('button', { name: new RegExp(`^Thinking ${marker}`) }).count(), marker)
         .toBe(1)
     }
 
@@ -847,7 +848,7 @@ describe('web e2e: lossless history wire pagination', () => {
         view: 'trajectory',
         inspect: null,
       }))
-    }, SEED_ID)
+    }, clientSessionKey({ kind: 'personal' }, SessionId(SEED_ID)))
     await bootPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await bootPage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     const groupRow = bootPage.locator('[role="treeitem"]').first()
