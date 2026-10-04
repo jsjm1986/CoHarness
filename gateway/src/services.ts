@@ -32,6 +32,7 @@ import type {
   ProjectModelProviderRow,
   ProjectModelSettingsView,
   UserQuotaView,
+  RoleQuotaView,
 } from './model-governance.ts'
 import type {
   EffectiveGrant,
@@ -254,6 +255,12 @@ export interface GatewayModelGovernanceService {
    * @returns per-metric modes; absent rows mean the user fully inherits the role quota
    */
   userQuota?(userId: number): Awaitable<UserQuotaView>
+  /**
+   * Stored role limits.
+   * @param role - quota subject role
+   * @returns stored integer limits; absent or null means unlimited
+   */
+  roleQuota?(role: 'admin' | 'user'): Awaitable<RoleQuotaView>
 }
 
 /** Instance lifecycle operations used by HTTP, proxy, and policy handlers. */

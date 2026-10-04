@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { transaction } from './database.ts'
+import { literalLikePattern } from './literal-like-pattern.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
 /** Scope addressed by the organization document catalog. */
@@ -230,11 +231,6 @@ function overviewFilterFingerprint(options: DocumentCatalogOverviewOptions): str
   })
 }
 
-/** Escape PostgreSQL LIKE metacharacters so document search remains literal. */
-function literalLikePattern(value: string): string {
-  return `%${value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
-}
-
 function validateAdminFilter(filter: DocumentCatalogAdminFilter): void {
   if (filter.scopeKind !== undefined && filter.scopeKind !== 'personal' && filter.scopeKind !== 'project') {
     throw new DocumentCatalogError('INVALID_DOCUMENT_METADATA', 400, 'Invalid document scope filter.')
@@ -326,8 +322,11 @@ export class PostgresDocumentCatalogService {
   }
 
   private async actorInternalId(client: Pool | PoolClient, userId: number): Promise<string> {
-    const result = await client.query<{ id: string }>(`SELECT id FROM harness.users
-      WHERE organization_id=$1 AND public_id=$2 AND status='active' AND deleted_at IS NULL`,
+    const result = await client.query<{ id: string }>(`SELECT u.id FROM harness.users u
+      JOIN harness.memberships membership
+        ON membership.organization_id=u.organization_id AND membership.user_id=u.id
+      WHERE u.organization_id=$1 AND u.public_id=$2
+        AND u.status='active' AND u.deleted_at IS NULL AND membership.status='active'`,
     [this.context.organizationId, userId])
     const id = result.rows[0]?.id
     if (id === undefined) throw new DocumentCatalogError('COLLABORATION_FORBIDDEN', 403, 'Document actor is unavailable.')
@@ -357,17 +356,17 @@ export class PostgresDocumentCatalogService {
     owner: boolean
   } | null> {
     const result = await client.query<{ mode: 'ro' | 'rw'; administrator: boolean; owner: boolean }>(`SELECT
-      CASE WHEN membership.role='admin' OR p.owner_user_id=$2 OR p.created_by=$2 THEN 'rw'::text ELSE member.access_mode END mode,
+      CASE WHEN membership.role='admin' THEN 'rw'::text ELSE member.access_mode END mode,
       membership.role='admin' administrator,
-      (p.owner_user_id=$3 OR p.created_by=$3) owner
+      (p.owner_user_id=$2) owner
       FROM harness.projects p
-      LEFT JOIN harness.memberships membership ON membership.organization_id=p.organization_id
+      JOIN harness.memberships membership ON membership.organization_id=p.organization_id
         AND membership.user_id=$2 AND membership.status='active'
       LEFT JOIN harness.project_members member ON member.organization_id=p.organization_id
         AND member.project_id=p.id AND member.user_id=$2
-      WHERE p.organization_id=$1 AND p.id=$4 AND p.status='active'
-        AND (membership.role='admin' OR member.user_id IS NOT NULL OR p.owner_user_id=$2 OR p.created_by=$2)`,
-    [this.context.organizationId, actorId, actorId, projectId])
+      WHERE p.organization_id=$1 AND p.id=$3 AND p.status='active'
+        AND (membership.role='admin' OR member.user_id IS NOT NULL)`,
+    [this.context.organizationId, actorId, projectId])
     return result.rows[0] ?? null
   }
 
@@ -426,11 +425,11 @@ export class PostgresDocumentCatalogService {
     await transaction(this.context.pool, async (client) => {
       const actorId = await this.actorInternalId(client, input.actorUserId)
       const scope = await this.scopeIds(client, input.scope)
-      let canReconcileMissing = true
       if (scope.kind === 'project') {
         const authority = await this.projectAuthority(client, scope.projectId!, actorId)
-        if (authority === null) throw new DocumentCatalogError('COLLABORATION_FORBIDDEN', 403, 'You cannot update this project document scope.')
-        canReconcileMissing = authority.mode === 'rw'
+        if (authority === null || authority.mode !== 'rw') {
+          throw new DocumentCatalogError('COLLABORATION_FORBIDDEN', 403, 'You cannot update this project document scope.')
+        }
       }
       let legacyOwner: string | null = scope.userId
       if (scope.kind === 'project') {
@@ -490,7 +489,7 @@ export class PostgresDocumentCatalogService {
         eventKind: existingByDocId.get(row.runtime_doc_id)?.state === 'active' ? 'updated'
           : existingByDocId.get(row.runtime_doc_id) === undefined ? 'created' : 'restored',
       })), actorId, { source })
-      if (input.replace === true && canReconcileMissing) {
+      if (input.replace === true) {
         const active = await client.query<{ id: string; runtime_doc_id: string }>(`SELECT id,runtime_doc_id
           FROM harness.document_catalog WHERE organization_id=$1 AND scope_kind=$2
             AND ((scope_kind='personal' AND scope_user_id=$3) OR (scope_kind='project' AND scope_project_id=$4))
@@ -653,7 +652,7 @@ export class PostgresDocumentCatalogService {
     const visibilityClauses = [
       'c.organization_id=$1',
       "c.state='active'",
-      "(c.scope_user_id=$2 OR membership.role='admin' OR member.user_id IS NOT NULL OR p.owner_user_id=$2 OR p.created_by=$2)",
+      "(c.scope_user_id=$2 OR membership.role='admin' OR member.user_id IS NOT NULL)",
     ]
     const clauses = [...visibilityClauses]
     const values = [...baseValues]
@@ -709,7 +708,7 @@ export class PostgresDocumentCatalogService {
     const select = `SELECT c.id catalog_id,c.scope_kind,
       CASE WHEN c.scope_kind='personal' THEN u.public_id::text ELSE p.public_id::text END scope_public_id,
       CASE WHEN c.scope_kind='personal' THEN '个人文档' ELSE p.name::text END scope_label,
-      CASE WHEN c.scope_kind='project' AND (membership.role='admin' OR p.owner_user_id=$2 OR p.created_by=$2) THEN 'rw'::text
+      CASE WHEN c.scope_kind='project' AND membership.role='admin' THEN 'rw'::text
         WHEN c.scope_kind='project' THEN member.access_mode ELSE NULL END access_mode,
       c.runtime_doc_id,c.directory_id,c.name,c.bytes::text,c.media_type,c.modified_at_ms::text,
       owner.public_id::text owner_public_id,owner.display_name owner_display_name,c.owner_source,c.legacy,c.lineage_root_id,c.state,
@@ -978,8 +977,7 @@ export class PostgresDocumentCatalogService {
       if (authority === null || (!authority.administrator && !authority.owner)) {
         throw new DocumentCatalogError('DOCUMENT_OWNERSHIP_FORBIDDEN', 403, 'Only a project owner or administrator can transfer ownership.')
       }
-      const member = await client.query(`SELECT 1 FROM harness.project_members WHERE organization_id=$1 AND project_id=$2 AND user_id=$3
-        UNION ALL SELECT 1 FROM harness.projects p WHERE p.organization_id=$1 AND p.id=$2 AND (p.owner_user_id=$3 OR p.created_by=$3)`,
+      const member = await client.query(`SELECT 1 FROM harness.project_members WHERE organization_id=$1 AND project_id=$2 AND user_id=$3`,
       [this.context.organizationId, document.scope_project_id, target])
       if (member.rows.length === 0) throw new DocumentCatalogError('DOCUMENT_OWNER_NOT_MEMBER', 409, 'The new owner must belong to the project.')
       const operation = await client.query<{ id: string }>(`INSERT INTO harness.document_operations(

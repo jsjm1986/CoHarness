@@ -96,10 +96,21 @@ it('rejects a lease race before sending the request and does not release an unac
   expect(f.operationRef.mock.calls).toEqual([[target, 1, 4], [target, 1, 4]])
 })
 
-it('reports incomplete lease cleanup without exposing storage diagnostics', async () => {
+it('reports a failed lease release to diagnostics without masking the operation result', async () => {
   const f = await fixture()
-  f.operationRef.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('private storage detail'))
-  await expect(f.manager.list(admin, target)).rejects.toMatchObject({ status: 503, message: 'terminal runtime lease cleanup failed' })
-  expect(f.requests).toHaveLength(1)
-  expect(f.operationRef.mock.calls).toEqual([[target, 1, 4], [target, -1, 4]])
+  const diagnostics = vi.spyOn(console, 'error').mockImplementation(() => {})
+  f.operationRef.mockImplementation(async (_target, delta) => {
+    if (delta === -1) throw new Error('private storage detail')
+  })
+  try {
+    const inventory = await f.manager.list(admin, target)
+    expect(inventory.terminals).toEqual([item])
+    f.status(503)
+    await expect(f.manager.list(admin, target)).rejects.toMatchObject({ status: 502, message: 'terminal runtime unavailable' })
+    expect(diagnostics).toHaveBeenCalled()
+  } finally {
+    diagnostics.mockRestore()
+  }
+  expect(f.requests).toHaveLength(2)
+  expect(f.operationRef.mock.calls).toEqual([[target, 1, 4], [target, -1, 4], [target, 1, 4], [target, -1, 4]])
 })

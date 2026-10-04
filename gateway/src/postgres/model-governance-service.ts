@@ -29,6 +29,7 @@ import type {
   ProjectModelProviderRow,
   ProjectModelSettingsView,
   UserQuotaView,
+  RoleQuotaView,
 } from '../model-governance.ts'
 import { ORGANIZATION_PROVIDER_PATTERN, ProjectModelSettingsConflictError } from '../model-governance.ts'
 import { OrganizationModelCredentialCipher } from '../organization-model-credentials.ts'
@@ -1396,6 +1397,30 @@ export class PostgresModelGovernanceService {
       companyCostMicrosLimit: row?.company_cost_mode === 'custom' && row.company_cost_limit !== null
         ? decimalToMicros(row.company_cost_limit)
         : null,
+    }
+  }
+
+  /**
+   * Read a role's stored monthly limits.
+   * @param role - the `admin` or `user` quota subject.
+   * @returns the stored limits; an absent row or null field means unlimited.
+   *   Rejects when the value cannot be decoded safely.
+   */
+  async roleQuota(role: 'admin' | 'user'): Promise<RoleQuotaView> {
+    const result = await this.context.pool.query<{
+      token_limit: string | null
+      company_cost_limit: string | null
+    }>(`SELECT token_limit::text,company_cost_limit::text
+      FROM harness.role_quotas WHERE organization_id=$1 AND role=$2`,
+      [this.context.organizationId, roleForPostgres(role)])
+    const row = result.rows[0]
+    return {
+      tokenLimit: row?.token_limit === null || row?.token_limit === undefined
+        ? null
+        : safeCount(row.token_limit, 'role token limit'),
+      companyCostMicrosLimit: row?.company_cost_limit === null || row?.company_cost_limit === undefined
+        ? null
+        : decimalToMicros(row.company_cost_limit),
     }
   }
 

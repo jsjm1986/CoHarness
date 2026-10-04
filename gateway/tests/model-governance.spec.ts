@@ -100,6 +100,17 @@ describe('ModelGovernanceService', () => {
     expect(() => governance.setQuota('role', 'owner', 1, null)).toThrow(/admin or user/)
   })
 
+  it('reads back stored role limits, preserving zero and unlimited', async () => {
+    const { governance, user } = await setup()
+    expect(governance.roleQuota('user')).toEqual({ tokenLimit: null, companyCostMicrosLimit: null })
+    governance.setQuota('role', 'user', 0, 1_250_000)
+    expect(governance.roleQuota('user')).toEqual({ tokenLimit: 0, companyCostMicrosLimit: 1_250_000 })
+    expect(governance.roleQuota('admin')).toEqual({ tokenLimit: null, companyCostMicrosLimit: null })
+    // User overrides keep their own storage and do not shadow the role read.
+    governance.setQuota('user', String(user.id), 999, null)
+    expect(governance.roleQuota('user')).toEqual({ tokenLimit: 0, companyCostMicrosLimit: 1_250_000 })
+  })
+
   it('reports missing usage and intake lag in the SQLite fallback', async () => {
     const { governance, user } = await setup()
     governance.ingest({ kind: 'user', id: user.id }, event({ eventId: 'missing-health', status: 'missing-usage', occurredAt: Date.now() }))

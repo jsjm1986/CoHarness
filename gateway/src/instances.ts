@@ -391,15 +391,37 @@ export class InstanceManager {
   /**
    * Whether this process still holds a live child for a `ready` row.
    * A crashed or externally killed child leaves the row `ready`; callers must
-   * treat that as not live and go through {@link ensureRunning}. systemd
-   * handles always answer true while the row is `ready` — that driver does
-   * not track the unit through this handle.
-   * @param userId - instance owner
-   * @returns true only when the row is `ready` and the tracked child has not exited
+   * treat that as not live and go through {@link ensureRunning}. Supervisor
+   * launchers whose units outlive the Gateway lazily re-attach the surviving
+   * unit so admin reads answer from the real process; a handle is published
+   * only while the durable state and captured generation still match.
+   * @param target - runtime target
+   * @returns true only while the row is `ready` and a tracked or attached runtime has not exited
    */
   async isLive(target: RuntimeTargetInput): Promise<boolean> {
-    const proc = this.procs.get(targetKey(target))
-    if (await this.stateOf(target) !== 'ready' || proc === undefined) return false
+    const resolved = targetOf(target)
+    if (await this.stateOf(resolved) !== 'ready') return false
+    const key = targetKey(resolved)
+    let proc = this.procs.get(key)
+    if (proc === undefined && this.launcher.attach !== undefined && this.launcher.instancesOutliveGateway) {
+      const generation = await this.repository.generationOf(resolved)
+      try {
+        proc = await this.attachSurvivor(resolved)
+      } catch (error: unknown) {
+        console.error(`[gateway] failed to attach ${key} survivor:`, error)
+        proc = undefined
+      }
+      // A serialized stop or restart may have won while the supervisor
+      // answered; never publish a handle whose durable state moved on.
+      if (proc !== undefined
+        && await this.repository.stateOf(resolved) === 'ready'
+        && await this.repository.generationOf(resolved) === generation) {
+        this.procs.set(key, proc)
+      } else {
+        proc = undefined
+      }
+    }
+    if (proc === undefined) return false
     if (proc.isAlive !== undefined) return await proc.isAlive()
     return !proc.hasExited()
   }
@@ -433,9 +455,13 @@ export class InstanceManager {
       try {
         await this.repository.touch(resolved, Date.now())
       } catch (error: unknown) {
-        if (prior === 0) this.wsRefs.delete(key)
-        else this.wsRefs.set(key, prior)
-        this.adjustLeaseTotal(this.wsTotals, resolved, prior - next)
+        // A failed touch rolls admission back, but a release stays released:
+        // resurrecting a dead lease would hold the runtime against reaping.
+        if (delta === 1) {
+          if (prior === 0) this.wsRefs.delete(key)
+          else this.wsRefs.set(key, prior)
+          this.adjustLeaseTotal(this.wsTotals, resolved, prior - next)
+        }
         throw error
       }
     })
@@ -461,9 +487,11 @@ export class InstanceManager {
       try {
         await this.repository.touch(resolved, Date.now())
       } catch (error: unknown) {
-        if (prior === 0) this.operationRefs.delete(key)
-        else this.operationRefs.set(key, prior)
-        this.adjustLeaseTotal(this.operationTotals, resolved, prior - next)
+        if (delta === 1) {
+          if (prior === 0) this.operationRefs.delete(key)
+          else this.operationRefs.set(key, prior)
+          this.adjustLeaseTotal(this.operationTotals, resolved, prior - next)
+        }
         throw error
       }
     })
@@ -862,22 +890,7 @@ export class InstanceManager {
     const key = targetKey(target)
     let proc = this.procs.get(key)
     if (proc === undefined && this.launcher.attach !== undefined) {
-      const row = await this.repository.owner(target)
-      if (row !== null) {
-        const runtimeKey = row.kind === 'user' ? row.username : `project-${String(row.id)}`
-        proc = this.launcher.attach({
-          kind: row.kind,
-          ownerId: row.id,
-          username: row.username,
-          runtimeKey,
-          systemUser: row.kind === 'user' ? `harness-${row.username}` : this.cfg.projectRuntimeUser,
-          port: await this.portOf(target),
-          homePath: row.homePath,
-          dshHome: row.kind === 'user'
-            ? join(this.cfg.usersRoot, row.username, 'dsh')
-            : join(this.cfg.projectRuntimesRoot, String(row.id), 'dsh'),
-        })
-      }
+      proc = await this.attachSurvivor(target)
     }
     if (proc !== undefined) await proc.terminate(STOP_GRACE_MS)
     this.procs.delete(key)
@@ -889,6 +902,29 @@ export class InstanceManager {
     this.wsTotals.delete(key)
     this.operationTotals.delete(key)
     await this.repository.markStopped(target)
+  }
+
+  /**
+   * Rebuild the process identity of a supervisor-owned unit this Gateway did
+   * not launch. Read-only against the instance row: no state transition,
+   * credential rotation, or policy/profile write happens here.
+   */
+  private async attachSurvivor(target: RuntimeTarget): Promise<InstanceProc | undefined> {
+    const row = await this.repository.owner(target)
+    if (row === null) return undefined
+    const runtimeKey = row.kind === 'user' ? row.username : `project-${String(row.id)}`
+    return this.launcher.attach!({
+      kind: row.kind,
+      ownerId: row.id,
+      username: row.username,
+      runtimeKey,
+      systemUser: row.kind === 'user' ? `harness-${row.username}` : this.cfg.projectRuntimeUser,
+      port: await this.portOf(target),
+      homePath: row.homePath,
+      dshHome: row.kind === 'user'
+        ? join(this.cfg.usersRoot, row.username, 'dsh')
+        : join(this.cfg.projectRuntimesRoot, String(row.id), 'dsh'),
+    })
   }
 
   /** Apply one generation's lease delta to the O(1) runtime aggregate. */

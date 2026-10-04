@@ -380,6 +380,12 @@ export interface UserQuotaView {
   companyCostMicrosLimit: number | null
 }
 
+/** Stored role limits; a missing role row means unlimited limits. */
+export interface RoleQuotaView {
+  tokenLimit: number | null
+  companyCostMicrosLimit: number | null
+}
+
 const nonEmpty = (value: string, name: string): string => {
   const accepted = value.trim()
   if (accepted === '') throw new Error(`${name} must not be empty`)
@@ -696,6 +702,22 @@ export class ModelGovernanceService {
       tokenLimit: token.limit,
       companyCostMode: cost.mode,
       companyCostMicrosLimit: cost.limit,
+    }
+  }
+
+  /**
+   * Read a role's stored monthly limits.
+   * @param role - the `admin` or `user` quota subject.
+   * @returns the stored limits; an absent row or null field means unlimited.
+   */
+  roleQuota(role: 'admin' | 'user'): RoleQuotaView {
+    const row = this.db.prepare(
+      `SELECT token_limit,company_cost_micros_limit
+       FROM model_quotas WHERE subject_type='role' AND subject_id=?`,
+    ).get(role) as { token_limit: number | null; company_cost_micros_limit: number | null } | undefined
+    return {
+      tokenLimit: row?.token_limit ?? null,
+      companyCostMicrosLimit: row?.company_cost_micros_limit ?? null,
     }
   }
 

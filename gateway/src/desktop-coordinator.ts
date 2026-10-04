@@ -427,13 +427,14 @@ export class DesktopCoordinator {
     await this.repository.transact(resourceKey, async (tx) => {
       const row = await tx.resource(resourceKey)
       if (row === undefined) throw new DesktopCoordinationError('not-found', `no desktop ${resourceKey}`)
+      if (row.state !== 'unavailable') {
+        throw new DesktopCoordinationError('conflict', `desktop ${resourceKey} is not unavailable`)
+      }
       const active = await tx.activeGrant(resourceKey)
       if (active !== undefined) {
         await this.settleGrant(tx, active, 'released', 'admin-clear')
       }
-      if (row.state === 'unavailable') {
-        await tx.upsertResource({ ...row, state: 'available', stateNote: null, updatedAt: this.now() })
-      }
+      await tx.upsertResource({ ...row, state: 'available', stateNote: null, updatedAt: this.now() })
       await this.promoteNext(tx, resourceKey)
     })
     await this.audit?.write({ userId: admin.userId, action: 'desktop.clear', detail: JSON.stringify({ resourceKey }) })

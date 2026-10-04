@@ -106,6 +106,21 @@ it('rejects lease acquisition races without releasing a lease it never acquired'
   expect(f.requests).toEqual([])
 })
 
+it('reports a failed lease release to diagnostics without masking the response', async () => {
+  const f = await fixture()
+  const diagnostics = vi.spyOn(console, 'error').mockImplementation(() => {})
+  f.operationRef.mockImplementation(async (_target, delta) => {
+    if (delta === -1) throw new Error('private storage detail')
+  })
+  try {
+    expect(JSON.parse(await f.invoke())).toMatchObject({ rpcId: f.request.rpcId, result: { ok: true } })
+    expect(diagnostics).toHaveBeenCalled()
+  } finally {
+    diagnostics.mockRestore()
+  }
+  expect(f.operationRef.mock.calls).toEqual([[target, 1, 4], [target, -1, 4]])
+})
+
 it('forwards configuration payloads directly while keeping the same administrator and generation lease', async () => {
   const f = await fixture()
   const args = { ns: 'shell', expectedRevision: 3, ops: [{ op: 'set', path: ['timeoutMs'], value: 5000 }] }

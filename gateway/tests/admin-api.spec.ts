@@ -553,6 +553,46 @@ describe('admin JSON API', () => {
     expect((await fetch(`${base}/admin/api/quotas?subjectType=project&subjectId=1`, { headers: { cookie } })).status).toBe(400)
   })
 
+  it('reads stored role quotas and rejects malformed role subjects', async () => {
+    const { base, cookie } = await setup()
+    const initial = await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=user`, { headers: { cookie } })
+    expect(initial.status).toBe(200)
+    expect(await initial.json()).toEqual({ tokenLimit: null, companyCostMicrosLimit: null })
+
+    const write = await fetch(`${base}/admin/api/quotas`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        subjectType: 'role', subjectId: 'user',
+        tokenLimit: 0, companyCostMicrosLimit: 2_500_000,
+      }),
+    })
+    expect(write.status).toBe(204)
+    const stored = await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=user`, { headers: { cookie } })
+    expect(await stored.json()).toEqual({ tokenLimit: 0, companyCostMicrosLimit: 2_500_000 })
+    expect(await (await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=admin`, { headers: { cookie } })).json())
+      .toEqual({ tokenLimit: null, companyCostMicrosLimit: null })
+
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=owner`, { headers: { cookie } })).status).toBe(400)
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=role`, { headers: { cookie } })).status).toBe(400)
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=project&subjectId=1`, { headers: { cookie } })).status).toBe(400)
+    const memberCookie = await login(base, 'worker', 'pw-12345678')
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=user`, { headers: { cookie: memberCookie } })).status).toBe(403)
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=user`)).status).toBe(401)
+  })
+
+  it('answers 503 when the role quota read is unavailable', async () => {
+    const { base, cookie, deps } = await setup()
+    const service = deps.governance as { roleQuota?: unknown }
+    const original = service.roleQuota
+    Object.assign(service, { roleQuota: undefined })
+    try {
+      expect((await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=user`, { headers: { cookie } })).status).toBe(503)
+      expect((await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=99999`, { headers: { cookie } })).status).toBe(404)
+    } finally {
+      Object.assign(service, { roleQuota: original })
+    }
+  })
+
   it('returns JSON { error: "origin not allowed" } for /admin/api CSRF failures', async () => {
     const { base, cookie } = await setup()
     const res = await fetch(`${base}/admin/api/users`, {
@@ -857,6 +897,104 @@ describe('admin desktop coordination API', () => {
     const { base, cookie } = await setup()
     const list = await fetch(`${base}/admin/api/desktops`, { headers: { cookie } })
     expect(list.status).toBe(503)
+  })
+
+  it('rejects malformed query ids before any service lookup and keeps 404 for valid missing ids', async () => {
+    const { deps, base, cookie, admin, member } = await setup()
+    const userLookups = vi.spyOn(deps.users, 'getById')
+    const projectLookups = vi.spyOn(deps.projects, 'getById')
+    try {
+      const malformed = [
+        '/admin/api/model-access',
+        '/admin/api/model-access?userId=',
+        '/admin/api/model-access?userId=abc',
+        '/admin/api/model-access?userId=1.5',
+        '/admin/api/model-access?userId=0',
+        '/admin/api/model-access?userId=-3',
+        '/admin/api/model-access?userId=Infinity',
+        '/admin/api/model-access?userId=9007199254740993',
+        '/admin/api/project-model-access?projectId=abc',
+        '/admin/api/project-model-access?projectId=2.5',
+        '/admin/api/project-model-access?projectId=0',
+        '/admin/api/usage?userId=abc',
+        '/admin/api/usage?userId=1e3',
+        '/admin/api/usage?projectId=xyz',
+        '/admin/api/usage?projectId=-1',
+      ]
+      for (const path of malformed) {
+        const response = await fetch(`${base}${path}`, { headers: { cookie } })
+        expect(response.status, path).toBe(400)
+      }
+      const invalidLookups = [...userLookups.mock.calls, ...projectLookups.mock.calls]
+        .map(([id]) => id)
+        .filter(id => typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0
+          || (id !== admin.id && id !== member.id))
+      expect(invalidLookups).toEqual([])
+
+      expect((await fetch(`${base}/admin/api/model-access?userId=424242`, { headers: { cookie } })).status).toBe(404)
+      expect((await fetch(`${base}/admin/api/project-model-access?projectId=424242`, { headers: { cookie } })).status).toBe(404)
+      expect((await fetch(`${base}/admin/api/usage?userId=424242`, { headers: { cookie } })).status).toBe(404)
+      expect((await fetch(`${base}/admin/api/usage?projectId=424242`, { headers: { cookie } })).status).toBe(404)
+    } finally {
+      userLookups.mockRestore()
+      projectLookups.mockRestore()
+    }
+  })
+
+  it('keeps a committed membership change when the runtime restart is audited and fails', async () => {
+    const { deps, base, cookie, admin, member, root } = await setup()
+    const shared = join(root, 'shared-restart')
+    mkdirSync(shared)
+    const created = await fetch(`${base}/admin/api/projects`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Restart', path: shared }),
+    })
+    const project = await created.json() as { id: number }
+    // The runtime looks ready but refuses to come back up after the policy write.
+    deps.instances.stateOf = async () => 'ready'
+    deps.instances.ensureRunning = async () => { throw new Error('supervisor refused') }
+    const res = await fetch(`${base}/admin/api/projects/${project.id}/members/${member.id}`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'rw' }),
+    })
+    expect(res.status).toBe(204)
+    const events = await deps.audit.query({ action: 'admin.instances.restart-failed' })
+    expect(events).toHaveLength(1)
+    expect((await deps.projects.membershipsFor?.(member.id))?.some(row => row.projectId === project.id)).toBe(true)
+  })
+
+  it('does not let an unrelated restart-failed event hide a grants-file failure', async () => {
+    const { deps, base, cookie, admin, member, root } = await setup()
+    const shared = join(root, 'shared-grants')
+    mkdirSync(shared)
+    const created = await fetch(`${base}/admin/api/projects`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Grants', path: shared }),
+    })
+    const project = await created.json() as { id: number }
+    expect((await fetch(`${base}/admin/api/projects/${project.id}/members/${member.id}`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'ro' }),
+    })).status).toBe(204)
+    const grantsPath = join(root, 'users', 'worker', 'dsh', 'directory-grants.json')
+    unlinkSync(grantsPath)
+    mkdirSync(grantsPath)
+    // An unrelated restart-failed row lands inside the same apply window; the
+    // grants-file failure must still surface instead of being suppressed.
+    const getById = deps.users.getById.bind(deps.users)
+    let lookups = 0
+    deps.users.getById = async (id: number) => {
+      lookups += 1
+      if (lookups === 2) {
+        await deps.audit.write({ userId: admin.id, action: 'admin.instances.restart-failed', detail: '{"userId":99}' })
+      }
+      return getById(id)
+    }
+    const res = await fetch(`${base}/admin/api/projects/${project.id}/members/${member.id}`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'rw' }),
+    })
+    expect(res.status).toBe(400)
   })
 })
 

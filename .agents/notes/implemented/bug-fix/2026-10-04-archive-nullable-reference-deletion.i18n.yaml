@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-archive-nullable-reference-deletion.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-archive-nullable-reference-deletion.md
+/agent-note-null-only-nullable-archive-references-on-deletion:
+  en: 90c7f06191092b51
+  zh: aff51bee9ee0a408
+/agent-note-null-only-nullable-archive-references-on-deletion/problem:
+  en: 09b4cbce9fc1bebd
+  zh: b73e4c32c549cdc6
+/agent-note-null-only-nullable-archive-references-on-deletion/decision:
+  en: 352222fc1836fe5e
+  zh: 1cae86b2abe555fe
+/agent-note-null-only-nullable-archive-references-on-deletion/alternatives-considered:
+  en: 38628fc3da4abfd6
+  zh: c73003abc4b0b140
+/agent-note-null-only-nullable-archive-references-on-deletion/consequences:
+  en: c3486096e572b4ea
+  zh: 7692ca946b3cb83c
+/agent-note-null-only-nullable-archive-references-on-deletion/verification:
+  en: 4bcb935da69ad9af
+  zh: 0f068f05ebe7ff5a

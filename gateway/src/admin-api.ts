@@ -2,7 +2,7 @@ import { auditSummary } from './audit-summary.ts'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { applyGrantsToUser } from './apply-grants.ts'
+import { applyGrantsToUser, GrantRestartError } from './apply-grants.ts'
 import {
   applyModelGovernanceToProject,
   applyModelGovernanceToUser,
@@ -69,6 +69,13 @@ function parseObject(body: string): Record<string, unknown> {
 function str(obj: Record<string, unknown>, key: string): string | undefined {
   const value = obj[key]
   return typeof value === 'string' ? value : undefined
+}
+
+/** A required query id is valid only as a positive safe integer. */
+function positiveId(raw: string | null): number | null {
+  if (raw === null || !/^\d+$/u.test(raw)) return null
+  const value = Number(raw)
+  return Number.isSafeInteger(value) && value > 0 ? value : null
 }
 
 function isCodedError(error: unknown): error is Error & { code: string } {
@@ -426,11 +433,14 @@ async function dispatch(
     }
     const input = parseObject(body)
     const ids = input.ids
+    const cutoff = input.cutoff
     if (!Array.isArray(ids) || ids.length === 0 || ids.length > 200
-      || !ids.every(id => typeof id === 'string' && id !== '')) {
+      || !ids.every(id => typeof id === 'string' && id !== '')
+      || (cutoff !== undefined
+        && (typeof cutoff !== 'number' || !Number.isSafeInteger(cutoff) || cutoff < 0 || cutoff > Date.now()))) {
       sendError(res, 400, 'invalid empty-draft batch'); return true
     }
-    const trashed = await deps.archives.trashEmptyDrafts(ids as string[], admin.id)
+    const trashed = await deps.archives.trashEmptyDrafts(ids as string[], admin.id, cutoff as number | undefined)
     await write('admin.archives.empty-drafts.trash', { requested: ids.length, trashed: trashed.length })
     sendJson(res, 200, { trashed })
     return true
@@ -862,12 +872,12 @@ async function dispatch(
   }
 
   const apply = async (userId: number): Promise<void> => {
-    const prior = await deps.audit.query({ action: 'admin.instances.restart-failed', userId: admin.id })
     try {
       await applyGrantsToUser(deps, userId, admin.id)
     } catch (error) {
-      const next = await deps.audit.query({ action: 'admin.instances.restart-failed', userId: admin.id })
-      if (next.length > prior.length) return
+      // Only the audited restart-failure classification is a tolerated
+      // partial success; grant-file and audit-write failures keep failing.
+      if (error instanceof GrantRestartError) return
       throw error
     }
   }
@@ -1179,7 +1189,8 @@ async function dispatch(
     if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
     const query = new URL(req.url ?? '/', 'http://x').searchParams
     if (method === 'GET') {
-      const userId = Number(query.get('userId'))
+      const userId = positiveId(query.get('userId'))
+      if (userId === null) { sendError(res, 400, 'invalid userId'); return true }
       const target = await deps.users.getById(userId)
       if (target === null) { sendError(res, 404, 'user not found'); return true }
       sendJson(res, 200, {
@@ -1205,7 +1216,8 @@ async function dispatch(
     if (deps.governance === undefined) { sendError(res, 503, 'model governance unavailable'); return true }
     const query = new URL(req.url ?? '/', 'http://x').searchParams
     if (method === 'GET') {
-      const projectId = Number(query.get('projectId'))
+      const projectId = positiveId(query.get('projectId'))
+      if (projectId === null) { sendError(res, 400, 'invalid projectId'); return true }
       const project = await deps.projects.getById(projectId)
       if (project === null) { sendError(res, 404, 'project not found'); return true }
       sendJson(res, 200, {
@@ -1254,17 +1266,26 @@ async function dispatch(
   if (pathname === '/admin/api/quotas') {
     if (deps.governance === undefined) return false
     if (method === 'GET') {
-      if (deps.governance.userQuota === undefined) { sendError(res, 503, 'user quota read unavailable'); return true }
       const query = new URL(req.url ?? '/', 'http://x').searchParams
       const subjectType = query.get('subjectType')
       const subjectId = query.get('subjectId')
-      if (subjectType !== 'user' || subjectId === null) { sendError(res, 400, 'user quota subject required'); return true }
-      const userId = Number(subjectId)
-      if (!Number.isSafeInteger(userId) || userId <= 0 || await deps.users.getById(userId) === null) {
-        sendError(res, 404, 'user not found'); return true
+      if (subjectType === 'user') {
+        if (deps.governance.userQuota === undefined) { sendError(res, 503, 'user quota read unavailable'); return true }
+        if (subjectId === null) { sendError(res, 400, 'user quota subject required'); return true }
+        const userId = Number(subjectId)
+        if (!Number.isSafeInteger(userId) || userId <= 0 || await deps.users.getById(userId) === null) {
+          sendError(res, 404, 'user not found'); return true
+        }
+        sendJson(res, 200, await deps.governance.userQuota(userId))
+        return true
       }
-      sendJson(res, 200, await deps.governance.userQuota(userId))
-      return true
+      if (subjectType === 'role') {
+        if (deps.governance.roleQuota === undefined) { sendError(res, 503, 'role quota read unavailable'); return true }
+        if (subjectId !== 'admin' && subjectId !== 'user') { sendError(res, 400, 'invalid quota role'); return true }
+        sendJson(res, 200, await deps.governance.roleQuota(subjectId))
+        return true
+      }
+      sendError(res, 400, 'invalid quota subject'); return true
     }
     if (method !== 'PUT') return false
     const input = parseObject(body); const subjectType = str(input, 'subjectType'); const subjectId = str(input, 'subjectId')
@@ -1291,13 +1312,16 @@ async function dispatch(
     const month = query.get('month') ?? undefined
     const requestedProject = query.get('projectId')
     if (requestedProject !== null) {
-      const projectId = Number(requestedProject)
+      const projectId = positiveId(requestedProject)
+      if (projectId === null) { sendError(res, 400, 'invalid projectId'); return true }
       if (await deps.projects.getById(projectId) === null) { sendError(res, 404, 'project not found'); return true }
       sendJson(res, 200, await deps.governance.summary({ kind: 'project', id: projectId }, month)); return true
     }
     const requested = query.get('userId')
     if (requested !== null) {
-      const userId = Number(requested); if (await deps.users.getById(userId) === null) { sendError(res, 404, 'user not found'); return true }
+      const userId = positiveId(requested)
+      if (userId === null) { sendError(res, 400, 'invalid userId'); return true }
+      if (await deps.users.getById(userId) === null) { sendError(res, 404, 'user not found'); return true }
       sendJson(res, 200, await deps.governance.summary({ kind: 'user', id: userId }, month)); return true
     }
     const summaries = await mapInBatches(await deps.users.list(), ADMIN_USAGE_SUMMARY_CONCURRENCY, async user => ({

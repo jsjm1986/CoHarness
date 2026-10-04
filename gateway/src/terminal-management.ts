@@ -101,8 +101,10 @@ export class GatewayTerminalManagement {
       if (error instanceof TerminalManagementError) throw error
       throw new TerminalManagementError(503, 'terminal runtime communication failed')
     } finally {
-      try { await instances.operationRef(target, -1, generation) } catch {
-        throw new TerminalManagementError(503, 'terminal runtime lease cleanup failed')
+      // A failed release stays released (see InstanceManager.operationRef);
+      // report it for operators without masking the operation's own result.
+      try { await instances.operationRef(target, -1, generation) } catch (error: unknown) {
+        console.error('[gateway] terminal runtime lease release failed:', error)
       }
     }
   }

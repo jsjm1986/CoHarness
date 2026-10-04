@@ -222,8 +222,10 @@ export class GatewayPluginManagement {
       lifetime.abort()
       try { await reader?.cancel() } catch { /* An aborted or errored reader already reports the transport failure. */ }
       reader?.releaseLock()
-      try { await instances.operationRef(target, -1, generation) } catch {
-        throw new PluginManagementError(503, 'profile operation lease cleanup failed')
+      try { await instances.operationRef(target, -1, generation) } catch (error: unknown) {
+        // A failed release stays released; report it without masking the
+        // operation's own result or earlier failure.
+        console.error('[gateway] profile operation lease release failed:', error)
       }
     }
   }

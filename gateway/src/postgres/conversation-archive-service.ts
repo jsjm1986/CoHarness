@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg'
 import { lstat, realpath, unlink } from 'node:fs/promises'
 import { dirname, parse } from 'node:path'
 import { transaction } from './database.ts'
+import { literalLikePattern } from './literal-like-pattern.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
 /** Lifecycle state of one archived root conversation. */
@@ -580,7 +581,7 @@ export class ConversationArchiveService {
       clauses.push('(a.message_count > 0)')
     }
     if (filter.query !== undefined && filter.query.trim() !== '') {
-      const needle = `%${filter.query.trim()}%`
+      const needle = literalLikePattern(filter.query.trim())
       values.push(needle)
       const arg = `$${String(values.length)}`
       clauses.push(`(a.root_session_id ILIKE ${arg} OR COALESCE(harness.human_session_title(COALESCE(a.title,r.title)),'') ILIKE ${arg}
@@ -613,7 +614,8 @@ export class ConversationArchiveService {
   async previewEmptyDrafts(options: { olderThanMs?: number; limit?: number } = {}): Promise<EmptyDraftPreview> {
     const age = options.olderThanMs ?? DEFAULT_EMPTY_DRAFT_AGE_MS
     if (!Number.isSafeInteger(age) || age < 0) throw new Error('invalid empty-draft age')
-    const cutoff = Date.now() - age
+    const cutoff = Math.max(0, Date.now() - age)
+    if (cutoff === 0) return { cutoff, candidates: [] }
     const limit = boundedLimit(options.limit, 200)
     const result = await this.context.pool.query<EmptyDraftDbRow>(`SELECT r.id root_session_id,
       CASE WHEN r.project_id IS NULL THEN 'user' ELSE 'project' END runtime_kind,
@@ -631,11 +633,15 @@ export class ConversationArchiveService {
         AND NOT EXISTS (
           SELECT 1 FROM harness.conversation_sessions child
           WHERE child.organization_id=r.organization_id AND child.root_session_id=r.root_session_id
-            AND child.has_visible_content=true AND child.status<>'deleted'
+            AND child.status<>'deleted'
+            AND (child.has_visible_content=true OR child.updated_at>to_timestamp($2/1000.0))
         )
         AND NOT EXISTS (
           SELECT 1 FROM harness.conversation_draft_reservations d
-          WHERE d.organization_id=r.organization_id AND d.session_id=r.id AND d.lease_expires_at > now()
+          LEFT JOIN harness.conversation_sessions leased
+            ON leased.organization_id=d.organization_id AND leased.id=d.session_id
+          WHERE d.organization_id=r.organization_id AND d.lease_expires_at>now()
+            AND (d.session_id=r.id OR (leased.root_session_id=r.id AND leased.status<>'deleted'))
         )
       ORDER BY r.updated_at,r.id LIMIT $3`, [this.context.organizationId, cutoff, limit])
     return {
@@ -657,25 +663,45 @@ export class ConversationArchiveService {
   }
 
   /** Move reviewed blank roots into the recoverable archive trash. */
-  async trashEmptyDrafts(rootSessionIds: readonly string[], actorUserId: number): Promise<readonly string[]> {
+  async trashEmptyDrafts(rootSessionIds: readonly string[], actorUserId: number, cutoff?: number): Promise<readonly string[]> {
     if (rootSessionIds.length === 0 || rootSessionIds.length > 200) throw new Error('invalid empty-draft batch')
+    const resolvedCutoff = cutoff ?? Math.max(0, Date.now() - DEFAULT_EMPTY_DRAFT_AGE_MS)
+    if (!Number.isSafeInteger(resolvedCutoff) || resolvedCutoff < 0 || resolvedCutoff > Date.now()) {
+      throw new Error('invalid empty-draft cutoff')
+    }
     const actor = await this.internalUserId(this.context.pool, actorUserId)
     if (actor === null) throw new Error('archive actor not found')
     const trashed = await transaction(this.context.pool, async client => {
       const result: string[] = []
       for (const rootSessionId of rootSessionIds) {
-        const row = await client.query<{
+        const locked = await client.query<{
           id: string; project_id: string | null; creator_user_id: string
         }>(`SELECT r.id,r.project_id,r.creator_user_id
           FROM harness.conversation_sessions r
-          WHERE r.organization_id=$1 AND r.id=$2 AND r.root_session_id=r.id AND r.status<>'deleted'
+          WHERE r.organization_id=$1 AND r.id=$2 AND r.root_session_id=r.id
+          FOR UPDATE`, [this.context.organizationId, rootSessionId])
+        const current = locked.rows[0]
+        if (current === undefined) continue
+        // Re-check eligibility after acquiring the root lock: this statement's
+        // snapshot sees reservations, content, and updates committed while the
+        // lock was held by a reservation or append transaction.
+        const eligible = await client.query(`SELECT r.id
+          FROM harness.conversation_sessions r
+          WHERE r.organization_id=$1 AND r.id=$2 AND r.status<>'deleted'
             AND r.has_visible_content=false
+            AND r.updated_at <= to_timestamp($3/1000.0)
             AND NOT EXISTS (SELECT 1 FROM harness.conversation_sessions child
               WHERE child.organization_id=r.organization_id AND child.root_session_id=r.id
-                AND child.has_visible_content=true AND child.status<>'deleted')
-          FOR UPDATE`, [this.context.organizationId, rootSessionId])
-        const current = row.rows[0]
-        if (current === undefined) continue
+                AND child.status<>'deleted'
+                AND (child.has_visible_content=true OR child.updated_at>to_timestamp($3/1000.0)))
+            AND NOT EXISTS (
+              SELECT 1 FROM harness.conversation_draft_reservations d
+              LEFT JOIN harness.conversation_sessions leased
+                ON leased.organization_id=d.organization_id AND leased.id=d.session_id
+              WHERE d.organization_id=r.organization_id AND d.lease_expires_at>now()
+                AND (d.session_id=r.id OR (leased.root_session_id=r.id AND leased.status<>'deleted'))
+            )`, [this.context.organizationId, rootSessionId, resolvedCutoff])
+        if (eligible.rows[0] === undefined) continue
         const existing = await client.query<{ state: ConversationArchiveState; sync_revision: string }>(`SELECT state,sync_revision::text
           FROM harness.conversation_archive_records WHERE organization_id=$1 AND root_session_id=$2 FOR UPDATE`,
         [this.context.organizationId, rootSessionId])
@@ -829,16 +855,23 @@ export class ConversationArchiveService {
         ? null : await this.internalUserId(client, snapshot.creatorUserId)
       const project = snapshot.projectId === undefined
         ? null : await this.internalProjectId(client, snapshot.projectId)
-      const prior = await client.query<{ state: ConversationArchiveState; sync_revision: string }>(`SELECT state,sync_revision::text
+      const prior = await client.query<{
+        state: ConversationArchiveState; runtime_kind: 'user' | 'project'; runtime_public_id: string; sync_revision: string
+      }>(`SELECT state,runtime_kind,runtime_public_id::text,sync_revision::text
         FROM harness.conversation_archive_records WHERE organization_id=$1 AND root_session_id=$2 FOR UPDATE`,
       [this.context.organizationId, snapshot.rootSessionId])
-      if (prior.rows[0]?.state === 'purged') return
-      await client.query(`INSERT INTO harness.conversation_archive_records(
+      const existing = prior.rows[0]
+      if (existing?.state === 'purged') return
+      if (existing !== undefined
+        && (existing.runtime_kind !== snapshot.runtime.kind
+          || publicNumber(existing.runtime_public_id, 'runtime') !== snapshot.runtime.id)) {
+        throw new Error('archive snapshot contains a session outside the authenticated runtime')
+      }
+      const upsert = await client.query(`INSERT INTO harness.conversation_archive_records(
         organization_id,root_session_id,runtime_kind,runtime_public_id,project_id,creator_user_id,title,
         workspace_path,workspace_title,workspace_position,message_count,archived_at,sync_revision,sync_state,updated_at
       ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,to_timestamp($12/1000.0),$13,'synced',now())
       ON CONFLICT (organization_id,root_session_id) DO UPDATE SET
-        runtime_kind=EXCLUDED.runtime_kind,runtime_public_id=EXCLUDED.runtime_public_id,
         project_id=COALESCE(EXCLUDED.project_id,conversation_archive_records.project_id),
         creator_user_id=COALESCE(EXCLUDED.creator_user_id,conversation_archive_records.creator_user_id),
         title=COALESCE(EXCLUDED.title,conversation_archive_records.title),
@@ -853,12 +886,29 @@ export class ConversationArchiveService {
           WHEN conversation_archive_records.sync_state='conflict' THEN 'conflict' ELSE 'synced' END,
         last_sync_error=CASE WHEN conversation_archive_records.sync_state='conflict'
           THEN conversation_archive_records.last_sync_error ELSE NULL END,updated_at=now()
-      WHERE EXCLUDED.sync_revision >= conversation_archive_records.sync_revision`, [
+      WHERE conversation_archive_records.runtime_kind=EXCLUDED.runtime_kind
+        AND conversation_archive_records.runtime_public_id=EXCLUDED.runtime_public_id
+        AND EXCLUDED.sync_revision>=conversation_archive_records.sync_revision`, [
         this.context.organizationId, snapshot.rootSessionId, snapshot.runtime.kind, snapshot.runtime.id,
         project, creator, snapshot.title ?? null, snapshot.workspace?.path ?? null,
         snapshot.workspace?.title ?? null, snapshot.workspace?.position ?? null, snapshot.messageCount ?? 0,
         snapshot.archivedAt ?? Date.now(), snapshot.syncRevision,
       ])
+      if (upsert.rowCount === 0) {
+        // Archive identity is immutable: a foreign claim always rejects, while
+        // a same-owner newer revision keeps the stored row and drops this
+        // snapshot's stale search rows.
+        const owner = await client.query<{ runtime_kind: 'user' | 'project'; runtime_public_id: string }>(`SELECT runtime_kind,runtime_public_id::text
+          FROM harness.conversation_archive_records WHERE organization_id=$1 AND root_session_id=$2 FOR UPDATE`,
+        [this.context.organizationId, snapshot.rootSessionId])
+        const claimed = owner.rows[0]
+        if (claimed !== undefined
+          && (claimed.runtime_kind !== snapshot.runtime.kind
+            || publicNumber(claimed.runtime_public_id, 'runtime') !== snapshot.runtime.id)) {
+          throw new Error('archive snapshot contains a session outside the authenticated runtime')
+        }
+        return
+      }
       for (let offset = 0; offset < search.length; offset += ARCHIVE_SEARCH_BATCH_SIZE) {
         const batch = search.slice(offset, offset + ARCHIVE_SEARCH_BATCH_SIZE)
         await client.query(`INSERT INTO harness.conversation_archive_search(
@@ -914,15 +964,22 @@ export class ConversationArchiveService {
       else list.push(item)
     }
     if (caller !== undefined) {
-      await this.assertRuntimeSessionOwnership(caller, [
+      // Lineage claims are identities too: a derived root or a declared
+      // parentSession pointing at another runtime's tree is checked against
+      // stored ownership exactly like an explicit rootSessionId.
+      const checkedIds = [
         ...snapshot.archivedSessionIds,
         ...snapshot.sessions.map(item => item.sessionId),
         ...snapshot.sessions.flatMap(item => item.rootSessionId === undefined ? [] : [item.rootSessionId]),
         ...(snapshot.search ?? []).map(item => item.sessionId),
-      ], snapshot.sessions.flatMap(item => item.rootSessionId === undefined ? [] : [{
-        sessionId: item.sessionId,
-        rootSessionId: item.rootSessionId,
-      }]))
+        ...snapshot.sessions.flatMap(item => item.header.parentSession === undefined ? [] : [item.header.parentSession]),
+        ...snapshot.sessions.map(item => rootFor(item.sessionId)),
+      ]
+      await this.assertRuntimeSessionOwnership(caller, checkedIds,
+        snapshot.sessions.map(item => ({
+          sessionId: item.sessionId,
+          rootSessionId: rootFor(item.sessionId),
+        })))
     }
     const grouped = new Map<string, string[]>()
     for (const sessionId of snapshot.archivedSessionIds) {
@@ -1181,6 +1238,16 @@ export class ConversationArchiveService {
       if (stored !== undefined && stored !== pair.rootSessionId) {
         throw new Error('archive snapshot contains a session with an incorrect lineage root')
       }
+    }
+    // Archive ownership is immutable once claimed: any stored root owned by a
+    // different runtime kind or public id is foreign data, not a reassignment.
+    const claimed = await this.context.pool.query<{ root_session_id: string }>(`SELECT root_session_id
+      FROM harness.conversation_archive_records
+      WHERE organization_id=$1 AND root_session_id=ANY($2::text[])
+        AND (runtime_kind<>$3::text OR runtime_public_id<>$4::bigint)`,
+    [this.context.organizationId, unique, runtime.kind, runtime.id])
+    if (claimed.rows.length !== 0) {
+      throw new Error('archive snapshot contains a session outside the authenticated runtime')
     }
   }
 

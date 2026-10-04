@@ -261,7 +261,7 @@ export class PostgresWebhookEndpointService {
     if (!parsed.success) throw new WebhookEndpointError(400, 'invalid webhook endpoint')
     const value = parsed.data
     return this.run(async client => {
-      await this.requireRuntimeTarget(client, value.runtimeKind, value.runtimePublicId)
+      await this.requireRuntimeTarget(client, value.runtimeKind, value.runtimePublicId, value.executionUserId)
       const user = await client.query<{ id: string }>(
         `SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2 AND status='active' AND deleted_at IS NULL`,
         [this.context.organizationId, value.executionUserId])
@@ -317,7 +317,7 @@ export class PostgresWebhookEndpointService {
         'SELECT 1 FROM harness.webhook_endpoints WHERE organization_id=$1 AND name=$2 AND public_id<>$3',
         [this.context.organizationId, value.name, targetId])
       if (renamed.rowCount !== 0) throw new WebhookEndpointError(409, 'webhook endpoint name is already registered')
-      await this.requireRuntimeTarget(client, value.runtimeKind, value.runtimePublicId)
+      await this.requireRuntimeTarget(client, value.runtimeKind, value.runtimePublicId, value.executionUserId)
       const user = await client.query<{ id: string }>(
         `SELECT id FROM harness.users WHERE organization_id=$1 AND public_id=$2 AND status='active' AND deleted_at IS NULL`,
         [this.context.organizationId, value.executionUserId])
@@ -414,11 +414,14 @@ export class PostgresWebhookEndpointService {
     return config
   }
 
-  /** Validate that the runtime target owner exists inside this organization. */
+  /** Validate that the runtime target owner exists inside this organization and matches its executor. */
   private async requireRuntimeTarget(
     client: { query: (text: string, values: unknown[]) => Promise<{ rowCount: number | null }> },
-    kind: 'user' | 'project', publicId: number,
+    kind: 'user' | 'project', publicId: number, executionUserId: number,
   ): Promise<void> {
+    if (kind === 'user' && publicId !== executionUserId) {
+      throw new WebhookEndpointError(400, 'webhook user runtime target must be the execution account')
+    }
     const found = kind === 'user'
       ? await client.query(
         `SELECT 1 FROM harness.users WHERE organization_id=$1 AND public_id=$2 AND status='active' AND deleted_at IS NULL`,

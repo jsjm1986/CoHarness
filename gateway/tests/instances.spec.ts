@@ -645,4 +645,107 @@ describe('InstanceManager', () => {
     // case the fixture changes its default cleanup order later.
     await initialManager.stopAll()
   })
+
+  it('reattaches a supervisor-owned ready runtime in isLive without launching it', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'live-survivor')
+    mkdirSync(projectPath, { recursive: true })
+    const attached = {
+      hasExited: () => false,
+      isAlive: vi.fn(async () => true),
+      terminate: vi.fn(async () => {}),
+    }
+    const launcher = {
+      instancesOutliveGateway: true,
+      start: async () => { throw new Error('isLive must never launch a new generation') },
+      attach: vi.fn(() => attached),
+    }
+    const liveManager = new InstanceManager(
+      new SurvivorRepository(projectPath, 43260),
+      cfg,
+      launcher,
+      { principalPublicKey: '' },
+    )
+    manager = liveManager
+    expect(await liveManager.isLive({ kind: 'project', id: 41 })).toBe(true)
+    expect(launcher.attach).toHaveBeenCalledTimes(1)
+    expect(attached.isAlive).toHaveBeenCalled()
+    expect(await liveManager.isLive({ kind: 'project', id: 41 })).toBe(true)
+    expect(launcher.attach).toHaveBeenCalledTimes(1)
+    await liveManager.stopAll()
+    expect(attached.terminate).not.toHaveBeenCalled()
+  })
+
+  it('does not publish a supervisor handle whose durable state moved on during attach', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'moving-survivor')
+    mkdirSync(projectPath, { recursive: true })
+    let state = 'ready'
+    const repository = new (class extends SurvivorRepository {
+      override stateOf(): Promise<string> { return Promise.resolve(state) }
+    })(projectPath, 43261)
+    const attached = {
+      hasExited: () => false,
+      isAlive: vi.fn(async () => true),
+      terminate: vi.fn(async () => {}),
+    }
+    const launcher = {
+      instancesOutliveGateway: true,
+      start: async () => { throw new Error('isLive must never launch a new generation') },
+      attach: () => {
+        state = 'stopping'
+        return attached
+      },
+    }
+    const liveManager = new InstanceManager(repository, cfg, launcher, { principalPublicKey: '' })
+    manager = liveManager
+    expect(await liveManager.isLive({ kind: 'project', id: 41 })).toBe(false)
+    expect(attached.isAlive).not.toHaveBeenCalled()
+  })
+
+  it('keeps a ready row not-live when the launcher does not outlive the Gateway', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'local-row')
+    mkdirSync(projectPath, { recursive: true })
+    const launcher = {
+      instancesOutliveGateway: false,
+      start: async () => { throw new Error('isLive must never launch') },
+      attach: vi.fn(() => ({ hasExited: () => false, isAlive: async () => true, terminate: async () => {} })),
+    }
+    const liveManager = new InstanceManager(
+      new SurvivorRepository(projectPath, 43262),
+      cfg,
+      launcher,
+      { principalPublicKey: '' },
+    )
+    manager = liveManager
+    expect(await liveManager.isLive({ kind: 'project', id: 41 })).toBe(false)
+    expect(launcher.attach).not.toHaveBeenCalled()
+  })
+
+  it('rolls back a lease admission when the durable touch fails', async () => {
+    const { cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const repository = new (class extends FailingStopRepository {
+      override touch(): Promise<void> { return Promise.reject(new Error('durable touch failed')) }
+    })(new Set<number>())
+    const touchManager = new InstanceManager(repository, cfg)
+    manager = touchManager
+    await expect(touchManager.wsRef({ kind: 'user', id: 1 }, 1)).rejects.toThrow('durable touch failed')
+    expect(touchManager['wsRefs'].size).toBe(0)
+    expect(touchManager['wsTotals'].size).toBe(0)
+  })
+
+  it('keeps a lease release applied when the durable touch fails', async () => {
+    const { db, alice, manager } = await setup()
+    db.prepare(`UPDATE instances SET state='ready' WHERE user_id=?`).run(alice.id)
+    await manager.wsRef(alice.id, 1)
+    await manager.operationRef(alice.id, 1)
+    db.prepare('DROP TABLE instances').run()
+    await expect(manager.wsRef(alice.id, -1)).rejects.toThrow()
+    await expect(manager.operationRef(alice.id, -1)).rejects.toThrow()
+    expect(manager['wsRefs'].size).toBe(0)
+    expect(manager['wsTotals'].size).toBe(0)
+    expect(manager['operationRefs'].size).toBe(0)
+    expect(manager['operationTotals'].size).toBe(0)
+  })
 })

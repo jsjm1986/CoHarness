@@ -260,6 +260,9 @@ export class PostgresDesktopCoordinatorRepository implements DesktopCoordinatorR
 
   async transact<T>(resourceKey: string, fn: (tx: DesktopCoordinatorTx) => Promise<T>): Promise<T> {
     return transaction(this.context.pool, async (client) => {
+      // Shared coordinator lock first: transactAll's exclusive lock excludes
+      // the whole-resource sweep while unrelated resources proceed together.
+      await client.query('SELECT pg_advisory_xact_lock_shared($1)', [lockKey(scopedKey(this.context.organizationId, GLOBAL_LOCK_KEY))])
       await client.query('SELECT pg_advisory_xact_lock($1)', [lockKey(scopedKey(this.context.organizationId, resourceKey))])
       return fn(new PostgresCoordinatorTx(client, this.context.organizationId))
     })
