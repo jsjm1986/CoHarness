@@ -138,6 +138,8 @@ export interface ClientPluginModule {
   apply(ctx: Context, config?: unknown): unknown
   readonly inject?: readonly string[] | Readonly<Record<string, unknown>>
   readonly Config?: unknown
+  /** Remote namespaces the module self-mounts through `remote.$mount`; the tier proxies them like injected ones. */
+  readonly remoteNamespaces?: readonly string[]
 }
 
 /** What to boot and what the test supplies itself. */

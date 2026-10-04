@@ -29,7 +29,7 @@ Open the execution environment's default shell in a Session workspace from the W
 
 SSH-bound Sessions resolve shell discovery and PTY allocation through their standing execution realm. A missing remote subprocess provider fails the operation; it never falls back to the Host process environment.
 
-The Client plugin owns its generated `remote.terminal` namespace and releases it when unloaded. The shared Remote assembly does not mount a second copy.
+The Client plugin mounts its generated `remote.terminal` namespace unless the assembly already provides it, and releases a self-mounted namespace when unloaded. The shared Remote assembly does not mount a second copy.
 
 The Web bundle mounts this package with the subprocess provider, sandbox policy and Typert Gateway. Sandbox policy supplies only the fallback working directory for Sessions without a cwd. `remote.terminal` exposes `environment`, `shells`, `list`, `create`, `retain`, `follow`, `write`, `resize`, `rename` and `close`; each ordinary operation is scoped by Session and creator identity. Gateway personal workspaces require user qualification; projects additionally require project authorization and writable membership. Qualification changes revoke retained grants and await process cleanup. Listing reads retained Host terminals directly, so viewing an offline Session neither activates an Agent nor produces a recovery error.
 

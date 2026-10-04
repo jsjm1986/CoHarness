@@ -29,7 +29,7 @@ kind: "package-reference"
 
 绑定 SSH 的 Session 通过其 standing 执行 realm 发现 shell 并分配 PTY。缺少远端 subprocess 提供方时操作失败，不会回退到 Host 的本机进程环境。
 
-Client 插件拥有生成的 `remote.terminal` 命名空间，并在卸载时释放。共享 Remote 组装不挂载第二份副本。
+Client 插件在组装尚未提供 `remote.terminal` 命名空间时挂载其生成的副本，并在卸载时释放自己挂载的命名空间。共享 Remote 组装不挂载第二份副本。
 
 Web bundle 挂载此包以及 subprocess 提供者、sandbox policy 和 Typert Gateway。Sandbox policy 仅为没有 cwd 的 Session 提供回退工作目录。`remote.terminal` 暴露 `environment`、`shells`、`list`、`create`、`retain`、`follow`、`write`、`resize`、`rename` 和 `close`；普通操作均按 Session 和创建者身份隔离。Gateway 个人工作区需要用户资格；项目还需要项目授权及可写成员身份。资格变化撤销保留的授权并等待进程清理。清单直接读取 Host 保留的终端，因此查看离线 Session 不会激活 Agent，也不会产生恢复错误。
 

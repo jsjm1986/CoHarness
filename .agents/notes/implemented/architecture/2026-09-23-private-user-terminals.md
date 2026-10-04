@@ -18,7 +18,7 @@ Ordinary terminal Remotes operate only on the caller's creator identity. The adm
 
 Client associations, unfinished closes and shell preferences carry verified account/runtime/Session ownership. An identity change clears screen models and refuses late responses. Cleanup retains its original address. The single right sidebar owns layout, while terminal recovery runs for blank and populated Sessions without creating replacement shells. Read streams use the existing connection's dedicated bounded NDJSON response; malformed frames and business refusals end the stream, and teardown awaits the iterator's cleanup.
 
-The terminal Client plugin mounts its generated Remote namespace through the Gateway's owned contribution effect before creating its models. Disposal releases that namespace with the terminal models. The shared Remote assembly does not import terminal Client code: runtime ownership supplies terminal identity, so importing the terminal back into that assembly would create a dependency cycle.
+The terminal Client plugin mounts its generated Remote namespace through the Gateway's owned contribution effect before creating its models, unless the assembly already provides `remote.terminal`; test assemblies stand in through their generated-Remote proxies, whose generated contributions exist only in built `lib/`. Disposal releases a self-mounted namespace with the terminal models. The shared Remote assembly does not import terminal Client code: runtime ownership supplies terminal identity, so importing the terminal back into that assembly would create a dependency cycle.
 
 ## Alternatives considered
 

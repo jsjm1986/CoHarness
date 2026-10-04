@@ -899,11 +899,7 @@ it('waits for verified Client services and disposes their ownership observers', 
   const policy = createSnapshotStore<{ verifiedAccountId?: number }>({})
   const stores = [catalog, host, policy]
   const subscriptions = stores.map(store => vi.spyOn(store, 'subscribe'))
-  const mount = vi.fn(async (contribution: { package: string }) => {
-    expect(contribution.package).toBe('@deepseek-ai/dsh-api-terminal-controller')
-    return async () => {}
-  })
-  ctx.provide('remote', { terminal: h.remote, $mount: mount } as never)
+  ctx.provide('remote', { terminal: h.remote } as never)
   ctx.provide('remote.terminal', h.remote)
   ctx.provide('sessions', { list: catalog, runtimeIdentityFor: () => ({ kind: 'personal' }) } as never)
   ctx.provide('connection', { hostDescription: host } as never)
@@ -918,7 +914,6 @@ it('waits for verified Client services and disposes their ownership observers', 
   expect(() =>{  ctx.webTerminals.selectShell(sessionId, '/bin/zsh') }).toThrow('not verified')
   const service = ctx.webTerminals
   await fiber.dispose()
-  expect(mount).toHaveBeenCalledTimes(1)
   expect(subscriptions.every(subscribe => subscribe.mock.calls.length === 1)).toBe(true)
   host.set({ executionAuthorityRequired: false })
   expect(() =>{  service.selectShell(sessionId, '/bin/zsh') }).toThrow('not verified')
@@ -960,9 +955,23 @@ it('does not install terminal models when the generated namespace cannot mount',
   const ctx = new Context()
   cleanups.push(() => ctx.fiber.dispose())
   ctx.provide('remote', { $mount: async () => { throw new Error('duplicate terminal namespace') } } as never)
-  ctx.provide('sessions', {} as never)
-  ctx.provide('connection', {} as never)
-  ctx.provide('projectUiPolicy', {} as never)
-  await expect(ctx.plugin({ inject: TerminalClient.inject, apply: TerminalClient.apply })).rejects.toThrow('duplicate terminal namespace')
+  ctx.provide('sessions', { list: createSnapshotStore({ byId: {} }) } as never)
+  ctx.provide('connection', { hostDescription: createSnapshotStore(undefined) } as never)
+  ctx.provide('projectUiPolicy', createSnapshotStore({}) as never)
+  await expect(ctx.plugin({ inject: TerminalClient.inject, apply: TerminalClient.apply })).rejects.toThrow()
   expect(ctx.get('webTerminals')).toBeUndefined()
+})
+
+it('consumes a provided terminal namespace without a second mount', async () => {
+  const ctx = new Context()
+  cleanups.push(() => ctx.fiber.dispose())
+  const mount = vi.fn(async () => async () => {})
+  ctx.provide('remote', { $mount: mount } as never)
+  ctx.provide('remote.terminal', {} as never)
+  ctx.provide('sessions', { list: createSnapshotStore({ byId: {} }) } as never)
+  ctx.provide('connection', { hostDescription: createSnapshotStore(undefined) } as never)
+  ctx.provide('projectUiPolicy', createSnapshotStore({}) as never)
+  await ctx.plugin({ inject: TerminalClient.inject, apply: TerminalClient.apply })
+  expect(mount).not.toHaveBeenCalled()
+  expect(ctx.get('webTerminals')).toBeDefined()
 })

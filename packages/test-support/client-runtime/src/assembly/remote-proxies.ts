@@ -30,7 +30,9 @@ export const REMOTES_PACKAGE = '@deepseek-ai/dsh-api-remotes'
 const PREFIX = 'remote.'
 
 /**
- * Namespaces to provide: every `remote.<ns>` a roster module injects, plus the
+ * Namespaces to provide: every `remote.<ns>` a roster module injects, every
+ * namespace a module declares through its optional `remoteNamespaces` export
+ * (self-mounted generated contributions exist only in built `lib/`), plus the
  * namespace of every `<ns>/<method>` endpoint the mock has a rule for.
  * @param modules - loaded roster modules.
  * @param mock - the spec's mock.
@@ -40,6 +42,7 @@ export function remoteNamespacesOf(modules: Iterable<ClientPluginModule>, mock: 
   const names = new Set<string>()
   for (const module of modules) {
     for (const service of injectNames(module.inject)) if (service.startsWith(PREFIX)) names.add(service.slice(PREFIX.length))
+    for (const namespace of module.remoteNamespaces ?? []) names.add(namespace)
   }
   for (const endpoint of mock.endpoints()) {
     const slash = endpoint.indexOf('/')
