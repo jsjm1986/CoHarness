@@ -775,8 +775,10 @@ jobs:
       # checkout cannot produce. tsc resolves @types and bare specifiers
       # upward from each project, so expose the gateway install's type
       # packages and schema spec plus the vendored cosmokit on that walk.
-      # tsconfig.run.json resolves dsh-llm through its published exports,
-      # so link the package and emit the lib its gateway subprocess loads.
+      # tsconfig.run.json resolves dsh-llm's /discovery and /package.json
+      # subpaths through published exports, so link the package; its bare
+      # specifier resolves through the paths map like the rest of the
+      # runtime closure.
       - name: Emit type declarations the Gateway paths consume
         run: |
           mkdir -p node_modules/@deepseek-ai

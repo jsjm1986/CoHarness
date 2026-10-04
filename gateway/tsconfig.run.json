@@ -3,9 +3,11 @@
   // accept-*.sh harness). tsconfig.json maps workspace packages to emitted
   // `.d.ts` declarations for artifact-plane typecheck; tsx resolves the same
   // paths at runtime and cannot execute declaration files, so this config
-  // keeps only runnable targets. Packages linked under node_modules
-  // (dsh-llm, dsh-session-format, dsh-session-format-catalog) resolve through
-  // their published exports.
+  // keeps only runnable targets. Every workspace specifier the spawned
+  // gateway loads maps to the emitted `lib/types` entry, because published
+  // `.` exports point at bundled `lib` output a standalone checkout cannot
+  // produce; the `dsh-llm` link still serves its `/discovery` and
+  // `/package.json` subpath exports, which already target emitted files.
   "compilerOptions": {
     "target": "es2023",
     "module": "nodenext",
@@ -13,10 +15,30 @@
     "strict": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "@deepseek-ai/dsh-brand": ["../packages/util/brand/lib/types/index.js"],
-      "@deepseek-ai/dsh-managed-data": ["../packages/util/managed-data/lib/types/index.js"],
+      "@deepseek-ai/cordis": ["../vendor/cordis/lib/types/index.js"],
+      "@deepseek-ai/cosmokit": ["../vendor/cosmokit/lib/types/index.js"],
+      "@deepseek-ai/schemastery": ["../vendor/schemastery/lib/types/index.js"],
       "@deepseek-ai/dsh-atomic-write": ["../packages/util/atomic-write/lib/types/index.js"],
-      "@deepseek-ai/dsh-typert-protocol": ["../packages/typert/protocol/lib/types/index.js"]
+      "@deepseek-ai/dsh-brand": ["../packages/util/brand/lib/types/index.js"],
+      "@deepseek-ai/dsh-compaction-image-offload/projection": ["../packages/compaction/compaction-image-offload/lib/types/projection.js"],
+      "@deepseek-ai/dsh-llm": ["../packages/llm/llm/lib/types/index.js"],
+      "@deepseek-ai/dsh-managed-data": ["../packages/util/managed-data/lib/types/index.js"],
+      "@deepseek-ai/dsh-scope": ["../packages/core/scope/lib/types/index.js"],
+      "@deepseek-ai/dsh-session": ["../packages/core/session/lib/types/index.js"],
+      "@deepseek-ai/dsh-session-format": ["../packages/session/session-format/lib/types/index.js"],
+      "@deepseek-ai/dsh-session-format-catalog": ["../packages/session/session-format-catalog/lib/types/index.js"],
+      "@deepseek-ai/dsh-session-format-v0-to-v1": ["../packages/session/session-format-v0-to-v1/lib/types/index.js"],
+      "@deepseek-ai/dsh-session-format-v1-to-v2": ["../packages/session/session-format-v1-to-v2/lib/types/index.js"],
+      "@deepseek-ai/dsh-session-format-v2-to-v3": ["../packages/session/session-format-v2-to-v3/lib/types/index.js"],
+      "@deepseek-ai/dsh-session-format-v3-to-v4": ["../packages/session/session-format-v3-to-v4/lib/types/index.js"],
+      "@deepseek-ai/dsh-session-format-v4-to-v5": ["../packages/session/session-format-v4-to-v5/lib/types/index.js"],
+      "@deepseek-ai/dsh-session-format-v5-to-v6": ["../packages/session/session-format-v5-to-v6/lib/types/index.js"],
+      "@deepseek-ai/dsh-session-format-v6-to-v7": ["../packages/session/session-format-v6-to-v7/lib/types/index.js"],
+      "@deepseek-ai/dsh-session-format/surface": ["../packages/session/session-format/lib/types/surface.js"],
+      "@deepseek-ai/dsh-timeout": ["../packages/util/timeout/lib/types/index.js"],
+      "@deepseek-ai/dsh-typert-protocol": ["../packages/typert/protocol/lib/types/index.js"],
+      "@deepseek-ai/dsh-util-crypto": ["../packages/util/crypto/lib/types/index.js"],
+      "@deepseek-ai/dsh-util-values": ["../packages/util/values/lib/types/index.js"]
     }
   }
 }
