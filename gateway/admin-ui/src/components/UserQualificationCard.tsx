@@ -1,9 +1,11 @@
 /** Per-user qualification card: reads and writes one resource policy for a fixed account. */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AdminResourcePolicy } from '../api.ts'
+import { adminLanguage, translateCopy } from '../language.ts'
 import { Button, ErrorBanner, StatusBadge, Switch } from './ui.tsx'
+import { zh, en } from './user-qualification-card.copy.ts'
 
-const messageOf = (error: unknown): string => error instanceof Error ? error.message : '无法更新授权'
+const messageOf = (error: unknown): string => error instanceof Error ? error.message : translateCopy(adminLanguage(), { zh, en })('updateFailed')
 
 export function UserQualificationCard({ name, description, userId, read, write }: {
   name: string
@@ -12,6 +14,7 @@ export function UserQualificationCard({ name, description, userId, read, write }
   read: (kind: AdminResourcePolicy['kind'], id: number, signal?: AbortSignal) => Promise<AdminResourcePolicy>
   write: (policy: AdminResourcePolicy) => Promise<AdminResourcePolicy>
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const [policy, setPolicy] = useState<AdminResourcePolicy | null>(null)
   const [enabled, setEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -42,9 +45,9 @@ export function UserQualificationCard({ name, description, userId, read, write }
       const result = await write({ ...policy, enabled })
       if (attempt !== generation.current) return
       setPolicy(result); setEnabled(result.enabled)
-      setNotice(result.enabled ? '已授予资格。' : '资格已撤销，已通知运行中的会话重新核验。')
+      setNotice(result.enabled ? t('noticeGranted') : t('noticeRevoked'))
     } catch (cause) {
-      if (attempt === generation.current) { setPolicy(null); setError(`${messageOf(cause)}。请重新读取当前授权。`) }
+      if (attempt === generation.current) { setPolicy(null); setError(t('errorReread', { error: messageOf(cause) })) }
     } finally { if (attempt === generation.current) setSaving(false) }
   }
 
@@ -52,17 +55,17 @@ export function UserQualificationCard({ name, description, userId, read, write }
     <div className="qualificationCard">
       <div className="qualificationHead">
         <strong>{name}</strong>
-        {policy === null ? null : <StatusBadge tone={policy.enabled ? 'success' : 'neutral'}>{policy.enabled ? '已授予' : '未授予'}</StatusBadge>}
+        {policy === null ? null : <StatusBadge tone={policy.enabled ? 'success' : 'neutral'}>{policy.enabled ? t('granted') : t('notGranted')}</StatusBadge>}
       </div>
       <p className="muted">{description}</p>
       <ErrorBanner message={error} />
-      {loading ? <p className="muted">正在读取{name}授权…</p> : policy === null ? (
-        <Button type="button" variant="secondary" onClick={() => setReload(value => value + 1)}>重新读取授权</Button>
+      {loading ? <p className="muted">{t('loadingPolicy', { name })}</p> : policy === null ? (
+        <Button type="button" variant="secondary" onClick={() => setReload(value => value + 1)}>{t('reread')}</Button>
       ) : (
         <>
-          <Switch checked={enabled} disabled={saving} onChange={setEnabled} label={`授予此用户${name}资格`} />
-          <p className="muted">{policy.revision === '0' ? '来源：默认拒绝' : `来源：管理员设置 · 版本 ${policy.revision}`}</p>
-          <Button type="button" disabled={saving || enabled === policy.enabled} onClick={() => void save()}>{saving ? '正在保存' : `保存${name}授权`}</Button>
+          <Switch checked={enabled} disabled={saving} onChange={setEnabled} label={t('grantLabel', { name })} />
+          <p className="muted">{policy.revision === '0' ? t('sourceDefault') : t('sourceAdmin', { revision: policy.revision })}</p>
+          <Button type="button" disabled={saving || enabled === policy.enabled} onClick={() => void save()}>{saving ? t('saving') : t('saveLabel', { name })}</Button>
         </>
       )}
       {notice === '' ? null : <p role="status">{notice}</p>}

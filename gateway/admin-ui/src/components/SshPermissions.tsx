@@ -1,9 +1,13 @@
 /** Project SSH qualification editor; user qualification lives on the user detail page. */
+import { useMemo } from 'react'
 import { getSshPolicy, setSshPolicy } from '../api.ts'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { zh, en } from './permissions.copy.ts'
 import { ResourcePermissions } from './ResourcePermissions.tsx'
 
 export function SshPermissions() {
-  return <ResourcePermissions name="SSH" read={getSshPolicy} write={setSshPolicy} kinds={['project']}
-    description="默认不授权。项目空间同时需要用户资格、项目授权和已共享的连接。SSH 使用目标身份是部署拥有的 OpenSSH 别名；每位用户仍需独立资格。撤权会切断对应运行时的连接。"
-    saved="SSH 授权已保存；项目空间仍需同时具备用户资格、项目授权和已共享的连接。" />
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
+  return <ResourcePermissions name={t('sshName')} read={getSshPolicy} write={setSshPolicy} kinds={['project']}
+    description={t('sshDescription')}
+    saved={t('sshSaved')} />
 }

@@ -37,6 +37,8 @@ import {
   StatusBadge,
 } from '../components/ui.tsx'
 import { ArchiveConversation } from '../components/ArchiveConversation.tsx'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { zh as archivesZh, en as archivesEn } from './archives.copy.ts'
 
 const PAGE_SIZE = 50
 
@@ -44,6 +46,7 @@ type Draft = { state: ConversationArchiveState | 'all'; query: string; userId: s
 const EMPTY_DRAFT: Draft = { state: 'archived', query: '', userId: '', projectId: '' }
 
 export function ArchivesPage() {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
   const [rows, setRows] = useState<ConversationArchiveRow[]>([])
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
   const [active, setActive] = useState<Draft>(EMPTY_DRAFT)
@@ -71,7 +74,7 @@ export function ArchivesPage() {
     const projectId = filter.projectId === '' ? undefined : Number(filter.projectId)
     if ((userId !== undefined && (!Number.isSafeInteger(userId) || userId <= 0))
       || (projectId !== undefined && (!Number.isSafeInteger(projectId) || projectId <= 0))) {
-      setError('用户 ID 和项目 ID 必须是正整数')
+      setError(t('invalidIdFilter'))
       return
     }
     const key = JSON.stringify([filter, nextOffset])
@@ -99,7 +102,7 @@ export function ArchivesPage() {
     } finally {
       if (showLoading && generation === rowsGeneration.current) setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { void fetchRows(EMPTY_DRAFT, 0) }, [fetchRows])
 
@@ -214,7 +217,7 @@ export function ArchivesPage() {
     try {
       const result = await applyArchiveAction(action, ids)
       const failed = result.results.filter(item => !item.ok)
-      if (failed.length > 0) setActionError(`有 ${failed.length} 条记录未完成：${failed.map(item => item.error ?? item.rootSessionId).join('；')}`)
+      if (failed.length > 0) setActionError(t('actionPartialFailure', { count: String(failed.length), details: failed.map(item => item.error ?? item.rootSessionId).join(t('detailSeparator')) }))
       else if (detail !== null) {
         const generation = detailGeneration.current
         const record = await getArchiveStatus(detail.record.rootSessionId)
@@ -246,42 +249,42 @@ export function ArchivesPage() {
   return (
     <div className="page">
       <PageHeader
-        title="归档对话"
-        description="统一查看和管理组织内已归档的个人与项目对话。"
-        meta={loading ? undefined : `${rows.length} 条记录`}
+        title={t('pageTitle')}
+        description={t('pageDescription')}
+        meta={loading ? undefined : t('recordCount', { count: String(rows.length) })}
         actions={selectedRows.length === 0 ? undefined : (
           <div className="pageActionGroup">
-            <Button icon={Undo2} onClick={() => setConfirmAction('restore')}>恢复所选</Button>
-            <Button icon={Trash2} variant="danger" onClick={() => setConfirmAction('trash')}>移入回收站</Button>
-            <Button variant="danger" onClick={() => setConfirmAction('purge')}>永久清理所选</Button>
+            <Button icon={Undo2} onClick={() => setConfirmAction('restore')}>{t('restoreSelected')}</Button>
+            <Button icon={Trash2} variant="danger" onClick={() => setConfirmAction('trash')}>{t('moveToTrash')}</Button>
+            <Button variant="danger" onClick={() => setConfirmAction('purge')}>{t('purgeSelected')}</Button>
           </div>
         )}
       />
       <ErrorBanner message={error} />
-      <Section title="空白会话维护" meta={emptyScanned ? '扫描完成' : '仅管理员可见'}>
+      <Section title={t('emptySectionTitle')} meta={emptyScanned ? t('emptyMetaScanned') : t('emptyMetaAdminOnly')}>
         <div className="archiveBulkBar">
-          <span>先扫描一小时无可见内容的会话，再将选中项移入可恢复回收站。</span>
+          <span>{t('emptyHint')}</span>
           <div className="pageActionGroup">
-            <Button icon={SearchCheck} onClick={() => { void scanEmptyDrafts() }} loading={emptyLoading}>扫描</Button>
-            {emptySelected.size > 0 ? <Button icon={Trash2} variant="danger" disabled={emptyLoading} onClick={() => { void moveEmptyDraftsToTrash() }}>清理选中空草稿</Button> : null}
+            <Button icon={SearchCheck} onClick={() => { void scanEmptyDrafts() }} loading={emptyLoading}>{t('scan')}</Button>
+            {emptySelected.size > 0 ? <Button icon={Trash2} variant="danger" disabled={emptyLoading} onClick={() => { void moveEmptyDraftsToTrash() }}>{t('trashSelectedEmpty')}</Button> : null}
           </div>
         </div>
         <ErrorBanner message={emptyError} />
         {emptyCandidates.length === 0 ? <div className="emptyDraftState">
           <span className="emptyDraftStateIcon" aria-hidden="true"><Archive /></span>
-          <strong>{emptyScanned ? '当前没有符合条件的空白会话' : '还没有扫描结果'}</strong>
-          <p>{emptyScanned ? '扫描完成，未发现超过一小时且没有可见内容的会话。' : '点击“扫描”查找超过一小时且没有可见内容的会话。'}</p>
+          <strong>{emptyScanned ? t('emptyScannedTitle') : t('emptyNotScannedTitle')}</strong>
+          <p>{emptyScanned ? t('emptyScannedDetail') : t('emptyNotScannedDetail')}</p>
         </div> : (
           <>
             <div className="tableWrap desktopOnly emptyDraftTableWrap">
-              <table className="dataTable emptyDraftTable" aria-label="空白会话维护列表">
-                <thead><tr><th aria-label="选择" /><th>会话</th><th>归属</th><th>创建者</th><th>更新时间</th><th>事件</th></tr></thead>
+              <table className="dataTable emptyDraftTable" aria-label={t('emptyTableAria')}>
+                <thead><tr><th aria-label={t('colSelect')} /><th>{t('colSession')}</th><th>{t('colOwner')}</th><th>{t('creatorLabel')}</th><th>{t('colUpdatedAt')}</th><th>{t('colEvents')}</th></tr></thead>
                 <tbody>{emptyCandidates.map(candidate => (
                   <tr key={candidate.rootSessionId}>
-                    <td><input type="checkbox" aria-label={`选择 ${candidate.rootSessionId}`} checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /></td>
+                    <td><input type="checkbox" aria-label={t('selectItem', { name: candidate.rootSessionId })} checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /></td>
                     <td><span className="codeText">{candidate.rootSessionId}</span></td>
-                    <td><span className="archiveOwner"><strong>{candidate.project?.name ?? '个人会话'}</strong><small>{candidate.runtime.kind === 'project' ? `项目 #${candidate.runtime.id}` : `个人运行时 #${candidate.runtime.id}`}</small></span></td>
-                    <td>{candidate.creator?.displayName ?? '未知用户'}</td>
+                    <td><span className="archiveOwner"><strong>{candidate.project?.name ?? t('personalConversation')}</strong><small>{candidate.runtime.kind === 'project' ? t('projectRuntime', { id: String(candidate.runtime.id) }) : t('personalRuntime', { id: String(candidate.runtime.id) })}</small></span></td>
+                    <td>{candidate.creator?.displayName ?? t('unknownUser')}</td>
                     <td><time dateTime={new Date(candidate.updatedAt).toISOString()}>{formatTime(candidate.updatedAt)}</time></td>
                     <td>{candidate.eventCount}</td>
                   </tr>
@@ -290,67 +293,67 @@ export function ArchivesPage() {
             </div>
             <div className="mobileList emptyDraftMobileList">{emptyCandidates.map(candidate => (
               <label className="mobileItem" key={candidate.rootSessionId}>
-                <span className="mobileItemHeader"><span className="checkLabel"><input type="checkbox" aria-label={`选择 ${candidate.rootSessionId}`} checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /><strong className="codeText">{candidate.rootSessionId}</strong></span><strong>{candidate.project?.name ?? '个人会话'}</strong></span>
-                <span className="mobileItemBody"><span className="muted">{candidate.creator?.displayName ?? '未知用户'} · {candidate.runtime.kind === 'project' ? `项目 #${candidate.runtime.id}` : `个人运行时 #${candidate.runtime.id}`}</span><span className="muted">{candidate.eventCount} 条事件 · {formatTime(candidate.updatedAt)}</span></span>
+                <span className="mobileItemHeader"><span className="checkLabel"><input type="checkbox" aria-label={t('selectItem', { name: candidate.rootSessionId })} checked={emptySelected.has(candidate.rootSessionId)} onChange={event => setEmptySelected(nextSelection(emptySelected, candidate.rootSessionId, event.target.checked))} /><strong className="codeText">{candidate.rootSessionId}</strong></span><strong>{candidate.project?.name ?? t('personalConversation')}</strong></span>
+                <span className="mobileItemBody"><span className="muted">{candidate.creator?.displayName ?? t('unknownUser')} · {candidate.runtime.kind === 'project' ? t('projectRuntime', { id: String(candidate.runtime.id) }) : t('personalRuntime', { id: String(candidate.runtime.id) })}</span><span className="muted">{t('eventCount', { count: String(candidate.eventCount) })} · {formatTime(candidate.updatedAt)}</span></span>
               </label>
             ))}</div>
           </>
         )}
       </Section>
-      <Section title="筛选条件">
+      <Section title={t('filterTitle')}>
         <form className="filterPanel" onSubmit={onFilter}>
           <div className="filterGrid">
-            <Field label="状态">
+            <Field label={t('stateLabel')}>
               <select className="input" value={draft.state} onChange={event => setDraft({ ...draft, state: event.target.value as Draft['state'] })}>
-                <option value="archived">已归档</option>
-                <option value="trash">回收站</option>
-                <option value="purged">已清理</option>
-                <option value="all">全部</option>
+                <option value="archived">{t('stateArchived')}</option>
+                <option value="trash">{t('stateTrash')}</option>
+                <option value="purged">{t('statePurged')}</option>
+                <option value="all">{t('stateAll')}</option>
               </select>
             </Field>
-            <Field label="关键词">
-              <input className="input" value={draft.query} onChange={event => setDraft({ ...draft, query: event.target.value })} placeholder="标题、正文或 Session ID" />
+            <Field label={t('filterKeyword')}>
+              <input className="input" value={draft.query} onChange={event => setDraft({ ...draft, query: event.target.value })} placeholder={t('filterKeywordPlaceholder')} />
             </Field>
-            <Field label="用户 ID">
-              <input className="input" value={draft.userId} onChange={event => setDraft({ ...draft, userId: event.target.value })} placeholder="全部用户" inputMode="numeric" />
+            <Field label={t('filterUserId')}>
+              <input className="input" value={draft.userId} onChange={event => setDraft({ ...draft, userId: event.target.value })} placeholder={t('filterUserIdAll')} inputMode="numeric" />
             </Field>
-            <Field label="项目 ID">
-              <input className="input" value={draft.projectId} onChange={event => setDraft({ ...draft, projectId: event.target.value })} placeholder="全部项目" inputMode="numeric" />
+            <Field label={t('filterProjectId')}>
+              <input className="input" value={draft.projectId} onChange={event => setDraft({ ...draft, projectId: event.target.value })} placeholder={t('filterProjectIdAll')} inputMode="numeric" />
             </Field>
           </div>
           <div className="filterActions">
-            <Button type="button" icon={RotateCcw} onClick={resetFilters} disabled={!hasFilters && draft.query === '' && draft.userId === '' && draft.projectId === ''}>重置</Button>
-            <Button type="submit" variant="primary" icon={Filter}>应用筛选</Button>
+            <Button type="button" icon={RotateCcw} onClick={resetFilters} disabled={!hasFilters && draft.query === '' && draft.userId === '' && draft.projectId === ''}>{t('filterReset')}</Button>
+            <Button type="submit" variant="primary" icon={Filter}>{t('filterApply')}</Button>
           </div>
         </form>
       </Section>
-      <Section className="responsiveSection" title="归档记录" meta={loading ? undefined : `第 ${page} 页`}>
-        {loading ? <LoadingState label="正在加载归档记录" /> : rows.length === 0 ? (
-          <EmptyState icon={Archive} title="没有匹配的归档对话" detail={hasFilters ? '调整筛选条件后重试。' : '当前还没有归档对话。'} />
+      <Section className="responsiveSection" title={t('recordsTitle')} meta={loading ? undefined : t('pageIndicator', { page: String(page) })}>
+        {loading ? <LoadingState label={t('loadingRecords')} /> : rows.length === 0 ? (
+          <EmptyState icon={Archive} title={t('emptyTitle')} detail={hasFilters ? t('emptyDetailFiltered') : t('emptyDetailNone')} />
         ) : (
           <>
             <div className="archiveBulkBar archiveSelectionSummary">
-              <span>{selectedRows.length > 0 ? `已选择 ${selectedRows.length} 条` : '选择记录后可批量操作'}</span>
+              <span>{selectedRows.length > 0 ? t('selectedCount', { count: String(selectedRows.length) }) : t('selectHint')}</span>
             </div>
             <div className="tableWrap desktopOnly">
               <table className="dataTable archiveTable">
-                <thead><tr><th aria-label="选择"><label className="checkLabel archiveSelectAll"><input ref={selectAllRef} type="checkbox" checked={allSelected} aria-checked={indeterminate ? 'mixed' : allSelected} onChange={event => toggleAll(event.target.checked)} /><span>全选本页</span></label></th><th>对话</th><th>归属</th><th>归档时间</th><th>状态</th><th>消息</th><th aria-label="查看" /></tr></thead>
+                <thead><tr><th aria-label={t('colSelect')}><label className="checkLabel archiveSelectAll"><input ref={selectAllRef} type="checkbox" checked={allSelected} aria-checked={indeterminate ? 'mixed' : allSelected} onChange={event => toggleAll(event.target.checked)} /><span>{t('selectAllPage')}</span></label></th><th>{t('colConversation')}</th><th>{t('colOwner')}</th><th>{t('colArchivedAt')}</th><th>{t('stateLabel')}</th><th>{t('colMessages')}</th><th aria-label={t('colView')} /></tr></thead>
                 <tbody>{rows.map(row => <ArchiveTableRow key={row.rootSessionId} row={row} checked={selected.has(row.rootSessionId)} onCheck={checked => setSelected(nextSelection(selected, row.rootSessionId, checked))} onOpen={() => void openDetail(row)} />)}</tbody>
               </table>
             </div>
             <div className="mobileList">{rows.map(row => <ArchiveMobileRow key={row.rootSessionId} row={row} checked={selected.has(row.rootSessionId)} onCheck={checked => setSelected(nextSelection(selected, row.rootSessionId, checked))} onOpen={() => void openDetail(row)} />)}</div>
           </>
         )}
-        {loading || (rows.length === 0 && offset === 0) ? null : <div className="pagination"><span>第 {page} 页</span><IconButton label="上一页" icon={ChevronLeft} variant="secondary" disabled={offset === 0} onClick={() => void fetchRows(active, Math.max(0, offset - PAGE_SIZE))} /><IconButton label="下一页" icon={ChevronRight} variant="secondary" disabled={rows.length < PAGE_SIZE} onClick={() => void fetchRows(active, offset + PAGE_SIZE)} /></div>}
+        {loading || (rows.length === 0 && offset === 0) ? null : <div className="pagination"><span>{t('pageIndicator', { page: String(page) })}</span><IconButton label={t('prevPage')} icon={ChevronLeft} variant="secondary" disabled={offset === 0} onClick={() => void fetchRows(active, Math.max(0, offset - PAGE_SIZE))} /><IconButton label={t('nextPage')} icon={ChevronRight} variant="secondary" disabled={rows.length < PAGE_SIZE} onClick={() => void fetchRows(active, offset + PAGE_SIZE)} /></div>}
       </Section>
-      <Dialog open={detail !== null || detailLoading} title={detail?.record.title ?? '归档对话'} description={detail === null ? '正在加载对话内容' : `${detail.record.workspace?.title ?? '未分组'} · ${detail.record.project?.name ?? '个人会话'}`} onClose={() => { if (!detailLoading) { detailGeneration.current++; setDetail(null) } }} wide footer={detail === null ? undefined : <div className="dialogActionRow">{detail.record.state === 'purged' ? <Button variant="secondary" disabled>导出</Button> : <a className="button button-secondary" href={exportArchive(detail.record.rootSessionId)}>导出</a>}<Button icon={Undo2} onClick={() => setConfirmAction('restore')} loading={pendingAction === 'restore'} disabled={detail.record.syncState === 'pending' || detail.record.state === 'purged'}>恢复</Button><Button icon={Trash2} variant="danger" onClick={() => setConfirmAction('trash')} loading={pendingAction === 'trash'} disabled={detail.record.syncState === 'pending' || detail.record.state === 'purged'}>移入回收站</Button><Button variant="danger" onClick={() => setConfirmAction('purge')} loading={pendingAction === 'purge'} disabled={detail.record.syncState === 'pending' || (detail.record.state === 'purged' && detail.record.syncState === 'synced')}>永久清理</Button></div>}>
-        {detailLoading ? <LoadingState label="正在读取对话" /> : detail === null ? null : <ArchiveDetail detail={detail} error={actionError} />}
+      <Dialog open={detail !== null || detailLoading} title={detail?.record.title ?? t('dialogTitleFallback')} description={detail === null ? t('dialogLoading') : `${detail.record.workspace?.title ?? t('ungrouped')} · ${detail.record.project?.name ?? t('personalConversation')}`} onClose={() => { if (!detailLoading) { detailGeneration.current++; setDetail(null) } }} wide footer={detail === null ? undefined : <div className="dialogActionRow">{detail.record.state === 'purged' ? <Button variant="secondary" disabled>{t('exportAction')}</Button> : <a className="button button-secondary" href={exportArchive(detail.record.rootSessionId)}>{t('exportAction')}</a>}<Button icon={Undo2} onClick={() => setConfirmAction('restore')} loading={pendingAction === 'restore'} disabled={detail.record.syncState === 'pending' || detail.record.state === 'purged'}>{t('restore')}</Button><Button icon={Trash2} variant="danger" onClick={() => setConfirmAction('trash')} loading={pendingAction === 'trash'} disabled={detail.record.syncState === 'pending' || detail.record.state === 'purged'}>{t('moveToTrash')}</Button><Button variant="danger" onClick={() => setConfirmAction('purge')} loading={pendingAction === 'purge'} disabled={detail.record.syncState === 'pending' || (detail.record.state === 'purged' && detail.record.syncState === 'synced')}>{t('purge')}</Button></div>}>
+        {detailLoading ? <LoadingState label={t('loadingConversation')} /> : detail === null ? null : <ArchiveDetail detail={detail} error={actionError} />}
       </Dialog>
       <ConfirmDialog
         open={confirmAction !== null}
-        title={confirmAction === 'purge' ? '永久清理归档对话？' : confirmAction === 'trash' ? '移入回收站？' : '恢复归档对话？'}
-        description={confirmAction === 'purge' ? '请求将在实例确认资源释放后清理整棵对话树及关联内容，不能恢复。仍有运行、子任务、终端或待处理输入时会拒绝，请先停止。' : confirmAction === 'trash' ? '对话会进入回收站，并在部署配置的保留窗口内可恢复。' : '对话会恢复到原来的 Workspace 位置。'}
-        confirmLabel={confirmAction === 'purge' ? '永久清理' : confirmAction === 'trash' ? '移入回收站' : '恢复'}
+        title={confirmAction === 'purge' ? t('confirmPurgeTitle') : confirmAction === 'trash' ? t('confirmTrashTitle') : t('confirmRestoreTitle')}
+        description={confirmAction === 'purge' ? t('confirmPurgeDescription') : confirmAction === 'trash' ? t('confirmTrashDescription') : t('confirmRestoreDescription')}
+        confirmLabel={confirmAction === 'purge' ? t('purge') : confirmAction === 'trash' ? t('moveToTrash') : t('restore')}
         pending={pendingAction !== null}
         onClose={() => { if (pendingAction === null) setConfirmAction(null) }}
         onConfirm={() => { if (confirmAction !== null) { const action = confirmAction; setConfirmAction(null); void runAction(action) } }}
@@ -360,37 +363,43 @@ export function ArchivesPage() {
 }
 
 function ArchiveTableRow({ row, checked, onCheck, onOpen }: { row: ConversationArchiveRow; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void }) {
-  return <tr><td><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong>{row.contentPreview === undefined || row.contentPreview === null ? <small className="archivePreview archivePreviewEmpty">暂无正文摘要</small> : <small className="archivePreview" title={row.contentPreview}>{row.contentPreview}</small>}<span className="codeText archiveSessionId">{row.rootSessionId}</span></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? '未知用户'}<small>{row.project?.name ?? '个人会话'}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td><ArchiveStateBadge state={row.state} /><ArchiveSyncState row={row} /></td><td>{row.messageCount}</td><td className="alignRight"><IconButton label={`查看 ${row.title}`} icon={Eye} onClick={onOpen} /></td></tr>
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
+  return <tr><td><input type="checkbox" aria-label={t('selectItem', { name: row.title })} checked={checked} onChange={event => onCheck(event.target.checked)} /></td><td><button type="button" className="tableLink" onClick={onOpen}><strong>{row.title}</strong>{row.contentPreview === undefined || row.contentPreview === null ? <small className="archivePreview archivePreviewEmpty">{t('noPreview')}</small> : <small className="archivePreview" title={row.contentPreview}>{row.contentPreview}</small>}<span className="codeText archiveSessionId">{row.rootSessionId}</span></button></td><td><span className="archiveOwner">{row.creator?.displayName ?? t('unknownUser')}<small>{row.project?.name ?? t('personalConversation')}</small></span></td><td><time dateTime={new Date(row.archivedAt).toISOString()}>{formatTime(row.archivedAt)}</time></td><td><ArchiveStateBadge state={row.state} /><ArchiveSyncState row={row} /></td><td>{row.messageCount}</td><td className="alignRight"><IconButton label={t('viewItem', { name: row.title })} icon={Eye} onClick={onOpen} /></td></tr>
 }
 
 function ArchiveMobileRow({ row, checked, onCheck, onOpen }: { row: ConversationArchiveRow; checked: boolean; onCheck: (checked: boolean) => void; onOpen: () => void }) {
-  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked} onChange={event => onCheck(event.target.checked)} /><span className="archiveIdentity"><strong>{row.title}</strong><small className="archivePreview">{row.contentPreview ?? '暂无正文摘要'}</small><small className="codeText archiveSessionId">{row.rootSessionId}</small></span></label><div><ArchiveStateBadge state={row.state} /><ArchiveSyncState row={row} /></div></div><button type="button" className="archiveMobileOpen" onClick={onOpen}><span>{row.creator?.displayName ?? '未知用户'} · {row.project?.name ?? '个人会话'}</span><span>{formatTime(row.archivedAt)} · {row.messageCount} 条消息</span></button></article>
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
+  return <article className="mobileItem archiveMobileItem"><div className="mobileItemHeader"><label className="checkLabel"><input type="checkbox" aria-label={t('selectItem', { name: row.title })} checked={checked} onChange={event => onCheck(event.target.checked)} /><span className="archiveIdentity"><strong>{row.title}</strong><small className="archivePreview">{row.contentPreview ?? t('noPreview')}</small><small className="codeText archiveSessionId">{row.rootSessionId}</small></span></label><div><ArchiveStateBadge state={row.state} /><ArchiveSyncState row={row} /></div></div><button type="button" className="archiveMobileOpen" onClick={onOpen}><span>{row.creator?.displayName ?? t('unknownUser')} · {row.project?.name ?? t('personalConversation')}</span><span>{formatTime(row.archivedAt)} · {t('messageCount', { count: String(row.messageCount) })}</span></button></article>
 }
 
 function ArchiveSyncState({ row }: { row: ConversationArchiveRow }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
   if (row.syncState === 'synced') return null
-  const label = row.syncState === 'pending' ? '等待实例确认' : row.syncState === 'conflict' ? '操作未完成' : '实例暂不可用'
+  const label = row.syncState === 'pending' ? t('syncPending') : row.syncState === 'conflict' ? t('syncConflict') : t('syncUnavailable')
   return <small className="archiveSyncState" title={row.lastSyncError}>{label}</small>
 }
 
 function ArchiveDetail({ detail, error }: { detail: ConversationArchiveDetail; error: string }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
   const syncLabels: Record<ConversationArchiveDetail['record']['syncState'], string> = {
-    pending: '等待实例确认',
-    synced: '已同步',
-    conflict: '操作未完成',
-    unavailable: '运行时暂不可用',
+    pending: t('syncPending'),
+    synced: t('syncSynced'),
+    conflict: t('syncConflict'),
+    unavailable: t('syncUnavailableDetail'),
   }
-  return <div className="archiveDetail"><ErrorBanner message={error || detail.record.lastSyncError || ''} /><dl className="definitionGrid"><div className="definitionRow"><dt>创建者</dt><dd>{detail.record.creator?.displayName ?? '未知用户'}</dd></div><div className="definitionRow"><dt>Workspace</dt><dd>{detail.record.workspace?.title ?? '未分组'}</dd></div><div className="definitionRow"><dt>项目</dt><dd>{detail.record.project?.name ?? '个人会话'}</dd></div><div className="definitionRow"><dt>归档时间</dt><dd><time dateTime={new Date(detail.record.archivedAt).toISOString()}>{formatTime(detail.record.archivedAt)}</time></dd></div><div className="definitionRow"><dt>记录状态</dt><dd><ArchiveStateBadge state={detail.record.state} /></dd></div><div className="definitionRow"><dt>同步状态</dt><dd>{syncLabels[detail.record.syncState]}</dd></div></dl><ArchiveConversationOrRemoval detail={detail} /></div>
+  return <div className="archiveDetail"><ErrorBanner message={error || detail.record.lastSyncError || ''} /><dl className="definitionGrid"><div className="definitionRow"><dt>{t('creatorLabel')}</dt><dd>{detail.record.creator?.displayName ?? t('unknownUser')}</dd></div><div className="definitionRow"><dt>Workspace</dt><dd>{detail.record.workspace?.title ?? t('ungrouped')}</dd></div><div className="definitionRow"><dt>{t('detailProject')}</dt><dd>{detail.record.project?.name ?? t('personalConversation')}</dd></div><div className="definitionRow"><dt>{t('colArchivedAt')}</dt><dd><time dateTime={new Date(detail.record.archivedAt).toISOString()}>{formatTime(detail.record.archivedAt)}</time></dd></div><div className="definitionRow"><dt>{t('recordStateLabel')}</dt><dd><ArchiveStateBadge state={detail.record.state} /></dd></div><div className="definitionRow"><dt>{t('syncStateLabel')}</dt><dd>{syncLabels[detail.record.syncState]}</dd></div></dl><ArchiveConversationOrRemoval detail={detail} /></div>
 }
 
 function ArchiveConversationOrRemoval({ detail }: { detail: ConversationArchiveDetail }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
   return detail.record.state === 'purged' && detail.record.syncState === 'synced'
-    ? <EmptyState icon={Archive} title="对话已永久清理" detail="正文和历史 Review 已清理，不能恢复。" />
+    ? <EmptyState icon={Archive} title={t('purgedTitle')} detail={t('purgedDetail')} />
     : <ArchiveConversation detail={detail} />
 }
 
 function ArchiveStateBadge({ state }: { state: ConversationArchiveState }) {
-  const labels: Record<ConversationArchiveState, string> = { archived: '已归档', trash: '回收站', purged: '已清理' }
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn }), [])
+  const labels: Record<ConversationArchiveState, string> = { archived: t('stateArchived'), trash: t('stateTrash'), purged: t('statePurged') }
   const tones: Record<ConversationArchiveState, 'info' | 'warning' | 'danger'> = { archived: 'info', trash: 'warning', purged: 'danger' }
   return <StatusBadge tone={tones[state]}>{labels[state]}</StatusBadge>
 }
@@ -402,7 +411,8 @@ function nextSelection(current: Set<string>, id: string, checked: boolean): Set<
 }
 
 function formatTime(timestamp: number): string {
-  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(timestamp)
+  const t = translateCopy(adminLanguage(), { zh: archivesZh, en: archivesEn })
+  return new Intl.DateTimeFormat(t('dateLocale'), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(timestamp)
 }
 
 function messageFrom(cause: unknown): string { return cause instanceof Error ? cause.message : String(cause) }

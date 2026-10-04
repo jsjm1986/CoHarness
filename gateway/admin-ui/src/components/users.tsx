@@ -1,8 +1,10 @@
 /** Shared user identity, state badges, instance controls, and account dialogs. */
 import { Play, RefreshCw, Square } from 'lucide-react'
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { controlInstance, type AdminUser } from '../api.ts'
+import { adminLanguage, translateCopy } from '../language.ts'
 import { Button, ConfirmDialog, Dialog, Field, IconButton, StatusBadge, Switch } from './ui.tsx'
+import { zh, en } from './users.copy.ts'
 
 export type UserRole = AdminUser['role']
 
@@ -22,23 +24,27 @@ export function UserIdentity({ user }: { user: AdminUser }) {
 }
 
 export function RoleBadge({ role }: { role: UserRole }) {
-  return <StatusBadge tone={role === 'admin' ? 'info' : 'neutral'}>{role === 'admin' ? '管理员' : '普通用户'}</StatusBadge>
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
+  return <StatusBadge tone={role === 'admin' ? 'info' : 'neutral'}>{role === 'admin' ? t('roleAdmin') : t('roleUser')}</StatusBadge>
 }
 
 export function AutoReviewBadge({ eligible }: { eligible: boolean }) {
-  return <StatusBadge tone={eligible ? 'info' : 'neutral'}>{eligible ? '已授予' : '未授予'}</StatusBadge>
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
+  return <StatusBadge tone={eligible ? 'info' : 'neutral'}>{eligible ? t('granted') : t('notGranted')}</StatusBadge>
 }
 
 export function AccountBadge({ status }: { status: AdminUser['status'] }) {
-  return <StatusBadge tone={status === 'active' ? 'success' : 'danger'}>{status === 'active' ? '正常' : '已禁用'}</StatusBadge>
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
+  return <StatusBadge tone={status === 'active' ? 'success' : 'danger'}>{status === 'active' ? t('accountActive') : t('accountDisabled')}</StatusBadge>
 }
 
 export function InstanceState({ state }: { state: string }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const labels: Record<string, string> = {
-    ready: '运行中',
-    starting: '启动中',
-    stopping: '停止中',
-    stopped: '已停止',
+    ready: t('stateReady'),
+    starting: t('stateStarting'),
+    stopping: t('stateStopping'),
+    stopped: t('stateStopped'),
   }
   const tone = state === 'ready' ? 'success' : state === 'starting' ? 'info' : state === 'stopping' ? 'warning' : 'neutral'
   return <StatusBadge tone={tone}>{labels[state] ?? state}</StatusBadge>
@@ -54,25 +60,26 @@ export function InstanceCell({ user, pending, run }: { user: AdminUser; pending:
 }
 
 export function InstanceControls({ user, pending, run }: { user: AdminUser; pending: string; run: UserActionRunner }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const busy = pending.startsWith(`instance:${user.id}:`)
   return (
-    <div className="compactActions" aria-label={`${user.username} 实例操作`}>
+    <div className="compactActions" aria-label={t('instanceActionsAria', { name: user.username })}>
       <IconButton
-        label="启动实例"
+        label={t('instanceStart')}
         icon={Play}
         disabled={busy || user.instanceState === 'ready' || user.instanceState === 'starting'}
         loading={pending === `instance:${user.id}:start`}
         onClick={() => void run(`instance:${user.id}:start`, () => controlInstance(user.id, 'start'))}
       />
       <IconButton
-        label="停止实例"
+        label={t('instanceStop')}
         icon={Square}
         disabled={busy || user.instanceState === 'stopped' || user.instanceState === 'stopping'}
         loading={pending === `instance:${user.id}:stop`}
         onClick={() => void run(`instance:${user.id}:stop`, () => controlInstance(user.id, 'stop'))}
       />
       <IconButton
-        label="重启实例"
+        label={t('instanceRestart')}
         icon={RefreshCw}
         disabled={busy || user.instanceState !== 'ready'}
         loading={pending === `instance:${user.id}:restart`}
@@ -106,6 +113,7 @@ export function UserCreateDialog({ open, pending, onSubmit, onClose }: {
   onSubmit: (draft: UserDraft) => void
   onClose: () => void
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const [draft, setDraft] = useState<UserDraft>(EMPTY_USER_DRAFT)
   useEffect(() => { if (open) setDraft(EMPTY_USER_DRAFT) }, [open])
   function submit(event: FormEvent) {
@@ -115,30 +123,30 @@ export function UserCreateDialog({ open, pending, onSubmit, onClose }: {
   return (
     <Dialog
       open={open}
-      title="新建用户"
-      description="创建登录账号并分配初始管理角色。"
+      title={t('createTitle')}
+      description={t('createDescription')}
       onClose={() => { if (!pending) onClose() }}
       footer={(
         <>
-          <Button type="button" onClick={onClose} disabled={pending}>取消</Button>
-          <Button type="submit" form="create-user-form" variant="primary" loading={pending}>创建用户</Button>
+          <Button type="button" onClick={onClose} disabled={pending}>{t('cancel')}</Button>
+          <Button type="submit" form="create-user-form" variant="primary" loading={pending}>{t('createSubmit')}</Button>
         </>
       )}
     >
       <form id="create-user-form" className="formGrid" onSubmit={submit}>
-        <Field label="用户名" hint="用于登录，创建后不可修改。">
+        <Field label={t('fieldUsername')} hint={t('hintUsername')}>
           <input className="input" required autoComplete="off" value={draft.username} onChange={event => setDraft({ ...draft, username: event.target.value })} />
         </Field>
-        <Field label="显示名">
-          <input className="input" value={draft.displayName} onChange={event => setDraft({ ...draft, displayName: event.target.value })} placeholder="可选" />
+        <Field label={t('fieldDisplayName')}>
+          <input className="input" value={draft.displayName} onChange={event => setDraft({ ...draft, displayName: event.target.value })} placeholder={t('placeholderOptional')} />
         </Field>
-        <Field label="初始密码" className="formSpanFull">
+        <Field label={t('fieldInitialPassword')} className="formSpanFull">
           <input className="input" required type="password" autoComplete="new-password" value={draft.password} onChange={event => setDraft({ ...draft, password: event.target.value })} />
         </Field>
-        <Field label="角色" className="formSpanFull">
+        <Field label={t('fieldRole')} className="formSpanFull">
           <select className="select" value={draft.role} onChange={event => setDraft({ ...draft, role: event.target.value as UserRole })}>
-            <option value="user">普通用户</option>
-            <option value="admin">管理员</option>
+            <option value="user">{t('roleUser')}</option>
+            <option value="admin">{t('roleAdmin')}</option>
           </select>
         </Field>
       </form>
@@ -152,6 +160,7 @@ export function UserEditDialog({ user, pending, onSubmit, onClose }: {
   onSubmit: (patch: { displayName?: string; role?: UserRole; autoReviewEligible?: boolean }) => void
   onClose: () => void
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const [name, setName] = useState('')
   const [role, setRole] = useState<UserRole>('user')
   const [eligible, setEligible] = useState(false)
@@ -173,29 +182,29 @@ export function UserEditDialog({ user, pending, onSubmit, onClose }: {
   return (
     <Dialog
       open={user !== null}
-      title={`编辑 ${user?.username ?? ''}`}
-      description="更新显示名、管理角色和 Auto 审查资格。"
+      title={t('editTitle', { name: user?.username ?? '' })}
+      description={t('editDescription')}
       onClose={() => { if (!pending) onClose() }}
       footer={(
         <>
-          <Button type="button" onClick={onClose} disabled={pending}>取消</Button>
-          <Button type="submit" form="edit-user-form" variant="primary" loading={pending}>保存更改</Button>
+          <Button type="button" onClick={onClose} disabled={pending}>{t('cancel')}</Button>
+          <Button type="submit" form="edit-user-form" variant="primary" loading={pending}>{t('saveChanges')}</Button>
         </>
       )}
     >
       <form id="edit-user-form" className="formGrid" onSubmit={submit}>
-        <Field label="显示名">
+        <Field label={t('fieldDisplayName')}>
           <input className="input" value={name} onChange={event => setName(event.target.value)} />
         </Field>
-        <Field label="角色">
+        <Field label={t('fieldRole')}>
           <select className="select" value={role} onChange={event => setRole(event.target.value as UserRole)}>
-            <option value="user">普通用户</option>
-            <option value="admin">管理员</option>
+            <option value="user">{t('roleUser')}</option>
+            <option value="admin">{t('roleAdmin')}</option>
           </select>
         </Field>
         <div className="field">
-          <Switch label="允许选择 Auto 审查" checked={eligible} onChange={setEligible} disabled={pending} />
-          <span className="fieldHint">授予资格不会自动启用 Auto，也不会改变已有会话或新会话的默认权限。用户仍需在当前会话主动选择。</span>
+          <Switch label={t('autoReviewLabel')} checked={eligible} onChange={setEligible} disabled={pending} />
+          <span className="fieldHint">{t('autoReviewHint')}</span>
         </div>
       </form>
     </Dialog>
@@ -208,6 +217,7 @@ export function UserPasswordDialog({ user, pending, onSubmit, onClose }: {
   onSubmit: (password: string) => void
   onClose: () => void
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   const [password, setPassword] = useState('')
   useEffect(() => { if (user !== null) setPassword('') }, [user])
   function submit(event: FormEvent) {
@@ -217,18 +227,18 @@ export function UserPasswordDialog({ user, pending, onSubmit, onClose }: {
   return (
     <Dialog
       open={user !== null}
-      title={`重置 ${user?.username ?? ''} 的密码`}
-      description="新密码会立即替换当前登录密码。"
+      title={t('passwordTitle', { name: user?.username ?? '' })}
+      description={t('passwordDescription')}
       onClose={() => { if (!pending) onClose() }}
       footer={(
         <>
-          <Button type="button" onClick={onClose} disabled={pending}>取消</Button>
-          <Button type="submit" form="reset-password-form" variant="primary" loading={pending}>重置密码</Button>
+          <Button type="button" onClick={onClose} disabled={pending}>{t('cancel')}</Button>
+          <Button type="submit" form="reset-password-form" variant="primary" loading={pending}>{t('passwordSubmit')}</Button>
         </>
       )}
     >
       <form id="reset-password-form" onSubmit={submit}>
-        <Field label="新密码">
+        <Field label={t('fieldNewPassword')}>
           <input className="input" required autoFocus type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} />
         </Field>
       </form>
@@ -242,12 +252,13 @@ export function UserDisableConfirm({ user, pending, onConfirm, onClose }: {
   onConfirm: () => void
   onClose: () => void
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   return (
     <ConfirmDialog
       open={user !== null}
-      title="禁用用户"
-      description={`禁用 ${user?.username ?? ''} 后，该账号将无法继续登录。`}
-      confirmLabel="确认禁用"
+      title={t('disableTitle')}
+      description={t('disableDescription', { name: user?.username ?? '' })}
+      confirmLabel={t('disableConfirm')}
       pending={pending}
       onClose={() => { if (!pending) onClose() }}
       onConfirm={onConfirm}
@@ -261,12 +272,13 @@ export function UserDeleteConfirm({ user, pending, onConfirm, onClose }: {
   onConfirm: () => void
   onClose: () => void
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh, en }), [])
   return (
     <ConfirmDialog
       open={user !== null}
-      title="删除用户"
-      description={`删除 ${user?.username ?? ''} 后会立即撤销登录、停止实例并移除项目成员关系。审计、用量、协作会话和本地历史会保留，用户名不可复用；此操作不可恢复。`}
-      confirmLabel="确认删除"
+      title={t('deleteTitle')}
+      description={t('deleteDescription', { name: user?.username ?? '' })}
+      confirmLabel={t('deleteConfirm')}
       pending={pending}
       onClose={() => { if (!pending) onClose() }}
       onConfirm={onConfirm}

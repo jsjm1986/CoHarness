@@ -12,10 +12,13 @@ import {
   Section,
 } from '../components/ui.tsx'
 import { formatCompact, formatMoney, MeteringState, Metric, PricingState, QuotaSummary } from '../components/usage.tsx'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { en as usagePageEn, zh as usagePageZh } from './usage-page.copy.ts'
 
 type QuotaMode = 'inherit' | 'unlimited' | 'custom'
 
 export function UsagePage() {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: usagePageZh, en: usagePageEn }), [])
   const [month, setMonth] = useState('')
   const [overview, setOverview] = useState<UsageOverview | null>(null)
   const [health, setHealth] = useState<UsageHealth | null>(null)
@@ -81,8 +84,8 @@ export function UsagePage() {
       const parsedToken = Number(tokenLimit)
       const parsedCost = Number(costLimit)
       const costMicros = Math.round(parsedCost * 1_000_000)
-      if (tokenMode === 'custom' && (!Number.isSafeInteger(parsedToken) || parsedToken < 0)) throw new Error('Token 额度必须是非负整数')
-      if (costMode === 'custom' && (!Number.isFinite(parsedCost) || parsedCost < 0 || !Number.isSafeInteger(costMicros))) throw new Error('成本额度必须是有效的非负数')
+      if (tokenMode === 'custom' && (!Number.isSafeInteger(parsedToken) || parsedToken < 0)) throw new Error(t('quotaTokenInvalid'))
+      if (costMode === 'custom' && (!Number.isFinite(parsedCost) || parsedCost < 0 || !Number.isSafeInteger(costMicros))) throw new Error(t('quotaCostInvalid'))
       await setQuota({
         subjectType,
         subjectId,
@@ -101,34 +104,34 @@ export function UsagePage() {
   return (
     <div className="page">
       <PageHeader
-        title="模型用量"
-        description="个人用量用于额度与账务；项目贡献用于活动分析，不与项目总量重复相加。"
+        title={t('pageTitle')}
+        description={t('pageDescription')}
         actions={(
           <div className="pageToolbar">
-            <label className="monthPicker"><span>月份</span><input className="input" type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
-            <Button icon={Settings2} onClick={() => setQuotaOpen(true)}>配置额度</Button>
+            <label className="monthPicker"><span>{t('monthLabel')}</span><input className="input" type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
+            <Button icon={Settings2} onClick={() => setQuotaOpen(true)}>{t('configureQuota')}</Button>
           </div>
         )}
       />
       <ErrorBanner message={error} />
-      <div className="metricGrid usageOverviewMetrics" aria-label="用量汇总">
-        <Metric label="个人调用" value={totals.personalCalls.toLocaleString()} />
-        <Metric label="个人 Token" value={formatCompact(totals.personalTokens)} />
-        <Metric label="项目 Token" value={formatCompact(totals.projectTokens)} />
-        <Metric label="项目公司成本" value={formatMoney(overview?.projects.companyCostMicros ?? 0, 2)} />
-        <Metric label="未归属项目 Token" value={formatCompact(totals.unattributedTokens)} tone={totals.unattributedTokens > 0 ? 'warning' : undefined} />
-        <Metric label="个人公司成本" value={formatMoney(totals.companyCost, 2)} />
-        <Metric label="额度告警" value={totals.alerts.toLocaleString()} tone={totals.alerts > 0 ? 'warning' : undefined} />
+      <div className="metricGrid usageOverviewMetrics" aria-label={t('summaryAria')}>
+        <Metric label={t('metricPersonalCalls')} value={totals.personalCalls.toLocaleString()} />
+        <Metric label={t('metricPersonalTokens')} value={formatCompact(totals.personalTokens)} />
+        <Metric label={t('metricProjectTokens')} value={formatCompact(totals.projectTokens)} />
+        <Metric label={t('metricProjectCost')} value={formatMoney(overview?.projects.companyCostMicros ?? 0, 2)} />
+        <Metric label={t('metricUnattributedTokens')} value={formatCompact(totals.unattributedTokens)} tone={totals.unattributedTokens > 0 ? 'warning' : undefined} />
+        <Metric label={t('metricPersonalCost')} value={formatMoney(totals.companyCost, 2)} />
+        <Metric label={t('metricQuotaAlerts')} value={totals.alerts.toLocaleString()} tone={totals.alerts > 0 ? 'warning' : undefined} />
       </div>
-      <Section className="responsiveSection" title="用户用量" meta={loading ? undefined : `${rows.length} 位用户 · ${overview?.timeZone ?? ''}`}>
-        {loading ? <LoadingState label="正在加载用量" /> : rows.length === 0 ? (
-          <EmptyState icon={Gauge} title="本月暂无用量" detail="所选月份还没有收到模型调用计量记录。" />
+      <Section className="responsiveSection" title={t('usersTitle')} meta={loading ? undefined : t('usersMeta', { count: String(rows.length), timeZone: overview?.timeZone ?? '' })}>
+        {loading ? <LoadingState label={t('loadingUsage')} /> : rows.length === 0 ? (
+          <EmptyState icon={Gauge} title={t('emptyTitle')} detail={t('emptyDetail')} />
         ) : (
           <>
             <div className="tableWrap desktopOnly">
               <table className="dataTable usageTable">
                 <thead>
-                  <tr><th>用户</th><th>个人调用</th><th>个人 Token</th><th>项目贡献</th><th>个人公司成本</th><th>价格</th><th>计量与额度</th></tr>
+                  <tr><th>{t('columnUser')}</th><th>{t('metricPersonalCalls')}</th><th>{t('metricPersonalTokens')}</th><th>{t('columnContribution')}</th><th>{t('metricPersonalCost')}</th><th>{t('columnPricing')}</th><th>{t('columnMeteringQuota')}</th></tr>
                 </thead>
                 <tbody>
                   {rows.map(row => (
@@ -151,11 +154,11 @@ export function UsagePage() {
                   <div className="mobileItemHeader"><UsageIdentity row={row} /><MeteringState missing={row.personal.missingUsageCalls} /></div>
                   <div className="mobileItemBody">
                     <dl className="definitionGrid">
-                      <Definition label="个人调用">{row.personal.calls.toLocaleString()}</Definition>
-                      <Definition label="个人 Token">{row.personal.totalTokens.toLocaleString()}</Definition>
-                      <Definition label="项目贡献">{row.projectContribution.totalTokens.toLocaleString()}（{row.projectContribution.calls.toLocaleString()} 次）</Definition>
-                      <Definition label="个人公司成本">{formatMoney(row.personal.companyCostMicros)}</Definition>
-                      <Definition label="价格"><PricingState pricing={row.personal.pricing} /></Definition>
+                      <Definition label={t('metricPersonalCalls')}>{row.personal.calls.toLocaleString()}</Definition>
+                      <Definition label={t('metricPersonalTokens')}>{row.personal.totalTokens.toLocaleString()}</Definition>
+                      <Definition label={t('columnContribution')}>{t('contributionValue', { tokens: row.projectContribution.totalTokens.toLocaleString(), calls: row.projectContribution.calls.toLocaleString() })}</Definition>
+                      <Definition label={t('metricPersonalCost')}>{formatMoney(row.personal.companyCostMicros)}</Definition>
+                      <Definition label={t('columnPricing')}><PricingState pricing={row.personal.pricing} /></Definition>
                     </dl>
                     <QuotaSummary summary={row.personal} />
                   </div>
@@ -165,63 +168,63 @@ export function UsagePage() {
           </>
         )}
       </Section>
-      <Section className="responsiveSection" title="计量健康" meta={health?.timeZone}>
-        {health === null ? <LoadingState label="正在加载计量健康" /> : (
-          <div className="usageHealthMetrics" aria-label="计量健康指标">
+      <Section className="responsiveSection" title={t('healthTitle')} meta={health?.timeZone}>
+        {health === null ? <LoadingState label={t('loadingHealth')} /> : (
+          <div className="usageHealthMetrics" aria-label={t('healthAria')}>
             <Metric
-              label="缺失计量"
-              value={`${health.missingUsageCalls.toLocaleString()} 次`}
+              label={t('healthMissing')}
+              value={t('callsValue', { count: health.missingUsageCalls.toLocaleString() })}
               tone={health.missingUsageCalls > 0 ? 'warning' : undefined}
             />
             <Metric
-              label="未归属项目调用"
-              value={`${health.unattributedProjectCalls.toLocaleString()} 次`}
+              label={t('healthUnattributedCalls')}
+              value={t('callsValue', { count: health.unattributedProjectCalls.toLocaleString() })}
               tone={health.unattributedProjectCalls > 0 ? 'warning' : undefined}
             />
             <Metric
-              label="未归属项目 Token"
+              label={t('metricUnattributedTokens')}
               value={health.unattributedProjectTokens.toLocaleString()}
               tone={health.unattributedProjectTokens > 0 ? 'warning' : undefined}
             />
             <Metric
-              label="未配置价格"
-              value={`${health.unpricedCalls.toLocaleString()} 次`}
+              label={t('healthUnpriced')}
+              value={t('callsValue', { count: health.unpricedCalls.toLocaleString() })}
               tone={health.unpricedCalls > 0 ? 'warning' : undefined}
             />
-            <Metric label="历史价格未知" value={`${health.historicalUnknownCalls.toLocaleString()} 次`} />
-            <Metric label="最大上报延迟" value={`${(health.maxIntakeLagMs / 1000).toFixed(1)} 秒`} />
+            <Metric label={t('healthHistoricalUnknown')} value={t('callsValue', { count: health.historicalUnknownCalls.toLocaleString() })} />
+            <Metric label={t('healthMaxLag')} value={t('lagValue', { value: (health.maxIntakeLagMs / 1000).toFixed(1) })} />
           </div>
         )}
       </Section>
 
       <Dialog
         open={quotaOpen}
-        title="配置月度额度"
-        description="额度在 80% 和 100% 产生告警，但不会阻断模型调用。"
+        title={t('quotaDialogTitle')}
+        description={t('quotaDialogDescription')}
         onClose={() => { if (!quotaSaving) setQuotaOpen(false) }}
         footer={(
           <>
-            <Button type="button" disabled={quotaSaving} onClick={() => setQuotaOpen(false)}>取消</Button>
-            <Button type="submit" form="quota-form" variant="primary" loading={quotaSaving}>保存额度</Button>
+            <Button type="button" disabled={quotaSaving} onClick={() => setQuotaOpen(false)}>{t('cancel')}</Button>
+            <Button type="submit" form="quota-form" variant="primary" loading={quotaSaving}>{t('saveQuota')}</Button>
           </>
         )}
       >
         <form id="quota-form" onSubmit={event => void save(event)}>
           <div className="formGrid">
-            <Field label="配置对象">
+            <Field label={t('subjectField')}>
               <select className="select" value={subjectType} onChange={event => changeSubjectType(event.target.value as 'role' | 'user')}>
-                <option value="role">角色默认</option>
-                <option value="user">指定用户</option>
+                <option value="role">{t('subjectRole')}</option>
+                <option value="user">{t('subjectUser')}</option>
               </select>
             </Field>
-            <Field label={subjectType === 'role' ? '角色' : '用户'}>
+            <Field label={subjectType === 'role' ? t('fieldRole') : t('fieldUser')}>
               {subjectType === 'role' ? (
                 <select className="select" value={subjectId} onChange={event => setSubjectId(event.target.value)}>
-                  <option value="user">普通用户</option><option value="admin">管理员</option>
+                  <option value="user">{t('roleUser')}</option><option value="admin">{t('roleAdmin')}</option>
                 </select>
               ) : (
                 <select className="select" required value={subjectId} onChange={event => setSubjectId(event.target.value)}>
-                  {users.length === 0 ? <option value="">暂无用户</option> : users.map(user => <option key={user.id} value={user.id}>{user.username}（ID {user.id}）</option>)}
+                  {users.length === 0 ? <option value="">{t('noUsers')}</option> : users.map(user => <option key={user.id} value={user.id}>{t('userOption', { name: user.username, id: String(user.id) })}</option>)}
                 </select>
               )}
             </Field>
@@ -229,21 +232,21 @@ export function UsagePage() {
           <div className="formDivider" />
           <div className="quotaEditorGrid">
             <QuotaEditor
-              label="Token 额度"
+              label={t('tokenQuotaLabel')}
               mode={tokenMode}
               subjectType={subjectType}
               value={tokenLimit}
-              inputLabel="每月 Token"
+              inputLabel={t('monthlyTokensLabel')}
               inputMode="numeric"
               onMode={setTokenMode}
               onValue={setTokenLimit}
             />
             <QuotaEditor
-              label="公司成本额度"
+              label={t('costQuotaLabel')}
               mode={costMode}
               subjectType={subjectType}
               value={costLimit}
-              inputLabel="每月人民币元"
+              inputLabel={t('monthlyCostLabel')}
               inputMode="decimal"
               onMode={setCostMode}
               onValue={setCostLimit}
@@ -258,20 +261,23 @@ export function UsagePage() {
 type UsageOverviewUser = UsageOverview['users'][number]
 
 function UsageIdentity({ row }: { row: UsageOverviewUser }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: usagePageZh, en: usagePageEn }), [])
   return (
     <div className="userIdentity">
       <span className="avatar" aria-hidden="true">{row.username.slice(0, 1)}</span>
-      <span className="identityText"><strong>{row.username}</strong><span>ID {row.userId} · {row.archived ? '已归档历史' : '个人账务'}</span></span>
+      <span className="identityText"><strong>{row.username}</strong><span>ID {row.userId} · {row.archived ? t('identityArchived') : t('identityPersonal')}</span></span>
     </div>
   )
 }
 
 function TokenBreakdown({ summary }: { summary: UsageOverviewUser['personal'] }) {
-  return <div className="stackedValue"><strong>{summary.totalTokens.toLocaleString()}</strong><span className="muted">输入 {formatCompact(summary.inputTokens)} · 输出 {formatCompact(summary.outputTokens)}</span></div>
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: usagePageZh, en: usagePageEn }), [])
+  return <div className="stackedValue"><strong>{summary.totalTokens.toLocaleString()}</strong><span className="muted">{t('tokenBreakdown', { input: formatCompact(summary.inputTokens), output: formatCompact(summary.outputTokens) })}</span></div>
 }
 
 function ContributionValue({ value, calls }: { value: number; calls: number }) {
-  return <div className="stackedValue"><strong>{value.toLocaleString()}</strong><span className="muted">{calls.toLocaleString()} 次 · 不计入个人额度</span></div>
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: usagePageZh, en: usagePageEn }), [])
+  return <div className="stackedValue"><strong>{value.toLocaleString()}</strong><span className="muted">{t('contributionNote', { count: calls.toLocaleString() })}</span></div>
 }
 
 function QuotaEditor({ label, mode, subjectType, value, inputLabel, inputMode, onMode, onValue }: {
@@ -284,21 +290,22 @@ function QuotaEditor({ label, mode, subjectType, value, inputLabel, inputMode, o
   onMode: (mode: QuotaMode) => void
   onValue: (value: string) => void
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: usagePageZh, en: usagePageEn }), [])
   return (
     <fieldset className="quotaEditor">
       <legend>{label}</legend>
-      <Field label="额度模式">
+      <Field label={t('quotaModeLabel')}>
         <select className="select" value={mode} onChange={event => onMode(event.target.value as QuotaMode)}>
-          {subjectType === 'user' ? <option value="inherit">继承角色</option> : null}
-          <option value="unlimited">无限制</option>
-          <option value="custom">自定义</option>
+          {subjectType === 'user' ? <option value="inherit">{t('quotaModeInherit')}</option> : null}
+          <option value="unlimited">{t('quotaModeUnlimited')}</option>
+          <option value="custom">{t('quotaModeCustom')}</option>
         </select>
       </Field>
       {mode === 'custom' ? (
         <Field label={inputLabel}>
           <input className="input" required min="0" inputMode={inputMode} value={value} onChange={event => onValue(event.target.value)} />
         </Field>
-      ) : <div className="quotaModeNote">{mode === 'inherit' ? '使用该用户所属角色的额度。' : '不设置月度上限。'}</div>}
+      ) : <div className="quotaModeNote">{mode === 'inherit' ? t('quotaInheritNote') : t('quotaUnlimitedNote')}</div>}
     </fieldset>
   )
 }
