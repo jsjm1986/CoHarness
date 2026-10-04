@@ -244,12 +244,14 @@ grep -q '^smoke: win32 x64' "$scratch/logs/smoke.log" || { echo 'wine-windows-ga
 # ---- the two blocking surfaces, concurrently ------------------------------
 # The build mirrors the root build:lib:host and build:lib:client scripts:
 # compile and bundle the Host face, bundle apps/desktop from the Host lib/
-# outputs, then compile and bundle the Client face.
+# outputs when the desktop app ships, then compile and bundle the Client face.
 # Both statuses are captured so one failure cannot hide the other's result.
 build_gate() {
   wine_node "$scratch/logs/host-tsc.log" --max-old-space-size=4096 "$tsc_js" -b tsconfig.host.json --pretty false || return $?
   wine_node "$scratch/logs/host-tsdown.log" "$tsdown_js" --env.DSH_BUILD_FACE host || return $?
-  (cd apps/desktop && wine_node "$scratch/logs/desktop-tsdown.log" "../../$tsdown_js") || return $?
+  if [[ -d apps/desktop ]]; then
+    (cd apps/desktop && wine_node "$scratch/logs/desktop-tsdown.log" "../../$tsdown_js") || return $?
+  fi
   wine_node "$scratch/logs/client-tsc.log" "$tsc_js" -b tsconfig.client.json --pretty false || return $?
   wine_node "$scratch/logs/client-tsdown.log" "$tsdown_js" --env.DSH_BUILD_FACE client
 }
