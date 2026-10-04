@@ -133,8 +133,8 @@ export function assertSourceDshPeerRanges(index: RegistryIndex, sourceVersion: s
     for (const [dependency, range] of Object.entries(manifest.peerDependencies ?? {})) {
       if (!isDshPackage(dependency)) continue
       checked++
-      if (range !== `^${sourceVersion}`) {
-        errors.push(`${name}@${sourceVersion}: peerDependencies ${dependency} has ${range}, expected ^${sourceVersion}`)
+      if (range !== sourceVersion) {
+        errors.push(`${name}@${sourceVersion}: peerDependencies ${dependency} has ${range}, expected ${sourceVersion}`)
       }
     }
   }
