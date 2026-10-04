@@ -34,10 +34,19 @@ export async function downloadPrimaryRuntimeAsset(url: string, sha256: string, c
   return destination
 }
 
-async function pythonArchive(target: keyof typeof lock.targets, cache: string): Promise<string> {
-  const artifact = lock.targets[target]
-  const filename = `cpython-${lock.pythonVersion}+${lock.pythonRelease}-${artifact.pythonTarget}-install_only_stripped.tar.gz`
-  return downloadPrimaryRuntimeAsset(`https://github.com/astral-sh/python-build-standalone/releases/download/${lock.pythonRelease}/${encodeURIComponent(filename)}`, artifact.pythonSha256, cache)
+/**
+ * Fetch the verified standalone-CPython archive for one locked target.
+ * @param params - Interpreter release fields and the target's locked artifact.
+ * @returns Verified local archive path.
+ */
+export async function downloadPythonArchive(params: {
+  readonly pythonVersion: string
+  readonly pythonRelease: string
+  readonly artifact: { readonly pythonTarget: string; readonly pythonSha256: string }
+  readonly cache: string
+}): Promise<string> {
+  const filename = `cpython-${params.pythonVersion}+${params.pythonRelease}-${params.artifact.pythonTarget}-install_only_stripped.tar.gz`
+  return downloadPrimaryRuntimeAsset(`https://github.com/astral-sh/python-build-standalone/releases/download/${params.pythonRelease}/${encodeURIComponent(filename)}`, params.artifact.pythonSha256, params.cache)
 }
 
 /**
@@ -75,6 +84,40 @@ export async function unpackPrimaryRuntimeWheel(archive: string, destination: st
       }
     },
   })
+}
+
+/**
+ * Unpack the locked Node archive and pnpm package into the payload's dependencies.
+ * @param params - Locked Node artifact, platform target and payload directories.
+ * @returns The installed pnpm version recorded in the payload manifest.
+ */
+export async function installPrimaryNode(params: {
+  readonly nodeVersion: string
+  readonly nodeArchive: string
+  readonly nodeSha256: string
+  readonly target: string
+  readonly downloads: string
+  readonly staging: string
+  readonly dependencies: string
+}): Promise<string> {
+  const nodeFilename = `node-v${params.nodeVersion}-${params.nodeArchive}`
+  const nodeArchive = await downloadPrimaryRuntimeAsset(`https://nodejs.org/dist/v${params.nodeVersion}/${nodeFilename}`, params.nodeSha256, params.downloads)
+  const unpackedNode = join(params.staging, 'node')
+  mkdirSync(unpackedNode)
+  if (params.target === 'win-x64') await extractZip(nodeArchive, { dir: unpackedNode })
+  else await extractTar({ file: nodeArchive, cwd: unpackedNode })
+  const nodeSource = join(unpackedNode, nodeFilename.replace(/\.(?:zip|tar\.gz)$/u, ''))
+  mkdirSync(join(params.dependencies, 'node', 'bin'), { recursive: true })
+  mkdirSync(join(params.dependencies, 'node', 'node_modules'))
+  writeFileSync(join(params.dependencies, 'node', 'node_modules', 'README.txt'), 'Reserved for bundled Node packages. pnpm uses its default installation directories.\n')
+  cpSync(join(nodeSource, ...(params.target === 'win-x64' ? ['node.exe'] : ['bin', 'node'])),
+    join(params.dependencies, 'node', 'bin', params.target === 'win-x64' ? 'node.exe' : 'node'))
+  cpSync(join(nodeSource, 'LICENSE'), join(params.dependencies, 'node', 'LICENSE'))
+  const require = createRequire(import.meta.url)
+  const pnpmManifest = require.resolve('pnpm')
+  const pnpmVersion = (JSON.parse(readFileSync(pnpmManifest, 'utf8')) as { version: string }).version
+  await cp(dirname(pnpmManifest), join(params.dependencies, 'pnpm'), { recursive: true, dereference: true })
+  return pnpmVersion
 }
 
 /**
@@ -121,27 +164,17 @@ export async function preparePrimaryRuntime(options: PreparePrimaryRuntimeOption
     const output = join(staging, 'payload')
     const dependencies = join(output, 'dependencies')
     mkdirSync(dependencies, { recursive: true })
-    let pnpmVersion: string | undefined
-    if (!options.pythonOnly) {
-      const nodeFilename = `node-v${lock.nodeVersion}-${artifact.nodeArchive}`
-      const nodeArchive = await downloadPrimaryRuntimeAsset(`https://nodejs.org/dist/v${lock.nodeVersion}/${nodeFilename}`, artifact.nodeSha256, paths.downloads)
-      const unpackedNode = join(staging, 'node')
-      mkdirSync(unpackedNode)
-      if (target === 'win-x64') await extractZip(nodeArchive, { dir: unpackedNode })
-      else await extractTar({ file: nodeArchive, cwd: unpackedNode })
-      const nodeSource = join(unpackedNode, nodeFilename.replace(/\.(?:zip|tar\.gz)$/u, ''))
-      mkdirSync(join(dependencies, 'node', 'bin'), { recursive: true })
-      mkdirSync(join(dependencies, 'node', 'node_modules'))
-      writeFileSync(join(dependencies, 'node', 'node_modules', 'README.txt'), 'Reserved for bundled Node packages. pnpm uses its default installation directories.\n')
-      cpSync(join(nodeSource, ...(target === 'win-x64' ? ['node.exe'] : ['bin', 'node'])),
-        join(dependencies, 'node', 'bin', target === 'win-x64' ? 'node.exe' : 'node'))
-      cpSync(join(nodeSource, 'LICENSE'), join(dependencies, 'node', 'LICENSE'))
-      const require = createRequire(import.meta.url)
-      const pnpmManifest = require.resolve('pnpm')
-      pnpmVersion = (JSON.parse(readFileSync(pnpmManifest, 'utf8')) as { version: string }).version
-      await cp(dirname(pnpmManifest), join(dependencies, 'pnpm'), { recursive: true, dereference: true })
-    }
-    await extractTar({ file: await pythonArchive(target, paths.downloads), cwd: dependencies })
+    const pnpmVersion = options.pythonOnly ? undefined : await installPrimaryNode({
+      nodeVersion: lock.nodeVersion, nodeArchive: artifact.nodeArchive, nodeSha256: artifact.nodeSha256,
+      target, downloads: paths.downloads, staging, dependencies,
+    })
+    await extractTar({
+      file: await downloadPythonArchive({
+        pythonVersion: lock.pythonVersion, pythonRelease: lock.pythonRelease,
+        artifact: lock.targets[target], cache: paths.downloads,
+      }),
+      cwd: dependencies,
+    })
     const manifest: PrimaryRuntimeManifest = {
       desktopVersion: options.version,
       platform: target === 'win-x64' ? 'win32' : target.startsWith('linux-') ? 'linux' : 'darwin',

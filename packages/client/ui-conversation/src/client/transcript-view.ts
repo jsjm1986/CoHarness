@@ -1,13 +1,11 @@
 /** Durable work-details presentation policy over the conversation settings scope. */
 
-import {
-  createSnapshotStore, settingsControlState,
-  type SettingsControlState, type SettingsScope, type SnapshotStore,
-} from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsControlState, SettingsScope, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   DEFAULT_TRANSCRIPT_VIEW_MODE, LEGACY_EXPANDED_TRANSCRIPT_VIEW_MODE, LEGACY_TRANSCRIPT_VIEW_MODE, TRANSCRIPT_VIEW_FIELD,
   type ConversationSettings, type TranscriptViewMode,
 } from '../submission-settings.ts'
+import { SettingsPreference } from './settings-preference.ts'
 
 /** Live work-details preference consumed by the Chat view and its Settings row. */
 export class TranscriptViewPolicy {
@@ -15,7 +13,7 @@ export class TranscriptViewPolicy {
   readonly mode: SnapshotStore<TranscriptViewMode>
   /** Host writability and write status source for the Settings row. */
   readonly settings: SnapshotStore<SettingsControlState>
-  private readonly unsubscribe: (() => void) | undefined
+  private readonly preference: SettingsPreference<typeof TRANSCRIPT_VIEW_FIELD, TranscriptViewMode>
 
   /**
    * @param host - durable preference scope owned by the providing plugin;
@@ -25,45 +23,23 @@ export class TranscriptViewPolicy {
    * @param defaultMode - presentation used without an explicit saved mode.
    */
   constructor(
-    private readonly host: SettingsScope<ConversationSettings> | undefined,
-    private readonly defaultMode: TranscriptViewMode = DEFAULT_TRANSCRIPT_VIEW_MODE,
+    host: SettingsScope<ConversationSettings> | undefined,
+    defaultMode: TranscriptViewMode = DEFAULT_TRANSCRIPT_VIEW_MODE,
   ) {
-    this.mode = createSnapshotStore(defaultMode)
-    this.settings = createSnapshotStore(host === undefined
-      ? { status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' } }
-      : settingsControlState(host.getSnapshot()))
-    if (host !== undefined) {
-      this.unsubscribe = host.subscribe(() => {
-        this.settings.set(settingsControlState(host.getSnapshot()))
-        this.adopt()
-      })
-      this.adopt()
-    }
+    this.preference = new SettingsPreference(host, TRANSCRIPT_VIEW_FIELD, defaultMode, saved =>
+      saved === LEGACY_TRANSCRIPT_VIEW_MODE || saved === LEGACY_EXPANDED_TRANSCRIPT_VIEW_MODE
+        ? 'detailed' : saved ?? defaultMode)
+    this.mode = this.preference.current
+    this.settings = this.preference.settings
   }
 
   /** Release the scope observer owned by this policy. */
-  dispose(): void { this.unsubscribe?.() }
+  dispose(): void { this.preference.dispose() }
 
   /**
    * Publish and persist one explicit user choice; the live value publishes
    * before the durable write starts.
    * @param mode - Compact, Standard, Detailed, or Verbose work details.
    */
-  setMode(mode: TranscriptViewMode): void {
-    if (this.mode.getSnapshot() === mode) return
-    const snapshot = this.host?.getSnapshot()
-    if (snapshot?.status === 'ready' && !snapshot.writable) return
-    this.mode.set(mode)
-    void this.host?.set(TRANSCRIPT_VIEW_FIELD, mode)
-  }
-
-  /** Adopt the latest accepted durable section without writing it back. */
-  private adopt(): void {
-    const section = this.host?.getSnapshot().value
-    if (section === undefined) return
-    const saved = section.transcriptView
-    const mode = saved === LEGACY_TRANSCRIPT_VIEW_MODE || saved === LEGACY_EXPANDED_TRANSCRIPT_VIEW_MODE
-      ? 'detailed' : saved ?? this.defaultMode
-    if (this.mode.getSnapshot() !== mode) this.mode.set(mode)
-  }
+  setMode(mode: TranscriptViewMode): void { this.preference.set(mode) }
 }

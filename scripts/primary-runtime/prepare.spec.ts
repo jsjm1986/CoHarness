@@ -2,10 +2,11 @@ import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { join } from 'node:path'
 import { zipSync } from 'fflate'
 import { expect, it } from 'vitest'
 import { downloadPrimaryRuntimeAsset, prepareOfficeSkillAssets, primaryRuntimePayloadDigest, smokePrimaryRuntime, unpackPrimaryRuntimeWheel } from './prepare.ts'
+import { declareRuntimeLockContract } from './lock-contract.ts'
 import lock from './lock.json' with { type: 'json' }
 
 it('covers every SDK wheel target with the shared interpreter lock', () => {
@@ -17,34 +18,7 @@ const libraryWheel = Buffer.from('UEsDBAoAAAAAAASeLl0sYMPjDAAAAAwAAAAJAAAAc2FtcG
 const relocatedWheel = Buffer.from('UEsDBAoAAAAAAASeLl3x0Nj9FAAAABQAAAAeAAAAc2FtcGxlLTEuMC5kYXRhL3NjcmlwdHMvc2FtcGxlcmVxdWlyZXMgcmVsb2NhdGlvbgpQSwECHgMKAAAAAAAEni5d8dDY/RQAAAAUAAAAHgAAAAAAAAABAAAApIEAAAAAc2FtcGxlLTEuMC5kYXRhL3NjcmlwdHMvc2FtcGxlUEsFBgAAAAABAAEATAAAAFAAAAAAAA==', 'base64')
 const externalLibraryWheel = Buffer.from('UEsDBBQAAAAAAAAAIVyBOE8OHAAAABwAAAAhAAAAc2FtcGxlLTEuMC5kYXRhL3B1cmVsaWIvc2FtcGxlLnB5cmVxdWlyZXMgbGlicmFyeSByZWxvY2F0aW9uClBLAQIUAxQAAAAAAAAAIVyBOE8OHAAAABwAAAAhAAAAAAAAAAAAAACAAQAAAABzYW1wbGUtMS4wLmRhdGEvcHVyZWxpYi9zYW1wbGUucHlQSwUGAAAAAAEAAQBPAAAAWwAAAAAA', 'base64')
 
-it.each(Object.entries(lock.targets))('records every locked wheel distribution and version for %s', (_target, artifact) => {
-  const normalize = (name: string): string => name.toLowerCase().replace(/[-_.]+/gu, '-')
-  const distributions = [...artifact.wheels, ...lock.wheels].map(({ url }) => {
-    const [name, version] = basename(new URL(url).pathname).split('-')
-    return [normalize(name!), version] as const
-  })
-  const declared = Object.entries(lock.pythonPackages).map(([name, version]) => [normalize(name), version] as const)
-  expect(new Set(distributions.map(([name]) => name)).size).toBe(distributions.length)
-  expect(new Set(declared.map(([name]) => name)).size).toBe(declared.length)
-  expect(Object.fromEntries(distributions)).toEqual(Object.fromEntries(declared))
-})
-
-it('keeps a target payload identity independent of other target archives', () => {
-  const changed = structuredClone(lock)
-  changed.targets['win-x64'].wheels[0]!.sha256 = 'a'.repeat(64)
-  expect(primaryRuntimePayloadDigest('mac-arm64', changed, '11.7.0')).toBe(primaryRuntimePayloadDigest('mac-arm64', lock, '11.7.0'))
-  expect(primaryRuntimePayloadDigest('win-x64', changed, '11.7.0')).not.toBe(primaryRuntimePayloadDigest('win-x64', lock, '11.7.0'))
-})
-
-it('invalidates payload identity for shared wheels, package versions and package-manager changes', () => {
-  const wheel = structuredClone(lock), distribution = structuredClone(lock)
-  wheel.wheels[0]!.sha256 = 'a'.repeat(64)
-  distribution.pythonPackages['python-docx'] = '1.2.1'
-  const original = primaryRuntimePayloadDigest('mac-arm64', lock, '11.7.0')
-  expect(primaryRuntimePayloadDigest('mac-arm64', wheel, '11.7.0')).not.toBe(original)
-  expect(primaryRuntimePayloadDigest('mac-arm64', distribution, '11.7.0')).not.toBe(original)
-  expect(primaryRuntimePayloadDigest('mac-arm64', lock, '11.7.1')).not.toBe(original)
-})
+declareRuntimeLockContract(lock, primaryRuntimePayloadDigest)
 
 it('reports missing distribution metadata before trying to execute a stale native payload', async () => {
   const root = await mkdtemp(join(tmpdir(), 'desktop-stale-runtime-'))

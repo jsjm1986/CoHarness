@@ -1,11 +1,9 @@
 /** General Settings row for Chat HTTP(S) link destinations. */
-import { useEffect, useState } from 'react'
 import type { ObservableSnapshot, SettingsControlState, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { IconChevronDownOutline14, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { LinkOpening } from '../../submission-settings.ts'
 import type { ConversationKey } from '../locales.ts'
-import css from './LinkOpeningRow.module.css'
+import { SettingsSelectRow } from './SettingsSelectRow.tsx'
 
 /** Registration-side link-opening preference. */
 export interface LinkOpeningRowInjected {
@@ -45,73 +43,15 @@ export function LinkOpeningRow({ useLinkOpening, useBrowserAvailable, useSetting
   const destination = useLinkOpening(value => value)
   const browserAvailable = useBrowserAvailable(value => value)
   const settings = useSettings(value => value)
-  const [open, setOpen] = useState(false)
-  const disabled = settings.status !== 'ready' || !settings.writable || settings.write.status === 'saving'
-  const blocked = settings.write.status === 'blocked' ? settings.write.reason : undefined
-  /* jscpd:ignore-start -- parallel settings-row surface variants share the
-   * notice chain and row layout by design. */
-  const notice = settings.write.status === 'error'
-    ? t('settings.links.saveFailed')
-    : settings.write.status === 'saving'
-      ? t('settings.links.saving')
-      : blocked === 'loading' || settings.status === 'loading'
-        ? t('settings.links.loading')
-        : blocked === 'unavailable' || settings.status === 'unavailable'
-          ? t('settings.links.unavailable')
-          : blocked === 'project' || settings.writableReason === 'project'
-            ? t('settings.links.projectReadOnly')
-            : blocked === 'provider' || settings.writableReason === 'provider'
-              ? t('settings.links.providerReadOnly')
-              : blocked === 'account' || settings.writableReason === 'account'
-                ? t('settings.links.accountReadOnly')
-                : blocked === 'organization' || settings.writableReason === 'organization'
-                  ? t('settings.links.organizationReadOnly')
-                  : blocked === 'deployment' || settings.writableReason === 'deployment'
-                    ? t('settings.links.deploymentReadOnly')
-                    : undefined
-
-  useEffect(() => {
-    if (disabled) setOpen(false)
-  }, [disabled])
-
   if (!browserAvailable) return null
   return (
-    <div className={css.row}>
-      <div className={css.rowText}>
-        <div className={css.title}>{t('settings.links.title')}</div>
-        <div className={css.desc}>{t('settings.links.description')}</div>
-        {notice === undefined ? null : (
-          <div className={css.notice} role={settings.write.status === 'error' ? 'alert' : 'status'}>
-            {notice}
-          </div>
-        )}
-      </div>
-      <Menu
-        open={open}
-        onClose={() => { setOpen(false) }}
-        items={OPTIONS.map(option => ({ id: option.id, label: t(option.label) }))}
-        selectedId={destination}
-        onSelect={(id) => {
-          setOpen(false)
-          setLinkOpening(id as LinkOpening)
-        }}
-        align="end"
-        portal
-        anchor={(
-          <button
-            type="button"
-            className={css.selector}
-            aria-haspopup="menu"
-            aria-expanded={open}
-            disabled={disabled}
-            onClick={() => { setOpen(value => !value) }}
-          >
-            {t(`settings.links.${destination}` as ConversationKey)}
-            <IconChevronDownOutline14 className={css.chevron} />
-          </button>
-        )}
-      />
-    </div>
+    <SettingsSelectRow
+      prefix="settings.links"
+      settings={settings}
+      options={OPTIONS}
+      selectedId={destination}
+      onSelect={(id) => { setLinkOpening(id as LinkOpening) }}
+      t={t}
+    />
   )
-  /* jscpd:ignore-end */
 }
