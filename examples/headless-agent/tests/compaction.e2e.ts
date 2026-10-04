@@ -38,6 +38,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('compaction: a long session compa
       compact: {
         thresholdRatio: 0.5,
         retainTokens: 400,
+        headroomTokens: 200,
         summarizationProvider: '',
         summarizationModel: '',
         maxTokens: 1024,
@@ -45,7 +46,13 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('compaction: a long session compa
       },
       persistenceRoot: join(workdir, '.sessions'),
     })
-    const agent = await ctx.agentLoop.create(SessionId('e2e-compaction'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
+    const agent = await ctx.agentLoop.create(SessionId('e2e-compaction'), {
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+      // Keep the reserved completion budget below the test's shrunken window so
+      // pressure compaction has headroom to fire.
+      maxTokens: 512,
+    })
 
     agent.followup(createUserMessage({
       content: [{

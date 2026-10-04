@@ -68,9 +68,17 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await deps.projects.create({ name: 'Taken', createdBy: admin.id })
     const quota = { source: 'independent' as const, tokenLimit: 12_345, companyCostMicrosLimit: 8_500_000 }
     const quotaWrites: unknown[] = []
+    const boundSetQuota = governance.setQuota.bind(governance)
     Object.assign(governance, {
       projectQuota: () => quota,
-      setQuota: (kind: string, id: string, tokens: number, cost: number) => { quotaWrites.push({ kind, id, tokens, cost }) },
+      // Project writes stay recorded for the legacy dialog; role and user
+      // subjects are recorded and hit the real SQLite store so the reads
+      // below are genuine.
+      setQuota: (kind: 'role' | 'user' | 'project', id: string, tokens: number | null | 'inherit', cost: number | null | 'inherit') => {
+        quotaWrites.push({ kind, id, tokens, cost })
+        if (kind === 'project') return
+        boundSetQuota(kind, id, tokens, cost)
+      },
       describeOrganizationModelSettings: () => ({ writable: false, hasDocument: false, namespaces: [] }),
       describeOrganizationCredentials: () => ({}),
     })
@@ -139,11 +147,19 @@ it('preserves stored values through built forms and keeps every mobile destinati
         }
         const value = path === '/admin/api/usage'
           ? { ...zero, month: '2026-09', tokenLimit: quota.tokenLimit, companyCostMicrosLimit: quota.companyCostMicrosLimit, alerts: [] }
-          : path === '/admin/api/usage/contributors'
-            ? { month: '2026-09', timeZone: 'Asia/Shanghai', projectId: project.id, rows: [], unattributed: zero }
-            : path === '/admin/api/project-model-access'
-              ? { projectDefaultAllowed: false, effective: { version: 1, defaultAllowed: false, models: [] }, overrides: [] }
-              : undefined
+          : path === '/admin/api/usage/overview'
+            ? { month: '2026-09', timeZone: 'Asia/Shanghai', personal: zero, projects: zero, unattributedProjects: zero,
+              users: [{ userId: admin.id, username: 'admin',
+                personal: { ...zero, month: '2026-09', tokenLimit: null, companyCostMicrosLimit: null, alerts: [] },
+                projectContribution: zero }] }
+            : path === '/admin/api/usage/health'
+              ? { month: '2026-09', timeZone: 'Asia/Shanghai', missingUsageCalls: 0, unattributedProjectCalls: 0,
+                unattributedProjectTokens: 0, unpricedCalls: 0, historicalUnknownCalls: 0, maxIntakeLagMs: 0 }
+              : path === '/admin/api/usage/contributors'
+                ? { month: '2026-09', timeZone: 'Asia/Shanghai', projectId: project.id, rows: [], unattributed: zero }
+                : path === '/admin/api/project-model-access'
+                  ? { projectDefaultAllowed: false, effective: { version: 1, defaultAllowed: false, models: [] }, overrides: [] }
+                  : undefined
         if (value !== undefined) { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(value)); return true }
         return adminHandler(req, res, user, path, body)
       },
@@ -157,6 +173,21 @@ it('preserves stored values through built forms and keeps every mobile destinati
     const browser = await chromium.launch(); cleanup.push(() => browser.close())
     const page = await browser.newPage({ viewport: { width: 1400, height: 1000 }, colorScheme: 'light', timezoneId: 'Asia/Shanghai' })
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
+    // Expected 4xx responses also log "Failed to load resource" console errors;
+    // skip those for the deliberately refused admin writes below.
+    const refusalPaths = /^\/admin\/api\/(projects\/\d+|deployment\/configuration)$/
+    page.on('console', (message) => {
+      if (message.type() !== 'error') return
+      const url = message.location().url
+      if (url !== undefined && url !== '' && refusalPaths.test(new URL(url).pathname)) return
+      errors.push(`console: ${message.text()}`)
+    })
+    const httpFailures: string[] = []
+    page.on('response', (response) => {
+      if (response.status() < 400) return
+      const { pathname } = new URL(response.url())
+      httpFailures.push(`${response.status()} ${response.request().method()} ${pathname}`)
+    })
     const login = await page.request.post(`${base}/login`, { form: { username: 'admin', password: 'fixture-password' }, headers: { origin: base }, maxRedirects: 0 })
     expect(login.status()).toBe(302)
     await page.goto(`${base}/admin/projects/${project.id}`)
@@ -186,6 +217,59 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await compareOrRefreshGolden(join(DIRECTORY, 'project-quota.expected.md'), await quotaDialog.ariaSnapshot(), webSnapshotMode())
     await quotaDialog.getByRole('button', { name: '保存额度', exact: true }).click()
     await expect.poll(() => quotaWrites).toEqual([{ kind: 'project', id: String(project.id), tokens: 12345, cost: 8500000 }])
+
+    await page.goto(`${base}/admin/usage`)
+    await page.getByRole('button', { name: '配置额度', exact: true }).click()
+    const usageQuota = page.getByRole('dialog', { name: '配置月度额度', exact: true })
+    await expect.poll(async () => usageQuota.getByRole('button', { name: '保存额度', exact: true }).isEnabled()).toBe(true)
+    const roleTokens = usageQuota.locator('fieldset', { hasText: 'Token 额度' })
+    const roleCost = usageQuota.locator('fieldset', { hasText: '公司成本额度' })
+    await roleTokens.getByRole('combobox', { name: '额度模式' }).selectOption('custom')
+    const roleTokenInput = roleTokens.getByLabel('每月 Token', { exact: true })
+    await roleTokenInput.fill('42000')
+    // inputValue tracks the DOM property; the value attribute only moves with a
+    // React controlled render, proving the component committed the draft.
+    await expect.poll(async () => roleTokenInput.inputValue()).toBe('42000')
+    await expect.poll(async () => roleTokenInput.getAttribute('value')).toBe('42000')
+    await roleCost.getByRole('combobox', { name: '额度模式' }).selectOption('custom')
+    const roleCostInput = roleCost.getByLabel('每月人民币元', { exact: true })
+    await roleCostInput.fill('9.250001')
+    await expect.poll(async () => roleCostInput.inputValue()).toBe('9.250001')
+    await expect.poll(async () => roleCostInput.getAttribute('value')).toBe('9.250001')
+    await usageQuota.getByRole('button', { name: '保存额度', exact: true }).click()
+    await usageQuota.waitFor({ state: 'hidden' })
+    expect(governance.roleQuota('user')).toEqual({ tokenLimit: 42_000, companyCostMicrosLimit: 9_250_001 })
+    await page.getByRole('button', { name: '配置额度', exact: true }).click()
+    const usageReopen = page.getByRole('dialog', { name: '配置月度额度', exact: true })
+    await expect.poll(async () => usageReopen.getByRole('button', { name: '保存额度', exact: true }).isEnabled()).toBe(true)
+    expect(await usageReopen.getByLabel('每月 Token', { exact: true }).inputValue()).toBe('42000')
+    expect(await usageReopen.getByLabel('每月人民币元', { exact: true }).inputValue()).toBe('9.250001')
+    // Editing tokens alone keeps the stored micro-precision cost unchanged.
+    const reopenedTokens = usageReopen.getByLabel('每月 Token', { exact: true })
+    await reopenedTokens.fill('777')
+    await expect.poll(async () => reopenedTokens.inputValue()).toBe('777')
+    await expect.poll(async () => reopenedTokens.getAttribute('value')).toBe('777')
+    await usageReopen.getByRole('button', { name: '保存额度', exact: true }).click()
+    await usageReopen.waitFor({ state: 'hidden' })
+    expect(quotaWrites[quotaWrites.length - 1]).toEqual({ kind: 'role', id: 'user', tokens: 777, cost: 9_250_001 })
+    expect(governance.roleQuota('user')).toEqual({ tokenLimit: 777, companyCostMicrosLimit: 9_250_001 })
+    await page.getByRole('button', { name: '配置额度', exact: true }).click()
+    const usageUserDialog = page.getByRole('dialog', { name: '配置月度额度', exact: true })
+    await expect.poll(async () => usageUserDialog.getByRole('button', { name: '保存额度', exact: true }).isEnabled()).toBe(true)
+    await usageUserDialog.getByRole('combobox', { name: '配置对象' }).selectOption('user')
+    const userSave = usageUserDialog.getByRole('button', { name: '保存额度', exact: true })
+    await expect.poll(async () => userSave.isEnabled()).toBe(true)
+    const userTokens = usageUserDialog.locator('fieldset', { hasText: 'Token 额度' })
+    await userTokens.getByRole('combobox', { name: '额度模式' }).selectOption('custom')
+    const userTokenInput = userTokens.getByLabel('每月 Token', { exact: true })
+    await userTokenInput.fill('777')
+    await expect.poll(async () => userTokenInput.inputValue()).toBe('777')
+    await expect.poll(async () => userTokenInput.getAttribute('value')).toBe('777')
+    await userSave.click()
+    await usageUserDialog.waitFor({ state: 'hidden' })
+    expect(governance.userQuota(admin.id)).toEqual({
+      tokenMode: 'custom', tokenLimit: 777, companyCostMode: 'inherit', companyCostMicrosLimit: null,
+    })
 
     await page.goto(`${base}/admin/deployment`)
     const networkSettings = page.getByRole('group', { name: '访问与监听', exact: true })
@@ -244,9 +328,20 @@ it('preserves stored values through built forms and keeps every mobile destinati
     const more = page.getByRole('dialog', { name: '更多管理功能', exact: true })
     await compareOrRefreshGolden(join(DIRECTORY, 'more-navigation.expected.md'), await more.ariaSnapshot(), webSnapshotMode())
     expect(await more.getByRole('link').count()).toBe(8)
-    await more.getByRole('link', { name: '终端', exact: true }).click()
+    await more.getByLabel('界面语言', { exact: true }).selectOption('en')
+    await page.getByRole('button', { name: 'More administration features', exact: true }).waitFor()
+    expect(await page.evaluate(() => localStorage.getItem('coharness-admin-language'))).toBe('en')
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe('en')
+    expect(await page.evaluate(() => document.cookie.includes('hgw_lang=en'))).toBe(true)
+    await page.getByRole('button', { name: 'More administration features', exact: true }).click()
+    const moreEn = page.getByRole('dialog', { name: 'More administration features', exact: true })
+    await moreEn.getByRole('link', { name: 'Terminals', exact: true }).click()
+    await page.getByRole('heading', { name: 'Terminals', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'More administration features', exact: true }).click()
+    await page.getByRole('dialog', { name: 'More administration features', exact: true })
+      .getByLabel('Interface language', { exact: true }).selectOption('zh')
     await page.getByRole('heading', { name: '终端', exact: true }).waitFor()
-    await more.waitFor({ state: 'hidden' })
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe('zh')
 
     await page.goto(`${base}/admin/ssh`)
     const targetTable = page.getByRole('table')
@@ -329,6 +424,11 @@ it('preserves stored values through built forms and keeps every mobile destinati
     expect(await deps.instances.isLive(admin.id)).toBe(false)
     expect(await page.locator('meta[http-equiv="refresh"]').count()).toBe(0)
     await compareOrRefreshGolden(join(DIRECTORY, 'runtime-stopped.expected.md'), await page.locator('main').ariaSnapshot(), webSnapshotMode())
+    const deliberateRefusals = [
+      /^4\d\d PATCH \/admin\/api\/projects\/\d+$/,
+      /^4\d\d POST \/admin\/api\/deployment\/configuration$/,
+    ]
+    expect(httpFailures.filter(entry => !deliberateRefusals.some(pattern => pattern.test(entry)))).toEqual([])
     expect(errors).toEqual([])
   } finally {
     const failures: unknown[] = []

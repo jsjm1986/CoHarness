@@ -41,6 +41,9 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('compaction: a long session compa
       compact: {
         thresholdRatio: 0.5,
         retainTokens: 400,
+        // Must fit inside the 8,000-token message budget or pressure
+        // compaction is misconfigured and silently never fires.
+        headroomTokens: 4000,
         summarizationProvider: '',
         summarizationModel: '',
         maxTokens: 1024,

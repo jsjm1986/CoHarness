@@ -2,7 +2,7 @@
   - banner:
     - heading "更多管理功能" [level=2]
     - button "关闭"
-  - navigation "更多管理导航":
+  - navigation "更多管理功能":
     - link "文档":
       - /url: /admin/documents
     - link "归档":
@@ -19,3 +19,6 @@
       - /url: /admin/desktops
     - link "审计":
       - /url: /admin/audit
+  - combobox "界面语言":
+    - option "中文" [selected]
+    - option "English"

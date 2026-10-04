@@ -135,7 +135,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
       const parent = {
         id: 'deepseek-e2e-parent',
         session: { header: { cwd: workspace } },
-      } as unknown as Agent
+        ctx,
+      } as Agent
       const run = await ctx.subagents.start('claude-code', {
         prompt: [{
           type: 'text',
