@@ -85,7 +85,17 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
   // the execution side, and its suites gate on process.platform, so the
   // Windows coverage lane can never cover the source.
   const posixCoverageExclusions = platform === 'win32'
-    ? ['packages/deliverables/workspace-changes/src/execution.ts']
+    ? [
+      'packages/deliverables/workspace-changes/src/execution.ts',
+      // Directory-handle fsync, symlink refusal, and read-failure paths are
+      // POSIX semantics covered by suites that skip on win32; the residue
+      // stays measured on Linux and macOS.
+      'packages/deliverables/workspace-changes/src/recorder.ts',
+      'packages/deliverables/workspace-changes/src/review-store.ts',
+      'packages/subagent/subagent-codex/src/member.ts',
+      'packages/subagent/subagent-codex/src/rollout.ts',
+      'packages/util/managed-data/src/index.ts',
+    ]
     : []
 
   // pwsh-local's run/start/lifecycle suites self-skip without a real pwsh
