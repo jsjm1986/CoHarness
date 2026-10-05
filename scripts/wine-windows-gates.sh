@@ -164,21 +164,22 @@ supportedArchitectures:
   cpu: [current, x64]
 EOF
   # The hoisted linker — used only by this lane — has an upstream rename
-  # race (pnpm/pnpm#12880): parallel linkers staging a nested package copy
-  # (observed on the tree's nested esbuild versions) rename their _tmp_*
-  # directory onto a path another racer already claimed, and the loser
-  # exits ERR_PNPM_ENOENT although an identical re-install succeeds.
-  # Exactly that signature earns warm retries: the winning rename already
-  # landed, so the next install only links the packages the abort skipped —
-  # a much smaller race window than re-running the full link on a wiped
-  # tree. Any other failure, or the race still standing after the final
-  # attempt, fails loud with the log tail.
+  # race (pnpm/pnpm#12880): concurrent hoist-copies whose destinations nest
+  # (observed on the tree's nested esbuild versions) let the parent's
+  # swap-rename carry off a sibling's staged _tmp_* directory, and the loser
+  # exits ERR_PNPM_ENOENT although an identical re-install succeeds. Warm
+  # retries proved unreliable here — the race won five straight attempts —
+  # so the install is pinned to one CPU: the worker pool sizes itself at
+  # availableParallelism()-1, and a single worker serializes every staged
+  # rename (the same mitigation the issue reports). Upstream fixed the copy
+  # itself in pnpm 11.28.4 (pnpm/pnpm#14242); this pinning can retire once
+  # packageManager reaches it.
   local attempt
-  for attempt in 1 2 3 4 5; do
-    (cd "$scratch/tree" && pnpm install --frozen-lockfile --ignore-scripts > "$scratch/logs/install.log" 2>&1) \
+  for attempt in 1 2 3; do
+    (cd "$scratch/tree" && taskset -c 0 pnpm install --frozen-lockfile --ignore-scripts > "$scratch/logs/install.log" 2>&1) \
       && return 0
     grep -q 'ERR_PNPM_ENOENT.*rename.*_tmp_' "$scratch/logs/install.log" || break
-    (( attempt < 5 )) || break
+    (( attempt < 3 )) || break
     echo "wine-windows-gates: pnpm hoisted-linker rename race (pnpm/pnpm#12880) on install attempt $attempt; retrying in place" >&2
   done
   tail -40 "$scratch/logs/install.log" >&2
