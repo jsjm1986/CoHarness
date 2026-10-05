@@ -22,10 +22,14 @@
 - button "6 tool calls · 6 intermediate messages":
   - text: 6 tool calls · 6 intermediate messages
   - img
-- 'button "Think Turn 1 is done. Per the objective: \"你做完一个turn之后，直接输出内容，停止\" — after finishing a turn, directly output the content and stop. The system will open another turn."':
+- button "System prompt":
   - img
   - img
-  - text: "Think Turn 1 is done. Per the objective: \"你做完一个turn之后，直接输出内容，停止\" — after finishing a turn, directly output the content and stop. The system will open another turn."
+  - text: System prompt
+- 'button "Thinking Turn 1 is done. Per the objective: \"你做完一个turn之后，直接输出内容，停止\" — after finishing a turn, directly output the content and stop. The system will open another turn."':
+  - img
+  - img
+  - text: "Thinking Turn 1 is done. Per the objective: \"你做完一个turn之后，直接输出内容，停止\" — after finishing a turn, directly output the content and stop. The system will open another turn."
 - paragraph:
   - strong: Turn 1 / 2
   - text: — 随机选中的包：
@@ -48,7 +52,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "5 tool calls · 6 intermediate messages":
   - text: 5 tool calls · 6 intermediate messages
   - img
@@ -113,7 +117,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -121,7 +125,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -134,4 +138,5 @@
   - button "115K tok · Cache hit 91%":
     - img
     - text: 115K tokCache hit 91%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

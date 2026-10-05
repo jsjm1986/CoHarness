@@ -237,8 +237,9 @@ describe('dsh web keyless CLI smoke', () => {
     )
     try {
       const readyUrl = await waitForReadyLine(child)
-      expect(readyUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
-      expect((await fetch(readyUrl)).status).toBe(200)
+      expect(readyUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/\?token=\S+$/)
+      const authenticated = await authenticatedWeb(readyUrl)
+      expect((await fetch(authenticated.origin, { headers: { cookie: authenticated.cookie } })).status).toBe(200)
     } finally {
       const closed = child.exitCode === null
         ? new Promise<void>((resolveClose) => { child.once('close', () => { resolveClose() }) })
@@ -313,7 +314,7 @@ describe('dsh web keyless CLI smoke', () => {
       const workspaceMessage = captured.messages?.find(message =>
         message.role === 'user' && textOfContent(message.content).includes('web-workspace-context-probe'))
       const expectedWebSection = readFileSync(WEB_SURFACE_PROMPT, 'utf8').trimEnd()
-        .replace('{{webUrl}}', baseUrl)
+        .replace('{{webUrl}}', new URL(baseUrl).origin)
       expect(textOfContent(captured.system)).toContain(expectedWebSection)
       expect(workspaceMessage?.role).toBe('user')
       const blocks = (workspaceMessage?.content ?? []) as MessagesContentBlock[]
