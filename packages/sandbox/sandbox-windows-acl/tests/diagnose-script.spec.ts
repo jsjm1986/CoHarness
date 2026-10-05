@@ -166,14 +166,18 @@ function replaceAcl(path: string, sid: string, rights: string, inheritance = 'No
  * DACL rows read through Get-Acl, which needs only READ_CONTROL — a right
  * the object owner always holds even when the DACL names no usable grant.
  * Use this for objects whose fixture or repair left the caller without
- * data-read access, where icacls' open is refused.
+ * data-read access, where icacls' open is refused. Trustees are translated
+ * back to SIDs: Get-Acl presents resolvable trustees as NT account names.
  * @param path - the file or directory whose DACL is read.
  * @returns one entry per ACE: trustee SID, FileSystemRights text, Allow/Deny.
  */
 function aceRows(path: string): Array<{ sid: string; rights: string; type: string }> {
   return pwsh(
-    `(Get-Acl -LiteralPath ${quote(path)}).Access | ` +
-    'ForEach-Object { "$($_.IdentityReference.Value)|$($_.FileSystemRights)|$($_.AccessControlType)" }',
+    `(Get-Acl -LiteralPath ${quote(path)}).Access | ForEach-Object { ` +
+    '$ref = $_.IdentityReference; ' +
+    '$sid = if ($ref -is [System.Security.Principal.SecurityIdentifier]) { $ref.Value } ' +
+    'else { $ref.Translate([System.Security.Principal.SecurityIdentifier]).Value }; ' +
+    '"$($sid)|$($_.FileSystemRights)|$($_.AccessControlType)" }',
   ).split(/\r?\n/u).map(line => line.trim()).filter(line => line !== '').map((line) => {
     const [sid, rights, type] = line.split('|')
     return { sid: sid!, rights: rights!, type: type! }

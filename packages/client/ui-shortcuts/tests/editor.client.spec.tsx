@@ -467,6 +467,7 @@ it.each(['macos', 'windows'] as const)('retries a %s command conflict while cont
       regions: ['page'], modals: [], resolve: () => ({ status: 'pass' }) })
   } })
   const recorder = screen.getByRole('button', { name: en.record })
+  await waitFor(() => { expect(document.activeElement).toBe(recorder) })
   const modifiers = platform === 'macos' ? { metaKey: true } : { ctrlKey: true }
   fireEvent.keyDown(recorder, { code: 'KeyK', key: 'k', ...modifiers })
   fireEvent.keyUp(recorder, { code: 'KeyK', ...modifiers })
@@ -483,6 +484,7 @@ it.each(['macos', 'windows'] as const)('retries a %s command conflict while cont
 it.each(['macos', 'windows'] as const)('waits for the remaining %s chord keys before accepting a retry', async (platform) => {
   const f = await mount({ platform })
   const recorder = screen.getByRole('button', { name: en.record })
+  await waitFor(() => { expect(document.activeElement).toBe(recorder) })
   fireEvent.keyDown(recorder, { code: 'KeyA', key: 'a' })
   fireEvent.keyDown(recorder, { code: 'Escape', key: 'Escape' })
   fireEvent.keyUp(recorder, { code: 'Escape' })

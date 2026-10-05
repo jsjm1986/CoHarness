@@ -527,18 +527,15 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     }
   }, 30_000)
 
-  it('a FullControl open inside a granted root still works for files (the deny inherits to containers only)', () => {
+  it('a granted-rights open inside a granted root still works for files (the deny inherits to containers only)', () => {
     // The ambient-delete deny is FILE_DELETE_CHILD (SDDL DT, 0x40), a member
     // of FILE_ALL_ACCESS: inheriting it onto files would deny every
-    // GENERIC_ALL/FullControl open by the confined child. Directories inside
-    // a granted root keep the deny (that is where FILE_DELETE_CHILD is
-    // evaluated), so a FullControl open of a DIRECTORY is the documented
-    // cost of the deny. That cost is only observable to a token whose
-    // matches come from the capability grant: on the granted tree the deny
-    // arrives inherited, and an unconfined caller's explicit FA allows sit
-    // before every inherited ACE in the DACL and win unconditionally. The
-    // probe therefore runs inside the confined runner child, where the only
-    // applicable ACEs are the inherited deny and the inherited grant.
+    // GENERIC_ALL open by the confined child. It lands on containers only —
+    // where FILE_DELETE_CHILD is evaluated — so the deny's observable cost is
+    // the denied parent-delete path, not object opens. The probe runs inside
+    // the confined runner child: the ambient FA allows (SYSTEM, Administrators,
+    // LOCAL) are not usable by the capability token, so the only ACEs that
+    // apply are the inherited deny and the inherited Write+Delete grant.
     const granted = join(scratchRoot, 'fullcontrol-root')
     const child = join(granted, 'child')
     const locked = join(granted, 'locked.txt')
@@ -581,17 +578,23 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
         ].join('\n'),
       ], { encoding: 'utf8', timeout: 30_000 })
       expect(strip.status, strip.stderr).toBe(0)
+      // The capability grant carries Write+Delete (the SDDL shows 0x110156),
+      // not FullControl — the probes request the granted mask. A FileStream on
+      // a directory always fails, so the deny's container reach is pinned by
+      // the SDDL and by the delete pair: file.txt deletes through its
+      // inherited DELETE bit while locked.txt, whose stripped DACL grants no
+      // DELETE to the capability SID, cannot be removed through the denied
+      // FILE_DELETE_CHILD.
       const probe = [
         "$ErrorActionPreference='SilentlyContinue';",
         'function TryOpen([string]$label, [string]$path) {',
         '  try {',
-        '    $fs = [System.IO.FileStream]::new($path, [System.IO.FileMode]::Open, [System.IO.FileSystemRights]::FullControl, [System.IO.FileShare]::ReadWrite);',
+        '    $fs = [System.IO.FileStream]::new($path, [System.IO.FileMode]::Open, [System.IO.FileSystemRights]::Write, [System.IO.FileShare]::ReadWrite);',
         '    $fs.Dispose(); "$($label): OK";',
         '  } catch { "$($label): DENIED" };',
         '};',
         `TryOpen 'FILE' '${join(granted, 'file.txt')}';`,
         `TryOpen 'NESTED-FILE' '${join(child, 'deep.txt')}';`,
-        `TryOpen 'DIRECTORY' '${child}';`,
         `"CHILD-SDDL: " + (Get-Acl -LiteralPath '${child}').Sddl;`,
         `"FILE-SDDL: " + (Get-Acl -LiteralPath '${join(granted, 'file.txt')}').Sddl;`,
         `try { [System.IO.File]::Delete('${join(granted, 'file.txt')}'); 'DELETE-IN-ROOT: OK' } catch { 'DELETE-IN-ROOT: DENIED' };`,
@@ -609,7 +612,6 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
       expect(result.stdout).not.toMatch(/FILE-SDDL:.*\(D;[^)]*DT[^)]*WD\)/u)
       expect(result.stdout).toContain('FILE: OK')
       expect(result.stdout).toContain('NESTED-FILE: OK')
-      expect(result.stdout).toContain('DIRECTORY: DENIED')
       expect(result.stdout).toContain('DELETE-IN-ROOT: OK')
       expect(result.stdout).toContain('LOCKED-DELETE: DENIED')
     } finally {
