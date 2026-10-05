@@ -540,13 +540,6 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     const child = join(granted, 'child')
     const locked = join(granted, 'locked.txt')
     mkdirSync(granted)
-    const grant = AclWriteGrant.create(workspaceWriteSid(granted))
-    grant.add(granted, true)
-    // Probe objects are created only after the grant lands: the confined
-    // token runs at Low integrity, and the grant's Low label reaches
-    // descendants through creation-inheritance — objects that predate the
-    // grant keep their ambient Medium label, and NoWriteUp then denies every
-    // write and delete regardless of the DACL the token could otherwise use.
     mkdirSync(child)
     writeFileSync(join(granted, 'file.txt'), 'x')
     writeFileSync(join(child, 'deep.txt'), 'x')
@@ -583,13 +576,16 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
         ].join('\n'),
       ], { encoding: 'utf8', timeout: 30_000 })
       expect(strip.status, strip.stderr).toBe(0)
-      // The capability grant carries Write+Delete (the SDDL shows 0x110156),
-      // not FullControl — the probes request the granted mask. A FileStream on
-      // a directory always fails, so the deny's container reach is pinned by
-      // the SDDL and by the delete pair: file.txt deletes through its
-      // inherited DELETE bit while locked.txt, whose stripped DACL grants no
-      // DELETE to the capability SID, cannot be removed through the denied
-      // FILE_DELETE_CHILD.
+      // The capability grant carries Write+Delete (0x110156), not FullControl
+      // — the probes request the granted mask. A FileStream on a directory
+      // always fails, so the deny's container reach is pinned by the SDDL and
+      // by the delete pair: file.txt deletes through its inherited DELETE bit
+      // while locked.txt, whose stripped DACL grants no DELETE to the
+      // capability SID, cannot be removed through the denied
+      // FILE_DELETE_CHILD. The runner materializes the workspace and temp
+      // grants itself — without the private-temp capability the confined pwsh
+      // fails its startup AppLocker probe into ConstrainedLanguage, where
+      // FileStream is not a permitted type.
       const probe = [
         "$ErrorActionPreference='SilentlyContinue';",
         'function TryOpen([string]$label, [string]$path) {',
@@ -607,7 +603,6 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
       ].join('')
       const result = runRunner([
         '--workspace', granted, '--temp', isolatedTemp, '--mode', 'workspace-write',
-        '--write-sid', workspaceWriteSid(granted), '--temp-write-sid', tempWriteSid(isolatedTemp),
         '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
       ])
       expect(result.status, `stderr: ${result.stderr}`).toBe(0)
@@ -620,7 +615,6 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
       expect(result.stdout).toContain('DELETE-IN-ROOT: OK')
       expect(result.stdout).toContain('LOCKED-DELETE: DENIED')
     } finally {
-      grant.dispose()
       rmSync(granted, { recursive: true, force: true })
     }
   }, 60_000)
