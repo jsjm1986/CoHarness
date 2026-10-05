@@ -14,7 +14,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
 import { AclWriteGrant, tempWriteSid, workspaceWriteSid } from '../src/index.ts'
-import { DISABLE_BYPASS_PRIVILEGES_PWSH } from './bypass-privileges.ts'
 
 const isWin32 = process.platform === 'win32'
 const runnerEntry = fileURLToPath(new URL('../src/runner.ts', import.meta.url))
@@ -529,11 +528,17 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
   }, 30_000)
 
   it('a FullControl open inside a granted root still works for files (the deny inherits to containers only)', () => {
-    // The ambient-delete deny is 0x40, a member of FILE_ALL_ACCESS: inheriting
-    // it onto files would deny every GENERIC_ALL/FullControl open by the user,
-    // Administrators, SYSTEM, or the DSH host. Directories inside a granted
-    // root keep the deny (that is where FILE_DELETE_CHILD is evaluated), so a
-    // FullControl open of a DIRECTORY is the documented cost of the deny.
+    // The ambient-delete deny is FILE_DELETE_CHILD (SDDL DT, 0x40), a member
+    // of FILE_ALL_ACCESS: inheriting it onto files would deny every
+    // GENERIC_ALL/FullControl open by the confined child. Directories inside
+    // a granted root keep the deny (that is where FILE_DELETE_CHILD is
+    // evaluated), so a FullControl open of a DIRECTORY is the documented
+    // cost of the deny. That cost is only observable to a token whose
+    // matches come from the capability grant: on the granted tree the deny
+    // arrives inherited, and an unconfined caller's explicit FA allows sit
+    // before every inherited ACE in the DACL and win unconditionally. The
+    // probe therefore runs inside the confined runner child, where the only
+    // applicable ACEs are the inherited deny and the inherited grant.
     const granted = join(scratchRoot, 'fullcontrol-root')
     const child = join(granted, 'child')
     mkdirSync(granted)
@@ -543,36 +548,35 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     const grant = AclWriteGrant.create(workspaceWriteSid(granted))
     grant.add(granted, true)
     try {
-      const probe = `
-${DISABLE_BYPASS_PRIVILEGES_PWSH}
-$ErrorActionPreference='SilentlyContinue'
-Add-Type -Namespace P -Name F -MemberDefinition @'
-[DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode, EntryPoint="CreateFileW")]
-public static extern IntPtr CreateFileW(string n, uint a, uint s, IntPtr sa, uint d, uint f, IntPtr t);
-[DllImport("kernel32.dll", SetLastError=true)]
-public static extern bool CloseHandle(IntPtr h);
-'@ | Out-Null
-function TryOpen([string]$label, [string]$path) {
-  $h = [P.F]::CreateFileW($path, 0x10000000, 7, [IntPtr]::Zero, 3, 0x02000000, [IntPtr]::Zero)
-  if ($h -eq [IntPtr]::new(-1)) { "$($label): DENIED" } else { [void][P.F]::CloseHandle($h); "$($label): OK" }
-}
-TryOpen 'FILE' '${join(granted, 'file.txt')}'
-TryOpen 'NESTED-FILE' '${join(child, 'deep.txt')}'
-TryOpen 'DIRECTORY' '${child}'
-"CHILD-SDDL: $((Get-Acl -LiteralPath '${child}').Sddl)"
-"FILE-SDDL: $((Get-Acl -LiteralPath '${join(granted, 'file.txt')}').Sddl)"
-`
-      const result = spawnSync('pwsh', ['-NoLogo', '-NonInteractive', '-NoProfile', '-Command', probe], { encoding: 'utf8', timeout: 60_000 })
+      const probe = [
+        "$ErrorActionPreference='SilentlyContinue';",
+        'function TryOpen([string]$label, [string]$path) {',
+        '  try {',
+        '    $fs = [System.IO.FileStream]::new($path, [System.IO.FileMode]::Open, [System.IO.FileSystemRights]::FullControl, [System.IO.FileShare]::ReadWrite)',
+        '    $fs.Dispose(); "$($label): OK"',
+        '  } catch { "$($label): DENIED" }',
+        '};',
+        `TryOpen 'FILE' '${join(granted, 'file.txt')}';`,
+        `TryOpen 'NESTED-FILE' '${join(child, 'deep.txt')}';`,
+        `TryOpen 'DIRECTORY' '${child}';`,
+        'try { [System.IO.File]::Delete(\'' + join(granted, 'file.txt') + '\'); \'DELETE-IN-ROOT: OK\' } catch { \'DELETE-IN-ROOT: DENIED\' };',
+        `"CHILD-SDDL: " + (Get-Acl -LiteralPath '${child}').Sddl;`,
+        `"FILE-SDDL: " + (Get-Acl -LiteralPath '${join(granted, 'file.txt')}').Sddl;`,
+      ].join('')
+      const result = runRunner([
+        '--workspace', granted, '--temp', isolatedTemp, '--mode', 'workspace-write',
+        '--write-sid', workspaceWriteSid(granted), '--temp-write-sid', tempWriteSid(isolatedTemp),
+        '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
+      ])
       expect(result.status, `stderr: ${result.stderr}`).toBe(0)
-      // The SDDL pins are privilege-independent evidence that the deny ACE
-      // reached the directory (CI propagates it to containers only); the
-      // TryOpen outcomes then read that DACL through the privilege-disabled
-      // token instead of a runner token's enabled bypass privileges.
-      expect(result.stdout).toMatch(/CHILD-SDDL:.*\(D;[^)]*DC[^)]*WD\)/u)
-      expect(result.stdout).not.toMatch(/FILE-SDDL:.*\(D;[^)]*DC[^)]*WD\)/u)
+      // The SDDL pins record where the deny landed: the directory carries it
+      // (CI propagates to containers only), the file does not.
+      expect(result.stdout).toMatch(/CHILD-SDDL:.*\(D;[^)]*DT[^)]*WD\)/u)
+      expect(result.stdout).not.toMatch(/FILE-SDDL:.*\(D;[^)]*DT[^)]*WD\)/u)
       expect(result.stdout).toContain('FILE: OK')
       expect(result.stdout).toContain('NESTED-FILE: OK')
       expect(result.stdout).toContain('DIRECTORY: DENIED')
+      expect(result.stdout).toContain('DELETE-IN-ROOT: DENIED')
     } finally {
       grant.dispose()
       rmSync(granted, { recursive: true, force: true })

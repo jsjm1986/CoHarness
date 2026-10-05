@@ -29,6 +29,8 @@ public static class DshSpecPrivileges {
   private struct TokenPrivileges { public uint Count; public long Luid; public uint Attributes; }
   [DllImport("advapi32.dll", SetLastError = true)]
   private static extern bool AdjustTokenPrivileges(IntPtr token, bool disableAll, ref TokenPrivileges state, uint length, IntPtr previous, IntPtr returnLength);
+  [DllImport("kernel32.dll")]
+  private static extern void SetLastError(uint error);
   private const uint TokenAdjustPrivileges = 0x20;
   private const uint TokenQuery = 0x08;
   private const int ErrorNotAllAssigned = 1300;
@@ -40,6 +42,7 @@ public static class DshSpecPrivileges {
       long luid;
       if (!LookupPrivilegeValue(null, name, out luid)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
       TokenPrivileges state = new TokenPrivileges { Count = 1, Luid = luid, Attributes = 0 };
+      SetLastError(0);
       if (!AdjustTokenPrivileges(token, false, ref state, 0, IntPtr.Zero, IntPtr.Zero))
         throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
       int error = Marshal.GetLastWin32Error();
