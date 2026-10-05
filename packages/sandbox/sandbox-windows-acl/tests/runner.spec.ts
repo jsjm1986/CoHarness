@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
 import { AclWriteGrant, tempWriteSid, workspaceWriteSid } from '../src/index.ts'
+import { DISABLE_BYPASS_PRIVILEGES_PWSH } from './bypass-privileges.ts'
 
 const isWin32 = process.platform === 'win32'
 const runnerEntry = fileURLToPath(new URL('../src/runner.ts', import.meta.url))
@@ -543,6 +544,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     grant.add(granted, true)
     try {
       const probe = `
+${DISABLE_BYPASS_PRIVILEGES_PWSH}
 $ErrorActionPreference='SilentlyContinue'
 Add-Type -Namespace P -Name F -MemberDefinition @'
 [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode, EntryPoint="CreateFileW")]
@@ -557,9 +559,17 @@ function TryOpen([string]$label, [string]$path) {
 TryOpen 'FILE' '${join(granted, 'file.txt')}'
 TryOpen 'NESTED-FILE' '${join(child, 'deep.txt')}'
 TryOpen 'DIRECTORY' '${child}'
+"CHILD-SDDL: $((Get-Acl -LiteralPath '${child}').Sddl)"
+"FILE-SDDL: $((Get-Acl -LiteralPath '${join(granted, 'file.txt')}').Sddl)"
 `
       const result = spawnSync('pwsh', ['-NoLogo', '-NonInteractive', '-NoProfile', '-Command', probe], { encoding: 'utf8', timeout: 60_000 })
       expect(result.status, `stderr: ${result.stderr}`).toBe(0)
+      // The SDDL pins are privilege-independent evidence that the deny ACE
+      // reached the directory (CI propagates it to containers only); the
+      // TryOpen outcomes then read that DACL through the privilege-disabled
+      // token instead of a runner token's enabled bypass privileges.
+      expect(result.stdout).toMatch(/CHILD-SDDL:.*\(D;[^)]*DC[^)]*WD\)/u)
+      expect(result.stdout).not.toMatch(/FILE-SDDL:.*\(D;[^)]*DC[^)]*WD\)/u)
       expect(result.stdout).toContain('FILE: OK')
       expect(result.stdout).toContain('NESTED-FILE: OK')
       expect(result.stdout).toContain('DIRECTORY: DENIED')
