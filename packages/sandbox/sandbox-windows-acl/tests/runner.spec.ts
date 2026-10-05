@@ -577,25 +577,24 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
       ], { encoding: 'utf8', timeout: 30_000 })
       expect(strip.status, strip.stderr).toBe(0)
       // The capability grant carries Write+Delete (0x110156), not FullControl
-      // — the probes request the granted mask. A FileStream on a directory
-      // always fails, so the deny's container reach is pinned by the SDDL and
-      // by the delete pair: file.txt deletes through its inherited DELETE bit
-      // while locked.txt, whose stripped DACL grants no DELETE to the
-      // capability SID, cannot be removed through the denied
-      // FILE_DELETE_CHILD. The runner materializes the workspace and temp
-      // grants itself — without the private-temp capability the confined pwsh
-      // fails its startup AppLocker probe into ConstrainedLanguage, where
-      // FileStream is not a permitted type.
+      // — the write probes use Set-Content, the same primitive the other
+      // confined-write tests use: FileStream construction is not a permitted
+      // operation under the confined child's ConstrainedLanguage fallback and
+      // would deny for a reason unrelated to the ACLs. The deny's container
+      // reach is pinned by the SDDL and by the delete pair: file.txt deletes
+      // through its inherited DELETE bit while locked.txt, whose stripped
+      // DACL grants no DELETE to the capability SID, cannot be removed
+      // through the denied FILE_DELETE_CHILD.
       const probe = [
         "$ErrorActionPreference='SilentlyContinue';",
-        'function TryOpen([string]$label, [string]$path) {',
+        '\'LANGMODE: \' + $ExecutionContext.SessionState.LanguageMode;',
+        'function TryWrite([string]$label, [string]$path) {',
         '  try {',
-        '    $fs = [System.IO.FileStream]::new($path, [System.IO.FileMode]::Open, [System.IO.FileSystemRights]::Write, [System.IO.FileShare]::ReadWrite);',
-        '    $fs.Dispose(); "$($label): OK";',
+        '    Set-Content -LiteralPath $path -Value x -ErrorAction Stop; "$($label): OK";',
         '  } catch { "$($label): DENIED" };',
         '};',
-        `TryOpen 'FILE' '${join(granted, 'file.txt')}';`,
-        `TryOpen 'NESTED-FILE' '${join(child, 'deep.txt')}';`,
+        `TryWrite 'FILE' '${join(granted, 'file.txt')}';`,
+        `TryWrite 'NESTED-FILE' '${join(child, 'deep.txt')}';`,
         `"CHILD-SDDL: " + (Get-Acl -LiteralPath '${child}').Sddl;`,
         `"FILE-SDDL: " + (Get-Acl -LiteralPath '${join(granted, 'file.txt')}').Sddl;`,
         `try { [System.IO.File]::Delete('${join(granted, 'file.txt')}'); 'DELETE-IN-ROOT: OK' } catch { 'DELETE-IN-ROOT: DENIED' };`,

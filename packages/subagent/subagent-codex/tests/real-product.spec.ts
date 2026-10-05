@@ -542,7 +542,11 @@ describe('real @openai/codex 0.153.4 product', () => {
       output: [{ type: 'text', text: 'bypass complete' }],
       stopReason: 'completed',
     })
-    expect(existsSync(target), JSON.stringify(fixture.requests.at(-1)?.body.input)).toBe(true)
+    // exec_command reports a session still running past the completed run:
+    // the spawned shell writes the file after the result resolves.
+    await expect
+      .poll(() => existsSync(target), { message: JSON.stringify(fixture.requests.at(-1)?.body.input) })
+      .toBe(true)
     expect(readFileSync(target, 'utf8').trim()).toBe('bypass')
     await run.dispose()
     await expectQuiescent(harness.handles)
