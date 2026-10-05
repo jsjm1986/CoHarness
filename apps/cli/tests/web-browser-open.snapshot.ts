@@ -35,6 +35,29 @@ function normalizeLocalUrl(url: string): string {
   return url.replace(/:\d+(?=[/?])/u, ':{{port}}').replace(/([?&]token=)[^&\s]+/u, '$1{{token}}')
 }
 
+/**
+ * Assembles the child-process environment. HOME/USERPROFILE join the DSH_*
+ * dirs under the per-test root because homedir() supplies the default document
+ * upload root: without them a sibling's orphaned admission lock would surface
+ * as unrelated stderr.
+ * @param root - the per-test temporary directory.
+ * @param extra - case-specific overrides layered over the common entries.
+ * @returns the complete environment for the spawned `dsh web` child.
+ */
+function childEnv(root: string, extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    DEEPSEEK_API_KEY: 'keyless-browser-open-no-call',
+    DSH_AGENTS_HOME: join(root, '.agents'),
+    DSH_HOME: join(root, '.dsh'),
+    DSH_TELEMETRY_DISABLED: '1',
+    HOME: root,
+    NODE_NO_WARNINGS: '1',
+    USERPROFILE: root,
+    ...extra,
+  }
+}
+
 describe.skipIf(!builtArtifactsExist)('dsh web browser-open assembled snapshot', () => {
   it('hands the reachable page to the default browser after the shipped tree settles', async () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-web-browser-open-snapshot-'))
@@ -46,16 +69,10 @@ describe.skipIf(!builtArtifactsExist)('dsh web browser-open assembled snapshot',
       '--port', '0',
     ], {
       cwd: root,
-      env: {
-        ...process.env,
-        DEEPSEEK_API_KEY: 'keyless-browser-open-no-call',
-        DSH_AGENTS_HOME: join(root, '.agents'),
-        DSH_HOME: join(root, '.dsh'),
-        DSH_TELEMETRY_DISABLED: '1',
-        NODE_NO_WARNINGS: '1',
+      env: childEnv(root, {
         SSH_CONNECTION: '',
         SSH_TTY: '',
-      },
+      }),
       input: '',
       timeout: 30_000,
       killSignal: 'SIGKILL',
@@ -104,18 +121,12 @@ describe.skipIf(!builtArtifactsExist)('dsh web browser-open assembled snapshot',
       '--port', '0',
     ], {
       cwd: root,
-      env: {
-        ...process.env,
+      env: childEnv(root, {
         BROWSER_OPEN_TEST_FAILURE: 'fixture desktop unavailable',
-        DEEPSEEK_API_KEY: 'keyless-browser-open-no-call',
-        DSH_AGENTS_HOME: join(root, '.agents'),
         DSH_BROWSER_OPEN_TEST_EXIT_ON_FAILURE: '1',
-        DSH_HOME: join(root, '.dsh'),
-        DSH_TELEMETRY_DISABLED: '1',
-        NODE_NO_WARNINGS: '1',
         SSH_CONNECTION: '',
         SSH_TTY: '',
-      },
+      }),
       input: '',
       timeout: 30_000,
       killSignal: 'SIGKILL',
@@ -153,18 +164,12 @@ describe.skipIf(!builtArtifactsExist)('dsh web browser-open assembled snapshot',
       '--port', '0',
     ], {
       cwd: root,
-      env: {
-        ...process.env,
-        DEEPSEEK_API_KEY: 'keyless-browser-open-no-call',
-        DSH_AGENTS_HOME: join(root, '.agents'),
+      env: childEnv(root, {
         DSH_BROWSER_OPEN_TEST_EXIT_ON_READY: '1',
-        DSH_HOME: join(root, '.dsh'),
-        DSH_TELEMETRY_DISABLED: '1',
-        NODE_NO_WARNINGS: '1',
         SSH_CONNECTION: '10.0.0.2 55000 10.0.0.9 22',
         SSH_TTY: '',
         VSCODE_IPC_HOOK_CLI: '/tmp/vscode-ipc',
-      },
+      }),
       input: '',
       timeout: 30_000,
       killSignal: 'SIGKILL',
@@ -200,16 +205,10 @@ describe.skipIf(!builtArtifactsExist)('dsh web browser-open assembled snapshot',
       '--port', '0',
     ], {
       cwd: root,
-      env: {
-        ...process.env,
-        DEEPSEEK_API_KEY: 'keyless-browser-open-no-call',
-        DSH_AGENTS_HOME: join(root, '.agents'),
-        DSH_HOME: join(root, '.dsh'),
-        DSH_TELEMETRY_DISABLED: '1',
-        NODE_NO_WARNINGS: '1',
+      env: childEnv(root, {
         SSH_CONNECTION: '',
         SSH_TTY: '',
-      },
+      }),
       input: '',
       timeout: 30_000,
       killSignal: 'SIGKILL',
