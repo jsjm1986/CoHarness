@@ -201,7 +201,7 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
       <span
         class="newSessionLabel wide"
       >
-        New session
+        New Session
       </span>
     </button>
     <div
