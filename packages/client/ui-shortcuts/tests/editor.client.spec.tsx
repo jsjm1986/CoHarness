@@ -406,6 +406,7 @@ it.each(['macos', 'windows'] as const)('records %s overlapping keys in either or
 it.each(['macos', 'windows'] as const)('rejects %s fixed-action keys and their overlapping chords without replacing the current binding', async (platform) => {
   const f = await mount({ platform })
   const recorder = screen.getByRole('button', { name: en.record })
+  await waitFor(() => { expect(document.activeElement).toBe(recorder) })
   expect(screen.queryByRole('button', { name: 'Cancel recording' })).toBeNull()
   expect(recorder.getAttribute('aria-describedby')).toBeTruthy()
   expect(document.getElementById(recorder.getAttribute('aria-describedby')!)?.textContent).toBe('')
@@ -503,6 +504,7 @@ it.each(['macos', 'windows'] as const)('waits for the remaining %s chord keys be
 it('retries unsupported keys and macOS conflicts whose character keyup is omitted', async () => {
   const f = await mount()
   const recorder = screen.getByRole('button', { name: en.record })
+  await waitFor(() => { expect(document.activeElement).toBe(recorder) })
   fireEvent.keyDown(recorder, { code: 'Unidentified', key: 'Unidentified', metaKey: true })
   expect(f.onError).toHaveBeenLastCalledWith(en['unsupported-key'])
   fireEvent.keyUp(recorder, { code: 'MetaLeft', key: 'Meta' })
@@ -522,6 +524,7 @@ it('keeps recorder focus during a write and accepts another combination after fa
   const write = new Promise<void>((_resolve, rejectWrite) => { reject = rejectWrite })
   f.storage.write.mockImplementationOnce(() => write)
   const recorder = screen.getByRole('button', { name: en.record })
+  await waitFor(() => { expect(document.activeElement).toBe(recorder) })
   fireEvent.keyDown(recorder, { code: 'KeyJ', key: 'j', metaKey: true })
   fireEvent.keyUp(recorder, { code: 'KeyJ' })
   expect(recorder.getAttribute('aria-disabled')).toBe('true')

@@ -48,7 +48,10 @@ it('installs and validates the shell section when a settings provider is mounted
   await ctx.plugin(MemorySettings)
   await ctx.plugin(LocalSubprocessRuntime)
   await ctx.plugin(PwshLocalExecutor)
-  await ctx.settings.update(SHELL_SETTINGS_NAMESPACE, { timeoutMs: 5_000 })
+  const executor = ctx.shell as PwshLocalExecutor
+  expect(typeof executor.pwshPath).toBe('string')
+  await ctx.settings.update(SHELL_SETTINGS_NAMESPACE, { timeoutMs: 5_000, pwshPath: '/opt/pwsh/pwsh' })
+  expect(executor.pwshPath).toBe('/opt/pwsh/pwsh')
   expect(ctx.shell.resolve({ command: 'echo ok' }).timeoutMs).toBe(5_000)
   await expect(ctx.settings.update(SHELL_SETTINGS_NAMESPACE, { timeoutMs: 0 })).rejects.toThrow('timeoutMs')
 })
