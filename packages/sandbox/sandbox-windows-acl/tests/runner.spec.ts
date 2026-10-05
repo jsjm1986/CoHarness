@@ -540,12 +540,17 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     const child = join(granted, 'child')
     const locked = join(granted, 'locked.txt')
     mkdirSync(granted)
+    const grant = AclWriteGrant.create(workspaceWriteSid(granted))
+    grant.add(granted, true)
+    // Probe objects are created only after the grant lands: the confined
+    // token runs at Low integrity, and the grant's Low label reaches
+    // descendants through creation-inheritance — objects that predate the
+    // grant keep their ambient Medium label, and NoWriteUp then denies every
+    // write and delete regardless of the DACL the token could otherwise use.
     mkdirSync(child)
     writeFileSync(join(granted, 'file.txt'), 'x')
     writeFileSync(join(child, 'deep.txt'), 'x')
     writeFileSync(locked, 'x')
-    const grant = AclWriteGrant.create(workspaceWriteSid(granted))
-    grant.add(granted, true)
     try {
       // Windows authorizes a delete from the object's own DELETE right OR the
       // parent's FILE_DELETE_CHILD, and the deny names Everyone — the parent

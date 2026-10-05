@@ -427,8 +427,12 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
       replaceAcl(root, 'S-1-5-11', 'Modify')
       const deep = makeDir(root, 'deep')
       const leaf = makeDir(deep, 'leaf')
-      replaceAcl(deep, PACKAGE_SID, 'ReadAndExecute', 'ContainerInherit,ObjectInherit')
+      // Lock the leaf before its parent: replaceAcl's post-write Get-Acl
+      // resolves the object path through the parent's DACL, and once deep
+      // holds only the package ACE the caller can no longer resolve leaf
+      // for the verification read.
       replaceAcl(leaf, OTHER_PACKAGE_SID, 'ReadAndExecute', 'ContainerInherit,ObjectInherit')
+      replaceAcl(deep, PACKAGE_SID, 'ReadAndExecute', 'ContainerInherit,ObjectInherit')
 
       const run = runScript(['-Path', root, '-AllowRoot', root, '-Out', join(scratch, 'out')])
       expect(run.code, run.output).toBe(0)
@@ -453,9 +457,12 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
       expect(aclLines(root).join('\n')).toMatch(/\(F\)/u)
       // The repair removes the only ACE the fixtures left, so the caller has
       // no data-read on deep/leaf; READ_CONTROL through aceRows still reads.
-      for (const path of [deep, leaf]) {
-        expect(aceRows(path).filter(row => row.sid.startsWith('S-1-15-2-'))).toEqual([])
-      }
+      expect(aceRows(deep).filter(row => row.sid.startsWith('S-1-15-2-'))).toEqual([])
+      // leaf resolves through deep's emptied DACL — grant the caller a read
+      // pass on deep purely so the verification path opens, after deep's own
+      // rows have already been asserted.
+      icacls(deep, '/grant', `*${meSid}:(RX)`)
+      expect(aceRows(leaf).filter(row => row.sid.startsWith('S-1-15-2-'))).toEqual([])
     } finally {
       dispose(scratch)
     }
