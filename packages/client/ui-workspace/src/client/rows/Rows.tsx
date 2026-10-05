@@ -239,6 +239,20 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
     { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
     { id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutline16 />, danger: true },
   ]
+  const ungrouped = row.workspaceId === undefined
+  const newSessionButton = (
+    <Tooltip label={t('actions.newSession')} shortcutKeys={newShortcut?.keys} side="bottom" align="end" delayMs={500}>
+      <button
+        type="button"
+        className={css.iconButton}
+        aria-keyshortcuts={newShortcut?.aria}
+        aria-label={t('actions.newSession.aria', { name: label })}
+        onClick={(e) => { e.stopPropagation(); onCreate() }}
+      >
+        <IconNewChatOutline16 />
+      </button>
+    </Tooltip>
+  )
   const ownRow = (
     <div
       className={clsx(css.projectRow, menuOpen && css.menuOpen)}
@@ -265,6 +279,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
       </span>
+      {!ungrouped && newSessionButton}
       <span className={css.rowActions}>
         {actions !== undefined && (
           <Menu
@@ -294,17 +309,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
             )}
           />
         )}
-        <Tooltip label={t('actions.newSession')} shortcutKeys={newShortcut?.keys} side="bottom" align="end" delayMs={500}>
-          <button
-            type="button"
-            className={css.iconButton}
-            aria-keyshortcuts={newShortcut?.aria}
-            aria-label={t('actions.newSession.aria', { name: label })}
-            onClick={(e) => { e.stopPropagation(); onCreate() }}
-          >
-            <IconNewChatOutline16 />
-          </button>
-        </Tooltip>
+        {ungrouped && newSessionButton}
       </span>
     </div>
   )

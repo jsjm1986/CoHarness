@@ -42,7 +42,7 @@
   - text: 1 intermediate message
   - img
 - text: m1
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r1
@@ -58,12 +58,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m2
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r2
@@ -79,12 +79,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m3
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r3
@@ -100,12 +100,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m4
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r4
@@ -121,12 +121,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m5
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r5
@@ -142,12 +142,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m6
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r6
@@ -163,12 +163,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m7
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r7
@@ -184,12 +184,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m8
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r8
@@ -205,12 +205,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m9
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r9
@@ -226,12 +226,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m10
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r10
@@ -247,12 +247,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m11
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r11
@@ -268,12 +268,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m12
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r12
@@ -289,12 +289,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m13
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r13
@@ -310,12 +310,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m14
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r14
@@ -331,12 +331,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m15
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r15
@@ -352,12 +352,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m16
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r16
@@ -373,12 +373,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m17
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r17
@@ -394,12 +394,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m18
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r18
@@ -415,12 +415,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m19
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r19
@@ -436,12 +436,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m20
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r20
@@ -457,12 +457,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m21
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r21
@@ -478,12 +478,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m22
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r22
@@ -499,12 +499,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m23
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r23
@@ -520,12 +520,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m24
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r24
@@ -541,12 +541,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m25
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r25
@@ -562,12 +562,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m26
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r26
@@ -583,12 +583,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m27
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r27
@@ -604,12 +604,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
 - text: m28
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: r28
@@ -625,7 +625,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Back to bottom":
   - img
 - textbox "Message the agent"
@@ -635,7 +635,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -644,4 +644,5 @@
   - button "28 turns · 28 steps":
     - img
     - text: 28 turns · 28 steps
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

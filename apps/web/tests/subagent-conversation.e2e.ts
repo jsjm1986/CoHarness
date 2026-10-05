@@ -476,7 +476,12 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       () => page.getByRole('tree', { name: 'Sessions' }).getByRole('treeitem').count(),
       { timeout: 15_000 },
     ).toBe(3)
-    expect(await page.getByText('Independent sessions', { exact: true }).count()).toBe(0)
+    // The workspace attach rides the mux stream while the fork receipt rides
+    // the RPC reply; poll for the two channels to converge.
+    await expect.poll(
+      () => page.getByText('Independent sessions', { exact: true }).count(),
+      { timeout: 15_000 },
+    ).toBe(0)
     const hierarchy = page.getByRole('navigation', { name: 'Session hierarchy' })
     await expect.poll(() => hierarchy.getByRole('button').count()).toBe(1)
     await compareOrRefreshGolden(

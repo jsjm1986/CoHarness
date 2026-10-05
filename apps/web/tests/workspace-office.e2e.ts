@@ -11,6 +11,8 @@ import { launchWebScaffold, seedSession, watchConsole, captureStableAria, compar
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
 const FORMATS = ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt'] as const
+// Workbooks take the read-only browser-parsed sheet surface, not Office→PDF.
+const SPREADSHEETS: ReadonlySet<string> = new Set(['xlsx', 'xls'])
 const SEED = fileURLToPath(new URL('./snapshots/seeded-history/seed.jsonl', import.meta.url))
 const GOLDEN = fileURLToPath(new URL('./snapshots/workspace-office/pdf.expected.md', import.meta.url))
 
@@ -34,13 +36,23 @@ describe('web e2e: authorized Office preview', () => {
   }, 120_000)
   afterAll(async () => { try { await browser?.close() } finally { await scaffold?.close() } })
 
-  it.each(FORMATS)('converts %s with the installed engine and displays selectable PDF pages', async (extension) => {
+  it.each(FORMATS)('previews %s with the installed surface and selectable content', async (extension) => {
     if (scaffold === undefined) throw new Error('Web scaffold is unavailable')
     onTestFailed(() => saveFailureShot(page, `workspace-office-${extension}`))
     const tripwire = watchConsole(page)
     await page.getByRole('button', { name: `Preview ${extension}`, exact: true }).click()
     const preview = page.getByRole('region', { name: `preview.${extension}`, exact: true })
-    await preview.locator('[data-pdf-text]').getByText('Office preview', { exact: false }).first().waitFor({ timeout: 60_000 })
+    if (SPREADSHEETS.has(extension)) {
+      const sheet = preview.locator('[data-excel-preview]')
+      await sheet.waitFor({ timeout: 60_000 })
+      // A1 is selected on load; the formula bar exposes the stored cell text.
+      await expect.poll(
+        () => preview.locator('#luckysheet-functionbox-cell').textContent(),
+        { timeout: 60_000 },
+      ).toContain('Office preview')
+    } else {
+      await preview.locator('[data-pdf-text]').getByText('Office preview', { exact: false }).first().waitFor({ timeout: 60_000 })
+    }
     const canvas = preview.locator('canvas').first()
     expect(await canvas.evaluate((element: HTMLCanvasElement) => element.width > 0 && element.height > 0)).toBe(true)
     expect(await canvas.evaluate((element: HTMLCanvasElement) => {

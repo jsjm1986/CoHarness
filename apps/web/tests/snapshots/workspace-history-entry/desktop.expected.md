@@ -2,13 +2,13 @@
   - text: 2 tool calls · 2 intermediate messages
   - img
 - text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop."
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Think Both files have been read. a.txt contains \"alpha\" and b.txt contains \"beta\". I'll now reply with DONE as instructed.":
+- button "Thinking Both files have been read. a.txt contains \"alpha\" and b.txt contains \"beta\". I'll now reply with DONE as instructed.":
   - img
   - img
-  - text: Think Both files have been read. a.txt contains "alpha" and b.txt contains "beta". I'll now reply with DONE as instructed.
+  - text: Thinking Both files have been read. a.txt contains "alpha" and b.txt contains "beta". I'll now reply with DONE as instructed.
 - paragraph: DONE
 - button "Copy":
   - img
@@ -22,7 +22,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -30,7 +30,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

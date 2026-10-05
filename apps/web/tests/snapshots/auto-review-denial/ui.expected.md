@@ -19,7 +19,7 @@
   - img
   - text: System prompt
 - text: Inspect the protected operation, but do not run it unless authorized.
-- group "Message timing": "{{date}} {{clock}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
 - text: Failed
@@ -51,6 +51,7 @@
     - img
     - text: 1 turns · 2 steps
 - separator "Adjust transcript content width"
+- separator "Adjust transcript content width"
 
 ## Expanded
 
@@ -73,7 +74,7 @@
   - img
   - text: System prompt
 - text: Inspect the protected operation, but do not run it unless authorized.
-- group "Message timing": "{{date}} {{clock}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
 - text: Failed
@@ -110,6 +111,7 @@
   - button "1 turns · 2 steps":
     - img
     - text: 1 turns · 2 steps
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"
 
 ## Trajectory
@@ -185,4 +187,3 @@
   - button "1 turns · 2 steps":
     - img
     - text: 1 turns · 2 steps
-- separator "Adjust transcript content width"

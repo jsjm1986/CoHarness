@@ -16,11 +16,15 @@
     - img
   - button "Open right sidebar":
     - img
+- button "Process details":
+  - text: Process details
+  - img
 - text: Give one concrete event sourcing example.
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - status:
   - strong: This subagent is read-only for now
   - text: The parent session is offline; reopen it to continue sending messages.
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

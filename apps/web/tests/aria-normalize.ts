@@ -73,6 +73,9 @@ export function normalizeAria(snapshot: string, workspaceCwd: string): string {
       // business identifiers are content, covered by seeded-history's
       // normalize-preserves-identifiers case.
       value = value.replace(/session-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, 'session-{{uuid}}')
+      // Loader entry ids for id-less rows are minted at random per boot
+      // (EntryTree.ensureId); nested forms render as `<id>:<name>`.
+      value = value.replace(/\b[0-9a-f]{8}:(?=\w)/g, '{{entry}}:')
       // Trajectory tooltips and similar chrome print seeded event times in
       // the runner's local zone (HH:MM:SS AM/PM); they are wall-clock output
       // even outside a timing group, while bare HH:MM deadlines in message

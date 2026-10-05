@@ -3,7 +3,7 @@
   - img
 - button "New session":
   - img
-  - text: New session
+  - text: New Session
 - navigation "Panels":
   - button "Plugins"
 - text: Workspaces
@@ -15,10 +15,12 @@
 - button "Add workspace":
   - img
 - tree "Sessions":
-  - treeitem "workspace" [expanded]:
+  - treeitem "workspace New session in workspace" [expanded]:
     - img
     - text: workspace
-  - treeitem "New session" [selected]
+    - button "New session in workspace":
+      - img
+  - treeitem "New Session" [selected]
 - button "Documents":
   - img
   - text: Documents

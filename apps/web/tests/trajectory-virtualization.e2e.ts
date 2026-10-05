@@ -67,6 +67,20 @@ interface RowAnchor {
   readonly top: number
 }
 
+// The compact shell keeps its navigation drawer open after session selection,
+// so phone-width runs must dismiss it before the main tabs become clickable.
+// Escape is the shell-level close; the toggle button label is the fallback.
+async function closeCompactDrawer(page: Page): Promise<void> {
+  const drawer = page.locator('[class*="drawer"][data-open="true"]')
+  if ((await drawer.count()) === 0) return
+  await page.keyboard.press('Escape')
+  if ((await drawer.count()) > 0) {
+    const toggle = page.getByRole('button', { name: /Close sidebar|关闭侧边栏/ })
+    if ((await toggle.count()) > 0) await toggle.first().click()
+  }
+  await expect.poll(() => drawer.count(), { timeout: 10_000 }).toBe(0)
+}
+
 async function openSeed(page: Page, tailMarker: string | RegExp = FIXTURE.markers.assistant(FIXTURE.turns)): Promise<void> {
   const sidebarToggle = page.getByRole('button', { name: /Open sidebar|打开侧边栏/ })
   if (await sidebarToggle.count() > 0 && await sidebarToggle.getAttribute('aria-expanded') !== 'true') {
@@ -80,10 +94,7 @@ async function openSeed(page: Page, tailMarker: string | RegExp = FIXTURE.marker
   const result = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
   await expect.poll(() => result.count(), { timeout: 60_000 }).toBe(1)
   await result.click()
-  const closeSidebar = page.getByRole('button', { name: /Close sidebar|关闭侧边栏/ })
-  if (await closeSidebar.count() > 0 && await closeSidebar.getAttribute('aria-expanded') === 'true') {
-    await closeSidebar.click()
-  }
+  await closeCompactDrawer(page)
   await page.getByRole('tab', { name: 'Trajectory', exact: true }).waitFor({ timeout: 30_000 })
   // Tail barrier: prove the conversation mounted its last page. The live
   // stream turn the first test appends displaces the seeded tail marker, so
@@ -94,6 +105,7 @@ async function openSeed(page: Page, tailMarker: string | RegExp = FIXTURE.marker
 }
 
 async function openTrajectory(page: Page): Promise<void> {
+  await closeCompactDrawer(page)
   await page.getByRole('tab', { name: 'Trajectory', exact: true }).click()
   const pane = page.locator('[data-trajectory-scroll]')
   await pane.waitFor({ timeout: 30_000 })
@@ -170,10 +182,15 @@ async function rowTop(page: Page, key: string): Promise<number | null> {
 
 async function loadToFirstTurn(page: Page): Promise<void> {
   const marker = FIXTURE.markers.user(1)
+  const loadMore = page.locator('[data-history-load] button')
   for (let attempt = 0; attempt < 12; attempt += 1) {
+    if (await page.getByText(marker, { exact: false }).count() > 0) return
+    await expect.poll(() => loadMore.evaluateAll(buttons =>
+      buttons.length === 0 || !(buttons[0] as HTMLButtonElement).disabled,
+    ), { timeout: 15_000 }).toBe(true)
+    const before = await logicalRows(page)
     await scrollToRatio(page, 0)
     if (await page.getByText(marker, { exact: false }).count() > 0) return
-    const before = await logicalRows(page)
     const anchor = await firstVisibleRow(page)
     await expect.poll(async () => ({
       marker: await page.getByText(marker, { exact: false }).count() > 0,
@@ -305,7 +322,6 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
       }
       host.scrollTo = trackedScrollTo as typeof host.scrollTo
     })
-    const rowsBeforeTurn = await logicalRows(page)
     const settled = scaffold.whenTurnSettled()
     const input = page.locator('textarea').first()
     await input.fill('Stream one deterministic response while Trajectory remains visible.')
@@ -318,12 +334,9 @@ describe('web e2e: Trajectory virtualization over tail-paged history', () => {
         .__trajectoryScrollCalls ?? 0
     })
     // Bottom-follow re-anchors per committed row-structure change, never per
-    // chunk: one streamed turn appends dozens of rows (85 chunks plus the
-    // turn's lifecycle events) and the follow must stay well under one call
-    // per four of them.
-    const appendedRows = await logicalRows(page) - rowsBeforeTurn
-    expect(appendedRows).toBeGreaterThan(20)
-    expect(streamingScrollCalls).toBeLessThanOrEqual(Math.ceil(appendedRows / 4))
+    // chunk: a per-chunk follow would cost ~80 calls for this stream, while a
+    // correct cadence stays in single digits for the whole turn.
+    expect(streamingScrollCalls).toBeLessThanOrEqual(10)
     expect(await mountedRows(page)).toBeLessThanOrEqual(MAX_MOUNTED_ROWS)
     expect({
       pageErrors: tripwire.pageErrors,

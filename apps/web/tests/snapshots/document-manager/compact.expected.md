@@ -2,7 +2,7 @@
   - heading "Document Manager" [level=2]
   - button "Close":
     - img
-  - paragraph: No per-file size limit, 20 per message
+  - paragraph: No per-file size limit, up to 20 per upload
   - button "Personal documents Visible only to you":
     - strong: Personal documents
     - text: Visible only to you

@@ -90,7 +90,11 @@ describe('web e2e: compact settings overlay', () => {
     const cubeYs = new Set(cubeBoxes.map(box => Math.round(box!.y)))
     expect(cubeYs.size).toBe(1)
 
-    const enterBox = await dialog.getByRole('button', { name: '排队发送' }).boundingBox()
+    const enterButton = dialog.getByRole('button', { name: '排队发送' })
+    // The General section grew past the 844px viewport; .options owns the
+    // scroll, so reach the row through it before checking geometry.
+    await enterButton.scrollIntoViewIfNeeded()
+    const enterBox = await enterButton.boundingBox()
     if (enterBox === null) throw new Error('settings compact enter selector has no box')
     expect(enterBox.y + enterBox.height).toBeLessThanOrEqual(dialogBox.y + dialogBox.height + 1)
 

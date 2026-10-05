@@ -14,16 +14,20 @@
 - button "1 tool call · 2 intermediate messages":
   - text: 1 tool call · 2 intermediate messages
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - text: Use the ask_user_question tool to ask me exactly one question with id "checkpoint", question "Ready to continue?", header "Checkpoint", and options labeled "Yes" and "No". After I answer, reply with one short sentence acknowledging my answer and stop.
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - text: "Interjection: include the word BANANA in your final reply."
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - text: "Interjection: include the word ORANGE in your final reply."
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: "Got it: BANANA and ORANGE."
@@ -39,7 +43,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -47,7 +51,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -60,4 +64,5 @@
   - button "40 tok · Cache hit 0%":
     - img
     - text: 40 tokCache hit 0%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

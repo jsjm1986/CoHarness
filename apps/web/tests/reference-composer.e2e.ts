@@ -194,7 +194,7 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     expect(tripwire.warnings).toEqual([])
   })
 
-  it('renders the direct message while retaining the following recall only in the log', async () => {
+  it('renders the direct message with the following recall as a context node', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-reference-order'))
     const group = page.getByRole('treeitem', { name: /Independent sessions/ })
     await group.waitFor({ timeout: 15_000 })
@@ -203,13 +203,14 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     await target.waitFor({ timeout: 15_000 })
     await target.click()
     await page.locator('[data-chat-flow-kind="user"]').filter({ hasText: 'Research notes' }).waitFor({ timeout: 15_000 })
-    expect(await page.locator('[data-chat-flow-kind="context"]').count()).toBe(0)
+    await expect.poll(() => page.locator('[data-chat-flow-kind="context"]').count(), { timeout: 15_000 }).toBe(1)
+    await page.getByRole('button', { name: /^Select model, current / }).waitFor({ timeout: 10_000 })
 
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(TARGET_SESSION_ID).join('{{targetId}}')
     await compareOrRefreshGolden(ORDER_EXPECTED, snapshot, MODE)
     expect(snapshot).toContain('Research notes what changed?')
-    expect(snapshot).not.toContain('Session recall Research notes')
+    expect(snapshot).toContain('Referenced session · Research notes')
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, ['menu.expected.md', 'order.expected.md'])

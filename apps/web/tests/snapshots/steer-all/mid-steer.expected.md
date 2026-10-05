@@ -19,17 +19,17 @@
   - img
   - text: System prompt
 - text: Use the ask_user_question tool to ask me exactly one question with id "checkpoint", question "Ready to continue?", header "Checkpoint", and options labeled "Yes" and "No". After I answer, reply with one short sentence acknowledging my answer and stop.
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
+- button "Context injection runtime-context":
   - img
   - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
-- button "Think The user wants me to ask them a checkpoint question first, then continue with whatever they interject. Let me do exactly that.":
+  - text: Context injection runtime-context
+- button "Thinking The user wants me to ask them a checkpoint question first, then continue with whatever they interject. Let me do exactly that.":
   - img
   - img
-  - text: Think The user wants me to ask them a checkpoint question first, then continue with whatever they interject. Let me do exactly that.
+  - text: Thinking The user wants me to ask them a checkpoint question first, then continue with whatever they interject. Let me do exactly that.
 - text: Running
 - button "Ask question waiting":
   - img
@@ -61,4 +61,5 @@
   - status
   - button "Skip"
   - button "Submit" [disabled]
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"
