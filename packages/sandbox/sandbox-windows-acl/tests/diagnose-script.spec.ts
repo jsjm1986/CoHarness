@@ -129,7 +129,13 @@ function icacls(path: string, ...args: readonly string[]): string {
  * into explicit entries instead of removing them, and the copied set keeps
  * every verdict the fixtures intend to produce unreachable.
  * SetAccessRuleProtection(false) drops inherited entries without copying.
- * The post-write scan fails the setup loudly when any fuller grant survives.
+ * The post-write scan fails the setup loudly unless the surviving DACL is
+ * exactly the requested grant: the fixtures' purpose is a directory the
+ * caller cannot write, so a fuller grant would keep every verdict the case
+ * intends to produce unreachable. The read goes through Get-Acl — it needs
+ * only READ_CONTROL, which the object owner always holds — because icacls
+ * opens the object for data read and is refused by the very DACLs the
+ * fixtures install (the grant may name no usable trustee for the caller).
  * @param path - the directory whose DACL is replaced.
  * @param sid - the trustee SID the single surviving grant names.
  * @param rights - FileSystemRights enum member for the surviving grant.
@@ -148,10 +154,30 @@ function replaceAcl(path: string, sid: string, rights: string, inheritance = 'No
       '[System.Security.AccessControl.AccessControlType]::Allow))',
     `Set-Acl -LiteralPath ${quote(path)} -AclObject $acl`,
   ].join('\n'))
-  const lines = aclLines(path).join('\n')
-  if (/\(F\)/u.test(lines)) {
-    throw new Error(`replaceAcl(${path}) left a fuller grant behind:\n${lines}`)
+  const rows = aceRows(path)
+  const valid = rows.length === 1 && rows[0]!.sid === sid && rows[0]!.type === 'Allow' &&
+    !/FullControl|GenericAll/u.test(rows[0]!.rights)
+  if (!valid) {
+    throw new Error(`replaceAcl(${path}) left ${JSON.stringify(rows)} instead of the single ${sid} ${rights} allow`)
   }
+}
+
+/**
+ * DACL rows read through Get-Acl, which needs only READ_CONTROL — a right
+ * the object owner always holds even when the DACL names no usable grant.
+ * Use this for objects whose fixture or repair left the caller without
+ * data-read access, where icacls' open is refused.
+ * @param path - the file or directory whose DACL is read.
+ * @returns one entry per ACE: trustee SID, FileSystemRights text, Allow/Deny.
+ */
+function aceRows(path: string): Array<{ sid: string; rights: string; type: string }> {
+  return pwsh(
+    `(Get-Acl -LiteralPath ${quote(path)}).Access | ` +
+    'ForEach-Object { "$($_.IdentityReference.Value)|$($_.FileSystemRights)|$($_.AccessControlType)" }',
+  ).split(/\r?\n/u).map(line => line.trim()).filter(line => line !== '').map((line) => {
+    const [sid, rights, type] = line.split('|')
+    return { sid: sid!, rights: rights!, type: type! }
+  })
 }
 
 function quote(value: string): string {
@@ -421,7 +447,11 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
         details: containingObject({ scanTruncated: false, nextAction: 'verify_original_confined_operation' }),
       })
       expect(aclLines(root).join('\n')).toMatch(/\(F\)/u)
-      for (const path of [deep, leaf]) expect(aclLines(path).join('\n')).not.toMatch(/S-1-15-2-/u)
+      // The repair removes the only ACE the fixtures left, so the caller has
+      // no data-read on deep/leaf; READ_CONTROL through aceRows still reads.
+      for (const path of [deep, leaf]) {
+        expect(aceRows(path).filter(row => row.sid.startsWith('S-1-15-2-'))).toEqual([])
+      }
     } finally {
       dispose(scratch)
     }

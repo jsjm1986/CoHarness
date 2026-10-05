@@ -556,7 +556,10 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
       // bit as the only delete authority inside the root. locked.txt makes
       // the deny's function observable: an object whose stripped DACL grants
       // everything but DELETE cannot be removed through the denied parent
-      // right, while a normally inherited object still deletes fine.
+      // right, while a normally inherited object still deletes fine. The
+      // Administrators ACE keeps the elevated test caller's delete authority
+      // for teardown; the confined token cannot use it — the same inherited
+      // Administrators grant on child did not stop DIRECTORY: DENIED.
       const strip = spawnSync(resolvePwshPath(), [
         '/NoLogo', '/NonInteractive', '/NoProfile', '-Command', [
           `$acl = Get-Acl -LiteralPath '${locked}'`,
@@ -565,6 +568,12 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
           '$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new(' +
             `[System.Security.Principal.SecurityIdentifier]::new('${workspaceWriteSid(granted)}'), ` +
             '[System.Security.AccessControl.FileSystemRights]\'ReadAndExecute, Write\', ' +
+            '[System.Security.AccessControl.InheritanceFlags]::None, ' +
+            '[System.Security.AccessControl.PropagationFlags]::None, ' +
+            '[System.Security.AccessControl.AccessControlType]::Allow))',
+          '$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new(' +
+            "[System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'), " +
+            '[System.Security.AccessControl.FileSystemRights]::FullControl, ' +
             '[System.Security.AccessControl.InheritanceFlags]::None, ' +
             '[System.Security.AccessControl.PropagationFlags]::None, ' +
             '[System.Security.AccessControl.AccessControlType]::Allow))',
