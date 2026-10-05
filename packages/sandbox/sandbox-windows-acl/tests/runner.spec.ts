@@ -541,27 +541,52 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     // applicable ACEs are the inherited deny and the inherited grant.
     const granted = join(scratchRoot, 'fullcontrol-root')
     const child = join(granted, 'child')
+    const locked = join(granted, 'locked.txt')
     mkdirSync(granted)
     mkdirSync(child)
     writeFileSync(join(granted, 'file.txt'), 'x')
     writeFileSync(join(child, 'deep.txt'), 'x')
+    writeFileSync(locked, 'x')
     const grant = AclWriteGrant.create(workspaceWriteSid(granted))
     grant.add(granted, true)
     try {
+      // Windows authorizes a delete from the object's own DELETE right OR the
+      // parent's FILE_DELETE_CHILD, and the deny names Everyone — the parent
+      // path is denied to the capability holder too, leaving the ACE's DELETE
+      // bit as the only delete authority inside the root. locked.txt makes
+      // the deny's function observable: an object whose stripped DACL grants
+      // everything but DELETE cannot be removed through the denied parent
+      // right, while a normally inherited object still deletes fine.
+      const strip = spawnSync(resolvePwshPath(), [
+        '/NoLogo', '/NonInteractive', '/NoProfile', '-Command', [
+          `$acl = Get-Acl -LiteralPath '${locked}'`,
+          '$acl.SetAccessRuleProtection($true, $false)',
+          'foreach ($ace in @($acl.Access)) { [void]$acl.RemoveAccessRule($ace) }',
+          '$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new(' +
+            `[System.Security.Principal.SecurityIdentifier]::new('${workspaceWriteSid(granted)}'), ` +
+            '[System.Security.AccessControl.FileSystemRights]\'ReadAndExecute, Write\', ' +
+            '[System.Security.AccessControl.InheritanceFlags]::None, ' +
+            '[System.Security.AccessControl.PropagationFlags]::None, ' +
+            '[System.Security.AccessControl.AccessControlType]::Allow))',
+          `Set-Acl -LiteralPath '${locked}' -AclObject $acl`,
+        ].join('\n'),
+      ], { encoding: 'utf8', timeout: 30_000 })
+      expect(strip.status, strip.stderr).toBe(0)
       const probe = [
         "$ErrorActionPreference='SilentlyContinue';",
         'function TryOpen([string]$label, [string]$path) {',
         '  try {',
-        '    $fs = [System.IO.FileStream]::new($path, [System.IO.FileMode]::Open, [System.IO.FileSystemRights]::FullControl, [System.IO.FileShare]::ReadWrite)',
-        '    $fs.Dispose(); "$($label): OK"',
-        '  } catch { "$($label): DENIED" }',
+        '    $fs = [System.IO.FileStream]::new($path, [System.IO.FileMode]::Open, [System.IO.FileSystemRights]::FullControl, [System.IO.FileShare]::ReadWrite);',
+        '    $fs.Dispose(); "$($label): OK";',
+        '  } catch { "$($label): DENIED" };',
         '};',
         `TryOpen 'FILE' '${join(granted, 'file.txt')}';`,
         `TryOpen 'NESTED-FILE' '${join(child, 'deep.txt')}';`,
         `TryOpen 'DIRECTORY' '${child}';`,
-        'try { [System.IO.File]::Delete(\'' + join(granted, 'file.txt') + '\'); \'DELETE-IN-ROOT: OK\' } catch { \'DELETE-IN-ROOT: DENIED\' };',
         `"CHILD-SDDL: " + (Get-Acl -LiteralPath '${child}').Sddl;`,
         `"FILE-SDDL: " + (Get-Acl -LiteralPath '${join(granted, 'file.txt')}').Sddl;`,
+        `try { [System.IO.File]::Delete('${join(granted, 'file.txt')}'); 'DELETE-IN-ROOT: OK' } catch { 'DELETE-IN-ROOT: DENIED' };`,
+        `try { [System.IO.File]::Delete('${locked}'); 'LOCKED-DELETE: OK' } catch { 'LOCKED-DELETE: DENIED' };`,
       ].join('')
       const result = runRunner([
         '--workspace', granted, '--temp', isolatedTemp, '--mode', 'workspace-write',
@@ -576,7 +601,8 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
       expect(result.stdout).toContain('FILE: OK')
       expect(result.stdout).toContain('NESTED-FILE: OK')
       expect(result.stdout).toContain('DIRECTORY: DENIED')
-      expect(result.stdout).toContain('DELETE-IN-ROOT: DENIED')
+      expect(result.stdout).toContain('DELETE-IN-ROOT: OK')
+      expect(result.stdout).toContain('LOCKED-DELETE: DENIED')
     } finally {
       grant.dispose()
       rmSync(granted, { recursive: true, force: true })

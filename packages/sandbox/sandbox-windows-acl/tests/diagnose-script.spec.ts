@@ -103,9 +103,14 @@ function runPowerShell(args: readonly string[], env?: NodeJS.ProcessEnv): Script
  * holds (the script's effective-rights probes open with
  * FILE_FLAG_BACKUP_SEMANTICS, under which enabled Backup/Restore/
  * TakeOwnership rights answer true regardless of the DACL the fixture just
- * wrote), and forward `exit $LASTEXITCODE` — an `&`-invoked script's `exit N`
- * only ends that script, so a `-Command` wrapper would report every verdict
- * as process exit 1. Written once per suite run under the system temp root.
+ * wrote), and forward the script's exit status — an `&`-invoked script's
+ * `exit N` only ends that script and lands in `$LASTEXITCODE`, so a
+ * `-Command` wrapper would report every verdict as process exit 1. A script
+ * that dies in parameter binding never reaches `exit`, leaving
+ * `$LASTEXITCODE` null; the wrapper falls back to `$?` — captured before the
+ * exit-code read, since the assignment itself would reset it — so binding
+ * rejections still surface as nonzero. Written once per suite run under the
+ * system temp root.
  */
 let scriptWrapper = ''
 
@@ -137,8 +142,8 @@ function replaceAcl(path: string, sid: string, rights: string, inheritance = 'No
     'foreach ($ace in @($acl.Access)) { [void]$acl.RemoveAccessRule($ace) }',
     '$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new(' +
       `[System.Security.Principal.SecurityIdentifier]::new('${sid}'), ` +
-      `[System.Security.AccessControl.FileSystemRights]::${rights}, ` +
-      `[System.Security.AccessControl.InheritanceFlags]${inheritance}, ` +
+      `[System.Security.AccessControl.FileSystemRights]'${rights}', ` +
+      `[System.Security.AccessControl.InheritanceFlags]'${inheritance}', ` +
       '[System.Security.AccessControl.PropagationFlags]::None, ' +
       '[System.Security.AccessControl.AccessControlType]::Allow))',
     `Set-Acl -LiteralPath ${quote(path)} -AclObject $acl`,
@@ -207,7 +212,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
   beforeAll(() => {
     meSid = pwsh('[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value').trim()
     scriptWrapper = join(newScratch(), 'invoke-diagnose.ps1')
-    writeFileSync(scriptWrapper, `${DISABLE_BYPASS_PRIVILEGES_PWSH}\n& ${quote(script)} @args\nexit $LASTEXITCODE\n`)
+    writeFileSync(scriptWrapper, `${DISABLE_BYPASS_PRIVILEGES_PWSH}\n& ${quote(script)} @args\n$__dshOk = $?\n$__dshCode = $LASTEXITCODE\nif ($null -eq $__dshCode) { $__dshCode = ($__dshOk ? 0 : 1) }\nexit $__dshCode\n`)
     const probe = newScratch()
     try {
       // The script inspects the real ancestor chain, including paths above our owned root.
@@ -570,7 +575,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
       const key = directory === 'Packages' ? 'LOCALAPPDATA' : 'ProgramFiles'
       // PowerShell re-derives ProgramFiles while starting, so assign the override inside the child session.
       const run = runPowerShell(['-Command',
-        `$env:${key} = ${quote(root)}; & ${quote(script)} -Path ${quote(child)} -AllowRoot ${quote(root)} -Out ${quote(join(scratch, 'out'))}; exit $LASTEXITCODE`])
+        `$env:${key} = ${quote(root)}; ${DISABLE_BYPASS_PRIVILEGES_PWSH}\n& ${quote(script)} -Path ${quote(child)} -AllowRoot ${quote(root)} -Out ${quote(join(scratch, 'out'))}; exit $LASTEXITCODE`])
       expect(run.code, run.output).toBe(2)
       expect(run.output).toContain('managed application directory')
       expect(run.output).toContain('SUMMARY FIXED=0 GRANTED=0 REFUSED=1 RESTORED=0')
@@ -620,7 +625,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
       icacls(second, '/deny', `*${meSid}:(WO)`)
       const before = [sddlOf(first), sddlOf(second)]
 
-      const run = runPowerShell(['-Command', `& ${quote(script)} -Path @(${quote(first)}, ${quote(second)}) -AllowRoot ${quote(scratch)} -Out ${quote(out)}; exit $LASTEXITCODE`])
+      const run = runPowerShell(['-Command', `${DISABLE_BYPASS_PRIVILEGES_PWSH}\n& ${quote(script)} -Path @(${quote(first)}, ${quote(second)}) -AllowRoot ${quote(scratch)} -Out ${quote(out)}; exit $LASTEXITCODE`])
       expect(run.code, run.output).toBe(2)
       expect(reports(run).filter(entry => entry.kind === 'verification' && entry.operation === 'restore').map(entry => entry.path))
         .toEqual([second, first])
@@ -642,6 +647,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
       icacls(second, '/deny', `*${meSid}:(WO)`)
       const wrapper = join(scratch, 'fail-rollback.ps1')
       writeFileSync(wrapper, `
+${DISABLE_BYPASS_PRIVILEGES_PWSH}
 $global:firstReads = 0
 function Get-Acl {
   param([string]$LiteralPath)
@@ -720,7 +726,7 @@ exit $LASTEXITCODE
         kind: 'error', status: 'stopped', details: containingObject({ error: containingString('requires -Out') }),
       }))
 
-      const twoPaths = runPowerShell(['-Command', `& ${quote(script)} -Path @(${quote(target)}, ${quote(other)}) -AllowRoot ${quote(scratch)} -Restore 'anything.json'; exit $LASTEXITCODE`])
+      const twoPaths = runPowerShell(['-Command', `${DISABLE_BYPASS_PRIVILEGES_PWSH}\n& ${quote(script)} -Path @(${quote(target)}, ${quote(other)}) -AllowRoot ${quote(scratch)} -Restore 'anything.json'; exit $LASTEXITCODE`])
       expect(twoPaths.code).toBe(2)
       expect(reports(twoPaths)).toContainEqual(containingObject({
         kind: 'error', status: 'stopped', details: containingObject({ error: containingString('exactly one -Path') }),
@@ -785,6 +791,7 @@ exit $LASTEXITCODE
       const target = makeDir(scratch, 'unreadable-observation')
       const before = sddlOf(target)
       const run = runPowerShell(['-Command', `
+${DISABLE_BYPASS_PRIVILEGES_PWSH}
 function Get-Acl { param([string]$LiteralPath); throw [System.IO.IOException]::new('ACL observation unavailable') }
 & ${quote(script)} -Path ${quote(target)} -AllowRoot ${quote(scratch)} -Out ${quote(join(scratch, 'out'))}; exit $LASTEXITCODE
 `])
@@ -809,6 +816,7 @@ function Get-Acl { param([string]$LiteralPath); throw [System.IO.IOException]::n
       const target = makeDir(scratch, 'incomplete-observation')
       const before = sddlOf(target)
       const run = runPowerShell(['-Command', `
+${DISABLE_BYPASS_PRIVILEGES_PWSH}
 function icacls { throw [System.IO.IOException]::new('icacls unavailable') }
 & ${quote(script)} -Path ${quote(target)} -AllowRoot ${quote(scratch)} -Out ${quote(join(scratch, 'out'))}; exit $LASTEXITCODE
 `])
