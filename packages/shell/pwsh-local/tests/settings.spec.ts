@@ -1,9 +1,11 @@
 /** Live executor configuration through Loader updates. */
 import { expect, it, onTestFinished } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { SHELL_SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-shell'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { PwshLocalExecutor } from '../src/index.ts'
 import { liveConfig } from '../../../settings/settings/tests/live-config.ts'
+import { MemorySettings } from '../../../settings/settings/tests/memory.ts'
 
 it('uses changed budgets for later commands without remounting the executor', async () => {
   const ctx = new Context()
@@ -38,4 +40,15 @@ it('resolves a changed pwsh path for later commands without remounting the execu
   expect(executor.pwshPath).toBe('/opt/pwsh/pwsh')
   await live.replace({})
   expect(executor.pwshPath).toBe(initial)
+})
+
+it('installs and validates the shell section when a settings provider is mounted', async () => {
+  const ctx = new Context()
+  onTestFinished(() => ctx.fiber.dispose())
+  await ctx.plugin(MemorySettings)
+  await ctx.plugin(LocalSubprocessRuntime)
+  await ctx.plugin(PwshLocalExecutor)
+  await ctx.settings.update(SHELL_SETTINGS_NAMESPACE, { timeoutMs: 5_000 })
+  expect(ctx.shell.resolve({ command: 'echo ok' }).timeoutMs).toBe(5_000)
+  await expect(ctx.settings.update(SHELL_SETTINGS_NAMESPACE, { timeoutMs: 0 })).rejects.toThrow('timeoutMs')
 })

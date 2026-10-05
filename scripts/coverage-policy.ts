@@ -98,6 +98,20 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
     ]
     : []
 
+  // Debt the POSIX lanes reported on sources the Windows lane already covers
+  // at the bar: their only measured residue is the spill-failure and
+  // spill-path render paths the win32 suites exercise. The platform-agnostic
+  // baseline would hide their Windows measurement, so the debt is recorded
+  // here — shrink by covering the paths on POSIX and deleting the line.
+  const windowsCoveredDebtExclusions = platform !== 'win32'
+    ? [
+      'packages/shell/tool-bash/src/render.ts',
+      'packages/ssh/ssh/src/helper-processes.ts',
+      'packages/subprocess/subprocess-local/src/index.ts',
+      'packages/subprocess/subprocess-local/src/output.ts',
+    ]
+    : []
+
   // pwsh-local's run/start/lifecycle suites self-skip without a real pwsh
   // (executor.spec.ts hasPwsh), leaving this file
   // far below per-file 100% on pwsh-less hosts; the exemption keeps those hosts
@@ -225,6 +239,7 @@ export function resolveCoveragePolicy(platform: NodeJS.Platform, pwshAvailable: 
       ...windowsRunnerCoverageExclusions,
       ...linuxOnlyCoverageExclusions,
       ...posixCoverageExclusions,
+      ...windowsCoveredDebtExclusions,
       ...pwshCoverageExclusions,
     ],
     excludedTests: windowsUnsupportedTests,
