@@ -144,7 +144,11 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })))
 })
 
-describe('archived version recovery', () => {
+// Each case boots the six-plugin storage stack and waits on a durable
+// write; under shared-runner contention that work can stall far past the
+// coverage partition's 30 s budget without anything being wrong, so the
+// suite carries its own headroom above the inner waitFor budget.
+describe('archived version recovery', { timeout: 90_000 }, () => {
   it('recovers the v3 whole-unit archive through the legacy bootstrap', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-projcache-fx-'))
     await cp(join(FIXTURES, 'v3-single-unit.json'), join(root, `${projectionCacheDomainSpec.name}.json`))
