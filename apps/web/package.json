@@ -28,7 +28,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@capacitor/core": "8.5.0",
+    "@capacitor/core": "8.5.1",
     "@capacitor/push-notifications": "8.1.2"
   },
   "devDependencies": {
