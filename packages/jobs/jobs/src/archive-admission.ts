@@ -41,7 +41,13 @@ export function installJobArchiveAdmission(ctx: Context, registry: JobRegistry):
   })
 }
 
-/** The jobs the Session owns that have not settled; unowned jobs in the same listing belong to nobody. */
+/**
+ * The jobs the Session owns that have not settled; unowned jobs in the same
+ * listing belong to nobody.
+ * @param registry - the registry to list through.
+ * @param owner - the Session whose owned jobs to return.
+ * @returns the owned jobs still in `running` or `stopping` status.
+ */
 export function runningJobs(registry: JobRegistry, owner: SessionId): JobView[] {
   return registry.list(owner)
     .filter(job => job.owner === owner && (job.status === 'running' || job.status === 'stopping'))
