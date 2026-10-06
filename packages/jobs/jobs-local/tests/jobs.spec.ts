@@ -2,7 +2,7 @@ import type { ExecutionInheritance, ExecutionInputId, ExecutionScopeId } from '@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { agentCarrier } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { bindScopeParent, createScope, scopeOf } from '@deepseek-ai/dsh-scope'
 import type { ScopeKey } from '@deepseek-ai/dsh-scope'
@@ -969,6 +969,28 @@ describe('LocalJobRegistry owner cleanup', () => {
     expect(seen[0]).toMatchObject({ cause: 'teardown', job: { status: 'failed' } })
     expect((seen[0] as { job: JobView }).job.detail).toContain('cancel threw during teardown')
     expect(ctx.jobs.list(owner.id)).toEqual([])
+  })
+})
+
+describe('LocalJobRegistry idle release veto', () => {
+  it('reports busy while the asked Agent owns a running job and releases it once settled', async () => {
+    const ctx = await harness()
+    const owner = await liveAgent(ctx, 'owner')
+    const other = await liveAgent(ctx, 'other')
+    const task = producer({ owner })
+    ctx.jobs.start(task.spec)
+    expect(ctx.bail(agentCarrier(owner), 'agent/idle-release-check', { agent: owner })).toBe('busy')
+    expect(ctx.bail(agentCarrier(other), 'agent/idle-release-check', { agent: other })).toBeUndefined()
+    task.settle({ status: 'completed' })
+    await tick()
+    expect(ctx.bail(agentCarrier(owner), 'agent/idle-release-check', { agent: owner })).toBeUndefined()
+  })
+
+  it('keeps an unowned job from vetoing any Agent', async () => {
+    const ctx = await harness()
+    const agent = await liveAgent(ctx, 'agent')
+    ctx.jobs.start(producer().spec)
+    expect(ctx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent })).toBeUndefined()
   })
 })
 

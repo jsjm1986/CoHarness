@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 The background job registry contract (`ctx.jobs`). The abstract `JobRegistry` and its vocabulary types give long-running producers shared ids, owner isolation, reads, cancellation, waiting, notices, and cleanup under one contract; the process-local registry lives in [`dsh-jobs-local`](../jobs-local/README.md). Producer plugins extend `JobKindMap` with their opaque id namespace.
 
-A running or stopping job answers the Workspace registry's archive-admission probe for its owner, and the owning Agent's disposal cancels and awaits it. Unowned jobs live until the service is disposed; resource cleanup beyond the ring remains the producer's responsibility.
+A running or stopping job answers the Workspace registry's archive-admission probe for its owner, vetoes `agent/idle-release-check` so the exact owning Agent cannot be idle-disposed mid-flight, and the owning Agent's disposal cancels and awaits it. Unowned jobs live until the service is disposed; resource cleanup beyond the ring remains the producer's responsibility.
 
 ## Summary
 
@@ -85,6 +85,7 @@ This section explains the design decisions behind the contract and points at the
 | [`src/view.ts`](src/view.ts) | Client-safe leaf: `JobView`, `JobChunk`, `JobStatus`, and the merge-extensible `JobKindMap` |
 | [`src/brand.ts`](src/brand.ts) | `JobId` branded identifier, importable without the agent dependency |
 | [`src/archive-admission.ts`](src/archive-admission.ts) | The `job` family of the Workspace registry's archive admission, installed by the seam's constructor for every implementation |
+| [`src/idle-release.ts`](src/idle-release.ts) | The jobs veto on `agent/idle-release-check`, installed by the seam's constructor for every implementation |
 | [`src/invariant.ts`](src/invariant.ts) | Invariant companion: checks the announced event protocol per job (registered first, one settlement, removal last) and each announced projection against the registry's own read |
 
 ### Service operations

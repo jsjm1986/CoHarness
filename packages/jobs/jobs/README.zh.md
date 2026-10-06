@@ -9,7 +9,7 @@ kind: "package-reference"
 
 后台任务注册表约定（`ctx.jobs`）。抽象的 `JobRegistry` 及其词汇类型在同一份约定下为长时间运行的生产方提供共享 id、owner 隔离、读取、取消、等待、通知和清理；进程局部注册表位于 [`dsh-jobs-local`](../jobs-local/README.zh.md)。生产方插件使用其不透明 id namespace 扩展 `JobKindMap`。
 
-运行中或停止中的作业响应 Workspace 注册表针对其 owner 的归档准入探针，所属 Agent 被释放时会取消并等待该作业。无 owner 的作业持续到服务释放为止；环之外的资源收敛仍由生产者负责。
+运行中或停止中的作业响应 Workspace 注册表针对其 owner 的归档准入探针，通过 `agent/idle-release-check` 否决其确切所属 Agent 的空闲释放使其不被中途回收，所属 Agent 被释放时会取消并等待该作业。无 owner 的作业持续到服务释放为止；环之外的资源收敛仍由生产者负责。
 
 ## 概述
 
@@ -85,6 +85,7 @@ kind: "package-reference"
 | [`src/view.ts`](src/view.ts) | 客户端安全叶子：`JobView`、`JobChunk`、`JobStatus` 与可合并扩展的 `JobKindMap` |
 | [`src/brand.ts`](src/brand.ts) | `JobId` 带类型标记的标识符，无需 agent 依赖即可导入 |
 | [`src/archive-admission.ts`](src/archive-admission.ts) | Workspace 注册表归档准入中的 `job` 族，由接缝构造函数为每个实现安装 |
+| [`src/idle-release.ts`](src/idle-release.ts) | `agent/idle-release-check` 上的作业否决，由接缝构造函数为每个实现安装 |
 | [`src/invariant.ts`](src/invariant.ts) | 不变式伴生插件：校验每个 job 的事件协议（先 registered、恰一次结算、最后 removed）以及每个通告的投影与注册表自身读取的一致性 |
 
 ### 服务操作
