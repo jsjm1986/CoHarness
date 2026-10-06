@@ -30,6 +30,9 @@ overrides:
   'extract-zip>yauzl': '3.4.0'
   '@deepseek-ai/cosmokit': 'link:vendor/cosmokit'
   '@deepseek-ai/schemastery': 'link:vendor/schemastery'
+  # Two zod copies in one graph poison `~standard` schema typing (mcp-client's
+  # CallToolResult validate narrows to never); 4.5 changed the interface.
+  zod: '4.4.3'
 
 peerDependencyRules:
   allowedVersions:
