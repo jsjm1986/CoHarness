@@ -176,6 +176,7 @@ describe('web e2e: Chat labels project senders on bubbles', () => {
     expect(await page.getByText('Lin', { exact: true }).count()).toBe(1)
     expect(await page.getByText('Admin', { exact: true }).count()).toBe(1)
     expect(await page.getByText(NOTICE_PREFIX, { exact: false }).count()).toBe(0)
+    await page.getByRole('button', { name: /^Select model, current / }).waitFor({ timeout: 15_000 })
     const snapshot = (await captureStableAria(page, '[data-conversation-scroll]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
