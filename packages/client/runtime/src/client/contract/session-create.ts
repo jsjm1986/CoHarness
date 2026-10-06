@@ -1,7 +1,10 @@
+import type { ConnectionRuntimeTarget } from '@deepseek-ai/dsh-client-connection/client'
 import type { SessionDraftId, SessionId, WorkspaceId } from '@deepseek-ai/dsh-api-remotes/client'
 
 /** Browser-owned options for creating one root session through the Host API. */
 export interface SessionCreateOptions {
+  /** Client-only owner for preparation hooks; never sent to the Host create API. */
+  readonly runtimeTarget?: ConnectionRuntimeTarget
   readonly workspaceId?: WorkspaceId
   readonly cwd?: string
   readonly sessionId?: SessionId

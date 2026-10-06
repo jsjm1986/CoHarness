@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-30-hook-bridges.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-30-hook-bridges.md
-2026-06-30-hook-bridges.md: 806e6851f0d71856698755f7dc7a502d0f86480e
-2026-06-30-hook-bridges.zh.md: 1648cbb16a9d091782dbdc50e9b010bf1f4d4ed8
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges:
+  en: cda23626c478d1bb
+  zh: b06fae512c8a89e6
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges/problem:
+  en: 758d13e1995f64b1
+  zh: 6519a744396aecac
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges/decision:
+  en: 41c37b5f28acdd4b
+  zh: f5177a603517e34e
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges/decision/outcome-decision-mapping:
+  en: 47fddb515c0ab741
+  zh: 2c9133c2f5ca6846
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges/decision/context-source-is-always-the-plugin-the-mislabel-guard:
+  en: 31aa2afaa60c7b82
+  zh: 7c9483474d3c4650
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges/decision/adding-context-is-not-a-veto-delegate-then-prepend:
+  en: 83b569408c717ea0
+  zh: 5a5b9ebfd248d3ad
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges/decision/claude-project-dir-defaults-to-the-session-workspace:
+  en: 52565f3f52fcc851
+  zh: 3e62a8d9f385283c
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges/decision/containment:
+  en: 43378b0c13a1a391
+  zh: c75851b7c6d9b4fe
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges/decision/where-hooks-run-and-where-their-config-comes-from:
+  en: cc06fe4ac94f1a96
+  zh: ea9933f2911a3f45
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges/deferred-compatibility-gaps:
+  en: f80156e1ef4776c7
+  zh: 6730db4281490ea6
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges/alternatives-considered:
+  en: 0481b724e93231cc
+  zh: cdc1f53a6f1d7e62
+/agent-note-dsh-hooks-claude-code-dsh-hooks-codex-the-claude-code-codex-hook-bridges/consequences:
+  en: 1df11b2b8479d0c1
+  zh: adc06f44b0e9cb2e

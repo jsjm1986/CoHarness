@@ -54,13 +54,24 @@
   --dsw-shadow-lv3: var(--shadow-dialog);
   --dsw-alias-bg-layer-1: var(--surface);
   --dsw-alias-bg-layer-2: var(--surface-subtle);
+  --dsw-alias-bg-layer-3: var(--surface-strong);
   --dsw-alias-bg-mask-1: rgba(15, 17, 21, 0.24);
   --dsw-alias-bg-module-platform: var(--surface-subtle);
+  --dsw-alias-bg-skeleton: var(--surface-strong);
   --dsw-alias-border-inverted: transparent;
+  --dsw-alias-border-l1: var(--border);
   --dsw-alias-border-l2: var(--border);
   --dsw-alias-border-l3: var(--border-strong);
+  --dsw-alias-border-l4: var(--border-strong);
   --dsw-alias-border-subtle: var(--border);
   --dsw-alias-brand-primary: var(--text);
+  --dsw-alias-state-business-primary: var(--accent);
+  --dsw-alias-state-warning-primary: var(--warning);
+  --dsw-alias-state-warn-primary: var(--warning);
+  --dsw-alias-state-warn-tertiary: var(--warning-soft);
+  --dsw-elevation-prominent: var(--shadow-dialog);
+  --dsw-focus-ring-width: 2px;
+  --dsw-focus-ring-color: var(--accent);
   --dsw-alias-button-primary-fill: var(--accent);
   --dsw-alias-button-primary-hover: var(--accent-hover);
   --dsw-alias-button-tool-bar-fill: var(--surface-strong);
@@ -70,6 +81,7 @@
   --dsw-alias-interactive-bg-hover-danger: var(--danger-soft);
   --dsw-alias-interactive-bg-hover-solid: var(--surface-strong);
   --dsw-alias-label-dimmed: var(--text-tertiary);
+  --dsw-alias-label-caption: var(--text-tertiary);
   --dsw-alias-label-primary: var(--text);
   --dsw-alias-label-primary-foreground: var(--surface);
   --dsw-alias-label-secondary: var(--text-secondary);
@@ -346,7 +358,9 @@ a {
 .sectionTitleLine {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   min-width: 0;
+  max-width: 100%;
   gap: 10px;
 }
 
@@ -369,7 +383,7 @@ a {
 .sectionMeta {
   color: var(--text-tertiary);
   font-size: 12px;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .pageActions,
@@ -429,6 +443,7 @@ a {
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text);
+  text-decoration: none;
   font-weight: 550;
   line-height: 1;
   white-space: nowrap;
@@ -708,6 +723,36 @@ a {
 
 .formGridThree {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.nodeConfigurationGroup {
+  margin-block: 16px;
+  padding-block: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.nodeConfigurationGroup > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.nodeConfigurationFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+  min-inline-size: 0;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.nodeConfigurationFields .field {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nodeConfigurationFields p {
+  margin: 0;
 }
 
 .formSpanFull {
@@ -2871,8 +2916,7 @@ a {
     left: 0;
     z-index: 10;
     display: grid;
-    /* Six destinations are first-class on mobile. Keeping one compact row is
-       clearer than letting the last item wrap into the fixed footer height. */
+    /* Five primary destinations and the overflow menu fit the reserved footer height. */
     grid-template-columns: repeat(6, minmax(0, 1fr));
     min-height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
     padding: 6px max(8px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px)
@@ -2882,7 +2926,8 @@ a {
     backdrop-filter: blur(18px);
   }
 
-  .mobileNav a {
+  .mobileNav a,
+  .mobileNav > button {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2897,9 +2942,12 @@ a {
     line-height: 16px;
     font-weight: 600;
     text-decoration: none;
+    border: 0;
+    background: transparent;
   }
 
-  .mobileNav a.active {
+  .mobileNav a.active,
+  .mobileNav > button.active {
     background: var(--accent-soft);
     color: var(--accent);
   }
@@ -2972,6 +3020,10 @@ a {
     padding: 0 2px 10px;
     border-bottom: none;
     flex-wrap: wrap;
+  }
+
+  .responsiveSection > .sectionBody {
+    padding: 0;
   }
 
   .responsiveSection .mobileList {
@@ -3377,4 +3429,336 @@ a {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+}
+
+.mobileMoreNav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mobileMoreNav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.mobileMoreNav a.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.mobileMoreNav svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.archiveSyncState { display: block; margin-top: 0.25rem; font-size: 0.75rem; }
+
+/* User detail page */
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  color: var(--accent);
+}
+
+.backLink svg {
+  width: 15px;
+  height: 15px;
+}
+
+.userLink,
+.projectLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.userLink:hover .identityText strong {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.projectLink:hover {
+  color: var(--accent);
+}
+
+.pageBadges {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.qualificationGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.qualificationCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.qualificationCard > .muted {
+  margin: 0;
+}
+
+.qualificationCard > p[role="status"] {
+  margin: 0;
+}
+
+.qualificationHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+
+.memberAddRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.memberAddRow > .select:first-child {
+  min-width: 200px;
+  flex: 1 1 200px;
+}
+
+.userQuotaForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.quotaSaveRow {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Plugin composition matrix: fused live and startup columns on the Plugins page. */
+.pluginMatrix .tableWrap {
+  margin-top: 10px;
+}
+
+.pluginMatrix .matrixFilter {
+  max-width: 260px;
+  margin-top: 4px;
+}
+
+.matrixGroup td {
+  padding-top: 14px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+
+.matrixName {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.matrixName .muted {
+  font-size: 11px;
+}
+
+.matrixModule {
+  font-size: 11px;
+}
+
+.matrixAdvanced {
+  margin-top: 10px;
+}
+
+.matrixAdvanced summary {
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.inlineFields {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.inlineFields .input {
+  max-width: 220px;
+}
+
+.buttonRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.targetPolicy {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.targetPolicyRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Plugin lifecycle explainer and the shared startup-draft bar on the Plugins page. */
+.pluginLifecycle {
+  margin-bottom: 10px;
+}
+
+.draftBar {
+  position: sticky;
+  bottom: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-raised, var(--bg));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.draftBarText {
+  font-size: 13px;
+}
+
+.draftBarActions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.pluginAdvanced {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.pluginAdvanced > summary {
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  padding: 4px 0;
+}
+
+/* Plugin configuration field cards on the plugin detail page. */
+.configPanel .configHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.configPanel .configExplain {
+  margin-top: 8px;
+}
+
+.configField {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-top: 10px;
+  background: var(--surface);
+}
+
+.configFieldHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.configFieldLabel {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.configFieldLabel .muted {
+  font-weight: 400;
+}
+
+.configFieldState {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.configFieldHint {
+  margin-top: 4px;
+}
+
+.configField .select,
+.configField .input {
+  margin-top: 8px;
+  max-width: 420px;
+}
+
+.configField textarea.input {
+  max-width: none;
+}
+
+.configFieldMeta {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.configFieldInvalid {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.linkButton {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.linkButton:hover:not(:disabled) {
+  color: var(--accent-hover);
+}
+
+.linkButton:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
 }

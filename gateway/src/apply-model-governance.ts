@@ -8,7 +8,7 @@ import type { GatewayModelGovernanceService } from './services.ts'
 import type { UserRow } from './auth.ts'
 import type { GatewayDeps } from './server.ts'
 
-interface PreviousPolicy { intakeToken?: unknown }
+interface PreviousPolicy { intakeToken?: unknown, intakeUrl?: unknown, version?: unknown }
 
 const MANAGED_DEFAULT_START = '# gateway-managed organization default: begin\n'
 const MANAGED_DEFAULT_END = '# gateway-managed organization default: end\n'
@@ -120,31 +120,36 @@ async function writeProjection(
 ): Promise<string> {
   const path = join(dshHome, 'model-governance.json')
   mkdirSync(dshHome, { recursive: true, mode: 0o700 })
-  let token: string | undefined
+  const intakeUrl = `http://127.0.0.1:${cfg.intakePort}/usage`
+  let token: string | undefined, current = false
   if (existsSync(path)) {
     try {
       const previous = JSON.parse(readFileSync(path, 'utf8')) as PreviousPolicy
       if (typeof previous.intakeToken === 'string'
         && sameSubject(await governance.subjectForIntakeToken(previous.intakeToken), subject)) {
         token = previous.intakeToken
+        current = previous.version === policy.version && previous.intakeUrl === intakeUrl
       }
     } catch { /* replace malformed old projection */ }
-  }
-  token ??= await governance.issueIntakeToken(subject)
-  const body = {
-    ...policy,
-    intakeUrl: `http://127.0.0.1:${cfg.intakePort}/usage`,
-    intakeToken: token,
-    // A personal runtime honors user-declared (BYOK) routes; a shared project
-    // runtime receives only the organization catalog and project-owned routes
-    // selected by the Gateway policy.
-    userDeclaredAllowed: subject.kind === 'user',
   }
   // The base bundle's legacy default is intentionally not authorized by the
   // organization policy. Projecting an authorized organization route here
   // gives accounts without a personal selection a usable starting point;
   // settings.yaml remains the higher-precedence user choice.
   updateManagedDefaultPatch(dshHome, policy)
+  // A file already carrying this revision and a live credential is the current
+  // projection; reconcile and restart passes stay byte-stable.
+  if (current) return path
+  token ??= await governance.issueIntakeToken(subject)
+  const body = {
+    ...policy,
+    intakeUrl,
+    intakeToken: token,
+    // A personal runtime honors user-declared (BYOK) routes; a shared project
+    // runtime receives only the organization catalog and project-owned routes
+    // selected by the Gateway policy.
+    userDeclaredAllowed: subject.kind === 'user',
+  }
   const temp = `${path}.${process.pid}.${Date.now()}.tmp`
   writeFileSync(temp, JSON.stringify(body, null, 2), { mode: 0o600 })
   renameSync(temp, path)
@@ -161,7 +166,7 @@ async function ensureProjection(
   readPolicy: () => Promise<Awaited<ReturnType<GatewayModelGovernanceService['policyFor']>>>,
 ): Promise<void> {
   const key = projectionKey(subject, dshHome)
-  await queueProjection(key, async () => {
+  await queueProjection(key, governance, async () => {
     const policy = await readPolicy()
     const path = join(dshHome, 'model-governance.json')
     if (projectionVersions.get(key) === policy.version && existsSync(path)) {
@@ -174,9 +179,11 @@ async function ensureProjection(
 }
 
 /** Serialize every projection write, including eager startup writes. */
-async function queueProjection<T>(key: string, operation: () => Promise<T>): Promise<T> {
+async function queueProjection<T>(key: string, governance: GatewayModelGovernanceService, operation: () => Promise<T>): Promise<T> {
   const previous = projectionQueues.get(key) ?? Promise.resolve()
-  const run = previous.then(operation, operation)
+  const admitted = (): Promise<T> => governance.projectionWrite === undefined
+    ? operation() : governance.projectionWrite(operation)
+  const run = previous.then(admitted, admitted)
   const tail = run.then(() => undefined, () => undefined)
   projectionQueues.set(key, tail)
   void tail.then(() => {
@@ -237,7 +244,7 @@ export async function writeModelGovernanceFile(
   const dshHome = join(cfg.usersRoot, user.username, 'dsh')
   const subject = { kind: 'user' as const, id: user.id }
   const key = projectionKey(subject, dshHome)
-  return queueProjection(key, async () => {
+  return queueProjection(key, governance, async () => {
     const policy = await governance.policyFor(user)
     const path = await writeProjection(cfg, governance, dshHome, subject, policy)
     rememberProjectionVersion(key, policy.version)
@@ -254,7 +261,7 @@ export async function writeProjectModelGovernanceFile(
   const dshHome = join(cfg.projectRuntimesRoot, String(project.id), 'dsh')
   const subject = { kind: 'project' as const, id: project.id }
   const key = projectionKey(subject, dshHome)
-  return queueProjection(key, async () => {
+  return queueProjection(key, governance, async () => {
     const policy = await governance.policyForProject(project.id)
     const path = await writeProjection(cfg, governance, dshHome, subject, policy)
     rememberProjectionVersion(key, policy.version)

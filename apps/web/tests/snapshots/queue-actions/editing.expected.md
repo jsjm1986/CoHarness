@@ -12,6 +12,5 @@
     - textbox "Edit queued message": Edited queue item
     - button "Save queued message":
       - img
-    - tooltip "Save queued message"
     - button "Cancel editing":
       - img

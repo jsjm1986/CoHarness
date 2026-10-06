@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-16-session-header-workspace-files-entry.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-16-session-header-workspace-files-entry.md
-2026-09-16-session-header-workspace-files-entry.md: 3044e7bc2edc80b61abb76db8d7262cb44c98c2f
-2026-09-16-session-header-workspace-files-entry.zh.md: 7190b6d65f60a39fd2c4eb3a61dbe608181ffc57
+/agent-note-workspace-files-entry-reaches-the-single-conversation-header:
+  en: d928a207111ef3e4
+  zh: 3ee94e0cdc3d0ed5
+/agent-note-workspace-files-entry-reaches-the-single-conversation-header/problem:
+  en: 06a537bbb1c27cc4
+  zh: 50e7366ce455ae5d
+/agent-note-workspace-files-entry-reaches-the-single-conversation-header/decision:
+  en: f2ae822db0cc79c6
+  zh: 662c0b032f2a992b
+/agent-note-workspace-files-entry-reaches-the-single-conversation-header/alternatives-considered:
+  en: b980bbbfbf9b2e04
+  zh: b7b3cdb5c66cc6fc
+/agent-note-workspace-files-entry-reaches-the-single-conversation-header/consequences:
+  en: 2267ae57156ad54e
+  zh: 8d188e6022e4ce3b
+/agent-note-workspace-files-entry-reaches-the-single-conversation-header/verification:
+  en: f33f8380341c0fe9
+  zh: 96b24d2af4f024c6

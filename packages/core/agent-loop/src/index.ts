@@ -5,6 +5,7 @@
  * @module @deepseek-ai/dsh-agent-loop
  */
 
+import { agentCarrier } from '@deepseek-ai/dsh-agent'
 import { Context, FiberState, Service } from '@deepseek-ai/cordis'
 import { randomUUID } from 'node:crypto'
 import z from '@deepseek-ai/schemastery'
@@ -419,6 +420,7 @@ export class AgentLoop extends Service implements AgentFactory {
       },
     }
     installSettingsSection(ctx, AGENT_LOOP_SETTINGS_NAMESPACE, AGENT_LOOP_SETTINGS_SCHEMA, entry, {
+      label: { en: 'Agent loop', zh: 'Agent 循环' },
       // The schema admits any integer above zero; `resolveMaxParallelToolCalls`
       // owns the whole rule, so refusing here keeps the running scheduler on
       // its last good cap instead of failing at the next tool group.
@@ -690,7 +692,13 @@ export class AgentLoop extends Service implements AgentFactory {
             assertLive()
             await loopCtx.agents.announce(agent, source, abort.signal)
             assertLive()
-            return { agent, dispose }
+            return { agent, dispose, tryDisposeIdle: () => {
+              if (disposing !== undefined) return disposing.then(() => true)
+              if (loopCtx.agents.list().some(child => loopCtx.agents.isOwnedBy(child.id, agent))
+                || loopCtx.bail(agentCarrier(agent), 'agent/idle-release-check', { agent }) === 'busy'
+                || !agent.closeIdleAdmission()) return Promise.resolve(false)
+              return dispose().then(() => true)
+            } }
           } finally {
             publication.resolve(undefined)
             publication = undefined

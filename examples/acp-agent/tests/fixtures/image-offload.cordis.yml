@@ -7,11 +7,10 @@
     path: ../../cordis.yml
     patches:
       - id: llm-deepseek
-        name: '@deepseek-ai/dsh-llm-deepseek'
+        name: '@deepseek-ai/dsh-llm-deepseek-api-key'
         config:
           apiKeyEnv: DSH_SNAPSHOT_API_KEY
           baseURL: !!js process.env.DSH_SNAPSHOT_BASE_URL
-          protocol: !!js process.env.DSH_SNAPSHOT_PROTOCOL
           thinking: disabled
           maxRequestFilesBytes: 92
           imageOffloadByteQuantum: 1

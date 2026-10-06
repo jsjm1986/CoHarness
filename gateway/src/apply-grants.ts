@@ -78,8 +78,22 @@ function ensureManagedDirectoryTree(root: string, target: string): void {
 }
 
 /**
+ * A committed grants write whose runtime restart failed after the
+ * `admin.instances.restart-failed` audit row was recorded. Admin callers may
+ * treat only this classification as an audited partial success; every other
+ * failure keeps its original identity.
+ */
+export class GrantRestartError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options)
+    this.name = 'GrantRestartError'
+  }
+}
+
+/**
  * Recompute a user's grants file; restart the instance only when it is `ready` or `starting`.
- * Restart failure writes `admin.instances.restart-failed` (actor as `userId`) then rethrows.
+ * Restart failure writes `admin.instances.restart-failed` (actor as `userId`) then rethrows
+ * as {@link GrantRestartError}; an audit-write failure replaces the restart error instead.
  * @param deps - cfg, projects, users, instances, audit
  * @param userId - user whose grants changed
  * @param actorId - admin who triggered the change
@@ -96,7 +110,7 @@ export async function applyGrantsToUser(
   const state = await deps.instances.stateOf(userId)
   if (state !== 'ready' && state !== 'starting') return 'written'
   try {
-    await deps.instances.stop(userId)
+    await deps.instances.stop(userId, 'access-change')
     await deps.instances.ensureRunning(user)
     return 'restarted'
   } catch (error) {
@@ -105,6 +119,6 @@ export async function applyGrantsToUser(
       action: 'admin.instances.restart-failed',
       detail: JSON.stringify({ userId, error: String(error) }),
     })
-    throw error
+    throw new GrantRestartError(error instanceof Error ? error.message : String(error), { cause: error })
   }
 }

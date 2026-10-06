@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-readme-assets-on-cdn.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-17-readme-assets-on-cdn.md
-2026-08-17-readme-assets-on-cdn.md: ed7511d1ef712b4f41f7c437b76a403ad08411d4
-2026-08-17-readme-assets-on-cdn.zh.md: f701d7682026b00671adc5dc57935ddcdba4dc44
+/agent-note-readme-assets-publish-from-a-dedicated-repository:
+  en: 3363410cf5d0a4ba
+  zh: 4dafb4ef690b7b61
+/agent-note-readme-assets-publish-from-a-dedicated-repository/problem:
+  en: 47df219c708b1cd8
+  zh: 3b5841966716b43d
+/agent-note-readme-assets-publish-from-a-dedicated-repository/decision:
+  en: 4eac183f7fed8649
+  zh: adb74d2dd8d970bf
+/agent-note-readme-assets-publish-from-a-dedicated-repository/alternatives-considered:
+  en: 3434b8d235cca8c7
+  zh: 97fc0533526ebd48
+/agent-note-readme-assets-publish-from-a-dedicated-repository/consequences:
+  en: 86d47b2a1f0f18f9
+  zh: f45bbdc8e80402a4

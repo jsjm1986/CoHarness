@@ -5,7 +5,7 @@
   - text: 1 intermediate message
   - img
 - text: Zhou ZHOU_PROMPT
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: ZHOU_REPLY
@@ -21,12 +21,12 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
-- text: Lin admin LIN_PROMPT
-- group "Message timing": "{{clock}}"
+- text: Lin Admin LIN_PROMPT
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: LIN_REPLY
@@ -42,7 +42,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -50,7 +50,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

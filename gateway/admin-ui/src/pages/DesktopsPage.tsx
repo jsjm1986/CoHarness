@@ -1,6 +1,6 @@
 import { DesktopPermissions } from '../components/DesktopPermissions.tsx'
 import { Ban, Monitor, RefreshCw, ShieldOff } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   applyDesktopAction,
   desktopHolderOf,
@@ -22,6 +22,10 @@ import {
   Section,
   StatusBadge,
 } from '../components/ui.tsx'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { zh as desktopsZh, en as desktopsEn } from './desktops.copy.ts'
+
+const desktopsCopy = () => translateCopy(adminLanguage(), { zh: desktopsZh, en: desktopsEn })
 
 type ConfirmState =
   | { kind: 'revoke'; grant: AdminDesktopGrant }
@@ -37,6 +41,7 @@ export function DesktopsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
   const [acting, setActing] = useState(false)
+  const t = useMemo(() => desktopsCopy(), [])
 
   const reload = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -93,23 +98,23 @@ export function DesktopsPage() {
   return (
     <div className="page">
       <PageHeader
-        title="桌面协调"
-        description="查看交互桌面的独占授权、FIFO 排队与失联恢复状态。"
-        meta={`${rows.length} 个资源`}
+        title={t('pageTitle')}
+        description={t('pageDescription')}
+        meta={t('resourceCount', { count: String(rows.length) })}
       />
       <DesktopPermissions />
       <ErrorBanner message={error} />
       <Section
-        title="桌面资源"
-        meta={<IconButton label="刷新" icon={RefreshCw} variant="secondary" onClick={() => void reload()} />}
+        title={t('sectionResources')}
+        meta={<IconButton label={t('refresh')} icon={RefreshCw} variant="secondary" onClick={() => void reload()} />}
       >
-        {loading ? <LoadingState label="正在加载桌面资源" /> : rows.length === 0 ? (
-          <EmptyState icon={Monitor} title="没有桌面资源" detail="尚无运行时申请交互桌面授权。" />
+        {loading ? <LoadingState label={t('loadingResources')} /> : rows.length === 0 ? (
+          <EmptyState icon={Monitor} title={t('emptyTitle')} detail={t('emptyDetail')} />
         ) : (
           <>
             <div className="tableWrap desktopOnly">
               <table className="dataTable">
-                <thead><tr><th>节点</th><th>桌面</th><th>状态</th><th>栅栏序号</th><th>更新时间</th><th /></tr></thead>
+                <thead><tr><th>{t('columnNode')}</th><th>{t('columnDesktop')}</th><th>{t('labelState')}</th><th>{t('labelFencingSeq')}</th><th>{t('labelUpdated')}</th><th /></tr></thead>
                 <tbody>
                   {rows.map(row => (
                     <tr key={row.resourceKey}>
@@ -118,7 +123,7 @@ export function DesktopsPage() {
                       <td><ResourceState state={row.state} note={row.stateNote} /></td>
                       <td><span className="codeText">{row.fencingSeq}</span></td>
                       <td><time dateTime={new Date(row.updatedAt).toISOString()}>{formatTime(row.updatedAt)}</time></td>
-                      <td><Button type="button" variant="secondary" onClick={() => void openDetail(row)}>详情</Button></td>
+                      <td><Button type="button" variant="secondary" onClick={() => void openDetail(row)}>{t('detail')}</Button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -133,10 +138,10 @@ export function DesktopsPage() {
                   </div>
                   <div className="mobileItemBody">
                     <dl className="definitionGrid">
-                      <Definition label="栅栏序号"><span className="codeText">{row.fencingSeq}</span></Definition>
-                      <Definition label="更新时间">{formatTime(row.updatedAt)}</Definition>
+                      <Definition label={t('labelFencingSeq')}><span className="codeText">{row.fencingSeq}</span></Definition>
+                      <Definition label={t('labelUpdated')}>{formatTime(row.updatedAt)}</Definition>
                     </dl>
-                    <Button type="button" variant="secondary" onClick={() => void openDetail(row)}>详情</Button>
+                    <Button type="button" variant="secondary" onClick={() => void openDetail(row)}>{t('detail')}</Button>
                   </div>
                 </article>
               ))}
@@ -145,23 +150,21 @@ export function DesktopsPage() {
         )}
       </Section>
       {selected === null ? null : (
-        <Section title={`授权与排队 · ${selected.resourceKey}`} meta={detailLoading ? '加载中' : `${activeGrants.length} 项授权 / ${liveQueue.length} 项排队`}>
-          {detailLoading ? <LoadingState label="正在加载桌面详情" /> : detail === null ? (
-            <EmptyState icon={Monitor} title="无法读取详情" detail="桌面资源可能已被清理。" />
+        <Section title={t('detailSectionTitle', { key: selected.resourceKey })} meta={detailLoading ? t('loading') : t('grantsQueueMeta', { grants: String(activeGrants.length), queue: String(liveQueue.length) })}>
+          {detailLoading ? <LoadingState label={t('loadingDetail')} /> : detail === null ? (
+            <EmptyState icon={Monitor} title={t('detailErrorTitle')} detail={t('detailErrorDetail')} />
           ) : (
             <>
-              {detail.resource?.state === 'unavailable' ? (
-                <div className="filterActions">
-                  <Button type="button" variant="danger" icon={ShieldOff} onClick={() => setConfirm({ kind: 'clear', resource: detail.resource! })}>清理不可用状态</Button>
-                  {detail.resource.stateNote === null ? null : <span className="muted">{detail.resource.stateNote}</span>}
-                </div>
-              ) : null}
+              <div className="filterActions">
+                <Button type="button" variant="danger" icon={ShieldOff} disabled={detail.resource?.state !== 'unavailable'} onClick={() => setConfirm({ kind: 'clear', resource: detail.resource! })}>{t('clearUnavailable')}</Button>
+                {detail.resource?.stateNote === null || detail.resource?.stateNote === undefined ? null : <span className="muted">{detail.resource.stateNote}</span>}
+              </div>
               <div className="tableWrap">
                 <table className="dataTable">
-                  <thead><tr><th>持有人</th><th>运行时</th><th>状态</th><th>栅栏</th><th>心跳</th><th>获取时间</th><th /></tr></thead>
+                  <thead><tr><th>{t('columnHolder')}</th><th>{t('columnRuntime')}</th><th>{t('labelState')}</th><th>{t('columnFencing')}</th><th>{t('columnHeartbeat')}</th><th>{t('columnAcquired')}</th><th /></tr></thead>
                   <tbody>
                     {detail.grants.length === 0 ? (
-                      <tr><td colSpan={7}><span className="muted">没有授权记录。</span></td></tr>
+                      <tr><td colSpan={7}><span className="muted">{t('noGrants')}</span></td></tr>
                     ) : detail.grants.map(grant => (
                       <tr key={grant.grantId}>
                         <td><HolderLabel holderJson={grant.holderJson} /></td>
@@ -171,7 +174,7 @@ export function DesktopsPage() {
                         <td><time dateTime={new Date(grant.heartbeatAt).toISOString()}>{formatTime(grant.heartbeatAt)}</time></td>
                         <td><time dateTime={new Date(grant.acquiredAt).toISOString()}>{formatTime(grant.acquiredAt)}</time></td>
                         <td>{grant.state === 'held' ? (
-                          <Button type="button" variant="secondary" icon={Ban} onClick={() => setConfirm({ kind: 'revoke', grant })}>撤权</Button>
+                          <Button type="button" variant="secondary" icon={Ban} onClick={() => setConfirm({ kind: 'revoke', grant })}>{t('revoke')}</Button>
                         ) : null}</td>
                       </tr>
                     ))}
@@ -181,7 +184,7 @@ export function DesktopsPage() {
               {detail.queue.length === 0 ? null : (
                 <div className="tableWrap">
                   <table className="dataTable">
-                    <thead><tr><th>位次</th><th>持有人</th><th>运行时</th><th>状态</th><th>入队时间</th></tr></thead>
+                    <thead><tr><th>{t('columnPosition')}</th><th>{t('columnHolder')}</th><th>{t('columnRuntime')}</th><th>{t('labelState')}</th><th>{t('columnQueued')}</th></tr></thead>
                     <tbody>
                       {detail.queue.map(entry => (
                         <tr key={entry.queueId}>
@@ -202,11 +205,11 @@ export function DesktopsPage() {
       )}
       <ConfirmDialog
         open={confirm !== null}
-        title={confirm?.kind === 'revoke' ? '撤权桌面授权' : '清理不可用桌面'}
+        title={confirm?.kind === 'revoke' ? t('revokeTitle') : t('clearTitle')}
         description={confirm?.kind === 'revoke'
-          ? '授权进入停止流程，持有人需在时限内确认输入已排空。操作会写入审计日志。'
-          : '强制释放无法确认的授权并恢复桌面可用，队首请求会被提升。操作会写入审计日志。'}
-        confirmLabel={confirm?.kind === 'revoke' ? '撤权' : '清理'}
+          ? t('revokeDescription')
+          : t('clearDescription')}
+        confirmLabel={confirm?.kind === 'revoke' ? t('revoke') : t('clearAction')}
         pending={acting}
         onConfirm={() => { void runAction() }}
         onClose={() => { if (!acting) setConfirm(null) }}
@@ -216,39 +219,43 @@ export function DesktopsPage() {
 }
 
 function HolderLabel({ holderJson }: { holderJson: string }) {
+  const t = useMemo(() => desktopsCopy(), [])
   const holder = desktopHolderOf({ holderJson })
-  if (holder === undefined) return <span className="muted">未知</span>
+  if (holder === undefined) return <span className="muted">{t('holderUnknown')}</span>
   return <span className="auditAction"><strong>{holder.user.username}</strong><span>#{holder.user.id}</span></span>
 }
 
 function RuntimeLabel({ holderJson }: { holderJson: string }) {
+  const t = useMemo(() => desktopsCopy(), [])
   const holder = desktopHolderOf({ holderJson })
   if (holder === undefined) return <span className="muted">—</span>
-  const kind = holder.runtime.kind === 'user' ? '个人' : '项目'
-  return <span className="codeText">{kind} {holder.runtime.id} · 代次 {holder.runtime.generation}</span>
+  return <span className="codeText">{t('runtimeLine', { kind: t(holder.runtime.kind === 'user' ? 'runtimeUser' : 'runtimeProject'), id: String(holder.runtime.id), generation: String(holder.runtime.generation) })}</span>
 }
 
 function ResourceState({ state, note }: { state: AdminDesktopResource['state']; note: string | null }) {
+  const t = useMemo(() => desktopsCopy(), [])
   return state === 'available'
-    ? <StatusBadge tone="success">可用</StatusBadge>
-    : <StatusBadge tone="danger" >不可用{note === null ? '' : ` · ${note}`}</StatusBadge>
+    ? <StatusBadge tone="success">{t('stateAvailable')}</StatusBadge>
+    : <StatusBadge tone="danger" >{t('stateUnavailable')}{note === null ? '' : ` · ${note}`}</StatusBadge>
 }
 
 function GrantState({ grant }: { grant: AdminDesktopGrant }) {
+  const t = useMemo(() => desktopsCopy(), [])
   switch (grant.state) {
-    case 'held': return <StatusBadge tone="success">持有中</StatusBadge>
-    case 'stopping': return <StatusBadge tone="warning">停止中{grant.reason === 'revoked' ? ' · 已撤权' : ''}</StatusBadge>
-    case 'pending-confirm': return <StatusBadge tone="danger">待确认</StatusBadge>
-    case 'released': return <StatusBadge>已释放</StatusBadge>
+    case 'held': return <StatusBadge tone="success">{t('grantHeld')}</StatusBadge>
+    case 'stopping': return <StatusBadge tone="warning">{t('grantStopping')}{grant.reason === 'revoked' ? ` · ${t('grantRevoked')}` : ''}</StatusBadge>
+    case 'pending-confirm': return <StatusBadge tone="danger">{t('grantPending')}</StatusBadge>
+    case 'released': return <StatusBadge>{t('grantReleased')}</StatusBadge>
   }
 }
 
 function QueueState({ entry }: { entry: AdminDesktopQueueEntry }) {
+  const t = useMemo(() => desktopsCopy(), [])
   switch (entry.state) {
-    case 'queued': return <StatusBadge tone="info">排队中</StatusBadge>
-    case 'promoted': return <StatusBadge tone="success">已提升</StatusBadge>
-    case 'cancelled': return <StatusBadge>已取消</StatusBadge>
-    case 'expired': return <StatusBadge tone="warning">已过期</StatusBadge>
+    case 'queued': return <StatusBadge tone="info">{t('queueQueued')}</StatusBadge>
+    case 'promoted': return <StatusBadge tone="success">{t('queuePromoted')}</StatusBadge>
+    case 'cancelled': return <StatusBadge>{t('queueCancelled')}</StatusBadge>
+    case 'expired': return <StatusBadge tone="warning">{t('queueExpired')}</StatusBadge>
   }
 }
 
@@ -257,7 +264,7 @@ function Definition({ label, children }: { label: string; children: React.ReactN
 }
 
 function formatTime(timestamp: number): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(desktopsCopy()('dateLocale'), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

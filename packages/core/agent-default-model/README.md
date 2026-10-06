@@ -1,3 +1,8 @@
+---
+description: "Default model selection shared by Agent entry points"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-agent-default-model
 
 English | [中文](README.zh.md)
@@ -15,10 +20,21 @@ The service does not validate catalog membership. A provider route may serve an 
 
 `dsh-agent-default-model` gives newly created agents a shared default provider and model when their sessions do not specify one. Use it to choose the starting model once for all supported agent entry points, including `dsh --profile headless`. When settings are available, users can override the configured selection, including reasoning effort, and saved changes apply to subsequent reads. The default is process-wide; per-session model selection remains the responsibility of the entry point that creates the agent.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The service publishes one configured default value; there is no mutable relation for an invariant to observe.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the `ModelSelection` the service supplies to an entry point; request assembly and the provider adapters own the model-visible request.
@@ -31,3 +47,13 @@ Changing the default affects only agents that subsequently resolve from it. An e
 
 - The service owns one process-wide default; per-session selection remains the entry point's responsibility.
 - Without a settings provider, `saveSelection()` cannot retain a selection for a later Agent.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

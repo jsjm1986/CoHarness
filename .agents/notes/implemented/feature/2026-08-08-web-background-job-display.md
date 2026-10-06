@@ -14,9 +14,9 @@ The session header was already the place where per-session background activity l
 
 ## Decision
 
-Task state reaches the browser as **one whole-snapshot mux frame per session**, pushed at every registry commit point that changes what that session can see. The client keeps a last-wins mirror; a header action renders it. There is no RPC, no polling, and no client-side staleness bookkeeping.
+Task state reaches the browser as **one whole-snapshot mux frame per session**, pushed at every registry commit point that changes what that session can see. The client keeps a last-wins mirror; a header action renders it. The roster itself has no RPC, no polling, and no client-side staleness bookkeeping.
 
-This ships the list alone. Per-task streamed output and a human-initiated cancellation are separate phases, and the channel is shaped so neither has to undo it.
+The frame is the only roster channel; per-task output and human kill ride cursor reads and a unary admission over the same carrier — [the output-and-kill note](2026-09-30-web-job-output-and-kill.md) owns that phase — so neither needed to undo it.
 
 ### Wire shape
 
@@ -36,9 +36,11 @@ export interface JobView {
   kind: string
   label: string
   status: 'running' | 'stopping' | 'completed' | 'killed' | 'failed'
+  progress?: string
   detail?: string
   startedAt: number
   finishedAt?: number
+  output: { total: number; earliest: number; spillPaths?: string[] }
 }
 ```
 
@@ -46,7 +48,7 @@ export interface JobView {
 
 `kind` is `string` on the wire rather than `JobKind`. The kind map is merge-extensible by producer plugins, so a client build cannot enumerate the closed set; presentation falls through a documented default for an unrecognized kind.
 
-Three `JobSnapshot` fields are deliberately absent: `ownerSession` (the frame's `sessionId` already carries it), `reported` (an internal notice-delivery bit with no user meaning), and `outputLimitBytes` (producer-owned model-presentation policy).
+`output` carries the ring's absolute coordinates so a row's observability is roster data rather than a probe read; the bytes themselves still travel `jobs.output`. Two registry-view fields are deliberately absent: `owner` (the frame's `sessionId` already carries it) and `outputLimitBytes` (producer-owned model-presentation policy).
 
 The frame carries a whole snapshot rather than a delta for the reason [`session/queue`](../../../../packages/host/apiproxy/src/api/events.ts) states for itself: start, kill, settlement, reconnect, and a second browser tab all converge through one authoritative value. A session's task set is single-digit; the frame is small.
 
@@ -89,15 +91,13 @@ Two clears keep it honest. On re-subscribe the manager drops the session's mirro
 
 [`@deepseek-ai/dsh-client-ui-jobs`](../../../../packages/client/ui-jobs/README.md) registers one entry in `conversation.session.header.actions`, ordered after the subagent catalog. Its own README owns the presentation contract; the decisions worth recording here are that the control does not render at all until the session has a task, that the live badge is omitted at zero so a history-only session keeps a quiet entry point, and that settled rows stay visible because a failed task's `detail` is the only place its failure is legible.
 
-A running one-shot background subagent therefore appears both there and in the subagent catalog. The two answer different questions — the catalog navigates into the child's transcript, this list is the only handle a cancellation can ever attach to — and suppressing `kind: 'subagent'` here would leave the cancellation phase with no entry point for exactly those tasks.
+A running one-shot background subagent therefore appears both there and in the subagent catalog. The two answer different questions — the catalog navigates into the child's transcript, this list is the handle the stop control attaches to — and suppressing `kind: 'subagent'` here would leave those tasks with no entry point for cancellation.
 
 ### What this deliberately does not do
 
-**No web path calls `ctx.jobs.read()`.** It consumes the single output cursor, so a browser read would silently take bytes the model's `job_output` will never see. This is an invariant worth a test rather than a convention, because the failure is invisible at the call site.
+**No web path calls `ctx.jobs.read()`.** It consumes the single output cursor, so a browser read would silently take bytes the model's `job_output` will never see. The observation channel therefore rides the non-consuming `readAt` behind `jobs.output` ([the output-and-kill note](2026-09-30-web-job-output-and-kill.md)); the invariant holds for it too, and is worth a test rather than a convention because the failure is invisible at the call site.
 
-**No cancellation.** That phase owes a decision the seam does not currently answer: `kill()` marks terminal delivery reported, so a human interrupt written against today's contract would leave the model believing its task is still running.
-
-**No output watermark on the frame.** The output phase's delta channel is where an anchor field earns its place; one added now would have no reader.
+**No output bytes on the frame.** Output travels the `jobs.output` cursor pull; the frame carries only the ring's coordinates, which is all a roster row needs to know whether a panel can open.
 
 ## Alternatives considered
 
@@ -129,7 +129,7 @@ Below it, [`jobs-local`](../../../../packages/jobs/jobs-local/tests/jobs.spec.ts
 
 **Settled rows accumulate.** The registry retains settled tasks until owner disposal, so a long session with many background commands grows a long list. Capping the settled tail is a presentation change, not a protocol one, if it becomes a real complaint.
 
-**`stopping` is nearly unreachable today.** Only the model's `job_kill` produces it, so the state is rendered but rarely seen until human cancellation lands. It is in the union now because leaving a status out would have made that phase a wire change.
+**`stopping` marks a kill in flight.** The model's `job_kill` and the list's two-press stop both produce it; the status stays in the union because removing it would be a wire change with no reader benefit.
 
 **Two entry points for one running subagent.** Accepted deliberately, and bounded to one-shot background delegations. If it reads as noise in practice, the fix is presentational — the catalog row can cite the task rather than the task list hiding the kind.
 

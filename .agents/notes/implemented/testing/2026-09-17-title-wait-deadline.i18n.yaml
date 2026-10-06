@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-title-wait-deadline.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-17-title-wait-deadline.md
-2026-09-17-title-wait-deadline.md: 1495cb61cdd013d84f34dbf12b35277f5fef39be
-2026-09-17-title-wait-deadline.zh.md: 111a56c92dda56bd52ae08b9f78cd4031fee83b1
+/agent-note-title-wait-deadline-diagnostics:
+  en: aa538eb1d1c7bf65
+  zh: 4f33a8bdab514ef8
+/agent-note-title-wait-deadline-diagnostics/problem:
+  en: bd2aabd30f4b03a3
+  zh: e62533e33d1988f3
+/agent-note-title-wait-deadline-diagnostics/decision:
+  en: 528b0a4c665f355f
+  zh: 8aeafafbb1bbff62
+/agent-note-title-wait-deadline-diagnostics/alternatives-considered:
+  en: a8c6361b237137ad
+  zh: 87a776408d844ae0
+/agent-note-title-wait-deadline-diagnostics/consequences:
+  en: d6f62c02b506add9
+  zh: e9bda5f9cfedb010

@@ -1,3 +1,8 @@
+---
+description: "Theme plugin: Host bootstrap for the pre-plugin palette; DOM-free ThemeRuntime for light/dark/system state; --dsw-* token styles and Appearance settings row"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-theme
 
 English | [中文](README.zh.md)
@@ -8,7 +13,7 @@ When the host composition includes an HTTP server, the host half injects a synch
 
 `src/styles/` holds seven sheets imported in order by ui-theme's dynamic client entry: `base.css`, `corner-shape.css`, `design-platform.css`, `metrics.css`, `scrollbar.css`, `gradient-shadow-text.css`, and `shiki.css`. The client bundle compiles and injects them as plugin-owned global styles, so unload and HMR remove them with ui-theme instead of leaving theme CSS in the static web shell. `metrics.css` supplies the shared spacing, safe-area, radius, touch-target, phone-sheet geometry, compact typography/icon roles, and stateful-control geometry used by client packages. Stateful mobile controls must keep readable current-value text and use the shared settings-sheet grammar rather than feature-local picker chrome. `scrollbar.css` is the sole consumer of the `--dsw-alias-scrollbar-*` tokens and must follow `design-platform.css`, which declares them.
 
-Scrollbar rebinding contract: `scrollbar.css` binds `--dsh-scrollbar-thumb` and `--dsh-scrollbar-thumb-hover` on `body` to the l1 (base-surface) tokens, and both rendering paths read that pair. An elevated surface (menu, popover, dialog) sets `--dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2)` and `--dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2)` on its own container; one rebind retints whichever path the engine took. The pair's other legal target is `transparent`, which draws no thumb at all — [ui-sidebar](../ui-sidebar/README.md) rebinds its column that way while the pointer is elsewhere. A rebind to the l1 pair is not a rebind; it restates the base-surface default. WebKit scrollbars are 4px wide and high; `--dsh-scrollbar-width` mirrors that layout width for surfaces that align themselves beside a space-consuming bar — [ui-conversation](../ui-conversation/README.md) reads it for the overlay composer seat's `right` offset. Card-internal WebKit thumbs use the shared `--dsh-scrollbar-thumb-inset` so a narrow bar keeps a visible coloured interior. The scrollbar-styles spec pairs these values with their consumers.
+Scrollbar rebinding contract: `scrollbar.css` binds `--dsh-scrollbar-thumb` and `--dsh-scrollbar-thumb-hover` on `body` to the l1 (base-surface) tokens, and both rendering paths read that pair. An elevated surface (menu, popover, dialog) sets `--dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2)` and `--dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2)` on its own container; one rebind retints whichever path the engine took. The pair's other legal target is `transparent`, which draws no thumb at all — [ui-sidebar](../ui-sidebar/README.md) rebinds its column that way while the pointer is elsewhere. A rebind to the l1 pair is not a rebind; it restates the base-surface default. WebKit-based browsers use a 5px default `--dsh-scrollbar-width` and also read `--dsh-scrollbar-thumb-border` and `--dsh-scrollbar-track-margin`; a scroll surface may rebind them to keep a wide draggable rail around a narrower visible thumb or to inset the track from rounded ends — [ui-conversation](../ui-conversation/README.md) reads the width for the overlay composer seat's `right` offset, and card-internal scrollers rebind `thumb-border` so a narrow bar keeps a visible coloured interior. The scrollbar-styles spec pairs these values with their consumers.
 
 The two paths are mutually exclusive by construction. `scrollbar-width`/`scrollbar-color` sit inside `@supports not selector(::-webkit-scrollbar)` because a non-`auto` value of either makes Chromium and Safari discard every `::-webkit-scrollbar*` rule for that element, `::-webkit-scrollbar-thumb:hover` included — declaring both unconditionally leaves `--dsh-scrollbar-thumb-hover` with no rendering anywhere. Firefox therefore takes the standard properties and WebKit-based engines take the pseudo-elements, so the hover token only ever renders through the pseudo-element path. Reasoning and the measured computed values: [the scrollbar Agent Note](../../../.agents/notes/implemented/bug-fix/2026-07-28-themed-scrollbars-and-reserved-gutter.md).
 
@@ -20,14 +25,27 @@ The two paths are mutually exclusive by construction. `scrollbar-width`/`scrollb
 
 `dsh-client-ui-theme` lets Web GUI users choose `light`, `dark`, or `system` and set conversation content text from 12 to 17 px in Settings. A loopback client stores both values in the `ui-theme` settings namespace, which the local provider persists in `$DSH_HOME/settings.yaml` by default. The plugin resolves `system` through `prefers-color-scheme` and publishes immutable `ThemeSnapshot`s; ui-layout applies each snapshot to the document. The package also ships the `--dsw-*` token stylesheets and injects a synchronous bootstrap so the selected palette and font size apply before the shell loads. Third-party themes can register alias-token overrides through `ctx.theme`.
 
+## Table of Contents
+
+- [Settings authority and compatibility](#settings-authority-and-compatibility)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="settings-authority-and-compatibility"></a>
 ## Settings authority and compatibility
 
 Appearance controls render the account preference while a project policy may force the active light or dark scheme. The account-backed scope disables selection when it reports `loading`, `writable: false`, or a `saving` write; project and provider restrictions are shown inline, and the service refuses a direct `setTheme` call until a writable account view exists. The theme listener supports both `addEventListener` and legacy `addListener` MediaQueryList implementations. The design stylesheet supplies a `100vh` viewport fallback and the client visual-viewport measurement overrides it when available; all `--ds-*` and `--dsw-*` references are checked against CSS declarations by the token-contract test, with runtime-owned viewport height as the explicit exception.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The preference's durable home is the Host settings namespace; `ThemeRuntime` keeps only the resolved snapshot, asserted by unit specs against pushed changes and reconnects.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -40,3 +58,13 @@ None; this package neither assembles nor sends a provider request.
 
 - **Third-party themes are an extension point, not a product** — registering one means overriding same-named alias variables; no validation exists that an override set is complete.
 - **The token sheets are the sole color authority** — values absent from cssdesign (for example the design's #4176E6 tab blue) are deliberately not appended; the nearest semantic token wins. Design-owner-approved additions are the exception and enter as a static step plus a semantic alias in the same change (`--dsw-static-blue-900` / `--dsw-alias-label-primary-bluish`).
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

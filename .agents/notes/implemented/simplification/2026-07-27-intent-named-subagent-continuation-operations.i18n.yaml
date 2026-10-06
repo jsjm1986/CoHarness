@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-intent-named-subagent-continuation-operations.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-27-intent-named-subagent-continuation-operations.md
-2026-07-27-intent-named-subagent-continuation-operations.md: cb0827e63ed6bf88f7f661cf071d15aaa2278bde
-2026-07-27-intent-named-subagent-continuation-operations.zh.md: fba07eac66af8e27d1f548a68f2ac060d39d10e7
+/agent-note-intent-named-subagent-continuation-operations:
+  en: 9170396efe61ebf5
+  zh: 33755db3326d47f7
+/agent-note-intent-named-subagent-continuation-operations/problem:
+  en: 4645dbfb04cfcfe7
+  zh: 171dd6fe84aefc0e
+/agent-note-intent-named-subagent-continuation-operations/decision:
+  en: 57cf0118d1fa5027
+  zh: 0c894d676978aa2e
+/agent-note-intent-named-subagent-continuation-operations/alternatives-considered:
+  en: 23feccf0a2352dc9
+  zh: be7105214f3fa3c5
+/agent-note-intent-named-subagent-continuation-operations/consequences:
+  en: 7f8a60af56579f0d
+  zh: 052ca65cf0ab577e

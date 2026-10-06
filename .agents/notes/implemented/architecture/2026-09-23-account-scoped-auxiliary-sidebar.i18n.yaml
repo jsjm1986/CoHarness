@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-23-account-scoped-auxiliary-sidebar.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-account-scoped-auxiliary-sidebar.md
-2026-09-23-account-scoped-auxiliary-sidebar.md: b7ad0115223194a2847be8290b5046d4f8ff68c1
-2026-09-23-account-scoped-auxiliary-sidebar.zh.md: 796091e1dc46fd361a8b1503f8ee0bdc75b70828
+/agent-note-account-scoped-auxiliary-sidebar:
+  en: 50522bc49795a1b3
+  zh: a295135d24ac0311
+/agent-note-account-scoped-auxiliary-sidebar/problem:
+  en: 80593107881a48f4
+  zh: a7c7c13a2bc466c4
+/agent-note-account-scoped-auxiliary-sidebar/decision:
+  en: 6a5e51d35c9cd9f3
+  zh: 44c481a267e5dc3a
+/agent-note-account-scoped-auxiliary-sidebar/alternatives-considered:
+  en: 0d7d34a47a55a943
+  zh: d5203871e0188996
+/agent-note-account-scoped-auxiliary-sidebar/consequences:
+  en: 2f3dc9cab99e11f2
+  zh: 02b0b78f903cc0a4

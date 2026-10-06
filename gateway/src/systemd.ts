@@ -226,6 +226,7 @@ User=${systemUser}
 WorkingDirectory=${user.homePath}
 Environment=HOME=${user.homePath}
 Environment=DSH_HOME=${user.dshHome}
+Environment=DSH_MANAGED_DATA_MANIFEST=${posix.join(user.dshHome, 'managed-data.jsonl')}
 Environment=DSH_DIRECTORY_GRANTS=${user.dshHome}/directory-grants.json
 ${gatewayCredentialPath === undefined ? '' : `Environment=DSH_GATEWAY_CREDENTIAL_FILE=%d/dsh-gateway
 LoadCredential=dsh-gateway:${gatewayCredentialPath}

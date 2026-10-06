@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
-import type { ExecutionInheritance, ExecutionInputId, ExecutionState } from '@deepseek-ai/dsh-execution-authority/types'
+import type { ExecutionInheritance, ExecutionInputId, ExecutionScopeId, ExecutionState } from '@deepseek-ai/dsh-execution-authority/types'
 
 /**
  * Hash the JSON value crossing the input registration operation.
@@ -37,7 +37,8 @@ export function executionInputOf(message: UserMessage): ExecutionInputId | undef
 export function executionState(value: unknown): ExecutionState {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new TypeError('invalid Gateway execution state')
   const row = value as Record<string, unknown>
-  if (typeof row.revision !== 'string' || !/^(0|[1-9][0-9]*)$/.test(row.revision)
+  if ((row.scopeId !== undefined && (typeof row.scopeId !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(row.scopeId)))
+    || typeof row.revision !== 'string' || !/^(0|[1-9][0-9]*)$/.test(row.revision)
     || !Array.isArray(row.inputs) || !row.inputs.every(id => typeof id === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id))
     || !Array.isArray(row.actors) || !row.actors.every(actor => typeof actor === 'object' && actor !== null
       && Number.isSafeInteger((actor as { userId?: unknown }).userId) && (actor as { userId: number }).userId > 0)
@@ -52,6 +53,7 @@ export function executionState(value: unknown): ExecutionState {
   }
   return {
     revision: row.revision,
+    ...(row.scopeId === undefined ? {} : { scopeId: row.scopeId as ExecutionScopeId }),
     inputs,
     actors,
     ...(row.primaryActorUserId === undefined ? {} : { primaryActorUserId: row.primaryActorUserId as number }),
@@ -67,7 +69,8 @@ export function executionState(value: unknown): ExecutionState {
 export function executionScope(value: unknown): ExecutionInheritance {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new TypeError('invalid Gateway execution scope')
   const row = value as Record<string, unknown>
-  if (typeof row.parentSessionId !== 'string' || row.parentSessionId.length === 0
+  if ((row.scopeId !== undefined && (typeof row.scopeId !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(row.scopeId)))
+    || typeof row.parentSessionId !== 'string' || row.parentSessionId.length === 0
     || !Array.isArray(row.inputs) || !row.inputs.every(id => typeof id === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id))
     || new Set(row.inputs).size !== row.inputs.length
     || typeof row.unverifiedHistory !== 'boolean'
@@ -79,6 +82,7 @@ export function executionScope(value: unknown): ExecutionInheritance {
   const inputs = row.inputs as ExecutionInputId[]
   return Object.freeze({
     parentSessionId: row.parentSessionId as SessionId,
+    ...(row.scopeId === undefined ? {} : { scopeId: row.scopeId as ExecutionScopeId }),
     inputs: Object.freeze([...inputs]),
     unverifiedHistory: row.unverifiedHistory,
     ...(row.primaryActorUserId === undefined ? {} : { primaryActorUserId: row.primaryActorUserId as number }),

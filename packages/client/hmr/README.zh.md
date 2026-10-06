@@ -98,6 +98,7 @@ fiber 的激活 epoch 会串联其服务提供方的 uid，因此替换提供方
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -107,6 +108,7 @@ fiber 的激活 epoch 会串联其服务提供方的 uid，因此替换提供方
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

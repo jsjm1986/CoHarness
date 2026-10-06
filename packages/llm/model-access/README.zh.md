@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-model-access
 
 [English](README.md) | 中文
@@ -9,9 +14,20 @@
 使用 `dsh-model-access` 作为部署方自有、精确到 `(provider, model)` 路由的授权服务定义：目录、模型选择与执行共用同一个 `ctx.modelAccess` 决策；服务缺省即表示未挂载授权策略。
 
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知局限与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该定义声明一个决定契约，其缺失意味着无策略；任何规则状态由提供方拥有。
+
 
 ## 模型体验
 
@@ -21,6 +37,19 @@
 
 无；本包从不组装或发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知局限与延后工作
 
 - **不持有策略存储**——部署必须挂载拥有策略持久化与刷新语义的 provider。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>
+
+<a id="model-experience"></a>

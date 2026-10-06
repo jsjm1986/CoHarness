@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use `present` to declare final files accessible through the Session filesystem, including files created through shell commands. The Web client previews current source files and offers native opening on an authorized independent desktop. The tool records paths and optional descriptions without copying file contents.
+Use `present` to declare final files accessible through the Session filesystem, including files created through shell commands. Users open the current source files in their default application. The tool records paths and optional descriptions without copying file contents.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ Use `present` to declare final files accessible through the Session filesystem, 
 <a id="use-this-package"></a>
 ## Use this package
 
-The base bundle mounts this plugin for its consuming profiles. Call `present` with `files: [{ path, description? }]` after creating the files. Files must be regular files accessible through the Session filesystem. Relative paths resolve against the Session working directory; absolute paths may name files outside it, including `/tmp` or Downloads. Missing files, directories, final symbolic links, and provider-denied paths fail the call. Files in a shell sandbox’s private `/tmp` must first be written somewhere the Session filesystem can access.
+The `standard`, `ptc`, and `cordis` agent presets mount this plugin. Call `present` with `files: [{ path, description? }]` after creating the files. Files must be regular files accessible through the Session filesystem. Relative paths resolve against the Session working directory; absolute paths may name files outside it, including `/tmp` or Downloads. Missing files, directories, final symbolic links, and provider-denied paths fail the call. Files in a shell sandbox’s private `/tmp` must first be written somewhere the Session filesystem can access.
 
 Mount it in an agent's Cordis composition with `tools`, `fs`, and the `turnBoundary` Session projection available:
 
@@ -64,7 +64,7 @@ The pure `./types` entry declares `PresentedFile` and the Session event without 
 
 - [Filesystem subsystem](../../../docs/subsystems/filesystem.md) — provider paths and errors.
 - [Web deliverables](../../client/ui-deliverables/README.md) — source-file opening and cards.
-- [Delivery decision](../../../.agents/notes/implemented/architecture/2026-09-23-authorized-workspace-review.md) — Session ownership and required-on-read events.
+- The delivery decision — Session ownership and required-on-read events.
 
 <a id="model-experience"></a>
 ## Model Experience
@@ -73,7 +73,7 @@ The pure `./types` entry declares `PresentedFile` and the Session event without 
 
 #### What the model sees
 
-The [present schema](../../../docs/tool-catalog.md#present) asks for existing accessible files: “Declare existing files accessible through the Session filesystem as final deliverables. When a file you create or update is an output the user asked to receive, you must call present after writing it and before your final response, including files created through Bash or code execution. Mentioning its path in your reply does not replace this call. The files must already exist. The user opens the current source files; their contents are not copied or preserved.” Results report `Presented <path>` for each file; the program result and durable event contain paths and optional descriptions.
+The [present schema](../../../docs/tool-catalog.md#present) asks for existing accessible files: “Declare existing files as final deliverables for the user. Use it when the user needs a separate file, especially Office documents, spreadsheets, and slide decks; prefer your final response when that suffices. The user opens the current files; their contents are not copied.” The `files` parameter asks for the 1-2 most important deliverables and at most 4 per call. Results report `Presented <path>` for each file; the program result and durable event contain paths and optional descriptions.
 
 #### Token effect
 

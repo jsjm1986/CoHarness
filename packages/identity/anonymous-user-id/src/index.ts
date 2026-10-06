@@ -21,6 +21,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 
 /** A harness-home-scoped anonymous user id (random UUID v4). */
 export type AnonymousUserId = Branded<'AnonymousUserId'>
@@ -39,7 +40,7 @@ export interface AnonymousUserIdOptions {
 }
 
 /** Process-lifetime memo keyed by resolved file path, so distinct test homes never share an id. */
-const memo = new Map<string, AnonymousUserId>()
+const memo = new Map<string, { id: AnonymousUserId; inventory: string | undefined }>()
 
 /** Read a valid persisted id from the file, or `undefined` when absent/corrupt. */
 function readPersistedId(file: string): AnonymousUserId | undefined {
@@ -61,14 +62,23 @@ function readPersistedId(file: string): AnonymousUserId | undefined {
  * narrow create-to-write window can still yield two per-process ids for that
  * run; the next launch converges on the persisted one.) Persistence is
  * best-effort — a write failure (read-only home) still returns a usable id
- * for the current run so feedback and telemetry are never blocked.
+ * for the current run so feedback and telemetry are never blocked. Managed
+ * deployments record ownership on first lookup and when the explicitly
+ * selected inventory changes; an unreadable inventory rejects that admission.
  * @param options - home-location and UUID-generation seams.
  * @returns the stable per-harness-home anonymous user id.
  */
 export function getOrCreateAnonymousUserId(options: AnonymousUserIdOptions = {}): AnonymousUserId {
-  const file = join(resolveDshHome(undefined, options.env ?? process.env), ANONYMOUS_USER_ID_FILE_NAME)
+  const environment = options.env ?? process.env
+  const file = join(resolveDshHome(undefined, environment), ANONYMOUS_USER_ID_FILE_NAME)
+  const inventory = environment.DSH_MANAGED_DATA_MANIFEST
   const cached = memo.get(file)
-  if (cached !== undefined) return cached
+  if (cached !== undefined && cached.inventory === inventory) return cached.id
+  registerManagedDataPath({ owner: '@deepseek-ai/dsh-anonymous-user-id', kind: 'file', path: file }, inventory)
+  if (cached !== undefined) {
+    cached.inventory = inventory
+    return cached.id
+  }
 
   let id = readPersistedId(file)
   if (id === undefined) {
@@ -95,6 +105,6 @@ export function getOrCreateAnonymousUserId(options: AnonymousUserIdOptions = {})
       }
     }
   }
-  memo.set(file, id)
+  memo.set(file, { id, inventory })
   return id
 }

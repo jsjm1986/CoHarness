@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-21-compaction-summary-prefix-cache-reuse.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-21-compaction-summary-prefix-cache-reuse.md
-2026-07-21-compaction-summary-prefix-cache-reuse.md: 08ceb820ee415cbac9aded7a6b4f55933dc64cf3
-2026-07-21-compaction-summary-prefix-cache-reuse.zh.md: 2d796c8518c703d872ebcec4f548a0e52d91994b
+/agent-note-the-summarization-call-replays-the-conversation-prefix-for-kv-cache-reuse:
+  en: f900f36b11a0dc20
+  zh: 02155ff1a41e9d92
+/agent-note-the-summarization-call-replays-the-conversation-prefix-for-kv-cache-reuse/problem:
+  en: 128c83b34ca09021
+  zh: 1b74d3d53d6608e0
+/agent-note-the-summarization-call-replays-the-conversation-prefix-for-kv-cache-reuse/decision:
+  en: 2af65e600557e6c7
+  zh: bc6668a5f7a23cac
+/agent-note-the-summarization-call-replays-the-conversation-prefix-for-kv-cache-reuse/decision/summarizationinput-carries-the-replayed-prefix-not-a-rendered-string:
+  en: 21d245dd3cf82d70
+  zh: 38082d52424fa20f
+/agent-note-the-summarization-call-replays-the-conversation-prefix-for-kv-cache-reuse/decision/the-instruction-is-a-trailing-user-message:
+  en: 9d4ca282b81daf4c
+  zh: 2961f4d866f02043
+/agent-note-the-summarization-call-replays-the-conversation-prefix-for-kv-cache-reuse/decision/cache-reuse-is-best-effort-correctness-is-not:
+  en: f62fc24381783b02
+  zh: 36fa16ae262bc5a8
+/agent-note-the-summarization-call-replays-the-conversation-prefix-for-kv-cache-reuse/alternatives-considered:
+  en: e9a1aa32d099b0a5
+  zh: 5afdbe4d0606eec4
+/agent-note-the-summarization-call-replays-the-conversation-prefix-for-kv-cache-reuse/consequences:
+  en: 7c439d7276b9db8d
+  zh: fc5731b8b093b4b7
+/agent-note-the-summarization-call-replays-the-conversation-prefix-for-kv-cache-reuse/testing:
+  en: 564dc74968c00b39
+  zh: dc49ff7f612d71ad

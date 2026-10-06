@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-03-sidebar-session-actions-archive-filter.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-03-sidebar-session-actions-archive-filter.md
+/agent-note-slot-based-session-row-actions-and-the-sidebar-archive-filter:
+  en: 972fc3ca62e16467
+  zh: b059faf7bcd68163
+/agent-note-slot-based-session-row-actions-and-the-sidebar-archive-filter/problem:
+  en: 1f99ea6d06976c18
+  zh: aa7ad3542c457a28
+/agent-note-slot-based-session-row-actions-and-the-sidebar-archive-filter/decision:
+  en: 94133db8e5355071
+  zh: 19507699e6389a59
+/agent-note-slot-based-session-row-actions-and-the-sidebar-archive-filter/alternatives-considered:
+  en: 811e118a79fc253e
+  zh: dd5e85ea1c489e3a
+/agent-note-slot-based-session-row-actions-and-the-sidebar-archive-filter/consequences:
+  en: e863333c95f892aa
+  zh: cd031dfe8df856df

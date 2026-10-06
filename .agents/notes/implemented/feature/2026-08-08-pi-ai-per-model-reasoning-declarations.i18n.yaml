@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-pi-ai-per-model-reasoning-declarations.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-08-pi-ai-per-model-reasoning-declarations.md
-2026-08-08-pi-ai-per-model-reasoning-declarations.md: 0e8d5c3ca4017e89332f6b22e4eb0a06062918e6
-2026-08-08-pi-ai-per-model-reasoning-declarations.zh.md: c4c060b21c8b7ee5b11b5e98c8d7da0ba6c032fc
+/agent-note-per-model-reasoning-declarations-in-llm-pi-ai:
+  en: c8a485b690bbe831
+  zh: 796f13a0e36d1daa
+/agent-note-per-model-reasoning-declarations-in-llm-pi-ai/problem:
+  en: 042d9ce6ffbc08ff
+  zh: 41838c8204894060
+/agent-note-per-model-reasoning-declarations-in-llm-pi-ai/decision:
+  en: 86ef636b2f5e15c5
+  zh: aa51a7c41cbaf2a4
+/agent-note-per-model-reasoning-declarations-in-llm-pi-ai/alternatives-considered:
+  en: 0d9b039ba314e09a
+  zh: 39acf83d00df5537
+/agent-note-per-model-reasoning-declarations-in-llm-pi-ai/consequences:
+  en: bd458fde2d16794d
+  zh: 5183618e9f7a9681

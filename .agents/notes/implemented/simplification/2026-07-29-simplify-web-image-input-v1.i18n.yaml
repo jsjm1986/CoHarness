@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-29-simplify-web-image-input-v1.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-29-simplify-web-image-input-v1.md
-2026-07-29-simplify-web-image-input-v1.md: e7847dc2ae18f48146cb2b686dcda64beebf2350
-2026-07-29-simplify-web-image-input-v1.zh.md: 47f6bb5face5b896b5184f7198eef7d99ee25afe
+/agent-note-simplify-web-image-input-version-one:
+  en: 1d74876fbcd25723
+  zh: f51fb473221af13f
+/agent-note-simplify-web-image-input-version-one/problem:
+  en: 4dfa68e5d32dad3f
+  zh: 484ed9f252dc973c
+/agent-note-simplify-web-image-input-version-one/decision:
+  en: e3492781ce8c1d74
+  zh: af04e770078449ca
+/agent-note-simplify-web-image-input-version-one/alternatives-considered:
+  en: 3f8cf701dd0b8d8b
+  zh: 93d1083fcd5f78ba
+/agent-note-simplify-web-image-input-version-one/consequences:
+  en: a6637cc6acd35255
+  zh: d31ea86109b7e1ef

@@ -146,7 +146,7 @@ describe('list lifecycle', () => {
         event: {
           ...injected,
           time: 700,
-          data: { ...injected.data, source: { kind: 'plugin', plugin: 'test' } },
+          data: { ...injected.data, source: { kind: 'fixture' } },
         },
       },
     })
@@ -1221,7 +1221,8 @@ describe('completed reminder', () => {
 
 describe('background-job mirror', () => {
   const view = (over: Partial<{ id: string; status: string; label: string }> = {}) => ({
-    id: 'bash-1', kind: 'bash', label: 'pnpm run build', status: 'running', startedAt: 5, ...over,
+    id: 'bash-1', kind: 'bash', label: 'pnpm run build', status: 'running', startedAt: 5,
+    output: { total: 0, earliest: 0 }, ...over,
   })
   const tasksFrame = (sessionId: SessionId, jobs: unknown[]) =>
     ({ rpcId: 't' as never, payload: { type: 'session/jobs', sessionId, jobs } as never })
@@ -1273,5 +1274,110 @@ describe('background-job mirror', () => {
     // The notifier batches on a microtask; the frame itself is already applied.
     await Promise.resolve()
     expect(seen).toHaveBeenCalled()
+  })
+})
+
+describe('job observation and kill', () => {
+  const runningView = {
+    id: 'bash-1', kind: 'bash', label: 'pnpm run build', status: 'running',
+    startedAt: 5, output: { total: 0, earliest: 0 },
+  } as const
+
+  it('polls jobs.output into observedJobs and stops when the last observer releases', async () => {
+    vi.useFakeTimers()
+    const api = new FakeApiClient()
+    const outputs = [
+      deferred<Awaited<ReturnType<FakeApiClient['onJobsOutput']>>>(),
+      deferred<Awaited<ReturnType<FakeApiClient['onJobsOutput']>>>(),
+    ]
+    let n = 0
+    api.onJobsOutput = () => outputs[n++]?.promise ?? Promise.resolve(ok({
+      job: { ...runningView, id: 'bash-1' as never },
+      output: { total: 6, earliest: 0 }, chunks: [], next: 6,
+    }) as never)
+    const manager = new SessionManager(api, fakeRemote(api))
+    manager.handleMuxEnvelope({
+      rpcId: 't' as never,
+      payload: { type: 'session/jobs', sessionId: S1, jobs: [runningView] } as never,
+    })
+
+    const stop = manager.observeJob(S1, 'bash-1' as never)
+    await vi.waitFor(() => { expect(api.callsOf('jobs.output')).toHaveLength(1) })
+    outputs[0]!.resolve(ok({
+      job: { ...runningView, id: 'bash-1' as never },
+      output: { total: 6, earliest: 0 },
+      chunks: [{ at: 0, text: 'built\n' }],
+      next: 6,
+    }) as never)
+    await vi.waitFor(() => {
+      expect(manager.getListSnapshot().observedJobs['bash-1']?.text).toBe('built\n')
+    })
+
+    // The running job schedules the next poll; the release aborts it.
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(api.callsOf('jobs.output')).toHaveLength(2)
+    stop()
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(api.callsOf('jobs.output')).toHaveLength(2)
+    expect(manager.getListSnapshot().observedJobs['bash-1']).toBeUndefined()
+    vi.useRealTimers()
+  })
+
+  it('marks a settled, drained observation done and stops polling', async () => {
+    vi.useFakeTimers()
+    const api = new FakeApiClient()
+    api.onJobsOutput = () => Promise.resolve(ok({
+      job: { ...runningView, id: 'bash-1' as never, status: 'completed', finishedAt: 9 },
+      output: { total: 4, earliest: 0 },
+      chunks: [{ at: 0, text: 'done' }],
+      next: 4,
+    }) as never)
+    const manager = new SessionManager(api, fakeRemote(api))
+    const stop = manager.observeJob(S1, 'bash-1' as never)
+    await vi.waitFor(() => {
+      expect(manager.getListSnapshot().observedJobs['bash-1']?.streaming).toBe(false)
+    })
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(api.callsOf('jobs.output')).toHaveLength(1)
+    stop()
+    vi.useRealTimers()
+  })
+
+  it('surfaces a business refusal as a terminal error without further polls', async () => {
+    vi.useFakeTimers()
+    const api = new FakeApiClient()
+    api.onJobsOutput = () => Promise.resolve(err({ code: 'job-not-found', message: 'gone', details: { jobId: 'bash-1' } }) as never)
+    const manager = new SessionManager(api, fakeRemote(api))
+    manager.observeJob(S1, 'bash-1' as never)
+    await vi.waitFor(() => {
+      expect(manager.getListSnapshot().observedJobs['bash-1']?.error).toContain('job-not-found')
+    })
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(api.callsOf('jobs.output')).toHaveLength(1)
+    vi.useRealTimers()
+  })
+
+  it('shares one poller between two observers of the same job', async () => {
+    const api = new FakeApiClient()
+    const gate = deferred<Awaited<ReturnType<FakeApiClient['onJobsOutput']>>>()
+    api.onJobsOutput = () => gate.promise
+    const manager = new SessionManager(api, fakeRemote(api))
+    const first = manager.observeJob(S1, 'bash-1' as never)
+    const second = manager.observeJob(S1, 'bash-1' as never)
+    await vi.waitFor(() => { expect(api.callsOf('jobs.output')).toHaveLength(1) })
+    first()
+    expect(manager.getListSnapshot().observedJobs['bash-1']).toBeDefined()
+    second()
+    expect(manager.getListSnapshot().observedJobs['bash-1']).toBeUndefined()
+  })
+
+  it('passes killJob straight through to the rpc', async () => {
+    const api = new FakeApiClient()
+    api.onJobsKill = () => Promise.resolve(ok({ outcome: 'requested' }) as never)
+    const manager = new SessionManager(api, fakeRemote(api))
+    await expect(manager.killJob(S1, 'bash-1' as never)).resolves.toBe(true)
+    expect(api.callsOf('jobs.kill')).toEqual([{ sessionId: S1, jobId: 'bash-1' }])
+    api.onJobsKill = () => Promise.resolve(err({ code: 'job-not-found', message: 'gone', details: { jobId: 'bash-1' } }) as never)
+    await expect(manager.killJob(S1, 'bash-1' as never)).resolves.toBe(false)
   })
 })

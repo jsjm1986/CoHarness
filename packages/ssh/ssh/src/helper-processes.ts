@@ -99,6 +99,14 @@ export class RemoteProcesses {
     private readonly limit: number, private readonly preparationMs: number,
   ) {}
 
+  /** Log one spill failure; the remote caller then receives the tail without a spill path. */
+  private readonly reportSpillFailure = (error: unknown, label: string): void => {
+    this.ctx.logger.error(
+      `ssh helper could not write the complete ${label} stream to its spill file; the remote result keeps only the in-memory tail and reports no full-output path.`,
+      error,
+    )
+  }
+
   /**
    * Allocate private stream listeners; no target executes until start().
    * @param raw - untrusted process request received over SSH.
@@ -217,7 +225,10 @@ export class RemoteProcesses {
       const mode = stdio[name]
       const socket = await (record.endpoints[name] as Endpoint).connected
       if (typeof mode === 'object') {
-        const collector = new OutputCollector(mode.maxBytes, mode.spill?.maxBytes, name, prepareManagedProcessBinding().spillDir)
+        const binding = prepareManagedProcessBinding({ onSpillFailure: this.reportSpillFailure })
+        const collector = new OutputCollector(mode.maxBytes, name, mode.spill === undefined ? undefined : {
+          maxBytes: mode.spill.maxBytes, dir: binding.spillDir, onFailure: binding.onSpillFailure,
+        })
         collectors[name] = collector
         const forwarder = new CollectedOutputForwarder(socket, collector, mode.maxBytes)
         forwarders.push(forwarder)

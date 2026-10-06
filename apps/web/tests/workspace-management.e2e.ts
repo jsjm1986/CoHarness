@@ -137,7 +137,7 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 
@@ -258,7 +258,7 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     const copy = await dialog.textContent()
     expect(copy).toContain('workspace list')
     expect(copy).toContain('folder and session logs will be kept')
-    expect(copy).toContain('sessions will appear under Independent sessions')
+    expect(copy).toContain('sessions will appear under “Independent sessions”')
     await dialog.getByRole('button', { name: 'Delete workspace' }).click()
     await expect.poll(() => dialog.count(), { timeout: 10_000 }).toBe(0)
 
@@ -401,7 +401,7 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
     await expect.poll(() => page.getByText('Independent sessions', { exact: true }).count(), { timeout: 15_000 }).toBe(0)
     await page.getByRole('button', { name: 'View options' }).click()
-    await page.getByRole('menuitem', { name: 'WorkSpace' }).click()
+    await page.getByRole('menuitem', { name: 'WorkSpace', exact: true }).click()
     await expect.poll(() => page.getByText('Independent sessions', { exact: true }).count(), { timeout: 10_000 }).toBeGreaterThanOrEqual(1)
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)

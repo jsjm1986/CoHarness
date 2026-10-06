@@ -17,8 +17,11 @@ import { ChangesDiffStore } from '../src/client/changes-diff.ts'
 import { ChangesSummaryStore } from '../src/client/changes-summary.ts'
 import { PresentedOpenController } from '../src/client/present-open.ts'
 import {
-  hunkRows, MAX_RENDERED_LINES, renderedHunks, ReviewTab, splitRows, type ReviewInjected, type ReviewTabProps,
+  ReviewTab, type ReviewInjected, type ReviewTabProps,
 } from '../src/client/ReviewTab.tsx'
+import {
+  hunkRows, MAX_RENDERED_LINES, renderedHunks, splitRows,
+} from '../src/client/FileDiff.tsx'
 import { changesReviewDefinition } from '../src/client/review-definition.ts'
 import { createReviewStore } from '../src/client/review-store.ts'
 import { en, zh } from '../src/client/locales.ts'
@@ -148,7 +151,7 @@ describe('ReviewTab', () => {
   } = {}) {
     const summaries = options.summaries ?? new ChangesSummaryStore((url, signal) => fetch(url, { signal }))
     const diffs = options.diffs ?? new ChangesDiffStore((url, signal) => fetch(url, { signal }))
-    const controller = options.controller ?? new PresentedOpenController(() => ({ name: '', available: false, fileManager: null }), async () => {})
+    const controller = options.controller ?? new PresentedOpenController(() => ({ name: '', available: false, fileManager: null }), async () => {}, async () => [])
     const store = createReviewStore().create()
     const aborter = new AbortController()
     const tabActions = {
@@ -264,7 +267,7 @@ describe('ReviewTab', () => {
   it('opens the whole file in the sidebar and the native open only with a desktop', () => {
     const summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))
     summaries.state.set({ [SUMMARY_URL]: summary })
-    const controller = new PresentedOpenController(() => ({ name: '', available: false, fileManager: null }), async () => {})
+    const controller = new PresentedOpenController(() => ({ name: '', available: false, fileManager: null }), async () => {}, async () => [])
     controller.host.set({ name: 'desktop', available: true, fileManager: 'finder' })
     const { view, injected, tabActions } = mount({ summaries, controller, params: { index: 1 } })
     expect(injected.reloadPresentedHost).not.toHaveBeenCalled()

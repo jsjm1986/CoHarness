@@ -43,10 +43,13 @@ kind: "package-reference"
 
 <a id="model-experience"></a>
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。`dsh_plugin_packages` 字段按请求从实时 Loader 清单计算；不保留清单副本。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 包清单元数据
@@ -63,6 +66,7 @@ kind: "package-reference"
 
 无；包生命周期变化不会改变模型可见前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -70,7 +74,6 @@ kind: "package-reference"
 - **仅含 Loader 支持的包身份**——以编程方式创建的子 fiber 与内存动态插件没有权威 NPM 名称／版本身份，因此不在该清单内。
 - **省略松散模块**——没有具名且带版本所属 manifest 的相对文件是插件模块，不是插件包。
 - **原地替换包需要重启**——manifest 身份会在进程存活期内缓存。Loader 的启用、禁用、挂载、卸载与普通源码 HMR 仍会刷新存活配置项集合，但在同一进程中把已挂载包的 manifest 替换为另一版本并不是受支持的升级路径。
-
 
 <a id="dev-note"></a>
 ### 开发备注

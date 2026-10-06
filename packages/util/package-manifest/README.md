@@ -76,10 +76,12 @@ The package root only re-exports declarations from [`src/types.ts`](src/types.ts
 
 <a id="model-experience"></a>
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Pure type declarations with no runtime behavior; readers own parsing, validation, and defaults.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this package only exports types.

@@ -1,6 +1,20 @@
+import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 const decoratorSyntax = /^\s*@[A-Za-z_$][\w$]*/m
+
+/**
+ * Src-plane stand-ins for specifiers whose real module exists only as a built
+ * `lib/` artifact. Vite applies `resolve.alias` before tsconfig paths and
+ * package exports, so test lanes land on the committed stand-in while
+ * typecheck and the bundle keep resolving the generated file.
+ */
+export const sourcePlaneAliases = [
+  {
+    find: /^@deepseek-ai\/dsh-api-terminal-controller\/remote$/,
+    replacement: fileURLToPath(new URL('./packages/api/terminal-controller/tests/remote-standin.ts', import.meta.url)),
+  },
+]
 
 /**
  * Worker arguments that keep process-wide Web Storage from shadowing jsdom storage.

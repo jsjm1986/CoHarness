@@ -55,6 +55,7 @@ async function bench(
       sessionId: sid('source'),
       label: 'Research',
       cwd: '/project',
+      sameWorkspace: false,
       createdAt: 1_700_000_000_000,
       mention: '@[Research](dsh-session:InNvdXJjZSI)',
     }],
@@ -143,6 +144,7 @@ describe('candidates', () => {
         sessionId: SessionId
         label: string
         cwd: string
+        sameWorkspace: boolean
         createdAt: number
         mention: string
       }[]
@@ -154,6 +156,7 @@ describe('candidates', () => {
             sessionId: sid('source'),
             label: 'Research',
             cwd: '/project',
+            sameWorkspace: false,
             createdAt: 1_700_000_000_000,
             mention: '@[Research](dsh-session:InNvdXJjZSI)',
           }],
@@ -198,6 +201,7 @@ describe('candidates', () => {
         sessionId: sid('source'),
         label: 'Research',
         cwd: '/project',
+        sameWorkspace: false,
         createdAt: 0,
         mention: '@[Research](dsh-session:InNvdXJjZSI)',
       }],
@@ -262,6 +266,7 @@ describe('candidates', () => {
       value: [{
         sessionId: sid('same'),
         label: 'same',
+        sameWorkspace: false,
         createdAt: 0,
         mention: '@[same](dsh-session:InNhbWUi)',
       }],

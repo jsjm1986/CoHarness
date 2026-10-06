@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-12-separate-source-launch-from-build.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-12-separate-source-launch-from-build.md
-2026-08-12-separate-source-launch-from-build.md: 639e9de0ce13a571e7f83929d9c76eac2664daab
-2026-08-12-separate-source-launch-from-build.zh.md: c8fd6626053358e1220fffb7ee0ed808d783b34d
+/agent-note-separate-source-launch-from-repository-build:
+  en: b62eb03dc3fa6aa8
+  zh: e40cbf88367da8d0
+/agent-note-separate-source-launch-from-repository-build/problem:
+  en: a4fa56f012e25a15
+  zh: 1ae4ddb6e45ef194
+/agent-note-separate-source-launch-from-repository-build/decision:
+  en: 7f5e88d32e3e3219
+  zh: c245167776816770
+/agent-note-separate-source-launch-from-repository-build/alternatives-considered:
+  en: 6b08a678d07a29fd
+  zh: abef64beb4a3afbc
+/agent-note-separate-source-launch-from-repository-build/consequences:
+  en: ff15744144d1e80f
+  zh: 75d583f9dbe5d454
+/agent-note-separate-source-launch-from-repository-build/verification:
+  en: de6e64bcf7389475
+  zh: 7d73ed9618973d57

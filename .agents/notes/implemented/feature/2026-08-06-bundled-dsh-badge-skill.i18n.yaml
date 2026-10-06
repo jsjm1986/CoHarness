@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-bundled-dsh-badge-skill.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-06-bundled-dsh-badge-skill.md
-2026-08-06-bundled-dsh-badge-skill.md: 4c6fbdcb76298759c2f17b3b5349a5b48198595e
-2026-08-06-bundled-dsh-badge-skill.zh.md: fe291d498660e744cf193e123aa1a4a4f4a27b3b
+/agent-note-bundled-dsh-badge-skill:
+  en: 9186e2302cb9db6d
+  zh: 8249c44f6f272015
+/agent-note-bundled-dsh-badge-skill/problem:
+  en: f938ec2da1b6c560
+  zh: 343b7537c0eaf793
+/agent-note-bundled-dsh-badge-skill/decision:
+  en: 1dbc21737c2ff4f7
+  zh: e461b6a85dfba336
+/agent-note-bundled-dsh-badge-skill/alternatives-considered:
+  en: f50b25deef115317
+  zh: 1237820055978e16
+/agent-note-bundled-dsh-badge-skill/consequences:
+  en: 521932a6cea98b43
+  zh: 6c0beb35c782e354

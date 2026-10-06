@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # client/ — web GUI 浏览器端
 
 [English](README.md) | 中文

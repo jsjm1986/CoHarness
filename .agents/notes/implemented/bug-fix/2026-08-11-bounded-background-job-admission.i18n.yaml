@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-bounded-background-job-admission.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-11-bounded-background-job-admission.md
-2026-08-11-bounded-background-job-admission.md: 8fa5bec07647947b730c436284da71b83deedb48
-2026-08-11-bounded-background-job-admission.zh.md: c30e15f26d42acd93eecbc90856d1db64bacba2e
+/agent-note-bounded-background-job-admission:
+  en: 2d484aef9befce29
+  zh: 11cbcdd084db7e78
+/agent-note-bounded-background-job-admission/problem:
+  en: 4da12f89c96fee3d
+  zh: a65d3859f724f80a
+/agent-note-bounded-background-job-admission/decision:
+  en: 2c51812450b4e316
+  zh: deff9a0b852cb14b
+/agent-note-bounded-background-job-admission/verification:
+  en: 3250d5fd0ed17904
+  zh: c646e40b9efc1f18
+/agent-note-bounded-background-job-admission/alternatives-considered:
+  en: fefb710efd1245bd
+  zh: 13808d6715cd9e92
+/agent-note-bounded-background-job-admission/consequences:
+  en: 605393a1415e867f
+  zh: 88738d39d6521bfe

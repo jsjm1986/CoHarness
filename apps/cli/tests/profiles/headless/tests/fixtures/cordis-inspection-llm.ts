@@ -14,7 +14,7 @@ const CALLS = [
 
 class InspectionAdapter extends LlmAdapter {
   async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    const results = options.messages.flatMap(message => message.content.filter(block => block.type === 'tool-result'))
+    const results = options.messages.filter(message => message.role === 'tool')
     if (results.length === 0) {
       for (const [index, call] of CALLS.entries()) {
         const block = { type: 'tool-call' as const, id: ToolCallId(`inspection-${index}`), name: call.name, arguments: JSON.stringify(call.args) }

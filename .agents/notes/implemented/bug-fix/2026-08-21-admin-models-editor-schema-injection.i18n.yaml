@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-21-admin-models-editor-schema-injection.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-21-admin-models-editor-schema-injection.md
-2026-08-21-admin-models-editor-schema-injection.md: a3ebebec4e0aea6372b01d17c439b4d56363eb0f
-2026-08-21-admin-models-editor-schema-injection.zh.md: 1eedd25ebbad340fdff5abe8b3e01a06497a5c1f
+/agent-note-admin-organization-models-must-use-the-shared-settings-faces:
+  en: eb80dbb6a7f41331
+  zh: fb02018684e0de45
+/agent-note-admin-organization-models-must-use-the-shared-settings-faces/problem:
+  en: c7e6fc85cad4b9e6
+  zh: fa1fe529e99e15fd
+/agent-note-admin-organization-models-must-use-the-shared-settings-faces/decision:
+  en: d3240b056cef5417
+  zh: 117caf7f22156663
+/agent-note-admin-organization-models-must-use-the-shared-settings-faces/alternatives-considered:
+  en: 95cf5dcc69c3e47e
+  zh: b693475d93d9bc2d
+/agent-note-admin-organization-models-must-use-the-shared-settings-faces/consequences:
+  en: 5c2885b1c8103cb2
+  zh: 453f2f3646f85784
+/agent-note-admin-organization-models-must-use-the-shared-settings-faces/testing:
+  en: 2188ff8413f4e8eb
+  zh: dbee142c5d405be5

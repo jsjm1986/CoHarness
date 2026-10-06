@@ -18,6 +18,7 @@ import type {} from '@deepseek-ai/dsh-agent-default-model'
 import type { ApiProxy } from './api/index.ts'
 import {
   authorizeTypertRemote,
+  invokeTypertRemote,
   createApiProxy,
   DEFAULT_COLD_BLANK_PROBE_MAX_BYTES,
 } from './api-proxy.ts'
@@ -111,6 +112,7 @@ export class ApiProxyService extends Service implements ApiProxy {
   readonly desktop: ApiProxy['desktop']
   readonly sessions: ApiProxy['sessions']
   readonly subagents: ApiProxy['subagents']
+  readonly jobs: ApiProxy['jobs']
   readonly workspace: ApiProxy['workspace']
   readonly workspaceChanges: ApiProxy['workspaceChanges']
   readonly workspaceFiles: ApiProxy['workspaceFiles']
@@ -123,10 +125,12 @@ export class ApiProxyService extends Service implements ApiProxy {
   readonly events: ApiProxy['events']
   readonly downloads: ApiProxy['downloads']
   readonly respond: ApiProxy['respond']
+  readonly hasLiveClient: ApiProxy['hasLiveClient']
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'apiProxy')
     ctx.on('typert-gateway/authorize', payload => authorizeTypertRemote(ctx, payload))
+    ctx.on('typert-gateway/invoke', (payload, next) => invokeTypertRemote(ctx, payload, next))
     const api = createApiProxy(ctx, {
       defaultModelSelection: () => ctx.agentDefaultModel.currentSelection(),
       saveDefaultModelSelection: selection => ctx.agentDefaultModel.saveSelection(selection),
@@ -146,6 +150,7 @@ export class ApiProxyService extends Service implements ApiProxy {
     this.desktop = api.desktop
     this.sessions = api.sessions
     this.subagents = api.subagents
+    this.jobs = api.jobs
     this.workspace = api.workspace
     this.workspaceChanges = api.workspaceChanges
     this.workspaceFiles = api.workspaceFiles
@@ -160,7 +165,10 @@ export class ApiProxyService extends Service implements ApiProxy {
     // createApiProxy returns closures (no `this` capture), so the bind is
     // behavior-neutral.
     this.respond = api.respond.bind(api)
+    this.hasLiveClient = api.hasLiveClient.bind(api)
   }
 }
 
 export default ApiProxyService
+
+export type { HostSessionLifecycle } from './session-lifecycle.ts'

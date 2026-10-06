@@ -1,8 +1,8 @@
-# Bash 执行器
+# Shell 执行器
 
 [English](shell.md) | 中文
 
-bash 执行 seam 分为 Service Definition（[dsh-shell](../../packages/shell/shell)，`ctx.shell`）、Service Provider（[dsh-bash-local](../../packages/shell/bash-local) 与 [dsh-bash-sandbox](../../packages/shell/bash-sandbox)）和 Consumer（[dsh-tool-bash](../../packages/shell/tool-bash)，即 `bash` schema）。通用后台任务的 job id、所有权与控制位于 [jobs.md](jobs.zh.md)；本 seam 返回一个不含任务概念的进程句柄。原始进程组机制封装在[子进程 seam](subprocess.zh.md)之后。
+shell 执行 seam 由 [dsh-shell](../../packages/shell/shell) 在 `ctx.shell` 上提供 Service Definition。[shell 包组](../../packages/shell/README.zh.md)列出其 Bash 与 PowerShell 提供方以及面向模型的 Consumer。通用后台任务的 id、所有权与控制位于 [jobs.md](jobs.zh.md)；本 seam 返回进程句柄，不注册后台任务。managed-range 机制封装在[子进程 seam](subprocess.zh.md)之后。
 
 源码：[`packages/shell/shell/src/types.ts`](../../packages/shell/shell/src/types.ts)
 
@@ -27,6 +27,8 @@ interface ShellExecRequest {
   workdir?: string | undefined
   /** Timeout override in milliseconds (implementations cap it). */
   timeoutMs?: number | undefined
+  /** Deadline policy at `timeoutMs` expiry (default `'kill'`). */
+  onExpiry?: ShellExpiryPolicy | undefined
   /**
    * Foreground stdout capture budget in bytes. Absent uses the executor's
    * default output cap. Trusted in-process consumers use this when they must
@@ -34,7 +36,7 @@ interface ShellExecRequest {
    * tool does not expose it as a parameter.
    */
   stdoutMaxBytes?: number | undefined
-  /** Abort signal — implementations kill the command when it fires. */
+  /** Abort signal — implementations kill the command when it fires, and treat a signal that is already aborted as fired. */
   signal?: AbortSignal | undefined
   /**
    * Bytes to write to the command's stdin, then close it. Absent leaves stdin
@@ -68,19 +70,21 @@ interface ShellExecRequest {
 ```ts type-equiv
 /**
  * A resolved execution spec. {@link ShellExecutor.resolve} fills and caps the
- * required fields; {@link ShellExecutor.start} ignores `timeoutMs` because
- * background processes have no executor timeout.
+ * required fields; under `onExpiry: 'none'` the resolved `timeoutMs` arms no
+ * timer and is only echoed into {@link ShellRunResult.timeoutMs}.
  */
 interface ShellExecSpec {
   command: string
   workdir: string
   timeoutMs: number
+  /** Deadline policy at `timeoutMs` expiry ({@link ShellExecutor.resolve} defaults it to `'kill'`). */
+  onExpiry: ShellExpiryPolicy
   /**
-   * Resolved foreground stdout capture budget in bytes. `run()` uses it for
-   * stdout; background jobs and stderr keep the executor's own output cap.
+   * Resolved stdout capture budget in bytes, applied to every execution's
+   * stdout; stderr keeps the executor's own output cap.
    */
   stdoutMaxBytes: number
-  /** Abort signal — implementations kill the command when it fires. */
+  /** Abort signal — implementations kill the command when it fires, and treat a signal that is already aborted as fired. */
   signal?: AbortSignal | undefined
   /** Bytes to write to stdin before closing it; absent means no stdin. */
   stdin?: string | undefined
@@ -166,11 +170,11 @@ interface ShellSandboxInfo {
 
 ## 后台进程：`ShellProcess`
 
-`start()` 返回不含 id 或所有者的句柄。`dsh-tool-bash` 将它适配为 `ctx.jobs.start()` 钩子；随后由通用运行时拥有任务标识与生命周期。`done` 在进程关闭时完成且绝不被拒绝；进程结束后仍可读取，并且沙箱事实会在 `done` 完成前写入。
+`execute()` 在异步启动准备完成后返回句柄；取消或准备失败会在发布前拒绝调用。该句柄没有 id 或 owner。`dsh-tool-bash` 将它适配为 `ctx.jobs.start()` 钩子；随后由通用运行时拥有任务标识与生命周期。`done` 会在底层进程结算时完成且绝不 reject；subprocess 提供方的 rejection 会生成状态为 `killed` 的进程，并把不声明阶段的错误写入 stderr。进程结算后仍可读取，并且沙箱事实会在 `done` 完成前写入。
 
 ```ts type-equiv
 /**
- * A background process handle returned by {@link ShellExecutor.start}. It is the
+ * A process handle published by {@link ShellExecutor.execute}. It is the
  * only access path; buffered output remains readable after exit. Composition
  * teardown (the subprocess service's disposal) kills running processes and
  * awaits {@link done}; an executor-only reload leaves them running.
@@ -195,6 +199,13 @@ interface ShellProcess {
    * full-stream spill files when available.
    */
   readOutput(): ShellProcessRead
+  /**
+   * Non-consuming offset readers over the same captured streams the consuming
+   * {@link readOutput} cursor drains, including the provider-failure note a
+   * rejected spawn leaves on stderr. Independent observers read here at their
+   * own offsets without stealing bytes from `readOutput`.
+   */
+  observed: ShellObservedStreams
   /**
    * Terminate the provider-managed range. Returns false when it had already finished
    * (no-op); idempotent.
@@ -221,7 +232,7 @@ interface ShellProcessRead {
 
 ## 服务
 
-`ShellExecutor` 拥有 `resolve`、前台 `run`、后台进程 `start` 以及 `sandboxMode` 能力事实。`dsh-bash-local` 拥有命令默认值补全、超时/中止分类、终端环境以及后台读取合并；进程组、有界收集器、spill 文件、凭据清除与 dispose（资源释放）后完全停稳归[子进程服务](subprocess.zh.md)所有。`dsh-tool-bash` 拥有面向模型的渲染，并将后台句柄适配到[通用任务运行时](jobs.zh.md)。`dsh-shell` 拥有 shell 工具共享的退出状态约定：导出的 `parseExitStatus`/`ParsedExitStatus` 是 `dsh-tool-bash` 的 `renderResult` 与 `dsh-tool-pwsh` 的 `renderPwshResult` 所追加的 `[exit code: N]` / `[killed by signal: X]` 标记的逆解析，两个工具的 `presentResult` 都用它把渲染文本拆分为 terminal 卡的输出正文与退出状态 pill。
+`ShellExecutor` 拥有 `resolve` 与 `execute`——其 `result()` 为前台投影，句柄本身承载后台 `ShellProcess` 面——以及 `sandboxMode` 能力事实。`dsh-bash-local` 拥有命令默认值补全、超时/中止分类、终端环境以及后台读取合并；managed-range 终止、有界收集器、spill 文件、凭据清除与 dispose（资源释放）后完全停稳归[子进程服务](subprocess.zh.md)所有。`dsh-tool-bash` 拥有面向模型的渲染，并将后台句柄适配到[通用任务运行时](jobs.zh.md)。`dsh-shell` 拥有 shell 工具共享的退出状态约定：导出的 `parseExitStatus`/`ParsedExitStatus` 是 `dsh-tool-bash` 的 `renderResult` 与 `dsh-tool-pwsh` 的 `renderPwshResult` 所追加的 `[exit code: N]` / `[killed by signal: X]` 标记的逆解析，两个工具的 `presentResult` 都用它把渲染文本拆分为 terminal 卡的输出正文与退出状态 pill。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -237,37 +248,33 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 Abstract bash execution service. Subclass, implement the abstract methods, and load the subclass as a plugin — it registers as `ctx.shell` (one implementation per context; loading a second throws, which is cordis' standard duplicate-service behavior).
 
+execute resolves with the process handle after preparation. "Foreground" is a property of what the caller awaits, not of the spawn — a caller that awaits ShellExecution.result ran the command in the foreground; one that keeps the handle ran it in the background. A caller that waits only for a while runs the command under `onExpiry: 'none'` and bounds its own wait; the handle stays valid after the caller stops waiting.
+
 Implementations must honor these semantics:
 
-- run rejects only for infrastructure failures. Nonzero exits, timeout kills, and abort kills resolve with a ShellRunResult.
-- start resolves after launch preparation; cancellation or setup failure rejects before publishing a handle. No timeout applies to background processes. Once published, `done` settles at process close and never rejects; subprocess provider failures settle as `killed` with the error on stderr.
+- ShellExecution.result rejects only for infrastructure failures. Nonzero exits, timeout kills, and abort kills resolve with a descriptive result: first-cause `timedOut`/`aborted`, the spec's `timeoutMs` echoed.
+- The handle is published after preparation. `done` settles at process close and never rejects; spawn failures settle as `killed` with the error on the read path, while `result()` carries the same failure as its rejection.
+- `onExpiry: 'none'` arms no deadline; `'kill'` kills at expiry. Expiry during preparation returns a settled timed-out handle without output.
 - ShellProcess.readOutput is incremental: consecutive reads never repeat output. Lossy reads report truncation and available spill files.
-- A still-running background process is stopped and awaited when its owning composition tears down. With the subprocess seam that boundary is `ctx.subprocess` disposal, so a background process survives an executor-only reload.
+- A still-running process is stopped and awaited when its owning composition tears down. With the subprocess seam that boundary is `ctx.subprocess` disposal, so a process survives an executor-only reload.
 
 ```ts cordis-catalog
 /**
  * Apply implementation-owned defaults and caps to a request before execution.
  * @param request - the caller's request; omitted fields get this
  *   implementation's defaults, capped fields are clamped.
- * @returns the fully-specified spec to hand to {@link run}/{@link start}.
+ * @returns the fully-specified spec to hand to {@link execute}.
  */
 abstract resolve(request: ShellExecRequest): ShellExecSpec
 
 /**
- * Run preparation and the foreground command under the resolved timeout.
+ * Prepare and spawn the command under its resolved deadline.
  * @param spec - a resolved spec from {@link resolve}, never a raw request.
- * @returns the outcome; nonzero exits, timeout kills, and abort kills
- *   resolve with a descriptive result rather than reject.
+ * @returns the prepared handle, including its result projection;
+ *   preparation timeout yields an already-settled handle with no output.
  * @throws on preparation failure or caller cancellation before process publication.
  */
-abstract run(spec: ShellExecSpec): Promise<ShellRunResult>
-
-/**
- * Prepare a background process asynchronously and publish its live handle.
- * @param spec - a resolved spec from {@link resolve}, never a raw request.
- * @returns the live process handle after preparation; cancellation or setup failure rejects.
- */
-abstract start(spec: ShellExecSpec): Promise<ShellProcess>
+abstract execute(spec: ShellExecSpec): Promise<ShellExecution>
 ```
 
 Source: [`packages/shell/shell/src/index.ts`](../../packages/shell/shell/src/index.ts)

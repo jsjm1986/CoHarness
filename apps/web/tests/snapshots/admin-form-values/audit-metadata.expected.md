@@ -1,0 +1,6 @@
+- term: 目标 ID
+- definition: "17"
+- term: 配置代次
+- definition: "12"
+- term: 执行状态
+- definition: unknown

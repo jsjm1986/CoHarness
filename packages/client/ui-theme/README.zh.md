@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-theme
 
 [English](README.md) | 中文
@@ -8,7 +13,7 @@
 
 `src/styles/` 下有七张样式表，由 ui-theme 的动态客户端 entry 依次导入：`base.css`、`corner-shape.css`、`design-platform.css`、`metrics.css`、`scrollbar.css`、`gradient-shadow-text.css` 与 `shiki.css`。客户端 bundle 将其编译并注入为插件持有的全局样式，因此卸载与 HMR 会随 ui-theme 一同移除这些样式，而不会把主题 CSS 留在静态 Web 外壳中。`metrics.css` 提供客户端包共用的间距、安全区、圆角、触控目标、手机 Sheet 几何、compact 排版／图标角色以及有状态控件几何。有状态的手机控件必须保留可读的当前值文字，并使用统一设置 Sheet 语言，不得由功能包自行发明选择器外观。`scrollbar.css` 是 `--dsw-alias-scrollbar-*` token 的唯一消费方，必须排在声明这些 token 的 `design-platform.css` 之后。
 
-滚动条重新绑定约定：`scrollbar.css` 在 `body` 上把 `--dsh-scrollbar-thumb` 与 `--dsh-scrollbar-thumb-hover` 绑定到 l1（基础表面）token，两条渲染路径都读取这一组变量。高层级表面（菜单、浮层、对话框）在自己的容器上设置 `--dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2)` 与 `--dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2)`；一次重新绑定即可为引擎实际走的那条路径换色。这组变量的另一个合法目标是 `transparent`，即完全不绘制滑块——[ui-sidebar](../ui-sidebar/README.zh.md) 在指针不在栏内时就这样重新绑定自己的列。绑回 l1 那组不算重新绑定，它只是重述基础表面的默认值。WebKit 滚动条的宽度和高度均为 4px；`--dsh-scrollbar-width` 镜像其布局宽度，供需要与占布局宽度的滚动条对齐的表面使用——[ui-conversation](../ui-conversation/README.zh.md) 用它作为覆盖 composer 座位 `right` 偏移。卡片内部的 WebKit 滑块使用共享的 `--dsh-scrollbar-thumb-inset`，确保滚动条变窄后仍有可见的有色内芯。scrollbar-styles 规格会把这些值与消费者配对检查。
+滚动条重新绑定约定：`scrollbar.css` 在 `body` 上把 `--dsh-scrollbar-thumb` 与 `--dsh-scrollbar-thumb-hover` 绑定到 l1（基础表面）token，两条渲染路径都读取这一组变量。高层级表面（菜单、浮层、对话框）在自己的容器上设置 `--dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2)` 与 `--dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2)`；一次重新绑定即可为引擎实际走的那条路径换色。这组变量的另一个合法目标是 `transparent`，即完全不绘制滑块——[ui-sidebar](../ui-sidebar/README.zh.md) 在指针不在栏内时就这样重新绑定自己的列。绑回 l1 那组不算重新绑定，它只是重述基础表面的默认值。基于 WebKit 的浏览器默认使用 5px 的 `--dsh-scrollbar-width`，并读取 `--dsh-scrollbar-thumb-border` 与 `--dsh-scrollbar-track-margin`；滚动表面可以重新绑定这两个几何变量，在较窄的可见滑块外保留一条更宽的拖拽轨道，或把轨道从圆角端点内缩——[ui-conversation](../ui-conversation/README.zh.md) 读取宽度作为覆盖 composer 座位的 `right` 偏移，卡片内部的滚动区重新绑定 `thumb-border`，确保滚动条变窄后仍有可见的有色内芯。scrollbar-styles 规格会把这些值与消费者配对检查。
 
 两条路径在构造上互斥。`scrollbar-width`／`scrollbar-color` 写在 `@supports not selector(::-webkit-scrollbar)` 之内，因为这两个属性中的任一个只要取非 `auto` 值，Chromium 与 Safari 就会丢弃该元素上的全部 `::-webkit-scrollbar*` 规则，`::-webkit-scrollbar-thumb:hover` 也在其中——若无条件地同时声明，`--dsh-scrollbar-thumb-hover` 在任何引擎上都不会被渲染。因此 Firefox 走标准属性，WebKit 系引擎走伪元素，hover token 只经由伪元素这条路径渲染。相关原理与实测计算值见[滚动条 Agent Note](../../../.agents/notes/implemented/bug-fix/2026-07-28-themed-scrollbars-and-reserved-gutter.zh.md)。
 
@@ -20,14 +25,28 @@
 
 `dsh-client-ui-theme` 让 Web GUI 用户在设置中选择 `light`、`dark` 或 `system`，并把会话正文字号设为 12 至 17 px。回环客户端把两个值存入 `ui-theme` 设置命名空间，本地提供方默认将其持久化到 `$DSH_HOME/settings.yaml`。插件通过 `prefers-color-scheme` 解析 `system` 并发布不可变的 `ThemeSnapshot`；ui-layout 把每份快照应用到文档。本包还提供 `--dsw-*` token 样式表，并注入同步引导，使所选调色板与字号在外壳加载前生效。第三方主题可通过 `ctx.theme` 注册别名 token 覆盖。
 
+## 目录
+
+- [设置权限与兼容性](#settings-authority-and-compatibility)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="settings-authority-and-compatibility"></a>
 ## 设置权限与兼容性
 
 外观控件显示账户偏好；项目策略可以强制当前界面使用浅色或深色方案。账户级 scope 在报告 `loading`、`writable: false` 或写入处于 `saving` 时禁用选择；项目和提供方限制会在行内显示，服务在取得可写账户视图前也会拒绝直接调用 `setTheme`。主题监听器同时支持 `addEventListener` 与旧版 `addListener` MediaQueryList 实现。设计样式表提供 `100vh` 视口回退，客户端可视视口测量就绪后覆盖该值；token-contract 测试会检查所有 `--ds-*` 与 `--dsw-*` 引用均有 CSS 声明，视口高度这一运行时变量是明确例外。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该偏好的持久归属是 Host settings namespace；`ThemeRuntime` 只保留已解析快照，其针对推送变更与重连的行为由单元规格断言。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。
@@ -36,7 +55,18 @@
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **第三方主题是表层，不是产品**：注册主题意味着覆盖同名别名变量；目前不会验证一组覆盖是否完整。
 - **token 样式表是颜色值的唯一权威来源**：会有意不补入 cssdesign 中缺失的值（例如设计中的 #4176E6 标签页蓝色）；一律采用最接近的语义 token。设计负责人批准的新增值是例外：须在同一变更中以一个静态尺度层级与一个语义别名的形式进入（`--dsw-static-blue-900` / `--dsw-alias-label-primary-bluish`）。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

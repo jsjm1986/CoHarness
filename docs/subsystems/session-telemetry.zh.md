@@ -29,6 +29,8 @@ type SessionTelemetrySeverity = 'info' | 'warn' | 'error'
  * identity so they can never be mistaken for ledger rows.
  */
 interface SessionTelemetryRecord {
+  /** Canonical envelope without data; body carries the separately redacted payload. Absent for operational records. */
+  sourceEvent?: { sessionId: SessionId; envelope: Omit<SessionEvent, 'data'> }
   /** Ledger (session-log mirror) or ops (operational signal) channel; backends keep the two under separate instrumentation scopes. */
   channel: 'ledger' | 'ops'
   /** Unix epoch milliseconds — the source event's append time for ledger records, the emission time for ops records. */
@@ -55,11 +57,11 @@ interface SessionTelemetryRecord {
 }
 ```
 
-每个 `(turn, step)` 只发出第一条 `assistant/chunk`，即「流已开始」的信号；其余分片在捕获时丢弃，因此传输中的 `seq` 缺口是常态，绝不是数据丢失的信号。其他所有[会话事件](session.zh.md)类型都会完整透传，包括该 seam 从未听说过、由插件合并进来的事件类型。投递是尽力而为的：游标标记的是「已交接」而非「已送达」，记录可能丢失（崩溃、重载窗口）也可能重复（无游标的重新接管、SDK 重试），因此接收端对 ledger 记录基于 `(session.id, event.seq)` 去重；ops 记录刻意省略这类标识——它们是用于告警的信号，而非用于累加的条目，重复被容忍而非被去重。
+每个 `(turn, step)` 只发送首个 `assistant/chunk`——流开始信号；其余在捕获时丢弃，因此线上出现 `seq` 缺口是常态而非丢失信号。其他所有[会话事件](session.zh.md)类型——包括 seam 从未知晓的插件合并类型——都整体透传。投递是尽力而为：游标标记的是已交接而非已送达，记录可能丢失（崩溃、重载窗口）也可能重复（无游标再收养、SDK 重试），因此接收方按 `(session.id, event.seq)` 对 ledger 记录去重；ops 记录刻意省略该身份——它们是告警信号而非求和条目，容忍重复。
 
 ## 共享披露
 
-该 seam 的确认契约（归属 [Service Definition README 的共享披露段](../../packages/session/session-telemetry/README.zh.md#the-sharing-disclosure)）：每个后端都通过 `ctx.sessionTelemetry` 上必需的抽象 `sharing` 成员披露其部署级共享策略，消费方只有在未挂载任何遥测服务时才渲染「未配置」。披露只陈述当前策略，绝不承诺投递或留存——交接是非阻塞入队，批处理、重试与丢失策略仍归上报 SDK。
+seam 的确认约定（由 [Service Definition README 的共享披露一节](../../packages/session/session-telemetry/README.zh.md#the-sharing-disclosure)持有）：每个后端通过 `ctx.sessionTelemetry` 上必需的抽象 `sharing` 成员披露其部署选定的共享策略，consumer 只在未挂载遥测服务时渲染「未配置」。披露陈述当前策略，绝不承诺送达或保留——交接是非阻塞入队，而批处理、重试与丢失策略归上报 SDK 所有。
 
 ```ts type-equiv
 /**
@@ -80,11 +82,10 @@ type SessionTelemetryCapture = 'live' | 'on-demand'
 interface SessionTelemetryCaptureOptions {
   /** Follow live events, or wait for explicit capture; defaults to live. */
   capture?: SessionTelemetryCapture
-  /** Include stored history before this lifecycle; defaults to false. */
+  /** Include inherited fork history and stored history from earlier lifecycles; defaults to false. */
   includeHistory?: boolean
 }
 ```
-
 ```ts type-equiv
 /**
  * The minimum backend contract the coordinator requires. {@link SessionTelemetryBackend} is

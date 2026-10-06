@@ -28,7 +28,7 @@ describe.skipIf(MODE === 'record')('web e2e: @ directory drill and breadcrumb', 
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await mkdir(join(scaffold.workspaceCwd, 'workspace', 'src'), { recursive: true })
     await writeFile(join(scaffold.workspaceCwd, 'workspace', 'src', 'nested.txt'), 'nested\n')

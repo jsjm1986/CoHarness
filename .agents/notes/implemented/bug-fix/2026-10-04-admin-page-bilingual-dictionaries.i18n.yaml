@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-admin-page-bilingual-dictionaries.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-admin-page-bilingual-dictionaries.md
+/agent-note-bilingual-dictionaries-for-every-admin-page:
+  en: 35621ee4ac982b7f
+  zh: a05a0c2917902625
+/agent-note-bilingual-dictionaries-for-every-admin-page/problem:
+  en: bd57e4cb94f5b410
+  zh: 65ba75c34e314f0b
+/agent-note-bilingual-dictionaries-for-every-admin-page/decision:
+  en: 95acd2616ea92870
+  zh: 51760458b18ad16b
+/agent-note-bilingual-dictionaries-for-every-admin-page/files:
+  en: efced73d5542d1f0
+  zh: f78980e1152ebfe0
+/agent-note-bilingual-dictionaries-for-every-admin-page/alternatives-considered:
+  en: 024b59aae90db88e
+  zh: 3760970f514c9125
+/agent-note-bilingual-dictionaries-for-every-admin-page/consequences:
+  en: c94e1bc68085cccc
+  zh: f508bc8db078486b

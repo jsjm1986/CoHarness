@@ -1,11 +1,13 @@
 /**
  * Background-job plugin, browser half: contributes one session-header action
- * that renders this session's `ctx.jobs` records. The data arrives entirely
- * through the `jobsBySession` list mirror, so the plugin issues no RPC and
- * holds no state of its own beyond popover visibility.
+ * that renders this session's `ctx.jobs` records. The roster arrives through
+ * the `jobsBySession` list mirror, and per-row live output plus the human
+ * kill ride the sessions service's `observeJob`/`killJob`; this plugin holds
+ * no transport state of its own.
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { JobListAction } from './JobListAction.tsx'
+import type { JobListInjected } from './JobListAction.tsx'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { en, NS, zh, type JobKey } from './locales.ts'
 
@@ -16,9 +18,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-export type { JobListActionProps } from './JobListAction.tsx'
+export type { JobListActionProps, JobListInjected } from './JobListAction.tsx'
 
-/** Required services for locale registration and header-slot contribution. */
+/** Required services for job control, locale registration, and the header slot. */
 export const inject = ['sessions', 'slots', 'locale']
 
 /**
@@ -35,6 +37,10 @@ export function apply(ctx: ClientContext): void {
       // After the subagent catalog: session lineage reads before process work.
       order: 20,
       locale: NS,
+      inject: (): JobListInjected => ({
+        observe: (sessionId, id) => ctx.sessions.observeJob(sessionId, id),
+        killJob: (sessionId, jobId) => ctx.sessions.killJob(sessionId, jobId),
+      }),
     }, JobListAction),
   )
 }

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-org-model-settings-revision-fold.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-org-model-settings-revision-fold.md
+/agent-note-fold-organization-model-settings-writes-through-the-describe-mirror:
+  en: 517df81eb8ba8e07
+  zh: 1b6ff4db89ca45a4
+/agent-note-fold-organization-model-settings-writes-through-the-describe-mirror/problem:
+  en: 636c805b421405dd
+  zh: 19337741652089f0
+/agent-note-fold-organization-model-settings-writes-through-the-describe-mirror/decision:
+  en: d85cca5a0aed55bf
+  zh: 74096882f2c88d7a
+/agent-note-fold-organization-model-settings-writes-through-the-describe-mirror/files:
+  en: 0291405950a28552
+  zh: a5eec531feb2bd8f
+/agent-note-fold-organization-model-settings-writes-through-the-describe-mirror/alternatives-considered:
+  en: bc472317baef5ecd
+  zh: 2656c70da3730d44
+/agent-note-fold-organization-model-settings-writes-through-the-describe-mirror/consequences:
+  en: 8eaa2ce217904eee
+  zh: 61e2e6cffaa84d36

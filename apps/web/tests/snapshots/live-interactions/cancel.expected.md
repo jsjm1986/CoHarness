@@ -11,13 +11,21 @@
     - img
   - button "Open right sidebar":
     - img
-- button "1 intermediate message":
+- button "1 intermediate message" [expanded]:
   - text: 1 intermediate message
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - text: Reply with a one-sentence description of event sourcing, then stop.
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- button "Context injection runtime-context":
+  - img
+  - img
+  - text: Context injection runtime-context
 - paragraph: partial
 - text: Stopped
 - button "Copy":
@@ -32,7 +40,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -40,7 +48,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -49,4 +57,5 @@
   - button "1 turns · 1 steps":
     - img
     - text: 1 turns · 1 steps
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

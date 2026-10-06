@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-29-ptc-mode-alias.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-29-ptc-mode-alias.md
-2026-08-29-ptc-mode-alias.md: 6eddfa2f20e7ff4acb4573c3c49480876c425ed3
-2026-08-29-ptc-mode-alias.zh.md: cb61791bfa5e695521048626cedc52c446b7eaee
+/agent-note-accept-ptc-as-the-canonical-tool-presentation-name:
+  en: 2c70493c2450fa4a
+  zh: 797359e45068180e
+/agent-note-accept-ptc-as-the-canonical-tool-presentation-name/problem:
+  en: 09b7d187d49262dc
+  zh: dc1fd6c0868f0a10
+/agent-note-accept-ptc-as-the-canonical-tool-presentation-name/decision:
+  en: b60fd97fd2befeb4
+  zh: 73ad791c49bda498
+/agent-note-accept-ptc-as-the-canonical-tool-presentation-name/alternatives-considered:
+  en: 0414a6598e51ddc7
+  zh: dde065c908e23fac
+/agent-note-accept-ptc-as-the-canonical-tool-presentation-name/consequences:
+  en: c9dda7cca41f77c3
+  zh: b20c883f018d67f9
+/agent-note-accept-ptc-as-the-canonical-tool-presentation-name/testing:
+  en: c894dd08b061ac30
+  zh: 3f2007034f34700b

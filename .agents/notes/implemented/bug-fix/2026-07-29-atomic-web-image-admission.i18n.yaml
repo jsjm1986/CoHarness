@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-29-atomic-web-image-admission.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-29-atomic-web-image-admission.md
-2026-07-29-atomic-web-image-admission.md: c09d376f101a41994df3a10c22c06da4e59f06f6
-2026-07-29-atomic-web-image-admission.zh.md: 8785f7489b0c433cba43a1747533b1d38aada3d3
+/agent-note-atomic-web-image-admission:
+  en: 25fae2438ba7808b
+  zh: ae5ea792181f3449
+/agent-note-atomic-web-image-admission/problem:
+  en: b7c3c770d3911d7a
+  zh: 87dbb051030a4fc3
+/agent-note-atomic-web-image-admission/decision:
+  en: feb3cfbbc05f99ec
+  zh: 5aa4daeae33055a5
+/agent-note-atomic-web-image-admission/alternatives-considered:
+  en: e72b671140fc0ee8
+  zh: f42a2863e92ddcaa
+/agent-note-atomic-web-image-admission/consequences:
+  en: 9c755f6ce90908b1
+  zh: cab536d36ccdd380

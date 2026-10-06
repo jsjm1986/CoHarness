@@ -10,7 +10,7 @@ import { apply as nodeApply } from '../src/index.ts'
 async function bench(declare = true) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
-  const layout = { toggleSidebar: vi.fn() }
+  const layout = { toggleSidebar: vi.fn(), selectPanel: vi.fn() }
   const workspaces = { startSession: vi.fn() }
   const sessions = { open: vi.fn(), clear: vi.fn() }
   ctx.provide('layout', layout)
@@ -46,7 +46,7 @@ describe('ui-sidebar apply', () => {
     // Copy rides the standard locale seat, not the inject face.
     expect(b.slots.entries('sidebar')[0]!.locale).toBe('sidebar')
     const injected = (b.slots.entries('sidebar')[0]!.inject as () => SidebarRootInjected)()
-    expect(Object.keys(injected)).toEqual(['hooks', 'exitWorkbench', 'startSession', 'toggleSidebar'])
+    expect(Object.keys(injected)).toEqual(['hooks', 'exitWorkbench', 'startSession', 'toggleSidebar', 'selectPanel'])
     // Both arms delegate to the runtime's shared New Session action.
     injected.startSession('workspace' as never)
     expect(b.workspaces.startSession).toHaveBeenCalledWith('workspace')

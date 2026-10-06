@@ -103,15 +103,15 @@ function failureDiagnostic(facts: CodexFailureFacts): string {
 }
 
 class CodexRunFailure extends Error {
-  constructor(
-    readonly facts: CodexFailureFacts,
-    cause?: unknown,
-  ) {
+  readonly facts: CodexFailureFacts
+
+  constructor(facts: CodexFailureFacts, cause?: unknown) {
     super(
       `subagent-codex: ${failureDiagnostic(facts)}`,
       cause === undefined ? undefined : { cause },
     )
     this.name = 'CodexRunFailure'
+    this.facts = facts
   }
 }
 
@@ -129,14 +129,18 @@ export function codexStartupFailure(cause: unknown): Error {
 
 /**
  * Fixed package-local app-server command, independent of the host `PATH`.
+ * @param executable - pre-resolved target command; omitted uses the bundled local program.
  * @returns Node, the official wrapper, and the fixed app-server arguments.
  */
-export function codexAppServerArgv(): string[] {
+export function codexAppServerArgv(executable?: string): string[] {
+  if (executable !== undefined) return [executable, 'app-server', '--stdio']
   return [process.execPath, CODEX_PACKAGE_BIN, 'app-server', '--stdio']
 }
 
 /** Fully resolved inputs for one Codex app-server run. */
 export interface CodexRunSpec {
+  /** Target-local program when execution belongs to SSH. */
+  readonly executable?: string
   /** Parent Session workspace, also supplied to `thread/start`. */
   readonly cwd: string
   /** Profile-selected native model; omitted to preserve Codex settings. */
@@ -225,7 +229,7 @@ export async function startCodexRun(
   let child: SubprocessHandle
   try {
     child = spec.spawn({
-      argv: codexAppServerArgv(),
+      argv: codexAppServerArgv(spec.executable),
       cwd: spec.cwd,
       stdio: { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
       graceMs: spec.disposeGraceMs,

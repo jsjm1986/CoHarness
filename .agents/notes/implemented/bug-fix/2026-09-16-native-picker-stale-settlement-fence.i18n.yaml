@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-16-native-picker-stale-settlement-fence.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-16-native-picker-stale-settlement-fence.md
-2026-09-16-native-picker-stale-settlement-fence.md: d02616dd7a43dbd0f21eb443fa6406c1b24673f5
-2026-09-16-native-picker-stale-settlement-fence.zh.md: c815f262aa145dda93e11e85b351c9f823990552
+/agent-note-generation-fence-for-the-native-directory-flow:
+  en: 7458fca48524d0dd
+  zh: da2498c2d1eff75a
+/agent-note-generation-fence-for-the-native-directory-flow/problem:
+  en: 284bf49796d23952
+  zh: 61ca50219b881b69
+/agent-note-generation-fence-for-the-native-directory-flow/decision:
+  en: ea4303bbf0b5195e
+  zh: 924fb01d80f07d6d
+/agent-note-generation-fence-for-the-native-directory-flow/alternatives-considered:
+  en: 66a2a158339c10e1
+  zh: 524ae03d2315a05e
+/agent-note-generation-fence-for-the-native-directory-flow/consequences:
+  en: 41c99092fd1859ef
+  zh: c5738b1338ac89b7
+/agent-note-generation-fence-for-the-native-directory-flow/verification:
+  en: 50631ec9ad4a6f83
+  zh: 8fae1c0dd6bc4cbb

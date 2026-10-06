@@ -1,3 +1,8 @@
+---
+description: "Plan mode is logged, per-agent collaboration state rather than a generic mode registry or capability seam."
+kind: "package-group"
+---
+
 # plan/ — plan collaboration state
 
 English | [中文](README.zh.md)

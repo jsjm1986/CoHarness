@@ -16,7 +16,7 @@ import { LocalBashExecutor } from '@deepseek-ai/dsh-bash-local'
 import * as BashEnvPlugin from '@deepseek-ai/dsh-shell-env'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as ToolBash from '@deepseek-ai/dsh-tool-bash'
-import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek'
+import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek-api-key'
 import { NodePtcRuntime } from '@deepseek-ai/dsh-ptc-runtime-node'
 import Sandbox from '@deepseek-ai/dsh-sandbox-local'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
@@ -27,6 +27,7 @@ import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
 import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
 import CordisHostRunner from '@deepseek-ai/dsh-cordis-host-runner'
 import * as ToolCordis from '@deepseek-ai/dsh-tool-cordis'
+import * as CordisInspectProviders from '@deepseek-ai/dsh-tool-cordis/host'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 /**
@@ -285,6 +286,7 @@ describe('PTC mode typed values: keyless real-worker contracts', () => {
   it('uses runtime inspection results directly through PTC', async () => {
     ctx = await typedPtcHarness()
     await ctx.plugin(CordisHostRunner)
+    await ctx.plugin(CordisInspectProviders)
     await ctx.plugin(ToolCordis)
     const agent = {
       id: SessionId('ptc-cordis'),

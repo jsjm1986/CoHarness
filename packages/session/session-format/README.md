@@ -15,10 +15,21 @@ The released chain is assembled in `@deepseek-ai/dsh-session-format-catalog`: th
 
 `dsh-session-format` lets persistence code restore a current Session directly or compose a unique sequence of adjacent migrations while consuming physical rows once. A restore transfers caller-owned parsed values through stateful stages without intermediate artifact copies or freezing. Physical framing, compression, immutable generation naming, exclusive publication, and Cordis lifecycle behavior remain outside this library.
 
+## Table of Contents
+
+- [Ownership and safety](#ownership-and-safety)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
 ## Summary
 
 `dsh-session-format` lets persistence code restore a current Session directly or compose a unique sequence of adjacent migrations while consuming physical rows once. A restore transfers caller-owned parsed values through stateful stages without intermediate artifact copies or freezing. Physical framing, compression, immutable generation naming, exclusive publication, and Cordis lifecycle behavior remain outside this library.
 
+<a id="ownership-and-safety"></a>
 ## Ownership and safety
 
 - Future versions refuse before body decoding.
@@ -29,10 +40,12 @@ The released chain is assembled in `@deepseek-ai/dsh-session-format-catalog`: th
 
 The catalog is a pure value operation. JSONL, Gateway, and SQLite adapters remain responsible for their own raw bytes, crash-tail recovery, backups, and atomic publication.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. A pure migration library: chains compile deterministically from the format catalog and conversion produces new generations without mutating sources.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Session restoration
@@ -52,3 +65,13 @@ No direct effect. A migration that changes current history can change the cache 
 ## Known Limitations and Deferred Work
 
 - The pre-v3 edges normalize the historical event vocabulary (legacy message payloads, `start`/`end` replace keys), and the logical catalog additionally normalizes the declared CoHarness v2 database dialect (turn-scoped surface events, header-carried prompts) onto the released v2→v3 stage. Each provider retains its own physical codec and publication rules.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

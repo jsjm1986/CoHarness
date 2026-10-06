@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-session-row-identity-covers-the-preset.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-10-session-row-identity-covers-the-preset.md
-2026-08-10-session-row-identity-covers-the-preset.md: 7a89dcb4e4ae292a06a1743842d2e9cf6bd96282
-2026-08-10-session-row-identity-covers-the-preset.zh.md: 2143134eb2a4c4a71159fe8b115ef5f0aa659698
+/agent-note-the-session-row-identity-guard-covers-the-preset:
+  en: 0bfcec6450cbc876
+  zh: 3b3b7bfed858d859
+/agent-note-the-session-row-identity-guard-covers-the-preset/problem:
+  en: 4574fc995731bd0f
+  zh: e24f45ee0481b8fd
+/agent-note-the-session-row-identity-guard-covers-the-preset/decision:
+  en: dfc6181178d41726
+  zh: 23738b4114bdc2be
+/agent-note-the-session-row-identity-guard-covers-the-preset/alternatives-considered:
+  en: 081eb0da6e195e96
+  zh: 3a8dbd08acc453d1
+/agent-note-the-session-row-identity-guard-covers-the-preset/consequences:
+  en: cf5cec07fd7fcd34
+  zh: e1b2fa1680cb9738
+/agent-note-the-session-row-identity-guard-covers-the-preset/testing:
+  en: 1e6e5d25629fca9f
+  zh: c4b7129a7176df13
+/agent-note-the-session-row-identity-guard-covers-the-preset/related:
+  en: 3ab2ed881f33589d
+  zh: c04b49f9ae71027a

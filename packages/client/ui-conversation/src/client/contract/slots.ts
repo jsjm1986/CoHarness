@@ -7,7 +7,7 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
   CommandNode, CompactionSummaryNode, ConversationSnapshot, ConversationTurnDataMap,
-  ObservableSnapshot, PendingInteraction, PendingWait, SessionId, ToolCallBlock,
+  ObservableSnapshot, PendingWait, SessionId, SessionPendingEntry, ToolCallBlock,
   TurnLocation, WorkspaceId,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationViewportSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
@@ -24,6 +24,7 @@ import type { createConversationViewportStore } from '../viewport.ts'
 import type { createChatStore } from '../stores.ts'
 import type { ConversationDisplaySettingsSnapshot } from '../display-settings.ts'
 import type { BusyEnterBehavior } from './composer-submission.ts'
+import type { ChatPresentationPolicy } from '../presentation-policy.ts'
 import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
 import type { ToolCallId, SelectionTarget, ViewTab } from './views.ts'
 
@@ -181,12 +182,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'conversation.chat.commandview': { kind: 'keyed'; scope: 'session'; owner: CommandRowOwnerProps }
     /**
-     * The completed Turn Node's extension chain, rendered before that Node's
+     * The completed Turn Node's extension list, rendered before that Node's
      * IconActions. Entries derive a match from the engine-owned Turn and
      * closing seq before mounting, so presentation components never mount
-     * only to return null; an all-declined chain renders nothing.
+     * only to return null; entries render by ascending `order` and each
+     * self-gates on its own Turn data.
      */
-    'conversation.chat.turnTail': { kind: 'chain'; scope: 'session'; owner: TurnTailOwnerProps }
+    'conversation.chat.turnTail': { kind: 'list'; scope: 'session'; owner: TurnTailOwnerProps }
     /**
      * Action strip attached to one finalized assistant message, rendered
      * inside that message's IconActions row. The chat entry owns the render
@@ -505,6 +507,8 @@ export interface ChatNodeOwnerProps {
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
   /** Turn-process disclosure controller for the process summary row. */
   turnProcess?: { readonly open: boolean; readonly setOpen: (open: boolean) => void }
+  /** Active work-details presentation policy; absent in runtimes without the preference. */
+  presentation?: ChatPresentationPolicy | undefined
 }
 
 /** Full props of one registered keyed Chat business renderer. */
@@ -687,6 +691,8 @@ export interface ComposerBarInjected {
    * order stays constant).
    */
   hooks: {
+    /** Effective stop-sequence key labels while the shortcuts service is composed; empty otherwise. */
+    stopShortcut: ObservableSnapshot<readonly string[]>
     /** Account preference used by Enter and the primary Send button. */
     busyEnter: ObservableSnapshot<BusyEnterBehavior>
     /** Latest surfaced notice (null after none; seq keys re-render of repeats). */
@@ -739,7 +745,7 @@ export type ComposerBarProps =
 export interface ComposerChainProps {
   /** Whether this pane may request automatic input focus. */
   active?: boolean
-  interactions: readonly PendingInteraction[]
+  interactions: readonly SessionPendingEntry[]
   /** Current conversation facts for feature-owned takeover selectors. */
   session: ConversationSnapshot | undefined
 }
@@ -781,8 +787,8 @@ export interface ConversationWorkbenchToolbarOwnerProps {
 
 /** Owner share for the empty workbench state. */
 export interface ConversationWorkbenchEmptyOwnerProps {
-  /** Marker owner share for the empty workbench surface. */
-  children?: never
+  /** Current saved-layout verification state. */
+  viewport: ConversationViewportSnapshot
 }
 
 /** Owner share for the sidebar workbench display-settings hole. */
@@ -832,7 +838,7 @@ export interface ConversationViewportInjected {
 
 /** Full props of the current-session or multi-pane conversation host. */
 export type ConversationSlotProps =
-  PropsRuntime<'conversation'> & PropsRenderSlots<
+  PropsRuntime<'main'> & PropsRenderSlots<
     'conversation.pane' | 'conversation.workbench.toolbar' | 'conversation.workbench.empty'
     | 'conversation.workbench.pane.header'
   >
@@ -970,6 +976,8 @@ export interface ChatViewInjected {
   }
   /** Fork through the completed turn ending at the eligible message `seq`, then open the child. */
   forkAt: (seq: number) => void
+  /** Live work-details presentation policy derived from the persisted transcriptView preference. */
+  presentation: ObservableSnapshot<ChatPresentationPolicy>
   /**
    * Prose file-mention vocabulary for one closing message, from the optional
    * {@link ChatFileMentions} service (resolved lazily per call, so composing

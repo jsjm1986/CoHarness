@@ -57,7 +57,7 @@ describe('web e2e: Workspace history-first entry', () => {
       ...(compact ? { hasTouch: true, isMobile: true } : {}),
     })
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByText('DONE', { exact: true }).waitFor({ timeout: 30_000 })
     await page.getByRole('button', { name: 'Select model, current DeepSeek-V4-Flash', exact: true }).waitFor()
@@ -97,7 +97,7 @@ describe('web e2e: Workspace history-first entry', () => {
     const requestStarted = Promise.withResolvers<undefined>()
     const release = Promise.withResolvers<undefined>()
     const responseDelivered = Promise.withResolvers<undefined>()
-    await page.route('**/api/session.create', async (route) => {
+    await page.route(/\/api\/session\.create(?:\?.*)?$/, async (route) => {
       requestStarted.resolve(undefined)
       await release.promise
       try {
@@ -112,7 +112,7 @@ describe('web e2e: Workspace history-first entry', () => {
       await page.getByRole('button', { name: /New session in /i }).first().click()
       await requestStarted.promise
       await page.locator('[role="treeitem"][aria-selected="true"]').click()
-      const finished = page.waitForEvent('requestfinished', request => request.url().endsWith('/api/session.create'))
+      const finished = page.waitForEvent('requestfinished', request => new URL(request.url()).pathname === '/api/session.create')
       release.resolve(undefined)
       await responseDelivered.promise
       await finished
@@ -144,7 +144,7 @@ describe('web e2e: Workspace history-first entry', () => {
       await page.getByText('Into the Unknown', { exact: true }).waitFor()
       const draft = page.locator('textarea').first()
       await draft.fill('Draft survives failed history loading')
-      await page.route('**/api/session.history', route => route.abort('failed'))
+      await page.route(/\/api\/session\.history(?:\?.*)?$/, route => route.abort('failed'))
       await history.click()
       await page.getByRole('alert').waitFor()
       expect(await draft.inputValue()).toBe('Draft survives failed history loading')
@@ -175,7 +175,7 @@ describe('web e2e: Workspace history-first entry', () => {
     const page = await compactContext.newPage()
     const tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-workspace-history-entry-compact'))
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await page.getByText('DONE', { exact: true }).waitFor({ timeout: 30_000 })
     expect(await page.getByText('Into the Unknown', { exact: true }).count()).toBe(0)

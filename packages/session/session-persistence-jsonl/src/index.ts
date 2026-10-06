@@ -6,11 +6,12 @@
  * @module @deepseek-ai/dsh-session-persistence-jsonl
  */
 
+import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import {
   SessionFormatUnsupportedMigrationError,
-  sessionFormatCatalog,
+  coharnessJsonlFormatCatalog as sessionFormatCatalog,
 } from '@deepseek-ai/dsh-session-format-catalog'
 import { readdirSync, type Dirent } from 'node:fs'
 import { open, mkdir, readdir, realpath, link, rm, stat, truncate } from 'node:fs/promises'
@@ -273,6 +274,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     }
     // Resolve once so later process.cwd() changes cannot split one backend across roots.
     this.root = resolve(config.root)
+    registerManagedDataPath({ owner: '@deepseek-ai/dsh-session-persistence-jsonl', kind: 'directory', path: this.root }, process.env.DSH_MANAGED_DATA_MANIFEST)
     this.compression = config.compression ?? DEFAULT_COMPRESSION
     this.generationFormat = {
       currentVersion: sessionFormatCatalog.currentVersion,

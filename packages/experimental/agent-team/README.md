@@ -1,3 +1,8 @@
+---
+description: "Implicit-root Agent Teams roster, durable peer mailbox, and shared task DAG"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-experimental-agent-team
 
 English | [中文](README.zh.md)
@@ -8,6 +13,19 @@ Implicit-root Agent Teams domain. `ctx.agentTeams` owns a flat Lead/teammate ros
 
 `dsh-experimental-agent-team` turns one coding session into a small working team: the session's agent becomes the Lead, creates named teammates for delegated work, exchanges durable messages with them, and tracks shared tasks on a common board. Messages and task state survive crashes, reloads, and interruptions, so a teammate that was offline receives its queued messages when it resumes. It provides no tools of its own — mount the sibling `dsh-experimental-tool-agent-team` so the model can create teammates, message them, and use the task board. It is published under its experimental name, carries no stability promise, and needs durable session storage to activate.
 
+## Table of Contents
+
+- [Config](#config)
+- [Team identity and roster](#team-identity-and-roster)
+- [Durable mailbox](#durable-mailbox)
+- [Shared task board](#shared-task-board)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 ```yaml
@@ -25,6 +43,9 @@ Every limit must be a positive safe integer. `maxMembers` counts every name ever
 
 The service requires Agent, Session, Session persistence, and continuable-subagent services. A composition without durable Session storage does not activate it.
 
+Pending journal mutations, teammate creation and recovery, mailbox dispatch, and asynchronous acknowledgements retain their affected Session identities through the last awaited checkpoint. Permanent purge refuses those identities until the operation completes, fails, or is cancelled; it cannot close a Session writer while a Team request still owns it.
+
+<a id="team-identity-and-roster"></a>
 ## Team identity and roster
 
 Every ordinary runtime root is the implicit Lead of a Team whose `TeamId` equals its `SessionId`; creating a Team is therefore state-free until the first member, message, or task record. A teammate is a named, continuable direct child recorded in that root's Session. Names are lowercase kebab-case, at most 64 characters, and immutable for the Team lifetime. Session ids remain the persistence and authorization identities.
@@ -35,6 +56,7 @@ Fresh children have no parent-history seed. Fork children capture the Lead's com
 
 The roster reports durable provisioning/failed phases and live `running`/`idle` status. An active but non-resident teammate is `inactive`; later waking delivery cold-resumes it through the continuation owner. Member recovery starts on each member's `agent/created` initialization and runs in the background: creation does not wait for a cold-resumed mailbox queue, because mailbox delivery can already hold that member's serial queue and awaiting it from creation would deadlock.
 
+<a id="durable-mailbox"></a>
 ## Durable mailbox
 
 `sendMessage()` validates peer membership, appends `team/message/queued`, and flushes before attempting delivery. The result always identifies that durable message; `queued` means immediate delivery was deferred and is not an instruction to resend. Quiet delivery injects, flushes, and acknowledges context immediately when the target is live, but never activates an inactive target; an inactive target's quiet message remains queued. Wakeup delivery becomes the target's next FIFO turn and cold-resumes it when needed.
@@ -43,6 +65,7 @@ The target message begins with `Team message <id> from <name>:` and retains the 
 
 The guarantee is process-local retry plus target-Session de-duplication, not cross-process exactly-once delivery. This release has no shared mailbox transaction across processes and no mailbox timeline UI.
 
+<a id="shared-task-board"></a>
 ## Shared task board
 
 Tasks are complete versioned snapshots. Every mutation carries `expectedRevision`; stale callers receive `TEAM_TASK_STALE_REVISION` instead of overwriting a newer value. Any member can create, read, or claim a ready unowned task. The owner or Lead can edit, release, complete, reopen, or delete it; only the Lead can assign another member. Numeric `task-<n>` ids require a safe-integer suffix; creation reports `TEAM_TASK_LIMIT` instead of reusing the final safe id.
@@ -55,6 +78,7 @@ Dependencies must name current non-deleted tasks and form a complete DAG with no
 
 The separate `./invariant` companion replays each candidate Team event against its committed Session prefix. Replay validates every current-version Team payload before it enters folded state, then rejects invalid member transitions, reused names, out-of-range numeric task ids, discontinuous task revisions, invalid task dependencies, duplicate queue/ack records, and acknowledgements with the wrong target before append. Session event `seq` and `time` own ordering and timing instead of duplicated snapshot timestamps.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Peer messages
@@ -78,3 +102,13 @@ Peer messages append after the target's reusable history prefix. Cold resume reu
 - **Flat immutable roster** — only the Lead creates direct teammates; there is no nested Team, rename, deletion, or name reuse.
 - **No automatic ownership release** — idle, interruption, process exit, and failed work do not release a task owner.
 - **Mailbox is not cross-process exactly-once** — concurrent harness processes over one Team are unsupported.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

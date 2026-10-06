@@ -1,10 +1,10 @@
 /** Historical workspace review through the shipped recorder, RPC, and Web consumers. */
 import { execFileSync } from 'node:child_process'
-import { writeFile } from 'node:fs/promises'
+import { cp, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, type Browser, type Page } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api'
@@ -23,6 +23,7 @@ describe('web e2e: delivered files and historical review', () => {
   let scaffold: WebScaffold | undefined
   let browser: Browser | undefined
   let page: Page
+  const previousHosts: WebScaffold[] = []
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({ workbench: true })
@@ -63,7 +64,7 @@ describe('web e2e: delivered files and historical review', () => {
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     const event = session.snapshotEvents().find(event => event.type === 'workspace/changes')
     if (event === undefined) throw new Error('Shipped recorder did not announce changes')
-    expect(ctx.workspaceChanges.summary(SESSION, event.seq)?.files.map(file => file.path)).toContain('review.txt')
+    expect((await ctx.workspaceChanges.summary(SESSION, event.seq))?.files.map(file => file.path)).toContain('review.txt')
     // Ordinary preview must see the newer file while Review keeps the turn snapshot.
     await writeFile(join(workspaceCwd, 'review.txt'), 'current file changed later\n')
     const workspace = await ctx.workspaceRegistry.create(workspaceCwd)
@@ -73,7 +74,13 @@ describe('web e2e: delivered files and historical review', () => {
   }, 120_000)
 
   afterAll(async () => {
-    try { await browser?.close() } finally { await scaffold?.close() }
+    try { await browser?.close() } finally {
+      const failures: unknown[] = []
+      for (const host of [scaffold, ...previousHosts.toReversed()]) {
+        try { await host?.close() } catch (error) { failures.push(error) }
+      }
+      if (failures.length > 0) throw new AggregateError(failures, 'Review Hosts did not clean up')
+    }
   })
 
   it('opens the recorded comparison and separately previews the current file', async () => {
@@ -81,12 +88,12 @@ describe('web e2e: delivered files and historical review', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-workspace-review'))
     const tripwire = watchConsole(page)
     const summaryResponse = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/workspaceChanges.summary'))
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     const summaryWire: unknown = await (await summaryResponse).json()
     expect(summaryWire, JSON.stringify(summaryWire)).toMatchObject({ result: { ok: true, value: { files: [{ path: 'review.txt' }] } } })
     await page.getByText('The review file is ready.', { exact: true }).waitFor()
     await page.locator('[data-presented-file]').waitFor()
-    await page.locator('[data-changed-files] li button').first().click()
+    await page.locator('[data-changed-files] button').first().click()
     const review = page.locator('[data-changes-review]')
     await expect.poll(() => review.textContent()).toContain('before the turn')
     expect(await review.textContent()).toContain('after the turn')
@@ -108,4 +115,56 @@ describe('web e2e: delivered files and historical review', () => {
   }, 60_000)
 
   it('owns only its review golden', async () => { await assertFixtureInventory(DIRECTORY, ['review.expected.md']) })
+
+  it('reopens the recorded review on an independent Host after the current file is deleted', async () => {
+    if (scaffold === undefined) throw new Error('Web scaffold unavailable')
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-workspace-review-restart'))
+    const prior = scaffold
+    const live = prior.ctx.sessions.get(SESSION)
+    if (live === undefined) throw new Error('Review Session unavailable before restart')
+    await prior.ctx.sessions.flush(live)
+    const reader = await prior.ctx.sessionPersistence.open(SESSION, 'read')
+    const header = reader.header
+    let history: Awaited<ReturnType<typeof reader.read>>
+    try { history = await reader.read() } finally { await reader.close() }
+    await prior.ctx.fiber.dispose()
+    previousHosts.push(prior)
+    scaffold = await launchWebScaffold({ workbench: true })
+    const writer = await scaffold.ctx.sessionPersistence.create(header)
+    try { await writer.append(history.events) } finally { await writer.close() }
+    await cp(join(prior.harnessHome, 'workspace-reviews'), join(scaffold.harnessHome, 'workspace-reviews'), { recursive: true })
+    await rm(join(prior.workspaceCwd, 'review.txt'))
+    const workspace = await scaffold.ctx.workspaceRegistry.create(prior.workspaceCwd)
+    await workspace.attachSession(SESSION)
+    expect(scaffold.ctx.agents.get(SESSION) === undefined, 'cold Host before Review lookup').toBe(true)
+    const announcement = history.events.find(event => event.type === 'workspace/changes')
+    if (announcement === undefined) throw new Error('Persisted history lost the review announcement')
+    const coldSummary = await scaffold.ctx.workspaceChanges.summary(SESSION, announcement.seq)
+    expect(JSON.parse(JSON.stringify(coldSummary ?? null)) as unknown).toMatchObject({ files: [{ path: 'review.txt' }] })
+    const read = await scaffold.ctx.apiProxy.workspaceChanges.summary({ rpcId: RpcId('cold-review'), payload: { sessionId: SESSION, seq: announcement.seq } })
+    expect(JSON.parse(JSON.stringify(read.result)) as unknown).toMatchObject({ ok: true, value: { files: [{ path: 'review.txt' }] } })
+    const transcript = await scaffold.ctx.apiProxy.sessions.history({ rpcId: RpcId('cold-review-history'), payload: { sessionId: SESSION, detail: 'conversation' } })
+    if (!transcript.result.ok) throw new Error(transcript.result.error.message)
+    expect(transcript.result.value.events.some(entry => entry.event.type === 'workspace/changes'), 'cold history includes the Review announcement').toBe(true)
+    expect(scaffold.ctx.agents.get(SESSION) === undefined, 'Review RPC does not activate an Agent').toBe(true)
+    const modelCalls = vi.spyOn(scaffold.ctx.llm, 'stream')
+    const startedTurns: number[] = []
+    const stopWatching = scaffold.ctx.on('session/event', (session, event) => {
+      if (session.id === SESSION && event.type === 'turn/start') startedTurns.push(event.data.turn)
+    })
+    const coldResponse = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/workspaceChanges.summary'))
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+    await page.getByText('The review file is ready.', { exact: true }).waitFor()
+    expect(await (await coldResponse).json()).toMatchObject({ result: { ok: true, value: { files: [{ path: 'review.txt' }] } } })
+    await page.locator('[data-changed-files] button').first().click()
+    const review = page.locator('[data-changes-review]')
+    await expect.poll(() => review.textContent()).toContain('before the turn')
+    expect(await review.textContent()).toContain('after the turn')
+    expect(await review.textContent()).not.toContain('current file changed later')
+    expect(modelCalls).not.toHaveBeenCalled()
+    expect(startedTurns).toEqual([])
+    stopWatching()
+    modelCalls.mockRestore()
+    expect(await page.locator('[data-slot-error]').count()).toBe(0)
+  }, 120_000)
 })

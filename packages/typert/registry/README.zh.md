@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-typert-registry
 
 [English](README.md) | 中文
@@ -10,6 +15,17 @@
 
 `dsh-typert-registry` 让生成的 Typert 产物在运行时可按需查询：每个包的反射、惰性 Zod schema factory 与 Remote 调用描述符都保存在稳定键下。消费方首次请求 schema 时才会物化并缓存它。注册是原子且按 fiber 作用域的：贡献要么整体落地要么完全不落地，并在注册组件卸载时自动撤销。同一服务还托管 Remote 调用所经由的 lookup 与作用域 Context 提供方注册表。它不执行 TypeScript 分析，也不生成 schema；这些由生成器与 loader 负责。
 
+## 目录
+
+- [公开 API](#public-api)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="public-api"></a>
 ## 公开 API
 
 - `TypertRegistry` 是默认插件，并提供 `ctx.typert`。
@@ -23,10 +39,13 @@
 
 `@deepseek-ai/dsh-typert-registry/types` 子路径包含注册项和记录的纯类型约定。[`dsh-typert-loader`](../loader/README.zh.md) 会在 Loader 组合中发现并注册生成的宿主侧产物；其他组合所有者可以直接调用 `ctx.typert.register()`。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。贡献原子地注册并随调用 fiber 撤回，因此注册表内容恰好是释放规格所证明的实时 effect 集。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为该运行时类型注册表的消费方（cordis_inspect、wire faces、门禁）拥有注册表内容的任何模型可见投影。
@@ -35,7 +54,18 @@
 
 无直接影响；把反射或 schema 放入请求的消费方负责由此产生的前缀变化。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 注册表存储生成的反射信息，但不会合并宿主侧与客户端侧的图，也不会解析 TypeScript 引用；这些由分析器和产物输出器负责。
 - schema 键不包含 face，因为宿主侧和客户端侧在不同的上下文中运行。若在同一上下文中注册来自两个 face 的同名 schema，系统会将其作为重复项拒绝。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { SubprocessSpawnSpec, SubprocessTerminalHandle } from '@deepseek-ai/dsh-subprocess'
 import LocalSubprocessRuntime from '../src/index.ts'
@@ -10,8 +10,7 @@ import { launchLinuxScope, probeLinuxScope } from '../src/linux-scope.ts'
 import { targetEnvironment } from '../src/runner-launch.ts'
 import { bindManagedProcess } from '../src/spawn.ts'
 
-const scratch = mkdtempSync(join(tmpdir(), 'dsh-native-containment-'))
-afterAll(() => { rmSync(scratch, { recursive: true, force: true }) })
+let scratch: string
 
 function spec(argv: string[], graceMs = 100): SubprocessSpawnSpec {
   return {
@@ -144,6 +143,13 @@ async function waitForInputReadiness(handle: SubprocessTerminalHandle): Promise<
 const linuxNative = process.platform === 'linux' && probeLinuxScope()
 
 describe.skipIf(!linuxNative)('Linux user-systemd native containment', () => {
+  beforeAll(() => {
+    scratch = mkdtempSync(join(tmpdir(), 'dsh-native-containment-'))
+  })
+  afterAll(() => {
+    if (scratch) rmSync(scratch, { recursive: true, force: true })
+  })
+
   it('aborts an established scope before bootstrap consumption and joins its managed handle', async () => {
     const controller = new AbortController()
     const request: SubprocessSpawnSpec = {

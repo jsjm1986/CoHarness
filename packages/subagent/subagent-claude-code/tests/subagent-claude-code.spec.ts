@@ -23,9 +23,9 @@ import {
   type Mock,
   vi,
 } from 'vitest'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import { AgentRegistry, type Agent } from '@deepseek-ai/dsh-agent'
 import LlmRuntime, { createUserMessage, type ContentBlock, type StreamChunk } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type {
   SubprocessHandle,
@@ -367,28 +367,42 @@ describe('named persistent member routes', () => {
     }
   })
 
-  it('prepares continuable members and drives member turns through ctx.subprocess.spawn', async () => {
+  it.each([false, true])('routes member and one-shot SDK processes to their selected world (remote=%s)', async (remote) => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-claude-plugin-'))
     const ctx = new Context()
+    const target = remote ? new Context() : ctx
     try {
       await ctx.plugin(SubagentRuntime)
       await ctx.plugin(LocalSubprocessRuntime)
       await ctx.plugin(LlmRuntime)
+      if (remote) {
+        await target.plugin(LocalSubprocessRuntime)
+        vi.spyOn(await import('@deepseek-ai/dsh-subagent'), 'resolveChildExecution').mockResolvedValue({
+          cwd: dir, remote: true, target: 'ssh:17', subprocess: target.subprocess,
+        })
+        vi.spyOn(target.subprocess, 'resolveExecutable').mockResolvedValue('/target/bin/claude')
+      }
+      const hostSpawn = remote ? vi.spyOn(ctx.subprocess, 'spawn') : undefined
       const child = fakeChild()
-      const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(() => child.handle)
-      await ctx.plugin(claudeCode, { stateDir: dir, memberCwd: dir })
+      const spawn = vi.spyOn(target.subprocess, 'spawn').mockImplementation(() => child.handle)
+      await ctx.plugin(claudeCode, { stateDir: dir, ...remote ? { model: 'chosen-claude' } : {}, memberCwd: dir, env: { APPROVED: 'yes' } })
 
       const provider = ctx.subagents.getProvider('claude-code')!
-      await expect(provider.prepareContinuable!({
+      await expect(provider.prepareContinuable!(withExecutionContext(ctx, {
         sessionId: SessionId('continuable-child'),
         parent: fakeParent,
         signal: new AbortController().signal,
-      })).resolves.toEqual({})
+      }))).resolves.toEqual({})
 
-      queryMock.mockImplementationOnce(({ options }) => {
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(AgentRegistry)
+      const memberSession = ctx.sessions.create(SessionId('ctx-member-child'), { meta: { cwd: dir } })
+      ctx.agents.register({ id: memberSession.id, session: memberSession, ctx, status: 'idle' } as Agent)
+      queryMock.mockImplementation(({ options }) => {
+        if (remote) expect(options.pathToClaudeCodeExecutable).toBe('/target/bin/claude')
         options.spawnClaudeCodeProcess!(sdkSpawnOptions({
           cwd: options.cwd!,
-          env: options.env!,
+          env: { ...options.env!, HOME: '/host-private-home', HOST_ONLY: 'private' },
           signal: options.abortController!.signal,
         }))
         return queryFrom([{
@@ -419,8 +433,20 @@ describe('named persistent member routes', () => {
       // and the member session reaps that child when the turn settles.
       expect(spawn).toHaveBeenCalledOnce()
       expect(child.terminate).toHaveBeenCalledOnce()
+      if (remote) {
+        expect(Object.keys(spawn.mock.calls[0]![0].env ?? {})).toEqual(['APPROVED'])
+        expect(spawn.mock.calls[0]![0].env?.APPROVED).toBe('yes')
+        const once = fakeChild()
+        spawn.mockImplementationOnce(() => once.handle)
+        const run = await ctx.subagents.start('claude-code', withExecutionContext(ctx, request()))
+        expect((await run.result).stopReason).toBe('completed')
+        await run.dispose()
+        expect(spawn).toHaveBeenCalledTimes(2)
+        expect(hostSpawn).not.toHaveBeenCalled()
+      }
     } finally {
       await ctx.fiber.dispose()
+      if (remote) await target.fiber.dispose()
       rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   })
@@ -583,13 +609,13 @@ describe('task admission and package contracts', () => {
 
     const safeController = new AbortController()
     const [safeRun, bypassRun] = await Promise.all([
-      ctx.subagents.start('claude-safe', request(undefined, safeController.signal)),
-      ctx.subagents.start('claude-bypass', request()),
+      ctx.subagents.start('claude-safe', withExecutionContext(ctx, request(undefined, safeController.signal))),
+      ctx.subagents.start('claude-bypass', withExecutionContext(ctx, request())),
     ])
     await safeFiber.dispose()
     expect(ctx.subagents.list()).toEqual(['claude-bypass'])
     expect(removed).toEqual(['claude-safe'])
-    await expect(ctx.subagents.start('claude-safe', request()))
+    await expect(ctx.subagents.start('claude-safe', withExecutionContext(ctx, request())))
       .rejects.toMatchObject({ code: 'NO_PROVIDER' })
 
     await expect(bypassRun.result).resolves.toEqual({
@@ -678,7 +704,7 @@ describe('task admission and package contracts', () => {
     })
     claudeCode.apply(ctx, { env: {}, disposeGraceMs: 3_000 })
     expect(ctx.subagents.getProvider('claude-code')).toBeDefined()
-    const run = await ctx.subagents.start('claude-code', request())
+    const run = await ctx.subagents.start('claude-code', withExecutionContext(ctx, request()))
     await expect(run.result).resolves.toEqual({
       output: [{ type: 'text', text: 'native model answer' }],
       stopReason: 'completed',
@@ -709,13 +735,13 @@ describe('task admission and package contracts', () => {
       disposeGraceMs: 29,
     })
 
-    await expect(ctx.subagents.start('claude-diagnostic', {
+    await expect(ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, {
       ...request(),
       parent: {
         id: 'parent-without-cwd',
         session: { header: {} },
       } as unknown as Agent,
-    })).rejects.toThrow(
+    }))).rejects.toThrow(
       'subagent-claude-code: no working directory for the child — delegate from a parent session that has one',
     )
     expect(queryMock).not.toHaveBeenCalled()
@@ -724,10 +750,10 @@ describe('task admission and package contracts', () => {
       id: 'parent-with-invalid-cwd',
       session: { header: { cwd: 'relative/SECRET_TOKEN' } },
     } as unknown as Agent
-    const invalidCwd = ctx.subagents.start('claude-diagnostic', {
+    const invalidCwd = ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, {
       ...request(),
       parent: invalidCwdParent,
-    })
+    }))
     await expect(invalidCwd)
       .rejects.toThrow(expectedFailureDiagnostic('query-start', 'unknown'))
     await expect(invalidCwd).rejects.not.toThrow('relative/SECRET_TOKEN')
@@ -740,10 +766,10 @@ describe('task admission and package contracts', () => {
 
     const invalidCwdAbort = new AbortController()
     invalidCwdAbort.abort(new Error('cancel invalid cwd startup'))
-    await expect(ctx.subagents.start('claude-diagnostic', {
+    await expect(ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, {
       ...request(undefined, invalidCwdAbort.signal),
       parent: invalidCwdParent,
-    })).rejects.toThrow('aborted before SDK startup')
+    }))).rejects.toThrow('aborted before SDK startup')
     expect(queryMock).not.toHaveBeenCalled()
     warn.mockClear()
 
@@ -753,7 +779,7 @@ describe('task admission and package contracts', () => {
         'Native CLI binary for fixture-platform not found. Reinstall @anthropic-ai/claude-agent-sdk without --omit=optional, or set options.pathToClaudeCodeExecutable.',
       )
     })
-    const missingPayload = ctx.subagents.start('claude-diagnostic', request())
+    const missingPayload = ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, request()))
     await expect(missingPayload)
       .rejects.toThrow(expectedFailureDiagnostic('query-start', 'unknown'))
     await expect(missingPayload).rejects.not.toThrow('Native CLI binary')
@@ -767,7 +793,7 @@ describe('task admission and package contracts', () => {
       .toContain('Native CLI binary for fixture-platform not found')
     expect(resolveExecutable).not.toHaveBeenCalled()
 
-    const run = await ctx.subagents.start('claude-diagnostic', request())
+    const run = await ctx.subagents.start('claude-diagnostic', withExecutionContext(ctx, request()))
     child.settle({ exitCode: 9, signal: null })
     child.stdout.end()
     await expect(run.result).resolves.toEqual({
@@ -1733,3 +1759,7 @@ describe('query and process disposal', () => {
     expect(waitFailure.terminate).toHaveBeenCalledOnce()
   })
 })
+
+function withExecutionContext<T extends { parent: Agent }>(ctx: Context, request: T): T {
+  return { ...request, parent: { ...request.parent, ctx } }
+}

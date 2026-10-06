@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # dsh-session-checkpoint-policy
 
 [English](README.md) | 中文
@@ -8,6 +13,17 @@
 
 将本包与会话持久化后端配合使用，可在模型请求之前、顶层工具可能产生外部副作用之前以及下一 agent 步骤开始之前持久记录工作。每个检查点之后，即使发生崩溃，系统也能从已存储的请求、工具调用、响应与结果恢复工作，而不会丢失这些工作。检查点失败按失败即阻止原则处理：持久写入成功前，模型适配器或顶层工具正文不会运行。本包没有配置，也不添加提示词或工具 schema；未完成的 Assistant 流保持瞬态，而中断的工具调用会以未知结果恢复，不会自动重试。
 
+## 目录
+
+- [插件（命名空间：`session-checkpoint-policy`）](#plugin-namespace-session-checkpoint-policy)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="plugin-namespace-session-checkpoint-policy"></a>
 ## 插件（命名空间：`session-checkpoint-policy`）
 
 该零配置函数插件消费 `ctx.sessions`、`ctx.llm`、`ctx.tools` 以及 `ctx.sessionPersistence` 的存在性。将其与一个持久化后端一起加载：
@@ -26,10 +42,13 @@
 
 在模型和工具边界，检查点被拒绝时会按失败即阻止原则处理：适配器和顶层工具正文都不运行。步骤边界处的检查点被拒绝会在另一个请求开始前使轮次失败。并发工具检查点共享会话存储的串行持久化排空流程，不会产生重复的序列号。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。策略在已定义边界上触发所属会话的检查点；它自身不存储检查点数据。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 中断调用
@@ -46,8 +65,19 @@
 
 修复结果追加在可重用前缀之后，因此不会使较早的缓存条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 该策略以持久方式记录执行意图，而非为通用副作用提供恰好一次保证。当提供方支持时，有副作用的工具应将 `exec.callId` 作为幂等键转发。
 - 流式 `assistant/chunk` 事件没有逐分片检查点。有界后台批次通常会在下一个语义检查点之前将其持久化，但硬崩溃可能丢失当前内存批次或尚未完成的写入。
 - 已持久化的调用没有结果时，无法证明其外部副作用是否完成。因此，恢复会记录未知结果，而不是自动重试。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

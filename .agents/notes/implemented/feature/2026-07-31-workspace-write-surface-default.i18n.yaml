@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-workspace-write-surface-default.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-31-workspace-write-surface-default.md
-2026-07-31-workspace-write-surface-default.md: 2ce4d7b45ad7058768f412302eb86ac332cabfe9
-2026-07-31-workspace-write-surface-default.zh.md: 40b97812eb17b5c11e422ff23cd718576c9c4364
+/agent-note-workspace-write-defaults-for-shipped-surfaces:
+  en: c6dd34b283ca2efe
+  zh: c85f495db987dc24
+/agent-note-workspace-write-defaults-for-shipped-surfaces/problem:
+  en: 2fd49712b0649526
+  zh: fef3c20bd6570445
+/agent-note-workspace-write-defaults-for-shipped-surfaces/decision:
+  en: 0dbb3ccee6dbf361
+  zh: aa2912a84f3e66f5
+/agent-note-workspace-write-defaults-for-shipped-surfaces/testing:
+  en: 1dfcf92d756c9a37
+  zh: 9e95c4a665bba1b2
+/agent-note-workspace-write-defaults-for-shipped-surfaces/alternatives-considered:
+  en: da83b517c72a6471
+  zh: bdd1ee4a16cdf187
+/agent-note-workspace-write-defaults-for-shipped-surfaces/consequences:
+  en: a85dae9b4c83251c
+  zh: e13fc078879bc3c0

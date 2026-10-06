@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-26-document-scope-runtime-readiness.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-26-document-scope-runtime-readiness.md
-2026-08-26-document-scope-runtime-readiness.md: fd6beb74402b40e5f7996c1bee44cfc9814c89de
-2026-08-26-document-scope-runtime-readiness.zh.md: 07b456bcadb01267dda1352d3b35d03d2112d5ac
+/agent-note-document-scope-runtime-readiness-and-safe-provider-projections:
+  en: c59f455b74e27ff4
+  zh: 130401a740939538
+/agent-note-document-scope-runtime-readiness-and-safe-provider-projections/problem:
+  en: bcd5020fc02ec00d
+  zh: 556e10c729c2d779
+/agent-note-document-scope-runtime-readiness-and-safe-provider-projections/decision:
+  en: 787a331c4b684554
+  zh: 8170ec4c52773774
+/agent-note-document-scope-runtime-readiness-and-safe-provider-projections/alternatives-considered:
+  en: 4ea9e38111b7b570
+  zh: e49ccdfaa5703c48
+/agent-note-document-scope-runtime-readiness-and-safe-provider-projections/consequences:
+  en: fdec14a229e0ef85
+  zh: e808c12d550eab21
+/agent-note-document-scope-runtime-readiness-and-safe-provider-projections/verification:
+  en: 45740f79cc4fe7dd
+  zh: 0b31e07c3a258b40
+/agent-note-document-scope-runtime-readiness-and-safe-provider-projections/related:
+  en: fee4954298b33e5a
+  zh: aeb6b3dc48fca65a

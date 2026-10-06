@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-26-ptc-dispatch-log-spill.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-26-ptc-dispatch-log-spill.md
-2026-07-26-ptc-dispatch-log-spill.md: ca88e751bada63229f658907812742175f523137
-2026-07-26-ptc-dispatch-log-spill.zh.md: b115e746c01b5c22cee42ed14e6bdb1c4409694c
+/agent-note-spilling-the-durable-copy-of-ptc-mode-sub-dispatch-results:
+  en: 5d8b7c646a5951ad
+  zh: b8185bebaa5158df
+/agent-note-spilling-the-durable-copy-of-ptc-mode-sub-dispatch-results/problem:
+  en: c3f15a8647d87117
+  zh: ee751433ec2174e4
+/agent-note-spilling-the-durable-copy-of-ptc-mode-sub-dispatch-results/decision:
+  en: 841a9a7541b6b4d2
+  zh: 92e8c645c6baf978
+/agent-note-spilling-the-durable-copy-of-ptc-mode-sub-dispatch-results/alternatives-considered:
+  en: 1c90c4cb10ba46c0
+  zh: 5aada88d325a5c47
+/agent-note-spilling-the-durable-copy-of-ptc-mode-sub-dispatch-results/consequences:
+  en: aa10a48a9872ecd5
+  zh: 8e879f1881e7e6b2

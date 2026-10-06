@@ -1,3 +1,8 @@
+---
+description: "Native-OS-chooser backend of the directory-picker seam for the DeepSeek Harness web GUI host"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-host-directory-picker-native
 
 English | [中文](README.zh.md)
@@ -10,10 +15,21 @@ The **native-OS-chooser backend** of the [directory-picker seam](../directory-pi
 
 An operator at the host's display picks a workspace directory through a native OS chooser: `dsh-host-directory-picker-native` opens one platform directory chooser per pick and resolves the chosen absolute path (`null` on cancel). macOS drives `osascript`, Linux uses Zenity with a KDialog fallback, and Windows opens the modern `IFileOpenDialog` in a spawned child process. Only viable when the operator sits at the host's display — remote deployments compose the [browse backend](../directory-picker-browse/README.md) instead. One composition row also registers the matching browser-side interaction in the workspace flow, so it selects both sides.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Each `pick` spawns one platform chooser and resolves its outcome; no picker state survives the call.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the GUI-host picking backend registers nothing model-facing.
@@ -27,3 +43,13 @@ None; this package neither assembles nor sends a provider request.
 - **Linux requires desktop tooling** — with neither Zenity nor KDialog installed, `pick` rejects with an actionable error; it does not fall back to a typed-path prompt (the browse backend is that fallback at the composition level).
 - **Windows has no mechanism fallback** — the child-process picker through packaged koffi is the only native tier, so a COM refusal or dialog crash surfaces the failure. The browse backend remains the fallback at the composition level.
 - **Windows foreground grant relies on injected input** — the child synthesizes an Alt press before `Show` so the dialog can take the foreground from a background host; where synthesized input is suppressed (secure desktops, restricted remote sessions, an elevated foreground window), the dialog may still open behind other windows. The technique is validated on Windows 11 only.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

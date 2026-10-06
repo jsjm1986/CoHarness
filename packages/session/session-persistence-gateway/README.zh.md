@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-persistence-gateway
 
 [English](README.md) | 中文
@@ -9,6 +14,17 @@
 使用 `dsh-session-persistence-gateway` 作为共享项目运行时的 Gateway PostgreSQL `SessionPersistence` 提供方：已存头部与事件、修订、幂等追加批次与崩溃修复提交在标准 `PersistenceCoordinator` 生命周期下经已认证的 Gateway 内部 API 传输。
 
 
+## 目录
+
+- [持久化约定](#persistence-contract)
+- [配置](#configuration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="persistence-contract"></a>
 ## 持久化约定
 
 - 项目运行时组合会停用 `session-persistence-jsonl` 并挂载此提供方。个人运行时保留普通持久化提供方。
@@ -21,6 +37,7 @@
 - `readHeader(id, signal?)` 和 `readRevision(id, signal?)` 使用带索引的元数据 endpoint。`readPage(id, request, signal?)` 使用 PostgreSQL 的 `(session_id, seq)` keyset 查询，每页最多返回 512 KiB／2,000 个事件／50 个组，并把续传 cursor 绑定到源 revision。`readHistoryIndex(id, maxItems?, signal?)` 只读取轮次边界和有界搜索预览，不选择事件正文。提供方保留有类型的分页失败，Gateway page 路径不会传输完整 detached 历史。
 - 读取旧 v0/v1 body 时，会可选地 POST `/internal/runtime/session/migrate`，携带 `sessionId`、`sourceRevision`、`targetHeader` 和幂等 `migrationId`。已部署的服务端必须校验源 revision 并在事务中更新元数据；旧 Gateway 返回 404 时，客户端保留内存归一化回退。
 
+<a id="configuration"></a>
 ## 配置
 
 - `preparedSessionCacheSize` — coordinator 保留的冷 preparation 正数数量；默认 `5`。
@@ -29,6 +46,8 @@
 - `maxPendingBytes` — 单个活动会话写入 controller 可保留的最大 UTF-8 JSON 字节数；默认 `48 MiB`，为 Gateway 的 64 MiB 请求上限预留 envelope 空间。
 - `requestTimeoutMs` — 单次 Gateway 内部请求的正数期限；默认 `30000`。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 恢复共享对话历史
@@ -47,8 +66,19 @@
 
 **运行时不变式：** 不发布伴生入口。后端正确性由共享持久化契约覆盖。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **依赖 Gateway** — 冷读取、写入、flush 和恢复都要求 loopback Gateway 与 PostgreSQL；没有本地回退。
 - **没有原始 artifact 路径** — 调用方不能通过 `locate()` 打开或导出每会话文件。
 - **请求生命周期有界** — Gateway 内部调用超过 `requestTimeoutMs` 会失败；coordinator 保留普通重试/恢复责任，不会把超时写入当成从未发生。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -19,7 +19,7 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as claudeCode from '../src/index.ts'
 
 const execFileAsync = promisify(execFile)
-const OFFICIAL_DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
+const OFFICIAL_DEEPSEEK_MESSAGES_BASE_URL = 'https://api.deepseek.com/anthropic'
 const sdkRoot = dirname(fileURLToPath(
   import.meta.resolve('@anthropic-ai/claude-agent-sdk'),
 ))
@@ -47,9 +47,12 @@ afterEach(async () => {
 })
 
 function deepSeekBaseUrl(): string {
-  const configured = (process.env.DEEPSEEK_BASE_URL ?? OFFICIAL_DEEPSEEK_BASE_URL)
+  const configured = (process.env.DEEPSEEK_BASE_URL ?? OFFICIAL_DEEPSEEK_MESSAGES_BASE_URL)
     .replace(/\/+$/, '')
-  if (configured !== OFFICIAL_DEEPSEEK_BASE_URL) {
+  // The harness env pin names the Messages root; older local .env files may
+  // still carry the bare host from before the protocol migration.
+  if (configured === 'https://api.deepseek.com') return OFFICIAL_DEEPSEEK_MESSAGES_BASE_URL
+  if (configured !== OFFICIAL_DEEPSEEK_MESSAGES_BASE_URL) {
     throw new Error('Claude Code DeepSeek e2e requires the official DeepSeek base URL')
   }
   return configured
@@ -88,7 +91,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
 
       const env = {
         ANTHROPIC_AUTH_TOKEN: apiKey,
-        ANTHROPIC_BASE_URL: `${deepSeekBaseUrl()}/anthropic`,
+        ANTHROPIC_BASE_URL: deepSeekBaseUrl(),
         ANTHROPIC_MODEL: 'deepseek-v4-pro[1m]',
         ANTHROPIC_DEFAULT_OPUS_MODEL: 'deepseek-v4-pro[1m]',
         ANTHROPIC_DEFAULT_SONNET_MODEL: 'deepseek-v4-pro[1m]',
@@ -135,7 +138,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
       const parent = {
         id: 'deepseek-e2e-parent',
         session: { header: { cwd: workspace } },
-      } as unknown as Agent
+        ctx,
+      } as Agent
       const run = await ctx.subagents.start('claude-code', {
         prompt: [{
           type: 'text',

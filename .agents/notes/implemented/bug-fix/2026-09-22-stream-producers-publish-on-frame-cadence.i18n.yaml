@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-stream-producers-publish-on-frame-cadence.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-stream-producers-publish-on-frame-cadence.md
-2026-09-22-stream-producers-publish-on-frame-cadence.md: 7a1fa0f8dd40000b9442adda414b34ea937da071
-2026-09-22-stream-producers-publish-on-frame-cadence.zh.md: a4160f6129aa68ae896ffa7497f5022f6a65f99d
+/agent-note-envelope-driven-stream-producers-publish-on-the-animation-frame-channel:
+  en: e74c44d8cbdb6903
+  zh: 349a1765a20dd1ae
+/agent-note-envelope-driven-stream-producers-publish-on-the-animation-frame-channel/problem:
+  en: 5c6b3e03b9eadb2f
+  zh: 27dc006a93266f73
+/agent-note-envelope-driven-stream-producers-publish-on-the-animation-frame-channel/decision:
+  en: 7ef488e0d3716d14
+  zh: 1fc26cd71c8053be
+/agent-note-envelope-driven-stream-producers-publish-on-the-animation-frame-channel/alternatives-considered:
+  en: 28c047b651902963
+  zh: 4860015498e20fc3
+/agent-note-envelope-driven-stream-producers-publish-on-the-animation-frame-channel/consequences:
+  en: a1ff4d9863d47776
+  zh: 69d658cf44ee3225

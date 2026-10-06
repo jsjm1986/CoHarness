@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-25-webhook-structured-repository-filter.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-25-webhook-structured-repository-filter.md
-2026-09-25-webhook-structured-repository-filter.md: 464b93b321c8a301b1e59520c15d058a1c24f539
-2026-09-25-webhook-structured-repository-filter.zh.md: 163df8c08176cfeace5a63009aa4ca0bd86466ca
+/agent-note-webhook-endpoints-carry-a-structured-repository-filter-enforced-at-intake:
+  en: 2430ceebdb18d682
+  zh: 1ce5d6833e0ad056
+/agent-note-webhook-endpoints-carry-a-structured-repository-filter-enforced-at-intake/problem:
+  en: 1a5cf5156a3f6b9c
+  zh: 9953dc045d923703
+/agent-note-webhook-endpoints-carry-a-structured-repository-filter-enforced-at-intake/decision:
+  en: 566155b388375522
+  zh: 6aa3b5299cfd97d8
+/agent-note-webhook-endpoints-carry-a-structured-repository-filter-enforced-at-intake/alternatives-considered:
+  en: a9ec308aafc9334a
+  zh: 976c31dde559157a
+/agent-note-webhook-endpoints-carry-a-structured-repository-filter-enforced-at-intake/consequences:
+  en: d11b4935be6d3fbc
+  zh: d5570a6e299f8bd6

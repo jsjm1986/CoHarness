@@ -43,7 +43,12 @@ describe('Session export Header action', () => {
     const b = bench()
     const button = b.view.getByRole('button', { name: 'Session log' })
     expect(button.querySelector('svg')).not.toBeNull()
+    // First click arms the confirmation; the button label changes.
     fireEvent.click(button)
+    expect(b.request).not.toHaveBeenCalled()
+    const confirming = b.view.getByRole('button', { name: 'Confirm download?' })
+    expect(confirming).toBeTruthy()
+    fireEvent.click(confirming)
     await waitFor(() => { expect(b.request).toHaveBeenCalledWith(SID) })
     expect(await b.view.findByRole('dialog', { name: 'Session download started' })).toBeTruthy()
   })

@@ -12,18 +12,17 @@
 - navigation "Turn navigation":
   - button "Jump to turn 1"
   - button "Jump to turn 2"
-- button "2 tool calls · 1 intermediate message":
+- button "2 tool calls · 1 intermediate message" [expanded]:
   - text: 2 tool calls · 1 intermediate message
   - img
 - text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop."
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- tooltip "Copy"
-- button "Think The user wants me to read a.txt and b.txt, then reply with \"DONE\". Let me do both reads in parallel.":
+- button "Thinking The user wants me to read a.txt and b.txt, then reply with \"DONE\". Let me do both reads in parallel.":
   - img
   - img
-  - text: Think The user wants me to read a.txt and b.txt, then reply with "DONE". Let me do both reads in parallel.
+  - text: Thinking The user wants me to read a.txt and b.txt, then reply with "DONE". Let me do both reads in parallel.
 - paragraph: I will read both files before answering.
 - button "Copy":
   - img
@@ -38,7 +37,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Read a.txt":
   - img
   - img
@@ -53,7 +52,7 @@
   - text: 1 intermediate message
   - img
 - text: Now give the final answer.
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: DONE
@@ -69,7 +68,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -77,7 +76,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -89,4 +88,5 @@
   - button "7.9K tok · Cache hit 98%":
     - img
     - text: 7.9K tokCache hit 98%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

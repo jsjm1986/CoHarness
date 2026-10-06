@@ -1,3 +1,8 @@
+---
+description: "Model-facing same-session goal tools with execution-time authority checks"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-goal
 
 English | [中文](README.zh.md)
@@ -8,6 +13,19 @@ The model-facing control tools for [`ctx.goals`](../goal/README.md): `get_goal`,
 
 `dsh-tool-goal` lets a model read persisted goals and infer and create a long-running goal from a direct human request. Creating, editing, pausing, or resuming requires that direct request in a top-level agent turn; completing or blocking also works in an autonomous goal round. Updates require the exact goal id and revision returned by a prior read. `resume` rearms active-but-disarmed or blocked goals, while users resume durable paused goals through Web or `/goal resume`. Autonomous blocking requires the same condition for a configurable threshold of three consecutive rounds by default.
 
+## Table of Contents
+
+- [Tools](#tools)
+- [Authority](#authority)
+- [Config](#config)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="tools"></a>
 ## Tools
 
 - `get_goal()` returns the current goal or `null`, including the compare-and-set id/revision, durable phase, admitted/capped goal rounds, any blocker reason, and current process-local activation.
@@ -20,6 +38,7 @@ All three canonical values match the compact JSON already rendered to Native cal
 
 An autonomous goal round that successfully reports `complete` or `blocked` marks that tool execution with `concludeTurn()` so the physical turn stops after the step. Direct-human mutations never contribute this stop: the assistant may acknowledge the change and concurrent human steering remains available to the loop.
 
+<a id="authority"></a>
 ## Authority
 
 Execution requires the exact live `exec.agent`, its inherited `AgentRegistry` initiator, running status, and an open turn. Create, edit, pause, and resume additionally require an accepted `{ kind: 'user' }` message or steering event in a runtime-root agent's current turn. Durable fork lineage does not demote a resumed root; live subagent ownership does.
@@ -28,6 +47,7 @@ Execution requires the exact live `exec.agent`, its inherited `AgentRegistry` in
 
 Complete and blocked also accept the exact current goal round: a goal-sourced `user/message` whose id, revision, and round equal the folded current goal. A goal-round blocked call is mechanically rejected until `blockedAfterConsecutiveRounds`; the model judges whether the same condition actually persisted and must describe it in `blocked_reason`. Direct human authority may stop a goal immediately.
 
+<a id="config"></a>
 ## Config
 
 ```yaml
@@ -39,22 +59,24 @@ Complete and blocked also accept the exact current goal round: a goal-sourced `u
 
 The value must be a positive safe integer. It supplies both the hard lower bound on model self-blocking and the number named in model guidance.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The tools are registrations over `ctx.goals`; goal state is owned by the goal domain.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### System prompt
 
 #### What the model sees
 
-A fixed goal policy says when semantic human intent warrants creation, requires exact read-before-update refs, explains rearming after resume/fork, and limits completion/blocking claims. Durable paused resume is rejected at execution with `GOAL_TOOL_RESUME_PAUSED`; the user-facing goal control owns that transition. The configured threshold is interpolated into that guidance.
+A fixed goal policy allows inferring goal intent in any language, explains rearming after resume/fork, and limits completion/blocking claims; creation scope and read-before-update refs live in the tool definitions. Durable paused resume is rejected at execution with `GOAL_TOOL_RESUME_PAUSED`; the user-facing goal control owns that transition. The configured threshold is interpolated into that guidance.
 
 ##### Goal policy
 
 ```markdown
-Use goal tools for one long-running completion objective in the current session. create_goal may infer goal intent from a direct human request in any language; do not create a goal for routine single-turn work. Call get_goal before update_goal and copy its exact goal_id and revision. After session resume or fork, an active goal is disarmed: when a human asks to continue or resume in any wording or language, use update_goal action resume to rearm it. Mark complete only when the objective is actually achieved. Mark blocked only after the same blocking condition persists for at least 3 consecutive goal rounds, and report that concrete condition in blocked_reason; difficulty, uncertainty, or useful remaining work is not blocked.
+create_goal may infer goal intent from a direct human request in any language. After session resume or fork, an active goal is disarmed: when a human asks to continue or resume in any wording or language, use update_goal action resume to rearm it. Mark complete only when the objective is actually achieved. Mark blocked only after the same blocking condition persists for at least 3 consecutive goal rounds, and report that concrete condition in blocked_reason; difficulty, uncertainty, or useful remaining work is not blocked.
 ```
 
 #### Token effect
@@ -86,3 +108,13 @@ Schemas are prefix-stable while their definitions and visibility are unchanged. 
 - **No scheduling or direct human rendering** — these tools mutate state only; the same-session driver and [`dsh-command-goal`](../command-goal/README.md) are independent consumers of the same domain.
 - **Goal-round authority requires a driver** — the autonomous `complete`/`blocked` path is dormant unless a continuation driver admits goal-sourced user turns; mounting this tool package alone does not create them.
 - **Prompt registration is independent of filtering** — a scope may hide the tools while retaining their guidance unless the deployment scopes both registrations together.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

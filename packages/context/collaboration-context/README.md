@@ -1,3 +1,8 @@
+---
+description: "Durable participant attribution for shared project conversations"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-collaboration-context
 
 English | [中文](README.zh.md)
@@ -9,6 +14,16 @@ Durable model-visible participant attribution for shared project conversations. 
 Use `dsh-collaboration-context` for durable model-visible participant attribution in shared project conversations. Listening at `agent/pre-step`, it recognizes authenticated project participant metadata on final user messages and inserts one paired attribution message immediately before each, so the model sees who said what.
 
 
+## Table of Contents
+
+- [Runtime contract](#runtime-contract)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="runtime-contract"></a>
 ## Runtime contract
 
 - The participant snapshot contains the authenticated user id, username, display name, role, project id/name, and project `ro`/`rw` mode supplied by the collaboration authority at message admission.
@@ -17,6 +32,7 @@ Use `dsh-collaboration-context` for durable model-visible participant attributio
 - The listener delegates through the `agent/pre-step` waterfall first, then transforms the final admitted messages so later policy cannot separate the notice from the participant message.
 - The Web Chat transcript does not render this notice; it labels the following human bubble from the same participant snapshot ([decision](../../../.agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.md)).
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Shared-project participant attribution
@@ -38,3 +54,13 @@ The attribution notice and participant message append together to the durable co
 - **Snapshot identity** — later display-name, role, project-name, or membership changes do not rewrite historical attribution.
 - **One notice per admitted message** — several participant messages admitted in one step each receive their own notice so attribution remains unambiguous, at the cost of repeated metadata.
 - **Project participants only** — personal-scope identity is intentionally absent because personal conversations already have one authenticated owner.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

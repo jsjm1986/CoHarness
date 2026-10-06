@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-01-goal-command-input-projection.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-01-goal-command-input-projection.md
-2026-08-01-goal-command-input-projection.md: 02836de7ea2d79122d7650d1b37406802ee1489f
-2026-08-01-goal-command-input-projection.zh.md: 8c28ba1c90be5942aa526fb9d8d2d8b1f014742e
+/agent-note-goal-command-input-projection:
+  en: 9202a5cf90bb2823
+  zh: e7a5e48ef5ed22df
+/agent-note-goal-command-input-projection/problem:
+  en: e08f2aba24bcd6be
+  zh: feaedad9a9e4798b
+/agent-note-goal-command-input-projection/decision:
+  en: 96234f5714cb12c0
+  zh: 6a9f4a67207d144f
+/agent-note-goal-command-input-projection/verification:
+  en: e3770d4e1b89be46
+  zh: 8c49d5d609b42a85
+/agent-note-goal-command-input-projection/alternatives-considered:
+  en: 8df7ec342d28c6bb
+  zh: 95e7a337024848f1
+/agent-note-goal-command-input-projection/consequences:
+  en: aa60ac7be0114264
+  zh: 5d936962e282ba35

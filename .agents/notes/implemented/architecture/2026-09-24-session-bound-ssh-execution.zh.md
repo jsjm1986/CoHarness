@@ -16,7 +16,7 @@ Status: implemented
 
 准入按加入粒度执行：`composeAgent` 解析调用方自己的 `sshAuthorization` 授权，以该授权的主体作为 realm 键，并返回一个在 setup 全部 await 落定后重新执行 `signal.throwIfAborted()` 的发布提交——与挂载竞态的撤权能否决发布。钩子在所属授权的失效信号中止时退役该 realm 代次并销毁连接。Resume 读取存储的绑定、以 resume 调用方身份重新解析，并把不一致的请求拒绝为 `ssh-target-conflict`；fork 继承绑定，因为种子历史是在那台主机上产生的。
 
-自助共享限定在项目管理权：`share` 与 `listForProject` 准入组织管理员或项目的 `owner_user_id`，并在同一写入事务内复查。`/account/api/projects/<id>/ssh-targets` 向项目管理者提供共享标志列表（GET）与共享开关（POST）；`capabilities.sshTargets` 显式汇报能力，UI 不必凭角色推断。目标登记、机密与带修订的变更仍归管理员在 `/admin` 管理。
+自助共享限定在项目管理权：`share` 与 `listForProject` 准入组织管理员或项目的 `owner_user_id`，并在同一写入事务内复查。`/account/api/projects/<id>/ssh-targets` 向项目管理者提供共享标志列表（GET）与共享开关（POST）；`capabilities.sshTargets` 显式汇报能力，UI 不必凭角色推断。目标登记、机密与带修订的变更仍归管理员在 `/admin` 管理。目标编辑器在每次更新中保留运行时密码凭据引用。API 省略该引用时保留已有值，明确传入 null 才移除引用，且不会删除其所属凭据存储中的密码。
 
 ## Alternatives considered
 
@@ -29,6 +29,8 @@ Status: implemented
 **项目级目标 CRUD**——目标行携带 helper 摘要、主机密钥与凭据引用；登记它们是部署安全决策。只有共享决策——本项目可使用哪些已登记目标——下放给项目管理权。
 
 ## Consequences
+
+用户终端的 shell 发现和 PTY 分配与远端工作区读取共用 standing realm 提供方解析。绑定 SSH 的 Session 缺少该提供方时不可用，即使 Host 存在本机 subprocess 提供方也不回退。
 
 按主体分键会在同一目标的不同用户间重复 standing 挂载——这是撤权隔离的 fail-closed 代价。被撤销的授权会退役它准入的全部挂载，并使在途提供方调用 fail-closed；`sshTarget` 会话同时要求 preset 花名册与 `sshAuthorization`，缺失时冷 resume 响亮失败。绑定目标的会话在创建时跳过 Host 侧 `mkdir`。本次 UI 改动面向用户可见，落地 PR 前仍欠真实服务器验收证据。
 

@@ -9,6 +9,15 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../attachment/attachment"
     },
     {
@@ -16,12 +25,6 @@
     },
     {
       "path": "../../core/tools"
-    },
-    {
-      "path": "../fs"
-    },
-    {
-      "path": "../fs-observation-policy"
     },
     {
       "path": "../../interaction/user-approval"
@@ -36,13 +39,13 @@
       "path": "../../sandbox/sandbox-policy"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../../util/code-language"
     },
     {
-      "path": "../../../vendor/cosmokit"
+      "path": "../fs"
     },
     {
-      "path": "../../../vendor/schemastery"
+      "path": "../fs-observation-policy"
     }
   ]
 }

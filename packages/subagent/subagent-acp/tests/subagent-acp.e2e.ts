@@ -35,8 +35,8 @@ const childLaunch = resolveExampleLaunch({
   },
 })
 
-/** The ACP backend ignores the parent, but the seam requires one. */
-const fakeParent = { id: 'parent', session: { header: {} } } as unknown as Agent
+/** The ACP backend ignores the parent, but the seam requires one with an execution-scoped ctx. */
+const fakeParent = (scope: Context): Agent => ({ id: 'parent', session: { header: {} }, ctx: scope }) as Agent
 
 let ctx: Context | undefined
 let workdir: string | undefined
@@ -65,7 +65,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('ACP backend with-key e2e (drive 
 
     const run = await ctx.subagents.start('acp', {
       prompt: [{ type: 'text', text: 'Reply with exactly the word PONG and nothing else. Do not use any tools.' }],
-      parent: fakeParent,
+      parent: fakeParent(ctx),
       signal: new AbortController().signal,
     })
     const result = await run.result
@@ -98,7 +98,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('ACP backend with-key e2e (drive 
       prompt: [{ type: 'text', text:
         'Use the bash tool to write the text ACP_CHILD_WAS_HERE into a file named proof.txt '
         + 'in the current directory. Then reply DONE.' }],
-      parent: fakeParent,
+      parent: fakeParent(ctx),
       signal: new AbortController().signal,
     })
     const result = await run.result

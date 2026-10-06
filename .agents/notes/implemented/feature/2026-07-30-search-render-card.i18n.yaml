@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-search-render-card.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-30-search-render-card.md
-2026-07-30-search-render-card.md: 585609bd059dbd9aa8283547fa8a4b223f7bdd99
-2026-07-30-search-render-card.zh.md: 4ffaa1ae16b9b6192ff1c678e66e2b2ea717b834
+/agent-note-search-render-intent-grep-and-glob-emit-a-structured-search-card:
+  en: 40b4b11dc657eb48
+  zh: 3530ed7f3670027a
+/agent-note-search-render-intent-grep-and-glob-emit-a-structured-search-card/problem:
+  en: 7b0739ef81076048
+  zh: 8729565555caa45e
+/agent-note-search-render-intent-grep-and-glob-emit-a-structured-search-card/decision:
+  en: 9cd9434497252dc0
+  zh: 35464a2e25c3f609
+/agent-note-search-render-intent-grep-and-glob-emit-a-structured-search-card/alternatives-considered:
+  en: 6eea9aca2ee92d97
+  zh: 62973e01c63eebe2
+/agent-note-search-render-intent-grep-and-glob-emit-a-structured-search-card/consequences:
+  en: f10b9af9824c170f
+  zh: edc0ab1ee13315dc
+/agent-note-search-render-intent-grep-and-glob-emit-a-structured-search-card/testing:
+  en: 39be95c0cca0ae61
+  zh: 8700e34c9d761997
+/agent-note-search-render-intent-grep-and-glob-emit-a-structured-search-card/related:
+  en: ed26aa012dab3ea4
+  zh: f9a8bc4cb81ff1a9

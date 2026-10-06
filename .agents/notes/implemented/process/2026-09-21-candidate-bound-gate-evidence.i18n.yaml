@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-21-candidate-bound-gate-evidence.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-21-candidate-bound-gate-evidence.md
-2026-09-21-candidate-bound-gate-evidence.md: 0d4f606ef80191207cf000495e23a888f1ef429e
-2026-09-21-candidate-bound-gate-evidence.zh.md: 157f8eb6e4c816011a8bc1726b9a87233a124149
+/agent-note-candidate-bound-gate-evidence-and-fork-consumers:
+  en: 57b6d450a5b59895
+  zh: a10df6c1fd305d84
+/agent-note-candidate-bound-gate-evidence-and-fork-consumers/problem:
+  en: 2886e1af5f517138
+  zh: 41e624406eec18e8
+/agent-note-candidate-bound-gate-evidence-and-fork-consumers/decision:
+  en: 17b689f09f0ab0ad
+  zh: aeddf14143ba7f2b
+/agent-note-candidate-bound-gate-evidence-and-fork-consumers/alternatives-considered:
+  en: bbf15e5510a43866
+  zh: 25a9592dbf418c5a
+/agent-note-candidate-bound-gate-evidence-and-fork-consumers/consequences:
+  en: a90e64447c46d3c3
+  zh: b9fa92d264dbc0e2

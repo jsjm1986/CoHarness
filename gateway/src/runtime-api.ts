@@ -36,6 +36,7 @@ import {
 import type { PostgresInstanceRepository } from './postgres/instance-repository.ts'
 import type { PostgresCollaborationService } from './postgres/collaboration-service.ts'
 import { SshTargetError, type PostgresSshTargetService } from './postgres/ssh-target-service.ts'
+import { PluginStateError } from './plugin-state.ts'
 import { internalUserId, type PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import type { GatewayPushService } from './push-notifications.ts'
 import type { GatewayModelGovernanceService } from './services.ts'
@@ -94,12 +95,12 @@ interface RuntimeApiDependencies {
   conversations: Pick<ConversationRepository, 'append' | 'listScoped' | 'load' | 'removeTree'>
     & Partial<Pick<ConversationRepository,
       'readHeader' | 'readFrom' | 'readPage' | 'readHistoryIndex' | 'revision' | 'migrate'
-      | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner'>>
+      | 'reserveDraft' | 'heartbeatDraftForOwner' | 'releaseDraftForOwner' | 'hasProjectDraftReservation'>>
   collaboration: Pick<
     PostgresCollaborationService,
     'access' | 'claimInteraction' | 'projectForUser' | 'readableSessionIds'
   >
-  archives?: Pick<ConversationArchiveService, 'syncRuntimeSnapshot' | 'acknowledgeCommand'>
+  archives?: Pick<ConversationArchiveService, 'syncRuntimeSnapshot' | 'acknowledgeCommand' | 'hasPendingCommands'>
   principals: GatewayPrincipalSigner
   governance: Pick<GatewayModelGovernanceService, 'resolveOrganizationCredential'>
     & Partial<Pick<GatewayModelGovernanceService, 'resolveManagedCredential'>>
@@ -127,6 +128,8 @@ interface RuntimeApiDependencies {
   desktops?: DesktopCoordinator
   /** Optional registered SSH targets; absent in standalone compositions without managed SSH. */
   sshTargets?: Pick<PostgresSshTargetService, 'resolveForRuntime'>
+  /** Optional durable plugin desired-state store; absent in compositions without PostgreSQL. */
+  pluginState?: Pick<import('./plugin-state.ts').PostgresPluginState, 'readForSubject' | 'publishForSubject'>
 }
 
 function send(res: ServerResponse, status: number, value: unknown): void {
@@ -703,12 +706,20 @@ export function createRuntimeApiHandler(
         }
         res.setHeader('cache-control', 'no-store')
         if (action === 'register-session') {
-          const header = subject.target.kind === 'project'
+          let header: Pick<ConversationHeader, 'id' | 'parentSessionId' | 'seedLength'> | undefined = subject.target.kind === 'project'
             ? await storedHeader(payload.sessionId, subject, requestSignal(req, res)) : undefined
+          if (header === undefined && subject.projectInternalId !== undefined
+            && await deps.conversations.hasProjectDraftReservation?.(subject.organizationId, payload.sessionId, subject.projectInternalId) === true) {
+            // A live draft reservation binds this Session id to the project before
+            // the first append materializes its header; it admits a root unseeded Session only.
+            header = { id: payload.sessionId }
+          }
           await execution.register(subject, value, header)
           send(res, 200, { registered: true })
         } else if (action === 'capture') {
           send(res, 200, await execution.capture(subject, value))
+        } else if (action === 'combine') {
+          send(res, 200, await execution.combine(subject, value))
         } else if (action === 'selection') {
           await execution.selection(subject, assertionFor(req, deps.principals, subject, true, { allowWebhookDispatch: true })!, value)
           res.writeHead(204)
@@ -754,16 +765,54 @@ export function createRuntimeApiHandler(
       if ((pathname === '/internal/runtime/plugin-management/authorize' || pathname === '/internal/runtime/terminal-management/authorize') && req.method === 'POST') {
         const terminal = pathname === '/internal/runtime/terminal-management/authorize'
         const claims = assertionFor(req, deps.principals, subject, true, { allowTerminalAdmin: terminal, allowPluginAdmin: !terminal })!
-        if (claims.user.role !== 'admin' || (terminal ? claims.purpose !== 'terminal-admin' : claims.purpose !== undefined && claims.purpose !== 'plugin-admin')) throw new CollaborationDeniedError('forbidden')
-        const current = await deps.context.pool.query(`SELECT u.id FROM harness.users u
-          JOIN harness.memberships m ON m.user_id=u.id AND m.organization_id=u.organization_id
-          JOIN harness.organizations o ON o.id=u.organization_id AND o.status='active'
-          WHERE u.organization_id=$1 AND u.public_id=$2 AND u.deleted_at IS NULL
-            AND u.status='active' AND m.status='active' AND m.role='admin'`,
-        [subject.organizationId, claims.user.id])
-        if (current.rows.length !== 1) throw new CollaborationDeniedError('forbidden')
+        if (terminal || claims.user.role === 'admin') {
+          // Administrators keep unconditional management authority; the
+          // elevated purpose stays restricted to them.
+          if (claims.user.role !== 'admin' || (terminal ? claims.purpose !== 'terminal-admin' : claims.purpose !== undefined && claims.purpose !== 'plugin-admin')) throw new CollaborationDeniedError('forbidden')
+          const current = await deps.context.pool.query(`SELECT u.id FROM harness.users u
+            JOIN harness.memberships m ON m.user_id=u.id AND m.organization_id=u.organization_id
+            JOIN harness.organizations o ON o.id=u.organization_id AND o.status='active'
+            WHERE u.organization_id=$1 AND u.public_id=$2 AND u.deleted_at IS NULL
+              AND u.status='active' AND m.status='active' AND m.role='admin'`,
+          [subject.organizationId, claims.user.id])
+          if (current.rows.length !== 1) throw new CollaborationDeniedError('forbidden')
+        } else {
+          // A non-administrator manages a profile only under the
+          // administrator-granted plugin policy, with an ordinary principal.
+          if (claims.purpose !== undefined) throw new CollaborationDeniedError('forbidden')
+          const granted = await deps.context.pool.query<{ enabled: boolean | null }>(`SELECT p.enabled FROM harness.users u
+            JOIN harness.memberships m ON m.user_id=u.id AND m.organization_id=u.organization_id
+            JOIN harness.organizations o ON o.id=u.organization_id AND o.status='active'
+            LEFT JOIN harness.plugin_access_policies p ON p.organization_id=u.organization_id AND p.user_id=u.id
+            WHERE u.organization_id=$1 AND u.public_id=$2 AND u.deleted_at IS NULL
+              AND u.status='active' AND m.status='active'`,
+          [subject.organizationId, claims.user.id])
+          if (granted.rows[0]?.enabled !== true) throw new CollaborationDeniedError('forbidden')
+          if (subject.target.kind === 'project') {
+            const project = await deps.context.pool.query(`SELECT 1 FROM harness.plugin_access_policies
+              WHERE organization_id=$1 AND project_id=$2 AND enabled`, [subject.organizationId, subject.projectInternalId])
+            if (project.rowCount !== 1) throw new CollaborationDeniedError('forbidden')
+          }
+        }
         res.writeHead(204, { 'cache-control': 'no-store' })
         res.end()
+        return true
+      }
+      if (pathname === '/internal/runtime/plugin-state' && (req.method === 'GET' || req.method === 'POST')) {
+        if (deps.pluginState === undefined) { send(res, 503, { error: 'plugin-state-unavailable' }); return true }
+        const reply = (status: number, body: unknown) => {
+          res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+          res.end(JSON.stringify(body))
+        }
+        if (req.method === 'GET') {
+          reply(200, await deps.pluginState.readForSubject(subject))
+          return true
+        }
+        const payload = record(JSON.parse(body))
+        if (payload === undefined) throw new PluginStateError(400, 'invalid plugin state report')
+        const outcome = await deps.pluginState.publishForSubject(subject, payload.state, payload.baseRevision)
+        if (outcome.status === 'conflict') reply(409, outcome.current)
+        else reply(200, { revision: outcome.revision })
         return true
       }
       if (pathname === '/internal/runtime/ssh/resolve' && req.method === 'POST') {
@@ -954,7 +1003,10 @@ export function createRuntimeApiHandler(
             && payload.visibility !== 'project' && payload.visibility !== 'private')) {
           throw new Error('invalid session creation request')
         }
-        const claims = assertionFor(req, deps.principals, subject, true)!
+        const claims = assertionFor(req, deps.principals, subject, true, { allowWebhookDispatch: true })!
+        if (claims.purpose !== undefined && claims.purpose !== 'webhook-dispatch') {
+          throw new CollaborationDeniedError('forbidden')
+        }
         const membership = await deps.collaboration.projectForUser(subject.target.id, claims.user.id)
         if (membership === null || membership.mode !== 'rw'
           || await internalUserId(deps.context.pool, subject.organizationId, claims.user.id) === null) {
@@ -1074,6 +1126,12 @@ export function createRuntimeApiHandler(
         return true
       }
 
+      if (pathname === '/internal/runtime/archive/pending' && req.method === 'GET') {
+        if (deps.archives === undefined) { send(res, 503, { error: 'conversation-archive-unavailable' }); return true }
+        send(res, 200, { pending: await deps.archives.hasPendingCommands(subject.target) })
+        return true
+      }
+
       if (pathname === '/internal/runtime/archive/snapshot' && req.method === 'POST') {
         if (deps.archives === undefined) {
           send(res, 503, { error: 'conversation-archive-unavailable' })
@@ -1181,10 +1239,11 @@ export function createRuntimeApiHandler(
           || (payload.error !== undefined && typeof payload.error !== 'string')) {
           throw new Error('invalid archive acknowledgement')
         }
-        await deps.archives.acknowledgeCommand(payload.commandId, payload.revision, payload.error as string | undefined, {
+        const acknowledged = await deps.archives.acknowledgeCommand(payload.commandId, payload.revision, payload.error as string | undefined, {
           kind: subject.target.kind,
           id: subject.target.id,
         })
+        if (!acknowledged) { send(res, 409, { error: 'archive-command-not-acknowledged' }); return true }
         send(res, 200, { acknowledged: true })
         return true
       }
@@ -1605,12 +1664,12 @@ export function createRuntimeApiHandler(
         const granted = action === 'heartbeat' || action === 'release' || action === 'confirm-stopped' || action === 'stop'
         if (!queued && !granted) return false
         const address = queued ? 'requestId' : 'grantId'
-        const allowed = ['sessionId', 'desktop', 'ownerSessionIds', address]
+        const allowed = ['sessionId', 'desktop', 'ownerSessionIds', 'scopeId', address]
         if (payload === undefined || Object.keys(payload).some(key => !allowed.includes(key))
           || typeof payload[address] !== 'string' || payload[address].length === 0 || payload[address].length > 256) {
           throw new ExecutionIdentityError(400, 'invalid desktop coordination request')
         }
-        const identity = { sessionId: payload.sessionId, desktop: payload.desktop, ownerSessionIds: payload.ownerSessionIds }
+        const identity = { sessionId: payload.sessionId, desktop: payload.desktop, ownerSessionIds: payload.ownerSessionIds, ...(payload.scopeId === undefined ? {} : { scopeId: payload.scopeId }) }
         const holder = await execution.desktopHolder(subject, identity)
         const resource = { node: deps.context.nodeId, desktop: payload.desktop as string }
         const needsAccess = action === 'acquire' || action === 'status' || action === 'heartbeat'
@@ -1674,6 +1733,10 @@ export function createRuntimeApiHandler(
       }
       if (error instanceof SshTargetError) {
         send(res, error.status, { error: error.message, message: error.message })
+        return true
+      }
+      if (error instanceof PluginStateError) {
+        send(res, error.status, { error: error.message })
         return true
       }
       if (error instanceof SyntaxError || (error instanceof Error && error.message.startsWith('invalid '))) {

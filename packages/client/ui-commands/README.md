@@ -1,3 +1,8 @@
+---
+description: "Client command surface: global directory cache, '/' source, three command UI kinds, popupSelect registry"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-commands
 
 English | [中文](README.zh.md)
@@ -6,7 +11,7 @@ Client command API (`ctx.commandUi`): the session-keyed command-directory cache,
 
 `src/client/contract.ts` is the fixed business contract: `CommandUiContract.register(name, spec)` and `decorate(name, spec)` are everything a business package consumes; `CommandUiSpec{options, onSelect}` keeps popup data self-contained — the shell component belongs to this package and business packages never see it. A contribution is a client-owned command (a host-name collision fails loud); a decoration adds a bare-invocation popup to an EXISTING host command. The host keeps its catalog row, argument claim (space / argued Enter), and lifecycle logging, and a decorated name with no host row in the session's directory never fires. Command kinds derive per dispatch, never per registration: a host descriptor with `input` is `leadingInput`, a registered `CommandUiSpec` is `popupSelect`, and everything else is `execute`.
 
-`CommandDirectory` (`src/client/directory.ts`) is the one wire-derived cache, keyed by session. Ordinary sessions fetch through `command.list({sessionId})`, and the source's scope-birth `warm` hook prewarms the session's entry. Catalog-addressed continuable children resolve an empty command directory locally: `command.list` is Agent-bound, so prewarming it would activate a child merely to view persisted history. Entries are soft-invalidated by the forwarded `commands/change` owner event (old snapshots serve while the repull flies) and by forwarded `agent-preset/selected` for that one session (recomposing an agent registers nothing, so the registry-wide signal never fires for it), hard-invalidated by `connection/reset`, and epoch-guarded so a superseded pull can never overwrite a newer one. `matchSpace` answers synchronously from this cache only; `matchEnter` strong-waits it on the SubmitAttempt signal and rejects on warmup failure — a `/` line is never silently downgraded to a plain prompt.
+`CommandDirectory` (`src/client/directory.ts`) is the one wire-derived cache, keyed by session. Ordinary sessions fetch through `command.list({sessionId})`, and the source's scope-birth `warm` hook prewarms the session's entry. A fetch borrows the session through `sessions.using` (source `commandCatalog`) and waits for its initial history open to settle: an unretained session and a failed open refuse before the RPC ever leaves. Catalog-addressed continuable children resolve an empty command directory locally: `command.list` is Agent-bound, so prewarming it would activate a child merely to view persisted history. Entries are soft-invalidated by the forwarded `commands/change` owner event (old snapshots serve while the repull flies) and by forwarded `agent-preset/selected` for that one session (recomposing an agent registers nothing, so the registry-wide signal never fires for it), hard-invalidated by `connection/reset`, and epoch-guarded so a superseded pull can never overwrite a newer one. `matchSpace` answers synchronously from this cache only; `matchEnter` strong-waits it on the SubmitAttempt signal and rejects on warmup failure — a `/` line is never silently downgraded to a plain prompt.
 
 `matchEnter` also enforces the submission envelope: when the composer submits with image attachments, only a host command declaring `input.images` proceeds (its claim carries `images: true` and its submit forwards the serialized payloads to `command.execute`); every other command route — contribution popup, decorated popup, non-declaring claim, bare detached execute — throws the localized `notice.imagesUnsupported` refusal, which the input machine publishes as one error notice and the composer renders as a transient Toast banner with the draft and images retained. An image-carrying submit whose host handler answers an error result maps to an error outcome so the composer keeps the images; imageless submits keep the plain success mapping because the durable flow node owns the outcome rendering.
 
@@ -26,18 +31,33 @@ The `/client` entrypoint exports the plugin body (`apply`/`inject`), `CommandUiR
 
 Typing a `/` command opens a registered popup, a client action, a host command's input, or direct execution; a command line is never silently downgraded to a plain prompt. Business packages register popupSelect specs (`/model`, `/permission`) or actions through `ctx.commandUi`, or decorate existing host commands with either kind while preserving their catalog rows and argument claims. Space and Enter resolve the line against the session's directory: a host descriptor with `input` is `leadingInput`, a registered `CommandUiSpec` is `popupSelect` or `action`, and everything else is `execute`.
 
+## Table of Contents
+
+- [Non-submitting actions](#non-submitting-actions)
+- [Popup availability](#popup-availability)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="non-submitting-actions"></a>
 ## Non-submitting actions
 
 An action consumes only the still-current trigger token and keeps attached images. A changed draft or retired Session prevents invocation. Unlike a popup selection or Host command, an action performs no submission.
 
+<a id="popup-availability"></a>
 ## Popup availability
 
 Popup options can be disabled with an explanation; pointer and keyboard selection both refuse them. A business spec may subscribe to invalidation of its captured options. That subscription exists only while its popup is open and dismisses only that popup; close, replacement, successful selection, and scope disposal release it. Reopening obtains fresh options without another directory cache.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The command directory is a session-keyed cache refetched through the owning command surface; it mirrors host data rather than owning a relation.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the host `command.execute` RPC they trigger, each command handler's host package owns any model-visible effect (the `/plan` handler flips plan mode, whose owning package injects its policy section), while the command line, the detached result, and every menu and notice rendering stay client-side and never enter the session log.
@@ -49,3 +69,13 @@ None directly; this package neither assembles nor sends a provider request. Comm
 ## Known Limitations and Deferred Work
 
 - **Detached-result notices fall back to the console off-session** — the fire-and-forget paths route results to the triggering session's composer via `SessionInput.notify`; after session teardown the console line is the only remaining surface.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

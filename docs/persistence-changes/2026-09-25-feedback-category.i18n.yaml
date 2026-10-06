@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-25-feedback-category.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-09-25-feedback-category.md
-2026-09-25-feedback-category.md: f642da0e2fd40ffe12a17284ad5a0d2042909dcf
-2026-09-25-feedback-category.zh.md: f428ff71fbe35cc5a07974ae5eedd021efa0ab62
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-09-25-feedback-category:
+  en: 7ad51226b721d42f
+  zh: 0575994b587b6a72
+/2026-09-25-feedback-category/summary:
+  en: 9d46ee7509826717
+  zh: a2bc55d37d3917f1
+/2026-09-25-feedback-category/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-09-25-feedback-category/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-09-25-feedback-category/compatibility:
+  en: 74c4dec38519c6fc
+  zh: f17d16709bb810e3
+/2026-09-25-feedback-category/verification:
+  en: 947a941f9338b25c
+  zh: 9d82f6ce0bde3f15
+/2026-09-25-feedback-category/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

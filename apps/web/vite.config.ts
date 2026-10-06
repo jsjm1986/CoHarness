@@ -142,6 +142,10 @@ export default defineConfig({
   build: {
     sourcemap: true,
     rollupOptions: {
+      // Explicit HTML entry: scripts/browser-bundled-externals discovers the
+      // published page set through rollupOptions.input, and notices fail when
+      // a public browser app leaves it implicit.
+      input: { index: src('./index.html') },
       output: {
         // Output layout: the two main chunks stay at assets/ root; lazy
         // @shikijs/langs grammar chunks group under assets/langs/; fonts

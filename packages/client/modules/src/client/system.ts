@@ -38,6 +38,10 @@ function atRevision(url: string, rev: string): string {
 
 const CLIENT_CHUNK = /^client\.[A-Za-z0-9][A-Za-z0-9._-]*\.js$/
 
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 /** Internal module-table key for one package-local chunk. */
 function chunkId(ownerId: string, fileName: string): string {
   return `${ownerId}/${fileName}`
@@ -101,6 +105,11 @@ export class ClientModuleSystem implements ClientModuleLoader {
   private readonly materializing = new Set<string>()
   private readonly graphRows = new Map<string, BootModuleRow>()
   private readonly loadBundle: (url: string) => Promise<void>
+  /** Batch URLs whose transport or execution already failed, keyed to the first attempt's failure
+   * lines; rows still missing from them go straight to their one-resource URL. */
+  private readonly failedBundleUrls = new Map<string, readonly string[]>()
+  /** Every URL whose script has executed once; a batch among them is never requested again. */
+  private readonly executedBundleUrls = new Set<string>()
 
   /**
    * Build the module system over the parsed boot rows.
@@ -161,25 +170,71 @@ export class ClientModuleSystem implements ClientModuleLoader {
     })
   }
 
-  /** Load one graph row so its factory is registered (idempotent per in-flight arrival). */
-  private arrive(row: BootModuleRow): Promise<void> {
-    const { id } = row
-    if (this.loadCache.has(id) || this.factories.has(id)) return Promise.resolve()
-    const reload = this.reloadTargets.get(id)
-    const url = reload?.url ?? row.initialUrl
+  /** Run one bundle transport per URL; every row waiting on the same URL shares the in-flight request. */
+  private loadShared(url: string): Promise<void> {
     let transport = this.pendingArrival.get(url)
     if (transport === undefined) {
-      transport = this.loadBundle(url).finally(() => { this.pendingArrival.delete(url) })
+      transport = this.loadBundle(url)
+        .then(() => { this.executedBundleUrls.add(url) })
+        .finally(() => { this.pendingArrival.delete(url) })
       this.pendingArrival.set(url, transport)
     }
-    return transport.then(() => {
-      if (!this.factories.has(id)) {
-        throw new Error(`client-modules: bundle ${url} loaded without registering "${id}" via __ModuleLoader__.load`)
+    return transport
+  }
+
+  /**
+   * Load one graph row so its factory is registered (idempotent per in-flight
+   * arrival). A transport failure retries the same URL once; a script that
+   * executed without registering the row is never replayed — replay would stop
+   * at the first duplicate registration — and either way the missing row falls
+   * back to its one-resource `row.url`. A failed or partially served batch is
+   * remembered so later imports of its missing rows skip it; a one-resource
+   * failure stays retryable. Recovery rationale lives in
+   * `.agents/notes/implemented/architecture/2026-07-23-client-plugin-loading-model.md`.
+   */
+  private async arrive(row: BootModuleRow): Promise<void> {
+    const { id } = row
+    if (this.loadCache.has(id) || this.factories.has(id)) return
+    const reload = this.reloadTargets.get(id)
+    const preferred = reload?.url ?? row.initialUrl
+    const fallback = reload === undefined && row.url !== preferred ? row.url : undefined
+    const failures: string[] = []
+    const attempt = async (url: string): Promise<'registered' | 'transport-failed' | 'not-registered'> => {
+      try {
+        await this.loadShared(url)
+      } catch (error) {
+        failures.push(`${url}: ${describeError(error)}`)
+        return 'transport-failed'
       }
-      if (reload !== undefined && this.reloadTargets.get(id) === reload) {
-        this.reloadTargets.delete(id)
-      }
-    })
+      if (this.factories.has(id)) return 'registered'
+      failures.push(`${url}: loaded without registering "${id}" via __ModuleLoader__.load`)
+      return 'not-registered'
+    }
+    let outcome: Awaited<ReturnType<typeof attempt>> = 'transport-failed'
+    const remembered = this.failedBundleUrls.get(preferred)
+    if (remembered !== undefined) {
+      failures.push(...remembered)
+    } else if (fallback !== undefined && this.executedBundleUrls.has(preferred)) {
+      // The batch already ran (an earlier importer was a row it did register)
+      // and this row is still missing: a replay would stop at the first
+      // duplicate registration.
+      failures.push(`${preferred}: already executed without registering "${id}"`)
+      outcome = 'not-registered'
+      this.failedBundleUrls.set(preferred, [...failures])
+    } else {
+      outcome = await attempt(preferred)
+      if (outcome === 'transport-failed') outcome = await attempt(preferred)
+      // Only a batch URL is remembered: a one-resource URL has no fallback and
+      // stays retryable on the next import, as before.
+      if (outcome !== 'registered' && fallback !== undefined) this.failedBundleUrls.set(preferred, [...failures])
+    }
+    if (outcome !== 'registered' && fallback !== undefined) outcome = await attempt(fallback)
+    if (outcome !== 'registered') {
+      throw new Error(`client-modules: could not load "${id}": ${failures.join('; ')}`)
+    }
+    if (reload !== undefined && this.reloadTargets.get(id) === reload) {
+      this.reloadTargets.delete(id)
+    }
   }
 
   /** Register each injected package and unresolved dynamic request before its consumer. */

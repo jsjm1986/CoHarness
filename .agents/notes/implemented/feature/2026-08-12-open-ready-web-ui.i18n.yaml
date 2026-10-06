@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-12-open-ready-web-ui.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-12-open-ready-web-ui.md
-2026-08-12-open-ready-web-ui.md: 075082aff6c0b811de3c6750637cb823fe83be61
-2026-08-12-open-ready-web-ui.zh.md: de73ab0c8574ff924229b54c2aedf41899fedee8
+/agent-note-dsh-web-opens-its-ready-page:
+  en: e1db1e9f5f2baa7d
+  zh: 520e7b5fd65aa988
+/agent-note-dsh-web-opens-its-ready-page/problem:
+  en: dc984e221cfbdb01
+  zh: 5c00808443069ac1
+/agent-note-dsh-web-opens-its-ready-page/decision:
+  en: fd7b2f3d7dcbfaa3
+  zh: 62ea7d2fe610dd8c
+/agent-note-dsh-web-opens-its-ready-page/alternatives-considered:
+  en: ee3518823fe1d9b8
+  zh: 471652a536d17d5a
+/agent-note-dsh-web-opens-its-ready-page/consequences:
+  en: b4dfb1764ac4e3f6
+  zh: e1d8cbc247724bad

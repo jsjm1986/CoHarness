@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-30-browser-safe-client-foundations.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-30-browser-safe-client-foundations.md
-2026-08-30-browser-safe-client-foundations.md: 7be93145f44ec9c3f39215107631c8a6d104200f
-2026-08-30-browser-safe-client-foundations.zh.md: cf6fb5a1a4534580152b44a15653e08a2a88653a
+/agent-note-centralize-browser-safe-client-primitives:
+  en: 0a88fb8cb78f40cd
+  zh: 024143b076ba23c1
+/agent-note-centralize-browser-safe-client-primitives/problem:
+  en: 431949e11beef286
+  zh: 763e576f22aa24fe
+/agent-note-centralize-browser-safe-client-primitives/decision:
+  en: f6f119b924faf97b
+  zh: f6652940dc2372c9
+/agent-note-centralize-browser-safe-client-primitives/alternatives-considered:
+  en: 48690c6f7d40356c
+  zh: 64570035b9e528d8
+/agent-note-centralize-browser-safe-client-primitives/consequences:
+  en: 3c96dae998544269
+  zh: f6bbd270ac1b1cf0
+/agent-note-centralize-browser-safe-client-primitives/testing:
+  en: 70e035e022d218cd
+  zh: 7f3c693e67c1b9a5

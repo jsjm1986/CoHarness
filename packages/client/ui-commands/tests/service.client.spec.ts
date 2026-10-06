@@ -40,6 +40,8 @@ interface BenchOptions {
   commands?: (payload: { sessionId: SessionId }) => Promise<{ commands: CommandDescriptor[] }>
   execute?: (payload: { sessionId: SessionId; line: string }) => Promise<ExecuteValue>
   addressed?: SessionId
+  /** Conversation snapshot every fake binding reports; default is a clean open. */
+  snapshot?: { openState: string; openError: { code: string; message: string; details: Record<string, never> } | null }
 }
 
 /**
@@ -106,12 +108,34 @@ async function bench(opts: BenchOptions = {}) {
   })
   // Real scope tags behind a fake sessions face.
   const scopes = new Map<SessionId, { ctx: Context; fiber: { dispose(): Promise<void> } }>()
+  /** Live `commandCatalog` references the fake `using` currently holds, by session. */
+  const catalogRefs = new Map<SessionId, number>()
+  const fakeBinding = (id: SessionId) => ({
+    sessionId: id,
+    session: { getSnapshot: () => opts.snapshot ?? { openState: 'open', openError: null } },
+    ctx: scopes.get(id)?.ctx,
+  })
   ctx.provide('sessions', {
     scope: (id: SessionId) => scopes.get(id)?.ctx,
     scopeOf: (c: Context) => scopeOf(c),
     subagentAddress: (id: SessionId) => id === opts.addressed
       ? { parentSessionId: sid('parent'), childSessionId: id, mode: 'continuable' as const }
       : undefined,
+    binding: (id: SessionId) => scopes.has(id) ? fakeBinding(id) : undefined,
+    using: async (target: SessionId, _options: unknown, operation: (reference: unknown) => unknown) => {
+      catalogRefs.set(target, (catalogRefs.get(target) ?? 0) + 1)
+      try {
+        return await operation({ ...fakeBinding(target), binding: fakeBinding(target) })
+      } finally {
+        catalogRefs.set(target, (catalogRefs.get(target) ?? 1) - 1)
+      }
+    },
+    retainInfo: (id: SessionId) => ({
+      getSnapshot: () => ({
+        referenceCount: (scopes.has(id) ? 1 : 0) + (catalogRefs.get(id) ?? 0),
+        retainedBy: catalogRefs.get(id) ? { commandCatalog: catalogRefs.get(id) } : {},
+      }),
+    }),
   })
   const forwarded = new Map<string, Array<(...args: never[]) => void>>()
   ctx.provide('remote', {
@@ -149,14 +173,28 @@ async function bench(opts: BenchOptions = {}) {
   if (source === undefined) throw new Error('command source not registered')
   const mint = (key: string) => {
     const handle = createScope(ctx, sid(key))
-    scopes.set(sid(key), handle)
-    return handle
+    const record = {
+      ctx: handle.ctx,
+      fiber: { dispose: async () => { scopes.delete(sid(key)); await handle.fiber.dispose() } },
+    }
+    scopes.set(sid(key), record)
+    return record
   }
   /** Warm one session's catalog through the source's own candidate pull. */
   const warm = async (session: ClientSessionContext) => {
     await source.candidates(session, { query: '', position: 'leading', signal: new AbortController().signal })
   }
-  return { ctx, fiber, command, source, mint, warm, listCalls, executeCalls, executions, registered, notices }
+  mint('s1')
+  mint('s2')
+  if (opts.addressed !== undefined) mint(opts.addressed)
+  const sessions = ctx.get('sessions') as {
+    binding(id: SessionId): unknown
+    retainInfo(id: SessionId): { getSnapshot(): { referenceCount: number; retainedBy: Record<string, number | undefined> } }
+  }
+  return {
+    ctx, fiber, command, source, mint, warm, listCalls, executeCalls,
+    executions, registered, notices, sessions, scopes, catalogRefs,
+  }
 }
 
 function menuPick(source: InputTriggerSource, name: string, session: ClientSessionContext, end?: number) {
@@ -211,6 +249,31 @@ describe('registration', () => {
 })
 
 describe('candidates', () => {
+  it('holds a commandCatalog reference until the catalog RPC settles', async () => {
+    const response = Promise.withResolvers<{ commands: CommandDescriptor[] }>()
+    const b = await bench({ commands: () => response.promise })
+    const pending = b.source.candidates(proj('s1'), req(''))
+    expect(b.sessions.retainInfo(sid('s1')).getSnapshot().retainedBy.commandCatalog).toBe(1)
+    response.resolve({ commands: S1_CMDS })
+    await pending
+    expect(b.sessions.retainInfo(sid('s1')).getSnapshot().retainedBy.commandCatalog).toBeUndefined()
+  })
+
+  it.each([true, false])('refuses an unsuccessful history open (reported error: %s)', async (reported) => {
+    const openError = { code: 'internal', message: 'history unavailable', details: {} }
+    const b = await bench({ snapshot: { openState: 'error', openError: reported ? openError : null } })
+    await expect(b.source.candidates(proj('s1'), req(''))).rejects.toThrow(reported ? 'history unavailable' : 'is not open')
+    expect(b.listCalls).toEqual([])
+  })
+
+  it('does not reopen a session released before catalog lookup', async () => {
+    const b = await bench()
+    await b.scopes.get(sid('s1'))?.fiber.dispose()
+    await expect(b.source.candidates(proj('s1'), req(''))).rejects.toThrow('requires a retained session')
+    expect(b.sessions.binding(sid('s1'))).toBeUndefined()
+    expect(b.listCalls).toEqual([])
+  })
+
   it('localizes first-party rows and groups an empty menu without changing command identity', async () => {
     const b = await bench({ commands: () => Promise.resolve({ commands: [
       { definitionId: CommandDefinitionId('@deepseek-ai/dsh-command-goal'), name: 'goal', description: 'host copy' },
@@ -699,10 +762,12 @@ describe('detached admission notices', () => {
   })
 
   it('a torn-down scope drops the failure notice', async () => {
-    const { source, warm, notices } = await bench({
+    const { source, warm, mint, notices } = await bench({
       execute: () => Promise.reject(new Error('orphan failure')),
     })
-    await warm(proj('ghost')) // never minted: scopeFor misses
+    const ghost = mint('ghost')
+    await warm(proj('ghost'))
+    await ghost.fiber.dispose() // released before the detached execute settles: scopeFor misses
     menuPick(source, 'plan', proj('ghost'))
     await flush()
     expect(notices).toEqual([])

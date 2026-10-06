@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-30-safety-notice.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-30-safety-notice.md
-2026-08-30-safety-notice.md: 4fba05775588161a8209ab0053697583516dce8f
-2026-08-30-safety-notice.zh.md: 47b5d755164b234f40dba123ea956d97d38bcfab
+/agent-note-publish-an-explicit-pre-release-safety-notice:
+  en: b780967004e485dc
+  zh: 766529d371e07604
+/agent-note-publish-an-explicit-pre-release-safety-notice/problem:
+  en: 61ad3aea598e08ee
+  zh: 60f3e504deaf2151
+/agent-note-publish-an-explicit-pre-release-safety-notice/decision:
+  en: 68b54accbc85cc44
+  zh: 120d363bafbd6d40
+/agent-note-publish-an-explicit-pre-release-safety-notice/alternatives-considered:
+  en: f5ba80bc0b3596c5
+  zh: 6e1e46062316c51c
+/agent-note-publish-an-explicit-pre-release-safety-notice/consequences:
+  en: fa096a14730dee65
+  zh: 6961d8a343d3565c

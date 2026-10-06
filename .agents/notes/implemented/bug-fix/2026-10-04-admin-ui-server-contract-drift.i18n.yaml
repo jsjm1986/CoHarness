@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-admin-ui-server-contract-drift.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-admin-ui-server-contract-drift.md
+/agent-note-close-admin-ui-drift-against-gateway-server-contracts:
+  en: 9d4db4d898294499
+  zh: 70641bfabb0e5614
+/agent-note-close-admin-ui-drift-against-gateway-server-contracts/problem:
+  en: 07304953a6c07afd
+  zh: 28d0b7a8ee402103
+/agent-note-close-admin-ui-drift-against-gateway-server-contracts/decision:
+  en: 7fe05d22165476ce
+  zh: cbea62b1b10c40ba
+/agent-note-close-admin-ui-drift-against-gateway-server-contracts/files:
+  en: 5193d3783f59c521
+  zh: 2db16ed57eee770c
+/agent-note-close-admin-ui-drift-against-gateway-server-contracts/alternatives-considered:
+  en: 2d94807b38271037
+  zh: 74f70a75ba6cad16
+/agent-note-close-admin-ui-drift-against-gateway-server-contracts/consequences:
+  en: 32a3e38d9ba4db94
+  zh: 21a28d365cad1a45

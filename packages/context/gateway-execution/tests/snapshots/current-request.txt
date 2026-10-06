@@ -1,0 +1,6 @@
+user: ordinary participant request
+tool denied: Error: The Gateway refused execution authorization. Use a verified account and an ordinary permission mode.
+assistant: finished
+user: qualified new request
+tool authorized: written
+assistant: finished

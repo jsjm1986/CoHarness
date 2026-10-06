@@ -1,3 +1,8 @@
+---
+description: "Model-route authorization Service Definition for DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-model-access
 
 English | [中文](README.zh.md)
@@ -9,10 +14,21 @@ Service Definition for deployment-owned authorization of exact `(provider, model
 Use `dsh-model-access` as the Service Definition for deployment-owned authorization of exact `(provider, model)` routes: catalogs, model selection, and execution consult the same `ctx.modelAccess` decision, and an absent service means no authorization policy is mounted.
 
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The definition declares a decision contract whose absence means no policy; providers own any rule state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the authorization seam permits or rejects routes but contributes no model input.
@@ -24,3 +40,13 @@ None; the package never assembles or sends provider requests.
 ## Known Limitations and Deferred Work
 
 - **No policy storage** — deployments must mount a provider that owns policy persistence and refresh semantics.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

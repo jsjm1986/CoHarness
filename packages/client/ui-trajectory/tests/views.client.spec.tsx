@@ -19,7 +19,7 @@ import {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ConversationSnapshot, RequestView,
+  ConversationSnapshot, ConversationViewSnapshotMap, RequestView,
   SessionId, SessionListState, SnapshotStore, WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConvViewProps, ViewTab } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -30,7 +30,7 @@ import {
 import { createChatStore } from '@deepseek-ai/dsh-client-ui-conversation/src/client/stores.ts'
 import { zh as conversationZh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 import { apply as localeApply, inject as localeInject } from '@deepseek-ai/dsh-client-locale/client'
-import { stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
 import type { LocaleKeysOf } from '@deepseek-ai/dsh-client-ui-slots'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-trajectory/client'
 import { apply as nodeApply } from '@deepseek-ai/dsh-client-ui-trajectory'
@@ -92,15 +92,17 @@ function historySnapshot(
     runningCalls: [],
     ...inspection,
   }
+  const viewSnapshots: Partial<ConversationViewSnapshotMap> = { trajectory }
   return {
     sessionId: SID,
     views: {
-      get: target => target === 'trajectory' ? trajectory : undefined,
+      get: target => viewSnapshots[target],
     },
     chat: EMPTY_CHAT_SNAPSHOT,
     nodes,
     turnTimings: new Map(),
     turnEnds: new Map(),
+    openTurn: undefined,
     partial: trajectory.partial,
     runningCalls: trajectory.runningCalls,
     pending: [],
@@ -155,13 +157,13 @@ function fakeSession(nodes: ConversationSnapshot['nodes']) {
 /** Empty sessions-list hook; breadcrumbs therefore fall back to the raw id. */
 function emptySessions() {
   const store = createSnapshotStore<SessionListState>(
-    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })
   return bindSnapshotSelector(store)
 }
 
 function emptyWorkspaces() {
   const store = createSnapshotStore<WorkspaceListState>({
-    items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true,
+    items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true,
     recentWorkspaceId: undefined,
   })
   return bindSnapshotSelector(store)
@@ -213,7 +215,7 @@ async function bench(snapshot = historySnapshot(NODES)) {
   // forwarded-event port.
   ctx.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
   ctx.provide('remote', { $on: () => () => {} } as never)
-  ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+  ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
   ctx.plugin({ inject: [...localeInject], apply: localeApply })
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
@@ -242,6 +244,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
   const inputActions = {
     setDraft: vi.fn(), addImages: vi.fn(), removeImage: vi.fn(), pruneImages: vi.fn(),
     addDocuments: vi.fn(), removeDocument: vi.fn(), pruneDocuments: vi.fn(), submit: vi.fn(),
+    captureInsertion: vi.fn(() => ({ start: 0, end: 0, draftRev: 0 })), insertText: vi.fn(() => false),
   }
   // Minimal outlet twin: resolve the ring entry by the `only` filter and
   // render it with the session standard kit (what SlotOutlet does for a
@@ -284,6 +287,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
         useSession={useSession}
         useSessions={emptySessions()}
         useWorkspaces={emptyWorkspaces()}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useProjection={(() => undefined)}
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
@@ -300,6 +304,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
         useSession={useSession}
         useSessions={emptySessions()}
         useWorkspaces={emptyWorkspaces()}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useProjection={(() => undefined)}
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
@@ -740,6 +745,7 @@ describe('timeline projection', () => {
     expect(view.container.querySelector('[data-timeline-hover-line]')).toBeTruthy()
     fireEvent.pointerEnter(boundary)
     expect(view.container.querySelector('[data-timeline-hover-line]')).toBeNull()
+    fireEvent.keyDown(boundary, { key: 'Tab' })
     fireEvent.focus(boundary)
     expect(screen.getByRole('tooltip').textContent)
       .toContain('Click to load earlier history')

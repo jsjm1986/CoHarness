@@ -116,7 +116,7 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     const sessionBaseline = baselineResponse(page, 'session.list')
     const workspaceBaseline = baselineResponse(page, 'workspace.list')
     const [, sessionResponse, workspaceResponse] = await Promise.all([
-      page.goto(scaffold.baseUrl, { waitUntil: 'load' }),
+      page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' }),
       sessionBaseline,
       workspaceBaseline,
     ])
@@ -213,13 +213,11 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     await compareOrRefreshGolden(SEARCH_EXPECTED, snapshot, MODE)
 
     await result.click()
-    // Search navigation addresses the session, not a specific event, and the
-    // query remains until the user explicitly clears it.
-    await expect.poll(() => search.inputValue(), { timeout: 5_000 }).toBe('WATERFALL')
+    // Search navigation addresses the session, not a specific event: opening a
+    // result reveals it in the tree, collapses the search, and clears the query.
+    await expect.poll(() => search.inputValue(), { timeout: 5_000 }).toBe('')
     await expect.poll(() => page.getByText('FIRST_DONE', { exact: true }).count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(1)
     await expect.poll(() => page.getByRole('heading', { name: 'Navigation Summary' }).count(), { timeout: 15_000 }).toBe(1)
-    await page.getByRole('button', { name: 'Clear search' }).click()
-    await expect.poll(() => search.inputValue(), { timeout: 5_000 }).toBe('')
     await expect.poll(() => page.locator('[role="treeitem"]').count(), { timeout: 10_000 }).toBeGreaterThanOrEqual(1)
   }, 90_000)
 
@@ -309,7 +307,10 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
       response.request().method() === 'HEAD'
       && new URL(response.url()).pathname === '/api/session.export', { timeout: 30_000 })
     const downloadPromise = page.waitForEvent('download', { timeout: 30_000 })
+    // The export capsule arms a confirmation before it downloads: the first
+    // click only reveals `Confirm download?`, the second triggers the export.
     await exportButton.click()
+    await page.getByRole('button', { name: 'Confirm download?' }).click()
     const response = await responsePromise
     expect(response.status()).toBe(200)
     const download = await downloadPromise
@@ -341,7 +342,7 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     const observerSessionBaseline = baselineResponse(observer, 'session.list')
     const observerWorkspaceBaseline = baselineResponse(observer, 'workspace.list')
     const [, observerSessionResponse, observerWorkspaceResponse] = await Promise.all([
-      observer.goto(scaffold.baseUrl, { waitUntil: 'load' }),
+      observer.goto(scaffold.authenticatedUrl, { waitUntil: 'load' }),
       observerSessionBaseline,
       observerWorkspaceBaseline,
     ])

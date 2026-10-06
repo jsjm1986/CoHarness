@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-26-merge-subagent-control-service.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-26-merge-subagent-control-service.md
-2026-07-26-merge-subagent-control-service.md: 1d8aadc6a90dc1bea5ea4b743bee6c112bf0c2ca
-2026-07-26-merge-subagent-control-service.zh.md: 2843a913a1e1bb912c0a77746a3887bcf1824471
+/agent-note-merge-subagent-control-into-the-subagent-service:
+  en: c979dacaed70fa8e
+  zh: 79298372f724fd88
+/agent-note-merge-subagent-control-into-the-subagent-service/problem:
+  en: 7a7826e0438fadf5
+  zh: 7add996b2695c71d
+/agent-note-merge-subagent-control-into-the-subagent-service/decision:
+  en: b5739e898ca1fb04
+  zh: 8668c6306ed2e6e9
+/agent-note-merge-subagent-control-into-the-subagent-service/alternatives-considered:
+  en: 9dc7f10b626f56c7
+  zh: f5296b309c2509a5
+/agent-note-merge-subagent-control-into-the-subagent-service/consequences:
+  en: dfc16bc69c35af0c
+  zh: 45ad901d59af84aa

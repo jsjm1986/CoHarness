@@ -101,8 +101,13 @@ function runTurn(sessionId: string): void {
   }
   event(sessionId, 'turn/start', { turn: 0 })
   if (env.FAKE_EXECUTION_EVENT !== undefined) {
-    event(sessionId, 'gateway/execution', { kind: 'accepted', state: { revision: '1',
+    event(sessionId, 'gateway/scoped-execution', { version: 1 })
+    event(sessionId, 'gateway/execution', { kind: 'accepted', state: { revision: '1', scopeId: '10000000-0000-4000-8000-000000000001',
       inputs: ['00000000-0000-4000-8000-000000000001'], actors: [{ userId: 7 }], primaryActorUserId: 7, unverifiedHistory: false } })
+    event(sessionId, 'gateway/continuation', { key: 'goal:example:1', scope: {
+      parentSessionId: sessionId, scopeId: '10000000-0000-4000-8000-000000000001',
+      inputs: ['00000000-0000-4000-8000-000000000001'], primaryActorUserId: 7, unverifiedHistory: false,
+    } })
   }
   if (env.FAKE_WEBHOOK_EVENT !== undefined) {
     event(sessionId, 'user/message', { turn: 0, step: 0, message: {
@@ -113,7 +118,8 @@ function runTurn(sessionId: string): void {
   }
   if (env.FAKE_DELIVERABLE_EVENTS !== undefined) {
     event(sessionId, 'deliverables/presented', { turn: 0, callId: 'present-1', files: [{ path: 'report.txt', description: 'Report' }] })
-    event(sessionId, 'workspace/changes', { turn: 0 })
+    event(sessionId, 'workspace/changes', { turn: 0, reviewId: 'a'.repeat(64) })
+    event(sessionId, 'workspace/changes', { turn: 1, incomplete: true, requiredReviewBytes: 8192 })
   }
   if (env.FAKE_MALFORMED_MESSAGE !== undefined) {
     event(sessionId, 'assistant/attempt', {

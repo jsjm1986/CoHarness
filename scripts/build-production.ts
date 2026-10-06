@@ -50,6 +50,8 @@ function requireAsset(directory: string, suffix: string, failures: string[]): vo
  * runtime, each paired with a built entry file proving the package built.
  */
 const GATEWAY_RUNTIME_PACKAGES: readonly { directory: string; entry: string }[] = [
+  { directory: 'packages/util/managed-data', entry: 'lib/index.js' },
+  { directory: 'packages/util/atomic-write', entry: 'lib/index.js' },
   { directory: 'packages/llm/llm', entry: 'lib/types/discovery.js' },
   { directory: 'packages/session/session-format', entry: 'lib/index.js' },
   { directory: 'packages/session/session-format-catalog', entry: 'lib/index.js' },
@@ -113,6 +115,7 @@ function verifyArtifacts(): void {
     'gateway/lib/config.js',
     'gateway/lib/server.js',
     'gateway/lib/runtime-api.js',
+    'gateway/lib/node-config-cli.js',
     'gateway/public/admin/index.html',
     'gateway/deploy/postgres/migrations/003_project_collaboration.sql',
     'gateway/deploy/postgres/migrations/004_conversation_event_json.sql',

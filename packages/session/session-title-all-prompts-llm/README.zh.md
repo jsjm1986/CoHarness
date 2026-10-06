@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-title-all-prompts-llm
 
 [English](README.md) | 中文
@@ -10,10 +15,22 @@
 
 `dsh-session-title-all-prompts-llm` 作为可选的 `ctx.sessionTitle` 提供方，通过 `ctx.llm` 总结所有符合条件的用户消息。它注册 `all-prompts` 节奏，并在每条新用户提示词后启动新修订，使用预置历史与子会话提示词。较新的修订会中止并取代旧工作，即使提供方忽略取消，也无法提交陈旧输出。它使用 `dsh-session-title-llm` 的完整必填共享 LLM 配置，因此路由、提示词、预算与取消行为不会漂移。本文优先介绍自动行为与配置；实现只是基于共享策略进行的轻量注册。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每个修订通过 `ctx.llm` 生成并经标题 seam 提交，更新的修订会中止陈旧工作；除已提交结果外不保留标题状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 全消息标题请求
@@ -30,7 +47,18 @@
 
 不会使主请求的 KV Cache 失效。每条提示词后，辅助输入都会增长或变化，因此提供方专用缓存复用会在第一个变化的 JSON token 处结束。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 输入溢出时保留先前标题；对于很长的会话，此提供方没有基于摘要继续生成摘要的机制或保留策略。
 - 它平等对待所有符合条件的用户消息，不提供权重、过滤或手动标题优先级。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

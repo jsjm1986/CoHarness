@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
+import { decimalToMicros, microsToDecimal } from '../money.ts'
 import { verifyExecutionAttribution } from '../execution-identity.ts'
 import type { UserRow } from '../auth.ts'
 import type {
@@ -27,6 +28,8 @@ import type {
   ProjectCredentialView,
   ProjectModelProviderRow,
   ProjectModelSettingsView,
+  UserQuotaView,
+  RoleQuotaView,
 } from '../model-governance.ts'
 import { ORGANIZATION_PROVIDER_PATTERN, ProjectModelSettingsConflictError } from '../model-governance.ts'
 import { OrganizationModelCredentialCipher } from '../organization-model-credentials.ts'
@@ -66,23 +69,6 @@ function credentialClassOf(source: string): CredentialClass {
 
 function tokenHash(token: string): Buffer {
   return createHash('sha256').update(token).digest()
-}
-
-function microsToDecimal(value: number): string {
-  nonnegative(value, 'monetary value')
-  return `${String(Math.floor(value / 1_000_000))}.${String(value % 1_000_000).padStart(6, '0')}`
-}
-
-function decimalToMicros(value: string | number): number {
-  const text = String(value)
-  const match = /^(\d+)(?:\.(\d+))?$/.exec(text)
-  if (match === null) throw new Error(`invalid non-negative decimal monetary value: ${text}`)
-  const whole = Number(match[1])
-  const fraction = (match[2] ?? '').padEnd(7, '0')
-  let micros = whole * 1_000_000 + Number(fraction.slice(0, 6))
-  if (Number(fraction[6]) >= 5) micros += 1
-  if (!Number.isSafeInteger(micros)) throw new Error(`monetary value exceeds safe integer range: ${text}`)
-  return micros
 }
 
 function safeCount(value: string | number, name: string): number {
@@ -428,6 +414,8 @@ function zeroUsageMeasure(): UsageMeasure {
 
 /** PostgreSQL-backed model access, pricing, quotas, and usage accounting. */
 export class PostgresModelGovernanceService {
+  /** Gateway-owned maintenance admission, including queued and background file projections. */
+  projectionWrite?: <T>(operation: () => Promise<T>) => Promise<T>
   constructor(
     private readonly context: PostgresRuntimeContext,
     private readonly credentialCipher: OrganizationModelCredentialCipher,
@@ -1386,6 +1374,53 @@ export class PostgresModelGovernanceService {
       companyCostMicrosLimit: limits?.company_cost_limit === null || limits?.company_cost_limit === undefined
         ? null
         : decimalToMicros(limits.company_cost_limit),
+    }
+  }
+
+  async userQuota(userId: number): Promise<UserQuotaView> {
+    const user = await internalUserId(this.context.pool, this.context.organizationId, userId)
+    if (user === null) throw new Error(`unknown user ${String(userId)}`)
+    const result = await this.context.pool.query<{
+      token_mode: 'inherit' | 'unlimited' | 'custom'
+      token_limit: string | null
+      company_cost_mode: 'inherit' | 'unlimited' | 'custom'
+      company_cost_limit: string | null
+    }>('SELECT token_mode,token_limit::text,company_cost_mode,company_cost_limit::text FROM harness.user_quotas WHERE user_id=$1',
+      [user])
+    const row = result.rows[0]
+    return {
+      tokenMode: row?.token_mode ?? 'inherit',
+      tokenLimit: row?.token_mode === 'custom' && row.token_limit !== null
+        ? safeCount(row.token_limit, 'user token limit')
+        : null,
+      companyCostMode: row?.company_cost_mode ?? 'inherit',
+      companyCostMicrosLimit: row?.company_cost_mode === 'custom' && row.company_cost_limit !== null
+        ? decimalToMicros(row.company_cost_limit)
+        : null,
+    }
+  }
+
+  /**
+   * Read a role's stored monthly limits.
+   * @param role - the `admin` or `user` quota subject.
+   * @returns the stored limits; an absent row or null field means unlimited.
+   *   Rejects when the value cannot be decoded safely.
+   */
+  async roleQuota(role: 'admin' | 'user'): Promise<RoleQuotaView> {
+    const result = await this.context.pool.query<{
+      token_limit: string | null
+      company_cost_limit: string | null
+    }>(`SELECT token_limit::text,company_cost_limit::text
+      FROM harness.role_quotas WHERE organization_id=$1 AND role=$2`,
+      [this.context.organizationId, roleForPostgres(role)])
+    const row = result.rows[0]
+    return {
+      tokenLimit: row?.token_limit === null || row?.token_limit === undefined
+        ? null
+        : safeCount(row.token_limit, 'role token limit'),
+      companyCostMicrosLimit: row?.company_cost_limit === null || row?.company_cost_limit === undefined
+        ? null
+        : decimalToMicros(row.company_cost_limit),
     }
   }
 

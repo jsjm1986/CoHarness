@@ -729,6 +729,41 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     return GatewaySessionCreationAuthorization(value.authorization)
   }
 
+  /** Issue one Gateway request under the shared deadline, classifying transport failures. */
+  private async fetchResponse(
+    path: string,
+    init: GatewayRuntimeRequestInit,
+    deadline: { signal: AbortSignal; dispose: () => void },
+    signal?: AbortSignal,
+  ): Promise<Response> {
+    try {
+      return await this.ctx.gatewayRuntime.request(path, { ...init, signal: deadline.signal })
+    } catch (error: unknown) {
+      throw classifyGatewayReadError(error, signal, deadline.signal)
+    }
+  }
+
+  private async requestValue(
+    response: Response,
+    responseLimit: number,
+    deadline: { signal: AbortSignal; dispose: () => void },
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    let value: unknown
+    try {
+      value = await readGatewayResponseJson(response, responseLimit, deadline.signal)
+    } catch (error: unknown) {
+      if (!response.ok) {
+        throwGatewayResponseError(response, undefined)
+      }
+      throw classifyGatewayReadError(error, signal, deadline.signal)
+    }
+    if (!response.ok) {
+      throwGatewayResponseError(response, value)
+    }
+    return value
+  }
+
   private async request(
     path: string,
     init: GatewayRuntimeRequestInit = {},
@@ -738,25 +773,8 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     signal?.throwIfAborted()
     const deadline = this.signal(signal)
     try {
-      let response: Response
-      try {
-        response = await this.ctx.gatewayRuntime.request(path, { ...init, signal: deadline.signal })
-      } catch (error: unknown) {
-        throw classifyGatewayReadError(error, signal, deadline.signal)
-      }
-      let value: unknown
-      try {
-        value = await readGatewayResponseJson(response, responseLimit, deadline.signal)
-      } catch (error: unknown) {
-        if (!response.ok) {
-          throwGatewayResponseError(response, undefined)
-        }
-        throw classifyGatewayReadError(error, signal, deadline.signal)
-      }
-      if (!response.ok) {
-        throwGatewayResponseError(response, value)
-      }
-      return value
+      const response = await this.fetchResponse(path, init, deadline, signal)
+      return await this.requestValue(response, responseLimit, deadline, signal)
     } finally {
       deadline.dispose()
     }
@@ -766,43 +784,19 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     signal?.throwIfAborted()
     const deadline = this.signal(signal)
     try {
-      let response: Response
-      try {
-        response = await this.ctx.gatewayRuntime.request(path, { ...init, signal: deadline.signal })
-      } catch (error: unknown) {
-        throw classifyGatewayReadError(error, signal, deadline.signal)
-      }
+      const response = await this.fetchResponse(path, init, deadline, signal)
       if (response.status === 404) {
         await response.body?.cancel().catch(() => {})
         return undefined
       }
-      let value: unknown
-      try {
-        value = await readGatewayResponseJson(response, GATEWAY_SESSION_RESPONSE_MAX_BYTES, deadline.signal)
-      } catch (error: unknown) {
-        if (!response.ok) {
-          throwGatewayResponseError(response, undefined)
-        }
-        throw classifyGatewayReadError(error, signal, deadline.signal)
-      }
-      if (!response.ok) {
-        throwGatewayResponseError(response, value)
-      }
-      return value
+      return await this.requestValue(response, GATEWAY_SESSION_RESPONSE_MAX_BYTES, deadline, signal)
     } finally {
       deadline.dispose()
     }
   }
 
-  async loadStored(id: SessionId, signal?: AbortSignal): Promise<StoredPrefix<never> | undefined> {
-    const value = record(await this.optional(
-      `/internal/runtime/session/load?sessionId=${encodeURIComponent(id)}`,
-      signal,
-    ))
-    if (value === undefined) return undefined
-    if (typeof value.revision !== 'string' || value.revision === '') {
-      throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session revision')
-    }
+  /** Parse the stored header and event list of one load/read response, verifying Session identity. */
+  private storedEvents(value: Record<string, unknown>, id: SessionId): { storage: SessionStorageMetadata; events: SessionEvent[] } {
     let storage: SessionStorageMetadata
     try {
       storage = storageFrom(value.header)
@@ -816,6 +810,19 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
     } catch (error: unknown) {
       throw protocolReadError(error, 'Gateway returned an invalid session event list')
     }
+    return { storage, events }
+  }
+
+  async loadStored(id: SessionId, signal?: AbortSignal): Promise<StoredPrefix<never> | undefined> {
+    const value = record(await this.optional(
+      `/internal/runtime/session/load?sessionId=${encodeURIComponent(id)}`,
+      signal,
+    ))
+    if (value === undefined) return undefined
+    if (typeof value.revision !== 'string' || value.revision === '') {
+      throw new SessionPersistenceReadError('protocol', 'Gateway returned an invalid session revision')
+    }
+    const { storage, events } = this.storedEvents(value, id)
     return {
       ...storage,
       events,
@@ -893,19 +900,7 @@ export class GatewaySessionPersistence extends SessionPersistence implements Per
       signal,
     ))
     if (value === undefined) return undefined
-    let storage: SessionStorageMetadata
-    try {
-      storage = storageFrom(value.header)
-    } catch (error: unknown) {
-      throw protocolReadError(error, 'Gateway returned an invalid session header')
-    }
-    if (storage.meta.id !== id) throw new SessionPersistenceReadError('protocol', 'Gateway returned a different session header')
-    let events: SessionEvent[]
-    try {
-      events = eventsFrom(value.events, (storage.meta.version as number) !== SESSION_FORMAT_VERSION)
-    } catch (error: unknown) {
-      throw protocolReadError(error, 'Gateway returned an invalid session event list')
-    }
+    const { storage, events } = this.storedEvents(value, id)
     return { ...storage, events }
   }
 

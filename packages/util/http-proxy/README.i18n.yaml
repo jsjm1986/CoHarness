@@ -1,6 +1,49 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/http-proxy/README.md
-README.md: da1d5e4733f0b5050743446a112b0465b28a53b0
-README.zh.md: 23e551941acac95ad6b9a77ba6a372e04b43a7dd
+/:
+  en: 117b4d191f773a9c
+  zh: 0b9e150f6cd23b04
+/deepseek-ai-dsh-http-proxy:
+  en: 6c9406455954c0e3
+  zh: 5bcd0337d80a2047
+/deepseek-ai-dsh-http-proxy/summary:
+  en: 973f5be57274a03b
+  zh: d720884e854da66f
+/deepseek-ai-dsh-http-proxy/table-of-contents:
+  en: 80b31a934611cb4a
+  zh: 05f3f7f9cb2fd881
+/deepseek-ai-dsh-http-proxy/use-this-package:
+  en: bc67087b571aa603
+  zh: 264ac9bb95c8efe8
+/deepseek-ai-dsh-http-proxy/use-this-package/writing-a-new-outbound-call:
+  en: 96d4f206a3384a19
+  zh: 8da1407d92f1d88d
+/deepseek-ai-dsh-http-proxy/use-this-package/what-the-policy-reads:
+  en: a1f74dd3a34ed97e
+  zh: d9440a0666caccb6
+/deepseek-ai-dsh-http-proxy/use-this-package/failures:
+  en: 4248bc9a662680ed
+  zh: 23c26fd2627711c9
+/deepseek-ai-dsh-http-proxy/understand-the-implementation:
+  en: ee4615a04fa6503d
+  zh: ee2c5fb2204a43cf
+/deepseek-ai-dsh-http-proxy/understand-the-implementation/design-philosophy:
+  en: 73c3a16dedfe00e2
+  zh: e8d949b479ca3dde
+/deepseek-ai-dsh-http-proxy/understand-the-implementation/source-map:
+  en: a099f88dd0c7d394
+  zh: 5444b961d452599c
+/deepseek-ai-dsh-http-proxy/understand-the-implementation/bypass-matching:
+  en: e9ad6c2e8ee2fc21
+  zh: c10de6995cf594bc
+/deepseek-ai-dsh-http-proxy/further-exploration:
+  en: 6445b364a7949e7f
+  zh: d2f5e8aa59bc9348
+/deepseek-ai-dsh-http-proxy/known-limitations-and-deferred-work:
+  en: 992c3aeb885450e1
+  zh: b5c3b12068119881
+/deepseek-ai-dsh-http-proxy/known-limitations-and-deferred-work/dev-note:
+  en: bc6f797809c40880
+  zh: 29b06e0aae5a30ec

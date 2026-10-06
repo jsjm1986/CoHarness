@@ -4,7 +4,7 @@
 
 import type {
   IApiClient, HostFrame, MuxFrame, RpcError, RpcRequest, RpcResult, SessionId,
-  SessionSummary as WireSessionSummary, SubagentAddress, SubagentCatalog, JobView, WorkspaceId,
+  SessionSummary as WireSessionSummary, SubagentAddress, SubagentCatalog, JobView, JobOutputValue, WorkspaceId,
 } from '@deepseek-ai/dsh-api-remotes/client'
 // Value import from the inline-safe wire layer (not the connection plugin):
 // plugin-to-plugin value imports are a bundle purity error.
@@ -53,6 +53,8 @@ export interface SessionListSnapshot {
   subagentsByParent: Readonly<Record<SessionId, SubagentCatalogSnapshot>>
   /** Background jobs per session; an absent key is an empty set. */
   jobsBySession: Readonly<Record<SessionId, readonly JobView[]>>
+  /** Live output observation per expanded job row; an absent key means unobserved. */
+  observedJobs: Readonly<Record<string, ObservedJob>>
   currentAddress: SubagentAddress | undefined
 }
 
@@ -73,6 +75,46 @@ interface CatalogInflight {
 
 /** Maximum resident-session history rebuilds admitted after one reconnect. */
 const MAX_RESYNC_CONCURRENCY = 4
+/** Bounded per-job render tail, in UTF-16 code units. */
+const JOB_RENDER_TAIL_LIMIT = 128 * 1024
+/** Observation poll cadence for one expanded job row, in milliseconds. */
+const JOB_OBSERVE_POLL_MS = 1_000
+
+/** One observed job's live view state: accumulated bounded output tail plus lifecycle. */
+export interface ObservedJob {
+  readonly jobId: JobView['id']
+  /** Accumulated output tail, bounded to the render limit. */
+  readonly text: string
+  /** True when bytes before {@link text} were dropped (eviction, resume gap, or the render bound). */
+  readonly gapBefore: boolean
+  /** True while the observation is live and the job has not settled. */
+  readonly streaming: boolean
+  /** Terminal observation failure, when a read ended abnormally. */
+  readonly error?: string
+}
+
+/** Mutable observation bookkeeping behind one {@link ObservedJob} view. */
+interface ObservedJobState {
+  view: ObservedJob
+  /** Resume offset for the next read (the last response's `next`). */
+  cursor: number | undefined
+}
+
+/** Wait out one poll interval, resolving early when the observation is released. */
+function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.resolve()
+  return new Promise((resolve) => {
+    const onAbort = (): void => {
+      clearTimeout(timer)
+      resolve()
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+}
 
 type SessionListMutation =
   | { kind: 'upsert'; summary: ClientSessionSummary }
@@ -167,6 +209,10 @@ export class SessionManager {
    * is stored as an absent key, so absence and `[]` are one representation.
    */
   private readonly jobsBySession = new Map<SessionId, readonly JobView[]>()
+  /** Live output observation state keyed by job id, fed by `jobs.output` reads. */
+  private readonly observedJobs = new Map<string, ObservedJobState>()
+  /** Reference-counted pollers — two viewers of one job share one observation. */
+  private readonly jobObservations = new Map<string, { refs: number; abort: AbortController }>()
 
   private selected: SessionId | undefined
 
@@ -263,7 +309,7 @@ export class SessionManager {
     this.notifier.notifyNow()
   }
 
-  /** Release reconnect queues and delayed catalog work owned by this manager. */
+  /** Release reconnect queues, delayed catalog work, and live job observations owned by this manager. */
   dispose(): void {
     this.resyncGeneration++
     this.resyncQueue = []
@@ -272,6 +318,9 @@ export class SessionManager {
     for (const timer of this.catalogDebounce.values()) clearTimeout(timer)
     this.catalogDebounce.clear()
     this.catalogStale.clear()
+    for (const entry of this.jobObservations.values()) entry.abort.abort()
+    this.jobObservations.clear()
+    this.observedJobs.clear()
   }
 
   /**
@@ -1197,6 +1246,123 @@ export class SessionManager {
     }
   }
 
+  /**
+   * Start observing one job's live output; reference-counted, so overlapping
+   * viewers of the same job share one poller. The roster itself keeps flowing
+   * through `session/jobs` frames — this channel only carries the ring's
+   * bytes. Resumption is cursor-driven: the next read passes the previous
+   * response's `next`, so a transport retry or a reconnect loses nothing.
+   * @param sessionId - owning session used for the fenced read; undefined for an unowned job.
+   * @param jobId - job to observe.
+   * @returns release for this observer's reference; the last release stops the poller.
+   */
+  observeJob(sessionId: SessionId | undefined, jobId: JobView['id']): () => void {
+    const key = String(jobId)
+    const existing = this.jobObservations.get(key)
+    if (existing !== undefined && !existing.abort.signal.aborted) {
+      existing.refs += 1
+      // Release closures bind the exact entry they were minted for, never the
+      // map's current occupant: a re-acquire on the same key may already hold
+      // a newer controller.
+      return () => { this.releaseJobObservation(key, existing.abort) }
+    }
+    const abort = new AbortController()
+    this.jobObservations.set(key, { refs: 1, abort })
+    void this.runJobObservation(sessionId, jobId, abort.signal)
+    return () => { this.releaseJobObservation(key, abort) }
+  }
+
+  /**
+   * Kill one background job from a session's job list. Pure RPC passthrough:
+   * row state converges through the `session/jobs` frames, and the caller
+   * (the job-list control) owns error presentation.
+   * @param sessionId - session whose job list carries the job.
+   * @param jobId - the job row's registry id.
+   * @returns whether the registry admitted the request (`requested` or `already-finished`).
+   */
+  async killJob(sessionId: SessionId, jobId: JobView['id']): Promise<boolean> {
+    const { result } = await this.api.jobs.kill({ sessionId, jobId })
+    return result.ok
+  }
+
+  /**
+   * Poll `jobs.output` on the observe cadence until the job settles drained,
+   * the read fails, or the last observer releases. Transport failures retry on
+   * the next tick — the cursor makes a reconnect idempotent — while a
+   * business refusal (`job-not-found` when the row vanished) is terminal.
+   */
+  private async runJobObservation(
+    sessionId: SessionId | undefined,
+    jobId: JobView['id'],
+    signal: AbortSignal,
+  ): Promise<void> {
+    const key = String(jobId)
+    const record: ObservedJobState = {
+      view: { jobId, text: '', gapBefore: false, streaming: true },
+      cursor: undefined,
+    }
+    this.observedJobs.set(key, record)
+    this.notifier.markDirty()
+    while (!signal.aborted) {
+      let value: JobOutputValue
+      try {
+        const { result } = await this.api.jobs.output({
+          jobId,
+          ...sessionId === undefined ? {} : { sessionId },
+          ...record.cursor === undefined ? {} : { from: record.cursor },
+        }, signal)
+        if (!result.ok) {
+          record.view = { ...record.view, streaming: false, error: `${result.error.code}: ${result.error.message}` }
+          this.notifier.markDirty()
+          return
+        }
+        value = result.value
+      } catch {
+        // A release-driven abort rejects the fetch as a transport failure;
+        // the sleep resolves at once for it, so both abort and retry funnel
+        // through the loop guard.
+        await abortableSleep(JOB_OBSERVE_POLL_MS, signal)
+        continue
+      }
+      // A first read anchored past offset zero starts after an evicted head,
+      // so it owes the same gap mark a live observer earns from lossy reads.
+      const firstRead = record.cursor === undefined
+      let text = record.view.text + value.chunks.map(chunk => chunk.text).join('')
+      let gapBefore = record.view.gapBefore || value.lossy === true
+        || (firstRead && value.output.earliest > 0)
+        || value.chunks.some(chunk => chunk.gapBefore === true)
+      if (text.length > JOB_RENDER_TAIL_LIMIT) {
+        let cut = text.length - JOB_RENDER_TAIL_LIMIT
+        // Never split a surrogate pair at the render bound.
+        const unit = text.charCodeAt(cut)
+        if (unit >= 0xDC00 && unit <= 0xDFFF) cut += 1
+        text = text.slice(cut)
+        gapBefore = true
+      }
+      record.cursor = value.next
+      record.view = { ...record.view, text, gapBefore }
+      this.notifier.markFrameDirty()
+      // Settled and drained: the roster row already carries the terminal
+      // projection, so the observation closes without a separate status read.
+      if (value.job.status !== 'running' && value.job.status !== 'stopping' && value.next >= value.output.total) {
+        record.view = { ...record.view, streaming: false }
+        this.notifier.markDirty()
+        return
+      }
+      await abortableSleep(JOB_OBSERVE_POLL_MS, signal)
+    }
+  }
+
+  private releaseJobObservation(key: string, abort: AbortController): void {
+    const entry = this.jobObservations.get(key)
+    if (entry === undefined || entry.abort !== abort) return
+    entry.refs -= 1
+    if (entry.refs > 0) return
+    this.jobObservations.delete(key)
+    abort.abort()
+    if (this.observedJobs.delete(key)) this.notifier.markDirty()
+  }
+
   private buildListSnapshot(): SessionListSnapshot {
     const merged: TitledSessionSummary[] = this.summaries.map((summary) => {
       // List rows read the generic 'title' projection key (host-computed unit
@@ -1256,6 +1422,7 @@ export class SessionManager {
       error: this.listError,
       subagentsByParent: Object.fromEntries(this.catalogs),
       jobsBySession: Object.fromEntries(this.jobsBySession),
+      observedJobs: Object.fromEntries([...this.observedJobs].map(([id, state]) => [id, state.view])),
       currentAddress: current === undefined ? undefined : this.addresses.get(current),
     }
   }
@@ -1295,6 +1462,11 @@ function applyMutation(summaries: readonly ClientSessionSummary[], mutation: Ses
         // create echo, the select echo, a list row) reports the CURRENT one.
         ...(mutation.summary.agentPreset !== undefined
           ? { agentPreset: mutation.summary.agentPreset } : {}),
+        // Visibility mutates through setVisibility; the freshest list row wins.
+        ...(mutation.summary.visibility !== undefined
+          ? { visibility: mutation.summary.visibility } : {}),
+        ...(existing.projectId === undefined && mutation.summary.projectId !== undefined
+          ? { projectId: mutation.summary.projectId } : {}),
       }
       if (!filled.blank && filled.workspaceId !== undefined) {
         const { workspaceId: _workspaceId, ...engaged } = filled

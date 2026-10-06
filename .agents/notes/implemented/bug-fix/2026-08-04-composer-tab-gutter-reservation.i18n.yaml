@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-04-composer-tab-gutter-reservation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-04-composer-tab-gutter-reservation.md
-2026-08-04-composer-tab-gutter-reservation.md: 8bd9fb2d86982d82b44a82c55b7303fcd9a5bf4d
-2026-08-04-composer-tab-gutter-reservation.zh.md: d3a9691f5f5fb095fc53b4cf6b627025220a8148
+/agent-note-the-conversation-column-reserves-one-scrollbar-gutter-for-every-view:
+  en: fd02bc766b6b9f71
+  zh: 4f1636b7cc0cfb77
+/agent-note-the-conversation-column-reserves-one-scrollbar-gutter-for-every-view/problem:
+  en: 6349b6c1786a111f
+  zh: 122d2d296f9f7186
+/agent-note-the-conversation-column-reserves-one-scrollbar-gutter-for-every-view/decision:
+  en: 835c5249209b3049
+  zh: c31eae2a54eab424
+/agent-note-the-conversation-column-reserves-one-scrollbar-gutter-for-every-view/alternatives-considered:
+  en: 15de92d349181f4a
+  zh: 5609a0ea049f1fec
+/agent-note-the-conversation-column-reserves-one-scrollbar-gutter-for-every-view/consequences:
+  en: 01946001e5f3fa12
+  zh: c332516366815d56
+/agent-note-the-conversation-column-reserves-one-scrollbar-gutter-for-every-view/testing:
+  en: 433cb3fb982ff726
+  zh: d427d2db035669ca

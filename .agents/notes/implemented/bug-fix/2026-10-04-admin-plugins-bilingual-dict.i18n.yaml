@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-admin-plugins-bilingual-dict.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-admin-plugins-bilingual-dict.md
+/agent-note-wire-the-admin-plugins-surface-s-english-dictionary:
+  en: a5003f3bb34fde36
+  zh: ff1ae5db7fb35a20
+/agent-note-wire-the-admin-plugins-surface-s-english-dictionary/problem:
+  en: c7ae3371c4e531fa
+  zh: a52c86ac544650ab
+/agent-note-wire-the-admin-plugins-surface-s-english-dictionary/decision:
+  en: 81541742e98bb4ac
+  zh: 04b23bd1927a3d89
+/agent-note-wire-the-admin-plugins-surface-s-english-dictionary/files:
+  en: 66d041eb028b21b7
+  zh: 80feab08e9d77b02
+/agent-note-wire-the-admin-plugins-surface-s-english-dictionary/alternatives-considered:
+  en: 6d564038aad0c6ae
+  zh: 568fe0631e1e759d
+/agent-note-wire-the-admin-plugins-surface-s-english-dictionary/consequences:
+  en: f0e1fa873da13ce7
+  zh: 947c17016cb871d3

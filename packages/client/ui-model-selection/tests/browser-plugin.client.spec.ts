@@ -161,13 +161,15 @@ describe('ui-model-selection dual entry', () => {
     expect(b.seat().locale).toBe('model')
   })
 
-  it('popup options mark the host current and explain each model input capability', async () => {
+  it('popup options group rows under provider headings and mark the host current', async () => {
     const b = await bench()
     b.mint('s1')
     const options = await b.contribution().ui.options(projection('s1'), new AbortController().signal)
     expect(options.map((o: SelectOption) => o.label)).toEqual(['DeepSeek-V4-Flash', 'DeepSeek-V4-Pro'])
-    expect(options[0]).toMatchObject({ active: true, detail: 'DeepSeek · 仅文本' })
-    expect(options[1]).toMatchObject({ detail: 'DeepSeek · 支持图片' })
+    expect(options.map((o: SelectOption) => o.group?.label)).toEqual(['DeepSeek', 'DeepSeek'])
+    expect(options.every((o: SelectOption) => o.detail === undefined)).toBe(true)
+    expect(b.contribution().ui.searchMode).toBe('fuzzy-label')
+    expect(options[0]).toMatchObject({ active: true })
     expect(options[1]?.active).toBeUndefined()
   })
 
@@ -199,12 +201,12 @@ describe('ui-model-selection dual entry', () => {
     const b = await bench()
     b.mint('s1')
     const seatFace = b.seat().inject!(sid('s1'))
-    // Switch through the SEAT entry.
-    expect(await seatFace.select({
-      provider: 'deepseek-official',
-      model: 'deepseek-v4-pro',
-      reasoningEffort: 'max',
-    })).toBe(true)
+    // Switch through the SEAT entry; the directory holds the submission until it settles.
+    const selection = { provider: 'deepseek-official', model: 'deepseek-v4-pro', reasoningEffort: 'max' }
+    const settled = seatFace.select(selection)
+    expect(seatFace.directory.getSnapshot()).toMatchObject({ status: 'selecting', pending: selection })
+    expect(await settled).toBe(true)
+    expect(seatFace.directory.getSnapshot()).toMatchObject({ status: 'ready', pending: null })
     expect(b.hostCurrent()).toEqual({
       provider: 'deepseek-official',
       model: 'deepseek-v4-pro',
@@ -245,6 +247,19 @@ describe('ui-model-selection dual entry', () => {
     expect(faceA.directory).not.toBe(faceB.directory)
     // The service face resolves the same instance the seat inject handed out.
     expect(b.ctx.modelDirectories.directoryFor(sid('a')).store).toBe(faceA.directory)
+  })
+
+  it('drops a pending selection on connection reset and ignores its late settlement', async () => {
+    const b = await bench()
+    b.mint('s1')
+    const face = b.seat().inject!(sid('s1'))
+    await b.ctx.modelDirectories.directoryFor(sid('s1')).load()
+    const late = face.select({ provider: 'deepseek-official', model: 'deepseek-v4-pro' })
+    expect(face.directory.getSnapshot().pending).toEqual({ provider: 'deepseek-official', model: 'deepseek-v4-pro' })
+    b.ctx.emit('connection/reset')
+    expect(face.directory.getSnapshot()).toMatchObject({ status: 'loading', pending: null })
+    await late
+    expect(face.directory.getSnapshot().pending).toBeNull()
   })
 
   it('drops an unconsumed local selection and restores the Host target after reconnect', async () => {

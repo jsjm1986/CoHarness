@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-24-live-conversation-history-retention.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-24-live-conversation-history-retention.md
-2026-08-24-live-conversation-history-retention.md: 495af2b76850507a4b39b03509f75990ff028076
-2026-08-24-live-conversation-history-retention.zh.md: e76cc3921bfeafb88e0a8083bc00bc0571730a94
+/agent-note-retain-the-active-conversation-history-window:
+  en: c561684fe94c174b
+  zh: f321f5339f96196b
+/agent-note-retain-the-active-conversation-history-window/problem:
+  en: 63ff94a600b17ae3
+  zh: 4655aff1a0a0c21a
+/agent-note-retain-the-active-conversation-history-window/decision:
+  en: 0ce1d51a2b4d275c
+  zh: db48cf5e5ba98aa1
+/agent-note-retain-the-active-conversation-history-window/alternatives-considered:
+  en: 7bce478814215dad
+  zh: 2047d1557b11b06e
+/agent-note-retain-the-active-conversation-history-window/consequences:
+  en: 9d8e547d79c127be
+  zh: 404aabca8702c62d

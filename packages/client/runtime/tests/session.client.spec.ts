@@ -14,6 +14,7 @@ import type {} from '@deepseek-ai/dsh-commands/types'
 import type { SessionAssistantStreamFrame, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import { LlmAttemptId, ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import { Session } from '../src/client/sessions/session.ts'
+import { PendingWait } from '../src/client/sessions/pending.ts'
 import type {
   ChatConversationViewNode, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot,
   ConversationEventInput, ConversationNode, ConversationNodeDefinition,
@@ -24,6 +25,11 @@ import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.
 import { entries, ev, plainTurn } from './event-script.client.ts'
 
 const SID = 'fk-s1' as SessionId
+const pendingWaitOf = (session: Session): PendingWait => {
+  const entry = session.getSnapshot().pending[0]
+  if (!(entry instanceof PendingWait)) throw new Error('expected a wire PendingWait at pending[0]')
+  return entry
+}
 const PARENT = 'fk-parent' as SessionId
 
 afterEach(() => {
@@ -1177,7 +1183,7 @@ describe('pending interactions', () => {
   it('mints waits whose respond() backfills the requested rpcId into the client-response envelope', async () => {
     const { api, session } = makeSession()
     session.handleMuxEnvelope('rq-answer' as never, { type: 'question/requested', sessionId: SID, questions: [] })
-    const wait = session.getSnapshot().pending[0]!
+    const wait = pendingWaitOf(session)
     expect(wait).toMatchObject({ kind: 'question', key: 'q:rq-answer', sessionId: SID, payload: { questions: [] } })
     const receipt = await wait.respond({
       ok: true,
@@ -1196,7 +1202,7 @@ describe('pending interactions', () => {
   it('settles the wait on the authoritative resolved frame: respond() then throws synchronously', async () => {
     const { api, session } = makeSession()
     session.handleMuxEnvelope('rq1' as never, { type: 'question/requested', sessionId: SID, questions: [] })
-    const wait = session.getSnapshot().pending[0]!
+    const wait = pendingWaitOf(session)
     session.handleMuxEnvelope('ry' as never, { type: 'question/resolved', sessionId: SID, questionRpcId: 'rq1' as never, outcome: 'answered' })
     expect(session.getSnapshot().pending).toEqual([])
     expect(() => wait.respond({ ok: false, error: { code: 'internal', message: 'x', details: {} } }))
@@ -1557,10 +1563,10 @@ describe('resync', () => {
     api.onHistory = () => histResponse(plainTurn(0, 0, 'a', 'b'))
     await session.open()
     session.handleMuxEnvelope('rq-replay' as never, { type: 'question/requested', sessionId: SID, questions: [] })
-    const before = session.getSnapshot().pending[0]!
+    const before = pendingWaitOf(session)
     await session.resync()
     session.handleMuxEnvelope('rq-replay' as never, { type: 'question/requested', sessionId: SID, questions: [] })
-    const after = session.getSnapshot().pending[0]!
+    const after = pendingWaitOf(session)
     expect(after).not.toBe(before)
     expect(after.key).toBe(before.key)
     // Superseded ≠ settled: an in-flight respond on the stale reference still reaches the host.

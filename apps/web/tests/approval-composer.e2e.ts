@@ -59,7 +59,7 @@ describe('web e2e: approval takeover keeps its actions reachable', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
   }, 120_000)
@@ -91,9 +91,9 @@ describe('web e2e: approval takeover keeps its actions reachable', () => {
     // Read-only: the mode whose denial the model escalates from. Switched
     // through the shipped access-mode chip, not a test-only override.
     await page.locator('[aria-label^="Access mode"]').click()
-    await page.getByRole('menuitem', { name: 'Read Only' }).click()
+    await page.getByRole('menuitem', { name: 'Read only' }).click()
     await expect.poll(
-      () => page.locator('[aria-label="Access mode, current: Read Only"]').count(),
+      () => page.locator('[aria-label="Access mode, current: Read only"]').count(),
       { timeout: 15_000 },
     ).toBe(1)
 

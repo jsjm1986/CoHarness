@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { IconCheckOutline16 } from './icons/index.tsx'
 import css from './Toast.module.css'
 
 /** Full-opacity hold before the fade starts, when the owner names none. */
@@ -23,19 +24,28 @@ const FADE_MS = 1000
  * reads it as a custom property — so the two can no longer disagree and leave
  * the banner unmounting mid-fade.
  * @param props.text - resolved banner copy; the owner passes localized text.
- * @param props.icon - optional leading glyph (e.g. a warning icon).
+ * @param props.icon - optional leading glyph (e.g. a warning icon); ignored
+ * under `tone="success"`, which brings its own glyph.
+ * @param props.tone - 'success' renders a circled-check-style green check as
+ * the leading glyph; omitted, the icon seat keeps its warning tint.
  * @param props.holdMs - full-opacity hold before the fade; defaults to 3000.
  * @param props.anchor - optional element whose horizontal center the banner
  * follows (e.g. the composer card, so the banner centers over the chat column
  * rather than the whole window); omitted, it centers on the viewport.
+ * @param props.actions - optional inline actions continuing the sentence: an
+ * action renders its optional prefix as plain text, then its label as a
+ * button; the banner stays click-through, only the action text takes the
+ * pointer.
  * @param props.onDone - called once the fade completes; unmount the toast here.
  * @returns the floating banner.
  */
-export function Toast({ text, icon, anchor, holdMs = HOLD_MS, onDone }: {
+export function Toast({ text, icon, tone, anchor, holdMs = HOLD_MS, actions, onDone }: {
   text: string
   icon?: ReactNode
+  tone?: 'success'
   anchor?: HTMLElement | null
   holdMs?: number
+  actions?: readonly { label: string; prefix?: string; onClick: () => void }[]
   onDone: () => void
 }) {
   useEffect(() => {
@@ -65,8 +75,20 @@ export function Toast({ text, icon, anchor, holdMs = HOLD_MS, onDone }: {
         '--dsh-toast-hold': `${String(holdMs)}ms`,
       } as CSSProperties}
     >
-      {icon !== undefined && <span className={css.icon} aria-hidden>{icon}</span>}
-      <span className={css.text}>{text}</span>
+      {tone === 'success'
+        ? <span className={`${css.icon} ${css.success}`} aria-hidden><IconCheckOutline16 /></span>
+        : icon !== undefined && <span className={css.icon} aria-hidden>{icon}</span>}
+      <span className={css.text}>
+        {text}
+        {actions?.map(action => (
+          <Fragment key={action.label}>
+            {action.prefix}
+            <button type="button" className={css.action} onClick={action.onClick}>
+              {action.label}
+            </button>
+          </Fragment>
+        ))}
+      </span>
     </div>,
     document.body,
   )

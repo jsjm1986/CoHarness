@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-lsp-stdio
 
 [English](README.md) | 中文
@@ -10,6 +15,20 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 
 使用 `dsh-lsp-stdio` 可让 agent（智能体）从显式配置的本地语言服务器获得定义、引用、实现与悬停信息。它把文件扩展名映射为语言标识符，按需为每个工作区启动一台服务器，并在每次查询时重新读取文件，不在查询之间保留文档状态。语言服务器进程与源文件读取共享已挂载的文件系统和子进程环境。本包不安装服务器，也不提供沙箱；部署方必须提供命令、映射和所需的隔离措施。同一服务器与工作区的查询串行执行，不同工作区可并行运行。
 
+## 目录
+
+- [功能](#what-it-does)
+- [配置](#configuration)
+- [协议行为](#protocol-behavior)
+- [安全边界](#security-boundary)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="what-it-does"></a>
 ## 功能
 
 - 在注册前解析每项服务器局部设置；无效映射或注册冲突会回滚较早配置项，因此加载失败不会留下提供方路由。
@@ -20,6 +39,7 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 - 通过 `ctx.subprocess` 解析服务器可执行文件、cwd、进程和协议流；`initialize.processId` 为 `null`，因为另一台机器或 PID namespace 不得监视 harness 进程。
 - 使用 `ctx.fs` 提供的规范化包含关系、文件 URI 与流式文本验证，但不发出 `fs/observed`：只有 LSP 结果对模型可见，因此查询不满足先读后写策略。
 
+<a id="configuration"></a>
 ## 配置
 
 `servers` 记录的 key 是在 `ctx.lsp` 上保留的稳定提供方 id；每个值具有以下形状：
@@ -40,18 +60,23 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 
 `servers` 必须至少包含一个配置项，每个 id 都必须非空。定时器预算必须是正整数，且不超过 Node 的 `2_147_483_647` ms 定时器上限。所有可执行文件都会在清理 credential 后于加载时解析；后面的坏配置项会阻止所有提供方注册。进程在第一次匹配查询时惰性启动。
 
+<a id="protocol-behavior"></a>
 ## 协议行为
 
 初始化会声明 `general.positionEncodings: ['utf-16']`、`workspace: { workspaceFolders: true, configuration: true }`、`textDocument.hover.contentFormat: ['markdown', 'plaintext']`，以及定义与实现使用的 `linkSupport: true`，且不进行动态注册。服务器返回的能力具有最终决定权：不受支持的操作，或缺少临时打开／关闭的同步方式，会使查询失败。服务器省略 `positionEncoding` 时默认为 `utf-16`；其他值都属于协议错误。客户端通过静态配置回答 `workspace/configuration`，接受生命周期记账请求，并拒绝 `workspace/applyEdit`：它绝不应用编辑或运行命令。导航直接映射 `Location`，并从 `LocationLink` 的 `targetUri` + `targetSelectionRange` 映射；hover 规范化会取得有效的 `MarkupContent.value`，保留 string `MarkedString`，把带 language tag 的值渲染为围栏代码，并用一个空行连接数组。缺失结果、格式错误的范围或位置，以及格式错误的 hover 编码，都会以结构化 `LSP_MALFORMED_RESPONSE` 错误的形式失败。
 
+<a id="security-boundary"></a>
 ## 安全边界
 
 提供方信任其配置的服务器，不提供任何沙箱隔离。它把规范化身份、包含关系、普通文件流式读取、UTF-8 验证和文件 URI 编码委托给 `ctx.fs`；并在服务器启动前拒绝缺失、非普通文件、非 UTF-8、过大，或规范化后位于 Workspace 外部的查询源。包含关系在打开流之前评估，不承诺在并发路径替换期间保持稳定句柄身份。结果位置可以在外部，但外部路径不能成为查询源。部署必须挂载描述同一执行世界的文件系统与进程管理提供方；分裂世界组合无效。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每个已注册提供方通过 `ctx.subprocess` 拥有一个 language-server 子进程；生命周期与隔离由提供方规格覆盖，插件不保留跨服务器状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 通过 `dsh-tool-lsp` 间接影响；该工具呈现此提供方的规范化结果，本主机自身不贡献提示词或 schema。
@@ -60,9 +85,20 @@ Namespace 插件（`name`／`inject`／`Config`／`apply`，无默认导出）�
 
 不会直接失效；请求前缀变更由 `dsh-tool-lsp` 负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **不提供隔离策略**：本包（package）信任所配置的服务器，不对其进程实施沙箱；受限部署必须提供适当的进程／文件系统提供方，或使用同一执行世界的沙箱包装层。
 - **临时打开兼容性下限**：同步能力省略打开／关闭（或声明 `None`）的服务器不受支持，即使关闭文档查询能够工作；固定的 TypeScript e2e 只建立一项兼容性下限，不代表跨语言承诺。
 - **逐服务器／Workspace 串行化延迟**：共享同一个服务器与 Workspace 的并行 agent（智能体）会在一个进程后排队；长生命周期 Workspace 进程会占用内存直到 dispose。
 - **被强制杀死的 harness 会遗留语言服务器**：`initialize.processId: null` 取消了服务器侧的客户端 PID 监视，因此服务器只能由服务的优雅 dispose 清理；被 SIGKILL 的 harness 会让它们继续运行，直到自行退出。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

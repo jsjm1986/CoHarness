@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-conversation-history-tier.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.md
-2026-08-18-conversation-history-tier.md: 0520340a95235434cea94ceff9f6b9089540343b
-2026-08-18-conversation-history-tier.zh.md: 25dc4b0b1c2a3627a504b8593e24f31451659504
+/agent-note-two-tier-conversation-history-transport:
+  en: bd1ece4e5aeed5a4
+  zh: 8b0a08ab1971cd35
+/agent-note-two-tier-conversation-history-transport/problem:
+  en: fc57a215a8f196ea
+  zh: e126f9e1306dcae8
+/agent-note-two-tier-conversation-history-transport/decision:
+  en: 3c252d547fa311ae
+  zh: 9918e6c4b0e5d622
+/agent-note-two-tier-conversation-history-transport/decision/verification:
+  en: 6c3be2a6b71f48ae
+  zh: 4e087638b834efd1
+/agent-note-two-tier-conversation-history-transport/alternatives-considered:
+  en: 8fc91fab251aaff4
+  zh: e2618cd8842d62de
+/agent-note-two-tier-conversation-history-transport/consequences:
+  en: 05ae5f1364cac722
+  zh: 43d08309bef9be2b

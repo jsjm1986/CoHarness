@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-dual-usage-attribution.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-dual-usage-attribution.md
-2026-08-25-dual-usage-attribution.md: b33a762f85ba6c4447bfda98c79cd1f80744318f
-2026-08-25-dual-usage-attribution.zh.md: 1e44bd8a05f9b8dca3307d1822e65ada355c6212
+/agent-note-separate-billing-ownership-from-project-activity-attribution:
+  en: df365e063154fdf2
+  zh: c8e403b1c2699b8e
+/agent-note-separate-billing-ownership-from-project-activity-attribution/problem:
+  en: 6297ff9c39908bb9
+  zh: 209736644daa8ba8
+/agent-note-separate-billing-ownership-from-project-activity-attribution/decision:
+  en: e4bc3e5fbb4d8131
+  zh: cfa25f44c04b45e0
+/agent-note-separate-billing-ownership-from-project-activity-attribution/alternatives-considered:
+  en: dc5ebb6cbfa06d25
+  zh: da9ca714dc306e08
+/agent-note-separate-billing-ownership-from-project-activity-attribution/consequences:
+  en: 149f1100b4986c30
+  zh: 8011d8f2b594765f

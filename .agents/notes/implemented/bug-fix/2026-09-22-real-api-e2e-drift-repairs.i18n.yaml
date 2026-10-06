@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-real-api-e2e-drift-repairs.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-real-api-e2e-drift-repairs.md
-2026-09-22-real-api-e2e-drift-repairs.md: 243f7cbe67f021ad34e1e8045e126f3efa14675b
-2026-09-22-real-api-e2e-drift-repairs.zh.md: 166dda0cccf5abb951e5b1cebf87b5f23b13ca0f
+/agent-note-real-api-e2e-drift-repairs-messages-endpoint-mount-order-upstream-contract-ports:
+  en: f66eed484955b4e7
+  zh: b57d695a6da7308c
+/agent-note-real-api-e2e-drift-repairs-messages-endpoint-mount-order-upstream-contract-ports/problem:
+  en: 997403aa6c915f95
+  zh: 08c37daabd327f71
+/agent-note-real-api-e2e-drift-repairs-messages-endpoint-mount-order-upstream-contract-ports/decision:
+  en: 3aea0c716ef2b968
+  zh: acf5cbfbceabee88
+/agent-note-real-api-e2e-drift-repairs-messages-endpoint-mount-order-upstream-contract-ports/alternatives-considered:
+  en: 277cc6a23a2f2cc2
+  zh: ba99831006cf0757
+/agent-note-real-api-e2e-drift-repairs-messages-endpoint-mount-order-upstream-contract-ports/consequences:
+  en: 386747ceb0d10208
+  zh: 2d71021e64ca0c7e

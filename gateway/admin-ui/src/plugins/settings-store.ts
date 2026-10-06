@@ -3,6 +3,8 @@ import { createSnapshotStore } from '../../../../packages/client/runtime/src/cli
 import type { SettingsNamespaceView, SettingsPathOpView } from '../../../../packages/host/apiproxy/src/api/settings.ts'
 import type { ConfigLedger, HostObservable } from './config-ledger.ts'
 import type { Answer, ProfileSettingsRemote } from './transport.ts'
+import { adminLanguage } from '../language.ts'
+import { translatePlugin } from './presentation.ts'
 
 export interface ProfileSettingsState {
   loading: boolean
@@ -35,15 +37,26 @@ export class ProfileSettingsController {
       .map(item => ({ ...item, writable: item.writable ?? result.value.writable }))
       .sort((a, b) => a.ns.localeCompare(b.ns))
     this.state.set({ loading: false, error: '', namespaces })
-    this.directory.set({ items: namespaces.map(item => ({ id: item.ns, label: item.ns })), bundles: new Set(), rows: new Set() })
+    const items = namespaces.map(item => ({ id: item.ns, label: item.ns, ...item.label === undefined ? {} : { labelText: item.label } }))
+    // Configuration keys follow `rowConfigKey`: `bundle#rowId` marks a row
+    // and its package, a bare `bundle` marks the package alone.
+    const bundles = new Set<string>()
+    const rows = new Set<string>()
+    for (const item of items) {
+      const split = item.id.indexOf('#')
+      if (split < 0) bundles.add(item.id)
+      else { bundles.add(item.id.slice(0, split)); rows.add(item.id) }
+    }
+    this.directory.set({ items, bundles, rows })
   }
 
   async save(ns: string, ops: SettingsPathOpView[], expectedRevision: number): Promise<Answer<SettingsNamespaceView>> {
-    if (this.disposed) return { ok: false, error: { code: 'disposed', message: '所选实例已变化，请重新打开配置。' } }
+    const t = translatePlugin(adminLanguage())
+    if (this.disposed) return { ok: false, error: { code: 'disposed', message: t('settingsStale') } }
     const result = await this.remote.mutate({ ns, ops, expectedRevision })
-    if (this.disposed) return { ok: false, error: { code: 'disposed', message: '所选实例已变化，请重新打开配置。' } }
+    if (this.disposed) return { ok: false, error: { code: 'disposed', message: t('settingsStale') } }
     if (result.ok && result.value.ns !== ns) {
-      return { ok: false, error: { code: 'wrong-namespace', message: '配置响应与当前插件不一致，请重新读取实例。' } }
+      return { ok: false, error: { code: 'wrong-namespace', message: t('settingsMismatch') } }
     }
     if (result.ok) {
       this.generation++

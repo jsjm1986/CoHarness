@@ -9,6 +9,7 @@
  */
 export const SESSION_SURFACE_EVENT_TYPES: ReadonlySet<string> = new Set([
   'system/message',
+  'developer/message',
   'user/message',
   'assistant/message',
   'tool/result',

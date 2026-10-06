@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-18-assistant-message-embedded-stream.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-18-assistant-message-embedded-stream.md
-2026-09-18-assistant-message-embedded-stream.md: b4129d25f9fe96e2c9e6c01869361088c24a8052
-2026-09-18-assistant-message-embedded-stream.zh.md: 4ba34e68f2c590c7695b6a4da2f35fff96b417bf
+/agent-note-assistant-messages-embed-their-provider-stream:
+  en: 99f882a01c5982ad
+  zh: c38fe694d83b4758
+/agent-note-assistant-messages-embed-their-provider-stream/problem:
+  en: 0fb91fb8d157ad9d
+  zh: 20ac3c90a79b0faf
+/agent-note-assistant-messages-embed-their-provider-stream/decision:
+  en: 0229a0b278509d0d
+  zh: f3acc2a7d6e36e9a
+/agent-note-assistant-messages-embed-their-provider-stream/alternatives-considered:
+  en: 739e41c82020a875
+  zh: 36c0c7783a1ce6a2
+/agent-note-assistant-messages-embed-their-provider-stream/consequences:
+  en: e71d854d28dd7236
+  zh: 5b4c4ae947b0001f

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-directory-picker-capability-seam.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-28-directory-picker-capability-seam.md
-2026-07-28-directory-picker-capability-seam.md: ac155cffc6d2a97e4ccf17982d0417249f302398
-2026-07-28-directory-picker-capability-seam.zh.md: fbb506a3f715a3e6480f6851c913f1bdfbc31b66
+/agent-note-a-capability-discriminated-directory-picker-seam-for-the-web-gui-host:
+  en: 6e037fa9dccd04fd
+  zh: 2676492fa8690cf7
+/agent-note-a-capability-discriminated-directory-picker-seam-for-the-web-gui-host/problem:
+  en: c33b43d7169f4fe5
+  zh: a8d817255886fd34
+/agent-note-a-capability-discriminated-directory-picker-seam-for-the-web-gui-host/decision:
+  en: 6fe132c921cc1ae9
+  zh: 643cb803452a0b9d
+/agent-note-a-capability-discriminated-directory-picker-seam-for-the-web-gui-host/alternatives-considered:
+  en: b00f7aab1aceaf2e
+  zh: 1c4027ce8dfeb5b2
+/agent-note-a-capability-discriminated-directory-picker-seam-for-the-web-gui-host/consequences:
+  en: 9243f2a45a201633
+  zh: e18fde7602634d36

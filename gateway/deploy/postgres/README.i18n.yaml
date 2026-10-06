@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/deploy/postgres/README.md
-README.md: 4da05b69a4136d2088f5776b78c00cbe738c7f0d
-README.zh.md: 07b0a003d14af7fde482c39d17036b53d6da6991
+/local-postgresql-control-plane:
+  en: 1b46bc3e1b1e3377
+  zh: 1f273d4682df985f
+/local-postgresql-control-plane/start-locally:
+  en: 16ad764891a907f6
+  zh: e3d3fae91d94dbb8
+/local-postgresql-control-plane/schema-and-conversation-data:
+  en: 4bf295f621f9a67e
+  zh: 5b2a5c075263b577
+/local-postgresql-control-plane/import-a-gateway-sqlite-snapshot:
+  en: 1c5481628c2419c5
+  zh: 7dab5169b783e5a8
+/local-postgresql-control-plane/gateway-runtime-and-cutover:
+  en: 4ce6d44f158508f9
+  zh: 3fd109f6af42f9d7
+/local-postgresql-control-plane/backup-and-restore-check:
+  en: 23026fa3e9f0d395
+  zh: fd09a4c0028f7432
+/local-postgresql-control-plane/tests:
+  en: 08ec3c0e4a499b4a
+  zh: b150fe02521976e2

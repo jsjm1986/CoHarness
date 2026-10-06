@@ -6,7 +6,9 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import { constants as bufferConstants } from 'node:buffer'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { once } from 'node:events'
+import { watch } from 'chokidar'
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import z from '@deepseek-ai/schemastery'
 import { FileSystem, FsError, FsVersion } from '@deepseek-ai/dsh-fs'
@@ -87,6 +89,29 @@ export class LocalFileSystem extends FileSystem {
       throw new Error(`fs-local: diffBasisMaxBytes must be a positive safe integer no greater than ${MAX_DIFF_BASIS_BYTES}`)
     }
     this.config = resolved
+  }
+
+  override async watch(target: FsTarget, changed: (error?: Error) => void, signal: AbortSignal): Promise<() => Promise<void>> {
+    signal.throwIfAborted()
+    const path = resolve(this.processPath(target))
+    const directory = (await this.stat(target, signal))?.type === 'directory'
+    signal.throwIfAborted()
+    const root = directory ? path : dirname(path)
+    const watcher = watch(root, {
+      ignoreInitial: true, depth: 0,
+      ignored: entry => !directory && resolve(entry) !== root && resolve(entry) !== path,
+    })
+    watcher.on('all', (_event, entry) => {
+      if (directory || resolve(entry) === path) changed()
+    })
+    watcher.on('error', (error) => { changed(error instanceof Error ? error : new Error(String(error))) })
+    try {
+      await once(watcher, 'ready', { signal })
+      return () => watcher.close()
+    } catch (error) {
+      await watcher.close()
+      throw error
+    }
   }
 
   /** Run `op` with exclusive access to `targetKey` (FIFO per key). */

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-15-context-breakdown-system-chain.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-15-context-breakdown-system-chain.md
-2026-09-15-context-breakdown-system-chain.md: 191072da05aa2c3bce9dd3719568fbf6a11e3b3b
-2026-09-15-context-breakdown-system-chain.zh.md: 336cbf6b827bd1dd877eac2c6a203cf3ef93779a
+/agent-note-context-breakdown-keeps-the-effective-system-prompt-and-superseded-nodes-in-separate-figures:
+  en: 6c050b58aec5010a
+  zh: 5fb45e0c01aaa49a
+/agent-note-context-breakdown-keeps-the-effective-system-prompt-and-superseded-nodes-in-separate-figures/problem:
+  en: b7a1d54ac059c2c4
+  zh: 11fe07b20ab505d5
+/agent-note-context-breakdown-keeps-the-effective-system-prompt-and-superseded-nodes-in-separate-figures/decision:
+  en: 3ed0c7d5cd068abe
+  zh: 18f6005409fd6b7d
+/agent-note-context-breakdown-keeps-the-effective-system-prompt-and-superseded-nodes-in-separate-figures/alternatives-considered:
+  en: 553dbfbab855e415
+  zh: a8a4b2c78fc35c33
+/agent-note-context-breakdown-keeps-the-effective-system-prompt-and-superseded-nodes-in-separate-figures/consequences:
+  en: d887e16e8b9531a4
+  zh: ab21cf77b2b1d73a
+/agent-note-context-breakdown-keeps-the-effective-system-prompt-and-superseded-nodes-in-separate-figures/verification:
+  en: 1aee1bc6f7a5d9f1
+  zh: 52487a0283b21023

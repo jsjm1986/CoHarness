@@ -31,7 +31,7 @@ describe('dsh-sdk-minimal bundle', () => {
       ['deepseek-llm-api-extensions', '@deepseek-ai/dsh-deepseek-llm-api-extensions'],
       ['session-log-deepseek', '@deepseek-ai/dsh-session-log-deepseek'],
       ['plugin-package-inventory-deepseek', '@deepseek-ai/dsh-plugin-package-inventory-deepseek'],
-      ['llm-deepseek', '@deepseek-ai/dsh-llm-deepseek'],
+      ['llm-deepseek', '@deepseek-ai/dsh-llm-deepseek-api-key'],
       ['sandbox', '@deepseek-ai/dsh-sandbox-local'],
       ['session-projection', '@deepseek-ai/dsh-session-projection'],
       ['sandbox-policy', '@deepseek-ai/dsh-sandbox-policy'],
@@ -82,8 +82,15 @@ describe('dsh-sdk-minimal bundle', () => {
       disabled: { __jsExpr: "process.platform !== 'win32'" },
       config: { shellDialect: 'pwsh', timeoutMs: 300000 },
     })
+    const rowPackages = new Set(rows.map(row => row.name).filter((name): name is string => name !== undefined).map(packageName))
+    // The api-key provider declares the configurable provider as a peer, so the
+    // bundle relays that exact package into its own dependencies.
+    const apiKeyManifest = JSON.parse(readFileSync(fileURLToPath(import.meta.resolve('@deepseek-ai/dsh-llm-deepseek-api-key/package.json')), 'utf8')) as {
+      peerDependencies?: Record<string, string>
+    }
+    expect(apiKeyManifest.peerDependencies).toHaveProperty('@deepseek-ai/dsh-llm-deepseek', 'workspace:*')
     expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual(
-      [...new Set(rows.map(row => row.name).filter((name): name is string => name !== undefined).map(packageName))].sort(),
+      [...rowPackages, '@deepseek-ai/dsh-llm-deepseek'].sort(),
     )
   })
 })

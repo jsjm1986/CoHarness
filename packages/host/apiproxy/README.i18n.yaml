@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/apiproxy/README.md
-README.md: 04790675b9e4e37bfc572c0bcd3abe4d147787c2
-README.zh.md: 7fbc3ed04503fa4bd042ec1514943d5d92b4eacc
+/:
+  en: 58a220bf8b4cd5b4
+  zh: 61495d48365178df
+/deepseek-ai-dsh-host-apiproxy:
+  en: 6fa643d0c9dc940a
+  zh: 5782d06bdc67f925
+/deepseek-ai-dsh-host-apiproxy/summary:
+  en: 5b5d9460e5807022
+  zh: 15d29c4f2ff58f2f
+/deepseek-ai-dsh-host-apiproxy/table-of-contents:
+  en: df44fac784f14556
+  zh: 13ca43631aee42c9
+/deepseek-ai-dsh-host-apiproxy/the-shared-agent-default-agent-default-model-settings-section:
+  en: eb39a5344537193d
+  zh: dc6cd6b71e1bbcb7
+/deepseek-ai-dsh-host-apiproxy/contract-layer-api:
+  en: de31e7fb3c9f3f93
+  zh: 9a525dff5e2d7e4e
+/deepseek-ai-dsh-host-apiproxy/carrier-layer-client-root:
+  en: 098940484b5a1f8a
+  zh: edaf009da41a460a
+/deepseek-ai-dsh-host-apiproxy/invariants:
+  en: c1c12b7aaa282f24
+  zh: 2531748c091e4ec1
+/deepseek-ai-dsh-host-apiproxy/model-experience:
+  en: beb77664ef00a70c
+  zh: 29b02408678bc172
+/deepseek-ai-dsh-host-apiproxy/model-experience/kv-cache-effect:
+  en: 47f982e326fe77fd
+  zh: 10b529588772b11d
+/deepseek-ai-dsh-host-apiproxy/known-limitations-and-deferred-work:
+  en: 433b9492942684b4
+  zh: 15ebf8a1175ecd69
+/deepseek-ai-dsh-host-apiproxy/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

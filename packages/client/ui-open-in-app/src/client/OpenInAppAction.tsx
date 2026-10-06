@@ -3,6 +3,7 @@ import { IconChevronDownOutline14, Menu, Tooltip, type MenuItem } from '@deepsee
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { NS, type OpenInAppKey } from './locales.ts'
 import css from './OpenInAppAction.module.css'
 
@@ -15,6 +16,12 @@ export interface OpenInAppActionInjected {
   launch: (appId: string, path: string) => Promise<void>
   choose: (appId: string) => void
   iconUrl: (appId: string) => string
+  /**
+   * Whether the session runs on the page host's own runtime. The apps catalog
+   * and the open route live on the page host, so a session owned by another
+   * runtime would send its foreign `cwd` to the local opener.
+   */
+  localTarget: (sessionId: SessionId) => boolean
 }
 
 /** Full props for the Session-header open-in-app split button. */
@@ -146,7 +153,7 @@ export function OpenInAppAction(props: OpenInAppActionProps): React.JSX.Element 
     .map(id => ({ id, labelKey: APP_LABEL_KEY[id] }))
     .filter((entry): entry is { id: string; labelKey: OpenInAppKey } => entry.labelKey !== undefined)
   const currentEntry = apps.find(entry => entry.id === choice) ?? apps[0]
-  if (currentEntry === undefined || cwd === undefined || cwd === '') return null
+  if (currentEntry === undefined || cwd === undefined || cwd === '' || !props.localTarget(sessionId)) return null
 
   const current = currentEntry.id
   const currentLabel = t(currentEntry.labelKey)

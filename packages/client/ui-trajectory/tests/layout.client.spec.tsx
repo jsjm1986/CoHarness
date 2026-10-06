@@ -27,6 +27,9 @@ const appendTrajectoryPartialLayout = (
   lastIndex: number,
 ) => appendTrajectoryPartialLayoutWithLocale(turns, partial, lastIndex, t)
 
+const EMPTY_LOCATION_DATA_SOURCE = { getSnapshot: () => undefined, subscribe: () => () => {} }
+const EMPTY_LOCATION_DATA = { get: () => undefined, source: () => EMPTY_LOCATION_DATA_SOURCE }
+
 afterEach(cleanup)
 
 describe('TrajectoryTurnHeader', () => {
@@ -35,7 +38,7 @@ describe('TrajectoryTurnHeader', () => {
     expect(screen.getByText('Turn 1')).toBeTruthy()
     expect(screen.getByText('Input')).toBeTruthy()
     expect(screen.getByText('Output')).toBeTruthy()
-    expect(screen.getByText('Think')).toBeTruthy()
+    expect(screen.getByText('Thinking')).toBeTruthy()
     expect(screen.getByText('Time')).toBeTruthy()
   })
 })
@@ -108,7 +111,7 @@ describe('deriveTrajectoryLayout', () => {
       nodes: [],
       partial: null,
       runningCalls: [{
-        callId: 'r1', name: 'bash', argsRaw: '{"command":"pwd"}',
+        phase: 'start', callId: 'r1', name: 'bash', argsRaw: '{"command":"pwd"}',
         turn: 1, step: 2, time: 9_000, callView: null, subCalls: [],
       }],
     })
@@ -172,7 +175,7 @@ describe('deriveTrajectoryLayout', () => {
       nodes: [],
       partial: { ...partial, blocks: [] },
       runningCalls: [{
-        callId: 'c1', name: 'bash', argsRaw: '{"command":"pwd"}',
+        phase: 'start', callId: 'c1', name: 'bash', argsRaw: '{"command":"pwd"}',
         turn: 1, step: 1, time: 9_000, callView: null, subCalls: [],
       }],
     })
@@ -267,10 +270,13 @@ describe('deriveTrajectoryLayout', () => {
         blocks: [{ kind: 'text', text: 'second step' }],
       },
     ] as unknown as ConversationSnapshot['nodes']
-    const data = { get: () => undefined }
-    const step = { turn: 1, step: 2, start: undefined, end: undefined, status: 'open' as const, data }
+    const step = {
+      turn: 1, step: 2, start: undefined, end: undefined, status: 'open' as const,
+      data: EMPTY_LOCATION_DATA,
+    }
     const turn = {
-      turn: 1, start: undefined, end: undefined, status: 'open' as const, steps: [step], data,
+      turn: 1, start: undefined, end: undefined, status: 'open' as const, steps: [step],
+      data: EMPTY_LOCATION_DATA,
     }
     const eventLocations = new Map<number, ConversationLocation>([[
       3,
@@ -299,10 +305,13 @@ describe('deriveTrajectoryLayout', () => {
       kind: 'steering', messageId: 'steer-1', seq: 3, time: 3_000,
       content: [{ type: 'text', text: 'change direction' }], source: null,
     }] as unknown as ConversationSnapshot['nodes']
-    const data = { get: () => undefined }
-    const step = { turn: 1, step: 2, start: undefined, end: undefined, status: 'open' as const, data }
+    const step = {
+      turn: 1, step: 2, start: undefined, end: undefined, status: 'open' as const,
+      data: EMPTY_LOCATION_DATA,
+    }
     const turn = {
-      turn: 1, start: undefined, end: undefined, status: 'open' as const, steps: [step], data,
+      turn: 1, start: undefined, end: undefined, status: 'open' as const, steps: [step],
+      data: EMPTY_LOCATION_DATA,
     }
     const eventLocations = new Map<number, ConversationLocation>([[
       3,

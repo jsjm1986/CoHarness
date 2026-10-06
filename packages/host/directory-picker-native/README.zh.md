@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-host-directory-picker-native
 
 [English](README.md) | 中文
@@ -10,10 +15,22 @@
 
 坐在宿主屏幕前的操作者通过原生 OS 选择器选择工作区目录：`dsh-host-directory-picker-native` 每次选择打开一个平台目录选择器，并解析出所选绝对路径（取消时为 `null`）。macOS 驱动 `osascript`，Linux 使用 Zenity 并以 KDialog 回退，Windows 在 spawn 的子进程中打开现代 `IFileOpenDialog`。只有操作者坐在宿主屏幕前时才可用——远程部署应组合[浏览后端](../directory-picker-browse/README.zh.md)。一行组合配置还会在工作区流程中注册匹配的浏览器侧交互，因此同时选择两侧。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每次 `pick` 派生一个平台选择器并给出其结果；选择器状态不会在调用后存活。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。GUI 宿主的目录选择后端不注册任何面向模型的内容。
@@ -22,8 +39,19 @@
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **Linux 依赖桌面工具**——Zenity 与 KDialog 均未安装时，`pick` 以包含解决建议的错误拒绝；它不会回退为手输路径提示（组合层面的回退是 browse 后端）。
 - **Windows 没有机制级回退**——通过打包依赖 koffi 运行的子进程选择器是唯一原生层级，因此 COM 拒绝或对话框崩溃会直接上报失败。组合层面的回退仍是 browse 后端。
 - **Windows 前台授权依赖注入的输入**——子进程在 `Show` 之前合成一次 Alt 按键，对话框才能从后台宿主取得前台；在合成输入被抑制的环境（安全桌面、受限远程会话、提权前台窗口）中，对话框仍可能在其他窗口后面打开。该技术仅在 Windows 11 上验证过。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

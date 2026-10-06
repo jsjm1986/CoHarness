@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-settings-describe-mirror.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-17-settings-describe-mirror.md
-2026-08-17-settings-describe-mirror.md: a3774699ff328a44aed192a16dea0fa19d03c83c
-2026-08-17-settings-describe-mirror.zh.md: 1fad68ae6346d656cc7868121eac14fdf845f8dc
+/agent-note-settings-describe-mirror:
+  en: 89b89ebcb4dfa99d
+  zh: 5b58dca7c5f5dbc3
+/agent-note-settings-describe-mirror/problem:
+  en: b4de2801afd55f16
+  zh: b2c9fb7d1ad5319c
+/agent-note-settings-describe-mirror/decision:
+  en: 17f60ed8b6d5356e
+  zh: ab9c5e22cba2d63b
+/agent-note-settings-describe-mirror/alternatives-considered:
+  en: 05b6df2185746f32
+  zh: 17a59636ee8d4d9c
+/agent-note-settings-describe-mirror/consequences:
+  en: 62e99e8e2cda7a3c
+  zh: 75b758e2dfad23bf

@@ -1,6 +1,49 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-agent-preset/README.md
-README.md: 01420803134c8811f2492ca6125d52b5f0734928
-README.zh.md: ddc1ee58ea51890ec8f00cf35e0eb8a43f61cee8
+/:
+  en: bc21e85265ce2411
+  zh: 61495d48365178df
+/dsh-client-ui-agent-preset:
+  en: d8a0142921b68df8
+  zh: d5b7a8c3036de05e
+/dsh-client-ui-agent-preset/summary:
+  en: 9d57e549d79e291c
+  zh: 216a3dcaec644cf8
+/dsh-client-ui-agent-preset/table-of-contents:
+  en: c55ea9475c062c6a
+  zh: 59f2f9a042f26605
+/dsh-client-ui-agent-preset/why-it-is-a-new-session-preference:
+  en: 2f0a1ce8f49a4b96
+  zh: 5ba31fc76f241214
+/dsh-client-ui-agent-preset/the-new-session-chip:
+  en: afe46fd416c610ef
+  zh: de267393f9c22f99
+/dsh-client-ui-agent-preset/the-session-header-label:
+  en: b6a7b16d11b5d2dc
+  zh: a5776612e3b0c0a7
+/dsh-client-ui-agent-preset/what-it-reads-and-writes:
+  en: 41d35e7ab1e5afd6
+  zh: 4373be71d66e0624
+/dsh-client-ui-agent-preset/the-management-section:
+  en: b36429223cf4f017
+  zh: af03af890e3914b8
+/dsh-client-ui-agent-preset/when-the-surfaces-are-absent:
+  en: 8ea38e047fe0d4d1
+  zh: c8f13512e5c95bc6
+/dsh-client-ui-agent-preset/invariants:
+  en: 64af959addfec89c
+  zh: 4bfe8854b6f90069
+/dsh-client-ui-agent-preset/model-experience:
+  en: 5174dc16b8930a37
+  zh: 46a31904e17bd5ad
+/dsh-client-ui-agent-preset/model-experience/kv-cache-effect:
+  en: daefa797529c67ca
+  zh: bda1121c7ad13413
+/dsh-client-ui-agent-preset/known-limitations-and-deferred-work:
+  en: 51aadae38f689de0
+  zh: a5bf9f20ca462ce3
+/dsh-client-ui-agent-preset/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

@@ -2,6 +2,8 @@
  * LLM-backed authorization gate for the current-session-only Auto permission
  * preset. Every native call and every started PTC inner call is reviewed once
  * before its body; the outer `run_code` transport is deliberately excluded.
+ * Under the `ask` approval policy a reviewer denial asks the user; under
+ * `never` it is final.
  *
  * @module @deepseek-ai/dsh-experimental-auto-review
  */
@@ -12,7 +14,6 @@ import { executionAuthorityOf, type ExecutionState } from '@deepseek-ai/dsh-exec
 import type {} from '@deepseek-ai/dsh-agent-instructions'
 import {
   BlockAssembler,
-  createUserMessage,
   type ContentBlock,
   type GenerateOptions,
   type MessageSource,
@@ -24,15 +25,16 @@ import { deepFreeze } from '@deepseek-ai/dsh-util-values'
 import { AUTO_PRESET } from '@deepseek-ai/dsh-permission-presets'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-subagent'
+import type {} from '@deepseek-ai/dsh-user-approval'
 import {
   RUN_CODE_NAME,
   type PreToolDecision,
   type ToolExecution,
 } from '@deepseek-ai/dsh-tools'
 
-/** Structured error name persisted for every reviewer denial or failure. */
+/** Structured error name persisted for every final reviewer denial. */
 const AUTO_REVIEW_DENIED_ERROR_NAME = 'AutoReviewDeniedError'
-/** Structured error code persisted for every reviewer denial or failure. */
+/** Structured error code persisted for every final reviewer denial. */
 const AUTO_REVIEW_DENIED_CODE = 'AUTO_REVIEW_DENIED'
 
 /** Fixed policy sent as the first of the review request's five sections. */
@@ -125,7 +127,7 @@ interface ScopedPtcStart {
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'experimental-auto-review'
 /** Complete host services required before Auto may be advertised. */
-export const inject = ['llm', 'permissionPresets', 'sessions', 'tools']
+export const inject = ['approval', 'llm', 'permissionPresets', 'sessions', 'tools']
 
 /** Return JSON text for one immutable logged value. */
 function json(value: unknown): string {
@@ -189,7 +191,8 @@ function isProjectInstruction(source: MessageSource): boolean {
 
 /** Whether this source is a compaction checkpoint. */
 function isCheckpoint(source: MessageSource): boolean {
-  return source.kind === 'plugin' && source.plugin === 'compact'
+  const kind: string = source.kind
+  return kind === 'compact-checkpoint'
 }
 
 /** Whether this message was durably attributed to the child's direct parent. */
@@ -246,8 +249,7 @@ function filteredUserEntries(
   initialPromptSeq: SessionEvent['seq'] | undefined,
   parentSession: string | undefined,
 ): HistoricalUserMessage[] {
-  const retained = content.filter(block => block.type !== 'tool-result')
-  return retained.map(block => ({
+  return content.map(block => ({
     kind: 'user-message',
     role: block.type === 'text'
       ? textRole(source, seq, initialPromptSeq, parentSession)
@@ -428,7 +430,7 @@ function snapshotAutoReview(agent: Agent, exec: ToolExecution): ReviewSnapshot {
     if (event.type === 'user/message') {
       if (event.data.source.kind === 'tool') continue
       if (isProjectInstruction(event.data.source)) {
-        const content = event.data.content.filter(block => block.type !== 'tool-result')
+        const content = event.data.content
         if (content.length > 0) {
           projectInstructions.push({
             kind: 'user-message',
@@ -598,6 +600,10 @@ async function readDecision(stream: AsyncIterable<StreamChunk>): Promise<AutoRev
     assembler.push(chunk)
     if (chunk.type === 'finish') {
       finished = true
+      if (chunk.reason.kind === 'error' || chunk.reason.kind === 'aborted') {
+        const { code, message } = chunk.reason.failure
+        throw new Error(`auto-review: reviewer ended with ${chunk.reason.kind} ${code}: ${message}`)
+      }
       if (chunk.reason.kind !== 'stop') {
         throw new Error(`auto-review: reviewer ended with ${chunk.reason.kind}`)
       }
@@ -624,14 +630,15 @@ async function classifyRisk(
   execution: ReviewExecution | undefined,
 ): Promise<AutoReviewDecision> {
   const snapshot = snapshotAutoReview(agent, exec)
+  // This review prompt is sent only through ctx.llm.stream and never enters a Session log.
   const options: GenerateOptions = deepFreeze({
     provider: snapshot.provider,
     model: snapshot.model,
     system: REVIEW_POLICY,
-    messages: [createUserMessage({
+    messages: [{
+      role: 'user',
       content: [{ type: 'text', text: reviewUserText(snapshot) }],
-      source: { kind: 'plugin', plugin: 'dsh-experimental-auto-review' },
-    })],
+    }],
     temperature: 0,
     sessionId: agent.session.id,
     purpose: 'auto-review',
@@ -646,7 +653,7 @@ async function classifyRisk(
   return readDecision(ctx.llm.stream(options))
 }
 
-/** Materialize the fixed model-facing Auto denial plus optional UI detail. */
+/** Materialize the fixed model-facing final Auto denial plus optional UI detail. */
 function denied(exec: ToolExecution, reason?: string): Extract<PreToolDecision, { kind: 'deny' }> {
   return {
     kind: 'deny',
@@ -667,11 +674,36 @@ function eligibilityDenied(exec: ToolExecution): PreToolDecision {
 
 /** The same verified inputs and primary actor must still own an allowed review. */
 function unchangedExecution(before: ExecutionState, after: ExecutionState): boolean {
-  return before.revision === after.revision
+  return before.scopeId === after.scopeId
+    && before.revision === after.revision
     && before.primaryActorUserId === after.primaryActorUserId
     && before.unverifiedHistory === after.unverifiedHistory
     && before.inputs.length === after.inputs.length
     && before.inputs.every(input => after.inputs.includes(input))
+}
+
+/**
+ * Ask the user to decide one call the reviewer denied. The audited reason is
+ * English; the prompt text is localized and keeps the reviewer's raw reason.
+ */
+function askUser(exec: ToolExecution, reason?: string): PreToolDecision {
+  const denial = `Auto review denied tool "${exec.name}"`
+  return {
+    kind: 'ask',
+    reason: reason === undefined ? denial : `${denial}: ${reason}`,
+    displayReason: reason === undefined
+      ? { en: 'Auto review denied this call.', zh: 'Auto review 拒绝了此调用。' }
+      : { en: `Auto review denied this call: ${reason}`, zh: `Auto review 拒绝了此调用：${reason}` },
+  }
+}
+
+/** Materialize a reviewer failure as its own error rather than a denial. */
+function failed(exec: ToolExecution, error: unknown): PreToolDecision {
+  const message = error instanceof Error ? error.message : String(error)
+  return {
+    kind: 'deny',
+    reason: `Auto review of tool "${exec.name}" failed; its body was not executed: ${message}`,
+  }
 }
 
 /** Install the Auto preset and its prepended per-call review gate. */
@@ -706,7 +738,7 @@ export function apply(ctx: Context): void {
           const authority = executionAuthorityOf(ctx)
           if (managed && authority === undefined) return eligibilityDenied(exec)
           managed ||= authority !== undefined
-          const current = await authority?.authorize('auto-review', agent, signal)
+          const current = await authority?.authorize('auto-review', agent, signal, exec)
           if (current !== undefined) {
             if (current.unverifiedHistory || current.primaryActorUserId === undefined) return eligibilityDenied(exec)
             execution = { ...current, primaryActorUserId: current.primaryActorUserId }
@@ -716,10 +748,19 @@ export function apply(ctx: Context): void {
           return isAborted(lifecycle.signal) ? { kind: 'cancel' } : eligibilityDenied(exec)
         }
         if (isAborted(signal)) return { kind: 'cancel' }
-        const decision = await classifyRisk(ctx, agent, exec, signal, execution).catch(() => undefined)
-        if (isAborted(lifecycle.signal)) return { kind: 'cancel' }
-        if (decision === undefined) return denied(exec)
-        if (decision.decision === 'deny') return denied(exec, decision.reason)
+        const review = await classifyRisk(ctx, agent, exec, signal, execution).then(
+          decision => ({ ok: true as const, decision }),
+          (error: unknown) => ({ ok: false as const, error }),
+        )
+        // A settled review still loses to caller cancellation: the abandoned
+        // call reports cancel rather than the reviewer's late outcome.
+        if (isAborted(signal)) return { kind: 'cancel' }
+        if (!review.ok) return failed(exec, review.error)
+        const { decision } = review
+        // The permission owner pins an approval policy into every published Session.
+        if (decision.decision === 'deny' && ctx.approval.overrideOf(agent.session) === 'never') {
+          return denied(exec, decision.reason)
+        }
         const downstream = await next()
         if (isAborted(lifecycle.signal)) return { kind: 'cancel' }
         if (execution !== undefined || ctx.get('executionAuthorityRequired') === true) {
@@ -727,7 +768,7 @@ export function apply(ctx: Context): void {
             if (execution === undefined) return eligibilityDenied(exec)
             const authority = executionAuthorityOf(ctx)
             if (authority === undefined) return eligibilityDenied(exec)
-            const current = await authority.authorize('auto-review', agent, signal)
+            const current = await authority.authorize('auto-review', agent, signal, exec)
             if (!unchangedExecution(execution, current)) return eligibilityDenied(exec)
           } catch {
             // Revoke or provider failure during review prevents the pending tool body.
@@ -735,7 +776,8 @@ export function apply(ctx: Context): void {
           }
         }
         if (isAborted(signal)) return { kind: 'cancel' }
-        return downstream
+        if (decision.decision === 'allow' || downstream.kind !== 'allow') return downstream
+        return askUser(exec, decision.reason)
       } finally {
         active.delete(completed.promise)
         completed.resolve(undefined)

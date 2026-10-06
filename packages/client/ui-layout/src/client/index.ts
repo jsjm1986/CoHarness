@@ -8,14 +8,16 @@
  * presenter, which projects ctx.theme snapshots onto document.body.
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { PanelActions } from './service.ts'
+import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { AppFrame } from './AppFrame.tsx'
 import { createLayoutStore } from './stores.ts'
 import { en, zh, type LayoutKey } from './locales.ts'
-import { LayoutController } from './service.ts'
+import { en as shortcutEn, zh as shortcutZh } from './shortcut-locales.ts'
+import { LayoutController, type PanelInfo } from './service.ts'
 import { ThemePresenter } from './theme-presenter.ts'
 
 // Contract exports only (export-convergence rule: cross-package consumers
@@ -24,7 +26,10 @@ import { ThemePresenter } from './theme-presenter.ts'
 // OwnerShare contracts below are the render-side halves registrants compose
 // against; the frame components and the store factory are package-internal.
 export { LayoutController } from './service.ts'
-export type { ILayout } from './service.ts'
+export type { ILayout, MainPanelId, PanelInfo } from './service.ts'
+
+/** Selector hook over root-scoped panel selection. */
+export type UsePanelInfo = SnapshotSelectorHook<PanelInfo>
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -37,6 +42,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Shell chrome copy (compact drawer toggle, overlay dismissal). */
     layout: LayoutKey
+    /** Sidebar command labels. */
+    'shortcuts.layout': keyof typeof shortcutZh
+  }
+
+  interface GlobalStandardProps {
+    /** Subscribe to the selected main panel independently of parent renders. */
+    usePanelInfo: UsePanelInfo
   }
 
   interface SlotMap {
@@ -56,17 +68,19 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'sidebar': { kind: 'single'; scope: 'root'; owner: SidebarOwnerProps }
     /**
-     * The whole center column, across both the no-session hero and a live
-     * conversation. OCCUPIED by ui-conversation's ConversationRoot, which
-     * declares the session body, composer, and input seats inside it —
-     * registering here replaces the entire conversation surface (and removes
-     * every seat it declares) rather than adding to it.
+     * The whole center column, keyed between the Conversation (reserved key
+     * `conversation`, occupied by ui-conversation's ConversationRoot, which
+     * declares the session body, composer, and input seats inside it) and
+     * optional global panels — registering a `key` here adds a top-level
+     * central surface selected through `ctx.layout.selectPanel`, and global
+     * panels keep the current Session selection intact.
      *
      * Root scope keeps the viewport mounted across active-pane changes.
-     * The occupant owns explicit session providers and receives the shell's
-     * compact presentation flag; session facts belong to its pane children.
+     * Occupants receive the shell's compact presentation flag; session facts
+     * belong to their own scoped children — a global panel declares none of
+     * the conversation's session seats.
      */
-    'conversation': { kind: 'single'; scope: 'root'; owner: ConvOwnerProps }
+    'main': { kind: 'keyed'; scope: 'root'; owner: ConvOwnerProps }
     /**
      * The right details column, shown when the layout opens it. OCCUPIED by
      * ui-conversation's DetailsPanel, which declares the tool-details seat
@@ -109,7 +123,7 @@ export interface SidebarOwnerProps {
   width: number
 }
 
-/** Conversation owner share: the shell's resolved compact mode. */
+/** Main-panel owner share: the shell's resolved compact mode. */
 export interface ConvOwnerProps {
   /** True when the frame is using the phone presenter. */
   compact?: boolean
@@ -146,7 +160,7 @@ export interface MobileHeaderActionOwnerProps {}
 const NS = 'layout'
 
 /** Required services (cordis fiber inject — the loader passes all module exports as an object plugin). */
-export const inject = ['slots', 'theme', 'locale']
+export const inject = ['slots', 'theme', 'locale', 'shortcuts', 'sessions']
 
 /**
  * Client plugin body: provide ctx.layout, then one register() call — AppFrame
@@ -156,32 +170,76 @@ export const inject = ['slots', 'theme', 'locale']
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-layout: dictionaries')
+  ctx.effect(() => ctx.locale.register('shortcuts.layout', { zh: shortcutZh, en: shortcutEn }), 'ui-layout: command labels')
+  const shortcutT = ctx.locale.bind('shortcuts.layout')
 
-  const layout = new LayoutController()
   ctx.effect(() => {
+    // Exclusive store: one eagerly-created instance shared by the service and
+    // the root entry, so ctx.layout reads live geometry before first render.
+    const handle = createLayoutStore()
+    const instance = handle.create()
+    const store: typeof handle = { ...handle, create: () => instance }
+    const viewportWidth: HostObservable<number> = {
+      getSnapshot: () => instance.getSnapshot().viewportWidth,
+      subscribe: listener => instance.subscribe(listener),
+    }
+    const panelInfo: HostObservable<PanelInfo> = {
+      getSnapshot: () => instance.getSnapshot().panelInfo,
+      subscribe: listener => instance.subscribe(listener),
+    }
+    const retainMainPanels = (): void => {
+      instance.actions.retainMainPanels(ctx.slots.entries('main').flatMap(entry =>
+        entry.options.key === undefined ? [] : [entry.options.key]))
+    }
+    const layout = new LayoutController(
+      instance.actions, viewportWidth,
+      id => ctx.slots.entries('main').some(entry => entry.options.key === id), panelInfo,
+    )
+    const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo } })
     const disposeService = ctx.reflect.provide('layout', layout)
+    const disposeShortcut = ctx.shortcuts.register({
+      id: 'sidebar.left.toggle' as ShortcutCommandId, label: () => shortcutT('toggle'), aliases: ['sidebar', 'toggle left sidebar'],
+      defaults: {
+        'desktop:macos': { code: 'KeyB', modifiers: ['primary'] },
+        'desktop:windows': { code: 'KeyB', modifiers: ['primary'] },
+        'desktop:linux': { code: 'KeyB', modifiers: ['primary'] },
+        'web:macos': { code: 'KeyB', modifiers: ['primary', 'alt'] },
+        'web:windows': { code: 'KeyB', modifiers: ['primary', 'alt'] },
+      },
+      regions: ['page', 'editable'], modals: [],
+      resolve: () => ({ status: 'handled', run: () => { layout.toggleSidebar() } }),
+    })
     const disposeRegistration = ctx.slots.register({
       name: 'root',
       locale: NS,
       children: {
         'sidebar': { kind: 'single', scope: 'root' },
-        'conversation': { kind: 'single', scope: 'root' },
+        'main': { kind: 'keyed', scope: 'root' },
         'rightbar': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.mobile.header.actions': { kind: 'list', scope: 'session' },
       },
-      // Exclusive store: the factory itself — the framework instantiates per
-      // entry and delivers useStore/actions to AppFrame as standard props.
-      store: createLayoutStore,
-      // The hook's only side effect connects the root store to ctx.layout;
-      // conversation business actions belong to their registrants.
-      inject: (actions: PanelActions) => {
-        layout.attachPanels(actions)
-        return { dismissRightbar: () => { layout.closeDetails() } }
-      },
+      store,
+      inject: () => ({ dismissRightbar: () => { layout.closeDetails() } }),
     }, AppFrame)
+    const disposePanels = ctx.slots.subscribe('main', retainMainPanels)
+    retainMainPanels()
+    // A Session arriving on the selection returns the center to the
+    // Conversation regardless of which surface opened it.
+    let lastCurrent = ctx.sessions.list.getSnapshot().current
+    const stopSessions = ctx.sessions.list.subscribe(() => {
+      const current = ctx.sessions.list.getSnapshot().current
+      if (current === lastCurrent) return
+      lastCurrent = current
+      if (instance.getSnapshot().panelInfo.activePanelId !== null) layout.selectPanel(null)
+    })
     return () => {
+      disposeShortcut()
+      stopSessions()
+      layout.dispose()
+      disposePanels()
       disposeRegistration()
+      disposePanelInfo()
       // provide()'s disposer settles asynchronously; teardown is synchronous fire-and-forget.
       void disposeService()
     }

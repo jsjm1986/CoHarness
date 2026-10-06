@@ -73,14 +73,17 @@ export function createWorkspacePreviewReaders(connection: ConnectionHandle | und
         ? connection
         : connection.forTarget?.(runtimeTarget)
       if (targetConnection === undefined) throw new WorkspaceResourceError('access-revoked', 'Workspace runtime is unavailable')
+      const tooLarge = (): WorkspaceResourceError =>
+        new WorkspaceResourceError('workspace-file/too-large', 'Workspace file exceeds the preview byte limit')
       let version = request.version
       if (version === undefined) {
         const stat = await targetConnection.api.workspaceFiles.stat({ sessionId, path }, signal)
         if (!stat.result.ok) throw new WorkspaceResourceError(stat.result.error.code, stat.result.error.message)
         if (stat.result.value.type !== 'file') throw new WorkspaceResourceError('workspace-file/not-regular-file', 'Workspace path is not a regular file')
+        if (stat.result.value.bytes !== undefined && stat.result.value.bytes > request.maxBytes) throw tooLarge()
         version = stat.result.value.version
       }
-      const chunks: Uint8Array[] = []
+      const windows: string[] = []
       let total = 0
       for (;;) {
         signal.throwIfAborted()
@@ -88,22 +91,17 @@ export function createWorkspacePreviewReaders(connection: ConnectionHandle | und
           { sessionId, path, offset: total, version }, signal,
         )
         if (!response.result.ok) throw new WorkspaceResourceError(response.result.error.code, response.result.error.message)
+        signal.throwIfAborted()
         const window = response.result.value
         const binary = atob(window.bytes)
-        const chunk = new Uint8Array(binary.length)
-        for (let index = 0; index < binary.length; index++) chunk[index] = binary.charCodeAt(index)
-        chunks.push(chunk)
-        total += chunk.byteLength
+        // The bound covers decoded bytes; an overflowing window never lands.
+        if (total + binary.length > request.maxBytes) throw tooLarge()
+        windows.push(binary)
+        total += binary.length
         if (window.eof) break
-        if (chunk.byteLength === 0) throw new Error('Workspace byte window made no progress before EOF')
+        if (binary.length === 0) throw new Error('Workspace byte window made no progress before EOF')
       }
-      const data = new Uint8Array(total)
-      let position = 0
-      for (const chunk of chunks) {
-        data.set(chunk, position)
-        position += chunk.byteLength
-      }
-      return { data, version }
+      return { bytes: btoa(windows.join('')), version }
     },
   }
 }

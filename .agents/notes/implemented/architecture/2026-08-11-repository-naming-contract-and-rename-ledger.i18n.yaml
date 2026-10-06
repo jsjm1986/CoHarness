@@ -1,6 +1,82 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-repository-naming-contract-and-rename-ledger.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-11-repository-naming-contract-and-rename-ledger.md
-2026-08-11-repository-naming-contract-and-rename-ledger.md: 5e7d0ec9dd22a0ed482d777bf268e4517b078882
-2026-08-11-repository-naming-contract-and-rename-ledger.zh.md: c609eaf929216619b0e0850bf643278d08dcd8d1
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger:
+  en: 7b827469d1c7ded6
+  zh: e7c0f7d1d50f8102
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/problem:
+  en: 8fa069c9fcf77f0c
+  zh: e5e80688110e9327
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/decision:
+  en: 844ccfcd210cbec1
+  zh: 2ad3ad58b9ca09e9
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/decision/use-sdk-for-one-thing:
+  en: c681c573805010a5
+  zh: e0419921f2616ad4
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/decision/name-the-role-that-exists:
+  en: 4fd3022f47260593
+  zh: b3e3514a69cceb50
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/decision/role-words-are-contracts:
+  en: bcc0c8709e14ffae
+  zh: 5dd7236662750e5d
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/decision/use-qualifiers-that-add-information:
+  en: dbc39dc3b7726e6a
+  zh: 68dfb903fa6bde3b
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/decision/put-the-rule-in-project-documentation:
+  en: 4daad59096877e24
+  zh: 9c4d3cdf0c04352c
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger:
+  en: 61e83bffc796f484
+  zh: e7f611d6a9dea4c6
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/runtime-sdk:
+  en: 1486cbc2f23d74ca
+  zh: 1a3d825a0870270e
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/shell-and-terminal:
+  en: eb05b10d9f6e9d6a
+  zh: 0514cb2fb7a19e86
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/language-server-and-jobs:
+  en: 106a153d5db8fae7
+  zh: 9cbf47e595e1f900
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/input-triggers-tool-presentation-permission-presets-and-user-questions:
+  en: 92277426937e4f35
+  zh: f354923960677c01
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/typert-api-gateway-and-tools:
+  en: 908ab5aa4ec00cd9
+  zh: 3f15919c997217a7
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/workspace-instructions-telemetry-identity-and-launch-environment:
+  en: 6de4da95a7ea2631
+  zh: f6095b8b24270f5b
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/schedule-workflow-goals-and-compaction:
+  en: 8b52deadbbccb138
+  zh: 309e0860d60d872c
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/settings-credentials-client-modules-and-small-core-roles:
+  en: d7d75cc46037b3af
+  zh: bd69a85648d5f8a3
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/host-web-server-session-data-and-code-execution:
+  en: 48b1924ea90cb922
+  zh: 450e30457d50cb69
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/filesystem-skill-subagent-and-web-providers:
+  en: ada54011a2da5379
+  zh: e816cb747fb98133
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/hooks-guards-plan-mode-extensions-and-diagnostics:
+  en: 02cc7087b8790f6b
+  zh: fb0416ccca1d535c
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/utilities-e2b-host-bundles-examples-and-applications:
+  en: cb059fbdf5aa67f9
+  zh: 13cc5d9808986376
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/rename-ledger/client-runtime-and-ui:
+  en: 36019fcd555fd5f5
+  zh: 8b0d3979a2b3f7f3
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/explicit-non-renames:
+  en: cbfd6831ef2f25d7
+  zh: a14fdf742a87e8ef
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/alternatives-considered:
+  en: 66746b0c4694e3d3
+  zh: cd139b9341b44c0f
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/verification:
+  en: 037a4852c15530f2
+  zh: 782fecc128757935
+/agent-note-repository-naming-contract-and-pre-release-rename-ledger/consequences:
+  en: 092025beca175edf
+  zh: ee0786b34a48c038

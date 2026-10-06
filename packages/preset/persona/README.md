@@ -1,3 +1,8 @@
+---
+description: "Composition-authored deployment persona section for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # dsh-persona
 
 English | [中文](README.zh.md)
@@ -10,10 +15,23 @@ The agent persona as a composable row. It can either shadow the deployment perso
 
 `dsh-persona` gives one agent its own persona: a preset mounts this composable row to register persona prefix and suffix sections, shadowing the deployment-wide defaults for that session. It can also make the prefix the session's complete system prompt, suppressing every other section, and can turn off dynamic runtime-context snapshots for the session. Mount it inside a preset composition — mounting it globally collides with the prompt registry's own persona registration and fails loud. Without this row, a preset could change an agent's tools but never its identity.
 
+## Table of Contents
+
+- [Scope-only](#scope-only)
+- [Config](#config)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="scope-only"></a>
 ## Scope-only
 
 Mounting this row outside an agent scope collides with the registry's own `deployment:persona-prefix` registration and fails loud. That is not a limitation to work around: the deployment persona already has an owner, and the whole point of this row is to shadow it for one agent. Mount it inside a preset composition, where the preset mount supplies the agent scope.
 
+<a id="config"></a>
 ## Config
 
 | Field | Default | Meaning |
@@ -24,10 +42,12 @@ Mounting this row outside an agent scope collides with the registry's own `deplo
 
 `text` is a template, like any prompt section: complete `{{…}}` groups resolve strictly against registered prompt variables when the prompt renders, not when it assembles. Empty text still occupies the slot, so it shadows the deployment persona away entirely and then disappears at render. With `complete: true`, assembly still resolves contexts, tools, variables, and cooperative listeners, then the prompt registry restores this exact persona as the sole section; no identity, tool guidance, or listener can append prompt text. With `includeRuntimeContext: false`, context providers are not evaluated for this scope and contexts added by assembly listeners are discarded.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The package contributes one declarative composition row; the resolved prompt is owned by preset composition.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### The persona section
@@ -47,3 +67,13 @@ Prefix-stable while the rendered template variables and text are unchanged. Suff
 ## Known Limitations and Deferred Work
 
 - **No global mount** — the prompt registry owns the unscoped persona slot, so this row is usable only from a scoped composition. A deployment-wide persona change belongs in the `system-prompt` row's own config.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

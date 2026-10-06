@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/examples/acp-demo/README.md
-README.md: 1cf0356d6cf21ee2626f1b0552d60cc638a5ea14
-README.zh.md: 826179e4bc76e556083e74c27bf410e58e46aa21
+/:
+  en: 9e66094448aecde2
+  zh: 61495d48365178df
+/deepseek-ai-dsh-acp-demo:
+  en: b0f978bcac44a848
+  zh: 32e8188df062cf20
+/deepseek-ai-dsh-acp-demo/summary:
+  en: 1ccbe175cb226e4b
+  zh: 3f10e2f1b026a779
+/deepseek-ai-dsh-acp-demo/table-of-contents:
+  en: 3b1e0577d102b9ea
+  zh: c8506a409e7f3f35
+/deepseek-ai-dsh-acp-demo/composition:
+  en: 61bd301650dcbdf5
+  zh: 3478de98dd1c9267
+/deepseek-ai-dsh-acp-demo/config:
+  en: 88aaa057fc347992
+  zh: 9faecea47feab7d7
+/deepseek-ai-dsh-acp-demo/bin:
+  en: 03ae476c4d7cfc29
+  zh: 5f1cd38e2b9727d1
+/deepseek-ai-dsh-acp-demo/invariants:
+  en: 655a91dd2eae0f5f
+  zh: f6024eeef595d212
+/deepseek-ai-dsh-acp-demo/model-experience:
+  en: 73e68991f435416d
+  zh: 33bc248aa1e2fc8c
+/deepseek-ai-dsh-acp-demo/model-experience/kv-cache-effect:
+  en: c62adaa305f773bb
+  zh: c7fd22d72743a759
+/deepseek-ai-dsh-acp-demo/known-limitations-and-deferred-work:
+  en: 35d426b552a6adeb
+  zh: f618bf3e731e5011
+/deepseek-ai-dsh-acp-demo/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

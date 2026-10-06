@@ -15,7 +15,7 @@ const SID = 'detail-session' as SessionId
 function props(readCall: DetailsSlotProps['readCall']): DetailsSlotProps {
   const snapshot: ConversationSnapshot = {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
-    nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue: [], running: false, composerPhase: 'active', removed: false, openState: 'open', openError: null,
     hasMore: true, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
   }
@@ -27,13 +27,16 @@ function props(readCall: DetailsSlotProps['readCall']): DetailsSlotProps {
     ),
     SessionProvider: ({ children }) => children(SID),
     useSession: bindSnapshotSelector(createSnapshotStore(snapshot)),
-    useSessions: bindSnapshotSelector(createSnapshotStore<SessionListState>({ ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })),
-    useWorkspaces: bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({ items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined })),
+    useSessions: bindSnapshotSelector(createSnapshotStore<SessionListState>({ ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })),
+    useWorkspaces: bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({ items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true, recentWorkspaceId: undefined })),
+    usePanelInfo: () => { throw new Error('unused') },
     useProjection: () => undefined,
     useInput: () => { throw new Error('unused') },
     inputActions: {
       setDraft: () => {}, addImages: () => true, removeImage: () => {}, pruneImages: () => {},
-      addDocuments: () => true, removeDocument: () => {}, pruneDocuments: () => {}, submit: () => {},
+      addDocuments: () => true, removeDocument: () => {}, pruneDocuments: () => {},
+      captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }), insertText: () => false,
+      submit: () => {},
     },
     renderSlot: vi.fn((_name: string, _owner: unknown, options?: { fallback?: unknown }) => options?.fallback ?? null) as never,
   }
@@ -80,7 +83,7 @@ describe('independent Tool details', () => {
     const view = render(<DetailsPanel {...props(readCall)} />)
     expect((await view.findByRole('alert')).textContent).toBe('Access revoked')
     expect(view.queryByText('This call was not found in the Session log')).toBeNull()
-    fireEvent.click(view.getByRole('button', { name: 'Retry read' }))
+    fireEvent.click(view.getByRole('button', { name: 'Retry loading' }))
     expect(await view.findByText('allowed output')).toBeTruthy()
     expect(readCall).toHaveBeenCalledTimes(2)
   })

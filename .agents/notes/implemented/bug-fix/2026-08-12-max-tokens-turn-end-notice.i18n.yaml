@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-12-max-tokens-turn-end-notice.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-12-max-tokens-turn-end-notice.md
-2026-08-12-max-tokens-turn-end-notice.md: bdb34d67a6d8271089af04f6bcd0f046ef7cdea6
-2026-08-12-max-tokens-turn-end-notice.zh.md: 9b9c679972570e791b607330195810d68f04c803
+/agent-note-the-chat-flow-surfaces-a-max-tokens-turn-end:
+  en: b1c2df67718db3ad
+  zh: a72ff1e9726a2892
+/agent-note-the-chat-flow-surfaces-a-max-tokens-turn-end/problem:
+  en: a7b64f5dc326099a
+  zh: 00a5918be713aad8
+/agent-note-the-chat-flow-surfaces-a-max-tokens-turn-end/decision:
+  en: f8ac4e6fb38c0ca4
+  zh: 70a885151c15395f
+/agent-note-the-chat-flow-surfaces-a-max-tokens-turn-end/alternatives-considered:
+  en: b43d675280e7d37d
+  zh: 66259cebb57bd23e
+/agent-note-the-chat-flow-surfaces-a-max-tokens-turn-end/consequences:
+  en: 4f23908aa8a5ae51
+  zh: 1bd2f910361fd854

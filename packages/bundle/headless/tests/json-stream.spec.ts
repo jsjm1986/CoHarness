@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+import { ToolCallId, createToolResultMessage, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import { boundJsonLine, MAX_STRING_BYTES, projectJsonRun, type JsonProjectionOptions } from '../src/json-stream.ts'
 
 interface ProjectionHarness {
@@ -59,7 +60,7 @@ function toolResult(
     data: {
       turn: 1,
       step: 1,
-      message: { content: [{ type: 'tool-result', toolCallId: callId, content, isError: false }] },
+      message: createToolResultMessage({ callId: ToolCallId(callId), content: content as ContentBlock[], isError: false }),
     },
   } as unknown as SessionEvent
 }
@@ -168,14 +169,11 @@ describe('--json projection', () => {
       data: {
         turn: 1,
         step: 1,
-        message: {
-          content: [{
-            type: 'tool-result',
-            toolCallId: 'c2',
-            content: [{ type: 'image' }, { type: 'text' }, { type: 'text', text: 'boom' }],
-            isError: true,
-          }],
-        },
+        message: createToolResultMessage({
+          callId: ToolCallId('c2'),
+          content: [{ type: 'image' }, { type: 'text' }, { type: 'text', text: 'boom' }] as unknown as ContentBlock[],
+          isError: true,
+        }),
       },
     } as unknown as SessionEvent)
     test.projection.finish('done')

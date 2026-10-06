@@ -10,7 +10,7 @@ import type {
   ConversationViewDefinition, SessionId, SessionListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply as applyLocale, inject as localeInject } from '@deepseek-ai/dsh-client-locale/client'
-import { makeTranslate, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { makeTranslate, stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
 import {
   WorkflowRunPanel, type WorkflowRunInjected, type WorkflowRunPanelProps,
 } from '../src/client/WorkflowRunPanel.tsx'
@@ -273,7 +273,7 @@ const listState = (overrides: Partial<SessionListState> = {}): SessionListState 
   current: PARENT_ID,
   phase: 'ready',
   subagentsByParent: {},
-  jobsBySession: {},
+  jobsBySession: {}, observedJobs: {},
   currentAddress: undefined,
   ...overrides,
 })
@@ -282,8 +282,10 @@ function panelProps(data: WorkflowRunChatData, sessions = listState(), openSessi
   return {
     node: node(data),
     sessionId: PARENT_ID,
+    sessionKey: id => id,
     useSessions: selector => selector(sessions),
     useSession: (() => undefined) as WorkflowRunPanelProps['useSession'],
+    usePanelInfo: selector => selector({ activePanelId: null }),
     useProjection: () => undefined,
     useInput: () => { throw new Error('unused') },
     inputActions: { setDraft: () => {}, submit: () => {} } as unknown as WorkflowRunPanelProps['inputActions'],
@@ -792,6 +794,29 @@ describe('WorkflowRunPanel', () => {
     expect(openSession).toHaveBeenCalledWith('child-1')
   })
 
+  it('navigates a raw wire childId when the sessions list is runtime-qualified', () => {
+    const qualifiedParent = 'dsh-session:v1:personal:parent-1' as SessionId
+    const qualifiedChild = 'dsh-session:v1:personal:child-1' as SessionId
+    const sessions = listState({
+      ids: [qualifiedParent, qualifiedChild],
+      byId: {
+        [qualifiedParent]: { id: qualifiedParent, displayTitle: 'parent', running: true, blank: false, updatedAt: 0 },
+        [qualifiedChild]: { id: qualifiedChild, displayTitle: 'child', parentId: qualifiedParent, origin: 'subagent', running: true, blank: false, updatedAt: 0 },
+      },
+      current: qualifiedParent,
+    })
+    const data: WorkflowRunChatData = { name: 'audit', status: 'running', phases: [phase()] }
+    const openSession = vi.fn()
+    const props = {
+      ...panelProps(data, sessions, openSession),
+      sessionId: qualifiedParent,
+      sessionKey: ((id: SessionId) => `dsh-session:v1:personal:${String(id)}` as SessionId),
+    }
+    render(<WorkflowRunPanel {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开 worker' }))
+    expect(openSession).toHaveBeenCalledWith(qualifiedChild)
+  })
+
   it('promotes a running member when its ordinary Session row arrives', () => {
     const data: WorkflowRunChatData = {
       name: 'audit', status: 'running', phases: [phase()],
@@ -844,7 +869,7 @@ describe('plugin lifecycle', () => {
     await ctx.plugin(SlotRegistry).await()
     ctx.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
     ctx.provide('remote', { $on: () => () => {} } as never)
-    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
     await ctx.plugin(ConversationEventRegistry).await()
     await ctx.plugin(TestSessions).await()
     ctx.slots.register({

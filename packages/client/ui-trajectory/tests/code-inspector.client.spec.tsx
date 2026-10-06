@@ -45,7 +45,7 @@ describe('PTC trajectory inspector', () => {
     fireEvent.click(ui.getByRole('button', { name: 'Code' }))
     expect(ui.getByRole('tab', { name: 'Code' }).getAttribute('aria-selected')).toBe('true')
     fireEvent.click(ui.getByRole('button', { name: 'Original JSON' }))
-    expect(ui.getByRole('tree', { name: 'parameters JSON' }).textContent).toContain('description:')
+    expect(ui.getByRole('tree', { name: 'Payload JSON' }).textContent).toContain('description:')
     fireEvent.click(ui.getByRole('button', { name: 'Original JSON' }))
     expect(view.container.querySelector('[data-line-numbers] pre')?.textContent).toBe(SOURCE.trimEnd())
   })

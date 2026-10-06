@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-24-recursive-python-sdk-session-notifications.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-24-recursive-python-sdk-session-notifications.md
-2026-07-24-recursive-python-sdk-session-notifications.md: c90213659391b565acd043a1be64e225f8babd31
-2026-07-24-recursive-python-sdk-session-notifications.zh.md: f6f0a8c0e393bc19f24085b04db06056369bb329
+/agent-note-recursive-python-sdk-session-notifications:
+  en: 61e47f393d4658ea
+  zh: c0e8dba1f3cb7d08
+/agent-note-recursive-python-sdk-session-notifications/problem:
+  en: 68b282531198fe68
+  zh: f3344b45643991a4
+/agent-note-recursive-python-sdk-session-notifications/decision:
+  en: 59e1d03a40bf463a
+  zh: 560ecd98cd728e67
+/agent-note-recursive-python-sdk-session-notifications/alternatives-considered:
+  en: 3ba459a935a0a398
+  zh: 25b7852bd0b18e23
+/agent-note-recursive-python-sdk-session-notifications/consequences:
+  en: daad0aceb6ffdcb6
+  zh: ee059689e00cfc33

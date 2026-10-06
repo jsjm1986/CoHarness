@@ -9,7 +9,7 @@ import Include from '@deepseek-ai/cordis-plugin-include'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import LlmRuntime, { createUserMessage, LlmAdapter } from '@deepseek-ai/dsh-llm'
-import type { GenerateOptions, Message, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, RequestMessage, StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { canonicalHeader, Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '../src/index.ts'
@@ -34,7 +34,7 @@ afterEach(async () => {
 
 /** Captures the model input after the real LLM runtime projects durable file references. */
 class RequestCapture extends LlmAdapter {
-  readonly requests: Message[][] = []
+  readonly requests: RequestMessage[][] = []
 
   async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     this.requests.push(structuredClone(options.messages))
@@ -87,7 +87,9 @@ it('matches emitted file-handle requests after restoring the same log under a di
   first.llm.registerAdapter(['capture'], firstModel)
   for await (const _chunk of first.llm.stream({ provider: 'capture', model: 'files', messages: session.deriveMessages() })) { /* drain */ }
   const sent = firstModel.requests[0]?.[0]
-  if (sent === undefined) throw new Error('the provider received no file request')
+  // A provider request carries RequestMessage; the loop passes derived durable
+  // messages, so the durable identity narrows the capture back to Message.
+  if (sent?.id === undefined) throw new Error('the provider received no file request')
   const path = first.attachments.fileHostPath(file)
   if (path === undefined) throw new Error('the local attachment has no stored path')
   expect(await readFile(path)).toEqual(source)
@@ -112,7 +114,7 @@ it('matches emitted file-handle requests after restoring the same log under a di
     provider: 'capture', model: 'files', messages: restored.deriveMessages(),
   })) { /* drain */ }
   const resent = restoredModel.requests[0]?.[0]
-  if (resent === undefined) throw new Error('the provider received no restored file request')
+  if (resent?.id === undefined) throw new Error('the provider received no restored file request')
   expect(resent.content).not.toEqual(sent.content)
   const remeasured = restoredWorld.tokenMeter.measure(restored)
   expect(remeasured.surfaceTokens).toBe(estimateMessage(resent))

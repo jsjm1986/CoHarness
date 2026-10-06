@@ -1,23 +1,43 @@
+---
+description: "Settings domain base plugin: the settings-namespace scope service and the canonical settings slot-type contract"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings
 
 English | [中文](README.zh.md)
 
 The settings domain's base layer, with no presentation of its own. It provides `ctx.settingsScope`, the Host transport every preference row binds its durable namespace section through; `ctx.settingsSchema`, the synchronous schema-rehydration, validation, and immutable path-editing service used by settings plugins; and the settings slot types registrants fill: `settings.trigger` / `settings.header` / `settings.close` (chrome content), `settings.action` (ordered content-header actions), `settings.section` (one page per feature), `settings.plugins.tab` (feature-owned pages inside the Plugins section), and `settings.onboarding` (ordered feature-owned pages). It depends on no `ui-*` presentation package, so any feature that owns a preference can reach it; the settings SHELL — the `sidebar.settings` occupant, its navigation, and the chrome — lives in ui-settings-general, because a shell dependency on ui-sidebar would close a reference graph cycle through ui-layout and ui-theme. The shell's own contract types live beside the shell for the same reason.
 
-The plugin injects `connection` and `remote` and owns the one `settings.describe` reader in the browser: a shared mirror holding the whole answer, refreshed on every forwarded `settings/document-updated` event and on `connection/reset` (the first connection included — that read closes the window where a commit lands between the eager read and the SSE subscription). Schema operations are synchronous and live on the `settingsSchema` service. `ctx.settingsScope.bind(spec)` returns a per-namespace scope DERIVED from the mirror on the CALLER's context — the scope's disposer belongs to the calling fiber, binding adds no wire read, a row's activation never blocks on the settings transport, and every derived surface shows the same document revision at any moment. Cross-namespace surfaces (schema introspection, the served-namespace directory, `hasDocument`) read the same mirror through `ctx.settingsScope.describe()`, a read/fold face (`getSnapshot`/`subscribe`/`ensure`, plus `acceptView` folding a write answer in). The scope snapshot carries the resolved section, composition `base`, raw `user`, revision, writability, and host/memory mode; a field is overridden when it is present in `user`, even when its value equals `base`, and `unset` clears that override. Writes stay per-scope: `set` and `unset` address one field, while Host scopes also expose `mutate(ops, expectedRevision)` for atomic multi-field changes fenced by the draft revision; a committed write folds its answer back into the mirror with no re-read, a rejected or failed latest write triggers one mirror recovery read, and a superseded one leaves recovery to its successor. Without a `decode` in the spec, a section that is not a plain object, fails its rehydrated schema, or carries a schema envelope this client cannot rehydrate publishes no value at all, so a row renders its own absent state instead of a half-decoded one. The cold-boot read count is pinned by `apps/web/tests/startup-rpc-budget.e2e.ts`; a new direct `settings.describe` caller in client code is a regression against it.
+The plugin injects `connection` and `remote` and owns the one `settings.describe` reader in the browser: a shared mirror holding the whole answer, refreshed on every forwarded `settings/document-updated` event and on `connection/reset` (the first connection included — that read closes the window where a commit lands between the eager read and the SSE subscription). Schema operations are synchronous and live on the `settingsSchema` service. `ctx.settingsScope.bind(spec)` returns a per-namespace scope DERIVED from the mirror on the CALLER's context — the scope's disposer belongs to the calling fiber, binding adds no wire read, a row's activation never blocks on the settings transport, and every derived surface shows the same document revision at any moment. Cross-namespace surfaces (schema introspection, the served-namespace directory, `hasDocument`) read the same mirror through `ctx.settingsScope.describe()`, a read/fold face (`getSnapshot`/`subscribe`/`ensure`, plus `acceptView` folding a write answer in). The binder also owns `developerTools`, the shared `ui-settings`-namespace preference every developer-facing gate (trajectory view, Agent preset seat, changed-files diff) reads off one accepted value. The scope snapshot carries the resolved section, composition `base`, raw `user`, revision, writability, and host/memory mode; a field is overridden when it is present in `user`, even when its value equals `base`, and `unset` clears that override. Writes stay per-scope: `set` and `unset` address one field, while Host scopes also expose `mutate(ops, expectedRevision)` for atomic multi-field changes fenced by the draft revision; a committed write folds its answer back into the mirror with no re-read, a rejected or failed latest write triggers one mirror recovery read, and a superseded one leaves recovery to its successor. Without a `decode` in the spec, a section that is not a plain object, fails its rehydrated schema, or carries a schema envelope this client cannot rehydrate publishes no value at all, so a row renders its own absent state instead of a half-decoded one. The cold-boot read count is pinned by `apps/web/tests/startup-rpc-budget.e2e.ts`; a new direct `settings.describe` caller in client code is a regression against it.
 
 ## Summary
 
 This package lets web-client features expose editable preferences backed by the Host settings document without implementing their own transport or schema handling. Each feature gets namespace-scoped reads and writes, atomic multi-field updates, schema validation, and protection against silently overwriting concurrent changes. It also provides the standard extension points for settings chrome, pages, header actions, plugin tabs, and onboarding while rendering no interface itself. Any preference-owning feature can use it without depending on a presentation package; a separate package provides the settings shell.
 
+## Table of Contents
+
+- [Write authority](#write-authority)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="write-authority"></a>
 ## Write authority
 
 Project-scoped mirrors expose the effective project value and carry per-namespace ownership metadata. A namespace marked `projectWrite: manager` is writable for the project owner or organization administrator; all other project namespaces set `writable: false` with an owner-specific `writableReason`. Provider read-only mode uses `provider`. Account-owned locale, theme, busy-Enter, transcript width, and transcript font-size scopes use the account preference transport even while a project is active, with a Host fallback only when the account route is explicitly unsupported. A scope refuses mutations while its first view is loading or when the authority is read-only, so these states produce zero mutation RPCs. Each accepted write publishes `saving`, folds a successful response into the shared mirror, and records `error` after recovery on a rejected or failed latest write; feature rows render those states and do not persist a blocked choice.
 
+Account reads coalesce behind the current request. Forced refresh or an accepted equal-or-newer mutation answer retires that request; the accepted answer makes `ensure()` complete from the ready view without waiting for a retired GET. Neither mutation answers nor current GETs can reduce the held revision. Disposal stops transport admission and publication; every disposal call waits for all retained GETs to settle, including aborted or superseded requests that ignore cancellation.
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The schema service rehydrates and validates Host-owned documents and the scope transport forwards each namespace section; the layer owns no preference values.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
@@ -30,3 +50,13 @@ None; this package neither assembles nor sends a provider request.
 
 - **A failed or refused settings describe stays unavailable** — the binder always uses Host persistence; a throw or non-ok `settings.describe` publishes `unavailable` so plugin cards hide instead of hanging on `loading`. The Host privileged-method fence still requires a loopback `Host` header; a gateway that rewrites `Host`/`Origin` to the instance loopback is what makes a public page succeed. `settings.openDocument` remains a loopback-page action because it opens a file on the host desktop.
 - **Atomic writes are Host-only** — account preference scopes retain their scalar transport. Host `mutate` shares the namespace queue and rejects the entire mutation on validation or revision failure; independent namespaces are separate transactions.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

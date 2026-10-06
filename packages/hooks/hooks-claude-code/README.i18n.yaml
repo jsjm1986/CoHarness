@@ -1,6 +1,61 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/hooks/hooks-claude-code/README.md
-README.md: a70631d7ee90dbf52a94823c7f0ed1716ee7ea98
-README.zh.md: 403a5d242c3dc7f0402e75e86045ce0adc4aaa96
+/:
+  en: ccc724007b5c1ec9
+  zh: 61495d48365178df
+/deepseek-ai-dsh-hooks-claude-code:
+  en: 204ad56eff0200f8
+  zh: 5ebcd9d4c1ae0ba1
+/deepseek-ai-dsh-hooks-claude-code/summary:
+  en: fd56bd2d9107d126
+  zh: de7e8358840e23b1
+/deepseek-ai-dsh-hooks-claude-code/table-of-contents:
+  en: 32eb5b63c21ec432
+  zh: 0de1faddbd147d8c
+/deepseek-ai-dsh-hooks-claude-code/config:
+  en: cff3356a9e09aeff
+  zh: d2ee96ebebd236df
+/deepseek-ai-dsh-hooks-claude-code/hook-points-typed-decisions:
+  en: 343c23ee3799e587
+  zh: 91df37c437f5ad92
+/deepseek-ai-dsh-hooks-claude-code/context-source:
+  en: c8f4c796680fe46f
+  zh: c7e8cca6f51beaac
+/deepseek-ai-dsh-hooks-claude-code/invariants:
+  en: c064bb1ecf126bf9
+  zh: 7ee7df985d43aae0
+/deepseek-ai-dsh-hooks-claude-code/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-hooks-claude-code/model-experience/hook-provided-context:
+  en: 7b2f5028dacd7146
+  zh: e4d226735f7abfc2
+/deepseek-ai-dsh-hooks-claude-code/model-experience/hook-provided-context/what-the-model-sees:
+  en: 7b6edde085633c5f
+  zh: caadcfe8b9364c6d
+/deepseek-ai-dsh-hooks-claude-code/model-experience/hook-provided-context/token-effect:
+  en: b70e3524b160cd63
+  zh: e1011ee18d1bf12b
+/deepseek-ai-dsh-hooks-claude-code/model-experience/hook-provided-context/kv-cache-effect:
+  en: f5d5f97a153f7c70
+  zh: f681f89596f500f5
+/deepseek-ai-dsh-hooks-claude-code/model-experience/blocked-prompt-or-tool-outcome:
+  en: 82be8d95921ef639
+  zh: 11c185068ec18932
+/deepseek-ai-dsh-hooks-claude-code/model-experience/blocked-prompt-or-tool-outcome/what-the-model-sees:
+  en: 1313b662532a2bda
+  zh: 4002d38540286a94
+/deepseek-ai-dsh-hooks-claude-code/model-experience/blocked-prompt-or-tool-outcome/token-effect:
+  en: 7c13e10d2a0e3151
+  zh: 54ffd88bca4fce3a
+/deepseek-ai-dsh-hooks-claude-code/model-experience/blocked-prompt-or-tool-outcome/kv-cache-effect:
+  en: f84fa6c0511cd113
+  zh: 95234e2cda228032
+/deepseek-ai-dsh-hooks-claude-code/known-limitations-and-deferred-work:
+  en: c30f76ec48197954
+  zh: 4f52230490ca0e0d
+/deepseek-ai-dsh-hooks-claude-code/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

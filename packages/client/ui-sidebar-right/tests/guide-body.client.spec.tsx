@@ -12,6 +12,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { GuideBody } from '../src/client/tabs/guide/GuideBody.tsx'
 import type { GuideBodyProps } from '../src/client/tabs/guide/GuideBody.tsx'
 import type { SidebarRightGuideBox } from '../src/client/tab-registry.ts'
@@ -42,13 +43,15 @@ function box(kind: string, order: number, icon?: SidebarRightGuideBox['icon'], d
  * Mount the body with the entries observable and a chain that renders its
  * fallback, which is what the chain does with no registrant.
  */
-function mountGuide(entries: readonly SidebarRightGuideBox[], custom?: (key: string) => ReactNode) {
+function mountGuide(entries: readonly SidebarRightGuideBox[], custom?: (key: string) => ReactNode,
+  shortcuts: readonly ShortcutCatalogEntry[] = []) {
   const guideEntries = createSnapshotStore<readonly SidebarRightGuideBox[]>(entries)
   const openTab = vi.fn()
   const renderSlot = vi.fn((_seat: string, _owner: unknown, options: { fallback: ReactNode }) => options.fallback)
   const props = {
     useTabInfo: () => ({ tab: { ...TAB, actions: { openResource: vi.fn(), openTab, close: vi.fn() } } }),
     useGuideEntries: bindSnapshotSelector(guideEntries),
+    useShortcuts: <T,>(selector: (entries: readonly ShortcutCatalogEntry[]) => T): T => selector(shortcuts),
     renderSlotChain: renderSlot,
     renderSlot: vi.fn((_slot: string, _owner: unknown, options: { entryKey: string; fallback: ReactNode }) =>
       custom?.(options.entryKey) ?? options.fallback),

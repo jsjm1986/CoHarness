@@ -10,6 +10,7 @@
  * consumers merge more namespaces in and the intersection keeps them
  * string-typed. The rule fires on the narrow-map view, not real redundancy. */
 import type { Context } from '@deepseek-ai/cordis'
+import type { LocalizedText } from '@deepseek-ai/dsh-package-manifest'
 import { settingsControlState } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   type BoundActions, type LocaleDictOf, type LocaleNamespaceMap, type Translate, type TranslateNS,
@@ -424,6 +425,20 @@ export class LocaleRuntime {
       }
       if (removed) this.publish(this.snapshot.active, false)
     }
+  }
+
+  /**
+   * Resolve package text through the active language's declared fallback chain.
+   * Plain strings stay verbatim; maps do not consult registered dictionaries.
+   * @param text - package text whose locale keys are lowercase and include English.
+   * @returns the first available translation, including an empty string.
+   */
+  resolveText(text: LocalizedText): string {
+    if (typeof text === 'string') return text
+    return this.fallbackChain(this.snapshot.active).reduceRight(
+      (resolved, locale) => text[localeKey(locale)] ?? resolved,
+      text.en,
+    )
   }
 
   /**

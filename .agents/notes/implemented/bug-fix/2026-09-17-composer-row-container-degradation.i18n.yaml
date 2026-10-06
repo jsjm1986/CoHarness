@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-composer-row-container-degradation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-composer-row-container-degradation.md
-2026-09-17-composer-row-container-degradation.md: 317b172309be80fcba68f0a9a496da32308559ed
-2026-09-17-composer-row-container-degradation.zh.md: dbdadd473af109b930b6b3bb5392afaa3bbf62fb
+/agent-note-composer-row-degrades-by-container-width:
+  en: fedae37e7aea0744
+  zh: ad1a5d31f974f688
+/agent-note-composer-row-degrades-by-container-width/problem:
+  en: ef91302d27c5bf2f
+  zh: d63beb8704f1a458
+/agent-note-composer-row-degrades-by-container-width/decision:
+  en: 1c84a1740f822548
+  zh: b4bcc15225772702
+/agent-note-composer-row-degrades-by-container-width/alternatives-considered:
+  en: c7496903951c716d
+  zh: 90384b2b91d70d7a
+/agent-note-composer-row-degrades-by-container-width/consequences:
+  en: 38a75872abe63ad3
+  zh: 13dc81ed220fbe39
+/agent-note-composer-row-degrades-by-container-width/verification:
+  en: 66a7a45d0a2de78e
+  zh: d5d7f4e6f5b19710
+/agent-note-composer-row-degrades-by-container-width/related:
+  en: 9197adadc5dd2076
+  zh: 17691701c14b2b1e

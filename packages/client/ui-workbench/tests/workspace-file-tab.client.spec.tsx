@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, waitFor, fireEvent } from '@testing-library/react'
-import { WorkspaceResourceRegistry, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react'
+import { WorkspaceResourceError, WorkspaceResourceRegistry, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId, WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import { WorkspaceFileTab } from '../src/client/components/WorkspaceFileTab.tsx'
-import { FontNotice } from '../src/client/office/FontNotice.tsx'
+import { previewRequest } from './workspace-preview-resource.fixture.tsx'
 
 vi.mock('../src/client/pdf/pdf.tsx', () => ({ PdfBody: ({ data }: { data: Uint8Array }) => <pre data-testid="pdf">{new TextDecoder().decode(data)}</pre> }))
+vi.mock('../src/client/excel/LazyExcelBody.tsx', () => ({ LazyExcelBody: ({ path }: { path: string }) => <pre data-testid="excel">{path}</pre> }))
 
 afterEach(cleanup)
 const sessionId = 'files-owner' as SessionId
@@ -18,14 +20,44 @@ function harness(path = 'a.txt') {
   }, 5)
   const close = vi.fn()
   const runtimeTarget = () => ({ kind: 'project' as const, projectId: 8 })
+  // The test twin of the renderer's keyedHooks binding: an address-keyed source
+  // with a memoized selector, so an identical snapshot never reselects.
+  const useWorkspaceResource = (
+    address: string, selector?: (state: unknown) => unknown, equal?: (a: unknown, b: unknown) => boolean,
+  ): unknown => {
+    const select = selector ?? ((value: unknown) => value)
+    const source = useMemo(() => (
+      address === '' ? undefined : resources.source(previewRequest(address, sessionId, runtimeTarget()))
+    ), [address])
+    const cache = useRef<{ snap: unknown; selected: unknown } | undefined>(undefined)
+    const getSnapshot = useCallback(() => {
+      if (source === undefined) return select(undefined)
+      const snap = source.getSnapshot()
+      if (cache.current !== undefined && Object.is(cache.current.snap, snap)) return cache.current.selected
+      const selected = select(snap)
+      cache.current = {
+        snap,
+        selected: cache.current !== undefined && equal !== undefined && equal(cache.current.selected, selected)
+          ? cache.current.selected
+          : selected,
+      }
+      return cache.current.selected
+    }, [source, select, equal])
+    return useSyncExternalStore(source?.subscribe ?? (() => () => {}), getSnapshot)
+  }
   const readPreview = vi.fn(async () => ({ path, offset: 1, limit: 20, text: 'project content', version: 'v1', eof: true }))
   const readBytesPreview = vi.fn()
-  const readFileBytes = vi.fn(async () => ({ data: new Uint8Array(), version: 'v1' }))
+  const readFileBytes = vi.fn(async () => ({ bytes: '', version: 'v1' }))
   const readDocument = vi.fn(async () => ({ bytes: btoa('PDF v1'), version: 'v1', missingFonts: [] as string[] }))
   const props = (visible: boolean, line?: number, revision = 0) => ({
-    sessionId, resources, runtimeTarget, readPreview, readBytesPreview, readFileBytes, readDocument,
-    renderHtml: vi.fn(async () => '<html></html>'), fontNotice: FontNotice,
+    sessionId, runtimeTarget, useWorkspaceResource, readPreview, readBytesPreview, readFileBytes, readDocument,
+    reloadResource: (request: WorkspaceResourceOpenRequest) => resources.source(request).reload(),
+    revokeResource: (request: WorkspaceResourceOpenRequest, message: string) => {
+      resources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', message))
+    },
+    renderHtml: vi.fn(async () => '<html></html>'),
     markdownT: (key: string) => key, htmlT: (key: string) => key, pdfT: (key: string) => key, officeT: (key: string) => key,
+    excelT: (key: string) => key, excelLimits: { maxBytes: 1024, maxCells: 1000, timeoutMs: 5000 },
     t: (key: string) => key,
     useTabInfo: () => ({
       tab: {
@@ -96,6 +128,24 @@ describe('workspace file tab', () => {
     expect(h.readFileBytes).not.toHaveBeenCalled()
     fireEvent.click(view.getByRole('button', { name: 'previewClose' }))
     expect(h.close).toHaveBeenCalledOnce()
+  })
+
+  it.each(['book.xlsx', 'legacy.xls', 'table.csv'])('routes the %s suffix to the browser spreadsheet body, never office-to-pdf', async (path) => {
+    const h = harness(path)
+    const view = render(<WorkspaceFileTab {...h.props(true)} />)
+    await waitFor(() => { expect(view.getByTestId('excel')).toBeTruthy() })
+    expect(h.readFileBytes).toHaveBeenCalled()
+    expect(h.readDocument).not.toHaveBeenCalled()
+    fireEvent.click(view.getByRole('button', { name: 'previewClose' }))
+    expect(h.close).toHaveBeenCalledOnce()
+  })
+
+  it.each(['notes.docx', 'slides.ppt'])('keeps %s on the Office conversion reader', async (path) => {
+    const h = harness(path)
+    const view = render(<WorkspaceFileTab {...h.props(true)} />)
+    await waitFor(() => { expect(view.getByTestId('pdf')).toBeTruthy() })
+    expect(h.readDocument).toHaveBeenCalled()
+    expect(view.queryByTestId('excel')).toBeNull()
   })
 
   it('rejects a tab address belonging to another Session before reading', () => {

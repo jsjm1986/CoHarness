@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-19-desktop-resource-coordination.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-19-desktop-resource-coordination.md
-2026-09-19-desktop-resource-coordination.md: d98a073498e0f7aa623a22384aecccc1daa04b15
-2026-09-19-desktop-resource-coordination.zh.md: 8d3ff544d50787b90690fecf70172f4eb7a74792
+/agent-note-gateway-coordinated-interactive-desktop-grants:
+  en: 7ad707a826c72430
+  zh: e4ff033b9f77cca5
+/agent-note-gateway-coordinated-interactive-desktop-grants/problem:
+  en: 859406d46f1b8a79
+  zh: 18ed82b8fa82fea2
+/agent-note-gateway-coordinated-interactive-desktop-grants/decision:
+  en: d4289549f03375a4
+  zh: 09cc49d198696c4f
+/agent-note-gateway-coordinated-interactive-desktop-grants/alternatives-considered:
+  en: 0ffba786cab0bb74
+  zh: 51cefdabb43d3bed
+/agent-note-gateway-coordinated-interactive-desktop-grants/consequences:
+  en: 7677ca2f97e0674a
+  zh: bc37849aece92562
+/agent-note-gateway-coordinated-interactive-desktop-grants/verification:
+  en: fea5da7ea7274c5b
+  zh: 084bf946e13c634f

@@ -6,6 +6,7 @@ import {
   assertFixtureInventory,
   compareOrRefreshGolden,
   launchWebScaffold,
+  realizedTokenId,
   seedSession,
   type WebScaffold,
 } from './scaffold.ts'
@@ -14,7 +15,8 @@ const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/message-feedback-protoco
 const SESSION_FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
 const PROTOCOL_EXPECTED = join(SNAPSHOT_DIR, 'protocol.expected.json')
 const SESSION_ID = 'message-feedback-protocol'
-const MESSAGE_ID = '11111111-1111-4111-8111-111111111111'
+// The seed's assistant message — the fixture's second canonical message token.
+const MESSAGE_ID = realizedTokenId('message', 2)
 
 interface ProtocolExchange {
   readonly endpoint: string
@@ -43,6 +45,7 @@ function normalizeProtocol(exchanges: readonly ProtocolExchange[], version: stri
   return JSON.stringify(exchanges, (key, value: unknown) => {
     if ((key === 'version' || key === 'ifVersion') && value === version) return '{{version}}'
     if ((key === 'createdAt' || key === 'updatedAt') && typeof value === 'number') return '{{timestamp}}'
+    if (key === 'messageId' && value === MESSAGE_ID) return '{{messageId}}'
     return value
   }, 2)
 }
@@ -63,7 +66,7 @@ describe('message feedback Host Remote protocol', () => {
     const exchanges: ProtocolExchange[] = []
     const invoke = async (rpcId: string, endpoint: string, request: unknown): Promise<unknown> => {
       const payload = { args: { request } }
-      const response = await fetch(`${scaffold.baseUrl}/api/${endpoint}`, {
+      const response = await scaffold.hostFetch(`/api/${endpoint}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({

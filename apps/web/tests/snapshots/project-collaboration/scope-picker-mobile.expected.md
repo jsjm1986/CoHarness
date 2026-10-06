@@ -1,18 +1,14 @@
 - menu:
+  - text: Switch space
   - searchbox "Search project spaces"
   - text: Personal
-  - menuitem "Personal":
-    - img
-    - text: Personal
+  - menuitem "Personal"
   - separator
   - text: Projects
   - menuitem "Payments migration Can edit":
-    - img
     - text: Payments migration Can edit
     - img
-  - menuitem "Audit platform Read only":
-    - img
-    - text: Audit platform Read only
+  - menuitem "Audit platform Read only"
   - separator
   - text: New conversation visibility
   - menuitem "Shared with project Project members can view and participate":

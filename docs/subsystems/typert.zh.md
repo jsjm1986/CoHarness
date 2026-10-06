@@ -243,9 +243,44 @@ Root interface of the unified API. New client-request domain = one new file pair
  * @returns Transport receipt for the response delivery.
  */
 respond(message: ClientResponse): Promise<RpcReceipt>
+
+/**
+ * Host-only liveness probe: whether at least one `events.mux` Client stream is
+ * open and has not been cancelled. Producers that dispatch to page listeners use
+ * it to fail fast instead of waiting out their response deadline.
+ * @returns whether a live Client event stream exists.
+ */
+hasLiveClient(): boolean
 ```
 
 Source: [`packages/host/apiproxy/src/api/index.ts`](../../packages/host/apiproxy/src/api/index.ts)
+
+<a id="ctxhostsessionlifecycle--hostsessionlifecycle"></a>
+
+### `ctx.hostSessionLifecycle` — `HostSessionLifecycle`
+
+Host-internal lifecycle operations; this service is not a Remote or HTTP endpoint.
+
+```ts cordis-catalog
+/**
+ * Retain the disposer returned to this Host entry point by the Agent factory.
+ * @param handle - newly created or resumed Agent owned by this API.
+ * @returns that exact Agent for ordinary request routing.
+ */
+own(handle: AgentHandle): Agent
+
+/**
+ * Release idle API-owned Sessions in runtime child-first order while preventing same-identity recreation.
+ * @param ids - the complete durable tree selected by the archive owner.
+ * @param remove - durable removal, invoked only after all releases succeed.
+ * @returns the removal result; busy or unknown owners leave persistent data untouched.
+ */
+withReleased<T>(ids: readonly SessionId[], remove: () => Promise<T>): Promise<T>
+```
+
+Types: [Agent](core.zh.md) · [AgentHandle](core.zh.md) · [SessionId](core.zh.md)
+
+Source: [`packages/host/apiproxy/src/session-lifecycle.ts`](../../packages/host/apiproxy/src/session-lifecycle.ts)
 
 <a id="ctxtypert--typertregistry"></a>
 

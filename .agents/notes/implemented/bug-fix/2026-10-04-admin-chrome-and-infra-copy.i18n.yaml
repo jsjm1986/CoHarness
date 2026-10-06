@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-admin-chrome-and-infra-copy.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-admin-chrome-and-infra-copy.md
+/agent-note-extend-the-admin-language-seam-to-chrome-and-plugin-infrastructure-copy:
+  en: ad9da118c662fe08
+  zh: 10c2f4de65018fce
+/agent-note-extend-the-admin-language-seam-to-chrome-and-plugin-infrastructure-copy/problem:
+  en: 98081981c8e7022d
+  zh: 4e81c6a98f5bc96d
+/agent-note-extend-the-admin-language-seam-to-chrome-and-plugin-infrastructure-copy/decision:
+  en: d44de227da80207d
+  zh: 02f97d688538f5ac
+/agent-note-extend-the-admin-language-seam-to-chrome-and-plugin-infrastructure-copy/files:
+  en: 9dbdf31880817d3a
+  zh: de6727c9e432d174
+/agent-note-extend-the-admin-language-seam-to-chrome-and-plugin-infrastructure-copy/alternatives-considered:
+  en: 4df12eb675e15121
+  zh: 1cfcc47b80fdf354
+/agent-note-extend-the-admin-language-seam-to-chrome-and-plugin-infrastructure-copy/consequences:
+  en: f741027b84140915
+  zh: c3fd30d0a5fe1662

@@ -64,7 +64,6 @@ const requireNative = createLazyRequire<NativeModule>('native-package', import.m
 
 -----
 
-<a id="model-experience"></a>
 ## 模型体验
 
 无，因为本 Host 工具不注册任何模型可见行为。
@@ -73,6 +72,7 @@ const requireNative = createLazyRequire<NativeModule>('native-package', import.m
 
 无。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -86,3 +86,5 @@ const requireNative = createLazyRequire<NativeModule>('native-package', import.m
 ### 开发备注
 
 无。
+
+<a id="model-experience"></a>

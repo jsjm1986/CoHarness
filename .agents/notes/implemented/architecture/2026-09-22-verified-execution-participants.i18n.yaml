@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-verified-execution-participants.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-verified-execution-participants.md
-2026-09-22-verified-execution-participants.md: 99080aadd8d2668008e7962a8b3a922e936c05e2
-2026-09-22-verified-execution-participants.zh.md: bb156860a9c8aad6fed9ad2fe4a901d950add73f
+/agent-note-verified-participants-for-managed-execution:
+  en: 1336bc185455c184
+  zh: fd68fb33e9e2a148
+/agent-note-verified-participants-for-managed-execution/problem:
+  en: a79a61848c57e0a5
+  zh: b7b0e3d150e74986
+/agent-note-verified-participants-for-managed-execution/decision:
+  en: d3d78c2ea84e3fba
+  zh: 9dbb06a56a6163e8
+/agent-note-verified-participants-for-managed-execution/alternatives-considered:
+  en: 0c469861387c99de
+  zh: c516fbab43da858d
+/agent-note-verified-participants-for-managed-execution/consequences:
+  en: 4a3bfe4ae90353f7
+  zh: e7cdada367baaaed
+/agent-note-verified-participants-for-managed-execution/testing:
+  en: ceae791a377b7f5a
+  zh: 3e76d49ff1c6e21b

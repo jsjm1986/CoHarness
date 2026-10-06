@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # acp/：Agent Client Protocol 自动化
 
 [English](README.md) | 中文

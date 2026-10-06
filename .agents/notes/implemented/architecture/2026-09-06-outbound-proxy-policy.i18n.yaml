@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-06-outbound-proxy-policy.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-06-outbound-proxy-policy.md
-2026-09-06-outbound-proxy-policy.md: b2013ac9aa3cfec29fdf2676793d87d791c7beb9
-2026-09-06-outbound-proxy-policy.zh.md: 408e90024ba80c1d55e0f39464ecceb698617268
+/agent-note-process-wide-outbound-proxy-policy:
+  en: 6141b2944ee2bc73
+  zh: cbad1d01d31501a4
+/agent-note-process-wide-outbound-proxy-policy/problem:
+  en: a3d79fb55df934eb
+  zh: d72675707f6e214a
+/agent-note-process-wide-outbound-proxy-policy/decision:
+  en: c18be21032247ca7
+  zh: 17cf8741bf11ec43
+/agent-note-process-wide-outbound-proxy-policy/alternatives-considered:
+  en: 16fa55505c4e800a
+  zh: 188fd9c781cf896f
+/agent-note-process-wide-outbound-proxy-policy/consequences:
+  en: 9f0aa7b085608c4c
+  zh: 258d2b39c34c6267
+/agent-note-process-wide-outbound-proxy-policy/verification:
+  en: f3a1b6ac5c7861ee
+  zh: 1440fc38e19c44dc

@@ -7,6 +7,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { expect, it, onTestFinished } from 'vitest'
+import * as CordisInspectProviders from '../src/host.ts'
 import * as ToolCordis from '../src/index.ts'
 
 const RETIRED = ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine'] as const
@@ -18,6 +19,7 @@ async function setup() {
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(CordisHostRunner)
+  const hostFiber = await ctx.plugin(CordisInspectProviders)
   const fiber = await ctx.plugin(ToolCordis)
   const id = SessionId('cordis-inspection')
   const agent = { id, ctx, session: ctx.sessions.create(id) } as Agent
@@ -28,7 +30,7 @@ async function setup() {
     agent,
     signal: new AbortController().signal,
   })
-  return { ctx, fiber, agent, execute }
+  return { ctx, fiber, hostFiber, agent, execute }
 }
 
 it('lists and queries callable tools without creating a dynamic definition', async () => {
@@ -84,10 +86,11 @@ it('reads retained Package source without activating that definition', async () 
 })
 
 it('removes inspection tools and providers when their owning plugin unloads', async () => {
-  const { ctx, fiber, agent, execute } = await setup()
+  const { ctx, fiber, hostFiber, agent, execute } = await setup()
   await fiber.dispose()
   expect(ctx.tools.schemas(agent)).toEqual([])
-  expect(ctx.cordisInspect.list()).toEqual([])
   expect(await execute('cordis_inspect_query', { platform: 'host', provider: 'Tool', method: 'listTools' }))
     .toMatchObject({ isError: true, error: { info: { code: 'UNKNOWN_TOOL' } } })
+  await hostFiber.dispose()
+  expect(ctx.cordisInspect.list()).toEqual([])
 })

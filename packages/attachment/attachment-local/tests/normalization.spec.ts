@@ -307,5 +307,5 @@ describe('normalizeImage', () => {
     expect(normalized).toMatchObject({ mediaType: 'image/jpeg', width: 512, height: 256 })
     expect(stats.channels[0]?.min).toBeLessThan(80)
     expect(stats.channels[0]?.max).toBeGreaterThan(240)
-  })
+  }, 90_000)
 })

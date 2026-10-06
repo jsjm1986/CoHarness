@@ -1,3 +1,8 @@
+---
+description: "Shared Claude Code / Codex hook wire protocol: matcher engine, stdin/exit-code/stdout codec, multi-hook merge, and hook/* session events"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-hook-protocol
 
 English | [中文](README.zh.md)
@@ -10,6 +15,18 @@ Codex deliberately reimplements a *subset* of the Claude Code hook protocol — 
 
 `dsh-hook-protocol` makes both bridges handle your hooks identically: it defines what a hook can do and what happens when it runs. You never install or configure it yourself — choose `dsh-hooks-claude-code` or `dsh-hooks-codex`, point it at your existing `hooks.json`, and these rules apply to your hooks. Through either bridge, a hook can block a prompt or tool call with a message the model sees, attach extra context to the conversation, or ask the run to stop. Only command hooks run; `http`, `mcp_tool`, `prompt`, and `agent` handlers are skipped with a warning.
 
+## Table of Contents
+
+- [What's shared (here) vs. per-dialect (the bridges)](#whats-shared-here-vs-per-dialect-the-bridges)
+- [Primitives](#primitives)
+- [`hook/*` session events](#hook-session-events)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="whats-shared-here-vs-per-dialect-the-bridges"></a>
 ## What's shared (here) vs. per-dialect (the bridges)
 
 | Concern | Here (`dsh-hook-protocol`) | The bridge (`dsh-hooks-claude-code` / `-codex`) |
@@ -21,6 +38,7 @@ Codex deliberately reimplements a *subset* of the Claude Code hook protocol — 
 | Durable record | `appendHookInvoked` / `appendHookResult` (`hook/*` session events; the result's `decision`/`stderrSummary` derive from the `HookOutput` here) | calls them around each invocation |
 | Detached-run quiescence | `createDetachedRuns()` — track fire-and-forget run chains; `drain()` aborts, then awaits them | passes `signal` to each detached `runHook`, registers `drain` as its effect disposer |
 
+<a id="primitives"></a>
 ## Primitives
 
 - **`matcherDiagnostic(matcher, mode)` / `matchesMatcher(matcher, query, mode)`** — match-all on absent/`''`/`'*'`; `claude` mode treats a pure `[A-Za-z0-9_|]+` pattern as a literal (pipe = exact-match alternation) and anything else as a regex; `codex` mode is always an unanchored regex. Bridge parsers discard matcher fields for events without matcher subjects, then use `matcherDiagnostic` to reject an invalid consumed regex with a stable diagnostic before registering any hooks. The runtime predicate still contains an invalid pattern as a non-match, so a direct library caller cannot throw into the agent loop.
@@ -29,12 +47,14 @@ Codex deliberately reimplements a *subset* of the Claude Code hook protocol — 
 - **`mergeHookOutputs(outputs)`** — fold the results of every hook that matched one point: permission precedence **deny > ask > allow**, halt sticky on the first `continue:false`, block reasons joined with `\n\n`, `additionalContext`/`systemMessages` accumulated in order.
 - **`createDetachedRuns()`** — quiescence tracking for the emit-shaped points, which run detached (no extension point awaits them). The bridge tracks each run chain — the hook run PLUS its continuation — and registers `drain()` as its effect disposer: drain fires the tracker's abort `signal` (so a still-running hook process is killed via `runHook`, not awaited out to its timeout), then resolves once every tracked chain has settled. `fiber.dispose()` resolving therefore means no detached hook work is left to fire into a disposed context ([defensive patterns](../../../docs/defensive-patterns.md): dispose must reach quiescence).
 
+<a id="hook-session-events"></a>
 ## `hook/*` session events
 
 Declaration-merged into `SessionEventMap` (log-only, like `compaction/*` — NOT a `SurfaceEventType`, no `surfaceOp`): `hook/invoked` (a hook command ran) and `hook/result` (its outcome, paired by `handlerId`, with `appendHookResult` owning the decision rule). Payloads and per-event JSDoc are in the generated [persistence log event catalog](../../../docs/persistence-catalog.md); `stderrSummary` is truncated to the record's `stderrSummaryMaxChars` (the bridge's config, reference default `DEFAULT_STDERR_SUMMARY_MAX_CHARS` = 500; omitted when empty).
 
 Hook invocation/result records must sit inside an open turn. `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, and `Stop` satisfy that owner-defined relation by construction. `SessionStart` runs before turn 1 and gets no `hook/*` record; its allowed context remains pending in the inbox until a waking delivery opens a turn — see the hooks Agent Note.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through `dsh-hooks-claude-code` and `dsh-hooks-codex`, which are the only consumers that render decoded hook output into model context.
@@ -46,3 +66,13 @@ No direct invalidation; the named consumers own any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 - **`HookOutput.updatedInput` is parsed but not honored** — input rewrite is a deferred consistency-design problem ([the pre-tool-input-rewrite Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.md)); a bridge logs + warns when a hook sets it. See `src/types.ts` for the full contracts.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

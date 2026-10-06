@@ -35,6 +35,7 @@ function scriptedApi(overrides: {
   const err = <T>(r: RpcRequest<unknown>): Promise<RpcResponse<T>> =>
     Promise.resolve({ rpcId: r.rpcId, result: { ok: false, error: { code: 'internal' as const, message: 'stub', details: {} } } })
   return {
+    hasLiveClient: () => true,
     desktop: { status: r => ok(r, null), confirm: r => err(r) },
     sessions: {
       list: r => ok(r, { items: [] }),
@@ -70,6 +71,10 @@ function scriptedApi(overrides: {
       history: r => ok(r, { events: [], hasMore: false }),
       ...overrides.subagents,
     },
+    jobs: {
+      output: r => err(r),
+      kill: r => err(r),
+    },
     host: {
       describe: r => ok(r, {
         version: '0-test', cwd: '/t', attachedSessions: 0, home: '/h', canOpenPath: true,
@@ -78,10 +83,11 @@ function scriptedApi(overrides: {
       listDirectory: r => ok(r, { path: '/t', home: '/t', crumbs: [], entries: [], truncated: false }),
       createDirectory: r => ok(r, { path: '/t/new' }),
       openPath: r => ok(r, { opened: true as const }),
+      fileApplications: r => ok(r, { applications: [] }),
       ...overrides.host,
     },
     workspace: {
-      list: r => ok(r, { items: [], archivedSessionIds: [] }),
+      list: r => ok(r, { items: [], archivedSessionIds: [], pinnedSessionIds: [] }),
       create: r => ok(r, { workspace: { workspaceId: 'w1' as never, path: '/t', title: 't', sessionIds: [], createdAt: '0', updatedAt: '0' }, created: true }),
       rename: r => ok(r, { workspace: { workspaceId: 'w1' as never, path: '/t', title: 't', sessionIds: [], createdAt: '0', updatedAt: '0' } }),
       delete: r => ok(r, { deleted: true as const }),
@@ -89,6 +95,8 @@ function scriptedApi(overrides: {
       insertSessionBefore: r => ok(r, { workspace: { workspaceId: 'w1' as never, path: '/t', title: 't', sessionIds: [], createdAt: '0', updatedAt: '0' } }),
       archiveSession: r => ok(r, { archivedSessionIds: [r.payload.sessionId] }),
       unarchiveSession: r => ok(r, { archivedSessionIds: [] }),
+      pinSession: r => ok(r, { pinnedSessionIds: [r.payload.sessionId] }),
+      unpinSession: r => ok(r, { pinnedSessionIds: [] }),
     },
     workspaceChanges: {
       async summary(request) { return { rpcId: request.rpcId, result: { ok: true, value: null } } },
@@ -415,7 +423,7 @@ describe('workspace domain round trip', () => {
   it('routes both workspace methods through their handler rows and value schemas', async () => {
     const c = client(scriptedApi())
     const list = await c.workspace.list({})
-    expect(list.result).toEqual({ ok: true, value: { items: [], archivedSessionIds: [] } })
+    expect(list.result).toEqual({ ok: true, value: { items: [], archivedSessionIds: [], pinnedSessionIds: [] } })
     const created = await c.workspace.create({ path: '/t' })
     expect(created.result.ok).toBe(true)
     if (created.result.ok) expect(created.result.value.created).toBe(true)

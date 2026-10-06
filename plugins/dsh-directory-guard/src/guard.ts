@@ -20,12 +20,12 @@ interface PathTarget {
  * Returns `null` when the tool DOES take a path but the argument is missing or
  * malformed, so the guard fails closed rather than passing an unresolved call.
  */
-function targetOf(exec: GuardExecution): PathTarget | undefined | null {
+function targetOf(exec: GuardExecution, cwd: string): PathTarget | undefined | null {
   const args = (typeof exec.arguments === 'object' && exec.arguments !== null)
     ? exec.arguments as Record<string, unknown>
     : {}
   const filePathTools: Record<string, boolean> = { read: false, write: true, edit: true }
-  if (exec.name in filePathTools) {
+  if (Object.hasOwn(filePathTools, exec.name)) {
     const p = args.file_path
     if (typeof p !== 'string' || p.trim() === '') return null
     return { path: p, isWrite: filePathTools[exec.name] === true }
@@ -34,6 +34,15 @@ function targetOf(exec: GuardExecution): PathTarget | undefined | null {
     const p = args.path
     if (typeof p !== 'string' || p.trim() === '') return null
     return { path: p, isWrite: args.command !== 'view' }
+  }
+  if (exec.name === 'grep' || exec.name === 'glob') {
+    // These search tools are reads whose pattern/include args flow to the
+    // search engine's own --glob filters; the guard constrains the traversal
+    // root only. An absent path searches the session cwd.
+    if (!Object.hasOwn(args, 'path')) return { path: cwd, isWrite: false }
+    const p = args.path
+    if (typeof p !== 'string' || p.trim() === '') return null
+    return { path: p, isWrite: false }
   }
   return undefined
 }
@@ -66,7 +75,7 @@ export function canonicalize(target: string, cwd: string): string {
  *   - A missing/malformed path argument on a path tool is denied (fail closed).
  */
 export function decideDeny(exec: GuardExecution, grants: readonly Grant[], cwd: string): string | null {
-  const target = targetOf(exec)
+  const target = targetOf(exec, cwd)
   if (target === undefined) return null
   if (target === null) return `${exec.name}: missing or invalid path argument`
 

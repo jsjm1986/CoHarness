@@ -3,22 +3,29 @@
  * snapshots taken at turn start and turn end, plus whole-file captures taken
  * around each file-tool edit for paths git does not cover, and serves each
  * listed file's before-and-after comparison on demand. Each summary is
- * announced by a `workspace/changes` Session event that carries only the turn
- * number; summaries and comparisons are served through the `workspaceChanges`
- * service until the Session is disposed. Outside a git repository, or without
+ * announced by a `workspace/changes` Session event that carries the turn
+ * number and immutable review identity; summaries and comparisons are served through the `workspaceChanges`
+ * service across Session release and Host restart. Outside a git repository, or without
  * git, the summary lists file-tool edits only.
  */
+import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { homedir, tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { z as validator } from 'zod'
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import type {} from '@deepseek-ai/dsh-agent'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-fs'
 import { PosixRecorderExecution } from './execution.ts'
 import type {} from '@deepseek-ai/dsh-tools'
+import { SessionPersistenceReadError, type SessionPersistencePage } from '@deepseek-ai/dsh-session-persistence'
+import type { ProjectionDefinition, SessionProjectionStateMap } from '@deepseek-ai/dsh-session-projection'
 import { GitRunner } from './git.ts'
 import { TurnRecorder } from './recorder.ts'
+import { ReviewStore, type StoredReview } from './review-store.ts'
 import type { WorkspaceChanges } from './types.ts'
 
 export type {
@@ -29,13 +36,17 @@ export type {
 export const name = 'workspace-changes'
 
 /** Filesystem and subprocess providers in the same execution world. */
-export const inject = ['subprocess', 'fs']
+export const inject = ['subprocess', 'fs', 'sessionProjections']
 
 /** Snapshot, capture, and comparison bounds. Invalid values fail plugin load. */
 export interface Config {
-  /** Milliseconds one git command may run before the turn's record is abandoned. */
+  /** Private historical review root; omitted uses `DSH_HOME/workspace-reviews`. */
+  storageRoot?: string
+  /** Maximum serialized bytes per immutable review, enforced on publication and reads. */
+  maxReviewBytes: number
+  /** Milliseconds one git command may run before recording fails and the turn is stopped. */
   timeoutMs: number
-  /** Bytes of git output retained per command; a larger diff listing abandons the record. */
+  /** Bytes of git output retained per command; a larger diff listing fails the recording and stops the turn. */
   outputMaxBytes: number
   /** Maximum files carried by one summary; `total` still reports the complete count. */
   maxFiles: number
@@ -50,12 +61,31 @@ export interface Config {
 
 /** Schemastery validation for {@link Config}. */
 export const Config: z<Config> = z.object({
+  storageRoot: z.string().min(1),
+  maxReviewBytes: z.number().default(64 * 1024 * 1024),
   timeoutMs: z.number().default(30_000),
   outputMaxBytes: z.number().default(8 * 1024 * 1024),
   maxFiles: z.number().default(500),
   maxFileBytes: z.number().default(2 * 1024 * 1024),
   diffTimeoutMs: z.number().default(100),
 })
+
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    'workspace-review-storage': { readonly failedTurn: number; readonly requiredBytes: number }
+  }
+}
+
+const REVIEW_STORAGE: ProjectionDefinition<'workspace-review-storage'> = {
+  key: 'workspace-review-storage', stateVersion: 1,
+  stateSchema: validator.object({
+    failedTurn: validator.number().int().nonnegative(), requiredBytes: validator.number().int().nonnegative(),
+  }),
+  init: () => ({ failedTurn: 0, requiredBytes: 0 }),
+  apply: (state, event) => event.type !== 'workspace/changes' ? state
+    : event.data.incomplete === true ? { failedTurn: event.data.turn, requiredBytes: event.data.requiredReviewBytes ?? 0 }
+      : event.data.reviewId !== undefined && event.data.turn >= state.failedTurn ? { failedTurn: 0, requiredBytes: 0 } : state,
+}
 
 function eligible(session: Session): string | undefined {
   const { cwd, origin, delegationDepth } = session.header
@@ -99,10 +129,16 @@ export function apply(ctx: Context, config: Config): void {
   for (const [field, value] of [
     ['timeoutMs', config.timeoutMs], ['outputMaxBytes', config.outputMaxBytes], ['maxFiles', config.maxFiles],
     ['maxFileBytes', config.maxFileBytes], ['diffTimeoutMs', config.diffTimeoutMs],
+    ['maxReviewBytes', config.maxReviewBytes],
   ] as const) {
     if (!Number.isSafeInteger(value) || value < 1) throw new Error(`workspace-changes requires a positive integer ${field}`)
   }
   const lifetime = new AbortController()
+  const storageRoot = config.storageRoot ?? join(resolveDshHome(), 'workspace-reviews')
+  registerManagedDataPath({ owner: '@deepseek-ai/dsh-workspace-changes', kind: 'directory', path: storageRoot }, process.env.DSH_MANAGED_DATA_MANIFEST)
+  const store = new ReviewStore(storageRoot, config.maxReviewBytes)
+  ctx.sessionProjections.register(REVIEW_STORAGE)
+  const storageRechecked = new WeakSet<Session>()
   const recorders = new Map<Session, TurnRecorder>()
   const byId = new Map<SessionId, TurnRecorder>()
   const retiring = new Set<Promise<void>>()
@@ -125,9 +161,34 @@ export function apply(ctx: Context, config: Config): void {
     /* v8 ignore next -- retiring disposal rejects only under the POSIX-gated cleanup-failure suite. */
     if (failures.length > 0) throw new AggregateError(failures.map(result => result.reason as unknown), 'Workspace snapshot cleanup failed')
   })
+  const historical = async (sessionId: SessionId, seq: number, signal = lifetime.signal): Promise<StoredReview | undefined> => {
+    const persistence = ctx.get('sessionPersistence')
+    if (persistence === undefined) return undefined
+    const request = { fromSeq: seq, maxEvents: 1, maxBytes: 64 * 1024 }
+    let page: SessionPersistencePage
+    try { page = await persistence.readPage(sessionId, request, signal) } catch (error) {
+      if (signal.aborted || !(error instanceof SessionPersistenceReadError) || error.code !== 'dependency') throw error
+      // A concurrent resume may append its marker while the immutable earlier event is read.
+      page = await persistence.readPage(sessionId, request, signal)
+    }
+    const event = page.events.find(event => event.seq === seq)
+    if (event?.type !== 'workspace/changes') return undefined
+    if (event.data.incomplete === true && page.meta.cwd !== undefined) {
+      return { version: 1, sessionId, diffs: [], summary: {
+        turn: event.data.turn, cwd: page.meta.cwd, incomplete: true, files: [], total: 0, added: 0, deleted: 0,
+      } }
+    }
+    return event.data.reviewId === undefined ? undefined : store.read(sessionId, event.data.reviewId, signal)
+  }
   const service: WorkspaceChanges = {
-    summary: (sessionId, seq) => byId.get(sessionId)?.summary(seq),
-    diff: (sessionId, seq, index, signal) => byId.get(sessionId)?.diff(seq, index, signal) ?? Promise.resolve(undefined),
+    removeStored: async (sessionId, signal) => {
+      if (ctx.get('sessions')?.get(sessionId) !== undefined) throw new Error('Release the Session before purging its historical reviews')
+      await store.remove(sessionId, signal)
+    },
+    summary: (sessionId, seq, signal) => byId.get(sessionId)?.summary(seq)
+      ?? (ctx.get('sessionPersistence') === undefined ? undefined : historical(sessionId, seq, signal).then(record => record?.summary)),
+    diff: async (sessionId, seq, index, signal) => await byId.get(sessionId)?.diff(seq, index, signal)
+      ?? (await historical(sessionId, seq, signal))?.diffs[index],
   }
   ctx.provide('workspaceChanges', service)
   let runner: Promise<GitRunner | null> | undefined
@@ -152,6 +213,7 @@ export function apply(ctx: Context, config: Config): void {
       const execution = fs.processPathFromHostPath(cwd) === undefined
         ? new PosixRecorderExecution(fs, ctx.subprocess, cwd, config.timeoutMs) : undefined
       recorder = new TurnRecorder(session, cwd, {
+        reviewStore: store,
         /* v8 ignore start -- the POSIX execution world is exercised only by POSIX-gated suites. */
         ...execution === undefined ? {} : { execution },
         /* v8 ignore stop */
@@ -165,6 +227,7 @@ export function apply(ctx: Context, config: Config): void {
     return recorder
   }
   ctx.on('session/event', (session, event) => {
+    if (event.type === 'workspace/changes' && event.data.incomplete === true) storageRechecked.delete(session)
     if (event.type === 'turn/start') {
       const cwd = eligible(session)
       if (cwd !== undefined) recorderFor(session, cwd).start(event.data.turn)
@@ -180,10 +243,33 @@ export function apply(ctx: Context, config: Config): void {
   ctx.on('agent/turn-stopping', async ({ agent, turn }) => {
     await recorders.get(agent.session)?.stopping(turn)
   })
+  ctx.on('agent/pre-step', async ({ agent, turn }, next) => {
+    const cwd = eligible(agent.session)
+    if (cwd === undefined) return next()
+    const recorder = recorders.get(agent.session)
+    if (recorder === undefined) {
+      agent.session.append('workspace/changes', { turn, incomplete: true })
+      throw new Error('Historical review recording was interrupted. Start a new request after restoring the recorder.')
+    }
+    await recorder.settled()
+    lifetime.signal.throwIfAborted()
+    const storageState = ctx.sessionProjections.stateOf(agent.session, 'workspace-review-storage') as
+      SessionProjectionStateMap['workspace-review-storage']
+    if (!storageRechecked.has(agent.session)) {
+      try { await store.probe(agent.id, storageState.requiredBytes) } catch (error) {
+        recorder.failStorage(turn, error)
+        throw new Error('Historical review storage is not ready. Resolve its capacity or access problem before continuing.')
+      }
+      lifetime.signal.throwIfAborted()
+      storageRechecked.add(agent.session)
+    }
+    return next()
+  })
   ctx.on('tools/pre-execute', async (exec, next) => {
     const session = exec.agent?.session
     const recorder = session === undefined ? undefined : recorders.get(session)
     if (recorder !== undefined) {
+      await recorder.settled()
       recorder.capture(exec.name, exec.arguments)
       await recorder.settled()
     }

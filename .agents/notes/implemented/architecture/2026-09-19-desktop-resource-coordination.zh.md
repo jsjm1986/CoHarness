@@ -31,8 +31,8 @@ Gateway 为每个交互桌面拥有一份**桌面租约**，以不透明的资�
 
 ## 后果
 
-获取与释放每资源需一次串行事务（PostgreSQL advisory lock、SQLite 库级互斥）——相对其防止的点击交错破坏，成本很小。持有人未确认即消失时桌面进入 `unavailable` 而非被悄悄重发，运维获得显式的恢复决策（`revoke`/`clear`，均入审计），代价是偶发的人工清理。驱动必须遵守 fencing 令牌与停止信号；无视它们的 provider 代码仍可能向已被取代的桌面注入输入。
+获取与释放每资源需一次串行事务（PostgreSQL：共享的协调器级 advisory lock 加独占的每资源 lock，使互不相关的资源可并发推进，而协调器级 sweep 在其独占锁后等待；SQLite：库级互斥）——相对其防止的点击交错破坏，成本很小。持有人未确认即消失时桌面进入 `unavailable` 而非被悄悄重发，运维获得显式的恢复决策（`revoke`/`clear`，均入审计），代价是偶发的人工清理；clear 仅对 `unavailable` 状态的资源受理——其它状态以冲突拒绝——受理的 clear 以 `admin-clear` 原因释放陈旧租约并提升下一位等待者。驱动必须遵守 fencing 令牌与停止信号；无视它们的 provider 代码仍可能向已被取代的桌面注入输入。
 
 ## 验证
 
-`gateway/tests/desktop-coordinator.spec.ts` 覆盖双运行时争用、旧代次拒绝、FIFO 顺序、requestId 去重、取消、带确认的撤权、heartbeat 丢失 → stopping → pending-confirm → 不可用、协调者重启调和，以及 confirm-stopped 释放；`gateway/tests/postgres.spec.ts` 在真实 PostgreSQL 上验证同一路径（advisory-lock 序列化、队列提升、重启持久化、组织隔离）。部署注意：仅驱动专用桌面并保留紧急停止通道。周期 sweep 以 grant TTL 的一半运行；`HGW_DESKTOP_GRANT_TTL_MS`、`HGW_DESKTOP_STOPPING_TTL_MS`、`HGW_DESKTOP_QUEUE_TTL_MS` 与 `HGW_DESKTOP_QUEUE_CAPACITY` 按部署调整协调窗口。
+`gateway/tests/desktop-coordinator.spec.ts` 覆盖双运行时争用、旧代次拒绝、FIFO 顺序、requestId 去重、取消、带确认的撤权、heartbeat 丢失 → stopping → pending-confirm → 不可用、协调者重启调和、confirm-stopped 释放、对可用资源执行 `clear` 的冲突拒绝，以及同一次 sweep 中仍有效的 held 租约优先于过期队列项；`gateway/tests/postgres.spec.ts` 在真实 PostgreSQL 上验证同一路径（advisory-lock 序列化、队列提升、重启持久化、组织隔离），`gateway/tests/admin-business-postgres.spec.ts` 证明互不相关的每资源事务可重叠推进，而协调器级 `transactAll` 等待，反向亦然。部署注意：仅驱动专用桌面并保留紧急停止通道。周期 sweep 以 grant TTL 的一半运行；`HGW_DESKTOP_GRANT_TTL_MS`、`HGW_DESKTOP_STOPPING_TTL_MS`、`HGW_DESKTOP_QUEUE_TTL_MS` 与 `HGW_DESKTOP_QUEUE_CAPACITY` 按部署调整协调窗口。

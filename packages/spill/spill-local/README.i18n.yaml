@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/spill/spill-local/README.md
-README.md: 6dbe431a6eb0e454701261b95e7246ffc92f6a61
-README.zh.md: 285065e7188be3e1cf5b8e140e40ee3ac52ab57c
+/:
+  en: 220445363ce07d52
+  zh: 61495d48365178df
+/deepseek-ai-dsh-spill-local:
+  en: 6bf9ba8856c19836
+  zh: 17ea6b54c77f6542
+/deepseek-ai-dsh-spill-local/summary:
+  en: 1d8b50741c23fe72
+  zh: 9e3eb775ee92d964
+/deepseek-ai-dsh-spill-local/table-of-contents:
+  en: 000249e91d7c9a06
+  zh: ab0c161b403ac5fd
+/deepseek-ai-dsh-spill-local/storage-layout:
+  en: 48a4d5a60555fa88
+  zh: 3b2dfd0bbc7f4f82
+/deepseek-ai-dsh-spill-local/config:
+  en: 066b88e2780fd369
+  zh: 44de9d3256b5424f
+/deepseek-ai-dsh-spill-local/startup-cleanup:
+  en: c597799ed64e6cad
+  zh: ea83d0189c6c91b9
+/deepseek-ai-dsh-spill-local/invariants:
+  en: a87507e8326e1d0c
+  zh: a576617d002c8946
+/deepseek-ai-dsh-spill-local/model-experience:
+  en: ae2966f8fc63dc5b
+  zh: 141aa4ebbc52574f
+/deepseek-ai-dsh-spill-local/model-experience/kv-cache-effect:
+  en: 40294c1c31b74824
+  zh: 08d6e44580b36020
+/deepseek-ai-dsh-spill-local/known-limitations-and-deferred-work:
+  en: 7de31efee0506b61
+  zh: 9d75ee08ea92cfd9
+/deepseek-ai-dsh-spill-local/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

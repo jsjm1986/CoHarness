@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-command-feedback
 
 [English](README.md) | 中文
@@ -8,6 +13,20 @@
 
 `dsh-command-feedback` 让用户告诉 harness 他们对会话的看法。输入 `/feedback` 加一条评价，评价即被记录，并以会话 id 与匿名用户 id 确认；Web 反馈弹窗通过 `sessionFeedback` Host Remote 记录分类与可选描述。记录是即时的，绝不会启动模型工作：模型既看不到这条评价，也不会被打断。本包同时拥有所有反馈界面共用的固定分类表。它随标准 `dsh` 基础组合交付，无需任何配置；无头模式、ACP（Agent Client Protocol）与 JSON-RPC 入口不提供斜杠命令。
 
+## 目录
+
+- [命令约定](#command-contract)
+- [会话共享披露](#session-sharing-disclosure)
+- [本插件做什么、不做什么](#what-this-plugin-does-and-does-not-do)
+- [组合](#composition)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="command-contract"></a>
 ## 命令约定
 
 | 输入 | 结果 |
@@ -17,6 +36,7 @@
 
 前后空白会被丢弃，但除此之外，反馈内容不会被解析：不进行截断或大小写折叠，也不识别控制词。看起来像另一个命令的文本（例如 `/feedback /plan felt slow`）就是反馈内容。重复执行命令时，每次都会产生一个事件；不会发生替换或合并。
 
+<a id="session-sharing-disclosure"></a>
 ## 会话共享披露
 
 确认文本会点名接收会话的 id，并报告该会话如何被共享；该信息通过插件上下文（`ctx.get('telemetry')`，绝不是声明的注入）从已挂载的 [`telemetry`](../../session/session-telemetry/README.zh.md) 服务读取。披露是依据后端 [`SessionTelemetrySharingStatus`](../../session/session-telemetry/README.zh.md) 选择的一句话：
@@ -30,6 +50,7 @@
 
 披露只陈述部署当前的共享策略，绝不承诺投递或留存：在 `full` 或 `feedback-only` 下，记录被交给后端的非阻塞入队，批处理、重试与丢失策略归 SDK 负责，因此句子不声称任何内容已到达采集端；`disabled` 也不声称未来不会重新配置。披露不新增任何事件，也绝不会进入模型 surface。
 
+<a id="what-this-plugin-does-and-does-not-do"></a>
 ## 本插件做什么、不做什么
 
 `recordFeedback(session, record)` 是不依赖命令的写入路径。它追加 `feedback/record`，携带记录中可选的 `text`（空白文本归一化为缺失）与 `category`；完全为空的记录也会标记反馈已被提交。其他 UI、钩子或 host 集成无需构造斜杠命令即可调用它。`/feedback` 处理器通过该函数写入，且不启动任何模型工作。可选的 [`dsh-session-telemetry-otel`](../../session/session-telemetry-otel) 消费方会观察该事件，但不改变它的采集约定。
@@ -38,6 +59,7 @@
 
 权威记录是该事件，而不是命令记录，因为反馈可能来自 `/feedback` 之外的触发方式。让载荷不进入 `command/run`，可避免两条记录携带相同文本。
 
+<a id="composition"></a>
 ## 组合
 
 生产方只注入 `commands`。自定义应用挂载注册表以及本插件：
@@ -51,10 +73,12 @@
 
 随附的 `dsh` 基础组合无条件挂载此命令；它没有配置，也不依赖持久化 goal 栈。Web 客户端通过命令适配器暴露该命令。无头模式、ACP（Agent Client Protocol）自动化和 JSON-RPC 不提供命令适配器，因此不会暴露它。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。本包仅有的 effect 是向所属会话日志的一次追加和一次全局命令注册；没有可供断言的可变关系。
 
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 用户 `/feedback` 采集
@@ -71,6 +95,7 @@
 
 与模型请求路径无关。记录只追加到会话日志，不触碰已经可复用的请求前缀。本包贡献的任何内容都不会使缓存复用失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓工作
 
 - **没有反馈检索或管理 surface**：可选的 OTel 插件仅将该事件用作共享触发器。本包不为 `feedback/record` 提供检索、聚合、分类或面向模型的工具。
@@ -80,3 +105,13 @@
 - **新会话上没有可见的确认**：Web 转录只在会话激活后渲染命令行，因此在仍为空白的新会话上执行 `/feedback` 会记录事件但不会显示确认行。发送首条消息后再记录反馈即可正常渲染。
 - **随附的产品入口中只有 Web 使用此命令**：无头模式、ACP（Agent Client Protocol）自动化和 JSON-RPC 不提供命令适配器，因此 `/feedback` 在那里不可用。
 - **`zod` 是生成的 Typert 契约面的运行时依赖，不是 `src` 的依赖。** 发布的 `./typert` 与 `./remote` 出口解析到不经打包的 `lib/typert.*.js` 文件，其中包含裸 `zod` 导入。manifest 必须保留 `zod`；只有当两份生成 JavaScript 契约面都不存在时，`knip.config.ts` 才注入 workspace 级例外，已构建 checkout 则由 Knip 直接观察该导入。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

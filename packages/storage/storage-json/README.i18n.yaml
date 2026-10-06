@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/storage/storage-json/README.md
-README.md: 493e496024a95f1fb41e6532681d9962daec97eb
-README.zh.md: 264b26a4cc2a252e6ff0e71412925cb1b1136e35
+/:
+  en: d09ec006ecc765b0
+  zh: 61495d48365178df
+/deepseek-ai-dsh-storage-json:
+  en: e5226551141e1efe
+  zh: 7680087b4384ba69
+/deepseek-ai-dsh-storage-json/summary:
+  en: 9eb9c035b03acd09
+  zh: 2adec96e42a054e1
+/deepseek-ai-dsh-storage-json/table-of-contents:
+  en: e1a0d2d61e02231f
+  zh: 9871e6d3986a5793
+/deepseek-ai-dsh-storage-json/model:
+  en: acf0ad33f88b87ef
+  zh: d650d6e67a1e9cea
+/deepseek-ai-dsh-storage-json/config:
+  en: 5ff2226472e75151
+  zh: b836064a133a38a2
+/deepseek-ai-dsh-storage-json/invariants:
+  en: 0b06cd326af3c2cc
+  zh: 9b86bc5cfd6a0319
+/deepseek-ai-dsh-storage-json/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-storage-json/model-experience/stored-domain-records:
+  en: c5d5ffaf6b114f3e
+  zh: 97db23b0b14ff1c0
+/deepseek-ai-dsh-storage-json/model-experience/stored-domain-records/what-the-model-sees:
+  en: d0798e9e30583b55
+  zh: 968f7f595b4bf1ff
+/deepseek-ai-dsh-storage-json/model-experience/stored-domain-records/token-effect:
+  en: 592ed887c69e5c46
+  zh: cb9be9de6e38db55
+/deepseek-ai-dsh-storage-json/model-experience/stored-domain-records/kv-cache-effect:
+  en: c13c59d13a5f1651
+  zh: a7cb0d6c86e865ad
+/deepseek-ai-dsh-storage-json/known-limitations-and-deferred-work:
+  en: 3d3ea34e77361fae
+  zh: d78c3c5024748d54
+/deepseek-ai-dsh-storage-json/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

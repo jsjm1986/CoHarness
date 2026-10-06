@@ -40,7 +40,7 @@ describe.skipIf(MODE === 'record')('web e2e: historical Cordis cards remain read
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     const group = page.getByRole('treeitem').first()
     await group.waitFor({ timeout: 15_000 })

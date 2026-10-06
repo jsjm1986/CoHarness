@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-title-first-prompt-llm/README.md
-README.md: f97459391ab0d178bea92fc78e9c31818b1a539d
-README.zh.md: ef16e3b468f121ee3eabec727e83239591d45a6f
+/:
+  en: ea4facda879cb457
+  zh: 61495d48365178df
+/deepseek-ai-dsh-session-title-first-prompt-llm:
+  en: 16db2676fb7e18f4
+  zh: ff20bd393ea8f448
+/deepseek-ai-dsh-session-title-first-prompt-llm/summary:
+  en: b83df8efb409c03b
+  zh: 9f1cba8b8a0964cb
+/deepseek-ai-dsh-session-title-first-prompt-llm/table-of-contents:
+  en: b59e55619aaa595f
+  zh: a35cee05e12c8f29
+/deepseek-ai-dsh-session-title-first-prompt-llm/invariants:
+  en: 7df59e4f57135832
+  zh: a79e3e2475ccd88f
+/deepseek-ai-dsh-session-title-first-prompt-llm/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-session-title-first-prompt-llm/model-experience/first-message-title-request:
+  en: b216200be66e9ec4
+  zh: 6805c5bfb9c55091
+/deepseek-ai-dsh-session-title-first-prompt-llm/model-experience/first-message-title-request/what-the-model-sees:
+  en: c465d920d61d8564
+  zh: 4b8843f5dac13dd8
+/deepseek-ai-dsh-session-title-first-prompt-llm/model-experience/first-message-title-request/token-effect:
+  en: eba887955bf3f8af
+  zh: 61fdea0346e06428
+/deepseek-ai-dsh-session-title-first-prompt-llm/model-experience/first-message-title-request/kv-cache-effect:
+  en: 22c407527c295def
+  zh: 699df311d66ef825
+/deepseek-ai-dsh-session-title-first-prompt-llm/known-limitations-and-deferred-work:
+  en: e149bf77c2d6fec1
+  zh: 314d8307de956e45
+/deepseek-ai-dsh-session-title-first-prompt-llm/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

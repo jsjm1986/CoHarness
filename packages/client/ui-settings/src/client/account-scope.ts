@@ -32,7 +32,10 @@ export interface AccountPreferencesMirrorSnapshot {
 /** A single account preference read/fold source. */
 export class AccountPreferencesMirror {
   private readonly store: SnapshotStore<AccountPreferencesMirrorSnapshot>
-  private inFlight: Promise<void> | undefined
+  private readonly lifetime = new AbortController()
+  private readSlot: { controller: AbortController; promise: Promise<void> } | undefined
+  /** Reads remain owned through transport settlement, even after losing the slot. */
+  private readonly pendingReads = new Set<Promise<void>>()
 
   constructor(private readonly transport: AccountPreferencesTransport | undefined) {
     this.store = createSnapshotStore({
@@ -58,28 +61,61 @@ export class AccountPreferencesMirror {
     return this.store.subscribe(listener)
   }
 
-  /** Load account preferences once, coalescing concurrent callers. */
+  /** Load account preferences once, coalescing current readers.
+   * @returns readiness without waiting for a read retired by an accepted view.
+   */
   ensure(): Promise<void> {
-    if (this.transport === undefined) return Promise.resolve()
-    if (this.inFlight !== undefined) return this.inFlight
+    if (this.transport === undefined || this.lifetime.signal.aborted) return Promise.resolve()
+    if (this.readSlot !== undefined) return this.readSlot.promise
     if (this.store.getSnapshot().status === 'ready') return Promise.resolve()
     return this.load()
   }
 
-  /** Refresh account preferences, preserving the last good answer on failure. */
-  load(): Promise<void> {
-    if (this.transport === undefined) return Promise.resolve()
-    if (this.inFlight !== undefined) return this.inFlight
-    const run = this.read()
-    this.inFlight = run
-    return run
+  /**
+   * Refresh account preferences, preserving the last good answer on failure.
+   * A force refresh invalidates the pending read: a caller that needs a
+   * post-mutation answer must not join a request issued before that mutation.
+   * @param force - supersede and abort any in-flight read instead of joining it.
+   * @returns settlement of the current or newly owned read.
+   */
+  load(force = false): Promise<void> {
+    const transport = this.transport
+    if (transport === undefined || this.lifetime.signal.aborted) return Promise.resolve()
+    const current = this.readSlot
+    if (current !== undefined && !force) return current.promise
+    const controller = new AbortController()
+    const promise = Promise.resolve().then(() => this.read(controller, transport)).finally(() => {
+      this.pendingReads.delete(promise)
+    })
+    // Publication eligibility and settlement ownership precede deferred wire admission.
+    this.readSlot = { controller, promise }
+    this.pendingReads.add(promise)
+    current?.controller.abort()
+    return promise
   }
 
-  /** Fold a successful mutation response into the held mirror.
+  /** Fold an equal or newer successful mutation response and retire the current read.
    * @param view - validated account preference response.
    */
   accept(view: AccountPreferencesView): void {
+    if (this.lifetime.signal.aborted) return
+    const held = this.store.getSnapshot().view
+    if (held !== undefined && view.revision < held.revision) return
+    const current = this.readSlot
+    this.readSlot = undefined
     this.store.set({ status: 'ready', view, error: null, unsupported: false })
+    current?.controller.abort()
+  }
+
+  /** Stop publication and wait for every retained read, including on repeated calls.
+   * @returns settlement after all owned transports settle, even when they ignore abort.
+   */
+  async dispose(): Promise<void> {
+    this.lifetime.abort()
+    const slot = this.readSlot
+    this.readSlot = undefined
+    slot?.controller.abort()
+    await Promise.allSettled([...this.pendingReads])
   }
 
   /** Project one namespace into the shared Host-like view.
@@ -117,21 +153,30 @@ export class AccountPreferencesMirror {
     return { ns, value, base, user, revision: view.revision, writable: true, owner: 'account' }
   }
 
-  private async read(): Promise<void> {
-    const transport = this.transport
+  private async read(controller: AbortController, transport: AccountPreferencesTransport): Promise<void> {
+    const owns = (): boolean =>
+      this.readSlot?.controller === controller
+      && !controller.signal.aborted
+      && !this.lifetime.signal.aborted
     try {
+      if (!owns()) return
       this.store.update((state) => {
         state.status = 'loading'
         state.error = null
         state.unsupported = false
       })
-      // `load()` returns early when the optional carrier is absent; optional
-      // chaining keeps that invariant local without adding a second state.
-      const view = await transport?.describe()
-      /* v8 ignore next -- load() returns before read() when the carrier is absent. */
-      if (view === undefined) return
-      this.accept(view)
+      if (!owns()) return
+      const view = await transport.describe(controller.signal)
+      if (!owns()) return
+      const held = this.store.getSnapshot().view
+      this.store.set({
+        status: 'ready',
+        view: held !== undefined && view.revision < held.revision ? held : view,
+        error: null,
+        unsupported: false,
+      })
     } catch (error: unknown) {
+      if (!owns()) return
       const unsupported = isUnsupported(error)
       const held = this.store.getSnapshot().view
       this.store.set({
@@ -141,7 +186,7 @@ export class AccountPreferencesMirror {
         unsupported,
       })
     } finally {
-      this.inFlight = undefined
+      if (this.readSlot?.controller === controller) this.readSlot = undefined
     }
   }
 }
@@ -222,20 +267,22 @@ export class AccountSettingsScopeController<T> implements SettingsScope<T> {
         return
       }
       this.setWrite({ status: 'saving' })
-      const revision = this.pendingRevision ?? this.getSnapshot().revision
       const mutation: AccountPreferenceMutation = {
         namespace: this.spec.namespace as AccountPreferenceMutation['namespace'],
         field: input.field as AccountPreferenceMutation['field'],
         operation: input.operation,
         ...(input.operation === 'set' ? { value: input.value as string | number } : {}),
-        /* v8 ignore next -- a ready account namespace always carries the mirror revision. */
-        ...(revision === undefined ? {} : { expectedRevision: revision }),
       }
-      try {
-        const transport = this.transport
-        /* v8 ignore next -- enqueue returns immediately when transport is absent. */
-        if (transport === undefined) return
-        const view = await transport.mutate(mutation)
+      const transport = this.transport
+      /* v8 ignore next -- enqueue returns immediately when transport is absent. */
+      if (transport === undefined) return
+      const attempt = async (): Promise<void> => {
+        const revision = this.pendingRevision ?? this.getSnapshot().revision
+        const view = await transport.mutate({
+          ...mutation,
+          /* v8 ignore next -- a ready account namespace always carries the mirror revision. */
+          ...(revision === undefined ? {} : { expectedRevision: revision }),
+        })
         if (this.disposed) return
         if (generation === this.generation) {
           this.pendingRevision = undefined
@@ -247,17 +294,43 @@ export class AccountSettingsScopeController<T> implements SettingsScope<T> {
           // still-pending value from the account UI.
           this.pendingRevision = view.revision
         }
+      }
+      try {
+        await attempt()
       } catch (error: unknown) {
-        // A failed latest write invalidates the response fence retained for a
-        // predecessor; the recovery read below supplies the only current
-        // revision. Keeping that predecessor would make the next edit send a
-        // stale expectedRevision after recovery.
+        // A stale expectedRevision is only a fence against concurrent
+        // writers: reload the mirror and retry once on the fresh revision
+        // before reporting a save failure to the row.
+        if (errorCode(error) !== 'account-preferences-conflict') {
+          await this.failWrite(generation, error)
+          return
+        }
         if (generation === this.generation) this.pendingRevision = undefined
-        await this.mirror.load()
+        await this.mirror.load(true)
         if (this.disposed || generation !== this.generation) return
-        this.setWrite({ status: 'error', code: errorCode(error), message: messageOf(error) })
+        try {
+          await attempt()
+        } catch (retryError: unknown) {
+          await this.failWrite(generation, retryError)
+        }
       }
     })
+  }
+
+  /**
+   * Recover the mirror after a rejected write and publish the error state.
+   * @param generation - the write generation that failed; superseded failures publish nothing.
+   * @param error - the transport rejection being reported.
+   */
+  private async failWrite(generation: number, error: unknown): Promise<void> {
+    // A failed latest write invalidates the response fence retained for a
+    // predecessor; the recovery read below supplies the only current
+    // revision. Keeping that predecessor would make the next edit send a
+    // stale expectedRevision after recovery.
+    if (generation === this.generation) this.pendingRevision = undefined
+    await this.mirror.load(true)
+    if (this.disposed || generation !== this.generation) return
+    this.setWrite({ status: 'error', code: errorCode(error), message: messageOf(error) })
   }
 
   private enqueue(operation: () => Promise<void>): Promise<void> {
@@ -307,74 +380,142 @@ export class AccountSettingsScopeController<T> implements SettingsScope<T> {
   }
 }
 
-/** A source that starts with account storage and falls back only on 404/501. */
+/**
+ * Fields the account preference endpoint accepts per namespace — the routing
+ * table of {@link AccountOrHostSettingsScopeController}. Mirrors the wire
+ * union on `AccountPreferenceMutation['field']`; client bundle purity forbids
+ * sharing the value across plugins.
+ */
+const ACCOUNT_FIELDS: Record<string, readonly string[]> = {
+  locale: ['preference'],
+  'ui-theme': ['preference'],
+  'ui-conversation': ['busyEnter', 'chatContentWidth', 'chatFullWidth', 'chatFontSize'],
+}
+
+/**
+ * A source that starts with account storage and falls back only on 404/501.
+ * The account endpoint accepts a fixed field whitelist per namespace; fields
+ * outside it keep reading and writing Host settings while the account layer
+ * stays authoritative for the whitelisted remainder.
+ */
 export class AccountOrHostSettingsScopeController<T> implements SettingsScope<T> {
   private readonly store: SnapshotStore<SettingsScopeSnapshot<T>>
   private readonly account: AccountSettingsScopeController<T>
-  private active: SettingsScope<T>
+  private readonly accountFields: readonly string[]
   private accountStop: (() => void) | undefined
-  private hostStop: (() => void) | undefined
+  private readonly hostStop: () => void
   private disposed = false
+  /** Per-source sequence of the latest write-state replacement, for merging by recency. */
+  private writeRecency = { account: { state: { status: 'idle' } as SettingsWriteState, seq: 0 }, host: { state: { status: 'idle' } as SettingsWriteState, seq: 0 }, next: 0 }
 
   constructor(
     account: AccountSettingsScopeController<T>,
     private readonly host: SettingsScope<T>,
     private readonly mirror: AccountPreferencesMirror,
+    namespace: string,
   ) {
     this.account = account
-    this.active = account
-    this.store = createSnapshotStore(account.getSnapshot())
-    this.accountStop = account.subscribe(() => {
-      const state = account.getSnapshot()
-      if (this.mirror.getSnapshot().unsupported) {
-        this.switchToHost()
-        return
-      }
-      this.publish(state)
-    })
-    void this.mirror.ensure().then(() => {
-      if (!this.disposed && this.mirror.getSnapshot().unsupported) this.switchToHost()
-    })
-  /* jscpd:ignore-start -- the account and settings scopes intentionally keep
-   * the same delegation surface to their authoritative source. */
+    this.accountFields = ACCOUNT_FIELDS[namespace] ?? []
+    this.store = createSnapshotStore(this.mergedSnapshot())
+    this.accountStop = account.subscribe(() => { this.publish() })
+    // Fields the account endpoint does not own read and write through the Host
+    // scope even while the account layer is active, so the Host subscription
+    // stays installed rather than arriving with a fallback switch.
+    this.hostStop = host.subscribe(() => { this.publish() })
+    void this.mirror.ensure().then(() => { this.publish() })
   }
-  /** @returns the active source snapshot. */
+
+  /* jscpd:ignore-start -- parallel SettingsScope implementations share the
+   * getSnapshot/subscribe/set/unset face by contract while their routing and
+   * publication differ. */
+  /** @returns the merged or fallback source snapshot. */
   getSnapshot(): SettingsScopeSnapshot<T> { return this.store.getSnapshot() }
 
-  /** @param listener - called after active-source changes. @returns disposer. */
+  /** @param listener - called after snapshot changes. @returns disposer. */
   subscribe(listener: () => void): () => void { return this.store.subscribe(listener) }
 
-  /** Write through the currently authoritative source. */
-  set(field: string, value: unknown): Promise<void> { return this.active.set(field, value) }
+  /** Write through the source owning the field. */
+  set(field: string, value: unknown): Promise<void> { return this.route(field).set(field, value) }
 
-  /** Clear through the currently authoritative source. */
-  unset(field: string): Promise<void> { return this.active.unset(field) }
+  /** Clear through the source owning the field. */
+  unset(field: string): Promise<void> { return this.route(field).unset(field) }
   /* jscpd:ignore-end */
 
   /** Dispose both source scopes. */
   async dispose(): Promise<void> {
     this.disposed = true
     this.accountStop?.()
-    this.hostStop?.()
+    this.hostStop()
     await Promise.all([
       disposeScope(this.account),
       disposeScope(this.host),
     ])
   }
 
-  private switchToHost(): void {
-    if (this.active === this.host || this.disposed) return
-    this.active = this.host
-    this.accountStop?.()
-    this.accountStop = undefined
-    this.hostStop = this.host.subscribe(() => { this.publish(this.host.getSnapshot()) })
-    this.publish(this.host.getSnapshot())
+  private route(field: string): SettingsScope<T> {
+    return this.accountFields.includes(field) ? this.active : this.host
   }
 
-  private publish(snapshot: SettingsScopeSnapshot<T>): void {
-    /* v8 ignore next -- the composite detaches its host listener during disposal. */
-    if (!this.disposed) this.store.set(snapshot)
+  /**
+   * The authoritative source for account-owned fields: Host while the mirror
+   * marks the endpoint unsupported, the account scope otherwise. Deriving it
+   * per publication lets a recovered endpoint resume account persistence
+   * instead of pinning the session to the first transient failure.
+   */
+  private get active(): SettingsScope<T> {
+    return this.mirror.getSnapshot().unsupported ? this.host : this.account
   }
+
+  private publish(): void {
+    /* v8 ignore next -- the composite detaches its listeners during disposal. */
+    if (this.disposed) return
+    this.store.set(this.active === this.account ? this.mergedSnapshot() : this.host.getSnapshot())
+  }
+
+  /**
+   * Publish the account snapshot with the layers it does not own refilled
+   * from Host storage and the more urgent of the two write states.
+   */
+  private mergedSnapshot(): SettingsScopeSnapshot<T> {
+    const account = this.account.getSnapshot()
+    const host = this.host.getSnapshot()
+    return {
+      ...account,
+      value: mergeSectionLayer(host.value, account.value, this.accountFields) as T | undefined,
+      base: mergeSectionLayer(host.base, account.base, this.accountFields),
+      user: mergeSectionLayer(host.user, account.user, this.accountFields),
+      write: this.mergedWrite(account.write, host.write),
+    }
+  }
+
+  /**
+   * Publish the write state most recently replaced on either source. Recency
+   * lets a later write clear an earlier terminal error instead of pinning
+   * the worst state forever on the merged row.
+   */
+  private mergedWrite(account: SettingsWriteState, host: SettingsWriteState): SettingsWriteState {
+    const recency = this.writeRecency
+    if (!Object.is(account, recency.account.state)) recency.account = { state: account, seq: ++recency.next }
+    if (!Object.is(host, recency.host.state)) recency.host = { state: host, seq: ++recency.next }
+    return recency.host.seq > recency.account.seq ? recency.host.state : recency.account.state
+  }
+}
+
+/** Overlay the account-owned fields of one section layer onto Host storage. */
+function mergeSectionLayer(host: unknown, account: unknown, fields: readonly string[]): unknown {
+  if (!isRecord(host) || !isRecord(account)) return account
+  const merged: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(host)) {
+    if (!fields.includes(key)) merged[key] = value
+  }
+  for (const field of fields) {
+    if (field in account) merged[field] = account[field]
+  }
+  return merged
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 async function disposeScope(scope: SettingsScope<unknown>): Promise<void> {

@@ -1,3 +1,8 @@
+---
+description: "In-process spawn subagent backend: runs a fresh child agent on ctx.agents"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-subagent-spawn-in-process
 
 English | [中文](README.zh.md)
@@ -8,26 +13,43 @@ The spawn provider creates a fresh child `Agent` in the current process. The chi
 
 `dsh-subagent-spawn-in-process` is an in-process subagent backend: it runs each delegated task in a fresh child agent that shares this process and its agent factory, LLM, and tool services. The child starts with an empty conversation, so a task prompt must stand alone; it inherits the parent's working directory, session lineage, provider, model, reasoning effort, and output-token limit unless `request.agentOptions` overrides them. A delegation tool or API call reaches it under the `spawn` provider name. Choose it for the cheapest delegation transport; choose the fork backend when the child must build on the parent's completed conversation turns.
 
+## Table of Contents
+
+- [Behavior](#behavior)
+- [Capabilities](#capabilities)
+- [Config](#config)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="behavior"></a>
 ## Behavior
 
 `start(request)` delegates to [`startInProcessRun`](../subagent-in-process-driver/README.md) with no seed and awaits publication before returning. The child receives parent working-directory/session lineage and inherits the parent's latest logged provider/model route unless overridden; it falls back to the parent's creation options before the first request is logged, but starts with an empty conversation.
 
 The shared driver owns depth checking, persona and tool-filter setup, structured output, required-signal cancellation, one-shot execution, result reading, and quiescent disposal. A startup rejection leaves no published child; provider unload after fulfillment does not revoke the holder-owned run.
 
+<a id="capabilities"></a>
 ## Capabilities
 
 Spawn advertises `{ outputSchema: true, depthLimit: true, toolFilter: true, persona: true }` because it controls the child's creation window and can enforce all four features.
 
+<a id="config"></a>
 ## Config
 
 | Key | Meaning |
 |---|---|
 | `providerName` | Registry name on `ctx.subagents` (default `spawn`). |
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The child Agent is created and disposed within the call by the shared driver; the provider owns no post-run state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Child-agent request
@@ -61,3 +83,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 ## Known Limitations and Deferred Work
 
 - **Fresh means no parent transcript** — the child inherits cwd, lineage, the latest logged route, and explicitly configured persona/tool restrictions, but none of the parent's conversation; use the fork provider when completed-turn context is required.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

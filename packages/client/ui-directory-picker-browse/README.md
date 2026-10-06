@@ -1,3 +1,8 @@
+---
+description: "In-app directory browsing surface: the workspace directory-flow owner rendering the host's listing and creation primitives"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-directory-picker-browse
 
 English | [中文](README.zh.md)
@@ -14,10 +19,21 @@ The node half is an empty `apply`: it exists so the plugin appears in the host c
 
 This package provides the in-app directory-browsing surface for the Web GUI: a Select Workspace Directory dialog that lists, navigates, and creates folders through the local Host, with no operating-system chooser involved. It fills the two directory-flow slots declared by `ui-workspace`, composing the client side of the browse picking interaction in one cordis.yml row. Choose it when the browser is remote or in-process and no local OS chooser exists; local deployments may prefer the [`-native`](../ui-directory-picker-native/README.md) surface.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Every listing and creation is delegated to the Host directory-picker backend through `ctx.workspaces`; the dialog holds only transient interaction state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the directory browser is browser chrome; nothing here reaches a model request.
@@ -30,3 +46,13 @@ None; this package neither assembles nor sends a provider request.
 
 - **No search, no multi-select, and no rename or delete** — the dialog lists and creates directories; a target is reached by navigating, editing the path, or filtering the last pane by prefix.
 - **Hidden-entry filtering is client-side** — the Host always lists hidden entries and flags them, so the toggle changes only what the dialog renders.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-13-deepseek-v41-image-token-calculator.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-13-deepseek-v41-image-token-calculator.md
-2026-09-13-deepseek-v41-image-token-calculator.md: 4749eee30d3ddc2818324d43f4492e24e35a714b
-2026-09-13-deepseek-v41-image-token-calculator.zh.md: 762f960170b6770c277bf170988da52296e41587
+/agent-note-deepseek-image-pricing-uses-the-v41-token-grid:
+  en: 17a3df9dada9439f
+  zh: 127dea6462eb87f3
+/agent-note-deepseek-image-pricing-uses-the-v41-token-grid/problem:
+  en: 0cfefeb4cf60e911
+  zh: 62563516610fa0ca
+/agent-note-deepseek-image-pricing-uses-the-v41-token-grid/decision:
+  en: c255d5bbcab50877
+  zh: df1e9f97c7f85361
+/agent-note-deepseek-image-pricing-uses-the-v41-token-grid/consequences:
+  en: f7d296036d6ebc04
+  zh: 608c9e99a56de8dc
+/agent-note-deepseek-image-pricing-uses-the-v41-token-grid/alternatives-considered:
+  en: cf5ba8ff6c27d394
+  zh: cc8c2259123f1eab
+/agent-note-deepseek-image-pricing-uses-the-v41-token-grid/verification:
+  en: 60f5af3c4dc5397a
+  zh: 3f23060d62fece4e

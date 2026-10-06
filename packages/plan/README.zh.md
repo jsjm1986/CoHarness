@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # plan/：plan 协作状态
 
 [English](README.md) | 中文

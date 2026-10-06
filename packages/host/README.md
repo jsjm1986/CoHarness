@@ -1,3 +1,8 @@
+---
+description: "The host side of the dsh web GUI: the API gateway every client shape shares, and the plain HTTP server it rides on. The browser side lives in `client/`; the composed application is `apps/cli` booting the `dsh-base` bundle serving `apps/web`. All **product** packages."
+kind: "package-group"
+---
+
 # host/ — web-GUI host half
 
 English | [中文](README.zh.md)

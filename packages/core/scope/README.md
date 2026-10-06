@@ -1,3 +1,8 @@
+---
+description: "Scoped-context registration primitive (scope tags, scope-filtered event dispatch) for the DeepSeek Harness"
+kind: "package-library"
+---
+
 # dsh-scope
 
 English | [中文](README.zh.md)
@@ -8,6 +13,16 @@ Scoped registration primitive. `createScope(ctx, key)` creates a tagged Cordis c
 
 `dsh-scope` lets plugin authors give each agent or group an isolated contribution set with a shared lifetime. Child scopes inherit ancestor contributions, with the nearest definition taking precedence, while ancestor scopes can observe descendant activity; neither relationship works in reverse. Disposing a scope removes everything owned by it. Use this dependency-free library when per-agent or per-group isolation must work without depending on the agent loop or presets.
 
+## Table of Contents
+
+- [Public API](#public-api)
+- [Design contract](#design-contract)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="public-api"></a>
 ## Public API
 
 - `createScope(ctx: Context, key: ScopeKey, options?): Scope` Mint a scope under `ctx`'s fiber. Usable synchronously (effect collection is uid-gated; service resolution falls through to the minting plugin's dependency surface). The typed, same-process key is trusted; an inactive minting context still fails through Cordis (`INACTIVE_EFFECT`). `options.parent` binds the enclosing scope via `bindScopeParent` before the scope is usable; the binding stays internal.
@@ -26,6 +41,7 @@ Scoped registration primitive. `createScope(ctx, key)` creates a tagged Cordis c
 
 The optional `@deepseek-ai/dsh-scope/invariant` companion owns that runtime assertion. It uses the generated `scoped-events.generated.ts` resolver map to require a carrier for every declared scoped event and, when the payload exposes its routing subject, require identity with the carrier key. The Program-backed generator derives the map from event declarations and real `scopeTarget(base, key)` calls.
 
+<a id="design-contract"></a>
 ## Design contract
 
 The registration context determines both visibility and ownership, preventing a registration from being visible in one scope but disposed with another. Scopes route trusted same-process plugins; they are not sandboxes or authority boundaries. See the [agent-scope Agent Note](../../../.agents/notes/implemented/architecture/2026-07-08-agent-scope-contexts.md#security-and-authority-are-non-goals) for rationale and security non-goals.
@@ -34,8 +50,19 @@ Scope-aware services define a concrete `ScopeLayer` that aggregates their hetero
 
 Handing out a scoped context hands out the minting plugin's service-resolution API (resolution walks the minting fiber's dependency chain, not the holder's) — mint it from the plugin whose dependencies the scoped registrations need to resolve.
 
+<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
 - **Only scope-aware APIs isolate state** — registries must file by `scopeOf()` and events must dispatch through `scopeTarget()`; an arbitrary Cordis service remains context-global merely because it is called through a scoped context.
 - **A context carries one nearest scope key** — the hierarchy lives in the key-level parent relation, not in context tags; nested scope CONTEXTS still shadow to a single tag, and multi-membership policy sets remain unsupported.
 - **Service reachability comes from the scope minter** — handing out `Scope.ctx` also hands out the minting plugin's injected services, so a broader minter cannot later be narrowed by the holder.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

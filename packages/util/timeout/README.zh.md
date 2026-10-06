@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-library"
+---
+
 # dsh-timeout
 
 [English](README.md) | 中文
@@ -12,6 +17,20 @@
 
 `dsh-timeout` 让调用方为工作设置有上限的截止时间、区分本地超时与上游取消，并监测流式读取是否空闲。`clampTimeout` 在提示缺失时填入后端默认值，把结果限制在允许的最大值以内，并在工作开始前拒绝无效值。`deadline` 将选定的超时与上游取消合并到一个信号中，而调用方仍负责真正停止自己的进程、套接字或任务。`idleWatchdog` 只计算等待提供方读取所花的时间；零仍保留给后端自有的不计时工作，而不是公开配置。
 
+## 目录
+
+- [对外接口](#api)
+- [`timeoutMs <= 0` 哨兵值](#the-timeoutms--0-sentinel)
+- [使用形态](#usage-shape)
+- [哪些操作不设置超时](#what-does-not-get-a-timeout)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="api"></a>
 ## 对外接口
 
 ```ts
@@ -27,10 +46,12 @@ import { clampTimeout, deadline, idleWatchdog, MAX_TIMER_DELAY_MS, timeoutOf, Ti
 | `timeoutOf(signal \| { reason }, code?)` | 从已中止的信号/错误中恢复 `TimeoutReason`，否则返回 `undefined`，即超时与取消的分类器。传入 `code` 可仅匹配这个 deadline 的 timer（见下文的嵌套）。 |
 | `TimeoutReason` | 标记在超时中止上的内部原因（`code` + `timeoutMs`）。它不是公开错误；提供方将其转换为自己的错误/字段。 |
 
+<a id="the-timeoutms--0-sentinel"></a>
 ## `timeoutMs <= 0` 哨兵值
 
 `0` 是后端自有后台工作（bash `start()`）使用的**内部**「无超时」值。`deadline()` 不启动 timer，只转发 `upstream`；如果也没有 upstream，它将返回永不中止的信号和无操作 disposer，因此每个调用方都能保持同一种调用形态。外部请求提示会通过 `clampTimeout` 验证为**正有限数**，之后才进入 `deadline`，因此 `0` 绝不是面向模型/插件的「禁用超时」值。
 
+<a id="usage-shape"></a>
 ## 使用形态
 
 ```ts
@@ -54,14 +75,18 @@ export async function runWithDeadline(upstream: AbortSignal | undefined, timeout
 
 对于流式传输，创建一个 `idleWatchdog`，将其稳定的 `signal` 传给传输层，并为提供方的每次读取调用 `watchdog.next(iterator)`。当传输活动不产生迭代器值时，调用 `watchdog.pulse()`。间隔必须为正有限数，且不得超过 `MAX_TIMER_DELAY_MS`；否则 Node 会将其限制为 1 毫秒。它只对尚未完成的读取请求计时，因此当下游代码进行渲染或在请求下一个分片前以其他方式等待时，timer 不会运行。该原语仍然只会通知，因此传输层必须观察稳定信号；DeepSeek 和 pi-ai 适配器证明，超时会关闭它们的真实响应正文或 SDK 请求。
 
+<a id="what-does-not-get-a-timeout"></a>
 ## 哪些操作不设置超时
 
 本地文件 `read`/`write`/`edit` 不接受 `timeoutMs`：文件 IO 不设时限地运行，因为截止时间会中止操作系统仍会完成的工作。详见[文件系统子系统页面](../../../docs/subsystems/filesystem.zh.md)。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。零依赖纯库；信号与分类代数由单元规格强制。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 通过渲染超时结果的超时消费方间接影响模型。
@@ -70,9 +95,20 @@ export async function runWithDeadline(upstream: AbortSignal | undefined, timeout
 
 不会直接导致失效；请求前缀的任何变更由超时消费方负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **只发出通知**：deadline 无法停止忽略其信号的工作；每项能力仍需要自己的 socket/进程/任务终止路径。
 - **`timeoutMs <= 0` 是内部词汇**：只有在所属后端已解析策略后，它才会禁用本地 timer；绝不会作为面向模型/插件的公开开关。
 - **第一个中止原因决定分类**：当 upstream 取消早于本地 timer 发生时，即使自己的超时之后也会到期，该层也无法再报告。
 - **空闲 watchdog 不是总 deadline**：它针对每个尚未完成的迭代器需求重新启动，并刻意排除消费方的处理时间。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

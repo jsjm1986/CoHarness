@@ -37,7 +37,8 @@ class CliMockAdapter extends LlmAdapter {
     if (process.env.DSH_CLI_STARTUP_HOOK_CONFIG !== undefined && !JSON.stringify(options.messages).includes('STARTUP_HOOK_CONTEXT')) {
       throw new Error('SessionStart context missing from model request')
     }
-    const toolResult = options.messages.at(-1)?.content.find(block => block.type === 'tool-result')
+    const last = options.messages.at(-1)
+    const toolResult = last?.role === 'tool' ? last : undefined
     if (toolResult === undefined) {
       const args = JSON.stringify({ command: 'printf CLI_TOOL_ROUND_TRIP', description: 'Prove the CLI tool round trip.' })
       yield { type: 'block-start', index: 0, blockType: 'tool-call' }

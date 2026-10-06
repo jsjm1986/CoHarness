@@ -13,13 +13,13 @@ import {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type {
-  ConversationEventInput, ConversationLocationDataStore, ConversationMatch, ConversationNodeDefinition,
-  ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewDefinition,
+  ConversationEventInput, ConversationLocationDataSource, ConversationLocationDataStore, ConversationMatch,
+  ConversationNodeDefinition, ConversationTimelineSnapshot, ConversationTurnDataMap, ConversationViewDefinition,
   ConversationViewNode, ToolResultNode, TurnLocation,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply as applyLocale, inject as localeInject } from '@deepseek-ai/dsh-client-locale/client'
 import type { ChatFileMentions, TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { makeTranslate, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { makeTranslate, stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
 import { ProducedFiles, type ProducedFilesProps } from '../src/client/ProducedFiles.tsx'
 import {
   changesForClosing, presentedForClosing, basename, deliverablesDefinition, producedFileMentions, producedForClosing, selectProducedFiles,
@@ -28,6 +28,7 @@ import {
 import type { SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { Deliverables, DeliverablesTail, selectDeliverables, type DeliverablesInjected } from '../src/client/Deliverables.tsx'
 import { ChangesSummaryStore } from '../src/client/changes-summary.ts'
+import { ChangesDiffStore } from '../src/client/changes-diff.ts'
 import { PresentedOpenController } from '../src/client/present-open.ts'
 import type { ReviewInjected } from '../src/client/ReviewTab.tsx'
 import { changesSummaryUrl, changesDiffUrl, changesReviewAddress, type ChangesSummary } from '../src/changes.ts'
@@ -42,11 +43,23 @@ afterEach(() => {
 
 class TestTurnDataStore implements ConversationLocationDataStore<ConversationTurnDataMap> {
   private readonly values = new Map<string, unknown>()
+  private readonly sources = new Map<string, ConversationLocationDataSource<unknown>>()
 
   get<Key extends Extract<keyof ConversationTurnDataMap, string>>(
     key: Key,
   ): Readonly<ConversationTurnDataMap[Key]> | undefined {
     return this.values.get(key) as Readonly<ConversationTurnDataMap[Key]> | undefined
+  }
+
+  source<Key extends Extract<keyof ConversationTurnDataMap, string>>(
+    key: Key,
+  ): ConversationLocationDataSource<Readonly<ConversationTurnDataMap[Key]> | undefined> {
+    let source = this.sources.get(key)
+    if (source === undefined) {
+      source = { getSnapshot: () => this.get(key), subscribe: () => () => {} }
+      this.sources.set(key, source)
+    }
+    return source as ConversationLocationDataSource<Readonly<ConversationTurnDataMap[Key]> | undefined>
   }
 
   set<Key extends Extract<keyof ConversationTurnDataMap, string>>(
@@ -139,8 +152,10 @@ function result(seq: number, callId: string, isError = false, turn = 1): Convers
     turn,
     step: 1,
     message: {
-      source: { type: 'tool-result', callId },
-      content: [{ type: 'tool-result', content: [], isError }],
+      source: { kind: 'tool', callId },
+      toolCallId: callId,
+      isError,
+      content: [{ type: 'tool-result', toolCallId: callId, content: [], isError }],
     },
   })
 }
@@ -322,7 +337,10 @@ describe('ProducedFiles row', () => {
     const openFile = vi.fn<(path: string) => void>()
 
     const view = render(
-      <ProducedFiles matched={paths} openFile={openFile} {...capability(true)} t={t} />,
+      <ProducedFiles
+        {...tailOwner(produced(...paths.map((path, index) => [index + 1, path] as const)), paths.length, openFile)}
+        {...capability(true)} t={t}
+      />,
     )
     expect(view.getByText('产物')).toBeTruthy()
     const row = view.container.querySelector('[data-produced-files-row]')
@@ -344,12 +362,15 @@ describe('ProducedFiles row', () => {
   it('keeps the folder action absent without overflow or a local native opener', () => {
     const openFile = vi.fn<(path: string) => void>()
     const view = render(
-      <ProducedFiles matched={['a.md']} openFile={openFile} {...capability(true)} t={t} />,
+      <ProducedFiles {...tailOwner(produced([1, 'a.md']), 1, openFile)} {...capability(true)} t={t} />,
     )
     const overflowing = ['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md']
     expect(view.queryByRole('button', { name: '在文件夹中显示' })).toBeNull()
     for (const unavailable of [capability(false), capability(true, false), capability(undefined)]) {
-      view.rerender(<ProducedFiles matched={overflowing} openFile={openFile} {...unavailable} t={t} />)
+      view.rerender(<ProducedFiles
+        {...tailOwner(produced(...overflowing.map((path, index) => [index + 1, path] as const)), overflowing.length, openFile)}
+        {...unavailable} t={t}
+      />)
       expect(view.queryByRole('button', { name: '在文件夹中显示' })).toBeNull()
     }
   })
@@ -357,7 +378,7 @@ describe('ProducedFiles row', () => {
   it('uses singular English copy when exactly one file is hidden', () => {
     const view = render(
       <ProducedFiles
-        matched={['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md']}
+        {...tailOwner(produced(...['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md'].map((path, index) => [index + 1, path] as const)), 7)}
         openFile={() => {}}
         {...capability(false)}
         t={makeTranslate(en)}
@@ -404,7 +425,7 @@ describe('plugin registration', () => {
     const sessionId = SessionId('project-review')
     await ctx.plugin(SlotRegistry).await()
     await ctx.plugin(ConversationEventRegistry).await()
-    ctx.slots.register({ name: 'root', children: { 'conversation.chat.turnTail': { kind: 'chain', scope: 'session' } } } as never, () => null)
+    ctx.slots.register({ name: 'root', children: { 'conversation.chat.turnTail': { kind: 'list', scope: 'session' } } } as never, () => null)
     const summary = vi.fn(async () => ({ result: { ok: true, value: { turn: 1, files: [], total: 0, added: 0, deleted: 0 } } }))
     const baseSummary = vi.fn()
     const target = { kind: 'project', projectId: 7 }
@@ -416,11 +437,12 @@ describe('plugin registration', () => {
     ctx.provide('sidebarRight', { openSessionResource: vi.fn() } as never)
     ctx.provide('sidebarRightTabs', { register: () => () => {} } as never)
     ctx.provide('remote', { $on: () => () => {} } as never)
-    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
     try {
       await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
       await ctx.plugin({ inject: [...inject], apply }).await()
-      const entry = ctx.slots.entries('conversation.chat.turnTail').find(item => item.select === selectDeliverables)!
+      const entry = ctx.slots.entries('conversation.chat.turnTail')
+        .find(item => item.options.id === '@deepseek-ai/dsh-client-ui-deliverables')!
       const face = entry.inject!(sessionId as never) as unknown as DeliverablesInjected
       forTarget.mockReturnValueOnce(undefined as never)
       expect(() => entry.inject!(SessionId('missing-runtime') as never)).toThrow('runtime is unavailable')
@@ -453,15 +475,26 @@ describe('plugin registration', () => {
     await ctx.plugin(SlotRegistry).await()
     await ctx.plugin(ConversationEventRegistry).await()
     ctx.slots.register({ name: 'root', children: {
-      'conversation.chat.turnTail': { kind: 'chain', scope: 'session' },
+      'conversation.chat.turnTail': { kind: 'list', scope: 'session' },
       'tool.call.toolview': { kind: 'keyed', scope: 'session' },
       'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session' },
     } } as never, () => null)
     const summary = vi.fn().mockResolvedValue({ result: { ok: true, value: { turn: 1, files: [], total: 0, added: 0, deleted: 0 } } })
     const diff = vi.fn().mockResolvedValue({ result: { ok: true, value: { kind: 'binary', path: 'a.bin', display: 'a.bin' } } })
     const openPath = vi.fn().mockResolvedValue({ result: { ok: true, value: null } })
-    const hostDescription = createSnapshotStore<{ executionAuthorityRequired?: boolean; canOpenPath?: boolean } | undefined>(undefined)
-    const connection = { api: { settings: {}, host: { openPath }, workspaceChanges: { summary, diff } }, hostDescription, isLoopback: true }
+    const fileApplications = vi.fn().mockResolvedValue({ result: { ok: true, value: { applications: [
+      { id: 'com.editor.zed', name: 'Zed', default: false, icon: null },
+      { id: 'com.apple.TextEdit', name: 'TextEdit', default: true, icon: null },
+    ] } } })
+    const hostDescription = createSnapshotStore<{
+      executionAuthorityRequired?: boolean
+      canOpenPath?: boolean
+      fileManager?: 'finder' | 'explorer' | 'directory' | null
+    } | undefined>(undefined)
+    const connection = {
+      api: { settings: {}, host: { openPath, fileApplications }, workspaceChanges: { summary, diff } },
+      hostDescription, isLoopback: true,
+    }
     const list = createSnapshotStore({ byId: { [sessionId]: { cwd: '/work' } } })
     ctx.provide('connection', connection as never)
     ctx.provide('sessions', { scope: () => ctx, list } as never)
@@ -469,12 +502,13 @@ describe('plugin registration', () => {
     ctx.provide('sidebarRight', { openSessionResource: navigate } as never)
     ctx.provide('sidebarRightTabs', { register: () => () => {} } as never)
     ctx.provide('remote', { $on: () => () => {} } as never)
-    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
     try {
       await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
       const fiber = ctx.plugin({ inject: [...inject], apply })
       await fiber.await()
-      const entry = ctx.slots.entries('conversation.chat.turnTail').find(item => item.select === selectDeliverables)!
+      const entry = ctx.slots.entries('conversation.chat.turnTail')
+        .find(item => item.options.id === '@deepseek-ai/dsh-client-ui-deliverables')!
       const face = entry.inject!(sessionId as never) as unknown as DeliverablesInjected
       const tab = ctx.slots.entries('sidebar.right.pane.tab')[0]!.inject!(sessionId as never) as unknown as ReviewInjected
       expect(tab.hooks.changesSummary).toBe(face.hooks.changesSummary)
@@ -503,9 +537,16 @@ describe('plugin registration', () => {
       await face.reloadPresentedHost()
       expect(tab.hooks.presentedHost.getSnapshot()).toMatchObject({ available: true })
       await face.openPresented(sessionId, 1, 0, 'open', 'report.txt')
-      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt' }, expect.any(AbortSignal))
+      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt', action: 'open' }, expect.any(AbortSignal))
       await face.openPresented(sessionId, 1, 0, 'reveal', 'report.txt')
-      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/' }, expect.any(AbortSignal))
+      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt', action: 'reveal' }, expect.any(AbortSignal))
+      const key = '/api/present.open?sessionId=local-review&seq=1&index=0'
+      face.loadPresentedApps(key, 'report.txt')
+      await vi.waitFor(() => { expect(face.hooks.presentedApps.getSnapshot()[key]).toMatchObject({ loading: false, failed: false }) })
+      expect(fileApplications).toHaveBeenLastCalledWith({ path: '/work/report.txt' }, expect.any(AbortSignal))
+      expect(face.hooks.presentedApps.getSnapshot()[key]?.applications).toHaveLength(2)
+      await face.openPresented(sessionId, 1, 0, 'open', 'report.txt', 'com.editor.zed')
+      expect(openPath).toHaveBeenLastCalledWith({ path: '/work/report.txt', action: 'open', application: 'com.editor.zed' }, expect.any(AbortSignal))
       await tab.openChanged(sessionId, 1, 0, '/work/report.txt')
       await face.openChanged(sessionId, 1, 0, '/work/report.txt')
       openPath.mockResolvedValueOnce({ result: { ok: false, error: { code: 'forbidden' } } })
@@ -533,7 +574,7 @@ describe('plugin registration', () => {
     // The owning view's child declaration, stood up by a bench root entry.
     ctx.slots.register({
       name: 'root',
-      children: { 'conversation.chat.turnTail': { kind: 'chain', scope: 'session' } },
+      children: { 'conversation.chat.turnTail': { kind: 'list', scope: 'session' } },
     } as never, () => null)
     const hostDescription = { getSnapshot: () => undefined, subscribe: () => () => {} }
     ctx.provide('connection', {
@@ -546,17 +587,24 @@ describe('plugin registration', () => {
     ctx.provide('sidebarRight', { openResource: vi.fn() } as never)
     ctx.provide('sidebarRightTabs', { register: () => () => {} } as never)
     ctx.provide('remote', { $on: () => () => {} } as never)
-    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+    ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
     await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
 
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    const [entry] = ctx.slots.entries('conversation.chat.turnTail')
+    const entries = ctx.slots.entries('conversation.chat.turnTail')
+    const entry = entries.find(item => item.options.id === '@deepseek-ai/dsh-client-ui-deliverables/produced-files')
     expect(entry).toBeDefined()
     expect(entry?.inject?.()).toEqual({ isLoopback: false, hooks: { hostDescription } })
-    expect(entry?.select?.(tailOwner(produced([2, 'fallback.txt']), 3) as never)).toEqual(['fallback.txt'])
-    expect(entry?.select?.(tailOwner({ produced: [], changes: { seq: 2 } }, 3) as never)).toBeNull()
-    expect(entry?.select?.(tailOwner({ produced: [], presented: [{ path: 'delivery.txt', seq: 2, index: 0 }] }, 3) as never)).toBeNull()
+    // List-seat gating lives inside the component: the produced row appears
+    // only when the turn produced files AND no delivery/changes card claimed
+    // the tail.
+    expect(selectProducedFiles(tailOwner(produced([2, 'fallback.txt']), 3))).toEqual(['fallback.txt'])
+    expect(
+      changesForClosing(tailOwner({ produced: [], changes: { seq: 2 } }, 3))
+      === null && presentedForClosing(tailOwner({ produced: [], changes: { seq: 2 } }, 3)).length === 0,
+    ).toBe(false)
+    expect(presentedForClosing(tailOwner({ produced: [], presented: [{ path: 'delivery.txt', seq: 2, index: 0 }] }, 3)).length).toBeGreaterThan(0)
 
 
     // The prose face is live while the plugin is: a produced turn yields a
@@ -586,22 +634,29 @@ describe('plugin registration', () => {
   })
 })
 
-function openProps(controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))) {
+function openProps(controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))) {
   controller.host.set({ name: 'desktop', available: true, fileManager: 'finder' })
-  const sessions: SessionListState = { current: undefined, currentAddress: undefined, ids: [], byId: {}, archivedById: {}, phase: 'ready', subagentsByParent: {}, jobsBySession: {} }
+  const diffs = new ChangesDiffStore((url, signal) => fetch(url, { signal }))
+  const sessions: SessionListState = { current: undefined, currentAddress: undefined, ids: [], byId: {}, archivedById: {}, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {} }
   return {
     useSessions: <T,>(select: (state: SessionListState) => T): T => select(sessions),
     reloadPresentedHost: vi.fn(() => controller.loadHost()),
     useChangesSummary: <T,>(select: (state: ReturnType<typeof summaries.state.getSnapshot>) => T): T =>
       select(summaries.state.getSnapshot()),
     loadChangesSummary: vi.fn((...args: Parameters<ChangesSummaryStore['load']>) => summaries.load(...args)),
+    useChangesDiff: <T,>(select: (state: ReturnType<typeof diffs.state.getSnapshot>) => T): T => select(diffs.state.getSnapshot()),
+    loadChangesDiff: vi.fn((...args: Parameters<ChangesDiffStore['load']>) => diffs.load(...args)),
     usePresentedHost: <T,>(select: (state: ReturnType<typeof controller.host.getSnapshot>) => T): T =>
       select(controller.host.getSnapshot()),
+    usePresentedApps: <T,>(select: (state: ReturnType<typeof controller.apps.getSnapshot>) => T): T =>
+      select(controller.apps.getSnapshot()),
+    loadPresentedApps: vi.fn((...args: Parameters<PresentedOpenController['loadApplications']>) => { controller.loadApplications(...args) }),
     openPresented: vi.fn((...args: Parameters<PresentedOpenController['open']>) => controller.open(...args)),
     openChanged: vi.fn((...args: Parameters<PresentedOpenController['openChanged']>) => controller.openChanged(...args)),
     openChangesReview: vi.fn<DeliverablesInjected['openChangesReview']>(),
     usePresentedOpen: <T,>(select: (state: ReturnType<typeof controller.state.getSnapshot>) => T): T =>
       select(controller.state.getSnapshot()),
+    useShowCodeDiff: <T,>(select: (state: boolean) => T): T => select(true),
   }
 }
 const changedFile = (display: string, added = 1, deleted = 0, extra: { binary?: true; oversized?: true; path?: string } = {}) =>
@@ -657,7 +712,7 @@ describe('ChangedFiles card', () => {
   }
 
   function renderCard(
-    controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), locale = en, matched = { changes, presented: [] as never[] }, summaries = servedStore(),
+    controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), locale = en, matched = { changes, presented: [] as never[] }, summaries = servedStore(),
   ) {
     const props = openProps(controller, summaries)
     props.openChanged.mockResolvedValue(undefined)
@@ -666,7 +721,7 @@ describe('ChangedFiles card', () => {
     return { props, openFile, view }
   }
 
-  it('reads the announced summary once and renders nothing while it loads, when it is gone, or when it lists no file', async () => {
+  it('keeps successful summaries cached and exposes unavailable history without inventing changed files', async () => {
     const summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
@@ -675,7 +730,7 @@ describe('ChangedFiles card', () => {
       return new Response('gone', { status: 404 })
     })
     vi.stubGlobal('fetch', fetchMock)
-    const { props, view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), en, { changes, presented: [] as never[] }, summaries)
+    const { props, view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), en, { changes, presented: [] as never[] }, summaries)
     expect(view.container.querySelector('[data-changed-files]')).toBeNull()
     expect(props.loadChangesSummary).toHaveBeenCalledWith('child-session', 5)
     await vi.waitFor(() => { expect(summaries.state.getSnapshot()[changesSummaryUrl(SessionId('child-session'), 5)]).toEqual(served) })
@@ -688,6 +743,7 @@ describe('ChangedFiles card', () => {
       expect(view.container.querySelector('[data-changed-files]')).toBeNull()
     }
     expect(summaries.state.getSnapshot()[changesSummaryUrl(SessionId('child-session'), 7)]).toBe('missing')
+    expect(view.getByRole('status').textContent).toContain(en['changes.unavailable'])
     await summaries.load(SessionId('child-session'), 5)
     expect(fetchMock).toHaveBeenCalledTimes(3)
     // A replaced connection forgets every read; a later mount asks the new Host again.
@@ -704,9 +760,32 @@ describe('ChangedFiles card', () => {
     expect(summaries.state.getSnapshot()[changesSummaryUrl(SessionId('child-session'), 9)]).toBeUndefined()
   })
 
+  it('shows an incomplete review without claiming zero changed files or offering an invalid comparison', () => {
+    const incomplete = servedStore({ turn: 1, files: [], total: 0, added: 0, deleted: 0, incomplete: true })
+    const { view } = renderCard(undefined, zh, { changes, presented: [] as never[] }, incomplete)
+    expect(view.getByRole('alert').textContent).toContain(zh['changes.incomplete'])
+    expect(view.getByRole('alert').textContent).toContain(zh['changes.storageFailure'])
+    expect(view.queryByText('已编辑 0 个文件')).toBeNull()
+    expect(view.queryByRole('button', { name: '在侧边栏查看本轮改动' })).toBeNull()
+  })
+
+  it('retries an unavailable immutable review only after an explicit click', async () => {
+    const fetchRecord = vi.fn(async () => Response.json(served))
+    const summaries = new ChangesSummaryStore(fetchRecord)
+    summaries.state.set({ [changesSummaryUrl(SessionId('child-session'), 5)]: 'missing' })
+    const { props, view } = renderCard(undefined, en, { changes, presented: [] as never[] }, summaries)
+    expect(fetchRecord).not.toHaveBeenCalled()
+    fireEvent.click(view.getByRole('button', { name: 'Retry' }))
+    await vi.waitFor(() => { expect(summaries.state.getSnapshot()[changesSummaryUrl(SessionId('child-session'), 5)]).toEqual(served) })
+    view.rerender(<Deliverables {...props} matched={{ changes, presented: [] }} openFile={() => {}}
+      sessionId={SessionId('child-session')} t={makeTranslate(en)} />)
+    expect(view.getByText('Edited 11 files')).toBeTruthy()
+    expect(fetchRecord).toHaveBeenCalledTimes(1)
+  })
+
   it('sums the header from the Host totals, not from the capped list', () => {
     const capped = servedStore({ turn: 1, files: files.slice(0, 1), total: 2, added: 50, deleted: 20 })
-    const { view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), en, { changes, presented: [] as never[] }, capped)
+    const { view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), en, { changes, presented: [] as never[] }, capped)
     expect(view.getByText('Edited 2 files')).toBeTruthy()
     expect(view.getByText('+50')).toBeTruthy()
     expect(view.getByText('-20')).toBeTruthy()
@@ -739,17 +818,19 @@ describe('ChangedFiles card', () => {
     expect(summaries.state.getSnapshot()).toEqual({})
   })
 
-  it('summarizes the turn, folds after three rows, and opens the review from the header and each row', () => {
+  it('summarizes the turn, folds after four rows, and opens the review from the header and each row', () => {
     const { props, openFile, view } = renderCard()
     const card = view.container.querySelector('[data-changed-files]')
     if (!(card instanceof HTMLElement)) throw new Error('changed-files card missing')
     expect(within(card).getByText('Edited 11 files')).toBeTruthy()
     expect(within(card).getByText('+1,232')).toBeTruthy()
     expect(within(card).getByText('-326')).toBeTruthy()
-    expect(within(card).getAllByRole('listitem')).toHaveLength(3)
-    expect(within(card).getByText('config/design-token')).toBeTruthy()
+    expect(within(card).getByText('Preview in sidebar')).toBeTruthy()
+    expect(within(card).getAllByRole('listitem')).toHaveLength(4)
+    expect(within(within(card).getByRole('button', { name: 'View changes to config/design-token' })).getByText('config/design-token')).toBeTruthy()
     expect(within(card).getByText('+42')).toBeTruthy()
-    expect(within(card).queryByText('src/index.ts')).toBeNull()
+    expect(within(within(card).getByRole('button', { name: 'View changes to src/index.ts' })).getByText('src/index.ts')).toBeTruthy()
+    expect(within(card).queryByText('~/.zshrc')).toBeNull()
     fireEvent.click(within(card).getByRole('button', { name: 'View changes to config/feature-flags.json' }))
     expect(props.openChangesReview).toHaveBeenLastCalledWith({ sessionId: 'child-session', seq: 5, turn: 1 }, 1)
     expect(props.openChanged).not.toHaveBeenCalled()
@@ -762,18 +843,19 @@ describe('ChangedFiles card', () => {
     fireEvent.click(expand)
     expect(within(card).getAllByRole('listitem')).toHaveLength(5)
     expect(within(card).getByText('binary')).toBeTruthy()
-    expect(within(card).getByRole('button', { name: 'View changes to ~/.zshrc' }).getAttribute('title')).toBe('/home/u/.zshrc')
+    expect(within(card).getByRole('button', { name: 'View changes to ~/.zshrc' }).getAttribute('title')).toBeNull()
+    expect(within(card).getByRole('button', { name: 'View changes to ~/.zshrc', description: '/home/u/.zshrc' })).toBeTruthy()
     fireEvent.click(within(card).getByRole('button', { name: 'View changes to ~/.zshrc' }))
     expect(props.openChangesReview).toHaveBeenLastCalledWith({ sessionId: 'child-session', seq: 5, turn: 1 }, 4)
     const collapse = within(card).getByRole('button', { name: 'Collapse changed files' })
     expect(collapse.getAttribute('aria-expanded')).toBe('true')
     expect(card.lastElementChild).toBe(collapse)
     fireEvent.click(collapse)
-    expect(within(card).getAllByRole('listitem')).toHaveLength(3)
+    expect(within(card).getAllByRole('listitem')).toHaveLength(4)
   })
 
   it('opens the review the same way without a desktop', () => {
-    const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {})
+    const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => [])
     const { openFile, props, view } = renderCard(controller, zh)
     controller.host.set('error')
     view.rerender(<Deliverables {...props} matched={{ changes, presented: [] }} openFile={openFile} sessionId={SessionId('child-session')} t={makeTranslate(zh)} />)
@@ -791,7 +873,7 @@ describe('ChangedFiles card', () => {
   })
 
   it('keeps every count in place whatever the native-open gestures of the review tab are doing', () => {
-    const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {})
+    const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => [])
     controller.state.set({
       '/api/changes.open?sessionId=child-session&seq=5&index=0': 'opening',
       '/api/changes.open?sessionId=child-session&seq=5&index=1': 'error',
@@ -807,7 +889,7 @@ describe('ChangedFiles card', () => {
 
   it('renders without a fold for three files or fewer and beside delivery cards', () => {
     const short = servedStore({ turn: 1, files: [...files.slice(0, 1), changedFile('huge.bin', 0, 0, { oversized: true })], total: 2, added: 185, deleted: 43 })
-    const { view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), en, { changes, presented: [{ path: 'report.pdf', seq: 6, index: 0 }] as never[] }, short)
+    const { view } = renderCard(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), en, { changes, presented: [{ path: 'report.pdf', seq: 6, index: 0 }] as never[] }, short)
     expect(view.getByText('Edited 2 files')).toBeTruthy()
     expect(view.getByText('too large')).toBeTruthy()
     expect(view.queryByRole('button', { name: /Show all|Collapse changed/ })).toBeNull()
@@ -870,7 +952,7 @@ describe('delivery card interactions', () => {
     expect(preview).toHaveBeenLastCalledWith('report-0.docx')
     fireEvent.click(view.getByRole('button', { name: 'More file actions for report-0.docx' }))
     fireEvent.click(view.getByRole('menuitem', { name: 'Open in default app' }))
-    expect(props.openPresented).toHaveBeenCalledWith('child-session', 2, 0, 'open', 'report-0.docx')
+    expect(props.openPresented).toHaveBeenCalledWith('child-session', 2, 0, 'open', 'report-0.docx', undefined)
     fireEvent.click(view.getByRole('button', { name: 'Collapse delivered files' }))
     expect(view.container.querySelectorAll('[data-presented-file]')).toHaveLength(4)
     expect(view.container.querySelector('[data-changed-files]')).toBeNull()
@@ -896,9 +978,30 @@ it.each([{}, { turn: '1', callId: 'bad', files: [] },
   const matched = selectDeliverables(owner)!
   const summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))
   summaries.state.set({ [changesSummaryUrl(SessionId('session'), 5)]: { turn: 1, files: [{ path: 'a.txt', display: 'a.txt', added: 1, deleted: 0 }], total: 1, added: 1, deleted: 0 } })
-  const view = render(<Deliverables {...openProps(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}), summaries)} matched={matched} openFile={owner.openFile} sessionId={SessionId('session')} t={makeTranslate(en)} />)
-  expect(view.getByText('Edited 1 files')).toBeTruthy()
+  const view = render(<Deliverables {...openProps(new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => []), summaries)} matched={matched} openFile={owner.openFile} sessionId={SessionId('session')} t={makeTranslate(en)} />)
+  expect(view.getByText('Edited a.txt')).toBeTruthy()
   expect(view.queryByText('Deliverables')).toBeNull()
+})
+
+it('withholds the changed-files card while developer tools are disabled', () => {
+  const value = assembler([
+    at(1, 'turn/start', { turn: 1 }),
+    call(2, 'write-a', diff('a.txt')),
+    result(3, 'write-a'),
+    at(4, 'deliverables/presented', { turn: 1, callId: 'x', files: [{ path: 'report.txt' }] }),
+    at(5, 'workspace/changes', { turn: 1 }),
+  ])
+  const owner = tailOwner(deliverablesOf(value), 6)
+  const matched = selectDeliverables(owner)!
+  const summaries = new ChangesSummaryStore((url, signal) => fetch(url, { signal }))
+  summaries.state.set({ [changesSummaryUrl(SessionId('session'), 5)]: { turn: 1, files: [{ path: 'a.txt', display: 'a.txt', added: 1, deleted: 0 }], total: 1, added: 1, deleted: 0 } })
+  const view = render(<Deliverables
+    {...openProps()}
+    useShowCodeDiff={<T,>(select: (state: boolean) => T): T => select(false)}
+    matched={matched} openFile={owner.openFile} sessionId={SessionId('session')} t={makeTranslate(en)} />)
+  // The announced diff is withheld; delivered files still list.
+  expect(view.queryByText('Edited a.txt')).toBeNull()
+  expect(view.queryByText('report.txt')).toBeTruthy()
 })
 
 it('shows descriptions and falls back to file metadata without hiding extensionless deliveries', () => {
@@ -936,7 +1039,7 @@ it('lets one delivered file span the complete row without an expansion control',
 
 
 it.each(['opening', 'opened', 'error'] as const)('shows the %s state and permits retries after failure', (phase) => {
-  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {})
+  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => [])
   controller.state.set({ '/api/present.open?sessionId=session&seq=2&index=0': phase })
   const props = openProps(controller)
   const view = render(<Deliverables {...props} matched={{ changes: null, presented: [
@@ -948,7 +1051,7 @@ it.each(['opening', 'opened', 'error'] as const)('shows the %s state and permits
 
 
 it('explains a missing desktop and retries failed Host metadata', () => {
-  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {})
+  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => [])
   const props = openProps(controller)
   const matched = { changes: null, presented: [{ path: 'file.txt', seq: 2, index: 0 }] }
   controller.host.set('error')
@@ -963,7 +1066,7 @@ it('explains a missing desktop and retries failed Host metadata', () => {
 
 
 it('loads desktop information once the tail renders and not again while it is known', () => {
-  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {})
+  const controller = new PresentedOpenController(() => ({ name: '', available: true, fileManager: 'directory' }), async () => {}, async () => [])
   const props = openProps(controller)
   controller.host.set(null)
   props.reloadPresentedHost.mockResolvedValue(undefined)

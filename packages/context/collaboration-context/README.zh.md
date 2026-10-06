@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-collaboration-context
 
 [English](README.md) | 中文
@@ -9,6 +14,16 @@
 使用 `dsh-collaboration-context` 在共享项目会话中提供持久的模型可见参与者归属。它在 `agent/pre-step` 监听，识别最终用户消息上的已认证项目参与者元数据，并在其前插入一条成对归属消息，使模型看到发言者身份。
 
 
+## 目录
+
+- [运行时约定](#runtime-contract)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="runtime-contract"></a>
 ## 运行时约定
 
 - 参与者快照包含消息准入时由协作 authority 提供的认证用户 id、用户名、显示名、角色、项目 id/名称和项目 `ro`/`rw` 模式。
@@ -17,6 +32,8 @@
 - 监听器先通过 `agent/pre-step` waterfall 委托，再转换最终获准的消息，因此后续策略不能把提示与参与者消息分开。
 - Web Chat transcript 不渲染这条提示；它用同一份参与者快照为随后的人类气泡标注发送者（[决策](../../../.agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.zh.md)）。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 共享项目参与者归属
@@ -33,8 +50,19 @@
 
 归属提示与参与者消息一起追加到持久对话后缀。参与者变化只改变这个新后缀；更早的缓存历史保持不变。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **身份为快照** — 后续显示名、角色、项目名称或成员身份变化不会重写历史归属信息。
 - **每条获准消息一份提示** — 一个步骤内获准的多条参与者消息各自获得提示，使归属保持明确，但会重复元数据。
 - **仅限项目参与者** — 个人 scope 身份有意不写入，因为个人对话已经只有一个认证所有者。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

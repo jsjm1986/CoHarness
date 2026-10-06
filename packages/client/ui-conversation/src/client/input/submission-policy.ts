@@ -3,14 +3,13 @@
  * preference and resolves composer gestures into queue/steer delivery modes;
  * Host and Agent keep the actual delivery-window authority.
  */
-import {
-  createSnapshotStore, settingsControlState, type SettingsControlState, type SettingsScope, type SnapshotStore,
-} from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsControlState, SettingsScope, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   BusyEnterBehavior,
 } from '../contract/composer-submission.ts'
 import { BUSY_ENTER_FIELD, DEFAULT_BUSY_ENTER_BEHAVIOR } from '../../submission-settings.ts'
 import type { ConversationSettings } from '../../submission-settings.ts'
+import { SettingsPreference } from '../settings-preference.ts'
 
 export { resolveSubmitMode } from '../contract/composer-submission.ts'
 
@@ -23,11 +22,10 @@ export { DEFAULT_BUSY_ENTER_BEHAVIOR } from '../../submission-settings.ts'
  */
 export class ComposerSubmissionPolicy {
   /** Reactive preference source shared by the composer and Settings row. */
-  readonly busyEnter: SnapshotStore<BusyEnterBehavior> = createSnapshotStore(DEFAULT_BUSY_ENTER_BEHAVIOR)
+  readonly busyEnter: SnapshotStore<BusyEnterBehavior>
   /** Host writability and write status source for the Settings row. */
   readonly settings: SnapshotStore<SettingsControlState>
-  private readonly host: SettingsScope<ConversationSettings> | undefined
-  private readonly unsubscribe: (() => void) | undefined
+  private readonly preference: SettingsPreference<typeof BUSY_ENTER_FIELD>
 
   /**
    * @param host - durable preference scope owned by the providing plugin;
@@ -36,17 +34,9 @@ export class ComposerSubmissionPolicy {
    * the policy needs no release hook.
    */
   constructor(host?: SettingsScope<ConversationSettings>) {
-    this.host = host
-    this.settings = createSnapshotStore(host === undefined
-      ? { status: 'ready', writable: true, writableReason: undefined, write: { status: 'idle' } }
-      : settingsControlState(host.getSnapshot()))
-    if (host !== undefined) {
-      this.unsubscribe = host.subscribe(() => {
-        this.settings.set(settingsControlState(host.getSnapshot()))
-        this.adopt(host)
-      })
-      this.adopt(host)
-    }
+    this.preference = new SettingsPreference(host, BUSY_ENTER_FIELD, DEFAULT_BUSY_ENTER_BEHAVIOR)
+    this.busyEnter = this.preference.current
+    this.settings = this.preference.settings
   }
 
   /**
@@ -54,26 +44,8 @@ export class ComposerSubmissionPolicy {
    * publishes before the durable write starts.
    * @param behavior - Queue or Steer.
    */
-  setBusyEnter(behavior: BusyEnterBehavior): void {
-    if (this.busyEnter.getSnapshot() === behavior) return
-    const snapshot = this.host?.getSnapshot()
-    if (snapshot?.status === 'ready' && !snapshot.writable) return
-    this.busyEnter.set(behavior)
-    void this.host?.set(BUSY_ENTER_FIELD, behavior)
-  }
+  setBusyEnter(behavior: BusyEnterBehavior): void { this.preference.set(behavior) }
 
   /** Release the scope observer owned by this policy. */
-  dispose(): void {
-    this.unsubscribe?.()
-  }
-
-  /**
-   * Adopt the scope's accepted durable behavior without writing it back.
-   * @param host - the constructor-narrowed scope driving this adoption.
-   */
-  private adopt(host: SettingsScope<ConversationSettings>): void {
-    const section = host.getSnapshot().value
-    if (section === undefined || this.busyEnter.getSnapshot() === section.busyEnter) return
-    this.busyEnter.set(section.busyEnter)
-  }
+  dispose(): void { this.preference.dispose() }
 }

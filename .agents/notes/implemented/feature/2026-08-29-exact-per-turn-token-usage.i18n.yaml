@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-29-exact-per-turn-token-usage.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-29-exact-per-turn-token-usage.md
-2026-08-29-exact-per-turn-token-usage.md: 5015201aae397866e05593ced2fd636ef414623d
-2026-08-29-exact-per-turn-token-usage.zh.md: f0a9a25966a0d0375909bc1f46e10464c6fbd369
+/agent-note-show-exact-token-usage-for-complete-turns:
+  en: 24dfc61d6cd30919
+  zh: 87631be9a04047b2
+/agent-note-show-exact-token-usage-for-complete-turns/problem:
+  en: 9c2cd69b1356aac4
+  zh: b033175e4e8810ef
+/agent-note-show-exact-token-usage-for-complete-turns/decision:
+  en: 9b72ddc2e3c0aa65
+  zh: 51042b726d685b54
+/agent-note-show-exact-token-usage-for-complete-turns/alternatives-considered:
+  en: 7baa0a751b0c9f40
+  zh: 0e26b00c0a668c5b
+/agent-note-show-exact-token-usage-for-complete-turns/consequences:
+  en: 06514aa06725a2b0
+  zh: 69270721909dcbe2
+/agent-note-show-exact-token-usage-for-complete-turns/testing:
+  en: 1ee144ca1091edf5
+  zh: c6d7ef995de65d7f

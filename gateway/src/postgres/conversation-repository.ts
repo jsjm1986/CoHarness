@@ -922,6 +922,43 @@ export class ConversationRepository {
       throw new Error('draft reservation has invalid scope visibility')
     }
     return await transaction(this.pool, async client => {
+      // Serialize against append, child materialization, and archive cleanup on
+      // the session's root before any reservation row is read or written.
+      const lineage = await client.query<{ root_session_id: string }>(
+        `SELECT root_session_id FROM harness.conversation_sessions
+         WHERE organization_id=$1 AND id=$2`,
+        [input.organizationId, input.sessionId])
+      const unavailable = (): Error => new Error('invalid draft reservation: session is archived or unavailable')
+      if (lineage.rows[0] !== undefined) {
+        await client.query(
+          `SELECT r.id FROM harness.conversation_sessions r
+           WHERE r.organization_id=$1 AND r.id=$2
+           FOR UPDATE`, [input.organizationId, lineage.rows[0]!.root_session_id])
+        // Read the root and its archive state only after the lock: this
+        // statement's snapshot sees an archive record committed while the lock
+        // was held by archive cleanup.
+        const root = await client.query<{
+          status: string; project_id: string | null; creator_user_id: string | null; archive_state: string | null
+        }>(`SELECT r.status,r.project_id,r.creator_user_id,a.state archive_state
+          FROM harness.conversation_sessions r
+          LEFT JOIN harness.conversation_archive_records a
+            ON a.organization_id=r.organization_id AND a.root_session_id=r.id
+          WHERE r.organization_id=$1 AND r.id=$2`, [input.organizationId, lineage.rows[0]!.root_session_id])
+        const row = root.rows[0]
+        if (row === undefined || row.status === 'deleted'
+          || row.archive_state === 'trash' || row.archive_state === 'purged') throw unavailable()
+        if (input.projectId !== undefined) {
+          if (row.project_id !== input.projectId) throw unavailable()
+        } else if (row.project_id !== null || row.creator_user_id !== input.userId) {
+          throw unavailable()
+        }
+      } else {
+        const tombstone = await client.query<{ state: string }>(
+          `SELECT state FROM harness.conversation_archive_records WHERE organization_id=$1 AND root_session_id=$2`,
+          [input.organizationId, input.sessionId])
+        const state = tombstone.rows[0]?.state
+        if (state === 'trash' || state === 'purged') throw unavailable()
+      }
       await client.query(
         `DELETE FROM harness.conversation_draft_reservations
          WHERE organization_id=$1 AND lease_expires_at <= now()`,
@@ -1036,6 +1073,14 @@ export class ConversationRepository {
   /** Release every reservation that points at a materialized session. */
   async releaseDraftForSession(organizationId: string, sessionId: string): Promise<void> {
     await this.pool.query('DELETE FROM harness.conversation_draft_reservations WHERE organization_id=$1 AND session_id=$2', [organizationId, sessionId])
+  }
+
+  /** Whether an unexpired draft lease binds this Session id to the project. */
+  async hasProjectDraftReservation(organizationId: string, sessionId: string, projectId: string): Promise<boolean> {
+    const result = await this.pool.query(`SELECT 1 FROM harness.conversation_draft_reservations
+      WHERE organization_id=$1 AND session_id=$2 AND project_id=$3 AND lease_expires_at > now()`,
+    [organizationId, sessionId, projectId])
+    return (result.rowCount ?? 0) > 0
   }
 
   /** Append one contiguous batch. Retrying the same batch id and bytes is idempotent. */

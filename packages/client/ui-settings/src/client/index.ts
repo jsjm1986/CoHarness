@@ -28,6 +28,7 @@ export type {
   SettingsPluginsTabOwnerProps, SettingsSectionOwnerProps, SettingsTriggerOwnerProps,
 } from './contract/slots.ts'
 export type { SettingsScopeController, SettingsScopeBinder, SettingsMutationScope } from './settings-scope.ts'
+export type { DeveloperToolsPreference } from './developer-tools.ts'
 export type { SettingsSchemaService } from './schema.ts'
 export type { SchemaNode } from './schema.ts'
 export type { SettingsDescribeFace, SettingsDescribeView, SettingsMirrorSnapshot } from './settings-mirror.ts'
@@ -64,24 +65,27 @@ export function apply(ctx: ClientContext): void {
     const disposers = [
       (ctx.get('remote') as ClientContext['remote']).$on('settings/document-updated', () => { void mirror.load() }),
       ctx.on('connection/reset', () => { void mirror.load() }),
+      ctx.on('connection/reset', () => { void accountMirror.load(true) }),
     ]
     // The first connection also emits connection/reset, so startup normally
     // costs two reads (budgeted in startup-rpc-budget.e2e.ts). The in-flight
     // fold does not merge them into one; it guarantees at most one pending
     // read at a time and that no invalidation arriving mid-read is lost.
     void mirror.ensure()
-    const onFocus = (): void => { void accountMirror.load() }
+    // Account invalidations must read the post-change answer, not join a read
+    // issued before the change — focus, visibility, and resets force a read.
+    const onFocus = (): void => { void accountMirror.load(true) }
     const onVisibility = (): void => {
       if (typeof document === 'undefined' || document.visibilityState === 'visible') onFocus()
     }
     if (typeof window !== 'undefined') window.addEventListener('focus', onFocus)
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility)
-    return () => {
+    return async () => {
       for (const dispose of disposers) dispose()
       if (typeof window !== 'undefined') window.removeEventListener('focus', onFocus)
       if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility)
+      await accountMirror.dispose()
     }
   }, 'ui-settings: describe mirror invalidations')
-  ctx.on('connection/reset', () => { void accountMirror.load() })
   new SettingsScopeBinder(ctx, { mirror, accountMirror, schema })
 }

@@ -1,6 +1,55 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/sdk/server/README.md
-README.md: 5c3f1781458dba8283c6b22887ad1a1e8522b490
-README.zh.md: c74bb6f318ffbba95e1fc85d739b29f95b82d4a9
+/:
+  en: 3d0239c38d00c1c8
+  zh: 61495d48365178df
+/deepseek-ai-dsh-sdk-jsonrpc-server:
+  en: e768be0572ef4546
+  zh: 7112c2f9a34e4c78
+/deepseek-ai-dsh-sdk-jsonrpc-server/summary:
+  en: 1412ec56449364a9
+  zh: 604f7127ce6e96b5
+/deepseek-ai-dsh-sdk-jsonrpc-server/table-of-contents:
+  en: 7eed9c417b365f8b
+  zh: bf866e6df9114dee
+/deepseek-ai-dsh-sdk-jsonrpc-server/wiring:
+  en: 0c231026b744cb8a
+  zh: 97f15abdca2f501e
+/deepseek-ai-dsh-sdk-jsonrpc-server/config:
+  en: cff82f42b1be81a2
+  zh: 314d6b17e19ab4f4
+/deepseek-ai-dsh-sdk-jsonrpc-server/stdout-is-the-protocol:
+  en: 3280487be06b58f2
+  zh: ec7094a59e60be21
+/deepseek-ai-dsh-sdk-jsonrpc-server/shutdown-and-exit-semantics:
+  en: 29fca918b95265db
+  zh: 28d65a8a5b07ac8e
+/deepseek-ai-dsh-sdk-jsonrpc-server/wire-notes:
+  en: 969dbdf207269101
+  zh: 1fe2ea2c1c7a148d
+/deepseek-ai-dsh-sdk-jsonrpc-server/invariants:
+  en: c3b260c626aa2210
+  zh: c07d568c4f266ead
+/deepseek-ai-dsh-sdk-jsonrpc-server/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-sdk-jsonrpc-server/model-experience/sdk-user-message:
+  en: 04d1b73cd8e06dfe
+  zh: cd67fbbfdf39f776
+/deepseek-ai-dsh-sdk-jsonrpc-server/model-experience/sdk-user-message/what-the-model-sees:
+  en: 2b5a80ec4b4df11e
+  zh: e459fe77cc14d9b8
+/deepseek-ai-dsh-sdk-jsonrpc-server/model-experience/sdk-user-message/token-effect:
+  en: 372ed851986b76d2
+  zh: 075b94a565275368
+/deepseek-ai-dsh-sdk-jsonrpc-server/model-experience/sdk-user-message/kv-cache-effect:
+  en: f5d5f97a153f7c70
+  zh: 003f251b4beef2b9
+/deepseek-ai-dsh-sdk-jsonrpc-server/known-limitations-and-deferred-work:
+  en: 300678ccb0eb8f1a
+  zh: 747be3f70774de9b
+/deepseek-ai-dsh-sdk-jsonrpc-server/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

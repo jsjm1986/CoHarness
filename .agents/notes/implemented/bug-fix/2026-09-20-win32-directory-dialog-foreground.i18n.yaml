@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-20-win32-directory-dialog-foreground.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-20-win32-directory-dialog-foreground.md
-2026-09-20-win32-directory-dialog-foreground.md: 774b2b1ac7df7ab9183a8cd786c6d25220b2b509
-2026-09-20-win32-directory-dialog-foreground.zh.md: 9b7af0625e390887f39f5f137b6ab56cb829bb26
+/agent-note-win32-directory-dialog-foreground-activation:
+  en: ac199da20c5be91f
+  zh: c789d18cf6d92864
+/agent-note-win32-directory-dialog-foreground-activation/problem:
+  en: 7385a5dadda4dc46
+  zh: 8dbbd7f0ff3e64b3
+/agent-note-win32-directory-dialog-foreground-activation/decision:
+  en: 7ec4b2ae417d0415
+  zh: 703436192bc529e7
+/agent-note-win32-directory-dialog-foreground-activation/alternatives-considered:
+  en: f46fb1861fc601ed
+  zh: 73cbeeb5aaec36a0
+/agent-note-win32-directory-dialog-foreground-activation/consequences:
+  en: 299f8c64c5d5e1b4
+  zh: 429fe53ab8e37280
+/agent-note-win32-directory-dialog-foreground-activation/testing:
+  en: f7957477a2e63380
+  zh: 0f0442eabe24c624

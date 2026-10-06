@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-08-tool-output-spill-files.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md
-2026-07-08-tool-output-spill-files.md: 4d1d4b7b665f34b362df2f8c8aeb06d96bf2668f
-2026-07-08-tool-output-spill-files.zh.md: 3e7ce4f57a0078c6a4b919436946be8e172fa7cb
+/agent-note-tool-output-spill-policy:
+  en: 06b99197145a4080
+  zh: 698a61dcd2385985
+/agent-note-tool-output-spill-policy/problem:
+  en: a29abc3ab8f1f7af
+  zh: f378cccb8d96f7f0
+/agent-note-tool-output-spill-policy/decision:
+  en: 1e5eca5f01a67e45
+  zh: 1f9c22d2801f02a0
+/agent-note-tool-output-spill-policy/decision/spill-seam:
+  en: 07a0c7a055490788
+  zh: dc2d3b61c9e1953c
+/agent-note-tool-output-spill-policy/decision/spill-policy:
+  en: be9d9de41e4aef3a
+  zh: 68e6d84dc80cf607
+/agent-note-tool-output-spill-policy/showcase-web-fetch:
+  en: d5c334b50f458925
+  zh: 7631307b5d9fbc55
+/agent-note-tool-output-spill-policy/relationship-to-retention-and-early-spill:
+  en: 7314ba8b0a03c0d9
+  zh: 8429f79ff3a7bd1f
+/agent-note-tool-output-spill-policy/non-goals:
+  en: ced64aed15bc429e
+  zh: 5929e4f4bd4ccdc3
+/agent-note-tool-output-spill-policy/deferred:
+  en: 23401bf54a445549
+  zh: 8207583973fa78f6
+/agent-note-tool-output-spill-policy/testing:
+  en: c98759345e1aebfa
+  zh: d1faeadb99bd748a
+/agent-note-tool-output-spill-policy/consequences:
+  en: 623cd54730dee308
+  zh: 26a21c4848ff71ce
+/agent-note-tool-output-spill-policy/alternatives-considered:
+  en: 30564f96948151ac
+  zh: 2d6c0cbf8ec14d38

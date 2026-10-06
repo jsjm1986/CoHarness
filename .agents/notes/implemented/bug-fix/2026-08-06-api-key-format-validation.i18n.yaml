@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-api-key-format-validation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-06-api-key-format-validation.md
-2026-08-06-api-key-format-validation.md: e2dcb91cba703cf95994426c67c4203effad290a
-2026-08-06-api-key-format-validation.zh.md: e74cb58ee0e0be9ec9ec30123e7eeffa3f3db657
+/agent-note-validate-api-key-format-before-it-reaches-an-http-header:
+  en: 035727ec4c386632
+  zh: c3ba94a14e4c6223
+/agent-note-validate-api-key-format-before-it-reaches-an-http-header/problem:
+  en: d884eaab39bf5f22
+  zh: 6c3e378272cd05a6
+/agent-note-validate-api-key-format-before-it-reaches-an-http-header/decision:
+  en: 7872038593c8127b
+  zh: cd102f3006038c18
+/agent-note-validate-api-key-format-before-it-reaches-an-http-header/decision/invariants-belong-at-every-layer-heuristics-belong-where-the-human-is:
+  en: cc3a2c8d88872693
+  zh: cc8f3d13686e512e
+/agent-note-validate-api-key-format-before-it-reaches-an-http-header/decision/absence-is-a-configuration-state-not-a-missing-key:
+  en: ffad660a6304184a
+  zh: f91e4ddddf08dd2e
+/agent-note-validate-api-key-format-before-it-reaches-an-http-header/decision/where-the-rule-lives:
+  en: f023b58a386c706b
+  zh: e932156ef2444a6e
+/agent-note-validate-api-key-format-before-it-reaches-an-http-header/decision/what-each-surface-does:
+  en: 34076c842176c8a9
+  zh: d67a364a6d8d3eae
+/agent-note-validate-api-key-format-before-it-reaches-an-http-header/alternatives-considered:
+  en: fbce1501b80c4425
+  zh: 806d9ae1f00a69ca
+/agent-note-validate-api-key-format-before-it-reaches-an-http-header/consequences:
+  en: 62f36cf81da09ce7
+  zh: 081cc031b96ec380
+/agent-note-validate-api-key-format-before-it-reaches-an-http-header/testing:
+  en: 110fe4ba815f81b7
+  zh: 2ff3c36c72a15295

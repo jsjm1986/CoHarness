@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-pwsh-persistent-pty.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-11-pwsh-persistent-pty.md
-2026-08-11-pwsh-persistent-pty.md: 8353b3ab3cdbf20add22a55acb03312c94283602
-2026-08-11-pwsh-persistent-pty.zh.md: 95048a02416dfcf5f0ef2837d99a561008f6496f
+/agent-note-persistent-pwsh-over-the-terminal-seam-on-windows:
+  en: 85a3eb5ba9de0129
+  zh: 4d173492a3ca5d75
+/agent-note-persistent-pwsh-over-the-terminal-seam-on-windows/problem:
+  en: 02d2e9959d05630a
+  zh: 9c6bef73bce5da4a
+/agent-note-persistent-pwsh-over-the-terminal-seam-on-windows/decision:
+  en: 7b50bc2615cdcf42
+  zh: 3f62647a961bd0a4
+/agent-note-persistent-pwsh-over-the-terminal-seam-on-windows/decision/windows-substrate-in-deepseek-ai-dsh-subprocess-local:
+  en: c64667cf6a9a60ed
+  zh: bba2fc1593149829
+/agent-note-persistent-pwsh-over-the-terminal-seam-on-windows/decision/shell-dialect-in-deepseek-ai-dsh-terminal-bash:
+  en: cdeff527ecbb776e
+  zh: abbff574307032ad
+/agent-note-persistent-pwsh-over-the-terminal-seam-on-windows/decision/deepseek-ai-dsh-tool-pwsh-persistent:
+  en: d93bf458ce20d8d8
+  zh: 3698493c17712e40
+/agent-note-persistent-pwsh-over-the-terminal-seam-on-windows/decision/composition:
+  en: d07348cbabbff8ae
+  zh: af895cebc1451477
+/agent-note-persistent-pwsh-over-the-terminal-seam-on-windows/decision/testing:
+  en: 1e3e3d8ca26679f6
+  zh: f251cb967604a49f
+/agent-note-persistent-pwsh-over-the-terminal-seam-on-windows/alternatives-considered:
+  en: bb1056117233fd4a
+  zh: 102b03cc2cda2951
+/agent-note-persistent-pwsh-over-the-terminal-seam-on-windows/consequences:
+  en: c1165a80cbbccdc8
+  zh: f5f7c947455bc487

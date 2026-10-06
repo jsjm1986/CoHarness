@@ -1,3 +1,8 @@
+---
+description: "Local filesystem skill provider for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-skill-filesystem
 
 English | [中文](README.zh.md)
@@ -10,6 +15,20 @@ This package implements one skill source. It scans local project, custom, and us
 
 Agents can use local skills from the repository, a custom directory, or the user's agent configuration: author a skill as a directory bundle with a `SKILL.md` or a flat `<name>.md` file under any scanned root, and it appears in the session catalog. The provider discovers the project, custom, and user roots, parses each skill's YAML frontmatter, and watches the directories, so new, renamed, or deleted skills reach agents without a restart. Choose it when skills live on disk — the registry (`dsh-skill`) accepts any provider, and another provider can supply skills from elsewhere.
 
+## Table of Contents
+
+- [Plugin](#plugin)
+- [Discovery](#discovery)
+- [Catalog Change Detection](#catalog-change-detection)
+- [Skill Format](#skill-format)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="plugin"></a>
 ## Plugin
 
 Requires `ctx.skills` (`inject: ['skills']`).
@@ -30,6 +49,7 @@ Requires `ctx.skills` (`inject: ['skills']`).
 | `watchMaxProjects` | `128` | Maximum distinct project roots retained in the watcher LRU. |
 | `watchFollowSymlinks` | `true` | Follow symbolic links while watching existing roots. |
 
+<a id="discovery"></a>
 ## Discovery
 
 Default roots are resolved in this provider's rank order:
@@ -46,6 +66,7 @@ The project root is the nearest ancestor containing `.git`; without one, the cur
 
 When `ctx.fs` is available, discovery lists roots through `ctx.fs.listDir`, reads skill files through `ctx.fs.readText`, and probes `.git` through the filesystem service. Full skill loads forward the lookup abort signal to filesystem metadata and content reads. Without a filesystem service, the provider falls back to abortable Node filesystem I/O so minimal local contexts can still load skills. Confirmed missing paths are valid empty state, malformed or non-text entries warn and skip, and unexpected discovery/read failures make the registry snapshot incomplete rather than replacing a last-good model catalog with a misleading deletion.
 
+<a id="catalog-change-detection"></a>
 ## Catalog Change Detection
 
 Existing skill roots are watched with Chokidar. Before opening a native watcher, the provider realpaths the existing root or ancestor and restores the next missing segment; when `watchFollowSymlinks` is false and the root itself is a symbolic link, it preserves that final link so Chokidar can enforce the configured boundary. Discovery and diagnostics retain the configured path, while Windows cannot otherwise mix an 8.3 alias with long-form libuv events. The provider observes direct bundle directory additions/removals, flat Markdown additions/removals, and direct `SKILL.md` additions/removals/changes; `change` exists to rediscover catalog frontmatter such as `name` and `description`. Changes below `references`, `scripts`, `assets`, or other bundle resources do not invalidate the catalog. Events delivered in the same microtask batch collapse to one provider invalidation.
@@ -54,6 +75,7 @@ A root that does not exist is followed from the nearest existing ancestor one mi
 
 The first-party filesystem `write` and `edit` tools also synchronously invalidate the provider through `fs/observed` when their target could affect a watched skill entry. This fast path makes the next model step observe its own filesystem mutation without waiting for the host watcher. External IDE, Git, shell, and process changes rely on Chokidar or the missing-path probe. Existing-root watchers remain persistent until effect teardown so Chokidar owns asynchronous native error events; startup/runtime watcher failures are logged and retried. Discovery still scans readable roots and returns their candidates for direct loading, but marks the observation incomplete so it is not cached or published as an authoritative model catalog. Effect teardown closes every watcher and contains late callbacks.
 
+<a id="skill-format"></a>
 ## Skill Format
 
 Skills can be single-level directory bundles (`<name>/SKILL.md`) or flat Markdown files (`<name>.md`). Nested `**/SKILL.md` discovery is deliberately excluded. Frontmatter is parsed as an open YAML object with the `yaml` package; this provider interprets required `name` and `description`, plus optional `whenToUse`, `metadata`, `disable-model-invocation`, and `user-invocable`. Names must be kebab-case.
@@ -62,10 +84,12 @@ The two invocation fields accept YAML booleans and the case-insensitive forms `t
 
 The catalog and body have separate lifecycles. Discovery parses frontmatter to produce the summary. Every `skill(name)` load rereads and reparses the current file, so body edits need no hash, revision, cache invalidation, or proactive model notification. A frontmatter rename between discovery and loading rejects the stale name and invalidates the provider; the next catalog observation publishes the new name.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Skills are discovered from the filesystem, which remains the only catalog authority; the provider keeps no second index to compare.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through `dsh-tool-skill`, which renders this provider's invocable names and capped descriptions into the initial or replacement catalog and a selected current instruction body plus resource-base guidance into retained tool history while paths, provider ranks, and disabled skills remain hidden.
@@ -81,3 +105,13 @@ Watcher invalidation can cause the named consumer to append a replacement catalo
 - **Malformed entries disappear with a warning** — the model catalog receives no per-skill diagnostic and cannot distinguish an absent skill from an invalid one; unexpected I/O failures preserve the last-good catalog instead.
 - **Missing-root observation polls one path segment** — roots absent at startup use `fs.watchFile` at `watchPollIntervalMs` until Chokidar can attach, trading bounded detection latency for reliable creation detection across IDE, Git, and shell workflows.
 - **No body revision protocol** — a loaded body is ordinary retained tool history; later file edits affect later calls but neither rewrite old results nor announce that the body changed.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

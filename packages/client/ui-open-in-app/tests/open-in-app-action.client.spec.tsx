@@ -28,16 +28,20 @@ function bench(over: {
   choice?: string
   cwd?: string
   launch?: (appId: string, path: string) => Promise<void>
+  localTarget?: (sessionId: SessionId) => boolean
 } = {}): Bench {
-  const state = {
+  const state: SessionListState = {
     ids: [SESSION],
-    byId: over.cwd === undefined ? {} : { [SESSION]: { cwd: over.cwd } },
+    byId: over.cwd === undefined ? {} : {
+      [SESSION]: { id: SESSION, displayTitle: 'session', running: false, blank: false, updatedAt: 0, cwd: over.cwd },
+    },
+    archivedById: {},
     current: SESSION,
     phase: 'ready',
     subagentsByParent: {},
-    jobsBySession: {},
+    jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
-  } as unknown as SessionListState
+  }
   const apps = createSnapshotStore<readonly string[] | null>(over.apps ?? null)
   const choice = createSnapshotStore<string>(over.choice ?? '')
   const launch = vi.fn(over.launch ?? (async () => {}))
@@ -48,16 +52,25 @@ function bench(over: {
   function useSelector<T, R>(source: { getSnapshot(): T }): (select: (value: T) => R) => R {
     return select => select(source.getSnapshot())
   }
-  const props = {
+  const props: OpenInAppActionProps = {
     sessionId: SESSION,
+    // Standard-kit feeds this contribution never reads; the slots contract
+    // requires them and `as never` marks them intentionally unread.
+    useSession: vi.fn() as never,
+    useProjection: vi.fn() as never,
+    usePanelInfo: vi.fn() as never,
+    useInput: vi.fn() as never,
+    inputActions: vi.fn() as never,
     useSessions,
+    useWorkspaces: vi.fn() as never,
     useOpenInAppApps: useSelector(apps),
     useOpenInAppChoice: useSelector(choice),
     launch,
     choose,
-    iconUrl: (appId: string) => `/open-in-app/icon/${appId}`,
+    iconUrl: (appId: string) => `open-in-app/icon/${appId}`,
+    localTarget: over.localTarget ?? (() => true),
     t,
-  } as unknown as OpenInAppActionProps
+  }
   return { props, launch, choose }
 }
 
@@ -74,6 +87,13 @@ describe('OpenInAppAction visibility', () => {
       expect(container.innerHTML).toBe('')
       cleanup()
     }
+  })
+
+  it('renders nothing when the session belongs to a runtime other than the page host', () => {
+    const { container } = render(<OpenInAppAction {...bench({
+      apps: ['finder', 'cursor'], cwd: '/w', localTarget: () => false,
+    }).props} />)
+    expect(container.innerHTML).toBe('')
   })
 
   it('shows the remembered choice, falling back to the first available app when it is gone', () => {
@@ -233,7 +253,7 @@ describe('OpenInAppAction launching', () => {
     const b = bench({ apps: ['terminal'], cwd: '/w/dir' })
     const { container } = render(<OpenInAppAction {...b.props} />)
     const img = container.querySelector('img')
-    expect(img?.getAttribute('src')).toBe('/open-in-app/icon/terminal')
+    expect(img?.getAttribute('src')).toBe('open-in-app/icon/terminal')
     if (img !== null) fireEvent.error(img)
     await waitFor(() => {
       expect(container.querySelector('img')).toBeNull()

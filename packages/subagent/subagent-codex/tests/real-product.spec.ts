@@ -23,6 +23,9 @@ import type {
 } from '@deepseek-ai/dsh-subprocess'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as codex from '../src/index.ts'
+import { CodexMemberTransport } from '../src/member.ts'
+import { recoverCodexThread } from '../src/rollout.ts'
+import { MessageId } from '@deepseek-ai/dsh-llm'
 import type { CodexPermissionMode } from '../src/run.ts'
 import {
   startResponsesFixture,
@@ -154,6 +157,7 @@ async function realHarness(
   })
   const parent = {
     id: 'real-parent',
+    ctx,
     session: { header: { cwd: instance.workspace } },
   } as unknown as Agent
   return {
@@ -213,6 +217,31 @@ function responseInputTexts(body: Record<string, unknown>): string[] {
 }
 
 describe('real @openai/codex 0.153.4 product', () => {
+  it('recovers a completed persistent turn from the official rollout without another model request', async () => {
+    const instance = await realInstanceFixture([{ kind: 'complete', text: 'RECOVERED_EXACT_TURN' }])
+    const runtime = await realRuntime()
+    const transport = new CodexMemberTransport({
+      cwd: instance.workspace, permissionMode: 'never', env: instance.env, disposeGraceMs: 2_000,
+    }, spec => runtime.ctx.subprocess.spawn(spec))
+    const signal = new AbortController().signal
+    const session = await transport.open(undefined, signal)
+    const prompt = 'Return the recovery marker.'
+    let turnId: string | undefined
+    try {
+      for await (const _piece of session.turn(prompt, signal, (id) => { turnId = id })) {
+        /* terminal proof is read from the real rollout below */
+      }
+    } finally { await session.dispose() }
+    expect(session.externalId).toBeTruthy()
+    expect(turnId).toBeTruthy()
+    if (turnId === undefined) throw new Error('Codex did not acknowledge the persistent turn')
+    expect(recoverCodexThread(session.externalId!, {
+      prompt, throughMessageId: MessageId('real-recovery'), externalTurnId: turnId,
+    }, instance.env.CODEX_HOME)).toEqual({ kind: 'result', text: 'RECOVERED_EXACT_TURN' })
+    expect(instance.fixture.requests).toHaveLength(1)
+    await expectQuiescent(runtime.handles)
+  }, 30_000)
+
   it('starts approve-for-me through the real app-server and returns exact text', async () => {
     const sentinel = 'REAL_CODEX_SENTINEL_0_149_1'
     const task = 'Return the fixture sentinel exactly.'
@@ -315,10 +344,12 @@ describe('real @openai/codex 0.153.4 product', () => {
     })
     const safeParent = {
       id: 'safe-parent',
+      ctx,
       session: { header: { cwd: safeInstance.workspace } },
     } as unknown as Agent
     const bypassParent = {
       id: 'bypass-parent',
+      ctx,
       session: { header: { cwd: bypassInstance.workspace } },
     } as unknown as Agent
     const safeController = new AbortController()
@@ -511,7 +542,11 @@ describe('real @openai/codex 0.153.4 product', () => {
       output: [{ type: 'text', text: 'bypass complete' }],
       stopReason: 'completed',
     })
-    expect(existsSync(target), JSON.stringify(fixture.requests.at(-1)?.body.input)).toBe(true)
+    // exec_command reports a session still running past the completed run:
+    // the spawned shell writes the file after the result resolves.
+    await expect
+      .poll(() => existsSync(target), { message: JSON.stringify(fixture.requests.at(-1)?.body.input) })
+      .toBe(true)
     expect(readFileSync(target, 'utf8').trim()).toBe('bypass')
     await run.dispose()
     await expectQuiescent(harness.handles)

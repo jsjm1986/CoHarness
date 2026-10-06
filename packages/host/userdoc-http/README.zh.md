@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-host-userdoc-http
 
 [English](README.md) | 中文
@@ -29,10 +34,22 @@ Gateway 的 `document-admin` principal 只被回收、恢复和永久清理路�
 使用 `dsh-host-userdoc-http` 作为 `ctx.userDocs` 的流式浏览器 HTTP 消费方：经宿主连接注册 `/api/documents`，使宿主/来源信任检查先于路由执行，上传字节旁路缓冲 JSON 桥。该路由族覆盖列表、上传、移动、回收站、还原、清除与文件夹操作，分页有界且游标不透明。
 
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与待完成工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该路由把每次上传流入 `ctx.userDocs`；文档状态留在附件后端。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 没有直接影响；流式浏览器传输只负责文件存取，任何模型可见渲染由会话消费方负责。
@@ -41,9 +58,20 @@ Gateway 的 `document-admin` principal 只被回收、恢复和永久清理路�
 
 无；本包从不组装或发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与待完成工作
 
 - **自身不提供认证** —— route 继承 Connection 的可达性与同源策略；把 Web server 暴露到回环之外的部署必须在网关提供认证。
 - **旧的当前运行时列表未建立索引** —— 提供方可能为了完整响应扫描整个根目录；Gateway 的作用域列表对大型工作区使用有界分页。
 - **下载默认使用附件 disposition** —— `inline=1` 只对图片、PDF 和文本媒体生效，并为预览 viewer 附带严格的内容策略。
 - **临时上传会话有保留期限，已发布文档没有自动过期** —— 未完成会话按本地后端策略清理，已完成文档仍需用户删除。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

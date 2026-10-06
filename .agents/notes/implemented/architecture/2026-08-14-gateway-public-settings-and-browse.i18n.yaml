@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-gateway-public-settings-and-browse.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-gateway-public-settings-and-browse.md
-2026-08-14-gateway-public-settings-and-browse.md: d3fb6248261f0310258d351cfd8c62fed315a743
-2026-08-14-gateway-public-settings-and-browse.zh.md: a65a59600c13b49856785d742312b7eb05ddaf56
+/agent-note-gateway-public-settings-and-in-app-directory-browse:
+  en: 74eecfe08b1734f7
+  zh: d854dc676439d7de
+/agent-note-gateway-public-settings-and-in-app-directory-browse/problem:
+  en: 10a9c7f48d6e7e28
+  zh: 7764ca895c4ed431
+/agent-note-gateway-public-settings-and-in-app-directory-browse/decision:
+  en: 7e9d59c1df600241
+  zh: 126ebafefa1b20b9
+/agent-note-gateway-public-settings-and-in-app-directory-browse/alternatives-considered:
+  en: da94cdfd2cbad0e3
+  zh: 1a8d3fb079a65dae
+/agent-note-gateway-public-settings-and-in-app-directory-browse/consequences:
+  en: 55646bcb862b2af7
+  zh: 7f54f3fe9c7e3fdc

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-skill
 
 [English](README.md) | 中文
@@ -14,14 +19,28 @@ pick 会落下字面文本 `/name `，发出的提示词中也是同一段字面
 
 `dsh-client-ui-skill` 让用户通过 `/` 建议选择或直接键入 `/name` 来调用 skill（技能）。同一条字面命令可以从 Web 编辑器、TUI 和 ACP（Agent Client Protocol）一致地加载 skill；如果名称与宿主命令相同，它仍会解析为该命令。skill 调用在对话中显示为可展开的 `Instructions` 卡片；即使已安装的 skill 目录发生变化，卡片落定后的内容仍保持稳定。
 
+## 目录
+
+- [skill 工具行](#skill-tool-row)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="skill-tool-row"></a>
 ## skill 工具行
 
 浏览器插件还会把 `skill` wire 名称注册进 `ui-tool` 的 keyed `tool.call.toolview` slot。收起的行以与 Bash 行相同的中性视觉层级显示 14 像素的 skill 文档与闪光组合图标、`Skill` 标题、分隔符和请求加载的 skill 名称；运行中的工具调用带有 transcript（文本记录）的扫光效果，失败时用错误首行替换名称，中断的工具调用则使用警告状态。已结算的行以整行作为展开入口，展开后显示一个尺寸受限的 `Instructions` 卡片，其中原样呈现持久化的工具输出；可用时还会提供标准执行轨迹的 `Inspect` 入口。该行的名称、生命周期和正文只派生自 `ui-tool` 提供的冻结的工具调用／工具结果切片，绝不读取当前 skill 目录，因此即使已安装的 skill 或其描述发生变化，回放仍保持稳定。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。候选由 Host skill 目录按请求提供；该来源只注册一个触发器贡献，不保留目录副本。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 用户显式 skill 调用
@@ -38,8 +57,19 @@ pick 会落下字面文本 `/name `，发出的提示词中也是同一段字面
 
 仅追加：注入的消息落在可复用历史前缀之后。该包绝不改写较早的请求 token。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **仅含工具结果的 history 页使用通用行**：键控分派要求配对的工具调用位于运行时窗口内；分页将工具调用留在窗口外时，工具结果没有工具身份。这项客户端呈现功能不会为了恢复该身份而扩展 history 协议约定。
 - **文本是唯一依据**：引用是普通的草稿文本；手动键入的相同 token 就是同一个引用，宿主手势边界评判的是发出的文本，而不是菜单交互。chip 视觉由 lexicon 扫描派生；没有 occurrence 身份、位置跟踪，也没有提示词协议上的结构化引用载荷（两者都是台账事项）。
 - **预热落定之前打开的菜单**：在那次击键下不显示 skill 候选；下一次击键会重新轮询已落定的缓存。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

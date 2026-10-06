@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-23-webhook-execution-identity.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-webhook-execution-identity.md
-2026-09-23-webhook-execution-identity.md: 01eb68e16fd19a1128256551705258395e2cb3b3
-2026-09-23-webhook-execution-identity.zh.md: c481e9eeacb6205f9910e5ea239eb6c0cd8fa0b2
+/agent-note-preserve-execution-identity-in-webhook-created-sessions:
+  en: 8497b3ae861b8aa3
+  zh: d8d537ddbdafce9d
+/agent-note-preserve-execution-identity-in-webhook-created-sessions/problem:
+  en: c181d30d3f22e8aa
+  zh: 65815491b651c8f9
+/agent-note-preserve-execution-identity-in-webhook-created-sessions/decision:
+  en: 24c43c7ce3c02e82
+  zh: ebe752562607b38d
+/agent-note-preserve-execution-identity-in-webhook-created-sessions/alternatives-considered:
+  en: 7af79fa94ae6dff2
+  zh: 65453f95044fedd9
+/agent-note-preserve-execution-identity-in-webhook-created-sessions/consequences:
+  en: 5670b9536b2f6951
+  zh: ebedbb97f09578df

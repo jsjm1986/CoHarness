@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/open-in-app/README.md
-README.md: 359eec9dac1561f34e29c76d42a14453c005ef81
-README.zh.md: ea47287547353b0442130ced0df98b86b84a7c0e
+/:
+  en: fbd3cf9953271b10
+  zh: 6efe4d036544d0d2
+/deepseek-ai-dsh-host-open-in-app:
+  en: 91ff0fbf5f0b95b9
+  zh: 6b4ecbe76f8bfe38
+/deepseek-ai-dsh-host-open-in-app/summary:
+  en: 45b47935d945302a
+  zh: f2a0cb0bfc641b56
+/deepseek-ai-dsh-host-open-in-app/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 725b47765ee8f30b
+/deepseek-ai-dsh-host-open-in-app/use-this-package:
+  en: c1217da1d6bdfd36
+  zh: 5075cbf515b3d4ef
+/deepseek-ai-dsh-host-open-in-app/use-this-package/when-to-choose-it:
+  en: fcf8f52b6cf1f0dd
+  zh: aed2366ccd0f112a
+/deepseek-ai-dsh-host-open-in-app/use-this-package/minimal-configuration:
+  en: a7dca840472b38d6
+  zh: af47a88ad41cbd57
+/deepseek-ai-dsh-host-open-in-app/use-this-package/the-catalog-and-how-it-resolves:
+  en: 7a63acc1bc55aa6f
+  zh: 8027c9db4b937acb
+/deepseek-ai-dsh-host-open-in-app/use-this-package/what-to-expect:
+  en: 55d0f9f68b38aec5
+  zh: 41a489c2170e617f
+/deepseek-ai-dsh-host-open-in-app/use-this-package/the-shared-subpath:
+  en: 558e741770080c93
+  zh: 80482d355dc89cae
+/deepseek-ai-dsh-host-open-in-app/understand-the-implementation:
+  en: 508ac3eb9c8f68a9
+  zh: bafe07da4d5a3144
+/deepseek-ai-dsh-host-open-in-app/further-exploration:
+  en: d5b6ee9a195a810b
+  zh: 97a269f506140f07
+/deepseek-ai-dsh-host-open-in-app/model-experience:
+  en: f4b8dd6b4e986564
+  zh: 814a768a38e52c03
+/deepseek-ai-dsh-host-open-in-app/model-experience/kv-cache-effect:
+  en: 47f982e326fe77fd
+  zh: daf3a81cd11c17fe
+/deepseek-ai-dsh-host-open-in-app/known-limitations-and-deferred-work:
+  en: 6e1cf559c4ce0d56
+  zh: f78c5548bb3d6236
+/deepseek-ai-dsh-host-open-in-app/known-limitations-and-deferred-work/dev-note:
+  en: 6cc5995deacbe951
+  zh: d7efd72b8e975c65

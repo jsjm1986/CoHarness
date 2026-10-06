@@ -11,18 +11,34 @@
     - img
   - button "Open right sidebar":
     - img
-- button "1 tool call · 2 intermediate messages":
+- button "1 tool call · 2 intermediate messages" [expanded]:
   - text: 1 tool call · 2 intermediate messages
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - text: Begin your reply with the plain sentence "Reading the workspace now." as text, and in that same message call the bash tool with the command "echo alpha". After the tool result, reply with the single word DONE and stop.
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
+- button "Context injection runtime-context":
+  - img
+  - img
+  - text: Context injection runtime-context
+- button "Thinking The user wants me to begin with \"Reading the workspace now.\" and call bash with \"echo alpha\" in the same message. Then after the tool result, reply with the single word DONE and stop.":
+  - img
+  - img
+  - text: Thinking The user wants me to begin with "Reading the workspace now." and call bash with "echo alpha" in the same message. Then after the tool result, reply with the single word DONE and stop.
+- paragraph: Reading the workspace now.
+- button "Bash Print alpha to stdout":
+  - img
+  - img
+  - text: Bash Print alpha to stdout
 - paragraph: partial
 - text: Stopped
 - button "Copy":
   - img
-- tooltip "Copy"
 - button "Good response":
   - img
 - button "Bad response":
@@ -33,7 +49,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -41,7 +57,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -54,4 +70,5 @@
   - button "7.9K tok · Cache hit 0%":
     - img
     - text: 7.9K tokCache hit 0%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

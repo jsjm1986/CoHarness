@@ -64,7 +64,7 @@ describe('web e2e: durable Tool detail tab', () => {
     })
     expect(cold.result.ok).toBe(true)
     expect(scaffold.ctx.agents.get(SessionId(SESSION)) === undefined).toBe(true)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.getByText('Later answer 30', { exact: true }).waitFor()
     // The fixture exceeds one tail page; reaching the head requests its only older page.
     await page.locator('[data-conversation-scroll]').evaluate((element) => {

@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-18-agent-lifecycle-and-ownership-contracts.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-06-18-agent-lifecycle-and-ownership-contracts.md
-2026-06-18-agent-lifecycle-and-ownership-contracts.md: 9bc558bfce75892b0ebdb80e9f8735d440cabaf4
-2026-06-18-agent-lifecycle-and-ownership-contracts.zh.md: bbd0a7219f902e5ead4d190c58e9a5d4da2131fd
+/agent-note-agent-lifecycle-and-ownership-contracts:
+  en: 0d7f2e4d9bebc86e
+  zh: bc733bbb15a2e7a2
+/agent-note-agent-lifecycle-and-ownership-contracts/problem:
+  en: da4779d689dbbb19
+  zh: eb489636311ccb9c
+/agent-note-agent-lifecycle-and-ownership-contracts/decision:
+  en: 04820b2b8f74c754
+  zh: d2537156ddef6a3c
+/agent-note-agent-lifecycle-and-ownership-contracts/decision/1-queue-aware-agent-cancel-cause:
+  en: f962e02b0c2976ae
+  zh: 3f84458e7a445ab6
+/agent-note-agent-lifecycle-and-ownership-contracts/decision/2-agenthandle-async-disposer:
+  en: c9da04b60de8dbea
+  zh: 147515b1dc0e08de
+/agent-note-agent-lifecycle-and-ownership-contracts/decision/3-bash-owner-token-in-the-service-definition:
+  en: ddbdd6573eb5434b
+  zh: 684c43ce2ade4e77
+/agent-note-agent-lifecycle-and-ownership-contracts/verification:
+  en: df13b55fe8d2b80c
+  zh: bd66d26f92e2ae0f
+/agent-note-agent-lifecycle-and-ownership-contracts/session-owner-tokens-are-unique-among-live-agents:
+  en: 4111342bb9f2af23
+  zh: 6d2b6b2249046f13
+/agent-note-agent-lifecycle-and-ownership-contracts/alternatives-considered:
+  en: e02ee20151e2641d
+  zh: a06bccb4a9e907bd
+/agent-note-agent-lifecycle-and-ownership-contracts/consequences:
+  en: ccb6ca03c9b70675
+  zh: c1f694b50c04d058

@@ -196,7 +196,7 @@ describe('visual audit: compact product chrome', () => {
           hasTouch: true,
           isMobile: true,
         })
-        await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+        await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
         await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
         await dismissOnboarding(page)
         await shot(page, `${prefix}-00-landing`)
@@ -246,6 +246,14 @@ describe('visual audit: compact product chrome', () => {
 
         const toolRow = page.locator('[data-tool], [class*="ToolRow"]').first()
         if (await toolRow.count() > 0) {
+          // Settled turns keep their step rows mounted but folded behind the
+          // turn-process toggle; open every closed fold before clicking.
+          if (!(await toolRow.isVisible())) {
+            for (const toggle of await page.locator('button[data-turn-process]').all()) {
+              if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click()
+            }
+            await toolRow.waitFor({ state: 'visible', timeout: 10_000 })
+          }
           await toolRow.click()
           await page.waitForTimeout(300)
           await shot(page, `${prefix}-05-tool-expanded`)

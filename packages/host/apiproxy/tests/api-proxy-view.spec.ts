@@ -261,7 +261,7 @@ describe('mux live view computation', () => {
     })
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: '<context_checkpoint>summary</context_checkpoint>' }],
-      source: { kind: 'plugin', plugin: 'compact' },
+      source: { kind: 'compact-checkpoint', compactionId: 'c1' as never },
     }), {
       surfaceOp: { op: 'replace', startSeq: SessionSeq(shadowed[0] as number), endSeq: SessionSeq(shadowed.at(-1) as number) },
       sourceEventSeqs: [...shadowed, summary.seq],

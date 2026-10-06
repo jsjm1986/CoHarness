@@ -15,11 +15,13 @@ function load(rel: string): string {
 }
 
 describe('primitive compact chrome', () => {
-  it('caps HoverCard width and lifts Toast below the safe top under 768px', () => {
+  it('fades HoverCard previews, honors reduced motion, and lifts Toast below the safe top under 768px', () => {
     const hover = load('../src/HoverCard.module.css')
     const toast = load('../src/Toast.module.css')
-    expect(hover).toContain('@media (max-width: 767px)')
-    expect(hover).toContain('calc(100vw - 24px)')
+    expect(hover).toContain('--dsh-hover-preview-fade')
+    expect(hover).toContain('@starting-style')
+    expect(hover).toContain('[data-closing]')
+    expect(hover).toContain('@media (prefers-reduced-motion: reduce)')
     expect(toast).toContain('@media (max-width: 767px)')
     expect(toast).toContain('--dsw-safe-top')
     expect(load('../src/markdown/CodeBlock.module.css')).toContain('min-height: var(--dsw-touch-target)')

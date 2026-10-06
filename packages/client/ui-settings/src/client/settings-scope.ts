@@ -34,6 +34,8 @@ import type {} from '@deepseek-ai/dsh-api-remotes/types'
 // never — the owning package's client-safe, type-only subpath supplies the
 // cordis `Events` entry (and with it the branded `SettingsNamespace`).
 import type {} from '@deepseek-ai/dsh-settings/types'
+import { DEVELOPER_TOOLS_NAMESPACE, type DeveloperToolsSettings } from '../developer-tools-settings.ts'
+import { DeveloperToolsPreference } from './developer-tools.ts'
 import type { SettingsSchemaService } from './schema.ts'
 import { SettingsDescribeMirror, type SettingsDescribeFace } from './settings-mirror.ts'
 import {
@@ -320,7 +322,15 @@ export class SettingsScopeBinder extends Service {
     this.mirror = config.mirror
     this.accountMirror = config.accountMirror ?? new AccountPreferencesMirror(undefined)
     this.schema = config.schema
+    // The shared developer-tool preference rides the provider's lifecycle so
+    // every consumer observes one scope instead of rebinding the namespace.
+    this.developerTools = new DeveloperToolsPreference(
+      this.bind<DeveloperToolsSettings>({ namespace: DEVELOPER_TOOLS_NAMESPACE }),
+    )
   }
+
+  /** Shared developer-tool preference; per-field writers still use {@link bind}. */
+  readonly developerTools: DeveloperToolsPreference
 
   /**
    * The shared mirror's read/fold face for cross-namespace surfaces (schema
@@ -376,6 +386,7 @@ export class SettingsScopeBinder extends Service {
           account as AccountSettingsScopeController<T>,
           host as SettingsScope<T>,
           this.accountMirror,
+          spec.namespace,
         )
         : host as SettingsScope<T>
     ctx.effect(() => {

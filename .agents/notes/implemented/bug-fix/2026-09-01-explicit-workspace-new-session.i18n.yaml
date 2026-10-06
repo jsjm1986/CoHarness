@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-01-explicit-workspace-new-session.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-01-explicit-workspace-new-session.md
-2026-09-01-explicit-workspace-new-session.md: b11dee4b474944a115cded3e58018e1ba5a28492
-2026-09-01-explicit-workspace-new-session.zh.md: d4aa25cffb05ec268ac151a3016cd09ed1d79cfd
+/agent-note-explicit-workspace-new-session-intent:
+  en: 20d926998e1e60e1
+  zh: 1810580df297f7fe
+/agent-note-explicit-workspace-new-session-intent/problem:
+  en: 643894e6814986b8
+  zh: 759a4a1f6a4293ad
+/agent-note-explicit-workspace-new-session-intent/decision:
+  en: 01a9b3ed7aecd3ee
+  zh: ebb964e570188577
+/agent-note-explicit-workspace-new-session-intent/alternatives-considered:
+  en: 962ead481bab8b4e
+  zh: 85dc8a5d7a337173
+/agent-note-explicit-workspace-new-session-intent/consequences:
+  en: 7ba30bf47fca68b9
+  zh: 7418e5d63653ea22
+/agent-note-explicit-workspace-new-session-intent/verification:
+  en: 41be6a8b24ff5445
+  zh: 143c13e5a87e16d7
+/agent-note-explicit-workspace-new-session-intent/related:
+  en: c841560348437709
+  zh: b9a7658f08147104

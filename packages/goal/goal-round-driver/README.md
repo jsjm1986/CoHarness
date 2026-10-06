@@ -1,3 +1,8 @@
+---
+description: "Race-fenced same-session goal-round driver"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-goal-round-driver
 
 English | [中文](README.zh.md)
@@ -8,6 +13,19 @@ Same-session continuation driver for [`ctx.goals`](../goal/README.md). It turns 
 
 `dsh-goal-round-driver` automatically continues an active goal in the same session while the agent is idle, continuation is armed, and the configured round allowance remains. Each round gives the model another turn toward the objective; only goal rounds that reach model history consume the allowance, and exhaustion records a blocker. The driver has no configuration: the goal defines the round limit, and `dsh-tool-goal` defines when repeated blocking stops continuation. Mount it with `dsh-goal` and `dsh-tool-goal` for unattended multi-round progress; omit it when each step requires human steering.
 
+## Table of Contents
+
+- [Composition](#composition)
+- [Round contract](#round-contract)
+- [Idle checkpoint](#idle-checkpoint)
+- [Lifecycle and durability](#lifecycle-and-durability)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="composition"></a>
 ## Composition
 
 ```yaml
@@ -23,6 +41,7 @@ Same-session continuation driver for [`ctx.goals`](../goal/README.md). It turns 
 
 The plugin has no tunable configuration. `maxGoalRounds` belongs to the goal definition, while the model-facing blocked threshold belongs to [`dsh-tool-goal`](../tool-goal/README.md); duplicating either value in the driver could produce divergent policy.
 
+<a id="round-contract"></a>
 ## Round contract
 
 When an exact live agent is idle with an active, armed goal and remaining capacity, the driver first checkpoints pending goal mutations, then reserves `roundsStarted + 1` for the current `{ goalId, revision }`. It queues one `<goal_round>` prompt with `GoalMessageSource`. The `agent/pre-step` listener verifies the complete claimed record and current goal both before and after downstream listeners; only an entered `user/message` increments `roundsStarted`. A reservation rejected as stale does not consume the round number.
@@ -31,18 +50,21 @@ When an exact live agent is idle with an active, armed goal and remaining capaci
 
 The retained prompt names the JSON-quoted objective and `round/maxGoalRounds`, treats the current workspace, tool results, and durable session state as authoritative, requires evidence before completion, and tells the model to leave the goal active when work remains. Quoting preserves multiline or tag-like objective text as data. Goal lifecycle mutations still require the independent authority checks in `dsh-tool-goal`.
 
+<a id="idle-checkpoint"></a>
 ## Idle checkpoint
 
 At whole-agent idle, durable goal phase and revision are authoritative. An active, armed goal with capacity reserves its next round; completion, pause, blocking, and edits suppress continuation. The driver does not classify the preceding activity by correlating the goal message with `turn/end`, so provider errors and token limits are not prompt-level goal outcomes.
 
+<a id="lifecycle-and-durability"></a>
 ## Lifecycle and durability
 
-`goal/changed` creates a durability obligation. Before queuing work, the driver awaits `ctx.sessions.flush()` and rechecks both the goal revision and competing input after the await. A flush failure arriving through `agent/error` disarms continuation before another round can start.
+`goal/changed` creates a durability obligation. Before queuing work, the driver awaits `ctx.sessions.flush()` and rechecks both the goal revision and competing input after the await. Each admitted driver task retains its Session against permanent removal until its checkpoints settle and a round is queued or continuation is abandoned. Paused and disarmed goals hold no reservation between tasks. Checkpoint failure or removal already in progress disarms continuation without automatic retry.
 
 Activation is never inherited when this plugin loads over an existing agent. `GoalService.disarm()` removes process-local authority without changing durable phase, revision, or history; explicit human-authorized resume records the later reactivation. The same rule applies after session resume and fork through the goal domain's `agent/created` handling.
 
 Cancellation removes pending inbox work or leaves an agent-wide aborted state. At the next idle checkpoint the driver pauses a goal with a reserved or admitted attempt so cancellation cannot auto-restart it; cancellation unrelated to a goal attempt only disarms process-local continuation. If the pause mutation fails, the driver falls back to disarming. Plugin teardown closes admission, disarms every live goal, cancels active work with the `parent` cause, and awaits the driver plus agent quiescence while its event fence remains installed.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Goal-round prompt
@@ -66,3 +88,13 @@ Append-only within an epoch: each admitted round extends the existing conversati
 - **Accepted-queue unload race** — Cordis plugin unload is asynchronous. A goal prompt already accepted by the agent inbox can begin and consume its round before unload starts; teardown then cancels the request, disarms the goal, and awaits quiescence. No later round starts.
 - **Round cap, not resource budget** — token, currency, time, and provider quota policies remain independent. Their session events are not attributed to the goal message or mapped into goal blocker codes.
 - **No abnormal auto-retry** — transient provider and persistence failures require a later human-authorized resume rather than an implicit retry policy.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

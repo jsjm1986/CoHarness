@@ -1,5 +1,6 @@
 /** Keyless Loader integration backed by a disposable PostgreSQL Gateway. */
 import { fork, type ChildProcess } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -12,9 +13,16 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
 import GatewayRuntime, { GATEWAY_PRINCIPAL_HEADER, type GatewayRuntimeCredential } from '@deepseek-ai/dsh-gateway-runtime'
 import LlmRuntime, { createUserMessage, LlmAdapter, ToolCallId, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
-import PermissionPresets from '@deepseek-ai/dsh-permission-presets'
+import PermissionPresets, { AUTO_PRESET } from '@deepseek-ai/dsh-permission-presets'
+import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
+import * as ToolJobs from '@deepseek-ai/dsh-tool-jobs'
+import * as AutoReview from '@deepseek-ai/dsh-experimental-auto-review'
+import type { JobOutcome } from '@deepseek-ai/dsh-jobs'
+import type { ExecutionQuestionId } from '@deepseek-ai/dsh-execution-authority'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionDraftId, SessionId } from '@deepseek-ai/dsh-session'
+import GatewayCollaboration from '@deepseek-ai/dsh-collaboration-gateway'
+import GatewaySessionPersistence from '@deepseek-ai/dsh-session-persistence-gateway'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SessionQuery from '@deepseek-ai/dsh-session-query-sqlite'
 import Shell from '@deepseek-ai/dsh-shell'
@@ -23,6 +31,9 @@ import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import Approval from '@deepseek-ai/dsh-user-approval'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import GatewayExecution from '../src/index.ts'
+import { executionInputOf, executionState, inputDigest } from '../src/input.ts'
+import GoalService from '@deepseek-ai/dsh-goal'
+import * as GoalRoundDriver from '@deepseek-ai/dsh-goal-round-driver'
 import TerminalController, { type WebTerminalId, type TerminalAttachmentId, type TerminalFrame } from '@deepseek-ai/dsh-api-terminal-controller'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
@@ -100,19 +111,35 @@ async function gateway() {
 class UnusedShell extends Shell {
   override get sandboxMode() { return 'workspace-write' as const }
   resolve(): never { throw new Error('fixture does not run shell commands') }
-  run(): never { throw new Error('fixture does not run shell commands') }
-  start(): never { throw new Error('fixture does not run shell commands') }
+  execute(): never { throw new Error('fixture does not run shell commands') }
 }
 
 class Connection extends HostConnectionService {
-  constructor(ctx: Context) { super(ctx, []) }
+  constructor(ctx: Context) {
+    // The fixture emits connection/request waterfalls only; no HTTP admission runs.
+    super(ctx, [], {
+      isAuthenticated: () => true,
+      authorizeIndex: () => true,
+      authenticatedUrl: (url: string) => url,
+    } as never)
+  }
 }
 
 class ScriptedModel extends LlmAdapter {
-  script: Array<'tool' | 'text' | 'hold'> = []
+  script: Array<'tool' | 'job-output' | 'text' | 'hold'> = []
+  readonly reviews: GenerateOptions[] = []
   readonly entered = Promise.withResolvers<undefined>()
   readonly cancelled = Promise.withResolvers<undefined>()
   async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    if (options.purpose === 'auto-review') {
+      this.reviews.push(options)
+      const text = '{"risk":"low","decision":"allow"}'
+      yield { type: 'block-start', index: 0, blockType: 'text' }
+      yield { type: 'text-delta', index: 0, text }
+      yield { type: 'block-end', index: 0, block: { type: 'text', text } }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+      return
+    }
     const action = this.script.shift()
     if (action === 'hold') {
       this.entered.resolve(undefined)
@@ -126,9 +153,11 @@ class ScriptedModel extends LlmAdapter {
         })
       } finally { this.cancelled.resolve(undefined) }
     }
-    if (action === 'tool') {
+    if (action === 'tool' || action === 'job-output') {
+      const name = action === 'tool' ? 'privileged_probe' : 'job_output'
+      const args = action === 'tool' ? '{}' : JSON.stringify({ job_id: 'bash-1' })
       yield { type: 'block-start', index: 0, blockType: 'tool-call' }
-      yield { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId('managed-probe'), name: 'privileged_probe', arguments: '{}' } }
+      yield { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId(`managed-${name}`), name, arguments: args } }
       yield { type: 'finish', reason: { kind: 'tool-calls' } }
     } else if (action === 'text') {
       yield { type: 'block-start', index: 0, blockType: 'text' }
@@ -138,7 +167,7 @@ class ScriptedModel extends LlmAdapter {
   }
 }
 
-async function composition(credential: GatewayRuntimeCredential) {
+async function composition(credential: GatewayRuntimeCredential, goals = false, jobsAndAuto = false, drafts = false) {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-execution-pg-'))
   cleanup.push(() => rm(directory, { recursive: true, force: true }))
   const credentialFile = join(directory, 'runtime.json')
@@ -146,19 +175,29 @@ async function composition(credential: GatewayRuntimeCredential) {
   vi.stubEnv('DSH_GATEWAY_CREDENTIAL_FILE', credentialFile)
   vi.stubEnv('DSH_GATEWAY_CREDENTIAL_FD', undefined)
   const configFile = join(directory, 'cordis.yml')
-  await writeFile(configFile, await readFile(new URL('./fixtures/postgres.cordis.yml', import.meta.url)))
+  const config = await readFile(new URL('./fixtures/postgres.cordis.yml', import.meta.url), 'utf8')
+  await writeFile(configFile, config + (jobsAndAuto
+    ? "- name: '@deepseek-ai/dsh-jobs-local'\n- name: '@deepseek-ai/dsh-tool-jobs'\n- name: '@deepseek-ai/dsh-experimental-auto-review'\n" : '') + (goals ? "- name: '@deepseek-ai/dsh-goal'\n- name: '@deepseek-ai/dsh-goal-round-driver'\n" : '') + (drafts
+    ? "- name: '@deepseek-ai/dsh-collaboration-gateway'\n- name: '@deepseek-ai/dsh-session-persistence-gateway'\n" : ''))
   const ctx = new Context()
   cleanup.push(() => ctx.fiber.dispose())
   ctx.baseUrl = pathToFileURL(directory).href + '/'
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
+    ['@deepseek-ai/dsh-jobs-local', LocalJobRegistry], ['@deepseek-ai/dsh-tool-jobs', ToolJobs],
+    ['@deepseek-ai/dsh-experimental-auto-review', AutoReview],
+    ['@deepseek-ai/dsh-goal', GoalService], ['@deepseek-ai/dsh-goal-round-driver', GoalRoundDriver],
     ['@deepseek-ai/dsh-session', SessionStore], ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt], ['@deepseek-ai/dsh-llm', LlmRuntime], ['@deepseek-ai/dsh-tools', ToolRuntime],
     ['@deepseek-ai/dsh-agent', AgentRegistry], ['@deepseek-ai/dsh-agent-loop', AgentLoop], ['@deepseek-ai/dsh-session-query-sqlite', SessionQuery],
     ['fixture:unused-shell', UnusedShell], ['@deepseek-ai/dsh-user-approval', Approval],
     ['@deepseek-ai/dsh-permission-presets', PermissionPresets], ['@deepseek-ai/dsh-sandbox-policy', SandboxPolicy],
     ['fixture:connection', Connection], ['@deepseek-ai/dsh-gateway-runtime', GatewayRuntime], ['@deepseek-ai/dsh-gateway-execution', GatewayExecution],
+    ...(drafts
+      ? [['@deepseek-ai/dsh-collaboration-gateway', GatewayCollaboration],
+        ['@deepseek-ai/dsh-session-persistence-gateway', GatewaySessionPersistence]] as Array<[string, unknown]>
+      : []),
   ])
   ctx.loader.internal = { version: 'v2', async import(specifier: string) {
     if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
@@ -264,6 +303,176 @@ describe.skipIf(process.env.HGW_TEST_DATABASE_URL === undefined)('Gateway execut
     } finally { await stream.return?.() }
   }, 30_000)
 
+  it('lets a new Auto request read a completed earlier job as historical data', async () => {
+    const server = await gateway(), world = await composition(server.credential, false, true)
+    const { ctx, model } = world
+    const sessionId = SessionId(String(await server.command('session')))
+    const agent = (await ctx.agents.create({ sessionId, meta: { cwd: world.directory },
+      agentOptions: { provider: 'fixture', model: 'fixture' } })).agent
+    await vi.waitFor(async () => {
+      await expect(ctx.executionAuthority.authorize('execute', agent)).rejects.toThrow(/Gateway refused/)
+    })
+    model.script.push('text')
+    await world.send(agent, server.principals.member, 'ordinary work')
+    await agent.whenIdle()
+    const original = ctx.executionAuthority.capture(agent)
+    const done = Promise.withResolvers<JobOutcome>()
+    const id = ctx.executionAuthority.runCaptured(agent, original, () => ctx.jobs.start({
+      kind: 'bash', label: 'earlier work', owner: agent.id,
+      run: () => ({ done: done.promise, cancel: () => { done.resolve({ status: 'killed' }) } }),
+    }))
+    const collected = ctx.jobs.wait(id, 5000, agent.id)
+    done.resolve({ status: 'completed', result: 'historical output from the ordinary participant' })
+    expect((await collected).status).toBe('completed')
+    expect(agent.inbox.nextStep).toHaveLength(0)
+    await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname: '/api/test/permission',
+      headers: { [GATEWAY_PRINCIPAL_HEADER]: server.principals.admin } }, async () => {
+      await ctx.executionAuthority.authorizeSelection(agent, AUTO_PRESET)
+      ctx.permissionPresets.set(agent.session, AUTO_PRESET)
+    })
+    model.script.push('job-output', 'tool', 'text')
+    await world.send(agent, server.principals.admin, 'Read the completed old job and write the privileged probe.')
+    await agent.whenIdle()
+    expect(world.writes).toEqual(['authorized'])
+    expect(await readFile(join(world.directory, 'privileged.txt'), 'utf8')).toBe('authorized')
+    expect(model.reviews).toHaveLength(2)
+    expect(model.reviews.map(review => review.executionIdentity?.primaryActorUserId)).toEqual([server.admin, server.admin])
+    expect(ctx.executionAuthority.capture(agent).inputs).not.toContain(original.inputs[0])
+    await expect(ctx.executionAuthority.runCaptured(agent, original, () => ctx.executionAuthority.authorize('auto-review', agent)))
+      .rejects.toThrow(/Gateway refused/)
+    expect(agent.session.snapshotEvents().some(event => event.type === 'tool/result'
+      && JSON.stringify(event.data).includes('historical output from the ordinary participant'))).toBe(true)
+  }, 30_000)
+
+  it('refuses a legacy pending question rather than replacing a newer independent scope', async () => {
+    const server = await gateway(), world = await composition(server.credential)
+    const { ctx, model } = world
+    const sessionId = SessionId(String(await server.command('session')))
+    const agent = (await ctx.agents.create({ sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })).agent
+    await vi.waitFor(async () => {
+      await expect(ctx.executionAuthority.authorize('execute', agent)).rejects.toThrow(/Gateway refused/)
+    })
+    await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname: '/api/test/send',
+      headers: { [GATEWAY_PRINCIPAL_HEADER]: server.principals.member } }, async () => {
+      const message = await ctx.executionAuthority.stamp(agent.session,
+        createUserMessage({ content: [{ type: 'text', text: 'legacy ordinary request' }], source: { kind: 'user' } }))
+      const response = await ctx.gatewayRuntime.request('/internal/runtime/execution/enter', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+          sessionId, inputId: executionInputOf(message), messageId: message.id, contentHash: inputDigest(message.content),
+        }),
+      })
+      expect(response.status).toBe(200)
+      const state = executionState(await response.json())
+      expect(state.scopeId).toBeUndefined()
+      agent.session.append('gateway/execution', { kind: 'accepted', state })
+    })
+    const original = ctx.executionAuthority.capture(agent)
+    expect(original.inputs).toHaveLength(1)
+    model.script.push('text')
+    await world.send(agent, server.principals.admin, 'fresh qualified request')
+    await agent.whenIdle()
+    const current = ctx.executionAuthority.capture(agent)
+    expect(current.scopeId).toBeDefined()
+    const reply = () => ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname: '/api/test/respond',
+      headers: { [GATEWAY_PRINCIPAL_HEADER]: server.principals.admin } }, async () => {
+      await ctx.executionAuthority.answer(agent.session, 'legacy-question' as ExecutionQuestionId, { yes: true }, original)
+    })
+    await expect(reply()).rejects.toThrow('question execution scope is unavailable')
+    expect(ctx.executionAuthority.capture(agent)).toEqual(current)
+    expect((await ctx.executionAuthority.authorize('auto-review', agent)).actors).toEqual([{ userId: server.admin }])
+  }, 30_000)
+
+  it('preserves a queued independent request when the current actor loses project access', async () => {
+    const server = await gateway(), world = await composition(server.credential)
+    const { ctx, model } = world
+    const sessionId = SessionId(String(await server.command('session')))
+    const agent = (await ctx.agents.create({ sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })).agent
+    await vi.waitFor(async () => {
+      await expect(ctx.executionAuthority.authorize('execute', agent)).rejects.toThrow(/Gateway refused/)
+    })
+    model.script.push('hold')
+    await world.send(agent, server.principals.member, 'work until access is revoked')
+    await model.entered.promise
+    model.script.push('tool', 'text')
+    await world.send(agent, server.principals.admin, 'independent qualified request')
+    expect(agent.inbox.nextTurn).toHaveLength(1)
+    await server.command('revoke')
+    await model.cancelled.promise
+    await agent.whenIdle()
+    expect(agent.inbox.nextTurn).toHaveLength(1)
+    expect(world.writes).toEqual([])
+    model.script.push('text')
+    await world.send(agent, server.principals.admin, 'continue the queued request')
+    await vi.waitFor(() => { expect(world.writes).toEqual(['authorized']) })
+    await agent.whenIdle()
+    expect(await readFile(join(world.directory, 'privileged.txt'), 'utf8')).toBe('authorized')
+    expect((await ctx.executionAuthority.authorize('auto-review', agent)).actors).toEqual([{ userId: server.admin }])
+  }, 30_000)
+
+  it('binds real automatic Goal rounds to the activating human instead of the preceding participant', async () => {
+    const server = await gateway(), world = await composition(server.credential, true)
+    const { ctx, model } = world
+    const sessionId = SessionId(String(await server.command('session')))
+    const agent = (await ctx.agents.create({ sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })).agent
+    await vi.waitFor(async () => {
+      await expect(ctx.executionAuthority.authorize('execute', agent)).rejects.toThrow(/Gateway refused/)
+    })
+    model.script.push('text')
+    await world.send(agent, server.principals.member, 'ordinary previous participant')
+    await agent.whenIdle()
+    model.script.push('tool', 'text')
+    await ctx.waterfall('connection/request', { kind: 'http', method: 'POST', pathname: '/api/goals/create',
+      headers: { [GATEWAY_PRINCIPAL_HEADER]: server.principals.admin } }, async () => {
+      await ctx.executionAuthority.runRequest(agent, { goal: 'write the privileged probe' }, () => {
+        ctx.goals.create(agent, { objective: 'write the privileged probe', maxGoalRounds: 1 })
+      })
+    })
+    await vi.waitFor(() => { expect(world.writes).toEqual(['authorized']) })
+    await agent.whenIdle()
+    expect(await readFile(join(world.directory, 'privileged.txt'), 'utf8')).toBe('authorized')
+    expect((await ctx.executionAuthority.authorize('auto-review', agent)).actors).toEqual([{ userId: server.admin }])
+    expect(ctx.goals.get(agent)?.roundsStarted).toBe(1)
+    expect(agent.session.snapshotEvents().some(event => event.type === 'gateway/continuation')).toBe(true)
+    const rounds = agent.session.snapshotEvents().filter(event => event.type === 'user/message' && event.data.source.kind === 'goal')
+    expect(rounds).toHaveLength(1)
+    expect(JSON.stringify(rounds[0])).toContain('gatewayExecutionScope')
+    expect(ctx.executionAuthority.capture(agent).scopeId).toMatch(/^[0-9a-f-]{36}$/u)
+  }, 30_000)
+
+  it('runs a qualified new request after an ordinary historical participant without weakening inherited denial', async () => {
+    const server = await gateway(), world = await composition(server.credential)
+    const { ctx, model } = world
+    const sessionId = SessionId(String(await server.command('session')))
+    const handle = await ctx.agents.create({ sessionId, agentOptions: { provider: 'fixture', model: 'fixture' } })
+    const agent = handle.agent
+    await vi.waitFor(async () => {
+      await expect(ctx.executionAuthority.authorize('execute', agent)).rejects.toThrow(/Gateway refused/)
+    })
+    model.script.push('tool', 'text')
+    await world.send(agent, server.principals.member, 'ordinary participant request')
+    await agent.whenIdle()
+    const prior = ctx.executionAuthority.capture(agent)
+    expect(world.writes).toEqual([])
+    model.script.push('tool', 'text')
+    await world.send(agent, server.principals.admin, 'qualified new request')
+    await agent.whenIdle()
+    expect(world.writes).toEqual(['authorized'])
+    expect(await readFile(join(world.directory, 'privileged.txt'), 'utf8')).toBe('authorized')
+    expect((await ctx.executionAuthority.authorize('auto-review', agent)).actors).toEqual([{ userId: server.admin }])
+    await expect(ctx.executionAuthority.runCaptured(agent, prior,
+      () => ctx.executionAuthority.authorize('auto-review', agent))).rejects.toThrow(/Gateway refused/)
+    const transcript = agent.session.snapshotEvents().flatMap((event) => {
+      if (event.type === 'user/message' && event.data.source.kind === 'user') return [`user: ${event.data.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('')}`]
+      if (event.type === 'tool/result') return event.data.message.content.flatMap(block => block.type === 'text'
+        ? [`tool ${event.data.message.isError ? 'denied' : 'authorized'}: ${block.text}`] : [])
+      if (event.type === 'assistant/message') return event.data.message.content.flatMap(block => block.type === 'text' ? [`assistant: ${block.text}`] : [])
+      return []
+    }).join('\n') + '\n'
+    await expect(transcript).toMatchFileSnapshot('./snapshots/current-request.txt')
+    const accepted = agent.session.snapshotEvents().filter(event => event.type === 'gateway/execution')
+    expect(accepted.some(event => event.data.kind === 'accepted' && event.data.state.scopeId !== undefined)).toBe(true)
+  }, 30_000)
+
   it('rejects mixed-actor tools, retains child restrictions, and cancels active work on revocation', async () => {
     const server = await gateway(), world = await composition(server.credential)
     const { ctx, model } = world
@@ -286,7 +495,7 @@ describe.skipIf(process.env.HGW_TEST_DATABASE_URL === undefined)('Gateway execut
     expect(world.attempts).toEqual([parent.id, parent.id])
     expect(JSON.stringify(parent.session.snapshotEvents().filter(event => event.type === 'tool/result').at(-1)))
       .toContain('Gateway refused')
-    expect(ctx.executionAuthority.capture(parent).inputs).toHaveLength(2)
+    expect(ctx.executionAuthority.capture(parent).inputs).toHaveLength(1)
     const scope = ctx.executionAuthority.capture(parent)
     const childId = SessionId(String(await server.command('session', { parentSessionId: parentId })))
     const child = (await ctx.agents.create({ sessionId: childId, parentAgent: parent,
@@ -311,5 +520,101 @@ describe.skipIf(process.env.HGW_TEST_DATABASE_URL === undefined)('Gateway execut
     await child.whenIdle()
     expect(child.status).toBe('idle')
     await expect(ctx.executionAuthority.authorize('execute', child)).rejects.toThrow(/Gateway refused/)
+  }, 30_000)
+
+  it('admits a reserved project draft through registration, desktop confirmation, and materialization', async () => {
+    const server = await gateway(), world = await composition(server.credential, false, false, true)
+    const { ctx, model } = world
+    const sessionId = SessionId(randomUUID())
+    const draftId = SessionDraftId(randomUUID())
+    const request = (assertion: string) => ({ kind: 'http' as const, method: 'POST', pathname: '/api/test/draft',
+      headers: { [GATEWAY_PRINCIPAL_HEADER]: assertion } })
+    // Mirror the api-proxy session.create order: reserve the draft identity, then
+    // create the in-memory draft Session under the caller's declared visibility.
+    let agent!: Agent
+    await ctx.waterfall('connection/request', request(server.principals.member), async () => {
+      await ctx.collaboration.withSessionCreation({ visibility: 'project' }, async () => {
+        const reservation = await ctx.sessionPersistence.reserveDraft({
+          draftId, sessionId, cwd: world.directory, visibility: 'project' })
+        expect(reservation?.sessionId).toBe(sessionId)
+        agent = (await ctx.agents.create({
+          sessionId, agentOptions: { provider: 'fixture', model: 'fixture' },
+          meta: { cwd: world.directory, ...{ draft: true } },
+        })).agent
+      })
+    })
+    expect(await server.command('draft-reservation', { sessionId }))
+      .toMatchObject({ draft_id: draftId, visibility: 'project', live: true })
+    expect(await server.command('conversation', { sessionId })).toBeNull()
+    // Collaboration write access rides the pending session-creation capability.
+    let authority!: ReturnType<typeof ctx.collaboration.capture>
+    await ctx.waterfall('connection/request', request(server.principals.member),
+      async () => { authority = ctx.collaboration.capture() })
+    await expect(authority.authorize(sessionId, 'write')).resolves.toMatchObject({ canWrite: true })
+    // Desktop confirmation reads occupancy and eligibility on the unmaterialized draft.
+    await server.command('desktop-enable')
+    const confirmation = await server.command('desktop-confirmation', {
+      sessionId, desktop: 'fixture-desktop', user: 'member' }) as {
+      status: number
+      body: { eligible: boolean; confirmed: boolean; occupancy: { available: boolean } }
+    }
+    expect(confirmation.status).toBe(200)
+    expect(confirmation.body).toMatchObject({ eligible: true, confirmed: false, occupancy: { available: true } })
+    // The first stamped input admits, executes, and materializes the conversation.
+    model.script.push('text')
+    await world.send(agent, server.principals.member, 'first message')
+    await agent.whenIdle()
+    await ctx.sessions.flush(agent.session)
+    expect(await server.command('conversation', { sessionId }))
+      .toMatchObject({ visibility: 'project', creator_public_id: String(server.member) })
+    expect(await server.command('draft-reservation', { sessionId })).toBeNull()
+  }, 30_000)
+
+  it('denies draft claims with an expired lease, a foreign private creator, or no reservation', async () => {
+    const server = await gateway(), world = await composition(server.credential, false, false, true)
+    const { ctx, model } = world
+    const request = (assertion: string) => ({ kind: 'http' as const, method: 'POST', pathname: '/api/test/draft',
+      headers: { [GATEWAY_PRINCIPAL_HEADER]: assertion } })
+    const createDraft = async (visibility: 'project' | 'private', creator: 'member' | 'admin' = 'member', expire = false) => {
+      const sessionId = SessionId(randomUUID())
+      let handle: Awaited<ReturnType<typeof ctx.agents.create>> | undefined
+      await ctx.waterfall('connection/request', request(server.principals[creator]), async () => {
+        await ctx.collaboration.withSessionCreation({ visibility }, async () => {
+          await ctx.sessionPersistence.reserveDraft({
+            draftId: SessionDraftId(randomUUID()), sessionId, cwd: world.directory, visibility })
+          if (expire) await server.command('expire-draft', { sessionId })
+          handle = await ctx.agents.create({
+            sessionId, agentOptions: { provider: 'fixture', model: 'fixture' },
+            meta: { cwd: world.directory, ...{ draft: true } },
+          })
+        })
+      })
+      if (handle === undefined) throw new Error('draft agent creation did not run')
+      return handle
+    }
+    // An expired reservation no longer fences registration.
+    await expect(createDraft('project', 'member', true)).rejects.toThrow(/Gateway refused/)
+    // An unreserved claim is rejected even though session creation was attested.
+    const forgedId = SessionId(randomUUID())
+    await expect(ctx.waterfall('connection/request', request(server.principals.member), async () => {
+      await ctx.collaboration.withSessionCreation({ visibility: 'project' }, async () => {
+        await ctx.agents.create({
+          sessionId: forgedId, agentOptions: { provider: 'fixture', model: 'fixture' },
+          meta: { cwd: world.directory, ...{ draft: true } },
+        })
+      })
+    })).rejects.toThrow(/Gateway refused/)
+    // A private draft writes only for its creator; an ordinary member cannot
+    // borrow an administrator's private draft.
+    const privateDraft = await createDraft('private', 'admin')
+    model.script.push('text')
+    await expect(world.send(privateDraft.agent, server.principals.member, 'member joins'))
+      .rejects.toThrow(/Gateway refused/)
+    model.script.push('text')
+    await world.send(privateDraft.agent, server.principals.admin, 'creator writes')
+    await privateDraft.agent.whenIdle()
+    await ctx.sessions.flush(privateDraft.agent.session)
+    expect(await server.command('conversation', { sessionId: privateDraft.agent.id }))
+      .toMatchObject({ visibility: 'private', creator_public_id: String(server.admin) })
   }, 30_000)
 })

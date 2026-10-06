@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-ralph
 
 [English](README.md) | 中文
@@ -8,6 +13,20 @@
 
 `ralph` 针对一个不可变目标运行由多个全新子 agent 组成的前台序列，每个 Round 只接收上一份有界报告与共享工作区状态。它会在 worker 报告完成或具体阻塞，或达到配置的 Round 上限时返回；这些报告不会得到独立验证。父级对话与先前子 agent 会话绝不会复制到新的 Round。仅当直接用户明确要求 Ralph 式全新 agent 迭代时使用它；普通的长期工作请使用 goal 工具，有界委派请使用 subagent 或工作流。
 
+## 目录
+
+- [契约](#contract)
+- [生命周期与取消](#lifecycle-and-cancellation)
+- [渲染意图](#render-intent)
+- [配置](#config)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="contract"></a>
 ## 契约
 
 `ralph({ objective, maxRounds? })` 会等待整个运行完成。部署配置中的 `maxRounds` 既是默认值，也是调用覆盖值的上限。每个 Ralph Round 通过 `subagentProvider` 启动一个子 agent；该提供方必须存在、支持结构化输出，并报告 `inheritsParentContext: false`。已配置的提供方以 `WorkflowStartRequest.subagentProvider` 传递，使固定脚本无法检查或更改路由，普通的模型编写 `workflow` 工具也不会因此获得提供方选择器。解析后的 Round 上限还会作为 `WorkflowStartRequest.maxTotalAgents` 传递，使固定循环与引擎的子 agent 总数后备上限协同；Ralph 上限超过引擎部署上限时，引擎会在发布运行前拒绝。
@@ -18,14 +37,17 @@
 
 普通子 agent 失败会产生错误，其中标明失败的 Round；如果已有上一次成功交接，也会保留它。Ralph 不会重试该 Round。致命的提供方启动、传输、worker 或工作流失败仍是工作流错误，并可能在固定脚本返回交接内容前结算。取消同样属于错误；局部输出绝不会视为成功。
 
+<a id="lifecycle-and-cancellation"></a>
 ## 生命周期与取消
 
 调用方 agent 是每个全新子 agent 的父级，因此会保留 cwd 和谱系，但不会复制其对话。`exec.signal` 进入工作流引擎，同时也桥接到 `run.cancel()`，以便不依赖具体实现。工具等待 `run.result` 并调用 `run.dispose()`，后一个调用位于 `finally` 中，因此取消的父级步骤会等到引擎完成有界终止且子 agent 完全停稳后才返回。
 
+<a id="render-intent"></a>
 ## 渲染意图
 
 待处理调用使用 `generic` 卡片，标题为 `ralph`；不可变目标作为其 `rawInput`。结果继续使用 generic 卡片。两个呈现函数都只依赖工具参数和已结算的工具包络。
 
+<a id="config"></a>
 ## 配置
 
 | 键 | 默认值 | 含义 |
@@ -37,10 +59,13 @@
 
 插件应用时会规范化并校验所有配置值，也包括绕过 Loader schema 规范化而直接应用的情况。每次调用前都会立即解析提供方能力，因为提供方注册可能随插件生命周期和热模块替换（HMR）变化。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每次运行通过引擎与 subagent seam 执行一个前台工作流；子方状态由那些服务拥有。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 系统提示词
@@ -91,6 +116,7 @@ Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop o
 
 每个全新子 agent 都有独立的请求缓存。父级结果追加在可复用请求前缀之后。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **完成由 worker 自行声明**：没有独立的评估器或验证器判断目标是否实际完成；评估器策略及评估器驱动的延续均暂缓处理。
@@ -99,3 +125,13 @@ Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop o
 - **一个 Round 对应一个全新子 agent**：Round 内没有扇出、模型/提供方切换、fork 上下文或由模型调用选择的提供方。
 - **普通子 agent 失败会终止运行**：固定脚本报告失败的 Round 和上一次成功交接，但不会重试；致命的工作流基础设施失败可能在该状态返回前结束。
 - **聚合工作量仅受 Round 数量限制**：token、价格和耗时预算均暂缓处理。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

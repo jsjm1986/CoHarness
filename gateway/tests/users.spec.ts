@@ -1,15 +1,20 @@
-import { existsSync, mkdtempSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
-import { loadConfig } from '../src/config.ts'
+import { afterEach, describe, expect, it } from 'vitest'
+import { readManagedDataPaths } from '@deepseek-ai/dsh-managed-data'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { UserService } from '../src/users.ts'
+
+const resources: Array<{ root: string; db: ReturnType<typeof openDb> }> = []
+afterEach(() => { for (const { root, db } of resources.splice(0)) { db.close(); rmSync(root, { recursive: true, force: true }) } })
 
 function setup(env: Record<string, string> = {}) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), ...env })
+  resources.push({ root, db })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), ...env })
   return { db, cfg, users: new UserService(db, cfg) }
 }
 
@@ -21,16 +26,50 @@ describe('UserService', () => {
     expect(existsSync(join(cfg.usersRoot, 'alice', 'home'))).toBe(true)
     expect(existsSync(join(cfg.usersRoot, 'alice', 'home', 'documents'))).toBe(true)
     expect(existsSync(join(cfg.usersRoot, 'alice', 'dsh'))).toBe(true)
+    expect(readManagedDataPaths(join(cfg.usersRoot, 'alice', 'dsh', 'managed-data.jsonl'))).toEqual([
+      { owner: '@deepseek-ai/dsh-userdoc-local', kind: 'directory', path: join(alice.homePath, 'documents') },
+    ])
     const listed = users.list()
     expect(listed.map(u => u.port)).toEqual([42000, 42001])
     expect(alice.mustChangePassword).toBe(true)
   })
 
-  it('rejects invalid or duplicate usernames', async () => {
+  it('reads one listed row with its instance port and state', async () => {
     const { users } = setup()
+    const alice = await users.create({ username: 'alice', password: 'pw-123456' })
+    const listed = users.list().find(user => user.id === alice.id)
+    expect(users.getListedById(alice.id)).toMatchObject({
+      id: alice.id, port: listed?.port, instanceState: listed?.instanceState,
+    })
+    expect(users.getListedById(99999)).toBeNull()
+    await users.remove(alice.id)
+    expect(users.getListedById(alice.id)).toBeNull()
+  })
+
+  it('rejects invalid or duplicate usernames', async () => {
+    const { cfg, users } = setup()
     await users.create({ username: 'alice', password: 'pw-123456' })
+    const inventory = join(cfg.usersRoot, 'alice', 'dsh', 'managed-data.jsonl'), before = readFileSync(inventory, 'utf8')
     await expect(users.create({ username: 'alice', password: 'x' })).rejects.toThrow()
+    expect(readFileSync(inventory, 'utf8')).toBe(before)
     await expect(users.create({ username: 'Bad Name', password: 'x' })).rejects.toThrow()
+  })
+
+  it('rolls back user admission for corrupt or aliased data without modifying another inventory', async () => {
+    const { cfg, users } = setup()
+    const inventory = join(cfg.usersRoot, 'broken', 'dsh', 'managed-data.jsonl')
+    mkdirSync(join(cfg.usersRoot, 'broken', 'dsh'), { recursive: true })
+    writeFileSync(inventory, 'incomplete')
+    await expect(users.create({ username: 'broken', password: 'pw-123456' })).rejects.toThrow('incomplete record')
+    expect(users.getByUsername('broken')).toBeNull()
+    expect(readFileSync(inventory, 'utf8')).toBe('incomplete')
+    expect(existsSync(join(cfg.usersRoot, 'broken', 'home', 'documents'))).toBe(false)
+    const owner = await users.create({ username: 'owner', password: 'pw-123456' })
+    const ownerInventory = join(cfg.usersRoot, owner.username, 'dsh', 'managed-data.jsonl'), before = readFileSync(ownerInventory, 'utf8')
+    symlinkSync(join(cfg.usersRoot, owner.username), join(cfg.usersRoot, 'alias'))
+    await expect(users.create({ username: 'alias', password: 'pw-123456' })).rejects.toThrow('must not be a link')
+    expect(users.getByUsername('alias')).toBeNull()
+    expect(readFileSync(ownerInventory, 'utf8')).toBe(before)
   })
 
   it('does not allocate below the configured port base when older rows use lower ports', async () => {

@@ -1,6 +1,13 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for attachment.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/attachment.md
-attachment.md: a895c55e7d09f958cdb64dc5df256434bb72abcc
-attachment.zh.md: 92b6cd396556080078bedea20f54370b3e14a690
+/durable-image-attachments:
+  en: 82a5600d372d3d73
+  zh: fce634b46be78821
+/durable-image-attachments/identity-and-verified-metadata:
+  en: e63a506ffa6fa2e2
+  zh: b3653774e4b3b25b
+/durable-image-attachments/commit-and-verified-read-payloads:
+  en: 6ea3f0e2ac87f63b
+  zh: 59653d5ba3dc8d5b

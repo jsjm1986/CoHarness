@@ -1,19 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import {
+  useEffect, useMemo, useRef, useState,
+  type ChangeEvent, type FocusEvent, type KeyboardEvent,
+} from 'react'
 import clsx from 'clsx'
 import {
-  Button, IconCheckOutline14, IconChevronDownOutline14, IconChevronLeftOutline14,
+  Button, IconCheckOutline16, IconChevronDownOutline14, IconChevronLeftOutline14,
   IconChevronRightOutline14, IconChevronUpOutline14, IconCloseOutline16,
   IconEditOutline16, MarkdownText,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import {
-  PendingQuestion, planReviewOf,
-  type QuestionAnswer, type QuestionComposerProps,
-} from './contract/slots.ts'
+import { planReviewOf, type QuestionAnswer, type QuestionCardSnapshot, type QuestionComposerProps } from './contract/slots.ts'
+import type { PendingQuestion } from './contract/slots.ts'
+import type { QuestionDraftAnswer, QuestionDraftProgress } from './draft-store.ts'
 import { PlanReviewPanel } from './PlanReviewPanel.tsx'
-import type { QuestionDraftAnswer, QuestionDraftState } from './draft-store.ts'
 import css from './QuestionComposer.module.css'
-
-type DraftAnswer = QuestionDraftAnswer
 
 /**
  * Displayed feedback: validation feedback is stored as a dictionary KEY and
@@ -21,7 +20,12 @@ type DraftAnswer = QuestionDraftAnswer
  * runtime failure messages (finished strings from the wire) pass through
  * verbatim.
  */
-type Feedback = { key: 'error.incomplete' | 'error.unanswered' } | { text: string }
+type Feedback = { key: 'error.incomplete' | 'error.unanswered' | 'error.unavailable' | 'error.resubmit' | 'status.sent' } | { text: string }
+
+/** A removed card can remain mounted until the composer seat updates. */
+const REMOVED_CARD: QuestionCardSnapshot = {
+  state: 'open', waitState: 'counting', countdown: undefined, channel: 'none', closed: true,
+}
 
 /**
  * Split the conventional recommendation suffix without changing the answer value.
@@ -35,16 +39,37 @@ export function parseRecommendedLabel(label: string): { label: string; recommend
     : { label, recommended: false }
 }
 
+/** Only a marked first choice is an implicit draft; the user still submits it. */
+function recommendedFirstOption(question: PendingQuestion['questions'][number]): string | undefined {
+  const label = question.options?.[0]?.label
+  return label !== undefined && parseRecommendedLabel(label).recommended ? label : undefined
+}
+
+/** Accept persisted progress only when it still describes this question batch. */
+function isQuestionDraftProgress(value: unknown, questionCount: number): value is QuestionDraftProgress {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const progress = value as Record<string, unknown>
+  if (typeof progress.index !== 'number' || !Number.isInteger(progress.index)
+    || progress.index < 0 || progress.index >= questionCount
+    || !Array.isArray(progress.drafts) || progress.drafts.length !== questionCount
+    || (progress.wait !== undefined && progress.wait !== 'editing' && progress.wait !== 'waiting')) return false
+  return progress.drafts.every((item: unknown) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) return false
+    const draft = item as Record<string, unknown>
+    return Array.isArray(draft.selected) && draft.selected.every((label: unknown) => typeof label === 'string')
+      && typeof draft.custom === 'string' && typeof draft.skipped === 'boolean'
+  })
+}
+
 /** Return whether a text-field key event belongs to an active IME composition. */
 function isComposing(event: KeyboardEvent<HTMLTextAreaElement>): boolean {
   // keyCode 229 is the legacy IME-composition signal engines emit without isComposing.
-  // oxlint-disable-next-line typescript/no-deprecated
-  return event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229
+  return event.nativeEvent.isComposing || Reflect.get(event.nativeEvent, 'keyCode') === 229
 }
 
-/** The free-text answer field shared by both question shapes. */
+/** The free-text answer field shared by both question variants. */
 interface AnswerFieldProps {
-  /** Which shape the field takes: the custom row's inline column, or the optionless question's own framed block. */
+  /** Visual variant: the custom row's inline column or the optionless question's framed block. */
   variant: 'inline' | 'block'
   /** Current draft text. */
   value: string
@@ -63,10 +88,19 @@ interface AnswerFieldProps {
 }
 
 /**
- * Auto-growing free-text answer: a textarea over a hidden mirror that owns
- * the height. The textarea itself remains the only scrollport after the mirror
- * reaches its cap.
- * @param props - field shape, draft text, and event handlers.
+ * Auto-growing free-text answer: a textarea, so a long answer soft-wraps and
+ * Shift+Enter breaks a line, over a hidden mirror that owns the height.
+ *
+ * The mirror renders the draft plus a trailing newline in normal flow and so
+ * sizes the grid row (counting rows by '\n' cannot see soft wraps); the
+ * textarea shares that one cell and stretches to it, and `rows={1}` keeps the
+ * control's own intrinsic height out of the row sizing so the mirror alone
+ * decides. Past the mirror's cap the textarea scrolls itself — it is the only
+ * scrollport in the stack, there being no second glyph layer to keep aligned.
+ * Mirror and textarea MUST share font, line-height, padding and wrapping rules
+ * or the two heights diverge.
+ *
+ * @param props - visual variant, draft text, and the field's event handlers.
  * @returns The mirrored auto-growing field.
  */
 function AnswerField(props: AnswerFieldProps) {
@@ -89,42 +123,22 @@ function AnswerField(props: AnswerFieldProps) {
 }
 
 /**
- * Composer takeover boundary; the carrier key keys local drafts, so a
- * same-request replay (same key, new carrier object) preserves them.
+ * Composer takeover router. Generic-question drafts live in this entry's
+ * Session-scoped Slot store, keyed by the pending carrier, so a strict Session
+ * entry remount restores the same request without exposing it to another one.
  *
- * One takeover, two shapes: a request that declares a presentation intent this
- * package renders takes that shape (a plan review is one decision over one
+ * One takeover, two presentations: a request that declares a presentation intent this
+ * package renders uses that presentation (a plan review is one decision over one
  * plan, not a question set), and every other request takes the generic flow.
  * The routing lives here, at the one entry that owns the composer seat, so
- * neither shape can claim a request the other is already rendering.
+ * neither presentation can claim a request the other is already rendering.
  *
  * @param props - the selector-matched pending question carrier plus the framework standard kit.
  * @returns The question flow, or the intent's own surface, for this request.
  */
 export function QuestionComposer(props: QuestionComposerProps) {
-  // Direct component consumers from the compatibility surface do not carry a
-  // Slot store. Production receives the Session-scoped store; this fallback
-  // retains the pre-store component contract for isolated embeds and tests.
-  const [fallbackState, setFallbackState] = useState<QuestionDraftState>({
-    progress: { index: 0, drafts: [] },
-  })
-  const fallbackActions = useMemo(() => ({
-    replace: (requestKey: string, progress: QuestionDraftState['progress']) => {
-      setFallbackState({ requestKey, progress })
-    },
-    clear: (requestKey: string) => {
-      setFallbackState(current => current.requestKey === requestKey
-        ? { progress: { index: 0, drafts: [] } }
-        : current)
-    },
-  }), [])
-  const useStore = props.useStore ?? (<T,>(select: (state: QuestionDraftState) => T): T => select(fallbackState))
-  const actions = props.actions ?? fallbackActions
-  // Domain-face mint rides the carrier's stable identity (never minted in a
-  // select/render dispatch — per-dispatch minting would churn memo identity).
-  const question = useMemo(() => new PendingQuestion(props.matched), [props.matched])
+  const question = props.matched
   const review = useMemo(() => planReviewOf(question.questions), [question])
-  if (question.questions.length === 0) return null
   return review === undefined
     ? (
       <QuestionFlow
@@ -132,76 +146,186 @@ export function QuestionComposer(props: QuestionComposerProps) {
         pending={question}
         active={props.active !== false}
         t={props.t}
-        useStore={useStore}
-        actions={actions}
+        useStore={props.useStore}
+        useQuestionCard={props.useQuestionCard}
+        actions={props.actions}
       />
     )
-    : <PlanReviewPanel key={question.key} pending={question} review={review} t={props.t} />
+    : <PlanReviewPanel key={question.key} pending={question} review={review} t={props.t} renderSlot={props.renderSlot} />
 }
 
-function QuestionFlow({ pending, active, t, useStore, actions }: {
-  active: boolean
-  pending: PendingQuestion
-  t: QuestionComposerProps['t']
-  useStore: NonNullable<QuestionComposerProps['useStore']>
-  actions: NonNullable<QuestionComposerProps['actions']>
-}) {
+type QuestionFlowProps =
+  { pending: PendingQuestion; active: boolean } & Pick<QuestionComposerProps, 't' | 'useStore' | 'useQuestionCard' | 'actions'>
+
+function QuestionFlow({ pending, active, t, useStore, useQuestionCard, actions }: QuestionFlowProps) {
   const questions = pending.questions
+  // A read-only card built from a settled call's transcript: the same panel
+  // over the recorded answers, with nothing left to submit.
+  const review = pending.review
   const markdownLabels = useMemo(() => ({
     code: { copyLabel: t('copy'), copiedLabel: t('copied') },
     footnotes: t('markdown.footnotes'),
   }), [t])
-  const blankDrafts = useMemo<DraftAnswer[]>(() => questions.map(() => ({
-    selected: [], custom: '', skipped: false,
-  })), [questions])
-  const stored = useStore(state => state)
-  const progress = stored.requestKey === pending.key
-    && stored.progress.drafts.length === questions.length
-    ? stored.progress
-    : { index: 0, drafts: blankDrafts }
-  const index = Math.min(progress.index, Math.max(0, questions.length - 1))
-  const drafts = progress.drafts
-  useEffect(() => {
-    if (stored.requestKey === pending.key && stored.progress.drafts.length === questions.length) return
-    actions.replace(pending.key, { index: 0, drafts: blankDrafts })
-  }, [actions, blankDrafts, pending.key, questions.length, stored.progress.drafts.length, stored.requestKey])
-  const replaceProgress = (nextIndex: number, nextDrafts: DraftAnswer[]): void => {
-    actions.replace(pending.key, { index: nextIndex, drafts: nextDrafts })
-  }
+  const initialDrafts = useMemo<QuestionDraftAnswer[]>(() => {
+    // Recorded answers echo the question ids rather than their order.
+    const recorded = new Map((review ?? []).map(answer => [answer.id, answer]))
+    return questions.map((item) => {
+      const answer = recorded.get(item.id)
+      const custom = answer?.custom ?? ''
+      const recommended = review === undefined ? recommendedFirstOption(item) : undefined
+      return {
+        selected: answer === undefined && recommended !== undefined ? [recommended] : [...answer?.selected ?? []],
+        custom,
+        // A recorded answer with no selection and no custom text was skipped.
+        skipped: answer !== undefined && answer.selected.length === 0 && custom === '',
+      }
+    })
+  }, [questions, review])
+  const stored = useStore(state => state.progressByRequest[pending.key])
+  const validStored = isQuestionDraftProgress(stored, questions.length) ? stored : undefined
+  // A review card renders the record itself, so a draft its live card left
+  // behind can never surface as an answer; only the page position is restored.
+  const storedProgress = review === undefined ? validStored : undefined
+  const index = validStored?.index ?? 0
+  const drafts = storedProgress?.drafts ?? initialDrafts
+  const restoredWait = storedProgress?.wait
+    ?? (storedProgress?.drafts.some((item, itemIndex) =>
+      item.selected.length !== initialDrafts[itemIndex]?.selected.length
+      || item.selected.some((label, labelIndex) => label !== initialDrafts[itemIndex]?.selected[labelIndex])
+      || item.custom !== '' || item.skipped) === true
+      ? 'editing' : undefined)
   const [busy, setBusy] = useState<'answer' | 'cancel' | null>(null)
   const [error, setError] = useState<Feedback | null>(null)
+  const card = useQuestionCard(pending.key, snapshot => snapshot ?? REMOVED_CARD)
+  const canSubmit = card.channel !== 'none'
+  // The answer surface freezes while a submission is in flight, and for good on
+  // a review card: its call has already settled.
+  const locked = busy !== null || review !== undefined
+  // A waterfall submission is only "sent": the gateway drops an outcome that
+  // arrives after another Client settled the event, without telling anyone.
+  // The draft therefore survives until the projection closes the card, and a
+  // card that flips to continued while a submission is in flight re-arms the
+  // controls so the same draft can go through the Remote path.
+  const sentVia = useRef<'waterfall' | null>(null)
+  useEffect(() => {
+    if (sentVia.current !== 'waterfall' || card.state !== 'continued') return
+    sentVia.current = null
+    setBusy(null)
+    setError({ key: 'error.resubmit' })
+  }, [card.state])
+  useEffect(() => {
+    if (card.closed) actions.clear(pending.key)
+  }, [actions, card.closed, pending.key])
+  useEffect(() => {
+    actions.prune(pending.liveKeys())
+  }, [actions, pending])
+  const waitDisposition = useRef<'editing' | 'waiting' | undefined>(restoredWait)
+  useEffect(() => {
+    if (waitDisposition.current === 'waiting') pending.takeTime()
+    if (waitDisposition.current === 'editing') pending.engage()
+  }, [pending])
+  // The countdown belongs to the carrier, not to this component: the user can
+  // close the panel and reopen it from the tool call row, and a timer that died
+  // with the mount would leave the tool call waiting past its deadline.
+  const countdown = card.countdown
   // Collapsed to the header strip so the conversation above stays readable
-  // while the user decides; the drafts survive because the state lives here.
+  // while the user decides; answer drafts live in the Session store above.
   const [minimized, setMinimized] = useState(false)
   // The free-form textarea autofocuses on first presentation; re-expanding a
   // collapsed question must not steal focus from the expand toggle back into
   // the input, so focus is granted once per question index.
   const focusedQuestions = useRef(new Set<number>())
-  // index stays in bounds (every setIndex site clamps) and drafts mirrors questions 1:1.
+  const answerSurface = useRef<HTMLDivElement>(null)
+  // Every navigation write stays in bounds and drafts mirrors questions 1:1.
   // oxlint-disable-next-line typescript/no-non-null-assertion
   const question = questions[index]!
   // oxlint-disable-next-line typescript/no-non-null-assertion
   const draft = drafts[index]!
   const hasOptions = (question.options?.length ?? 0) > 0
 
-  const cancelFlow = (): void => {
-    setBusy('cancel')
-    setError(null)
-    void pending.cancel().then(() => { actions.clear(pending.key) }).catch((cause: unknown) => {
-      setBusy(null)
-      setError({ text: cause instanceof Error ? cause.message : String(cause) })
+  const replaceProgress = (nextIndex: number, nextDrafts: QuestionDraftAnswer[]): void => {
+    actions.replace(pending.key, {
+      index: nextIndex,
+      drafts: nextDrafts,
+      ...(waitDisposition.current === undefined ? {} : { wait: waitDisposition.current }),
     })
   }
 
-  const updateDraft = (update: (current: DraftAnswer) => DraftAnswer): DraftAnswer[] => {
-    const next = drafts.map((item, itemIndex) => itemIndex === index ? update(item) : item)
-    replaceProgress(index, next)
+  const takeTime = (): void => {
+    waitDisposition.current = 'waiting'
+    pending.takeTime()
+    replaceProgress(index, drafts)
+  }
+
+  const engage = (): void => {
+    if (waitDisposition.current !== undefined) return
+    waitDisposition.current = 'editing'
+    pending.engage()
+  }
+
+  const focusAnswerSurface = (event: FocusEvent<HTMLDivElement>): void => {
+    if (!event.currentTarget.contains(event.relatedTarget)) pending.holdFocus()
+  }
+
+  const blurAnswerSurface = (event: FocusEvent<HTMLDivElement>): void => {
+    if (!event.currentTarget.contains(event.relatedTarget)) pending.releaseFocus()
+  }
+
+  useEffect(() => {
+    const release = (): void => { pending.releaseFocus() }
+    const refocus = (): void => {
+      if (waitDisposition.current === 'editing') {
+        pending.engage()
+        return
+      }
+      if (answerSurface.current?.contains(document.activeElement) === true) pending.holdFocus()
+    }
+    const visibilityChanged = (): void => { if (document.hidden) release(); else refocus() }
+    window.addEventListener('blur', release)
+    window.addEventListener('focus', refocus)
+    document.addEventListener('visibilitychange', visibilityChanged)
+    return () => {
+      release()
+      window.removeEventListener('blur', release)
+      window.removeEventListener('focus', refocus)
+      document.removeEventListener('visibilitychange', visibilityChanged)
+    }
+  }, [pending])
+
+  const dismissFlow = (): void => {
+    // A tool-call-keyed panel only leaves the seat; nothing is sent and nothing
+    // is persisted, and the tool call row brings it back.
+    if (pending.dismissal === 'hide') {
+      void pending.dismiss()
+      return
+    }
+    if (!canSubmit) {
+      setError({ key: 'error.unavailable' })
+      return
+    }
+    setBusy('cancel')
     setError(null)
-    return next
+    sentVia.current = 'waterfall'
+    void pending.dismiss()
+      .catch((cause: unknown) => {
+        sentVia.current = null
+        setBusy(null)
+        setError({ text: cause instanceof Error ? cause.message : String(cause) })
+      })
+  }
+
+  const updateDraft = (
+    update: (current: QuestionDraftAnswer) => QuestionDraftAnswer,
+    nextIndex = index,
+  ): void => {
+    engage()
+    const nextDrafts = drafts.map((item, itemIndex) => itemIndex === index ? update(item) : item)
+    replaceProgress(nextIndex, nextDrafts)
+    setError(null)
   }
 
   const choose = (label: string): void => {
-    const nextDrafts = updateDraft((current) => {
+    updateDraft((current) => {
       if (question.multiSelect === true) {
         const selected = current.selected.includes(label)
           ? current.selected.filter(item => item !== label)
@@ -209,27 +333,28 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
         return { ...current, selected, skipped: false }
       }
       return { selected: [label], custom: '', skipped: false }
-    })
-    if (question.multiSelect !== true && index < questions.length - 1) {
-      replaceProgress(index + 1, nextDrafts)
-    }
+    }, question.multiSelect !== true && index < questions.length - 1 ? index + 1 : index)
   }
 
-  const answered = (item: DraftAnswer): boolean =>
+  const answered = (item: QuestionDraftAnswer): boolean =>
     item.selected.length > 0 || item.custom.trim() !== ''
 
-  const completed = (item: DraftAnswer): boolean => answered(item) || item.skipped
+  const completed = (item: QuestionDraftAnswer): boolean => answered(item) || item.skipped
 
-  const submitDrafts = (values: DraftAnswer[]): void => {
+  const submitDrafts = (values: QuestionDraftAnswer[]): void => {
     const missing = values.findIndex(item => !completed(item))
     if (missing >= 0) {
       replaceProgress(missing, values)
       setError({ key: 'error.incomplete' })
       return
     }
+    if (!canSubmit) {
+      setError({ key: 'error.unavailable' })
+      return
+    }
     const answer: QuestionAnswer = {
       answers: questions.map((item, itemIndex) => {
-        const value = values[itemIndex] as DraftAnswer
+        const value = values[itemIndex] as QuestionDraftAnswer
         if (value.skipped) return { id: item.id, selected: [] }
         const custom = value.custom.trim()
         return {
@@ -241,10 +366,23 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
     }
     setBusy('answer')
     setError(null)
-    void pending.answer(answer).then(() => { actions.clear(pending.key) }).catch((cause: unknown) => {
-      setBusy(null)
-      setError({ text: cause instanceof Error ? cause.message : String(cause) })
-    })
+    // The external-store render can lag the carrier as a timed call continues.
+    // Read the channel used by answer() in this same event turn.
+    const channel = pending.snapshot().channel
+    sentVia.current = channel === 'waterfall' ? 'waterfall' : null
+    void pending.answer(answer)
+      .then(() => {
+        if (channel !== 'rpc') return
+        sentVia.current = null
+        setBusy(null)
+        setError(null)
+        void pending.dismiss().catch(() => { setError({ key: 'status.sent' }) })
+      })
+      .catch((cause: unknown) => {
+        sentVia.current = null
+        setBusy(null)
+        setError({ text: cause instanceof Error ? cause.message : String(cause) })
+      })
   }
 
   const continueFlow = (): void => {
@@ -280,6 +418,7 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
   }
 
   const skipQuestion = (): void => {
+    engage()
     const nextDrafts = drafts.map((item, itemIndex) => itemIndex === index
       ? { selected: [], custom: '', skipped: true }
       : item)
@@ -305,6 +444,25 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
             </h2>
           </div>
           <div className={css.headerActions}>
+            {countdown !== undefined && card.waitState !== 'waiting' && card.waitState !== 'editing' && card.waitState !== 'continued' && (
+              <span className={css.waitStatus}>
+                {t(countdown.running ? 'wait.countdown' : 'wait.paused', {
+                  seconds: Math.ceil(countdown.remainingMs / 1000),
+                })}
+              </span>
+            )}
+            {countdown !== undefined && card.waitState !== 'waiting' && card.waitState !== 'editing' && card.waitState !== 'continued' && (
+              <Button variant="outline" className={css.waitButton} onClick={takeTime}>
+                {t('wait.takeTime')}
+              </Button>
+            )}
+            {card.state === 'continued' && <span className={css.waitStatus}>{t('wait.continued')}</span>}
+            {/* A held or frozen countdown says so; a request that never carried
+                one waits silently, as the blocking question always has. */}
+            {countdown !== undefined && (card.waitState === 'waiting' || card.waitState === 'editing') && (
+              <span className={css.waitStatus}>{t('wait.held')}</span>
+            )}
+            {review !== undefined && <span className={css.waitStatus}>{t('review.status')}</span>}
             <button
               type="button" className={css.iconButton}
               aria-label={t(minimized ? 'nav.maximize' : 'nav.minimize')}
@@ -316,9 +474,10 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
               {minimized ? <IconChevronUpOutline14 /> : <IconChevronDownOutline14 />}
             </button>
             <button
-              type="button" className={css.iconButton} aria-label={t('nav.cancel')}
-              title={t('nav.cancel')}
-              disabled={busy !== null} onClick={cancelFlow}
+              type="button" className={css.iconButton}
+              aria-label={t(pending.dismissal === 'hide' ? 'nav.close' : 'nav.cancel')}
+              title={t(pending.dismissal === 'hide' ? 'nav.close' : 'nav.cancel')}
+              disabled={busy !== null} onClick={dismissFlow}
             >
               <IconCloseOutline16 />
             </button>
@@ -327,7 +486,13 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
 
         {!minimized && (
           <>
-            <div className={css.body} data-question-scroll>
+            <div
+              ref={answerSurface}
+              className={css.body}
+              data-question-scroll
+              onFocusCapture={focusAnswerSurface}
+              onBlurCapture={blurAnswerSurface}
+            >
               {question.detail !== undefined && (
                 <div className={css.detail}><MarkdownText text={question.detail} labels={markdownLabels} /></div>
               )}
@@ -342,10 +507,10 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
                       role={question.multiSelect === true ? 'checkbox' : 'radio'}
                       aria-checked={selected}
                       aria-label={display.label}
-                      disabled={busy !== null}
+                      disabled={locked}
                       onClick={() => { choose(option.label) }}
                       onKeyDown={(event) => {
-                        if (event.key !== 'Enter' || !drafts.every(completed)) return
+                        if (event.key !== 'Enter') return
                         event.preventDefault()
                         submitDrafts(drafts)
                       }}
@@ -353,7 +518,7 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
                       {question.multiSelect === true
                         ? (
                           <span className={clsx(css.checkbox, selected && css.checkboxChecked)} aria-hidden="true">
-                            {selected && <IconCheckOutline14 size={12} />}
+                            {selected && <IconCheckOutline16 size={12} />}
                           </span>
                         )
                         : <span className={css.number}>{optionIndex + 1}</span>}
@@ -372,7 +537,14 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
                   )
                 })}
 
-                {hasOptions
+                {review !== undefined && draft.skipped && (
+                  <p className={css.reviewNote}>{t('review.skipped')}</p>
+                )}
+
+                {/* A review card keeps the free-text field only when the
+                    recorded answer used it; an empty disabled box with a
+                    placeholder would read as somewhere to type. */}
+                {(review === undefined || draft.custom !== '') && (hasOptions
                   ? (
                     <div className={clsx(css.customRow, draft.custom !== '' && css.customRowActive)}>
                       {question.multiSelect === true
@@ -381,7 +553,7 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
                             className={clsx(css.checkbox, draft.custom !== '' && css.checkboxChecked)}
                             aria-hidden="true"
                           >
-                            {draft.custom !== '' && <IconCheckOutline14 size={12} />}
+                            {draft.custom !== '' && <IconCheckOutline16 size={12} />}
                           </span>
                         )
                         : (
@@ -392,7 +564,7 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
                       <AnswerField
                         variant="inline"
                         value={draft.custom}
-                        disabled={busy !== null}
+                        disabled={locked}
                         placeholder={t('custom.placeholder')}
                         onChange={draftCustom}
                         onKeyDown={continueFromCustom}
@@ -401,16 +573,18 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
                   )
                   : (
                     <AnswerField
+                      // A missing countdown does not imply an indefinite request:
+                      // a timed request can still be awaiting its claim's first frame.
+                      autoFocus={active && canSubmit && countdown === undefined && !locked && !focusedQuestions.current.has(index)}
                       variant="block"
-                      autoFocus={active && !focusedQuestions.current.has(index)}
                       value={draft.custom}
-                      disabled={busy !== null}
+                      disabled={locked}
                       placeholder={t('custom.placeholder')}
                       onFocus={() => { focusedQuestions.current.add(index) }}
                       onChange={draftCustom}
                       onKeyDown={continueFromCustom}
                     />
-                  )}
+                  ))}
               </div>
             </div>
 
@@ -435,19 +609,23 @@ function QuestionFlow({ pending, active, t, useStore, actions }: {
               <div className={css.feedback} role="status">
                 {error === null ? null : 'key' in error ? t(error.key) : error.text}
               </div>
-              <div className={css.footerActions}>
-                <Button variant="outline" disabled={busy !== null} onClick={skipQuestion}>
-                  {t('action.skip')}
-                </Button>
-                <Button
-                  variant="primary"
-                  disabled={busy !== null || !answered(draft)} onClick={continueFlow}
-                >
-                  {busy === 'answer'
-                    ? t('submitting')
-                    : index === questions.length - 1 ? t('submit') : t('action.next')}
-                </Button>
-              </div>
+              {/* A review card has nothing to send: the pager alone walks the record. */}
+              {review === undefined && (
+                <div className={css.footerActions}>
+                  <Button variant="outline" disabled={busy !== null} onClick={skipQuestion}>
+                    {t('action.skip')}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    disabled={busy !== null || !answered(draft) || (index === questions.length - 1 && !canSubmit)}
+                    onClick={continueFlow}
+                  >
+                    {busy === 'answer'
+                      ? t('submitting')
+                      : index === questions.length - 1 ? t('submit') : t('action.next')}
+                  </Button>
+                </div>
+              )}
             </footer>
           </>
         )}

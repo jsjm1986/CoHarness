@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-02-todo-first-composer-context-order.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-02-todo-first-composer-context-order.md
-2026-08-02-todo-first-composer-context-order.md: 26962426c763c6911fc61acab09cdb96725922b1
-2026-08-02-todo-first-composer-context-order.zh.md: a341dddfb759043dbd3d7cf8347530bb33afcf65
+/agent-note-todo-first-composer-context-order:
+  en: 2f83e2f5ee82024f
+  zh: 5c8e1d6f9f29bbe7
+/agent-note-todo-first-composer-context-order/problem:
+  en: d010eb7516132f72
+  zh: 525adabdb2caa23d
+/agent-note-todo-first-composer-context-order/decision:
+  en: 2ebf9d38ab5aae56
+  zh: 59ef681a862dc94b
+/agent-note-todo-first-composer-context-order/verification:
+  en: 9f54914f874cd514
+  zh: f7d9e48bd302c602
+/agent-note-todo-first-composer-context-order/alternatives-considered:
+  en: 0ce8bb44af9ef5ad
+  zh: 1dfa0d61b7145d91
+/agent-note-todo-first-composer-context-order/consequences:
+  en: f96d050f373bfd19
+  zh: d84dc3a347b326b4

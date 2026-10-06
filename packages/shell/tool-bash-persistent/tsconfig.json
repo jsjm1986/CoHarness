@@ -9,6 +9,12 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -18,13 +24,10 @@
       "path": "../../terminal/terminal"
     },
     {
+      "path": "../../util/output-retention"
+    },
+    {
       "path": "../../util/timeout"
-    },
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../../../vendor/schemastery"
     }
   ]
 }

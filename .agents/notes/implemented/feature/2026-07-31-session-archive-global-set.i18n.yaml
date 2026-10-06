@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-session-archive-global-set.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-31-session-archive-global-set.md
-2026-07-31-session-archive-global-set.md: 4fd1df62989bc0d68b731193c52d16e5ea4f31c4
-2026-07-31-session-archive-global-set.zh.md: aa623ef63dde69161ed12bbcc0641938ed1db861
+/agent-note-session-archive-registry-global-set:
+  en: 764d9e132b019a80
+  zh: 5dfed34db0b6e0c4
+/agent-note-session-archive-registry-global-set/problem:
+  en: e145ec9460c227f0
+  zh: 2fd68152d0958ea4
+/agent-note-session-archive-registry-global-set/decision:
+  en: 1f2bd18228f67361
+  zh: 66148bfdd7925bd2
+/agent-note-session-archive-registry-global-set/alternatives-considered:
+  en: 80ab3f5774f1ee60
+  zh: da5407b3f6babb9a
+/agent-note-session-archive-registry-global-set/consequences:
+  en: 6a70acf8ea1b7bd9
+  zh: aa7b9bf0a8a64c84

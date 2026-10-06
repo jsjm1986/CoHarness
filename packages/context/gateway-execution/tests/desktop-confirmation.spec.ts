@@ -9,7 +9,8 @@ function fixture() {
   const root = { id: SessionId('root') } as Agent, child = { id: SessionId('child') } as Agent
   let owner = root
   let principal = { claims: { user: { id: 12 }, expiresAt: Date.now() + 60_000 } } as GatewayRequestPrincipal | undefined
-  const value = { rootSessionId: root.id, nodeId: 'node', desktop: 'display-0', userId: 12, eligible: true, confirmed: false }
+  const value = { rootSessionId: root.id, nodeId: 'node', desktop: 'display-0', userId: 12, eligible: true, confirmed: false,
+    occupancy: { available: true, inUse: false, heldByThisSession: false, queued: 0 } }
   const request = vi.fn<GatewayRuntime['request']>(async path => Response.json(path.endsWith('/desktop-confirm') ? { saved: true } : value))
   const policy = desktopConfirmationController({ interactive: () => principal, request }, () => owner, 'display-0')
   return { policy, root, child, value, request, signal: new AbortController().signal,

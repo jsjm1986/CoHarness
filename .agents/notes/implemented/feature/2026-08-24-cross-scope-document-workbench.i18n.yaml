@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-24-cross-scope-document-workbench.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-cross-scope-document-workbench.md
-2026-08-24-cross-scope-document-workbench.md: a1a8c55afc236f54355c5ea64f065deee95fedf5
-2026-08-24-cross-scope-document-workbench.zh.md: 2324acd03d8ea8d5649f5dedcf86dc0b01449a59
+/agent-note-cross-scope-document-catalog-and-workbench:
+  en: a06a5484c26ac76e
+  zh: 721947eeac639bb0
+/agent-note-cross-scope-document-catalog-and-workbench/problem:
+  en: c934ff7fb8649bda
+  zh: 539c08f19d3b4aee
+/agent-note-cross-scope-document-catalog-and-workbench/decision:
+  en: 7f42609c11d0f6d3
+  zh: 71a8d4082f7a8fa9
+/agent-note-cross-scope-document-catalog-and-workbench/alternatives-considered:
+  en: e095d8b706a56242
+  zh: dad1aa23d59f9a1a
+/agent-note-cross-scope-document-catalog-and-workbench/consequences:
+  en: 1025572def072a6f
+  zh: 7e8b587adcd16c79
+/agent-note-cross-scope-document-catalog-and-workbench/verification:
+  en: 58eafc4610903eb0
+  zh: d89248acca42b318

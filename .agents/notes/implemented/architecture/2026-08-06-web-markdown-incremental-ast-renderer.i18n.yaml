@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-web-markdown-incremental-ast-renderer.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-06-web-markdown-incremental-ast-renderer.md
-2026-08-06-web-markdown-incremental-ast-renderer.md: 3599bfcc78dc4eefe5e82f461a469bdba15f3aae
-2026-08-06-web-markdown-incremental-ast-renderer.zh.md: 70261f5ef9800308e68762d14255d50d3c9bb908
+/agent-note-incremental-streaming-markdown-through-a-direct-mdast-renderer:
+  en: 30149b488c066c6d
+  zh: 7d9913def6ac17e7
+/agent-note-incremental-streaming-markdown-through-a-direct-mdast-renderer/problem:
+  en: 90d76f2bfc0e5ed3
+  zh: fb99c521815a9f00
+/agent-note-incremental-streaming-markdown-through-a-direct-mdast-renderer/decision:
+  en: 7e0210147e0136f6
+  zh: 41eaf5f838457b26
+/agent-note-incremental-streaming-markdown-through-a-direct-mdast-renderer/alternatives-considered:
+  en: 003049dd85b099f7
+  zh: 38068dd0c167a4f0
+/agent-note-incremental-streaming-markdown-through-a-direct-mdast-renderer/consequences:
+  en: f578d2f383d64637
+  zh: ecffbf5a45a17087

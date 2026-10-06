@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-24-session-bound-ssh-execution.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-24-session-bound-ssh-execution.md
-2026-09-24-session-bound-ssh-execution.md: 761e08d6a650b68be2bb19610289cf13f91a43f3
-2026-09-24-session-bound-ssh-execution.zh.md: 88d0fd7db2b6e5579ecd180801b90aae884f0507
+/agent-note-session-bound-ssh-execution:
+  en: 45da8d708992cdc4
+  zh: 7a9700138d9df81f
+/agent-note-session-bound-ssh-execution/problem:
+  en: ae3c56caf2f4d44f
+  zh: 3b35183c51ffb062
+/agent-note-session-bound-ssh-execution/decision:
+  en: f4f4faf02f12783a
+  zh: a32b29851233966b
+/agent-note-session-bound-ssh-execution/alternatives-considered:
+  en: 1f636e03ffa9aaa9
+  zh: 449ebf89659b0476
+/agent-note-session-bound-ssh-execution/consequences:
+  en: 3c6707b3e11f5356
+  zh: 09cfbb8d8827a242
+/agent-note-session-bound-ssh-execution/testing:
+  en: def1b2da8e85de3f
+  zh: 2173a6bdb919bb81

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-10-snapshot-record-preflight.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-10-snapshot-record-preflight.md
-2026-09-10-snapshot-record-preflight.md: f748b878735f835d129fec233d2f3bba162a2b62
-2026-09-10-snapshot-record-preflight.zh.md: 042798c24ed9ffc8b63073ead087ef585ff2a411
+/agent-note-snapshot-record-preflight:
+  en: f4f6a4ededcff4ac
+  zh: f7a3e8b8d77da202
+/agent-note-snapshot-record-preflight/problem:
+  en: cb8e9de71954c5f3
+  zh: 98c83a0da04becdc
+/agent-note-snapshot-record-preflight/decision:
+  en: 8ce856ae7b92b8d4
+  zh: 9fc3cf1a3bd9eb0b
+/agent-note-snapshot-record-preflight/alternatives-considered:
+  en: b74ac15475e096be
+  zh: f7918d8086caae9a
+/agent-note-snapshot-record-preflight/consequences:
+  en: 9f48d644ac852f1d
+  zh: 374e0dbb089e6e12
+/agent-note-snapshot-record-preflight/tests:
+  en: 1f872e5e7c124313
+  zh: 136866f31f67d83f

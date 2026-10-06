@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-tmux-location-context.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-tmux-location-context.md
-2026-07-27-tmux-location-context.md: b8cffc7e3761dfe58b0d24a5489fc1e0d498c1c9
-2026-07-27-tmux-location-context.zh.md: 07d2c23a938402ab3bf736361bf8a3bf944a94fe
+/agent-note-tmux-location-context:
+  en: 242cf9b3a709d684
+  zh: d10a0dc0762a784d
+/agent-note-tmux-location-context/problem:
+  en: 1ef746c78ecbd35b
+  zh: e9ce3836daf5cbc4
+/agent-note-tmux-location-context/decision:
+  en: 76564bfce2b7e116
+  zh: 0dbe48d979a1dd3f
+/agent-note-tmux-location-context/decision/text:
+  en: e69d91997392f834
+  zh: 4acb5a18d1590f7b
+/agent-note-tmux-location-context/decision/durability-and-request-reconstruction:
+  en: e2687893a93fd04d
+  zh: 1a86d85864efd3e2
+/agent-note-tmux-location-context/consequences:
+  en: 2673953dfceab67f
+  zh: aa01d6c37f566bac
+/agent-note-tmux-location-context/testing:
+  en: 2d49a21626abf7ce
+  zh: 2e0d9dde4137f4b3
+/agent-note-tmux-location-context/alternatives-considered:
+  en: cf3f38f72b01824f
+  zh: 77fc6a2bb121f8ee

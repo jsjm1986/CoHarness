@@ -506,9 +506,27 @@
 }
 
 .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dsw-space-2);
   padding: var(--dsw-space-4) var(--dsw-space-3);
   color: var(--dsw-alias-label-tertiary);
   font-size: 13px;
+}
+
+/* The archived-only empty view's way back to the default list. */
+.emptyAction {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.emptyAction:hover {
+  text-decoration: underline;
 }
 
 /* Rename dialog form (same figma dialog family as the create modals). */

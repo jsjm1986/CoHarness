@@ -28,12 +28,15 @@ export interface IWorkspaces {
   openWorkspace(workspaceId: WorkspaceId): Promise<SessionId>
   /**
    * The New Session flow: connect the explicit, current-Session, or recent
-   * Workspace and open the resulting session; failures surface on the session
-   * list state.
+   * Workspace and open the resulting session. Connect and navigation failures
+   * are non-fatal — they log and reach `onFailure` when supplied; the current
+   * view stays usable.
    * @param workspaceId - explicit target; omitted inherits the current
    * Session's Workspace before falling back to the recency projection.
+   * @param onFailure - observer for the rejected connect/open, for surfaces
+   * that turn an explicit New Session click into a notice.
    */
-  startSession(workspaceId?: WorkspaceId): void
+  startSession(workspaceId?: WorkspaceId, onFailure?: (reason: unknown) => void): void
   /**
    * Register an existing path as a Workspace.
    * @param input - the Host create payload.
@@ -95,8 +98,11 @@ export interface IWorkspaces {
    * surfaces; session log and accounting slot remain). Archiving the current
    * session clears the selection into the New Session view state.
    * @param sessionId - session to archive.
+   * @param options - `stopActivity` asks the Host to stop the session's running work
+   *   instead of refusing; without it a session with running work rejects with a
+   *   `session-active` error whose details name that activity.
    */
-  archiveSession(sessionId: SessionId): Promise<void>
+  archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>
   /**
    * Drop a session from the registry-global archive set, restoring it to its
    * recorded Workspace position and to every grouping surface. Idempotent:
@@ -104,4 +110,18 @@ export interface IWorkspaces {
    * @param sessionId - archived session to restore.
    */
   unarchiveSession(sessionId: SessionId): Promise<void>
+  /**
+   * Pin a session so it leads its grouping-surface section in Host pin
+   * order (most recently pinned first). The returned complete pin set
+   * re-orders every grouping surface on resolution.
+   * @param sessionId - session to pin.
+   */
+  pinSession(sessionId: SessionId): Promise<void>
+  /**
+   * Drop a session from the registry-global pin set, restoring it to the
+   * ordinary part of every grouping-surface section. Idempotent: an id
+   * that is not pinned resolves as a no-op.
+   * @param sessionId - pinned session to unpin.
+   */
+  unpinSession(sessionId: SessionId): Promise<void>
 }

@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for api-gateway.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/api-gateway.md
-api-gateway.md: cd3103a172d75a4ab325a2368e37af354f09051b
-api-gateway.zh.md: fd7494917f209af4a16f88b87afbc47d75c6afd3
+/api-gateway:
+  en: bb69b67db026edcb
+  zh: e1fa01966a574a5d
+/api-gateway/programming-model:
+  en: 184ccd410db28179
+  zh: 260c83b51bed85bd
+/api-gateway/component-responsibilities:
+  en: cf96261baa357e73
+  zh: eeaa295110a83adc
+/api-gateway/strict-generation-pipeline:
+  en: c92a304d38848004
+  zh: fc6db18d95305f79
+/api-gateway/runtime-invocation:
+  en: 7f18b6a343afb724
+  zh: d966bc00d43de9ef
+/api-gateway/src-development-fallback:
+  en: d57088d9fc7dd0fe
+  zh: 14c7bfb165f0070c
+/api-gateway/development-mode:
+  en: 7b3d0180d1bd08a0
+  zh: 0dcdad63116a03d1
+/api-gateway/boundaries:
+  en: 2c35a1c27042fedd
+  zh: 3e8d51bfb72b7e8c

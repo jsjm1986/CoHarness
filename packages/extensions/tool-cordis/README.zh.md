@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-cordis
 
 [English](README.md) | 中文
@@ -6,25 +11,39 @@
 
 只读发现 Host 和 Client API，以及已有的会话所属 Cordis Package。创造模式将这些工具与[插件管理器](../../boot/plugin-manager/README.zh.md)组合使用，由插件管理器的安装流程负责持久化 Profile 变更。
 
+## 目录
+
+- [使用方式](#usage)
+- [实现](#implementation)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="usage"></a>
 ## 使用方式
 
-将工具集与提供检查注册表的 [Cordis Host 运行器](../cordis-host-runner/README.zh.md)一同加载。先用 `cordis_inspect_list` 发现提供者，再用 `cordis_inspect_query` 查询确切 API。`cordis_inspect_self` 读取已有 Plugin 摘要、版本指针或指定 Package 的源码与诊断。显式 `@pluginId` 引用为当前会话所属定义补充只读上下文。
+将工具集与提供检查注册表的 [Cordis Host 运行器](../cordis-host-runner/README.zh.md)一同加载。先用 `cordis_inspect_list` 发现提供者，再用 `cordis_inspect_query` 查询确切 API。`cordis_inspect_self` 读取已有 Plugin 摘要、版本指针或指定 Package 的源码与诊断。显式 `@pluginId` 引用为当前会话所属定义补充只读上下文。Host 的 `Config` 提供者分页列出运行中 Loader 的条目目录（`offset`、`limit` 上限 100，可选精确插件 `name`；`total` 与 `nextOffset` 约束遍历），每个条目给出 Loader id、patch 可寻址 id 与 Config 状态（`schema`、`absent`、`unsupported`、group 与 include 载体为 `tree`、已禁用或未导入或已释放条目为 `inactive`），并在 profile 包查询可解析 `packageDir` 时，把单个条目的原生 Config 投影为一份自包含的 JSON Schema 文档。
 
 工具集不能定义、激活、停止或移除动态 Plugin。这些退役工具名称会被工具执行器拒绝。历史定义卡片和生命周期卡片仍可读取；读取日志不会重新创建运行时副作用。持久化修改使用已安装的 `cordis-plugin-development` 技能及插件管理器的授权路径。[退役决策](../../../.agents/notes/implemented/simplification/2026-09-22-retire-dynamic-cordis-model-tools.zh.md)说明安全与兼容范围。
 
+<a id="implementation"></a>
 ## 实现
 
-Host 提供者将生成的 [API 目录](src/api-catalog.ts)与请求 Agent 的实时工具注册表结合。Client 提供者同步清单，并从已连接页面回答查询。检查返回数据，不调用业务服务方法。工具、提供者、提示词和引用监听器均由 Cordis effect 持有；卸载插件会移除这些注册。
+Host 提供者将生成的 [API 目录](src/api-catalog.ts)、经 app-boot Config 投影器处理的运行中 Loader 树，以及请求 Agent 的实时工具注册表结合。Client 提供者同步清单，并从已连接页面回答查询。检查返回数据，不调用业务服务方法。工具、提供者、提示词和引用监听器均由 Cordis effect 持有；卸载插件会移除这些注册。
 
 检查直接读取其提供者，不维护独立运行时投影，因此不发布不变量伴随模块。工具集没有配置；查询传输及保留的动态定义由 Host 运行器负责。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 运行时检查
 
 #### 模型看到什么
 
-[三个只读工具 schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-cordis)、[检查指引](src/prompt.ts)及确切查询结果。只有显式指定 Plugin 和 Package 才返回 Package 源码。API 声明描述可用接口，不授予执行权限。
+[三个只读工具 schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-cordis)、[检查指引](src/prompt.ts)及确切查询结果。只有显式指定 Plugin 和 Package 才返回 Package 源码。API 声明描述可用接口，不授予执行权限。查询结果包含带 Config 状态的实时条目目录，或单个条目投影出的 Config JSON Schema。
 
 #### Token 影响
 
@@ -36,5 +55,18 @@ Host 提供者将生成的 [API 目录](src/api-catalog.ts)与请求 Agent 的�
 
 ## 已知限制与后续工作
 
-- Client 查询需要页面响应或取消。
+<a id="known-limitations-and-deferred-work"></a>
+
+- Client 查询需要页面响应，并采用 Host runner 的[有界等待与重试策略](../cordis-host-runner/README.zh.md#client-inspection)。检查不能调用服务方法、配置插件或执行生成代码。
+- `Config.listConfigs` 只遍历 profile 的 Loader 树。Agent preset 的 `plugins` 列表挂载在独立的 preset 树中，所以只出现在 preset 声明里的插件不会被列出，除非 profile 树也挂载了它。
 - 会话所属动态引用仅存在于当前进程，重启后可能不可用。检查不会恢复定义或执行日志中的代码。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

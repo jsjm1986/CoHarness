@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-20-gateway-logout-entrypoints.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-20-gateway-logout-entrypoints.md
-2026-08-20-gateway-logout-entrypoints.md: 9a197ad1ee9cf0494c8f3f3d3ec30895bab50b96
-2026-08-20-gateway-logout-entrypoints.zh.md: 1425a6ec68815735ea3cf86e434bfc970e9bc5dc
+/agent-note-gateway-logout-entry-points:
+  en: 5944f6ca7a8341e5
+  zh: 15bb301c07a50c5f
+/agent-note-gateway-logout-entry-points/problem:
+  en: 8fe8a1edce90189f
+  zh: 0b88035b739bcee0
+/agent-note-gateway-logout-entry-points/decision:
+  en: 5dc043ddf86a41ff
+  zh: 1f972940f3ac4b9d
+/agent-note-gateway-logout-entry-points/consequences:
+  en: ea20aa451eafbb86
+  zh: 7f9806694c32b713
+/agent-note-gateway-logout-entry-points/alternatives-considered:
+  en: 23595c9dd719d6c9
+  zh: 59f3cdbe1d1fa48e

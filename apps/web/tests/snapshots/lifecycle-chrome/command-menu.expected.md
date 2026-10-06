@@ -2,9 +2,9 @@
   - text: Add
   - option "Goal Set or view the goal for a long-running task" [selected]
   - option "Plan Enter or leave plan mode"
-  - option "Feedback Record feedback about this session"
+  - option "Feedback Send feedback about this session"
   - text: Commands
   - option "Compact Compact older conversation history"
-  - option "Permission Switch sandbox and approval permissions"
-  - option "model Select the model for this conversation"
-  - option "Export Download this Session log as a ZIP archive"
+  - option "Permission Switch the permission preset (sandbox mode and approval policy)"
+  - option "Model Select the model for this session"
+  - option "Export log export Download this Session log as a ZIP archive"

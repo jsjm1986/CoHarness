@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { PermissionCatalog } from '@deepseek-ai/dsh-permission-presets/client'
-import type { HostDescription, HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
+import type { ConnectionHandle, HostDescription, HostDescriptionSource, SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import { RemoteError, type RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
-import { PermissionCatalogMirror } from '../src/client/permission-catalog.ts'
+import { PermissionCatalogDirectory, PermissionCatalogMirror } from '../src/client/permission-catalog.ts'
+import { createSnapshotStore } from '../src/client/contract/store.ts'
+import { FakeApiClient } from './fake-api.client.ts'
 
 type CatalogCall = () => Promise<RemoteResult<PermissionCatalog>>
 
@@ -43,6 +45,26 @@ const flush = async () => {
 }
 
 describe('PermissionCatalogMirror', () => {
+  it('refuses an in-flight Session read when ownership is withdrawn without stopping its shared runtime', async () => {
+    const id = 'withdrawn' as SessionId
+    const pending = Promise.withResolvers<{ ok: true; value: PermissionCatalog }>()
+    const ownership = createSnapshotStore<{ byId: Record<SessionId, unknown> }>({ byId: { [id]: {} } })
+    const connection: ConnectionHandle = {
+      api: new FakeApiClient(), isLoopback: true, hostDescription: idleHost(),
+      state: { getSnapshot: () => undefined, subscribe: () => () => {} },
+      rpc: { call: () => pending.promise }, reconnect: () => {}, start: () => ({ stop: () => {} }),
+    }
+    const directory = new PermissionCatalogDirectory(connection, ownership)
+    try {
+      const face = directory.forSession(id)
+      const read = face.read()
+      const denied = expect(read).rejects.toThrow('no owned runtime')
+      ownership.set({ byId: {} })
+      pending.resolve({ ok: true, value: CATALOG_A })
+      await denied
+      expect(face.getSnapshot()).toBeUndefined()
+    } finally { directory.dispose() }
+  })
   it('installs the first successful pull and notifies subscribers', async () => {
     const mirror = new PermissionCatalogMirror(() => Promise.resolve({ ok: true, value: CATALOG_A }), idleHost())
     const seen: Array<PermissionCatalog | undefined> = []

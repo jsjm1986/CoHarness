@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-gateway-runtime
 
 [English](README.md) | 中文
@@ -9,9 +14,21 @@
 使用 `dsh-gateway-runtime` 获得 Gateway 启动的 Harness 运行时的已认证请求上下文与私有 loopback 传输。启动凭据把进程绑定到一个组织与一个个人或项目运行时身份，并为其他协作包验证短生命周期浏览器主体。
 
 
+## 目录
+
+- [运行时约定](#runtime-contract)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="runtime-contract"></a>
 ## 运行时约定
 
 - 启动凭据必须且只能从 `DSH_GATEWAY_CREDENTIAL_FD` 或 `DSH_GATEWAY_CREDENTIAL_FILE` 之一读取。它包含仅限 loopback 的 Gateway origin、运行时 bearer token、运行时 generation、组织和 Ed25519 公钥。
+- 运行时注册 `connection/authenticate` provider，使 Connection 在浏览器令牌交换与 Cookie 之前就向 index、`/api`、通用通道和事件流放行已验证的 principal；经 Gateway 启动的进程绝不单独接受浏览器凭据。受限用途的断言被约束在 HTTP 操作内，绝不能提供 index 或开启事件流——三个钉死用途（`terminal-admin`、`plugin-admin`、`webhook-dispatch`）只能到达其声明的 POST 路由。
 - `connection/request` 监听器要求 `x-dsh-gateway-principal`，验证其签名、有效期、组织、scope、运行时身份和 generation，再通过请求局部的 `current()` / `requireCurrent()` 暴露它。
 - `interactive()` 只在认证 HTTP 操作仍活动时暴露该主体。`current()` 标识起始认证分发，并可以沿异步上下文传递；它不会向脱离请求的工作授予交互权限。
 - `request()` 只接受凭据 loopback origin 上的绝对 `/internal/runtime/` 路径，加入私有 bearer token，并且只在调用方明确要求时转发浏览器 principal。
@@ -25,10 +42,13 @@
 
 本插件为所属应用标记 `executionAuthorityRequired`。该要求一直保留到应用销毁，授权提供者卸载也不会移除。[Gateway Execution](../gateway-execution/README.zh.md) 拥有执行、权限预设和 profile 管理策略。它使用本包已验证的交互调用者与私有传输；对于委派和恢复工作，则使用真正 Agent 的持久参与者引用。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。启动凭据绑定固定进程身份，并在请求准入时检查；本包没有可与该身份比较的独立投影。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 没有直接影响；请求上下文仅完成宿主操作认证，不贡献任何模型输入。
@@ -37,8 +57,19 @@
 
 无；本包从不组装或发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **仅限 Gateway 启动的运行时** — 未提供有效私有启动凭据时加载插件会导致启动失败。
 - **请求上下文不是执行授权** — 保留的 `current()` 主体标识起始分发。后台、委派和恢复工作必须使用 [Execution Authority](../execution-authority/README.zh.md)；先前请求不能证明当前特权。
 - **短期断言** — Gateway 的交付默认值把 `HGW_PRINCIPAL_ASSERTION_TTL_MS` 设为 30 秒。已验证主体会固定其项目 scope 模式直到 `expiresAt`；Session 消费方使用 `ctx.collaboration` 取得当前成员身份与 ACL 决定。代理过期和访问失效处理由 [Gateway](../../../gateway/README.zh.md) 负责。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

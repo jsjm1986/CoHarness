@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-cordis
 
 [English](README.md) | 中文
@@ -6,6 +11,17 @@
 
 展示历史生成 Plugin 卡片，并为已有进程内定义提供全局面板。用户通过 Host 运行器的授权端点操作程序化消费者提供的定义。创造模式通过插件管理器安装持久化 Plugin；模型工具集仅提供检查。
 
+## 目录
+
+- [展示与所有权](#presentation-and-ownership)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="presentation-and-ownership"></a>
 ## 展示与所有权
 
 历史 `cordis_define`、`cordis_run`、`cordis_stop` 和 `cordis_undefine` 记录保留源码及结果。渲染这些记录不会注册工具、恢复定义或执行代码。定义卡片读取冻结的调用与结果数据；已记录的成功移除结果优先于瞬时运行状态。
@@ -16,10 +32,13 @@ Host 激活与页面本地装载是独立事实。Host 已运行某个 Client �
 
 `/client` 入口导出插件体及其注入接口、运行状态、端口和事件类型。[Client 运行器](../cordis-client-runner/README.zh.md)负责浏览器装载与清理；[Host 运行器](../cordis-host-runner/README.zh.md)负责定义与执行。
 
+<a id="invariants"></a>
 ## 不变量
 
 不发布不变量伴随模块。面板消费 Host 状态，卡片投影持久化事件；本包不持有独立的定义状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 通过运行器负责的结果和诊断消息间接影响模型。本包不添加工具或提示词段。
@@ -28,8 +47,19 @@ Host 激活与页面本地装载是独立事实。Host 已运行某个 Client �
 
 没有直接影响；运行器发出的消息追加到会话历史。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 - 历史卡片的调用参数离开已加载事件窗口后，标签和源码会缺失，直到重新加载相应历史。窗口外的移除结果也不能用于确定卡片的终态。
 - Client 装载和渲染错误属于观察到错误的页面；其他页面仍可能正常。
 - 进程重启会丢弃动态定义。历史卡片仍可读，但不能恢复定义。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

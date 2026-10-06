@@ -6,15 +6,15 @@ import {
   ModelsSettingsStore,
   type ModelsSettingsState,
 } from '../../../../packages/client/ui-settings-models/src/client/store.ts'
-import { zh } from '../../../../packages/client/ui-settings-models/src/client/locales.ts'
+import { en, zh } from '../../../../packages/client/ui-settings-models/src/client/locales.ts'
 import { createSettingsSchemaOperations } from '../../../../packages/client/ui-settings-models/src/client/schema-operations.ts'
 import { SettingsSchemaService } from '../../../../packages/client/ui-settings/src/client/schema.ts'
-import { SettingsDescribeMirror } from '../../../../packages/client/ui-settings/src/client/settings-mirror.ts'
-import { createOrganizationModelsApi } from '../model-settings-api.ts'
+import { createOrganizationModelsMirror } from '../model-settings-api.ts'
+import { adminLanguage } from '../language.ts'
 
 const ORGANIZATION_PROVIDER_PATTERN = /^org-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 
-const organizationCopy = {
+const organizationCopyZh = {
   ...zh,
   title: '组织 Provider 与模型',
   intro: '配置组织统一持有的 Provider、API 密钥和完整模型目录；保存后按角色、用户和项目的默认规则生效，也可设置单模型例外。',
@@ -26,6 +26,20 @@ const organizationCopy = {
   create: '创建组织 Provider',
   creating: '正在创建组织 Provider…',
   advancedHint: '其余 Provider 字段会保留在完整 profile 中。',
+}
+
+const organizationCopyEn = {
+  ...en,
+  title: 'Organization providers and models',
+  intro: 'Configure the providers, API keys, and the complete model catalog the organization holds; saved settings take effect through the role, user, and project default rules, with per-model exceptions.',
+  customAdd: 'Add an organization provider',
+  customTitle: 'Organization provider',
+  customTag: 'Organization',
+  customRouteHint: 'An organization provider ID must start with org- followed by lowercase letters, digits, and dashes.',
+  customRouteInvalid: 'An organization provider ID must match org-name, for example org-primary.',
+  create: 'Create the organization provider',
+  creating: 'Creating the organization provider…',
+  advancedHint: 'The remaining provider fields stay in the complete profile.',
 }
 
 type SnapshotHook = <S>(
@@ -46,23 +60,25 @@ function bindSnapshot(controller: ModelsSettingsStore): SnapshotHook {
 
 /** Shared Models settings plugin mounted against the organization REST facade. */
 export function OrganizationModelsEditor({ onChanged }: { onChanged: () => void }) {
-  const api = useMemo(() => createOrganizationModelsApi({ onChanged }), [onChanged])
-  const { schema, describeFace } = useMemo(() => {
+  const { schema, describeFace, api } = useMemo(() => {
     // The admin surface reuses the shared editor outside the Cordis client
     // plugin graph, so it must provide the same schema and settings mirror
     // faces that ui-settings-models receives from its host plugin.
     const schemaService = new SettingsSchemaService(new Context())
     return {
       schema: createSettingsSchemaOperations(schemaService),
-      describeFace: new SettingsDescribeMirror(api as never),
+      ...createOrganizationModelsMirror({ onChanged }),
     }
-  }, [api])
+  }, [onChanged])
   const controller = useMemo(
     () => new ModelsSettingsStore(api as never, schema, describeFace),
     [api, describeFace, schema],
   )
   const useSnapshot = useMemo(() => bindSnapshot(controller), [controller])
-  const t = useMemo(() => (key: keyof typeof zh) => organizationCopy[key], [])
+  const t = useMemo(() => {
+    const copy = adminLanguage() === 'en' ? organizationCopyEn : organizationCopyZh
+    return (key: keyof typeof copy) => copy[key]
+  }, [])
   // The shared section probes a provider endpoint through this page's own
   // facade so discovery stays inside the organization REST surface.
   const discoverModels = useMemo<ModelDiscoveryProbe>(() => async (settingsNs, request) => {

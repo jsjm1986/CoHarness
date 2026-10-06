@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-subagent-in-process-driver
 
 [English](README.md) | 中文
@@ -8,6 +13,20 @@
 
 `dsh-subagent-in-process-driver` 是两个进程内 subagent 后端共用的运行驱动器：它通过宿主的 agent（智能体）工厂创建一个子 agent，应用按子 agent 的定制，把一项任务驱动到完成，并以单一完全停稳的 dispose（资源释放）路径返回子 agent 自身的最终输出。spawn 调用它时不传入会话初始内容；fork 调用它时传入父级已完成轮次的前缀。它是库而非独立功能：提供方后端调用 `startInProcessRun`，组合中没有任何东西配置它。阅读本页可理解两个进程内后端共享的运行生命周期。
 
+## 目录
+
+- [启动约定](#start-contract)
+- [取消与所有权](#cancellation-and-ownership)
+- [spawn 与 fork 输入](#spawn-and-fork-inputs)
+- [结构化输出](#structured-output)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="start-contract"></a>
 ## 启动约定
 
 `startInProcessRun(request, options): Promise<SubagentRun>` 只在子 agent 发布到 `ctx.agents` 后才兑现。启动被拒绝时，agent 工厂的未发布创建事务已经完全停稳，因此调用方绝不会收到创建到一半的句柄。
@@ -26,18 +45,21 @@
 
 驱动器通过共享的子 agent 辅助函数应用该 seam 的[委派策略](../subagent/README.zh.md#delegated-policy)：它会在创建子 agent 前捕获父级的显式沙箱覆盖项与 `'never'` 审批钉定，并在未发布的设置阶段追加带来源标记的事件，使其位于所有 fork 历史之后、会话发布之前。参见[委派策略决策](../../../.agents/notes/implemented/feature/2026-07-25-subagent-policy-inheritance.zh.md)。
 
+<a id="cancellation-and-ownership"></a>
 ## 取消与所有权
 
 必需的请求信号同时覆盖启动阶段和实时运行。发布前，`AgentCreationTransaction` 会观察该信号、回滚并拒绝。工厂返回前会移除仅用于创建阶段的监听器；驱动器随即再次检查信号，然后安装最小化的实时运行监听器，从而消除交接竞态。发布后，中止会取消子 agent。
 
 兑现后，调用方拥有该运行。提供方插件卸载不会撤销它。`dispose()` 会移除实时中止监听器、记录取消，并委托给返回的 `AgentHandle.dispose()`；后者通过经记忆化的完全停稳事务停止循环、移除 agent 和会话，并撤销作用域内的注册。取消流程会接管所有尚未完成的进行中结果，并将其报告为 `aborted`；已经完成的轮次仍保持完成状态。
 
+<a id="spawn-and-fork-inputs"></a>
 ## spawn 与 fork 输入
 
 `InProcessRunOptions` 的形态为 `{ seed?: SessionEvent[] }`。spawn 省略该值。fork 提供已配平的已完成轮次前缀，并记录其长度，确保结果读取器不会把作为初始内容的父 agent 消息误认为子 agent 输出。
 
 深度强制在 `startInProcessRun` 内部完成：它通过 `delegationDepthOf` 读取父 agent 深度（持久化的 `SessionHeader.delegationDepth` 具有权威性；运行时 `AgentOptions.subagentDepth` 可以加深但绝不能降低该值，因此恢复后的子 agent 会保留预算），缺失值按顶层深度零处理，拒绝格式错误的存储值，并报告尝试的子 agent 深度超过 `maxDepth`。超过安全整数范围、无法表示的深度会触发 `RangeError`。子 agent 深度写入子 agent header，因此会在持久化和恢复后保留。
 
+<a id="structured-output"></a>
 ## 结构化输出
 
 `attachStructuredRuntime(childCtx, schema)` 会在子 agent 作用域中安装完整约定：
@@ -50,10 +72,13 @@
 
 正常结束却始终未提交必需结构化值的轮次会报告 `error`；驱动器不会重新提示。所有注册都附着于子 agent fiber，并随其一同消失。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。驱动器通过宿主的 agent 工厂按调用管理一个子 Agent；深度、种子注入与结果读取是逐次调用状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 子 agent 请求
@@ -118,7 +143,18 @@ When you have your final answer, you MUST report it by calling the `structured_o
 
 仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **运行不公开 `sendMessage`/`resume`**：进程内运行不具备这些可选运行时能力。
 - **结构化捕获只接受 `defineTool` schema 子集**：不支持的 JSON Schema 构造会在子 agent 创建前失败；需要更广 schema 词汇的提供方必须采用不同的运行时。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for tools.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/tools.md
-tools.md: 79c7e01b9130e1b29e96c66b6148f92754f6c627
-tools.zh.md: 2fa507070c924d65c5071256623f3bf7fc9d0f2b
+/tools:
+  en: e3ecdbc9d7078226
+  zh: 82d609bfd382311e
+/tools/tooldefinition-a-registered-tool:
+  en: 5307b6df5445d868
+  zh: 05d198273e983d41
+/tools/the-unified-json-value-schema-dsl:
+  en: 9ff354e00a1fbe91
+  zh: 5fad9cdc39354d03
+/tools/toolrestriction-one-scope-s-live-filter-over-what-it-inherits:
+  en: 8c3fc4ca26f7e314
+  zh: 2e27263cb25243b9
+/tools/execution-extensible-waterfalls-plus-monotonic-policy:
+  en: 2dd7110ed5d802dd
+  zh: ea7afb987c0b3181
+/tools/the-enforced-raw-json-schema-subset:
+  en: 28e354bfa2f9cebb
+  zh: be1f75abccf8afdf
+/tools/tool-presentation-ui-vocabulary:
+  en: 078fac733842b847
+  zh: e8bc6e56ad1932fe

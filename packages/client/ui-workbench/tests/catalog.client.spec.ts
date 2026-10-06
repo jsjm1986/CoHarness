@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loadWorkbenchCatalog, parseWorkbenchCatalog } from '../src/client/catalog.ts'
 
 const okResponse = { ok: true, status: 200, json: async () => ({
-  personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [],
+  personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [],
 }) } as unknown as Response
 
 afterEach(() => vi.unstubAllGlobals())
@@ -10,7 +10,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('workbench account catalog', () => {
   it('preserves personal and project runtime targets', () => {
     const catalog = parseWorkbenchCatalog({
-      personal: { id: 1, name: 'Me' },
+      personalComplete: true, personal: { id: 1, name: 'Me' },
       activeRuntime: { kind: 'project', projectId: 7 },
       projects: [{ projectId: 7, name: 'Demo', mode: 'ro' }],
       items: [{
@@ -26,13 +26,13 @@ describe('workbench account catalog', () => {
 
   it('rejects malformed or incomplete rows', () => {
     expect(() => parseWorkbenchCatalog({
-      personal: { id: 1, name: 'Me' },
+      personalComplete: true, personal: { id: 1, name: 'Me' },
       activeRuntime: { kind: 'personal' }, projects: [], items: [{ sessionId: 'x' }],
     })).toThrow('invalid workbench catalog')
   })
 })
 
-const valid = () => ({ personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [] })
+const valid = () => ({ personalComplete: true, personal: { id: 1, name: 'Me' }, activeRuntime: { kind: 'personal' }, projects: [], items: [] })
 
 describe('catalog wire validation', () => {
   it.each([null, [], 'bad', 1])('rejects non-object catalogs (%j)', (value) => {
@@ -40,10 +40,11 @@ describe('catalog wire validation', () => {
   })
   it.each([
     { personal: { id: 0, name: 'Me' } }, { personal: { id: 1.1, name: 'Me' } },
-    { personal: { id: '1', name: 'Me' } }, { personal: { id: 1, name: null } },
+    { personal: { id: '1', name: 'Me' } }, { personalComplete: true, personal: { id: 1, name: null } },
     { activeRuntime: { kind: 'unknown' } }, { activeRuntime: { kind: 'project', projectId: '1' } },
     { activeRuntime: { kind: 'project', projectId: 0 } }, { activeRuntime: { kind: 'project', projectId: 0.5 } },
     { projects: {} }, { items: {} },
+    { personalComplete: undefined }, { personalComplete: 'false' },
   ])('rejects invalid catalog ownership or collections (%j)', (fields) => {
     expect(() => parseWorkbenchCatalog({ ...valid(), ...fields })).toThrow('invalid workbench catalog')
   })
@@ -65,6 +66,11 @@ describe('catalog wire validation', () => {
   })
   it('accepts a complete personal row and rw project', () => {
     expect(parseWorkbenchCatalog({ ...valid(), projects: [{ projectId: 1, name: 'A', mode: 'rw' }], items: [{ sessionId: 's', runtime: { kind: 'personal' }, title: 'Title', cwd: '/work', visibleContentSeq: 0, lastPromptAt: 0, visibility: 'personal', creatorUserId: 1, creatorDisplayName: 'A', updatedAt: 1, blank: false, canWrite: true }] }).items).toHaveLength(1)
+  })
+  it('keeps personal directory availability separate from the authoritative project rows', () => {
+    const catalog = parseWorkbenchCatalog({ ...valid(), personalComplete: false })
+    expect(catalog.personalComplete).toBe(false)
+    expect(catalog.items).toEqual([])
   })
 })
 

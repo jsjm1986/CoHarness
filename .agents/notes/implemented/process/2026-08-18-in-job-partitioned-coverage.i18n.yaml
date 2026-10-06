@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-in-job-partitioned-coverage.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-18-in-job-partitioned-coverage.md
-2026-08-18-in-job-partitioned-coverage.md: f86c2dffb6d3d30fdccfa445c57043c5217e439b
-2026-08-18-in-job-partitioned-coverage.zh.md: 62bb77511dd2c28b31e470288ff5c906dd346aeb
+/agent-note-in-job-partitioned-coverage:
+  en: eb25ff049a1ecc31
+  zh: d7430b14ccea5707
+/agent-note-in-job-partitioned-coverage/problem:
+  en: ab6dcac4ca2bbfb3
+  zh: c754cc8077671b25
+/agent-note-in-job-partitioned-coverage/decision:
+  en: ce6a7a9ed6d49bfe
+  zh: 347c2719d1e784f4
+/agent-note-in-job-partitioned-coverage/failure-and-output-semantics:
+  en: c73ddbc65107e34e
+  zh: dbc7649637f8d1c0
+/agent-note-in-job-partitioned-coverage/verification:
+  en: 81fdffc305211873
+  zh: 1f936d1251151acc
+/agent-note-in-job-partitioned-coverage/alternatives-considered:
+  en: 8bf2db146b6d91f2
+  zh: 6655c613cfc243b3
+/agent-note-in-job-partitioned-coverage/consequences:
+  en: 007b7c0ea50f52dd
+  zh: 1a2823cd87f0e435

@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-manager-owned-subagent-settlement-delivery.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-06-manager-owned-subagent-settlement-delivery.md
-2026-08-06-manager-owned-subagent-settlement-delivery.md: 1f91e8b9ce018dd7fc79d698978e5aa922b32033
-2026-08-06-manager-owned-subagent-settlement-delivery.zh.md: 392a82ae7bec4900ed8e3fb4eaae086f4a496846
+/agent-note-settlement-delivery-belongs-to-the-continuation-manager:
+  en: e8e4fec15acfe5d4
+  zh: 6dac0279cf244edc
+/agent-note-settlement-delivery-belongs-to-the-continuation-manager/problem:
+  en: 325f283354af59f6
+  zh: 059179e883da78c2
+/agent-note-settlement-delivery-belongs-to-the-continuation-manager/decision:
+  en: c71529b3f11612db
+  zh: f89b95417265b62a
+/agent-note-settlement-delivery-belongs-to-the-continuation-manager/decision/source-kind:
+  en: 66c0a503a4dfe989
+  zh: 3f0ca1650483f719
+/agent-note-settlement-delivery-belongs-to-the-continuation-manager/decision/two-ordering-rules-and-why-the-manager-owns-them:
+  en: dc26460107b92275
+  zh: 1682ea9a61ab38a1
+/agent-note-settlement-delivery-belongs-to-the-continuation-manager/decision/scheduling:
+  en: 3d1862329727a379
+  zh: 92fcf4ffd366ea30
+/agent-note-settlement-delivery-belongs-to-the-continuation-manager/decision/the-epoch-s-own-log-is-the-whole-account:
+  en: f444a596a75f0180
+  zh: ec9c0b61a38a3458
+/agent-note-settlement-delivery-belongs-to-the-continuation-manager/decision/snapshot-coverage:
+  en: 0822a55c268a9366
+  zh: 159fc95bb74111b3
+/agent-note-settlement-delivery-belongs-to-the-continuation-manager/alternatives-considered:
+  en: dc21795dbbe43e49
+  zh: 07353322dfd28890
+/agent-note-settlement-delivery-belongs-to-the-continuation-manager/consequences:
+  en: 10ebfbc70ff94e20
+  zh: c32a335007de89d1
+/agent-note-settlement-delivery-belongs-to-the-continuation-manager/consequences/accepted-risks:
+  en: 615cd09443411b4d
+  zh: f74b5dcab43975d3

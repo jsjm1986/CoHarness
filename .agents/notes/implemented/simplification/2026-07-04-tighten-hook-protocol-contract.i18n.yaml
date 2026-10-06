@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-04-tighten-hook-protocol-contract.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-04-tighten-hook-protocol-contract.md
-2026-07-04-tighten-hook-protocol-contract.md: 70cf7a15fe0ec0c43c0ef768667ef4741aee27d2
-2026-07-04-tighten-hook-protocol-contract.zh.md: 3be16b4b8cdbe210b0f2e2dc1dc315dc0d3a2bd6
+/agent-note-tighten-the-hook-protocol-contract-dialect-discarded-fields-double-defaults-and-lib-owned-hook-result-semantics:
+  en: 2987203a259281c5
+  zh: 76dc41a7788217aa
+/agent-note-tighten-the-hook-protocol-contract-dialect-discarded-fields-double-defaults-and-lib-owned-hook-result-semantics/problem:
+  en: 6061125d820e6764
+  zh: 717d24e3a6da375b
+/agent-note-tighten-the-hook-protocol-contract-dialect-discarded-fields-double-defaults-and-lib-owned-hook-result-semantics/decision:
+  en: f834f02ec7b616ae
+  zh: adbace689803097c
+/agent-note-tighten-the-hook-protocol-contract-dialect-discarded-fields-double-defaults-and-lib-owned-hook-result-semantics/alternatives-considered:
+  en: 6119e2aff3b6be5a
+  zh: 76136ef5249c23eb
+/agent-note-tighten-the-hook-protocol-contract-dialect-discarded-fields-double-defaults-and-lib-owned-hook-result-semantics/alternatives-considered/why-not-keep-them:
+  en: 755a8d1028180b2c
+  zh: 43036c29d8db8385
+/agent-note-tighten-the-hook-protocol-contract-dialect-discarded-fields-double-defaults-and-lib-owned-hook-result-semantics/verification:
+  en: 94ae5bad704bccd1
+  zh: 45de344c8f8be8a2
+/agent-note-tighten-the-hook-protocol-contract-dialect-discarded-fields-double-defaults-and-lib-owned-hook-result-semantics/consequences:
+  en: 614184aa5ae1b2c9
+  zh: e05936ec1e5122a6

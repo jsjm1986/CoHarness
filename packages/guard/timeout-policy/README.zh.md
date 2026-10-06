@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # dsh-tool-call-timeout-policy
 
 [English](README.md) | 中文
@@ -8,6 +13,17 @@
 
 使用本包可为工具调用执行其配置的协作式时间上限，并在取消完成后向模型返回清晰的超时错误。按时完成的调用保持不变。忽略或缓慢处理取消的工具仍可能让调用方继续等待，因为本包无法硬性停止下游工作。每个工具分别提供自己的限时；本包无需配置，并随 `dsh` 基础组合包默认启用。
 
+## 目录
+
+- [插件（命名空间：`timeout-policy`）](#plugin-namespace-timeout-policy)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="plugin-namespace-timeout-policy"></a>
 ## 插件（命名空间：`timeout-policy`）
 
 它是函数／命名空间插件（`name`／`inject`／`apply`），而非服务。它不注册工具，也不接受配置；它消费 `ctx.tools` 的 `tools/execute` waterfall（瀑布式事件）（由 `dsh-tools` 注册表始终提供），并读取每个已分发工具声明的 `timeoutMs`；该声明来自注册表（`ctx.tools.get(exec.name)`）。
@@ -39,10 +55,13 @@
 
 多个 `tools/execute` 监听器按 Cordis 注册顺序组合。与未来的重试／沙箱／指标包装层一起使用时，注册顺序决定语义：「超时覆盖整个重试操作」（超时注册在外层），或「超时覆盖每次尝试」（超时注册在内层）。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每次调用按工具自身声明装配一个新的协作式截止时间；不存在跨调用状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 条件工具结果
@@ -59,7 +78,18 @@
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **协作式，绝不是硬终止**：截止时间只通过 `exec.signal` 通知；忽略该信号的工具不会在超时时停止（参见「协作式，而非硬终止」一节）。
 - **没有统一预算**：只有声明 `timeoutMs` 并将其放在 `ToolDefinition` 上的工具才会获得截止时间；未声明工具没有注册表级默认值（已交付的 `bash`／`read`／`write`／`edit` 有意不声明）。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

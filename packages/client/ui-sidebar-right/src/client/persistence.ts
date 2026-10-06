@@ -98,3 +98,19 @@ export function clearSidebarLayout(sessionId: string): void {
   try { localStorage.removeItem(`${sidebarPersistence}.${sessionId}`) }
   catch (_storageUnavailable) { /* The invalid layout is still excluded from this window. */ }
 }
+
+/** Qualify the declared Session segment of built-in resource addresses in a verified owner record.
+ * @param address - persisted resource address.
+ * @param originalId - original Host ID already owned by the account/runtime storage key.
+ * @param sessionKey - current runtime-qualified browser key.
+ * @returns migrated address, or the unchanged address for another grammar or owner.
+ */
+export function qualifySavedResource(address: string, originalId: string, sessionKey: string): string {
+  const match = /^(dsh-resource:\/\/(?:file|tool|changes-review)\/session\/)([^/]+)(\/.*)$/u.exec(address)
+  if (match === null) return address
+  const [, prefix, encoded, suffix] = match as unknown as readonly [string, string, string, string]
+  let owner: string
+  try { owner = decodeURIComponent(encoded) }
+  catch { return address /* Ordinary resource validation rejects malformed persisted encoding. */ }
+  return owner === originalId ? `${prefix}${encodeURIComponent(sessionKey)}${suffix}` : address
+}

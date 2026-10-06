@@ -1,3 +1,8 @@
+---
+description: "pi-ai-backed DeepSeek adapter for the DeepSeek Harness LLM seam (design-verification twin of dsh-llm-deepseek)"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-llm-pi-ai
 
 English | [中文](README.zh.md)
@@ -10,6 +15,24 @@ The package root exposes the Cordis plugin contract, `PiAiAdapter`, and `support
 
 `@deepseek-ai/dsh-llm-pi-ai` routes model requests to multiple pi-ai providers, OpenAI-compatible gateways, or self-hosted servers from one configuration. Installed pi-ai providers supply endpoint, protocol, and model-catalog defaults; custom routes can declare those values without code changes. Profiles and credentials are resolved for each request, so settings changes take effect on the next request without a restart. Supported providers can use stored OAuth or interactive-key sign-in with cross-process refresh locking. The package may start with no routes and activate when user settings add them.
 
+## Table of Contents
+
+- [Config](#config)
+- [Catalog resolution](#catalog-resolution)
+- [Dynamic configuration (settings + credentials)](#dynamic-configuration-settings--credentials)
+- [Endpoint interrogation](#endpoint-interrogation)
+- [Provider/model routing and replay](#providermodel-routing-and-replay)
+- [Vocabulary differences](#vocabulary-differences)
+- [App attribution](#app-attribution)
+- [Dependency weight](#dependency-weight)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 Configure credentials, the model catalog, and deployment-specific transport settings per provider, keyed by the provider route itself. Each profile may set a `retryPolicy`; omission uses normal mode with five retries. `apiKeyEnv` is a credential *reference* resolved per request, so no secret enters this file. Omitting it leaves the route unauthenticated, which for an installed catalog route means pi-ai's provider-native ambient discovery; a configured reference that resolves to nothing fails the request with `MISSING_CREDENTIAL` instead, because falling through would authenticate with whatever unrelated key the environment happens to hold. One credential serves every model on its route.
@@ -80,6 +103,7 @@ Configure credentials, the model catalog, and deployment-specific transport sett
 
 The dict shape makes duplicate routes unrepresentable, and the pre-release array shape (with per-profile `provider` fields) fails load with migration directions. `providers` may also be empty or omitted entirely: the adapter then mounts **dormant** — zero routes, no extra catalog entries — and registers routes the moment the `llm-pi-ai:` settings section supplies profiles, dropping them again when it empties. Dormant or not, the plugin declares every installed catalog provider in the configurable-provider directory (`ctx.llm.listConfigurableProviders()`, settings path `providers.<provider>`), joined with every route the current profiles declare, so configuration surfaces can offer the full catalog before any route exists and can still address a hand-declared one. Each entry carries `declared`: whether pi-ai ships nothing under that key. It follows the installed catalog, never the settings document, because narrowing a shipped provider's models stores a profile too and that route is still one pi-ai knows — only the adapter can tell the two apart, which is why the directory answers rather than leaving a surface to infer it. Which adapters exist is composition; which providers run can be entirely the user's settings document. Registration with `ctx.llm` is atomic: a collision with any provider route already owned by another adapter fails plugin loading without registering the remaining routes. Model ids are not lifecycle config; a model the route does not configure fails before any provider request with `LlmError('UNKNOWN_MODEL')`.
 
+<a id="catalog-resolution"></a>
 ## Catalog resolution
 
 A profile's `models` list *replaces* the route's installed catalog rather than extending it; omitting it (or leaving it empty) serves that catalog unchanged. Each entry defaults its unset fields from the installed model of the same `id`, so narrowing a catalog route to two models, correcting one capacity, or adding a model newer than the installed catalog are all one-line edits — but declaring any `models` list means every model the route should keep serving must appear in it, an entry of nothing but `id` being enough. The configurable entry fields are `id`, `name`, `contextWindow`, `maxTokens`, `reasoningEfforts`, and `compat`. Pricing and input modalities have no harness consumer and ride the installed entry or are absent.
@@ -112,6 +136,7 @@ Resolution still fails loud, naming the offending route and model, when a route 
 
 `supportedProtocols()` is deliberately narrower than pi-ai's full streaming API set: it holds only the protocols a profile can *completely* describe with a key, an endpoint, and headers. Bedrock signs with SigV4 over AWS credentials and a region, Vertex needs a project, a location, and application-default credentials, Azure needs provider environment plus an api-version, and Codex authenticates through OAuth — offering those would hand back a route that cannot authenticate. Catalog routes still reach them through their own provider; only an explicit override is refused.
 
+<a id="dynamic-configuration-settings--credentials"></a>
 ## Dynamic configuration (settings + credentials)
 
 The adapter reads its profiles through a thunk **once per operation** instead of freezing them at construction. The plugin registers the `llm-pi-ai` namespace on the optional `ctx.settings` seam with this same `Config` schema and its `cordis.yml` entry as the composition `base`, and because `providers` is a dict, the base and the user's `llm-pi-ai:` settings section merge **per provider**: a user can add a route, override one field of a composition route, or point a route at another proxy, all effective on the next request with no restart. Without a mounted settings service the entry config alone drives the adapter, unchanged.
@@ -130,6 +155,7 @@ Supported profile fields are `apiKeyEnv`, `displayName`, `api`, `baseURL`, `mode
 
 The adapter forces pi-ai's SDK `maxRetries` to zero. URL compatibility may issue one additional request only after a clear endpoint-path mismatch; authentication (401/403), rate limits (429), server failures (5xx), network failures, and genuine SSE truncation are returned without URL fallback. The removed profile fields `maxRetries` and `maxRetryDelayMs` fail load instead of silently multiplying or hiding the separately composed agent-level retry budget. Idle expiry aborts the SDK's stable request signal and surfaces `TIMEOUT`; an earlier caller abort remains `ABORTED`. The temporary ordering queue used while an OpenAI-compatible text-thinking prefix is undecided is capped at 4,096 events or 8 MiB, and streamed text/tool fragments are joined once at block close.
 
+<a id="endpoint-interrogation"></a>
 ## Endpoint interrogation
 
 The plugin offers `ctx.llm.registerModelDiscovery('llm-pi-ai', …)`, which answers "which models can this provider serve?" for a route a configuration surface is editing or drafting. A route the installed catalog ships is answered from that catalog with no network call; only a route the catalog does not describe is interrogated over the wire. A named configured route supplies its stored credential and profile `headers` inside the Host, so deployment headers configured through `settings.yaml` or Cordis config reach `GET /models` without becoming discovery-request or Models-page fields; a key typed into the form still wins over the stored credential. It is deliberately *not* a catalog refresh: nothing is stored, and the reply is candidates the surface offers for adoption. `settings.yaml` remains the only thing that decides what a route serves.
@@ -142,6 +168,7 @@ The protocol request is delegated to the shared `@deepseek-ai/dsh-llm/discovery`
 
 Most listings disclose an id and nothing else; `context_window`/`context_length` and `max_output_tokens`/`max_tokens` are read when a gateway supplies them, entries without a usable id are skipped rather than failing the whole listing, and everything else the adopting surface still owes. The reply is read under a four-megabyte ceiling enforced on the bytes actually received — the endpoint is a URL the user typed, so a declared length is checked first but never trusted as the bound. An unreachable endpoint, a refused credential, a non-JSON body, and a body with no `data` array all fail with `DISCOVERY_FAILED` and a message naming the endpoint and, for a 401 or 403 alone, the credential. Cancellation during the body read surfaces as `ABORTED`, like a cancellation before the request went out.
 
+<a id="providermodel-routing-and-replay"></a>
 ## Provider/model routing and replay
 
 Each resolution produces one **immutable** snapshot — the profiles plus a `createModels()` collection holding the `Provider` each route built — and every operation captures a whole snapshot before its first `await`. A configuration change builds a *new* collection rather than mutating the one in use: `Models.streamSimple()` resolves its provider lazily, when the stream is first consumed, which is after the credential await, so a mutated collection would let a request that started under one configuration finish under another or fail on a provider that no longer exists. This is what makes the seam's per-step call freeze (`llm.prepareCall()`) hold end to end — switching models mid-reply takes effect on the next step, never inside the one in flight. Requests reach their provider through `Models.streamSimple()`. A catalog route that keeps its catalog protocol **reuses** the installed provider with its model list replaced, because that provider owns API implementations this package cannot reconstruct — Bedrock loads its Smithy module through a separate entry point — so rebuilding it from parts would silently narrow which providers work. Every other route is built by `createProvider()` over the protocol table behind `supportedProtocols()`, whose entries are the same factories pi-ai's own provider factories use.
@@ -160,6 +187,7 @@ For `openai-completions`, the adapter also recognizes a strict reasoning prefix 
 
 This is a compatibility heuristic, not a general XML parser. An answer deliberately beginning with one of these tags is classified as reasoning. When conversion occurs, the adapter omits pi-ai replay metadata because one provider text block becomes two Harness blocks; durable Harness content remains authoritative and later history uses provider-neutral conversion. A gateway using another delimiter is left as ordinary text until an explicit response-dialect setting exists.
 
+<a id="vocabulary-differences"></a>
 ## Vocabulary differences
 
 - pi-ai tool-call arguments are parsed objects; the harness stores raw JSON strings. The adapter parses input and re-stringifies output.
@@ -168,18 +196,22 @@ This is a compatibility heuristic, not a general XML parser. An answer deliberat
 - pi-ai's `off` thinking level crosses the Harness capability seam unchanged and becomes an omitted pi-ai common `reasoning` option at dispatch.
 - `GenerateOptions.stop` is rejected with `UNSUPPORTED_OPTION` because pi-ai's common streaming UI cannot guarantee it across providers.
 
+<a id="app-attribution"></a>
 ## App attribution
 
-Every request carries the shared attribution header from dsh-llm's `attributionHeaders()`, merged through pi-ai's `headers` stream option. Provider-specific app-attribution headers are not synthesized. See [dsh-llm § App attribution](../llm/README.md#app-attribution-attributionts).
+Every request carries the shared attribution header from dsh-llm's `attributionHeaders()`, merged through pi-ai's `headers` stream option. Provider-specific app-attribution headers are not synthesized. See the [mandatory app-attribution note](../../../.agents/notes/implemented/architecture/2026-06-21-mandatory-app-attribution-headers.md) and dsh-llm's `src/attribution.ts`.
 
+<a id="dependency-weight"></a>
 ## Dependency weight
 
 pi-ai installs several provider SDKs and lazy-loads the one selected by the catalog model. The dependency weight is isolated to this opt-in adapter package.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Provider profiles are fixed configuration resolved per request; the adapter keeps no cross-request state beyond the immutable route table.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Provider request through pi-ai
@@ -227,3 +259,14 @@ Recorded response content appends to the next request and does not invalidate it
 - **In-history `system` messages use pi-ai's common context conversion** — provider-specific placement follows pi-ai rather than a harness-owned wire override.
 - **Provider HTTP status is partial** — pi-ai's response callback exposes the status and headers before a body is consumed, so the adapter retains the status when a terminal-event parser error follows an explicit non-SSE `Content-Type`. OpenAI SDK status text also lets the adapter recognize only 404/405 path failures when the callback is skipped; other pi-ai error events still do not expose a stable HTTP status across providers and carry only stable harness error codes.
 - **Retry policy is provider-owned, not an SDK retry** — each provider profile may supply nested `retryPolicy`; omission resolves to normal mode with five retries, and the effective route policy is what `dsh-llm-retry` executes at the agent failed-step extension point. pi-ai SDK retries stay disabled so durable agent steps and `llm/retry` events own every visible attempt, and direct `ctx.llm.stream()` calls remain single-attempt.
+- **Streamed tool-call arguments are parsed once, when the call ends** — the installed pi-ai carries [`patches/@earendil-works__pi-ai@0.87.1.patch`](../../../patches/@earendil-works__pi-ai@0.87.1.patch), which removes the per-delta re-parse of the whole accumulated argument JSON in every stream adapter (upstream [earendil-works/pi#9265](https://github.com/earendil-works/pi/issues/9265)); unpatched, a multi-megabyte argument stream costs O(n²) CPU on the event loop and stalls every session in the process. Until `toolcall_end`, a pi-ai partial's tool-call `arguments` stays `{}`; this adapter reads only the delta strings and the finalized arguments. Re-apply or retire the patch on every pi-ai upgrade.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

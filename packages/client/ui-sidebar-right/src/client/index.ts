@@ -20,8 +20,11 @@
  * guide registers through those stages unmodified, exactly as a type shipped
  * from another package does — `ui-sidebar-browser` and workspace file preview use this lifecycle.
  */
+import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
+import { observeSidebarFocus } from './focus.ts'
+import { registerSidebarShortcuts } from './shortcuts.ts'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { parseWorkspaceResourceAddress, workspaceResourceAddress, sessionPersistenceKey } from '@deepseek-ai/dsh-client-runtime/client'
+import { parseWorkspaceResourceAddress, workspaceResourceAddress, sessionPersistenceKey, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -29,14 +32,16 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from './contract/slots.ts'
-import { clearSidebarLayout, readSidebarLayout, writeSidebarLayout } from './persistence.ts'
+import { clearSidebarLayout, readSidebarLayout, writeSidebarLayout, qualifySavedResource } from './persistence.ts'
 import { parseToolAddress, toolAddress } from './tabs/tool/address.ts'
 import { ToolBody } from './tabs/tool/ToolBody.tsx'
 import { GuideBody, type GuideInjected } from './tabs/guide/GuideBody.tsx'
 import { GuideTitle } from './tabs/guide/GuideTitle.tsx'
 import { ExpandButton, BlankExpandButton } from './shell/ExpandButton.tsx'
-import { RightbarSeat, type SidebarRightInjected } from './shell/SidebarRight.tsx'
-import { RightbarRoot } from './shell/RightbarRoot.tsx'
+import { AUTO_FULLSCREEN_BELOW, RightbarSeat, type SidebarRightInjected } from './shell/SidebarRight.tsx'
+import { closeWithPaneFocus, openWithPaneFocus } from './shell/close-focus.ts'
+import { RightbarRoot, type RightbarRootInjected } from './shell/RightbarRoot.tsx'
+import { SidebarSessionViews } from './session-views.ts'
 import { createSidebarRightController, type SidebarRightController } from './service.ts'
 import { SidebarRightTabRegistry } from './tab-registry.ts'
 import { createSidebarRightStore } from './stores.ts'
@@ -46,12 +51,13 @@ import { guideTabInfoFactory, tabInfoFactory } from './tab-info.ts'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { defaultSeed } from './contract/seed.ts'
 
+export type { SidebarRightTarget } from './focus.ts'
 export type { RightbarSeatProps, SidebarRightInjected, SidebarRightPresentation } from './shell/SidebarRight.tsx'
 export type { GuideBodyProps, GuideInjected } from './tabs/guide/GuideBody.tsx'
 export type { ExpandButtonProps } from './shell/ExpandButton.tsx'
 export type { SidebarRightState, SurfaceState } from './stores.ts'
 export type {
-  ISidebarRight, SidebarRightBinding, SidebarRightOpenResourceOptions, SidebarRightOpenTabOptions,
+  ISidebarRight, SidebarRightOpenResourceOptions, SidebarRightOpenTabOptions,
   SidebarRightPlacement, SidebarRightCloseHandler, SurfaceActions,
 } from './service.ts'
 export type {
@@ -68,7 +74,7 @@ export type {
 } from './contract/params.ts'
 // The layout ids and rectangle the navigation face takes, so a caller needs no import from the kit.
 export type { FloatRect, PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
-export type { PinResource, SidebarRightNavigator, TabOccurrence } from './tab-domain.ts'
+export type { PinResource, SidebarRightNavigator, TabOccurrence, SidebarRightOccurrenceId } from './tab-domain.ts'
 export type { SidebarRightKey } from './locales.ts'
 export type { OpenContentIntent } from './stores.ts'
 export type { SidebarRightOpenTab } from './tab-inventory.ts'
@@ -81,7 +87,7 @@ declare module '@deepseek-ai/dsh-client-runtime/client' {
 }
 
 /** Required browser services: the slot registry, the frame's panel actions, copy, and the resource model. */
-export const inject = ['slots', 'layout', 'locale', 'sessions', 'workspaceResources', 'connection', 'projectUiPolicy']
+export const inject = ['slots', 'layout', 'locale', 'sessions', 'workspaceResources', 'connection', 'projectUiPolicy', 'shortcuts']
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -110,12 +116,24 @@ export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
   const t = ctx.locale.bind(NS)
   const tabs = new SidebarRightTabRegistry(ctx)
+  // Independently retained Session views keep their mounted subtrees across
+  // selection changes; the root below drives `select` through the frame's
+  // target prop so a pinned `targetSessionId` wins over current selection.
+  const views = new SidebarSessionViews(ctx.sessions)
+  const current = ctx.sessions.list
+  ctx.effect(() => {
+    const sync = (): void => { views.select(current.getSnapshot().current) }
+    const unsubscribe = current.subscribe(sync)
+    sync()
+    return () => { unsubscribe(); views.dispose() }
+  }, 'ui-sidebar-right: retained Session views')
   const validateResource = (sessionId: SessionId, address: string): void => {
     const target = parseWorkspaceResourceAddress(address) ?? parseToolAddress(address)
     const owner = target?.sessionId ?? tabs.get(tabs.claim(address).kind)?.resourceSession?.(address)
     if (owner !== sessionId) throw new Error('Sidebar resource does not belong to this Session')
   }
-  const { controller, adopt, forget } = createSidebarRightController(
+  const layout: ILayout = ctx.layout
+  const { controller, adopt, forget, show, measure } = createSidebarRightController(
     tabs,
     (address, signal, sessionId) => {
       if (!address.startsWith('dsh-resource://')) return
@@ -135,8 +153,29 @@ export function apply(ctx: ClientContext): void {
         throw error
       }
     },
+    {
+      autoFullscreen: () => layout.viewportWidth.getSnapshot() < AUTO_FULLSCREEN_BELOW,
+      openWithFocus: (sessionId, open) => { openWithPaneFocus(document, sessionId, open) },
+      closeWithFocus: (sessionId, paneId, close) => { closeWithPaneFocus(document, sessionId, paneId, close) },
+    },
     { discoverSaved: false, validateResource },
   )
+  // The Session on screen: the selected one in the mounted right column.
+  // The source notifies before React renders its change, so the service names
+  // the arriving Session before any component of that commit reads it, and
+  // its seat mints the Session's store in the same render.
+  ctx.effect(() => {
+    const sync = (): void => {
+      const selected = views.source.getSnapshot().find(view => view.selected)
+      show(selected?.sessionId)
+    }
+    const unsubscribe = views.source.subscribe(sync)
+    sync()
+    return () => {
+      unsubscribe()
+      show(undefined)
+    }
+  }, 'ui-sidebar-right: on-screen Session')
   const disposeRegistry = ctx.reflect.provide('sidebarRightTabs', tabs)
   const disposeService = ctx.reflect.provide('sidebarRight', controller)
   // Registered first, so it tears down last: the faces outlive every seat and
@@ -150,6 +189,10 @@ export function apply(ctx: ClientContext): void {
   }, 'ui-sidebar-right: service faces')
 
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-sidebar-right: dictionaries')
+  ctx.effect(() => registerSidebarShortcuts(ctx.shortcuts, controller, t, () => {
+    void ctx.shortcuts.closeWindow().catch((error: unknown) => { console.error('Window close failed', error) })
+  }), 'ui-sidebar-right: shortcuts')
+  if (typeof document !== 'undefined') ctx.effect(() => observeSidebarFocus(document), 'ui-sidebar-right: focus')
 
   ctx.effect(() => {
     const handle = createSidebarRightStore(() => defaultSeed(tabs), false)
@@ -173,13 +216,21 @@ export function apply(ctx: ClientContext): void {
         const restore = (): void => {
           restoring = true
           try {
-            const saved = key === undefined ? undefined : readSidebarLayout(key)
+            let saved = key === undefined ? undefined : readSidebarLayout(key)
+            const address = parseClientSessionKey(sessionId)
+            if (saved !== undefined && address !== undefined) {
+              saved = { ...saved, layout: { ...saved.layout,
+                tabs: Object.fromEntries(Object.entries(saved.layout.tabs).map(([id, tab]) => [id, {
+                  ...tab, contentId: qualifySavedResource(tab.contentId, address.sessionId, sessionId),
+                }])),
+              } }
+            }
             const valid = saved !== undefined && Object.values(saved.layout.tabs).every((tab) => {
               if (!tab.contentId.startsWith('dsh-resource://')) return true
               try { validateResource(sessionId, tab.contentId); return true } catch { return false }
             })
             if (saved !== undefined && !valid && key !== undefined) clearSidebarLayout(key)
-            instance.store.set({ bySession: valid ? { [scopeKey]: saved } : {} })
+            instance.store.set({ bySession: valid && saved !== undefined ? { [scopeKey]: saved } : {} })
           } finally { restoring = false }
         }
         restore()
@@ -204,15 +255,18 @@ export function apply(ctx: ClientContext): void {
         } }
       },
     }
-    const layout: ILayout = ctx.layout
-    const injected: Omit<SidebarRightInjected, 'keyedHooks' | 'occurrence' | 'closeTab'> = {
+    const injected: Omit<SidebarRightInjected, 'keyedHooks' | 'occurrence' | 'closeTab' | 'measureRoom'> = {
       syncPresentation({ shown, track, fullscreen }) {
         if (shown) layout.openRightbar(track, fullscreen)
         else layout.closeRightbar()
       },
-      bindService: binding => controller.bind(binding),
+      splitPane: (paneId) => { controller.split(paneId) },
+      toggleFullscreen: () => { const target = controller.commandTarget(); if (target !== undefined) controller.toggleFullscreen(target) },
       openTab: (kind, options) => { controller.openTab(kind, options) },
-      hooks: { tabTypes: { subscribe: listener => tabs.subscribe(listener), getSnapshot: () => tabs.entries() } },
+      hooks: {
+        shortcuts: ctx.shortcuts.catalog,
+        tabTypes: { subscribe: listener => tabs.subscribe(listener), getSnapshot: () => tabs.entries() },
+      },
     }
 
     const disposeTypes = [tabs.register(guideDefinition(t)), tabs.register({
@@ -238,6 +292,11 @@ export function apply(ctx: ClientContext): void {
       yield ctx.slots.register({
         name: 'rightbar',
         children: { 'rightbar.session': { kind: 'single', scope: 'session' } },
+        inject: (): RightbarRootInjected => ({
+          hooks: { views: views.source },
+          mountView: reference => views.mount(reference),
+          selectView: (sessionId) => { views.select(sessionId) },
+        }),
       }, RightbarRoot)
       yield ctx.slots.register({
         name: 'rightbar.session',
@@ -250,6 +309,7 @@ export function apply(ctx: ClientContext): void {
         store,
         inject: (sessionId): SidebarRightInjected => ({
           ...injected,
+          measureRoom: (canSplitPane) => { measure(sessionId, canSplitPane) },
           closeTab: (tabId) => {
             try { controller.closeIn(sessionId, tabId) }
             catch (error) { console.error('Sidebar tab close failed:', error) }
@@ -267,20 +327,23 @@ export function apply(ctx: ClientContext): void {
       name: 'conversation.session.header.corner',
       locale: NS,
       store,
-      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) } }),
+      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
     }, ExpandButton))
     const disposeBlankExpand = ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
       name: 'conversation.input.left', id: 'auxiliary-sidebar', locale: NS, store,
-      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) } }),
+      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
     }, BlankExpandButton))
     const disposeMobileExpand = ctx.slots.inject('shell.mobile.header.actions', () => ctx.slots.register({
       name: 'shell.mobile.header.actions', id: 'auxiliary-sidebar', locale: NS, store,
-      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) } }),
+      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
     }, ExpandButton))
     // Stage two for the guide: it declares the chain child it hosts and reads
     // the registry's entry boxes, which an ordinary type has no reason to do.
     const guideInjected: GuideInjected = {
-      hooks: { guideEntries: { subscribe: listener => tabs.subscribe(listener), getSnapshot: () => tabs.guide() } },
+      hooks: {
+        shortcuts: ctx.shortcuts.catalog,
+        guideEntries: { subscribe: listener => tabs.subscribe(listener), getSnapshot: () => tabs.guide() },
+      },
     }
     const disposeGuide = ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
       name: 'sidebar.right.pane.tab',

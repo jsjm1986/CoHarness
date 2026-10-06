@@ -4,15 +4,19 @@
 - button "New session":
   - img
   - text: New Session
+- navigation "Panels":
+  - button "Plugins"
 - text: Workspaces
 - button "Search sessions":
   - img
-- textbox "Search sessions..."
+- textbox "Search sessions…"
 - button "View options":
   - img
 - button "Add workspace":
   - img
-- tree "Sessions": No sessions yet
+- tree "Sessions":
+  - img
+  - text: No sessions yet
 - button "Documents":
   - img
   - text: Documents

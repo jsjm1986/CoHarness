@@ -176,6 +176,44 @@
   gap: 4px 10px;
 }
 
+.clampedDescription {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.expandToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  /* Floated ahead of the meta spans: it keeps the first line's top-right
+     corner, so wrapped meta lines continue below it instead of pushing the
+     toggle under content it expands. */
+  float: right;
+  margin-left: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.expandToggle:hover,
+.expandToggle:focus-visible {
+  color: var(--dsw-alias-label-primary);
+}
+
+.expandToggle svg {
+  transition: transform 120ms ease;
+}
+
+.expandToggleOpen {
+  transform: rotate(180deg);
+}
+
 .taskActions {
   flex-wrap: wrap;
   margin-top: 8px;

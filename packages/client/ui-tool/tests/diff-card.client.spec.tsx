@@ -5,13 +5,15 @@
 // the details panel's Output section.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ConversationSnapshot, RunningToolCall, SessionId, SessionListState, ToolResultNode, WorkspaceListState,
+  ConversationSnapshot, RunningToolCall, SessionId, SessionListState, StartedToolCall, ToolResultNode,
+  WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -24,6 +26,7 @@ import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-conversation/src/client
 import { FileMutationRow, fileMutationToolview } from '../src/client/tool/toolviews/file-mutation-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
 
 afterEach(cleanup)
 
@@ -31,6 +34,11 @@ afterEach(cleanup)
 type FileMutationRowProps = Parameters<typeof FileMutationRow>[0]
 
 const SID = 's1' as SessionId
+
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
 
 const t = makeTranslate(zh, commonZh)
 
@@ -48,8 +56,8 @@ const resultDiff = (over?: Partial<Extract<ToolResultView, { card: 'diff' }>>): 
   diffs: [{ path: 'notes/demo.txt', oldText: 'hello', newText: 'hello fixture' }], ...over,
 })
 
-const running = (over?: Partial<RunningToolCall>): RunningToolCall => ({
-  callId: 'c1', name: 'edit', argsRaw: ARGS,
+const running = (over?: Partial<StartedToolCall>): StartedToolCall => ({
+  phase: 'start', callId: 'c1', name: 'edit', argsRaw: ARGS,
   turn: 1, step: 1, time: 1_000, callView: callDiff(), subCalls: [], ...over,
 })
 
@@ -116,8 +124,9 @@ describe('diffCardModel', () => {
 })
 
 describe('chat row diff body', () => {
-  const ownerProps = (block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName: 'edit', block, openFile: vi.fn(), t,
+  const ownerProps = (block: StartedToolCall | ToolResultNode): GenericToolCardProps => ({
+    callId: 'c1', toolName: 'edit', openFile: vi.fn(), t, useDisclosure,
+    ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
   })
 
   it('the expanded body is the applied diff, capped tighter than the panel', () => {
@@ -141,7 +150,8 @@ describe('chat row diff body', () => {
     // A non-file tool name so the row is not single-file (no path link), and its
     // args body is the fallback the diff card must not have replaced.
     const view = render(<GenericToolCard {...{
-      callId: 'c1', toolName: 'some_tool', openFile: vi.fn(), t,
+      callId: 'c1', toolName: 'some_tool', openFile: vi.fn(), t, useDisclosure,
+      phase: 'result' as const,
       block: settled({
         call: { name: 'some_tool', argsRaw: '{"foo":"bar"}' },
         callView: null, resultView: null,
@@ -160,14 +170,14 @@ describe('FileMutationRow diff card', () => {
     archivedById: {},
     current: SID,
     phase: 'ready',
-    subagentsByParent: {}, jobsBySession: {},
+    subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })
 
   const rowProps = (block: RunningToolCall | ToolResultNode, toolName = 'edit'): FileMutationRowProps => ({
     callId: 'c1', toolName, block, openFile: vi.fn(), cwd: '/w/app',
     sessionId: SID, useSessions: bindSnapshotSelector(list()),
-    t,
+    t, useDisclosure,
   } as unknown as FileMutationRowProps)
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -328,18 +338,18 @@ describe('DetailsPanel diff Output section', () => {
     const chat = createChatStore().create()
     if (selection !== null) chat.actions.select(selection)
     const sessions = createSnapshotStore<SessionListState>(cwd === undefined
-      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined }
+      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }
       : {
         ids: [SID],
         byId: { [SID]: { id: SID, displayTitle: 'r', running: false, blank: false, updatedAt: 0, cwd } },
         archivedById: {},
         current: SID,
         phase: 'ready',
-        subagentsByParent: {}, jobsBySession: {},
+        subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
         currentAddress: undefined,
       })
     const workspaces = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })
     return render(
@@ -350,6 +360,7 @@ describe('DetailsPanel diff Output section', () => {
         useSession={bindSnapshotSelector({ getSnapshot: () => snapshot, subscribe: () => () => {} })}
         useSessions={bindSnapshotSelector(sessions)}
         useWorkspaces={bindSnapshotSelector(workspaces)}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
           setDraft: () => {},
@@ -359,6 +370,8 @@ describe('DetailsPanel diff Output section', () => {
           addDocuments: () => true,
           removeDocument: () => {},
           pruneDocuments: () => {},
+          captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+          insertText: () => false,
           submit: () => {},
         }}
         useProjection={(() => undefined)}
@@ -377,7 +390,7 @@ describe('DetailsPanel diff Output section', () => {
     return {
       sessionId: SID, views: EMPTY_CONVERSATION_VIEWS,
       chat: over.chat ?? toolChatSnapshot(nodes, runningCalls),
-      nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+      nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
       pending: [], queue: [], running: false, composerPhase: 'active', removed: false,
       openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
       promptError: null, blank: false, subagent: null, lastAgentError: null, ...over,

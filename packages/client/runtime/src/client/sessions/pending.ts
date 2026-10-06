@@ -21,6 +21,25 @@ export type PendingInteractionStatus = 'approval' | 'plan-review' | 'question'
 /** Kind-discriminated union of concrete waits: narrowing on `kind` types `payload`. */
 export type PendingInteraction = { [K in PendingKind]: PendingWait<K> }[PendingKind]
 
+/**
+ * A plugin-published interaction carrier merged into the Session pending
+ * feed. Unlike a {@link PendingWait} it owns no wire lifecycle: the publisher
+ * answers through its own channel and withdraws the entry when the domain
+ * ends. `kind` namespaces the consumer; publishers pick a key that cannot
+ * collide with a `PendingWait` (`<prefix>:<rpcId>`).
+ */
+export interface SessionPublishedInteraction {
+  /** Presentation discriminator; consumers narrow with `instanceof`, never payload. */
+  readonly kind: string
+  /** Opaque render identity, stable while the publisher keeps the entry. */
+  readonly key: string
+  /** Owning session. */
+  readonly sessionId: SessionId
+}
+
+/** One entry of the Session pending feed: a wire wait or a plugin-published carrier. */
+export type SessionPendingEntry = PendingInteraction | SessionPublishedInteraction
+
 /** Key prefixes, one per kind (the key doubles as the Session pending-map key). */
 const KEY_PREFIX: Record<PendingKind, string> = { approval: 'a', question: 'q' }
 

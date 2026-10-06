@@ -3,8 +3,8 @@
  * spawns one ACP child process, attaches to the member's durable ACP session
  * (`session/load` when bound, `session/new` on the first turn), issues one
  * prompt, and disposes the process. The durable ACP session outlives the
- * process, so restart and recovery re-attach by session id; `session/load`'s
- * replayed `session/update` transcript doubles as the recovery proof.
+ * process. Resume reattaches by session id; replayed message chunks do not
+ * prove the outcome of an interrupted prompt.
  *
  * `session/load` is an OPTIONAL ACP capability: the provider probes it during
  * `prepareContinuable` so an agent that cannot resume rejects the member at
@@ -32,6 +32,7 @@ import type {
   ExternalBindingStore,
   ExternalMemberSession,
   ExternalMemberTransport,
+  ExternalMemberTransportSource,
   ExternalPendingPrompt,
   ExternalRecovery,
   ExternalTurnOutcome,
@@ -67,31 +68,27 @@ export interface AcpMemberConfig {
   disposeGraceMs: number
 }
 
-/** One replayed message from a `session/load` transcript — the recovery proof. */
-interface ReplayedMessage {
-  readonly role: 'user' | 'agent'
-  readonly text: string
-}
-
 /**
  * One open ACP member session: a live child process bound to a durable ACP
  * session id. Disposal ends the process; the ACP session persists on the
  * agent's side for the next `session/load`.
  */
 class AcpMemberSession implements ExternalMemberSession {
-  /** Replayed `session/load` transcript — filled only while `loading` is set. */
-  private readonly transcript: ReplayedMessage[] = []
   /** Assistant text of the in-flight `session/prompt`. */
   private turnText: string[] = []
   private liveSessionId: string | undefined
   private loading = false
   private disposed = false
 
-  constructor(
-    private readonly child: SubprocessHandle,
-    private readonly conn: ClientContext,
-    private readonly config: AcpMemberConfig,
-  ) {}
+  private readonly child: SubprocessHandle
+  private readonly conn: ClientContext
+  private readonly config: AcpMemberConfig
+
+  constructor(child: SubprocessHandle, conn: ClientContext, config: AcpMemberConfig) {
+    this.child = child
+    this.conn = conn
+    this.config = config
+  }
 
   get externalId(): string | undefined {
     return this.liveSessionId
@@ -111,33 +108,17 @@ class AcpMemberSession implements ExternalMemberSession {
       throw new Error('subagent-acp member: turn aborted before the prompt was issued')
     }
     this.turnText = []
-    await this.conn.request(methods.agent.session.prompt, {
+    const result = await this.conn.request(methods.agent.session.prompt, {
       sessionId,
       prompt: toAcpPrompt([{ type: 'text', text: prompt }]),
     })
+    if (result.stopReason !== 'end_turn') throw new Error(`subagent-acp member turn ended with ${result.stopReason}`)
     yield { text: this.turnText.join('') }
   }
 
-  /**
-   * Prove the pending prompt's state from the replayed transcript collected
-   * during `session/load`: the prompt text appears among replayed user
-   * messages iff the ACP session accepted it, and the agent text that follows
-   * it is the settled answer.
-   */
-  recover(pending: ExternalPendingPrompt, signal: AbortSignal): Promise<ExternalRecovery> {
-    void signal
-    const index = this.transcript.findIndex(
-      entry => entry.role === 'user' && entry.text === pending.prompt,
-    )
-    if (index < 0) return Promise.resolve({ kind: 'absent' })
-    const answer = this.transcript
-      .slice(index + 1)
-      .filter(entry => entry.role === 'agent')
-      .map(entry => entry.text)
-      .join('')
-    return Promise.resolve(
-      answer === '' ? { kind: 'unknown' } : { kind: 'result', text: answer },
-    )
+  /** Replayed ACP chunks have no request identity or terminal result to prove completion. */
+  recover(_pending: ExternalPendingPrompt, _signal: AbortSignal): Promise<ExternalRecovery> {
+    return Promise.resolve({ kind: 'unknown' })
   }
 
   /** Cancel the remote turn best-effort, then quiesce/terminate the child. */
@@ -175,13 +156,7 @@ class AcpMemberSession implements ExternalMemberSession {
     }
     const text = acpContentText(update.content as Parameters<typeof acpContentText>[0])
     if (text === '') return
-    if (this.loading) {
-      this.transcript.push({
-        role: update.sessionUpdate === 'user_message_chunk' ? 'user' : 'agent',
-        text,
-      })
-      return
-    }
+    if (this.loading) return
     if (update.sessionUpdate === 'agent_message_chunk') this.turnText.push(text)
   }
 }
@@ -202,10 +177,13 @@ interface MemberConnection {
  * one; the caller disposes the returned session after its turn.
  */
 export class AcpMemberTransport implements ExternalMemberTransport {
-  constructor(
-    private readonly config: AcpMemberConfig,
-    private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle,
-  ) {}
+  private readonly config: AcpMemberConfig
+  private readonly spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle
+
+  constructor(config: AcpMemberConfig, spawn: (spec: SubprocessSpawnSpec) => SubprocessHandle) {
+    this.config = config
+    this.spawn = spawn
+  }
 
   /**
    * Verify the configured ACP agent advertises `loadSession` — the continuable
@@ -348,11 +326,13 @@ export class AcpMemberTransport implements ExternalMemberTransport {
  * recovery, prompt window, and consumed cursor all live in the store.
  */
 export class AcpMemberAdapter extends LlmAdapter {
-  constructor(
-    private readonly transport: ExternalMemberTransport,
-    private readonly store: ExternalBindingStore,
-  ) {
+  private readonly transport: ExternalMemberTransportSource
+  private readonly store: ExternalBindingStore
+
+  constructor(transport: ExternalMemberTransportSource, store: ExternalBindingStore) {
     super()
+    this.transport = transport
+    this.store = store
   }
 
   override providerInfo(provider: string): { readonly id: string; readonly name: string } {

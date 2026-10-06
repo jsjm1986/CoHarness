@@ -9,7 +9,7 @@
 // (runningCalls) nest their so-far dispatches the same way.
 
 import { Context } from '@deepseek-ai/cordis'
-import { stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import {
@@ -57,8 +57,8 @@ const codeResult = (seq: number, callId: string): ToolResultNode => ({
 })
 
 const runningCode = (callId: string): RunningToolCall => ({
-  callId, name: 'run_code', argsRaw: RUN_CODE_ARGS, turn: 9, step: 0, time: 9_000, callView: null,
-  subCalls: [],
+  phase: 'start', callId, name: 'run_code', argsRaw: RUN_CODE_ARGS, turn: 9, step: 0, time: 9_000,
+  callView: null, subCalls: [],
 })
 
 const subCall = (
@@ -82,7 +82,7 @@ function snapshotWith(
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS,
     chat: toolChatSnapshot(nestedNodes, nestedRunningCalls),
-    nodes: nestedNodes, turnTimings: new Map(), turnEnds: new Map(), partial: null,
+    nodes: nestedNodes, turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null,
     runningCalls: nestedRunningCalls,
     pending: [], queue: [], running: runningCalls.length > 0, composerPhase: 'active', removed: false,
     openState: 'open', openError: null,
@@ -91,9 +91,9 @@ function snapshotWith(
 }
 
 /** Test-owned AppFrame role: declares and renders the resident conversation area. */
-type AppRootProps = PropsRenderSlots<'conversation' | 'details'>
+type AppRootProps = PropsRenderSlots<'main' | 'details'>
 function AppRoot({ renderSlot }: AppRootProps) {
-  return <>{renderSlot('conversation', {})}</>
+  return <>{renderSlot('main', {}, { entryKey: 'conversation' })}</>
 }
 
 /**
@@ -114,7 +114,7 @@ async function bench(snapshot: ConversationSnapshot) {
     byId: { [SID]: { id: SID, title: 'S', displayTitle: 'S', running: false, blank: false, updatedAt: 1 } },
     archivedById: {},
     current: SID,
-    phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+    phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
   })
   const scoped = { send: vi.fn(async () => {}), cancel: vi.fn(async () => {}) }
   const layout = { openDetails: vi.fn(), closeDetails: vi.fn() }
@@ -151,7 +151,7 @@ async function bench(snapshot: ConversationSnapshot) {
   ctx.provide('sessions', sessionsFake)
   const workspaces = {
     list: createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     }),
     startSession: vi.fn(),
@@ -168,7 +168,7 @@ async function bench(snapshot: ConversationSnapshot) {
   // ui-theme's Appearance row binds a durable scope through these two.
   ctx.provide('remote', { $on: () => () => {} } as never)
   ctx.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) } as never)
-  ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+  ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
   const locale = new LocaleRuntime(ctx)
   ctx.provide('locale', locale)
   slots.installLocale(locale)
@@ -177,7 +177,7 @@ async function bench(snapshot: ConversationSnapshot) {
   slots.register({
     name: 'root',
     children: {
-      'conversation': { kind: 'single', scope: 'root' },
+      'main': { kind: 'keyed', scope: 'root' },
       'details': { kind: 'single', scope: 'session' },
     },
   }, AppRoot)
@@ -235,8 +235,8 @@ describe('run_code sub-calls through the real chat machinery', () => {
     // Each run-control verb names its act and shows the package id; without the
     // owned titles all three would read "Tool call · cordis_run · dyn-2".
     expect(nest.querySelector('[data-tool="cordis_runtime_inspect"]')?.textContent).toContain('Inspect')
-    expect(nest.querySelector('[data-tool="cordis_run"]')?.textContent).toContain('Run Cordis Plugindyn-2')
-    expect(nest.querySelector('[data-tool="cordis_undefine"]')?.textContent).toContain('Remove Cordis Plugindyn-2')
+    expect(nest.querySelector('[data-tool="cordis_run"]')?.textContent).toContain('Run Cordis plugindyn-2')
+    expect(nest.querySelector('[data-tool="cordis_undefine"]')?.textContent).toContain('Remove Cordis plugindyn-2')
     // None of them is a code row: the program belongs to cordis_define, whose
     // own keyed card renders it (the next case covers the code row itself).
     expect(nest.querySelector('[data-variant="code"]')).toBeNull()
@@ -303,7 +303,7 @@ describe('run_code sub-calls through the real chat machinery', () => {
   it('a started-but-unsettled sub-call renders the running state exactly like a native in-flight row', async () => {
     const parent = 'call-live'
     const runningSub: ToolCallBlock = {
-      callId: `${parent}:ptc:1`, name: 'grep', argsRaw: '{"pattern":"todo"}',
+      phase: 'start', callId: `${parent}:ptc:1`, name: 'grep', argsRaw: '{"pattern":"todo"}',
       turn: 0, step: 0, time: 21_000, callView: null, subCalls: [],
     }
     const b = await bench(snapshotWith([], [runningSub], [runningCode(parent)]))

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-12-onboarding-reads-every-provider.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-12-onboarding-reads-every-provider.md
-2026-08-12-onboarding-reads-every-provider.md: 1f247a6c93257c24052f55eb4297ec3c9c3df06d
-2026-08-12-onboarding-reads-every-provider.zh.md: fc6e43195a46eaea881f8b4bee3219b5e583b284
+/agent-note-first-run-readiness-reads-every-provider-and-the-setup-card-closes:
+  en: ac309f11d5e7237a
+  zh: 9319863a1eb436ba
+/agent-note-first-run-readiness-reads-every-provider-and-the-setup-card-closes/problem:
+  en: db2e705cbe285a9e
+  zh: 8a87ebb00c06d085
+/agent-note-first-run-readiness-reads-every-provider-and-the-setup-card-closes/decision:
+  en: 7c93068808c5fe3f
+  zh: 0d98151581fb076f
+/agent-note-first-run-readiness-reads-every-provider-and-the-setup-card-closes/alternatives-considered:
+  en: 20bd585e7d7c3d72
+  zh: 32080ddd42ee9278
+/agent-note-first-run-readiness-reads-every-provider-and-the-setup-card-closes/consequences:
+  en: d065a7feaf5220c3
+  zh: 271126a3541e779a
+/agent-note-first-run-readiness-reads-every-provider-and-the-setup-card-closes/testing:
+  en: bd94c3e0c41847ae
+  zh: ca2dd3680830ed58

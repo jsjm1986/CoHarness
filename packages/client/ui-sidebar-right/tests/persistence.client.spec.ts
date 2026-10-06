@@ -6,6 +6,7 @@ import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { createSidebarRightStore } from '../src/client/stores.ts'
 import { createSidebarRightController } from '../src/client/service.ts'
 import { SidebarRightTabRegistry } from '../src/client/tab-registry.ts'
+import { qualifySavedResource } from '../src/client/persistence.ts'
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
@@ -21,6 +22,17 @@ function storage() {
 
 const sessionId = 'first' as SessionId
 const seed = () => ({ kind: 'guide', title: 'Start' })
+
+it('migrates only built-in Session address segments belonging to the verified stored owner', () => {
+  for (const type of ['file', 'tool', 'changes-review']) {
+    expect(qualifySavedResource(`dsh-resource://${type}/session/a%2Fb/detail/a%2Fb`, 'a/b', 'qualified'))
+      .toBe(`dsh-resource://${type}/session/qualified/detail/a%2Fb`)
+  }
+  for (const address of ['https://outside/a', 'dsh-resource://extension/session/a%2Fb/detail',
+    'dsh-resource://file/session/other/file', 'dsh-resource://file/session/%xx/file']) {
+    expect(qualifySavedResource(address, 'a/b', 'qualified')).toBe(address)
+  }
+})
 
 it('restores current layout independently by Session with a fresh undo history', () => {
   storage()
@@ -63,7 +75,11 @@ it('pins restored records during adoption before the first render or store mutat
   first.actions.openContent(sessionId, { kind: 'text', contentId: address, title: 'a' }, (id) => { file = id })
   const ctx = new Context()
   const pin = vi.fn()
-  const { controller, adopt } = createSidebarRightController(new SidebarRightTabRegistry(ctx), pin)
+  const { controller, adopt } = createSidebarRightController(new SidebarRightTabRegistry(ctx), pin, {
+    autoFullscreen: () => false,
+    openWithFocus: (_sessionId, open) => { open() },
+    closeWithFocus: (_sessionId, _paneId, close) => { close() },
+  })
   expect(controller.tabsIn(sessionId)).toEqual([])
   const restored = createSidebarRightStore(seed).create(sessionId)
   const release = adopt(sessionId, restored)

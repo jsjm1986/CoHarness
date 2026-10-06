@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-session-list-empty-content-and-archive-ordering.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-session-list-empty-content-and-archive-ordering.md
-2026-08-25-session-list-empty-content-and-archive-ordering.md: c76eca4de424970970108f86e791acf1ff08f050
-2026-08-25-session-list-empty-content-and-archive-ordering.zh.md: 69c8e0fc8338915df51089759194ca43584df84c
+/agent-note-session-list-hides-empty-turns-and-resists-stale-archive-snapshots:
+  en: bd2d0db0f7fcd13c
+  zh: 537c4d06e0dfa204
+/agent-note-session-list-hides-empty-turns-and-resists-stale-archive-snapshots/problem:
+  en: 20a9ba2f02267bdd
+  zh: 3fb91f345318633d
+/agent-note-session-list-hides-empty-turns-and-resists-stale-archive-snapshots/decision:
+  en: ae97dce4f00b2bc5
+  zh: 7975104b2417bad4
+/agent-note-session-list-hides-empty-turns-and-resists-stale-archive-snapshots/alternatives-considered:
+  en: 73830bd4a7671e04
+  zh: f3d91b467b6da404
+/agent-note-session-list-hides-empty-turns-and-resists-stale-archive-snapshots/consequences:
+  en: 4a59210c43ed2620
+  zh: df7fc57ca28c301b
+/agent-note-session-list-hides-empty-turns-and-resists-stale-archive-snapshots/verification:
+  en: 2769fc336e41aacb
+  zh: 199f5d1245863119
+/agent-note-session-list-hides-empty-turns-and-resists-stale-archive-snapshots/related:
+  en: a1bd06af4d4ab839
+  zh: 6884d7ed45ce4619

@@ -154,6 +154,9 @@ export class WebProductBundleIsolation {
     const checkModule = (id: string): void => {
       if (visitedModules.has(id)) return
       visitedModules.add(id)
+      // Bundler-internal helpers (the \0-virtual space and rolldown's runtime)
+      // are emitted, not input, so they own no module record or input proof.
+      if (id.startsWith('\0') || /^[\s\0]*rolldown\//.test(id)) return
       this.inputs.assertInput(id)
       const info = moduleInfo(id)
       if (info === null) throw new Error(`Web product isolation: module ${id} has no Rollup module record`)
@@ -165,6 +168,8 @@ export class WebProductBundleIsolation {
       for (const file of this.cssInputs.get(id) ?? []) this.inputs.assertInput(file)
       for (const child of [...info.importedIds, ...info.dynamicallyImportedIds]) {
         const childInfo = moduleInfo(child)
+        // Bundler-internal children own no record, same as virtual parents.
+        if (childInfo === null && (child.startsWith('\0') || /^[\s\0]*rolldown\//.test(child))) continue
         if (childInfo === null) throw new Error(`Web product isolation: module ${child} has no Rollup module record`)
         if (childInfo.isIncluded || childInfo.isExternal) checkModule(child)
       }
@@ -178,7 +183,10 @@ export class WebProductBundleIsolation {
       if (this.workerInputs.has(file)) checkWorker(file)
       else if (item.type === 'chunk') {
         for (const id of Object.keys(item.modules)) checkModule(id)
-        queue.push(...item.imports, ...item.dynamicImports, ...item.implicitlyLoadedBefore, ...item.referencedFiles)
+        queue.push(
+          ...item.imports, ...item.dynamicImports,
+          ...item.implicitlyLoadedBefore, ...item.referencedFiles,
+        )
         queue.push(...item.viteMetadata?.importedCss ?? [], ...item.viteMetadata?.importedAssets ?? [])
       } else if (cssOwners.has(file)) {
         for (const id of cssOwners.get(file) ?? []) checkModule(id)

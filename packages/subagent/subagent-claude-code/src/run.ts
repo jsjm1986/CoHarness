@@ -147,6 +147,10 @@ function unattendedDiagnostic(
  * run inputs and error normalization instead of adding a shared lifecycle owner. */
 /** Fully resolved inputs for one official Claude Agent SDK query. */
 export interface ClaudeCodeRunSpec {
+  /** Preinstalled target-local CLI, instead of the bundled SDK executable. */
+  readonly executable?: string
+  /** Forward only explicit deployment environment to a remote execution target. */
+  readonly remote?: boolean
   /** Parent Session workspace supplied to the SDK and real CLI. */
   readonly cwd: string
   /** Profile-selected native model; omitted to preserve Claude settings. */
@@ -319,6 +323,8 @@ export function claudeQueryOptions(
   return {
     abortController: controller,
     cwd: spec.cwd,
+    ...spec.remote === true ? { executable: 'node' as const } : {},
+    ...spec.executable === undefined ? {} : { pathToClaudeCodeExecutable: spec.executable },
     ...spec.model === undefined ? {} : { model: spec.model },
     env: { ...scrubbedParentEnv(), ...spec.env },
     persistSession: false,
@@ -362,7 +368,8 @@ export function claudeQueryOptions(
     },
     supportedDialogKinds: SUPPORTED_UNATTENDED_DIALOG_KINDS,
     spawnClaudeCodeProcess: (options: SpawnOptions) => {
-      const child = spec.spawn(claudeSpawnSpec(options, spec.disposeGraceMs))
+      const spawn = claudeSpawnSpec(options, spec.disposeGraceMs)
+      const child = spec.spawn(spec.remote === true ? { ...spawn, env: spec.env } : spawn)
       const process = new ManagedClaudeCodeProcess(child)
       capture(child, process)
       return process

@@ -23,6 +23,30 @@ it('loads registered namespaces without duplicating account preferences and acce
   expect(await controller.save('shell', [], 2)).toMatchObject({ ok: false, error: { code: 'wrong-namespace' } })
   expect(controller.state.getSnapshot().namespaces[0]?.revision).toBe(2)
 })
+it('carries the registrant label onto ledger items and keeps the namespace fallback', async () => {
+  const { controller, remote } = fixture()
+  vi.mocked(remote.describe).mockResolvedValueOnce(described([
+    { ...view, label: { en: 'Shell', zh: '终端' } },
+    { ...view, ns: 'unlabelled' },
+  ]))
+  await controller.load()
+  expect(controller.ledger.getSnapshot().items).toEqual([
+    { id: 'shell', label: 'shell', labelText: { en: 'Shell', zh: '终端' } },
+    { id: 'unlabelled', label: 'unlabelled' },
+  ])
+})
+it('derives configured bundles and rows from configuration keys', async () => {
+  const { controller, remote } = fixture()
+  vi.mocked(remote.describe).mockResolvedValueOnce(described([
+    view,
+    { ...view, ns: 'dsh-pack' },
+    { ...view, ns: 'dsh-pack#sidebar' },
+    { ...view, ns: 'unrelated-key' },
+  ]))
+  await controller.load()
+  expect(controller.ledger.getSnapshot().bundles).toEqual(new Set(['shell', 'dsh-pack', 'unrelated-key']))
+  expect(controller.ledger.getSnapshot().rows).toEqual(new Set(['dsh-pack#sidebar']))
+})
 it('discards old reads when a newer load or accepted mutation has superseded them', async () => {
   const { controller, remote } = fixture()
   await controller.load()

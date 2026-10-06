@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { SettingsRootComponentProps } from '../src/client/shell-contract.ts'
 import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
+import { createSettingsShellStore } from '../src/client/shell-store.ts'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 
 afterEach(cleanup)
 
@@ -59,9 +61,13 @@ function mount({
       byId: { 'active-session': { blank: false } },
     })) as never
   const unusedHook = (() => { throw new Error('unused by SettingsRoot') }) as never
+  const shell = createSettingsShellStore().create()
   const props: SettingsRootComponentProps = {
     useSessions,
     useWorkspaces: unusedHook,
+    usePanelInfo: unusedHook,
+    useStore: bindSnapshotSelector(shell),
+    actions: shell.actions,
     reconnect,
     t: ((key: string) => key),
     useConnectionState: (select) => {
@@ -195,10 +201,10 @@ describe('SettingsPanel close paths', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
-  it('lands focus on the close button when the dialog opens', () => {
+  it('lands focus on the first nav row when the dialog opens', () => {
     mount()
     openPanel()
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'General' }))
   })
 })
 

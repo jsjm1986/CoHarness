@@ -3,6 +3,8 @@
  * narrow RpcRequest<P> and echoes request.rpcId on the RpcResponse<T>.
  */
 
+import { REMOTE_SESSION_POLICIES, remoteSessionId } from './api/remote-session-routing.ts'
+import { hostSessionLifecycle } from './session-lifecycle.ts'
 import type {} from '@deepseek-ai/dsh-plugin-manager'
 import { randomUUID } from 'node:crypto'
 import { createDesktopApi } from './desktop.ts'
@@ -14,7 +16,7 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path
 import { z as zod } from 'zod'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-terminal-controller'
-import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
+import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentSetup, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
@@ -68,6 +70,7 @@ import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
 import type { Workspace, WorkspaceRecord } from '@deepseek-ai/dsh-workspace'
 import {
   workspaceDomainState, workspaceRecord, WorkspaceId as brandWorkspaceId,
+  WorkspaceActiveSessionError, WorkspaceArchivedSessionPinError,
   WorkspaceMoveInvalidError, WorkspaceOrderInvalidError, WorkspaceUnknownSessionError,
 } from '@deepseek-ai/dsh-workspace'
 // Type-only: brings the `ctx.tools` Context merge into this program (viewFor reads presenters).
@@ -113,7 +116,7 @@ import {
 import type {} from '@deepseek-ai/dsh-session-projection'
 // Type-only: resolves `ctx.get('tasks')` to the background job registry.
 import type {} from '@deepseek-ai/dsh-jobs'
-import type { JobSnapshot } from '@deepseek-ai/dsh-jobs'
+import type { JobView as RegistryJobView } from '@deepseek-ai/dsh-jobs'
 // Type-only: resolves `ctx.get('sessionProjectionCache')` (the cold listing column).
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
 // Type-only edges: resolve the command-change stream and `ctx.get('skills')`.
@@ -132,12 +135,11 @@ import {
   TypertLookupFailure,
   type TypertGatewayAuthorizationRequest,
 } from '@deepseek-ai/dsh-typert-protocol'
+import type {} from '@deepseek-ai/dsh-skill'
 // Type-only: the dynamic-package runner's forwarded-event declarations. Its
 // client-safe `./types` subpath deliberately, not the package root — the root
-// merges `ctx.dynamicCordisRunner`, and a dependency on that package would
-// rebuild the api-remotes cycle this direction exists to avoid.
+// merges `ctx.dynamicCordisRunner`, a service the proxy does not consume.
 import type {} from '@deepseek-ai/dsh-cordis-host-runner/types'
-import type {} from '@deepseek-ai/dsh-skill'
 // The settings/credentials seams: brand guards run at this wire boundary; the
 // service reads stay optional (`ctx.get`) so a composition without either
 // provider still serves every other domain.
@@ -152,6 +154,8 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
 // Side-effect type import: resolves the `approval/request` waterfall and
 // `ctx.get('approval')` without a value dependency on the seam (optional composition).
 import type {} from '@deepseek-ai/dsh-user-approval'
+// Type-only: resolves the `schedule/changed` forward event and `ctx.get('schedule')`.
+import type {} from '@deepseek-ai/dsh-schedule/client'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
 import { inboxProjectionDefinition } from './inbox-projection.ts'
 import { modelSelectionProjectionDefinition } from './model-selection-projection.ts'
@@ -173,7 +177,11 @@ import {
   hasApiRemoteSubagentOwner,
   inspectApiRemoteSession,
 } from '@deepseek-ai/dsh-api-remotes'
-import { canOpenNativePath, openNativePath, openNativeTextFile } from './native-path-opener.ts'
+import {
+  canOpenNativePath, nativeFileApplications, nativeFileManager, openNativeFileApplication,
+  openNativePath, openNativeTextFile, revealNativePath,
+  type NativeFileApplication,
+} from './native-path-opener.ts'
 
 /** Page size when history is called without maxMessages. */
 const DEFAULT_MAX_MESSAGES = 50
@@ -196,44 +204,7 @@ const COLD_SUMMARY_BATCH_SIZE = 16
 /** Default maximum artifact size eligible for one cold blankness read. */
 export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 1024
 
-interface TypertSessionAuthorization {
-  readonly action: CollaborationAction
-  readonly sessionId: (args: Readonly<Record<string, unknown>>) => SessionId | undefined
-}
 
-/** Project-scope Remote methods whose resource and mutation class are explicit. */
-const PROJECT_TYPERT_SESSION_AUTHORIZATION: Readonly<Record<string, TypertSessionAuthorization>> = Object.freeze({
-  'commands/list': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'commands/execute': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'fileReferences/list': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'sessionReferenceResolver/candidates': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'goals/create': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/edit': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/pause': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/resume': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/complete': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/clear': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'messageFeedback/list': { action: 'read', sessionId: args => typertRequestSessionId(args.request) },
-  'messageFeedback/put': { action: 'write', sessionId: args => typertRequestSessionId(args.request) },
-  'messageFeedback/delete': { action: 'write', sessionId: args => typertRequestSessionId(args.request) },
-  'dynamicCordisRunner/runHostHalf': { action: 'approve', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/getClientCode': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/settleUserRun': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/stopFromPanel': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/undefineFromPanel': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/reportRenderFailure': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/reportClientGuardFailure': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'dynamicCordisRunner/resolveInspectQuery': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'goals/get': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'subagents/list': { action: 'read', sessionId: args => typertSessionId(args.parentSessionId) },
-  'subagents/prompt': { action: 'write', sessionId: args => typertRequestFieldSessionId(args.request, 'parentSessionId') },
-  'subagents/interruptByParent': { action: 'write', sessionId: args => typertSessionId(args.parentSessionId) },
-  'agentPresets/select': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'agentTeams/view': { action: 'read', sessionId: args => typertSessionId(args.agentId) },
-  'agentTeams/createTask': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'agentTeams/updateTask': { action: 'write', sessionId: args => typertSessionId(args.agentId) },
-  'sessionFeedback/record': { action: 'write', sessionId: args => typertRequestSessionId(args.request) },
-})
 
 /**
  * Project-scope Remote methods that expose read-only process-wide runtime state
@@ -241,11 +212,30 @@ const PROJECT_TYPERT_SESSION_AUTHORIZATION: Readonly<Record<string, TypertSessio
  * request principal is captured, so every member (ro or rw) may call them; the
  * owning service filters rows that carry Session-scoped metadata itself.
  */
-const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
+export const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
+  // Host-wide read whose payload the invoke seam narrows back to the
+  // participant's readable Sessions — the task store is global, visibility is not.
+  'schedule/catalog',
   'pluginInventory/list',
   'dynamicCordisRunner/inventory',
   'llm/listProviders',
   'llm/listConfigurableProviders',
+  'permissionPresets/catalog',
+  'pluginRegistryProbe/fastest',
+  'speech/catalog',
+  'speech/follow',
+])
+
+/**
+ * Project-scope Remote operations with no Session identity that every
+ * participant may invoke — per-client voice capture prepares the shared
+ * provider and transcribes its own recordings; none carries another
+ * participant's data. Provider selection stays manager-only below.
+ */
+export const PROJECT_TYPERT_PROCESS_WIDE_OPERATIONS: ReadonlySet<string> = new Set([
+  'speech/prepare',
+  'speech/cancelPreparation',
+  'speech/transcribe',
 ])
 
 /**
@@ -254,19 +244,28 @@ const PROJECT_TYPERT_PROCESS_WIDE_READS: ReadonlySet<string> = new Set([
  * enforces its Session ACL or deployment management policy itself; this table
  * only admits the call after principal capture has verified project membership.
  */
-const USER_TERMINAL_ENDPOINTS = new Set(['environment', 'shells', 'list', 'create', 'retain', 'follow', 'write', 'resize', 'rename', 'close'].map(method => `terminal/${method}`))
+export const USER_TERMINAL_ENDPOINTS = new Set(['environment', 'shells', 'list', 'create', 'retain', 'follow', 'write', 'resize', 'rename', 'close'].map(method => `terminal/${method}`))
+
+/** Administrative terminal operations; the controller's own grant check runs inside the handler. */
+export const ADMIN_TERMINAL_ENDPOINTS: ReadonlySet<string> = new Set(['terminal/adminList', 'terminal/adminClose'])
 const TERMINAL_REQUEST_SIGNAL = new AbortController().signal
 
-const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
+/** Registry-inspection endpoints every project participant may call (read-only plugin/preset introspection). */
+export const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
   'dynamicCordisRunner/resolveRequestRun',
   'dynamicCordisRunner/invoke',
   'dynamicCordisRunner/syncInspectManifest',
   'agentPresets/list',
+  'pluginManager/access',
   'pluginManager/listPlugins',
   'pluginManager/listBundles',
+  'pluginManager/listVersionExemptions',
+  'pluginManager/registries',
+  'pluginManager/waitForInstall',
   'pluginManager/inspect',
   'pluginManager/setPluginEnabled',
   'pluginManager/setBundleEnabled',
+  'pluginManager/setVersionExemption',
   'pluginManager/installBundle',
   'pluginManager/installBundleStream',
   'pluginManager/cancelInstall',
@@ -278,34 +277,26 @@ const PROJECT_TYPERT_REGISTRY_AUTHORIZED: ReadonlySet<string> = new Set([
  * available to project managers, matching the RPC personal-configuration path.
  * A non-manager project member is refused before lookup.
  */
-const PROJECT_TYPERT_MANAGER_CONFIGURATION: ReadonlySet<string> = new Set([
+export const PROJECT_TYPERT_MANAGER_CONFIGURATION: ReadonlySet<string> = new Set([
   'agentPresets/read',
   'agentPresets/copy',
   'agentPresets/deletePreset',
+  // Speech provider selection is shared mutable state; participants without
+  // manage rights must not reconfigure the voice path for other members.
+  'speech/configure',
 ])
 
 /**
  * Project-scope Remote methods reserved for personal configuration: every
  * project member (ro, rw, or manager) is refused before lookup.
  */
-const PROJECT_TYPERT_PERSONAL_CONFIGURATION: ReadonlySet<string> = new Set([
+export const PROJECT_TYPERT_PERSONAL_CONFIGURATION: ReadonlySet<string> = new Set([
   'llm/discoverModels',
 ])
 
 /** Brand one validated non-empty wire string as a Session identity. */
 function typertSessionId(value: unknown): SessionId | undefined {
   return typeof value === 'string' && value.length > 0 ? brandSessionId(value) : undefined
-}
-
-/** Read a Session identity from a decoded request object. */
-function typertRequestSessionId(value: unknown): SessionId | undefined {
-  return typertRequestFieldSessionId(value, 'sessionId')
-}
-
-/** Read a Session identity from one named field of a decoded request object. */
-function typertRequestFieldSessionId(value: unknown, field: string): SessionId | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
-  return typertSessionId(Reflect.get(value, field))
 }
 
 /** Reject a Typert call through the carrier's existing collaboration error branch. */
@@ -331,6 +322,42 @@ function pluginAdministration(ctx: Context): boolean {
 }
 
 /**
+ * Bind a live human request after its Agent lookup has completed.
+ * @param ctx - Host Context with the managed authority provider.
+ * @param payload - already authorized and decoded Remote invocation.
+ * @param next - resolved business method.
+ * @returns its result under the current initiator's verified identity.
+ */
+export function invokeTypertRemote(ctx: Context, payload: TypertGatewayAuthorizationRequest,
+  next: () => Promise<unknown>): Promise<unknown> {
+  const invoke = (): Promise<unknown> => {
+    if (payload.endpoint !== 'schedule/catalog') return next()
+    const collaboration = ctx.get('collaboration')
+    if (collaboration === undefined) return next()
+    // The task store is Host-wide; a project-scoped caller receives only the
+    // entries bound to Sessions that participant may read.
+    const authority = collaboration.capture()
+    if (authority.participant.scope.kind === 'personal') return next()
+    return next().then(async (result: unknown) => {
+      if (!Array.isArray(result)) return result
+      const rows: readonly unknown[] = result
+      const ids = [...new Set(rows
+        .map(entry => (entry as { sessionId?: unknown }).sessionId)
+        .filter((id): id is string => typeof id === 'string'))] as SessionId[]
+      const readable = await authority.readableSessionIds(ids)
+      return rows.filter(entry => readable.has((entry as { sessionId: SessionId }).sessionId))
+    })
+  }
+  const rule = REMOTE_SESSION_POLICIES[payload.endpoint]
+  if (rule === undefined || rule.action === 'read' || rule.execution !== 'request') return invoke()
+  const id = remoteSessionId(payload.endpoint, payload.args)
+  const agent = id === undefined ? undefined : ctx.agents.get(brandSessionId(id))
+  const authority = executionAuthorityOf(ctx)
+  return agent === undefined || authority === undefined ? invoke()
+    : authority.runRequest(agent, { endpoint: payload.endpoint, args: payload.args }, invoke)
+}
+
+/**
  * Apply project collaboration ACLs to a validated Typert Remote request.
  * Personal requests and compositions without collaboration retain ordinary behavior.
  * @param ctx - Host Context carrying the optional collaboration provider.
@@ -350,7 +377,7 @@ export async function authorizeTypertRemote(
     await manager.authorize()
     return
   }
-  if (payload.endpoint === 'terminal/adminList' || payload.endpoint === 'terminal/adminClose') return
+  if (ADMIN_TERMINAL_ENDPOINTS.has(payload.endpoint)) return
   if (USER_TERMINAL_ENDPOINTS.has(payload.endpoint)) {
     // Retained output uses the controller's revocable creator grant, not an expired browser assertion.
     if (payload.phase === 'stream-item') return
@@ -362,7 +389,7 @@ export async function authorizeTypertRemote(
   }
   const collaboration = ctx.get('collaboration')
   if (collaboration === undefined) return
-  const policy = PROJECT_TYPERT_SESSION_AUTHORIZATION[payload.endpoint]
+  const policy = REMOTE_SESSION_POLICIES[payload.endpoint]
   const action = policy?.action ?? 'manage'
   let authority: CollaborationAuthority
   try {
@@ -372,6 +399,7 @@ export async function authorizeTypertRemote(
   }
   if (authority.participant.scope.kind === 'personal') return
   if (PROJECT_TYPERT_PROCESS_WIDE_READS.has(payload.endpoint)) return
+  if (PROJECT_TYPERT_PROCESS_WIDE_OPERATIONS.has(payload.endpoint)) return
   if (PROJECT_TYPERT_REGISTRY_AUTHORIZED.has(payload.endpoint)) return
   if (PROJECT_TYPERT_MANAGER_CONFIGURATION.has(payload.endpoint)) {
     if (authority.participant.scope.canManage === true) return
@@ -383,7 +411,7 @@ export async function authorizeTypertRemote(
   if (policy === undefined) {
     rejectTypertCollaboration(new CollaborationError('forbidden'), action)
   }
-  const sessionId = policy.sessionId(payload.args)
+  const sessionId = remoteSessionId(payload.endpoint, payload.args)
   if (sessionId === undefined) {
     rejectTypertCollaboration(new Error('Remote authorization did not receive a Session identity'), action)
   }
@@ -923,6 +951,9 @@ function authorizeReadBatch<F extends MuxFrame | HostFrame>(
       if (payload.type === 'host/archived-sessions-changed') {
         for (const id of payload.archivedSessionIds) sessionIds.add(id)
       }
+      if (payload.type === 'host/pinned-sessions-changed') {
+        for (const id of payload.pinnedSessionIds) sessionIds.add(id)
+      }
       if (payload.type === 'host/remote-event' && payload.event === 'agent-preset/selected') {
         sessionIds.add(payload.args[0] as SessionId)
       }
@@ -947,6 +978,9 @@ function authorizeReadBatch<F extends MuxFrame | HostFrame>(
       }
       if (payload.type === 'host/archived-sessions-changed') {
         return [{ ...item, payload: { ...payload, archivedSessionIds: payload.archivedSessionIds.filter(id => allowed.has(id)) } }]
+      }
+      if (payload.type === 'host/pinned-sessions-changed') {
+        return [{ ...item, payload: { ...payload, pinnedSessionIds: payload.pinnedSessionIds.filter(id => allowed.has(id)) } }]
       }
       return [item]
     })
@@ -1001,19 +1035,29 @@ function subscribeSession(
 }
 
 /**
- * Project registry snapshots onto the wire view, dropping the three internal
- * fields {@link JobView} documents as absent.
+ * Project registry snapshots onto the wire view, dropping the internal fields
+ * {@link JobView} documents as absent.
  */
-function jobViews(snapshots: readonly JobSnapshot[]): JobView[] {
-  return snapshots.map(job => ({
+function jobView(job: RegistryJobView): JobView {
+  return {
     id: job.id,
     kind: job.kind,
     label: job.label,
     status: job.status,
+    ...job.progress === undefined ? {} : { progress: job.progress },
     ...job.detail === undefined ? {} : { detail: job.detail },
     startedAt: job.startedAt,
     ...job.finishedAt === undefined ? {} : { finishedAt: job.finishedAt },
-  }))
+    output: {
+      total: job.output.total,
+      earliest: job.output.earliest,
+      ...job.output.spillPaths === undefined ? {} : { spillPaths: [...job.output.spillPaths] },
+    },
+  }
+}
+
+function jobViews(snapshots: readonly RegistryJobView[]): JobView[] {
+  return snapshots.map(jobView)
 }
 
 /**
@@ -1201,6 +1245,12 @@ export interface ApiProxyDefaults {
   cwd: string
   /** Native open-with-default-application; injectable for carrier tests. */
   openPath?: (path: string, signal: AbortSignal) => Promise<void>
+  /** Native reveal-in-file-manager; injectable for carrier tests. */
+  revealPath?: (path: string, signal: AbortSignal) => Promise<void>
+  /** Native open-with-chosen-application; injectable for carrier tests. */
+  openFileApplication?: (path: string, application: string, signal: AbortSignal) => Promise<void>
+  /** OS file-association query; injectable for carrier tests. */
+  fileApplications?: (path: string, signal: AbortSignal) => Promise<readonly NativeFileApplication[]>
   /** Native text-editor handoff; injectable for settings-document tests. */
   openTextFile?: (path: string, signal: AbortSignal) => Promise<void>
   /** Validated DEFLATE level for session-log ZIP entries; defaults to 6. */
@@ -1264,9 +1314,12 @@ function requestedFrame(pending: PendingApproval): RpcRequest<MuxFrame> {
 
 /** One host-owned question wait, addressed by the stable server-request id. */
 interface PendingQuestion {
+  executionScope: ExecutionInheritance | undefined
   rpcId: RpcId
   sessionId: SessionId
   questions: AskUserQuestionItem[]
+  /** Host-named wait identity: the Client card key and its timed flag, replayed verbatim. */
+  wait?: { callId: ToolCallId; timed?: boolean }
   resolve: (answer: AskUserQuestionAnswer) => void
   reject: (error: UserQuestionError) => void
   signal?: AbortSignal
@@ -1321,13 +1374,12 @@ function viewFor(
     }
     if (event.type === 'tool/result') {
       const { message, meta } = event.data
-      const [result] = message.content
-      const callId = message.source.callId
+      const callId = message.toolCallId
       const call = argsFor(callId) as { name: string; args: unknown } | undefined
       if (call === undefined) return undefined
       const view = ctx.tools.get(call.name, scope)?.presentResult?.(call.args, {
-        content: result.content,
-        isError: result.isError === true,
+        content: [...message.content],
+        isError: message.isError === true,
         ...meta === undefined ? {} : { meta },
       })
       return view === undefined ? undefined : { for: 'result', view }
@@ -1788,6 +1840,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   const selections = new WeakMap<Agent, WebModelSelectionRef>()
   /** Client-chosen identity creation/resume, deduplicated across concurrent retries. */
   const sessionCreations = new Map<SessionId, Promise<Agent>>()
+  const sessionOwner = hostSessionLifecycle(ctx)
   /** Draft workspace attachments are published only after durable content lands. */
   const draftSessions = new Map<SessionId, {
     workspace: Workspace
@@ -1798,6 +1851,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   /** Serializes path ownership and explicit title checks with Workspace mutations. */
   let workspaceCreationChain = Promise.resolve()
   const pendingQuestions = new Map<RpcId, PendingQuestion>()
+  /** Open `events.mux` consumer count — the liveness signal for page-dispatched requests. */
+  let liveEventClients = 0
   const pendingApprovals = new Map<RpcId, PendingApproval>()
   const muxQueues = new Set<MuxSubscription>()
   const imageAdmissionChains = new WeakMap<Agent, Promise<void>>()
@@ -2125,6 +2180,35 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return sessionIds.filter(sessionId => readable.has(sessionId))
   }
 
+  /**
+   * Filter the archived set and its revision as one snapshot captured before
+   * the authorization await: the emitted revision describes exactly the id
+   * set it is paired with, even when the registry changes mid-filter.
+   */
+  async function readableArchivedSessionSet(
+    authority: CollaborationAuthority | undefined,
+  ): Promise<{ archivedSessionIds: SessionId[]; archiveRevision: number }> {
+    const snapshot = ctx.workspaceRegistry.archiveSnapshot()
+    return {
+      archivedSessionIds: await readableSessionList(snapshot.archivedSessionIds, authority),
+      archiveRevision: snapshot.revision,
+    }
+  }
+
+  /**
+   * The archived-input refusal, or undefined when the session is writable.
+   * Minimal compositions without a Workspace Registry have no archive set.
+   */
+  function archivedInputError(sessionId: SessionId):
+    { code: 'session-archived'; message: string; details: { sessionId: SessionId } } | undefined {
+    if (ctx.get('workspaceRegistry')?.archivedSessionIds.includes(sessionId) !== true) return undefined
+    return {
+      code: 'session-archived',
+      message: `session ${sessionId} is archived; unarchive it before sending input`,
+      details: { sessionId },
+    }
+  }
+
   /** Filter a workspace order to paths owned by the captured project runtime. */
   async function readableWorkspaceOrder(
     workspaceIds: readonly WorkspaceId[],
@@ -2418,6 +2502,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   // restore that history under the old tool set.
   const { agentFor, pendingResume } = createApiRemoteAgentResolver(ctx, {
     agentOptions,
+    onResumed: (handle) => { sessionOwner.own(handle) },
     setup: async ({ meta, events }) =>
       (await composeAgent(resolveSessionPreset({ header: meta, events }), meta.sshTarget)).setup,
     liveAdmission: async (agent) => {
@@ -2437,6 +2522,16 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       }
     },
   })
+
+  // Publish the shared Session-resolution surface non-session capabilities
+  // inject (the Schedule service resolves a due task's original Session
+  // through it). Same resolver instance: the cold-resume and ownership rules
+  // cannot drift between entry points. The publish is idempotent because
+  // the resolver derives from this ctx — a second proxy on the same ctx
+  // contributes nothing.
+  if (ctx.get('sessionController') === undefined) {
+    ctx.provide('sessionController', { resolveAgent: agentFor })
+  }
 
   /** Send one transient frame to every connected mux consumer. */
   function broadcast(payload: MuxFrame): void {
@@ -2556,7 +2651,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   })
 
   /** Remove a wait before settling it: synchronous deletion makes the first claimant win. */
-  function claimQuestion(pending: PendingQuestion, outcome: 'answered' | 'cancelled'): void {
+  function claimQuestion(pending: PendingQuestion, outcome: 'answered' | 'cancelled' | 'pending'): void {
     pendingQuestions.delete(pending.rpcId)
     if (pending.signal !== undefined && pending.onAbort !== undefined) {
       pending.signal.removeEventListener('abort', pending.onAbort)
@@ -2577,12 +2672,22 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       const rpcId = RpcId(randomUUID())
       const pending: PendingQuestion = {
         rpcId, sessionId, questions: request.questions, resolve, reject,
+        executionScope: request.agent === undefined ? undefined : executionAuthorityOf(ctx)?.capture(request.agent),
+        ...(request.wait === undefined ? {} : { wait: request.wait }),
         ...(request.signal === undefined ? {} : { signal: request.signal }),
       }
       const onAbort = (): void => {
-        claimQuestion(pending, 'cancelled')
-        reject(new UserQuestionError(
-          'ask_user_question was aborted before the user answered', 'ASK_ABORTED'))
+        // A timed wait ends with the service's ASK_TIMED_OUT as the abort
+        // reason: the frame outcome distinguishes a continued question (still
+        // answerable from its tool call row) from a real cancellation, and the
+        // rejection preserves the code so askTimed can map it to `pending`.
+        const reason: unknown = request.signal?.reason
+        const timedOut = reason instanceof UserQuestionError && reason.code === 'ASK_TIMED_OUT'
+        claimQuestion(pending, timedOut ? 'pending' : 'cancelled')
+        reject(reason instanceof Error
+          ? reason
+          : new UserQuestionError(
+            'ask_user_question was aborted before the user answered', 'ASK_ABORTED'))
       }
       pending.onAbort = onAbort
       pendingQuestions.set(rpcId, pending)
@@ -2593,7 +2698,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       }
       const envelope: RpcRequest<MuxFrame> = {
         rpcId,
-        payload: { type: 'question/requested', sessionId, questions: request.questions },
+        payload: { type: 'question/requested', sessionId, questions: request.questions,
+          ...(pending.wait === undefined ? {} : { wait: pending.wait }) },
       }
       broadcastEnvelope(envelope)
     })
@@ -3163,6 +3269,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     draft = false,
     sshTarget?: number,
   ): Promise<Agent> {
+    using _admission = ctx.agents.reserveUse([sessionId])
     let creation = sessionCreations.get(sessionId)
     if (creation === undefined) {
       creation = (async () => {
@@ -3209,11 +3316,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           // rebuilding it differently would replay tool calls the model can no
           // longer make. The persisted SSH binding likewise re-mounts from the
           // header, re-resolved under the resuming caller's authority.
-          return (await ctx.agents.resume({
+          return sessionOwner.own(await ctx.agents.resume({
             resumeSessionId: sessionId,
             agentOptions: agentOptions(),
             setup: (await composeAgent(storedPreset, inspected.meta.sshTarget)).setup,
-          })).agent
+          }))
         }
 
         if (sshTarget === undefined) {
@@ -3224,7 +3331,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
         }
         const composition = await composeAgent(presetId, sshTarget)
-        return (await ctx.agents.create({
+        return sessionOwner.own(await ctx.agents.create({
           sessionId,
           agentOptions: agentOptions(),
           meta: {
@@ -3234,7 +3341,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             ...sshTarget === undefined ? {} : { sshTarget },
           },
           setup: composition.setup,
-        })).agent
+        }))
       })().catch((error: unknown) => {
         // Another Host entry path may have published the same identity while
         // this operation crossed an asynchronous persistence/filesystem step.
@@ -3459,12 +3566,24 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     }
   }
 
-  /** Open one Host-resolved path with its default application. */
+  /**
+   * Open one Host-resolved path: default application, an explicit
+   * file-association id, or the file-manager reveal. `openNativeFileApplication`
+   * re-checks the id against the file's current handlers, so a stale menu row
+   * fails at the executor rather than silently opening the default.
+   */
   function openPath(
     request: RpcRequest<unknown>, path: string, signal: AbortSignal,
+    action: 'open' | 'reveal' | undefined, application: string | undefined,
   ): Promise<RpcResponse<{ opened: true }>> {
-    const open = defaults.openPath
-      ?? ((target: string, openSignal: AbortSignal) => openNativePath(target, openSignal))
+    const injected = defaults.openFileApplication
+    const open = action === 'reveal'
+      ? defaults.revealPath ?? ((target: string, openSignal: AbortSignal) => revealNativePath(target, openSignal))
+      : application !== undefined
+        ? injected !== undefined
+          ? (target: string, openSignal: AbortSignal) => injected(target, application, openSignal)
+          : (target: string, openSignal: AbortSignal) => openNativeFileApplication(target, application, openSignal)
+        : defaults.openPath ?? ((target: string, openSignal: AbortSignal) => openNativePath(target, openSignal))
     return openTarget(request, path, signal, open)
   }
 
@@ -3522,6 +3641,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       revision: descriptor.revision,
       writable: namespaceWritable,
       owner: descriptor.owner,
+      ...descriptor.label === undefined ? {} : { label: descriptor.label },
       ...writableReason === undefined ? {} : { writableReason },
       ...descriptor.projectWritePaths === undefined
         ? {}
@@ -4447,6 +4567,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const { sessionId, atSeq } = request.payload
         const authorized = await authorizeSession(sessionId, 'write')
         if ('error' in authorized) return err(request, authorized.error)
+        let admission: Disposable
+        try {
+          admission = ctx.agents.reserveUse([sessionId])
+        } catch (error: unknown) {
+          return err(request, { code: 'fork-unavailable', message: String(error), details: { sessionId } })
+        }
+        using _admission = admission
         let source: SessionReadState
         try {
           source = await readSessionState(sessionId)
@@ -4507,7 +4634,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // plane, composing nothing would leave the child with no tools at all.
         const forkComposition = await composeAgent(resolveSessionPreset(source), source.header.sshTarget)
         try {
-          await ctx.agents.create({
+          sessionOwner.own(await ctx.agents.create({
             sessionId: childId,
             seed: events.slice(0, cut),
             meta: {
@@ -4525,7 +4652,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               if (executionScope !== undefined && authority !== undefined) authority.inherit(agent.session, executionScope)
               return forkComposition.setup(agentCtx, agent)
             },
-          })
+          }))
         } catch (error: unknown) {
           return err(request, {
             code: 'internal',
@@ -4561,6 +4688,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         const authorized = await authorizeSession(sessionId, 'write')
         if ('error' in authorized) return err(request, authorized.error)
+        // An archived session admits no input; clients may hold a stale
+        // mounted view until the archive baseline lands.
+        const archived = archivedInputError(sessionId)
+        if (archived !== undefined) return err(request, archived)
         const canonicalTimeZone = clientTimeZone === undefined
           ? undefined
           : canonicalClientTimeZone(clientTimeZone)
@@ -4603,6 +4734,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             let message: UserMessage = createUserMessage({ content: durable.blocks, source: messageSource })
             const execution = executionAuthorityOf(ctx)
             if (execution !== undefined) message = await execution.stamp(agent.session, message)
+            // Re-decide after the awaited conversion/stamp: a session archived
+            // mid-request admits no input.
+            const archived = archivedInputError(sessionId)
+            if (archived !== undefined) return err(request, archived)
             if (mode === 'steer') agent.steer(message)
             else agent.followup(message)
           } catch (error: unknown) {
@@ -4700,6 +4835,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { issues: [] },
           })
         }
+        // Edit and steer admit input; removal stays allowed so queued work
+        // can still be released from an archived session.
+        if (action.kind !== 'remove') {
+          const archived = archivedInputError(sessionId)
+          if (archived !== undefined) return err(request, archived)
+        }
         let agent = ctx.agents.get(sessionId)
         if (agent === undefined) {
           // A restored Session's pending Inbox rows live in its durable
@@ -4754,6 +4895,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const execution = executionAuthorityOf(ctx)
         if (action.kind !== 'remove' && execution !== undefined) {
           replacement = await execution.stamp(agent.session, replacement)
+        }
+        if (action.kind !== 'remove') {
+          const archived = archivedInputError(sessionId)
+          if (archived !== undefined) return err(request, archived)
         }
         const current = (target === 'next-turn' ? agent.inbox.nextTurn : agent.inbox.nextStep)
           .find(candidate => candidate.id === itemId)
@@ -4907,13 +5052,15 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             const visible = await readableWorkspaceView(workspaceView(workspace), captured.authority)
             if (visible !== undefined) items.push(visible)
           }
+          const archived = await readableArchivedSessionSet(captured.authority)
           return ok(request, {
             items,
-            archivedSessionIds: await readableSessionList(
-              ctx.workspaceRegistry.archivedSessionIds,
+            archivedSessionIds: archived.archivedSessionIds,
+            pinnedSessionIds: await readableSessionList(
+              ctx.workspaceRegistry.pinnedSessionIds,
               captured.authority,
             ),
-            archiveRevision: ctx.workspaceRegistry.archiveRevision,
+            archiveRevision: archived.archiveRevision,
           })
         } catch (error: unknown) {
           return err(request, collaborationRefusal(error, 'read'))
@@ -5085,14 +5232,24 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       async archiveSession(request) {
-        const { sessionId } = request.payload
+        const { sessionId, stopActivity } = request.payload
         const authorized = await authorizeSession(sessionId, 'write')
         if ('error' in authorized) return err(request, authorized.error)
         try {
-          await ctx.workspaceRegistry.archiveSession(sessionId)
+          await ctx.workspaceRegistry.archiveSession(
+            sessionId,
+            stopActivity === true ? { stopActivity: true } : {},
+          )
         } catch (error: unknown) {
-          // Only the registry's unknown-session rejection is the business
-          // code; storage/durability failures propagate as internal errors.
+          // Only the registry's domain rejections are business codes;
+          // storage/durability failures propagate as internal errors.
+          if (error instanceof WorkspaceActiveSessionError) {
+            return err(request, {
+              code: 'session-active',
+              message: error.message,
+              details: { sessionId, activity: error.activity },
+            })
+          }
           if (!(error instanceof WorkspaceUnknownSessionError)) throw error
           return err(request, {
             code: 'session-not-found',
@@ -5101,12 +5258,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           })
         }
         try {
+          const archived = await readableArchivedSessionSet(authorized.authority)
           return ok(request, {
-            archivedSessionIds: await readableSessionList(
-              ctx.workspaceRegistry.archivedSessionIds,
-              authorized.authority,
-            ),
-            archiveRevision: ctx.workspaceRegistry.archiveRevision,
+            archivedSessionIds: archived.archivedSessionIds,
+            archiveRevision: archived.archiveRevision,
           })
         } catch (error: unknown) {
           return err(request, collaborationRefusal(error, 'read', sessionId))
@@ -5120,18 +5275,132 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // Idempotent like the registry operation: an id that is not archived
         // (a lost race with another surface) resolves as a no-op returning the
         // current set, not as an error.
-        await ctx.workspaceRegistry.restoreSession(sessionId)
+        await ctx.workspaceRegistry.unarchiveSession(sessionId)
         try {
+          const archived = await readableArchivedSessionSet(authorized.authority)
           return ok(request, {
-            archivedSessionIds: await readableSessionList(
-              ctx.workspaceRegistry.archivedSessionIds,
-              authorized.authority,
-            ),
-            archiveRevision: ctx.workspaceRegistry.archiveRevision,
+            archivedSessionIds: archived.archivedSessionIds,
+            archiveRevision: archived.archiveRevision,
           })
         } catch (error: unknown) {
           return err(request, collaborationRefusal(error, 'read', sessionId))
         }
+      },
+
+      async pinSession(request) {
+        const { sessionId } = request.payload
+        const authorized = await authorizeSession(sessionId, 'write')
+        if ('error' in authorized) return err(request, authorized.error)
+        try {
+          await ctx.workspaceRegistry.pinSession(sessionId)
+        } catch (error: unknown) {
+          if (error instanceof WorkspaceUnknownSessionError) {
+            return err(request, {
+              code: 'session-not-found',
+              message: error.message,
+              details: { sessionId },
+            })
+          }
+          if (error instanceof WorkspaceArchivedSessionPinError) {
+            return err(request, { code: 'session-archived', message: error.message, details: { sessionId } })
+          }
+          throw error
+        }
+        try {
+          return ok(request, {
+            pinnedSessionIds: await readableSessionList(
+              ctx.workspaceRegistry.pinnedSessionIds,
+              authorized.authority,
+            ),
+          })
+        } catch (error: unknown) {
+          return err(request, collaborationRefusal(error, 'read', sessionId))
+        }
+      },
+
+      async unpinSession(request) {
+        const { sessionId } = request.payload
+        const authorized = await authorizeSession(sessionId, 'write')
+        if ('error' in authorized) return err(request, authorized.error)
+        await ctx.workspaceRegistry.unpinSession(sessionId)
+        try {
+          return ok(request, {
+            pinnedSessionIds: await readableSessionList(
+              ctx.workspaceRegistry.pinnedSessionIds,
+              authorized.authority,
+            ),
+          })
+        } catch (error: unknown) {
+          return err(request, collaborationRefusal(error, 'read', sessionId))
+        }
+      },
+    },
+
+    jobs: {
+      async output(request) {
+        const { sessionId, jobId, from } = request.payload
+        if (sessionId === undefined) {
+          // An unowned job is observable by any authenticated principal.
+          const captured = captureCollaboration('read')
+          if ('error' in captured) return err(request, captured.error)
+        } else {
+          const authorized = await authorizeSession(sessionId, 'read')
+          if ('error' in authorized) return err(request, authorized.error)
+        }
+        const jobs = ctx.get('jobs')
+        if (jobs === undefined) {
+          return err(request, { code: 'internal', message: 'no job registry is composed', details: {} })
+        }
+        try {
+          const job = jobs.get(jobId, sessionId)
+          const read = jobs.readAt(jobId, from ?? job.output.earliest, sessionId)
+          return ok(request, {
+            job: jobView(job),
+            output: {
+              total: job.output.total,
+              earliest: job.output.earliest,
+              ...job.output.spillPaths === undefined ? {} : { spillPaths: [...job.output.spillPaths] },
+            },
+            chunks: read.chunks.map(chunk => ({ ...chunk })),
+            next: read.next,
+            ...read.lossy ? { lossy: true as const } : {},
+          })
+        } catch (error: unknown) {
+          // `unknown job` and `belongs to another session` both mean this
+          // session's list carries no row under that id; the client renders
+          // one story. The schema bounds `from`, so the registry's offset
+          // rejection cannot reach here.
+          return err(request, {
+            code: 'job-not-found',
+            message: error instanceof Error ? error.message : String(error),
+            details: sessionId === undefined ? { jobId } : { sessionId, jobId },
+          })
+        }
+      },
+
+      async kill(request) {
+        const { sessionId, jobId } = request.payload
+        const authorized = await authorizeSession(sessionId, 'write')
+        if ('error' in authorized) return err(request, authorized.error)
+        const jobs = ctx.get('jobs')
+        if (jobs === undefined) {
+          return err(request, { code: 'internal', message: 'no job registry is composed', details: {} })
+        }
+        try {
+          jobs.get(jobId, sessionId)
+        } catch (error: unknown) {
+          return err(request, {
+            code: 'job-not-found',
+            message: error instanceof Error ? error.message : String(error),
+            details: { sessionId, jobId },
+          })
+        }
+        // Same synchronous span as the lookup, so nothing can remove the job
+        // in between — and a producer-cancel throw propagates per the
+        // registry contract (job state unchanged) instead of masquerading as
+        // job-not-found.
+        const outcome = jobs.kill(jobId, sessionId, 'cancelled by the user')
+        return ok(request, { outcome })
       },
     },
 
@@ -5149,6 +5418,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         // TODO: version should read apps/cli's package.json; placeholder for now.
         const selection = defaults.defaultModelSelection()
+        const runtimeIdentity = (ctx.get('gatewayRuntime', false) as GatewayRuntimeIdentityReader | undefined)?.identity
         return ok(request, {
           version: '0.0.1',
           // Same source as session.create's fallback: the UI's default project
@@ -5161,7 +5431,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           attachedSessions,
           home: homedir(),
           canOpenPath: !projectScope && canOpenPaths(),
+          fileManager: !projectScope && canOpenPaths() ? nativeFileManager() : null,
           executionAuthorityRequired: ctx.get('executionAuthorityRequired') === true,
+          runtimeTarget: runtimeIdentity?.kind === 'project'
+            ? { kind: 'project' as const, projectId: runtimeIdentity.id } : { kind: 'personal' as const },
           ...(ctx.get('fs') === undefined ? {} : { workspaceFiles: {
             maxBytes: defaults.workspaceFileMaxBytes ?? DEFAULT_WORKSPACE_FILE_MAX_BYTES,
             maxLines: defaults.workspaceFileMaxLines ?? DEFAULT_WORKSPACE_FILE_MAX_LINES,
@@ -5262,7 +5535,32 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       async openPath(request, signal) {
         const authorized = authorizePersonalConfiguration()
         if (authorized.error !== undefined) return err(request, authorized.error)
-        return openPath(request, request.payload.path, signal)
+        return openPath(request, request.payload.path, signal, request.payload.action, request.payload.application)
+      },
+
+      async fileApplications(request, signal) {
+        const authorized = authorizePersonalConfiguration()
+        if (authorized.error !== undefined) return err(request, authorized.error)
+        try {
+          if (!canOpenPaths()) return ok(request, { applications: [] })
+          const applications = defaults.fileApplications !== undefined
+            ? await defaults.fileApplications(request.payload.path, signal)
+            : await nativeFileApplications(request.payload.path, signal)
+          return ok(request, { applications: [...applications] })
+        } catch (error: unknown) {
+          if (signal.aborted) {
+            return err(request, {
+              code: 'cancelled',
+              message: 'file application query was aborted',
+              details: {},
+            })
+          }
+          return err(request, {
+            code: 'internal',
+            message: `file application query failed: ${error instanceof Error ? error.message : String(error)}`,
+            details: {},
+          })
+        }
       },
     },
 
@@ -5289,7 +5587,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           // unless the deployment has no opener to hand it to.
           const directory = dirname(preset.path)
           if (!canOpenPaths()) return ok(request, { opened: false as const, path: directory })
-          return await openPath(request, directory, signal)
+          return await openPath(request, directory, signal, undefined, undefined)
         } catch (error: unknown) {
           return err(request, presetError(agentPreset, error))
         }
@@ -5583,7 +5881,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     events: {
       mux(_request, signal) {
         const captured = captureCollaboration('read')
-        return openStream((async function*(): AsyncGenerator<RpcRequest<MuxFrame>, void, unknown> {
+        liveEventClients += 1
+        const inner = openStream((async function*(): AsyncGenerator<RpcRequest<MuxFrame>, void, unknown> {
           if ('error' in captured) {
             yield frame({ type: 'stream/error', error: captured.error })
             return
@@ -5648,7 +5947,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
 
           const pushJobs = (session: Session): void => {
-            const views = jobs === undefined ? [] : jobViews(jobs.list(ctx.agents.get(session.id)))
+            const views = jobs === undefined ? [] : jobViews(jobs.list(session.id))
             if (views.length > 0) {
               queue.push(frame({ type: 'session/jobs', sessionId: session.id, jobs: views }))
             }
@@ -5721,10 +6020,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 }
               })
             }),
-            ...jobs === undefined ? [] : [jobs.onJobsChanged((owner) => {
+            ...jobs === undefined ? [] : [jobs.events.subscribe({ owners: 'all' }, (event) => {
+              const owner = event.type === 'output' ? event.owner : event.job.owner
               if (owner !== undefined) {
-                publishFor(owner.id, () => {
-                  queue.push(frame({ type: 'session/jobs', sessionId: owner.id, jobs: jobViews(jobs.list(owner)) }))
+                publishFor(owner, () => {
+                  queue.push(frame({ type: 'session/jobs', sessionId: owner, jobs: jobViews(jobs.list(owner)) }))
                 })
                 return
               }
@@ -5733,7 +6033,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                   queue.push(frame({
                     type: 'session/jobs',
                     sessionId: session.id,
-                    jobs: jobViews(jobs.list(ctx.agents.get(session.id))),
+                    jobs: jobViews(jobs.list(session.id)),
                   }))
                 })
               }
@@ -5763,6 +6063,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 payload: {
                   type: 'question/requested', sessionId: pending.sessionId,
                   questions: pending.questions,
+                  ...(pending.wait === undefined ? {} : { wait: pending.wait }),
                 },
               })
             }
@@ -5804,6 +6105,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             cleanup()
           }, authorizeReadBatch<MuxFrame>(authority, fail))
         })())
+        return (async function*(): AsyncGenerator<RpcRequest<MuxFrame>, void, unknown> {
+          try {
+            yield* inner
+          } finally {
+            liveEventClients -= 1
+          }
+        })()
       },
 
       host(_request, signal) {
@@ -5825,6 +6133,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           let committedWorkspaceOrder: WorkspaceId[] = []
           let archivedSessionIds = ctx.workspaceRegistry.archivedSessionIds
           let archiveRevision = ctx.workspaceRegistry.archiveRevision
+          let pinnedSessionIds = ctx.workspaceRegistry.pinnedSessionIds
           const initializationPublications: Array<() => void> = []
           let initializing = true
           const fail = createReadStreamFailure(queue, streamErrorFrame)
@@ -5866,6 +6175,17 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 type: 'host/archived-sessions-changed',
                 archivedSessionIds: await readableSessionList(sessionIds, authority),
                 archiveRevision: revision,
+              }))
+            } catch (error: unknown) {
+              fail(error)
+            }
+          }
+
+          const pushPinned = async (sessionIds: readonly SessionId[]): Promise<void> => {
+            try {
+              queue.push(frame({
+                type: 'host/pinned-sessions-changed',
+                pinnedSessionIds: await readableSessionList(sessionIds, authority),
               }))
             } catch (error: unknown) {
               fail(error)
@@ -5946,6 +6266,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                     archivedSessionIds = state.archivedSessionIds
                     archiveRevision = state.archiveRevision
                     void pushArchived(state.archivedSessionIds, state.archiveRevision)
+                  }
+                  if (state.pinnedSessionIds.length !== pinnedSessionIds.length
+                    || state.pinnedSessionIds.some((id, index) => id !== pinnedSessionIds[index])) {
+                    pinnedSessionIds = state.pinnedSessionIds
+                    void pushPinned(state.pinnedSessionIds)
                   }
                   return
                 }
@@ -6099,9 +6424,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       const pending = pendingQuestions.get(message.rpcId)
       if (pending === undefined) return { accepted: false, reason: 'not-pending' }
       if (!message.result.ok) {
-        if (message.result.error.code !== 'cancelled') {
+        if (message.result.error.code !== 'cancelled' && message.result.error.code !== 'timed-out') {
           return { accepted: false, reason: 'bad-response' }
         }
+        const timedOut = message.result.error.code === 'timed-out'
         /* jscpd:ignore-start -- approval and question cancellation share an authorization CAS ladder. */
         const authorized = await authorizeSession(pending.sessionId, 'write')
         if ('error' in authorized) return { accepted: false, reason: 'bad-response' }
@@ -6111,15 +6437,20 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             pending.sessionId,
             'question',
             String(pending.rpcId),
-            { cancelled: true },
+            timedOut ? { timedOut: true } : { cancelled: true },
           )) return { accepted: false, reason: 'not-pending' }
         } catch {
           return { accepted: false, reason: 'bad-response' }
         }
         if (pendingQuestions.get(message.rpcId) !== pending) return { accepted: false, reason: 'not-pending' }
-        claimQuestion(pending, 'cancelled')
+        // A client-side countdown ending is 'pending', not a cancellation: the
+        // business wait outlives the frame, so the question stays answerable.
+        claimQuestion(pending, timedOut ? 'pending' : 'cancelled')
         pending.reject(new UserQuestionError(
-          'the user cancelled ask_user_question', 'ASK_CANCELLED'))
+          timedOut
+            ? 'ask_user_question timed out before the user answered'
+            : 'the user cancelled ask_user_question',
+          timedOut ? 'ASK_TIMED_OUT' : 'ASK_CANCELLED'))
         return { accepted: true }
         /* jscpd:ignore-end */
       }
@@ -6148,7 +6479,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const execution = executionAuthorityOf(ctx)
         const session = ctx.sessions.get(pending.sessionId)
         if (execution !== undefined) {
-          if (session === undefined || !await execution.answer(session, pending.rpcId, payload.answer)) {
+          if (session === undefined || !await execution.answer(session, pending.rpcId, payload.answer, pending.executionScope)) {
             return { accepted: false, reason: 'not-pending' }
           }
         } else if (authorized.authority !== undefined && !await authorized.authority.claimInteraction(
@@ -6165,6 +6496,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       pending.resolve(payload.answer)
       return { accepted: true }
       /* jscpd:ignore-end */
+    },
+
+    hasLiveClient(): boolean {
+      return liveEventClients > 0
     },
   }
 }

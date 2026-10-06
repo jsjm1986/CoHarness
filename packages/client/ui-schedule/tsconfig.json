@@ -9,10 +9,13 @@
   ],
   "references": [
     {
-      "path": "../locale"
+      "path": "../../../vendor/cordis"
     },
     {
-      "path": "../runtime"
+      "path": "../../schedule/schedule"
+    },
+    {
+      "path": "../locale"
     },
     {
       "path": "../ui-conversation"
@@ -21,16 +24,37 @@
       "path": "../ui-primitives"
     },
     {
+      "path": "../ui-layout"
+    },
+    {
+      "path": "../ui-sidebar"
+    },
+    {
+      "path": "../ui-sidebar-right"
+    },
+    {
+      "path": "../ui-tool"
+    },
+    {
+      "path": "../ui-workspace"
+    },
+    {
       "path": "../ui-renderer"
+    },
+    {
+      "path": "../runtime"
     },
     {
       "path": "../ui-slots"
     },
     {
-      "path": "../../schedule/schedule"
+      "path": "../../api/remotes/tsconfig.client.json"
     },
     {
-      "path": "../../../vendor/cordis"
+      "path": "../connection/tsconfig.client.json"
+    },
+    {
+      "path": "../../util/values"
     }
   ]
 }

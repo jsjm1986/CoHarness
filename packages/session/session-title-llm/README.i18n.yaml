@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-title-llm/README.md
-README.md: 8c77d2f6c4084e82b9224e459f0f63dfcae7119e
-README.zh.md: 2162ee4e3c905352bf0b5a7429ed2a459184a720
+/:
+  en: 6184e467da62f0c8
+  zh: 0a51af1cad6486b4
+/deepseek-ai-dsh-session-title-llm:
+  en: 1c56063916d08b7d
+  zh: d99d72dcd6e55803
+/deepseek-ai-dsh-session-title-llm/summary:
+  en: 741cd917e857bd99
+  zh: 43c290b6baf222e6
+/deepseek-ai-dsh-session-title-llm/table-of-contents:
+  en: 5c327cb51d492dee
+  zh: 1bb6e148e00b460d
+/deepseek-ai-dsh-session-title-llm/route-and-failure-contract:
+  en: 7431d3f954179fe8
+  zh: 81b3861aed670ab3
+/deepseek-ai-dsh-session-title-llm/configuration:
+  en: c0045003bb9354fd
+  zh: 2f281532c60f8086
+/deepseek-ai-dsh-session-title-llm/invariants:
+  en: eda0961d8863c725
+  zh: 03b01f61e76b9254
+/deepseek-ai-dsh-session-title-llm/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-session-title-llm/model-experience/auxiliary-title-request:
+  en: 7dcc6f74474f78e7
+  zh: 64cffa0b4d94c69d
+/deepseek-ai-dsh-session-title-llm/model-experience/auxiliary-title-request/what-the-model-sees:
+  en: d3f50a8dab65c53f
+  zh: 6d4f2e4183564e84
+/deepseek-ai-dsh-session-title-llm/model-experience/auxiliary-title-request/token-effect:
+  en: 4d59f31ebbff4d31
+  zh: 6104f3b7a4c690af
+/deepseek-ai-dsh-session-title-llm/model-experience/auxiliary-title-request/kv-cache-effect:
+  en: 5d3b5b7c8d8b4b67
+  zh: 587eb6cadf03490d
+/deepseek-ai-dsh-session-title-llm/known-limitations-and-deferred-work:
+  en: f52e8fc0c45d3d40
+  zh: 7e75c73412cef4e3
+/deepseek-ai-dsh-session-title-llm/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

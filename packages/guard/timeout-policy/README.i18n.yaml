@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/guard/timeout-policy/README.md
-README.md: 27562b554e8d05dbf0e86b2eab3ba13c45d72878
-README.zh.md: ec40d28a623212dc736664d41b1b0913de1566a7
+/:
+  en: 325a85eef76e9446
+  zh: 61495d48365178df
+/dsh-tool-call-timeout-policy:
+  en: 76991abf8996b35c
+  zh: e1f1907490ea0813
+/dsh-tool-call-timeout-policy/summary:
+  en: 745e3c8642ed9ea9
+  zh: c8cfd6a3b0c3c9bf
+/dsh-tool-call-timeout-policy/table-of-contents:
+  en: 8f1c283b3da5e44c
+  zh: fafdc50a0465e2e2
+/dsh-tool-call-timeout-policy/plugin-namespace-timeout-policy:
+  en: e97e794a559ec425
+  zh: 2d4bfbec15baace5
+/dsh-tool-call-timeout-policy/plugin-namespace-timeout-policy/behavior:
+  en: faba2f784e82d21d
+  zh: e28b9e2544bd2734
+/dsh-tool-call-timeout-policy/plugin-namespace-timeout-policy/cooperative-not-a-hard-kill:
+  en: 765bfd9b04b1c470
+  zh: d372328886437f14
+/dsh-tool-call-timeout-policy/plugin-namespace-timeout-policy/composing-with-other-tools-execute-wrappers:
+  en: 4eed467374011ee9
+  zh: bf01556afa86b2dc
+/dsh-tool-call-timeout-policy/invariants:
+  en: 14e192f3e685cf1e
+  zh: 87e3facefee07f5b
+/dsh-tool-call-timeout-policy/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/dsh-tool-call-timeout-policy/model-experience/conditional-tool-result:
+  en: 7877631ca859b191
+  zh: fb6f2aa33f70b82c
+/dsh-tool-call-timeout-policy/model-experience/conditional-tool-result/what-the-model-sees:
+  en: 1fd9832261036f56
+  zh: 245b04969f3bc26d
+/dsh-tool-call-timeout-policy/model-experience/conditional-tool-result/token-effect:
+  en: 063d0485b8631d04
+  zh: 13c1a680cfa9f02b
+/dsh-tool-call-timeout-policy/model-experience/conditional-tool-result/kv-cache-effect:
+  en: 2fbf2175168e8244
+  zh: 003f251b4beef2b9
+/dsh-tool-call-timeout-policy/known-limitations-and-deferred-work:
+  en: 7176a6daf0052901
+  zh: ecadc0b925c439a0
+/dsh-tool-call-timeout-policy/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

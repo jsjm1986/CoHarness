@@ -4,7 +4,7 @@ import type {
   ConversationNodeDefinition,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { isReplacementSurfaceEvent } from '@deepseek-ai/dsh-client-runtime/client'
-import type { CompactionCheckpointSource } from '@deepseek-ai/dsh-compaction/checkpoint'
+import type {} from '@deepseek-ai/dsh-compaction/checkpoint'
 import type {} from '@deepseek-ai/dsh-compaction/types'
 import type {} from '@deepseek-ai/dsh-commands/types'
 import type { ManualCompactionChatData } from '../contract/chat-nodes.ts'
@@ -21,7 +21,6 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
 
 type CommandId = CommandNode['commandId']
 
-const COMPACT_PLUGIN: CompactionCheckpointSource['plugin'] = 'compact'
 
 interface CommandState {
   readonly command: CommandNode
@@ -83,11 +82,10 @@ function compactSource(event: Parameters<ConversationNodeDefinition['match']>[0]
   if (event.type !== 'user/message' || !isReplacementSurfaceEvent(event)) return undefined
   const source = event.data.source as unknown as {
     kind?: unknown
-    plugin?: unknown
     compactionId?: unknown
     sourceCommandId?: CommandId
   }
-  if (source.kind !== 'plugin' || source.plugin !== COMPACT_PLUGIN || typeof source.compactionId !== 'string') return undefined
+  if (source.kind !== 'compact-checkpoint' || typeof source.compactionId !== 'string') return undefined
   return {
     compactionId: source.compactionId,
     ...source.sourceCommandId === undefined ? {} : { sourceCommandId: source.sourceCommandId },

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-archived-selection-races.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-archived-selection-races.md
+/agent-note-close-the-archived-selection-races-at-connect-and-prompt-admission:
+  en: 5fcabb2c3fa4c8c8
+  zh: 5566ad5015989042
+/agent-note-close-the-archived-selection-races-at-connect-and-prompt-admission/problem:
+  en: 994193da191db985
+  zh: f652d716c501d2fa
+/agent-note-close-the-archived-selection-races-at-connect-and-prompt-admission/decision:
+  en: 5e8c2ddf6536f8bc
+  zh: 6c23318897b1fd28
+/agent-note-close-the-archived-selection-races-at-connect-and-prompt-admission/files:
+  en: ecf178e8d93ab8e2
+  zh: 9188b9de9199e87c
+/agent-note-close-the-archived-selection-races-at-connect-and-prompt-admission/alternatives-considered:
+  en: e61aa723123df8ef
+  zh: b7e6424265040d72
+/agent-note-close-the-archived-selection-races-at-connect-and-prompt-admission/consequences:
+  en: ec4a960561bdbc37
+  zh: ca5e743388ccfcc7

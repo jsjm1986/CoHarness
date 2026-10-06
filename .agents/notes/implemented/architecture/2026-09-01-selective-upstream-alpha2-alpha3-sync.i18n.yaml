@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-01-selective-upstream-alpha2-alpha3-sync.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-01-selective-upstream-alpha2-alpha3-sync.md
-2026-09-01-selective-upstream-alpha2-alpha3-sync.md: ca44bb61a6f28dea09f810cf1bafd2db7123a14c
-2026-09-01-selective-upstream-alpha2-alpha3-sync.zh.md: cc3b60a05c833e8621fa3beddd2a80796f7a9098
+/agent-note-selective-upstream-alpha-2-and-alpha-3-integration:
+  en: c52f9bf031c1448e
+  zh: 9e48796bef349257
+/agent-note-selective-upstream-alpha-2-and-alpha-3-integration/problem:
+  en: 122da8a767d7c450
+  zh: 826b6f6f09ca6554
+/agent-note-selective-upstream-alpha-2-and-alpha-3-integration/decision:
+  en: 9d36e78b642b1c73
+  zh: 78080ad48cdb76c6
+/agent-note-selective-upstream-alpha-2-and-alpha-3-integration/release-comparison:
+  en: c6c866ac23f28845
+  zh: 3825e073fc54d023
+/agent-note-selective-upstream-alpha-2-and-alpha-3-integration/verification:
+  en: d11f2046000a11ee
+  zh: 16b7580f94615dd2
+/agent-note-selective-upstream-alpha-2-and-alpha-3-integration/alternatives-considered:
+  en: 9aac4359af3373ea
+  zh: 721f26e246853bc6
+/agent-note-selective-upstream-alpha-2-and-alpha-3-integration/consequences:
+  en: 2b3bf51f1ac0de62
+  zh: fef1079fefe1e124

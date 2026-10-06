@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-30-session-store-fork-api.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-30-session-store-fork-api.md
-2026-06-30-session-store-fork-api.md: 61022e940cd44af6162cb552ade32a9df8d9150a
-2026-06-30-session-store-fork-api.zh.md: dc7ebdc6d8d4f3566f9ff27579e5660d868218e3
+/agent-note-sessionstore-fork-api:
+  en: 36f0f38fcbbce292
+  zh: f240aff137e6e738
+/agent-note-sessionstore-fork-api/problem:
+  en: 091ab94452053bea
+  zh: 255427f401a9073a
+/agent-note-sessionstore-fork-api/decision:
+  en: 0248000918799d6c
+  zh: 156d9b069642e851
+/agent-note-sessionstore-fork-api/decision/host-and-browser-adaptation:
+  en: 37e6ad2a6c9e3099
+  zh: 8a304586558b7b67
+/agent-note-sessionstore-fork-api/alternatives-considered:
+  en: f3d2467d56a345a7
+  zh: e179c99dc31d23bd
+/agent-note-sessionstore-fork-api/consequences:
+  en: eb5e0eb762be48ed
+  zh: 4d1d5bdf89692473

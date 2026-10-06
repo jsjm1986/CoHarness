@@ -22,8 +22,8 @@ const MODE = webSnapshotMode()
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/workflow-run', import.meta.url))
 const UI_LIVE_EXPECTED = join(SNAPSHOT_DIR, 'ui-live.expected.md')
 const UI_EXPECTED = join(SNAPSHOT_DIR, 'ui.expected.md')
-const PARENT_FIXTURE = join(REPO_ROOT, 'examples/acp-agent/tests/snapshots/workflow-run/session.v6.jsonl')
-const CHILD_FIXTURE = join(REPO_ROOT, 'examples/acp-agent/tests/snapshots/workflow-run/session.1.v6.jsonl')
+const PARENT_FIXTURE = join(REPO_ROOT, 'examples/acp-agent/tests/snapshots/workflow-run/session.v7.jsonl')
+const CHILD_FIXTURE = join(REPO_ROOT, 'examples/acp-agent/tests/snapshots/workflow-run/session.1.v7.jsonl')
 const CHILD_PROMPT = 'Reply with exactly the word WF_CHILD_OK and nothing else.'
 
 describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () => {
@@ -58,7 +58,7 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
   }, 120_000)
@@ -117,7 +117,7 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
       const disclosures = element.querySelectorAll('[data-disclosure-row]')
       const runHeader = disclosures[0]
       const phaseHeader = disclosures[1]
-      const phaseTitle = phaseHeader?.children.item(1) as HTMLElement | null
+      const phaseTitle = phaseHeader?.querySelector('[class*="phaseTitle"]') as HTMLElement | null
       const phaseStatus = element.querySelector('[data-phase-status-text]')
       const originalPhaseTitle = phaseTitle?.textContent ?? ''
       if (phaseTitle !== null) phaseTitle.textContent = 'A phase name long enough to require ellipsis in the narrow layout'
@@ -171,7 +171,7 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     expect(await terminalWorkflow.getAttribute('aria-expanded')).toBe('false')
     expect(await terminalWorkflow.evaluate(element => getComputedStyle(element).cursor)).toBe('pointer')
     await terminalWorkflow.click()
-    const terminalPhase = page.getByRole('button', { name: /^Run/ })
+    const terminalPhase = page.getByRole('button', { name: /^Run \d/ })
     await terminalPhase.waitFor()
     expect(await terminalPhase.getAttribute('aria-expanded')).toBe('false')
     expect(await terminalPhase.evaluate(element => getComputedStyle(element).cursor)).toBe('pointer')
@@ -197,7 +197,7 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
       .replace(' {{throughput}} tok/s', '')
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
     await workflow.click()
-    const phase = page.getByRole('button', { name: /^Run/ })
+    const phase = page.getByRole('button', { name: /^Run \d/ })
     await phase.waitFor()
     expect(await phase.getAttribute('aria-expanded')).toBe('false')
     await phase.click()

@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-14-typescript-program-backed-semantic-gates.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-14-typescript-program-backed-semantic-gates.md
-2026-07-14-typescript-program-backed-semantic-gates.md: 91639d53b660c68ae52c7ddcef6b3f594e82273e
-2026-07-14-typescript-program-backed-semantic-gates.zh.md: 2ccb6a95185e1f666359b8b864f6ad655070a47f
+/agent-note-typescript-program-backed-semantic-gates:
+  en: 8fdfd0e270786dac
+  zh: 9d9f6e4938126d7f
+/agent-note-typescript-program-backed-semantic-gates/problem:
+  en: f4790324412e0fd2
+  zh: 768b5615fccda249
+/agent-note-typescript-program-backed-semantic-gates/decision:
+  en: 435bb784445fd221
+  zh: 4aa013fe23125744
+/agent-note-typescript-program-backed-semantic-gates/decision/one-project-model-expands-the-root-solution:
+  en: 139812d4fb1c2607
+  zh: 29428b63e7a004ec
+/agent-note-typescript-program-backed-semantic-gates/decision/a-event-relations-follow-receiver-and-value-types:
+  en: 0ec7e6cc9623e532
+  zh: 1f5fa2edf9e3dd08
+/agent-note-typescript-program-backed-semantic-gates/decision/b-scoped-event-routing-generates-one-typed-resolver-map:
+  en: 23387f412e248728
+  zh: e92ae52feae44f1d
+/agent-note-typescript-program-backed-semantic-gates/decision/semantic-gaps-fail-explicitly:
+  en: abd17df643b7dc5d
+  zh: 33b985fb5729aa9f
+/agent-note-typescript-program-backed-semantic-gates/verification:
+  en: 09f65bf8592958cd
+  zh: 71ef1203d291b127
+/agent-note-typescript-program-backed-semantic-gates/alternatives-considered:
+  en: cdd5dd5512457e2a
+  zh: ccef89865c42b61f
+/agent-note-typescript-program-backed-semantic-gates/consequences:
+  en: f38bcf04a45b512f
+  zh: 3a0fb0e5302f9e2e

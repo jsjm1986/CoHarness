@@ -17,14 +17,18 @@ const OPTIONS = [{ id: 'zh', label: '中文' }, { id: 'en', label: 'English' }]
 /** Empty global standard-kit hooks (the row reads neither). */
 function emptySessions() {
   const store = createSnapshotStore<SessionListState>(
-    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+    { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })
   return bindSnapshotSelector(store)
 }
 function emptyWorkspaces() {
   const store = createSnapshotStore<WorkspaceListState>({
-    items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+    items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
     baselinesReady: true, recentWorkspaceId: undefined,
   })
+  return bindSnapshotSelector(store)
+}
+function emptyPanelInfo() {
+  const store = createSnapshotStore({ activePanelId: null })
   return bindSnapshotSelector(store)
 }
 
@@ -38,6 +42,7 @@ function mount(active = 'en', settings: SettingsControlState = {
   const props: LanguageRowComponentProps = {
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
+    usePanelInfo: emptyPanelInfo(),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
     t: (key: string) => ({

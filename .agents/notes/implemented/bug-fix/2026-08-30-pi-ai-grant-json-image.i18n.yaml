@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-30-pi-ai-grant-json-image.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-30-pi-ai-grant-json-image.md
-2026-08-30-pi-ai-grant-json-image.md: 33acc98aa4d554000e0b58816ad728391e212c4e
-2026-08-30-pi-ai-grant-json-image.zh.md: 54edf43d58c930a9c9efe701635528cd89a5ad01
+/agent-note-store-pi-ai-grants-as-json-compatible-values:
+  en: ec061554729845e5
+  zh: 06ad6636486b4a60
+/agent-note-store-pi-ai-grants-as-json-compatible-values/problem:
+  en: 792ffb15239fa200
+  zh: bf71c64ed7ec69ba
+/agent-note-store-pi-ai-grants-as-json-compatible-values/decision:
+  en: 2df6b1af22df19dc
+  zh: c53726f1706203c9
+/agent-note-store-pi-ai-grants-as-json-compatible-values/alternatives-considered:
+  en: ef0485f67e711e1d
+  zh: 6471073d34638336
+/agent-note-store-pi-ai-grants-as-json-compatible-values/consequences:
+  en: 543c5d62064f8175
+  zh: 540038fbda5c263e
+/agent-note-store-pi-ai-grants-as-json-compatible-values/testing:
+  en: 90faaa99f0265392
+  zh: 106dbe67ff72e757

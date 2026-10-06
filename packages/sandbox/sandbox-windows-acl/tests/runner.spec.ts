@@ -78,9 +78,9 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     const probe = [
       "$ErrorActionPreference='SilentlyContinue';",
       // The private-temp capability lets PowerShell complete its startup
-      // AppLocker probe, so without a host policy workspace-write stays in
-      // FullLanguage. Read-only cannot create those scratch files and fails
-      // that probe closed to ConstrainedLanguage (pinned below).
+      // AppLocker probe, so workspace-write stays in FullLanguage. Read-only
+      // cannot create those scratch files and fails that probe closed to
+      // ConstrainedLanguage (pinned below).
       '\'LANGMODE: \' + $ExecutionContext.SessionState.LanguageMode;',
       `try{Set-Content -Path '${writableDir}\\child-wrote.txt' -Value ok -ErrorAction Stop;'TARGET-WRITE: OK'}catch{'TARGET-WRITE: DENIED'};`,
       "try{Set-Content -Path (Join-Path $env:TEMP 'child-wrote.txt') -Value ok -ErrorAction Stop;'TEMP-WRITE: OK'}catch{'TEMP-WRITE: DENIED'};",
@@ -395,19 +395,271 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     }
   }, 30_000)
 
-  it('partial boundary: an external Everyone-Modify directory stays writable under BOTH modes', () => {
+  it('delete-escape regression: deletes outside the granted roots are denied in BOTH modes, through every delete authority', () => {
+    // Windows authorizes a delete from the object's own DELETE right OR the
+    // parent directory's FILE_DELETE_CHILD, and the write-restricted
+    // intersection only covers the first — so `cmd /c del` used to delete
+    // outside the workspace. The Low label plus the grant's deny close both
+    // routes; these are the deleters a confined child reaches for.
+    for (const mode of ['read-only', 'workspace-write'] as const) {
+      const victims = {
+        cmd: join(scratchRoot, `delete-${mode}-cmd.txt`),
+        dotnet: join(scratchRoot, `delete-${mode}-dotnet.txt`),
+        remove: join(scratchRoot, `delete-${mode}-remove.txt`),
+        unlink: join(scratchRoot, `delete-${mode}-unlink.txt`),
+        inside: join(writableDir, `delete-${mode}-inside.txt`),
+      }
+      for (const path of Object.values(victims)) writeFileSync(path, 'delete me')
+      const quoted = (path: string) => `'${path}'`
+      const probe = [
+        "$ErrorActionPreference='SilentlyContinue';",
+        `& '${process.env.SystemRoot ?? 'C:\\Windows'}\\System32\\cmd.exe' /c del /f /q ${quoted(victims.cmd)} 2>&1 | Out-Null;`
+          + `'CMD-DEL: ' + $(if (Test-Path -LiteralPath ${quoted(victims.cmd)}) {'DENIED'} else {'DELETED'});`,
+        `try{[System.IO.File]::Delete(${quoted(victims.dotnet)});'DOTNET-DELETE: DELETED'}catch{'DOTNET-DELETE: DENIED'};`,
+        `try{Remove-Item -LiteralPath ${quoted(victims.remove)} -ErrorAction Stop;'REMOVE-ITEM: DELETED'}catch{'REMOVE-ITEM: DENIED'};`,
+        `& "${process.execPath}" -e "const fs=require('node:fs');try{fs.unlinkSync(process.argv[1]);console.log('NODE-UNLINK: DELETED')}catch(e){console.log('NODE-UNLINK: DENIED')}" ${quoted(victims.unlink)};`,
+        `try{[System.IO.File]::Delete(${quoted(victims.inside)});'INSIDE-DELETE: DELETED'}catch{'INSIDE-DELETE: DENIED'}`,
+      ].join('')
+      const result = runRunner([
+        '--workspace', writableDir, '--temp', isolatedTemp, '--mode', mode,
+        '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
+      ])
+      expect(result.status, `mode: ${mode}\nstderr: ${result.stderr}`).toBe(0)
+      expect(result.stdout, `mode: ${mode}`).toContain('CMD-DEL: DENIED')
+      expect(result.stdout, `mode: ${mode}`).toContain('DOTNET-DELETE: DENIED')
+      expect(result.stdout, `mode: ${mode}`).toContain('REMOVE-ITEM: DENIED')
+      expect(result.stdout, `mode: ${mode}`).toContain('NODE-UNLINK: DENIED')
+      for (const path of [victims.cmd, victims.dotnet, victims.remove, victims.unlink]) {
+        expect(existsSync(path), `mode: ${mode}, ${path}`).toBe(true)
+      }
+      // The granted root keeps its own delete authority: read-only carries no
+      // write SID, so only workspace-write may delete there.
+      expect(result.stdout, `mode: ${mode}`).toContain(
+        mode === 'workspace-write' ? 'INSIDE-DELETE: DELETED' : 'INSIDE-DELETE: DENIED',
+      )
+      expect(existsSync(victims.inside), `mode: ${mode}`).toBe(mode === 'read-only')
+    }
+  }, 60_000)
+
+  it('cross-root delete regression: one session cannot delete inside ANOTHER granted root', () => {
+    // Both roots carry the Low label, so the integrity check alone would not
+    // stop this: Windows also authorizes a delete from the parent directory's
+    // FILE_DELETE_CHILD right, which the capability intersection never reaches.
+    // The grant denies that right, leaving the capability DELETE bit as the
+    // only delete authority inside a granted root.
+    const otherWorkspace = join(scratchRoot, 'other-workspace')
+    const otherTemp = join(scratchRoot, 'other-temp')
+    mkdirSync(otherWorkspace)
+    mkdirSync(otherTemp)
+    const otherWorkspaceSid = workspaceWriteSid(otherWorkspace)
+    const otherTempSid = tempWriteSid(otherTemp)
+    const otherWorkspaceGrant = AclWriteGrant.create(otherWorkspaceSid)
+    const otherTempGrant = AclWriteGrant.create(otherTempSid)
+    otherWorkspaceGrant.add(otherWorkspace, true)
+    otherTempGrant.add(otherTemp)
+    // Session A's own roots, granted the same way, run through the runner.
+    const ownWorkspace = join(scratchRoot, 'own-workspace')
+    const ownTemp = join(scratchRoot, 'own-temp')
+    mkdirSync(ownWorkspace)
+    mkdirSync(ownTemp)
+    const ownWorkspaceSid = workspaceWriteSid(ownWorkspace)
+    const ownTempSid = tempWriteSid(ownTemp)
+    const ownWorkspaceGrant = AclWriteGrant.create(ownWorkspaceSid)
+    const ownTempGrant = AclWriteGrant.create(ownTempSid)
+    ownWorkspaceGrant.add(ownWorkspace, true)
+    ownTempGrant.add(ownTemp)
+    try {
+      const victims = {
+        ownWork: join(ownWorkspace, 'victim.txt'),
+        otherWork: join(otherWorkspace, 'victim.txt'),
+        ownTemp: join(ownTemp, 'victim.txt'),
+        otherTemp: join(otherTemp, 'victim.txt'),
+      }
+      for (const path of Object.values(victims)) writeFileSync(path, 'delete me')
+      const probe = [
+        "$ErrorActionPreference='SilentlyContinue';",
+        ...Object.entries(victims).map(([name, path]) =>
+          `try{[System.IO.File]::Delete('${path}');'${name}: DELETED'}catch{'${name}: DENIED'};`),
+      ].join('')
+      const result = runRunner([
+        '--workspace', ownWorkspace, '--temp', ownTemp, '--mode', 'workspace-write',
+        '--write-sid', ownWorkspaceSid, '--temp-write-sid', ownTempSid,
+        '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
+      ])
+      expect(result.status, `stderr: ${result.stderr}`).toBe(0)
+      expect(result.stdout).toContain('ownWork: DELETED')
+      expect(result.stdout).toContain('ownTemp: DELETED')
+      expect(result.stdout).toContain('otherWork: DENIED')
+      expect(result.stdout).toContain('otherTemp: DENIED')
+      expect(existsSync(victims.otherWork)).toBe(true)
+      expect(existsSync(victims.otherTemp)).toBe(true)
+      expect(existsSync(victims.ownWork)).toBe(false)
+      expect(existsSync(victims.ownTemp)).toBe(false)
+    } finally {
+      ownWorkspaceGrant.dispose()
+      ownTempGrant.dispose()
+      otherWorkspaceGrant.dispose()
+      otherTempGrant.dispose()
+      rmSync(ownTemp, { recursive: true, force: true })
+      rmSync(otherTemp, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('NUL writes stay ambient under the Low token in BOTH modes', () => {
+    // The device DACL grants Everyone write and carries no higher label, so
+    // the documented `> NUL` redirection must survive the lowered token. The
+    // redirection stays inside cmd's own command line: PowerShell's `>nul`
+    // opens a file named nul instead, which is a different probe.
+    const cmd = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32\\cmd.exe')
+    const probe = [
+      "$ErrorActionPreference='SilentlyContinue';",
+      `& '${cmd}' /c 'echo ok>NUL&&echo CMD-NUL: OK';`,
+      `& "${process.execPath}" -e "try{require('node:fs').writeFileSync(process.argv[1],'x');console.log('NODE-NUL: OK')}catch(e){console.log('NODE-NUL: DENIED '+e.code)}" '\\\\.\\NUL'`,
+    ].join('')
+    for (const mode of ['read-only', 'workspace-write'] as const) {
+      const result = runRunner([
+        '--workspace', writableDir, '--temp', isolatedTemp, '--mode', mode,
+        '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
+      ])
+      expect(result.status, `mode: ${mode}\nstderr: ${result.stderr}`).toBe(0)
+      expect(result.stdout, `mode: ${mode}`).toContain('CMD-NUL: OK')
+      expect(result.stdout, `mode: ${mode}`).toContain('NODE-NUL: OK')
+    }
+  }, 30_000)
+
+  it('a granted-rights open inside a granted root still works for files (the deny inherits to containers only)', () => {
+    // The ambient-delete deny is FILE_DELETE_CHILD (SDDL DT, 0x40), a member
+    // of FILE_ALL_ACCESS: inheriting it onto files would deny every
+    // GENERIC_ALL open by the confined child. It lands on containers only —
+    // where FILE_DELETE_CHILD is evaluated — so the deny's observable cost is
+    // the denied parent-delete path, not object opens. The probe runs inside
+    // the confined runner child: the ambient FA allows (SYSTEM, Administrators,
+    // LOCAL) are not usable by the capability token, so the only ACEs that
+    // apply are the inherited deny and the inherited Write+Delete grant.
+    const granted = join(scratchRoot, 'fullcontrol-root')
+    const child = join(granted, 'child')
+    const locked = join(granted, 'locked.txt')
+    mkdirSync(granted)
+    mkdirSync(child)
+    writeFileSync(join(granted, 'file.txt'), 'x')
+    writeFileSync(join(child, 'deep.txt'), 'x')
+    writeFileSync(locked, 'x')
+    try {
+      // Windows authorizes a delete from the object's own DELETE right OR the
+      // parent's FILE_DELETE_CHILD, and the deny names Everyone — the parent
+      // path is denied to the capability holder too, leaving the ACE's DELETE
+      // bit as the only delete authority inside the root. locked.txt makes
+      // the deny's function observable: an object whose stripped DACL grants
+      // everything but DELETE cannot be removed through the denied parent
+      // right, while a normally inherited object still deletes fine. The
+      // Administrators ACE keeps the elevated test caller's delete authority
+      // for teardown; the confined token cannot use it — the same inherited
+      // Administrators grant on child did not stop DIRECTORY: DENIED.
+      const strip = spawnSync(resolvePwshPath(), [
+        '/NoLogo', '/NonInteractive', '/NoProfile', '-Command', [
+          `$acl = Get-Acl -LiteralPath '${locked}'`,
+          '$acl.SetAccessRuleProtection($true, $false)',
+          'foreach ($ace in @($acl.Access)) { [void]$acl.RemoveAccessRule($ace) }',
+          '$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new(' +
+            `[System.Security.Principal.SecurityIdentifier]::new('${workspaceWriteSid(granted)}'), ` +
+            '[System.Security.AccessControl.FileSystemRights]\'ReadAndExecute, Write\', ' +
+            '[System.Security.AccessControl.InheritanceFlags]::None, ' +
+            '[System.Security.AccessControl.PropagationFlags]::None, ' +
+            '[System.Security.AccessControl.AccessControlType]::Allow))',
+          '$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new(' +
+            "[System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'), " +
+            '[System.Security.AccessControl.FileSystemRights]::FullControl, ' +
+            '[System.Security.AccessControl.InheritanceFlags]::None, ' +
+            '[System.Security.AccessControl.PropagationFlags]::None, ' +
+            '[System.Security.AccessControl.AccessControlType]::Allow))',
+          `Set-Acl -LiteralPath '${locked}' -AclObject $acl`,
+        ].join('\n'),
+      ], { encoding: 'utf8', timeout: 30_000 })
+      expect(strip.status, strip.stderr).toBe(0)
+      // The capability grant carries Write+Delete (0x110156), not FullControl
+      // — the write probes use Set-Content, the same primitive the other
+      // confined-write tests use: FileStream construction is not a permitted
+      // operation under the confined child's ConstrainedLanguage fallback and
+      // would deny for a reason unrelated to the ACLs. The deny's container
+      // reach is pinned by the SDDL and by the delete pair: file.txt deletes
+      // through its inherited DELETE bit while locked.txt, whose stripped
+      // DACL grants no DELETE to the capability SID, cannot be removed
+      // through the denied FILE_DELETE_CHILD.
+      const probe = [
+        "$ErrorActionPreference='SilentlyContinue';",
+        '\'LANGMODE: \' + $ExecutionContext.SessionState.LanguageMode;',
+        'function TryWrite([string]$label, [string]$path) {',
+        '  try {',
+        '    Set-Content -LiteralPath $path -Value x -ErrorAction Stop; "$($label): OK";',
+        '  } catch { "$($label): DENIED" };',
+        '};',
+        `TryWrite 'FILE' '${join(granted, 'file.txt')}';`,
+        `TryWrite 'NESTED-FILE' '${join(child, 'deep.txt')}';`,
+        `"CHILD-SDDL: " + (Get-Acl -LiteralPath '${child}').Sddl;`,
+        `"FILE-SDDL: " + (Get-Acl -LiteralPath '${join(granted, 'file.txt')}').Sddl;`,
+        `try { [System.IO.File]::Delete('${join(granted, 'file.txt')}'); 'DELETE-IN-ROOT: OK' } catch { 'DELETE-IN-ROOT: DENIED' };`,
+        `try { [System.IO.File]::Delete('${locked}'); 'LOCKED-DELETE: OK' } catch { 'LOCKED-DELETE: DENIED' };`,
+      ].join('')
+      const result = runRunner([
+        '--workspace', granted, '--temp', isolatedTemp, '--mode', 'workspace-write',
+        '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
+      ])
+      expect(result.status, `stderr: ${result.stderr}`).toBe(0)
+      // The SDDL pins record where the deny landed: the directory carries it
+      // (CI propagates to containers only), the file does not.
+      expect(result.stdout).toMatch(/CHILD-SDDL:.*\(D;[^)]*DT[^)]*WD\)/u)
+      expect(result.stdout).not.toMatch(/FILE-SDDL:.*\(D;[^)]*DT[^)]*WD\)/u)
+      expect(result.stdout).toContain('FILE: OK')
+      expect(result.stdout).toContain('NESTED-FILE: OK')
+      expect(result.stdout).toContain('DELETE-IN-ROOT: OK')
+      expect(result.stdout).toContain('LOCKED-DELETE: DENIED')
+    } finally {
+      rmSync(granted, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('revoking one of two grants on a directory leaves the shared Low label usable', () => {
+    // Two capabilities may target one directory; the revoke of the first must
+    // not strip the label the second one's child still writes through.
+    const shared = join(scratchRoot, 'shared-root')
+    mkdirSync(shared)
+    const sidA = workspaceWriteSid(shared)
+    const sidB = `${sidA}-1`
+    const grantA = AclWriteGrant.create(sidA)
+    const grantB = AclWriteGrant.create(sidB)
+    grantA.add(shared, true)
+    grantB.add(shared)
+    try {
+      grantB.dispose() // revokes B's ACE, must keep the shared label
+      const target = join(shared, 'after-revoke.txt')
+      const result = runRunner([
+        '--workspace', shared, '--temp', isolatedTemp, '--mode', 'workspace-write',
+        '--write-sid', sidA, '--temp-write-sid', tempWriteSid(isolatedTemp),
+        '--', process.execPath, '-e', "require('node:fs').writeFileSync(process.argv[1], 'written')", target,
+      ])
+      expect(result.status, `stderr: ${result.stderr}`).toBe(0)
+      expect(existsSync(target)).toBe(true)
+    } finally {
+      grantA.dispose()
+      rmSync(shared, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('the Low mandatory label closes the Everyone-Modify ambient boundary under BOTH modes', () => {
     // Everyone is a required keep-alive restricting SID: without it early DLL
     // initialization and CNG fail. A normal DACL that grants Everyone Modify
-    // therefore also clears the WRITE_RESTRICTED pass-2 check. Pin this
-    // unavoidable gap beside the provider's `partial` enforcement report.
+    // therefore also clears the WRITE_RESTRICTED pass-2 check. The Low label
+    // still denies the write, because the kernel evaluates the integrity
+    // policy inside the access check regardless of which right supplied the
+    // authority.
     for (const mode of ['read-only', 'workspace-write'] as const) {
       const target = join(worldWritableDir, `${mode}.txt`)
       const result = runRunner([
         '--workspace', writableDir, '--temp', isolatedTemp, '--mode', mode,
         '--', process.execPath, '-e', "require('node:fs').writeFileSync(process.argv[1], 'written')", target,
       ])
-      expect(result.status, `mode: ${mode}\nstderr: ${result.stderr}`).toBe(0)
-      expect(existsSync(target), `mode: ${mode}`).toBe(true)
+      expect(result.status, `mode: ${mode}\nstderr: ${result.stderr}`).not.toBe(0)
+      expect(existsSync(target), `mode: ${mode}`).toBe(false)
     }
   }, 30_000)
 

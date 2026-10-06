@@ -62,7 +62,7 @@ export const en: Record<SubagentKey, string> = {
   'load.error': 'Unable to load subagents',
   'retry': 'Retry',
   'mode.oneShot': 'one-shot',
-  'mode.continuable': 'continuable',
+  'mode.continuable': 'resumable',
   'activity.running': 'running',
   'activity.inactive': 'not running',
   'branch.collapse': 'Collapse {label} descendants',

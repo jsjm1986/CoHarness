@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-message-feedback-sidecar.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-10-message-feedback-sidecar.md
-2026-08-10-message-feedback-sidecar.md: eb1f8786f9ec0363b3c98d5b80a796b9c0fc0b4c
-2026-08-10-message-feedback-sidecar.zh.md: 573d3b30e3bd14b492925f4a00424db588736943
+/agent-note-lifecycle-bound-message-feedback-sidecar:
+  en: d3aaa3e80303b712
+  zh: 47bc193a6995a0cb
+/agent-note-lifecycle-bound-message-feedback-sidecar/problem:
+  en: 57af2ffc1d5d84d5
+  zh: 5e49fad7b8cfe37a
+/agent-note-lifecycle-bound-message-feedback-sidecar/decision:
+  en: 0615b0ded9312699
+  zh: 294d221980661bc9
+/agent-note-lifecycle-bound-message-feedback-sidecar/alternatives-considered:
+  en: fc3ffeaeb3fa8c2c
+  zh: 1d29431af6127ed0
+/agent-note-lifecycle-bound-message-feedback-sidecar/consequences:
+  en: fa92d81b1510fad8
+  zh: bbc9f5ae982d5f95

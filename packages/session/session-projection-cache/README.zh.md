@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-projection-cache
 
 [English](README.md) | 中文
@@ -17,6 +22,21 @@
 
 本包保存持久的逐会话投影检查点，让历史列表、统计信息与 goal 快照无需加载每个会话日志即可读取缓存值。冷投影折叠可从已检查点化的前缀之后继续，从而减少重启后的工作量。会话日志始终是权威：崩溃可能使检查点陈旧，但不会使其领先于已提交事件；不兼容记录会被忽略或备份。当重启的会话需要频繁读取投影时选择本包；当投影只服务活会话，或额外存储写入与无限增长的检查点保留成本超过节省的工作量时跳过本包。
 
+## 目录
+
+- [写策略](#write-policy)
+- [列表读（`cachedSnapshot(meta, inheritedEventCount, keys?)`）](#listing-read-cachedsnapshotmeta-inheritedeventcount-keys)
+- [冷读（`coldSnapshot(meta, inheritedEventCount, events)`）](#cold-read-coldsnapshotmeta-inheritedeventcount-events)
+- [升级兼容性](#upgrade-compatibility)
+- [组合](#composition)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知局限与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="write-policy"></a>
 ## 写策略
 
 三个必写点，其间节流：
@@ -31,20 +51,24 @@
 
 两个 `Config` 字段均必填（无默认值）：写入节奏是部署选择，没有普适正确值，由 cordis.yml 明示。
 
+<a id="listing-read-cachedsnapshotmeta-inheritedeventcount-keys"></a>
 ## 列表读（`cachedSnapshot(meta, inheritedEventCount, keys?)`）
 
 零 I/O 一档：从身份匹配的存储记录直接 view 客户端值（仅版本与 state schema 均匹配的 key），以 `{asOfSeq, values}` 切面返回。`cachedPredecessorTitle(meta, inheritedEventCount)` 是更窄的列表专用例外：生命周期匹配且已通过结构准入的前任记录只能公开与当前版本兼容的 `title` 行——一个可能陈旧的事实，携带哨兵 `asOfSeq: -1`，绝不是折叠种子。无种子的列表项知道自己的切点是零；带种子但只有 header 的列表项不知道数字切点，必须跳过这两条快路，直到权威的事件体读取给出切点。`asOfSeq` 取所服务行的最低水位，客户端在 higher-seq-wins 规则下播种值存储时，陈旧列表块永远压不过更新的推送帧。host-only 行永不返回。无可用客户端行（未知 id、无关生命周期、无可用行）时返回 `undefined`；api-proxy 列表载体将其转为列缺席。
 
+<a id="cold-read-coldsnapshotmeta-inheritedeventcount-events"></a>
 ## 冷读（`coldSnapshot(meta, inheritedEventCount, events)`）
 
 调用方提供该会话完整有序的日志（session-query 观察层是出厂生产者）；缓存在可用时以检查点行为每个单元播种，把供入事件折叠到切点，并刷新记录而不自行读取持久化。来自另一 Session 格式世代或生命周期的行永不匹配：每条记录绑定完整身份（`formatVersion`、`createdAt`、`cwd`、`isSeeded`、`inheritedEventCount`）。`hydratePrepared(session, events)` 是对已准备好的未发布 Session 做同样的播种再折叠，不写任何内容。
 
 `write(session)` 是所有必写点共用的同步切面检查点；载体可以直接调用（非 fail-soft——由 fail-soft 包装层负责遏制）。
 
+<a id="upgrade-compatibility"></a>
 ## 升级兼容性
 
 该域以 `per-record` 布局把每个会话存为一份带版本戳的文档（`<root>/session_projcache/sessions/` 下），因此陈旧或畸形的记录单独丢弃，而不会使整个单元拒绝打开。`compatibleVersions: [3, 4, 5, 6]` 使结构有效的前任文档保持可读、供当前检查点重写，并允许旧的整体文件 `session_projcache.json` 在其存储版本被接受时做一次引导迁移；schema 校验失败的记录按 `invalidRecords: 'backup-and-skip'` 移到 `<id>.json.bak.<stamp>`，由下一次检查点重建。
 
+<a id="composition"></a>
 ## 组合
 
 ```yaml
@@ -57,9 +81,11 @@
 
 注入 `storageDomain`、`sessionProjections`、`sessions`。没有这一行时，投影系统只跑 live（水位缓存；冷读在实现了它的载体处退回全量日志折叠）。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。缓存记录是通过存储域写入与读取的持久文档；服务投影同一存储，不保留影子副本。
+
 
 ## 模型体验
 
@@ -69,8 +95,21 @@
 
 无；缓存从不组装或发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知局限与延后工作
 
 - **不提供淘汰或保留接口**：记录会按会话持续累积；清理已存储的检查点属于带外维护，与会话持久化采用相同策略。
 - **间隔节流采用按会话的粗粒度控制**：一次无脏数据的写入完成后，计时器会在首个脏事件到达时启动；对于持续但未达到条数阈值的事件流，系统每个间隔写入一次，而不采用滑动窗口。
 - **`coldSnapshot` 折叠不去重**——同一会话的两个并发冷折叠各自对供入日志播种再折叠；写回最后者胜（行等价），对列表级调用频率可接受。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>
+
+<a id="model-experience"></a>

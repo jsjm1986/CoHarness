@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-user-bubbles-drop-the-branch-action.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-06-user-bubbles-drop-the-branch-action.md
-2026-08-06-user-bubbles-drop-the-branch-action.md: 817b5e72b7e18b03ddb3a160e6f7a86b04f02764
-2026-08-06-user-bubbles-drop-the-branch-action.zh.md: 0f538315106ef89020633a90873af2cf519b0166
+/agent-note-user-and-steering-bubbles-drop-the-branch-action:
+  en: 2c2af0011024d1e4
+  zh: 49ce3384ead4d104
+/agent-note-user-and-steering-bubbles-drop-the-branch-action/problem:
+  en: 72c77495692542fe
+  zh: c35c784216347c56
+/agent-note-user-and-steering-bubbles-drop-the-branch-action/decision:
+  en: 86de8c835bcf26b6
+  zh: e375218932630918
+/agent-note-user-and-steering-bubbles-drop-the-branch-action/alternatives-considered:
+  en: 90ddd4a4e136631e
+  zh: 502bf1ff49c0a6f6
+/agent-note-user-and-steering-bubbles-drop-the-branch-action/consequences:
+  en: 4cbbaacf222306bd
+  zh: d0eccd647acddfe2

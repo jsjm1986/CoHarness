@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-resume-selector-batch-projection.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-31-resume-selector-batch-projection.md
-2026-07-31-resume-selector-batch-projection.md: 5b0b33c34137efb95f31e07e7fce7622aeb2dbce
-2026-07-31-resume-selector-batch-projection.zh.md: a8e89c2e989680a1d1bf98f0cd2817b5900d36d0
+/agent-note-resume-selector-folds-titles-only:
+  en: f64f2d78ea8a335f
+  zh: 76fb21a0ce860ee9
+/agent-note-resume-selector-folds-titles-only/problem:
+  en: c1407552a8c43093
+  zh: 671bafd770069f3f
+/agent-note-resume-selector-folds-titles-only/decision:
+  en: 5630b7f2c55c1c19
+  zh: 99b6cbca444c06d6
+/agent-note-resume-selector-folds-titles-only/alternatives-considered:
+  en: f3834f123288489e
+  zh: f6f487be1d9badad
+/agent-note-resume-selector-folds-titles-only/consequences:
+  en: 6380c7c61cc3a2b2
+  zh: c0f4f86cc6a51720

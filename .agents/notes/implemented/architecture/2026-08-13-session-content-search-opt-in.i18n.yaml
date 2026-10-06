@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-13-session-content-search-opt-in.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-13-session-content-search-opt-in.md
-2026-08-13-session-content-search-opt-in.md: 2d14b2def00186c2957dc03ae712fbcb63d2c820
-2026-08-13-session-content-search-opt-in.zh.md: 5231b37cf13adacd191638e0be437c34929a2981
+/agent-note-session-content-search-ships-opt-in-through-openat-never:
+  en: 4f4e0a22244eabb5
+  zh: bbc70ebe5608e844
+/agent-note-session-content-search-ships-opt-in-through-openat-never/problem:
+  en: c6f021056ee2e350
+  zh: 1513e4de4528d7d0
+/agent-note-session-content-search-ships-opt-in-through-openat-never/decision:
+  en: 3815ffe7e7ea0718
+  zh: 1433e11eb506db9d
+/agent-note-session-content-search-ships-opt-in-through-openat-never/alternatives-considered:
+  en: d4a08ee5005bcd4d
+  zh: 27d08affb2f9b3cb
+/agent-note-session-content-search-ships-opt-in-through-openat-never/consequences:
+  en: 01b0685c203acd5c
+  zh: 9c81f0d40a125a02

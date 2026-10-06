@@ -48,6 +48,16 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* Archived rows keep their slot but read as secondary text (one step down
+   over the sidebar fill). Archived search rows drop their meta line to the
+   same step so both lines read as one unit. */
+.sessionRow.archived .title,
+.searchResultRow.archived .searchResultTitle,
+.searchResultRow.archived .searchResultWorkspace,
+.searchResultRow.archived .searchResultSnippet {
+  color: var(--dsw-alias-label-caption);
+}
+
 .searchResultHeading {
   display: flex;
   align-items: center;
@@ -212,6 +222,19 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* Static pin marker occupying the same right-edge cell as the hover pin
+   button that replaces it. */
+.pinIndicator {
+  display: inline-flex;
+  flex: none;
+  width: 16px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  color: var(--dsw-alias-label-caption);
+}
+
 .dot {
   flex: none;
 }
@@ -234,6 +257,13 @@
 
 .sessionRow:hover .time,
 .sessionRow.menuOpen .time {
+  display: none;
+}
+
+/* Hover swaps the trailing cell to the action buttons, which already carry
+   the pin glyph — hide the static marker so they do not double. */
+.sessionRow:hover .pinIndicator,
+.sessionRow.menuOpen .pinIndicator {
   display: none;
 }
 
@@ -320,6 +350,12 @@
   font-size: 12px;
   line-height: 20px;
   color: #ADB2B8;
+}
+
+/* Archive glyph rides the status row's text color; slight inset aligns it with the 6px status dots. */
+.hoverArchived svg {
+  flex-shrink: 0;
+  margin: 0 -4px;
 }
 
 .iconButton {

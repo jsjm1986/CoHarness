@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-model-menu-keyboard-navigation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-model-menu-keyboard-navigation.md
-2026-09-22-model-menu-keyboard-navigation.md: d60e82ee4d8d5655db71bf0ae5204375ab262502
-2026-09-22-model-menu-keyboard-navigation.zh.md: a7cf9ce67c49698b375deb3e567b48f07d7438c9
+/agent-note-keep-keyboard-focus-inside-model-menu-navigation:
+  en: eb5f0986829e0594
+  zh: 35184a228237776c
+/agent-note-keep-keyboard-focus-inside-model-menu-navigation/problem:
+  en: 8be5ed3a162e1d2b
+  zh: 287a8f7fed08fd4d
+/agent-note-keep-keyboard-focus-inside-model-menu-navigation/decision:
+  en: cf77e50caf712d36
+  zh: 9d3638b05f8b88b1
+/agent-note-keep-keyboard-focus-inside-model-menu-navigation/verification:
+  en: 840fdb7148b8b787
+  zh: 050957f21b6cc0bd
+/agent-note-keep-keyboard-focus-inside-model-menu-navigation/alternatives-considered:
+  en: 7b652d0365bcd1d1
+  zh: 2c1a9008ffdecc07
+/agent-note-keep-keyboard-focus-inside-model-menu-navigation/consequences:
+  en: d025e2cf76eb9694
+  zh: 873b91c7c1d52fd0

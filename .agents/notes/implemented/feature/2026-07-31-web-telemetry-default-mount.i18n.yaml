@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-web-telemetry-default-mount.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-31-web-telemetry-default-mount.md
-2026-07-31-web-telemetry-default-mount.md: 9399cbced62e326a46058a5f0c21c949e8737eff
-2026-07-31-web-telemetry-default-mount.zh.md: 133c5293fce676567a9ef8d2a47196678f4dc0e4
+/agent-note-default-session-telemetry-mount-otel-reporting-in-the-dsh-web-composition:
+  en: e9d44545afb920f8
+  zh: d4d59d5c0145be39
+/agent-note-default-session-telemetry-mount-otel-reporting-in-the-dsh-web-composition/problem:
+  en: 0a9580da286920ab
+  zh: 8f893e7549f3b341
+/agent-note-default-session-telemetry-mount-otel-reporting-in-the-dsh-web-composition/decision:
+  en: a056e68d8353d74a
+  zh: 6d6956722f276157
+/agent-note-default-session-telemetry-mount-otel-reporting-in-the-dsh-web-composition/alternatives-considered:
+  en: 45f7f1b13351de4b
+  zh: 6c7c3dec0073a166
+/agent-note-default-session-telemetry-mount-otel-reporting-in-the-dsh-web-composition/consequences:
+  en: 52b277bbda8c9f24
+  zh: 58fd76682d12be77

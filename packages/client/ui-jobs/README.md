@@ -1,23 +1,41 @@
+---
+description: "Session-header background-job list: expandable streaming output panels, running/settled sections, and a two-press stop control"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-jobs
 
 English | [中文](README.zh.md)
 
-Web background-job feature owner: contributes one entry to `conversation.session.header.actions` listing the `ctx.jobs` records this session can see. The data arrives entirely through the `jobsBySession` list mirror that [`dsh-client-runtime`](../runtime/README.md) folds from `session/jobs` frames, so this package issues no RPC and holds no state beyond popover visibility.
+Web background-job feature owner: contributes one entry to `conversation.session.header.actions` listing the `ctx.jobs` records this session can see. The roster arrives through the `jobsBySession` list mirror that [`dsh-client-runtime`](../runtime/README.md) folds from `session/jobs` frames, so the package keeps no roster of its own. Row interactions ride the sessions service: expanding an observable row starts a reference-counted `ctx.sessions.observeJob` loop that polls the host's `jobs.output` read into the runtime's `observedJobs` snapshot, and the stop control calls `ctx.sessions.killJob` against `jobs.kill`.
 
 The trigger renders only when the session has at least one job, so an ordinary conversation never grows a control for a capability it is not using. Its badge counts `running` plus `stopping` and is omitted at zero, leaving a session that holds only finished jobs a quiet entry point into its history rather than one advertising a count of nothing. The popover is a flat list: live rows first by `startedAt` ascending, then settled rows by `finishedAt` descending, with a same-millisecond tie broken on start order so the host's map iteration never decides it. A row shows the producer kind, the label, a status marker, the producer's `detail` in place of the generic status word once it has one, and an elapsed duration. That duration advances once per second while the row is live and freezes at `finishedAt`; the clock runs only while an open list holds something that moves. A settled row missing `finishedAt` reads as zero rather than as a negative figure, and a duration past an hour stays in hours rather than growing a day vocabulary no producer currently reaches.
 
-Settled rows stay visible and de-emphasized until the registry drops them at owner disposal. They are in the snapshot, a failed job's `detail` is the only place its failure is legible, and filtering them out here is work the output and cancellation phases would undo. A running one-shot background subagent therefore appears both here and in the [subagent catalog](../ui-subagent/README.md): the catalog navigates into the child's transcript, while this list is the only handle a future cancellation can attach to.
+Settled rows stay visible and de-emphasized until the registry drops them at owner disposal. They are in the snapshot, a failed job's `detail` is the only place its failure is legible, and filtering them out here is work the output and cancellation phases would undo. A running one-shot background subagent therefore appears both here and in the [subagent catalog](../ui-subagent/README.md): the catalog navigates into the child's transcript, while this list owns the stop control.
+
+A live row, or a settled row whose ring retained output (`output.total` above zero), expands into a terminal panel fed by the observation loop. The panel copies the command (not the output), wraps lines in full, scrolls inside a fixed height, and draws no run-state dot of its own — the row above carries the state. Retention gaps, lossy reads, and read failures render as notices above the panel; the retained tail is bounded, so a job that out-produced the ring shows a gap marker rather than the missing head. Releasing the last expanded viewer stops the poll and drops the accumulated text. Running rows additionally carry a two-press stop control: the first press arms it, the confirming press within three seconds issues the kill, and the row converges through the next `session/jobs` frame (`stopping`, then the settled section, whose `detail` carries the `cancelled by the user` reason the host forwards). The kill claims nothing in the producer's terminal delivery, so the owning agent still receives the standard completion notice. The settled section folds behind its count while live work exists and can be cleared client-side; a settled row with no retained output stays static, including subagents whose answers went to the model.
 
 Escape closes the list and returns focus to the trigger, as does a pointer press outside it. Below 768px the same list becomes a safe-area phone sheet with the shared backdrop and touch-sized rows. The last job disappearing closes the list before the control unmounts, so focus never vanishes from a removed node. Styling uses tokens only; copy goes through the package's own `job` locale namespace. The behavior is specified by the [Web background-job display Agent Note](../../../.agents/notes/implemented/feature/2026-08-08-web-background-job-display.md).
 
 ## Summary
 
-This package renders the background-job surface of the Web GUI: a session-header action that opens a popover listing the jobs this session can see. It reads host-computed registry state through the runtime's `jobsBySession` mirror and issues no RPC of its own. The trigger appears only when the session has at least one job, with a badge counting running and stopping jobs; settled rows stay visible and de-emphasized until the registry drops them. The model's own view of the same jobs belongs to `dsh-tool-jobs`; this package is a read-only projection for the human.
+This package renders the background-job surface of the Web GUI: a session-header action that opens a popover listing the jobs this session can see. It reads roster state through the runtime's `jobsBySession` mirror; row interactions (output observation, kill) ride `ctx.sessions` onto the host's `jobs.output`/`jobs.kill` methods. The trigger appears only when the session has at least one job, with a badge counting running and stopping jobs; settled rows stay visible and de-emphasized until the registry drops them. The model's own view of the same jobs belongs to `dsh-tool-jobs`.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
-**Runtime invariant:** No companion is published. Job records arrive entirely through the runtime's `jobsBySession` mirror; the package issues no RPC and holds only popover visibility.
+**Runtime invariant:** No companion is published. Job records arrive entirely through the runtime's `jobsBySession` and `observedJobs` mirrors; the package issues no RPC itself and holds only popover visibility.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this package renders host-computed registry state for a human and touches no prompt, message, schema, stream, or tool result.
@@ -28,5 +46,15 @@ None; the package never assembles or sends provider requests.
 
 ## Known Limitations and Deferred Work
 
-- **Rows are read-only** — a job's streamed output and a human-initiated cancellation are separate phases. Cancellation additionally owes a model-facing decision the seam does not answer today: `kill()` marks terminal delivery reported, so an interrupt written against the current contract would leave the model believing its job is still running.
+- **Observation is render-tail only** — the panel accumulates a bounded tail of the job's retained ring; bytes the ring already evicted before the first read, or that the render bound dropped, show as a gap notice rather than recoverable history. A process restart ends the loop mid-flight and the row returns to its roster state.
 - **The list is not the registry's own set** — it shows what one session can see through the wire view, so a job owned by another session never appears here, and a process restart empties the list while the transcript keeps the `run_in_background` cards that started those jobs. An unowned job (one started without a live `Agent`) is the opposite case: it reaches every session's list, matching what `list(caller)` reports to every caller.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

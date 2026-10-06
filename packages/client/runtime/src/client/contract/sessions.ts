@@ -9,7 +9,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {
-  RpcResult, SessionId, SubagentAddress,
+  JobView, RpcResult, SessionId, SubagentAddress,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionRuntimeTarget } from '@deepseek-ai/dsh-client-connection/client'
 import type { HostObservable, SessionMaybeProvideInfo, SessionProvideInfo } from '@deepseek-ai/dsh-client-ui-slots'
@@ -130,6 +130,24 @@ export interface ISessions {
    * @returns completion of the current or newly started refresh.
    */
   refreshSubagents(parentSessionId: SessionId): Promise<void>
+  /**
+   * Observe one background job's live output under `list.observedJobs`;
+   * reference-counted, so overlapping viewers share one read channel. The
+   * roster row itself keeps converging through `session/jobs` frames.
+   * @param sessionId - owning session used for the fenced read; undefined for an unowned job.
+   * @param jobId - job to observe.
+   * @returns release for this observer's reference; the last release stops the channel.
+   */
+  observeJob(sessionId: SessionId | undefined, jobId: JobView['id']): () => void
+  /**
+   * Kill one background job on a human's behalf. Pure passthrough — the row's
+   * terminal state converges through `session/jobs`, and the caller owns
+   * error presentation.
+   * @param sessionId - session whose job list carries the job.
+   * @param jobId - the job row's registry id.
+   * @returns whether the registry admitted the request.
+   */
+  killJob(sessionId: SessionId, jobId: JobView['id']): Promise<boolean>
 
   /**
    * Record the composition one session now runs. The agent-preset seat calls
@@ -199,17 +217,32 @@ export interface ISessions {
    * @returns the live binding, or undefined without a retained generation.
    */
   binding(id: SessionId): SessionBinding | undefined
-  /** Ensure an account-visible session is loaded into its target runtime.
+  /** Resolve one original Host ID to its runtime-qualified browser key.
+   * @param id - original Host Session ID.
+   * @param target - explicit runtime, or the verified bootstrap runtime.
+   * @returns account-local browser resource key.
+   */
+  keyFor?(id: SessionId, target?: SessionRuntimeTarget): SessionId
+  /** Hold a runtime through discovery, asynchronous work, and synchronous reference adoption.
+   * @param target - runtime retained against inactivity cleanup; this grants no access.
+   * @param signal - consumer lifetime or navigation cancellation.
+   * @param operation - work that adopts any continuing Session references before settling.
+   * @returns the operation result or failure; cancellation releases the runtime hold immediately.
+   */
+  usingRuntime?<T>(target: SessionRuntimeTarget, signal: AbortSignal, operation: (signal: AbortSignal) => Promise<T>): Promise<T>
+  /** Discover an account-visible Session in its target runtime before retaining history.
    * @param target - account runtime that owns the session's workbench binding.
    * @param id - listed session identity to materialize.
-   * @returns whether the runtime accepted the load; false means the session stays list-only.
+   * @param signal - cancels discovery without releasing other consumers of the runtime.
+   * @returns true for a listed, unarchived Session; metadata or authorization failures reject.
    */
-  ensureSession?(target: SessionRuntimeTarget, id: SessionId): Promise<boolean>
+  ensureSession?(target: SessionRuntimeTarget, id: SessionId, signal?: AbortSignal): Promise<boolean>
   /** Create a new conversation in an explicitly selected account runtime.
    * @param target - account runtime that hosts the new session.
+   * @param signal - cancels discovery and prevents late selection; an accepted Host creation is not rolled back.
    * @returns the created session identity.
    */
-  createSession?(target: SessionRuntimeTarget): Promise<SessionId>
+  createSession?(target: SessionRuntimeTarget, signal?: AbortSignal): Promise<SessionId>
   /** Reconcile the bootstrap connection with the account's current scope.
    * @param target - runtime the account scope now resolves to.
    */

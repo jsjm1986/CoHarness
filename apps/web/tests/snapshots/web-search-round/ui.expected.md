@@ -19,17 +19,17 @@
   - img
   - text: System prompt
 - text: Use web_search once with queries ["DeepSeek Harness snapshot search","DeepSeek Harness multi-query search"]. Then reply exactly SEARCH_DONE and stop.
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
+- button "Context injection runtime-context":
   - img
   - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
-- button "Search DeepSeek Harness snapshot search, DeepSeek Harness multi-query search":
+  - text: Context injection runtime-context
+- button "Web search DeepSeek Harness snapshot search, DeepSeek Harness multi-query search":
   - img
   - img
-  - text: Search DeepSeek Harness snapshot search, DeepSeek Harness multi-query search
+  - text: Web search DeepSeek Harness snapshot search, DeepSeek Harness multi-query search
 - paragraph: SEARCH_DONE
 - button "Copy":
   - img
@@ -43,7 +43,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -51,7 +51,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -64,4 +64,5 @@
   - button "29 tok · Cache hit 0%":
     - img
     - text: 29 tokCache hit 0%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

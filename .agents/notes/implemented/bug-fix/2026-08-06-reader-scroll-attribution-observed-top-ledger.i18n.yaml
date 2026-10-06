@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-reader-scroll-attribution-observed-top-ledger.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-06-reader-scroll-attribution-observed-top-ledger.md
-2026-08-06-reader-scroll-attribution-observed-top-ledger.md: 66a1ca361cf28bf0beab95fa81da9cac3527474c
-2026-08-06-reader-scroll-attribution-observed-top-ledger.zh.md: 6aa1866e802b00d0a3431dfd5bef9efd57121294
+/agent-note-reader-scroll-attribution-through-the-observed-top-ledger:
+  en: c45c58e3944a78a7
+  zh: aa747c42ba32fbbb
+/agent-note-reader-scroll-attribution-through-the-observed-top-ledger/problem:
+  en: 35adc276711c960b
+  zh: 844c1ad03d9b3472
+/agent-note-reader-scroll-attribution-through-the-observed-top-ledger/decision:
+  en: 4ecd17887c671bda
+  zh: f4983af61966aa1e
+/agent-note-reader-scroll-attribution-through-the-observed-top-ledger/contract-change-coalesced-shrink-plus-regrow-clamps:
+  en: 64fee2655911c13b
+  zh: 900400af1af11e84
+/agent-note-reader-scroll-attribution-through-the-observed-top-ledger/testing:
+  en: 899022b76ab22a1c
+  zh: 05e7ffefa71c0929
+/agent-note-reader-scroll-attribution-through-the-observed-top-ledger/alternatives-considered:
+  en: 61317a9abe7a8852
+  zh: 2466d1d3b39d7b42
+/agent-note-reader-scroll-attribution-through-the-observed-top-ledger/consequences:
+  en: b9602f2bc7252350
+  zh: 5b63fadb8426c25e

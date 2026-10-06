@@ -12,12 +12,13 @@
  * workspace-browser.spec.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, waitFor, within } from '@testing-library/react'
 import type { ISession, SessionId, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
-import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotTestRuntime, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
+import { MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 
 // The service reads its initial locale from the browser; these specs assert
@@ -25,6 +26,8 @@ import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 usePinnedBrowserLanguages('zh-CN')
 
 const SID = 's1' as SessionId
+// A snapshot must keep one identity between changes (uSES polls it).
+const EMPTY_CATALOG: readonly never[] = []
 
 afterEach(cleanup)
 beforeEach(() => { localStorage.clear() })
@@ -38,17 +41,112 @@ async function createRuntime(): Promise<SlotTestRuntime> {
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.provide('locale', locale)
   runtime.provide('conversationViewport', { snapshot: { getSnapshot: () => ({ mode: 'single', paneIds: [], paneRatios: [] }), subscribe: () => () => {} } } as never)
+  runtime.provide('shortcuts', {
+    register: vi.fn(() => () => {}),
+    catalog: { getSnapshot: () => EMPTY_CATALOG, subscribe: () => () => {} },
+  })
+  runtime.provide('layout', { selectPanel: vi.fn() })
+  // ui-layout's apply owns this contribution in the assembled app; the spec
+  // stubs the no-panel selection the row surfaces read through usePanelInfo.
+  runtime.slots.provideRoot({
+    hooks: { panelInfo: { getSnapshot: () => ({ activePanelId: null }), subscribe: () => () => {} } },
+  })
   runtime.slots.installLocale(locale)
   return runtime
 }
 
-/** Test-owned sidebar shell role: declares and renders the browsing region. */
-type FrameProps = PropsRenderSlots<'sidebar.workspaces'>
+/** Test-owned shell role: declares and renders the browsing region and the frame-wide overlay list. */
+type FrameProps = PropsRenderSlots<'sidebar.workspaces' | 'shell.overlay'>
 function SidebarFrame({ renderSlot }: FrameProps) {
-  return <>{renderSlot('sidebar.workspaces', { wide: true, expandSidebar: () => {} })}</>
+  return (
+    <>
+      {renderSlot('sidebar.workspaces', { wide: true, expandSidebar: () => {} })}
+      {renderSlot('shell.overlay', {})}
+    </>
+  )
+}
+
+/** Declare the sidebar hole and the overlay list the rename dialog and the row notices mount in. */
+async function declareFrame(runtime: SlotTestRuntime): Promise<void> {
+  await runtime.root.declare(
+    {
+      'sidebar.workspaces': { kind: 'single', scope: 'root' },
+      'shell.overlay': { kind: 'list', scope: 'root' },
+    } as never,
+    SidebarFrame as never,
+  )
+}
+
+/** One Workspace holding the fixture Session. */
+async function seedWorkspace(runtime: SlotTestRuntime): Promise<void> {
+  await runtime.workspaces.update((draft) => {
+    draft.items = [{
+      workspaceId: 'w1' as WorkspaceId, title: 'alpha', path: '/w/alpha',
+      sessionIds: [SID], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    }] as never
+  })
 }
 
 describe('session rename through the assembled browser', () => {
+  it('renders independently registered Session actions in declared order', async () => {
+    const runtime = await createRuntime()
+    const selected = vi.fn()
+    await runtime.sessions.add({
+      id: SID,
+      summary: { title: 'Persisted title', displayTitle: 'Persisted title', cwd: '/w/alpha' },
+      session: { rename: vi.fn() },
+    })
+    await seedWorkspace(runtime)
+    await declareFrame(runtime)
+    await runtime.mount({ inject: [...inject], apply })
+    const registerAction = (id: string, order: number, priority: number, label: string) => {
+      runtime.slots.register(
+        { name: 'sidebar.workspaces.session.menu.item', id, order, priority },
+        ({ sessionId, displayTitle, useMenuOpenState }: PropsRuntime<'sidebar.workspaces.session.menu.item'>) => {
+          const [, setMenuOpen] = useMenuOpenState()
+          return (
+            <MenuItemButton separatorBefore={order === 500} onSelect={() => {
+              setMenuOpen(false)
+              selected(id, sessionId, displayTitle)
+            }}>
+              {label}
+            </MenuItemButton>
+          )
+        },
+      )
+    }
+    // `order` places plugin rows after the shipped rows (100/200/300/400)
+    // even when the later registration has the lower shadowing priority
+    // assigned to dynamic browser packages; the first plugin row opens the
+    // plugin group with a hairline.
+    registerAction('export', 500, -1, 'Export action')
+    registerAction('last', 600, -2, 'Last action')
+    const view = runtime.renderRoot()
+
+    const row = (await view.findByText('Persisted title')).closest('[role="treeitem"]')!
+    const trigger = within(row as HTMLElement).getByLabelText('会话“Persisted title”的操作')
+    fireEvent.click(trigger)
+    expect(view.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
+      '置顶会话', '重命名', '分叉会话', '归档会话', 'Export action', 'Last action',
+    ])
+    expect(view.getAllByRole('separator')).toHaveLength(1)
+    const last = view.getByRole('menuitem', { name: 'Last action' })
+    const exportRow = view.getByRole('menuitem', { name: 'Export action' })
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'End' })
+    expect(document.activeElement).toBe(last)
+    fireEvent.keyDown(last, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(exportRow)
+    fireEvent.click(exportRow)
+    expect(selected).toHaveBeenCalledWith('export', SID, 'Persisted title')
+    // The plugin row dismissed the menu through the bound open-state hook;
+    // the list returns focus to the trigger.
+    expect(view.queryByRole('menu')).toBeNull()
+    await act(async () => { await Promise.resolve() })
+    expect(document.activeElement).toBe(trigger)
+    await runtime.dispose()
+  })
+
   it('renames via the row menu: binding.session.rename fires, the dialog closes, the row re-labels from the list', async () => {
     const runtime = await createRuntime()
     const rename = vi.fn<ISession['rename']>(async title => ({
@@ -59,16 +157,8 @@ describe('session rename through the assembled browser', () => {
       summary: { title: '旧标题', displayTitle: '旧标题', cwd: '/w/alpha' },
       session: { rename },
     })
-    await runtime.workspaces.update((draft) => {
-      draft.items = [{
-        workspaceId: 'w1' as WorkspaceId, title: 'alpha', path: '/w/alpha',
-        sessionIds: [SID], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-      }] as never
-    })
-    await runtime.root.declare(
-      { 'sidebar.workspaces': { kind: 'single', scope: 'root' } } as never,
-      SidebarFrame as never,
-    )
+    await seedWorkspace(runtime)
+    await declareFrame(runtime)
     await runtime.mount({ inject: [...inject], apply })
     const view = runtime.renderRoot()
 
@@ -76,6 +166,8 @@ describe('session rename through the assembled browser', () => {
     const row = (await view.findByText('旧标题')).closest('[role="treeitem"]')!
     fireEvent.click(within(row as HTMLElement).getByLabelText('会话“旧标题”的操作'))
     fireEvent.click(view.getByRole('menuitem', { name: '重命名', hidden: true }))
+    // The rename row dismissed the menu; the dialog lives in the overlay list.
+    expect(view.queryByRole('menu')).toBeNull()
 
     // The dialog seeds from the current title; submit a padded value.
     const input = await view.findByLabelText('会话名称') as HTMLInputElement
@@ -106,16 +198,8 @@ describe('session rename through the assembled browser', () => {
       summary: { title: '旧标题', displayTitle: '旧标题', cwd: '/w/alpha' },
       session: { rename },
     })
-    await runtime.workspaces.update((draft) => {
-      draft.items = [{
-        workspaceId: 'w1' as WorkspaceId, title: 'alpha', path: '/w/alpha',
-        sessionIds: [SID], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
-      }] as never
-    })
-    await runtime.root.declare(
-      { 'sidebar.workspaces': { kind: 'single', scope: 'root' } } as never,
-      SidebarFrame as never,
-    )
+    await seedWorkspace(runtime)
+    await declareFrame(runtime)
     await runtime.mount({ inject: [...inject], apply })
     const view = runtime.renderRoot()
     await runtime.flush()

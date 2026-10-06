@@ -13,7 +13,9 @@ import Timer from '@deepseek-ai/cordis-plugin-timer'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { FSWatcher, type ChokidarOptions } from 'chokidar'
 
-const configWatch = vi.hoisted(() => ({ create: undefined as ((options?: ChokidarOptions) => FSWatcher) | undefined }))
+const configWatch = vi.hoisted(() => ({
+  create: undefined as ((options?: ChokidarOptions, paths?: string | string[]) => FSWatcher) | undefined,
+}))
 vi.mock('node:fs', async (importOriginal) => {
   const native = await importOriginal<typeof import('node:fs')>()
   return { ...native, realpathSync: vi.fn(native.realpathSync) }
@@ -25,7 +27,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 vi.mock('chokidar', async (importOriginal) => {
   const native = await importOriginal<typeof import('chokidar')>()
   return { ...native, watch: (paths: string | string[], options?: ChokidarOptions) =>
-    configWatch.create === undefined ? native.watch(paths, options) : configWatch.create(options) }
+    configWatch.create === undefined ? native.watch(paths, options) : configWatch.create(options, paths) }
 })
 
 /** Every per-test tree root, removed once the booted watcher has been disposed. */
@@ -45,8 +47,30 @@ async function bootHmr(dir: string, root: string[] = [], usePolling?: boolean): 
   return ctx
 }
 
-async function eventually(test: () => boolean, message: string, timeoutMs = 20_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs
+/**
+ * Block until this process's native directory watches deliver events. Chokidar
+ * reports `ready` once `fs.watch()` returns, but libuv on darwin builds the
+ * per-process FSEvents stream later on its CoreFoundation thread
+ * (`uv__fsevents_init` only signals that thread), and a write that lands before
+ * then is never reported. Closing any directory handle runs `uv__fsevents_close`,
+ * whose `uv_sem_wait` returns only after `uv__fsevents_reschedule` has rebuilt
+ * and started the stream with the remaining handles (libuv `src/unix/fsevents.c`,
+ * unchanged across the libuv 1.x releases bundled by Node 22–24), so a watcher
+ * registered before this call observes the next write. Any existing directory
+ * works because the stream is per process. Per-file handles use kqueue and leave
+ * the stream alone, so one call after registration covers the later change and
+ * unlink steps. Linux inotify and Windows `ReadDirectoryChangesW` are armed
+ * inside `fs.watch()`, so there this is an immediate open and close. Should a
+ * libuv release drop the close-time wait, these cases regain the darwin loss
+ * rate this call removes rather than failing deterministically.
+ */
+function ensureNativeWatchLive(dir: string): void {
+  fs.watch(dir).close()
+}
+
+/** Poll `test` every 10 ms under the calling case's effective budget. */
+async function eventually(test: () => boolean, message: string, budget: number): Promise<void> {
+  const deadline = Date.now() + budget
   while (!test()) {
     if (Date.now() >= deadline) throw new Error(message)
     await new Promise(resolve => setTimeout(resolve, 10))
@@ -109,18 +133,19 @@ describe('HMR exact config paths', () => {
     }
   })
 
-  it('observes add, change, and unlink outside its module roots', { timeout: 20_000 }, async () => {
+  it('observes add, change, and unlink outside its module roots', { timeout: 20_000 }, async ({ task, onTestFailed }) => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-hmr-config-'))
     hmrRoots.push(dir)
     const filename = join(dir, 'plugins.yml')
     const ctx = await bootHmr(dir)
     const observed: string[] = []
+    // The case budget fires before eventually() can name the pending step.
+    onTestFailed(() => { console.error(`refresh observed ${JSON.stringify(observed)}`) })
     try {
-      // Polling keeps add/change/unlink delivery bounded on a loaded shared
-      // runner; the native-event lane stays under 'registered during a transaction'.
       // Single-shot writes need no stabilization sampling, whose repeated
       // stats can starve on the shared UV threadpool under the coverage lane.
-      await watchConfig(ctx, filename, { usePolling: true, awaitWriteFinish: false }, () => {
+      // Polling would carry the same threadpool dependency every interval.
+      await watchConfig(ctx, filename, { awaitWriteFinish: false }, () => {
         try {
           observed.push(readFileSync(filename, 'utf8'))
         } catch (error) {
@@ -128,19 +153,52 @@ describe('HMR exact config paths', () => {
           observed.push('missing')
         }
       })
+      ensureNativeWatchLive(dir)
 
       writeFileSync(filename, 'one', { flag: 'wx' })
-      await eventually(() => observed.includes('one'), 'HMR did not observe config creation')
+      await eventually(() => observed.includes('one'), 'HMR did not observe config creation', task.timeout)
       writeFileSync(filename, 'two')
-      await eventually(() => observed.includes('two'), 'HMR did not observe config change')
+      await eventually(() => observed.includes('two'), 'HMR did not observe config change', task.timeout)
       unlinkSync(filename)
-      await eventually(() => observed.includes('missing'), 'HMR did not observe config removal')
+      await eventually(() => observed.includes('missing'), 'HMR did not observe config removal', task.timeout)
     } finally {
       await ctx.fiber.dispose()
     }
   })
 
-  it('observes creation when the config parent did not exist at registration', { timeout: 90_000 }, async () => {
+  it.each([false, true])('observes one parent/config creation after watcher readiness (polling=%s)', { timeout: 90_000 }, async (usePolling) => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-hmr-once-'))
+    hmrRoots.push(root)
+    const filename = join(root, 'later', 'plugins.yml')
+    const ctx = new Context()
+    const previousFactory = configWatch.create
+    let watcher: FSWatcher | undefined
+    let ready = false
+    configWatch.create = (options, paths) => {
+      const created = new FSWatcher(options)
+      watcher = created
+      created.once('ready', () => { ready = true })
+      return created.add(paths!)
+    }
+    const observed: string[] = []
+    try {
+      await watchConfig(ctx, filename, { usePolling, awaitWriteFinish: false }, () => {
+        observed.push(readFileSync(filename, 'utf8'))
+      })
+      if (!usePolling) ensureNativeWatchLive(root)
+      expect(ready).toBe(true)
+      expect(watcher).toBeDefined()
+      expect(Object.keys(watcher!.getWatched())).toContain(await realpath(root))
+      mkdirSync(join(root, 'later'))
+      writeFileSync(filename, 'created-once', { flag: 'wx' })
+      await eventually(() => observed.includes('created-once'), 'HMR missed a single parent/config creation after ready', 60_000)
+    } finally {
+      configWatch.create = previousFactory
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('observes a new config parent amid repeated unrelated root activity', { timeout: 90_000 }, async () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-hmr-config-'))
     hmrRoots.push(root)
     const dir = join(root, 'later')
@@ -148,19 +206,12 @@ describe('HMR exact config paths', () => {
     const ctx = await bootHmr(root)
     const observed: string[] = []
     try {
-      // A not-yet-existing parent forces the watcher to notice the new
-      // directory, attach to it, and then observe the file. The watched root's
-      // stat changes only when its own entries do, so a lone mkdir is a
-      // one-shot diff: a coalesced or dropped tick forfeits the scan and
-      // nothing re-triggers it. Toggling a probe entry on every poll is the
-      // directory form of the rewrite loop above — each delivered event is a
-      // fresh chance to bind the new parent, whose first scan already sees the
-      // file. Native events come off the kernel queue; fs.watchFile polling
-      // would also need a UV-threadpool stat per tick, which starves under
-      // the coverage lane.
+      // Repeated root activity exercises discovery while unrelated entries change.
+      // The single-creation case independently owns detection without that activity.
       await watchConfig(ctx, filename, { awaitWriteFinish: false }, () => {
         observed.push(readFileSync(filename, 'utf8'))
       })
+      ensureNativeWatchLive(root)
       mkdirSync(dir)
       writeFileSync(filename, 'created')
       const probe = join(root, '.watch-probe')
@@ -189,6 +240,7 @@ describe('HMR exact config paths', () => {
     await hmr.runExclusive(() => hmr.watchConfig(filename, async () => {
       observed.resolve(readFileSync(filename, 'utf8'))
     }))
+    ensureNativeWatchLive(dir)
     writeFileSync(filename, 'created-after-transaction')
     expect(await observed.promise).toBe('created-after-transaction')
   })

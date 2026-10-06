@@ -1,5 +1,5 @@
 - button "Select workbench":
-  - text: 我的工作台
+  - text: My workbench
   - img
 - text: 3/4
 - button "Add conversation":

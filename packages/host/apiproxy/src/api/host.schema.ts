@@ -19,7 +19,12 @@ export const hostDescribeValueSchema = z.object({
   attachedSessions: z.number().int().nonnegative(),
   home: z.string(),
   canOpenPath: z.boolean(),
+  fileManager: z.enum(['finder', 'explorer', 'directory']).nullable().optional(),
   executionAuthorityRequired: z.boolean().optional(),
+  runtimeTarget: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('personal') }),
+    z.object({ kind: z.literal('project'), projectId: z.number().int().positive() }),
+  ]).optional(),
   workspaceFiles: z.object({
     maxBytes: z.number().int().positive(),
     maxLines: z.number().int().positive(),
@@ -74,9 +79,29 @@ export const hostCreateDirectoryValueSchema = z.object({
 /** host.openPath request payload. */
 export const hostOpenPathRequestSchema = z.object({
   path: z.string().min(1),
+  action: z.enum(['open', 'reveal']).optional(),
+  application: z.string().min(1).optional(),
 }) satisfies z.ZodType<Wire<RequestPayload<'host.openPath'>>>
 
 /** host.openPath response value. */
 export const hostOpenPathValueSchema = z.object({
   opened: z.literal(true),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.openPath'>>>
+
+/** host.fileApplications request payload. */
+export const hostFileApplicationsRequestSchema = z.object({
+  path: z.string().min(1),
+}) satisfies z.ZodType<Wire<RequestPayload<'host.fileApplications'>>>
+
+/** One OS-registered file handler on the wire. */
+export const hostFileApplicationSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  default: z.boolean(),
+  icon: z.string().regex(/^data:image\/(?:png|svg\+xml);base64,[A-Za-z0-9+/=]+$/).nullable(),
+})
+
+/** host.fileApplications response value. */
+export const hostFileApplicationsValueSchema = z.object({
+  applications: z.array(hostFileApplicationSchema),
+}) satisfies z.ZodType<Wire<ResponseValue<'host.fileApplications'>>>

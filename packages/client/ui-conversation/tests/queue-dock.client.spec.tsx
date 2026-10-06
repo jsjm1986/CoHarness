@@ -58,7 +58,7 @@ function imageRow(id: string, attachmentId: string, text = ''): QueuedMessage {
 function snapshotWith(queue: QueuedMessage[]): ConversationSnapshot {
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
-    nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue, running: true, composerPhase: 'active', removed: false, openState: 'open', openError: null,
     hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
     pendingSubmissions: [],
@@ -98,6 +98,7 @@ function kitFor(snapshot: ConversationSnapshot, injected: Partial<QueueDockInjec
     t,
     useSessions: (() => { throw new Error('unused') }) as unknown as SnapshotSelectorHook<SessionListState>,
     useWorkspaces: (() => { throw new Error('unused') }) as never,
+    usePanelInfo: (() => { throw new Error('unused') }) as never,
     useProjection: (() => undefined) as never,
     useInput: (() => { throw new Error('unused') }) as never,
     inputActions: { setDraft: () => {}, submit: () => {} } as never,
@@ -164,16 +165,21 @@ describe('QueueDock', () => {
     const header = view.getByRole('button', { name: '2 条排队消息' })
     expect(header.getAttribute('aria-expanded')).toBe('false')
     expect(document.getElementById(header.getAttribute('aria-controls')!)).toBeTruthy()
+    // Collapsed exposes the count header only: the row actions are not rendered.
+    expect(view.getAllByRole('button')).toEqual([header])
     expect(view.queryByText('one')).toBeNull()
     expect(view.queryByText('two')).toBeNull()
 
     fireEvent.click(header)
     expect(header.getAttribute('aria-expanded')).toBe('true')
+    // Expanded renders one Edit/Remove/Steer group per row, plus the header.
+    expect(view.getAllByRole('button')).toHaveLength(1 + 2 * 3)
     expect(view.getByText('one')).toBeTruthy()
     expect(view.getByText('two')).toBeTruthy()
 
     fireEvent.click(header)
     expect(header.getAttribute('aria-expanded')).toBe('false')
+    expect(view.getAllByRole('button')).toEqual([header])
     expect(view.queryByText('one')).toBeNull()
   })
 

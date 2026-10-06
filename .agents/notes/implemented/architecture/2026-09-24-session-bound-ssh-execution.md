@@ -16,7 +16,7 @@ The [SSH execution providers](2026-09-23-ssh-execution-providers.md) make `fs`/`
 
 Admission is per-join: `composeAgent` resolves the caller's own `sshAuthorization` grant, keys the realm by that grant's subject, and returns a publication commit that re-checks `signal.throwIfAborted()` after setup awaits settle — a revocation racing the mount vetoes publication. The hook aborts on the owning grant's invalidation signal, retires the realm generation, and disposes the connection. Resume reads the stored binding, re-resolves under the resuming caller, and rejects a mismatched request as `ssh-target-conflict`; fork inherits the binding because the seeded history ran on that host.
 
-Self-service sharing is scoped to project management: `share` and `listForProject` admit an organization administrator or the project's `owner_user_id`, re-checked inside the same transaction that writes. `/account/api/projects/<id>/ssh-targets` serves a share-flag list (GET) and share toggles (POST) to project managers; `capabilities.sshTargets` reports the capability so the UI does not infer it from role. Target registration, secrets, and revisioned mutation remain administrator-owned in `/admin`.
+Self-service sharing is scoped to project management: `share` and `listForProject` admit an organization administrator or the project's `owner_user_id`, re-checked inside the same transaction that writes. `/account/api/projects/<id>/ssh-targets` serves a share-flag list (GET) and share toggles (POST) to project managers; `capabilities.sshTargets` reports the capability so the UI does not infer it from role. Target registration, secrets, and revisioned mutation remain administrator-owned in `/admin`. The target editor carries the runtime password credential reference through every update. Omitting that reference at the API preserves it; only explicit null removes it, without deleting the credential value from its owner.
 
 ## Alternatives considered
 
@@ -29,6 +29,8 @@ Self-service sharing is scoped to project management: `share` and `listForProjec
 **Project-level target CRUD** — target rows carry helper digests, host keys, and credential references; registering them is a deployment security decision. Only the share decision — which registered targets this project may use — is delegated to project management.
 
 ## Consequences
+
+User-terminal shell discovery and PTY allocation use the same standing-realm provider lookup as remote workspace reads. An SSH-bound Session without that provider is unavailable, even when the Host has a local subprocess provider.
 
 Realm keying by subject duplicates standing mounts across users of the same target — the fail-closed cost of revocation isolation. A revoked grant retires every mount it authorized and fail-closes in-flight provider calls; `sshTarget` sessions require both a preset roster and `sshAuthorization`, and cold resume fails loudly without them. Sessions bound to a target skip the host `mkdir` on create. The UI change is user-visible and owes real-server acceptance evidence before the pull request lands.
 

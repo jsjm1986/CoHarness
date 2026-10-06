@@ -16,12 +16,14 @@
  * aborted on that commit. The slot framework binds the navigation sources for
  * each record's `useTabInfo` reader.
  */
+import type { Branded } from '@deepseek-ai/dsh-brand'
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { LayoutState, PaneId, TabId, TabRecord } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { findTabPane } from '@deepseek-ai/dsh-client-ui-dockkit'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SidebarRightNavigationParams } from './contract/params.ts'
-import type { SidebarRightTabActions, SidebarRightTabNavigation, SidebarRightTabPlacement } from './contract/slots.ts'
+import type { SidebarRightTabActions, SidebarRightTabCommands, SidebarRightTabNavigation, SidebarRightTabPlacement } from './contract/slots.ts'
 import type { SidebarRightOpenResourceOptions, SidebarRightOpenTabOptions, SidebarRightPlacement } from './service.ts'
 
 /**
@@ -37,11 +39,19 @@ export interface SidebarRightNavigator {
   closeIn(sessionId: SessionId, tabId: TabId): void
 }
 
-/** `ctx.resources.pin`: hold an address's content open for as long as `signal` lives. */
+/** `ctx.workspaceResources.pin` wrapper: hold an address's content open for as long as `signal` lives. */
 export type PinResource = (address: string, signal: AbortSignal, sessionId: SessionId) => void
+
+/** Identity of one open lifetime; a restored tab receives a new value. */
+export type SidebarRightOccurrenceId = Branded<'SidebarRightOccurrenceId'>
 
 /** What one open tab record holds beyond its layout entry. */
 export interface TabOccurrence {
+  /** Operations of the currently mounted page body. */
+  readonly commands: SidebarRightTabCommands
+
+  /** Distinguishes a reopened record from its previous lifetime. */
+  readonly id: SidebarRightOccurrenceId
   readonly sessionId: SessionId
   readonly tabId: TabId
   /** Aborted when the record disappears or this package unloads. */
@@ -54,6 +64,8 @@ export interface TabOccurrence {
 
 /** An occurrence plus what only the domain touches. */
 interface Held extends TabOccurrence {
+  commands: SidebarRightTabCommands
+
   readonly controller: AbortController
   /** The docked pane holding the record at the last sync; `undefined` while it floats or before any sync. */
   paneId: PaneId | undefined
@@ -94,8 +106,8 @@ export class TabDomain {
       const pane = findTabPane(layout, tab.id)
       occurrence.paneId = pane.host === 'dock' ? pane.id : undefined
       if (occurrence.pinned) continue
-      this.pin(occurrence.navigation.getSnapshot().address, occurrence.signal, sessionId)
       occurrence.pinned = true
+      this.pin(occurrence.navigation.getSnapshot().address, occurrence.signal, sessionId)
     }
   }
 
@@ -171,14 +183,26 @@ export class TabDomain {
       ...placement.revealIfOpened === undefined ? {} : { revealIfOpened: placement.revealIfOpened },
     })
     const held: Held = {
+      id: randomUUID() as SidebarRightOccurrenceId,
       sessionId,
       tabId,
       controller,
+      commands: {},
       signal: controller.signal,
       navigation: createSnapshotStore(navigation),
       paneId: undefined,
       pinned: false,
       tabActions: {
+        bindCommands: (commands) => {
+          if (controller.signal.aborted) return () => {}
+          held.commands = commands
+          const release = (): void => {
+            if (held.commands === commands) held.commands = {}
+            controller.signal.removeEventListener('abort', release)
+          }
+          controller.signal.addEventListener('abort', release, { once: true })
+          return release
+        },
         openResource: (address, options = {}) => {
           navigator.openResourceIn(sessionId, address, { ...place(options), params: options.params })
         },

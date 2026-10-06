@@ -30,11 +30,11 @@ const VARIANT_ICONS: Record<ToolRowVariant, ReactNode> = {
 }
 
 /** Card props: the owner payload plus the render site's locale seat (plain prop). */
-export interface GenericToolCardProps extends ToolCallOwnerProps {
+export type GenericToolCardProps = ToolCallOwnerProps & {
   t: ToolTreeProps['t']
 }
 
-export function GenericToolCard({ toolName, block, cwd, home, openFile, openDetails, inspect, t }: GenericToolCardProps) {
+export function GenericToolCard({ useDisclosure, toolName, block, cwd, home, openFile, openDetails, inspect, t }: GenericToolCardProps) {
   const model = toolRowModel(toolName, block, cwd, home)
   const terminal = terminalCardModel(block, cwd)
   const read = readCardModel(block, cwd, home)
@@ -52,6 +52,7 @@ export function GenericToolCard({ toolName, block, cwd, home, openFile, openDeta
     : localizeAutoReviewDenial(model.autoReviewDenial, t)
   return (
     <ToolRow
+      useDisclosure={useDisclosure}
       t={t}
       variant={model.variant}
       toolName={toolName}

@@ -1,0 +1,14 @@
+- textbox "描述你想要构建的内容"
+- button "添加图片或文档":
+  - img
+- button "从文档库选择":
+  - img
+- button "命令":
+  - img
+- button "访问模式，当前：工作区内修改": 工作区内修改
+- button "打开右侧边栏":
+  - img
+- button "选择模型，当前 Acme Large":
+  - text: Acme Large
+  - img
+- button "发送消息" [disabled]

@@ -3,10 +3,11 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import WebSocket from 'ws'
 import { AuditService } from '../src/audit.ts'
 import { AuthService } from '../src/auth.ts'
 import { createAdminApiHandler } from '../src/admin-api.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import type { ModelUsageSubject, UsageSummary } from '../src/model-governance.ts'
@@ -21,7 +22,7 @@ afterEach(async () => { await closer?.() })
 async function setup(env: NodeJS.ProcessEnv = {}, handlers: GatewayHandlers = {}) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
-  const cfg = loadConfig({
+  const cfg = testConfig(root, {
     ...env,
     HGW_USERS_ROOT: join(root, 'users'),
     HGW_STATE_ROOT: join(root, 'state'),
@@ -107,11 +108,49 @@ const emptyUsageSummary: UsageSummary = {
 }
 
 describe('gateway server', () => {
+  it('rejects a stale browser principal before HTTP or WebSocket routing while keeping untagged clients compatible', async () => {
+    const routed: number[] = [], upgrades: number[] = []
+    const { base, deps } = await setup({}, {
+      proxy: async (_req, res, context) => { routed.push(context.user.id); res.end('routed') },
+      upgrade: async (_req, socket, _head, context) => { upgrades.push(context.user.id); socket.destroy() },
+    })
+    const second = await deps.users.create({ username: 'second-user', password: 'pw-12345678', role: 'user' })
+    await deps.users.changeOwnPassword(second.id, 'pw-12345678')
+    const cookie = await login(base, 'second-user', 'pw-12345678')
+    const rejected = await fetch(`${base}/api/identity-proof`, { headers: { cookie, 'x-dsh-expected-principal-id': '1' } })
+    expect(rejected.status).toBe(409)
+    expect(rejected.headers.get('x-dsh-principal-id')).toBe(String(second.id))
+    expect(await rejected.json()).toEqual({ error: 'account-changed' })
+    for (const principal of ['1', `${second.id}&dshPrincipal=${second.id}`]) {
+      const chunk = await fetch(`${base}/api/documents/uploads/00000000-0000-4000-8000-000000000000/chunks/0?dshPrincipal=${principal}&dshTarget=personal`, {
+        method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/octet-stream' }, body: 'private document',
+      })
+      expect(chunk.status).toBe(409)
+      expect(await chunk.json()).toEqual({ error: 'account-changed' })
+    }
+    expect(routed).toEqual([])
+    expect((await fetch(`${base}/account/api/context`, { headers: { cookie, 'x-dsh-expected-principal-id': '1' } })).status).toBe(409)
+    const accepted = await fetch(`${base}/api/identity-proof`, { headers: { cookie, 'x-dsh-expected-principal-id': String(second.id) } })
+    expect(accepted.status).toBe(200)
+    expect(accepted.headers.get('x-dsh-principal-id')).toBe(String(second.id))
+    expect((await fetch(`${base}/api/identity-proof`, { headers: { cookie } })).status).toBe(200)
+    expect((await fetch(`${base}/api/identity-proof?dshPrincipal=${second.id}`, { headers: { cookie } })).status).toBe(200)
+    expect(routed).toEqual([second.id, second.id, second.id])
+    const socket = new WebSocket(`${base.replace('http:', 'ws:')}/api/events?dshPrincipal=1`, { headers: { cookie, origin: base } })
+    const status = await new Promise<number | undefined>((resolveStatus, reject) => {
+      socket.once('unexpected-response', (_request, response) => { response.resume(); response.once('end', () => { resolveStatus(response.statusCode) }) })
+      socket.once('error', reject)
+      socket.once('open', () => { socket.close(); reject(new Error('wrong principal reached WebSocket')) })
+    })
+    expect(status).toBe(409)
+    expect(upgrades).toEqual([])
+  })
+
   it('serves healthz without auth and redirects anonymous html to /login', async () => {
     const { base } = await setup()
     const health = await fetch(`${base}/healthz`)
     expect(health.status).toBe(200)
-    expect(await health.json()).toEqual({ ok: true })
+    expect(await health.json()).toEqual({ ok: true, configurationRevision: 0 })
     const anonymous = await fetch(`${base}/`, { redirect: 'manual', headers: { accept: 'text/html' } })
     expect(anonymous.status).toBe(302)
     expect(anonymous.headers.get('location')).toBe('/login')
@@ -126,6 +165,7 @@ describe('gateway server', () => {
     expect(await (await fetch(`${base}/healthz`)).json()).toEqual({
       ok: true,
       release: basename(releaseRoot),
+      configurationRevision: 0,
     })
   })
 
@@ -304,7 +344,8 @@ describe('gateway server', () => {
       expect(userId).toBe(1)
       return { id: `device-${input.token}` }
     })
-    const removeDevice = vi.fn(async (userId: number, deviceId: string) => userId === 1 && deviceId === 'device-token')
+    const removeDevice = vi.fn(async (userId: number, deviceId: string) => userId === 1
+      && deviceId === '018f8c3e-9d74-7f2e-b4a1-2c3d4e5f6a7b')
     deps.push = {
       registerDevice,
       removeDevice,
@@ -349,11 +390,17 @@ describe('gateway server', () => {
     expect(invalidProvider.status).toBe(400)
     expect(await invalidProvider.json()).toEqual({ error: 'invalid-push-device' })
 
-    const removed = await fetch(`${base}/account/api/push-devices/device-token`, {
+    const removed = await fetch(`${base}/account/api/push-devices/018f8c3e-9d74-7f2e-b4a1-2c3d4e5f6a7b`, {
       method: 'DELETE', headers: { cookie, origin: base },
     })
     expect(removed.status).toBe(204)
-    expect(removeDevice).toHaveBeenCalledWith(1, 'device-token')
+    expect(removeDevice).toHaveBeenCalledWith(1, '018f8c3e-9d74-7f2e-b4a1-2c3d4e5f6a7b')
+
+    const malformed = await fetch(`${base}/account/api/push-devices/not-a-uuid`, {
+      method: 'DELETE', headers: { cookie, origin: base },
+    })
+    expect(malformed.status).toBe(400)
+    expect(await malformed.json()).toEqual({ error: 'invalid-push-device-id' })
   })
 
   it('forces password change before proxying', async () => {
@@ -463,9 +510,20 @@ describe('gateway server', () => {
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(await response.json()).toMatchObject({
       personal: { id: 1 },
+      personalComplete: false,
       projects: [expect.objectContaining({ projectId: project.id, mode: 'ro' })],
       items: [expect.objectContaining({ sessionId: 'project-session', canWrite: false })],
     })
+  })
+
+  it.each([false, true])('exposes personal catalog completeness %s through the authenticated route', async (personalComplete) => {
+    const { deps, base } = await setup({}, { workbenchCatalog: async () => ({ items: [], personalComplete }) })
+    installProjectCollaboration(deps)
+    deps.collaboration!.listAccountConversations = async () => []
+    const cookie = await login(base, 'root-admin', 'pw-12345678')
+    const response = await fetch(`${base}/account/api/workbench/catalog`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ personalComplete, items: [] })
   })
 
   it('routes a target-runtime API request through membership-checked context', async () => {
@@ -544,7 +602,7 @@ describe('gateway server', () => {
     expect(project.headers.get('set-cookie')).toContain('hgw_scope=project:42')
     expect(ensureRunning).toHaveBeenNthCalledWith(1, {
       kind: 'project', id: 42, name: 'Shared project', path: '/shared',
-    })
+    }, 'explicit')
 
     const personal = await fetch(`${base}/account/api/scope`, {
       method: 'POST',
@@ -553,7 +611,7 @@ describe('gateway server', () => {
     })
     expect(personal.status).toBe(204)
     expect(personal.headers.get('set-cookie')).toContain('hgw_scope=personal')
-    expect(ensureRunning).toHaveBeenNthCalledWith(2, expect.objectContaining({ id: 1, username: 'root-admin' }))
+    expect(ensureRunning).toHaveBeenNthCalledWith(2, expect.objectContaining({ id: 1, username: 'root-admin' }), 'explicit')
   })
 
   it('keeps the current scope when the selected runtime cannot start', async () => {
@@ -749,4 +807,24 @@ describe('gateway server', () => {
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({ error: 'invalid-session-id' })
   })
+})
+
+it('checks the explicit project before returning or modifying a conversation with the same raw ID', async () => {
+  const { deps, base } = await setup()
+  const setVisibility = vi.fn()
+  deps.collaboration = {
+    projectsForUser: () => [], projectForUser: () => null,
+    access: () => ({ sessionId: 'same', rootSessionId: 'same', projectId: 7, visibility: 'project', creatorUserId: 1,
+      mode: 'rw', canRead: true, canWrite: true, canManage: true }),
+    listConversations: () => [], readableSessionIds: () => [], setVisibility, claimInteraction: () => false,
+  }
+  const cookie = await login(base, 'root-admin', 'pw-12345678')
+  const headers = { cookie, origin: base, 'content-type': 'application/json' }
+  expect((await fetch(`${base}/account/api/conversations/same?projectId=7`, { headers })).status).toBe(200)
+  expect((await fetch(`${base}/account/api/conversations/same?projectId=8`, { headers })).status).toBe(404)
+  expect((await fetch(`${base}/account/api/conversations/same?projectId=8`, { method: 'PATCH', headers, body: '{"visibility":"private"}' })).status).toBe(404)
+  expect(setVisibility).not.toHaveBeenCalled()
+  expect((await fetch(`${base}/account/api/conversations/same?projectId=07`, { headers })).status).toBe(400)
+  expect((await fetch(`${base}/account/api/conversations/same?projectId=7`, { method: 'PATCH', headers, body: '{"visibility":"private"}' })).status).toBe(204)
+  expect(setVisibility).toHaveBeenCalledOnce()
 })

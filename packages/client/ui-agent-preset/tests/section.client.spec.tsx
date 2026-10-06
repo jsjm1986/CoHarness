@@ -333,21 +333,18 @@ describe('the preset list', () => {
 
     expect(actions.load).toHaveBeenCalledTimes(2)
   })
-  it('gates selection controls on the picker preference when it is off', () => {
+  it('keeps selection controls enabled while the picker preference is off', () => {
     renderSection({
       showPicker: false,
       rows: [...READY.rows, { id: 'cordis', trust: 'system', isDefault: false, name: '创造模式' }],
     })
 
-    // The creator entry explains the preference gate instead of opening a draft.
-    expect(screen.getByTitle(en.enablePickerToCreate)).toBeTruthy()
-    // The in-use row keeps a non-interactive Default label; other rows name
-    // the preference that must be turned on first.
-    expect(within(rowFor('standard')).getByTitle(en.selectionOffDefault)).toBeTruthy()
-    const mine = rowFor('mine')
-    const minePick = within(mine).getByTitle(en.enablePickerToSetDefault)
-    expect(minePick).toHaveProperty('disabled', true)
-    expect(mine.className).toContain('cardSelectionDisabled')
+    // Neither the creator entry nor the default picks are gated by the
+    // preference, which only controls the new-session chip.
+    expect(screen.getByRole('button', { name: en.creatorDraft })).toHaveProperty('disabled', false)
+    expect(within(rowFor('standard')).getByTitle(en.inUse)).toBeTruthy()
+    const minePick = within(rowFor('mine')).getByTitle(en.setDefault)
+    expect(minePick).toHaveProperty('disabled', false)
   })
 
   it('flips the picker preference through the switch', () => {
@@ -516,9 +513,18 @@ describe('deleting a preset', () => {
 })
 
 describe('a long card description', () => {
-  /** jsdom has no ResizeObserver; the description watches its own box through one. */
-  class ResizeObserverStub {
-    observe(): void {}
+  /** jsdom has no ResizeObserver; the description and tooltip bubbles watch their boxes through one. */
+  class ResizeObserverStub implements ResizeObserver {
+    constructor(private readonly callback: ResizeObserverCallback) {}
+
+    observe(target: Element): void {
+      const size = [{ inlineSize: 0, blockSize: 0 }]
+      this.callback([{
+        target, contentRect: new DOMRectReadOnly(0, 0, 0, 0),
+        borderBoxSize: size, contentBoxSize: size, devicePixelContentBoxSize: size,
+      }], this)
+    }
+
     unobserve(): void {}
     disconnect(): void {}
   }
@@ -577,5 +583,108 @@ describe('a long card description', () => {
     }).not.toThrow()
     // The first measurement does not depend on the observer.
     expect(within(rowFor('zh')).getByText(LONG).getAttribute('title')).toBe('')
+  })
+})
+
+describe('preset guide help', () => {
+  it.each([
+    ['standard', en.presetStandardName, 'How it works', 'Fix a bug'],
+    ['ptc', en.presetPtcName, 'How tools are called', 'Check a set of configuration files'],
+    ['minimal', en.presetMinimalName, 'What is included', 'Compare performance on a small bug fix'],
+    ['cordis', en.presetCordisName, 'What you can create', 'Add a UI'],
+  ] as const)('opens both help sections for %s without changing the default', (id, name, heading, exampleTitle) => {
+    const actions = renderSection({ rows: [{ id, trust: 'system', isDefault: false }] })
+    const trigger = within(rowFor(id)).getByRole('button', { name: `${en.modeExplanation}: ${name}` })
+    trigger.focus()
+    fireEvent.click(trigger)
+
+    const dialog = screen.getByRole('dialog', { name })
+    expect(within(dialog).getByRole('heading', { name: heading })).toBeTruthy()
+    const usage = within(dialog).getByRole('tab', { name: en.howToUse })
+    fireEvent.click(usage)
+    expect(usage.getAttribute('aria-selected')).toBe('true')
+    expect(within(dialog).getByRole('heading', { name: exampleTitle })).toBeTruthy()
+    expect(within(dialog).getAllByText(en.guideExampleTask).length).toBeGreaterThan(0)
+    fireEvent.click(within(dialog).getByRole('tab', { name: en.modeExplanation }))
+    expect(within(dialog).getByRole('heading', { name: heading })).toBeTruthy()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: en.close }))
+    expect(document.activeElement).toBe(trigger)
+    fireEvent.click(within(rowFor(id)).getByRole('button', { name: `${en.howToUse}: ${name}` }))
+    expect(within(screen.getByRole('dialog')).getByRole('tab', { name: en.howToUse }).getAttribute('aria-selected')).toBe('true')
+    expect(actions.makeDefault).not.toHaveBeenCalled()
+  })
+
+  it('keeps keyboard focus in help and dismisses only the reader on Escape', () => {
+    const actions = renderSection()
+    const trigger = within(rowFor('standard')).getByRole('button', { name: `${en.modeExplanation}: ${en.presetStandardName}` })
+    trigger.focus()
+    fireEvent.click(trigger)
+
+    const dialog = screen.getByRole('dialog', { name: en.presetStandardName })
+    const details = within(dialog).getByRole('tab', { name: en.modeExplanation })
+    const panel = within(dialog).getByRole('tabpanel', { name: en.modeExplanation })
+    const close = within(dialog).getByRole('button', { name: en.close })
+    expect(document.activeElement).toBe(details)
+    expect(fireEvent.keyDown(details, { key: 'Tab' })).toBe(true)
+    panel.focus()
+    fireEvent.keyDown(panel, { key: 'Tab' })
+    expect(document.activeElement).toBe(close)
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(panel)
+    fireEvent.keyDown(panel, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: en.presetStandardName })).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+    expect(actions.close).not.toHaveBeenCalled()
+  })
+
+  it('connects keyboard selection to the visible guide panel', () => {
+    renderSection()
+    fireEvent.click(within(rowFor('standard')).getByRole('button', { name: `${en.modeExplanation}: ${en.presetStandardName}` }))
+    const dialog = screen.getByRole('dialog')
+    const details = within(dialog).getByRole('tab', { name: en.modeExplanation })
+    const usage = within(dialog).getByRole('tab', { name: en.howToUse })
+    expect(details.tabIndex).toBe(0)
+    expect(usage.tabIndex).toBe(-1)
+
+    fireEvent.keyDown(details, { key: 'ArrowRight' })
+    const panel = within(dialog).getByRole('tabpanel', { name: en.howToUse })
+    expect(panel.id).toBe(usage.getAttribute('aria-controls'))
+    expect(document.activeElement).toBe(usage)
+    expect(usage.getAttribute('aria-selected')).toBe('true')
+    expect(details.tabIndex).toBe(-1)
+    expect(usage.tabIndex).toBe(0)
+    expect(within(dialog).queryByRole('tabpanel', { name: en.modeExplanation })).toBeNull()
+  })
+
+  it('does not attach built-in claims to custom or unknown presets', () => {
+    renderSection({ rows: [{ id: 'ptc', trust: 'user', isDefault: false, name: 'My PTC' }, { id: 'third-party', trust: 'user', isDefault: false }] })
+    expect(screen.queryByRole('button', { name: new RegExp(en.modeExplanation) })).toBeNull()
+    expect(screen.queryByRole('button', { name: new RegExp(en.howToUse) })).toBeNull()
+  })
+
+  it('leaves help usable while authoring is unavailable', () => {
+    const actions = renderSection({ authorable: false })
+    fireEvent.click(within(rowFor('standard')).getByRole('button', { name: `${en.howToUse}: ${en.presetStandardName}` }))
+    expect(screen.getByRole('dialog', { name: en.presetStandardName })).toBeTruthy()
+    expect(actions.makeDefault).not.toHaveBeenCalled()
+  })
+
+  it('closes help even when the browser reports no previously focused element', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'activeElement')!
+    const readActiveElement = descriptor.get!.bind(document) as () => Element | null
+    // Only the initial unfocused body is absent; modal controls must observe subsequent focus.
+    const activeElement = vi.spyOn(document, 'activeElement', 'get').mockImplementation(() => {
+      const focused = readActiveElement()
+      return focused === document.body ? null : focused
+    })
+    try {
+      renderSection()
+      fireEvent.click(within(rowFor('standard')).getByRole('button', { name: `${en.modeExplanation}: ${en.presetStandardName}` }))
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: en.close }))
+      expect(screen.queryByRole('dialog')).toBeNull()
+    } finally {
+      activeElement.mockRestore()
+    }
   })
 })

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-22-question-replay-readiness-race.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-22-question-replay-readiness-race.md
-2026-08-22-question-replay-readiness-race.md: e927fe0386529a57f7eab703ec3459bd2d5457f9
-2026-08-22-question-replay-readiness-race.zh.md: bb8da5b2dae8d6eea7f954237bfcf9703ec60870
+/agent-note-question-replay-waits-for-connection-readiness:
+  en: f5ae3d4059d9d284
+  zh: ee7ebc03fe99488e
+/agent-note-question-replay-waits-for-connection-readiness/problem:
+  en: a8b2fb37412066e2
+  zh: 527f3ae1ccbf4c1a
+/agent-note-question-replay-waits-for-connection-readiness/decision:
+  en: a063044958ddff48
+  zh: 2495fb4142bc94a3
+/agent-note-question-replay-waits-for-connection-readiness/alternatives-considered:
+  en: e015058fb90869bd
+  zh: f737368223283124
+/agent-note-question-replay-waits-for-connection-readiness/consequences:
+  en: ff2d5846b0037f64
+  zh: 7bc4ac3361e6e615
+/agent-note-question-replay-waits-for-connection-readiness/testing:
+  en: a75c0d065b0c2e70
+  zh: e6dcf703c54be36b

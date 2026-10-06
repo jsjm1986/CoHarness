@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { executionAuthorityOf } from '@deepseek-ai/dsh-execution-authority'
-import type { GenerateOptions, Message, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, RequestMessage, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-settings'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ReloadableModelAccess } from './access.ts'
@@ -28,7 +28,7 @@ function terminalStatus(chunk: Extract<StreamChunk, { type: 'finish' }>): UsageR
   return chunk.reason.kind === 'error' ? 'failed' : chunk.reason.kind === 'aborted' ? 'cancelled' : 'succeeded'
 }
 
-function participantIdentity(messages: readonly Message[]): { userId: number; projectId: number } | undefined {
+function participantIdentity(messages: readonly RequestMessage[]): { userId: number; projectId: number } | undefined {
   for (let index = messages.length - 1; index >= 0; index--) {
     const source = messages[index]?.source
     if (source === null || typeof source !== 'object') continue

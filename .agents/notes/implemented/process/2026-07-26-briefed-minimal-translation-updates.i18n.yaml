@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-26-briefed-minimal-translation-updates.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-26-briefed-minimal-translation-updates.md
-2026-07-26-briefed-minimal-translation-updates.md: 1c032fa07167ec2407d0f46707f942ba0c830494
-2026-07-26-briefed-minimal-translation-updates.zh.md: 9cb0d965f37442c9e6d3587d23aa340368fc9fa0
+/agent-note-briefed-minimal-translation-updates:
+  en: 173d4849a73de32f
+  zh: 23314f19095a9451
+/agent-note-briefed-minimal-translation-updates/problem:
+  en: c267fd52d64d48f3
+  zh: bbefe5be652d194d
+/agent-note-briefed-minimal-translation-updates/decision:
+  en: aad1e5ea7e37c051
+  zh: 21efc1aa074fbc98
+/agent-note-briefed-minimal-translation-updates/benchmark:
+  en: 795350a394b8ea8d
+  zh: db379e577e4dfae5
+/agent-note-briefed-minimal-translation-updates/alternatives-considered:
+  en: d38542296b96994d
+  zh: 1fc1b3d50541e70b
+/agent-note-briefed-minimal-translation-updates/consequences:
+  en: f3fe123bfaf4fbbc
+  zh: eb0537da3e4beb05
+/agent-note-briefed-minimal-translation-updates/testing:
+  en: 15b3ab7f6b73a2bb
+  zh: 719b2474e985898d

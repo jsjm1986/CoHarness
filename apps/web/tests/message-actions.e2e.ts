@@ -160,7 +160,7 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 
@@ -192,9 +192,12 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
       () => branchButtons.evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-disabled'))),
       { timeout: 5_000 },
     ).toEqual(['true', null])
-    await branchButtons.first().focus()
-    await expect.poll(() => page.getByRole('tooltip').textContent(), { timeout: 5_000 })
-      .toBe('Available only on the last message of a completed turn')
+    // Keyboard focus raises the availability tooltip; a programmatic focus in
+    // pointer modality never does (Tooltip suppresses focus after pointer input).
+    await branchButtons.first().press('Shift+Tab')
+    await page.keyboard.press('Tab')
+    await expect.poll(() => page.getByRole('tooltip').allTextContents(), { timeout: 5_000 })
+      .toEqual(['Available only on the last message of a completed turn'])
     await expect.poll(() => page.getByRole('button', { name: 'Edit' }).count(), { timeout: 5_000 }).toBe(0)
   }, 60_000)
 
@@ -203,6 +206,10 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     await page.getByRole('button', { name: /^Select model/ })
       .waitFor({ timeout: 10_000 })
     await page.getByRole('button', { name: /Cache hit \d+%/u }).waitFor({ timeout: 10_000 })
+    // Drop keyboard modality left by prior tests: a focus tooltip would leak
+    // into the captured tree, and pointer modality keeps the reveal focus silent.
+    await page.evaluate(() => { (document.activeElement as HTMLElement | null)?.blur() })
+    await page.evaluate(() => { window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })) })
     // Keep a footer focused so opacity-hidden actions stay in the a11y tree
     // as an active/focused control during the capture.
     await page.getByRole('button', { name: 'Copy' }).first().focus()

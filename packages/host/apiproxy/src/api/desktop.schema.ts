@@ -10,10 +10,14 @@ export const desktopStatusRequestSchema = z.object({ sessionId: sessionIdSchema 
 export const desktopConfirmRequestSchema = desktopStatusRequestSchema.extend({
   rootSessionId: sessionIdSchema, nodeId: z.string().min(1).max(256), desktop: z.string().min(1).max(256), confirmed: z.boolean(),
 }).strict() satisfies z.ZodType<Wire<RequestPayload<'desktop.confirm'>>>
+/** Coordinator grant state for the session's desktop resource. */
+export const desktopOccupancySchema = z.object({
+  available: z.boolean(), inUse: z.boolean(), heldByThisSession: z.boolean(), queued: z.number().int().nonnegative(),
+}).strict() satisfies z.ZodType<Wire<NonNullable<ResponseValue<'desktop.status'>>['occupancy']>>
 /** Current-user state; other participants' confirmations are not exposed. */
 export const desktopConfirmationSchema = z.object({
   rootSessionId: sessionIdSchema, nodeId: z.string().min(1), desktop: z.string().min(1),
-  userId: z.number().int().positive(), eligible: z.boolean(), confirmed: z.boolean(),
+  userId: z.number().int().positive(), eligible: z.boolean(), confirmed: z.boolean(), occupancy: desktopOccupancySchema,
 }).strict() satisfies z.ZodType<Wire<ResponseValue<'desktop.confirm'>>>
 /** Null represents a deployment without a managed desktop policy. */
 export const desktopStatusValueSchema = desktopConfirmationSchema.nullable() satisfies z.ZodType<Wire<ResponseValue<'desktop.status'>>>

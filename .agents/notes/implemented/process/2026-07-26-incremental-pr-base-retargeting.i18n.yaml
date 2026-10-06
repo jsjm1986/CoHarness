@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-26-incremental-pr-base-retargeting.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-26-incremental-pr-base-retargeting.md
-2026-07-26-incremental-pr-base-retargeting.md: b2e644d99877b4214b5a6edb2775b3962e6b7da2
-2026-07-26-incremental-pr-base-retargeting.zh.md: 1d7bb955206b91af9e78d4c0d9d5e4232edb7691
+/agent-note-retarget-pr-bases-incrementally:
+  en: 22f2169defeae2c7
+  zh: 60ac932fe4fec1ec
+/agent-note-retarget-pr-bases-incrementally/problem:
+  en: e799f5007a708d3f
+  zh: 673670392acb4221
+/agent-note-retarget-pr-bases-incrementally/decision:
+  en: 8e5e9912fe64ee7b
+  zh: 924ca359e7570561
+/agent-note-retarget-pr-bases-incrementally/alternatives-considered:
+  en: ca8f07a52b223b46
+  zh: b9e0530c7741d5e6
+/agent-note-retarget-pr-bases-incrementally/consequences:
+  en: 757a1ad335b40f3c
+  zh: 1922ffed2936c76f

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # `@deepseek-ai/dsh-client-ui-reference`
 
 [English](README.md) | 中文
@@ -14,10 +19,22 @@
 
 Web 用户需要从同一个 `@` 补全菜单提及文件、文件夹或会话时，可以使用 `dsh-client-ui-reference`。菜单先列出文件，再列出会话；其中一组无法加载时，另一组仍然可用。选择文件、文件夹或会话会插入带稳定剪贴板形式的原子引用；文件夹行还允许用户在不关闭补全的情况下继续下钻。文件行省略多余的根目录位置，会话行仅在工作区与当前工作区不同时显示该工作区。会话 mention 会在捕获模型上下文前接受校验，而浏览候选项不会影响模型。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。候选按 token 经 `fileReferences/list` 与 `sessionReferenceResolver/candidates` 远程接口获取；来源在请求之间不保留候选状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 间接影响模型体验：通过宿主拥有的提供方实现，本包的引用选择把文件指引与会话快照准备委托给它们。
@@ -26,8 +43,19 @@ Web 用户需要从同一个 `@` 补全菜单提及文件、文件夹或会话�
 
 浏览候选项不会影响模型。选择文件或会话只会改变新用户消息的后缀，以及紧随该消息、由宿主准备的会话引用上下文；目标会话更早的历史保持不变。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **候选失败有意保持静默**：Remote 发现调用不可用或失败时，该领域不产生候选行。会话引用准备失败发生在提示词接受后，并会终止该 agent 轮次。
 - **浏览器侧不扫描文件**：Web 补全需要挂载宿主 `ctx.fileReferences` 提供方；浏览器无法回退到自身文件系统。
 - **会话搜索仍仅使用元数据**：发现流程通过 `ctx.sessionReferenceResolver` 筛选 session id、cwd 和以日志为依据的最新标题；不搜索消息主体或完整 transcript（文本记录）。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

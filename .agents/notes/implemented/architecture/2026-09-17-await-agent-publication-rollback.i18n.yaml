@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-await-agent-publication-rollback.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-17-await-agent-publication-rollback.md
-2026-09-17-await-agent-publication-rollback.md: 4c053f351f977ac88a2c7a626733fcf79766444b
-2026-09-17-await-agent-publication-rollback.zh.md: 00d8d05de4bfa057e2ef5c8b2a9c70a443ef3093
+/agent-note-await-publication-inside-agent-creation-rollback:
+  en: 866c2c4d0fbf28df
+  zh: ac5d7753e6e6c730
+/agent-note-await-publication-inside-agent-creation-rollback/problem:
+  en: c73d2a9707accefb
+  zh: 5666ae418d8e5f50
+/agent-note-await-publication-inside-agent-creation-rollback/decision:
+  en: 782eb45bacd9f164
+  zh: 008a11bbaebf2e41
+/agent-note-await-publication-inside-agent-creation-rollback/alternatives-considered:
+  en: 440b7d8c9be33222
+  zh: dc81195489d3e4a0
+/agent-note-await-publication-inside-agent-creation-rollback/consequences:
+  en: 0ba9fb60fdfd607d
+  zh: 2d75763545b00f2b

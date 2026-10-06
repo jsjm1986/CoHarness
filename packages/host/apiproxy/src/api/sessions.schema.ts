@@ -55,7 +55,7 @@ export const sessionEventSchema = z.object({
 }) as unknown as z.ZodType<SessionEvent>
 
 /** SessionSummary row of session.list (`projections` reuses the history block's shape and schema). */
-export const sessionSummarySchema = z.object({
+export const sessionSummarySchema: z.ZodType<Wire<SessionSummary>> = z.object({
   sessionId: sessionIdSchema,
   updatedAt: z.number(),
   running: z.boolean(),
@@ -67,7 +67,9 @@ export const sessionSummarySchema = z.object({
   agentPreset: z.string().optional(),
   sshTarget: z.number().int().positive().optional(),
   projections: z.lazy(() => sessionProjectionsBlockSchema).optional(),
-}) as unknown as z.ZodType<Wire<SessionSummary>>
+  visibility: z.union([z.literal('project'), z.literal('private')]).optional(),
+  projectId: z.number().int().positive().optional(),
+})
 
 /** session.list request payload (cursor is a reserved seat, unimplemented in v1). */
 export const sessionListRequestSchema = z.object({
@@ -362,13 +364,9 @@ export const sessionPromptRequestSchema = z.object({
   requestId: rpcIdSchema.optional(),
 }) as unknown as z.ZodType<RequestPayload<'session.prompt'>>
 
-/** session.prompt response value (the command slot appears only when the prompt dispatched a slash command). */
+/** session.prompt response value. */
 export const sessionPromptValueSchema = z.object({
   accepted: z.literal(true),
-  command: z.object({
-    kind: z.literal('success'),
-    text: z.string().optional(),
-  }).optional(),
 }) satisfies z.ZodType<Wire<ResponseValue<'session.prompt'>>>
 
 /** Opaque attachment id after string-shape validation. */

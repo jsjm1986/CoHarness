@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-21-log-backed-session-titles.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-21-log-backed-session-titles.md
-2026-07-21-log-backed-session-titles.md: 06d4dbd0988d6278906a1dd28378d653ae84edea
-2026-07-21-log-backed-session-titles.zh.md: 7005387f6ccb4cfa3f4e69ec773f8c8bcdd6691e
+/agent-note-log-backed-session-titles:
+  en: b04a348ca633c170
+  zh: 5d6a97ea03e86102
+/agent-note-log-backed-session-titles/problem:
+  en: a8d2ab248591ef81
+  zh: 06e554fd5bcf6647
+/agent-note-log-backed-session-titles/decision:
+  en: 3ca186e66bb202ff
+  zh: be4726dfe37dd6e8
+/agent-note-log-backed-session-titles/decision/event-ownership-and-folding:
+  en: f9fb17cec3cb6c70
+  zh: 0910f6f2d389428e
+/agent-note-log-backed-session-titles/decision/input-and-asynchronous-timing:
+  en: b993715f52754146
+  zh: e903c499cd541475
+/agent-note-log-backed-session-titles/decision/registration-routing-and-failure-policy:
+  en: a69c2254b7972b73
+  zh: 83e1382c5a83a7ac
+/agent-note-log-backed-session-titles/decision/explicit-rename:
+  en: 9292a291c530fcf0
+  zh: 9fb05c234ef88baa
+/agent-note-log-backed-session-titles/decision/legacy-injection-repair:
+  en: 320e11a555d0f187
+  zh: dc54a50aee3c897d
+/agent-note-log-backed-session-titles/decision/forks-and-consumers:
+  en: 0075d97093c93e06
+  zh: a43e5ea48bb0b93d
+/agent-note-log-backed-session-titles/alternatives-considered:
+  en: 50ec0dfc11c70d3e
+  zh: 37a100e19b245c33
+/agent-note-log-backed-session-titles/consequences:
+  en: 3eeb82838ffffda7
+  zh: 96dd1f8a27bb83e2

@@ -19,7 +19,7 @@ import { rpcReceiptSchema, serverRequestSchema, serverResponseSchema } from '../
 import { hostFrameSchema, muxFrameSchema } from '../api/events.schema.ts'
 import {
   hostCreateDirectoryValueSchema, hostDescribeValueSchema,
-  hostListDirectoryValueSchema, hostOpenPathValueSchema, hostPickDirectoryValueSchema,
+  hostFileApplicationsValueSchema, hostListDirectoryValueSchema, hostOpenPathValueSchema, hostPickDirectoryValueSchema,
 } from '../api/host.schema.ts'
 import {
   sessionCancelValueSchema,
@@ -37,7 +37,9 @@ import {
 } from '../api/sessions.schema.ts'
 import {
   workspaceArchiveSessionValueSchema,
+  workspacePinSessionValueSchema,
   workspaceUnarchiveSessionValueSchema,
+  workspaceUnpinSessionValueSchema,
   workspaceCreateValueSchema,
   workspaceDeleteValueSchema,
   workspaceInsertBeforeValueSchema,
@@ -51,6 +53,7 @@ import {
   workspaceFilesReadValueSchema,
   workspaceFilesStatValueSchema,
 } from '../api/workspace-files.schema.ts'
+import { jobsKillValueSchema, jobsOutputValueSchema } from '../api/jobs.schema.ts'
 import { skillListValueSchema } from '../api/skills.schema.ts'
 import { agentPresetOpenDocumentValueSchema } from '../api/agent-presets.schema.ts'
 import {
@@ -98,12 +101,17 @@ export interface IApiClient {
   subagents: {
     history(payload: RequestPayload<'subagent.history'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'subagent.history'>>>
   }
+  jobs: {
+    output(payload: RequestPayload<'jobs.output'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'jobs.output'>>>
+    kill(payload: RequestPayload<'jobs.kill'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'jobs.kill'>>>
+  }
   host: {
     describe(payload: RequestPayload<'host.describe'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.describe'>>>
     pickDirectory(payload: RequestPayload<'host.pickDirectory'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.pickDirectory'>>>
     listDirectory(payload: RequestPayload<'host.listDirectory'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.listDirectory'>>>
     createDirectory(payload: RequestPayload<'host.createDirectory'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.createDirectory'>>>
     openPath(payload: RequestPayload<'host.openPath'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.openPath'>>>
+    fileApplications(payload: RequestPayload<'host.fileApplications'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.fileApplications'>>>
   }
   workspace: {
     list(payload: RequestPayload<'workspace.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.list'>>>
@@ -114,6 +122,8 @@ export interface IApiClient {
     insertSessionBefore(payload: RequestPayload<'workspace.insertSessionBefore'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.insertSessionBefore'>>>
     archiveSession(payload: RequestPayload<'workspace.archiveSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.archiveSession'>>>
     unarchiveSession(payload: RequestPayload<'workspace.unarchiveSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.unarchiveSession'>>>
+    pinSession(payload: RequestPayload<'workspace.pinSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.pinSession'>>>
+    unpinSession(payload: RequestPayload<'workspace.unpinSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.unpinSession'>>>
   }
   desktop: {
     status(payload: RequestPayload<'desktop.status'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'desktop.status'>>>
@@ -181,6 +191,8 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'session.updateQueue': sessionUpdateQueueValueSchema,
   'session.cancel': sessionCancelValueSchema,
   'subagent.history': historyWireValueSchema,
+  'jobs.output': jobsOutputValueSchema,
+  'jobs.kill': jobsKillValueSchema,
   'desktop.status': desktopStatusValueSchema,
   'desktop.confirm': desktopConfirmationSchema,
   'host.describe': hostDescribeValueSchema,
@@ -188,6 +200,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'host.listDirectory': hostListDirectoryValueSchema,
   'host.createDirectory': hostCreateDirectoryValueSchema,
   'host.openPath': hostOpenPathValueSchema,
+  'host.fileApplications': hostFileApplicationsValueSchema,
   'workspace.list': workspaceListValueSchema,
   'workspace.create': workspaceCreateValueSchema,
   'workspace.rename': workspaceRenameValueSchema,
@@ -196,6 +209,8 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'workspace.insertSessionBefore': workspaceInsertSessionBeforeValueSchema,
   'workspace.archiveSession': workspaceArchiveSessionValueSchema,
   'workspace.unarchiveSession': workspaceUnarchiveSessionValueSchema,
+  'workspace.pinSession': workspacePinSessionValueSchema,
+  'workspace.unpinSession': workspaceUnpinSessionValueSchema,
   'workspaceChanges.summary': workspaceChangesSummaryValueSchema,
   'workspaceChanges.diff': workspaceChangesDiffValueSchema,
   'workspaceFiles.list': workspaceFilesListValueSchema,
@@ -774,6 +789,12 @@ export abstract class AbstractApiClient implements IApiClient {
     listDirectory: (payload, signal) => this.callUnary('host.listDirectory', payload, signal),
     createDirectory: (payload, signal) => this.callUnary('host.createDirectory', payload, signal),
     openPath: (payload, signal) => this.callUnary('host.openPath', payload, signal),
+    fileApplications: (payload, signal) => this.callUnary('host.fileApplications', payload, signal),
+  }
+
+  readonly jobs: IApiClient['jobs'] = {
+    output: (payload, signal) => this.callUnary('jobs.output', payload, signal),
+    kill: (payload, signal) => this.callUnary('jobs.kill', payload, signal),
   }
 
   readonly workspace: IApiClient['workspace'] = {
@@ -785,6 +806,8 @@ export abstract class AbstractApiClient implements IApiClient {
     insertSessionBefore: (payload, signal) => this.callUnary('workspace.insertSessionBefore', payload, signal),
     archiveSession: (payload, signal) => this.callUnary('workspace.archiveSession', payload, signal),
     unarchiveSession: (payload, signal) => this.callUnary('workspace.unarchiveSession', payload, signal),
+    pinSession: (payload, signal) => this.callUnary('workspace.pinSession', payload, signal),
+    unpinSession: (payload, signal) => this.callUnary('workspace.unpinSession', payload, signal),
   }
 
   readonly desktop: IApiClient['desktop'] = {

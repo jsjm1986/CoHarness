@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-24-chat-follow-effect-dependencies.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-24-chat-follow-effect-dependencies.md
-2026-08-24-chat-follow-effect-dependencies.md: a8e4dc6ad8a3669deca681e2c496813555aa4ce3
-2026-08-24-chat-follow-effect-dependencies.zh.md: 34b1f32ee98a0f29b598c8f4fb407809cc9fea38
+/agent-note-flow-gated-chat-follow-layout-effect:
+  en: a07acc92f801554f
+  zh: 12c1a4a9d0c7a990
+/agent-note-flow-gated-chat-follow-layout-effect/problem:
+  en: 36bdda0b497340bf
+  zh: a7ee6443de90db2b
+/agent-note-flow-gated-chat-follow-layout-effect/decision:
+  en: 9a5644774b767e65
+  zh: fd63b5fe754e62dd
+/agent-note-flow-gated-chat-follow-layout-effect/alternatives-considered:
+  en: 298db64579e5ca7d
+  zh: 6774d8f675e1a8d8
+/agent-note-flow-gated-chat-follow-layout-effect/consequences:
+  en: c653ca3b1fd250f5
+  zh: 6341464b75fd8c45

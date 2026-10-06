@@ -1,32 +1,22 @@
 /** Host BFF policy for resolving Remote Agent and Session identities. */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { Agent, AgentOptions, AgentSetup } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentHandle, AgentOptions, AgentSetup } from '@deepseek-ai/dsh-agent'
 import type { Session, SessionEvent, SessionHeader, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import { TypertLookupFailure, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type {} from '@deepseek-ai/dsh-typert-registry'
+import type { ApiRemoteLookupError, ApiRemoteAgentResult } from './session-controller.ts'
 
-/** Caller-facing failures preserved by the Gateway's RPC adapter. */
-export type ApiRemoteLookupError =
-  | { readonly code: 'agent-busy'; readonly message: string; readonly details: { readonly reason: string } }
-  | { readonly code: 'session-not-found'; readonly message: string; readonly details: { readonly sessionId: SessionId } }
-  | { readonly code: 'session-writer-held'; readonly message: string; readonly details: { readonly sessionId: SessionId } }
-  /**
-   * The session's durable execution binding (a managed SSH target) could not
-   * be re-qualified for the joining caller — same wire code the managed
-   * authorization service raises for a refused resolve.
-   */
-  | { readonly code: 'ssh/forbidden'; readonly message: string; readonly details: Record<never, never> }
-  | { readonly code: 'internal'; readonly message: string; readonly details: Record<never, never> }
-
-/** Result of resolving one session identity to its live Agent. */
-export type ApiRemoteAgentResult =
-  | { readonly agent: Agent }
-  | { readonly error: ApiRemoteLookupError }
+export type { ApiRemoteLookupError, ApiRemoteAgentResult, ApiSessionController } from './session-controller.ts'
 
 /** Resume configuration supplied by the owning Host composition. */
 export interface ApiRemoteAgentOptions {
+  /**
+   * Retain the exact factory handle for Host-owned idle release.
+   * @param handle - newly resumed Agent; shared waiters do not repeat ownership.
+   */
+  readonly onResumed?: (handle: AgentHandle) => void
   /** Read the per-Agent defaults when a cold identity must resume. */
   readonly agentOptions?: () => AgentOptions
   /**
@@ -165,6 +155,11 @@ export function createApiRemoteAgentResolver(
   }
 
   const agentFor = async (sessionId: SessionId): Promise<ApiRemoteAgentResult> => {
+    let admission: Disposable
+    try { admission = ctx.agents.reserveUse([sessionId]) } catch (error: unknown) {
+      return { error: { code: 'internal', message: String(error), details: {} } }
+    }
+    using _admission = admission
     const fenced = await fencedLiveAgent(sessionId)
     if (fenced !== undefined) return fenced
     const attached = ctx.sessions.get(sessionId)
@@ -195,6 +190,7 @@ export function createApiRemoteAgentResolver(
             ...options.agentOptions === undefined ? {} : { agentOptions: options.agentOptions() },
             ...setup === undefined ? {} : { setup },
           })
+          options.onResumed?.(handle)
           return handle.agent
         } finally {
           resumes.delete(sessionId)

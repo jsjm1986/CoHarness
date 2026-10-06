@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-anonymous-user-id
 
 [English](README.md) | 中文
@@ -10,18 +15,33 @@
 
 DeepSeek Harness 为每个 harness home 使用一个匿名标识符，以关联同一套安装产生的遥测、反馈与 DeepSeek 请求，同时不识别用户身份。该随机 UUID 存储在 `$DSH_HOME/.anonymous-user-id`（`$DSH_HOME` 默认为 `~/.dsh`）中，可跨重启保留，并在你删除文件后重新生成。不同 harness home 使用不同的标识符，且该值不包含机器或账户数据。内置功能会自动创建并附加该值；包消费方可以复用同一个值进行安装范围的关联，但无法跨 home 关联记录。
 
+## 目录
+
+- [存储约定](#storage-contract)
+- [组合](#composition)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="storage-contract"></a>
 ## 存储约定
 
-读写采用同步方式，因为启动时构造遥测和直接执行命令都需要使用同一个 API。结果在进程生命周期内按解析后的文件路径缓存。首个写入方采用独占创建；并发竞争中失败的一方会采用已持久化的胜出值。损坏的文件会被替换。持久化采用 best-effort，因此即使 home 不可写，系统仍会返回进程本地 UUID，而不会阻塞遥测或反馈。
+读写采用同步方式，因为启动时构造遥测和直接执行命令都需要使用同一个 API。结果在进程生命周期内按解析后的文件路径缓存。首个写入方采用独占创建；并发竞争中失败的一方会采用已持久化的胜出值。损坏的文件会被替换。身份持久化采用 best-effort，因此独立部署的 home 不可写时仍会返回进程本地 UUID。设置 `DSH_MANAGED_DATA_MANIFEST` 时，函数在首次读取或选定清单变化时通过 [managed-data](../../util/managed-data/README.zh.md) 登记确切的身份文件；清单损坏会在身份写入前拒绝该次准入。缓存读取仍只访问内存，备份会独立验证清单。因此，部署备份会包含已存储的标识符，而不会认领整个 Harness home。
 
+<a id="composition"></a>
 ## 组合
 
 本包是共享库，并非 Cordis 插件。消费方直接导入 `getOrCreateAnonymousUserId()`。其不变式伴生插件刻意留空，因为本包既不拥有事件流，也不拥有任何可以在不触发创建身份这一副作用的情况下检查的公开可变关系。`DSH_TELEMETRY_DISABLED` 只会停止遥测导出，不会禁止直接反馈确认或 DeepSeek 提供方标头。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该 id 只创建一次，作为单行持久记录保存，此后不可变；没有变化中的关系可供观测。
 
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为该共享标识符只会作为模型不可见的 HTTP 元数据发送给 DeepSeek，且不注册任何面向模型的内容。
@@ -30,9 +50,20 @@ DeepSeek Harness 为每个 harness home 使用一个匿名标识符，以关联�
 
 无；该传输标头既不会改变 token，也不会改变模型可见前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓工作
 
 - **删除后无法恢复**：身份丢失后会按设计生成新的匿名身份；若要恢复身份，就需要稳定的派生材料，这会削弱匿名性。
 - **Best-effort 并发**：如果读取方恰好落在并发进程完成独占创建但尚未写完的狭窄时间窗内，本次运行可能使用不同的内存 UUID；后续启动会收敛到已持久化的值。
 - **没有跨 home 身份**：不同 `$DSH_HOME` 值之间无法关联。
 - **已配置的 DeepSeek gateway 会收到该 id**：`dsh-llm-deepseek` 会把稳定标头发送至解析后的 `baseURL`（包括部署覆盖），且不受遥测共享模式影响。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

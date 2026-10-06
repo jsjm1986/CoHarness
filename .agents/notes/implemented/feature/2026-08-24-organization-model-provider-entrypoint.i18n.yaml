@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-24-organization-model-provider-entrypoint.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-organization-model-provider-entrypoint.md
-2026-08-24-organization-model-provider-entrypoint.md: 96cfd6d8abe4746fd47e4ea07439c35b1f03122c
-2026-08-24-organization-model-provider-entrypoint.zh.md: c464a8006b670f3140135cbf85d7ed7a6ca75089
+/agent-note-organization-model-provider-entrypoint:
+  en: 5226b8b5197511fa
+  zh: 6a297b0718497a37
+/agent-note-organization-model-provider-entrypoint/problem:
+  en: 54105ba486fb80d2
+  zh: 4f9415cabf863965
+/agent-note-organization-model-provider-entrypoint/decision:
+  en: 2c7a9f1b0a051ac5
+  zh: 396f06041e0ca226
+/agent-note-organization-model-provider-entrypoint/consequences:
+  en: 9b3ab5f85fae06b8
+  zh: 23be904c8586ca2a
+/agent-note-organization-model-provider-entrypoint/alternatives-considered:
+  en: 5a564932d034a509
+  zh: e450462cf4b52457
+/agent-note-organization-model-provider-entrypoint/verification:
+  en: dd0bed0a79f29fe7
+  zh: 56ffe10e3fd57cda

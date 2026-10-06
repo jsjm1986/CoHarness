@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/test-support/llm-replay/README.md
-README.md: 3dcfa46225dccf4551c18542d5acb743c3e91014
-README.zh.md: 6dcaeee594e3c33cb8167d46abc25f2c7ba134b9
+/:
+  en: 859b61dd561538fb
+  zh: 61495d48365178df
+/deepseek-ai-dsh-llm-replay:
+  en: 38c4ef0c09f0f4e1
+  zh: 0b5c8558e7c3338c
+/deepseek-ai-dsh-llm-replay/summary:
+  en: 9db70d252b8e2902
+  zh: 26c3e40a0fef9b53
+/deepseek-ai-dsh-llm-replay/table-of-contents:
+  en: 576769798833f610
+  zh: 4c96828ecda030bf
+/deepseek-ai-dsh-llm-replay/how-the-fixture-works:
+  en: 8075e02534dab579
+  zh: 08f3cc98b4a3be19
+/deepseek-ai-dsh-llm-replay/nested-agents-per-session-keying:
+  en: d9bedac5f071915c
+  zh: ea0cf490389ba0f4
+/deepseek-ai-dsh-llm-replay/config:
+  en: 8c0ac404199e4c80
+  zh: 72dc38e45e64f2f8
+/deepseek-ai-dsh-llm-replay/exports:
+  en: 25c397927b3a2efc
+  zh: abb7736ff5c9e8af
+/deepseek-ai-dsh-llm-replay/plugin-export-shape:
+  en: 091a74a3d5a9233a
+  zh: db1966f32da03a99
+/deepseek-ai-dsh-llm-replay/invariants:
+  en: 04dbc8ceafd6daa4
+  zh: 2b1dc17dc98f8b89
+/deepseek-ai-dsh-llm-replay/model-experience:
+  en: ad4fe7025029da90
+  zh: 1cced10c67323c37
+/deepseek-ai-dsh-llm-replay/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: ae5eece628147ab8
+/deepseek-ai-dsh-llm-replay/known-limitations-and-deferred-work:
+  en: 260b2eb367ce25be
+  zh: 8c132f43fb370ca9
+/deepseek-ai-dsh-llm-replay/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

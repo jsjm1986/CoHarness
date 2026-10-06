@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-acp
 
 [English](README.md) | 中文
@@ -10,6 +15,20 @@
 
 `dsh-acp` 让受信程序通过标准 [ACP](https://agentclientprotocol.com) 自动操作持久 DeepSeek Harness agent：创建或恢复会话、选择模型与推理强度、挂载 MCP 服务器、提交或取消工作、接收语义更新，并独立关闭会话。进程外 subagent、测试运行器与脚本化控制器适合选择它；它刻意不提供 DSH 专用呈现数据与交互式 UI 功能。持久化支持跨进程重启列出、恢复与关闭会话，但不支持删除、fork、transcript（文本记录）回放与附加目录。运行 `pnpm dsh --profile acp` 可启动服务器；仓库客户端使用 `dsh-subagent-acp`。
 
+## 目录
+
+- [插件](#plugin)
+- [协议约定](#protocol-contract)
+- [生命周期](#lifecycle)
+- [运行](#running)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="plugin"></a>
 ## 插件
 
 `apply(ctx, config)` 构建类型化 ACP `agent()` app，连接 stdin/stdout 并驱动 `ctx.agents`。Stdout 专用于协议帧。
@@ -23,6 +42,7 @@
 
 <a id="protocol-contract"></a>
 
+<a id="protocol-contract"></a>
 ## 协议约定
 
 | 方法 | 行为 |
@@ -43,20 +63,25 @@
 
 已提交消息输出有意牺牲逐 token 输出的低延迟，以换取干净的自动化结果。未提交的提供方分片和重试尝试无法泄漏部分文本或图片；推理与工具活动仍保留在会话日志中，以便其他界面观测。由于附件读取是异步的，每个会话会串行交付内容；已提交图片缺失或损坏时，提示词响应会失败，而不会发出占位符。
 
+<a id="lifecycle"></a>
 ## 生命周期
 
 客户端断开与 Cordis 释放共用同一个记忆化清理流程。桥接层先拒绝新会话和提示词，取消并等待提示词准入、agent 活动和有序输出交付全部停稳，然后只 drain 此连接确切拥有的 Agent 之下的可继续后代，再并行释放这些 handle，并等待全部结果结算后才报告失败。其他共享该上下文的前端会保留其可继续森林和准入。因此，仅 ACP 的插件重载不会遗留 agent。
 
 ACP 要求每个提示词响应都携带 `stopReason`，但桥接层不声称它表示提示词专属的轮次结果。操作区间从提示词进入 Agent inbox 开始，在准入、整个 Agent 空闲和有序输出交付全部停稳后结束；inbox 接收前无关 Agent 工作的失败不会归因给该提示词。已提交的 assistant 消息会在自有区间内流式输出，Agent 进入空闲状态前发生的 steering（中途引导）或注入工作也可能参与其中。结算优先级依次为显式取消、输出交付失败、区间内 Agent 失败、关联轮次结束。因 token 上限而结束时以 `end_turn` 结算；关联模型错误也只会在同一个完全停稳边界拒绝提示词。
 
+<a id="running"></a>
 ## 运行
 
 `pnpm --dir /path/to/deepseek-harness run demo:acp` 启动仓库的自动化服务器组合。父 harness 可以通过 [`@deepseek-ai/dsh-subagent-acp`](../../subagent/subagent-acp/README.zh.md) spawn 它；其他 ACP 客户端只需上述核心方法。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。服务器把每个 ACP 帧翻译为 `ctx.agents` 操作；会话生命周期由它所驱动的运行时拥有，因此没有适配器自有的关系可供比较。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 提示词内容
@@ -87,9 +112,20 @@ ACP 要求每个提示词响应都携带 `stopReason`，但桥接层不声称它
 
 仅通过所属工具的结果追加。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **没有 load、删除或 fork 方法**：持久主会话使用标准 `session/list`、`session/resume` 和 `session/close` 控制；ACP 的 `load`、删除和不稳定 fork 操作尚未实现。
 - **仅光栅图片和一个 workspace**：图片提示词要求持久存储以及明确声明支持图片输入的确切路由；只接受 PNG、JPEG、WebP 和 GIF。音频、嵌入资源和非空附加目录都会被拒绝；资源链接只会展平为文本引用，不会获取其内容。会话级 MCP 挂载仅限 ACP stdio 与 Streamable HTTP 声明。
 - **仅已提交答案**：实时进度、推理、工具活动、计划、标题和用量不会通过协议传输。
 - **由连接管理的生命周期**：连接关闭时会释放其所有活动会话；连接保持打开时可使用 `session/close`。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

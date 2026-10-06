@@ -154,10 +154,11 @@ function assistantText(event: Extract<SessionEvent, { type: 'assistant/message' 
 }
 
 function toolResultText(event: Extract<SessionEvent, { type: 'tool/result' }>): string {
-  return event.data.message.content[0].content
-    .filter(block => block.type === 'text')
-    .map(block => block.text)
-    .join('')
+  let text = ''
+  for (const block of event.data.message.content) {
+    if (block.type === 'text') text += block.text
+  }
+  return text
 }
 
 function messageKey(event: SessionEvent<'user/message'>): string {
@@ -197,7 +198,7 @@ describe('web e2e: continuous conversation grown through the composer', () => {
     page.on('console', (message) => {
       if (message.type() === 'warning') consoleWarnings.push(message.text())
     })
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await connectFreshWorkspace(page, scaffold.workspaceCwd, 'continuous-chat-e2e')
   }, 120_000)
@@ -312,7 +313,7 @@ describe('web e2e: continuous conversation grown through the composer', () => {
       })
       expect(results[0]?.data.turn).toBe(spec.index)
       expect(results[0]?.data.message.source.callId).toBe(spec.callId)
-      expect(results[0]?.data.message.content[0].isError).toBe(false)
+      expect(results[0]?.data.message.isError).toBe(false)
       expect(toolResultText(results[0]!)).toBe(`${spec.toolResultMarker}\n`)
 
       // Completed process rows are collapsed by the shipped UI. Expand this

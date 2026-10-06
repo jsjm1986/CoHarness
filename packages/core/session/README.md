@@ -1,3 +1,8 @@
+---
+description: "Event-sourced session store for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # dsh-session
 
 English | [中文](README.zh.md)
@@ -10,6 +15,16 @@ The optional `@deepseek-ai/dsh-session/invariant` companion registers this packa
 
 `dsh-session` records every model-visible fact in an append-only session log and derives model history from that record. Consumers can inspect, replay, fork, and flush sessions while preserving historical events; compaction hides superseded entries from the active conversation without deleting them. Sessions remain in memory unless a persistence backend is added, and durability checkpoints wait for configured backends. Choose this package wherever an agent needs a reconstructable session record; it does not call models.
 
+## Table of Contents
+
+- [Service: `SessionStore` (ctx key: `sessions`)](#service-sessionstore-ctx-key-sessions)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="service-sessionstore-ctx-key-sessions"></a>
 ## Service: `SessionStore` (ctx key: `sessions`)
 
 Creates and holds event-sourced `Session` instances. Persistence is intentionally not implemented here — plugins subscribe to `session/event`, flush on `session/flush`, and may mirror the paired `session/created`/`session/disposed` lifecycle.
@@ -119,6 +134,7 @@ Every `SessionEvent` carries three optional top-level fields (structural metadat
 - Replay/fork: `create(id, { seed })` validates and freezes a contiguous current-format log and rebuilds its surface; request headers require provider/model, and assistant messages require provider/model source. Persistence owns read compatibility before constructing this current-format seed. `fork(source, boundary?, childSessionId?)` selects a completed-turn prefix and records lineage.
 - Compaction: `dsh-compaction-basic` appends a `user/message` replacement for summary checkpoints, while `dsh-compaction-tool-result-pruner` appends a content-only `tool/result` replacement. Tool-pairing boundary policy and its cache belong to the [`dsh-compaction` seam](../../compaction/compaction/README.md), while this package owns ordered surface membership, replacement validation, and `replaceGeneration`.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Derived message history
@@ -174,3 +190,13 @@ These limits define when the session store needs special care. They are current 
 - **`fork()` cuts only at stable boundaries of live sessions** — the selected prefix must end outside an open turn and the source must be in the store; forking a persisted-but-unloaded session is excluded from the [fork API](../../../.agents/notes/implemented/feature/2026-06-30-session-store-fork-api.md).
 - **`SESSION_FORMAT_VERSION` is `3`** — the current reader rejects retired `header.system` and validates `system/message` payloads and protected-head rewrites. Persistence providers migrate supported v0/v1/v2 historical generations through adjacent format packages before constructing a current `Session`; v2 request-header system text is promoted to a durable `system/message` surface node, while older generations remain immutable. Assistant settlements may carry a compact lossless stream and failed attempts are recorded separately. Newer versions refuse with a direction-aware error. Unknown event types refuse the same way unless marked `ignorable` in the envelope; the versioning mechanism is owned by the [Session format library](../../session/session-format/README.md).
 - **`TurnEndReasonMap` omits the ACP-named `refusal` / `max_turn_requests` variants** — producer-gated: they land when an adapter or the loop first emits them.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

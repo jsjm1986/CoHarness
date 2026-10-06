@@ -1,0 +1,50 @@
+- banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - navigation "Session hierarchy":
+    - button "Use the ask_user_question tool to" [disabled]
+  - button "Session log":
+    - text: Session log
+    - img
+  - button "Open right sidebar":
+    - img
+- button "1 tool call · 1 intermediate message" [expanded]:
+  - text: 1 tool call · 1 intermediate message
+  - img
+- text: "Use the ask_user_question tool to ask me exactly one multi-select question with id \"color\", question \"Which color do you prefer?\", header \"Pick one\", and two options: label \"Blue\" with description \"A cool recessive hue that reads as calm and trustworthy in long reading sessions and dense dashboards.\", and label \"Green\" with description \"A restful mid-spectrum hue with the highest perceived brightness, easiest on the eye over long sessions.\" Set multi_select to true. After I answer, reply with the single word DONE and stop."
+- group "Message time and speed": "{{clock}}"
+- button "Copy":
+  - img
+- button "Thinking The user wants me to use the ask_user_question tool with specific parameters. Let me do exactly that.":
+  - img
+  - img
+  - text: Thinking The user wants me to use the ask_user_question tool with specific parameters. Let me do exactly that.
+- button "Ask question cancelled" [expanded]:
+  - img
+  - text: Ask question cancelled
+- paragraph: This question set was cancelled before answers were submitted.
+- list:
+  - listitem: Which color do you prefer?
+- button "Inspect"
+- textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]
+- group "Session statistics":
+  - "button \"1 turns · 1 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 1 steps{{throughput}} tok/s"
+  - button "4.4K tok · Cache hit 97%":
+    - img
+    - text: 4.4K tokCache hit 97%
+- separator "Adjust transcript content width"
+- separator "Adjust transcript content width"

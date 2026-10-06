@@ -1,3 +1,8 @@
+---
+description: "Concrete ctx.sessionQuery backend with SQLite FTS5 search"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-query-sqlite
 
 English | [中文](README.zh.md)
@@ -8,6 +13,20 @@ Concrete `ctx.sessionQuery` provider. `SqliteSessionQueryEngine` inherits exact 
 
 Use this package to add ranked SQLite FTS5 search across session history, either across sessions or within one session, with cursor pagination. It indexes live and persisted history in a separate derived database, so searches reflect current state without modifying the session-persistence store. Exact reads, filters, and traces remain available through the same query API. Search is opt-in in shipped compositions; configure `openAt` to open the index at startup, on first search, or never. Results match tokens and phrases rather than arbitrary substrings, and each index path has a single process owner.
 
+## Table of Contents
+
+- [Search contract](#search-contract)
+- [Source and index lifecycle](#source-and-index-lifecycle)
+- [Configuration](#configuration)
+- [Tokenizer and limits](#tokenizer-and-limits)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="search-contract"></a>
 ## Search contract
 
 `searchSessions(request, exec?)` returns `SessionSearchHit` pages across the corpus; `searchEvents(request, exec?)` returns `SessionEventSearchHit` pages within one session. Queries are required, trimmed, whitespace-normalized literal phrases. FTS5 syntax such as quotes, `OR`, `NEAR`, and `*` is treated as data rather than executable MATCH syntax. Metadata filters are parameterized SQL predicates applied before ranking. To keep SQLite FTS5 MATCH in a supported outer-predicate context, cross-session requests may compile at most 14 combined session and event filter predicates; within-session requests may compile at most 13 filter predicates because the fixed target-session predicate consumes one slot. Each range endpoint compiles as one predicate. A request exceeding either predicate budget or SQLite's portable limit of 32,766 total bindings, including fixed query and pagination values, fails with `SESSION_QUERY_INVALID_FILTER` before statement preparation.
@@ -16,6 +35,7 @@ Relevance is source-comparable across persistent and TEMP tables: actual FTS5 hi
 
 All three surfaces (`current`, `shadowed`, and `log-only`) are searchable by default. Pass a surface filter to narrow them.
 
+<a id="source-and-index-lifecycle"></a>
 ## Source and index lifecycle
 
 The service requires `ctx.sessions` and observes optional `ctx.sessionPersistence` dynamically. One serialized state machine compares source-qualified lightweight durable snapshot revisions, non-mutatingly inspects only new or changed logs, extracts shared semantic documents, reconciles changes transactionally, and runs the query. Session queries never invoke the persistence backend's crash-repairing `load()`; an owner attaching during inspection cannot mutate its log, and the stable-observation retry makes the result live-preferred. The TEMP live row still records persisted availability, and the durable base refreshes after that live owner detaches. Repeated queries and an unchanged same-store reopen perform no full durable-log inspection; switching stores, or observing new, changed, deleted, or externally load-repaired sources, reconciles on the next stable observation. Source or transaction failure commits nothing, and the next search retries.
@@ -26,6 +46,7 @@ Persisted FTS rows live in a dedicated derived database. Connection-local TEMP t
 
 The database is disposable but reset is guarded: every recognized schema version rejects unknown user tables before mutating journal mode, and only a recognized incompatible schema containing derived tables rebuilds in place. An unrelated or canonical database is refused. Never point `path` at the session-persistence database. On filesystems with POSIX modes, missing directories and databases are created owner-only (`0700` and `0600` before the process umask), and SQLite sidecars inherit the database mode; existing modes are preserved. Exactly one service in one process owns a derived-index path; external writers or a second process are unsupported because generations and TEMP shadow state are connection-owned.
 
+<a id="configuration"></a>
 ## Configuration
 
 | Key | Default | Contract |
@@ -39,16 +60,19 @@ The database is disposable but reset is guarded: every recognized schema version
 | `readWindowMax` | `50` | Maximum `before` or `after` raw-event count for inherited `readEvent()`. |
 | `persistedInspectConcurrency` | `4` | Maximum concurrent persisted-log inspections for inherited batch reads; must be a positive safe integer. |
 
+<a id="tokenizer-and-limits"></a>
 ## Tokenizer and limits
 
 The index uses FTS5 `unicode61`. The trade-off is token/phrase recall rather than arbitrary substring recall: `AI` does not match the token `BRAID`. Use `ctx.sessionQuery.filterEvents()` with a `text` clause when a literal whitespace-flexible substring scan is required. NUL is rejected in queries; reserved highlight markers and NUL in documents are normalized before indexing so presentation markers cannot collide with source text.
 
 Abort signals stop queued work and flow unchanged through snapshot listing and non-mutating inspection. Once source work starts, the serialized state machine awaits that backend promise itself—even when a backend ignores cancellation—then checks the signal before starting any further listing, inspection, reconciliation, or query work. The caller therefore observes cancellation only after started backend work is quiescent, and a later search cannot enter the serializer while that cleanup is pending. Node's synchronous `DatabaseSync` API cannot interrupt a metadata or MATCH statement already executing on the JavaScript thread; signals are checked immediately before and after those non-preemptible calls.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Search runs over the live-preferred logical corpus and its index lives inside the SQLite store it opens; no second corpus exists.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the search backend returns hits only to callers and registers nothing model-facing.
@@ -63,3 +87,13 @@ None; this package neither assembles nor sends a provider request.
 - **Synchronous query execution** — `DatabaseSync` blocks the JavaScript thread during MATCH execution and cannot interrupt a statement already running.
 - **Token recall, not arbitrary substrings** — the `unicode61` tokenizer does not match substrings inside a larger token; use `filterEvents()` for literal scans.
 - **Single-owner derived index** — one service in one process must own each index path; external writers and multi-process sharing are unsupported.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

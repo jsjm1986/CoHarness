@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createMessage, createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-title'
 import {
@@ -34,11 +34,7 @@ function mathFixture(): string {
   session.append('system/message', {
     turn: 1,
     step: 1,
-    message: createMessage({
-      role: 'system',
-      content: [{ type: 'text', text: 'Fixture system prompt.' }],
-      source: { kind: 'plugin', plugin: 'test-fixture' },
-    }),
+    message: createSystemMessage('Fixture system prompt.'),
   }, { surfaceOp: 'append' })
   const user = session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: 'Render this mathematical proof.' }],
@@ -109,7 +105,7 @@ describe('web e2e: settled Markdown math rendering', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 
@@ -135,6 +131,7 @@ describe('web e2e: settled Markdown math rendering', () => {
       () => page.getByText('1 turns · 1 steps', { exact: false }).count(),
       { timeout: 10_000 },
     ).toBe(1)
+    await page.getByRole('button', { name: /^Select model, current / }).waitFor({ timeout: 10_000 })
 
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')

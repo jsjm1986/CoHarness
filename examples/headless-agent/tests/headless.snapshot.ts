@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, readdir, realpath, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { delimiter, dirname, join } from 'node:path'
@@ -19,6 +19,7 @@ import {
   type NormalizeContext,
 } from '@deepseek-ai/dsh-session-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
+import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import {
   decompressZstdFrame,
   scanZstdFrames,
@@ -34,7 +35,7 @@ const advancedCorpusDir = join(snapshotsDir, '../../../../snapshots/session/adva
 const advancedScenarioDir = join(snapshotsDir, 'advanced-toolchain')
 const advancedStreamExpected = join(advancedScenarioDir, 'stream-json.expected.jsonl')
 const ptyScenarioDir = join(snapshotsDir, 'pty-tools')
-const ptySessionFixture = join(ptyScenarioDir, 'session.v6.jsonl')
+const ptySessionFixture = join(ptyScenarioDir, `session.v${String(SESSION_FORMAT_VERSION)}.jsonl`)
 const ptyStreamExpected = join(ptyScenarioDir, 'stream-json.expected.jsonl')
 const ptyConfigPath = fileURLToPath(new URL('../pty.cordis.snapshot.yml', import.meta.url))
 const goalScenarioDir = join(snapshotsDir, 'goal-tools')
@@ -44,7 +45,7 @@ const retryConfigPath = fileURLToPath(new URL('../retry.cordis.snapshot.yml', im
 const malformedProviderScenarioDir = join(snapshotsDir, 'malformed-provider')
 const malformedProviderConfigPath = fileURLToPath(new URL('../malformed-provider.cordis.snapshot.yml', import.meta.url))
 const compactionScenarioDir = join(snapshotsDir, 'compaction-recovery')
-const compactionSessionFixture = join(compactionScenarioDir, 'session.v6.jsonl')
+const compactionSessionFixture = join(compactionScenarioDir, `session.v${String(SESSION_FORMAT_VERSION)}.jsonl`)
 const compactionStreamExpected = join(compactionScenarioDir, 'stream-json.expected.jsonl')
 const compactionConfigPath = fileURLToPath(new URL('../compaction.cordis.snapshot.yml', import.meta.url))
 const credentialsScenarioDir = join(snapshotsDir, 'missing-credential')
@@ -952,6 +953,51 @@ describe('headless stream-json snapshots', () => {
     expect(normalized).toBe(await readFile(advancedStreamExpected, 'utf8'))
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
+  it.each(['complete', 'commentary'])('renders %s external recovery through the headless app', async (scenario) => {
+    const configPath = fileURLToPath(new URL('../external-recovery.cordis.snapshot.yml', import.meta.url))
+    const result = await runLoaderSmoke({
+      label: 'external recovery headless snapshot', tempDirPrefix: 'headless-external-recovery-',
+      binScript, libBinScript: binScript, configPath, binArgs: [configPath, 'Recover the existing external request.'],
+      tsconfigPath,
+      env: { DSH_SNAPSHOT: 'external-recovery', EXTERNAL_RECOVERY_CASE: scenario },
+    })
+    const records = parseJsonl(result.stdout)
+    const turnEnd = records.filter(row => row.type === 'session_event')
+      .map(row => row.event as JsonObject).find(event => event.type === 'turn/end')
+    const output = records.findLast(row => row.type === 'result')?.output
+    const reason = (turnEnd?.data as JsonObject | undefined)?.reason
+    expect({ output, reason, stderr: result.stderr }).toMatchSnapshot()
+    expect(output).toBe(scenario === 'complete' ? 'EXTERNAL_TURN_RECOVERED' : '')
+    if (scenario !== 'complete') expect(reason).toMatchObject({ kind: 'error' })
+    expect(result.stdout).not.toContain('I have only started the operation.')
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it.each(['selected', 'target-moved'])('renders %s external workspace execution through the headless app', async (scenario) => {
+    let runCwd = ''
+    const configPath = fileURLToPath(new URL('../external-workspace.cordis.snapshot.yml', import.meta.url))
+    const result = await runLoaderSmoke({
+      label: 'external workspace headless snapshot', tempDirPrefix: 'headless-external-workspace-',
+      binScript, libBinScript: binScript, configPath, binArgs: [configPath, 'Report your execution workspace.'], tsconfigPath,
+      prepare: async (cwd) => { runCwd = await realpath(cwd) },
+      env: { DSH_SNAPSHOT: 'external-workspace', EXTERNAL_WORKSPACE_CASE: scenario },
+    })
+    const records = parseJsonl(result.stdout)
+    const output = records.findLast(row => row.type === 'result')?.output
+    const turnEnd = records.filter(row => row.type === 'session_event')
+      .map(row => row.event as JsonObject).find(event => event.type === 'turn/end')
+    const reason = (turnEnd?.data as JsonObject | undefined)?.reason
+    if (scenario === 'selected') {
+      const expectedCwd = join(runCwd, 'requested-member-workspace')
+      expect(output).toBe(`${expectedCwd}\n${expectedCwd}`)
+    } else {
+      expect(output).toBe('')
+      expect(reason).toMatchObject({ kind: 'error' })
+    }
+    const normalized = typeof output === 'string'
+      ? output.replaceAll(join(runCwd, 'requested-member-workspace'), '<member-workspace>') : output
+    expect({ output: normalized, reason, stderr: result.stderr }).toMatchSnapshot()
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
   it('runs a keyless Agent Team with peer mail, dependent tasks, waiting, and Lead aggregation', async () => {
     let projection: unknown
     const result = await runLoaderSmoke({
@@ -1066,8 +1112,7 @@ describe('headless stream-json snapshots', () => {
         })
         const probeData = probeResult?.data as JsonObject | undefined
         const probeMessage = probeData?.message as JsonObject | undefined
-        const probeContent = probeMessage?.content as JsonObject[] | undefined
-        expect(probeContent?.[0]?.isError).toBe(true)
+        expect(probeMessage?.isError).toBe(true)
         expect((probeData?.error as JsonObject | undefined)?.code).toBe('GOAL_NOT_FOUND')
         const goalChanges = records.filter(record => record.type === 'goal/change')
         expect(goalChanges).toHaveLength(1)
@@ -1135,8 +1180,8 @@ describe('headless stream-json snapshots', () => {
         const parentResultData = parentResult?.data as JsonObject | undefined
         const parentMessage = parentResultData?.message as JsonObject | undefined
         const parentContent = parentMessage?.content as JsonObject[] | undefined
-        expect(parentContent?.[0]?.isError).toBe(false)
-        expect(JSON.stringify(parentContent?.[0]?.content)).toContain('reported completion after 2 rounds')
+        expect(parentMessage?.isError).toBe(false)
+        expect(JSON.stringify(parentContent)).toContain('reported completion after 2 rounds')
 
         const childRecords = children.map(child => parseJsonl(child.content))
         const childPrompts = childRecords.map((records) => {

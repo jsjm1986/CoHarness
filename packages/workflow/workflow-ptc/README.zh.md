@@ -101,6 +101,8 @@ Host 分别跟踪待完成的提供方启动与已发布子 agent。共享中止
 
 -----
 
+受管 Workflow 回调保留工作流启动时捕获的执行范围。worker 延迟请求创建子任务时，不能借用父 Agent 上后续人类请求的身份。
+
 <a id="further-exploration"></a>
 ## 进一步探索
 
@@ -114,6 +116,7 @@ Host 分别跟踪待完成的提供方启动与已发布子 agent。共享中止
 - [工作流沙箱复用](../../../.agents/notes/implemented/architecture/2026-09-13-workflow-ptc-sandbox-reuse.zh.md)——执行归属与取舍。
 
 -----
+
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -146,6 +149,7 @@ Host 分别跟踪待完成的提供方启动与已发布子 agent。共享中止
 
 仅追加；新增可见内容位于可复用请求前缀之后。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

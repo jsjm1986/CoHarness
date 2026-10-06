@@ -58,6 +58,13 @@ function text(t: string): ContentBlock[] {
   return [{ type: 'text', text: t }]
 }
 
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    /** Demo-session fixture producer kind; exists only inside this generator. */
+    fixture: { kind: 'fixture' }
+  }
+}
+
 function userMessage(content: ContentBlock[], source: MessageSource = { kind: 'user' }): UserMessage {
   return createUserMessage({ content, source })
 }
@@ -426,7 +433,7 @@ function buildAlphaLog(): SessionEvent[] {
       })
     }
     if (turn % 9 === 4) {
-      push({ type: 'user/message', surfaceOp: 'append', data: userMessage(text(`[fixture] 上下文注入（turn ${turn}）`), { kind: 'plugin', plugin: 'fixture' }) })
+      push({ type: 'user/message', surfaceOp: 'append', data: userMessage(text(`[fixture] 上下文注入（turn ${turn}）`), { kind: 'fixture' }) })
     }
     push({ type: 'step/start', data: { turn, step: 0 } })
     const withTool = turn % 5 === 2
@@ -768,7 +775,7 @@ function viewFor(event: SessionEvent, log: readonly SessionEvent[]): ToolEventVi
       /* v8 ignore next -- dense-array guard: i stays within [0, log.length),
       so the undefined arm needs a sparse log no code path builds. */
       if (candidate !== undefined && candidate.type === 'tool/call' && String(candidate.data.callId) === callId) {
-        const resultText = event.data.message.content[0].content.map(b => (b.type === 'text' ? b.text : '')).join('')
+        const resultText = event.data.message.content.map(b => (b.type === 'text' ? b.text : '')).join('')
         const view = presentResult(candidate.data.name, candidate.data.arguments, resultText)
         return view === undefined ? undefined : { for: 'result', view }
       }
@@ -1032,11 +1039,8 @@ function estimateFixtureContent(blocks: readonly ContentBlock[]): number {
       return tokens + densityPrice(block.name) + densityPrice(block.arguments) + BLOCK_OVERHEAD
     }
     // ContentBlockMap is merge-extensible: this client graph sees only the
-    // base four members, but fixture turns do carry extended blocks at
+    // base members, but fixture turns do carry extended blocks at
     // runtime, so the structural JSON fallback below is live code.
-    if (block.type === 'tool-result') {
-      return tokens + estimateFixtureContent(block.content) + BLOCK_OVERHEAD
-    }
     return tokens + densityPrice(JSON.stringify(block)) + BLOCK_OVERHEAD
   }, 0)
 }
@@ -1391,8 +1395,6 @@ function searchBlockText(block: ContentBlock): string[] {
       return []
     case 'tool-call':
       return [block.name, block.arguments]
-    case 'tool-result':
-      return block.content.flatMap(searchBlockText)
     default:
       return []
   }
@@ -1746,6 +1748,9 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   // Registry-global archive set mirroring the host: archived sessions keep
   // their workspace accounting slot and only grouping surfaces hide them.
   const archivedSessionIds: SessionId[] = []
+  // Registry-global pin set, most recently pinned first, mirroring the host
+  // registry: pinning fronts once and an already-pinned id never reorders.
+  const pinnedSessionIds: SessionId[] = []
   // Monotonic archive snapshot revision, mirroring the host registry counter:
   // versioned echoes/frames let the client replace rather than merge, which
   // is what makes an unarchive's smaller set win over the older snapshot.
@@ -2494,6 +2499,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   }
 
   const api: ApiProxy = {
+    hasLiveClient: () => true,
     desktop: {
       status: request => ok(request, null),
       confirm: request => err(request, { code: 'internal', message: 'Fixture has no managed desktop.', details: {} }),
@@ -2857,10 +2863,26 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         ))
       },
     },
+    jobs: {
+      // The keyless fixture runs no background work; any observed or killed id
+      // is unknown to it.
+      output: request => err(request, {
+        code: 'job-not-found',
+        message: `unknown job ${String(request.payload.jobId)}`,
+        details: request.payload.sessionId === undefined
+          ? { jobId: request.payload.jobId }
+          : { sessionId: request.payload.sessionId, jobId: request.payload.jobId },
+      }),
+      kill: request => err(request, {
+        code: 'job-not-found',
+        message: `unknown job ${String(request.payload.jobId)}`,
+        details: { sessionId: request.payload.sessionId, jobId: request.payload.jobId },
+      }),
+    },
     host: {
       describe: request => ok(request, {
         version: '0.0.0-fixture', cwd: '/tmp/fixture', attachedSessions, home: FIXTURE_HOME, canOpenPath: true,
-        executionAuthorityRequired: false,
+        fileManager: 'directory', executionAuthorityRequired: false,
       }),
       // Deterministic native pick: the keyless lanes drive the full
       // pick-then-adopt path without an OS chooser (design-mock content,
@@ -2899,11 +2921,13 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         return ok(request, { path: target })
       },
       openPath: request => ok(request, { opened: true as const }),
+      fileApplications: request => ok(request, { applications: [] }),
     },
     workspace: {
       list: request => ok(request, {
         items: workspaces.map(w => ({ ...w })),
         archivedSessionIds: [...archivedSessionIds],
+        pinnedSessionIds: [...pinnedSessionIds],
         archiveRevision,
       }),
       create: (request) => {
@@ -3035,6 +3059,12 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
             archiveRevision,
           })
         }
+        // The host drops an archived session's pin in the same durable write.
+        const pinIndex = pinnedSessionIds.indexOf(sessionId)
+        if (pinIndex >= 0) {
+          pinnedSessionIds.splice(pinIndex, 1)
+          emitHost({ type: 'host/pinned-sessions-changed', pinnedSessionIds: [...pinnedSessionIds] })
+        }
         return ok(request, { archivedSessionIds: [...archivedSessionIds], archiveRevision })
       },
       unarchiveSession: (request) => {
@@ -3050,6 +3080,34 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           })
         }
         return ok(request, { archivedSessionIds: [...archivedSessionIds], archiveRevision })
+      },
+      pinSession: (request) => {
+        const missing = requireSession(request)
+        if (missing !== undefined) return missing
+        const { sessionId } = request.payload
+        if (archivedSessionIds.includes(sessionId)) {
+          return err(request, {
+            code: 'session-archived',
+            message: `session ${sessionId} is archived`,
+            details: { sessionId },
+          })
+        }
+        // Already pinned resolves as a no-op: the registry never reorders.
+        if (pinnedSessionIds.includes(sessionId)) {
+          return ok(request, { pinnedSessionIds: [...pinnedSessionIds] })
+        }
+        pinnedSessionIds.unshift(sessionId)
+        emitHost({ type: 'host/pinned-sessions-changed', pinnedSessionIds: [...pinnedSessionIds] })
+        return ok(request, { pinnedSessionIds: [...pinnedSessionIds] })
+      },
+      unpinSession: (request) => {
+        const { sessionId } = request.payload
+        const index = pinnedSessionIds.indexOf(sessionId)
+        if (index >= 0) {
+          pinnedSessionIds.splice(index, 1)
+          emitHost({ type: 'host/pinned-sessions-changed', pinnedSessionIds: [...pinnedSessionIds] })
+        }
+        return ok(request, { pinnedSessionIds: [...pinnedSessionIds] })
       },
     },
     workspaceChanges: {
@@ -3459,6 +3517,8 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'session.updateQueue': return this.api.sessions.updateQueue(request)
       case 'session.cancel': return this.api.sessions.cancel(request)
       case 'subagent.history': return this.api.subagents.history(request, signal)
+      case 'jobs.output': return this.api.jobs.output(request)
+      case 'jobs.kill': return this.api.jobs.kill(request)
       case 'desktop.status': return this.api.desktop.status(request, signal)
       case 'desktop.confirm': return this.api.desktop.confirm(request, signal)
       case 'host.describe': return this.api.host.describe(request)
@@ -3466,6 +3526,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'host.listDirectory': return this.api.host.listDirectory(request, new AbortController().signal)
       case 'host.createDirectory': return this.api.host.createDirectory(request)
       case 'host.openPath': return this.api.host.openPath(request, new AbortController().signal)
+      case 'host.fileApplications': return this.api.host.fileApplications(request, new AbortController().signal)
       case 'workspace.list': return this.api.workspace.list(request)
       case 'workspace.create': return this.api.workspace.create(request)
       case 'workspace.rename': return this.api.workspace.rename(request)
@@ -3474,6 +3535,8 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'workspace.insertSessionBefore': return this.api.workspace.insertSessionBefore(request)
       case 'workspace.archiveSession': return this.api.workspace.archiveSession(request)
       case 'workspace.unarchiveSession': return this.api.workspace.unarchiveSession(request)
+      case 'workspace.pinSession': return this.api.workspace.pinSession(request)
+      case 'workspace.unpinSession': return this.api.workspace.unpinSession(request)
       case 'workspaceChanges.summary': return this.api.workspaceChanges.summary(request, signal)
       case 'workspaceChanges.diff': return this.api.workspaceChanges.diff(request, signal)
       case 'workspaceFiles.list': return this.api.workspaceFiles.list(request)

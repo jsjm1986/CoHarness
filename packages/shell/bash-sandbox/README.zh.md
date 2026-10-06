@@ -88,7 +88,7 @@ kind: "package-reference"
 
 ### 主要流程
 
-对受限模式，`resolve()` 标记每次调用的策略（会话的模式覆盖值，或部署回退）；`run` 与 `start` 把 bash argv 经提供方包装，再把受限 argv 交给继承的 subprocess 路径。结算时执行器对结果分类：runner 失败优先于拒绝（命令从未运行），stderr 携带后端拒绝方言的失败运行报告 `denied: true`，每次受限运行都携带模式与强制执行事实。`danger-full-access` 完全绕过提供方，并标记 `denied: false`。
+对受限模式，`resolve()` 标记每次调用的策略（会话的模式覆盖值，或部署回退）；`execute` 把 bash argv 经提供方包装，再把受限 argv 交给继承的 subprocess 路径。结算时执行器对结果分类：runner 失败优先于拒绝（命令从未运行），stderr 携带后端拒绝方言的失败运行报告 `denied: true`，每次受限运行都携带模式与强制执行事实。`danger-full-access` 完全绕过提供方，并标记 `denied: false`。
 
 ### 不变式
 
@@ -115,6 +115,7 @@ kind: "package-reference"
 - [沙箱 Agent Note](../../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md) —— 沙箱设计、升权与切换约定。
 
 -----
+
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -161,6 +162,7 @@ kind: "package-reference"
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -170,7 +172,7 @@ kind: "package-reference"
 
 - **限制只覆盖文件影响**——不提供网络限制和统一的进程可见性保证，因此这些模式不是通用安全沙箱。
 - **拒绝从失败命令的 stderr 推断**——后端特征使该推断可跨平台使用，但包含相同特征的应用错误可能被分类为拒绝，也可能遗漏未出现在保留尾部中的拒绝。
-- **异步观测到的后台 runner 失败没有即时错误通道**——它记录在已结算进程上，并在调用方用 `job_output` 读取通用任务时呈现；同步 subprocess throw 若指明 runner 路径，则会在发布句柄前拒绝 `start()`。
+- **异步观测到的后台 runner 失败没有即时错误通道**——它记录在已结算进程上，并在调用方用 `job_output` 读取通用任务时呈现；同步 subprocess throw 若指明 runner 路径，则会在发布句柄前拒绝 `execute()`。
 - **`danger-full-access` 有意绕过 `ctx.sandbox`**——它是显式无约束模式，不是更宽的沙箱 profile。
 
 <a id="dev-note"></a>

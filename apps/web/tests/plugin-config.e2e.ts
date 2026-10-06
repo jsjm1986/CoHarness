@@ -34,7 +34,7 @@ describe('web e2e: plugin configuration section', () => {
     // derives from it, as the rest of the settings surface does.
     page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 
@@ -181,7 +181,7 @@ describe('web e2e: plugin configuration section', () => {
     const arrived = Promise.withResolvers<undefined>()
     const release = Promise.withResolvers<undefined>()
     const drained = Promise.withResolvers<undefined>()
-    const pattern = '**/api/settings.mutate'
+    const pattern = /\/api\/settings\.mutate(?:\?.*)?$/
     await page.route(pattern, async (route) => {
       try {
         const response = await route.fetch()

@@ -1,3 +1,8 @@
+---
+description: "Model-facing skill loading tool for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-skill
 
 English | [中文](README.zh.md)
@@ -10,6 +15,18 @@ Requires `ctx.agents`, `ctx.tools`, and `ctx.skills` (`inject: ['agents', 'tools
 
 Agents can discover and load skills during a session. Before the first request, when model-invocable skills exist and the `skill` tool is visible, they receive a durable catalog of available skill names and capped descriptions, and can use the `skill` tool to load full instructions. Users can invoke a user-invocable skill with `/name`, which injects the same instructions into that step. Catalog changes append a complete replacement, including an empty catalog that retires old names; configure `catalogDescriptionMaxLength` to limit each description.
 
+## Table of Contents
+
+- [Catalog lifecycle](#catalog-lifecycle)
+- [Tool: `skill`](#tool-skill)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="catalog-lifecycle"></a>
 ## Catalog lifecycle
 
 At every eligible `agent/pre-step`, the plugin calls `ctx.skills.snapshot()` for the calling session's cwd, forwards the pre-step abort signal to discovery, applies exact `skill` tool visibility, and renders the ordered `name` and `description` entries. When no prior catalog exists and that view is non-empty, it adds an initial durable user-role `<system-reminder>` to a downstream `enter` decision. Catalog messages contain only those summaries; skill bodies, paths, sources, providers, and `whenToUse` hints remain outside the catalog.
@@ -20,6 +37,7 @@ The catalog is omitted when no model-invocable skills are initially available, a
 
 `catalogDescriptionMaxLength` controls normalized catalog descriptions; rendering XML-escapes them. Its default is `500` and values must be integers of at least `3`, which reserves room for a truncation ellipsis. The [skill catalog hot-refresh Agent Note](../../../.agents/notes/implemented/feature/2026-07-27-skill-catalog-hot-refresh.md) owns the durable initial catalog and replacement lifecycle.
 
+<a id="tool-skill"></a>
 ## Tool: `skill`
 
 | Arg | Type | Notes |
@@ -34,10 +52,12 @@ An unresolved name reports that the skill is unknown or no longer available. Inv
 
 Tool execution does not add a synthetic context message. Its freshly loaded result is already recorded as the tool result and becomes available to the next model step without duplicating the body. Only the catalog projection adds replacement summaries.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The tool and catalog read the `ctx.skills` registry; provider registration and content stay behind the seam.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Session catalog
@@ -175,3 +195,13 @@ Append-only; the injection lands after the reusable request prefix inside the st
 - **Loading is one-shot text** — there is no partial, streaming, or cached-content handle when a remote provider is slow or a skill body is large.
 - **Catalog replacement is whole-list** — one changed name or description appends every currently visible summary; this keeps stale-name retirement explicit but costs tokens proportional to the catalog.
 - **Bodies are not versioned** — body-only edits do not change the catalog digest or notify the model; a later tool call reads the current provider content while earlier tool results remain historical facts.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

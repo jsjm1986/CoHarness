@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-13-token-cache-disclosure-replay.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-13-token-cache-disclosure-replay.md
-2026-09-13-token-cache-disclosure-replay.md: 8d934582c68bc2cedd8939c62537073a73fdd6d1
-2026-09-13-token-cache-disclosure-replay.zh.md: c4eb25ad573aff3d67e4de017e14cac30ef96c67
+/agent-note-token-and-cache-disclosure-follows-compact-retry-settlements:
+  en: ea4eefc7b9258240
+  zh: 28e7b081c6387ac5
+/agent-note-token-and-cache-disclosure-follows-compact-retry-settlements/problem:
+  en: 5aedc581e3534f82
+  zh: f3e28ff7c61c048e
+/agent-note-token-and-cache-disclosure-follows-compact-retry-settlements/decision:
+  en: ef593ba958082698
+  zh: 3625866bcd109524
+/agent-note-token-and-cache-disclosure-follows-compact-retry-settlements/consequences:
+  en: 9455318e2a19fbbc
+  zh: 674ca4b59deaf61e
+/agent-note-token-and-cache-disclosure-follows-compact-retry-settlements/alternatives-considered:
+  en: 3ddeb6cb9ad5c838
+  zh: 9556158153d85676
+/agent-note-token-and-cache-disclosure-follows-compact-retry-settlements/verification:
+  en: f9ab160c73121122
+  zh: 5daa7ed5d20d0329

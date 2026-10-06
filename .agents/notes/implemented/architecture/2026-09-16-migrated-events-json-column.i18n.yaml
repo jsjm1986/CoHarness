@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-16-migrated-events-json-column.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-16-migrated-events-json-column.md
-2026-09-16-migrated-events-json-column.md: cb66f1fb646206ecfafe87e2b6a11767dc58d4cb
-2026-09-16-migrated-events-json-column.zh.md: fa3cff1d97b4f204e221dfaa4019b08c5980b08a
+/agent-note-preserved-migration-bodies-stay-on-the-json-type:
+  en: 32aa3952440c13ea
+  zh: 063e5e48fe3164c2
+/agent-note-preserved-migration-bodies-stay-on-the-json-type/problem:
+  en: 2db3e9d3aa3b1a8f
+  zh: 8534cc02a145b815
+/agent-note-preserved-migration-bodies-stay-on-the-json-type/decision:
+  en: 5b87fee4794311a9
+  zh: 2ee32465ac320793
+/agent-note-preserved-migration-bodies-stay-on-the-json-type/alternatives-considered:
+  en: 7f68609a6c73afbc
+  zh: 0695aea859cdc92b
+/agent-note-preserved-migration-bodies-stay-on-the-json-type/consequences:
+  en: 897669ce576089a1
+  zh: 9807774b71d36865

@@ -21,6 +21,7 @@ Grants are `{ path, mode: 'ro' | 'rw' }` entries and may also carry a `label` (d
 | `read` | `file_path` | read |
 | `write`, `edit` | `file_path` | write |
 | `str_replace_editor` | `path` | `view` = read; `create`/`str_replace`/`insert` = write |
+| `grep`, `glob` | `path` (defaults to the session cwd; patterns and `include` filters stay with the search engine) | read |
 
 - **write** to a target not inside an `rw` grant → denied.
 - **read** of a target outside every grant → denied.

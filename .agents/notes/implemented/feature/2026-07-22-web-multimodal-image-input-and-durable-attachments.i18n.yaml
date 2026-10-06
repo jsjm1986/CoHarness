@@ -1,6 +1,73 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-22-web-multimodal-image-input-and-durable-attachments.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-22-web-multimodal-image-input-and-durable-attachments.md
-2026-07-22-web-multimodal-image-input-and-durable-attachments.md: c09adafa11285a0cb03ab1d264420dffc3c3fa49
-2026-07-22-web-multimodal-image-input-and-durable-attachments.zh.md: abbdc0ff4c765a9065bd76d24c96b6a0c9ed026c
+/agent-note-web-multimodal-image-input-and-durable-attachments:
+  en: ca760d16926e4fed
+  zh: f4f27acff31179bb
+/agent-note-web-multimodal-image-input-and-durable-attachments/problem:
+  en: 3ddd78fc39b2e111
+  zh: ed6aeea1df273826
+/agent-note-web-multimodal-image-input-and-durable-attachments/decision:
+  en: 32dc58a1f4419bb1
+  zh: 305c0844d85d1670
+/agent-note-web-multimodal-image-input-and-durable-attachments/decision/product-behavior:
+  en: 8013deaf54aba2f4
+  zh: ba803d144d131838
+/agent-note-web-multimodal-image-input-and-durable-attachments/decision/storage-lifecycle-and-ownership:
+  en: 26753f74d8f15118
+  zh: f51b63a76e5ba3a0
+/agent-note-web-multimodal-image-input-and-durable-attachments/decision/durable-content-and-prompt-wire:
+  en: 5062995f2a6bde05
+  zh: ab2cffdb5c6a78e2
+/agent-note-web-multimodal-image-input-and-durable-attachments/decision/model-capabilities-and-provider-behavior:
+  en: e15641b2f31f7ed6
+  zh: 8ea118e8af67b112
+/agent-note-web-multimodal-image-input-and-durable-attachments/decision/history-rendering-and-original-preview:
+  en: 0e645d7621e01369
+  zh: bdf13e1bf52daa4c
+/agent-note-web-multimodal-image-input-and-durable-attachments/decision/limits-and-trust-boundaries:
+  en: 3103026c75ea0994
+  zh: 3c351d2b441422c7
+/agent-note-web-multimodal-image-input-and-durable-attachments/decision/package-and-surface-changes:
+  en: 0ae29385202b9110
+  zh: 2f8a8670e96edee6
+/agent-note-web-multimodal-image-input-and-durable-attachments/decision/implementation:
+  en: 74de23b3cb733f75
+  zh: 0b9807585b332c4e
+/agent-note-web-multimodal-image-input-and-durable-attachments/alternatives-considered:
+  en: 6119e2aff3b6be5a
+  zh: 76136ef5249c23eb
+/agent-note-web-multimodal-image-input-and-durable-attachments/alternatives-considered/keep-every-intake-image-in-var-or-another-temporary-directory:
+  en: 55f1a50226d4c33b
+  zh: 6ae0415c2a86d80d
+/agent-note-web-multimodal-image-input-and-durable-attachments/alternatives-considered/persist-immediately-on-paste-or-drop:
+  en: 314c6d00f9e7e98f
+  zh: d86d415e799ac066
+/agent-note-web-multimodal-image-input-and-durable-attachments/alternatives-considered/inline-base64-in-messages-and-session-logs:
+  en: 39f97b15233d7f49
+  zh: b922ea685e0cb116
+/agent-note-web-multimodal-image-input-and-durable-attachments/alternatives-considered/use-browser-object-urls-local-paths-or-provider-urls-as-canonical-content:
+  en: 9be59a4608c52609
+  zh: 9a75926944ae3ce6
+/agent-note-web-multimodal-image-input-and-durable-attachments/alternatives-considered/use-one-generic-attachmentblock-for-images-files-audio-and-video:
+  en: 8eb0c4de98168cd0
+  zh: addec9810f83454e
+/agent-note-web-multimodal-image-input-and-durable-attachments/alternatives-considered/rely-on-ui-capability-checks-or-silently-filter-images:
+  en: f7a847aa158cbbb9
+  zh: dcf33305da2d4d8e
+/agent-note-web-multimodal-image-input-and-durable-attachments/alternatives-considered/add-a-generic-richcontent-service-above-the-core-content-vocabulary:
+  en: 249e082b37a0fed5
+  zh: acbf391fb68a85c3
+/agent-note-web-multimodal-image-input-and-durable-attachments/alternatives-considered/normalize-mcp-results-into-core-content-as-the-canonical-tool-value:
+  en: 663cc4e9a3ea563a
+  zh: c88a1fe298cd199f
+/agent-note-web-multimodal-image-input-and-durable-attachments/alternatives-considered/perform-attachment-reads-and-writes-inside-synchronous-output-renderers:
+  en: 96631bc0a23ded13
+  zh: 674cd9b989d47872
+/agent-note-web-multimodal-image-input-and-durable-attachments/testing:
+  en: b85b7914b31627df
+  zh: 6855a04ed906e821
+/agent-note-web-multimodal-image-input-and-durable-attachments/consequences:
+  en: 7ec5b88078702992
+  zh: 1acffe54f30daf41

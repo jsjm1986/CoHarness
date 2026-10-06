@@ -109,7 +109,6 @@ binding-global 与 error-class 名称是语言可移植的：必须匹配标识�
 
 -----
 
-<a id="model-experience"></a>
 ## 模型体验
 
 通过 `dsh-tools` 中的 PTC mode 与工作流适配器间接提供；它们通过各自的工具结果呈现程序结果。
@@ -118,6 +117,7 @@ binding-global 与 error-class 名称是语言可移植的：必须匹配标识�
 
 不会直接失效；由上述消费方负责请求前缀变更。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -147,3 +147,5 @@ binding-global 与 error-class 名称是语言可移植的：必须匹配标识�
 容器级后端将为代码与 shell 执行都提供硬性的多租户边界；除已知的 `isolation` 值外，暂无任何决定。
 
 </details>
+
+<a id="model-experience"></a>

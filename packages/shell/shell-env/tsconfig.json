@@ -15,6 +15,9 @@
       "path": "../../session/session-persistence"
     },
     {
+      "path": "../../boot/app-boot"
+    },
+    {
       "path": "../shell"
     },
     {

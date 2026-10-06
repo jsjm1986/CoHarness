@@ -38,7 +38,6 @@ export function messageSender(source: unknown): MessageSender | undefined {
  */
 export function isCollaborationAttributionNotice(source: unknown): boolean {
   const candidate = record(source)
-  return candidate?.kind === 'plugin'
-    && candidate.plugin === 'collaboration-context'
+  return candidate?.kind === 'collaboration-context'
     && candidate.form === 'notice'
 }

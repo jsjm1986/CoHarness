@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-creator-guidance-introduce-cue.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-10-creator-guidance-introduce-cue.md
-2026-08-10-creator-guidance-introduce-cue.md: 888fee7b3def585ed3098fedcb7bc6169ee26a22
-2026-08-10-creator-guidance-introduce-cue.zh.md: d80260abd1995df1f95e3f24fefcb265bda64c11
+/agent-note-creator-guidance-lands-as-an-introduce-cue-on-the-preset-chip:
+  en: f3c41fb17c7d8a0e
+  zh: 009f06a3f46a943b
+/agent-note-creator-guidance-lands-as-an-introduce-cue-on-the-preset-chip/problem:
+  en: 53edc762b3e04afa
+  zh: e6dd46e32a3984ca
+/agent-note-creator-guidance-lands-as-an-introduce-cue-on-the-preset-chip/decision:
+  en: 5da3b5b2524824c1
+  zh: 277e3e7ca08206e1
+/agent-note-creator-guidance-lands-as-an-introduce-cue-on-the-preset-chip/alternatives-considered:
+  en: b4378dcab0f6396a
+  zh: 0d4aef13b29f8159
+/agent-note-creator-guidance-lands-as-an-introduce-cue-on-the-preset-chip/consequences:
+  en: a2dfb110af45dd20
+  zh: eff61f21be7699f8
+/agent-note-creator-guidance-lands-as-an-introduce-cue-on-the-preset-chip/testing:
+  en: 9067baeaff70f2d0
+  zh: abd498f95666271a

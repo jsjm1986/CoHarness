@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import type { GeneralSectionComponentProps } from '../src/client/GeneralSection.tsx'
 import { GeneralSection } from '../src/client/GeneralSection.tsx'
 import { CloseLabel, HeaderContent, TriggerContent } from '../src/client/chrome.tsx'
 import type { TriggerContentProps } from '../src/client/chrome.tsx'
 import { SettingsDocumentAction } from '../src/client/SettingsDocumentAction.tsx'
+import { DeveloperToolsRow } from '../src/client/DeveloperToolsRow.tsx'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { SettingsDocumentStore } from '../src/client/settings-document-store.ts'
 
@@ -25,7 +27,7 @@ const t: TriggerContentProps['t'] = key => (en as Record<string, string>)[key] ?
 
 // Global standard kit stubs: none of these components consume the hooks.
 const unusedHook = (() => { throw new Error('unused by settings-general components') }) as never
-const kit = { useSessions: unusedHook, useWorkspaces: unusedHook }
+const kit = { useSessions: unusedHook, useWorkspaces: unusedHook, usePanelInfo: unusedHook }
 
 describe('chrome content', () => {
   it('TriggerContent renders the icon with the label in the wide column', () => {
@@ -62,6 +64,46 @@ describe('GeneralSection', () => {
     const { renderSlot } = mount()
     expect(renderSlot).toHaveBeenCalledWith('settings.general.item', {})
     expect(screen.getByTestId('slot-settings.general.item')).toBeTruthy()
+  })
+})
+
+describe('DeveloperToolsRow', () => {
+  function mount(enabled: boolean, setEnabled = vi.fn(async (_next: boolean) => {})) {
+    const store = createSnapshotStore(enabled)
+    const view = render(<DeveloperToolsRow {...{
+      ...kit,
+      useDeveloperTools: bindSnapshotSelector(store),
+      setEnabled,
+      t,
+    }} />)
+    return { view, store, setEnabled }
+  }
+
+  it('mirrors the accepted value and saves a flip through the shared writer', async () => {
+    const { store, setEnabled } = mount(true)
+    const toggle = screen.getByRole('switch')
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+
+    fireEvent.click(toggle)
+    expect(setEnabled).toHaveBeenCalledWith(false)
+    await waitFor(() => { expect(toggle).toHaveProperty('disabled', false) })
+
+    // An external accepted change moves the switch.
+    act(() => { store.set(false) })
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('reports a refused save and clears on the next attempt', async () => {
+    const setEnabled = vi.fn(async (_next: boolean): Promise<void> => { throw new Error('conflict') })
+    mount(false, setEnabled)
+    const toggle = screen.getByRole('switch')
+
+    fireEvent.click(toggle)
+    await waitFor(() => { expect(screen.getByRole('alert').textContent).toBe(en['developerTools.error']) })
+
+    setEnabled.mockImplementation(async () => {})
+    fireEvent.click(toggle)
+    await waitFor(() => { expect(screen.queryByRole('alert')).toBeNull() })
   })
 })
 

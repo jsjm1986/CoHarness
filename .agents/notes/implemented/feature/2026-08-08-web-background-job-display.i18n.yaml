@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-web-background-job-display.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-08-web-background-job-display.md
-2026-08-08-web-background-job-display.md: 25352ec4f137f0f40c04c90c5c578dcd73eb4e71
-2026-08-08-web-background-job-display.zh.md: f540c65b51a9d23e2f7d286e74cb5cec7356acf7
+/agent-note-web-background-job-display:
+  en: 0d0404b9cce14367
+  zh: 2dbf18965256c53f
+/agent-note-web-background-job-display/problem:
+  en: 41ddca92193cbbf1
+  zh: ec8f39ad20044d1c
+/agent-note-web-background-job-display/decision:
+  en: a89f75fd656589a6
+  zh: 087ea0e33db5e93d
+/agent-note-web-background-job-display/decision/wire-shape:
+  en: 4544200594ed9e40
+  zh: 5691603aa2ee639c
+/agent-note-web-background-job-display/decision/the-task-registry-change-feed:
+  en: 1a0d8a5c542638d1
+  zh: 7305522b089ac1df
+/agent-note-web-background-job-display/decision/the-api-proxy-carrier:
+  en: 7dab7a9e03ae225a
+  zh: 8de954cf3de299c9
+/agent-note-web-background-job-display/decision/the-client-mirror:
+  en: a2d13b1ad2654c81
+  zh: bc39f9b75e75d81c
+/agent-note-web-background-job-display/decision/the-header-action:
+  en: c6a11dd82eb9d1ee
+  zh: 5a7c33902e67e9e1
+/agent-note-web-background-job-display/decision/what-this-deliberately-does-not-do:
+  en: 95487f025a6ef8ae
+  zh: e046cf7d8ed5b6c2
+/agent-note-web-background-job-display/alternatives-considered:
+  en: b209cc4487299237
+  zh: 944708f64c077585
+/agent-note-web-background-job-display/testing:
+  en: 587344a3ec743875
+  zh: edf910fcd3cfc209
+/agent-note-web-background-job-display/consequences:
+  en: 10ea1a1a2b17f28f
+  zh: a85ea6ed6c745d71

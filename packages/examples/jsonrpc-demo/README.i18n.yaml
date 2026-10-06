@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/examples/jsonrpc-demo/README.md
-README.md: ad8b21d564c6ef6a1d5c00cc84eb75c29c66a707
-README.zh.md: 9495d2f6841d2dcd4806957f6e19433077f43377
+/:
+  en: 5124efa9956cd8a3
+  zh: 61495d48365178df
+/deepseek-ai-dsh-sdk-jsonrpc-demo:
+  en: 7b82069ed80f79ed
+  zh: cf8c552b5c37306b
+/deepseek-ai-dsh-sdk-jsonrpc-demo/summary:
+  en: cbff42cd7ac6d12f
+  zh: 299f6f7f810de53f
+/deepseek-ai-dsh-sdk-jsonrpc-demo/table-of-contents:
+  en: e60e03005fe4c649
+  zh: 519e4c972c4e84ad
+/deepseek-ai-dsh-sdk-jsonrpc-demo/config-discovery:
+  en: 635fac65345edb39
+  zh: fc170ecaf6530863
+/deepseek-ai-dsh-sdk-jsonrpc-demo/exit-lifecycle:
+  en: f0fe29621735e428
+  zh: 9b28594a4d05735f
+/deepseek-ai-dsh-sdk-jsonrpc-demo/stdout-is-the-protocol:
+  en: b57042233a483bdf
+  zh: d499d15e38323a28
+/deepseek-ai-dsh-sdk-jsonrpc-demo/invariants:
+  en: e4c10126bf48094e
+  zh: 2d52e0bf1b32db69
+/deepseek-ai-dsh-sdk-jsonrpc-demo/model-experience:
+  en: 7d6722140441fc99
+  zh: 4f30cf3a8eecdb68
+/deepseek-ai-dsh-sdk-jsonrpc-demo/model-experience/kv-cache-effect:
+  en: c62adaa305f773bb
+  zh: c7fd22d72743a759
+/deepseek-ai-dsh-sdk-jsonrpc-demo/known-limitations-and-deferred-work:
+  en: d784116e487bcd33
+  zh: a8cfd3d4f08ca059
+/deepseek-ai-dsh-sdk-jsonrpc-demo/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

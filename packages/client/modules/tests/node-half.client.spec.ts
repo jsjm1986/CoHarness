@@ -17,8 +17,9 @@ import type { ClientModuleLoaderTarget, WebBootEntry, WebBootGraph } from '../sr
 const MODULES_ID = '@deepseek-ai/dsh-client-modules'
 const UI_RENDERER_ID = '@deepseek-ai/dsh-client-ui-renderer'
 
-const comboUrl = (ids: readonly string[], rev: string): string =>
+const comboPath = (ids: readonly string[], rev: string): string =>
   `/plugins/??${ids.map(id => `${id}/client.js`).join(',')}&rev=${rev}`
+const comboUrl = (ids: readonly string[], rev: string): string => comboPath(ids, rev).slice(1)
 const mapUrl = (url: string): string => url.replace(/\/client\.js(?=,|&rev=)/g, '/client.js.map')
 const chunkUrl = (id: string, fileName: string, rev: string): string => `/plugins/${id}/${fileName}?rev=${rev}`
 const BOOTSTRAP_URL = comboUrl([MODULES_ID], 'boot')
@@ -162,7 +163,8 @@ async function routeRequest(route: Promise<WebRoute>, url: string, method = 'GET
       return response
     },
   } as unknown as ServerResponse
-  await (await route).handler({ method, url } as IncomingMessage, response)
+  const resolved = new URL(url, 'http://localhost/')
+  await (await route).handler({ method, url: `${resolved.pathname}${resolved.search}` } as IncomingMessage, response)
   return { status, headers, body }
 }
 
@@ -499,8 +501,8 @@ describe('client bundle activation', () => {
     writeFileSync(`${clientPath}.map`, '{')
     const torn = constructWithRoute([packageName])
     const tornRow = torn.service.graph().entries[0]!
-    expect((await routeRequest(torn.route, tornRow.url)).body.toString('utf8'))
-      .toContain(`sourceMappingURL=${mapUrl(tornRow.url)}`)
+    const tornScript = (await routeRequest(torn.route, tornRow.url)).body.toString('utf8')
+    expect(tornScript).toContain(`sourceMappingURL=${mapUrl(tornRow.url).slice('plugins/'.length)}`)
     const fallback = await routeRequest(torn.route, mapUrl(torn.service.graph().batches[0]!.url))
     expect(JSON.parse(fallback.body.toString('utf8'))).toMatchObject({
       sections: [{ map: { sources: [`/plugins/${packageName}/client.js`] } }],
@@ -611,7 +613,7 @@ describe('client bundle activation', () => {
     const batch = service.graph().batches[0]!
     const script = (await routeRequest(route, batch.url)).body.toString('utf8')
     expect(script).not.toContain('//# sourceURL=')
-    expect(script).toContain(`//# sourceMappingURL=${mapUrl(batch.url)}`)
+    expect(script).toContain(`//# sourceMappingURL=${mapUrl(batch.url).slice('plugins/'.length)}`)
     const payload = JSON.parse((await routeRequest(route, mapUrl(batch.url))).body.toString('utf8')) as {
       sections: { map: { mappings: string; sources: string[]; sourcesContent: string[] } }[]
     }
@@ -716,7 +718,7 @@ describe('client bundle activation', () => {
     }
     for (let index = 0; index < batches.length - 1; index += 1) {
       const entries = [...batches[index]!.entries, batches[index + 1]!.entries[0]!]
-      expect(Buffer.byteLength(mapUrl(comboUrl(entries, '0'.repeat(12))))).toBeGreaterThan(3 * 1024)
+      expect(Buffer.byteLength(mapUrl(comboPath(entries, '0'.repeat(12))))).toBeGreaterThan(3 * 1024)
     }
   })
 
@@ -730,7 +732,7 @@ describe('client bundle activation', () => {
     const { service, route } = constructWithRoute([packageName])
     const row = service.graph().entries[0]!
     const singleScript = await routeRequest(route, row.url)
-    expect(singleScript.body.toString('utf8')).toContain(`sourceMappingURL=${mapUrl(row.url)}`)
+    expect(singleScript.body.toString('utf8')).toContain(`sourceMappingURL=${mapUrl(row.url).slice('plugins/'.length)}`)
     const singleMap = await routeRequest(route, mapUrl(row.url))
     expect(singleMap.status).toBe(200)
     expect(singleMap.headers).toEqual({
@@ -754,8 +756,8 @@ describe('client bundle activation', () => {
     const batchScript = await routeRequest(route, batch.url)
     expect(batchScript.status).toBe(200)
     expect(batchScript.headers?.['cache-control']).toBe('public, max-age=31536000, immutable')
-    expect(batchScript.body.toString('utf8')).toContain(`//# sourceMappingURL=${mapUrl(batch.url)}`)
-    const shellResponse = await service.fetchBundle(new Request(`dsh-app://app${batch.url}`))
+    expect(batchScript.body.toString('utf8')).toContain(`//# sourceMappingURL=${mapUrl(batch.url).slice('plugins/'.length)}`)
+    const shellResponse = await service.fetchBundle(new Request(new URL(batch.url, 'dsh-app://app/')))
     expect(shellResponse.status).toBe(200)
     expect(shellResponse.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
     expect(await shellResponse.text()).toBe(batchScript.body.toString('utf8'))
@@ -788,6 +790,41 @@ describe('client bundle activation', () => {
     })
   })
 
+  it('emits document-relative references whose trailers resolve under the document base', async () => {
+    const packageName = '@fixture/relative-refs'
+    const clientPath = writePackage(packageName)
+    const chunkName = 'client.lazy.js'
+    mkdirSync(dirname(clientPath), { recursive: true })
+    writeFileSync(clientPath, 'module.exports = { load: () => require.async("./client.lazy.js") }\n')
+    writeFileSync(join(dirname(clientPath), chunkName), 'module.exports = {}\n')
+    const { service, route } = constructWithRoute([packageName])
+    const graph = service.graph()
+    const references = [...graph.entries.map(row => row.url), ...graph.batches.map(batch => batch.url)]
+    for (const reference of references) {
+      expect(reference).not.toMatch(/^\//)
+    }
+
+    const script = (await routeRequest(route, graph.batches[0]!.url)).body.toString('utf8')
+    const trailer = /sourceMappingURL=(\S+)/.exec(script)?.[1]
+    for (const base of ['http://example.test/', 'http://example.test/mount/', 'http://example.test/mount/index.html']) {
+      const scriptUrl = new URL(graph.batches[0]!.url, base)
+      expect(trailer).toBeDefined()
+      const mapUrlResolved = new URL(trailer!, scriptUrl)
+      expect(mapUrlResolved.href).toBe(new URL(mapUrl(graph.batches[0]!.url), base).href)
+      expect(mapUrlResolved.pathname).toBe(scriptUrl.pathname)
+    }
+
+    const row = graph.entries[0]!
+    const chunkRequestUrl = chunkUrl(packageName, chunkName, row.rev)
+    const chunkScript = (await routeRequest(route, chunkRequestUrl)).body.toString('utf8')
+    const chunkTrailer = /sourceMappingURL=(\S+)/.exec(chunkScript)?.[1]
+    expect(chunkTrailer).toBe(`${chunkName}.map?rev=${row.rev}`)
+    for (const base of ['http://example.test/mount/', 'http://example.test/mount/index.html']) {
+      const chunkUrlResolved = new URL(chunkRequestUrl.slice(1), base)
+      expect(new URL(chunkTrailer!, chunkUrlResolved).href).toBe(new URL(chunkUrl(packageName, chunkName, row.rev).replace('.js?', '.js.map?').slice(1), base).href)
+    }
+  })
+
   it('serves a package-local chunk only after its versioned URL is requested', async () => {
     const packageName = '@fixture/chunked'
     const clientPath = writePackage(packageName)
@@ -810,7 +847,7 @@ describe('client bundle activation', () => {
     const chunk = await routeRequest(route, url)
     expect(chunk.status).toBe(200)
     expect(chunk.body.toString('utf8')).toContain('terminal loaded')
-    expect(chunk.body.toString('utf8')).toContain(`sourceMappingURL=${url.replace('.js?', '.js.map?')}`)
+    expect(chunk.body.toString('utf8')).toContain(`sourceMappingURL=client.terminal.js.map?rev=${row.rev}`)
     expect((await routeRequest(route, url.replace('.js?', '.js.map?'))).status).toBe(200)
     expect((await routeRequest(route, url.replace(`rev=${row.rev}`, 'rev=stale'))).status).toBe(404)
   })
@@ -935,7 +972,7 @@ describe('shared module declarations', () => {
     writeBuiltPackage(packageName, { external: ['react'] })
     expect(construct([packageName]).graph().entries).toEqual([{
       id: packageName,
-      url: expect.stringContaining(`/plugins/??${packageName}/client.js&rev=`) as unknown as string,
+      url: expect.stringContaining(`plugins/??${packageName}/client.js&rev=`) as unknown as string,
       rev: expect.any(String) as unknown as string,
       external: ['react'],
     }])

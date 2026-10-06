@@ -11,7 +11,7 @@ import { AuditService } from '../src/audit.ts'
 import { DesktopCoordinator, SqliteDesktopCoordinatorRepository } from '../src/desktop-coordinator.ts'
 import { AuthService } from '../src/auth.ts'
 import { CollaborationDeniedError } from '../src/collaboration.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager, type RuntimeTargetInput } from '../src/instances.ts'
 import { ModelGovernanceService } from '../src/model-governance.ts'
@@ -55,7 +55,7 @@ async function setup(
 ) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects') })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects') })
   const instances = new InstanceManager(db, cfg)
   const stoppedTargets: RuntimeTargetInput[] = []
   const stop = instances.stop.bind(instances)
@@ -110,6 +110,35 @@ async function setup(
 }
 
 describe('admin JSON API', () => {
+  it('rejects an invalid organization provider id before invoking the storage service', async () => {
+    const { deps, base, cookie } = await setup()
+    const upsertProvider = vi.fn(async () => {})
+    Object.assign(deps.governance!, { upsertProvider })
+    const response = await fetch(`${base}/admin/api/model-providers`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'invalid-prefix', displayName: 'Invalid', driver: 'pi-ai',
+        protocol: 'openai-completions', baseURL: 'https://example.com/v1', authMode: 'none', status: 'disabled' }),
+    })
+    expect(response.status).toBe(400)
+    expect((await response.json() as { error: string }).error).toContain('org- prefix')
+    expect(upsertProvider).not.toHaveBeenCalled()
+  })
+
+  it('rejects a provider profile carried on the row route before invoking the storage service', async () => {
+    const { deps, base, cookie } = await setup()
+    const upsertProvider = vi.fn(async () => {})
+    Object.assign(deps.governance!, { upsertProvider })
+    const response = await fetch(`${base}/admin/api/model-providers`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'org-primary', displayName: 'Primary', driver: 'pi-ai',
+        protocol: 'openai-completions', baseURL: 'https://example.com/v1', authMode: 'none', status: 'draft',
+        profile: { models: [{ id: 'chat' }] } }),
+    })
+    expect(response.status).toBe(400)
+    expect((await response.json() as { error: string }).error).toContain('model-settings')
+    expect(upsertProvider).not.toHaveBeenCalled()
+  })
+
   it('restricts bounded webhook delivery diagnostics to authenticated administrators', async () => {
     const { deps, base, cookie } = await setup()
     const url = `${base}/admin/api/webhook-deliveries?endpointId=70ee10ba-3cb9-4e4f-91dd-03606a5527cb&limit=10`
@@ -243,6 +272,7 @@ describe('admin JSON API', () => {
     const archives = {
       adminList: async () => [row],
       detail: async () => detail,
+      status: async (id: string) => id === row.rootSessionId ? { ...row, syncState: 'conflict', lastSyncError: 'Stop active resources first' } : null,
       setState: async (id: string, state: 'archived' | 'trash') => { calls.push(`${state}:${id}`); return { ...row, state } },
       purge: async (id: string) => { calls.push(`purge:${id}`); return true },
     } as unknown as GatewayDeps['archives']
@@ -253,6 +283,11 @@ describe('admin JSON API', () => {
     const read = await fetch(`${base}/admin/api/archives/${row.rootSessionId}`, { headers: { cookie } })
     expect(read.status).toBe(200)
     expect(await read.json()).toEqual(detail)
+    const status = await fetch(`${base}/admin/api/archives/${row.rootSessionId}/status`, { headers: { cookie } })
+    expect(status.status).toBe(200)
+    expect(await status.json()).toMatchObject({ syncState: 'conflict', lastSyncError: 'Stop active resources first' })
+    expect((await fetch(`${base}/admin/api/archives/missing/status`, { headers: { cookie } })).status).toBe(404)
+    expect((await fetch(`${base}/admin/api/archives/${row.rootSessionId}/status`)).status).toBe(401)
     const action = await fetch(`${base}/admin/api/archives/actions`, {
       method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
       body: JSON.stringify({ action: 'restore', ids: [row.rootSessionId], idempotencyKey: 'archive-test' }),
@@ -465,6 +500,99 @@ describe('admin JSON API', () => {
     expect(await deps.users.getById(admin.id)).not.toBeNull()
   })
 
+  it('returns one user and lists its stored project memberships', async () => {
+    const { base, cookie, member, admin, deps } = await setup()
+    const detail = await fetch(`${base}/admin/api/users/${member.id}`, { headers: { cookie } })
+    expect(detail.status).toBe(200)
+    const detailBody = await detail.json()
+    expect(detailBody).toMatchObject({ id: member.id, username: 'worker' })
+    const listRow = (await deps.users.list()).find(user => user.id === member.id)
+    expect(detailBody.port).toBe(listRow?.port)
+    expect(typeof detailBody.port).toBe('number')
+    expect(detailBody.instanceState).toBe(listRow?.instanceState)
+    expect(typeof detailBody.instanceState).toBe('string')
+    expect((await fetch(`${base}/admin/api/users/99999`, { headers: { cookie } })).status).toBe(404)
+
+    const empty = await fetch(`${base}/admin/api/users/${member.id}/memberships`, { headers: { cookie } })
+    expect(empty.status).toBe(200)
+    expect(await empty.json()).toEqual({ memberships: [] })
+
+    const project = await deps.projects.createManaged!({ name: 'owned', ownerUserId: admin.id })
+    await deps.projects.setMember(project.id, member.id, 'ro')
+    const listed = await fetch(`${base}/admin/api/users/${member.id}/memberships`, { headers: { cookie } })
+    expect(await listed.json()).toEqual({
+      memberships: [expect.objectContaining({ projectId: project.id, name: 'owned', mode: 'ro' })],
+    })
+    expect((await fetch(`${base}/admin/api/users/99999/memberships`, { headers: { cookie } })).status).toBe(404)
+  })
+
+  it('reads the stored per-user quota and rejects missing subjects', async () => {
+    const { base, cookie, member } = await setup()
+    const initial = await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=${member.id}`, { headers: { cookie } })
+    expect(initial.status).toBe(200)
+    expect(await initial.json()).toEqual({
+      tokenMode: 'inherit', tokenLimit: null,
+      companyCostMode: 'inherit', companyCostMicrosLimit: null,
+    })
+
+    const write = await fetch(`${base}/admin/api/quotas`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        subjectType: 'user', subjectId: String(member.id),
+        tokenLimit: 5000, companyCostMicrosLimit: null,
+      }),
+    })
+    expect(write.status).toBe(204)
+    const stored = await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=${member.id}`, { headers: { cookie } })
+    expect(await stored.json()).toEqual({
+      tokenMode: 'custom', tokenLimit: 5000,
+      companyCostMode: 'unlimited', companyCostMicrosLimit: null,
+    })
+
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=99999`, { headers: { cookie } })).status).toBe(404)
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=project&subjectId=1`, { headers: { cookie } })).status).toBe(400)
+  })
+
+  it('reads stored role quotas and rejects malformed role subjects', async () => {
+    const { base, cookie } = await setup()
+    const initial = await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=user`, { headers: { cookie } })
+    expect(initial.status).toBe(200)
+    expect(await initial.json()).toEqual({ tokenLimit: null, companyCostMicrosLimit: null })
+
+    const write = await fetch(`${base}/admin/api/quotas`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        subjectType: 'role', subjectId: 'user',
+        tokenLimit: 0, companyCostMicrosLimit: 2_500_000,
+      }),
+    })
+    expect(write.status).toBe(204)
+    const stored = await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=user`, { headers: { cookie } })
+    expect(await stored.json()).toEqual({ tokenLimit: 0, companyCostMicrosLimit: 2_500_000 })
+    expect(await (await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=admin`, { headers: { cookie } })).json())
+      .toEqual({ tokenLimit: null, companyCostMicrosLimit: null })
+
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=owner`, { headers: { cookie } })).status).toBe(400)
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=role`, { headers: { cookie } })).status).toBe(400)
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=project&subjectId=1`, { headers: { cookie } })).status).toBe(400)
+    const memberCookie = await login(base, 'worker', 'pw-12345678')
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=user`, { headers: { cookie: memberCookie } })).status).toBe(403)
+    expect((await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=user`)).status).toBe(401)
+  })
+
+  it('answers 503 when the role quota read is unavailable', async () => {
+    const { base, cookie, deps } = await setup()
+    const service = deps.governance as { roleQuota?: unknown }
+    const original = service.roleQuota
+    Object.assign(service, { roleQuota: undefined })
+    try {
+      expect((await fetch(`${base}/admin/api/quotas?subjectType=role&subjectId=user`, { headers: { cookie } })).status).toBe(503)
+      expect((await fetch(`${base}/admin/api/quotas?subjectType=user&subjectId=99999`, { headers: { cookie } })).status).toBe(404)
+    } finally {
+      Object.assign(service, { roleQuota: original })
+    }
+  })
+
   it('returns JSON { error: "origin not allowed" } for /admin/api CSRF failures', async () => {
     const { base, cookie } = await setup()
     const res = await fetch(`${base}/admin/api/users`, {
@@ -567,6 +695,19 @@ describe('admin JSON API', () => {
     expect(rows.every(r => r.detail === undefined)).toBe(true)
   })
 
+  it('returns safe audit targets and revisions while withholding secrets and raw details', async () => {
+    const { base, cookie, deps, admin } = await setup()
+    await deps.audit.write({ userId: admin.id, action: 'admin.ssh-targets.update', status: 200,
+      detail: JSON.stringify({ targetId: 17, revision: '9', name: 'private-name', password: 'fixture-secret', fields: { token: 'private' } }) })
+    const res = await fetch(`${base}/admin/api/audit?action=admin.ssh-targets.update`, { headers: { cookie } })
+    expect(res.status).toBe(200)
+    const rows = await res.json() as Array<Record<string, unknown>>
+    expect(rows[0]).toMatchObject({ outcome: 'success', metadata: { targetId: 17, revision: '9' } })
+    expect(rows[0]).not.toHaveProperty('detail')
+    expect(JSON.stringify(rows)).not.toContain('fixture-secret')
+    expect(JSON.stringify(rows)).not.toContain('private-name')
+  })
+
   it('rewrites grants on member write and on project delete', async () => {
     const { base, cookie, root, member, stoppedTargets } = await setup()
     const shared = join(root, 'shared'); mkdirSync(shared)
@@ -657,7 +798,7 @@ describe('admin JSON API', () => {
 })
 
 describe('admin desktop coordination API', () => {
-  it.each(['desktop', 'terminal'] as const)('restricts %s qualification reads and writes to administrators with request protection', async (resource) => {
+  it.each(['desktop', 'terminal', 'plugin'] as const)('restricts %s qualification reads and writes to administrators with request protection', async (resource) => {
     const { base, cookie, deps } = await setup()
     const get = vi.fn(async () => ({ kind: 'user' as const, id: 1, enabled: false, revision: '0' }))
     const set = vi.fn(async () => ({ kind: 'user' as const, id: 1, enabled: true, revision: '1' }))
@@ -757,6 +898,104 @@ describe('admin desktop coordination API', () => {
     const list = await fetch(`${base}/admin/api/desktops`, { headers: { cookie } })
     expect(list.status).toBe(503)
   })
+
+  it('rejects malformed query ids before any service lookup and keeps 404 for valid missing ids', async () => {
+    const { deps, base, cookie, admin, member } = await setup()
+    const userLookups = vi.spyOn(deps.users, 'getById')
+    const projectLookups = vi.spyOn(deps.projects, 'getById')
+    try {
+      const malformed = [
+        '/admin/api/model-access',
+        '/admin/api/model-access?userId=',
+        '/admin/api/model-access?userId=abc',
+        '/admin/api/model-access?userId=1.5',
+        '/admin/api/model-access?userId=0',
+        '/admin/api/model-access?userId=-3',
+        '/admin/api/model-access?userId=Infinity',
+        '/admin/api/model-access?userId=9007199254740993',
+        '/admin/api/project-model-access?projectId=abc',
+        '/admin/api/project-model-access?projectId=2.5',
+        '/admin/api/project-model-access?projectId=0',
+        '/admin/api/usage?userId=abc',
+        '/admin/api/usage?userId=1e3',
+        '/admin/api/usage?projectId=xyz',
+        '/admin/api/usage?projectId=-1',
+      ]
+      for (const path of malformed) {
+        const response = await fetch(`${base}${path}`, { headers: { cookie } })
+        expect(response.status, path).toBe(400)
+      }
+      const invalidLookups = [...userLookups.mock.calls, ...projectLookups.mock.calls]
+        .map(([id]) => id)
+        .filter(id => typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0
+          || (id !== admin.id && id !== member.id))
+      expect(invalidLookups).toEqual([])
+
+      expect((await fetch(`${base}/admin/api/model-access?userId=424242`, { headers: { cookie } })).status).toBe(404)
+      expect((await fetch(`${base}/admin/api/project-model-access?projectId=424242`, { headers: { cookie } })).status).toBe(404)
+      expect((await fetch(`${base}/admin/api/usage?userId=424242`, { headers: { cookie } })).status).toBe(404)
+      expect((await fetch(`${base}/admin/api/usage?projectId=424242`, { headers: { cookie } })).status).toBe(404)
+    } finally {
+      userLookups.mockRestore()
+      projectLookups.mockRestore()
+    }
+  })
+
+  it('keeps a committed membership change when the runtime restart is audited and fails', async () => {
+    const { deps, base, cookie, admin, member, root } = await setup()
+    const shared = join(root, 'shared-restart')
+    mkdirSync(shared)
+    const created = await fetch(`${base}/admin/api/projects`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Restart', path: shared }),
+    })
+    const project = await created.json() as { id: number }
+    // The runtime looks ready but refuses to come back up after the policy write.
+    deps.instances.stateOf = async () => 'ready'
+    deps.instances.ensureRunning = async () => { throw new Error('supervisor refused') }
+    const res = await fetch(`${base}/admin/api/projects/${project.id}/members/${member.id}`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'rw' }),
+    })
+    expect(res.status).toBe(204)
+    const events = await deps.audit.query({ action: 'admin.instances.restart-failed' })
+    expect(events).toHaveLength(1)
+    expect((await deps.projects.membershipsFor?.(member.id))?.some(row => row.projectId === project.id)).toBe(true)
+  })
+
+  it('does not let an unrelated restart-failed event hide a grants-file failure', async () => {
+    const { deps, base, cookie, admin, member, root } = await setup()
+    const shared = join(root, 'shared-grants')
+    mkdirSync(shared)
+    const created = await fetch(`${base}/admin/api/projects`, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Grants', path: shared }),
+    })
+    const project = await created.json() as { id: number }
+    expect((await fetch(`${base}/admin/api/projects/${project.id}/members/${member.id}`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'ro' }),
+    })).status).toBe(204)
+    const grantsPath = join(root, 'users', 'worker', 'dsh', 'directory-grants.json')
+    unlinkSync(grantsPath)
+    mkdirSync(grantsPath)
+    // An unrelated restart-failed row lands inside the same apply window; the
+    // grants-file failure must still surface instead of being suppressed.
+    const getById = deps.users.getById.bind(deps.users)
+    let lookups = 0
+    deps.users.getById = async (id: number) => {
+      lookups += 1
+      if (lookups === 2) {
+        await deps.audit.write({ userId: admin.id, action: 'admin.instances.restart-failed', detail: '{"userId":99}' })
+      }
+      return getById(id)
+    }
+    const res = await fetch(`${base}/admin/api/projects/${project.id}/members/${member.id}`, {
+      method: 'PUT', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'rw' }),
+    })
+    expect(res.status).toBe(400)
+  })
 })
 
 it('admin plugin routes preserve target identity, stream bytes and deny ordinary users', async () => {
@@ -769,7 +1008,7 @@ it('admin plugin routes preserve target identity, stream bytes and deny ordinary
   deps.pluginManagement = { target, async *invoke(admin, input, signal) {
     expect(admin.role).toBe('admin'); expect(signal.aborted).toBe(false); invoked.push(input)
     yield bytes
-  } }
+  }, async state() { throw new Error('not wired in this test') }, async saveState() { throw new Error('not wired in this test') } }
   const bound = await fetch(`${base}/admin/api/plugins/target?kind=user&id=3`, { headers: { cookie } })
   expect(await bound.json()).toEqual(binding)
   const response = await fetch(`${base}/admin/api/plugins/invoke`, { method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' }, body: JSON.stringify(invocation) })

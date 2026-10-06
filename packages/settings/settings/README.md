@@ -1,3 +1,8 @@
+---
+description: "Abstract user-settings seam (ctx.settings) for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-settings
 
 English | [中文](README.zh.md)
@@ -8,11 +13,23 @@ User-settings Service Definition (`ctx.settings`). One provider holds a raw docu
 
 Use this package when users must change a plugin's configuration at runtime without restarting or rereading `cordis.yml`. Each namespace combines schema defaults, deployment configuration, and user overrides; readers receive a deep-frozen resolved snapshot and can observe committed changes. Writes affect only user overrides, are serialized per namespace, and may reject stale revisions instead of overwriting newer changes. Durable runtime edits require configured settings storage; without it, the plugin continues with its composed configuration.
 
+## Table of Contents
+
+- [Service API](#service-api)
+- [Provider contract](#provider-contract)
+- [Events](#events)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="service-api"></a>
 ## Service API
 
 - `documentPath` — absolute path of the provider's user-editable file when it has one; non-file providers leave it `undefined`. Host configuration adapters derive availability from it, while browser protocols expose only a boolean capability and never a filesystem target.
 - `prepareDocument()` — return that path after making the document ready for a native editor. The base implementation returns `documentPath`; a file provider may materialize an absent document first.
-- `register(ns, schema, { base?, applies? })` — returns the owner `SettingsScope` (`get`/`watch`/`update`). The registration is an effect on the calling plugin's fiber: disposing that fiber removes the namespace and its observers. A stored section the schema rejects fails the registration itself; a duplicate namespace fails loud.
+- `register(ns, schema, { base?, applies?, label? })` — returns the owner `SettingsScope` (`get`/`watch`/`update`). The registration is an effect on the calling plugin's fiber: disposing that fiber removes the namespace and its observers. A stored section the schema rejects fails the registration itself; a duplicate namespace fails loud. `label` is an optional localized display title (`LocalizedText`) that reaches `describe()` for surfaces which title the namespace outside the registrant's own UI; absent it, they fall back to the namespace key.
 
 - `authorizeWrite(value)` is an optional registration hook for live authorization. It receives the immutable resolved candidate at the front of the write queue and must settle before persistence. Refusal, owner/service disposal during authorization, or a concurrent external revision change leaves storage untouched. Boot, registration, and provider reload use only synchronous schema and `validate` checks.
 - `describe(options?)` — one descriptor per namespace (`schema.toJSON()` envelope, resolved value, detached `base`/`user` layers, `applies`) for configuration surfaces; a field's presence in `user` is what marks it user-overridden. `describe({ redactSecrets: true })` strips `role('secret')` fields from every layer, removes defaults from schema nodes that can contain them, and adds the `secrets` slot list (`{ path, set }`); every wire surface MUST pass it, and the pure `redactSecrets(schema, value)` and `redactSchemaDefaults(schema)` helpers are exported for other wires.
@@ -24,10 +41,12 @@ Use this package when users must change a plugin's configuration at runtime with
 - Resolved values are deep-frozen snapshots. Watchers receive `(next, prev)` after each commit: invocations of one callback run asynchronously, one at a time, in commit order (a slow stale invocation can never apply after a newer one), and failures — sync throws and async rejections alike — are contained. After a watch disposer returns, no further invocation starts (one already queued is skipped); an invocation already started still settles. The `settings/updated` event fans out one listener at a time, so one throwing listener cannot starve the rest; an async listener's rejection is contained and logged, which is why `INVARIANT`-coded failures rethrow only from synchronous listeners.
 - Service teardown refuses new writes and watcher starts, then drains every queued write and every started watcher invocation before disposal completes; a write already handed to persistence still reaches storage after its registrant unloads but commits and notifies nobody; an authorization-pending write is refused before storage.
 
+<a id="provider-contract"></a>
 ## Provider contract
 
 Subclasses implement `writable`, `load()`, and `persist(ns, section)`, optionally override `documentPath` and `prepareDocument()` for one local user-editable file, and push externally observed documents through the protected `publish(doc)`. The base service init loads and publishes the document once before the service becomes injectable; a provider with its own init (watcher, connection) delegates first via `yield* super[Service.init]()`. At publish, each registered namespace re-resolves independently: an invalid section keeps that namespace's last good value and warns — a live reload never takes the process down — while boot-time and registration-time validation fail loud.
 
+<a id="events"></a>
 ## Events
 
 `settings/updated (ns, next, prev, source)` fires after each commit; `source` is `update` (in-process write) or `provider` (external change). It never fires for a deep-equal resolved value — it is the consumer-facing event, and a consumer only cares that its value moved.
@@ -36,6 +55,7 @@ Subclasses implement `writable`, `load()`, and `persist(ns, section)`, optionall
 
 Both declarations live in the client-safe `./types` subpath export, together with the `SettingsNamespace` and `SettingsUpdateSource` types their signatures name; the package root re-exports those types. A consumer outside the Host compilation face therefore reads the very signature the Host emits instead of restating it.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through consumer plugins, which own any model-facing content fed by a settings value; the service only stores and resolves user settings and registers nothing model-facing itself.
@@ -49,3 +69,13 @@ No direct invalidation; a consumer that folds a settings value into the request 
 - **Single user layer** — resolution knows schema defaults, one composition `base`, and one user document; it does not yet record which layer supplied each resolved value.
 - **`redactSecrets` deliberately fails closed for opaque schema nodes** — the walker follows `object`/`dict`/`array`; a union, intersection, tuple, transform, or lazy subtree is omitted and recorded as an opaque secret position instead of being returned verbatim. Schema serialization still belongs to the caller: a wire surface must remove secret defaults from its `schema.toJSON()` envelope as well as requesting redacted values.
 - **Cross-process concurrency is provider-defined** — the seam serializes writes per namespace in-process only; concurrent processes converge by provider behavior (the local file provider read-modify-writes under a writer lock, so namespaces survive concurrent writers and same-namespace conflicts resolve last-write-wins).
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

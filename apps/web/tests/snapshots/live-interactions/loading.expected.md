@@ -19,13 +19,13 @@
   - img
   - text: System prompt
 - text: Reply with a one-sentence description of event sourcing, then stop.
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
+- button "Context injection runtime-context":
   - img
   - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
+  - text: Context injection runtime-context
 - paragraph: partial
 - status: Deep diving...
 - textbox "Message the agent"
@@ -35,9 +35,10 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
 - button "Stop generating"
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

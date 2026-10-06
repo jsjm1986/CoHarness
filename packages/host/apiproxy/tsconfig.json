@@ -93,6 +93,9 @@
       "path": "../../preset/agent-presets"
     },
     {
+      "path": "../../schedule/schedule"
+    },
+    {
       "path": "../../session-query/session-query"
     },
     {
@@ -135,6 +138,9 @@
       "path": "../../util/brand"
     },
     {
+      "path": "../../util/package-manifest"
+    },
+    {
       "path": "../../util/crypto"
     },
     {
@@ -154,6 +160,21 @@
     },
     {
       "path": "../../context/execution-authority"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../../vendor/include"
+    },
+    {
+      "path": "../../experimental/agent-team"
+    },
+    {
+      "path": "../../goal/goal-round-driver"
+    },
+    {
+      "path": "../../session/session-persistence-jsonl"
     }
   ]
 }

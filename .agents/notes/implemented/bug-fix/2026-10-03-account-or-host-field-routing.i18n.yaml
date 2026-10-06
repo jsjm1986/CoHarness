@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-03-account-or-host-field-routing.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-03-account-or-host-field-routing.md
+/agent-note-route-account-or-host-settings-writes-by-field-whitelist:
+  en: 37f48eb36a7bad06
+  zh: 419f4f5afd9931b1
+/agent-note-route-account-or-host-settings-writes-by-field-whitelist/problem:
+  en: a35334c653b5c9fc
+  zh: e04bebd25f85aa3f
+/agent-note-route-account-or-host-settings-writes-by-field-whitelist/decision:
+  en: fd77443f464f582c
+  zh: fddaf98ff16ad783
+/agent-note-route-account-or-host-settings-writes-by-field-whitelist/files:
+  en: 5545a33e2f64dc17
+  zh: 43f809ef72a95767
+/agent-note-route-account-or-host-settings-writes-by-field-whitelist/alternatives-considered:
+  en: bdfe640233d48bd2
+  zh: 516510d7168dda41
+/agent-note-route-account-or-host-settings-writes-by-field-whitelist/consequences:
+  en: 6eddf6134045895a
+  zh: 249ec94b1a30fb41

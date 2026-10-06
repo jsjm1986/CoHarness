@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-15-product-subagent-noninteractive-permissions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-15-product-subagent-noninteractive-permissions.md
-2026-08-15-product-subagent-noninteractive-permissions.md: 8788fba3492e08090dd038fc3e7377f6bd1e29cd
-2026-08-15-product-subagent-noninteractive-permissions.zh.md: cbf3c3cd14fcecd2c24e335a8b71cc3b5370e247
+/agent-note-product-subagents-use-profile-selected-non-interactive-permissions:
+  en: feb20636c72ade23
+  zh: fd2e9f192a3fa527
+/agent-note-product-subagents-use-profile-selected-non-interactive-permissions/problem:
+  en: aa273f35ed05678a
+  zh: 6e7d4467f5ab60d0
+/agent-note-product-subagents-use-profile-selected-non-interactive-permissions/decision:
+  en: a4635e16af21d478
+  zh: 6cd59ad7e2bb9885
+/agent-note-product-subagents-use-profile-selected-non-interactive-permissions/decision/claude-code:
+  en: fde584f95a81f036
+  zh: e308a891fa1946b2
+/agent-note-product-subagents-use-profile-selected-non-interactive-permissions/decision/codex:
+  en: 9d7f28afc6193926
+  zh: 8ab9340d3b9208c6
+/agent-note-product-subagents-use-profile-selected-non-interactive-permissions/decision/failure-diagnostic:
+  en: 5a9a731db2cb3b75
+  zh: 8ce0a4c052784283
+/agent-note-product-subagents-use-profile-selected-non-interactive-permissions/decision/ownership-and-lifecycle:
+  en: 987eec9a67ba131d
+  zh: 735399cd3ac78a45
+/agent-note-product-subagents-use-profile-selected-non-interactive-permissions/verification:
+  en: d89f88e2b95f0439
+  zh: 20bc8cfaacad5856
+/agent-note-product-subagents-use-profile-selected-non-interactive-permissions/alternatives-considered:
+  en: 7b6bbb52fd5e4cbc
+  zh: c8e7ab515cd6c0db
+/agent-note-product-subagents-use-profile-selected-non-interactive-permissions/consequences:
+  en: 6e995471b4cb9ff4
+  zh: 9baf59015a911310

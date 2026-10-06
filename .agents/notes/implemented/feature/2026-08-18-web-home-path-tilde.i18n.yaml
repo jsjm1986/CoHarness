@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-web-home-path-tilde.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-web-home-path-tilde.md
-2026-08-18-web-home-path-tilde.md: b148833bab09eadce4c9c1a362dd99d04eba5977
-2026-08-18-web-home-path-tilde.zh.md: 9d15cd6dca1128927389d5731dff6bf831cffe76
+/agent-note-web-ui-abbreviates-posix-home-paths-as:
+  en: 4b9f8180b27e021a
+  zh: 9af34c843728168a
+/agent-note-web-ui-abbreviates-posix-home-paths-as/problem:
+  en: 33e056ca325aa023
+  zh: 0bd3363223cb0684
+/agent-note-web-ui-abbreviates-posix-home-paths-as/decision:
+  en: c90ff713b7f218a4
+  zh: 4d29ec171945a52c
+/agent-note-web-ui-abbreviates-posix-home-paths-as/alternatives-considered:
+  en: b47ba6c9129202d5
+  zh: d49bb1e674b36deb
+/agent-note-web-ui-abbreviates-posix-home-paths-as/consequences:
+  en: 011c2784ad801d81
+  zh: 5337490f6406d71f
+/agent-note-web-ui-abbreviates-posix-home-paths-as/testing:
+  en: 35ab5d90cd297516
+  zh: 37f287bd8ebbb6b8

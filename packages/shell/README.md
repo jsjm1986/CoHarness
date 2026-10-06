@@ -1,3 +1,8 @@
+---
+description: "The capability family spans the canonical executor seam, its implementations, the shared shell environment, and the model-facing tools. All are **product** packages."
+kind: "package-group"
+---
+
 # shell/ — bash capability family
 
 English | [中文](README.zh.md)

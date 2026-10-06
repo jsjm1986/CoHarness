@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # core/ — 产品 API 主干
 
 [English](README.md) | 中文

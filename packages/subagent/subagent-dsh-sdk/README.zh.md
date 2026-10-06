@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-subagent-dsh-sdk
 
 [English](README.md) | 中文
@@ -8,6 +13,21 @@ SDK 提供方会在全新的子进程中把每个 subagent 作为完整的 DeepS
 
 `dsh-subagent-dsh-sdk` 在全新的 DeepSeek Harness 子进程中运行每个委派任务，子进程拥有自己的 profile、会话、模型路由与工具。父级提供任务与工作目录，每个子进程使用其已配置的运行时，并与父级对话保持隔离。父级只会收到子进程最终的 assistant 文本或安全错误；中间消息与工具流量保留在子进程内。当委派需要完整的 Harness 运行时而不是共享进程内状态时，选择此后端，并接受每次运行都要启动新进程的成本。
 
+## 目录
+
+- [启动与所有权](#start-and-ownership)
+- [停止原因映射](#stop-reason-mapping)
+- [能力与上下文](#capabilities-and-context)
+- [配置](#configuration)
+- [进程边界](#process-boundary)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="start-and-ownership"></a>
 ## 启动与所有权
 
 `start(request)` 先解析子进程工作目录，通过 `DeepSeekHarness` spawn 运行时，并在履行前完成 `initialize` 握手（携带配置的 `provider`/`model` 路由及可选的 `maxTokens` 输出上限）。因此，履行意味着子运行时已就绪、所有权已移交给调用方。spawn、握手或发布前取消失败时，只会在子进程被回收后拒绝；工作目录解析失败则会在尚未 spawn 任何内容时拒绝。
@@ -18,14 +38,17 @@ SDK 提供方会在全新的子进程中把每个 subagent 作为完整的 DeepS
 
 `dispose()`（资源释放）是幂等的：先在本地把结果确定为 `aborted`（协议层面没有提示词取消机制），再关闭运行时，即先发出一次有界的协议 `shutdown` 请求，随后通过共享的 stdin-EOF → SIGTERM → SIGKILL 阶梯使进程实际退出。
 
+<a id="stop-reason-mapping"></a>
 ## 停止原因映射
 
 SDK 客户端返回自有子活动，而不是提示词结果。提供方读取该活动内最后一个已持久化的 `turn/end`，并将其映射为 seam 词汇：`completed` → `completed`，`max-tokens` → `max-tokens`，`blocked` → `refusal`，`aborted` → `aborted`（子侧 `disposed` 原因会附带 `child-disposed` 诊断）；其余情况，包括 `error`、`interrupted`、未来变体或不含轮次的活动，均映射为 `error` 并在适用处携带固定的安全诊断，因此非正常停止绝不会报告为成功。发布后的传输层失败会通过 `onError` 诊断接收器（连接到 `ctx.logger.warn`）压平为 `stopReason: 'error'` 并附带诊断；seam 约定禁止 `result` 被拒绝。
 
+<a id="capabilities-and-context"></a>
 ## 能力与上下文
 
 Provider 不宣告任何启动期能力（`outputSchema`/`depthLimit`/`toolFilter`/`persona` 全为 false），且 `inheritsParentContext: false`：子进程是另一进程里的全新运行时，唯一来自父方的输入是工作区 cwd。基于本 provider 的 `dsh-tool-subagent` 部署应设置 `maxDepth: 'provider-managed'`——子 harness 拥有自己的递归预算。
 
+<a id="configuration"></a>
 ## 配置
 
 | 键 | 默认 | 含义 |
@@ -57,16 +80,20 @@ Provider 不宣告任何启动期能力（`outputSchema`/`depthLimit`/`toolFilte
   config: { provider: dsh-sdk, toolName: subagent, maxDepth: 'provider-managed' }
 ```
 
+<a id="process-boundary"></a>
 ## 进程边界
 
 子进程环境以 [`dsh-subprocess`](../../subprocess/README.zh.md) seam 的 `scrubbedParentEnv()` 为基础，先移除疑似凭据和名称为 `DSH_*` 的环境变量，再合并显式 `config.env` 值。子进程由 SDK 客户端 spawn，而不是经由 `ctx.subprocess` spawn（这是 subprocess README 中记录的 SDK 托管传输例外），因此本后端会自行执行环境清理。JSON-RPC 协议格式才是真正的序列化边界。
 
 本包没有默认导出。否则 Cordis loader 解包会隐藏具名 `inject` 元数据；见[事故复盘（postmortem）0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。子方是拥有自身组合与会话的完整对等运行时；提供方通过 stdio JSON-RPC 驱动它，不保留镜像状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 子 agent 请求
@@ -97,9 +124,20 @@ Provider 不宣告任何启动期能力（`outputSchema`/`depthLimit`/`toolFilte
 
 仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **每次运行都使用全新的运行时进程**：不使用进程池；harness 运行时需要启动完整的插件树，因此每次运行的 spawn 成本高于 ACP 后端通常使用的子进程。
 - **不支持可选的启动时能力**：父级无法在子进程内强制执行 `outputSchema`、深度限制、工具过滤或 persona；应改为配置子进程自身的 `cordis.yml`。
 - **子进程的 transcript（文本记录）保留在其自身的会话根目录中**：父级日志只记录委派工具调用／结果（seam 的子级隔离规则）；流式 `session.event` 通道只用于提取输出，不会桥接到父级日志中。
 - **仅支持本地子进程**：解析出的 cwd 是本地路径；远程运行时需要独立的后端。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

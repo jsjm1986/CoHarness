@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-30-preserve-mixed-ask-results.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-30-preserve-mixed-ask-results.md
-2026-08-30-preserve-mixed-ask-results.md: a08552ee52e124ef507e029e1ec85d624a419bb8
-2026-08-30-preserve-mixed-ask-results.zh.md: e8304882e8787f3d83ea7d29e420af18312f4f22
+/agent-note-preserve-mixed-ask-user-result-diagnostics:
+  en: 6c5f2f5bb236d4d5
+  zh: f94d2b2877f01d3b
+/agent-note-preserve-mixed-ask-user-result-diagnostics/problem:
+  en: 83205a4323e64617
+  zh: fbd9f8344a596d37
+/agent-note-preserve-mixed-ask-user-result-diagnostics/decision:
+  en: edd680a52ef266c8
+  zh: f1e0692513bc3db9
+/agent-note-preserve-mixed-ask-user-result-diagnostics/alternatives-considered:
+  en: 79674be93a64a4e7
+  zh: a1ddbd8226859477
+/agent-note-preserve-mixed-ask-user-result-diagnostics/consequences:
+  en: 449c3f48dde480c4
+  zh: 74b400aadaecb7eb
+/agent-note-preserve-mixed-ask-user-result-diagnostics/testing:
+  en: 77c0c6315052bf18
+  zh: d8e960122f31da9b

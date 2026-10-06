@@ -1,3 +1,8 @@
+---
+description: "File-backed credentials provider ($DSH_HOME/.env under the live process environment) for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # dsh-credentials-local
 
 English | [中文](README.zh.md)
@@ -21,6 +26,21 @@ Under the product CLI, resolution reads the launcher's frozen [environment snaps
 
 `dsh-credentials-local` keeps API keys and other secrets in a private file under your harness home. You can save credentials through the configuration UI or edit the file directly; changes reload automatically and saved values survive restarts. Credential lookup follows a fixed precedence: the launch environment wins, followed by the stored file, the project's `.env`, and the harness-home `.env`; a newly saved value immediately overrides older `.env` values. Only your OS user can read the file, but agent tool processes run as that same user, so this store cannot isolate secrets from the agent.
 
+## Table of Contents
+
+- [Config](#config)
+- [The document](#the-document)
+- [Permissions](#permissions)
+- [Hot reload](#hot-reload)
+- [Security boundary](#security-boundary)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 | Field | Default | Meaning |
@@ -30,6 +50,7 @@ Under the product CLI, resolution reads the launcher's frozen [environment snaps
 | `watch` | `true` | Hot-publish external edits. |
 | `debounceMs` | `100` | Watcher write-settle window. |
 
+<a id="the-document"></a>
 ## The document
 
 A versioned YAML document with one section per key space, and nothing else:
@@ -67,24 +88,29 @@ Writes patch the parsed document rather than rebuilding it, so comments and the 
 
 Any string value round-trips, multi-line values included, so no entry is unwritable for want of a quoting style. An empty stored value is absent, per the seam rule — which is why an empty string in the document is rejected outright: `unset` removes a key, it does not blank it.
 
+<a id="permissions"></a>
 ## Permissions
 
 The provider creates the directory `0700` and creates or atomically replaces the document `0600`. It holds what it *reads* to that same bound: on POSIX a document carrying any group or other permission bit fails before its contents are parsed — at boot and on every reload — and the error names the `chmod 600` repair. Windows has no mode to inspect, so the check is skipped there rather than faked.
 
+<a id="hot-reload"></a>
 ## Hot reload
 
 External edits publish `credentials/reference-updated` per changed reference after the snapshot is replaced **wholesale** — an entry deleted on disk never lingers in memory. Before Chokidar opens the target, the provider realpaths its deepest existing ancestor and restores any missing suffix; file access and diagnostics retain the configured path, while Windows cannot mix an 8.3 alias with long-form libuv events. The provider's own writes are recognized by content and publish exactly their one commit event. An unreadable or invalid document at runtime keeps the last good snapshot and warns; an absent file is an empty store; an unreadable or invalid file at boot fails loud.
 
+<a id="security-boundary"></a>
 ## Security boundary
 
 The document is `0600` under a `0700` directory, which stops other OS users — **not** the model. Tool processes (bash, the filesystem tools) run as the same user, and the shipped `workspace-write` file policy confines mutations rather than reads, so they can read this file exactly like any other file the user owns; no sandbox mode singles it out. What the harness does hold to is narrower: it never hands the model a resolved path to the document, and never loads it into the process environment — unlike `$DSH_HOME/.env`, which is the user's ordinary environment layer (see [app-boot's Harness-home layers](../../boot/app-boot/README.md#profiles)) — so reaching the value takes a deliberate read of a path the agent was not given.
 
 That is discretion, not a boundary. A deployment that must keep provider keys away from its own agent cannot get there with file permissions; an OS-keychain provider — a store the model's processes cannot read at all — is the deferred answer and belongs beside this provider as a sibling package.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Each resolution derives its answer from the layered sources at call time under the documented precedence; the file layer's behavior is asserted by specs and no credential cache is published.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the consumers of `ctx.credentials`, which own any model-facing behavior a stored value enables.
@@ -95,7 +121,18 @@ No direct invalidation; stored values never enter a request prefix.
 
 ## Known Limitations and Deferred Work
 
+- Managed launches with `DSH_MANAGED_DATA_MANIFEST` register the managed credential document before data writes. Read-only fallback `.env` sources are not claimed. An invalid inventory refuses initialization; [inventory and backup rules](../../util/managed-data/README.md) govern retained roots and deployment approval.
 - **Same-reference concurrent writes are last-write-wins** — the writer lock and the read-modify-write keep concurrent writers from dropping each other's entries, but two writers editing one reference still resolve to the later write; there is no revision check.
 - **A same-UID process can read the document** — see [Security boundary](#security-boundary): the file-effect sandbox modes do not deny reads, and an OS-keychain provider is deferred.
 - **Environment changes are invisible** — the snapshot is frozen at launch, so a variable exported after startup reaches neither resolution nor `describe`; changing an environment-sourced credential takes a restart.
 - **Atomic, not crash-durable** — inherited from `dsh-atomic-write`; the store re-reads on boot.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

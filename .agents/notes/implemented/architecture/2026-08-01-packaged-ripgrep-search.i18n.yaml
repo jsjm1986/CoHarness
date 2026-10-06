@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-01-packaged-ripgrep-search.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-01-packaged-ripgrep-search.md
-2026-08-01-packaged-ripgrep-search.md: c401bc1e30df0c3443ad58b37f64523b1c10cb31
-2026-08-01-packaged-ripgrep-search.zh.md: 6a195e59f77aa73b9d0918461cef45360e617098
+/agent-note-packaged-ripgrep-spawn-for-glob-grep:
+  en: 58ebe429d7daf2ea
+  zh: 5023228d5206056d
+/agent-note-packaged-ripgrep-spawn-for-glob-grep/problem:
+  en: f255ef2474afecda
+  zh: faf4dc5620640ead
+/agent-note-packaged-ripgrep-spawn-for-glob-grep/decision:
+  en: e57d7a9b3a5f9b92
+  zh: 4fd59c3189b3049f
+/agent-note-packaged-ripgrep-spawn-for-glob-grep/alternatives-considered:
+  en: d4bab3157843a557
+  zh: 3f020c9f85e4846e
+/agent-note-packaged-ripgrep-spawn-for-glob-grep/consequences:
+  en: cd7c39e0d2c5680e
+  zh: 24b42d1f113fc0ee

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-23-private-user-terminals.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-private-user-terminals.md
-2026-09-23-private-user-terminals.md: 8651009a74e03ab8791d6800b33e96b0bbf0d96a
-2026-09-23-private-user-terminals.zh.md: 20afe7ebea2ad07a72e66dace8a55fec26fc3162
+/agent-note-private-user-terminals-in-managed-runtimes:
+  en: 5166716870e54bf8
+  zh: 3c35b9fbc81bd440
+/agent-note-private-user-terminals-in-managed-runtimes/problem:
+  en: 424c9ac614bcd415
+  zh: 9f6e178252525957
+/agent-note-private-user-terminals-in-managed-runtimes/decision:
+  en: 4cdb853922ff60dd
+  zh: 577927e169414246
+/agent-note-private-user-terminals-in-managed-runtimes/alternatives-considered:
+  en: ec2e77474ef275c0
+  zh: a8883664472c5b63
+/agent-note-private-user-terminals-in-managed-runtimes/related-decisions:
+  en: 11a979384d5ae985
+  zh: 28f5d36e6d8b5926
+/agent-note-private-user-terminals-in-managed-runtimes/consequences:
+  en: 7a881b7beba22c66
+  zh: 3bc92abdc780808a

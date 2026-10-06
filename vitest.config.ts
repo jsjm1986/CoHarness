@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import tsconfigPaths from 'vite-tsconfig-paths'
 import { defineConfig } from 'vitest/config'
-import { standardDecoratorPlugin, vitestExecArgv } from './vitest.shared.ts'
+import { sourcePlaneAliases, standardDecoratorPlugin, vitestExecArgv } from './vitest.shared.ts'
 import { COVERAGE_EXEMPT_ENV, coverageExemptHeavySuites } from './scripts/coverage-exempt.ts'
 import { COVERAGE_PARTITION_MODE_ENV } from './scripts/coverage-partitions.ts'
 import { COVERAGE_SCOPED_MODE_ENV } from './scripts/coverage-scoped.ts'
@@ -25,7 +25,7 @@ const windowsUnsupportedTests = [...repositoryTestExclusions()]
 
 const testIncludes = [
   'packages/*/*/tests/**/*.spec.{ts,tsx}',
-  'apps/*/tests/**/*.spec.ts',
+  'apps/*/tests/**/*.spec.{ts,tsx}',
   'examples/*/tests/**/*.spec.ts',
   'scripts/**/*.spec.ts',
   'website/tests/**/*.spec.ts',
@@ -87,8 +87,9 @@ const processBoundTests = [
 
 export default defineConfig({
   plugins: [pathsPlugin(), standardDecoratorPlugin()],
+  resolve: { alias: sourcePlaneAliases },
   test: {
-    setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-invariants.ts'],
+    setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-invariants.ts', './scripts/test-dom-environment.ts'],
     // .tsx: client component specs (jsdom via per-file @vitest-environment pragma).
     include: testIncludes,
     exclude: windowsUnsupportedTests,
@@ -97,6 +98,7 @@ export default defineConfig({
     projects: [
       {
         plugins: [pathsPlugin(), standardDecoratorPlugin()],
+        resolve: { alias: sourcePlaneAliases },
         test: {
           name: 'thread-safe',
           execArgv: vitestExecArgv,
@@ -104,7 +106,7 @@ export default defineConfig({
           // MaybeLocal in cjs_lexer::Parse) from worker threads on macOS,
           // Linux, and Windows. Forked workers avoid that shared thread path.
           pool: 'forks',
-          setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-invariants.ts'],
+          setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-invariants.ts', './scripts/test-dom-environment.ts'],
           include: testIncludes,
           exclude: [
             ...windowsUnsupportedTests,
@@ -115,11 +117,12 @@ export default defineConfig({
       },
       {
         plugins: [pathsPlugin(), standardDecoratorPlugin()],
+        resolve: { alias: sourcePlaneAliases },
         test: {
           name: 'process-bound',
           execArgv: vitestExecArgv,
           pool: 'forks',
-          setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-invariants.ts'],
+          setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-invariants.ts', './scripts/test-dom-environment.ts'],
           include: processBoundTests,
           exclude: [
             ...windowsUnsupportedTests,

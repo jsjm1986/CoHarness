@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write plugins/dsh-directory-guard/README.md
-README.md: fe7aeea267cfef714ba7077449e39d1f8eecdcde
-README.zh.md: e90cef72dbac938c084c5a748cb833066d051726
+/deepseek-ai-dsh-directory-guard:
+  en: 388b615962e47ac1
+  zh: 3877bcd0bc25bee1
+/deepseek-ai-dsh-directory-guard/what-it-does:
+  en: c5ec7dec385fd639
+  zh: ccf3474da64ece53
+/deepseek-ai-dsh-directory-guard/enforcement-rule:
+  en: 23c9a614987319dc
+  zh: e1b362aa78a9756b
+/deepseek-ai-dsh-directory-guard/boundary-honest-limits:
+  en: efbc0c1c39701472
+  zh: f38accbc80f808bd
+/deepseek-ai-dsh-directory-guard/grants-handoff:
+  en: 898de641ce3373e2
+  zh: 1b6b91c5d57602fe
+/deepseek-ai-dsh-directory-guard/upstream-coupling-sync-strategy:
+  en: 4795e8f2ee79b85b
+  zh: 073e75f1af53b1f7
+/deepseek-ai-dsh-directory-guard/mounting:
+  en: 50582bee4f9f8571
+  zh: 6e49bf3f5707a4dd
+/deepseek-ai-dsh-directory-guard/tests:
+  en: 8524b9af9f08aee7
+  zh: 8df0731d15e5cf00
+/deepseek-ai-dsh-directory-guard/remaining-verification-manual-needs-a-model-api-key:
+  en: 745fbfab99363f30
+  zh: 466f3d2f02647500

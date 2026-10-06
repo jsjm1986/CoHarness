@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, within } from '@testing-library/react'
 import type { ISession, SessionId, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import { SlotTestRuntime, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { SlotTestRuntime, stubSettingsScope, stubDeveloperTools } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply as applyConversation, inject as injectConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { apply as applyTool, inject as injectTool } from '@deepseek-ai/dsh-client-ui-tool/client'
@@ -47,13 +47,13 @@ const toolResult = (seq: number, callId: string, name: string, args = '{"command
 })
 
 /** Test-owned AppFrame role: declares and renders the resident conversation area. */
-type AppRootProps = PropsRenderSlots<'conversation' | 'details'>
+type AppRootProps = PropsRenderSlots<'main' | 'details'>
 function AppRoot({ renderSlot }: AppRootProps) {
-  return <>{renderSlot('conversation', {})}</>
+  return <>{renderSlot('main', {}, { entryKey: 'conversation' })}</>
 }
 
 const LAYOUT_CHILDREN = {
-  'conversation': { kind: 'single', scope: 'root' },
+  'main': { kind: 'keyed', scope: 'root' },
   'details': { kind: 'single', scope: 'session' },
 } as const
 
@@ -72,7 +72,7 @@ async function bench(nodes: ToolResultNode[]) {
   // ui-theme's Appearance row binds a durable scope through these two.
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
-  runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+  runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
   const layout = { openDetails: vi.fn(), closeDetails: vi.fn() }
   runtime.provide('layout', layout)
   const locale = new LocaleRuntime(runtime.ctx)
@@ -140,9 +140,9 @@ describe('keyed toolview hole through the real machinery', () => {
     // generic "Tool call · <name> · <id>" row.
     const rowText = (name: string) => view.container.querySelector(`[data-tool="${name}"]`)?.textContent
     expect(rowText('cordis_runtime_inspect')).toContain('Inspect')
-    expect(rowText('cordis_run')).toContain('Run Cordis Plugindyn-2')
-    expect(rowText('cordis_stop')).toContain('Stop Cordis Plugindyn-2')
-    expect(rowText('cordis_undefine')).toContain('Remove Cordis Plugindyn-2')
+    expect(rowText('cordis_run')).toContain('Run Cordis plugindyn-2')
+    expect(rowText('cordis_stop')).toContain('Stop Cordis plugindyn-2')
+    expect(rowText('cordis_undefine')).toContain('Remove Cordis plugindyn-2')
     // No run-control verb is a code row; the program is cordis_define's, and its
     // own keyed card owns that rendering.
     expect(view.container.querySelector('[data-variant="code"]')).toBeNull()
@@ -232,7 +232,7 @@ describe('registrant declaration injection', () => {
     // ui-theme's Appearance row binds a durable scope through these two.
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
-    runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+    runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
     runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn() })
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)

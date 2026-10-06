@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-20-core-data-structures-catalog.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-06-20-core-data-structures-catalog.md
-2026-06-20-core-data-structures-catalog.md: 489dc488b82883dc1ab23fb0685c9467651cb60f
-2026-06-20-core-data-structures-catalog.zh.md: 2742603cd6f83d114c00e9b50977cedc32f90b60
+/agent-note-subsystems-catalog-and-the-ts-type-equiv-drift-gate:
+  en: da02b4e23769f5e9
+  zh: da5a10e2b137deb8
+/agent-note-subsystems-catalog-and-the-ts-type-equiv-drift-gate/problem:
+  en: f4a611cc4f4e69f8
+  zh: f08c23a7aaa8cf80
+/agent-note-subsystems-catalog-and-the-ts-type-equiv-drift-gate/decision:
+  en: e1b6cd024df0394d
+  zh: 375f5466139060c3
+/agent-note-subsystems-catalog-and-the-ts-type-equiv-drift-gate/decision/what-counts-as-core-the-spine-vs-subsystem-line:
+  en: 1fafd41435689fc9
+  zh: 447784f1501fda80
+/agent-note-subsystems-catalog-and-the-ts-type-equiv-drift-gate/decision/the-ts-type-equiv-mechanism-literal-and-drift-proof:
+  en: 71797b8ae4293737
+  zh: 6982deaf5ca8f1ef
+/agent-note-subsystems-catalog-and-the-ts-type-equiv-drift-gate/decision/maintenance-is-the-author-s-job-with-a-gate-backstop:
+  en: 3801f03323cb8fa4
+  zh: 68ccdb85bab1bf9c
+/agent-note-subsystems-catalog-and-the-ts-type-equiv-drift-gate/alternatives-considered:
+  en: f6c29f55ef79ec1f
+  zh: 952a9083cec71f37
+/agent-note-subsystems-catalog-and-the-ts-type-equiv-drift-gate/verification-lesson:
+  en: 9b361ca8cf25a1fe
+  zh: b61cbc4fc7189e31
+/agent-note-subsystems-catalog-and-the-ts-type-equiv-drift-gate/consequences:
+  en: 63b59d35f53d509b
+  zh: abc39b011282ec97

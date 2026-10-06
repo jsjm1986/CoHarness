@@ -92,7 +92,7 @@ describe('catalog-route model discovery', () => {
     // pi-ai's own registry is the authority for its own providers, and it
     // carries what a listing endpoint would not disclose.
     expect(models.map(model => model.id).sort())
-      .toEqual(getBuiltinModels('deepseek').map(model => model.id).sort())
+      .toEqual([...getBuiltinModels('deepseek').map(model => model.id), 'deepseek-v4-flash', 'deepseek-v4-flash-vision-exp'].sort())
     expect(models.every(model => (model.contextWindow ?? 0) > 0 && (model.maxTokens ?? 0) > 0)).toBe(true)
     expect(server.paths).toEqual([])
   })

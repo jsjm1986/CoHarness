@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-mcp-client-auto-reconnect.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-06-mcp-client-auto-reconnect.md
-2026-08-06-mcp-client-auto-reconnect.md: 99a8aec1abe3713822f8f17c17d8efaca5d61a4d
-2026-08-06-mcp-client-auto-reconnect.zh.md: 87acb6901cf3bc03fc5d71e89538e5ec23b2b118
+/agent-note-mcp-client-auto-reconnect-with-bounded-backoff:
+  en: 3f75da7e32247eeb
+  zh: a99ba1b76142febc
+/agent-note-mcp-client-auto-reconnect-with-bounded-backoff/problem:
+  en: a7fffc8baa049b39
+  zh: 76759476f0bb4509
+/agent-note-mcp-client-auto-reconnect-with-bounded-backoff/decision:
+  en: 3eb272b00127f396
+  zh: b6e0f8727de1b6df
+/agent-note-mcp-client-auto-reconnect-with-bounded-backoff/alternatives-considered:
+  en: c6c96464c36287a7
+  zh: 7f6c803187a01822
+/agent-note-mcp-client-auto-reconnect-with-bounded-backoff/testing:
+  en: c617406a6e19d3b4
+  zh: a322875bea28ae64
+/agent-note-mcp-client-auto-reconnect-with-bounded-backoff/consequences:
+  en: e71716333c224203
+  zh: 3b03f431492b358c

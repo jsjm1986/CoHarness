@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-bundle"
+---
+
 # @deepseek-ai/dsh-subagent-codex
 
 [English](README.md) | 中文
@@ -8,6 +13,21 @@
 
 当委派工作需要在父会话工作区中的真实无人值守 Codex 会话内运行时，把 `@deepseek-ai/dsh-subagent-codex` 安装进 Profile。每次委派都会为一个自包含文本任务使用全新且隔离的 Codex 线程，并且只返回其最终答案或安全失败诊断。原生 Codex 配置和身份验证继续作为权威来源，而 `permissionMode` 选择非交互式审批和沙箱行为。Bundle 会提供兼容的原生 Codex 载荷，但只有配置委派工具后才会向模型公开相应能力。
 
+## 目录
+
+- [启动与所有权](#start-and-ownership)
+- [能力与上下文](#capabilities-and-context)
+- [配置](#configuration)
+- [持续成员](#persistent-members)
+- [产品兼容性与证据](#product-compatibility-and-evidence)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="start-and-ownership"></a>
 ## 启动与所有权
 
 `start(request)` 只接受非空的文本块序列，并根据父会话确定子级 cwd。随后，它通过 [`dsh-subprocess`](../../subprocess/subprocess/README.zh.md) spawn 固定命令，依次执行 `initialize` → `initialized`，把 Profile 选择的模式映射为官方 `thread/start` approval／reviewer／sandbox 字段并与 `{ cwd, ephemeral: true }` 一起发送，且仅在 Codex 返回有效的临时线程后才发布此次运行。若在发布前发生失败或取消，它会关闭通信链路、终止受管进程树并等待其退出，然后拒绝 `start()` 调用。非取消拒绝只公开固定的 `initialize` 或 `thread-start` 阶段及已经观测到的进程结果；原始产品与 Host 错误只保留在内部 cause 链中。
@@ -20,10 +40,12 @@
 
 `dispose()`（资源释放）具有幂等性：如果当前的两个标识符均已知，它会尽力请求 `turn/interrupt`，关闭 JSON-RPC 通信链路，结束标准输入，调用共享的进程树逐级终止机制，等待整棵进程树退出，并移除 stderr observer。独立清理拒绝使用固定的 `teardown` 阶段与可用进程结果。当启动与回滚同时失败时，顶层聚合消息会保留两条安全阶段说明，而原始失败仍只在内部可见。
 
+<a id="capabilities-and-context"></a>
 ## 能力与上下文
 
 本提供方不声明任何可选的启动时能力，并报告 `inheritsParentContext: false`。Codex 会接收独立文本任务和父会话 cwd，但不会接收父会话的对话、角色设定、工具筛选器、深度策略或结构化输出约定。临时 Codex 线程 ID 与轮次 ID 仅在此次运行内部可见，绝不会持久化到父会话。
 
+<a id="configuration"></a>
 ## 配置
 
 | 配置键 | 默认值 | 含义 |
@@ -33,15 +55,23 @@
 | `permissionMode` | `never` | 为该提供方实例的每个线程固定原生非交互审批与沙箱模式。 |
 | `disposeGraceMs` | `3000` | 共享进程树责任方各终止层级之间的宽限期，单位为毫秒且须为正有限值，并不得大于仓库共享的 [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.zh.md)；随后资源释放会等待整棵进程树退出。 |
 | `stateDir` | `~/.dsh/external-members` | 实例独立绑定存储的目录；`codex.jsonl` 属于默认实例。仅由持续成员使用。 |
-| `memberCwd` | harness 启动目录 | 成员 Codex 线程的工作区。仅由持续成员使用。 |
+| `memberCwd` | 成员 Session cwd | 持续成员的工作区覆盖值，在其执行目标上验证。 |
+| `remoteCommand` | `codex` | 在 SSH 目标内解析的预装程序；本机继续使用随包固定的程序。 |
 
+<a id="persistent-members"></a>
 ## 持续成员
+
+SSH 使用目标机器上的 `remoteCommand`，不会发送 Host 的 Node 或包路径。远端待决轮次无法通过 Host 的 rollout 证明结果，因此保持未知且不自动重发；正常后续提示仍使用远端持久线程。
+
+每次调用通过实际成员 Session 解析工作区及子进程提供方，SSH 会话必须使用同一 standing realm 的文件系统和子进程，缺失时拒绝而不回退到 Host。绑定存储在首次启动前固定规范路径及执行目标，重启后拒绝目标变化。损坏或不可读的记录不能被视为新成员；缺少目标证明的旧绑定保留原记录，须新建成员后才能执行。
+
+本地 rollout 缺失或不可读时，已发出提示词的结果保持未知。这不能证明提示词未送达，也不能据此自动重发。
 
 默认 `codex` 实例保留既有模型路由及 `codex.jsonl` 存储。其他名称根据完整提供方名称生成独立、确定的路由和文件，在大小写不敏感的文件系统上仍保持隔离；卸载一个实例只释放其路由。重命名实例会改变其持久身份，不会收养其他实例的绑定。
 
 挂载 `llm` 服务时本提供方同时声明 `prepareContinuable`，`ctx.subagents.startContinuable` 即可接受它——包括 Team roster 的提供方选择通道。成员子级是由 continuation 管理器拥有的普通进程内 Agent（耐用身份、inbox、持久化、重启）；本包只提供模型路由：每次成员模型调用 spawn `codex app-server --stdio`，挂载成员的耐用线程（已绑定时 `thread/resume`，首轮 `thread/start` 带 `ephemeral: false`），发出一次轮次，然后处置进程。
 
-绑定存储记录 harness 子会话 ↔ Codex 线程映射与最后发出的提示词；轮次中途崩溃后，下一次调用可经 `~/.codex/sessions/` 下的耐用 rollout 证明该提示词：已完结的答案直接重放不重发，可证未送达的提示词重发一次，不可证的提示词被丢弃而非重复投递。没有 `llm` 服务时提供方保持仅一次性能力——没有 `prepareContinuable`，可继续启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
+绑定存储记录子会话 ↔ 线程映射、待决提示词、已确认的轮次 ID 和已消费游标。恢复必须在同一 rollout 中找到该 ID 对应的原始提示词及成功终止事件，且最终文本与终止答案一致。进度文本、重复提示词、其他轮次、缺失确认、失败轮次以及损坏或缺失的 rollout 都保持未知，不自动重发。正常成员仍可续接耐用线程；未挂载 `llm` 时，持续成员启动以 `UNSUPPORTED_CAPABILITY` 拒绝。
 
 | `permissionMode` 值 | `thread/start` 字段 | 原生行为 |
 |---|---|---|
@@ -106,6 +136,7 @@ dsh --profile <name>
     maxDepth: provider-managed
 ```
 
+<a id="product-compatibility-and-evidence"></a>
 ## 产品兼容性与证据
 
 生产环境的协议层有意只实现这一单次执行约定所需的 app-server 方法。运行时依赖与六个 optional-dependency alias 均锁定到 `@openai/codex@0.153.4` / `codex-cli 0.153.4`。普通安装会按当前操作系统与 CPU 选择一个载荷。对于当前 darwin-arm64 载荷，`npm pack --dry-run --json @openai/codex@0.153.4-darwin-arm64` 报告压缩包为 115,672,312 字节、解包后为 288,140,243 字节。该包包含原生 `codex`、`codex-code-mode-host`、`rg` 与 `zsh` 资源；其他平台可能不同，这些数值只用于披露而不是安装阈值。
@@ -114,10 +145,13 @@ dsh --profile <name>
 
 如果安装时省略 optional dependencies、当前平台不受支持，或所选载荷缺失，第一次委派会在 `initialize` 阶段以安全 `unknown` 类别和已观测到的进程结果失败。原始 wrapper 文本只保留在 Host stderr；提供方既不会探测宿主 CLI，也不会用它重试。独立 wrapper fixture 会另行证明原生载荷失败与不存在宿主回退。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。每次运行向委托工作区中的一个临时 Codex 线程提交一个任务并返回其结果；运行之间不保留会话状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 子级请求
@@ -148,6 +182,7 @@ Codex 子级会在一个全新的临时线程中，以单个轮次接收这些�
 
 仅追加：前台会在可复用的父请求前缀后增加一个结果，后台则会继续追加 Job 启动确认、通知以及后续控制或收集结果。后台调度可能增加一个由通知唤醒的轮次，但这些消息都不会改写更早的前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 - **每次运行均新建一个进程、一个线程和一个轮次**：不支持续接、恢复、池化、进度流或产品会话持久化。
@@ -159,3 +194,13 @@ Codex 子级会在一个全新的临时线程中，以单个轮次接收这些�
 - **assistant 载荷仅包含最终文本**：失败运行可以额外公开独立的安全诊断；推理、过程说明、中间消息、工具通信、用量信息、原始 stderr 和工作区差异不会进入父会话，通用 Job id、通知与状态来自共享作业运行时。
 - **没有可选的共享能力**：对于本提供方，共享服务会拒绝输出 schema、子任务角色设定、工具筛选和 harness 深度强制约束。
 - **没有按实际经过时间触发的超时或副作用回滚**：长时间运行的工作由调用方取消，且取消前已更改的文件或外部系统不会恢复原状。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

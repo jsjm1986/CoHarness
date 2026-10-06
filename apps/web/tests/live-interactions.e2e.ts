@@ -19,6 +19,8 @@ import { chromium } from 'playwright'
 import { afterEach, describe, expect, it, onTestFailed } from 'vitest'
 import { deriveReplayScript, parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
 import type { ReplayOverrideDoc } from '@deepseek-ai/dsh-llm-replay'
+import type { RetryPolicyConfig } from '@deepseek-ai/dsh-llm'
+import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
@@ -79,7 +81,10 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
   })
 
   /** Boot scaffold + page with an optional override doc materialized per run. */
-  async function launch(buildOverride?: (sidecarHome: string) => ReplayOverrideDoc): Promise<void> {
+  async function launch(
+    buildOverride?: (sidecarHome: string) => ReplayOverrideDoc,
+    retryPolicy?: RetryPolicyConfig,
+  ): Promise<void> {
     sessionEvents = []
     let overridePath: string | undefined
     if (buildOverride !== undefined) {
@@ -93,12 +98,13 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     scaffold = await launchWebScaffold({
       replayFixture: FIXTURE,
       ...(overridePath === undefined ? {} : { replayOverride: overridePath }),
+      ...(retryPolicy === undefined ? {} : { replayRetryPolicy: retryPolicy }),
     })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     // Fresh world: connect a Workspace so the composer scenarios start live.
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
@@ -300,6 +306,43 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     await compareOrRefreshGolden(PERSISTENCE_ERROR_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
+  }, 120_000)
+
+  it.skipIf(MODE === 'record')('wraps an active retry label inside a narrow conversation column', async () => {
+    // A 60s backoff keeps the retry label live while the scenario measures it.
+    await launch(() => ({ patches: [{ at: 0, entry: { kind: 'throw', chunks: [], message: 'upstream 503', code: 'SERVER' } }] }),
+      { mode: 'normal', maxRetries: 1, retryableCodes: ['SERVER'],
+        backoff: { initialDelayMs: 60_000, maxDelayMs: 60_000, jitterRatio: 0 } })
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-retry-wrap'))
+    // The larger chat font widens the label so a 200px column must wrap it.
+    await scaffold!.ctx.settings.update(settingsNamespace('ui-conversation'), { chatFontSize: 17 })
+    const { settled } = await sendPrompt(90_000)
+    const retry = page.locator('details[data-active="true"]')
+    await retry.waitFor()
+    const originalStyle = await retry.getAttribute('style')
+    try {
+      const geometry = await retry.evaluate((element) => {
+        element.style.width = '200px'
+        const summary = element.querySelector('summary')!
+        const status = summary.querySelector('[role="status"]')!
+        return { width: summary.getBoundingClientRect().width,
+          scrollWidth: summary.scrollWidth, clientWidth: summary.clientWidth,
+          height: status.getBoundingClientRect().height,
+          lineHeight: Number.parseFloat(getComputedStyle(status).lineHeight) }
+      })
+      expect(geometry.width).toBeLessThanOrEqual(200)
+      expect(geometry.scrollWidth).toBe(geometry.clientWidth)
+      expect(geometry.height).toBeGreaterThan(geometry.lineHeight)
+      expect(await retry.getByRole('status').textContent()).toContain('Retrying')
+    } finally {
+      await retry.evaluate((element, style) => {
+        if (style === null) element.removeAttribute('style')
+        else element.setAttribute('style', style)
+      }, originalStyle)
+      await page.getByRole('button', { name: 'Stop generating', exact: true }).click()
+      await settled
+    }
+    expect(tripwire.pageErrors).toEqual([])
   }, 120_000)
 
   it.skipIf(MODE === 'record')('recovers a transient SERVER failure through llm-retry and completes', async () => {

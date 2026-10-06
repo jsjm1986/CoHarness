@@ -23,7 +23,7 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/cordis": "workspace:~",
     "@testing-library/react": "^16.1.0",
     "@types/react": "~19.2.7",
     "@types/react-dom": "~19.2.4",
@@ -36,11 +36,11 @@
     "lib/types/**/*.d.ts"
   ],
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:~"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-brand": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-primitives": "workspace:^",
+    "@deepseek-ai/dsh-brand": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-primitives": "workspace:*",
     "clsx": "^2.0.0"
   }
 }

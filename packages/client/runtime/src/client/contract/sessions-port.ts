@@ -27,16 +27,22 @@ export interface SessionsPortSummary {
   updatedAt: number
 }
 
-/** Session-list facts sibling domains read: readiness, selection, and the row map. */
+/** Session-list facts sibling domains read: readiness, selection, and the row maps. */
 export interface SessionsPortList {
   ids: SessionId[]
   byId: Record<SessionId, SessionsPortSummary>
+  /**
+   * Archived summaries partitioned out of `byId`, merged across every pooled
+   * runtime; an archived-elsewhere check that reads only `byId` or one
+   * runtime's mirror mis-classifies the session.
+   */
+  archivedById: Record<SessionId, SessionsPortSummary>
   current: SessionId | undefined
   phase: 'pending' | 'ready'
 }
 
 /** The sessions-service face injected into sibling domains. */
-export interface SessionsPort extends Pick<ISessions, 'retain'> {
+export interface SessionsPort extends Pick<ISessions, 'retain' | 'keyFor' | 'runtimeTargetFor'> {
   /**
    * Begin an asynchronous navigation intent, superseding any earlier intent.
    * Selecting, clearing, scope changes, and owner disposal cancel it.

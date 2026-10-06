@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-23-translation-prompt-v4-contract.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-23-translation-prompt-v4-contract.md
-2026-07-23-translation-prompt-v4-contract.md: 68d6837971a0bbb40fbc5ee093e5911515905ba3
-2026-07-23-translation-prompt-v4-contract.zh.md: e1505e29840bebe7215780fad950995ba8fc4640
+/agent-note-calibrated-translation-prompt-v4-contract:
+  en: 1a924a00930afad5
+  zh: 719317ce7818f808
+/agent-note-calibrated-translation-prompt-v4-contract/problem:
+  en: 93ff1272d9d7126e
+  zh: 1b9094b2e8ce0feb
+/agent-note-calibrated-translation-prompt-v4-contract/decision:
+  en: 393c85f8ed301199
+  zh: b2d1a6fbadb3b3b8
+/agent-note-calibrated-translation-prompt-v4-contract/response-framing:
+  en: a15c21485b5a7325
+  zh: 1d9c6c07ca4aff13
+/agent-note-calibrated-translation-prompt-v4-contract/alternatives-considered:
+  en: 6a529b5bfc3b1d0e
+  zh: b0465ad782563ef8
+/agent-note-calibrated-translation-prompt-v4-contract/consequences:
+  en: c89885f87018fbf5
+  zh: 3be2a12bd5f363c9

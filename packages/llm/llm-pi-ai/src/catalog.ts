@@ -20,6 +20,7 @@ import type {
   BedrockCompat,
   ChatTemplateKwargValue,
   KnownApi,
+  MistralConversationsCompat,
   Model,
   ModelCost,
   ModelThinkingLevel,
@@ -213,6 +214,59 @@ export function catalogProviderTakesApiKey(provider: string): boolean {
 }
 
 /**
+ * Legacy model ids this deployment keeps serving after the installed catalog
+ * renamed them, keyed by provider and alias id. pi-ai 0.87 renamed
+ * `deepseek-v4-flash` to `deepseek-flash` and dropped `vision-exp`; existing
+ * session logs, settings documents, and composition profiles still name the
+ * older ids, so the entries below retain the 0.85-era metadata verbatim —
+ * including the wire `id` — rather than inheriting the successor's fields.
+ */
+const LEGACY_MODEL_ENTRIES: Record<string, Record<string, Model<Api>>> = {
+  deepseek: {
+    'deepseek-v4-flash': {
+      id: 'deepseek-v4-flash',
+      name: 'DeepSeek V4 Flash',
+      api: 'openai-completions',
+      baseUrl: 'https://api.deepseek.com',
+      provider: 'deepseek',
+      reasoning: true,
+      input: ['text'],
+      cost: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0 },
+      contextWindow: 1_000_000,
+      maxTokens: 384_000,
+      compat: {
+        supportsStore: false,
+        supportsDeveloperRole: false,
+        maxTokensField: 'max_tokens',
+        requiresReasoningContentOnAssistantMessages: true,
+        thinkingFormat: 'deepseek',
+      },
+      thinkingLevelMap: { minimal: null, low: 'low', medium: null, high: 'high', max: 'max' },
+    },
+    'deepseek-v4-flash-vision-exp': {
+      id: 'deepseek-v4-flash-vision-exp',
+      name: 'DeepSeek V4 Flash Vision Exp',
+      api: 'openai-completions',
+      baseUrl: 'https://api.deepseek.com',
+      provider: 'deepseek',
+      reasoning: true,
+      input: ['text', 'image'],
+      cost: { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0 },
+      contextWindow: 1_000_000,
+      maxTokens: 384_000,
+      compat: {
+        supportsStore: false,
+        supportsDeveloperRole: false,
+        maxTokensField: 'max_tokens',
+        requiresReasoningContentOnAssistantMessages: true,
+        thinkingFormat: 'deepseek',
+      },
+      thinkingLevelMap: { minimal: null, low: 'low', medium: null, high: 'high', max: 'max' },
+    },
+  },
+}
+
+/**
  * The installed catalog models for one route, indexed by model id.
  * @param provider - provider route key.
  * @returns catalog models by id; empty for a route pi-ai does not ship.
@@ -220,7 +274,11 @@ export function catalogProviderTakesApiKey(provider: string): boolean {
 export function catalogModels(provider: string): Map<string, Model<Api>> {
   if (!catalogProviders().has(provider)) return new Map()
   const models = getBuiltinModels(provider as BuiltinProvider) as Model<Api>[]
-  return new Map(models.map(model => [model.id, model]))
+  const byId = new Map(models.map(model => [model.id, model]))
+  for (const [id, entry] of Object.entries(LEGACY_MODEL_ENTRIES[provider] ?? {})) {
+    if (!byId.has(id)) byId.set(id, entry)
+  }
+  return byId
 }
 
 /**
@@ -273,7 +331,8 @@ const COMPLETIONS_COMPAT_GATE = {
   zaiToolStream: 'withhold',
   supportsOpenAIGrammarTools: 'withhold',
   sendSessionAffinityHeaders: 'withhold',
-  deferredToolsMode: 'withhold',
+  supportsMidConvoSystemMessages: 'withhold',
+  supportsMidConvoToolAdditions: 'withhold',
   sessionAffinityFormat: 'withhold',
 } as const satisfies Record<keyof OpenAICompletionsCompat, CompatDisposition>
 
@@ -288,6 +347,7 @@ const RESPONSES_COMPAT_GATE = {
   supportsAdditionalTools: 'withhold',
   supportsToolSearch: 'withhold',
   supportsExplicitPromptCacheMode: 'withhold',
+  supportsMidConvoSystemMessages: 'withhold',
 } as const satisfies Record<keyof OpenAIResponsesCompat, CompatDisposition>
 
 /** Disposition of every `AnthropicMessagesCompat` field; a drift gate like the one above. */
@@ -300,7 +360,9 @@ const ANTHROPIC_COMPAT_GATE = {
   allowEmptySignature: 'offer',
   supportsStrictTools: 'offer',
   sendSessionAffinityHeaders: 'withhold',
-  supportsToolReferences: 'withhold',
+  sessionAffinityFormat: 'withhold',
+  supportsMidConvoSystemMessages: 'withhold',
+  supportsMidConvoToolChanges: 'withhold',
   supportsMidConvoEffort: 'withhold',
   allowedFallbackModels: 'withhold',
 } as const satisfies Record<keyof AnthropicMessagesCompat, CompatDisposition>
@@ -309,6 +371,11 @@ const ANTHROPIC_COMPAT_GATE = {
 const BEDROCK_COMPAT_GATE = {
   supportsStrictMode: 'offer',
 } as const satisfies Record<keyof BedrockCompat, CompatDisposition>
+
+/** Disposition of every `MistralConversationsCompat` field. */
+const MISTRAL_COMPAT_GATE = {
+  supportsMidConvoSystemMessages: 'withhold',
+} as const satisfies Record<keyof MistralConversationsCompat, CompatDisposition>
 
 /**
  * Every wire protocol pi-ai gives a compat type. Derived from `Model.compat`'s
@@ -329,6 +396,7 @@ type ApiWithCompat = { [K in KnownApi]: NonNullable<Model<K>['compat']> extends 
  * models declare.
  */
 const COMPAT_GATES: Readonly<Record<ApiWithCompat, Readonly<Record<string, CompatDisposition>>>> = {
+  'mistral-conversations': MISTRAL_COMPAT_GATE,
   'openai-completions': COMPLETIONS_COMPAT_GATE,
   'openai-responses': RESPONSES_COMPAT_GATE,
   'azure-openai-responses': RESPONSES_COMPAT_GATE,
@@ -357,6 +425,8 @@ type OfferedCompatField =
   | OfferedIn<typeof RESPONSES_COMPAT_GATE>
   | OfferedIn<typeof ANTHROPIC_COMPAT_GATE>
   | OfferedIn<typeof BEDROCK_COMPAT_GATE>
+  // oxlint-disable-next-line typescript/no-redundant-type-constituents -- Include gates whose current offering is empty.
+  | OfferedIn<typeof MISTRAL_COMPAT_GATE>
 
 /**
  * pi-ai wire-compatibility switches, set on the route (its models' default) or
@@ -470,7 +540,7 @@ export type EveryOfferedFieldIsDocumented = AssertNever<Exclude<OfferedCompatFie
 type AssertTrue<T extends true> = T
 
 /** Every compat type a gate classifies, merged so one `Pick` reaches all offered fields. */
-type UpstreamCompat = OpenAICompletionsCompat & OpenAIResponsesCompat & AnthropicMessagesCompat & BedrockCompat
+type UpstreamCompat = OpenAICompletionsCompat & OpenAIResponsesCompat & AnthropicMessagesCompat & BedrockCompat & MistralConversationsCompat
 
 /**
  * Proof that each documented field carries its upstream type, not a hand-copied
@@ -764,7 +834,7 @@ function resolveModelReasoning(
 }
 
 /** The compat block a materialized model carries, whichever protocol it speaks. */
-type ModelCompat = OpenAICompletionsCompat | OpenAIResponsesCompat | AnthropicMessagesCompat | BedrockCompat
+type ModelCompat = OpenAICompletionsCompat | OpenAIResponsesCompat | AnthropicMessagesCompat | BedrockCompat | MistralConversationsCompat
 
 /**
  * Resolve one model's compat block from the profile's switches.

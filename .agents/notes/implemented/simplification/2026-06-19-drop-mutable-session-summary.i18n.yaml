@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-19-drop-mutable-session-summary.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-06-19-drop-mutable-session-summary.md
-2026-06-19-drop-mutable-session-summary.md: 91932c50e02fe5aa488599afd913c5c34706b67d
-2026-06-19-drop-mutable-session-summary.zh.md: b8612b57bea1e1235452a128ea517848b9d55862
+/agent-note-drop-the-mutable-session-summary:
+  en: 6fa08e78a7eaa100
+  zh: f9225f1e560a7953
+/agent-note-drop-the-mutable-session-summary/problem:
+  en: c6912e68b654f76d
+  zh: c09acecb90cd1011
+/agent-note-drop-the-mutable-session-summary/decision:
+  en: b35e87aebc5e03c4
+  zh: e02a8da177acb36f
+/agent-note-drop-the-mutable-session-summary/no-migration:
+  en: aa48c2e9629f93d6
+  zh: bf2424ff64e6b303
+/agent-note-drop-the-mutable-session-summary/consequences:
+  en: df63997526b4de71
+  zh: 4c6fc501557e21c7

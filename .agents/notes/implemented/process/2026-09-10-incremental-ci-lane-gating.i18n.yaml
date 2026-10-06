@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-10-incremental-ci-lane-gating.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-10-incremental-ci-lane-gating.md
-2026-09-10-incremental-ci-lane-gating.md: f50ebb6564daf574e1e96332959cb88020e947ee
-2026-09-10-incremental-ci-lane-gating.zh.md: f46bb3edb037d9c10cc0e54f348209753caa0777
+/agent-note-incremental-ci-lane-gating:
+  en: 90f73100508e0437
+  zh: 1944eef05bf93910
+/agent-note-incremental-ci-lane-gating/problem:
+  en: b012c8bd1bf16044
+  zh: 990bb55d4ef882fe
+/agent-note-incremental-ci-lane-gating/decision:
+  en: 568b884de3d3ce1a
+  zh: ef22b7f66fb60694
+/agent-note-incremental-ci-lane-gating/alternatives-considered:
+  en: fc6fd5a1c3dfa09a
+  zh: f17be4bfe83bcbd8
+/agent-note-incremental-ci-lane-gating/consequences:
+  en: 0cf6a200b18aaf88
+  zh: a5f2fb8772b4a71b
+/agent-note-incremental-ci-lane-gating/tests:
+  en: 343c5befd0662f85
+  zh: 3489cb7be3066c5c

@@ -20,13 +20,13 @@
   - img
   - text: System prompt
 - text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop."
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Think The user wants me to read a.txt and b.txt, then reply with \"DONE\". Let me do both reads in parallel.":
+- button "Thinking The user wants me to read a.txt and b.txt, then reply with \"DONE\". Let me do both reads in parallel.":
   - img
   - img
-  - text: Think The user wants me to read a.txt and b.txt, then reply with "DONE". Let me do both reads in parallel.
+  - text: Thinking The user wants me to read a.txt and b.txt, then reply with "DONE". Let me do both reads in parallel.
 - button "Read a.txt":
   - img
   - img
@@ -37,10 +37,10 @@
   - img
   - text: Read
   - button "b.txt"
-- button "Think Both files have been read. a.txt contains \"alpha\" and b.txt contains \"beta\". I'll now reply with DONE as instructed.":
+- button "Thinking Both files have been read. a.txt contains \"alpha\" and b.txt contains \"beta\". I'll now reply with DONE as instructed.":
   - img
   - img
-  - text: Think Both files have been read. a.txt contains "alpha" and b.txt contains "beta". I'll now reply with DONE as instructed.
+  - text: Thinking Both files have been read. a.txt contains "alpha" and b.txt contains "beta". I'll now reply with DONE as instructed.
 - paragraph: DONE
 - button "Copy":
   - img
@@ -54,8 +54,11 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - "button \"compact Compacted 5 history items (~{{tokens}} tokens)\""
+- button "Process details":
+  - text: Process details
+  - img
 - button "Context injection AGENTS.md":
   - img
   - img
@@ -67,7 +70,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -79,4 +82,5 @@
   - button "16K tok · Cache hit 98%":
     - img
     - text: 16K tokCache hit 98%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

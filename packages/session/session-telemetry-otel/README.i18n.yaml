@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-telemetry-otel/README.md
-README.md: fd85d6505d7841196f306e95764294c37a6afca7
-README.zh.md: 94ef1b40489427865db427aad93bb736d74e8c09
+/:
+  en: 255ab2e2d7cdf5b7
+  zh: 61495d48365178df
+/deepseek-ai-dsh-session-telemetry-otel:
+  en: 6494fc2f6ec38b03
+  zh: 7074d35851b16ea0
+/deepseek-ai-dsh-session-telemetry-otel/summary:
+  en: 1c5d2f15cb13e318
+  zh: 5e061a16cd38c4c5
+/deepseek-ai-dsh-session-telemetry-otel/table-of-contents:
+  en: db0de18be046e070
+  zh: 7409aef706c82a04
+/deepseek-ai-dsh-session-telemetry-otel/config:
+  en: 82c5f7e63355fbcd
+  zh: 63e43b80e10877b8
+/deepseek-ai-dsh-session-telemetry-otel/what-leaves-the-machine:
+  en: b16ca55cdd42b153
+  zh: c1aab273173ccd0c
+/deepseek-ai-dsh-session-telemetry-otel/field-mapping:
+  en: 4f6d2fe686113055
+  zh: a12a1823ad2ab93e
+/deepseek-ai-dsh-session-telemetry-otel/invariants:
+  en: 283df679c2c43d0a
+  zh: e1dd109e4cacf35c
+/deepseek-ai-dsh-session-telemetry-otel/model-experience:
+  en: a5a1c890ddacd9a9
+  zh: 019c0d113e141853
+/deepseek-ai-dsh-session-telemetry-otel/model-experience/kv-cache-effect:
+  en: 7593cf5d0d2cedd6
+  zh: ae5eece628147ab8
+/deepseek-ai-dsh-session-telemetry-otel/known-limitations-and-deferred-work:
+  en: 80e0eec297820696
+  zh: 17fdc0384ae1eb9e
+/deepseek-ai-dsh-session-telemetry-otel/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

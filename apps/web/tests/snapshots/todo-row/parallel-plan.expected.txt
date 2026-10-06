@@ -1,7 +1,7 @@
 row=todo_write
 title=Update to-do list
 summary=1/4 completed · 实现 fixture 样本
-suffix=+1
+suffix=4 added · +1
 panel=1 completed · 2 in progress · 1 pending
 item=completed 梳理需求
 item=in_progress 实现 fixture 样本

@@ -1,0 +1,78 @@
+- banner:
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - navigation "Session hierarchy":
+    - button "Use the ask_user_question tool to" [disabled]
+  - img
+  - text: Standard mode
+  - button "Session log":
+    - text: Session log
+    - img
+  - button "Open right sidebar":
+    - img
+- button "1 tool call · 2 intermediate messages" [expanded]:
+  - text: 1 tool call · 2 intermediate messages
+  - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
+- text: "Use the ask_user_question tool to ask me exactly one multi-select question with id \"color\", question \"Which color do you prefer?\", header \"Pick one\", and two options: label \"Blue\" with description \"A cool recessive hue that reads as calm and trustworthy in long reading sessions and dense dashboards.\", and label \"Green\" with description \"A restful mid-spectrum hue with the highest perceived brightness, easiest on the eye over long sessions.\" Set multi_select to true. After I answer, reply with the single word DONE and stop."
+- group "Message time and speed": "{{clock}}"
+- button "Copy":
+  - img
+- button "Context injection runtime-context":
+  - img
+  - img
+  - text: Context injection runtime-context
+- button "Thinking The user wants me to use the ask_user_question tool with specific parameters. Let me do exactly that.":
+  - img
+  - img
+  - text: Thinking The user wants me to use the ask_user_question tool with specific parameters. Let me do exactly that.
+- button "Ask question 1/1 answered" [expanded]:
+  - img
+  - text: Ask question 1/1 answered
+- term: Which color do you prefer?
+- definition: Blue Include accessibility notes
+- button "Inspect"
+- button "Thinking The user answered \"Blue\". I should now reply with the single word DONE and stop.":
+  - img
+  - img
+  - text: Thinking The user answered "Blue". I should now reply with the single word DONE and stop.
+- paragraph: DONE
+- button "Copy":
+  - img
+- button "Good response":
+  - img
+- button "Bad response":
+  - img
+- button "Branch into a new conversation":
+  - img
+- group "Turn time and speed":
+  - "button \"Ran for {{duration}}\"":
+    - img
+    - text: "Ran for {{duration}}"
+- group "Message time and speed": "{{clock}}"
+- textbox "Message the agent"
+- button "Add images or documents":
+  - img
+- button "Choose from Documents":
+  - img
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace write"': Workspace write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "3% of context used"
+- button "Send message" [disabled]
+- group "Session statistics":
+  - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
+    - img
+    - text: "1 turns · 2 steps{{throughput}} tok/s"
+  - button "8.8K tok · Cache hit 95%":
+    - img
+    - text: 8.8K tokCache hit 95%
+- separator "Adjust transcript content width"
+- separator "Adjust transcript content width"

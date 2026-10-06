@@ -206,8 +206,10 @@ interface CreateSessionOptions {
   /** Initial replay or fork history supplied at construction. */
   readonly seed?: readonly SessionEvent[]
   /**
-   * Exact fork-inherited prefix length when `meta.isSeeded` is true. A
-   * constructor seed may also contain child-owned setup events after this cut.
+   * Exact fork-inherited prefix length when `meta.isSeeded` is true. The
+   * constructor appends the child-owned tagged marker at the cut unless
+   * the seed already includes it followed by child-owned fork closers.
+
    */
   readonly inheritedEventCount?: SessionLogOffset
   /**
@@ -229,11 +231,9 @@ interface CreateSessionOptions {
 }
 ```
 
-因此，普通回放的调用方式为 `ctx.sessions.create(id, { seed: seedEvents })`；fork 还会提供 `inheritedEventCount` 与 `meta.isSeeded: true`。将一个*持久化*会话恢复为活跃 agent 的调用方式为 `ctx.agents.resume({ resumeSessionId })`。
+## `SessionStorageMetadata`——逻辑头与继承切点
 
-## `SessionStorageMetadata`：逻辑 header 与继承 cut
-
-每个读取 Session 正文的持久化结果都携带 `SessionStorageMetadata`：当前逻辑 header，以及单独校验的继承事件 cut。仅 header 的列表操作有意只返回 `SessionHeader`。
+每个读取 Session 主体的持久化结果都携带 `SessionStorageMetadata`：当前逻辑头加上单独校验过的继承事件切点。仅列头的查询有意只返回 `SessionHeader`。
 
 ```ts type-equiv
 /** Logical Session header paired with its exact inherited cut for body-bearing storage operations. */

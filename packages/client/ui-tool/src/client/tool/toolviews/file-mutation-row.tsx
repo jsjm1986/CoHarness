@@ -13,12 +13,15 @@ import { IconEditOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
 import { diffCardModel } from '../models/diff-card-model.ts'
-import { toolRowModel } from '../models/tool-call-model.ts'
+import { toolRowModel, toolTitleKey } from '../models/tool-call-model.ts'
 import { ToolRow } from '../components/ToolRow.tsx'
+import { PreparingToolRow } from '../components/PreparingToolRow.tsx'
 import { CONVERSATION_NS as NS } from '../../locale.ts'
 
 /** Full row props: the toolview runtime share plus the standard locale seat. */
 type FileMutationRowProps = ToolCallViewProps & PropsLocale<'conversation'>
+
+const FILE_MUTATION_ICON = <IconEditOutline16 size={14} />
 
 /**
  * File-mutation row: icon + {Edit,Write} · {path} in the shared ToolRow chrome,
@@ -29,15 +32,39 @@ type FileMutationRowProps = ToolCallViewProps & PropsLocale<'conversation'>
  * model-facing error text through its Output section and its first line in the
  * collapsed summary instead.
  */
-export function FileMutationRow({ toolName, block, cwd, home, openFile, inspect, openDetails, t }: FileMutationRowProps) {
+export function FileMutationRow(props: FileMutationRowProps) {
+  return props.phase === 'preparing'
+    ? <PreparingFileMutationRow {...props} />
+    : <StartedFileMutationRow {...props} />
+}
+
+/** Preparation phase: the streamed argument prefix sizes the summary copy. */
+function PreparingFileMutationRow({
+  toolName, useToolCallArgumentsPartial, t, useDisclosure,
+}: Extract<FileMutationRowProps, { phase: 'preparing' }>) {
+  const raw = useToolCallArgumentsPartial()
+  return (
+    <PreparingToolRow
+      toolName={toolName}
+      icon={FILE_MUTATION_ICON}
+      title={t(toolTitleKey(toolName))}
+      summary={t('tool.preparing.content', { kilobytes: Math.ceil(raw.length / 1024) })}
+      t={t}
+      useDisclosure={useDisclosure}
+    />
+  )
+}
+
+function StartedFileMutationRow({ useDisclosure, toolName, block, cwd, home, openFile, inspect, openDetails, t }: Exclude<FileMutationRowProps, { phase: 'preparing' }>) {
   const model = toolRowModel(toolName, block, cwd, home)
   const diff = diffCardModel(block)
   return (
     <ToolRow
+      useDisclosure={useDisclosure}
       t={t}
       variant={model.variant}
       toolName={toolName}
-      icon={<IconEditOutline16 size={14} />}
+      icon={FILE_MUTATION_ICON}
       title={t(model.titleKey)}
       summary={model.summary}
       bodyRaw={null}

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-26-runtime-archive-package-closure.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-26-runtime-archive-package-closure.md
-2026-08-26-runtime-archive-package-closure.md: 33f7b7b316a40af5d590f14a2354ed19711edcc9
-2026-08-26-runtime-archive-package-closure.zh.md: 0e55538b7dd0f6863cefec40666766e71c7e20a3
+/agent-note-keep-the-archive-runtime-package-in-the-installation-dependency-closure:
+  en: 9282ffe9b66c3aa4
+  zh: 51f2086b9f246893
+/agent-note-keep-the-archive-runtime-package-in-the-installation-dependency-closure/problem:
+  en: 34dcad8c3c5840ce
+  zh: 42bcc05cfcb4eb6b
+/agent-note-keep-the-archive-runtime-package-in-the-installation-dependency-closure/decision:
+  en: d83dfbcbf45fc804
+  zh: d592fbd016813347
+/agent-note-keep-the-archive-runtime-package-in-the-installation-dependency-closure/alternatives-considered:
+  en: 95bd4af0cecb5d64
+  zh: e35bd38ca4b3738f
+/agent-note-keep-the-archive-runtime-package-in-the-installation-dependency-closure/consequences:
+  en: a5deff6837b7c8a5
+  zh: 311f81d278d3a389
+/agent-note-keep-the-archive-runtime-package-in-the-installation-dependency-closure/testing:
+  en: caa1bdccba7ccbb4
+  zh: 9dd0740b6b071b4f

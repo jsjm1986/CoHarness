@@ -56,8 +56,9 @@ function renderRow(state: Partial<AgentPresetSettingsState> = {}) {
   return actions
 }
 
-function renderSeat(state: Partial<AgentPresetSeatState> = {}) {
+function renderSeat(state: Partial<AgentPresetSeatState> = {}, developerTools = true) {
   const store = createSnapshotStore<AgentPresetSeatState>({ ...SEAT_READY, ...state })
+  const devTools = createSnapshotStore(developerTools)
   const actions = {
     load: vi.fn(() => Promise.resolve()),
     select: vi.fn(() => Promise.resolve()),
@@ -66,9 +67,10 @@ function renderSeat(state: Partial<AgentPresetSeatState> = {}) {
   render(<AgentPresetSeat {...({
     ...actions,
     useAgentPresetSeat: bindSnapshotSelector(store),
+    useDeveloperTools: bindSnapshotSelector(devTools),
     t: (key: keyof typeof en) => en[key],
   } as unknown as AgentPresetSeatProps)} />)
-  return { ...actions, store }
+  return { ...actions, store, devTools }
 }
 
 function renderLabel(
@@ -266,6 +268,17 @@ describe('the new-session chip', () => {
 
     renderSeat({ current: '' })
     expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('hides the seat while developer tools are disabled', () => {
+    const { devTools } = renderSeat({}, true)
+    expect(screen.queryByRole('button')).not.toBeNull()
+
+    act(() => { devTools.set(false) })
+    expect(screen.queryByRole('button')).toBeNull()
+
+    act(() => { devTools.set(true) })
+    expect(screen.queryByRole('button')).not.toBeNull()
   })
 
   it('closes on an outside dismissal', () => {

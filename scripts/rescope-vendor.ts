@@ -81,6 +81,12 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'packages/examples/acp-demo/tests/built-bin.e2e.ts', upstream: ['cordis', 'cosmokit', 'schemastery'] },
   // `Symbol.for('schemastery')` and the `vendor:` metadata field are upstream identifiers.
   { file: 'vendor/schemastery/src/index.ts', upstream: ['schemastery'] },
+  // The vendored package marks its Config schemas with `Symbol.for('schemastery')`;
+  // detecting that marker keeps the upstream identifier or interop breaks.
+  { file: 'packages/boot/app-boot/src/config-schema/native.ts', upstream: ['schemastery'] },
+  { file: 'packages/boot/app-boot/tests/config-schema.spec.ts', upstream: ['schemastery'] },
+  // The `~standard.vendor` spec identifier is the upstream name, not a package specifier.
+  { file: 'vendor/loader/src/config/diff.ts', upstream: ['schemastery'] },
   // Asserts the vendored-manifest table, which gains an upstream-name column.
   { file: 'scripts/gen-third-party-notices.spec.ts', upstream: RENAMES.map(rename => rename.upstream) },
   // `cordis` is also an agent-preset id — the directory name under
@@ -92,6 +98,8 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'packages/client/ui-agent-preset/tests/apply.client.spec.ts', upstream: ['cordis'] },
   { file: 'packages/client/ui-agent-preset/tests/locales.client.spec.ts', upstream: ['cordis'] },
   { file: 'packages/client/ui-agent-preset/tests/section.client.spec.tsx', upstream: ['cordis'] },
+  // The guide dialog keys its preset blurbs by the `cordis` preset id, not a package.
+  { file: 'packages/client/ui-agent-preset/src/client/PresetGuideDialog.tsx', upstream: ['cordis'] },
   // TODO(alpha.2): restore apps/cli/tests/web-agent-presets.e2e.ts with the
   // shipped-presets port that exports SHIPPED_PRESET_ROOT.
   { file: 'apps/web/tests/agent-preset-authoring.e2e.ts', upstream: ['cordis'] },
@@ -147,6 +155,7 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'packages/extensions/ui-cordis/src/client/CordisActionRow.tsx', upstream: ['cordis'] },
   { file: 'packages/extensions/ui-cordis/src/client/CordisDefineRow.tsx', upstream: ['cordis'] },
   { file: 'packages/extensions/ui-cordis/src/client/CordisPanel.tsx', upstream: ['cordis'] },
+  { file: 'packages/extensions/ui-cordis/src/client/CordisPreparingRow.tsx', upstream: ['cordis'] },
   { file: 'packages/extensions/ui-cordis/src/client/CordisRunRow.tsx', upstream: ['cordis'] },
   { file: 'packages/extensions/ui-cordis/src/client/locales.ts', upstream: ['cordis'] },
 ]
@@ -369,8 +378,6 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
   /** The name this package carries upstream; MIT attribution names the fork's origin, not our scope. */
   upstreamName: string
   upstream: string
-  /** The checked-in \`vendor/\` directory disclosed by the notices row. */
-  sourceDirectory: string
 }`,
     expect: 1,
   },
@@ -403,7 +410,7 @@ const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery)(\\/|$)/
     find: `| Package | Upstream | License |
 | --- | --- | --- |
 \${vendored.map(row => \`| \\\`\${row.npmName}\\\` | [\${row.upstream.replace('https://', '')}](\${row.upstream}) | MIT |\`).join('\\n')}`,
-    replace: `| Package | Upstream name | Upstream | License |
+    replace: `| Package | Upstream name | Source | License |
 | --- | --- | --- | --- |
 \${vendored.map(row => \`| \\\`\${row.npmName}\\\` | \\\`\${row.upstreamName}\\\` | [\${row.sourceDirectory}](\${row.sourceDirectory}/) | MIT |\`).join('\\n')}`,
     expect: 1,

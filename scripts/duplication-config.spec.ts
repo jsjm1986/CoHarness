@@ -14,7 +14,7 @@ describe('duplication gate configuration', () => {
     }
 
     expect(config).toMatchObject({
-      threshold: 0.115,
+      threshold: 0.09,
       reporters: ['console'],
     })
     expect(config).not.toHaveProperty('exitCode')

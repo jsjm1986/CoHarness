@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-claude-startup-hooks.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-17-claude-startup-hooks.md
-2026-09-17-claude-startup-hooks.md: e48d8c4f41be8e0f24d5c571007baa32b96816a4
-2026-09-17-claude-startup-hooks.zh.md: 8e5279dd3921bfc7b0f0631bc1a772d56d3ae9d7
+/agent-note-await-claude-code-sessionstart-hooks:
+  en: 17dc69212df144cd
+  zh: 1a5854f2f665965d
+/agent-note-await-claude-code-sessionstart-hooks/problem:
+  en: 9a289ac935c9bb67
+  zh: a3b940a854533b32
+/agent-note-await-claude-code-sessionstart-hooks/decision:
+  en: 71b4c13b7648c4e2
+  zh: 3ee16deec68c6420
+/agent-note-await-claude-code-sessionstart-hooks/alternatives-considered:
+  en: 668640f4d5711c65
+  zh: 050f0c4f669d39ed
+/agent-note-await-claude-code-sessionstart-hooks/consequences:
+  en: 6d5f104a2240a72b
+  zh: 87209840a5ba2dad
+/agent-note-await-claude-code-sessionstart-hooks/verification:
+  en: e1b4e9f904f49d66
+  zh: 0dedd488640bd60e

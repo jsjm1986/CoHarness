@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-14-docs-mermaid-viewer.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-14-docs-mermaid-viewer.md
-2026-09-14-docs-mermaid-viewer.md: 03aecb7b4df1c79d2eb254375f6b2c68145079ac
-2026-09-14-docs-mermaid-viewer.zh.md: b66f427a4820eef0d6fa25b163cfc8e3548ec0c6
+/agent-note-documentation-mermaid-viewer:
+  en: ba1a156f12503487
+  zh: de6cd8986da8842e
+/agent-note-documentation-mermaid-viewer/problem:
+  en: e2e7c4902e4ce7a1
+  zh: cbff4b7ea9a74f12
+/agent-note-documentation-mermaid-viewer/decision:
+  en: 2737a044dd98e9b3
+  zh: a582c8d7db78c5cf
+/agent-note-documentation-mermaid-viewer/alternatives-considered:
+  en: bdebec164a27c787
+  zh: 8acb59417c96b807
+/agent-note-documentation-mermaid-viewer/consequences:
+  en: dd3022dd4fcdeb15
+  zh: 8e69b9b7dd0e6792

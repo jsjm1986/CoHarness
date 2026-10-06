@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-attachment-local
 
 [English](README.md) | 中文
@@ -16,10 +21,22 @@
 
 在运行 DSH 的机器上，把图片与通用文件附件持久存储到 `DSH_HOME` 下。图片经过校验、针对模型请求完成规范化并按路由缓存；通用文件不设准入限制，按字节原样保存。即使上传时使用不同显示名称，相同字节也只存储一次；读取会校验文件长度与内容，之后收紧限制也不会让已接纳的图片不可读。随附的 `dsh` 组合无需配置即可使用本包。对象仅限本机，并且永远不会自动删除。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与待完成工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。已发布对象是按内容哈希寻址的不可变文件，且分段原子发布路径由文件系统层规格断言；提供方自身不保留可变索引。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 本包通过请求描述符间接影响模型。执行文件系统可以映射宿主对象时，模型会随请求字节看到每张图片的身份、尺寸、媒体类型、只读进程路径、可写副本扩展名与规范化警告。通用文件会投影为指出文件身份与只读进程路径的文本句柄；无法映射时，句柄会说明当前执行环境不能读取该文件。
@@ -28,9 +45,21 @@
 
 规范化和请求投影都是确定性的。附件和路由策略不变时，之后各轮会复用相同的缓存请求字节；执行世界路径映射可以改变描述符文本，而不会改变这些字节或其 `variantId`。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与待完成工作
 
+- 设置 `DSH_MANAGED_DATA_MANIFEST` 的受管启动会在写入数据前登记实际解析后的 `attachments/v1` 目录。清单无效时拒绝初始化；保留旧根和部署批准遵循[清单与备份规则](../../util/managed-data/README.zh.md)。
 - 规范化附件对象会无限期保留；派生请求图片文件受 `requestImageCacheMaxBytes`、`requestImageCacheMaxEntries` 和 `requestImageCacheTtlMs` 限制，并由尽力而为的定时器回收。
 - 本地后端假定宿主与提供方适配器共享同一个文件系统服务。
 - 动态 GIF 源图只保留首帧；动画在版本一图片契约之外。
 - 规范化和请求版本编码器由安装的 sharp/libvips 构建钉定；编码器或变换策略版本升级会让未来的规范化附件或请求变体产生新地址，已有对象保持有效。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

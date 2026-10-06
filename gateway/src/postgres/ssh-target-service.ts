@@ -231,7 +231,8 @@ export class PostgresSshTargetService {
 
   /**
    * Replace one target's coordinates only when the submitted revision is current.
-   * @param input - public target id, observed revision, and complete new field set.
+   * An omitted password reference preserves the stored value; explicit null clears it.
+   * @param input - public target id, observed revision, and new connection fields.
    * @returns the updated target.
    */
   async update(input: unknown): Promise<SshTargetView> {
@@ -239,8 +240,8 @@ export class PostgresSshTargetService {
     if (!parsed.success) throw new SshTargetError(400, 'invalid ssh target update')
     const { targetId, revision, fields: value } = parsed.data
     return this.run(async client => {
-      const current = await client.query<{ revision: string }>(
-        `SELECT revision::text FROM harness.ssh_targets WHERE organization_id=$1 AND public_id=$2 FOR UPDATE`,
+      const current = await client.query<{ revision: string; password_ref: string | null }>(
+        `SELECT revision::text,password_ref FROM harness.ssh_targets WHERE organization_id=$1 AND public_id=$2 FOR UPDATE`,
         [this.context.organizationId, targetId])
       const row = current.rows[0]
       if (row === undefined) throw new SshTargetError(404, 'ssh target not found')
@@ -256,7 +257,7 @@ export class PostgresSshTargetService {
         WHERE organization_id=$1 AND public_id=$2`,
       [this.context.organizationId, targetId, value.name, value.host, value.node, value.helper,
         value.helperHash, value.workspace, value.bootstrapPath ?? null, value.bootstrapHash ?? null,
-        value.passwordRef ?? null, value.requestTimeoutMs ?? null, value.maxFrameBytes ?? null,
+        value.passwordRef === undefined ? row.password_ref : value.passwordRef, value.requestTimeoutMs ?? null, value.maxFrameBytes ?? null,
         value.maxPending ?? null, value.leaseMs ?? null])
       const updated = await client.query<TargetRow>(
         `SELECT ${columns} FROM harness.ssh_targets t WHERE t.organization_id=$1 AND t.public_id=$2`,

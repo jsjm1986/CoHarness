@@ -10,7 +10,8 @@ import { desktopEn } from '../src/client/desktop-locales.ts'
 afterEach(cleanup)
 const ok = <T,>(value: T) => ({ rpcId: 'r' as never, result: { ok: true as const, value } })
 function fixture() {
-  const value: DesktopConfirmation = { rootSessionId: 'root' as SessionId, nodeId: 'node', desktop: 'display-0', userId: 12, eligible: true, confirmed: false }
+  const value: DesktopConfirmation = { rootSessionId: 'root' as SessionId, nodeId: 'node', desktop: 'display-0', userId: 12,
+    eligible: true, confirmed: false, occupancy: { available: true, inUse: false, heldByThisSession: false, queued: 0 } }
   const status = vi.fn<ConnectionHandle['api']['desktop']['status']>().mockResolvedValue(ok(value))
   const confirm = vi.fn<ConnectionHandle['api']['desktop']['confirm']>().mockImplementation(async payload => ok({ ...value, confirmed: payload.confirmed }))
   const state = createSnapshotStore<'connected' | 'reconnecting' | undefined>('connected')

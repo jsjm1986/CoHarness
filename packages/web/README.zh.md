@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # web/：web 能力家族
 
 [English](README.md) | 中文

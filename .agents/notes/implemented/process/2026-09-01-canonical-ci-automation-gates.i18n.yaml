@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-01-canonical-ci-automation-gates.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-01-canonical-ci-automation-gates.md
-2026-09-01-canonical-ci-automation-gates.md: 31095b480e6268f0efc2f06c8b312eba3a30e063
-2026-09-01-canonical-ci-automation-gates.zh.md: c2855120735818ef27388059748a29361534db93
+/agent-note-canonical-repository-gates-for-credentialed-ci-automation:
+  en: 08f49a2e56f498e4
+  zh: d4b311cd6ba9caae
+/agent-note-canonical-repository-gates-for-credentialed-ci-automation/problem:
+  en: 2a9e05c8d1888bfc
+  zh: c23b90204acead54
+/agent-note-canonical-repository-gates-for-credentialed-ci-automation/decision:
+  en: 6f35f1cf106250ea
+  zh: 4cb2a06cc0fb3627
+/agent-note-canonical-repository-gates-for-credentialed-ci-automation/alternatives-considered:
+  en: cffd9cedb5217086
+  zh: 5541e7e8829827a7
+/agent-note-canonical-repository-gates-for-credentialed-ci-automation/consequences:
+  en: 703e99a2500aef08
+  zh: 34208a18570e255a

@@ -14,8 +14,12 @@
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - text: /user-invoke-demo and confirm the fixture wiring
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
 - paragraph: USER_INVOKE_REPLY acknowledged; following the injected skill.
@@ -31,7 +35,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -39,7 +43,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -52,4 +56,5 @@
   - button "272 tok · Cache hit 0%":
     - img
     - text: 272 tokCache hit 0%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

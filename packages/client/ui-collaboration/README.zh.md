@@ -1,14 +1,32 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-collaboration
 
 [English](README.md) | 中文
 
 Web 客户端的 Gateway 协作 UI。一个插件通过已有 Client slot 与会话创建 waterfall 事件，负责账户上下文 HTTP 状态、个人/项目 scope 选择器、根对话待用可见性、对话共享菜单，以及只读项目 composer 策略。
 
+Workbench 的共享、只读输入区选择及创建资格按窗格或请求的 runtime 判定，与页面当前空间独立。浏览器共享请求携带原始 Session ID 和显式项目 ID；Gateway 在读取或修改可见性前核验项目。个人窗格不会继承项目窗格的只读状态或共享控件。
+
 ## 概述
 
 使用 `dsh-client-ui-collaboration` 获得 Web 客户端的 Gateway 协作 UI：账户上下文选择器、分阶段的根会话可见性、会话共享菜单与只读项目创作区策略。一个插件经既有 Client 槽位与会话创建瀑布事件贡献这些能力，共享项目会话无需独立账户界面即可工作。
 
 
+## 目录
+
+- [用户界面约定](#user-interface-contract)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="user-interface-contract"></a>
 ## 用户界面约定
 
 - `sidebar.footer.action` 显示当前个人或项目运行时、可访问成员身份、`ro`/`rw` 模式，以及下一条根对话的 `project` 或 `private` 可见性。更改运行时 scope 会通过 `/account/api/scope` 持久化并刷新页面，使每条 Host 连接都指向所选运行时。
@@ -18,14 +36,18 @@ Web 客户端的 Gateway 协作 UI。一个插件通过已有 Client slot 与会
 - `conversation.session.header.actions` 用一个紧凑入口显示可见性和参与者数量。菜单会加载从根继承的访问权限、创建者、参与者列表和参与次数；创建者或组织管理员可以请求更改可见性，`visibility-locked` 响应也会继续显示在其中。
 - 高优先级 `conversation.composer` 注册为 `ro` 项目成员替换整个 composer，覆盖普通输入、审批和问答控件。`sessions/prepare-create` 也会在 RPC 分发前拒绝创建根会话。
 - 新建 `rw` 项目会话流程会通过 `sessions/prepare-create` 传递待用可见性。复用空白候选项前，`sessions/confirm-blank-reuse` 会通过 Gateway 重新校验其根可见性，并且只接受完全匹配的候选项；不匹配时会用准备后的可见性创建新根会话。HTTP 响应会先在浏览器信任边界通过 16 MiB 的流式字节上限解码，再发布任何状态。
-- 所有注册都是 effect，并会在卸载时完整清理。个人 scope 保留普通 Web UI，并清除项目对话详情状态。
+- 所有注册都是 effect，并会在卸载时完整清理。个人窗格保留普通 Web UI。账号变化及成员资格移除会清除对应的缓存会话详情。
 
 账户上下文还会把当前账户选择 Full 和 Auto 的资格发布到现有运行时 UI 策略。刷新开始时撤销验证状态；请求失败可保留展示上下文，但不会保留权限资格。连接重置会取消并丢弃上一代上下文请求。消费者将该账户值与自身连接的部署信息结合，遵循[权限 UI 规则](../ui-permission-presets/README.zh.md)。
 
+上下文加载只合并非强制调用；变更后的强制刷新会取代并取消旧的上下文读取，陈旧请求的成功或失败都不会发布。请求 slot 在延迟传输执行或通知订阅者之前赋值。对话详情的强制刷新仍保留合并后的尾随读取语义。
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。协作事实位于 Gateway 上经认证的端点之后；插件只在页面中暂存请求作用域的选择与 composer 策略。
 
+<a id="model-experience"></a>
 ## 模型体验
 
 经由宿主协作消费方间接产生影响；浏览器 UI 所选状态的授权与参与者归属由该消费方负责。
@@ -34,8 +56,18 @@ Web 客户端的 Gateway 协作 UI。一个插件通过已有 Client slot 与会
 
 无直接失效；消费方负责请求前缀的任何变化。
 
-## 已知限制与延期工作
+## 已知限制与延期工作 <a id="known-limitations-and-deferred-work"></a>
 
 - **切换 scope 时整页刷新** — 个人和项目运行时使用独立 Host 连接与进程状态，因此切换不会保留当前页面草稿。Gateway 准备目标运行时期间，客户端会显示不可关闭的状态层，告知目标空间、启动阶段和已等待时间；scope mutation 成功后仍会执行整页刷新。
 - **仅支持 Gateway 传输** — `/account/api/context` 缺失或失败时会隐藏协作控件，并保留普通个人 Web UI。
 - **浏览器暂存创建可见性** — 页面加载后，下一条对话的选择默认恢复为项目公开；它不是账户偏好设置。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -30,7 +30,9 @@ function settledMaterial(node: ToolResultNode, callId: string): CallMaterial {
 
 /** Material of an in-flight call (native call or run_code sub-dispatch). */
 function runningMaterial(call: RunningToolCall): CallMaterial {
-  return { name: call.name, argsRaw: call.argsRaw, block: call }
+  // A preparing call has no dispatched arguments yet; the Input section stays
+  // hidden until the tool/call event lands.
+  return { name: call.name, argsRaw: call.phase === 'start' ? call.argsRaw : null, block: call }
 }
 
 function materialFor(s: ConversationSnapshot, callId: string): CallMaterial | null {

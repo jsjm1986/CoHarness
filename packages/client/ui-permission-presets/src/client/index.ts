@@ -148,8 +148,8 @@ export function apply(ctx: ClientContext): void {
 
   const connection = ctx.get('connection') as ConnectionHandle
   ctx.effect(() => ctx.locale.register('permission.desktop', { zh: desktopZh, en: desktopEn }), 'permission: desktop confirmation copy')
-  ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
-    name: 'conversation.input.left', id: 'desktop-confirmation', locale: 'permission.desktop',
+  ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
+    name: 'conversation.session.header.utilities', id: 'desktop-confirmation', locale: 'permission.desktop',
     inject: (sessionId: SessionId): DesktopConfirmationInjected => ({ connection: connection.forSession?.(sessionId) ?? connection }),
   }, DesktopConfirmationAction))
   const defaultAvailability = permissionAvailabilitySource(ctx.get('projectUiPolicy'), connection.hostDescription)

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-pooled-session-archive-consistency.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-pooled-session-archive-consistency.md
+/agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror:
+  en: 19c7c7b6872c6cab
+  zh: e928b709b81ce86c
+/agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror/problem:
+  en: 8920b25fe83645b9
+  zh: c219678a89dac14f
+/agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror/decision:
+  en: c84d0bb2d5d93d6d
+  zh: bae1edc85ee3e51b
+/agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror/files:
+  en: d36af0892237c290
+  zh: b90c5688ca5998e8
+/agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror/alternatives-considered:
+  en: b96b8c29d57e343a
+  zh: 538565e062cc649c
+/agent-note-read-pooled-session-archive-state-from-the-sessions-partition-plus-the-workspace-mirror/consequences:
+  en: 6b2d5ecb2874f3bb
+  zh: a0772168fe8bcdca

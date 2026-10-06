@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-30-settings-write-path-integrity.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-30-settings-write-path-integrity.md
-2026-07-30-settings-write-path-integrity.md: 7a2d377586ff2bfa7caeb9d4196ee99f70d3e63f
-2026-07-30-settings-write-path-integrity.zh.md: 596f4814674e6fc471959a6c1637dd7a818c50dc
+/agent-note-settings-write-path-integrity-and-observer-lifecycle:
+  en: 0178f54c15b312b1
+  zh: cb108997ea3b0f23
+/agent-note-settings-write-path-integrity-and-observer-lifecycle/problem:
+  en: 7d20d60f07db97ed
+  zh: 134269fb32d59c30
+/agent-note-settings-write-path-integrity-and-observer-lifecycle/decision:
+  en: 3415b9da72a978af
+  zh: 2192c0c55fabbd0e
+/agent-note-settings-write-path-integrity-and-observer-lifecycle/alternatives-considered:
+  en: 1e37ea2b38b334fb
+  zh: 6b249ba2c2985b8a
+/agent-note-settings-write-path-integrity-and-observer-lifecycle/consequences:
+  en: 83fabec7158be534
+  zh: 0b4823cea23c11d9

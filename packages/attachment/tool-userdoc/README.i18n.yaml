@@ -1,6 +1,76 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/attachment/tool-userdoc/README.md
-README.md: db6620da0fcd33f4b42f2c80fd65bdb3d0f74a44
-README.zh.md: eb4811b38f2ff0edc88e7acb584b90ee7a7be495
+/:
+  en: 2d280444d3c3efc4
+  zh: 61495d48365178df
+/deepseek-ai-dsh-tool-userdoc:
+  en: 12c2eea5d15e0b6c
+  zh: dcd49ef190a09832
+/deepseek-ai-dsh-tool-userdoc/summary:
+  en: 8eb6efcf6de13648
+  zh: e1f21c0a64a8ebd3
+/deepseek-ai-dsh-tool-userdoc/table-of-contents:
+  en: 8f8b33faa7fb690d
+  zh: 8d3c3e4a70112e38
+/deepseek-ai-dsh-tool-userdoc/installation:
+  en: 62629be2f4583101
+  zh: 999f1dc8fd637051
+/deepseek-ai-dsh-tool-userdoc/tools:
+  en: 2e7a280bcf50b446
+  zh: 392dbfd56cd0c767
+/deepseek-ai-dsh-tool-userdoc/configuration:
+  en: ed344dca0ec05fe1
+  zh: a5b944ab3d77438d
+/deepseek-ai-dsh-tool-userdoc/extension-points:
+  en: 83ddbcf267a6aaea
+  zh: 3f0accd70f93e26e
+/deepseek-ai-dsh-tool-userdoc/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-tool-userdoc/model-experience/system-prompt:
+  en: cf78b9dd5596495f
+  zh: bd44560f8c2435e8
+/deepseek-ai-dsh-tool-userdoc/model-experience/system-prompt/what-the-model-sees:
+  en: 22c11f655065fe9c
+  zh: 85edfbc3b11cebdb
+/deepseek-ai-dsh-tool-userdoc/model-experience/system-prompt/what-the-model-sees/personal-document-guidance:
+  en: 6c8a25989a1c5a76
+  zh: 74ee53747221680f
+/deepseek-ai-dsh-tool-userdoc/model-experience/system-prompt/token-effect:
+  en: bd61f25b4d03d527
+  zh: 0077452d36975589
+/deepseek-ai-dsh-tool-userdoc/model-experience/system-prompt/kv-cache-effect:
+  en: 79abe3f017acea5b
+  zh: dc11a9a11ffe4654
+/deepseek-ai-dsh-tool-userdoc/model-experience/tool-schemas:
+  en: 3039bc5e7a796b21
+  zh: 6b7a9eaf69c9ea53
+/deepseek-ai-dsh-tool-userdoc/model-experience/tool-schemas/what-the-model-sees:
+  en: 184bed11f40d49c9
+  zh: df7445880fb1c4ff
+/deepseek-ai-dsh-tool-userdoc/model-experience/tool-schemas/token-effect:
+  en: e9ffc2871212346d
+  zh: bb17fec4747b7238
+/deepseek-ai-dsh-tool-userdoc/model-experience/tool-schemas/kv-cache-effect:
+  en: b00b15ae5f0aa2a0
+  zh: 58b3bc25d7180bf9
+/deepseek-ai-dsh-tool-userdoc/model-experience/tool-results:
+  en: beaabb79f229692a
+  zh: 8573891441963be4
+/deepseek-ai-dsh-tool-userdoc/model-experience/tool-results/what-the-model-sees:
+  en: 3ba7ea7f69d49292
+  zh: 2b81773dbb00a531
+/deepseek-ai-dsh-tool-userdoc/model-experience/tool-results/token-effect:
+  en: ea350d80fba3c73c
+  zh: 56f0b0725f562ea3
+/deepseek-ai-dsh-tool-userdoc/model-experience/tool-results/kv-cache-effect:
+  en: f1db3ca963aa55fb
+  zh: 33661ec0da0da5b3
+/deepseek-ai-dsh-tool-userdoc/known-limitations-and-deferred-work:
+  en: 7b365d28f2b45eb2
+  zh: 3726e293b62ae882
+/deepseek-ai-dsh-tool-userdoc/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 4438af76c19be347

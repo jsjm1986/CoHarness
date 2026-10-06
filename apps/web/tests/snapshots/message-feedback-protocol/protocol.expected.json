@@ -5,7 +5,7 @@
       "args": {
         "request": {
           "sessionId": "message-feedback-protocol",
-          "messageId": "11111111-1111-4111-8111-111111111111",
+          "messageId": "{{messageId}}",
           "rating": "invalid-rating",
           "ifVersion": null
         }
@@ -58,7 +58,7 @@
       "args": {
         "request": {
           "sessionId": "message-feedback-protocol",
-          "messageId": "11111111-1111-4111-8111-111111111111",
+          "messageId": "{{messageId}}",
           "rating": "positive",
           "note": "Useful answer",
           "ifVersion": null
@@ -74,7 +74,7 @@
         "value": {
           "ok": true,
           "value": {
-            "messageId": "11111111-1111-4111-8111-111111111111",
+            "messageId": "{{messageId}}",
             "rating": "positive",
             "note": "Useful answer",
             "version": "{{version}}",
@@ -105,7 +105,7 @@
           "value": {
             "items": [
               {
-                "messageId": "11111111-1111-4111-8111-111111111111",
+                "messageId": "{{messageId}}",
                 "rating": "positive",
                 "note": "Useful answer",
                 "version": "{{version}}",
@@ -124,7 +124,7 @@
       "args": {
         "request": {
           "sessionId": "message-feedback-protocol",
-          "messageId": "11111111-1111-4111-8111-111111111111",
+          "messageId": "{{messageId}}",
           "rating": "negative",
           "ifVersion": null
         }
@@ -141,7 +141,7 @@
           "error": {
             "code": "version-conflict",
             "current": {
-              "messageId": "11111111-1111-4111-8111-111111111111",
+              "messageId": "{{messageId}}",
               "rating": "positive",
               "note": "Useful answer",
               "version": "{{version}}",
@@ -159,7 +159,7 @@
       "args": {
         "request": {
           "sessionId": "message-feedback-protocol",
-          "messageId": "11111111-1111-4111-8111-111111111111",
+          "messageId": "{{messageId}}",
           "ifVersion": "{{version}}"
         }
       }

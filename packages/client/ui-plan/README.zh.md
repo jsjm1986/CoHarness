@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-plan
 
 [English](README.md) | 中文
@@ -14,9 +19,20 @@ chip 携带无障碍描述 "Plan mode on, press to turn off"。准入失败（`m
 
 计划模式让你在实施前审阅计划。通过 `/plan` 进入，通过编辑器中的状态按钮退出。提交的计划自动在右侧边栏打开供审阅；批准、拒绝或关闭审批后，仍可通过已完成回合末尾的产物卡片查看。重新打开同一计划会聚焦已有标签页，刷新浏览器后会从会话历史恢复正文。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知局限与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。Plan 状态由 `dsh-plan-mode` 拥有并经 `plan` 投影到达；chip 是纯渲染器，node 侧是空 apply。
+
 
 ## 模型体验
 
@@ -26,8 +42,21 @@ chip 携带无障碍描述 "Plan mode on, press to turn off"。准入失败（`m
 
 进入或离开 plan mode 会改变活跃的 `plan:policy` 系统提示词段，因此改变请求前缀；chip 本身不添加任何提示词内容。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知局限与延后工作
 
 - **Plan mode 是引导而非执行沙箱**：需要强制只读规划的部署必须组合独立的沙箱与审批策略。
 - **chip 属于默认编辑器**：待处理的整编辑器交互（如 plan 评审）会临时取代 InputBar 及其 chip。
 - **无未激活态 plan 控件**——入口使用共享 Command source；有能力但 mode 未激活的会话在工具行不显示 plan 入口。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>
+
+<a id="model-experience"></a>

@@ -32,15 +32,17 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/dsh-host-directory-picker": "workspace:^",
-    "@deepseek-ai/dsh-native-command": "workspace:^",
+    "@deepseek-ai/dsh-host-directory-picker": "workspace:*",
+    "@deepseek-ai/dsh-native-command": "workspace:*"
+  },
+  "optionalDependencies": {
     "koffi": "^3.1.6"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:~"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/cordis": "workspace:~",
     "tsx": "^4.23.12"
   }
 }

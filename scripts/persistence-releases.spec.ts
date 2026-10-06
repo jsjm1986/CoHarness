@@ -367,7 +367,9 @@ describe('release facts', () => {
     const data = fixture()
     const snapshotPath = join(data.directory, TAGS[2] + '.schema.json')
     const snapshot = readFileSync(snapshotPath, 'utf8')
-    writeFileSync(snapshotPath, snapshot.replace('"formatVersion":1', '"formatVersion":2'))
+    const machineData = JSON.parse(snapshot) as { formatVersion: number }
+    expect(machineData.formatVersion).toBe(1)
+    writeFileSync(snapshotPath, JSON.stringify({ ...machineData, formatVersion: 3 }, null, 2) + '\n')
     const corrupt = directoryBytes(data.directory)
     expect(() => runPersistenceReleases(['--write'], data.root)).toThrow('normalization version')
     expect(directoryBytes(data.directory)).toEqual(corrupt)

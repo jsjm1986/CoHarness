@@ -61,6 +61,9 @@ function makeHost() {
       list: observable<unknown>({ ids: [] }),
       provideInfo: provide,
     },
+    getRootRevision: () => 0,
+    subscribeRootRevision: () => () => {},
+    rootSources: () => ({}),
     workspaces: { list: observable<unknown>({ items: [] }) },
   }
   return {

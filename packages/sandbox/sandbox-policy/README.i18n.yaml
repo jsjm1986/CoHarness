@@ -1,6 +1,58 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/sandbox/sandbox-policy/README.md
-README.md: 69ca849e5c3819611c00a0af7c955a93accbec66
-README.zh.md: c6427ec7705dc3d8755ac6debf142f7731e75137
+/:
+  en: 06ff9dfc072e2f5b
+  zh: 61495d48365178df
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy:
+  en: b36e836e9b3c3d24
+  zh: 311612e8a2c55918
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/summary:
+  en: 62e1a0a017d6bc07
+  zh: 1d9f86eb54f51b8e
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/table-of-contents:
+  en: 3bcd5e133a8f9183
+  zh: 8504efde89cee96e
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/why-a-shared-home:
+  en: a2da2a374a2fbef0
+  zh: 681a82e0bd462a32
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/config:
+  en: f1a094875a33e0a4
+  zh: 48512745150ca087
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/api:
+  en: 55178df45a1ba25b
+  zh: e91195768c02e6a1
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/the-per-session-store:
+  en: 4a41c9d81fdba842
+  zh: c3c17816a1470e99
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/model-experience/current-file-sandbox-policy:
+  en: 593b59dbbb02bc8c
+  zh: 38fa746346e9bc06
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/model-experience/current-file-sandbox-policy/what-the-model-sees:
+  en: 4cd0e0cf93a02d2c
+  zh: 0f8ece0297cf3c0b
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/model-experience/current-file-sandbox-policy/what-the-model-sees/read-only:
+  en: 36f15579c9444eb9
+  zh: 289f3c4ce040bfe9
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/model-experience/current-file-sandbox-policy/what-the-model-sees/workspace-write:
+  en: 269d494ad304638d
+  zh: a879c1d7cc03e6ac
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/model-experience/current-file-sandbox-policy/what-the-model-sees/danger-full-access:
+  en: 4e28324a011422a1
+  zh: bf31ffce30f06a09
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/model-experience/current-file-sandbox-policy/token-effect:
+  en: e3387fb6eeba1239
+  zh: 06a47393057d3e9b
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/model-experience/current-file-sandbox-policy/kv-cache-effect:
+  en: a16a657e0e5145fb
+  zh: 1c4dbcc8221d6c2a
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/known-limitations-and-deferred-work:
+  en: a4eef76a669d6a6f
+  zh: 8e219ef056c92cb2
+/dsh-sandbox-policy-the-sandbox-policy-home-ctx-sandboxpolicy/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-22-unified-send-and-coalesced-user-messages.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-22-unified-send-and-coalesced-user-messages.md
-2026-07-22-unified-send-and-coalesced-user-messages.md: bc195e77c71b554d60c03c91134bbcef95678fff
-2026-07-22-unified-send-and-coalesced-user-messages.zh.md: 414b5542aae2972b22ba015ba9397ec44921a6fa
+/agent-note-unify-agent-delivery-on-send-target-wakeup-and-coalesce-injected-context-into-user-message:
+  en: feb2582d2137249e
+  zh: 022b69b2df0df6b6
+/agent-note-unify-agent-delivery-on-send-target-wakeup-and-coalesce-injected-context-into-user-message/problem:
+  en: 8fb46f092d8afd5c
+  zh: 73bf0c95ec08c9ac
+/agent-note-unify-agent-delivery-on-send-target-wakeup-and-coalesce-injected-context-into-user-message/decision:
+  en: 8df249c20f559c96
+  zh: f7837ee02e80311a
+/agent-note-unify-agent-delivery-on-send-target-wakeup-and-coalesce-injected-context-into-user-message/alternatives-considered:
+  en: b809c9b0f329e091
+  zh: 3df7b10fd4051f92
+/agent-note-unify-agent-delivery-on-send-target-wakeup-and-coalesce-injected-context-into-user-message/consequences:
+  en: 997d62a9339fc337
+  zh: 85278a41b14c172b
+/agent-note-unify-agent-delivery-on-send-target-wakeup-and-coalesce-injected-context-into-user-message/related:
+  en: 07e08fa77095c775
+  zh: e0768aff1c6e78b5

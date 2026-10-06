@@ -1,15 +1,31 @@
+---
+description: "Local-filesystem ctx.fileReferences provider with bounded fuzzy indexes"
+kind: "package-reference"
+---
+
 # `@deepseek-ai/dsh-file-reference-local`
 
 English | [中文](README.zh.md)
 
 Local-filesystem implementation of `ctx.fileReferences`. It maintains one bounded `WorkspaceFileSearch` per agent, rooted at that session's `cwd` and falling back to the host process cwd. The index ranks direct directory listings for queries containing `/`, otherwise fuzzy-ranks a bounded recursive index; it never follows directory symlinks.
 
-Tool-result events invalidate the addressed agent's reusable index so later completion observes likely workspace mutations. Agent disposal releases that index and its scoped prompt contribution; plugin disposal awaits every prompt fiber and releases all cached searches.
+Tool-result events invalidate the addressed agent's reusable index so later completion observes likely workspace mutations. Agent disposal releases that index and its scoped prompt contribution; plugin disposal awaits every prompt fiber and releases all cached searches. Cleanup also accepts a registration that its Agent scope has already disposed.
 
 ## Summary
 
 Agents and host UIs can complete `@file` mentions with ranked paths from each agent's local workspace, with bounded discovery that stays responsive in large repositories. Results refresh after tool activity without blocking completion, and directory symlinks are never followed. When `read` is available, the model also receives stable guidance for interpreting referenced paths. Choose this package when `read` uses the Harness host filesystem; remote or virtual namespaces need matching discovery.
 
+## Table of Contents
+
+- [Configuration](#configuration)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="configuration"></a>
 ## Configuration
 
 | Key | Default | Contract |
@@ -20,10 +36,12 @@ Agents and host UIs can complete `@file` mentions with ranked paths from each ag
 
 Every numeric value must be a positive safe integer. Excluded names must be non-empty basenames without `/` or `\`.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The per-agent index is a bounded cache rebuilt from the filesystem on demand; the filesystem remains the only authority.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### File-reference guidance when read is available
@@ -51,3 +69,13 @@ The stable sentence joins the system-prompt prefix. Mounting or removing this pr
 - **Host-local namespace** — the provider scans the Harness host filesystem, so remote or virtual `read` implementations require a provider whose namespace matches the tool.
 - **Bounded advisory index** — very large workspaces may omit paths after `maxEntries`, and excluded or unreadable descendant directories do not appear. An unreadable workspace root rejects the index so the next query can retry instead of publishing a false empty result.
 - **No ignore-file semantics** — `.gitignore` and other project ignore files do not influence discovery; only configured directory basenames are excluded.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

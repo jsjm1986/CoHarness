@@ -129,6 +129,82 @@
   min-height: 0;
 }
 
+/* Every tab remains a sibling. Explicit tracks determine placement; order only
+   changes painting, so raising a float never moves a connected DOM ancestor. */
+.tabLayout {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.tabCell,
+.emptyTabHost {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  z-index: var(--dsh-dockkit-dock-layer, 10);
+}
+
+.tabCell[hidden] {
+  display: none;
+}
+
+/* A zero-sized Grid item supplies a stacking context, not a containing block
+   for its fixed child. Floats share one layer and use Grid paint order within it. */
+.floatingCell {
+  width: 0;
+  height: 0;
+  z-index: var(--dsh-dockkit-float-layer, 60);
+}
+
+.tabHost {
+  min-width: 0;
+  min-height: 0;
+  pointer-events: auto;
+}
+
+.tabHost:not(.float),
+.emptyTabHost {
+  background: var(--dsw-alias-bg-base);
+}
+
+.tabCell[data-dockkit-host='dock'][data-dockkit-column='0'] > .tabHost {
+  border-left: 0.5px solid var(--dsw-alias-border-l4);
+}
+
+.tabHostHeader {
+  flex: none;
+}
+
+.tabHostBody {
+  position: relative;
+  min-width: 0;
+}
+
+.tabLayoutDivider {
+  width: 0;
+  cursor: col-resize;
+  z-index: calc(var(--dsh-dockkit-dock-layer, 10) + 1);
+  pointer-events: auto;
+}
+
+.tabLayoutDivider::before {
+  top: 0;
+  bottom: 0;
+  left: -0.25px;
+  width: 0.5px;
+}
+
+.tabLayoutDivider::after {
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+  background: linear-gradient(to bottom, transparent, var(--dsw-alias-label-caption) 50%, transparent) center / 1px 100% no-repeat;
+}
+
 /* A body that overflows scrolls inside its pane; nothing escapes the pane. */
 .pane {
   display: flex;
@@ -137,6 +213,11 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.pane:focus,
+.float:focus {
+  outline: none;
 }
 
 /* A 38px row whose 28px content band sits at its bottom: chips fill the band,
@@ -219,6 +300,25 @@
   align-items: center;
   height: 28px;
   margin-left: 4px;
+}
+
+/* macOS desktop: an embedder may pin this surface at the window's top edge (the
+   right sidebar does, in both presentations). The strip row is marked
+   `data-window-drag` in markup (TabPanel), so ui-web base.css's single darwin
+   rule drags it over its own box; the chip run, the strip-end chrome, the pane
+   body, and the split divider subtract their whole boxes so tabs, controls,
+   content, and the resize grab stay usable wherever they overlap that row. The
+   divider must be named here: it is a plain div, so ui-web base.css's
+   interactive-element subtraction never matches it. A floating pane subtracts its
+   own box the same way, so the strip row never drags the window over it. Hidden
+   surfaces contribute nothing: Blink skips non-visible boxes when it collects
+   draggable regions. */
+:global(html[data-platform='darwin']) .stripTabs,
+:global(html[data-platform='darwin']) .stripChrome,
+:global(html[data-platform='darwin']) .paneBody,
+:global(html[data-platform='darwin']) .float,
+:global(html[data-platform='darwin']) .divider {
+  -webkit-app-region: no-drag;
 }
 
 /* The slot between two chips: a 10px box with a hairline down its centre.
@@ -639,6 +739,14 @@
   bottom: 0;
   left: 0;
   height: 40%;
+}
+
+:global(html[data-windows-titlebar]) .float {
+  --dsh-dockkit-float-top: calc(var(--dsh-windows-titlebar-height) + 20px);
+}
+
+:global(html[data-windows-titlebar][data-fullscreen]) .float {
+  --dsh-dockkit-float-top: 20px;
 }
 
 .float {

@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/boot/workspace-dependencies/README.md
-README.md: dfc5b61a3bc4c6c6ffb8fbab18a46f9e9d22279b
-README.zh.md: 7eba74175f6b84778a5b4e08a7257304118260c9
+/:
+  en: 28711a0a29fb9465
+  zh: 7afbec7ff645d2ae
+/deepseek-ai-dsh-workspace-dependencies:
+  en: 59ce6959c9ca4fa5
+  zh: a49a440c89a51ba9
+/deepseek-ai-dsh-workspace-dependencies/summary:
+  en: f164dfb93ee4de99
+  zh: df3372cf7388a1e6
+/deepseek-ai-dsh-workspace-dependencies/table-of-contents:
+  en: c48870ed8f642d07
+  zh: d1c9ecee6db4a1a8
+/deepseek-ai-dsh-workspace-dependencies/configuration:
+  en: af76b3bd12f82f52
+  zh: 124b25659bd6752f
+/deepseek-ai-dsh-workspace-dependencies/installation:
+  en: 39f071acb2729ae5
+  zh: 17a3fcb7c8a41234
+/deepseek-ai-dsh-workspace-dependencies/dev-note:
+  en: a0644747c7506b35
+  zh: 34c1af3328857ddb
+/deepseek-ai-dsh-workspace-dependencies/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-workspace-dependencies/model-experience/request-context-and-condition:
+  en: cd8530c72534ee6b
+  zh: 16dbf6046e7e51fd
+/deepseek-ai-dsh-workspace-dependencies/model-experience/request-context-and-condition/what-the-model-sees:
+  en: 53040b2f200f23b9
+  zh: 8a10dd4833db3b8c
+/deepseek-ai-dsh-workspace-dependencies/model-experience/request-context-and-condition/token-effect:
+  en: 8951855bf02f21ac
+  zh: 294d223ce1340a99
+/deepseek-ai-dsh-workspace-dependencies/model-experience/request-context-and-condition/kv-cache-effect:
+  en: 0878a80c1429da26
+  zh: 039910981b3a5aa2
+/deepseek-ai-dsh-workspace-dependencies/known-limitations-and-deferred-work:
+  en: 25d6881a27855780
+  zh: 17a5cb79c1050186

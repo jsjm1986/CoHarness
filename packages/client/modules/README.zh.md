@@ -71,7 +71,7 @@ application combo 脚本只携带每个插件的 `client.js` 入口，并在启�
 
 Node 半侧逐包增量扫描——没有全量重扫路径。每次发出 `internal/plugin` 事件时，系统都会把该 fiber 的 entry 名标脏；微任务 flush 会把每个脏名与当前 loader 条目对账，激活 pass 会初始化同一个脏集合并同步 flush，因此首次扫描与稳态共用同一实现。包元数据按 Loader specifier 与所属 tree base URL 缓存至重启，解析出的 manifest（元数据清单）包名作为浏览器模块身份。若不同的 active Loader source 解析到同一包名，组合会失败；移除冲突来源后，剩余来源无需重启 fiber 即可接替。bundle 内容变更只能通过 `rebuilt()`（HMR 钩子）进入图。
 
-Node 半侧会在发布前快照每个 `client.js` 入口，并在不构建响应 body 的情况下创建 combo descriptor。它把资源分组到 `/plugins/??...&rev=...` combo URL：modules row 使用一个 bootstrap combo，其余 row 使用一个或多个 application combo；每个阶段都会在 URL 超过 3 KiB 之前分区。脚本 body 在首次 `GET` 时只组合一次，并以对应 map URL 结尾；map 文件则在首次 map `GET` 时单独读取、校验并组合，`HEAD` 不会物化任一 body。Host 不扫描也不预加载同级 chunk：精确的 `/plugins/<package>/client.<name>.js?rev=<rev>` 请求会读取并缓存该脚本，其 map 仍会等到 map URL 被请求后才计算。每个 combo 或 chunk map 都是 Indexed Source Map v3，并在可用时使用作者提供的 section，否则为已打包 bundle 生成 identity section。初始逐插件 revision 使用进程 nonce。开发期间，共享预设会在该包所有输出写完后标记 `client.js`；HMR 从入口字节和该构建完成标记派生下一 revision，因此仅 chunk 发生重建也会更换 owner revision，无需 Host 扫描 chunk。combo revision 从有序 row revision 派生。已公告的 combo 响应与已请求的 chunk 响应会跨无关图重组保持不可变；未知资源或 revision 返回 404。
+Node 半侧会在发布前快照每个 `client.js` 入口，并在不构建响应 body 的情况下创建 combo descriptor。图行与批次描述符携带文档相对的 `plugins/??...&rev=...` 引用——被挂载到前缀下的 shell 会相对文档解析它们——而响应表与路由仍按绝对的 `/plugins/...` 键匹配；每个阶段都在绝对 map 形式 URL 超过 3 KiB 前分区。脚本 body 在首次 `GET` 时只组合一次，并以相对脚本自身 `/plugins/` 目录解析的 `??...&rev=...` source-map 尾注结尾；map 文件则在首次 map `GET` 时单独读取、校验并组合，`HEAD` 不会物化任一 body。Host 不扫描也不预加载同级 chunk：精确的 `/plugins/<package>/client.<name>.js?rev=<rev>` 请求会读取并缓存该脚本——其尾注是文件名相对的 `client.<name>.js.map?rev=<rev>`——其 map 仍会等到 map URL 被请求后才计算。每个 combo 或 chunk map 都是 Indexed Source Map v3，并在可用时使用作者提供的 section，否则为已打包 bundle 生成 identity section。初始逐插件 revision 使用进程 nonce。开发期间，共享预设会在该包所有输出写完后标记 `client.js`；HMR 从入口字节和该构建完成标记派生下一 revision，因此仅 chunk 发生重建也会更换 owner revision，无需 Host 扫描 chunk。combo revision 从有序 row revision 派生。已公告的 combo 响应与已请求的 chunk 响应会跨无关图重组保持不可变；未知资源或 revision 返回 404。
 
 ### 启动 manifest 注入
 
@@ -111,6 +111,7 @@ bundle 路由随注入的 `webServer` 生命周期注册：服务就绪时注册
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -120,6 +121,7 @@ bundle 路由随注入的 `webServer` 生命周期注册：服务就绪时注册
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

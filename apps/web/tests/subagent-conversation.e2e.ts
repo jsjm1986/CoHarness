@@ -95,7 +95,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       if (path.startsWith('/api/')) apiCalls.push(path)
     })
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
 
@@ -265,7 +265,7 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
 
   it('keeps known descendants reachable across a stale empty catalog response', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-subagent-stale-catalog'))
-    const pattern = '**/api/subagents/list'
+    const pattern = /\/api\/subagents\/list(?:\?.*)?$/
     let firstClaimed = false
     let emptyDelivered = false
     let trailingRequested = false
@@ -476,7 +476,12 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       () => page.getByRole('tree', { name: 'Sessions' }).getByRole('treeitem').count(),
       { timeout: 15_000 },
     ).toBe(3)
-    expect(await page.getByText('Independent sessions', { exact: true }).count()).toBe(0)
+    // The workspace attach rides the mux stream while the fork receipt rides
+    // the RPC reply; poll for the two channels to converge.
+    await expect.poll(
+      () => page.getByText('Independent sessions', { exact: true }).count(),
+      { timeout: 15_000 },
+    ).toBe(0)
     const hierarchy = page.getByRole('navigation', { name: 'Session hierarchy' })
     await expect.poll(() => hierarchy.getByRole('button').count()).toBe(1)
     await compareOrRefreshGolden(

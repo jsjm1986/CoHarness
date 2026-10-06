@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-01-web-superellipse-corner-smoothing.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-01-web-superellipse-corner-smoothing.md
-2026-09-01-web-superellipse-corner-smoothing.md: 7088438a8068343434a27495b771515d4a5158ee
-2026-09-01-web-superellipse-corner-smoothing.zh.md: 26aa64fda9f557069cfc3040422c8e1b7e34676e
+/agent-note-web-superellipse-corner-smoothing:
+  en: 1c3f4d90f86032cb
+  zh: ed3addfc2bf876cd
+/agent-note-web-superellipse-corner-smoothing/problem:
+  en: ab478765a94f9846
+  zh: 27d7fb58e0ee7713
+/agent-note-web-superellipse-corner-smoothing/decision:
+  en: 4cfe7120e65e787e
+  zh: 8b8d278ba224a0dc
+/agent-note-web-superellipse-corner-smoothing/alternatives-considered:
+  en: c7e1719e7b3f94ab
+  zh: 0a0e23dc3003dab2
+/agent-note-web-superellipse-corner-smoothing/consequences:
+  en: 86c26a39b9b0f313
+  zh: 1b90eb879be477cf

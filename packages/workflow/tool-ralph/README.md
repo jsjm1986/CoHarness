@@ -1,3 +1,8 @@
+---
+description: "Model-facing fresh-agent Ralph loop over the workflow and subagent seams"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-ralph
 
 English | [中文](README.zh.md)
@@ -8,6 +13,20 @@ The model-facing `ralph` tool runs a fixed foreground workflow that gives one im
 
 `ralph` runs a foreground sequence of fresh child agents against one immutable objective, with each round receiving only the previous bounded report and shared workspace state. It returns when a worker reports completion or a concrete blocker, or when the configured round limit is reached; those reports are not independently verified. Parent conversation and prior child sessions are never copied into a new round. Use it only when the direct human explicitly requests Ralph-style fresh-agent iteration; use goal tools for ordinary long-running work and subagents or workflows for bounded delegation.
 
+## Table of Contents
+
+- [Contract](#contract)
+- [Lifecycle and cancellation](#lifecycle-and-cancellation)
+- [Render intent](#render-intent)
+- [Config](#config)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="contract"></a>
 ## Contract
 
 `ralph({ objective, maxRounds? })` waits for the entire run. The deployment config's `maxRounds` is both the default and a ceiling on a call override. Every Ralph round starts one child through `subagentProvider`; that provider must exist, support structured output, and report `inheritsParentContext: false`. The configured provider is carried as `WorkflowStartRequest.subagentProvider`, so the fixed script cannot inspect or change routing and the ordinary model-written `workflow` tool gains no provider selector. The resolved round cap is also carried as `WorkflowStartRequest.maxTotalAgents`, coordinating the fixed loop with the engine's total-child backstop; the engine rejects a Ralph cap above its deployment ceiling before publishing a run.
@@ -18,14 +37,17 @@ The successful terminal tool result is `complete`, `blocked`, or `budget-limited
 
 An ordinary child failure produces an error naming the failed round and retaining the last successful handoff when one exists. Ralph does not retry that round. Fatal provider-start, transport, worker, or workflow failures remain workflow errors and may settle before the fixed script can return a handoff. Cancellation is also an error; partial output is never success.
 
+<a id="lifecycle-and-cancellation"></a>
 ## Lifecycle and cancellation
 
 The caller's agent is the parent of every fresh child, preserving cwd and lineage without copying its conversation. `exec.signal` enters the workflow engine and is also bridged to `run.cancel()` for implementation independence. The tool awaits `run.result` and calls `run.dispose()` in `finally`, so a cancelled parent step waits for the engine's bounded termination and child quiescence before returning.
 
+<a id="render-intent"></a>
 ## Render intent
 
 The pending call is a `generic` card titled `ralph`; the immutable objective is its `rawInput`. The result keeps the generic card. Both presentation functions depend only on tool arguments and the settled tool envelope.
 
+<a id="config"></a>
 ## Config
 
 | Key | Default | Meaning |
@@ -37,10 +59,12 @@ The pending call is a `generic` card titled `ralph`; the immutable objective is 
 
 All config values are normalized and validated when the plugin applies, including direct application outside Loader schema normalization. Provider capabilities are resolved immediately before each call because provider registration can change under plugin lifecycle and HMR.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Each run executes one foreground workflow through the engine and subagent seams; child state is owned by those services.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### System prompt
@@ -99,3 +123,13 @@ Each fresh child has an independent request cache. The parent result appends aft
 - **One round is one fresh child** — there is no within-round fan-out, model/provider switching, fork context, or model-call-selected provider.
 - **Ordinary child failure is terminal for the run** — the fixed script reports the failed round and last successful handoff but does not retry; fatal workflow infrastructure failures can end before that state is returned.
 - **Only round count bounds aggregate effort** — token, price, and elapsed-time budgets are deferred.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

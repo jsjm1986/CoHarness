@@ -81,3 +81,13 @@ The edge preserves historical request meaning; it does not guarantee provider ca
 <a id="known-limitations-and-deferred-work"></a>
 
 - **CoHarness-only edge** — upstream released V3 as the current format; V4 exists only in this fork. Downstream artifacts cannot be reopened by upstream builds.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

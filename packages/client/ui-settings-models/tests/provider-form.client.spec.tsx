@@ -79,6 +79,8 @@ function scriptedFace(options: {
   userProviders?: Record<string, unknown>
   /** Composition layer, for a route a `cordis.yml` pins rather than the page. */
   baseProviders?: Record<string, unknown>
+  /** Directory rows managed at another scope; the rest read as personal. */
+  management?: Record<string, 'personal' | 'organization' | 'project'>
   /** Routes the adapter reports as hand-declared; the rest come back as shipped. */
   declaredRoutes?: readonly string[]
   discover?: Mock<ModelDiscoveryProbe>
@@ -100,7 +102,7 @@ function scriptedFace(options: {
           displayName: provider,
           settingsNs: 'llm-pi-ai',
           settingsPath: ['providers', provider],
-          management: 'personal' as const,
+          management: options.management?.[provider] ?? 'personal' as const,
           active: true,
           declared: options.declaredRoutes?.includes(provider) ?? false,
         })),
@@ -1349,6 +1351,28 @@ describe('hand-declared providers', () => {
     expect(screen.getByText(en.customRouteInvalid)).toBeTruthy()
     fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'org-primary' } })
     expect(screen.queryByText(en.customRouteInvalid)).toBeNull()
+  })
+
+  it('blocks deleting the last model of an organization provider', async () => {
+    const { mutate } = await mountSection({
+      providers: {
+        'org-primary': {
+          displayName: 'Primary',
+          apiKeyEnv: 'DSH_ORG_PRIMARY_API_KEY',
+          api: 'openai-responses',
+          baseURL: 'https://org.example/v1',
+          models: [{ id: 'chat' }],
+        },
+      },
+      management: { 'org-primary': 'organization' },
+    }, { managementScope: 'organization' })
+
+    openEditor('org-primary')
+    fireEvent.click(screen.getByLabelText(`${en.removeModel} 1`))
+
+    expect(screen.getByText(en.providerModelsRequired)).toBeTruthy()
+    expect(buttonNamed(en.apply).disabled).toBe(true)
+    expect(mutate).not.toHaveBeenCalled()
   })
 
   it('refuses an unusable key on the field and blocks creation', () => {

@@ -21,6 +21,7 @@ import {
 } from '@deepseek-ai/dsh-session'
 import type { SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
 import {
+  createSessionFormatCatalogWithChildren,
   SessionFormatUnsupportedMigrationError,
   sessionFormatCatalog,
 } from '@deepseek-ai/dsh-session-format-catalog'
@@ -37,6 +38,7 @@ import type {
   StreamChunk,
   SystemPromptUpdate,
   TokenUsage,
+  ToolUpdate,
 } from '@deepseek-ai/dsh-llm'
 import { LlmAdapter, LlmError, ReasoningEffortId, assertNever, expandAssistantStream, offloadedImageText, requestImageHandleText, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 
@@ -90,6 +92,8 @@ export interface ReplayModelConfig {
   defaultReasoningEffort?: string
   /** Optional in-history system prompt replacement for a keyless replay route. */
   systemPromptUpdate?: SystemPromptUpdate
+  /** Optional mid-conversation tool declaration mode for a keyless replay route. */
+  toolUpdate?: ToolUpdate
 }
 
 /** One provider route exposed by the replay adapter. */
@@ -254,7 +258,7 @@ function parseSessionFixture(text: string): ParsedSessionFixture {
       headerLineNumber = lineNumber
       sourceHeader = recordValue
       try {
-        restore = sessionFormatCatalog.createRestore(normalizeProjectedHeader(recordValue), {
+        restore = createSessionFormatCatalogWithChildren([]).createRestore(normalizeProjectedHeader(recordValue), {
           recovery: 'strict',
           validation: 'current',
         })
@@ -664,18 +668,15 @@ function inferStartedSubagents(
         if (block.type === 'tool-call' && block.name === 'subagent') subagentCalls.add(block.id)
       }
     }
-    if (message.role !== 'user' || message.source.kind !== 'tool'
+    if (message.role !== 'tool' || message.isError
       || !subagentCalls.has(message.source.callId)) continue
-    for (const block of message.content) {
-      if (block.type !== 'tool-result' || block.isError) continue
-      for (const content of block.content) {
-        if (content.type !== 'text') continue
-        const id = /^started subagent ([^\s"'<>]+)$/.exec(content.text)?.[1]
-        if (id === undefined || liveSessionIds.includes(id)) continue
-        const index = liveSessionIds.findIndex((value, candidate) => candidate > 0 && value === undefined)
-        if (index < 0) return
-        liveSessionIds[index] = id
-      }
+    for (const content of message.content) {
+      if (content.type !== 'text') continue
+      const id = /^started subagent ([^\s"'<>]+)$/.exec(content.text)?.[1]
+      if (id === undefined || liveSessionIds.includes(id)) continue
+      const index = liveSessionIds.findIndex((value, candidate) => candidate > 0 && value === undefined)
+      if (index < 0) return
+      liveSessionIds[index] = id
     }
   }
 }
@@ -940,6 +941,9 @@ class ReplayAdapter extends LlmAdapter {
       ...configuredModel?.systemPromptUpdate === undefined
         ? {}
         : { systemPromptUpdate: configuredModel.systemPromptUpdate },
+      ...configuredModel?.toolUpdate === undefined
+        ? {}
+        : { toolUpdate: configuredModel.toolUpdate },
       ...configuredModel?.reasoningEfforts === undefined
         ? {}
         : {
@@ -1197,6 +1201,13 @@ function validateConfiguredModels(providers: ReplayProviderConfig[] | undefined)
         throw new Error(
           `llm-replay: provider "${provider.id}" model "${model.id}" systemPromptUpdate `
           + 'must be "in-history" when present',
+        )
+      }
+      const toolUpdate: unknown = model.toolUpdate
+      if (toolUpdate !== undefined && toolUpdate !== 'in-history' && toolUpdate !== 'addition-only') {
+        throw new Error(
+          `llm-replay: provider "${provider.id}" model "${model.id}" toolUpdate `
+          + 'must be "in-history" or "addition-only" when present',
         )
       }
     }

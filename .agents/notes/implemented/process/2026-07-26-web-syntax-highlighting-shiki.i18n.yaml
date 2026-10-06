@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-26-web-syntax-highlighting-shiki.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-26-web-syntax-highlighting-shiki.md
-2026-07-26-web-syntax-highlighting-shiki.md: ba50318d306426d886af25f01eba616ab919d237
-2026-07-26-web-syntax-highlighting-shiki.zh.md: 5533bcb5348db152a8f9466eae7d3d8d9a726162
+/agent-note-web-client-syntax-highlighting-synchronous-fine-grained-shiki:
+  en: 43be52b9af687aed
+  zh: 5f5b70aa4c821e00
+/agent-note-web-client-syntax-highlighting-synchronous-fine-grained-shiki/problem:
+  en: 56852ef478157a4d
+  zh: 397c12dac67ce35d
+/agent-note-web-client-syntax-highlighting-synchronous-fine-grained-shiki/decision:
+  en: d136b7757c7248b1
+  zh: 973f4e117f0ce0e4
+/agent-note-web-client-syntax-highlighting-synchronous-fine-grained-shiki/alternatives-considered:
+  en: a516f9544be8a871
+  zh: 08ac7e3055656b41
+/agent-note-web-client-syntax-highlighting-synchronous-fine-grained-shiki/consequences:
+  en: 997e893db08e7978
+  zh: eaa55bf9ff926cb7

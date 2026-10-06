@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-permission-default-for-new-sessions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-31-permission-default-for-new-sessions.md
-2026-07-31-permission-default-for-new-sessions.md: ebf7fe39712d64c18e12b9b26d86201a61ad6cfd
-2026-07-31-permission-default-for-new-sessions.zh.md: c0f450c8efca8647e3058fb305724cf0a554cc8d
+/agent-note-permission-settings-default-for-new-sessions:
+  en: 52931160e9dd9cf1
+  zh: 79e4b385445f05dc
+/agent-note-permission-settings-default-for-new-sessions/problem:
+  en: 51d2dbdb5ee56f45
+  zh: 41c4ec706dcbadab
+/agent-note-permission-settings-default-for-new-sessions/decision:
+  en: 931c8b84230a62c6
+  zh: cb7ec1f65e44799e
+/agent-note-permission-settings-default-for-new-sessions/consequences:
+  en: d1a30336132085da
+  zh: b250477aa51db7da
+/agent-note-permission-settings-default-for-new-sessions/alternatives-considered:
+  en: cda24214f4b1408b
+  zh: b99cb6d996d230ce

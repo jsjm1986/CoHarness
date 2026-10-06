@@ -1,3 +1,8 @@
+---
+description: "Opt-in durable per-step context with the current time and elapsed time"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-time-context
 
 English | [中文](README.zh.md)
@@ -8,6 +13,18 @@ Opt-in durable context with the current zoned time, the browser zone attached to
 
 `dsh-time-context` gives the model a clock: on eligible steps it appends a durable, source-attributed reading with the current time, the browser zone attached to the open request, and the elapsed time since the preceding model-visible message. It helps the model interpret otherwise-unqualified dates and times in the user's browser zone, and tells it to ask when current-turn browser zones are mixed or missing. The plugin is opt-in: default compositions leave it disabled, and the Schedule Web overlay mounts it. A positive `refreshIntervalMs` reduces how often readings accumulate; omission or `0` injects at every eligible step.
 
+## Table of Contents
+
+- [Config](#config)
+- [Request-zone ownership](#request-zone-ownership)
+- [Timing semantics](#timing-semantics)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 ```yaml
@@ -22,12 +39,14 @@ When the open turn contains one Host-validated browser zone, that request-local 
 
 `refreshIntervalMs` must be a non-negative safe integer. Omission or `0` adds context to every eligible entering pre-step whose signal is not already aborted. A positive value adds it only when the Session has no earlier time-context injection, wall time moved backward, or at least that many milliseconds elapsed since the latest injection.
 
+<a id="request-zone-ownership"></a>
 ## Request-zone ownership
 
 The browser samples `Intl.DateTimeFormat().resolvedOptions().timeZone` for each prompt. The Host validates and canonicalizes that value before binding it to the exact durable `user-rpc` message source. Time-context examines only those sources in the open turn: one unique zone resolves the request, multiple zones are `mixed`, and none are `unavailable`. It does not read or mutate Session headers, connection state, or Schedule records.
 
 The resolved instruction tells the model to interpret otherwise-unqualified dates and times in that browser zone. Mixed or unavailable zone records tell the model to ask the user to clarify. This is natural-language context, not an input default at another package boundary: a tool that accepts local calendar fields still owns its explicit zone requirement.
 
+<a id="timing-semantics"></a>
 ## Timing semantics
 
 The plugin prepends an `agent/pre-step` listener and delegates first. When an injection is due and the downstream decision enters, it appends one sourced `UserMessage` to the returned batch. AgentLoop records the final batch after `step/start` and before request derivation. Rejection, listener failure, or an already-aborted signal records nothing.
@@ -40,6 +59,7 @@ Step 1 measures from the latest preceding durable user, assistant, or tool-resul
 
 A reading records an entered step, not a completed or transmitted request. A later preparation failure can leave it in history. The message remains in derived conversation history until compaction shadows it; `request/header` contains no time-context state, and request reconstruction uses the complete durable surface prefix after each `step/start`.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Preparation-time temporal context
@@ -79,3 +99,13 @@ Append-only; newly visible content follows the reusable request prefix and does 
 - **Fallback is not user authority** — the configured or process zone formats the clock when browser-zone records are missing or mixed, but the model-facing policy still says to clarify.
 - **Whole-second display** — timestamps and durations omit sub-second precision even though durable event times retain milliseconds.
 - **History cost between compactions** — omission or `0` retains one reading for every eligible attempt; a positive interval reduces but does not eliminate this cost and may leave a later request without fresh browser-zone guidance.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

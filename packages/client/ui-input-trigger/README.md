@@ -1,3 +1,8 @@
+---
+description: "Input trigger pipeline: '/' and '@' detection, candidate menu, pick routing to registered sources"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-input-trigger
 
 English | [中文](README.zh.md)
@@ -18,10 +23,21 @@ The `/client` exports are the plugin body (`apply`/`inject`), `InputTriggerServi
 
 When users type `/` or `@` at the caret in the Web GUI, this package opens a grouped menu for slash commands, file references, and session references. It supports keyboard and pointer selection, including drill-down choices and launchers that open a single candidate group over the current selection. A pick either invokes a command flow or inserts a reference for the consuming input surface to handle. The package affects browser presentation only; it does not assemble or send model requests.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The trigger source roster is an effect-owned registration set proven by the HMR-safety spec; arbitration is per-request controller state with no durable relation.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the trigger pipeline is browser presentation only — picks produce command claims and reference inserts whose model-visible consequences are owned by the consuming host and input-machine packages.
@@ -35,3 +51,13 @@ None; this package neither assembles nor sends a provider request.
 - **Global source layer only** — session-scope source registration (per-session shadowing, ScopedLayers-alike) is designed but not enabled; the ledger tracks the trigger condition (a real per-session source need).
 - **Extension icons are display-only** — built-in `file`, `folder`, and `session` values use shared glyphs; sources may also provide a shared icon component, while arbitrary strings remain text-compatible.
 - **Overlay SlotMap merge home is split from slot ownership** — the sole `conversation.input.overlay` merge lives here, while ui-conversation owns its anchor, children declaration, and lifecycle because the dependency direction is ui-conversation → ui-input-trigger.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

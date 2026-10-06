@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-admin-archive-channel.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-admin-archive-channel.md
-2026-08-25-admin-archive-channel.md: a1e3ddb2ce5cdf1eabc8d74c440a8f66a59c78c3
-2026-08-25-admin-archive-channel.zh.md: e3109828d74e1a371549935b48e0b4660d4c91be
+/agent-note-admin-archive-channel-and-gateway-lifecycle-index:
+  en: 929d4ecda790d490
+  zh: bf8ae8391670e8c8
+/agent-note-admin-archive-channel-and-gateway-lifecycle-index/problem:
+  en: 2be9d81c51ffd296
+  zh: 413c2d6e18aa82b0
+/agent-note-admin-archive-channel-and-gateway-lifecycle-index/decision:
+  en: bd1e390724b19cbf
+  zh: 020d3ed98569b9da
+/agent-note-admin-archive-channel-and-gateway-lifecycle-index/alternatives-considered:
+  en: 1d8fc918b2001c5b
+  zh: 1d17a91e185a7795
+/agent-note-admin-archive-channel-and-gateway-lifecycle-index/consequences:
+  en: 9c2bb3e899688b4d
+  zh: e83a6680e936f7c9

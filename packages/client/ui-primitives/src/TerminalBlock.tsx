@@ -73,6 +73,18 @@ export interface TerminalBlockProps {
   signal?: string | undefined
   /** The command is still running: show any received output, with no copy control until settlement. */
   running?: boolean | undefined
+  /**
+   * Text the copy control writes; defaults to the output. A surface that
+   * frames the card differently (a job row above its output panel) may hand
+   * the command instead when that is the value a user would reuse.
+   */
+  copyText?: string | undefined
+  /**
+   * Draw the run-state dot and its assistive label in the card gutter
+   * (default true). A host whose surrounding row already carries the same
+   * state omits both and reclaims the gutter via `--dsl-terminal-gutter`.
+   */
+  runStateDot?: boolean | undefined
   /** Height cap in output lines before the middle collapses (default {@link DEFAULT_TERMINAL_MAX_LINES}); Infinity disables the cap. */
   maxLines?: number | undefined
   /** Extra class merged onto the wrapper (callers position; this component draws). */
@@ -171,6 +183,8 @@ export function TerminalBlock({
   exitCode,
   signal,
   running = false,
+  copyText,
+  runStateDot = true,
   maxLines = DEFAULT_TERMINAL_MAX_LINES,
   className,
   labels: copy,
@@ -193,7 +207,7 @@ export function TerminalBlock({
   const [expanded, setExpanded] = useState(false)
   // The raw output, never the rendered tree: the prompt line and the status pill
   // are chrome the user did not run.
-  const { copied, onCopy } = useCopyFeedback(text)
+  const { copied, onCopy } = useCopyFeedback(copyText ?? text)
 
   const onToggle = useCallback(() => { setExpanded(value => !value) }, [])
 
@@ -224,14 +238,14 @@ export function TerminalBlock({
     <div className={clsx(css.block, className)} data-terminal="" data-running={running ? '' : undefined} data-body={hasBody ? '' : undefined}>
       <div className={css.header}>
         <div className={css.prompt}>
-          <span className={css.runStateLabel}>{state.label}</span>
+          {runStateDot && <span className={css.runStateLabel}>{state.label}</span>}
           {commandLines.map((line, index) => (
             <div key={index} className={css.promptLine}>
               {/* One dot for the card, on the first row: the exit status the
                   view carries is the whole call's, and bash reports no
                   per-command status, so a dot per row would assert a
                   per-line outcome nothing here knows. */}
-              {index === 0 && <StateDot state={state.state} className={css.runState} />}
+              {index === 0 && runStateDot && <StateDot state={state.state} className={css.runState} />}
               {/* The cwd labels the CALL, so only its first row carries it. The
                   view knows one working directory — where the call started —
                   and a later line may well run somewhere else (a `cd` in the

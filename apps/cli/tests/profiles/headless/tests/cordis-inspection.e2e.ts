@@ -25,9 +25,9 @@ it('executes three read-only tools and refuses every retired name through the re
     'cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine',
   ])
   expect(results).toHaveLength(7)
-  expect(results.slice(0, 3).map(event => event.data.message.content[0].isError)).toEqual([false, false, false])
+  expect(results.slice(0, 3).map(event => event.data.message.isError)).toEqual([false, false, false])
   for (const event of results.slice(3)) {
-    expect(event.data.message.content[0].isError).toBe(true)
+    expect(event.data.message.isError).toBe(true)
     expect(event.data.error).toMatchObject({ name: 'ToolNotFoundError', code: 'UNKNOWN_TOOL' })
   }
   const inspected = JSON.stringify(results[1]?.data.message.content)

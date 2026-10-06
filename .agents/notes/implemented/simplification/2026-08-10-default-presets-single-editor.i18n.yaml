@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-default-presets-single-editor.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-10-default-presets-single-editor.md
-2026-08-10-default-presets-single-editor.md: 270813f1cbc1587d0966994510f51f4a7935dfbc
-2026-08-10-default-presets-single-editor.zh.md: 7fc701d5e745b6cf9aaec6ffe6887f83f953dc8d
+/agent-note-one-editor-family-in-general-purpose-presets:
+  en: c9842a3e891c8d20
+  zh: 6c0740bfb1b6402e
+/agent-note-one-editor-family-in-general-purpose-presets/problem:
+  en: 80c8b23407bfd442
+  zh: 56c5ee2bf89f98eb
+/agent-note-one-editor-family-in-general-purpose-presets/decision:
+  en: f0c2d95bddd0adc0
+  zh: a7e9c802c5dc8520
+/agent-note-one-editor-family-in-general-purpose-presets/alternatives-considered:
+  en: 5bcedee2a30c9cbb
+  zh: 9591e75f21d6f22a
+/agent-note-one-editor-family-in-general-purpose-presets/consequences:
+  en: afd411bdbf35d178
+  zh: 859357b759418660

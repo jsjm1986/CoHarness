@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-llm-replay
 
 [English](README.md) | 中文
@@ -10,6 +15,21 @@
 
 `dsh-llm-replay` 从已记录的 Session JSONL fixture（测试前置数据）回放模型流，让快照测试无需 API 密钥即可运行真实 agent。每个 parent 与 subagent 会话按首次调用顺序取得各自的已记录脚本，而同一会话内的调用会独立推进。`replay.override.json` 伴随文件表示持久 settlement 无法重建的分片前失败、取消、挂起与注入重试。需要以固定模型输出确定性测试真实 loop 行为时，可在 ACP（Agent Client Protocol）、headless 与 Web 浏览器场景中使用本包。
 
+## 目录
+
+- [fixture 的工作方式](#how-the-fixture-works)
+- [嵌套 agent：每会话键控](#nested-agents-per-session-keying)
+- [配置](#config)
+- [导出项](#exports)
+- [插件导出形态](#plugin-export-shape)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="how-the-fixture-works"></a>
 ## fixture 的工作方式
 
 fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `assistant/message` 与 `assistant/attempt` 事件包含每次模型调用的已录制流；展开该流即可重建 `StreamChunk` 序列。历史分片行先经过声明的格式目录，再派生回放脚本。压缩（compaction）摘要器成功时，日志记录方式有所不同：当 `compaction/summary` 携带 `llmStreamCall: true` 和完整的 `rawOutput` 时，回放会在该事件的位置重建一条规范成功流，其中每个块各使用一对 `block-start`/`block-end`，带上已记录的用量（如有），并以 `stop` 终止。提供方增量的精确切分不属于持久压缩结果。不带该标记的 `rawOutput` 并不意味着发生了本地 LLM 调用，因为模板摘要器和远程摘要器即使未使用此上下文的适配器，也可能保留完整输出。
@@ -22,6 +42,7 @@ fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `as
 
 脚本字符串可以内嵌 `{{fromRequest:<regex>}}`，用来填入静态伴随文件不可能预知的值——例如模型必须原样回填到 `update_goal` 的随机生成 goal id。回放时每个占位符针对实时请求解析：语料是请求消息的所有字符串叶子按换行拼接的结果，取该模式在语料中的最后一次匹配，用其第一个捕获组（无捕获组时用整个匹配）原位替换。模式匹配不到内容、模式非法、占位符未闭合都会明确报错。连续右花括号串的最后两个花括号才是占位符结束符，因此模式可以以花括号量词收尾（如 `[0-9a-f]{4}`），但不能在 `}}` 之后还有后续模式内容。解析作用于所有脚本条目，包括从已记录 JSONL 派生的条目——若录制文本本身合法地含有该字面量标记，需改用不含标记的伴随文件表达。
 
+<a id="nested-agents-per-session-keying"></a>
 ## 嵌套 agent：每会话键控
 
 父 agent 委托给进程内 subagent 的场景会记录多个日志：父会话使用 `session.jsonl`，每个子会话各使用一个日志（`session.1.jsonl` 等）。每个 agent 都在同一上下文中作为独立的 `Session` 运行，因此回放必须为每个 agent 提供各自的脚本。
@@ -30,6 +51,7 @@ fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `as
 
 官方 DeepSeek 回放只在脚本请求已受理后提交注册的请求扩展。无 chunk 的抛错默认为未受理，除非 sidecar 显式设置 `accepted: true`；部分流默认为已受理。类型化的 `{{session:N}}` 引用解析为对应的实时会话。尚未绑定的子会话会失败，除非成功的 `subagent` 工具结果已公布其身份；用户正文、其他工具及失败结果不能建立该身份。后续子会话调用必须与公布的身份一致。
 
+<a id="config"></a>
 ## 配置
 
 | 键 | 类型 | 默认值 | 说明 |
@@ -62,6 +84,7 @@ fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `as
   # harness per scenario.
 ```
 
+<a id="exports"></a>
 ## 导出项
 
 - `installLlmReplay(ctx, config)`：安装已配置回放适配器或 catch-all `llm/stream` 监听器；返回 `ReplayHandle`（包含用于保证 HMR（热模块替换）安全的 `dispose()`，以及清理阶段执行的 `assertConsumed()` 检查；后者确保每个已记录脚本都绑定到实时会话，且每个已绑定游标都已耗尽，从而将场景静默驱动的模型调用少于记录数转换为明确诊断）。在测试中使用它，可以不通过 Loader 或 env var 驱动回放。
@@ -70,14 +93,18 @@ fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `as
 - `deriveReplayScript(events)` / `parseSessionLog(text)` / `parseSessionHeader(text)` / `resolveScriptedEntry(entry, messages)`：将已记录会话日志中的普通 loop 分片和显式标记的本地压缩输出转换为脚本、读取其 header `id`/`createdAt`、并针对单次实时请求解析 `{{fromRequest:...}}` 占位符的纯辅助工具。派生的 assistant 分组必须以 `finish` 分片结束；没有该分片的分组是 `stream()` 抛出异常的指纹，必须改用 override 伴随文件表达。
 - 类型 `ReplayEntry` / `ReplayOverrideDoc` / `ReplayOverridePatch` / `SessionScript` / `ReplayConfig` / `ReplayProviderConfig` / `ReplayModelConfig` / `ReplayHandle` / `Config`。
 
+<a id="plugin-export-shape"></a>
 ## 插件导出形态
 
 命名导出 `name` / `inject` / `Config` / `apply`，且**没有默认导出**：Cordis Loader 的 `unwrapExports` 执行 `exports.default ?? exports`，因此意外的默认导出会将模块折叠为函数本身，并丢弃 `inject` 命名空间（见 [docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)）。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。适配器每个测试重放一份固定的已录制转录；不存在实时的提供方关系。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该无密钥测试适配器不向提供方模型发送请求，只将已记录 assistant 分片回放到测试 loop 中。
@@ -86,7 +113,18 @@ fixture 就是持久化的会话日志（`<scenario>/session.jsonl`）。其 `as
 
 无；本包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **首次调用顺序脚本绑定假设串行委托**：一种并发运行同级 subagent 的实现会非确定性地将实时会话绑定到已记录脚本；在这种场景出现前暂不实现更强的键控（`XXX(concurrent-subagents)`）。
 - **只有普通 loop 分片和带标记的本地压缩输出才能派生**：在产生分片前直接抛出异常、取消/挂起，或未标记的外部摘要器调用场景需要 `replay.override.json` 伴随文件。替换和补丁两种形式都只影响主会话；子会话脚本仍从各自日志派生。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

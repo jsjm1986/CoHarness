@@ -410,9 +410,10 @@ function uploadNetworkError(status: number): Error {
 
 /**
  * Create the default relative-path document client.
+ * @param privateResourceUrl - binds native upload chunks to the verified document identity.
  * @returns a client targeting the current host's document route.
  */
-export function createUserDocClient(): UserDocClient {
+export function createUserDocClient(privateResourceUrl: (url: string) => string = url => url): UserDocClient {
   return {
     list: signal => requestReadJson<UserDocListResponse>(ROOT, requestInit('GET', signal)),
     browse: (directoryId, signal, query) => requestReadJson<UserDocDirectoryResponse>(
@@ -463,20 +464,24 @@ export function createUserDocClient(): UserDocClient {
       }
     },
     listDirectories: signal => requestReadJson<UserDocDirectoriesResponse>(`${ROOT}/directories`, requestInit('GET', signal)),
-    upload: (file, directoryId, signal, onProgress) => resumableUpload(file, directoryId, signal, onProgress, {
-      root: ROOT,
-      requestJson,
-      networkError: uploadNetworkError,
-      responseError: errorFrom,
-    }),
-    uploadToScope: (scope, file, directoryId, signal, onProgress) => resumableUpload(file, directoryId, signal, onProgress, {
-      root: SCOPED_UPLOAD_PATH,
-      query: scopeQuery(scope),
-      resumeNamespace: scopeKey(scope),
-      requestJson,
-      networkError: uploadNetworkError,
-      responseError: errorFrom,
-    }),
+    upload: (file, directoryId, signal, onProgress) => {
+      const query = new URL(privateResourceUrl(ROOT), 'http://dsh.internal').search
+      return resumableUpload(file, directoryId, signal, onProgress, {
+        root: ROOT, query, resumeNamespace: query,
+        requestJson,
+        networkError: uploadNetworkError,
+        responseError: errorFrom,
+      })
+    },
+    uploadToScope: (scope, file, directoryId, signal, onProgress) => {
+      const query = new URL(privateResourceUrl(`${SCOPED_UPLOAD_PATH.slice(1)}${scopeQuery(scope)}`), 'http://dsh.internal').search
+      return resumableUpload(file, directoryId, signal, onProgress, {
+        root: SCOPED_UPLOAD_PATH.slice(1), query, resumeNamespace: query,
+        requestJson,
+        networkError: uploadNetworkError,
+        responseError: errorFrom,
+      })
+    },
     createDirectory: (parentDirectoryId, name, signal) => requestJson<UserDocDirectoryRef>(
       `${ROOT}/folders?directory=${encodeURIComponent(parentDirectoryId)}&name=${encodeURIComponent(name)}`,
       requestInit('POST', signal),

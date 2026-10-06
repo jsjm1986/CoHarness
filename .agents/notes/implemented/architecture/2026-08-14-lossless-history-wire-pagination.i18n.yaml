@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-lossless-history-wire-pagination.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-lossless-history-wire-pagination.md
-2026-08-14-lossless-history-wire-pagination.md: 0c35773a5f97f91fa31c492e571abd58d6d7dec5
-2026-08-14-lossless-history-wire-pagination.zh.md: a89d4550d73ea861c5af2ac369c586072dcd50da
+/agent-note-lossless-history-wire-pagination:
+  en: d2dc8909f346b451
+  zh: 23b0d4784cb1f413
+/agent-note-lossless-history-wire-pagination/problem:
+  en: a19efcf3249712c1
+  zh: 02ec6a7bc893cd03
+/agent-note-lossless-history-wire-pagination/decision:
+  en: b3a8fbd25e1143f2
+  zh: 4d152350d088657e
+/agent-note-lossless-history-wire-pagination/decision/verification:
+  en: 850f6608507cd86e
+  zh: 73d5b9bb757e7041
+/agent-note-lossless-history-wire-pagination/alternatives-considered:
+  en: e097f2df23e1f745
+  zh: bc4806fe23a70fcd
+/agent-note-lossless-history-wire-pagination/consequences:
+  en: 42531ae859920eca
+  zh: a051f1c159742bef

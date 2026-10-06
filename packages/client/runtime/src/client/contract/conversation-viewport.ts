@@ -8,6 +8,8 @@ export type ConversationViewportMode = 'single' | 'workbench'
 /** JSON view state projected by the active viewport provider. */
 export interface ConversationViewportSnapshot {
   mode: ConversationViewportMode
+  /** Present while a legacy raw-ID layout awaits a complete catalog; layout edits are refused. */
+  pendingIdentity?: true
   paneIds: readonly SessionId[]
   activePaneId?: SessionId
   paneRatios: readonly number[]
@@ -52,8 +54,10 @@ export interface ConversationViewport {
    * @param ratios - width weights in pane order.
    */
   setPaneRatios(ratios: readonly number[]): void
-  /** Finish account-catalog hydration before pruning restored foreign panes. */
-  markCatalogReady(): void
+  /** Finish account-catalog hydration before pruning restored foreign panes.
+   * @param unavailable - identities awaiting runtime or directory verification; these retain metadata without granting access.
+   */
+  markCatalogReady(unavailable?: ReadonlySet<SessionId>): void
   /** List user-owned named workbench layouts. */
   listWorkbenches?(): readonly { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number }[]
   /** Return the active named workbench. */

@@ -1,6 +1,58 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/web/web-search-perplexity/README.md
-README.md: 4e5d5586e67d3bbfef1c90074cc52a5a780fd283
-README.zh.md: c58602906a265f446bc390888e11c202844f1bed
+/:
+  en: adef18a007306f8b
+  zh: 61495d48365178df
+/deepseek-ai-dsh-web-search-perplexity:
+  en: 23128b625e84dc3f
+  zh: d478b0d5e351317d
+/deepseek-ai-dsh-web-search-perplexity/summary:
+  en: 355bf2550d1655df
+  zh: c659fa3e25a02d91
+/deepseek-ai-dsh-web-search-perplexity/table-of-contents:
+  en: b1e4b33307e12d7a
+  zh: 3fa9878be0e061e1
+/deepseek-ai-dsh-web-search-perplexity/config:
+  en: 4283e6a5f592070a
+  zh: 4130448a46cd912b
+/deepseek-ai-dsh-web-search-perplexity/mapping:
+  en: d3c1133de4e5a13f
+  zh: 5071f248a3f8cacd
+/deepseek-ai-dsh-web-search-perplexity/invariants:
+  en: ba451a8d8aa1d17d
+  zh: 123ce32aec4f5791
+/deepseek-ai-dsh-web-search-perplexity/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-web-search-perplexity/model-experience/auxiliary-perplexity-request:
+  en: 9d564a5863828a46
+  zh: 143112cfc85fe3f3
+/deepseek-ai-dsh-web-search-perplexity/model-experience/auxiliary-perplexity-request/what-the-model-sees:
+  en: eacb10a5e907e796
+  zh: 74fbd30db7c983a1
+/deepseek-ai-dsh-web-search-perplexity/model-experience/auxiliary-perplexity-request/token-effect:
+  en: 5f5b2bf40168d371
+  zh: 25bc3b50bc74ff20
+/deepseek-ai-dsh-web-search-perplexity/model-experience/auxiliary-perplexity-request/kv-cache-effect:
+  en: ca308291b52b8028
+  zh: 12e8f89f79a2756c
+/deepseek-ai-dsh-web-search-perplexity/model-experience/conversation-tool-result-indirectly:
+  en: 666f5753c99783ab
+  zh: b44328e99bcc45c9
+/deepseek-ai-dsh-web-search-perplexity/model-experience/conversation-tool-result-indirectly/what-the-model-sees:
+  en: 1bab9dad335b62eb
+  zh: 1d64c077b88c316e
+/deepseek-ai-dsh-web-search-perplexity/model-experience/conversation-tool-result-indirectly/token-effect:
+  en: 8c5d9983ba129daf
+  zh: 3e7889629bed353d
+/deepseek-ai-dsh-web-search-perplexity/model-experience/conversation-tool-result-indirectly/kv-cache-effect:
+  en: f5d5f97a153f7c70
+  zh: 003f251b4beef2b9
+/deepseek-ai-dsh-web-search-perplexity/known-limitations-and-deferred-work:
+  en: 814ae51c0de9136c
+  zh: a6fdc4b3ac55f098
+/deepseek-ai-dsh-web-search-perplexity/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

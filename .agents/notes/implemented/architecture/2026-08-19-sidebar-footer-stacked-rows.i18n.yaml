@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-sidebar-footer-stacked-rows.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-sidebar-footer-stacked-rows.md
-2026-08-19-sidebar-footer-stacked-rows.md: c4e00029bc1edead90f400a0fdad4199040eb40d
-2026-08-19-sidebar-footer-stacked-rows.zh.md: 5daf2056b213148bbe2b40e1c282850cc54ed18d
+/agent-note-sidebar-footer-stacked-settings-rows:
+  en: 33da985268d8c1ba
+  zh: 780c43d266ef0eea
+/agent-note-sidebar-footer-stacked-settings-rows/problem:
+  en: 3538a47d07b18a63
+  zh: b5f874303156b295
+/agent-note-sidebar-footer-stacked-settings-rows/decision:
+  en: 900bc9be3b523e40
+  zh: ee9764a976304eaf
+/agent-note-sidebar-footer-stacked-settings-rows/alternatives-considered:
+  en: dd8ff0e0662c51e1
+  zh: 85dd19a56e400465
+/agent-note-sidebar-footer-stacked-settings-rows/consequences:
+  en: c05c560d378371c1
+  zh: 30f8796550fc9353
+/agent-note-sidebar-footer-stacked-settings-rows/testing:
+  en: 629968541ca546a5
+  zh: 17a8a1b91bdbaca9

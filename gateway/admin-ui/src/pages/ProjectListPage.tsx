@@ -1,5 +1,5 @@
 import { ArrowUpRight, CheckCircle2, Folder, FolderKanban, Plus } from 'lucide-react'
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { createProject, listProjects, type Project } from '../api.ts'
 import { ProjectDirectoryBrowser } from '../components/ProjectDirectoryBrowser.tsx'
@@ -14,8 +14,15 @@ import {
   Section,
   StatusBadge,
 } from '../components/ui.tsx'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { zh as projectListZh, en as projectListEn, type ProjectListCopyKey } from './project-list.copy.ts'
+
+function projectListT() {
+  return translateCopy(adminLanguage(), { zh: projectListZh, en: projectListEn })
+}
 
 export function ProjectListPage() {
+  const t = useMemo(() => projectListT(), [])
   const [projects, setProjects] = useState<Project[]>([])
   const [originFilter, setOriginFilter] = useState<'all' | 'admin' | 'user'>('all')
   const [loading, setLoading] = useState(true)
@@ -84,24 +91,24 @@ export function ProjectListPage() {
   return (
     <div className="page">
       <PageHeader
-        title="项目"
-        description="统一查看管理员发起和用户发起的工作空间，并配置成员权限。"
-        meta={loading ? undefined : `${projects.length} 个项目`}
-        actions={<Button variant="primary" icon={Plus} onClick={openCreate}>新建项目</Button>}
+        title={t('pageTitle')}
+        description={t('pageDescription')}
+        meta={loading ? undefined : t('projectCount', { count: String(projects.length) })}
+        actions={<Button variant="primary" icon={Plus} onClick={openCreate}>{t('createProject')}</Button>}
       />
       <ErrorBanner message={error} />
-      <div className="segmented" role="group" aria-label="项目来源筛选">
-        <button type="button" aria-pressed={originFilter === 'all'} onClick={() => setOriginFilter('all')}>全部</button>
-        <button type="button" aria-pressed={originFilter === 'admin'} onClick={() => setOriginFilter('admin')}>管理员发起</button>
-        <button type="button" aria-pressed={originFilter === 'user'} onClick={() => setOriginFilter('user')}>用户发起</button>
+      <div className="segmented" role="group" aria-label={t('originFilterAria')}>
+        <button type="button" aria-pressed={originFilter === 'all'} onClick={() => setOriginFilter('all')}>{t('filterAll')}</button>
+        <button type="button" aria-pressed={originFilter === 'admin'} onClick={() => setOriginFilter('admin')}>{t('originAdmin')}</button>
+        <button type="button" aria-pressed={originFilter === 'user'} onClick={() => setOriginFilter('user')}>{t('originUser')}</button>
       </div>
-      <Section className="responsiveSection" title="项目目录" meta={loading ? undefined : `${projects.length} 条记录`}>
-        {loading ? <LoadingState label="正在加载项目" /> : projects.length === 0 ? (
+      <Section className="responsiveSection" title={t('sectionTitle')} meta={loading ? undefined : t('recordCount', { count: String(projects.length) })}>
+        {loading ? <LoadingState label={t('loadingProjects')} /> : projects.length === 0 ? (
           <EmptyState
             icon={FolderKanban}
-            title="还没有项目"
-            detail="管理员项目可使用默认目录或导入现有目录；用户项目由账户在受控项目根目录中创建。"
-            action={<Button variant="primary" icon={Plus} onClick={openCreate}>新建项目</Button>}
+            title={t('emptyTitle')}
+            detail={t('emptyDetail')}
+            action={<Button variant="primary" icon={Plus} onClick={openCreate}>{t('createProject')}</Button>}
           />
         ) : (
           <>
@@ -109,11 +116,11 @@ export function ProjectListPage() {
               <table className="dataTable">
                 <thead>
                   <tr>
-                    <th>项目</th>
-                    <th>来源 / 所有者</th>
-                    <th>目录</th>
-                    <th>成员</th>
-                    <th aria-label="打开" />
+                    <th>{t('colProject')}</th>
+                    <th>{t('colOrigin')}</th>
+                    <th>{t('colDirectory')}</th>
+                    <th>{t('colMembers')}</th>
+                    <th aria-label={t('colOpen')} />
                   </tr>
                 </thead>
                 <tbody>
@@ -127,13 +134,13 @@ export function ProjectListPage() {
                       </td>
                       <td>
                         <div className="projectOriginCell">
-                          <StatusBadge tone={project.origin === 'user' ? 'info' : 'neutral'}>{project.origin === 'user' ? '用户发起' : '管理员发起'}</StatusBadge>
-                          <span>{project.owner?.displayName || project.owner?.username || '组织管理'}</span>
+                          <StatusBadge tone={project.origin === 'user' ? 'info' : 'neutral'}>{project.origin === 'user' ? t('originUser') : t('originAdmin')}</StatusBadge>
+                          <span>{project.owner?.displayName || project.owner?.username || t('ownerFallback')}</span>
                         </div>
                       </td>
                       <td><span className="pathText">{project.path}</span></td>
-                      <td><StatusBadge tone={project.memberCount === 0 ? 'neutral' : 'info'}>{project.memberCount} 位成员</StatusBadge></td>
-                      <td className="alignRight"><Link className="iconLink" to={`/projects/${project.id}`} aria-label={`打开 ${project.name}`} title="打开项目"><ArrowUpRight aria-hidden="true" /></Link></td>
+                      <td><StatusBadge tone={project.memberCount === 0 ? 'neutral' : 'info'}>{t('membersCount', { count: String(project.memberCount) })}</StatusBadge></td>
+                      <td className="alignRight"><Link className="iconLink" to={`/projects/${project.id}`} aria-label={t('openProjectAria', { name: project.name })} title={t('openProjectTitle')}><ArrowUpRight aria-hidden="true" /></Link></td>
                     </tr>
                   ))}
                 </tbody>
@@ -150,9 +157,9 @@ export function ProjectListPage() {
                     <ArrowUpRight className="mobileChevron" aria-hidden="true" />
                   </div>
                   <div className="mobileItemBody">
-                    <StatusBadge tone={project.origin === 'user' ? 'info' : 'neutral'}>{project.origin === 'user' ? `用户发起 · ${project.owner?.displayName || project.owner?.username || '未知所有者'}` : '管理员发起'}</StatusBadge>
+                    <StatusBadge tone={project.origin === 'user' ? 'info' : 'neutral'}>{project.origin === 'user' ? `${t('originUser')} · ${project.owner?.displayName || project.owner?.username || t('unknownOwner')}` : t('originAdmin')}</StatusBadge>
                     <span className="pathText">{project.path}</span>
-                    <StatusBadge tone={project.memberCount === 0 ? 'neutral' : 'info'}>{project.memberCount} 位成员</StatusBadge>
+                    <StatusBadge tone={project.memberCount === 0 ? 'neutral' : 'info'}>{t('membersCount', { count: String(project.memberCount) })}</StatusBadge>
                   </div>
                 </Link>
               ))}
@@ -163,13 +170,13 @@ export function ProjectListPage() {
 
       <Dialog
         open={createOpen}
-        title="新建项目"
-        description="创建受管目录，或把 Gateway 主机上的现有项目加入工作区。"
+        title={t('createProject')}
+        description={t('createDialogDescription')}
         onClose={closeCreate}
         wide
         footer={(
           <>
-            <Button type="button" onClick={closeCreate} disabled={pending}>取消</Button>
+            <Button type="button" onClick={closeCreate} disabled={pending}>{t('cancel')}</Button>
             <Button
               type="submit"
               form="create-project-form"
@@ -177,7 +184,7 @@ export function ProjectListPage() {
               loading={pending}
               disabled={createMode === 'existing' && selectedPath === undefined}
             >
-              创建项目
+              {t('submitCreate')}
             </Button>
           </>
         )}
@@ -185,36 +192,36 @@ export function ProjectListPage() {
         <form id="create-project-form" className="formGrid projectCreateForm" onSubmit={event => void onCreate(event)}>
           <div className="formSpanFull"><ErrorBanner message={createError} /></div>
           <Field
-            label="项目名称"
-            hint={createMode === 'managed' ? 'Gateway 会在默认项目根目录创建同名目录。' : '用于工作区列表显示，不会重命名现有目录。'}
+            label={t('projectNameLabel')}
+            hint={createMode === 'managed' ? t('nameHintManaged') : t('nameHintExisting')}
             className="formSpanFull"
           >
-            <input className="input" required autoFocus value={name} onChange={event => { setName(event.target.value); setCreateError('') }} placeholder="例如：产品文档" />
+            <input className="input" required autoFocus value={name} onChange={event => { setName(event.target.value); setCreateError('') }} placeholder={t('namePlaceholder')} />
           </Field>
           <fieldset className="field projectDirectoryField formSpanFull">
-            <legend className="fieldLabel">项目目录</legend>
-            <div className="segmented" role="group" aria-label="项目目录方式">
+            <legend className="fieldLabel">{t('directoryFieldLabel')}</legend>
+            <div className="segmented" role="group" aria-label={t('directoryModeAria')}>
               <button
                 type="button"
                 aria-pressed={createMode === 'managed'}
                 onClick={() => { setCreateMode('managed'); setCreateError('') }}
               >
-                默认目录
+                {t('modeManaged')}
               </button>
               <button
                 type="button"
                 aria-pressed={createMode === 'existing'}
                 onClick={() => { setCreateMode('existing'); setCreateError('') }}
               >
-                现有目录
+                {t('modeExisting')}
               </button>
             </div>
             {createMode === 'managed' ? (
               <div className="managedDirectorySummary">
                 <FolderKanban aria-hidden="true" />
                 <span>
-                  <strong>Gateway 默认项目目录</strong>
-                  <small>创建一个新的受管项目文件夹</small>
+                  <strong>{t('managedTitle')}</strong>
+                  <small>{t('managedDetail')}</small>
                 </span>
               </div>
             ) : (
@@ -223,7 +230,7 @@ export function ProjectListPage() {
                   <div className="selectedDirectory">
                     <CheckCircle2 aria-hidden="true" />
                     <span>
-                      <small>已选择目录</small>
+                      <small>{t('selectedDirectory')}</small>
                       <strong title={selectedPath}>{selectedPath}</strong>
                     </span>
                   </div>
@@ -242,36 +249,23 @@ function messageFrom(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
 }
 
+const PROJECT_ERROR_KEYS: Record<string, ProjectListCopyKey> = {
+  'project-name-invalid': 'errorNameInvalid',
+  'project-root-not-directory': 'errorRootNotDirectory',
+  'project-path-outside-root': 'errorPathOutsideRoot',
+  'project-path-not-absolute': 'errorPathNotAbsolute',
+  'project-path-reserved': 'errorPathReserved',
+  'project-path-overlap': 'errorPathOverlap',
+  'project-path-not-found': 'errorPathNotFound',
+  'project-path-not-directory': 'errorPathNotDirectory',
+  'project-path-inaccessible': 'errorPathInaccessible',
+}
+
 function projectMessageFrom(cause: unknown): string {
   const message = messageFrom(cause)
-  if (message === 'project-name-invalid') {
-    return '项目名称不能为空，也不能包含路径分隔符。'
-  }
-  if (message === 'project-root-not-directory') {
-    return '项目根路径不是目录，请检查 Gateway 配置。'
-  }
-  if (message === 'project-path-outside-root') {
-    return '项目目录不在 Gateway 允许的项目根目录内。'
-  }
-  if (message === 'project-path-not-absolute') {
-    return '项目目录必须是 Gateway 主机上的绝对路径。'
-  }
-  if (message === 'project-path-reserved') {
-    return '不能把 Gateway 数据、凭据、运行时或用户目录登记为项目。'
-  }
-  if (message === 'project-path-overlap') {
-    return '该目录与已登记项目重叠，请选择其他目录。'
-  }
-  if (message === 'project-path-not-found') {
-    return '目录不存在。请先在 Gateway 主机上创建该目录，再登记为项目。'
-  }
-  if (message === 'project-path-not-directory') {
-    return '该路径不是目录。请填写 Gateway 主机上的现有目录。'
-  }
-  if (message === 'project-path-inaccessible') {
-    return 'Gateway 无权访问该目录，请检查目录权限。'
-  }
-  if (message.startsWith('duplicate project name')) return '项目名称已存在。'
+  const key = PROJECT_ERROR_KEYS[message]
+  if (key !== undefined) return projectListT()(key)
+  if (message.startsWith('duplicate project name')) return projectListT()('errorDuplicateName')
   return message
 }
 

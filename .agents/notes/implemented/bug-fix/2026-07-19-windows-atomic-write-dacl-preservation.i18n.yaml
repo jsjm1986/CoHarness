@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-19-windows-atomic-write-dacl-preservation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-19-windows-atomic-write-dacl-preservation.md
-2026-07-19-windows-atomic-write-dacl-preservation.md: be9f82174300a7d605c6a6e63878728f08cb37be
-2026-07-19-windows-atomic-write-dacl-preservation.zh.md: ed52773b0314e06ecdc470f9d569685c47a7aec3
+/agent-note-preserve-windows-dacls-during-atomic-file-replacement:
+  en: b4db086f6ff72468
+  zh: 64229600f97432b3
+/agent-note-preserve-windows-dacls-during-atomic-file-replacement/problem:
+  en: aa23437de83c6e34
+  zh: 901005e81c9f3511
+/agent-note-preserve-windows-dacls-during-atomic-file-replacement/decision:
+  en: b2284e8b50c30e35
+  zh: 9e6dd8fd7ac41721
+/agent-note-preserve-windows-dacls-during-atomic-file-replacement/alternatives-considered:
+  en: 9d60064c785591fa
+  zh: a6a5767676bbe749
+/agent-note-preserve-windows-dacls-during-atomic-file-replacement/consequences:
+  en: cd412716b928eb68
+  zh: a252736f10f63d7c

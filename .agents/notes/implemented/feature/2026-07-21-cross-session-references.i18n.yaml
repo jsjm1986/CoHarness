@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-21-cross-session-references.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-21-cross-session-references.md
-2026-07-21-cross-session-references.md: 0e1d6c5ba167266799c4954991d9efdb3880488a
-2026-07-21-cross-session-references.zh.md: 0daeec7836c2cba476d1c427fe849db7a25339ab
+/agent-note-cross-session-references:
+  en: 0adc3bc970cb36d4
+  zh: c9b52a2f995d73ec
+/agent-note-cross-session-references/problem:
+  en: 3904f4d671c8d754
+  zh: ddc4b823fb186926
+/agent-note-cross-session-references/decision:
+  en: a3fe9e6269a70f1b
+  zh: 29c4d9989fa6c633
+/agent-note-cross-session-references/snapshot-and-projection:
+  en: f8bdaf847b7dcbbe
+  zh: 54a6e961be9f3d2b
+/agent-note-cross-session-references/message-ownership:
+  en: 4546390229a0077c
+  zh: dbb095cbaa629fc8
+/agent-note-cross-session-references/host-adapters:
+  en: 5d77fedd6d20b257
+  zh: 0a6a14219ff5c51b
+/agent-note-cross-session-references/budget-and-retention:
+  en: 7324df2e8605c3bb
+  zh: dcad0b970c2d987d
+/agent-note-cross-session-references/alternatives-considered:
+  en: 2a680668039b7f8d
+  zh: 52436f19645f6390
+/agent-note-cross-session-references/verification:
+  en: 481346d374200150
+  zh: 1eb58fabb47141ba
+/agent-note-cross-session-references/consequences:
+  en: 6b8f5f5873e97b8b
+  zh: 5ac52beefc3d95ab

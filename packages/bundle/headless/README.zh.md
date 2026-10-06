@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-bundle"
+---
+
 # `@deepseek-ai/dsh-headless`
 
 [English](README.md) | 中文
@@ -10,10 +15,22 @@ Loader 结算后，runner 读取共享的 [`ctx.agentDefaultModel`](../../core/a
 
 `dsh-headless` 从命令行运行一个 dsh 任务并打印最终答案，然后退出——没有 GUI、没有服务器、没有浏览器。输入 `dsh --profile headless "run the tests"`，agent（智能体）会以与所有其他表层相同的模型、工具与安全默认值完成该任务。它非常适合脚本、CI 与一次性任务：进程不打开任何端口，也不会留下任何后台运行的东西。监督进程还可以通过按行 JSON 事件流（`--json`）驱动它，并用该事件流报告的标识（`--session-id`）在同一段对话上继续唤醒。退出码告诉你结果——任务完成时为 0，中止或出错时为 1。主要边界：每次调用只运行一个任务，没有交互式后续。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。补丁层插入 profile 行，其插件各自拥有自身关系；headless-runner 插件只读取一次启动请求，不拥有持久状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为 runner 把任务作为普通用户消息提交，提示词与工具由组合出的 base 与 headless 行提供。
@@ -22,9 +39,20 @@ Loader 结算后，runner 读取共享的 [`ctx.agentDefaultModel`](../../core/a
 
 runner 不向请求前缀添加任何内容；它只是驱动组合出的配置树处理一条用户消息。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **只提交一个任务**：runner 没有用于交互式后续输入的 surface；它会等待 Agent 在返回 idle 前完成的所有工作，并打印该区间内最后一条非空 assistant 消息。
 - **`ctx.appExit` 由启动器持有**：在 `dsh` 启动器之外启动 headless profile 会在激活时明确报错，直到宿主提供该退出请求。
 - **收养有范围限制**：`--session-id` 要求组合了 `sessionPersistence` 与 `sessionQuery` 服务，并拒绝记录在其他工作目录下、或运行在本 profile 未组合的 agent preset 下的 Session。
 - **事件流是投影而非日志**：`--json` 将除结尾 `final` 外的每个字符串截断在 8 KiB、每行截断在 32 KiB，并省略投影未建模的事件，因此它不是 Session 日志的无损副本。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

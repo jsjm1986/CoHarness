@@ -1,3 +1,8 @@
+---
+description: "The language-server capability seam: an LSP Service Definition, a generic stdio provider, and the model-facing `lsp` tool. All **product** packages."
+kind: "package-group"
+---
+
 # lsp/ - LSP capability family
 
 English | [中文](README.zh.md)

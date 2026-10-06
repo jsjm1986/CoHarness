@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-02-legacy-deepseek-catalog-aliases.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-02-legacy-deepseek-catalog-aliases.md
+/agent-note-legacy-deepseek-catalog-ids-retained-over-pi-ai-0-87-renames:
+  en: 80641eb366e87fa0
+  zh: 50332e70deab6709
+/agent-note-legacy-deepseek-catalog-ids-retained-over-pi-ai-0-87-renames/problem:
+  en: a8f3c0152e0deba5
+  zh: 00a2a3dfc060e93f
+/agent-note-legacy-deepseek-catalog-ids-retained-over-pi-ai-0-87-renames/decision:
+  en: 08977a2dd0a77e44
+  zh: a03f10839702aba7
+/agent-note-legacy-deepseek-catalog-ids-retained-over-pi-ai-0-87-renames/alternatives-considered:
+  en: f640e63ec4e9c70b
+  zh: 6feab9a5341621e8
+/agent-note-legacy-deepseek-catalog-ids-retained-over-pi-ai-0-87-renames/consequences:
+  en: 6c4c3820903fcc85
+  zh: 9aeab982f88279ec
+/agent-note-legacy-deepseek-catalog-ids-retained-over-pi-ai-0-87-renames/testing:
+  en: be21ab1ecb085394
+  zh: 6c6dc8fa80e95b27

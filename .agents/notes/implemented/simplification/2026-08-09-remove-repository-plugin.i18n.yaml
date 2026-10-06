@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-09-remove-repository-plugin.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-09-remove-repository-plugin.md
-2026-08-09-remove-repository-plugin.md: f9d1c00849219d30b4c0441246b2810ebca9fd6a
-2026-08-09-remove-repository-plugin.zh.md: 7f89f7f20f0f08533fef1d0de99e0ae6c827c93a
+/agent-note-remove-the-dedicated-repository-plugin-path:
+  en: 40e9eacd0b7e0a90
+  zh: 3ed91d88be06a2af
+/agent-note-remove-the-dedicated-repository-plugin-path/problem:
+  en: 03dd54a719c68ce5
+  zh: 89a0b9b2bbf8e2d8
+/agent-note-remove-the-dedicated-repository-plugin-path/decision:
+  en: 825f21412438c6cc
+  zh: d86e6cef662527f1
+/agent-note-remove-the-dedicated-repository-plugin-path/alternatives-considered:
+  en: cef68c7b23202fda
+  zh: 01067503541eb7d2
+/agent-note-remove-the-dedicated-repository-plugin-path/consequences:
+  en: c57c5b48a942bf3d
+  zh: 120a05e05e695afb
+/agent-note-remove-the-dedicated-repository-plugin-path/testing:
+  en: ba54c2cac7d7c413
+  zh: 83d4161d92b17a28

@@ -32,6 +32,7 @@ export const settingsNamespaceViewSchema = z.object({
   owner: z.union([
     z.literal('account'), z.literal('project'), z.literal('organization'), z.literal('deployment'),
   ]).optional(),
+  label: z.union([z.string(), z.object({ en: z.string() }).catchall(z.string())]).optional(),
   projectWritePaths: z.array(z.array(z.string())).optional(),
 }) satisfies z.ZodType<Wire<SettingsNamespaceView>>
 

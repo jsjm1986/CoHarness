@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-13-markdown-image-error-fallback.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-13-markdown-image-error-fallback.md
-2026-09-13-markdown-image-error-fallback.md: 4bfc06eb2dd7b6aa36a636af1a412aab99ec3f26
-2026-09-13-markdown-image-error-fallback.zh.md: b1e80698b711afbbbdc8716d89f2a63e2a34d43c
+/agent-note-markdown-image-failures-keep-authored-content-visible:
+  en: 70da156438ff8e64
+  zh: bd13c24f2c2f15d7
+/agent-note-markdown-image-failures-keep-authored-content-visible/problem:
+  en: 5d9a162cd4d90e8e
+  zh: db10d4d416f30f3e
+/agent-note-markdown-image-failures-keep-authored-content-visible/decision:
+  en: 4a07be23d1215b25
+  zh: c8c32fbfa0665377
+/agent-note-markdown-image-failures-keep-authored-content-visible/alternatives-considered:
+  en: 3470040f2460e925
+  zh: 771818ca26d8d1b1
+/agent-note-markdown-image-failures-keep-authored-content-visible/consequences:
+  en: 577fb27021f0282b
+  zh: 88f84bc1fd0f5f52

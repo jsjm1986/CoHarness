@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import {
   SESSION_FORMAT_VERSION,
   Session,
@@ -45,11 +45,7 @@ function sourceSessionFixture(): string {
   session.append('system/message', {
     turn: 1,
     step: 1,
-    message: createMessage({
-      role: 'system',
-      content: [{ type: 'text', text: 'Fixture system prompt.' }],
-      source: { kind: 'plugin', plugin: 'test-fixture' },
-    }),
+    message: createSystemMessage('Fixture system prompt.'),
   }, { surfaceOp: 'append' })
   const user = session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: 'Research context for the reference menu.' }],
@@ -85,11 +81,7 @@ function targetSessionFixture(): string {
   session.append('system/message', {
     turn: 1,
     step: 1,
-    message: createMessage({
-      role: 'system',
-      content: [{ type: 'text', text: 'Fixture system prompt.' }],
-      source: { kind: 'plugin', plugin: 'test-fixture' },
-    }),
+    message: createSystemMessage('Fixture system prompt.'),
   }, { surfaceOp: 'append' })
   const user = session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: '@Research notes what changed?' }],
@@ -150,7 +142,7 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
     await writeFile(join(scaffold.workspaceCwd, 'workspace', 'reference.txt'), 'reference fixture\n')
@@ -202,7 +194,7 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     expect(tripwire.warnings).toEqual([])
   })
 
-  it('renders the durable direct-message then recall order', async () => {
+  it('renders the direct message with the following recall as a context node', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-reference-order'))
     const group = page.getByRole('treeitem', { name: /Independent sessions/ })
     await group.waitFor({ timeout: 15_000 })
@@ -210,15 +202,15 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     const target = page.getByRole('treeitem').filter({ hasText: /^dsh-web-e2e-ws-/ }).first()
     await target.waitFor({ timeout: 15_000 })
     await target.click()
-    await page.getByRole('button', { name: /^Session recall\s*Research notes$/ }).waitFor({ timeout: 15_000 })
-    // The model trigger announces its current selection once the models RPC
-    // resolves; two stable captures can still precede it.
-    await page.getByRole('button', { name: /Select model, current / }).waitFor({ timeout: 15_000 })
+    await page.locator('[data-chat-flow-kind="user"]').filter({ hasText: 'Research notes' }).waitFor({ timeout: 15_000 })
+    await expect.poll(() => page.locator('[data-chat-flow-kind="context"]').count(), { timeout: 15_000 }).toBe(1)
+    await page.getByRole('button', { name: /^Select model, current / }).waitFor({ timeout: 10_000 })
 
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(TARGET_SESSION_ID).join('{{targetId}}')
     await compareOrRefreshGolden(ORDER_EXPECTED, snapshot, MODE)
-    expect(snapshot.indexOf('Research notes what changed?')).toBeLessThan(snapshot.indexOf('Session recall Research notes'))
+    expect(snapshot).toContain('Research notes what changed?')
+    expect(snapshot).toContain('Referenced session · Research notes')
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, ['menu.expected.md', 'order.expected.md'])

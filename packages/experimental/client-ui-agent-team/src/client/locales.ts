@@ -40,6 +40,8 @@ export const zh = {
   'status.pending': '待处理',
   'status.in_progress': '进行中',
   'status.completed': '已完成',
+  'task.expand': '展开',
+  'task.collapse': '收起',
 } satisfies Record<string, string>
 
 /** Agent Teams locale key union. */
@@ -55,11 +57,11 @@ export const en = {
   roster: 'Members',
   tasks: 'Shared tasks',
   model: 'Model',
-  open: 'Open teammate conversation',
+  open: 'Open teammate session',
   create: 'New task',
   subject: 'Task subject',
   description: 'Task description',
-  blockers: 'Blocking task ids (comma separated)',
+  blockers: 'Dependency task IDs (comma separated)',
   scopes: 'Write scopes (comma separated)',
   save: 'Save',
   cancel: 'Cancel',
@@ -79,6 +81,8 @@ export const en = {
   'memberStatus.inactive': 'Inactive',
   'memberStatus.provisioning': 'Provisioning',
   'memberStatus.failed': 'Failed',
+  'task.expand': 'Show more',
+  'task.collapse': 'Show less',
   'status.pending': 'Pending',
   'status.in_progress': 'In progress',
   'status.completed': 'Completed',

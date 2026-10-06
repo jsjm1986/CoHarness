@@ -31,6 +31,8 @@ import type {
   ProjectCredentialView,
   ProjectModelProviderRow,
   ProjectModelSettingsView,
+  UserQuotaView,
+  RoleQuotaView,
 } from './model-governance.ts'
 import type {
   EffectiveGrant,
@@ -39,11 +41,15 @@ import type {
   ProjectInvitation,
   ProjectRow,
   ProjectThemePolicy,
+  UserProjectMembership,
 } from './projects.ts'
 import type { PostgresDocumentCatalogService } from './postgres/document-catalog-service.ts'
 
 /** A service result that may come from an in-process store or an asynchronous database. */
 export type Awaitable<T> = T | Promise<T>
+
+/** A user row with its personal instance's port and observed state. */
+export type GatewayUserListRow = UserRow & { port: number; instanceState: string }
 
 /** Authentication operations consumed by the Gateway HTTP server. */
 export interface GatewayAuthService {
@@ -69,8 +75,10 @@ export interface GatewayUserService {
     role?: 'admin' | 'user'
     displayName?: string
   }): Promise<UserRow>
-  list(): Awaitable<Array<UserRow & { port: number; instanceState: string }>>
+  list(): Awaitable<GatewayUserListRow[]>
   getById(id: number): Awaitable<UserRow | null>
+  /** Read one user with its personal instance port and state, or null when absent or deleted. */
+  getListedById(id: number): Awaitable<GatewayUserListRow | null>
   /** Atomically apply the administrator-editable user fields when supported. */
   patch?(id: number, next: {
     role?: 'admin' | 'user'
@@ -101,6 +109,12 @@ export interface GatewayProjectService {
   remove(id: number): Awaitable<number[]>
   setMember(projectId: number, userId: number, mode: GrantMode): Awaitable<void>
   removeMember(projectId: number, userId: number): Awaitable<void>
+  /**
+   * Stored membership rows owned by one account, for the user-centric admin view.
+   * @param userId - public user id
+   * @returns memberships ordered by project name; implicit administrator authority is not included
+   */
+  membershipsFor?(userId: number): Awaitable<UserProjectMembership[]>
   effectiveGrants(userId: number): Awaitable<EffectiveGrant[]>
   createInvitation?(input: {
     projectId: number
@@ -163,6 +177,8 @@ export type GatewayDocumentCatalogService = Pick<
 
 /** Model authorization, pricing, quota, and usage operations consumed by the Gateway. */
 export interface GatewayModelGovernanceService {
+  /** Admit each queued policy write against the current maintenance/data epoch and own it until settlement. */
+  projectionWrite?: <T>(operation: () => Promise<T>) => Promise<T>
   /** Monotonic organization policy revision used by lazy runtime projections. */
   configurationRevision?(): Awaitable<number>
   listProviders(): Awaitable<ModelProviderRow[]>
@@ -233,12 +249,24 @@ export interface GatewayModelGovernanceService {
    * @returns inherit with ordinary-member limits when no project quota row exists; otherwise the stored independent limits
    */
   projectQuota(projectId: number): Awaitable<ProjectQuotaView>
+  /**
+   * Stored per-user quota modes and custom limits.
+   * @param userId - public user id
+   * @returns per-metric modes; absent rows mean the user fully inherits the role quota
+   */
+  userQuota?(userId: number): Awaitable<UserQuotaView>
+  /**
+   * Stored role limits.
+   * @param role - quota subject role
+   * @returns stored integer limits; absent or null means unlimited
+   */
+  roleQuota?(role: 'admin' | 'user'): Awaitable<RoleQuotaView>
 }
 
 /** Instance lifecycle operations used by HTTP, proxy, and policy handlers. */
 export type GatewayInstanceService = Pick<
   InstanceManager,
-  'beforeStart' | 'beforeUse' | 'portOf' | 'stateOf' | 'generationOf' | 'isLive' | 'touch' | 'wsRef' | 'ensureRunning' | 'reapIdle'
+  'beforeStart' | 'beforeUse' | 'portOf' | 'stateOf' | 'stopReasonOf' | 'generationOf' | 'isLive' | 'touch' | 'wsRef' | 'ensureRunning' | 'reapIdle'
   | 'stop' | 'stopAll' | 'withStopped'
 > & {
   /** Optional long-request lease supported by the production manager. */

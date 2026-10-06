@@ -15,6 +15,9 @@
       "path": "../../context/collaboration"
     },
     {
+      "path": "../../context/execution-authority"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -25,6 +28,9 @@
     },
     {
       "path": "../../core/tools"
+    },
+    {
+      "path": "../../interaction/permission-presets"
     },
     {
       "path": "../../interaction/user-approval"
@@ -46,6 +52,9 @@
     },
     {
       "path": "../../sandbox/sandbox-policy"
+    },
+    {
+      "path": "../../session-query/session-query"
     },
     {
       "path": "../../session/session-persistence"
@@ -75,6 +84,9 @@
       "path": "../../util/values"
     },
     {
+      "path": "../../workspace/workspace"
+    },
+    {
       "path": "../../../vendor/cordis"
     },
     {
@@ -88,6 +100,15 @@
     },
     {
       "path": "../../interaction/permission-presets"
+    },
+    {
+      "path": "../../fs/fs"
+    },
+    {
+      "path": "../../subprocess/subprocess"
+    },
+    {
+      "path": "../../util/managed-data"
     }
   ]
 }

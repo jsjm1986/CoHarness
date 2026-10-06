@@ -13,6 +13,7 @@ import type { WorkspaceChangesApi } from './workspace-changes.ts'
 import type { AgentPresetsApi } from './agent-presets.ts'
 import type { SkillsApi } from './skills.ts'
 import type { SubagentsApi } from './subagents.ts'
+import type { JobsApi } from './jobs.ts'
 import type { EventsApi } from './events.ts'
 import type { SettingsApi } from './settings.ts'
 import type { CredentialsApi } from './credentials.ts'
@@ -25,6 +26,7 @@ export interface ApiProxy {
   desktop: DesktopApi
   sessions: SessionsApi
   subagents: SubagentsApi
+  jobs: JobsApi
   host: HostApi
   workspace: WorkspaceApi
   workspaceFiles: WorkspaceFilesApi
@@ -43,6 +45,13 @@ export interface ApiProxy {
    * @returns Transport receipt for the response delivery.
    */
   respond(message: ClientResponse): Promise<RpcReceipt>
+  /**
+   * Host-only liveness probe: whether at least one `events.mux` Client stream is
+   * open and has not been cancelled. Producers that dispatch to page listeners use
+   * it to fail fast instead of waiting out their response deadline.
+   * @returns whether a live Client event stream exists.
+   */
+  hasLiveClient(): boolean
 }
 
 // ---- Domain interfaces and payload entities ----
@@ -59,7 +68,7 @@ export type {
   SubagentPromptContentPart, SubagentPromptReceipt,
 } from '@deepseek-ai/dsh-subagent/client'
 export type { SubagentsApi } from './subagents.ts'
-export type { JobView } from './jobs.ts'
+export type { JobChannel, JobKillValue, JobOutputChunk, JobOutputCoords, JobOutputValue, JobsApi, JobView } from './jobs.ts'
 export type { WorkspaceApi, WorkspaceId, WorkspaceView } from './workspace.ts'
 export type {
   WorkspaceFileByteWindow,
@@ -114,3 +123,8 @@ export {
 
 // ---- Method registry and derived generics ----
 export type { RequestPayload, ResponseValue, RpcMethodMap } from './rpc-map.ts'
+
+export { clientSessionKey, parseClientSessionKey, runtimeTargetKey } from './client-session.ts'
+export type { ClientSessionAddress, ClientSessionKey, ClientRuntimeTarget } from './client-session.ts'
+export { REMOTE_SESSION_POLICIES, remoteSessionId, mapRemoteSessionIds } from './remote-session-routing.ts'
+export type { RemoteSessionPolicy } from './remote-session-routing.ts'

@@ -14,6 +14,8 @@ Web 通过 `@deepseek-ai/dsh-client-ui-reference` 暴露一个合并的 `@file` 
 
 文件功能遵循由三个包构成的 seam：`@deepseek-ai/dsh-file-reference` 拥有 `ctx.fileReferences`、共享 `@path` token 语法、候选形状和稳定的模型指引；`@deepseek-ai/dsh-file-reference-local` 拥有每个 agent（智能体）有界的宿主文件系统索引、失效处理和作用域内的提示词安装；`dsh-client-ui-reference` 消费生成的 Remote 命名空间与共享语法。选择文件会创建带文件图标与文件名的原子输入框引用，其序列化形式仍只是路径提示词文本。目录普通 pick 会落定为原子文件夹引用；显式 drill 会保留可编辑路径文本，在尾部斜杠后重新触发补全，并发布可返回的面包屑。
 
+提示词注册归 Agent 作用域所有。Agent 释放通知可能晚于该作用域的清理，因此释放注册时应将已释放的 Cordis effect 视为完成，不能假设每次调用释放函数都返回 Promise。
+
 选择会话会创建一个结构化输入框引用。可见形式使用聊天气泡图标与业务色会话标题，不使用胶囊容器；剪贴板和模型形式则是宿主生成的规范 `@[label](dsh-session:…)` mention。完整的 `@label` 展示文本会保留在透明 textarea 中，同尺寸 backdrop 会为这段范围着色，并把开头的 marker 替换为对应领域图标。因此宽度、换行、选择区与光标位置都由原生字形度量决定，不会截断。occurrence 范围会保留引用身份以供序列化；在边界按 Backspace 或 Delete 会整段删除引用，在范围内部编辑则会把剩余字符转为普通文本。普通 `session.prompt` 投递会原样携带规范 mention。session-reference 服务会在 `agent/pre-step` 解析已接受的直接用户消息，捕获每个源，在保留直接消息 id 的同时把规范 mention 替换为可读文本，并把冻结快照插入到该消息紧后。召回上下文行使用同一个聊天图标，其他上下文保留文档图标。API Proxy 不包含引用专用路由、依赖或错误码。
 
 补全标签在这些能力存在时使用实时 session projection 或持久 projection-cache checkpoint；没有 projection 的会话在首次打开前回退到稳定 id。这样 `@` 每次击键都不会折叠完整的冷日志，同时在最小组合中保留与传输无关的回退路径。

@@ -35,3 +35,5 @@ Agent Teams 的服务与工具约定仍在变化，但它需要使用真实 Sess
 Agent Teams 可以使用完整仓库依赖图与质量检查，而不进入正式 tarball，也不会成为受支持的运行时依赖。在 Team 包 promotion 前，发布包不能暴露 Team，因此 CLI 和 Web 实验使用显式示例或实验性组合，而不是已发布的基础组合包。
 
 孵化期间的产品职责分组不够直接。promotion 会按照实验性包命名决策产生路径和 npm 名改动。
+
+上游后来把持久层改到了 session projection 上，本地包仍保留自己的持久层形态：权威 Team 状态经 `foldTeam`（`src/fold.ts`）重放，服务仍是 `TypertRemoteService` 并应答 `view`/`createTask`/`updateTask`，mailbox 投递携带 quiet/wakeup 模式与捕获的 `gatewayExecutionScope`，不活跃成员日志经 `sessionPersistence.inspect` 读取，`team/*` 信封保持 `version: 1`。上游的 `persisted.ts`/`projection.ts`/`task-view.ts`、`sessionProjections` 接线、仅 `steer` 投递与 `version: 2` 信封属于另一套客户端面与重放设计；采用它们会在 Remote 方法已应答的客户端面之外重复一套。

@@ -35,7 +35,7 @@ function sessionState(
     current: undefined,
     phase,
     subagentsByParent: {},
-    jobsBySession: {},
+    jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   }
 }
@@ -44,6 +44,7 @@ function workspaceState(archivedSessionIds: readonly string[], items: readonly W
   return {
     items,
     archivedSessionIds: archivedSessionIds.map(sid),
+    pinnedSessionIds: [],
     state: 'idle',
     phase: 'ready',
     error: null,

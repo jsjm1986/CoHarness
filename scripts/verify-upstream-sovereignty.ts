@@ -9,8 +9,11 @@
  * `replaced` packages exist upstream but substitute a wholesale owned contract
  * (upstream diffs land by behavior port, never by file merge), and `owned`
  * packages have no upstream counterpart. Directories upstream ships that the
- * fork does not carry sit in `upstreamOnly` with a recorded reason. The gate
- * re-checks every `tracked` claim against `git diff --quiet`, verifies each
+ * fork does not carry sit in `upstreamOnly` with a recorded reason. An `owned`
+ * package may collide with a same-keyed upstream package carrying unrelated
+ * semantics; `upstreamShadowed: true` records that collision so the bijection
+ * stays enforceable and upstream diffs never merge into the owned package. The
+ * gate re-checks every `tracked` claim against `git diff --quiet`, verifies each
  * `removedUpstreamPaths` entry exists at the synced commit and is absent on
  * disk, and enforces the manifest↔disk↔tag bijections, so which packages
  * faithfully track upstream is a mechanical fact instead of prose in upgrade
@@ -36,7 +39,7 @@ const PACKAGE_KEY = /^[0-9A-Za-z._-]+\/[0-9A-Za-z._-]+$/
 const COMMIT_ID = /^[0-9a-f]{40,64}$/
 
 const TOP_LEVEL_KEYS = new Set(['version', 'syncedTag', 'syncedCommit', 'packages', 'upstreamOnly', 'gateReplayRecord'])
-const ENTRY_KEYS = new Set(['sovereignty', 'note', 'removedUpstreamPaths'])
+const ENTRY_KEYS = new Set(['sovereignty', 'note', 'removedUpstreamPaths', 'upstreamShadowed'])
 const UPSTREAM_ONLY_KEYS = new Set(['package', 'reason', 'replacedBy'])
 
 /** How one package's `src/` relates to the synced upstream commit. */
@@ -70,6 +73,14 @@ export interface UpstreamSyncManifest {
      * recorded decision instead of invisible merge drift.
      */
     removedUpstreamPaths?: string[]
+    /**
+     * Only legal on `owned`: upstream ships a different package at the same
+     * `<group>/<pkg>` key. The owned package is unrelated to the upstream one
+     * and upstream diffs must never merge into it; the flag exempts the
+     * package from the owned-absent-at-tag bijection and becomes stale (a
+     * violation) once upstream no longer ships the key.
+     */
+    upstreamShadowed?: boolean
   }>
   upstreamOnly: UpstreamOnlyEntry[]
 }
@@ -149,6 +160,15 @@ export function validateUpstreamSyncManifest(raw: unknown, repoRoot: string): Up
         removedPaths.push(removedPath)
       }
       entry.removedUpstreamPaths = removedPaths
+    }
+    if (value.upstreamShadowed !== undefined) {
+      if (value.upstreamShadowed !== true) {
+        fail(`manifest package "${key}" upstreamShadowed must be true when present`)
+      }
+      if (sovereignty !== 'owned') {
+        fail(`manifest package "${key}" upstreamShadowed is only legal on "owned" packages`)
+      }
+      entry.upstreamShadowed = true
     }
     packages[key] = entry
   }
@@ -337,12 +357,20 @@ export function checkUpstreamSovereignty(repoRoot: string, manifest: UpstreamSyn
     violations.push(`present at ${manifest.syncedTag} but in neither packages nor upstreamOnly: ${uncovered.join(', ')}`)
   }
   const ownedAtUpstream = entries
-    .filter(([, entry]) => entry.sovereignty === 'owned')
+    .filter(([, entry]) => entry.sovereignty === 'owned' && entry.upstreamShadowed !== true)
     .map(([key]) => key)
     .filter(key => upstream.has(key))
     .sort()
   if (ownedAtUpstream.length > 0) {
     violations.push(`classified "owned" but present at ${manifest.syncedTag}: ${ownedAtUpstream.join(', ')}`)
+  }
+  const staleShadowed = entries
+    .filter(([, entry]) => entry.upstreamShadowed === true)
+    .map(([key]) => key)
+    .filter(key => !upstream.has(key))
+    .sort()
+  if (staleShadowed.length > 0) {
+    violations.push(`flagged "upstreamShadowed" but absent at ${manifest.syncedTag}: ${staleShadowed.join(', ')}`)
   }
   const absentAtUpstream = entries
     .filter(([, entry]) => entry.sovereignty !== 'owned')

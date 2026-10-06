@@ -40,17 +40,15 @@ describe('messageSender', () => {
 describe('isCollaborationAttributionNotice', () => {
   it('recognizes the durable collaboration-context notice source', () => {
     expect(isCollaborationAttributionNotice({
-      kind: 'plugin',
-      plugin: 'collaboration-context',
+      kind: 'collaboration-context',
       form: 'notice',
       participant,
     })).toBe(true)
   })
 
-  it('rejects other plugin or user sources', () => {
+  it('rejects other producer or user sources', () => {
     expect(isCollaborationAttributionNotice({
-      kind: 'plugin',
-      plugin: '@deepseek-ai/dsh-system-prompt',
+      kind: 'system-prompt',
       form: 'notice',
     })).toBe(false)
     expect(isCollaborationAttributionNotice({ kind: 'user', participant })).toBe(false)

@@ -8,13 +8,21 @@ import type {
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
+import { createWorkspaceShortcutControls } from '../src/client/shortcuts.ts'
 import { createWorkspaceViewStore, FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
 import { UNGROUPED_KEY } from '../src/client/tree.ts'
 import { WorkspaceBrowser } from '../src/client/WorkspaceBrowser.tsx'
+import { ArchiveSessionMenuItem } from '../src/client/session-actions/ArchiveSession.tsx'
 import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
-beforeEach(() => { localStorage.clear(); createWorkspaceViewStore().create().actions.setOrderBy('manual') })
+const scrollIntoView = vi.fn()
+beforeEach(() => {
+  localStorage.clear()
+  createWorkspaceViewStore().create().actions.setOrderBy('manual')
+  Element.prototype.scrollIntoView = scrollIntoView
+  scrollIntoView.mockClear()
+})
 
 // The seat's key domain is workspace ∪ common; the stub mirrors the real
 // lookup chain (namespace, then common vocabulary, then the key).
@@ -31,7 +39,7 @@ const sessionState = (items: readonly SessionSummary[], overrides: Partial<Sessi
   archivedById: {},
   current: undefined,
   phase: 'ready',
-  subagentsByParent: {}, jobsBySession: {},
+  subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
   currentAddress: undefined,
   ...overrides,
 })
@@ -39,8 +47,12 @@ const workspace = (id: string, sessionIds: string[], title = id): WorkspaceView 
   workspaceId: wid(id), path: `/projects/${id}`, title,
   sessionIds: sessionIds.map(sid), createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
 })
-const workspaceState = (items: readonly WorkspaceView[], archivedSessionIds: readonly SessionId[] = []): WorkspaceListState => ({
-  items, archivedSessionIds, state: 'idle', phase: 'ready', error: null, baselinesReady: true,
+const workspaceState = (
+  items: readonly WorkspaceView[],
+  archivedSessionIds: readonly SessionId[] = [],
+  pinnedSessionIds: readonly SessionId[] = [],
+): WorkspaceListState => ({
+  items, archivedSessionIds, pinnedSessionIds, state: 'idle', phase: 'ready', error: null, baselinesReady: true,
   recentWorkspaceId: items[0]?.workspaceId,
 })
 function hook<T>(snapshot: T) {
@@ -62,12 +74,16 @@ function dragData(): Pick<DataTransfer, 'effectAllowed' | 'dropEffect' | 'setDat
 function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
   const store = createWorkspaceViewStore().create()
   const baseSessions = hook(sessionState([]))
+  // The real request store, wired like apply: pointer gestures publish
+  // requests and the browser consumes the same snapshot the commands do.
+  const controls = createWorkspaceShortcutControls()
   const props: WorkspaceBrowserProps = {
     wide: true,
     expandSidebar: vi.fn(),
     useSessions: baseSessions,
     useCurrentSessions: selector => baseSessions(selector),
     useWorkspaces: hook(workspaceState([])),
+    usePanelInfo: hook({ activePanelId: null }),
     useViewport: hook({ mode: 'single', paneIds: [], paneRatios: [] }),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
@@ -75,16 +91,23 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     open: vi.fn(),
     searchSessions: vi.fn(async () => ({ items: [], hasMore: false })),
     searchResultLimit: 20,
-    renameSession: vi.fn(async () => {}),
-    forkSession: vi.fn(),
+    requestSessionRename: controls.rename,
+    notifyArchivedNotOpenable: vi.fn(),
     renameWorkspace: vi.fn(async () => {}),
     deleteWorkspace: vi.fn(async () => {}),
-    archiveSession: vi.fn(async () => {}),
+    unarchiveSession: vi.fn(async () => {}),
     insertWorkspaceBefore: vi.fn(async () => {}),
     insertSessionBefore: vi.fn(async () => {}),
     createWorkspace: vi.fn(async () => workspace('created', [])),
     useDirectoryFlow: bindSnapshotSelector({ getSnapshot: () => true, subscribe: () => () => {} }),
     useHostDescription: selector => selector(undefined),
+    useWorkspaceShortcuts: bindSnapshotSelector(controls.state),
+    useShortcuts: hook([] as const),
+    requestSearch: controls.search,
+    requestAddWorkspace: controls.add,
+    closeAddWorkspace: controls.closeAdd,
+    setDirectoryBusy: controls.directoryBusy,
+    dismissForkError: controls.dismissForkError,
     renderSlot: ((_name: string, owner: { open: boolean }) => (owner.open ? <div data-testid="directory-flow" /> : null)) as never,
     t,
     ...overrides,
@@ -93,7 +116,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
   // list at render time, including across rerender useSessions swaps.
   props.useCurrentSessions = selector => props.useSessions(selector)
   const view = render(<WorkspaceBrowser {...props} />)
-  return { view, props, store }
+  return { view, props, store, controls }
 }
 
 /** Re-render with (possibly) changed props — WorkspaceBrowser has no side channel. */
@@ -103,6 +126,52 @@ function rerender(b: ReturnType<typeof mount>, overrides: Partial<WorkspaceBrows
 }
 
 describe('WorkspaceBrowser', () => {
+  it('shows localized fork failures and dismisses them', () => {
+    vi.useFakeTimers()
+    try {
+      const b = mount()
+      act(() => { b.controls.forkFailed('unavailable') })
+      const first = screen.getByRole('alert')
+      expect(first.textContent).toBe(zh['shortcut.noCompletedTurn'])
+      act(() => { b.controls.dismissForkError(); b.controls.forkFailed('unavailable') })
+      expect(screen.getByRole('alert')).not.toBe(first)
+      act(() => { b.controls.forkFailed('failed') })
+      expect(screen.getByRole('alert').textContent).toBe(zh['shortcut.forkFailed'])
+      act(() => { b.controls.dismissForkError() })
+      expect(screen.queryByRole('alert')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('opens search through a command request and the picker through an add request', () => {
+    const b = mount({ useWorkspaces: hook(workspaceState([workspace('alpha', [])])) })
+    act(() => { b.controls.search() })
+    const input = screen.getByPlaceholderText('搜索会话…') as HTMLInputElement
+    expect(document.activeElement).toBe(input)
+    act(() => { b.controls.add() })
+    expect(screen.getByTestId('directory-flow')).toBeTruthy()
+  })
+
+  it('a title double-click asks for the rename dialog with the row title', () => {
+    const requestSessionRename = vi.fn()
+    const open = vi.fn()
+    const b = mount({
+      useSessions: hook(sessionState([summary('alpha-s', 1, { displayTitle: 'Alpha session' })])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-s'])])),
+      requestSessionRename,
+      open,
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    fireEvent.doubleClick(screen.getByText('Alpha session'))
+    expect(requestSessionRename).toHaveBeenCalledWith(sid('alpha-s'), 'Alpha session')
+    expect(open).not.toHaveBeenCalled()
+    // The flat list threads the same request.
+    act(() => { b.store.actions.setGroupBy('flat') })
+    fireEvent.doubleClick(screen.getByText('Alpha session'))
+    expect(requestSessionRename).toHaveBeenCalledTimes(2)
+  })
+
   it('workspace hover card shows a POSIX home descendant as ~', () => {
     vi.useFakeTimers()
     try {
@@ -117,7 +186,7 @@ describe('WorkspaceBrowser', () => {
         }),
       })
       fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
-      act(() => { vi.advanceTimersByTime(500) })
+      act(() => { vi.advanceTimersByTime(800) })
       expect(screen.getByText('~/Documents/project')).toBeTruthy()
     } finally {
       vi.useRealTimers()
@@ -159,9 +228,10 @@ describe('WorkspaceBrowser', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     expect(screen.getByText('分组方式')).toBeTruthy() // the menu heading label
-    expect(screen.getByRole('separator')).toBeTruthy()
+    expect(screen.getByText('筛选会话')).toBeTruthy()
+    expect(screen.getAllByRole('separator')).toHaveLength(2)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '按工作区', '单列表', '手动排序', '最近更新',
+      '按工作区', '按工作区目录树', '单列表', '手动排序', '最近更新', '隐藏已归档', '全部对话（显示已归档）', '仅显示已归档',
     ])
     expect(screen.getByRole('menuitem', { name: '按工作区' }).querySelector('svg')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '手动排序' }).querySelector('svg')).toBeTruthy()
@@ -386,19 +456,52 @@ describe('WorkspaceBrowser', () => {
   })
 
   it('archives a session from the row menu and hides archived rows in both modes', async () => {
-    const archiveSession = vi.fn(async () => {})
+    // The menu list's entries are slot occupants: mount the shipped archive
+    // item with a mock face, the way the renderer composes it.
+    const archiveSession = vi.fn<(sessionId: SessionId) => Promise<void>>(async () => {})
+    const archivedSet = { current: new Set<SessionId>() }
+    const menuOpenState: readonly [boolean, (open: boolean) => void] = [true, () => {}]
+    const renderSlot: WorkspaceBrowserProps['renderSlot'] = (name: string, owner: unknown, extra?: unknown) => {
+      if (name === 'sidebar.workspaces.directoryFlow') {
+        return (owner as { open: boolean }).open ? <div data-testid="directory-flow" /> : null
+      }
+      if (name === 'sidebar.workspaces.session.menu.item') {
+        const row = owner as { sessionId: SessionId; displayTitle: string }
+        const openState = (extra as { hookContext?: typeof menuOpenState } | undefined)?.hookContext ?? menuOpenState
+        return (
+          <ArchiveSessionMenuItem
+            sessionId={row.sessionId}
+            displayTitle={row.displayTitle}
+            t={t}
+            useSessions={hook(sessionState([]))}
+            useWorkspaces={hook(workspaceState([]))}
+            usePanelInfo={hook({ activePanelId: null })}
+            useArchived={selector => selector(archivedSet.current)}
+            useMenuOpenState={() => openState}
+            useShortcuts={selector => selector([])}
+            archiveSession={(sessionId) => { void archiveSession(sessionId) }}
+            unarchiveSession={vi.fn()}
+          />
+        )
+      }
+      return null
+    }
     const b = mount({
       useSessions: hook(sessionState([summary('kept-s', 2), summary('gone-s', 1)])),
       useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])])),
-      archiveSession,
+      renderSlot,
     })
     fireEvent.click(screen.getByText('alpha'))
     fireEvent.click(screen.getByRole('button', { name: '会话“gone-s”的操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '归档会话' }))
     expect(archiveSession).toHaveBeenCalledWith(sid('gone-s'))
 
-    // The archive-set echo hides the row in grouped and flat modes.
-    rerender(b, { useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])], [sid('gone-s')])) })
+    // The archived partition echo hides the row in grouped and flat modes.
+    archivedSet.current = new Set([sid('gone-s')])
+    rerender(b, {
+      useSessions: hook(sessionState([summary('kept-s', 2)], { archivedById: { [sid('gone-s')]: summary('gone-s', 1) } })),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])])),
+    })
     expect(screen.queryByText('gone-s')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '单列表' }))
@@ -406,26 +509,27 @@ describe('WorkspaceBrowser', () => {
     expect(screen.queryByText('gone-s')).toBeNull()
   })
 
-  it('logs and keeps the tree when the archive call rejects', async () => {
-    const rejection = new Error('archive exploded')
-    const archiveSession = vi.fn(async () => { throw rejection })
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    try {
-      mount({
-        useSessions: hook(sessionState([summary('alpha-s', 1)])),
-        useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-s'])])),
-        archiveSession,
-      })
-      fireEvent.click(screen.getByText('alpha'))
-      fireEvent.click(screen.getByRole('button', { name: '会话“alpha-s”的操作' }))
-      fireEvent.click(screen.getByRole('menuitem', { name: '归档会话' }))
-      await Promise.resolve()
-      await Promise.resolve()
-      expect(warn).toHaveBeenCalledWith('session archive rejected:', rejection)
-      expect(screen.getByText('alpha-s')).toBeTruthy()
-    } finally {
-      warn.mockRestore()
-    }
+  it('surfaces the shipped archive filter rows, restoring them in place', async () => {
+    const b = mount({
+      useSessions: hook(sessionState([summary('live-s', 2)], { archivedById: { [sid('gone-s')]: summary('gone-s', 1) } })),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['live-s', 'gone-s'])])),
+      renderSlot: ((name: string, owner: { open: boolean }) =>
+        name === 'sidebar.workspaces.directoryFlow' && owner.open
+          ? <div data-testid="directory-flow" />
+          : null) as never,
+    })
+    // The default filter hides the archived row; 'show' restores it in place.
+    expect(screen.queryByText('gone-s')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '全部对话（显示已归档）' }))
+    expect(b.store.getSnapshot().archivedFilter).toBe('show')
+    fireEvent.click(screen.getByText('alpha'))
+    expect(screen.getByText('gone-s')).toBeTruthy()
+    // 'only' keeps just the archived rows.
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '仅显示已归档' }))
+    expect(screen.getByText('gone-s')).toBeTruthy()
+    expect(screen.queryByText('live-s')).toBeNull()
   })
 
   it('renders a fork child as a top-level row without a session twist', () => {
@@ -575,15 +679,19 @@ describe('WorkspaceBrowser', () => {
     await waitFor(() => {
       expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['blank', 'old', 'mid'])
     })
+    // The promoted blank keeps the section lead by rule: it is not a drag
+    // source, so the manual gesture moves an ordinary row instead.
     const blank = screen.getByText('新会话').closest('[role="treeitem"]') as HTMLElement
+    expect(blank.getAttribute('draggable')).toBe('false')
+    const old = screen.getByText('old').closest('[role="treeitem"]') as HTMLElement
     const mid = screen.getByText('mid').closest('[role="treeitem"]') as HTMLElement
     mid.getBoundingClientRect = () => ({
       top: 150, bottom: 184, left: 0, right: 200, width: 200, height: 34, x: 0, y: 150, toJSON: () => ({}),
     })
-    fireEvent.dragStart(blank, { dataTransfer: dragData() })
+    fireEvent.dragStart(old, { dataTransfer: dragData() })
     fireDrag(mid, 'drop', 180)
-    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['old', 'mid', 'blank'])
-    expect(insertSessionBefore).toHaveBeenCalledWith(wid('alpha'), sid('blank'), undefined)
+    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['blank', 'mid', 'old'])
+    expect(insertSessionBefore).toHaveBeenCalledWith(wid('alpha'), sid('old'), undefined)
 
     rerender(b, {
       useSessions: hook(sessionState([
@@ -593,7 +701,7 @@ describe('WorkspaceBrowser', () => {
       ], { current: sid('blank') })),
     })
     await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['old', 'mid', 'blank'])
+      expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['blank', 'mid', 'old'])
     })
   })
 
@@ -685,7 +793,7 @@ describe('WorkspaceBrowser', () => {
       expect(screen.getByText('仅显示前 20 条结果，请缩小搜索范围。')).toBeTruthy()
       fireEvent.click(screen.getByRole('treeitem'))
       expect(open).toHaveBeenCalledWith(sid('body-hit'))
-      expect(input.value).toBe('waterfall token')
+      expect(input.value).toBe('')
     } finally {
       vi.useRealTimers()
     }
@@ -1059,7 +1167,197 @@ describe('WorkspaceBrowser', () => {
     ])
   })
 
-  it('still sends the reorder when the dragged row left the group mid-drag', () => {
+  it('leads pinned rows in the grouped, ungrouped, and flat lists', () => {
+    const sessions = sessionState([
+      summary('one', 4), summary('two', 3), summary('three', 2), summary('loose', 1),
+    ])
+    const b = mount({
+      useSessions: hook(sessions),
+      useWorkspaces: hook(workspaceState(
+        [workspace('alpha', ['one', 'two', 'three'])], [], [sid('three'), sid('loose')],
+      )),
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    // alpha's rows: the pinned member leads, then the Host member order.
+    expect(screen.getAllByRole('treeitem').slice(1, 4).map(row => row.textContent)).toEqual([
+      expect.stringContaining('three'), expect.stringContaining('one'), expect.stringContaining('two'),
+    ])
+    // Ungrouped bucket: the pinned stray is its only row.
+    fireEvent.click(screen.getByText('独立会话'))
+    const grouped = screen.getAllByRole('treeitem')
+    expect(grouped[grouped.length - 1]!.textContent).toContain('loose')
+
+    // Flat list: both pins lead the supplied order.
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '单列表' }))
+    expect(screen.getAllByRole('treeitem').map(row => row.textContent)).toEqual([
+      expect.stringContaining('three'), expect.stringContaining('loose'),
+      expect.stringContaining('one'), expect.stringContaining('two'),
+    ])
+    // The stored flat order is the natural recency baseline: the pin
+    // partition is a rendering rule, not a store rewrite.
+    expect(b.store.getSnapshot().sessionOrderByAccount[FLAT_SESSION_ORDER_KEY])
+      .toEqual(['one', 'two', 'three', 'loose'])
+  })
+
+  it('drags a pinned row by moving its position in the complete Session sequence', () => {
+    const insertSessionBefore = vi.fn(async () => {})
+    const sessions = sessionState([
+      summary('one', 4), summary('two', 3), summary('three', 2), summary('four', 1),
+    ])
+    const b = mount({
+      useSessions: hook(sessions),
+      useWorkspaces: hook(workspaceState(
+        [workspace('alpha', ['one', 'two', 'three', 'four'])], [], [sid('one'), sid('two')],
+      )),
+      insertSessionBefore,
+    })
+    // A saved order with an ordinary row above the pins loses to the pin
+    // partition: the pinned block always leads the rendered section.
+    b.store.actions.setSessionOrder('alpha', ['three', 'one', 'four', 'two'])
+    fireEvent.click(screen.getByText('alpha'))
+    expect(screen.getAllByRole('treeitem').slice(1).map(row => row.textContent)).toEqual([
+      expect.stringContaining('one'), expect.stringContaining('two'),
+      expect.stringContaining('three'), expect.stringContaining('four'),
+    ])
+    const one = screen.getByText('one').closest('[role="treeitem"]') as HTMLElement
+    const two = screen.getByText('two').closest('[role="treeitem"]') as HTMLElement
+    one.getBoundingClientRect = () => ({
+      top: 100, bottom: 134, left: 0, right: 200, width: 200, height: 34, x: 0, y: 100, toJSON: () => ({}),
+    })
+    fireEvent.dragStart(two, { dataTransfer: dragData() })
+    fireDrag(one, 'dragOver', 105)
+    fireDrag(one, 'drop', 105)
+    // The drop writes the complete account sequence: the pinned block moves
+    // inside itself while saved member positions outside it stay untouched.
+    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['three', 'two', 'one', 'four'])
+    expect(screen.getAllByRole('treeitem').slice(1).map(row => row.textContent)).toEqual([
+      expect.stringContaining('two'), expect.stringContaining('one'),
+      expect.stringContaining('three'), expect.stringContaining('four'),
+    ])
+
+    // Dropping the trailing pinned row after the leading one restates the
+    // current block: a no-op that writes nothing.
+    const oneAgain = screen.getByText('one').closest('[role="treeitem"]') as HTMLElement
+    const twoAgain = screen.getByText('two').closest('[role="treeitem"]') as HTMLElement
+    twoAgain.getBoundingClientRect = () => ({
+      top: 100, bottom: 134, left: 0, right: 200, width: 200, height: 34, x: 0, y: 100, toJSON: () => ({}),
+    })
+    fireEvent.dragStart(oneAgain, { dataTransfer: dragData() })
+    fireDrag(twoAgain, 'drop', 130)
+    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['three', 'two', 'one', 'four'])
+  })
+
+  it('keeps pinned and unpinned rows in separate drag domains', () => {
+    const insertSessionBefore = vi.fn(async () => {})
+    const sessions = sessionState([summary('one', 2), summary('two', 1)])
+    const b = mount({
+      useSessions: hook(sessions),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['one', 'two'])], [], [sid('one')])),
+      insertSessionBefore,
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    const one = screen.getByText('one').closest('[role="treeitem"]') as HTMLElement
+    const two = screen.getByText('two').closest('[role="treeitem"]') as HTMLElement
+    for (const row of [one, two]) {
+      row.getBoundingClientRect = () => ({
+        top: 100, bottom: 134, left: 0, right: 200, width: 200, height: 34, x: 0, y: 100, toJSON: () => ({}),
+      })
+    }
+    const before = b.store.getSnapshot().sessionOrderByAccount.alpha
+
+    // A pinned source ignores unpinned targets…
+    fireEvent.dragStart(one, { dataTransfer: dragData() })
+    fireDrag(two, 'dragOver', 105)
+    fireDrag(two, 'drop', 105)
+    fireEvent.dragEnd(one)
+    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(before)
+
+    // …and an unpinned source ignores pinned targets.
+    fireEvent.dragStart(two, { dataTransfer: dragData() })
+    fireDrag(one, 'dragOver', 105)
+    fireDrag(one, 'drop', 105)
+    fireEvent.dragEnd(two)
+    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(before)
+    expect(insertSessionBefore).not.toHaveBeenCalled()
+  })
+
+  it('ignores a pinned drop whose pin state moved in flight', () => {
+    const sessions = sessionState([summary('one', 3), summary('two', 2), summary('three', 1)])
+    const b = mount({
+      useSessions: hook(sessions),
+      useWorkspaces: hook(workspaceState(
+        [workspace('alpha', ['one', 'two', 'three'])], [], [sid('one'), sid('two')],
+      )),
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    const before = b.store.getSnapshot().sessionOrderByAccount.alpha
+    const markTarget = (): HTMLElement => {
+      const two = screen.getByText('two').closest('[role="treeitem"]') as HTMLElement
+      two.getBoundingClientRect = () => ({
+        top: 100, bottom: 134, left: 0, right: 200, width: 200, height: 34, x: 0, y: 100, toJSON: () => ({}),
+      })
+      return two
+    }
+
+    // The target unpins in flight: its id left the pinned block.
+    let one = screen.getByText('one').closest('[role="treeitem"]') as HTMLElement
+    fireEvent.dragStart(one, { dataTransfer: dragData() })
+    fireDrag(markTarget(), 'dragOver', 105)
+    rerender(b, {
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['one', 'two', 'three'])], [], [sid('one')])),
+    })
+    fireEvent.dragEnd(screen.getByText('one').closest('[role="treeitem"]') as HTMLElement)
+    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(before)
+
+    // The source unpins in flight.
+    rerender(b, {
+      useWorkspaces: hook(workspaceState(
+        [workspace('alpha', ['one', 'two', 'three'])], [], [sid('one'), sid('two')],
+      )),
+    })
+    one = screen.getByText('one').closest('[role="treeitem"]') as HTMLElement
+    fireEvent.dragStart(one, { dataTransfer: dragData() })
+    fireDrag(markTarget(), 'dragOver', 105)
+    rerender(b, {
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['one', 'two', 'three'])], [], [sid('two')])),
+    })
+    fireEvent.dragEnd(screen.getByText('one').closest('[role="treeitem"]') as HTMLElement)
+    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(before)
+  })
+
+  it('drags pinned rows within the flat pinned block and keeps cross-block targets inert', () => {
+    const sessions = sessionState([summary('one', 3), summary('two', 2), summary('three', 1)])
+    const b = mount({
+      useSessions: hook(sessions),
+      useWorkspaces: hook(workspaceState([], [], [sid('one'), sid('two')])),
+    })
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '单列表' }))
+    const one = screen.getByText('one').closest('[role="treeitem"]') as HTMLElement
+    const two = screen.getByText('two').closest('[role="treeitem"]') as HTMLElement
+    for (const row of [one, two]) {
+      row.getBoundingClientRect = () => ({
+        top: 100, bottom: 134, left: 0, right: 200, width: 200, height: 34, x: 0, y: 100, toJSON: () => ({}),
+      })
+    }
+    fireEvent.dragStart(two, { dataTransfer: dragData() })
+    fireDrag(one, 'dragOver', 105)
+    fireDrag(one, 'drop', 105)
+    expect(b.store.getSnapshot().sessionOrderByAccount[FLAT_SESSION_ORDER_KEY])
+      .toEqual(['two', 'one', 'three'])
+
+    // An unpinned source ignores pinned targets.
+    const three = screen.getByText('three').closest('[role="treeitem"]') as HTMLElement
+    fireEvent.dragStart(three, { dataTransfer: dragData() })
+    fireDrag(one, 'dragOver', 105)
+    fireDrag(one, 'drop', 105)
+    fireEvent.dragEnd(three)
+    expect(b.store.getSnapshot().sessionOrderByAccount[FLAT_SESSION_ORDER_KEY])
+      .toEqual(['two', 'one', 'three'])
+  })
+
+  it('ignores a drag whose source left the group in flight', () => {
     const insertSessionBefore = vi.fn(async () => {})
     const sessions = sessionState([summary('one', 2), summary('two', 1)])
     const b = mount({
@@ -1071,14 +1369,17 @@ describe('WorkspaceBrowser', () => {
     const one = screen.getByText('one').closest('[role="treeitem"]') as HTMLElement
     fireEvent.dragStart(one, { dataTransfer: dragData() })
     // The host dropped "one" from the workspace account while the drag is in
-    // flight: the source index is gone but the drop still resolves its anchor.
+    // flight: the source is no longer a member, so the drop is stale and the
+    // saved order stays untouched.
     rerender(b, { useWorkspaces: hook(workspaceState([workspace('alpha', ['two'])])) })
     const two = screen.getByText('two').closest('[role="treeitem"]') as HTMLElement
     two.getBoundingClientRect = () => ({
       top: 150, bottom: 184, left: 0, right: 200, width: 200, height: 34, x: 0, y: 150, toJSON: () => ({}),
     })
     fireDrag(two, 'drop', 155)
-    expect(insertSessionBefore).toHaveBeenCalledWith(wid('alpha'), sid('one'), sid('two'))
+    expect(insertSessionBefore).not.toHaveBeenCalled()
+    // The account reconciled down to its remaining members; no drag order.
+    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['two'])
   })
 
   it('drag end without a drop clears markers; bottom-half drop appends past the last row', () => {

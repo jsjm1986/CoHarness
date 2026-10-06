@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-01-ask-user-delegated-caller-guard.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-01-ask-user-delegated-caller-guard.md
-2026-08-01-ask-user-delegated-caller-guard.md: ed4bfae1b647cdbb58e9f09abe544a9ac58b6bf5
-2026-08-01-ask-user-delegated-caller-guard.zh.md: 82779d0b31710356c1465ca9bc102a923f03410a
+/agent-note-reject-human-interaction-from-runtime-owned-subagents:
+  en: cebce57ce1f75dea
+  zh: bb46e7519fd64244
+/agent-note-reject-human-interaction-from-runtime-owned-subagents/problem:
+  en: 84570690f42f36ab
+  zh: 7cba6d8cc32c4f8f
+/agent-note-reject-human-interaction-from-runtime-owned-subagents/decision:
+  en: 98c09e92fd64222e
+  zh: 3142008372d1d7cb
+/agent-note-reject-human-interaction-from-runtime-owned-subagents/alternatives-considered:
+  en: 5ae0750a2f91a450
+  zh: cbfba20a825e847a
+/agent-note-reject-human-interaction-from-runtime-owned-subagents/consequences:
+  en: 330b472765728a58
+  zh: ed4a62427a3532ad
+/agent-note-reject-human-interaction-from-runtime-owned-subagents/testing:
+  en: 0dc97dc5982d2422
+  zh: 5df7495c4be7bd5d

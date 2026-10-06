@@ -63,6 +63,8 @@ export interface WorkspacePickFlowProps {
    * Host, skips the check so standalone dsh web still opens existing workspaces.
    */
   listDirectory?: ((path?: string, signal?: AbortSignal) => Promise<DirectoryListing>) | undefined
+  /** Mirror picking occupancy so workspace commands can gate their availability. */
+  onBusyChange?: ((busy: boolean) => void) | undefined
 }
 
 /**
@@ -84,6 +86,7 @@ export function WorkspacePickFlow({
   side = 'bottom',
   selectedId,
   listDirectory,
+  onBusyChange,
 }: WorkspacePickFlowProps) {
   const workspaceSnapshot = useWorkspaces(state => state)
   const workspaces = workspaceSnapshot.items
@@ -103,6 +106,7 @@ export function WorkspacePickFlow({
   // menu action stays disabled — a late outcome must not race a concurrent
   // selection or adoption.
   const flowBusy = flowOpen || pickingFolder
+  useEffect(() => { onBusyChange?.(flowBusy) }, [flowBusy, onBusyChange])
 
   // The occupied hole gates the picking affordance: with no composed flow the
   // entry simply is not there (the seam's documented no-flow default). The

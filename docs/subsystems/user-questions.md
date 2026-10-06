@@ -2,7 +2,7 @@
 
 English | [中文](user-questions.zh.md)
 
-The user-questions seam of [dsh-user-questions](../../packages/interaction/user-questions). It is the provider-neutral vocabulary a tool or permission plugin uses when it needs the human to answer before the agent can continue. UI surfaces answer through the `user-questions/request` waterfall; the host runtime relays requests to its connected client.
+The user-questions seam of [dsh-user-questions](../../packages/interaction/user-questions). It is the provider-neutral vocabulary a tool or permission plugin uses when it needs the human to answer before the agent can continue. Agent-scoped waterfall listeners compose the available UI surfaces, including listeners relayed to a connected client.
 
 Source: [`packages/interaction/user-questions/src/index.ts`](../../packages/interaction/user-questions/src/index.ts)
 
@@ -103,13 +103,92 @@ interface AskUserQuestionAnswer {
 }
 ```
 
-## Provider
+Timed answerers receive `wait: { callId, timed: true }`. The call id identifies the card and the foreground wait. The Client calls `attachWait` to claim the wait and obtain its remaining duration; transport forwards the original event without inspecting or rewriting these fields. A `wait` without `timed` identifies an indefinite card-keyed request. An absent `wait` identifies a blocking request without a card key.
 
-A UI surface answers through the `user-questions/request` waterfall: its `ctx.on` listener returns an answer to claim the request or calls `next()` to delegate. Scope-filtered dispatch delivers an agent-scoped listener only its own agent's requests, and the listener is effect-bound so HMR or disposal removes the active UI.
+```ts type-equiv
+/** Client-safe payload declared for the user-question answerer waterfall. */
+interface AskUserQuestionRequestEvent {
+  /** Questions to display. */
+  questions: AskUserQuestionItem[]
+  /** Agent identity projected to the corresponding Client Context in transit. */
+  agent?: Agent
+  /** Cancellation lifetime of the pending request. */
+  signal?: AbortSignal
+  /**
+   * Tool call the Client card is keyed by. Timed answerers attach to the
+   * business wait stream before starting their local countdown.
+   */
+  wait?: {
+    /** Tool call the Client card is keyed by. */
+    callId: ToolCallId
+    /** True for a foreground wait that requires a Client claim; absent for indefinite waits. */
+    timed?: boolean
+  }
+}
+```
+
+## Timed questions and late replies
+
+A timed question waits for a bounded foreground window and then lets the agent continue independent work. If the user answers inside the window, the tool returns the answer batch; otherwise `TimedUserQuestionResult` is `{ pending: true, callId }`. Pending means the question is still answerable; it is not an empty answer, a refusal, a confirmation, or permission.
+
+```ts type-equiv
+/** Timed ask result returned when the foreground answer window closes. */
+type TimedUserQuestionResult = AskUserQuestionAnswer | { pending: true; callId: ToolCallId }
+```
+
+A Client claim is a business Remote stream, not a Gateway delivery. `TimedQuestionWait` holds the original Host deadline and runs its timer only while no claim exists. Its `attachWait` stream yields the current remaining duration, and the Client counts down with its own clock. Focus, editing, and Take time stay local. Stream cancellation releases that claim; after the last claim leaves, the Host resumes the original deadline. An unattended timeout aborts the foreground waterfall's private signal and returns pending without cancelling the Turn. Gateway and `api-remotes` contain no question-specific timing policy.
+
+The `userQuestions` Session projection folds existing events into the answerable question set and the settled one; no wait state, focus state, or deadline is logged. Each `request/header` records the exact tool schemas the model saw, and the fold tracks a call only while that header declares the timed `ask_user_question` schema, the one with a `timeout` parameter; the blocking legacy tool never declares it, so a legacy Session folds to the empty view and nothing about its rows, cards, or restart changes. A `tool/call` for `ask_user_question` under the timed schema opens a question. A `tool/result` marks it `continued` only when it carries the pending payload or is the synthetic `TOOL_OUTCOME_UNKNOWN` result Session resume repair appends; an answer batch moves it into `settled` with that batch, and any failure drops it. A late reply moves a continued question into `settled` the moment its message enters the agent inbox, together with the answer batch read out of that message: the timed call's own result recorded the timeout, so a transcript row has nowhere else to read what the user finally chose. A reply whose text carries no readable batch settles the call with no answers, and one naming a call that is not active changes nothing, so the inbox splice and the durable user message record the same reply once.
+
+```ts type-equiv
+/** `open` while the tool call may still return the answer; `continued` once the answer can only arrive as a new turn. */
+type UserQuestionState = 'open' | 'continued'
+```
+
+```ts type-equiv
+/** One unanswered timed `ask_user_question` call reconstructed from the Session log. */
+interface PendingUserQuestion {
+  readonly callId: ToolCallId
+  readonly questions: readonly AskUserQuestionItem[]
+  readonly state: UserQuestionState
+}
+```
+
+```ts type-equiv
+/**
+ * One timed `ask_user_question` call and the answers it settled with: the
+ * batch its own result carried when the user answered inside the window,
+ * otherwise the batch its late reply carried, because that call's own result
+ * recorded the timeout. A transcript row reads what the user finally answered
+ * from here, and only a call listed here was a timed one.
+ */
+interface SettledUserQuestion {
+  /** The settled call. */
+  readonly callId: ToolCallId
+  /** The recorded batch, one entry per question; empty when the late reply carried none. */
+  readonly answers: readonly AskUserQuestionAnswerItem[]
+}
+```
+
+```ts type-equiv
+/**
+ * Both halves of one Session's timed `ask_user_question` state, as every
+ * Client reads them. A call made while the blocking legacy tool was in
+ * effect appears in neither half.
+ */
+interface UserQuestionProjectionView {
+  /** Calls that can still take an answer, in ask order. */
+  readonly active: readonly PendingUserQuestion[]
+  /** Calls an answer settled, in settlement order. */
+  readonly settled: readonly SettledUserQuestion[]
+}
+```
+
+While a question is open, the only answer path is the waterfall. Once it is `continued`, the `answer` Remote method steers a user message into the owning agent, waking an idle one; its source is `user-question-reply` with `outcome: 'answered'` and its text is the `answer_to_pending_question` payload. That method refuses an open question, and rejects with `BAD_ANSWER` a batch that does not name each question of the call exactly once. No Remote method abandons a question: a Client that puts its question surface away sends nothing, so a question left unanswered ends only through its timeout. The `user-question-reply` source also admits `outcome: 'dismissed'`, which the projection and the Client conversation node still read for Sessions that recorded one; no current caller produces it. When the Session was reopened after a Host restart, the Remote layer resumes the root agent first, and the reply enters as a new turn.
 
 ## Errors
 
-`UserQuestionError` extends `HarnessError`, so `ctx.tools.execute()` preserves `{ name, code }` for model-facing tool failures such as `EMPTY_QUESTIONS`, `NO_PROVIDER`, `ASK_ABORTED`, or UI-side cancellation.
+`UserQuestionError` extends `HarnessError`, so `ctx.tools.execute()` preserves `{ name, code }` for model-facing tool failures such as `EMPTY_QUESTIONS`, `BAD_INTENT`, `NO_PROVIDER`, `ASK_ABORTED`, or UI-side cancellation.
 
 ```ts type-equiv
 /** Stable error taxonomy for user-questions failures. */
@@ -137,6 +216,42 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ```ts cordis-catalog
 /**
+ * Answer a continued question. The reply is steered into the agent as a
+ * user message whose source names the call; that message is also the
+ * record that closes the question in the projection.
+ * @param agent - Live root agent for the owning Session.
+ * @param callId - Continued question identity.
+ * @param answer - Complete structured answer batch, one item per question of the call.
+ * @returns Whether the question was continued and accepted the answer.
+ * @throws {UserQuestionError} `BAD_ANSWER` when the batch does not name each
+ *   question of the call exactly once.
+ */
+@Remote answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer): boolean
+
+/**
+ * Let one answer UI hold a live timed wait. Closing the stream releases its claim.
+ * @param agent - Live root agent owning the question.
+ * @param callId - Foreground tool call to attach to.
+ * @param signal - Remote stream cancellation, including Client disconnect.
+ * @returns One Host-computed remaining duration, or no frames once the wait ended.
+ */
+@Remote({ mode: 'stream' }) async *attachWait(agent: Agent, callId: ToolCallId, signal: AbortSignal): AsyncIterable<{ remainingMs: number }>
+
+/**
+ * Foreground wait whose first settlement the Client decides: the Client
+ * rejects with `ASK_TIMED_OUT` when its countdown ends, and this method maps
+ * that code to the pending result.
+ * @param request - Questions, live owner agent, and abort signal.
+ * @param callId - Tool call identity the Client card is keyed by.
+ * @param timeoutMs - Positive foreground wait in milliseconds.
+ * @returns The answer when it arrives inside the window, otherwise a pending
+ *   result, also when no connected Client claimed the request by the deadline.
+ * @throws {UserQuestionError} `BAD_TIMEOUT` for a non-integer, non-positive,
+ *   or oversized wait.
+ */
+async askTimed( request: AskUserQuestionRequest & { agent: Agent }, callId: ToolCallId, timeoutMs: number, ): Promise<TimedUserQuestionResult>
+
+/**
  * Ask the scoped answerer waterfall and wait for the user's answer.
  *
  * When a caller supplies an agent, human interaction is valid only for the
@@ -154,6 +269,8 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
  */
 async ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>
 ```
+
+Types: [Agent](core.md) · [ToolCallId](core.md)
 
 Source: [`packages/interaction/user-questions/src/index.ts`](../../packages/interaction/user-questions/src/index.ts)
 

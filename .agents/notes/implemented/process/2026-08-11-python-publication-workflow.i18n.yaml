@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-python-publication-workflow.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-11-python-publication-workflow.md
-2026-08-11-python-publication-workflow.md: 15a9d2ad451f7c4cf77df6a587497516e9a39c09
-2026-08-11-python-publication-workflow.zh.md: 75ead83c4671c45ccb1afd235f4d8e557d0a9968
+/agent-note-python-public-publication-workflow:
+  en: 38e580f4e36ba49d
+  zh: 57103d0719beede0
+/agent-note-python-public-publication-workflow/problem:
+  en: a48c087863ce5d33
+  zh: 2616b5992eb5c4d1
+/agent-note-python-public-publication-workflow/decision:
+  en: 3514f0011d6f731b
+  zh: 83b1791c7ad206f9
+/agent-note-python-public-publication-workflow/alternatives-considered:
+  en: 86bc164a8b23f0b4
+  zh: 60c491b3ce260423
+/agent-note-python-public-publication-workflow/consequences:
+  en: 91c52cfdd1ddcbdd
+  zh: f77f66b8c0dcde84

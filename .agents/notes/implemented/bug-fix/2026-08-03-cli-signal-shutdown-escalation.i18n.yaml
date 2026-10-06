@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-03-cli-signal-shutdown-escalation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-03-cli-signal-shutdown-escalation.md
-2026-08-03-cli-signal-shutdown-escalation.md: 0373a93314e0478bc8d0a8feff126295051cc2a0
-2026-08-03-cli-signal-shutdown-escalation.zh.md: 3d97e5ce64f63b29a472f93b27f5663028b92d6b
+/agent-note-bounded-escalating-signal-shutdown-for-web-and-headless:
+  en: d8f8ef8811dfe378
+  zh: ca728da97cb35920
+/agent-note-bounded-escalating-signal-shutdown-for-web-and-headless/problem:
+  en: 1042d3e1c2cb1e45
+  zh: d32f05dd83eee04b
+/agent-note-bounded-escalating-signal-shutdown-for-web-and-headless/decision:
+  en: b39e134d91dd6b13
+  zh: 3edfbbe015ab2823
+/agent-note-bounded-escalating-signal-shutdown-for-web-and-headless/alternatives-considered:
+  en: 53239a7e43d70aa1
+  zh: d5ab1cc4c52513e6
+/agent-note-bounded-escalating-signal-shutdown-for-web-and-headless/consequences:
+  en: 888679c978b87125
+  zh: c68d962f516f675e
+/agent-note-bounded-escalating-signal-shutdown-for-web-and-headless/testing:
+  en: e2dd8e925ff94a13
+  zh: b9430f38c27982ff

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-08-sidebar-last-tab-close-rules.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-08-sidebar-last-tab-close-rules.md
-2026-09-08-sidebar-last-tab-close-rules.md: c3dc1845328f86dd13d8adcfdda2f84681068238
-2026-09-08-sidebar-last-tab-close-rules.zh.md: 3e391335df34d67b8c6becc65d1c98592d417188
+/agent-note-last-tab-close-rules-on-the-sidebar-s-docked-surface:
+  en: 4f38145de396b08f
+  zh: 3e65231a5ebb8fdd
+/agent-note-last-tab-close-rules-on-the-sidebar-s-docked-surface/problem:
+  en: 90a9c3dc146c7d11
+  zh: a12b784b66fa3979
+/agent-note-last-tab-close-rules-on-the-sidebar-s-docked-surface/decision:
+  en: dd21611a281fc079
+  zh: cb37abb92af77250
+/agent-note-last-tab-close-rules-on-the-sidebar-s-docked-surface/alternatives-considered:
+  en: 4e2673d521d6540e
+  zh: 0d5f0b99ea80d5ff
+/agent-note-last-tab-close-rules-on-the-sidebar-s-docked-surface/consequences:
+  en: ee6138d1f4f8c28e
+  zh: 16b0b7a3c45a99ab

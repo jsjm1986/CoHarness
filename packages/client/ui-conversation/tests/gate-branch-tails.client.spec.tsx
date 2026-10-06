@@ -52,7 +52,7 @@ function renderToolDetailsProbe(owners?: DetailsToolOwnerProps[]): DetailsSlotPr
 function snapshotBase(): ConversationSnapshot {
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
-    nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+    nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
     pending: [], queue: [], running: false, composerPhase: 'active', removed: false, openState: 'open', openError: null,
     hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full', promptError: null, blank: false, subagent: null, lastAgentError: null,
   }
@@ -118,9 +118,9 @@ describe('render branch tails', () => {
     const chat = createChatStore().create()
     chat.actions.select({ turnSeq: 1, callId: 'ghost' } satisfies SelectionTarget)
     const emptyList = createSnapshotStore<SessionListState>(
-      { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+      { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })
     const emptyWorkspaces = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })
     const view = render(
@@ -131,6 +131,7 @@ describe('render branch tails', () => {
         useSession={bindSnapshotSelector({ getSnapshot: () => snap, subscribe: () => () => {} })}
         useSessions={bindSnapshotSelector(emptyList)}
         useWorkspaces={bindSnapshotSelector(emptyWorkspaces)}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useProjection={(() => undefined)}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
@@ -141,6 +142,8 @@ describe('render branch tails', () => {
           addDocuments: () => true,
           removeDocument: () => {},
           pruneDocuments: () => {},
+          captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+          insertText: () => false,
           submit: () => {},
         }}
         {...(chat.getSnapshot().selection ?? {})}
@@ -159,7 +162,7 @@ describe('render branch tails', () => {
     const snap = snapshotBase()
     const longText = 'x'.repeat(1_000)
     snap.runningCalls = [{
-      callId: 'p1', name: 'run_code', argsRaw: '{}', turn: 1, step: 1,
+      phase: 'start', callId: 'p1', name: 'run_code', argsRaw: '{}', turn: 1, step: 1,
       time: 7_000, callView: null, subCalls: [{
         kind: 'tool-result', seq: 8, time: 8_000, callId: 'p1:ptc:1',
         call: { name: 'run_code', argsRaw: '{"code":"return 1"}' },
@@ -178,9 +181,9 @@ describe('render branch tails', () => {
     const chat = createChatStore().create()
     chat.actions.select({ turnSeq: 9, callId: 'p1:ptc:1:ptc:1', toolName: 'read' } satisfies SelectionTarget)
     const emptyList = createSnapshotStore<SessionListState>(
-      { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+      { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined })
     const emptyWorkspaces = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })
     const owners: DetailsToolOwnerProps[] = []
@@ -192,6 +195,7 @@ describe('render branch tails', () => {
         useSession={bindSnapshotSelector({ getSnapshot: () => snap, subscribe: () => () => {} })}
         useSessions={bindSnapshotSelector(emptyList)}
         useWorkspaces={bindSnapshotSelector(emptyWorkspaces)}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useProjection={(() => undefined)}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
@@ -202,6 +206,8 @@ describe('render branch tails', () => {
           addDocuments: () => true,
           removeDocument: () => {},
           pruneDocuments: () => {},
+          captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+          insertText: () => false,
           submit: () => {},
         }}
         {...(chat.getSnapshot().selection ?? {})}

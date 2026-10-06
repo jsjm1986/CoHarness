@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-05-skill-system.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-05-skill-system.md
-2026-07-05-skill-system.md: 481cdecbb4acaf5a0c38106ab47c6c489aca507c
-2026-07-05-skill-system.zh.md: a0d7dd953337b0e9e764738d6d4cd7ef825999f5
+/agent-note-skill-system-progressive-disclosure-instructions-for-agents:
+  en: 2d5060afab309278
+  zh: 30f16dc70320b799
+/agent-note-skill-system-progressive-disclosure-instructions-for-agents/problem:
+  en: 184fac825cf14b8b
+  zh: fcd465b77d75ca77
+/agent-note-skill-system-progressive-disclosure-instructions-for-agents/decision:
+  en: cad157f797090d5a
+  zh: 8493375f8e30a2b6
+/agent-note-skill-system-progressive-disclosure-instructions-for-agents/alternatives-considered:
+  en: 98859166ef270fcb
+  zh: 54411180bdc7a693
+/agent-note-skill-system-progressive-disclosure-instructions-for-agents/consequences:
+  en: 19cab3abfbd197cf
+  zh: 15227162d4d46c83
+/agent-note-skill-system-progressive-disclosure-instructions-for-agents/deferred:
+  en: 09f78bdb7ea93bd8
+  zh: c3e0b2847468321a

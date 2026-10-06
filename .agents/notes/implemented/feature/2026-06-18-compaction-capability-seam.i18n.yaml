@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-18-compaction-capability-seam.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md
-2026-06-18-compaction-capability-seam.md: 71ea7144cd843364fd77db0dd2c8a0d1e8bab1ac
-2026-06-18-compaction-capability-seam.zh.md: f25c0d295e8d782213cc044e7109377feaa93e7e
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend:
+  en: 6808ccbe73762daa
+  zh: 11f3669e6ae4512c
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/problem:
+  en: 71bab246cd8175b1
+  zh: 2dcb973580bfce5a
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision/compaction-is-a-capability-seam-with-separate-service-definition-and-service-provider-roles:
+  en: 785c69730accbb4d
+  zh: ee9bd2a8a7dc3b72
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision/the-contract-depends-on-dsh-session-and-dsh-llm-a-deliberate-deviation:
+  en: 5c07a5a6429f6752
+  zh: 8bf83da6e0563a66
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision/three-abstract-operations-algorithm-in-the-backend:
+  en: ff914d2ab023dee2
+  zh: 9eeb946afedd3d15
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision/automatic-pressure-runs-after-successful-durable-step-work:
+  en: b246f9837c9c9a6b
+  zh: c19c51456c8fd8b7
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision/retention-is-turn-agnostic-tool-pairing-balance-is-the-only-structural-guard:
+  en: 3126c249c48e90b9
+  zh: dc82bc9a37d90474
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision/head-anchoring-one-auto-checkpoint-always-at-the-head:
+  en: 26f187b321217e4c
+  zh: b324dcdb6da4bf02
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision/approximate-convergence-invariant:
+  en: 4870032f23833fc4
+  zh: b30180c31ba84a5a
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision/surface-replacement-compaction-events-are-log-only-one-user-message-carries-the-summary:
+  en: 402204c07277b740
+  zh: 9b5711d9ef35e7dc
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision/checkpoint-framing-incremental-merge-backend-private:
+  en: 1c71cf67450e78d5
+  zh: fb44b3cf5cee070a
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/decision/blocking-via-a-log-recorded-lock-plus-a-crash-recoverable-failure-taxonomy:
+  en: 5aed57a49e031b1e
+  zh: 1424f332197ef541
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/alternatives-considered:
+  en: 24a7bb1949445136
+  zh: 7914ea99f498ed67
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/consequences:
+  en: d46b4ebf81883f6f
+  zh: 9dcdb0b34d6375cf
+/agent-note-compaction-as-a-capability-seam-abstract-contract-basic-backend/testing:
+  en: 843476bd607fe832
+  zh: 50be0b06553a54d0

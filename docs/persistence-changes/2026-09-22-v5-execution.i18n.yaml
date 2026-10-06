@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-v5-execution.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-09-22-v5-execution.md
-2026-09-22-v5-execution.md: 80e52499caaeb12b6b6d5c63e60830d23f462cb6
-2026-09-22-v5-execution.zh.md: 39c7dfa4e22d589bad8411a94c4a4343a3cffb51
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-09-22-v5-execution:
+  en: dd3b86bf45ac02a6
+  zh: 39da6050abc47091
+/2026-09-22-v5-execution/summary:
+  en: 81ef229eb20217d7
+  zh: bdcce1931575776d
+/2026-09-22-v5-execution/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-09-22-v5-execution/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-09-22-v5-execution/compatibility:
+  en: 9a4e1c3116ff5c05
+  zh: 175a558fbeb6f37c
+/2026-09-22-v5-execution/verification:
+  en: 06b1904ede30d5ea
+  zh: 92bd0f0afa22e8f9
+/2026-09-22-v5-execution/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

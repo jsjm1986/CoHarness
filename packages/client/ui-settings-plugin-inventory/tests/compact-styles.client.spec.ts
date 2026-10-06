@@ -8,14 +8,13 @@ import { describe, expect, it } from 'vitest'
 const css = readFileSync(fileURLToPath(new URL('../src/client/PluginInventorySettingsTab.module.css', import.meta.url)), 'utf8')
 
 /**
- * Inner text of one `@media` block.
- * @param query - the media condition.
+ * Inner text of one at-rule block (`@media`/`@container`).
+ * @param query - the full at-rule header, e.g. `@container plugin-inventory (max-width: 520px)`.
  * @returns the block body.
  */
 function mediaBody(query: string): string {
-  const marker = `@media ${query}`
-  const start = css.indexOf(marker)
-  if (start === -1) throw new Error(`PluginInventorySettingsTab.module.css has no @media ${query}`)
+  const start = css.indexOf(query)
+  if (start === -1) throw new Error(`PluginInventorySettingsTab.module.css has no ${query}`)
   const open = css.indexOf('{', start)
   let depth = 0
   for (let i = open; i < css.length; i += 1) {
@@ -30,8 +29,8 @@ function mediaBody(query: string): string {
 }
 
 describe('PluginInventorySettingsTab.module.css compact', () => {
-  it('gives the catalog search the touch target under 768px', () => {
-    const compact = mediaBody('(max-width: 767px)')
-    expect(compact).toContain('height: var(--dsw-touch-target)')
+  it('collapses the cards grid to one column under 520px of inline size', () => {
+    const compact = mediaBody('@container plugin-inventory (max-width: 520px)')
+    expect(compact).toContain('grid-template-columns: minmax(0, 1fr)')
   })
 })

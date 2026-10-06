@@ -21,6 +21,8 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
     alias: [
+      { find: /^@deepseek-ai\/dsh-atomic-write$/, replacement: pkg('packages/util/atomic-write') },
+      { find: /^@deepseek-ai\/dsh-managed-data$/, replacement: pkg('packages/util/managed-data') },
       { find: '@deepseek-ai/dsh-session-format-catalog', replacement: pkg('packages/session/session-format-catalog') },
       { find: '@deepseek-ai/dsh-session-format/surface', replacement: pkg('packages/session/session-format', 'surface.js') },
       { find: /^@deepseek-ai\/dsh-session-format$/, replacement: pkg('packages/session/session-format') },
@@ -30,6 +32,7 @@ export default defineConfig({
       { find: /^@deepseek-ai\/dsh-session-format-v3-to-v4$/, replacement: pkg('packages/session/session-format-v3-to-v4') },
       { find: /^@deepseek-ai\/dsh-session-format-v4-to-v5$/, replacement: pkg('packages/session/session-format-v4-to-v5') },
       { find: /^@deepseek-ai\/dsh-session-format-v5-to-v6$/, replacement: pkg('packages/session/session-format-v5-to-v6') },
+      { find: /^@deepseek-ai\/dsh-session-format-v6-to-v7$/, replacement: pkg('packages/session/session-format-v6-to-v7') },
       { find: /^@deepseek-ai\/dsh-session$/, replacement: pkg('packages/core/session') },
       { find: '@deepseek-ai/dsh-compaction-image-offload/projection', replacement: pkg('packages/compaction/compaction-image-offload', 'projection.js') },
       { find: '@deepseek-ai/dsh-llm/discovery', replacement: pkg('packages/llm/llm', 'discovery.js') },

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-acp-exit-observation-cleanup.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-acp-exit-observation-cleanup.md
-2026-09-22-acp-exit-observation-cleanup.md: 4aa88a9be2b67b56dd7bef64d0d1a05860fb433d
-2026-09-22-acp-exit-observation-cleanup.zh.md: d8c0512879880861e61cc0ad419addafa1fc5cfd
+/agent-note-continue-acp-cleanup-after-an-exit-observation-fails:
+  en: 1f6e5843641e73e7
+  zh: 3e8ca74e7944f024
+/agent-note-continue-acp-cleanup-after-an-exit-observation-fails/problem:
+  en: de0ae36d3843b661
+  zh: d3695684d1ad1ba0
+/agent-note-continue-acp-cleanup-after-an-exit-observation-fails/decision:
+  en: e172ec2284a67433
+  zh: 0a7f7e0b832d26b7
+/agent-note-continue-acp-cleanup-after-an-exit-observation-fails/alternatives-considered:
+  en: 17afcf469123390b
+  zh: bbe24cb9b4c00a59
+/agent-note-continue-acp-cleanup-after-an-exit-observation-fails/consequences:
+  en: 87b9974b0cf187d4
+  zh: 402de9308d9ab908

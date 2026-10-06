@@ -18,6 +18,7 @@ import type { HostFrame, WorkspaceId } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { RpcRequest, RpcResponse } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import { sessionBackedInbox, unsupportedInbox } from '../../../core/agent-loop/tests/inbox-helpers.ts'
 
@@ -97,6 +98,7 @@ async function harness(
       return {
         agent,
         dispose: unregister,
+        tryDisposeIdle: async () => false,
       }
     },
     async resume() {
@@ -574,6 +576,24 @@ describe('Host Workspace increments', () => {
     abort.abort()
   })
 
+  it('refuses prompts on an archived session', async () => {
+    const { api, root } = await harness()
+    const workspace = expectOk(await api.workspace.create(request({ path: stageDir(root, 'archive-prompt') }))).workspace
+    const sessionId = SessionId('session-prompt-archived')
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId })))
+    expectOk(await api.workspace.archiveSession(request({ sessionId })))
+
+    // A client may hold a stale mounted view until the archive baseline
+    // lands; the admission check is the durable refusal.
+    const refused = await api.sessions.prompt(request({
+      sessionId, mode: 'queue', content: [{ type: 'text', text: 'still typing' }],
+    }))
+    expect(refused.result).toMatchObject({
+      ok: false,
+      error: { code: 'session-archived', details: { sessionId } },
+    })
+  })
+
   it('unarchives a session, streams the set once, and no-ops ids outside the set', async () => {
     const { api, root } = await harness()
     const workspace = expectOk(await api.workspace.create(request({ path: stageDir(root, 'unarchive-home') }))).workspace
@@ -604,5 +624,232 @@ describe('Host Workspace increments', () => {
     expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId: otherSession })))
     expect((await after).payload.type).not.toBe('host/archived-sessions-changed')
     abort.abort()
+  })
+
+  it('pins a session to the front of the registry set, streams it once, and refuses archived or missing ids', async () => {
+    const { api, root } = await harness()
+    const workspace = expectOk(await api.workspace.create(request({ path: stageDir(root, 'pin-home') }))).workspace
+    const sessionId = SessionId('session-to-pin')
+    const otherId = SessionId('session-pinned-later')
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId })))
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId: otherId })))
+    expect(expectOk(await api.workspace.list(request({}))).pinnedSessionIds).toEqual([])
+
+    const abort = new AbortController()
+    const stream: AsyncIterator<RpcRequest<HostFrame>> =
+      api.events.host(request({}), abort.signal)[Symbol.asyncIterator]()
+    const changed = nextHostFrame(stream)
+    expect(expectOk(await api.workspace.pinSession(request({ sessionId }))).pinnedSessionIds)
+      .toEqual([sessionId])
+    expect(await changed).toMatchObject({
+      payload: { type: 'host/pinned-sessions-changed', pinnedSessionIds: [sessionId] },
+    })
+
+    // A newer pin fronts the complete ordered set; list re-baselines it.
+    const second = nextHostFrame(stream)
+    expect(expectOk(await api.workspace.pinSession(request({ sessionId: otherId }))).pinnedSessionIds)
+      .toEqual([otherId, sessionId])
+    expect((await second).payload).toMatchObject({
+      type: 'host/pinned-sessions-changed', pinnedSessionIds: [otherId, sessionId],
+    })
+    expect(expectOk(await api.workspace.list(request({}))).pinnedSessionIds).toEqual([otherId, sessionId])
+
+    // An already-pinned id resolves as a no-op: the next observed frames are a
+    // later attach's, not another pin snapshot.
+    const after = nextHostFrame(stream)
+    expect(expectOk(await api.workspace.pinSession(request({ sessionId }))).pinnedSessionIds)
+      .toEqual([otherId, sessionId])
+    const markerSession = SessionId('session-after-repin')
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId: markerSession })))
+    expect((await after).payload.type).not.toBe('host/pinned-sessions-changed')
+    // The attach emits its session-added + workspace-changed pair: drain the
+    // second increment so the unpin observation starts from a clean stream.
+    expect((await nextHostFrame(stream)).payload.type).not.toBe('host/pinned-sessions-changed')
+
+    // Unpinning echoes the remaining set; a repeat is a silent no-op.
+    const unpinned = nextHostFrame(stream)
+    expect(expectOk(await api.workspace.unpinSession(request({ sessionId: otherId }))).pinnedSessionIds)
+      .toEqual([sessionId])
+    expect((await unpinned).payload).toMatchObject({
+      type: 'host/pinned-sessions-changed', pinnedSessionIds: [sessionId],
+    })
+    expect(expectOk(await api.workspace.unpinSession(request({ sessionId: otherId }))).pinnedSessionIds)
+      .toEqual([sessionId])
+
+    // Archiving drops the pin in the same durable write: both snapshots stream.
+    const archived = nextHostFrame(stream)
+    const pinDropped = nextHostFrame(stream)
+    expectOk(await api.workspace.archiveSession(request({ sessionId })))
+    const drops = [await archived, await pinDropped]
+    expect(drops.map(envelope => envelope.payload.type))
+      .toEqual(['host/archived-sessions-changed', 'host/pinned-sessions-changed'])
+    expect(drops[1]).toMatchObject({ payload: { pinnedSessionIds: [] } })
+
+    const deniedArchived = await api.workspace.pinSession(request({ sessionId }))
+    expect(deniedArchived.result).toMatchObject({
+      ok: false, error: { code: 'session-archived', details: { sessionId } },
+    })
+    const missing = await api.workspace.pinSession(request({ sessionId: SessionId('session-ghost') }))
+    expect(missing.result).toMatchObject({
+      ok: false, error: { code: 'session-not-found', details: { sessionId: 'session-ghost' } },
+    })
+    abort.abort()
+  })
+})
+
+describe('archived session input admission', () => {
+  it('refuses prompt input on a session archived during the execution stamp', async () => {
+    const { api, ctx, root } = await harness()
+    const workspace = expectOk(await api.workspace.create(request({ path: stageDir(root, 'archive-stamp') }))).workspace
+    const sessionId = SessionId('session-archived-mid-prompt')
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId })))
+    const agent = ctx.agents.get(sessionId)
+    if (agent === undefined) throw new Error('created session has no attached agent')
+    const followup = vi.spyOn(agent, 'followup')
+    const steer = vi.spyOn(agent, 'steer')
+    let promptSettled: Promise<void> | undefined
+    const gate = Promise.withResolvers<undefined>()
+    try {
+      const started = Promise.withResolvers<undefined>()
+      ctx.provide('executionAuthority', {
+        stamp: async (_session: Session, message: unknown) => {
+          started.resolve(undefined)
+          await gate.promise
+          return message
+        },
+      } as never)
+
+      const prompt = api.sessions.prompt(request({
+        sessionId, mode: 'queue', content: [{ type: 'text', text: 'still typing' }],
+      }))
+      promptSettled = prompt.then(() => undefined, () => undefined)
+      await Promise.race([
+        started.promise,
+        prompt.then(() => { throw new Error('prompt completed before the execution stamp') }),
+      ])
+      expectOk(await api.workspace.archiveSession(request({ sessionId })))
+      gate.resolve(undefined)
+      const response = await prompt
+      expect(response.result).toMatchObject({
+        ok: false,
+        error: {
+          code: 'session-archived',
+          message: `session ${sessionId} is archived; unarchive it before sending input`,
+          details: { sessionId },
+        },
+      })
+      expect(followup).not.toHaveBeenCalled()
+      expect(steer).not.toHaveBeenCalled()
+    } finally {
+      gate.resolve(undefined)
+      await promptSettled
+    }
+  })
+
+  it('refuses queue edit and steer on a session archived during the execution stamp', async () => {
+    for (const kind of ['edit', 'steer'] as const) {
+      const { api, ctx, root } = await harness()
+      const workspace = expectOk(await api.workspace.create(request({ path: stageDir(root, `archive-${kind}`) }))).workspace
+      const sessionId = SessionId(`session-archived-mid-${kind}`)
+      expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId })))
+      const agent = ctx.agents.get(sessionId)
+      if (agent === undefined) throw new Error('created session has no attached agent')
+      // Steer requires a running target; the archive call below stops activity.
+      if (kind === 'steer') Object.assign(agent, { status: 'running' })
+      const message = createUserMessage({
+        content: [{ type: 'text', text: 'queued' }],
+        source: { kind: 'user' },
+      })
+      agent.session.append('agent/inbox/spliced', { target: 'next-turn', start: 0, inserted: [message] })
+      await vi.waitFor(() => { expect(agent.inbox.nextTurn.map(row => row.id)).toContain(message.id) })
+      let updatedSettled: Promise<void> | undefined
+      const gate = Promise.withResolvers<undefined>()
+      try {
+        const started = Promise.withResolvers<undefined>()
+        ctx.provide('executionAuthority', {
+          stamp: async (_session: Session, stamped: unknown) => {
+            started.resolve(undefined)
+            await gate.promise
+            return stamped
+          },
+        } as never)
+        const steer = vi.spyOn(agent, 'steer')
+        const replace = vi.spyOn(agent.inbox, 'replace')
+        const remove = vi.spyOn(agent.inbox, 'remove')
+
+        const updated = api.sessions.updateQueue(request({
+          sessionId,
+          itemId: message.id,
+          action: kind === 'edit'
+            ? { kind: 'edit', content: [{ type: 'text', text: 'edited' }] }
+            : { kind: 'steer' },
+        }))
+        updatedSettled = updated.then(() => undefined, () => undefined)
+        await Promise.race([
+          started.promise,
+          updated.then(() => { throw new Error('queue update completed before the execution stamp') }),
+        ])
+        expectOk(await api.workspace.archiveSession(request({ sessionId, stopActivity: true })))
+        gate.resolve(undefined)
+        const response = await updated
+        expect(response.result).toMatchObject({
+          ok: false,
+          error: {
+            code: 'session-archived',
+            message: `session ${sessionId} is archived; unarchive it before sending input`,
+            details: { sessionId },
+          },
+        })
+        expect(replace).not.toHaveBeenCalled()
+        expect(remove).not.toHaveBeenCalled()
+        expect(steer).not.toHaveBeenCalled()
+        expect(agent.inbox.nextTurn.map(row => row.id)).toEqual([message.id])
+      } finally {
+        gate.resolve(undefined)
+        await updatedSettled
+      }
+    }
+  })
+
+  it('denies queue edits on an already archived session before resolving its Agent', async () => {
+    const { api, ctx, root } = await harness()
+    const workspace = expectOk(await api.workspace.create(request({ path: stageDir(root, 'archive-first') }))).workspace
+    const sessionId = SessionId('session-already-archived')
+    expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId })))
+    const agent = ctx.agents.get(sessionId)
+    if (agent === undefined) throw new Error('created session has no attached agent')
+    const message = createUserMessage({
+      content: [{ type: 'text', text: 'queued' }],
+      source: { kind: 'user' },
+    })
+    agent.session.append('agent/inbox/spliced', { target: 'next-turn', start: 0, inserted: [message] })
+    await vi.waitFor(() => { expect(agent.inbox.nextTurn.map(row => row.id)).toContain(message.id) })
+    const stamp = vi.fn(async (_session: Session, stamped: unknown) => stamped)
+    ctx.provide('executionAuthority', { stamp } as never)
+    expectOk(await api.workspace.archiveSession(request({ sessionId })))
+
+    const edited = await api.sessions.updateQueue(request({
+      sessionId, itemId: message.id, action: { kind: 'edit', content: [{ type: 'text', text: 'edited' }] },
+    }))
+    expect(edited.result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'session-archived',
+        message: `session ${sessionId} is archived; unarchive it before sending input`,
+        details: { sessionId },
+      },
+    })
+    expect(stamp).not.toHaveBeenCalled()
+
+    // Removal and cancel stay allowed so queued work can still be released.
+    const removed = await api.sessions.updateQueue(request({
+      sessionId, itemId: message.id, action: { kind: 'remove' },
+    }))
+    expect(removed.result).toMatchObject({ ok: true })
+    expect(agent.inbox.nextTurn).toEqual([])
+    const cancel = vi.spyOn(agent, 'cancel')
+    const cancelled = await api.sessions.cancel(request({ sessionId }))
+    expect(cancelled.result).toMatchObject({ ok: true })
+    expect(cancel).toHaveBeenCalledOnce()
   })
 })

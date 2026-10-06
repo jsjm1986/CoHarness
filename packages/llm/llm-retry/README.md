@@ -1,3 +1,8 @@
+---
+description: "Provider-routed LLM request retry policy for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # `@deepseek-ai/dsh-llm-retry`
 
 English | [中文](README.zh.md)
@@ -32,6 +37,15 @@ The executor has no policy config. Multi-provider adapters such as `dsh-llm-pi-a
 
 Mount `@deepseek-ai/dsh-llm-retry` to retry failed model requests at durable agent-step boundaries. Provider `retryPolicy` settings choose bounded normal-mode retries or unlimited always-mode retries; scheduled attempts reach the session log before backoff, and cancellation leaves consistent history. Retries re-run the failed step in the same open turn, while direct `ctx.llm.stream()` calls remain single-attempt. Each retry is another billed provider request, and always mode continues until success, cancellation, or disposal.
 
+## Table of Contents
+
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Model-request recovery
@@ -55,3 +69,13 @@ The reconstructed request preserves the prior prefix and is eligible for provide
 - **Finite plugin budgets add** — normal mode counts only its configured codes and exact provider policy, while context-overflow compaction owns a separate budget. Any overlapping policy must define registration-order behavior.
 - **Recovery policies compose by waterfall order** — always mode accepts a downstream retry before applying its fallback. A later policy that ignores cancellation and never settles also prevents fallback, turn quiescence, and plugin disposal from completing.
 - **`llm/retry` records scheduling, not completion** — later step and turn events establish success, exhaustion, or cancellation.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

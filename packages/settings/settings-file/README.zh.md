@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-settings-file
 
 [English](README.md) | 中文
@@ -8,6 +13,18 @@
 
 `dsh-settings-file` 把所有 namespace 的用户设置保存在一个 YAML 或 JSON 文档中，默认是 harness home 下的 `settings.yaml`：用户可以直接编辑文档——变更实时生效——也可以经服务写入，后者会安全合并并发编辑。YAML 写入保留每个未触碰节点上的注释、锚点与排版，未加载插件所拥有的分节也绝不会被丢弃。启动时非法文档直接报错；运行中失败的热重载保留最后可用分节并告警，而不是拖垮进程。
 
+## 目录
+
+- [配置](#config)
+- [行为](#behavior)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## 配置
 
 | 字段 | 含义 | 默认 |
@@ -19,6 +36,7 @@
 
 默认值解析是一步显式的 `resolveSpec(config)`；不支持的扩展名在加载时报错。
 
+<a id="behavior"></a>
 ## 行为
 
 - **启动失败并明确报错，重载保留最后可用值。** 存在但非法的文档使插件加载失败；运行中不可读或不可解析的编辑只告警并保留最后可用分节。文档缺失时所有 namespace 按默认值与 `base` 解析；删除文档发布同样的空状态。
@@ -33,10 +51,13 @@
 - **按内容抑制自写。** 提供方缓存最后可用文本；watcher 事件内容与缓存相同（含自己的写入）即为 no-op。
 - **Host 配置适配器会收到解析后的路径。** `ctx.settings.documentPath` 是 `resolveSpec()` 得出的绝对文件名，包括自定义 YAML/JSON 路径；`prepareDocument()` 会保留现有文件，或在 Host 打开文档前，以仅属主可访问的权限独占创建缺失的空文件。浏览器只收到可用性标志，绝不重建 `$DSH_HOME`，也绝不提交文件系统目标。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。磁盘上的文档是单一权威：更新在写回前于写锁下重读它，外部编辑会重新发布，因此不存在第二份可能分歧的持久副本。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 间接生效：存储值会影响的任何面向模型的行为均由 `ctx.settings` 的消费方负责；文件提供方只存储并发布 namespace 分节，自身不注册任何面向模型的内容。
@@ -45,9 +66,21 @@
 
 无直接失效；请求前缀的任何变更均由消费方插件负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
+- 设置 `DSH_MANAGED_DATA_MANIFEST` 的受管启动会在写入数据前登记实际解析后的设置文档，包括配置的自定义路径。清单无效时拒绝初始化；保留旧根和部署批准遵循[清单与备份规则](../../util/managed-data/README.zh.md)。
 - **同 namespace 冲突仍是后写胜出** — 写锁加读-改-写让并发写入者不会丢掉彼此的 namespace，但两个写入者编辑同一个 namespace 时仍以较后的写入为准；没有按值合并，也没有修订检查。
 - **漏掉的 watcher 事件在下一个信号前保持不可见** — 读取从不重新 stat 文件，因此 watcher 漏报的变更只会在下一个事件、下一次写入或重启时被并入。
 - **注释保留仅限 YAML 且仅限 map 形状** — JSON 文档重新序列化，无注释（JSON 本身没有），且被改数组内部的注释（或行内附着在被改标量值上的注释）随其所描述的值一同被换掉。
 - **无值间接引用** — 分节存字面值；面向密钥的 `${env:VAR}` 式引用是暂缓实现的 seam 层功能。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

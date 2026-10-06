@@ -1,3 +1,8 @@
+---
+description: "Zero-dependency timeout/deadline primitive: clampTimeout, deadline, timeoutOf, TimeoutReason (timing + classification only, no termination)"
+kind: "package-library"
+---
+
 # dsh-timeout
 
 English | [中文](README.zh.md)
@@ -12,6 +17,20 @@ It is a **library, not a service or plugin**: no `ctx`, registers nothing, holds
 
 `dsh-timeout` lets callers apply bounded deadlines to work, distinguish local timeout from upstream cancellation, and monitor streamed reads for inactivity. `clampTimeout` fills a missing hint from a backend default, caps it at the allowed maximum, and rejects invalid values before work starts. `deadline` combines the chosen timeout with upstream cancellation in one signal, while the caller remains responsible for actually stopping its process, socket, or task. `idleWatchdog` counts only time spent waiting for provider reads, and zero remains reserved for backend-owned untimed work rather than public configuration.
 
+## Table of Contents
+
+- [API](#api)
+- [The `timeoutMs <= 0` sentinel](#the-timeoutms--0-sentinel)
+- [Usage shape](#usage-shape)
+- [What does NOT get a timeout](#what-does-not-get-a-timeout)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="api"></a>
 ## API
 
 ```ts
@@ -27,10 +46,12 @@ import { clampTimeout, deadline, idleWatchdog, MAX_TIMER_DELAY_MS, timeoutOf, Ti
 | `timeoutOf(signal \| { reason }, code?)` | Recover the `TimeoutReason` from an aborted signal/error, else `undefined` — the timeout-vs-cancel classifier. Pass `code` to match only THIS deadline's timer (see nesting below). |
 | `TimeoutReason` | The internal reason (`code` + `timeoutMs`) stamped on a timeout abort. Not a public error — providers translate it into their own error/field. |
 
+<a id="the-timeoutms--0-sentinel"></a>
 ## The `timeoutMs <= 0` sentinel
 
 `0` is the **internal** "no timeout" value for backend-owned background work (bash `start()`): `deadline()` arms no timer and forwards only `upstream`; with no upstream either, it returns a never-aborting signal plus a no-op disposer, so every caller keeps one call shape. External request hints validate as **positive finite** via `clampTimeout` before they reach `deadline`, so `0` is never a model-/plugin-facing "disable timeout" value.
 
+<a id="usage-shape"></a>
 ## Usage shape
 
 ```ts
@@ -54,14 +75,17 @@ Pass your own `code` to `timeoutOf` so classification composes under nesting. Wh
 
 For a streamed transport, create one `idleWatchdog`, pass its stable `signal` into the transport, and call `watchdog.next(iterator)` for each provider read. Call `watchdog.pulse()` when transport activity does not yield an iterator value. The interval must be positive, finite, and no greater than `MAX_TIMER_DELAY_MS`; Node otherwise clamps it to one millisecond. It measures only outstanding demand, so no timer runs while downstream code renders or otherwise waits before asking for the next chunk. The primitive still only notifies, so the transport must observe the stable signal; the DeepSeek and pi-ai adapters prove that timeout closes their real response body or SDK request.
 
+<a id="what-does-not-get-a-timeout"></a>
 ## What does NOT get a timeout
 
 Local file `read`/`write`/`edit` take no `timeoutMs`: file IO runs untimed because a deadline would kill work the OS will still finish. See [the filesystem subsystem page](../../../docs/subsystems/filesystem.md).
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. A zero-dependency pure library; the signal and classification algebra is enforced by unit specs.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the timeout consumers that render timeout outcomes.
@@ -76,3 +100,13 @@ No direct invalidation; the timeout consumers own any request-prefix changes.
 - **`timeoutMs <= 0` is internal vocabulary** — it disables the local timer only after an owning backend has resolved policy, never as a public model/plugin knob.
 - **The first abort reason wins classification** — when an upstream cancellation beats the local timer, this layer cannot later report that its own timeout would also have elapsed.
 - **An idle watchdog is not a total deadline** — it rearms per outstanding iterator demand and deliberately excludes consumer think time.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

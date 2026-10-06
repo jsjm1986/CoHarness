@@ -1,18 +1,16 @@
 import {
+  ChevronRight,
   KeyRound,
   Pencil,
-  Play,
   Plus,
   Power,
-  RefreshCw,
-  Square,
   Trash2,
   UserRound,
   Users,
 } from 'lucide-react'
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
-  controlInstance,
   createUser,
   deleteUser,
   listUsers,
@@ -22,48 +20,42 @@ import {
 } from '../api.ts'
 import {
   Button,
-  ConfirmDialog,
-  Dialog,
   EmptyState,
   ErrorBanner,
-  Field,
   IconButton,
   LoadingState,
   PageHeader,
   Section,
-  StatusBadge,
-  Switch,
 } from '../components/ui.tsx'
-
-type UserRole = AdminUser['role']
-
-type UserDraft = {
-  username: string
-  password: string
-  displayName: string
-  role: UserRole
-}
-
-const EMPTY_USER: UserDraft = {
-  username: '',
-  password: '',
-  displayName: '',
-  role: 'user',
-}
+import {
+  AccountBadge,
+  AutoReviewBadge,
+  Definition,
+  InstanceCell,
+  InstanceControls,
+  InstanceState,
+  RoleBadge,
+  UserCreateDialog,
+  UserDeleteConfirm,
+  UserDisableConfirm,
+  UserEditDialog,
+  UserIdentity,
+  UserPasswordDialog,
+  type UserDraft,
+  type UserRole,
+} from '../components/users.tsx'
+import { adminLanguage, translateCopy } from '../language.ts'
+import { zh as usersZh, en as usersEn } from './users.copy.ts'
 
 export function UsersPage() {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: usersZh, en: usersEn }), [])
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pending, setPending] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
-  const [createDraft, setCreateDraft] = useState<UserDraft>(EMPTY_USER)
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null)
-  const [editName, setEditName] = useState('')
-  const [editRole, setEditRole] = useState<UserRole>('user')
-  const [editAutoReviewEligible, setEditAutoReviewEligible] = useState(false)
   const [passwordTarget, setPasswordTarget] = useState<AdminUser | null>(null)
-  const [newPassword, setNewPassword] = useState('')
   const [disableTarget, setDisableTarget] = useState<AdminUser | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null)
 
@@ -95,46 +87,26 @@ export function UsersPage() {
     }
   }
 
-  async function onCreate(event: FormEvent) {
-    event.preventDefault()
-    const saved = await run('create', async () => {
-      await createUser({
-        username: createDraft.username,
-        password: createDraft.password,
-        role: createDraft.role,
-        displayName: createDraft.displayName === '' ? undefined : createDraft.displayName,
-      })
-    })
-    if (!saved) return
-    setCreateDraft(EMPTY_USER)
-    setCreateOpen(false)
+  async function onCreate(draft: UserDraft) {
+    const saved = await run('create', async () => { await createUser({
+      username: draft.username,
+      password: draft.password,
+      role: draft.role,
+      displayName: draft.displayName === '' ? undefined : draft.displayName,
+    }) })
+    if (saved) setCreateOpen(false)
   }
 
-  function openEdit(user: AdminUser) {
-    setEditTarget(user)
-    setEditName(user.displayName)
-    setEditRole(user.role)
-    setEditAutoReviewEligible(user.autoReviewEligible)
-  }
-
-  async function onEdit(event: FormEvent) {
-    event.preventDefault()
+  async function onEdit(patch: { displayName?: string; role?: UserRole; autoReviewEligible?: boolean }) {
     if (editTarget === null) return
-    const saved = await run(`edit:${editTarget.id}`, () => patchUser(editTarget.id, {
-      ...(editName === editTarget.displayName ? {} : { displayName: editName }),
-      ...(editRole === editTarget.role ? {} : { role: editRole }),
-      ...(editAutoReviewEligible === editTarget.autoReviewEligible ? {} : { autoReviewEligible: editAutoReviewEligible }),
-    }))
+    const saved = await run(`edit:${editTarget.id}`, () => patchUser(editTarget.id, patch))
     if (saved) setEditTarget(null)
   }
 
-  async function onResetPassword(event: FormEvent) {
-    event.preventDefault()
+  async function onResetPassword(password: string) {
     if (passwordTarget === null) return
-    const saved = await run(`password:${passwordTarget.id}`, () => resetPassword(passwordTarget.id, newPassword))
-    if (!saved) return
-    setNewPassword('')
-    setPasswordTarget(null)
+    const saved = await run(`password:${passwordTarget.id}`, () => resetPassword(passwordTarget.id, password))
+    if (saved) setPasswordTarget(null)
   }
 
   async function onDisable() {
@@ -152,19 +124,19 @@ export function UsersPage() {
   return (
     <div className="page">
       <PageHeader
-        title="用户管理"
-        description="管理账号权限、登录状态和每位用户的独立 Harness 实例。"
-        meta={loading ? undefined : `${users.length} 位用户`}
-        actions={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>新建用户</Button>}
+        title={t('pageTitle')}
+        description={t('pageDescription')}
+        meta={loading ? undefined : t('userCount', { count: String(users.length) })}
+        actions={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>{t('createUser')}</Button>}
       />
       <ErrorBanner message={error} />
-      <Section className="responsiveSection" title="账号与实例" meta={loading ? undefined : `${users.length} 条记录`}>
-        {loading ? <LoadingState label="正在加载用户" /> : users.length === 0 ? (
+      <Section className="responsiveSection" title={t('sectionTitle')} meta={loading ? undefined : t('recordCount', { count: String(users.length) })}>
+        {loading ? <LoadingState label={t('loadingUsers')} /> : users.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="还没有用户"
-            detail="创建第一个账号后，可在这里配置角色并控制其 Harness 实例。"
-            action={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>新建用户</Button>}
+            title={t('emptyTitle')}
+            detail={t('emptyDetail')}
+            action={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>{t('createUser')}</Button>}
           />
         ) : (
           <>
@@ -172,19 +144,19 @@ export function UsersPage() {
               <table className="dataTable">
                 <thead>
                   <tr>
-                    <th>用户</th>
-                    <th>角色</th>
-                    <th>Auto 审查资格</th>
-                    <th>账号</th>
-                    <th>实例</th>
-                    <th>端口</th>
-                    <th aria-label="操作" />
+                    <th>{t('colUser')}</th>
+                    <th>{t('colRole')}</th>
+                    <th>{t('colAutoReview')}</th>
+                    <th>{t('colAccount')}</th>
+                    <th>{t('colInstance')}</th>
+                    <th>{t('colPort')}</th>
+                    <th aria-label={t('colActions')} />
                   </tr>
                 </thead>
                 <tbody>
                   {users.map(user => (
                     <tr key={user.id}>
-                      <td><UserIdentity user={user} /></td>
+                      <td><Link className="userLink" to={`/users/${user.id}`}><UserIdentity user={user} /></Link></td>
                       <td><RoleBadge role={user.role} /></td>
                       <td><AutoReviewBadge eligible={user.autoReviewEligible} /></td>
                       <td><AccountBadge status={user.status} /></td>
@@ -194,8 +166,8 @@ export function UsersPage() {
                         <UserActions
                           user={user}
                           pending={pending}
-                          onEdit={() => openEdit(user)}
-                          onPassword={() => { setPasswordTarget(user); setNewPassword('') }}
+                          onEdit={() => setEditTarget(user)}
+                          onPassword={() => setPasswordTarget(user)}
                           onDisable={() => setDisableTarget(user)}
                           onDelete={() => setDeleteTarget(user)}
                           onEnable={() => { void run(`status:${user.id}`, () => patchUser(user.id, { status: 'active' })) }}
@@ -210,14 +182,14 @@ export function UsersPage() {
               {users.map(user => (
                 <article className="mobileItem" key={user.id}>
                   <div className="mobileItemHeader">
-                    <UserIdentity user={user} />
+                    <Link className="userLink" to={`/users/${user.id}`}><UserIdentity user={user} /></Link>
                     <AccountBadge status={user.status} />
                   </div>
                   <div className="mobileItemBody">
                     <dl className="definitionGrid">
-                      <Definition label="角色"><RoleBadge role={user.role} /></Definition>
-                      <Definition label="Auto 审查资格"><AutoReviewBadge eligible={user.autoReviewEligible} /></Definition>
-                      <Definition label="端口"><span className="codeText">{user.port}</span></Definition>
+                      <Definition label={t('colRole')}><RoleBadge role={user.role} /></Definition>
+                      <Definition label={t('colAutoReview')}><AutoReviewBadge eligible={user.autoReviewEligible} /></Definition>
+                      <Definition label={t('colPort')}><span className="codeText">{user.port}</span></Definition>
                     </dl>
                     <div className="mobileControlRow">
                       <InstanceState state={user.instanceState} />
@@ -227,8 +199,8 @@ export function UsersPage() {
                       mobile
                       user={user}
                       pending={pending}
-                      onEdit={() => openEdit(user)}
-                      onPassword={() => { setPasswordTarget(user); setNewPassword('') }}
+                      onEdit={() => setEditTarget(user)}
+                      onPassword={() => setPasswordTarget(user)}
                       onDisable={() => setDisableTarget(user)}
                       onDelete={() => setDeleteTarget(user)}
                       onEnable={() => { void run(`status:${user.id}`, () => patchUser(user.id, { status: 'active' })) }}
@@ -241,186 +213,11 @@ export function UsersPage() {
         )}
       </Section>
 
-      <Dialog
-        open={createOpen}
-        title="新建用户"
-        description="创建登录账号并分配初始管理角色。"
-        onClose={() => { if (pending !== 'create') setCreateOpen(false) }}
-        footer={(
-          <>
-            <Button type="button" onClick={() => setCreateOpen(false)} disabled={pending === 'create'}>取消</Button>
-            <Button type="submit" form="create-user-form" variant="primary" loading={pending === 'create'}>创建用户</Button>
-          </>
-        )}
-      >
-        <form id="create-user-form" className="formGrid" onSubmit={event => void onCreate(event)}>
-          <Field label="用户名" hint="用于登录，创建后不可修改。">
-            <input className="input" required autoComplete="off" value={createDraft.username} onChange={event => setCreateDraft({ ...createDraft, username: event.target.value })} />
-          </Field>
-          <Field label="显示名">
-            <input className="input" value={createDraft.displayName} onChange={event => setCreateDraft({ ...createDraft, displayName: event.target.value })} placeholder="可选" />
-          </Field>
-          <Field label="初始密码" className="formSpanFull">
-            <input className="input" required type="password" autoComplete="new-password" value={createDraft.password} onChange={event => setCreateDraft({ ...createDraft, password: event.target.value })} />
-          </Field>
-          <Field label="角色" className="formSpanFull">
-            <select className="select" value={createDraft.role} onChange={event => setCreateDraft({ ...createDraft, role: event.target.value as UserRole })}>
-              <option value="user">普通用户</option>
-              <option value="admin">管理员</option>
-            </select>
-          </Field>
-        </form>
-      </Dialog>
-
-      <Dialog
-        open={editTarget !== null}
-        title={`编辑 ${editTarget?.username ?? ''}`}
-        description="更新显示名、管理角色和 Auto 审查资格。"
-        onClose={() => { if (!pending.startsWith('edit:')) setEditTarget(null) }}
-        footer={(
-          <>
-            <Button type="button" onClick={() => setEditTarget(null)} disabled={pending.startsWith('edit:')}>取消</Button>
-            <Button type="submit" form="edit-user-form" variant="primary" loading={pending.startsWith('edit:')}>保存更改</Button>
-          </>
-        )}
-      >
-        <form id="edit-user-form" className="formGrid" onSubmit={event => void onEdit(event)}>
-          <Field label="显示名">
-            <input className="input" value={editName} onChange={event => setEditName(event.target.value)} />
-          </Field>
-          <Field label="角色">
-            <select className="select" value={editRole} onChange={event => setEditRole(event.target.value as UserRole)}>
-              <option value="user">普通用户</option>
-              <option value="admin">管理员</option>
-            </select>
-          </Field>
-          <div className="field">
-            <Switch label="允许选择 Auto 审查" checked={editAutoReviewEligible} onChange={setEditAutoReviewEligible} disabled={pending.startsWith('edit:')} />
-            <span className="fieldHint">授予资格不会自动启用 Auto，也不会改变已有会话或新会话的默认权限。用户仍需在当前会话主动选择。</span>
-          </div>
-        </form>
-      </Dialog>
-
-      <Dialog
-        open={passwordTarget !== null}
-        title={`重置 ${passwordTarget?.username ?? ''} 的密码`}
-        description="新密码会立即替换当前登录密码。"
-        onClose={() => { if (!pending.startsWith('password:')) setPasswordTarget(null) }}
-        footer={(
-          <>
-            <Button type="button" onClick={() => setPasswordTarget(null)} disabled={pending.startsWith('password:')}>取消</Button>
-            <Button type="submit" form="reset-password-form" variant="primary" loading={pending.startsWith('password:')}>重置密码</Button>
-          </>
-        )}
-      >
-        <form id="reset-password-form" onSubmit={event => void onResetPassword(event)}>
-          <Field label="新密码">
-            <input className="input" required autoFocus type="password" autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)} />
-          </Field>
-        </form>
-      </Dialog>
-
-      <ConfirmDialog
-        open={disableTarget !== null}
-        title="禁用用户"
-        description={`禁用 ${disableTarget?.username ?? ''} 后，该账号将无法继续登录。`}
-        confirmLabel="确认禁用"
-        pending={pending.startsWith('status:')}
-        onClose={() => { if (!pending.startsWith('status:')) setDisableTarget(null) }}
-        onConfirm={() => void onDisable()}
-      />
-
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        title="删除用户"
-        description={`删除 ${deleteTarget?.username ?? ''} 后会立即撤销登录、停止实例并移除项目成员关系。审计、用量、协作会话和本地历史会保留，用户名不可复用；此操作不可恢复。`}
-        confirmLabel="确认删除"
-        pending={pending.startsWith('delete:')}
-        onClose={() => { if (!pending.startsWith('delete:')) setDeleteTarget(null) }}
-        onConfirm={() => void onDelete()}
-      />
-    </div>
-  )
-}
-
-function UserIdentity({ user }: { user: AdminUser }) {
-  const initial = (user.displayName || user.username).slice(0, 1)
-  return (
-    <div className="userIdentity">
-      <span className="avatar" aria-hidden="true">{initial}</span>
-      <span className="identityText">
-        <strong>{user.displayName || user.username}</strong>
-        <span>@{user.username} · ID {user.id}</span>
-      </span>
-    </div>
-  )
-}
-
-function RoleBadge({ role }: { role: UserRole }) {
-  return <StatusBadge tone={role === 'admin' ? 'info' : 'neutral'}>{role === 'admin' ? '管理员' : '普通用户'}</StatusBadge>
-}
-
-function AutoReviewBadge({ eligible }: { eligible: boolean }) {
-  return <StatusBadge tone={eligible ? 'info' : 'neutral'}>{eligible ? '已授予' : '未授予'}</StatusBadge>
-}
-
-function AccountBadge({ status }: { status: AdminUser['status'] }) {
-  return <StatusBadge tone={status === 'active' ? 'success' : 'danger'}>{status === 'active' ? '正常' : '已禁用'}</StatusBadge>
-}
-
-function InstanceState({ state }: { state: string }) {
-  const labels: Record<string, string> = {
-    running: '运行中',
-    ready: '运行中',
-    starting: '启动中',
-    stopping: '停止中',
-    stopped: '已停止',
-    failed: '异常',
-  }
-  const tone = state === 'running' || state === 'ready' ? 'success' : state === 'starting' ? 'info' : state === 'failed' ? 'danger' : state === 'stopping' ? 'warning' : 'neutral'
-  return <StatusBadge tone={tone}>{labels[state] ?? state}</StatusBadge>
-}
-
-function InstanceCell({ user, pending, run }: UserOperationProps) {
-  return (
-    <div className="instanceBlock">
-      <InstanceState state={user.instanceState} />
-      <InstanceControls user={user} pending={pending} run={run} />
-    </div>
-  )
-}
-
-type UserOperationProps = {
-  user: AdminUser
-  pending: string
-  run: (key: string, action: () => Promise<void>) => Promise<boolean>
-}
-
-function InstanceControls({ user, pending, run }: UserOperationProps) {
-  const busy = pending.startsWith(`instance:${user.id}:`)
-  return (
-    <div className="compactActions" aria-label={`${user.username} 实例操作`}>
-      <IconButton
-        label="启动实例"
-        icon={Play}
-        disabled={busy || user.instanceState === 'running'}
-        loading={pending === `instance:${user.id}:start`}
-        onClick={() => void run(`instance:${user.id}:start`, () => controlInstance(user.id, 'start'))}
-      />
-      <IconButton
-        label="停止实例"
-        icon={Square}
-        disabled={busy || user.instanceState === 'stopped'}
-        loading={pending === `instance:${user.id}:stop`}
-        onClick={() => void run(`instance:${user.id}:stop`, () => controlInstance(user.id, 'stop'))}
-      />
-      <IconButton
-        label="重启实例"
-        icon={RefreshCw}
-        disabled={busy || user.instanceState !== 'running'}
-        loading={pending === `instance:${user.id}:restart`}
-        onClick={() => void run(`instance:${user.id}:restart`, () => controlInstance(user.id, 'restart'))}
-      />
+      <UserCreateDialog open={createOpen} pending={pending === 'create'} onSubmit={draft => void onCreate(draft)} onClose={() => setCreateOpen(false)} />
+      <UserEditDialog user={editTarget} pending={pending.startsWith('edit:')} onSubmit={patch => void onEdit(patch)} onClose={() => setEditTarget(null)} />
+      <UserPasswordDialog user={passwordTarget} pending={pending.startsWith('password:')} onSubmit={password => void onResetPassword(password)} onClose={() => setPasswordTarget(null)} />
+      <UserDisableConfirm user={disableTarget} pending={pending.startsWith('status:')} onConfirm={() => void onDisable()} onClose={() => setDisableTarget(null)} />
+      <UserDeleteConfirm user={deleteTarget} pending={pending.startsWith('delete:')} onConfirm={() => void onDelete()} onClose={() => setDeleteTarget(null)} />
     </div>
   )
 }
@@ -435,38 +232,41 @@ function UserActions({ user, pending, onEdit, onPassword, onDisable, onDelete, o
   onEnable: () => void
   mobile?: boolean
 }) {
+  const t = useMemo(() => translateCopy(adminLanguage(), { zh: usersZh, en: usersEn }), [])
   const statusPending = pending === `status:${user.id}`
   const deletePending = pending === `delete:${user.id}`
   if (mobile) {
     return (
       <div className="mobileActions">
-        <Button icon={Pencil} onClick={onEdit}>编辑</Button>
-        <Button icon={KeyRound} onClick={onPassword}>密码</Button>
+        <Link className="button button-secondary" to={`/users/${user.id}`}>{t('detail')}</Link>
+        <Button icon={Pencil} onClick={onEdit}>{t('edit')}</Button>
+        <Button icon={KeyRound} onClick={onPassword}>{t('password')}</Button>
         <Button
           variant={user.status === 'active' ? 'danger' : 'secondary'}
           icon={Power}
           loading={statusPending}
           onClick={user.status === 'active' ? onDisable : onEnable}
         >
-          {user.status === 'active' ? '禁用' : '启用'}
+          {user.status === 'active' ? t('disable') : t('enable')}
         </Button>
-        <Button variant="danger" icon={Trash2} loading={deletePending} onClick={onDelete}>删除</Button>
+        <Button variant="danger" icon={Trash2} loading={deletePending} onClick={onDelete}>{t('deleteAction')}</Button>
       </div>
     )
   }
   return (
     <div className="rowActions">
-      <IconButton label="编辑用户" icon={Pencil} onClick={onEdit} />
-      <IconButton label="重置密码" icon={KeyRound} onClick={onPassword} />
+      <Link className="iconButton iconButton-ghost" to={`/users/${user.id}`} aria-label={t('manageDetail')} title={t('manageDetail')}><ChevronRight /></Link>
+      <IconButton label={t('editUser')} icon={Pencil} onClick={onEdit} />
+      <IconButton label={t('resetPassword')} icon={KeyRound} onClick={onPassword} />
       <IconButton
-        label={user.status === 'active' ? '禁用用户' : '启用用户'}
+        label={user.status === 'active' ? t('disableUser') : t('enableUser')}
         icon={user.status === 'active' ? Power : UserRound}
         variant={user.status === 'active' ? 'danger' : 'ghost'}
         loading={statusPending}
         onClick={user.status === 'active' ? onDisable : onEnable}
       />
       <IconButton
-        label="删除用户"
+        label={t('deleteUser')}
         icon={Trash2}
         variant="danger"
         loading={deletePending}
@@ -474,10 +274,6 @@ function UserActions({ user, pending, onEdit, onPassword, onDisable, onDelete, o
       />
     </div>
   )
-}
-
-function Definition({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="definitionRow"><dt>{label}</dt><dd>{children}</dd></div>
 }
 
 function messageFrom(cause: unknown): string {

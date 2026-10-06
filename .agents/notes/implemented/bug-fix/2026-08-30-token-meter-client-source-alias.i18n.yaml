@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-30-token-meter-client-source-alias.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-30-token-meter-client-source-alias.md
-2026-08-30-token-meter-client-source-alias.md: 50d24f2113902565540c1fe08fb3f5dcf67d5265
-2026-08-30-token-meter-client-source-alias.zh.md: 8f31eb67cd1f6ffb50f3d3e8da82494cae736040
+/agent-note-keep-token-meter-client-imports-resolvable-in-source-tests:
+  en: 13254f3899a549d9
+  zh: 39f59fa2a84c1a65
+/agent-note-keep-token-meter-client-imports-resolvable-in-source-tests/problem:
+  en: 93832231282c9393
+  zh: 20607428c4939873
+/agent-note-keep-token-meter-client-imports-resolvable-in-source-tests/decision:
+  en: c33a6f8b785bd267
+  zh: 12ca441134906157
+/agent-note-keep-token-meter-client-imports-resolvable-in-source-tests/verification:
+  en: 2e5b9a80d2a361cd
+  zh: c0e6d1515025c53d
+/agent-note-keep-token-meter-client-imports-resolvable-in-source-tests/alternatives-considered:
+  en: 051c146ab85ab95a
+  zh: 8ddef13779f83f4b
+/agent-note-keep-token-meter-client-imports-resolvable-in-source-tests/consequences:
+  en: 708e89c8d30f0890
+  zh: 127f7e171c86b43a

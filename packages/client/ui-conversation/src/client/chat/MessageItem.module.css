@@ -165,14 +165,15 @@
 
 .retryRow {
   color: var(--dsw-alias-label-tertiary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: calc(var(--dsh-chat-font-size, 14px) - 1px);
+  line-height: calc(20px + var(--dsh-chat-font-size, 14px) - 14px);
 }
 
 .retrySummary {
   display: inline-flex;
   align-items: center;
   width: fit-content;
+  max-width: 100%;
   padding: 2px 0;
   gap: 7px;
   border-radius: 3px;
@@ -187,8 +188,10 @@
 }
 
 .retrySummary::after {
+  flex: none;
   width: 6px;
   height: 6px;
+  margin-right: 2px;
   border-right: 1.5px solid currentcolor;
   border-bottom: 1.5px solid currentcolor;
   content: '';
@@ -207,6 +210,8 @@
 }
 
 .retryText {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: inherit;
 }
 
@@ -237,8 +242,8 @@
   margin-top: 3px;
   padding-left: 14px;
   overflow-wrap: anywhere;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: calc(var(--dsh-chat-font-size, 14px) - 1px);
+  line-height: calc(18px + var(--dsh-chat-font-size, 14px) - 14px);
 }
 
 .retryDetailLabel {
@@ -251,8 +256,8 @@
   gap: var(--dsw-space-2);
   align-items: start;
   padding: 2px 0;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: calc(var(--dsh-chat-font-size, 14px) - 1px);
+  line-height: calc(20px + var(--dsh-chat-font-size, 14px) - 14px);
 }
 
 .turnErrorDot {

@@ -1,3 +1,8 @@
+---
+description: "Bridge plugin: run a Claude Code hooks.json / settings hook config on the DeepSeek Harness interception seams"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-hooks-claude-code
 
 English | [中文](README.zh.md)
@@ -10,6 +15,19 @@ A native cordis plugin could do everything this bridge does — more powerfully,
 
 `dsh-hooks-claude-code` runs command hooks from your existing Claude Code `hooks.json` or settings file during agent runs, without requiring a rewrite. Supported hooks can run when sessions, prompts, tools, stops, or subagents reach matching moments. They can block prompts or tool calls with model-visible reasons, add conversation context, or force another model turn. Choose this package to reuse Claude Code command hooks in the harness; use a native plugin for behavior that has no Claude Code equivalent.
 
+## Table of Contents
+
+- [Config](#config)
+- [Hook points → typed Decisions](#hook-points--typed-decisions)
+- [Context source](#context-source)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 ```ts
@@ -37,6 +55,7 @@ The config is parsed **once** at load. `configPath` is **process-level**: a rela
 
 The hooks **themselves** run in the agent's session workspace: for the agent-scoped points the bridge passes the session's `cwd` (the `session/new.cwd`) as the hook process's working directory, so a hook's `pwd`/relative-path/marker operates in the user's project tree, not the server launch dir.
 
+<a id="hook-points--typed-decisions"></a>
 ## Hook points → typed Decisions
 
 | CC hook | Harness point | Mapping |
@@ -55,14 +74,17 @@ The matcher subject is the tool name (`PreToolUse`/`PostToolUse`), the session s
 
 Every agent-scoped stdin payload carries `session_id` and string-shaped `transcript_path`. The bridge resolves the latter through `ctx.sessionPersistence.locate(session.header)` when available and otherwise sends `''`. Lookup does not create or flush the artifact, so a path can be absent before the first turn-end checkpoint or omit the current open turn.
 
+<a id="context-source"></a>
 ## Context source
 
 Injected context carries an explicit `{ kind: 'plugin', plugin: 'hooks-claude-code' }` source so the durable message is never mistaken for a user prompt.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The bridge translates each canonical interception into a Claude Code hook invocation and maps the outcome back; hook behavior is pinned by specs and no relation is retained between events.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Hook-provided context
@@ -104,3 +126,13 @@ A blocked prompt sends no request and invalidates nothing. Denial, feedback, and
 - **`Stop` is partial:** blocking forces another model turn, but `stop_hook_active` is always `false`, `last_assistant_message`, `background_tasks`, and `session_crons` are omitted, and the consecutive-block cap is not implemented (`TODO(stop-loop-guard)`). An unconditionally blocking hook therefore force-continues every step unless it self-limits.
 - **Common payload and output fields are partial:** mapped event payloads omit `prompt_id`, `transcript_path`, `permission_mode`, and `effort` where Claude Code would provide them. `systemMessage` is logged + warned but not surfaced; `{"continue": false}` is recorded but does not halt the run; `suppressOutput`, `stopReason`, and `terminalSequence` are not applied (`TODO(hook-continue-false)`).
 - **Handler and config support is partial:** only shell-form command handlers run. `http`, `mcp_tool`, `prompt`, and `agent` handlers are skipped; command-handler options such as `args`, `async`, `asyncRewake`, `shell`, `if`, `once`, and `statusMessage` are not honored. Matching handlers run serially and are not deduplicated, whereas Claude Code runs them in parallel and deduplicates identical handlers. One process-level `configPath` is parsed once at load; Claude Code's layered project, user, plugin, and policy discovery and live reload are not implemented (`TODO(per-session-hook-config)`).
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

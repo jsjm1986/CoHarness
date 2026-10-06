@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-28-web-terminal-card.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-28-web-terminal-card.md
-2026-07-28-web-terminal-card.md: c1a4974bb82ac23947579261ae691e64d5724aed
-2026-07-28-web-terminal-card.zh.md: 99878bab11acac4b2c8f472dc7428d497ed2893d
+/agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser:
+  en: 689812ed16cd037d
+  zh: 93338e1ced5717ab
+/agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser/problem:
+  en: d0e5fd6c4c001538
+  zh: 4ed3ac43f4a19dd8
+/agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser/decision:
+  en: b95f22a610d89c1c
+  zh: df3005391f7153f8
+/agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser/decision/inline-output-in-the-chat-row-reverses-a-stated-convention:
+  en: 8665929f8070e340
+  zh: 61c735e03ca149fb
+/agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser/alternatives-considered:
+  en: 05a0d56c69e45b2c
+  zh: 946c11cebf631601
+/agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser/consequences:
+  en: d7035604806a47f3
+  zh: 4706b96b4bec13de
+/agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser/testing:
+  en: 57308713f75b1594
+  zh: 7509fdd6ad875dd3
+/agent-note-web-terminal-card-the-bash-render-intent-reaches-the-browser/related:
+  en: d30940628f4fbd0c
+  zh: 1fd5b61a28f32edc

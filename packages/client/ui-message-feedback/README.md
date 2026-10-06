@@ -1,3 +1,8 @@
+---
+description: "Per-message feedback controls contributed to the assistant-message action strip, backed by the messageFeedback Host Remote"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-message-feedback
 
 English | [中文](README.zh.md)
@@ -14,10 +19,21 @@ The `/client` exports are the plugin body (`apply`/`inject`) and public types; c
 
 Message controls retain editable ratings and notes in the Host-owned sidecar. A bare `/feedback` opens a separate Session dialog with a category and optional description; `/feedback <text>` keeps the command acknowledgement. Submitting the dialog uses `sessionFeedback.record`, appends one log-only `feedback/record`, and may trigger Session-log delivery under the deployment's telemetry policy. Neither path starts a model turn. A rejected submission retains its draft for correction, and success shows an acknowledgement. Drafts are isolated by Session and discarded when that Session scope ends; late replies cannot reopen them.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The Host owns durable feedback; the client controllers own disposable reads, drafts, and submission state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as message ratings remain in a sidecar and Session remarks remain log-only; neither enters model context.
@@ -31,3 +47,13 @@ None; feedback mutations leave the model-visible history unchanged.
 - **Note size is a Host policy** — the deployment configures `maxNoteBytes` (8192 in the Web bundle) and the Host rejects an oversized note with `note-too-large`. The editor does not pre-check the limit, so an oversized note fails on save rather than while typing.
 - **No cross-tab push** — a second tab's rating becomes visible on reconnect or on the next conflict reply, not immediately; the sidecar publishes no live frames.
 - **Chat view only** — the trajectory and waterfall views render no feedback controls even though their assistant nodes now carry the same `messageId`.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

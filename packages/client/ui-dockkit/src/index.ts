@@ -64,5 +64,7 @@ export type { DockIntents, DockLabels, TabMenuExtras, TabRenderer } from './cont
 // React surface.
 export { DockSurface } from './components/DockSurface.tsx'
 export type { DockSurfaceProps } from './components/DockSurface.tsx'
+export { DockLayout } from './components/DockSurface.tsx'
+export type { DockLayoutProps } from './components/DockSurface.tsx'
 export { FloatLayer } from './components/FloatLayer.tsx'
 export type { FloatLayerProps } from './components/FloatLayer.tsx'

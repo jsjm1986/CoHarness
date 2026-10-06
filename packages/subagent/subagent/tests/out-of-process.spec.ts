@@ -119,6 +119,21 @@ describe('settleRunResult', () => {
     expect(onAbort).not.toHaveBeenCalled()
   })
 
+  it('reports a late successful attempt as aborted after its owner cancels', async () => {
+    const { controller, onAbort } = wiring()
+    const attempt = Promise.withResolvers<Awaited<ReturnType<typeof settleRunResult>>>()
+    const settled = settleRunResult({
+      attempt: () => attempt.promise,
+      collectOutput: () => [{ type: 'text', text: 'cancelled output' }],
+      cancelled: () => controller.signal.aborted,
+      signal: controller.signal,
+      onAbort,
+    })
+    controller.abort()
+    attempt.resolve({ output: [{ type: 'text', text: 'late completion' }], stopReason: 'completed' })
+    await expect(settled).resolves.toEqual({ output: [{ type: 'text', text: 'cancelled output' }], stopReason: 'aborted' })
+  })
+
   it('reads an in-flight rejection as aborted when cancellation already settled', async () => {
     const { controller, onAbort } = wiring()
     const result = await settleRunResult({

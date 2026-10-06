@@ -1,6 +1,49 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/agent-team/README.md
-README.md: 13009a9cbf532a7a673e9af11e8191e064d903d1
-README.zh.md: d692a0d1142e8b78dc2ce2045354413c38d453c4
+/:
+  en: c818b74c14d94f85
+  zh: 61495d48365178df
+/deepseek-ai-dsh-experimental-agent-team:
+  en: 95be2983443a5308
+  zh: a6577fb2dbca1dfd
+/deepseek-ai-dsh-experimental-agent-team/summary:
+  en: 5b981abe3a308e53
+  zh: 7116e552a40dc79f
+/deepseek-ai-dsh-experimental-agent-team/table-of-contents:
+  en: 4157482003013edd
+  zh: 30a8cf433ac576a4
+/deepseek-ai-dsh-experimental-agent-team/config:
+  en: 2ce1213cb64678f6
+  zh: 5ba211ce4341d121
+/deepseek-ai-dsh-experimental-agent-team/team-identity-and-roster:
+  en: 53736f1aa2f89dff
+  zh: 4ea645bfd48c04e8
+/deepseek-ai-dsh-experimental-agent-team/durable-mailbox:
+  en: 9b9b995f4a5e9ef4
+  zh: 48298ad6894e6759
+/deepseek-ai-dsh-experimental-agent-team/shared-task-board:
+  en: 7ea0f0492b486c40
+  zh: 24fc8f5582f4c5e8
+/deepseek-ai-dsh-experimental-agent-team/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-experimental-agent-team/model-experience/peer-messages:
+  en: 7a72088145dd45ec
+  zh: 6763071c604c2edd
+/deepseek-ai-dsh-experimental-agent-team/model-experience/peer-messages/what-the-model-sees:
+  en: 4f9110ba058f25cd
+  zh: cf820293929ea993
+/deepseek-ai-dsh-experimental-agent-team/model-experience/peer-messages/token-effect:
+  en: 37ec43beac34a6ad
+  zh: 6cdcd89ccceea815
+/deepseek-ai-dsh-experimental-agent-team/model-experience/peer-messages/kv-cache-effect:
+  en: ff845d434b857afe
+  zh: e03cddc841344316
+/deepseek-ai-dsh-experimental-agent-team/known-limitations-and-deferred-work:
+  en: 4aef3758efce9c60
+  zh: 631041eaf2b9600e
+/deepseek-ai-dsh-experimental-agent-team/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

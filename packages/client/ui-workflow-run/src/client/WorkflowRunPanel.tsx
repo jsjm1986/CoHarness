@@ -16,6 +16,8 @@ import css from './WorkflowRunPanel.module.css'
 
 /** Navigation action injected from the plugin's own SessionRuntime access. */
 export interface WorkflowRunInjected {
+  /** Re-key a durable session id into the presentation space of `parentId`'s runtime. */
+  readonly sessionKey: (id: SessionId, parentId: SessionId) => SessionId
   readonly openSession: (id: SessionId) => void
 }
 
@@ -181,18 +183,22 @@ function navigableMembers(
   sessions: SessionListState,
   phases: readonly WorkflowRunPhaseData[],
   parentId: SessionId,
+  sessionKey: WorkflowRunInjected['sessionKey'],
 ): readonly SessionId[] {
   const ordinary = new Set(sessions.ids)
   const result: SessionId[] = []
   for (const phase of phases) {
     for (const member of phase.members) {
-      const summary = sessions.byId[member.childId]
+      // Durable events carry the raw wire id; the sessions list is keyed in
+      // presentation space, so navigation compares the qualified key.
+      const key = sessionKey(member.childId, parentId)
+      const summary = sessions.byId[key]
       if (member.status === 'running'
-        && ordinary.has(member.childId)
+        && ordinary.has(key)
         && summary?.origin === 'subagent'
         && summary.parentId === parentId
         && summary.running) {
-        result.push(member.childId)
+        result.push(key)
       }
     }
   }
@@ -236,8 +242,9 @@ function RunHeader({ children, count, name, onToggle, open, status, t }: {
   )
 }
 
-function MemberRow({ member, navigable, openSession, t }: {
+function MemberRow({ member, memberKey, navigable, openSession, t }: {
   readonly member: WorkflowRunMemberData
+  readonly memberKey: SessionId
   readonly navigable: boolean
   readonly openSession: WorkflowRunInjected['openSession']
   readonly t: WorkflowRunPanelProps['t']
@@ -266,7 +273,7 @@ function MemberRow({ member, navigable, openSession, t }: {
       tabIndex={navigable ? undefined : -1}
       onFocus={() => { setFocused(true) }}
       onBlur={() => { setFocused(false) }}
-      onClick={navigable ? () => { openSession(member.childId) } : undefined}
+      onClick={navigable ? () => { openSession(memberKey) } : undefined}
     >
       {content}
     </button>
@@ -275,7 +282,7 @@ function MemberRow({ member, navigable, openSession, t }: {
 
 function PhaseSection({
   contentRef, onContentBlur, onToggle, open, pendingCleanCollapse,
-  phase, navigable, openSession, t,
+  phase, parentId, navigable, sessionKey, openSession, t,
 }: {
   readonly contentRef: (element: HTMLDivElement | null) => void
   readonly onContentBlur: (event: FocusEvent<HTMLDivElement>) => void
@@ -283,7 +290,9 @@ function PhaseSection({
   readonly open: boolean
   readonly pendingCleanCollapse: boolean
   readonly phase: WorkflowRunPhaseData
+  readonly parentId: SessionId
   readonly navigable: readonly SessionId[]
+  readonly sessionKey: WorkflowRunInjected['sessionKey']
   readonly openSession: WorkflowRunInjected['openSession']
   readonly t: WorkflowRunPanelProps['t']
 }) {
@@ -312,15 +321,19 @@ function PhaseSection({
         )}
       >
         <div ref={contentRef} className={css.members} onBlur={onContentBlur}>
-          {phase.members.map(member => (
-            <MemberRow
-              key={member.seq}
-              member={member}
-              navigable={navigable.includes(member.childId)}
-              openSession={openSession}
-              t={t}
-            />
-          ))}
+          {phase.members.map((member) => {
+            const memberKey = sessionKey(member.childId, parentId)
+            return (
+              <MemberRow
+                key={member.seq}
+                member={member}
+                memberKey={memberKey}
+                navigable={navigable.includes(memberKey)}
+                openSession={openSession}
+                t={t}
+              />
+            )
+          })}
         </div>
       </StatusDisclosure>
     </div>
@@ -328,7 +341,7 @@ function PhaseSection({
 }
 
 /** Render one durable workflow run with status-driven run and phase disclosure. */
-export function WorkflowRunPanel({ node, sessionId, useSessions, openSession, t }: WorkflowRunPanelProps) {
+export function WorkflowRunPanel({ node, sessionId, useSessions, sessionKey, openSession, t }: WorkflowRunPanelProps) {
   const phaseFacts = useMemo(() => node.data.phases.map(phase => (
     [phase.key, phaseDisclosureFacts(phase)] as const
   )), [node.data.phases])
@@ -344,7 +357,7 @@ export function WorkflowRunPanel({ node, sessionId, useSessions, openSession, t 
   const runContentRef = useRef<HTMLDivElement>(null)
   const phaseContentRefs = useRef(new Map<string, HTMLDivElement>())
   const navigable = useSessions(
-    sessions => navigableMembers(sessions, node.data.phases, sessionId),
+    sessions => navigableMembers(sessions, node.data.phases, sessionId, sessionKey),
     shallowEqual,
   )
 
@@ -454,7 +467,9 @@ export function WorkflowRunPanel({ node, sessionId, useSessions, openSession, t 
                   open={disclosure.open}
                   pendingCleanCollapse={disclosure.pendingCleanCollapse}
                   phase={phase}
+                  parentId={sessionId}
                   navigable={navigable}
+                  sessionKey={sessionKey}
                   openSession={openSession}
                   t={t}
                 />

@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-telemetry-otel
 
 [English](README.md) | 中文
@@ -8,6 +13,19 @@
 
 `dsh-session-telemetry-otel` 仅在新的显式反馈后通过 OTel JS SDK 导出会话记录，适用于所有用户和提供方，包括 `deepseek-official`。`FEEDBACK_ONLY` 释放截至该反馈的权威日志前缀，包含上下文；后续记录等待下一次显式反馈。`DISABLED` 不构造传输。SDK 批处理可完成已授权的上传，无需另一次用户交互或模型调用。部署方负责脱敏规则。
 
+## 目录
+
+- [配置](#config)
+- [哪些数据会离开本机](#what-leaves-the-machine)
+- [字段映射](#field-mapping)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## 配置
 
 ```yaml
@@ -37,18 +55,23 @@
 
 `exporter.url` 在 `FULL` 与 `FEEDBACK_ONLY` 中必填，无默认值，且必须能解析为 `http(s)`；在 `DISABLED` 中可省略且不使用。在上传模式中，`shutdownTimeoutMillis` 是由 DSH 管理的有限正数外层截止时间，默认值为 3000 ms；`processor.maxExportBatchSize` 不是正整数时也会在插件加载时失败，因为 SDK 会接受该值，随后却在关闭时挂起。两个 SDK 配置块都整体透传（passthrough）：`OTLPExporterNodeConfigBase` 的每个字段（`headers`、`timeoutMillis`、`compression`、`keepAlive` 等）都会到达导出器；批处理、导出节奏（`scheduledDelayMillis`）、重试、队列上限，以及持续失败下的丢失策略，都是通过 `processor` 调节的 SDK 行为。该后端不实现 `flush()`：常规 flush 由批处理器负责。关闭期间，OTel 会先等待 `exporter.forceFlush()`，再等待受处理器 `exportTimeoutMillis` 限制的完成 promise；如果该传输 promise 始终不结算，本包会在 `shutdownTimeoutMillis` 到期时放弃等待，通过协调器记录已隔离的关闭失败，并让应用继续拆卸。该截止时间无法取消 SDK 传输，因此届时仍待处理的记录可能在进程退出时丢失。
 
+<a id="what-leaves-the-machine"></a>
 ## 哪些数据会离开本机
 
 在上传模式中，记录携带完整的 `event.data`，内容以 seam 的 `sessionTelemetry/record` waterfall（瀑布式事件）返回的结果为准：用户与 assistant 消息内容、工具参数与工具结果（命令输出、文件内容）、完整的系统提示词与工具 schema（`request/header`）、todo 文本、压缩（compaction）摘要、钩子的 `stderrSummary`、反馈文本，以及会话 `cwd`（一个本地路径）。seam 不带任何脱敏规则：未挂载 `sessionTelemetry/record` 监听器时，导出的就是捕获原样的副本，因此向可信边界之外导出的部署方要挂载自己的规则（见 [seam README](../session-telemetry/README.zh.md#the-redact-waterfall)）。`FULL` 在追加时运行脱敏；`FEEDBACK_ONLY` 不保留遥测副本，而是在反馈触发权威日志回放时运行当时挂载的规则。无论如何，提供方凭据都不会出现：适配器的 API key 是构造函数参数而非会话事件，因此它们在结构上就不存在于日志中，也就不存在于遥测中。`DISABLED` 不会构造 SDK 流水线，也不会将任何捕获内容交给后端。
 
+<a id="field-mapping"></a>
 ## 字段映射
 
 seam 记录 → SDK 日志记录：`time` → `timestamp`/`observedTimestamp`；`severity` → `severityNumber`/`severityText`（INFO 9 / WARN 13 / ERROR 17）；`body` → 结构化日志 body；`attributes` 原样照搬。接收端基于 `(session.id, event.seq)` 去重，并按严重级别告警。在 `FULL` 中，接收端还可通过缺少 `shutdown` 记录检测崩溃：该标记在会话自身 dispose（资源释放）或应用关闭时发出；标记之后出现更多事件，说明遥测发生了重载。在 `FEEDBACK_ONLY` 中，已释放的前缀通常不包含随后的 `shutdown` 标记，因此缺少该标记不是崩溃信号。跨谱系（lineage）的流并不自足：恢复的会话在其自身 id 的流上从上一个进程停止之处继续；fork 出的会话的流从继承边界开始，其前缀位于父会话的流中，由接收端基于 `session.parent_id` + `session.seed_length` 拼接。恢复后的本地日志可能包含从未导出的合成关闭事件；协议流忠实于实际交给 SDK 的记录。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。记录交给供应商 SDK 自身的批处理与导出流水线；后端不拥有可供比较的排队或重试状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为该后端把 seam 记录转发进 OTel SDK 流水线，不注册任何面向模型的内容。
@@ -57,8 +80,19 @@ seam 记录 → SDK 日志记录：`time` → `timestamp`/`observedTimestamp`；
 
 无；本包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **上游实验性源码树**：`@opentelemetry/sdk-logs` 仍从上游实验性（experimental）源码树发布；SDK API 的变动只会落在本包，也仅落在本包；seam 约定不动。
 - **真实 collector 行为属于 SDK 导出器**：身份验证、TLS、限流及其他真实 OTLP 部署行为遵循上游 SDK，不由本包自有兼容层处理。
 - **反馈时快照**：`FEEDBACK_ONLY` 在反馈前不保留遥测自有副本。记录反馈时，它读取并脱敏当前的权威日志；反馈前发生崩溃时什么都不上传，而反馈前的策略变更会影响该次回放的导出内容。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-auto-review-execution-attribution.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-22-auto-review-execution-attribution.md
-2026-09-22-auto-review-execution-attribution.md: ed9f1f0421233805be11df98f74e442b77f7eef6
-2026-09-22-auto-review-execution-attribution.zh.md: 7b5548b1295102b18f78b778ce70dfb6731d966a
+/agent-note-auto-review-execution-authority-and-billing-attribution:
+  en: 37cf33ffacb64c12
+  zh: 6d9a70f76547f21a
+/agent-note-auto-review-execution-authority-and-billing-attribution/problem:
+  en: 5cc782c9bed7fbdc
+  zh: 2971b91938001cdb
+/agent-note-auto-review-execution-authority-and-billing-attribution/decision:
+  en: f47563c9f9865e88
+  zh: 4349226056355237
+/agent-note-auto-review-execution-authority-and-billing-attribution/alternatives-considered:
+  en: 7c017dc834ee87b3
+  zh: 6ed17cb00654f06d
+/agent-note-auto-review-execution-authority-and-billing-attribution/consequences:
+  en: 9491ce151c4d4478
+  zh: 55be6db05faa467d
+/agent-note-auto-review-execution-authority-and-billing-attribution/testing:
+  en: f96d8cdf0b99f0d0
+  zh: e67835605a20ab46

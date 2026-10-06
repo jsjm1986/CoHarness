@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-durable-workflow-runs-in-chat.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-10-durable-workflow-runs-in-chat.md
-2026-08-10-durable-workflow-runs-in-chat.md: 817fd4debd93a4768904e3934456ebdd4bdaa896
-2026-08-10-durable-workflow-runs-in-chat.zh.md: 1a31e54dc9bf52884c118884c24c6856aad399a0
+/agent-note-durable-workflow-runs-in-chat:
+  en: 22082185fc7e67e0
+  zh: 24e07a41c65722a9
+/agent-note-durable-workflow-runs-in-chat/problem:
+  en: e36c634aaede0584
+  zh: 1d15c4c0727b35cc
+/agent-note-durable-workflow-runs-in-chat/decision:
+  en: 96962a0835ebca12
+  zh: 23d808b66e00fec6
+/agent-note-durable-workflow-runs-in-chat/verification:
+  en: 01f4adf1c42653bc
+  zh: 7157390ad38386d5
+/agent-note-durable-workflow-runs-in-chat/alternatives-considered:
+  en: bb92ac1c94fbcd14
+  zh: 2cfbd3df06e7225e
+/agent-note-durable-workflow-runs-in-chat/consequences:
+  en: 1a3181e91f0665f6
+  zh: 7ed5d12e4c4adf31

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-experimental-agent-teams-packages.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-18-experimental-agent-teams-packages.md
-2026-08-18-experimental-agent-teams-packages.md: 7c7e7d8b868d4bff3d36affbaa340766d3321bdd
-2026-08-18-experimental-agent-teams-packages.zh.md: 6ae76aaba7e73c6b84d773b7a6770571630667c4
+/agent-note-incubate-agent-teams-as-private-experimental-packages:
+  en: 00c58c1f62f6c58f
+  zh: 7b59a91ce12f499b
+/agent-note-incubate-agent-teams-as-private-experimental-packages/problem:
+  en: 29e36a510381a7e1
+  zh: b87d793ae851e18c
+/agent-note-incubate-agent-teams-as-private-experimental-packages/decision:
+  en: 11b9c189869dda53
+  zh: 0a97a420c26b1627
+/agent-note-incubate-agent-teams-as-private-experimental-packages/alternatives-considered:
+  en: 79c7b970d42401a1
+  zh: ec1c278a0b5e18e9
+/agent-note-incubate-agent-teams-as-private-experimental-packages/consequences:
+  en: d4123a47ed967b04
+  zh: b4554905663c4cc1

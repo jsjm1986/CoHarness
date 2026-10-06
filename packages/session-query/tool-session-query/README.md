@@ -1,3 +1,8 @@
+---
+description: "Workspace-authorized model-facing session history search, trace, and event read tools"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-session-query
 
 English | [中文](README.zh.md)
@@ -8,6 +13,17 @@ Workspace-authorized model tools over `ctx.sessionQuery`. The opt-in package dep
 
 Use `dsh-tool-session-query` to let a model search earlier sessions, inspect event matches, trace session or event relationships, and read exact event data. Its five read-only tools return cursor-free text and authorize cross-session access only when the target session's `cwd` exactly matches the caller's; callers without a `cwd` can inspect only themselves. Search excludes the caller session and asks the model to narrow its query when the deployment result cap is reached. The package is opt-in, and enabling it adds fixed guidance plus five tool schemas to every model request.
 
+## Table of Contents
+
+- [Configuration](#configuration)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="configuration"></a>
 ## Configuration
 
 | Key | Default | Meaning |
@@ -23,10 +39,12 @@ Every trusted `ctx.sessionQuery` call crosses one model-boundary sanitizer. Call
 
 The package deliberately performs no byte or character truncation and does not import a spill backend. Deployments that need bounded inline output mount `@deepseek-ai/dsh-spill-policy`, which can replace the rendered text after execution while retaining the complete result.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The tools are registrations over `ctx.sessionQuery`; corpus state stays behind the query seam.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### System prompt
@@ -82,3 +100,13 @@ Append-only result text follows the reusable request prefix and does not invalid
 - Search returns at most the deployment cap and asks the model to narrow its query when more matches exist; it offers no continuation token.
 - Workspace identity is conservative exact-string `cwd` equality, so symlink-equivalent paths do not share authority.
 - Custom compositions without the generic spill policy accept complete trace and event payloads inline.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

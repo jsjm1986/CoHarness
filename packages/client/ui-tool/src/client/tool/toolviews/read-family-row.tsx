@@ -32,12 +32,13 @@ export type ReadFamilyCard = Pick<ToolRowProps, 'read' | 'image' | 'renderMessag
  * @returns the assembled ToolRow.
  */
 export function readFamilyRow(
-  { toolName, block, cwd, home, openFile, inspect, openDetails, t }: ReadFamilyRowProps,
+  { useDisclosure, toolName, block, cwd, home, openFile, inspect, openDetails, t }: ReadFamilyRowProps,
   card: ReadFamilyCard,
 ): ReactNode {
   const model = toolRowModel(toolName, block, cwd, home)
   return (
     <ToolRow
+      useDisclosure={useDisclosure}
       t={t}
       variant={model.variant}
       toolName={toolName}

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-24-adapter-owned-reasoning-effort-capabilities.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-24-adapter-owned-reasoning-effort-capabilities.md
-2026-07-24-adapter-owned-reasoning-effort-capabilities.md: f59e5d351970e785e6ade32797f1c1a5dd9e2591
-2026-07-24-adapter-owned-reasoning-effort-capabilities.zh.md: 6e657a90e8ef3cd400a3e252f728bb1aadd9f4f2
+/agent-note-adapter-owned-reasoning-effort-capabilities:
+  en: fc5b9dfdd1749328
+  zh: feefd453fe8cb2c8
+/agent-note-adapter-owned-reasoning-effort-capabilities/problem:
+  en: fbd1307e11ea777b
+  zh: 7d146175f9b5c35c
+/agent-note-adapter-owned-reasoning-effort-capabilities/decision:
+  en: 8db82bebd4178a28
+  zh: c43f216a3e440da5
+/agent-note-adapter-owned-reasoning-effort-capabilities/alternatives-considered:
+  en: 53f27586a6b1766b
+  zh: 1e6f4b361d1a2bac
+/agent-note-adapter-owned-reasoning-effort-capabilities/consequences:
+  en: 3bdd1c7318bb9855
+  zh: a829caf8ec1cbd69

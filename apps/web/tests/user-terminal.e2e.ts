@@ -38,7 +38,7 @@ describe('web e2e: private user terminal lifecycle', () => {
     page.on('console', capture)
     onTestFinished(() => { page.removeListener('console', capture) })
     onTestFailed(() => { console.error(errors.join('\n'), tripwire.pageErrors.join('\n')) })
-    await page.goto(world.baseUrl, { waitUntil: 'load' })
+    await page.goto(world.authenticatedUrl, { waitUntil: 'load' })
     await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
     const guide = '[data-sidebar-right-guide-entry="terminal"]'
     await page.locator(guide).waitFor()
@@ -52,7 +52,7 @@ describe('web e2e: private user terminal lifecycle', () => {
     const inventory = await world.ctx.terminalController.list(SESSION)
     expect(inventory).toHaveLength(1)
     const management = async (method: string, args: object) => {
-      const response = await fetch(`${world.baseUrl}/api/terminal/${method}`, { method: 'POST',
+      const response = await world.hostFetch(`/api/terminal/${method}`, { method: 'POST',
         headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: 'terminal-administration', method: `terminal/${method}`, payload: { args } }) })
       expect(response.status).toBe(200)
       return await response.json() as { result: { ok: boolean; value: unknown } }

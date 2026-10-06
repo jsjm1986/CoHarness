@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-17-bundle-patch-confined-to-package.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-17-bundle-patch-confined-to-package.md
-2026-09-17-bundle-patch-confined-to-package.md: 30eb9085d4e4be92d95f99d64d98a016f3e36ef1
-2026-09-17-bundle-patch-confined-to-package.zh.md: 9349d96410711f7467947a51e94ce9bb48632a41
+/agent-note-bundle-patch-declarations-stay-inside-the-package:
+  en: 51f57d4b44e7af80
+  zh: 031bd2ffda9708c6
+/agent-note-bundle-patch-declarations-stay-inside-the-package/problem:
+  en: eb9ed826c1797691
+  zh: a29066ef8693f64e
+/agent-note-bundle-patch-declarations-stay-inside-the-package/decision:
+  en: 42e8b583f2c2a5d8
+  zh: 2bcad90270bc3fd5
+/agent-note-bundle-patch-declarations-stay-inside-the-package/alternatives-considered:
+  en: af62a4e1807fd215
+  zh: 70ea605fd70cc905
+/agent-note-bundle-patch-declarations-stay-inside-the-package/consequences:
+  en: 0d4a89297fe48a29
+  zh: 68868f8f185936b8
+/agent-note-bundle-patch-declarations-stay-inside-the-package/verification:
+  en: b84c125a1453dcdb
+  zh: 590c6442e1aa5a3b

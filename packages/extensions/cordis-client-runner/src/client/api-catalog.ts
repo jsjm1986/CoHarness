@@ -321,9 +321,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the selected historical or fallback blank Session id.',
       },
       {
-        signature: 'startSession(workspaceId?: WorkspaceId): void',
-        description: 'The New Session flow: connect the explicit, current-Session, or recent Workspace and open the resulting session; failures surface on the session list state.',
-        parameters: [{ name: 'workspaceId', description: 'explicit target; omitted inherits the current Session\'s Workspace before falling back to the recency projection.' }],
+        signature: 'startSession(workspaceId?: WorkspaceId, onFailure?: (reason: unknown) => void): void',
+        description: 'The New Session flow: connect the explicit, current-Session, or recent Workspace and open the resulting session. Connect and navigation failures are non-fatal — they log and reach `onFailure` when supplied; the current view stays usable.',
+        parameters: [{ name: 'workspaceId', description: 'explicit target; omitted inherits the current Session\'s Workspace before falling back to the recency projection.' }, { name: 'onFailure', description: 'observer for the rejected connect/open, for surfaces that turn an explicit New Session click into a notice.' }],
       },
       {
         signature: 'create(input: { path: string }): Promise<WorkspaceView>',
@@ -372,9 +372,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the updated Workspace view.',
       },
       {
-        signature: 'archiveSession(sessionId: SessionId): Promise<void>',
+        signature: 'archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>',
         description: 'Archive a session into the registry-global set (hidden from grouping surfaces; session log and accounting slot remain). Archiving the current session clears the selection into the New Session view state.',
-        parameters: [{ name: 'sessionId', description: 'session to archive.' }],
+        parameters: [{ name: 'sessionId', description: 'session to archive.' }, { name: 'options', description: '`stopActivity` asks the Host to stop the session\'s running work instead of refusing; without it a session with running work rejects with a `session-active` error whose details name that activity.' }],
       },
     ],
   },
@@ -535,8 +535,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ConversationLocation = {\n    readonly kind: \'session\';\n} | {\n    readonly kind: \'turn\';\n    readonly turn: TurnLocation;\n} | {\n    readonly kind: \'step\';\n    readonly turn: TurnLocation;\n    readonly step: StepLocation;\n} | {\n    readonly kind: \'unresolved\';\n};',
   },
   {
+    name: 'ConversationLocationDataSource',
+    declaration: 'export interface ConversationLocationDataSource<Value> {\n    getSnapshot(): Value;\n    subscribe(listener: () => void): () => void;\n}',
+  },
+  {
     name: 'ConversationLocationDataStore',
-    declaration: 'export interface ConversationLocationDataStore<DataMap extends object> {\n    get<Key extends keyof DataMap & string>(key: Key): Readonly<DataMap[Key]> | undefined;\n}',
+    declaration: 'export interface ConversationLocationDataStore<DataMap extends object> {\n    get<Key extends keyof DataMap & string>(key: Key): Readonly<DataMap[Key]> | undefined;\n    source<Key extends keyof DataMap & string>(key: Key): ConversationLocationDataSource<Readonly<DataMap[Key]> | undefined>;\n}',
   },
   {
     name: 'ConversationNode',
@@ -544,7 +548,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ConversationSnapshot',
-    declaration: 'export interface ConversationSnapshot {\n    sessionId: SessionId;\n    views: ConversationViewSnapshotStore;\n    chat: ChatSnapshot;\n    nodes: readonly ConversationNode[];\n    turnTimings: ReadonlyMap<number, {\n        readonly startTime: number;\n        readonly endTime?: number;\n    }>;\n    turnEnds: ReadonlyMap<number, number>;\n    partial: PartialAssistant | null;\n    runningCalls: readonly RunningToolCall[];\n    pending: readonly PendingInteraction[];\n    pendingSubmissions?: readonly PendingSubmission[];\n    queue: readonly QueuedMessage[];\n    running: boolean;\n    subagent: {\n        address: SubagentAddress;\n        parentAvailable: boolean;\n    } | null;\n    composerPhase: ComposerPhase;\n    removed: boolean;\n    openState: OpenState;\n    openError: RpcError | null;\n    hasMore: boolean;\n    loadingOlder: boolean;\n    historyWindowMode: HistoryWindowMode;\n    historyDetail: HistoryDetailState;\n    historyNavigation?: HistoryNavigationSnapshot;\n    promptError: PromptError | null;\n    blank: boolean;\n    lastAgentError: string | null;\n}',
+    declaration: 'export interface ConversationSnapshot {\n    sessionId: SessionId;\n    views: ConversationViewSnapshotStore;\n    chat: ChatSnapshot;\n    nodes: readonly ConversationNode[];\n    turnTimings: ReadonlyMap<number, {\n        readonly startTime: number;\n        readonly endTime?: number;\n    }>;\n    turnEnds: ReadonlyMap<number, number>;\n    openTurn: number | undefined;\n    partial: PartialAssistant | null;\n    runningCalls: readonly RunningToolCall[];\n    pending: readonly SessionPendingEntry[];\n    pendingSubmissions?: readonly PendingSubmission[];\n    queue: readonly QueuedMessage[];\n    running: boolean;\n    subagent: {\n        address: SubagentAddress;\n        parentAvailable: boolean;\n    } | null;\n    composerPhase: ComposerPhase;\n    removed: boolean;\n    openState: OpenState;\n    openError: RpcError | null;\n    hasMore: boolean;\n    loadingOlder: boolean;\n    historyWindowMode: HistoryWindowMode;\n    historyDetail: HistoryDetailState;\n    historyNavigation?: HistoryNavigationSnapshot;\n    promptError: PromptError | null;\n    blank: boolean;\n    lastAgentError: string | null;\n}',
   },
   {
     name: 'ConversationStepDataMap',
@@ -632,7 +636,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ISession',
-    declaration: 'export interface ISession {\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    readCallHistory(callId: ToolCallId, signal?: AbortSignal): Promise<ChatSnapshot>;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
+    declaration: 'export interface ISession {\n    publishInteraction(entry: SessionPublishedInteraction): () => void;\n    readonly sessionId: SessionId;\n    readonly projections: ProjectionsFace;\n    readonly beginSubmission?: (input: BeginSubmissionInput) => SubmissionHandle;\n    readCallHistory(callId: ToolCallId, signal?: AbortSignal): Promise<ChatSnapshot>;\n    prompt(content: PromptContentPart[], mode: \'queue\' | \'steer\', signal?: AbortSignal, requestId?: RpcId): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    readAttachment(attachmentId: AttachmentIdType): Promise<RpcResult<{\n        attachment: ImageAttachmentRef;\n        data: Uint8Array;\n    }>>;\n    updateQueue(itemId: MessageId, action: QueueAction): Promise<RpcResult<{\n        accepted: true;\n    }>>;\n    cancel(): Promise<RpcResult<{\n        accepted: true;\n    }> | RemoteResult<{\n        accepted: true;\n    }>>;\n    rename(title: string): Promise<RpcResult<{\n        title: string;\n        seq: number;\n    }>>;\n    loadOlder(): Promise<void>;\n    loadHistoryUntil?(targetSeq: number): Promise<boolean>;\n    ensureHistoryDetail(): Promise<void>;\n    command(line: string): Promise<RemoteResult<{\n        matched: boolean;\n    }>>;\n}',
   },
   {
     name: 'KeyedHooksSources',
@@ -751,6 +755,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export class PendingWait<K extends PendingKind = PendingKind> {\n    readonly kind: K;\n    readonly key: string;\n    readonly sessionId: SessionId;\n    readonly payload: PendingPayloads[K];\n    constructor(kind: K, rpcId: RpcId, sessionId: SessionId, payload: PendingPayloads[K], respond: (message: ClientResponse) => Promise<RpcReceipt>);\n    respond(result: ClientResponse[\'result\']): Promise<RpcReceipt>;\n    markSettled(): void;\n}',
   },
   {
+    name: 'PreparingToolCall',
+    declaration: 'export interface PreparingToolCall extends ToolCallHead {\n    readonly phase: \'preparing\';\n}',
+  },
+  {
     name: 'ProjectionsFace',
     declaration: 'export interface ProjectionsFace {\n    faceOf(key: string): ObservableSnapshot<unknown>;\n}',
   },
@@ -812,7 +820,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'RunningToolCall',
-    declaration: 'export interface RunningToolCall {\n    callId: string;\n    name: string;\n    argsRaw: string;\n    turn: number;\n    step: number;\n    time: number;\n    callView: ToolCallView | null;\n    subCalls: readonly ToolCallBlock[];\n}',
+    declaration: 'export type RunningToolCall = PreparingToolCall | StartedToolCall;',
   },
   {
     name: 'ScopeOf',
@@ -839,8 +847,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionMaybeStandardProps {\n}',
   },
   {
+    name: 'SessionPendingEntry',
+    declaration: 'export type SessionPendingEntry = PendingInteraction | SessionPublishedInteraction;',
+  },
+  {
     name: 'SessionProviderComponent',
     declaration: 'export type SessionProviderComponent = (props: SessionAreaProps) => ReactNode;',
+  },
+  {
+    name: 'SessionPublishedInteraction',
+    declaration: 'export interface SessionPublishedInteraction {\n    readonly kind: string;\n    readonly key: string;\n    readonly sessionId: SessionId;\n}',
   },
   {
     name: 'SessionSearchResultItem',
@@ -893,6 +909,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SnapshotSelectorHook',
     declaration: 'export type SnapshotSelectorHook<T> = <S>(sel: (s: T) => S, eq?: (a: S, b: S) => boolean) => S;',
+  },
+  {
+    name: 'StartedToolCall',
+    declaration: 'export interface StartedToolCall extends ToolCallHead {\n    readonly phase: \'start\';\n    readonly argsRaw: string;\n}',
   },
   {
     name: 'SteeringMessageNode',
@@ -964,11 +984,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolResultNode',
-    declaration: 'export interface ToolResultNode {\n    kind: \'tool-result\';\n    seq: number;\n    time: number;\n    callId: string;\n    call: {\n        name: string;\n        argsRaw: string;\n    } | null;\n    callTime: number | null;\n    content: readonly ContentBlock[];\n    isError: boolean;\n    error?: {\n        name: string;\n        code: string;\n        reason?: string;\n    };\n    meta?: unknown;\n    callView: ToolCallView | null;\n    resultView: ToolResultView | null;\n    subCalls: readonly ToolCallBlock[];\n}',
-  },
-  {
-    name: 'Translate',
-    declaration: 'export type Translate<K extends string = string> = (key: K, params?: Record<string, unknown>) => string;',
+    declaration: 'export interface ToolResultNode {\n    kind: \'tool-result\';\n    seq: number;\n    time: number;\n    callId: string;\n    parentCallId?: string;\n    call: {\n        name: string;\n        argsRaw: string;\n    } | null;\n    callTime: number | null;\n    content: readonly ContentBlock[];\n    isError: boolean;\n    error?: {\n        name: string;\n        code: string;\n        reason?: string;\n    };\n    meta?: unknown;\n    callView: ToolCallView | null;\n    resultView: ToolResultView | null;\n    subCalls: readonly ToolCallBlock[];\n}',
   },
   {
     name: 'TranslateNS',

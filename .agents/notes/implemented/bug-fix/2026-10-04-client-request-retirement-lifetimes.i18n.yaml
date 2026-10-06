@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-client-request-retirement-lifetimes.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-04-client-request-retirement-lifetimes.md
+/agent-note-separate-client-request-retirement-from-transport-completion:
+  en: 405320bc872dcc6d
+  zh: bc3f9e25d07e3c0e
+/agent-note-separate-client-request-retirement-from-transport-completion/problem:
+  en: b35c0e5cf34f7c4c
+  zh: e764edc8fdabc8c4
+/agent-note-separate-client-request-retirement-from-transport-completion/decision:
+  en: 25a2e1796faf48ed
+  zh: 969f1f888114a498
+/agent-note-separate-client-request-retirement-from-transport-completion/alternatives-considered:
+  en: c8a06afb283fba36
+  zh: 27b5dcebbc2e7ded
+/agent-note-separate-client-request-retirement-from-transport-completion/consequences:
+  en: 375d8af79fb544f8
+  zh: 3aa6a9a3a9d3baf8
+/agent-note-separate-client-request-retirement-from-transport-completion/verification:
+  en: 2f54496d4f1080c8
+  zh: ee26444efe0f90b2

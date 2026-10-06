@@ -27,7 +27,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Page } from 'playwright'
 import { expect } from 'vitest'
@@ -36,6 +36,7 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include, { type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import Group from '@deepseek-ai/cordis-plugin-group'
 import { scrubModelRequestBulk, stabilizeFixtureMessageIds } from '@deepseek-ai/dsh-session-snapshot'
+import type {} from '@deepseek-ai/dsh-client-connection'
 import { assertSessionFixtureVersion, parseSessionFixtureName, parseSnapshotManifest, redactSessionSnapshotIds, sessionFixtureFiles, sessionFixtureName } from '@deepseek-ai/dsh-session-snapshot'
 import {
   auditStartupEntries,
@@ -47,7 +48,7 @@ import {
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { AssistantStreamAccumulator, expandAssistantStream, LlmAdapter } from '@deepseek-ai/dsh-llm'
 import type {
-  AssistantStreamRecord, LlmModelInfo, LlmProviderInfo, LlmResolvedModelInfo, StreamChunk,
+  AssistantStreamRecord, LlmModelInfo, LlmProviderInfo, LlmResolvedModelInfo, RetryPolicyConfig, StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { ReplayHandle } from '@deepseek-ai/dsh-llm-replay'
 import { installLlmReplay, parseSessionLog, prepareSessionSnapshotFixtureForComparison } from '@deepseek-ai/dsh-llm-replay'
@@ -154,6 +155,17 @@ export interface WebScaffold {
   mode: WebSnapshotMode
   /** Browser-facing origin for the bound test server. */
   baseUrl: string
+  /**
+   * `baseUrl` carrying this process's launch token. The first navigation to it
+   * mints the browser-session cookie; a page may then reach `baseUrl` paths
+   * directly.
+   */
+  authenticatedUrl: string
+  /**
+   * Node-side fetch against the bound server with the browser session cookie
+   * attached; connects over loopback so remote authorities stay resolvable.
+   */
+  hostFetch(path: string, init?: RequestInit): Promise<Response>
   /** Settled root context (the in-process readiness barrier; headless event subscription is its sanctioned use). */
   ctx: Context
   /** Temp project directory sessions run in (shell/fs tool cwd). */
@@ -174,6 +186,8 @@ export interface WebScaffold {
 
 /** Options for {@link launchWebScaffold}. */
 export interface LaunchOptions {
+  /** Record actual storage roots inside this isolated Harness home for backup integration scenarios. */
+  managedDataInventory?: boolean
   /** Compose the optional multi-session workbench; ordinary scenarios exercise single-session fallback. */
   workbench?: boolean
   /** Disable the optional native Open In app rows when the host package is not built in a fixture. */
@@ -183,7 +197,7 @@ export interface LaunchOptions {
    * the scaffold's hermetic test patches, matching the launcher's `--patch`
    * ordering.
    */
-  extraOverlayPath?: string
+  extraOverlayPath?: string | readonly string[]
   /**
    * Additional package manifests whose dependency closures supply experimental
    * profile layers named by {@link extraOverlayPath}.
@@ -219,6 +233,12 @@ export interface LaunchOptions {
    * recorded chunks; replay/refresh only.
    */
   replayOverride?: string
+  /**
+   * Retry policy registered on every replay provider route, for failure-
+   * injection scenarios that must exhaust recovery quickly instead of walking
+   * the shared normal default's five backed-off retries; replay/refresh only.
+   */
+  replayRetryPolicy?: RetryPolicyConfig
   /** Per-chunk replay pacing (ms) so the browser observes genuinely incremental SSE; replay/refresh only. */
   paceMs?: number
   /** Synthetic model capacity for UI scenarios whose seeded history must remain uncompacted. */
@@ -343,6 +363,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
   // credentials rows were configured with.
   const skillRootEnvironment = {
     DSH_HOME: harnessHome,
+    DSH_MANAGED_DATA_MANIFEST: options.managedDataInventory === true ? join(harnessHome, 'managed-data.jsonl') : undefined,
     DSH_AGENTS_HOME: join(workspaceCwd, '.agents-home'),
     DSH_BUNDLED_SKILL_DIR: join(workspaceCwd, '.bundled-skills'),
   }
@@ -358,7 +379,10 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       else process.env[key] = value
     }
   }
-  Object.assign(process.env, skillRootEnvironment)
+  for (const [key, value] of Object.entries(skillRootEnvironment)) {
+    if (value === undefined) Reflect.deleteProperty(process.env, key)
+    else process.env[key] = value
+  }
   let storageRoot: string
   try {
     storageRoot = await mkdtemp(join(tmpdir(), 'dsh-web-e2e-storage-'))
@@ -381,7 +405,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
   const surfacePatches = loadOverlayPatches('web e2e scaffold', WEB_PATCH_PATH)
   const extraOverlayPatches = options.extraOverlayPath === undefined
     ? []
-    : loadOverlayPatches('web e2e scaffold', options.extraOverlayPath)
+    : (typeof options.extraOverlayPath === 'string' ? [options.extraOverlayPath] : options.extraOverlayPath)
+      .flatMap(file => loadOverlayPatches('web e2e scaffold', file))
   const composedRows = composeEntries([basePatches, surfacePatches, extraOverlayPatches])
   const webRuntimeConfig = composedRows.find(row => row.id === 'web-runtime')?.config as {
     surfaceContext?: boolean
@@ -412,6 +437,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       },
     },
     { id: 'session-persistence-jsonl', config: { root: persistenceRoot } },
+    { id: 'workspace-changes', config: { storageRoot: join(harnessHome, 'workspace-reviews') } },
     // An explicit document root also disables implicit ~/uploads migration.
     // The real store still warms, locks, sweeps and drains inside this world.
     { id: 'userdoc-local', config: { uploadRoot: documentRoot } },
@@ -420,10 +446,9 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // the seeded-session scenarios navigate by content search, and these e2e
     // runs are the assembled coverage for the opt-in search path.
     { id: 'session-query-sqlite', config: { path: ':memory:', openAt: 'first-search' } },
-    // storage-json's yml root is anchored to the real $DSH_HOME; pin the row
-    // to an absolute temp root (removed with the workspace at close) so tests
-    // never write the user's harness home.
-    { id: 'storage-json', config: { root: join(workspaceCwd, '.dsh-storages') } },
+    // Application state belongs under the private Harness home. A project
+    // snapshot must not race its projection-cache temporary files.
+    { id: 'storage-json', config: { root: join(harnessHome, 'storages') } },
     // Skill discovery is model-visible input. Pin every host-level root inside
     // the owned temp world so ~/.dsh, ~/.agents, and a bundled-root env setting
     // cannot change replay requests or conversation goldens. Project roots stay
@@ -526,6 +551,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
   const originalCwd = process.cwd()
   const ctx = new Context()
   let port = 0
+  let authenticatedUrl = ''
+  let cookieHeader = ''
   let replayHandle: ReplayHandle | undefined
   try {
     process.chdir(workspaceCwd)
@@ -547,7 +574,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       return {
         packageName: manifest.name,
         packageDir,
-        patchPath: join(packageDir, 'cordis.patch.yml'),
+        patchPaths: [join(packageDir, 'cordis.patch.yml')],
         patches: [],
       }
     }))
@@ -557,6 +584,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       layers: extraLayers,
       patchPath: join(profileDir, 'cordis.patch.yml'),
       patches: [],
+      skippedBundles: [],
     }
     await healProfilesModuleFallback({ installAnchor: INSTALL_ANCHOR, home: harnessHome, profile })
     await mkdir(profileDir, { recursive: true })
@@ -593,6 +621,27 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       throw new Error('web e2e scaffold: webServer service missing after settled boot')
     }
     port = boundPort
+    // The browser authenticates by loading the tokenized URL; Node-side
+    // requests reuse the minted cookie. authorizeIndex runs in-process so the
+    // exchange also works for remote authorities Node cannot resolve.
+    authenticatedUrl = ctx.connection.authenticatedUrl(`http://${browserHost}:${port}`)
+    const exchange = new URL(ctx.connection.authenticatedUrl(`http://127.0.0.1:${String(port)}`))
+    let setCookie: string | undefined
+    const authorized = ctx.connection.authorizeIndex({
+      method: 'GET',
+      url: `${exchange.pathname}${exchange.search}`,
+      headers: { host: exchange.host },
+    }, {
+      writeHead(_status, headers) { setCookie = headers?.['set-cookie'] },
+      end() {},
+    })
+    if (authorized || setCookie === undefined) {
+      throw new Error('web e2e scaffold: browser token exchange did not return a session cookie')
+    }
+    cookieHeader = setCookie.split(';', 1)[0] ?? ''
+    if (cookieHeader.length === 0) {
+      throw new Error('web e2e scaffold: browser token exchange returned an empty session cookie')
+    }
 
     // Fill the open llm seam on the settled root ctx. Ordinary keyless modes
     // disable llm-deepseek; the first-run lane keeps it mounted but has no
@@ -632,7 +681,10 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     if (mode !== 'record' && options.replayFixture !== undefined) {
       replayHandle = installLlmReplay(ctx, {
         file: options.replayFixture,
-        providers: replayProviders(options.replayContextWindow),
+        providers: replayProviders(options.replayContextWindow).map(provider => ({
+          ...provider,
+          ...(options.replayRetryPolicy === undefined ? {} : { retryPolicy: options.replayRetryPolicy }),
+        })),
         ...(options.replayOverride === undefined ? {} : { overrideFile: options.replayOverride }),
         ...(options.replayChildFixtures === undefined ? {} : { childFiles: options.replayChildFixtures }),
         ...(options.paceMs === undefined ? {} : { paceMs: options.paceMs }),
@@ -661,10 +713,20 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     if (process.cwd() !== originalCwd) process.chdir(originalCwd)
   }
 
+  const baseUrl = `http://${browserHost}:${port}`
   return {
     harnessHome,
     mode,
-    baseUrl: `http://${browserHost}:${port}`,
+    baseUrl,
+    authenticatedUrl,
+    hostFetch(path: string, init: RequestInit = {}): Promise<Response> {
+      const target = new URL(path, baseUrl)
+      const headers = new Headers(init.headers)
+      headers.set('cookie', cookieHeader)
+      // *.localhost authorities resolve in Chromium but not in Node; the
+      // session cookie binds the loopback authority this request actually uses.
+      return fetch(`http://127.0.0.1:${String(port)}${target.pathname}${target.search}`, { ...init, headers })
+    },
     ctx,
     workspaceCwd,
     persistenceRoot,
@@ -820,6 +882,21 @@ export function systemPromptTexts(events: readonly SessionEvent[]): string[] {
  * @returns the seeded id.
  */
 /**
+ * Realize one canonical `{{kind:ordinal}}` fixture token to the deterministic
+ * UUID {@link realizeSeedFixture} writes in place of the token. Tests that
+ * address a seeded identity use this instead of pinning a literal UUID.
+ * @param kind - the token's identity kind (`message`, `approval`, ...).
+ * @param ordinal - the token's 1-based ordinal within that kind.
+ * @returns the realized UUIDv4-shaped string.
+ */
+export function realizedTokenId(kind: string, ordinal: number): string {
+  const hex = createHash('sha256').update(`${kind}:${ordinal}`).digest('hex').slice(0, 32).split('')
+  hex[12] = '4'
+  hex[16] = ['8', '9', 'a', 'b'][Number.parseInt(hex[16] as string, 16) % 4] as string
+  return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex.slice(12, 16).join('')}-${hex.slice(16, 20).join('')}-${hex.slice(20).join('')}`
+}
+
+/**
  * Realize a recorded seed fixture against one scaffold: substitute the
  * `{{sessionId}}`/`{{cwd}}` placeholders and rewrite the recorded cwd to the
  * scaffold's workspace. Idempotent, so a caller may realize early (e.g. to
@@ -846,12 +923,7 @@ export function realizeSeedFixture(scaffold: Pick<WebScaffold, 'workspaceCwd' | 
       .replace(/\{\{session:([1-9]\d*)\}\}/g, (_token, ordinal: string) =>
         ordinal === '1' ? id : `${id}-child-${ordinal}`)
       .replace(/\{\{(message|approval|workflow|command|rpc|retry|principal|project|runtime|target|resource|id):([1-9]\d*)\}\}/g,
-        (_token, kind: string, ordinal: string) => {
-          const hex = createHash('sha256').update(`${kind}:${ordinal}`).digest('hex').slice(0, 32).split('')
-          hex[12] = '4'
-          hex[16] = ['8', '9', 'a', 'b'][Number.parseInt(hex[16] as string, 16) % 4] as string
-          return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex.slice(12, 16).join('')}-${hex.slice(16, 20).join('')}-${hex.slice(20).join('')}`
-        })
+        (_token, kind: string, ordinal: string) => realizedTokenId(kind, Number(ordinal)))
       .split('{{harnessHome}}').join(scaffold.harnessHome)
       .split('{{cwd}}').join(scaffold.workspaceCwd)
   }
@@ -1079,19 +1151,47 @@ async function toggleTurnProcesses(page: Page, expanded: 'true' | 'false', timeo
 
 /**
  * Fixture-inventory guard: the scenario directory holds exactly the expected
- * files and every committed JSONL is a scrub fixed-point without a run-local
- * browser RPC id. Legacy single-request and indexed identity tokens are valid.
+ * role files and every committed JSONL is a header-scrubbed, typed-redaction
+ * fixed point. A `snapshot.yml` manifest is validated when the scenario owns
+ * one; extra fixture generations collapse to their role's canonical name.
  * @param dir - the scenario snapshot directory.
- * @param expected - the exact expected file inventory.
+ * @param expected - the exact expected role inventory.
  */
 export async function assertFixtureInventory(dir: string, expected: string[]): Promise<void> {
   const entries = (await readdir(dir)).sort()
-  expect(entries).toEqual([...expected].sort())
-  for (const entry of entries.filter(name => name.endsWith('.jsonl'))) {
+  const ownsManifest = entries.includes('snapshot.yml')
+  const artifacts = entries.filter(name => name !== 'snapshot.yml')
+  const roleInventory = (names: readonly string[]): string[] => [...new Set(names.map((name) => {
+    const fixture = parseSessionFixtureName(name)
+    return fixture === undefined ? name : sessionFixtureName(fixture.index, 0)
+  }))].sort()
+  expect(roleInventory(artifacts)).toEqual(roleInventory(expected))
+  if (ownsManifest) {
+    const manifestPath = join(dir, 'snapshot.yml')
+    const manifest = parseSnapshotManifest(await readFile(manifestPath, 'utf8'), manifestPath)
+    expect(manifest.profile).toBe('web')
+    if (manifest.session === undefined) {
+      expect(
+        artifacts.some(name => parseSessionFixtureName(name)?.index === 0),
+        `${dir}: session owner must carry a canonical parent Session fixture`,
+      ).toBe(true)
+    } else {
+      expect(existsSync(resolve(dir, manifest.session.source)), `${dir}: session source`).toBe(true)
+    }
+  }
+  for (const entry of artifacts.filter(name => name.endsWith('.jsonl'))) {
     const content = await readFile(join(dir, entry), 'utf8')
     expect(scrubModelRequestBulk(content), `${dir}/${entry} carries request-header bulk`).toBe(content)
     expect(content, `${dir}/${entry} carries a run-local rpcId`)
       .not.toMatch(/"rpcId"\s*:\s*"(?!(?:\{\{rpcId\}\}|\{\{rpc:[1-9]\d*\}\})")[^"]*"/)
+    // Both committed spellings are admitted: legacy {{xId}} placeholders and
+    // canonical {{kind:N}} tokens. Normalizing the legacy spellings first
+    // keeps the fixed-point comparison about unredacted raw identities only.
+    const canonicalized = content
+      .replace(/\{\{sessionId\}\}/g, '{{session:1}}')
+      .replace(/\{\{messageId\}\}/g, '{{message:1}}')
+      .replace(/\{\{rpcId\}\}/g, '{{rpc:1}}')
+    expect(redactSessionSnapshotIds([canonicalized]), `${dir}/${entry} carries unredacted identities`).toEqual([canonicalized])
   }
 }
 

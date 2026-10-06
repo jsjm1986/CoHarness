@@ -7,6 +7,7 @@
 // pins the keyed 'read' toolview registration.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { Context } from '@deepseek-ai/cordis'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
@@ -16,7 +17,8 @@ import {
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type {
-  ConversationSnapshot, RunningToolCall, SessionId, SessionListState, ToolResultNode, WorkspaceListState,
+  ConversationSnapshot, RunningToolCall, SessionId, SessionListState, StartedToolCall, ToolResultNode,
+  WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ToolResultView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -27,8 +29,14 @@ import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.t
 import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
 import { ReadRow, readToolview } from '../src/client/tool/toolviews/read-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
 
 afterEach(cleanup)
+
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
 
 const SID = 's1' as SessionId
 
@@ -59,8 +67,8 @@ const resultRead = (over?: Partial<Extract<ToolResultView, { card: 'read' }>>): 
   card: 'read', path: 'src/a.ts', offset: 41, lines: sampleLines, totalLines: 180, lang: 'ts', ...over,
 })
 
-const running = (over?: Partial<RunningToolCall>): RunningToolCall => ({
-  callId: 'c1', name: 'read', argsRaw: ARGS,
+const running = (over?: Partial<StartedToolCall>): StartedToolCall => ({
+  phase: 'start', callId: 'c1', name: 'read', argsRaw: ARGS,
   turn: 1, step: 1, time: 1_000, callView: { card: 'generic', title: 'Read src/a.ts', kind: 'read' }, subCalls: [], ...over,
 })
 
@@ -160,8 +168,9 @@ describe('readCallLine', () => {
 })
 
 describe('GenericToolCard read body', () => {
-  const ownerProps = (block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName: 'web_fetch', block, openFile: vi.fn(), t,
+  const ownerProps = (block: StartedToolCall | ToolResultNode): GenericToolCardProps => ({
+    callId: 'c1', toolName: 'web_fetch', openFile: vi.fn(), t, useDisclosure,
+    ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
   })
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -185,9 +194,9 @@ describe('GenericToolCard read body', () => {
 
   it('a non-read tool renders the bare row with no read card', () => {
     const view = render(<GenericToolCard {...({
-      callId: 'c1', toolName: 'echo', block: settled({
+      callId: 'c1', toolName: 'echo', phase: 'result' as const, block: settled({
         call: { name: 'echo', argsRaw: '{"text":"x"}' }, callView: null, resultView: null,
-      }), openFile: vi.fn(), t,
+      }), openFile: vi.fn(), t, useDisclosure,
     })} />)
     toggleRow(view)
     expect(view.container.querySelector('[data-read]')).toBeNull()
@@ -206,14 +215,14 @@ describe('ReadRow keyed toolview', () => {
     archivedById: {},
     current: SID,
     phase: 'ready',
-    subagentsByParent: {}, jobsBySession: {},
+    subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
     currentAddress: undefined,
   })
 
   const rowProps = (block: RunningToolCall | ToolResultNode): Parameters<typeof ReadRow>[0] => ({
     callId: 'c1', toolName: 'read', block, openFile: vi.fn(),
     sessionId: SID, useSessions: bindSnapshotSelector(list()),
-    t,
+    t, useDisclosure,
   } as unknown as Parameters<typeof ReadRow>[0])
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -297,18 +306,18 @@ describe('DetailsPanel Output section (read)', () => {
     const chat = createChatStore().create()
     if (selection !== null) chat.actions.select(selection)
     const sessions = createSnapshotStore<SessionListState>(cwd === undefined
-      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined }
+      ? { ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined }
       : {
         ids: [SID],
         byId: { [SID]: { id: SID, displayTitle: 'r', running: false, blank: false, updatedAt: 0, cwd } },
         archivedById: {},
         current: SID,
         phase: 'ready',
-        subagentsByParent: {}, jobsBySession: {},
+        subagentsByParent: {}, jobsBySession: {}, observedJobs: {},
         currentAddress: undefined,
       })
     const workspaces = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })
     return render(
@@ -320,6 +329,7 @@ describe('DetailsPanel Output section (read)', () => {
         useSession={bindSnapshotSelector({ getSnapshot: () => snapshot, subscribe: () => () => {} })}
         useSessions={bindSnapshotSelector(sessions)}
         useWorkspaces={bindSnapshotSelector(workspaces)}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
           setDraft: () => {},
@@ -329,6 +339,8 @@ describe('DetailsPanel Output section (read)', () => {
           addDocuments: () => true,
           removeDocument: () => {},
           pruneDocuments: () => {},
+          captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+          insertText: () => false,
           submit: () => {},
         }}
         useProjection={(() => undefined)}
@@ -346,7 +358,7 @@ describe('DetailsPanel Output section (read)', () => {
     return {
       sessionId: SID, views: EMPTY_CONVERSATION_VIEWS,
       chat: over.chat ?? toolChatSnapshot(nodes, runningCalls),
-      nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+      nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
       pending: [], queue: [], running: false, composerPhase: 'active', removed: false,
       openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
       promptError: null, blank: false, subagent: null, lastAgentError: null, ...over,

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-10-vendor-package-rescope.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-10-vendor-package-rescope.md
-2026-08-10-vendor-package-rescope.md: 3ad442a681229b7b9df8feb1c487a925b6123f23
-2026-08-10-vendor-package-rescope.zh.md: 276c94ac9e7d755c02e325f4a4657e21a8bd6ab9
+/agent-note-rescope-vendored-cordis-into-deepseek-ai:
+  en: 3e75d288ea778725
+  zh: 9b2366f7d3d628d9
+/agent-note-rescope-vendored-cordis-into-deepseek-ai/problem:
+  en: 3f83ef28bc30e6e8
+  zh: d29e1e021d714d76
+/agent-note-rescope-vendored-cordis-into-deepseek-ai/decision:
+  en: 048d6a1cacb260a6
+  zh: eb880a55437cecb7
+/agent-note-rescope-vendored-cordis-into-deepseek-ai/consequences:
+  en: 07ce3d3049f09b60
+  zh: 57871265b877ece2
+/agent-note-rescope-vendored-cordis-into-deepseek-ai/alternatives-considered:
+  en: 7c9273a950971cdf
+  zh: 2480fe55e866e163

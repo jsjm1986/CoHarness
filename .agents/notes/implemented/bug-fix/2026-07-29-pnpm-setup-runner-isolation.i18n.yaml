@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-29-pnpm-setup-runner-isolation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-29-pnpm-setup-runner-isolation.md
-2026-07-29-pnpm-setup-runner-isolation.md: 74b672b3f90ea445ad1a8e283a5904056059b2f8
-2026-07-29-pnpm-setup-runner-isolation.zh.md: 3e3dfaafe0ed3f2048f42634f5bc1fcddeb266ed
+/agent-note-isolate-pnpm-setup-per-github-actions-runner:
+  en: b41bc84391915524
+  zh: e301cf8794c012ab
+/agent-note-isolate-pnpm-setup-per-github-actions-runner/problem:
+  en: 9d796daf8b266543
+  zh: 13ccf6238fc11171
+/agent-note-isolate-pnpm-setup-per-github-actions-runner/decision:
+  en: d219619de04f7f5d
+  zh: b187673b293989d3
+/agent-note-isolate-pnpm-setup-per-github-actions-runner/alternatives-considered:
+  en: 2d5eefbae8824e7b
+  zh: 26e70c0699e09203
+/agent-note-isolate-pnpm-setup-per-github-actions-runner/consequences:
+  en: d4ceff391251c323
+  zh: ba89cca1656323a5

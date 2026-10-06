@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, waitFor, within } from '@testing-library/react'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import { SlotTestRuntime, stubSettingsScope, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
+import { SlotTestRuntime, stubSettingsScope, stubDeveloperTools, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as applyConversation, inject as conversationInject } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { apply as applyWorkspace, inject as workspaceInject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
@@ -15,6 +15,7 @@ usePinnedBrowserLanguages('zh-CN')
 
 const A = 'pane-a' as SessionId
 const B = 'pane-b' as SessionId
+const EMPTY_CATALOG: readonly never[] = []
 
 class ResizeObserverStub {
   observe(): void {}
@@ -22,8 +23,8 @@ class ResizeObserverStub {
   disconnect(): void {}
 }
 
-function Root({ renderSlot }: PropsRenderSlots<'conversation' | 'details'>) {
-  return <>{renderSlot('conversation', {})}</>
+function Root({ renderSlot }: PropsRenderSlots<'main' | 'details'>) {
+  return <>{renderSlot('main', {}, { entryKey: 'conversation' })}</>
 }
 
 beforeEach(() => {
@@ -38,10 +39,14 @@ describe('assembled workbench', () => {
     runtime.provide('connection', { api: { settings: {} }, isLoopback: false, hostDescription: createSnapshotStore({ executionAuthorityRequired: false }) })
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
-    runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
+    runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope, developerTools: stubDeveloperTools().preference } as never)
     runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn() })
     runtime.provide('workspaceResources', new WorkspaceResourceRegistry())
     runtime.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
+    runtime.provide('shortcuts', {
+      register: vi.fn(() => () => {}),
+      catalog: { getSnapshot: () => EMPTY_CATALOG, subscribe: () => () => {} },
+    })
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)
@@ -61,7 +66,7 @@ describe('assembled workbench', () => {
       ] as never
     })
     await runtime.root.declare({
-      conversation: { kind: 'single', scope: 'root' },
+      main: { kind: 'keyed', scope: 'root' },
       details: { kind: 'single', scope: 'session' },
     }, Root)
     await runtime.mount({ inject: [...conversationInject], apply: applyConversation })
@@ -86,11 +91,11 @@ describe('assembled workbench', () => {
 })
 
 /** Test-owned shell role: the browsing region plus the conversation surface that hosts the toolbar. */
-function SidebarFrame({ renderSlot }: PropsRenderSlots<'sidebar.workspaces' | 'conversation'>) {
+function SidebarFrame({ renderSlot }: PropsRenderSlots<'sidebar.workspaces' | 'main'>) {
   return (
     <>
       {renderSlot('sidebar.workspaces', { wide: true, expandSidebar: () => {} })}
-      {renderSlot('conversation', {})}
+      {renderSlot('main', {}, { entryKey: 'conversation' })}
     </>
   )
 }
@@ -106,13 +111,20 @@ describe('assembled workbench sidebar panel', () => {
     })
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('remote.permissionPresets', { catalog: () => Promise.resolve({ ok: true, value: [] }) })
-    runtime.provide('settingsScope', { bind: () => scope.scope } as never)
+    runtime.provide('settingsScope', { bind: () => scope.scope, developerTools: stubDeveloperTools().preference } as never)
     runtime.provide('layout', { openDetails: vi.fn(), closeDetails: vi.fn(), bindRightbar: () => () => {}, focusRightbar: vi.fn() })
     runtime.provide('workspaceResources', new WorkspaceResourceRegistry())
     runtime.provide('projectUiPolicy', new ProjectUiPolicyRuntime())
+    runtime.provide('shortcuts', {
+      register: vi.fn(() => () => {}),
+      catalog: { getSnapshot: () => EMPTY_CATALOG, subscribe: () => () => {} },
+    })
     const locale = new LocaleRuntime(runtime.ctx)
     runtime.provide('locale', locale)
     runtime.slots.installLocale(locale)
+    // In production the layout plugin contributes this root share; the Session
+    // tree reads it to dim the list while a global panel is selected.
+    runtime.ctx.slots.provideRoot({ hooks: { panelInfo: createSnapshotStore({ activePanelId: null }) } })
     for (const [id, title, path] of [[A, 'Alpha', '/work/alpha'], [B, 'Beta', '/work/beta']] as const) {
       await runtime.sessions.add({
         id,
@@ -129,7 +141,7 @@ describe('assembled workbench sidebar panel', () => {
     await runtime.root.declare(
       {
         'sidebar.workspaces': { kind: 'single', scope: 'root' },
-        conversation: { kind: 'single', scope: 'root' },
+        main: { kind: 'keyed', scope: 'root' },
         details: { kind: 'single', scope: 'session' },
       } as never,
       SidebarFrame as never,

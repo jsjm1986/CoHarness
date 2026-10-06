@@ -12,9 +12,9 @@ describe('ARIA runtime measurements', () => {
   })
 
   it('normalizes timing in its group while retaining identical prose outside it', () => {
-    const snapshot = '- group "Message timing": 12:34 Ran for 45s\n- paragraph: 12:34 Ran for 45s\n- group "Session statistics":\n  - button "2 turns · 3 steps · 20 tok/s": 2 turns 3 steps 20 tok/s'
+    const snapshot = '- group "Message time and speed": 12:34 Ran for 45s\n- paragraph: 12:34 Ran for 45s\n- group "Session statistics":\n  - button "2 turns · 3 steps · 20 tok/s": 2 turns 3 steps 20 tok/s'
     const result = normalizeAria(snapshot, cwd)
-    expect(result).toContain('group "Message timing": "{{clock}} Ran for {{duration}}"')
+    expect(result).toContain('group "Message time and speed": "{{clock}} Ran for {{duration}}"')
     expect(result).toContain('- paragraph: 12:34 Ran for 45s')
     expect(result).toContain('2 turns · 3 steps · {{throughput}} tok/s')
     expect(result).toContain('2 turns 3 steps {{throughput}} tok/s')
@@ -22,9 +22,9 @@ describe('ARIA runtime measurements', () => {
   })
 
   it('preserves counts, names, disabled state, order and business text that imitates YAML', () => {
-    const snapshot = '- paragraph: |\n    - group "Message timing": 12:34 45s\n- group "Session statistics":\n  - button "2 turns · 3 steps · 20 tok/s" [disabled]\n  - button "Details"'
+    const snapshot = '- paragraph: |\n    - group "Message time and speed": 12:34 45s\n- group "Session statistics":\n  - button "2 turns · 3 steps · 20 tok/s" [disabled]\n  - button "Details"'
     const normalized = normalizeAria(snapshot, cwd)
-    expect(normalized).toContain('- group "Message timing": 12:34 45s')
+    expect(normalized).toContain('- group "Message time and speed": 12:34 45s')
     expect(normalized).toContain('[disabled]')
     for (const [before, after] of [['2 turns', '3 turns'], ['[disabled]', '[pressed]'], ['Details', 'Other']]) {
       expect(normalizeAria(snapshot.replace(before!, after!), cwd)).not.toBe(normalized)

@@ -35,12 +35,14 @@ import {
 } from '../api/sessions.schema.ts'
 import {
   hostCreateDirectoryRequestSchema, hostDescribeRequestSchema,
-  hostListDirectoryRequestSchema, hostOpenPathRequestSchema,
+  hostFileApplicationsRequestSchema, hostListDirectoryRequestSchema, hostOpenPathRequestSchema,
   hostPickDirectoryRequestSchema,
 } from '../api/host.schema.ts'
 import {
   workspaceArchiveSessionRequestSchema,
+  workspacePinSessionRequestSchema,
   workspaceUnarchiveSessionRequestSchema,
+  workspaceUnpinSessionRequestSchema,
   workspaceCreateRequestSchema,
   workspaceDeleteRequestSchema,
   workspaceInsertBeforeRequestSchema,
@@ -54,6 +56,7 @@ import {
   workspaceFilesReadRequestSchema,
   workspaceFilesStatRequestSchema,
 } from '../api/workspace-files.schema.ts'
+import { jobsKillRequestSchema, jobsOutputRequestSchema } from '../api/jobs.schema.ts'
 import { skillListRequestSchema } from '../api/skills.schema.ts'
 import { agentPresetOpenDocumentRequestSchema } from '../api/agent-presets.schema.ts'
 import {
@@ -113,6 +116,8 @@ const UNARY_ROUTES: UnaryRoutes = {
   'session.updateQueue': { schema: sessionUpdateQueueRequestSchema, invoke: (api, r) => api.sessions.updateQueue(r) },
   'session.cancel': { schema: sessionCancelRequestSchema, invoke: (api, r) => api.sessions.cancel(r) },
   'subagent.history': { schema: subagentHistoryRequestSchema, invoke: (api, r, signal) => api.subagents.history(r, signal) },
+  'jobs.output': { schema: jobsOutputRequestSchema, invoke: (api, r) => api.jobs.output(r) },
+  'jobs.kill': { schema: jobsKillRequestSchema, invoke: (api, r) => api.jobs.kill(r) },
   'desktop.status': { schema: desktopStatusRequestSchema, invoke: (api, r, signal) => api.desktop.status(r, signal) },
   'desktop.confirm': { schema: desktopConfirmRequestSchema, invoke: (api, r, signal) => api.desktop.confirm(r, signal) },
   'host.describe': { schema: hostDescribeRequestSchema, invoke: (api, r) => api.host.describe(r) },
@@ -120,6 +125,7 @@ const UNARY_ROUTES: UnaryRoutes = {
   'host.listDirectory': { schema: hostListDirectoryRequestSchema, invoke: (api, r, signal) => api.host.listDirectory(r, signal) },
   'host.createDirectory': { schema: hostCreateDirectoryRequestSchema, invoke: (api, r) => api.host.createDirectory(r) },
   'host.openPath': { schema: hostOpenPathRequestSchema, invoke: (api, r, signal) => api.host.openPath(r, signal) },
+  'host.fileApplications': { schema: hostFileApplicationsRequestSchema, invoke: (api, r, signal) => api.host.fileApplications(r, signal) },
   'workspace.list': { schema: workspaceListRequestSchema, invoke: (api, r) => api.workspace.list(r) },
   'workspace.create': { schema: workspaceCreateRequestSchema, invoke: (api, r) => api.workspace.create(r) },
   'workspace.rename': { schema: workspaceRenameRequestSchema, invoke: (api, r) => api.workspace.rename(r) },
@@ -128,6 +134,8 @@ const UNARY_ROUTES: UnaryRoutes = {
   'workspace.insertSessionBefore': { schema: workspaceInsertSessionBeforeRequestSchema, invoke: (api, r) => api.workspace.insertSessionBefore(r) },
   'workspace.archiveSession': { schema: workspaceArchiveSessionRequestSchema, invoke: (api, r) => api.workspace.archiveSession(r) },
   'workspace.unarchiveSession': { schema: workspaceUnarchiveSessionRequestSchema, invoke: (api, r) => api.workspace.unarchiveSession(r) },
+  'workspace.pinSession': { schema: workspacePinSessionRequestSchema, invoke: (api, r) => api.workspace.pinSession(r) },
+  'workspace.unpinSession': { schema: workspaceUnpinSessionRequestSchema, invoke: (api, r) => api.workspace.unpinSession(r) },
   'workspaceChanges.summary': { schema: workspaceChangesSummaryRequestSchema, invoke: (api, r, signal) => api.workspaceChanges.summary(r, signal) },
   'workspaceChanges.diff': { schema: workspaceChangesDiffRequestSchema, invoke: (api, r, signal) => api.workspaceChanges.diff(r, signal) },
   'workspaceFiles.list': { schema: workspaceFilesListRequestSchema, invoke: (api, r, signal) => api.workspaceFiles.list(r, signal) },

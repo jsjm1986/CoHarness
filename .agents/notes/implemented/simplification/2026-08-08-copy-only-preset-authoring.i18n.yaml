@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-copy-only-preset-authoring.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-08-copy-only-preset-authoring.md
-2026-08-08-copy-only-preset-authoring.md: 5f1f413d835ed96a02a01c9b541ef8660b9bf2a9
-2026-08-08-copy-only-preset-authoring.zh.md: 31517591feca8e7fc270377032af862db9a4227e
+/agent-note-copy-only-preset-authoring-and-the-way-into-a-preset-s-files:
+  en: 5a1fd2580086909c
+  zh: 83dac7d0f6703b01
+/agent-note-copy-only-preset-authoring-and-the-way-into-a-preset-s-files/problem:
+  en: 4d37b31f0106b786
+  zh: dbe494678e93af68
+/agent-note-copy-only-preset-authoring-and-the-way-into-a-preset-s-files/decision:
+  en: c3af83082b8bae6e
+  zh: 53ea74e220c5c2c2
+/agent-note-copy-only-preset-authoring-and-the-way-into-a-preset-s-files/consequences:
+  en: 7df20f4957120a1c
+  zh: 2a2489508778b9ce
+/agent-note-copy-only-preset-authoring-and-the-way-into-a-preset-s-files/load-bearing-details:
+  en: d2b36019ef46db43
+  zh: 8e172a7d3d3e1c95
+/agent-note-copy-only-preset-authoring-and-the-way-into-a-preset-s-files/alternatives-considered:
+  en: 1b5ff1101cc0a370
+  zh: b051f38e42948537

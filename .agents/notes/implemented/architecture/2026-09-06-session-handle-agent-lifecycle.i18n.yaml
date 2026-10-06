@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-06-session-handle-agent-lifecycle.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-06-session-handle-agent-lifecycle.md
-2026-09-06-session-handle-agent-lifecycle.md: da853ca679477838c2ac0ac7c0ee5a1ca7b3cdf3
-2026-09-06-session-handle-agent-lifecycle.zh.md: eb2097e15e5fa2f68ed31a60eb4b5e4943796c49
+/agent-note-persistence-handles-follow-agent-lifecycle-ownership:
+  en: 05fa30c1fd1b0797
+  zh: 06deda1307917e79
+/agent-note-persistence-handles-follow-agent-lifecycle-ownership/problem:
+  en: f1770cd2103a6376
+  zh: 8bdbd6d100e5ac9a
+/agent-note-persistence-handles-follow-agent-lifecycle-ownership/decision:
+  en: d967bd643967d62a
+  zh: 97688dc4e45220e4
+/agent-note-persistence-handles-follow-agent-lifecycle-ownership/alternatives-considered:
+  en: e08ee7d41bca728f
+  zh: 615d5e96ab9b1910
+/agent-note-persistence-handles-follow-agent-lifecycle-ownership/consequences:
+  en: ec0c7b301b8d577b
+  zh: b2400fcba5183419
+/agent-note-persistence-handles-follow-agent-lifecycle-ownership/verification:
+  en: fcb14427fd09cd01
+  zh: e69eca45431f35b6

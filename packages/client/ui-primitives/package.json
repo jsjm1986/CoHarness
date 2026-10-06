@@ -43,10 +43,11 @@
     "shiki": "^4.3.1"
   },
   "devDependencies": {
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-util-code-language": "workspace:*",
+    "@types/mdast": "^4.0.4",
     "@types/react": "~19.2.7",
     "@types/react-dom": "~19.2.4",
-    "@deepseek-ai/cordis": "workspace:^",
-    "@types/mdast": "^4.0.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
@@ -56,6 +57,6 @@
     "lib/types/**/*.d.ts"
   ],
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:~"
   }
 }

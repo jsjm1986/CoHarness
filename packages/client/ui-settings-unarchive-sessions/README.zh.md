@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings-unarchive-sessions
 
 [English](README.md) | 中文
@@ -10,10 +15,21 @@ Web 设置中的**已归档会话**页面：从 Workspace 导航中隐藏的会�
 
 **已归档会话**设置页用于恢复在所有分组界面中被隐藏的会话。它按归档时间倒序列出归档集合，展示每个会话所属的 Workspace（或“未分组”）与最后活动时间，支持按标题或 Workspace 搜索，并通过共享的 Workspace 命令逐行恢复。恢复后，会话回到其记录的 Workspace 位置；若不属于任何 Workspace，则回到未分组会话中。
 
+## 目录
+
+- [不变量](#invariants)
+- [Model Experience](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行不变量：** 不发布伴生包。本页面注册一个本地化的 `settings.section` 贡献及其 locale 命名空间；不发出 Cordis 事件，也不拥有跨插件的可变关系。
 
+<a id="model-experience"></a>
 ## Model Experience
 
 无——本包是浏览器侧 UI 插件层，不注册任何面向模型的内容。
@@ -22,7 +38,18 @@ Web 设置中的**已归档会话**页面：从 Workspace 导航中隐藏的会�
 
 无；本包既不组装也不发送 provider 请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 - **没有已加载摘要的已归档会话无法恢复** —— 页面通过归档集合与会话列表的连接得出行，列表未携带的成员没有对应行和“取消归档”操作，尽管归档集合仍持有它；当集合中全部成员都处于该状态时，页面报告为“不可恢复”而非“空”。
 - **页面只列出会话；不提供会话删除** —— 归档可通过本页面撤销，而删除会话记录是另一项独立能力。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

@@ -4,10 +4,12 @@
 - button "New session":
   - img
   - text: New Session
+- navigation "Panels":
+  - button "Plugins"
 - text: Workspaces
 - button "Search sessions":
   - img
-- textbox "Search sessions..."
+- textbox "Search sessions…"
 - button "View options":
   - img
 - button "Add workspace":
@@ -41,12 +43,10 @@
   - img
 - button "Commands":
   - img
-- tooltip "Commands"
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Open right sidebar":
   - img
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- separator "Adjust transcript content width"

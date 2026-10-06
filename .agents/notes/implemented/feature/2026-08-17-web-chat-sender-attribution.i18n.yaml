@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-web-chat-sender-attribution.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-web-chat-sender-attribution.md
-2026-08-17-web-chat-sender-attribution.md: 343d53c8719f3f62ef44d43f90d44a401229f9f8
-2026-08-17-web-chat-sender-attribution.zh.md: ac5ed9f1844e0c33f6e172ba9acacc8096111815
+/agent-note-web-chat-labels-project-senders-on-bubbles:
+  en: 739dba3fc337c874
+  zh: 9297a8dc8b94c47d
+/agent-note-web-chat-labels-project-senders-on-bubbles/problem:
+  en: fa77e4ec8aca8586
+  zh: f9712a0efdca83fd
+/agent-note-web-chat-labels-project-senders-on-bubbles/decision:
+  en: 5789a68c2122d72a
+  zh: fa86fb27f9a6f9ce
+/agent-note-web-chat-labels-project-senders-on-bubbles/alternatives-considered:
+  en: dbd6d5558a18afb1
+  zh: f83342b87f0590e2
+/agent-note-web-chat-labels-project-senders-on-bubbles/consequences:
+  en: e52ea5ac35c66c99
+  zh: 5dcd1478877d086a
+/agent-note-web-chat-labels-project-senders-on-bubbles/testing:
+  en: 1d87671d76da4619
+  zh: 5f2f7f824ef61def

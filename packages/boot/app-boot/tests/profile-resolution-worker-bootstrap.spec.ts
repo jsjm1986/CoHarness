@@ -1,12 +1,13 @@
-/** Worker bootstrap installs only the generation inherited from its parent. */
+/** Worker bootstrap installs only the resolution inherited from its parent. */
 
 import { beforeEach, expect, it, vi } from 'vitest'
-import type { ProfileResolutionGeneration } from '../src/profile.ts'
+import type { RuntimeResolution } from '../src/profile.ts'
+import type { ProfileResolutionBehavior } from '../src/profile-resolution/resolver.ts'
 
 const harness = vi.hoisted(() => ({
   data: undefined as {
-    generation: ProfileResolutionGeneration
-    behavior: 'enforce' | 'verify'
+    resolution: RuntimeResolution
+    behavior?: ProfileResolutionBehavior
   } | undefined,
   install: vi.fn(),
 }))
@@ -16,7 +17,7 @@ vi.mock('node:worker_threads', () => ({
 }))
 
 vi.mock('../src/profile-resolution/resolver.ts', () => ({
-  installProfileResolution: harness.install,
+  installRuntimeInterception: harness.install,
 }))
 
 beforeEach(() => {
@@ -30,14 +31,15 @@ it('does nothing without inherited profile resolution data', async () => {
   expect(harness.install).not.toHaveBeenCalled()
 })
 
-it('installs the inherited generation and behavior', async () => {
-  const generation: ProfileResolutionGeneration = {
+it('installs the inherited resolution', async () => {
+  const resolution: RuntimeResolution = {
     profilesDir: '/profiles',
     profileDir: '/profiles/test',
     localPackageNames: [],
+    linkedRoots: [],
     entries: [],
   }
-  harness.data = { generation, behavior: 'verify' }
+  harness.data = { resolution, behavior: 'enforce' }
   await import('../src/profile-resolution/worker-bootstrap.ts')
-  expect(harness.install).toHaveBeenCalledWith(generation, 'verify')
+  expect(harness.install).toHaveBeenCalledWith(resolution, 'enforce')
 })

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-resumable-user-document-upload.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-25-resumable-user-document-upload.md
-2026-08-25-resumable-user-document-upload.md: ea0e1d233e62bc83fcad3cc47125fb93553f7421
-2026-08-25-resumable-user-document-upload.zh.md: 0ea648f2f3bb729843c15e1e61123487f27ba8ae
+/agent-note-resumable-user-document-uploads:
+  en: 18e5399991a0b074
+  zh: 18e5399991a0b074
+/agent-note-resumable-user-document-uploads/problem:
+  en: b3703c3aaa616f52
+  zh: 536a9d31c08cd323
+/agent-note-resumable-user-document-uploads/decision:
+  en: ae47184d26b0fbfc
+  zh: 23cbd54a5c58a61b
+/agent-note-resumable-user-document-uploads/alternatives-considered:
+  en: c3eb2edde30b5668
+  zh: 88a5eb50e2ecb8a8
+/agent-note-resumable-user-document-uploads/consequences:
+  en: 32958dc59da80f77
+  zh: bd7a50180f9c7964

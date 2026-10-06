@@ -1,3 +1,8 @@
+---
+description: "Abstract web access capability seam (ctx.web) for the DeepSeek Harness — search/fetch provider registry, registration-order-independent selection, request/result vocabulary, and the WebError taxonomy"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-web
 
 English | [中文](README.zh.md)
@@ -20,6 +25,19 @@ Search and fetch share no request schema and no business logic, but they are del
 
 Use `dsh-web` to search the web or fetch a URL without tying callers to a specific vendor. It selects a usable backend for each operation and gives callers consistent cancellation, errors, and result limits. Choose it for plugins or tools that call `ctx.web.search()` or `ctx.web.fetch()`; the shipped `dsh-tool-web` tools load it for you. A search or fetch requires a configured, usable provider because this package does not make network requests on its own.
 
+## Table of Contents
+
+- [Service API (`ctx.web`)](#service-api-ctxweb)
+- [Selection](#selection)
+- [Vocabulary](#vocabulary)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="service-api-ctxweb"></a>
 ## Service API (`ctx.web`)
 
 | Member | Semantics |
@@ -32,6 +50,7 @@ Providers register **capabilities**, not tools. `dsh-tool-web` is the only owner
 
 The package also exports `readWebResponseBytes()` and `readWebResponseJson()`. Search providers use these readers to enforce a positive `maxResponseBytes` budget before parsing an upstream body; declared and chunked responses share the same limit, the configured cap cannot exceed 256 MiB, and `WebResponseTooLargeError` identifies the refusal.
 
+<a id="selection"></a>
 ## Selection
 
 Selection never depends on registration, config, or HMR order. A capability has an explicit provider id (config `searchProvider`/`fetchProvider`, or env `$DSH_WEB_SEARCH_PROVIDER`/`$DSH_WEB_FETCH_PROVIDER` feeding the same fields), or auto-selects when exactly one usable provider is registered. `search()`/`fetch()` resolve the provider at execution time:
@@ -47,14 +66,17 @@ Selection never depends on registration, config, or HMR order. A capability has 
 
 The failure branches throw `WebError`, whose structured code (plus message detail — the missing id, the ambiguous candidate set) is the direct callers route on. A provider's own `available()` is a cheap local check (credential presence, parseable config) that feeds this execution-time selection and **must not make network calls**; `dsh-tool-web` never calls it — the tool executes through `ctx.web.search()`/`fetch()` and routes on the thrown codes, so provider selection has one owner.
 
+<a id="vocabulary"></a>
 ## Vocabulary
 
 `WebSearchRequest` (`query`, `maxResults?`) → `WebSearchResult` (`content?`, `sources[]`, `truncated`); each `WebSearchSource` has a required `url` and optional `title`/`snippet`/`publishedAt` (Perplexity citations may be URL-only). `WebFetchRequest` (`url`) → `WebFetchResult` (final `url`, `statusCode`, `body`, `truncated`); cancellation is a direct optional `AbortSignal` argument to `search()`/`fetch()`. `WebFetchBody` is a CLOSED discriminated union (`html` | `text`) owned here — consumers `switch` to exhaustiveness so a new kind breaks their compilation until handled. See `src/types.ts` for the full contracts and the `WebError` code taxonomy.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The seam defines the search/fetch contract over providers; vendor state stays behind each provider.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through `dsh-tool-web`, which renders the seam's normalized search results and fetch bodies to the model while this service contributes no prompt or schema.
@@ -69,3 +91,13 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 - **`WebSearchRequest` carries only `query` + `maxResults`** — provider-neutral controls (recency, domain filters, regional hints, search depth) are deferred until Exa and Perplexity can both honor them honestly ([seam Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md)).
 - **`WebFetchBody` has no `pdf` arm** — text-extractable PDF support is named deferred work; the closed union makes adding it a compile-enforced change across the three web packages.
 - **Provider-backed page extraction is out of scope of `fetch()`** — a Firecrawl/Tavily-style `web_extract` capability is deferred rather than widening the fetch operation.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

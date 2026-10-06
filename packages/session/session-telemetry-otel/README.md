@@ -1,3 +1,8 @@
+---
+description: "OpenTelemetry backend for the DeepSeek Harness telemetry seam: hands captured session records to the OTel JS SDK's log pipeline"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-session-telemetry-otel
 
 English | [中文](README.zh.md)
@@ -8,6 +13,19 @@ The OpenTelemetry backend for [the telemetry seam](../session-telemetry/) — th
 
 `dsh-session-telemetry-otel` exports session records through the OTel JS SDK only after new explicit feedback, for all users and providers, including `deepseek-official`. `FEEDBACK_ONLY` releases the canonical prefix through that feedback, including context; later records wait for the next explicit feedback. `DISABLED` constructs no transport. SDK batching can finish an authorized upload without another user interaction or model call. Deployments own their redaction rules.
 
+## Table of Contents
+
+- [Config](#config)
+- [What leaves the machine](#what-leaves-the-machine)
+- [Field mapping](#field-mapping)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="config"></a>
 ## Config
 
 ```yaml
@@ -37,18 +55,22 @@ The mounted service discloses the resolved mode through the seam's [`SessionTele
 
 `exporter.url` is required in `FULL` and `FEEDBACK_ONLY`, has no default, and must parse as `http(s)`; it is optional and unused in `DISABLED`. In uploading modes, `shutdownTimeoutMillis` is a positive finite DSH-owned outer deadline that defaults to 3000 ms, and a non-positive-integer `processor.maxExportBatchSize` also fails at plugin load because the SDK accepts it but then hangs on shutdown. Both SDK blocks pass through whole: every `OTLPExporterNodeConfigBase` field (`headers`, `timeoutMillis`, `compression`, `keepAlive`, …) reaches the exporter, and batching, export cadence (`scheduledDelayMillis`), retry, queue bounds, and loss policy under sustained failure are SDK behavior tuned through `processor`. The backend implements no `flush()`: the batch processor owns ordinary flushing. During shutdown, OTel awaits `exporter.forceFlush()` before the processor's `exportTimeoutMillis`-bounded completion promise; if that transport promise never settles, this package abandons the wait at `shutdownTimeoutMillis`, logs the contained shutdown failure through the coordinator, and lets application teardown continue. The deadline cannot cancel the SDK transport, so records still pending then may be lost at process exit.
 
+<a id="what-leaves-the-machine"></a>
 ## What leaves the machine
 
 In uploading modes, records carry the complete `event.data` as the seam's `sessionTelemetry/record` waterfall returns it — user and assistant message content, tool arguments and results (command output, file contents), the full system prompt and tool schemas (`request/header`), todo text, compaction summaries, hook `stderrSummary`, feedback text, and the session `cwd` (a local path). The seam ships no redaction rules: with no `sessionTelemetry/record` listener mounted, that is the raw captured copy, so a deployment exporting beyond a trusted boundary mounts its own rules (see [the seam README](../session-telemetry/README.md#the-redact-waterfall)). `FULL` runs redaction at append time; `FEEDBACK_ONLY` retains no telemetry copy and runs the currently mounted rules when feedback triggers canonical-log replay. Provider credentials never appear regardless: adapter API keys are constructor parameters, not session events, so they are structurally absent from the log and therefore from telemetry. `DISABLED` does not construct the SDK pipeline or hand any capture to a backend.
 
+<a id="field-mapping"></a>
 ## Field mapping
 
 Seam record → SDK log record: `time` → `timestamp`/`observedTimestamp`; `severity` → `severityNumber`/`severityText` (INFO 9 / WARN 13 / ERROR 17); `body` → the structured log body; `attributes` verbatim. Receivers dedupe on `(session.id, event.seq)` and alert on severity. In `FULL`, they may also detect crashes by `shutdown`-record absence: the marker is emitted at the session's own disposal or application teardown, and a marker followed by more events is a telemetry reload. In `FEEDBACK_ONLY`, a released prefix normally has no later `shutdown` marker, so its absence is not a crash signal. Streams are not self-contained across lineage: a resumed session continues its own id's stream from where the previous process left off, and a forked session's stream starts at its inherited boundary — its prefix lives in the parent's stream, stitched via `session.parent_id` + `session.seed_length`. A resumed local log may contain synthetic closers that were never exported; the wire stream stays faithful to records actually handed to the SDK.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Records are handed to the vendor SDK's own batching and export pipeline; the backend owns no queueing or retry state to compare.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the backend forwards seam records into the OTel SDK pipeline and registers nothing model-facing.
@@ -62,3 +84,13 @@ None; the package neither assembles nor sends a provider request.
 - **Upstream experimental tree** — `@opentelemetry/sdk-logs` is still published from the upstream experimental tree; SDK API churn lands here and only here — the seam contract does not move.
 - **Live-collector behavior belongs to the SDK exporter** — authentication, TLS, throttling, and other real OTLP deployment behavior follow the upstream SDK rather than a package-owned compatibility layer.
 - **Feedback-time snapshot** — `FEEDBACK_ONLY` retains no telemetry-owned copy before feedback. It reads and redacts the current canonical log when feedback is recorded; a crash before feedback uploads nothing, and policy changes before feedback affect what that replay exports.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-gateway-model-governance-live-policy-reload.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-gateway-model-governance-live-policy-reload.md
-2026-08-14-gateway-model-governance-live-policy-reload.md: 26ed1984c7d165d7717de1ec1f9262959da78cbc
-2026-08-14-gateway-model-governance-live-policy-reload.zh.md: 8acf6bf0f41c20307fd185eb0c91b26238ef58a4
+/agent-note-live-model-governance-policy-reload:
+  en: 4f88ea7195c5bd6b
+  zh: 7a4d90593f4c2e1f
+/agent-note-live-model-governance-policy-reload/problem:
+  en: c8e8968be975b649
+  zh: 8156d5c14255ed7d
+/agent-note-live-model-governance-policy-reload/decision:
+  en: 156b7f04ec5a5a85
+  zh: 29378da8ed5d93d9
+/agent-note-live-model-governance-policy-reload/alternatives-considered:
+  en: 1db5841b53b8bfaa
+  zh: 75577e123c2484e1
+/agent-note-live-model-governance-policy-reload/consequences:
+  en: 3c1e9ccc976de5ad
+  zh: 1ca2430953c6f27a
+/agent-note-live-model-governance-policy-reload/testing:
+  en: c49311a50140bf2b
+  zh: 74ee3c3980eb7af1

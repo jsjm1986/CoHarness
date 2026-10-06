@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-04-web-context-source-and-steer-marks.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-04-web-context-source-and-steer-marks.md
-2026-08-04-web-context-source-and-steer-marks.md: 4b426797ea60006e9529cdb05498adc463d312f7
-2026-08-04-web-context-source-and-steer-marks.zh.md: 2c3e2d21c76743d7485729cdae79766c9dcb1bab
+/agent-note-web-transcript-marks-context-source-recall-and-steering:
+  en: a7526b207d7152e5
+  zh: 8defcd9495023161
+/agent-note-web-transcript-marks-context-source-recall-and-steering/problem:
+  en: 4552cd0d8132c795
+  zh: a1a7e5fbc3fcca1a
+/agent-note-web-transcript-marks-context-source-recall-and-steering/decision:
+  en: bad5a7fff11f7b59
+  zh: 1a822f6bb7d8f8ca
+/agent-note-web-transcript-marks-context-source-recall-and-steering/alternatives-considered:
+  en: c781049b6e352ebf
+  zh: 81c172efec50c4f1
+/agent-note-web-transcript-marks-context-source-recall-and-steering/testing:
+  en: e825aa815f9b11ee
+  zh: bfe2f0cdebe874e0
+/agent-note-web-transcript-marks-context-source-recall-and-steering/consequences:
+  en: c25b08cf9c6048c1
+  zh: 0de9c04043347467

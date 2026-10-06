@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-05-subagent-provider-lifecycle-events.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-05-subagent-provider-lifecycle-events.md
-2026-07-05-subagent-provider-lifecycle-events.md: 503c0d638785e3a4944c8903b8d7d469c68b1881
-2026-07-05-subagent-provider-lifecycle-events.zh.md: d9d15b4ff688506b84b81c8649e1de4ce50e086d
+/agent-note-subagent-provider-lifecycle-events-subagent-provider-added-subagent-provider-removed:
+  en: 51d6635b38321bb8
+  zh: f72e73643a8deeca
+/agent-note-subagent-provider-lifecycle-events-subagent-provider-added-subagent-provider-removed/problem:
+  en: 7cbea54b54a72e91
+  zh: d71c187da559bbda
+/agent-note-subagent-provider-lifecycle-events-subagent-provider-added-subagent-provider-removed/decision:
+  en: b2fa212344ecc74b
+  zh: f52dd84374e96aad
+/agent-note-subagent-provider-lifecycle-events-subagent-provider-added-subagent-provider-removed/alternatives-considered:
+  en: 863e1d3d433b6b13
+  zh: f472f7a667dfa1aa
+/agent-note-subagent-provider-lifecycle-events-subagent-provider-added-subagent-provider-removed/consequences:
+  en: 6c662d949abd5672
+  zh: 8bc5c13a6eaa67d9

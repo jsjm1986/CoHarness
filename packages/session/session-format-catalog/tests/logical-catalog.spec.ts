@@ -16,16 +16,16 @@ const CONFIG = { provider: 'mock', model: 'mock' }
 describe('logical Session format catalog', () => {
   it('classifies headers without reading events and migrates each adjacent generation', () => {
     const result = sessionLogicalFormatCatalog.readHeader({ version: 0, id: 'old', createdAt: 1 })
-    expect(result).toMatchObject({ status: 'migration-required', storedVersion: 0, targetVersion: 6 })
+    expect(result).toMatchObject({ status: 'migration-required', storedVersion: 0, targetVersion: 7 })
     if (result.status !== 'migration-required') throw new Error('expected migration-required header')
-    expect(result.header).toMatchObject({ version: 6, id: 'old', createdAt: 1 })
+    expect(result.header).toMatchObject({ version: 7, id: 'old', createdAt: 1 })
   })
 
   it('refuses newer generations before body decoding', () => {
-    expect(sessionLogicalFormatCatalog.readHeader({ version: 7, id: 'newer', createdAt: 1 })).toMatchObject({
+    expect(sessionLogicalFormatCatalog.readHeader({ version: 8, id: 'newer', createdAt: 1 })).toMatchObject({
       status: 'unsupported',
-      storedVersion: 7,
-      targetVersion: 6,
+      storedVersion: 8,
+      targetVersion: 7,
     })
   })
 
@@ -37,7 +37,7 @@ describe('logical Session format catalog', () => {
     })).toMatchObject({ status: 'malformed' })
     /* seedLength is the stored spelling of the seeded declaration. */
     const seeded = sessionLogicalFormatCatalog.readHeader({
-      version: 6, id: 'x', createdAt: 1, seedLength: 2,
+      version: 7, id: 'x', createdAt: 1, seedLength: 2,
     })
     expect(seeded).toMatchObject({ status: 'current' })
     if (seeded.status !== 'current') throw new Error('expected current header')
@@ -49,9 +49,9 @@ describe('logical Session format catalog', () => {
 
   it('carries an sshTarget binding through the logical header read', () => {
     const result = sessionLogicalFormatCatalog.readHeader({
-      version: 6, id: 'ssh', createdAt: 1, isSeeded: false, delegationDepth: 0, sshTarget: 42,
+      version: 7, id: 'ssh', createdAt: 1, isSeeded: false, delegationDepth: 0, sshTarget: 42,
     })
-    expect(result).toMatchObject({ status: 'current', storedVersion: 6, targetVersion: 6 })
+    expect(result).toMatchObject({ status: 'current', storedVersion: 7, targetVersion: 7 })
     if (result.status !== 'current') throw new Error('expected current header')
     expect(result.header.sshTarget).toBe(42)
   })
@@ -59,7 +59,7 @@ describe('logical Session format catalog', () => {
   it('keeps source artifacts detached and upgrades the header only', () => {
     const events: SessionFormatEvent[] = [{ type: 'turn/start', seq: 0, time: 3, data: { turn: 1 } }]
     const migrated = migrate({ version: 1, id: 'artifact', createdAt: 2 }, events)
-    expect(migrated.header.version).toBe(6)
+    expect(migrated.header.version).toBe(7)
     expect(migrated.events).toEqual(events)
   })
 
@@ -69,7 +69,7 @@ describe('logical Session format catalog', () => {
       { type: 'step/start', seq: 1, time: 3, data: { turn: 1, step: 1 } },
       { type: 'request/header', seq: 2, time: 4, data: { header: { config: CONFIG, system: 'Be concise.' }, reason: 'initial' } },
     ] as SessionFormatEvent[])
-    expect(migrated.header.version).toBe(6)
+    expect(migrated.header.version).toBe(7)
     expect(migrated.events.map(item => item.type)).toEqual([
       'turn/start', 'step/start', 'system/message', 'system/message', 'request/header',
     ])
@@ -93,7 +93,7 @@ describe('logical Session format catalog', () => {
       event('turn/end', 9, { turn: 1, reason: { kind: 'completed' } }),
     ], 2)
     /* The released v2→v3 header edge retires the code preset vocabulary. */
-    expect(migrated.header).toMatchObject({ version: 6, agentPreset: 'ptc' })
+    expect(migrated.header).toMatchObject({ version: 7, agentPreset: 'ptc' })
     expect(migrated.inheritedEventCount).toBeGreaterThan(0)
     expect(migrated.events.map(item => item.type)).toContain('system/message')
     /* request/header is not a surface type: the generated system node
@@ -191,7 +191,7 @@ describe('logical Session format catalog', () => {
       event('turn/end', 4, { turn: 2, reason: { kind: 'completed' } }),
       event('session/end-seed', 5, {}),
     ])
-    expect(migrated.header.version).toBe(6)
+    expect(migrated.header.version).toBe(7)
     expect(migrated.inheritedEventCount).toBe(0)
     expect(migrated.events.filter(item => item.type === 'session/end-seed')).toHaveLength(2)
   })
@@ -203,7 +203,7 @@ describe('logical Session format catalog', () => {
       event('session/end-seed', 2, {}),
       event('turn/start', 3, { turn: 2 }),
     ], 2)
-    expect(migrated.header.version).toBe(6)
+    expect(migrated.header.version).toBe(7)
     expect(migrated.inheritedEventCount).toBe(2)
   })
 
@@ -311,6 +311,6 @@ describe('logical Session format catalog', () => {
     expect(output.map(item => item.type)).toEqual([
       'turn/start', 'session/end-seed', 'step/start', 'system/message', 'system/message', 'request/header', 'step/end', 'turn/end',
     ])
-    expect(stream.header.version).toBe(6)
+    expect(stream.header.version).toBe(7)
   })
 })

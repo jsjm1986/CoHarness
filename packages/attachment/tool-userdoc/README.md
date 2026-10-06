@@ -1,3 +1,8 @@
+---
+description: "Model-facing discovery and read tools for personal user documents"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-userdoc
 
 English | [中文](README.zh.md)
@@ -9,10 +14,24 @@ Model-facing discovery and read tools for the personal document workspace. The p
 Use `dsh-tool-userdoc` to give the agent `userdoc_list` and `userdoc_read` tools over the personal document workspace provided by `ctx.userDocs`. The agent can list folders and read document text through the same storage the browser document manager uses, without a separate retrieval channel. The package registers only tools and prompt guidance; it does not change the agent loop, the storage provider, or the document HTTP routes.
 
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Tools](#tools)
+- [Configuration](#configuration)
+- [Extension points](#extension-points)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="installation"></a>
 ## Installation
 
 Mount this function plugin in an Agent preset that already exposes `ctx.userDocs`, `ctx.tools`, and `ctx.systemPrompt`. The shipped Web `standard`, `ptc`, and `cordis` presets include the row; a minimal preset can omit it to keep personal-document access out of its tool catalog.
 
+<a id="tools"></a>
 ## Tools
 
 `userdoc_list` returns active personal documents as bounded metadata rows. An optional `query` matches the case-insensitive document name or root-relative id; `directory` limits the result to a root-relative folder; `offset` and `limit` continue a large result. The output contains the document id, display name, folder, byte count, media type, and modification time, but never the absolute host path.
@@ -25,6 +44,7 @@ Provider and stream failures are reduced to stable tool errors before they reach
 
 The package exports `USERDOC_NOT_TEXT_CODE`, `USERDOC_PERSONAL_SCOPE_UNAVAILABLE_CODE`, `USERDOC_TOOL_NO_AGENT_CODE`, and `USERDOC_TOOL_FAILED_CODE` for callers that need to route failures without parsing messages.
 
+<a id="configuration"></a>
 ## Configuration
 
 | Key | Default | Meaning |
@@ -37,10 +57,12 @@ The package exports `USERDOC_NOT_TEXT_CODE`, `USERDOC_PERSONAL_SCOPE_UNAVAILABLE
 
 The values are deployment configuration, not model-controlled limits. Every complete result remains bounded after formatting, including multibyte names and document content.
 
+<a id="extension-points"></a>
 ## Extension points
 
 The package is a Consumer of the existing `UserDocStore` seam. A future project-scope or remote implementation should add a separate document-source Service Definition and Provider that resolves an authenticated scope, then reuse these tool responsibilities without exposing Gateway URLs or host paths. Browser management remains owned by `@deepseek-ai/dsh-host-userdoc-http` and `@deepseek-ai/dsh-client-ui-documents`.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### System prompt
@@ -99,3 +121,13 @@ Each call and result is an append-only tool exchange after the reusable prompt p
 - The package is read-only. Saving, editing, versioning, and native desktop opening require separate model-facing or Host Consumers with their own approval and concurrency contracts.
 
 **Runtime invariant:** No companion is published. The package owns only tool and prompt registrations; execution results and storage containment are validated by their owning seams.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

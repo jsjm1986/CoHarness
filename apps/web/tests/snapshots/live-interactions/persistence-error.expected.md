@@ -11,7 +11,7 @@
     - img
   - button "Open right sidebar":
     - img
-- button "Process details":
+- button "Process details" [expanded]:
   - text: Process details
   - img
 - button "System prompt":
@@ -19,13 +19,13 @@
   - img
   - text: System prompt
 - text: Reply with a one-sentence description of event sourcing, then stop.
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
+- button "Context injection runtime-context":
   - img
   - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
+  - text: Context injection runtime-context
 - status: This turn failedThe session could not be saved. Please try again; contact an administrator if the problem continues.
 - textbox "Message the agent"
 - button "Add images or documents":
@@ -34,7 +34,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -42,4 +42,5 @@
 - group "Session statistics":
   - img
   - text: 1 turns · 1 steps
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

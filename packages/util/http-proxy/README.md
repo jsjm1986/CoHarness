@@ -92,6 +92,7 @@ An entry names a host and matches it together with every subdomain under it: `NO
 
 **Runtime invariant:** No companion is published. The one piece of mutable state here — the active policy — is asserted against the dispatcher it installs by unit tests that dispose the registration and observe a real loopback proxy.
 
+<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>

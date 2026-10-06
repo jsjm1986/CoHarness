@@ -32,8 +32,41 @@ it('installs a local bundle through the built Admin workflow and verifies the re
     await mkdir(bundle)
     await writeFile(join(bundle, 'package.json'), JSON.stringify({ name: '@fixture/admin-install', version: '1.0.0', description: 'Administrative installation acceptance', dsh: { bundle: { patch: './cordis.patch.yml' } } }))
     await writeFile(join(bundle, 'cordis.patch.yml'), '[]\n')
-    const process = spawn(globalThis.process.execPath, [resolve('apps/cli/lib/bin.js'), '--profile', 'web', '--port', '0', '--no-open'], {
-      cwd: root, env: { ...globalThis.process.env, DSH_HOME: home, DSH_AGENTS_HOME: join(root, 'agents'), DSH_TELEMETRY_DISABLED: '1', DEEPSEEK_API_KEY: 'keyless-no-model-calls' }, stdio: ['ignore', 'pipe', 'pipe'],
+    const pair = generateKeyPairSync('ed25519')
+    const db = openDb(join(root, 'gateway.sqlite')); cleanup.push(() => { db.close() })
+    const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_UPSTREAM_TIMEOUT_MS: '120000' })
+    const instances = new InstanceManager(db, cfg)
+    instances.isLive = async () => true; instances.generationOf = async () => 1
+    // The runtime port is bound by the spawned CLI below; reads happen only after it reports its address.
+    let runtimePort = 0
+    instances.portOf = async () => runtimePort
+    let leases = 0
+    instances.operationRef = async (_target, delta, generation) => { expect(generation).toBe(1); leases += delta }
+    const deps: GatewayDeps = { cfg, instances, auth: new AuthService(db, cfg),
+      users: new UserService(db, cfg), projects: new ProjectService(db, cfg), audit: new AuditService(db) }
+    const admin = await deps.users.create({ username: 'admin', password: 'fixture-password', role: 'admin' })
+    await deps.users.changeOwnPassword(admin.id, 'fixture-password')
+    deps.pluginManagement = new GatewayPluginManagement(deps, new GatewayPrincipalSigner(pair.privateKey, 'fixture', 30000), 'fixture-node')
+    const server = createGatewayServer(deps, { admin: createAdminApiHandler(deps), adminRoot: resolve('gateway/public/admin') })
+    await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
+    cleanup.push(() => new Promise<void>((resolve, reject) => {
+      server.closeAllConnections()
+      server.close((error) => { if (error) reject(error); else resolve() })
+    }))
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`; cfg.publicOrigins.push(base)
+    // Managed runtimes authenticate admin traffic by a verified principal against the credential
+    // injected at launch; the fixture reproduces that launch contract with a patch overlay and a
+    // credential file naming this test's signer public key and runtime identity.
+    const overlay = join(root, 'gateway-runtime.patch.yml')
+    await writeFile(overlay, "- insert:\n    - id: gateway-runtime\n      name: '@deepseek-ai/dsh-gateway-runtime'\n")
+    const credential = join(root, 'gateway-credential.json')
+    await writeFile(credential, JSON.stringify({
+      version: 1, gatewayUrl: base, organization: 'fixture', token: 'fixture-runtime-token',
+      principalPublicKey: pair.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
+      runtime: { kind: 'user', id: admin.id, generation: 1 },
+    }))
+    const process = spawn(globalThis.process.execPath, [resolve('apps/cli/lib/bin.js'), '--profile', 'web', '--patch', overlay, '--port', '0', '--no-open'], {
+      cwd: root, env: { ...globalThis.process.env, DSH_HOME: home, DSH_AGENTS_HOME: join(root, 'agents'), DSH_TELEMETRY_DISABLED: '1', DEEPSEEK_API_KEY: 'keyless-no-model-calls', DSH_GATEWAY_CREDENTIAL_FILE: credential }, stdio: ['ignore', 'pipe', 'pipe'],
     })
     let output = ''
     const exited = new Promise<void>((resolve, reject) => { process.once('close', () => { resolve() }); process.once('error', reject) })
@@ -45,37 +78,19 @@ it('installs a local bundle through the built Admin workflow and verifies the re
     }, { timeout: 60000 }).toBeTruthy()
     const runtime = /dsh web: (http:\/\/\S+)/u.exec(output)?.[1]
     if (runtime === undefined) throw new Error('CLI did not report its Web address')
-    const db = openDb(join(root, 'gateway.sqlite')); cleanup.push(() => { db.close() })
-    const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users'), HGW_PROJECTS_ROOT: join(root, 'projects'), HGW_UPSTREAM_TIMEOUT_MS: '120000' })
-    const instances = new InstanceManager(db, cfg)
-    instances.isLive = async () => true; instances.generationOf = async () => 1
-    instances.portOf = async () => Number(new URL(runtime).port)
-    let leases = 0
-    instances.operationRef = async (_target, delta, generation) => { expect(generation).toBe(1); leases += delta }
-    const deps: GatewayDeps = { cfg, instances, auth: new AuthService(db, cfg),
-      users: new UserService(db, cfg), projects: new ProjectService(db, cfg), audit: new AuditService(db) }
-    const admin = await deps.users.create({ username: 'admin', password: 'fixture-password', role: 'admin' })
-    await deps.users.changeOwnPassword(admin.id, 'fixture-password')
-    deps.pluginManagement = new GatewayPluginManagement(deps, new GatewayPrincipalSigner(generateKeyPairSync('ed25519').privateKey, 'fixture', 30000), 'fixture-node')
-    const server = createGatewayServer(deps, { admin: createAdminApiHandler(deps), adminRoot: resolve('gateway/public/admin') })
-    await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
-    cleanup.push(() => new Promise<void>((resolve, reject) => {
-      server.closeAllConnections()
-      server.close((error) => { if (error) reject(error); else resolve() })
-    }))
-    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`; cfg.publicOrigins.push(base)
+    runtimePort = Number(new URL(runtime).port)
     const browser = await chromium.launch(); cleanup.push(() => browser.close())
     const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } })
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
     const login = await page.request.post(`${base}/login`, { form: { username: 'admin', password: 'fixture-password' }, headers: { origin: base }, maxRedirects: 0 }); expect(login.status()).toBe(302)
     try {
       await page.goto(`${base}/admin/plugins`)
-      await page.getByLabel('插件运行范围').selectOption(`user:${admin.id}`)
-      await page.getByRole('button', { name: '查看 subagent', exact: true }).click()
+      await page.getByLabel('插件管理对象').selectOption(`user:${admin.id}`)
+      await page.getByRole('button', { name: '查看 子智能体', exact: true }).click()
       const config = page.getByRole('region', { name: 'subagent 配置', exact: true })
       await config.getByLabel('maxDepth', { exact: true }).fill('2')
       await config.getByRole('button', { name: '保存配置', exact: true }).click()
-      await config.getByText('即时配置已保存。', { exact: true }).waitFor()
+      await config.getByText('配置已保存并即时生效。', { exact: true }).waitFor()
       const settings = async () => parseYaml(await readFile(join(home, 'settings.yaml'), 'utf8')) as { subagent: { maxDepth: number } }
       expect((await settings()).subagent.maxDepth).toBe(2)
       await compareOrRefreshGolden(join(DIRECTORY, 'configuration.expected.md'), await config.ariaSnapshot(), webSnapshotMode())
@@ -109,7 +124,7 @@ it('installs a local bundle through the built Admin workflow and verifies the re
       }
       expect(manifest.dependencies['@fixture/admin-install']).toBeTruthy()
       expect(manifest.dsh.profile.bundles).not.toContain('@fixture/admin-install')
-      const row = page.getByRole('listitem').filter({ has: page.getByRole('button', { name: '查看 admin-install', exact: true }) })
+      const row = page.getByRole('listitem').filter({ has: page.getByRole('button', { name: '查看 @fixture/admin-install', exact: true }) })
       await compareOrRefreshGolden(join(DIRECTORY, 'install.expected.md'), await row.ariaSnapshot(), webSnapshotMode())
       await page.getByRole('button', { name: '立即启用', exact: true }).click()
       await expect.poll(async () => (JSON.parse(await readFile(join(home, 'profiles/web/package.json'), 'utf8')) as typeof manifest).dsh.profile.bundles).toContain('@fixture/admin-install')

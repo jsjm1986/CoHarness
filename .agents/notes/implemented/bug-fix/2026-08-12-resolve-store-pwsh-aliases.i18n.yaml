@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-12-resolve-store-pwsh-aliases.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-12-resolve-store-pwsh-aliases.md
-2026-08-12-resolve-store-pwsh-aliases.md: 20fe58e15e75462dc0a9ba76c7a1a94939f8a004
-2026-08-12-resolve-store-pwsh-aliases.zh.md: bbfa4616127a9dbdb6609fe2973283663de55b31
+/agent-note-resolve-microsoft-store-pwsh-aliases:
+  en: 541b402e9cd3d2ae
+  zh: d3640e7d4936df43
+/agent-note-resolve-microsoft-store-pwsh-aliases/problem:
+  en: caadd9b978ca38d3
+  zh: 9d08a01626bfc276
+/agent-note-resolve-microsoft-store-pwsh-aliases/decision:
+  en: af2e87ff7d35dac5
+  zh: 5420569db4ac27b6
+/agent-note-resolve-microsoft-store-pwsh-aliases/alternatives-considered:
+  en: ca0732ff4fb0b73c
+  zh: 31276a4dcf49ff1f
+/agent-note-resolve-microsoft-store-pwsh-aliases/consequences:
+  en: 40cbb5dce9fccafa
+  zh: 5e8c3114fe615cdb

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-31-project-session-failure-guidance.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-31-project-session-failure-guidance.md
-2026-08-31-project-session-failure-guidance.md: 0f707d4679787f2f7509aeafe117c7f9757fd608
-2026-08-31-project-session-failure-guidance.zh.md: c62996da79e1f48f1869d5fddc78b1832f63ab23
+/agent-note-project-session-failures-use-safe-user-guidance:
+  en: e348a48044cafcce
+  zh: d53c6c1bdc5f6b1b
+/agent-note-project-session-failures-use-safe-user-guidance/problem:
+  en: 1d05eaee9632fb3a
+  zh: 8261bd284d558ca3
+/agent-note-project-session-failures-use-safe-user-guidance/decision:
+  en: 39892decab0ae5cb
+  zh: 83bcad68d5d533c5
+/agent-note-project-session-failures-use-safe-user-guidance/verification:
+  en: 21a768d3a261603d
+  zh: b4ea5568b4c82991
+/agent-note-project-session-failures-use-safe-user-guidance/alternatives-considered:
+  en: 5a0151e181bebc16
+  zh: 5d031b9626013124
+/agent-note-project-session-failures-use-safe-user-guidance/consequences:
+  en: fefcef97ae89c527
+  zh: 530ea8781dd37e0e

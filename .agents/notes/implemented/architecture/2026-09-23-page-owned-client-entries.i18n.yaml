@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-23-page-owned-client-entries.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-23-page-owned-client-entries.md
-2026-09-23-page-owned-client-entries.md: 6f93640495c9b1a8fba745ac0efae6eacd338e94
-2026-09-23-page-owned-client-entries.zh.md: 119a371652e6bf0ad4c6a34e7ab148e42d2a1128
+/agent-note-page-owned-client-entry-lifecycle:
+  en: 8ae83f93c19cc5c4
+  zh: 7eee4eae7bc2f6f5
+/agent-note-page-owned-client-entry-lifecycle/problem:
+  en: 1042fc18d5c01764
+  zh: 2ab78347cbb1b4eb
+/agent-note-page-owned-client-entry-lifecycle/decision:
+  en: 41fcdbd88a3ba196
+  zh: 9c20cbdb35a65b61
+/agent-note-page-owned-client-entry-lifecycle/alternatives-considered:
+  en: 45837ad84dad286d
+  zh: ffaa5164c4c6e642
+/agent-note-page-owned-client-entry-lifecycle/consequences:
+  en: d2165d5c7f6b5486
+  zh: 8f6d6537d1648730

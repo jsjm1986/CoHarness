@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-pi-ai-wire-compat-surface.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-pi-ai-wire-compat-surface.md
-2026-08-18-pi-ai-wire-compat-surface.md: 3da2db1ebdf67bcfaf8c872491356b0ef7d0ca89
-2026-08-18-pi-ai-wire-compat-surface.zh.md: ff9870f5863fb96ee026dfab1b96b4e1f3e6e238
+/agent-note-pi-ai-wire-compatibility-surface-in-llm-pi-ai:
+  en: b7200701fe718f62
+  zh: b3d341445a75df2e
+/agent-note-pi-ai-wire-compatibility-surface-in-llm-pi-ai/problem:
+  en: fb1b3d0600007347
+  zh: f0a6d798686a6889
+/agent-note-pi-ai-wire-compatibility-surface-in-llm-pi-ai/decision:
+  en: aa767a88900c10b9
+  zh: 1dbd97251095e0e1
+/agent-note-pi-ai-wire-compatibility-surface-in-llm-pi-ai/where-a-refusal-lands:
+  en: 69ab9031e96bf002
+  zh: 9a2ec67ec24a1edb
+/agent-note-pi-ai-wire-compatibility-surface-in-llm-pi-ai/alternatives-considered:
+  en: 59a4de85775db783
+  zh: 57e4f80fdd01b84f
+/agent-note-pi-ai-wire-compatibility-surface-in-llm-pi-ai/consequences:
+  en: 9a477d16745d606f
+  zh: a800048b5c3f3fe8

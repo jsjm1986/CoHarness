@@ -119,10 +119,16 @@ describe('DeepSeekHarness', () => {
     const harness = harnessWith({ FAKE_EXECUTION_EVENT: '1', FAKE_TEXT: 'visible response' })
     const result = await harness.run('go')
     expect(result.finalResponse).toBe('visible response')
+    expect(result.events.find(event => event.type === 'gateway/scoped-execution')).toMatchObject({ data: { version: 1 } })
     expect(result.events.find(event => event.type === 'gateway/execution')).toMatchObject({
-      data: { kind: 'accepted', state: { revision: '1', primaryActorUserId: 7,
+      data: { kind: 'accepted', state: { revision: '1', scopeId: '10000000-0000-4000-8000-000000000001', primaryActorUserId: 7,
         inputs: ['00000000-0000-4000-8000-000000000001'], actors: [{ userId: 7 }], unverifiedHistory: false } },
     })
+    expect(result.events.find(event => event.type === 'gateway/continuation')).toMatchObject({ data: {
+      key: 'goal:example:1', scope: { parentSessionId: result.sessionId,
+        scopeId: '10000000-0000-4000-8000-000000000001', inputs: ['00000000-0000-4000-8000-000000000001'],
+        primaryActorUserId: 7, unverifiedHistory: false },
+    } })
   })
 
   it('preserves webhook message sources without promoting its prompt to the final response', async () => {
@@ -143,7 +149,8 @@ describe('DeepSeekHarness', () => {
     expect(result.events.filter(event => ['deliverables/presented', 'workspace/changes'].includes(event.type)))
       .toMatchObject([
         { type: 'deliverables/presented', data: { turn: 0, callId: 'present-1', files: [{ path: 'report.txt', description: 'Report' }] } },
-        { type: 'workspace/changes', data: { turn: 0 } },
+        { type: 'workspace/changes', data: { turn: 0, reviewId: 'a'.repeat(64) } },
+        { type: 'workspace/changes', data: { turn: 1, incomplete: true, requiredReviewBytes: 8192 } },
       ])
   })
 

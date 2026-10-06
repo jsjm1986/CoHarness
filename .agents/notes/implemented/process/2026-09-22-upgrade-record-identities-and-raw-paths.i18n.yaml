@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-22-upgrade-record-identities-and-raw-paths.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-22-upgrade-record-identities-and-raw-paths.md
-2026-09-22-upgrade-record-identities-and-raw-paths.md: 07afec7a463c72a6b79e239ea49fd410eb9d7eef
-2026-09-22-upgrade-record-identities-and-raw-paths.zh.md: 146e4b22e7341474dd43d4e1c53b7360000603a8
+/agent-note-unique-upgrade-decisions-and-raw-upstream-path-inventories:
+  en: a96f9cabbf2065b0
+  zh: a7002a6c0cf3b702
+/agent-note-unique-upgrade-decisions-and-raw-upstream-path-inventories/problem:
+  en: c38d4e61185d18b3
+  zh: 318cb155fde1a579
+/agent-note-unique-upgrade-decisions-and-raw-upstream-path-inventories/decision:
+  en: 0221edb26fdfed3a
+  zh: 12d8a344a727ffd4
+/agent-note-unique-upgrade-decisions-and-raw-upstream-path-inventories/alternatives-considered:
+  en: e0e4a1ad10a049df
+  zh: c0a41342bff21bb4
+/agent-note-unique-upgrade-decisions-and-raw-upstream-path-inventories/consequences:
+  en: 45b2d70b71dbcf74
+  zh: ec25544ff7a59048

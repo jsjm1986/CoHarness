@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-project-centric-admin.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-14-project-centric-admin.md
-2026-08-14-project-centric-admin.md: 4d7518574e062d9b206065a58a395f3589d4369a
-2026-08-14-project-centric-admin.zh.md: 915f82df7be6c524cde74a7f0b5def2110712da7
+/agent-note-project-centric-admin-browse-roots-and-unauthorized-workspace-open:
+  en: 2750854feca3e313
+  zh: a455b993f32a05ea
+/agent-note-project-centric-admin-browse-roots-and-unauthorized-workspace-open/problem:
+  en: e8e96356db0dbe27
+  zh: 34867d926c433f71
+/agent-note-project-centric-admin-browse-roots-and-unauthorized-workspace-open/decision:
+  en: 35560af8cc760735
+  zh: c354110a27400157
+/agent-note-project-centric-admin-browse-roots-and-unauthorized-workspace-open/alternatives-considered:
+  en: 7d7de75d80045e18
+  zh: 182e0db3d00a778a
+/agent-note-project-centric-admin-browse-roots-and-unauthorized-workspace-open/consequences:
+  en: cd193bfcb3424985
+  zh: 166b5d15fd3e78dd
+/agent-note-project-centric-admin-browse-roots-and-unauthorized-workspace-open/testing:
+  en: c4c023dffa19dc54
+  zh: 875a580084dfc81a

@@ -50,6 +50,18 @@ const rpcDomainErrorSchema = z.discriminatedUnion('code', [
     }),
   }),
   z.object({ code: z.literal('session-not-found'), message: z.string(), details: z.object({ sessionId: z.string() }) }),
+  z.object({
+    code: z.literal('session-active'),
+    message: z.string(),
+    details: z.object({
+      sessionId: z.string(),
+      activity: z.array(z.object({
+        kind: z.string(),
+        items: z.array(z.object({ id: z.string(), label: z.string().optional() })).optional(),
+      })),
+    }),
+  }),
+  z.object({ code: z.literal('session-archived'), message: z.string(), details: z.object({ sessionId: z.string() }) }),
   z.object({ code: z.literal('session-writer-held'), message: z.string(), details: z.object({ sessionId: z.string() }) }),
   z.object({ code: z.literal('model-unavailable'), message: z.string(), details: z.object({ provider: z.string(), model: z.string() }) }),
   z.object({ code: z.literal('model-forbidden'), message: z.string(), details: z.object({ provider: z.string(), model: z.string() }) }),
@@ -85,8 +97,6 @@ const rpcDomainErrorSchema = z.discriminatedUnion('code', [
   z.object({ code: z.literal('document-error'), message: z.string(), details: z.object({ reason: z.string() }) }),
   z.object({ code: z.literal('queue-item-not-found'), message: z.string(), details: z.object({ itemId: z.string() }) }),
   z.object({ code: z.literal('steer-unavailable'), message: z.string(), details: z.object({ itemId: z.string() }) }),
-  z.object({ code: z.literal('command-error'), message: z.string(), details: z.object({}) }),
-  z.object({ code: z.literal('unknown-command'), message: z.string(), details: z.object({}) }),
   z.object({
     code: z.literal('settings-rejected'), message: z.string(), details: z.object({
       ns: z.string(),
@@ -103,6 +113,7 @@ const rpcDomainErrorSchema = z.discriminatedUnion('code', [
   z.object({ code: z.literal('fork-unavailable'), message: z.string(), details: z.object({ sessionId: z.string() }) }),
   z.object({ code: z.literal('subagent-parent-unavailable'), message: z.string(), details: z.object({ parentSessionId: z.string() }) }),
   z.object({ code: z.literal('subagent-not-found'), message: z.string(), details: z.object({ parentSessionId: z.string(), childSessionId: z.string() }) }),
+  z.object({ code: z.literal('job-not-found'), message: z.string(), details: z.object({ sessionId: z.string().optional(), jobId: z.string() }) }),
   z.object({ code: z.literal('subagent-catalog-diagnostic'), message: z.string(), details: z.object({
     parentSessionId: z.string(),
     childSessionId: z.string(),

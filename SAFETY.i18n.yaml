@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for SAFETY.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write SAFETY.md
-SAFETY.md: af4f3aa74eb489e4b4456fc73cdff45fe14d1917
-SAFETY.zh.md: 76f9c49e5566ac63138dfb40f881c74a4d5afc99
+/safety:
+  en: a374f70c56b3f221
+  zh: a07f7a9ba9af40fc
+/safety/pre-release-status:
+  en: 403bb0e12fadcd40
+  zh: ed24237fc1f9965e
+/safety/sandbox-and-authorization-limits:
+  en: 0c7323dac0f1a71b
+  zh: 2e613c95a96c395a
+/safety/responsible-operation:
+  en: 8a87aca95977bba3
+  zh: 5e0fc7ea8fe263fe
+/safety/no-warranty:
+  en: 9f5d3f12364dcf35
+  zh: 8d7178140d59165c

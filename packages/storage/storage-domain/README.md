@@ -1,3 +1,8 @@
+---
+description: "Domain data form (ctx.storage.domain): schema-validated, event-emitting KV domains over storage backends for the DeepSeek Harness"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-storage-domain
 
 English | [中文](README.zh.md)
@@ -12,6 +17,16 @@ Design rationale, open semantics, and the storage/domain layer split live in the
 
 Use this package to declare schema-validated key-value domains and open them through `ctx.storageDomain` over a configured storage backend. Reads return synchronously from validated in-memory state, while each write becomes durable before it resolves and emits `domain/changed` in order. Product packages use domain handles instead of accessing storage backends directly. This host-side state does not add tools, prompts, or session events, so it remains invisible to the model and agent loop.
 
+## Table of Contents
+
+- [Configuration](#configuration)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="configuration"></a>
 ## Configuration
 
 | key | meaning |
@@ -19,6 +34,7 @@ Use this package to declare schema-validated key-value domains and open them thr
 | `backend` | Default backend name for every domain (required; no universally correct medium exists). |
 | `routes` | Per-domain overrides: domain name → backend name. |
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Durable domain state
@@ -39,3 +55,13 @@ Independent: domain reads and writes never touch request prefixes, so nothing he
 
 - **Single-process change visibility** — `domain/changed` is an in-process event; a second host process or a reconnecting GUI observes no changes until the cross-process revision pattern deferred in the Agent Note lands.
 - **No cross-table transactions, secondary indexes, or multi-segment keys** — each write touches one record; triggers and rework points for these extensions are tabled in the Agent Note's deferred-work list.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

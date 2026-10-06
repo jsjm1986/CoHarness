@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-localized-bilingual-links.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-18-localized-bilingual-links.md
-2026-08-18-localized-bilingual-links.md: d8b792d5d1e9c23a1e6389328ed02cf2fb337a0e
-2026-08-18-localized-bilingual-links.zh.md: ed49fccd975c6681831724d3577104a8ae7221cf
+/agent-note-localize-bilingual-document-links:
+  en: 769807d58174bbec
+  zh: 2dd753cb26aefaab
+/agent-note-localize-bilingual-document-links/problem:
+  en: 723e9d9d04387731
+  zh: c3e9a228ecb51e16
+/agent-note-localize-bilingual-document-links/decision:
+  en: e177ebbb8a53f92a
+  zh: b2cf14593487ad27
+/agent-note-localize-bilingual-document-links/verification:
+  en: e6e7e71c356785dc
+  zh: 7d97d9fbe3a54985
+/agent-note-localize-bilingual-document-links/alternatives-considered:
+  en: 163dfac13d5386da
+  zh: a796d3aad942657f
+/agent-note-localize-bilingual-document-links/consequences:
+  en: 22aaf1a82ec9da75
+  zh: 3a40445fd41e8008

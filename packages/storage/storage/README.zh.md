@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-storage
 
 [English](README.md) | 中文
@@ -8,16 +13,30 @@
 
 使用 `dsh-storage` 持久保存类型化应用数据，而不将其加入会话历史。将它与受支持的存储介质和领域配置一同挂载后，调用方即可通过公共 `ctx.storageDomain` API 访问记录。工作区记录、会话伴随数据或其他必须在重启后保留且不应成为会话事件的应用状态适合使用它。它仅供宿主代码使用，对模型没有可见影响；无需此类数据的组合可以省略它。
 
+## 目录
+
+- [结构](#shape)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="shape"></a>
 ## 结构
 
 - `ctx.storage.backend`：名称 → 后端表。多个后端并排保持挂载（`json`、`sqlite`）；为消费方提供服务的后端由该消费方自身的配置决定（领域层的路由表），绝非中心的全局选择。`register()` 返回资源释放函数；注册重复名称或查找未知名称时都会明确报错。
 - `ctx.storage.mount(form, facility)`／`ctx.storage.form(form)`：数据形式挂载。`StorageForms` 可通过合并扩展；领域层合并 `domain`，并通过 `ctx.storage.domain` 访问。
 - 后端拥有一种介质，并公开其支持的数据形状**分面**。当前分面为 `kv`；`src/backend.ts` 负责定义其确切约定。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。枢纽是后端与已挂载数据形式的具名注册表；它不执行 IO，也不拥有记录。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 后端与形式注册
@@ -34,7 +53,18 @@
 
 与实时请求相互独立：枢纽绝不触碰请求前缀，因此无法使提供方缓存复用失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **`kv` 是唯一的数据形状**：后端目前只有一个分面需要实现。
 - **数据形式按需解析**：在领域插件挂载前读取 `ctx.storage.domain` 会抛出 `form-not-mounted`；组装会按相应顺序排列插件（错误配置会明确报错，而不是静默推迟处理）。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

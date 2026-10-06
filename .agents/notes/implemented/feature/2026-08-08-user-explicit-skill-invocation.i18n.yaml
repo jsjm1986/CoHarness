@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-user-explicit-skill-invocation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-08-user-explicit-skill-invocation.md
-2026-08-08-user-explicit-skill-invocation.md: 6e70c67f771afeec881bdd8ad5c5322cc9190dfe
-2026-08-08-user-explicit-skill-invocation.zh.md: 00c76ab99a2074b5d7d84c870afd9a9190ec45df
+/agent-note-user-explicit-skill-invocation-at-the-pre-step-gesture-boundary:
+  en: f9778fe165ba1496
+  zh: fcda0eb4a018fb2b
+/agent-note-user-explicit-skill-invocation-at-the-pre-step-gesture-boundary/problem:
+  en: 7b82b788f64642ea
+  zh: 03f68a4683a9c04f
+/agent-note-user-explicit-skill-invocation-at-the-pre-step-gesture-boundary/decision:
+  en: 9af2fc54e37484ea
+  zh: 84c4c43f9ffa3013
+/agent-note-user-explicit-skill-invocation-at-the-pre-step-gesture-boundary/alternatives-considered:
+  en: 366b17b25f2d3727
+  zh: d12d3c78f04fa884
+/agent-note-user-explicit-skill-invocation-at-the-pre-step-gesture-boundary/consequences:
+  en: 48ff3f191f69c5e3
+  zh: 127f528766c332b0

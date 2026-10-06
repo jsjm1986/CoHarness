@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-12-product-subagent-one-shot-background-jobs.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-12-product-subagent-one-shot-background-jobs.md
-2026-08-12-product-subagent-one-shot-background-jobs.md: 778cf07d0df498564800427dd94865bd3620dd9c
-2026-08-12-product-subagent-one-shot-background-jobs.zh.md: f375a5eb85b9fcece875fe7071e60c91075e9c6f
+/agent-note-product-one-shot-subagents-use-generic-background-jobs:
+  en: 86d8f55c9662de33
+  zh: 3a1dbecad496b64a
+/agent-note-product-one-shot-subagents-use-generic-background-jobs/problem:
+  en: 0be5e7635ad7354d
+  zh: ffe7d6225674b999
+/agent-note-product-one-shot-subagents-use-generic-background-jobs/decision:
+  en: 440874679b7531e2
+  zh: 4965f6045204e00e
+/agent-note-product-one-shot-subagents-use-generic-background-jobs/decision/ownership-and-lifecycle:
+  en: ecbe978fe4693cc4
+  zh: 25ab032c8c1580f5
+/agent-note-product-one-shot-subagents-use-generic-background-jobs/published-composition:
+  en: 1893b93eadb79e85
+  zh: 2d3493cd8ccb7060
+/agent-note-product-one-shot-subagents-use-generic-background-jobs/verification:
+  en: b15c6d5cee89ca3c
+  zh: 2d576b34a8a51fae
+/agent-note-product-one-shot-subagents-use-generic-background-jobs/alternatives-considered:
+  en: 5510071655fe2c03
+  zh: 8d4eee298d4022d6
+/agent-note-product-one-shot-subagents-use-generic-background-jobs/consequences:
+  en: 36785b7584659213
+  zh: e3cbd192058ba2b6

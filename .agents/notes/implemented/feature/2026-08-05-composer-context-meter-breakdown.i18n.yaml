@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-05-composer-context-meter-breakdown.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-composer-context-meter-breakdown.md
-2026-08-05-composer-context-meter-breakdown.md: b9b3f8105153a1f873132010574f8880dc2253b0
-2026-08-05-composer-context-meter-breakdown.zh.md: 11453339e6cdda449489e6bbd811e8eaf27230f9
+/agent-note-composer-context-meter-with-heuristic-composition-breakdown:
+  en: 38d8ddfba08c8664
+  zh: c40ca14351b805c7
+/agent-note-composer-context-meter-with-heuristic-composition-breakdown/problem:
+  en: f4501f1d03e7e429
+  zh: 04d73ac7ff7a9941
+/agent-note-composer-context-meter-with-heuristic-composition-breakdown/decision:
+  en: f0d7472ab199ce88
+  zh: 7858a115a8fce54e
+/agent-note-composer-context-meter-with-heuristic-composition-breakdown/alternatives-considered:
+  en: 2a34917be990776f
+  zh: 55bbb5f69eef7b0f
+/agent-note-composer-context-meter-with-heuristic-composition-breakdown/consequences:
+  en: 3f9667b3fabc0d99
+  zh: 280fdbc9b8599813

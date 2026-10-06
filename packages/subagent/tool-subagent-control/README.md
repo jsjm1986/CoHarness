@@ -1,3 +1,8 @@
+---
+description: "Globally named send_message, interrupt_agent, and list_agents tools over ctx.subagents continuations"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-tool-subagent-control
 
 English | [中文](README.zh.md)
@@ -14,10 +19,21 @@ The tool performs no lifecycle routing — residency, cold resume, and authoriza
 
 `dsh-tool-subagent-control` adds the global control tools for continuable children: `send_message` steers between a direct parent and child, `interrupt_agent` stops a child's current turn while keeping its inbox and descendants intact, and `list_agents` (from the separately loadable `list-agents` plugin) lists continuable children by durable id and label. Parents and continuable children inherit the same `send_message` definition and ordering, so model communication adds no child-only tool schema. No tool's presence decides whether a delegation tool starts continuable work.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The controls are thin registrations over `ctx.subagents`; agent state belongs to the registry and its providers.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Tool schema
@@ -82,3 +98,13 @@ Append-only; each result follows the reusable request prefix.
 - **Only supported adjacent Agents can communicate** — every sender may target a direct continuable child, only a sender with a resident continuable Activation may target its direct parent, and that parent must remain live; siblings and deeper descendants are not message targets, and only direct-child delivery supports cold activation.
 - **Listing is a snapshot, not a delivery promise** — it may race publication, disposal, or a later message, and another process may activate a child this process reports as `ready`; cross-process accuracy requires a shared lease. `interrupt_agent` performs the authoritative live-lineage check itself, so discovery staleness cannot grant authority.
 - **No pagination or deletion** — the complete stably ordered set is returned, and persisted children remain listed for as long as their sessions remain in persistence; a service-level bound or delete operation is a later product decision.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

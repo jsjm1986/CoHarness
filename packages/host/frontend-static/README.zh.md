@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # `@deepseek-ai/dsh-host-frontend-static`
 
 [English](README.md) | 中文
@@ -10,10 +15,22 @@ Web 壳的 SPA dist 服务器：一个函数插件（配置为 `{distIndex}`）�
 
 从配置的发布目录向浏览器提供已构建的 Web 壳。根路径与配置的 index 路径渲染包含启动信息的 index；已有资产直接提供，而缺失或非文件路径返回 404、路径遍历返回 403、不支持的方法返回 405。访问 index 需要有效的进程 token 或浏览器 cookie，但静态资产仍可公开访问。同一时间只能有一个实例处理未匹配的路由；第二个实例启动失败，卸载活动实例后，未匹配的请求返回 404。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。响应从 dist 树无状态地提供；唯一注册是认领的回退席位，其释放由 HMR 安全性规格证明。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。该 SPA dist 服务器只应答浏览器资产请求，不注册任何面向模型的内容。
@@ -22,7 +39,18 @@ Web 壳的 SPA dist 服务器：一个函数插件（配置为 `{distIndex}`）�
 
 无；该包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **初始 MIME 表很精简**：它覆盖 Vite 输出的资产集合及实际交付的 PWA manifest；其他扩展名在相应资产类别实际发布前都会回退到 `application/octet-stream`。
 - **pathname 路由是显式的**：当前客户端只从根路径或配置的 index 路径进入，没有 History API pathname 路由。添加这类路由时必须同时添加显式服务器规则和真实组合测试，不得为每个未命中项启用宽泛回退。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

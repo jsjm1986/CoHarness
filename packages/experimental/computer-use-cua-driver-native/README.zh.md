@@ -82,6 +82,7 @@ env -u NODE_USE_ENV_PROXY DSH_COMPUTER_USE_NATIVE_E2E=1 node node_modules/vitest
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -123,6 +124,7 @@ On macOS, cursor-overlay operations may return facility_unavailable even when sc
 
 目录不变时，工具定义前缀保持稳定。工具结果追加到 Session 历史。替换提供者或其目录会改变模型可见工具，并可能减少前缀复用。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 <a id="known-limitations-and-deferred-work"></a>

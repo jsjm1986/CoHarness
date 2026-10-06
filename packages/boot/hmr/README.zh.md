@@ -64,7 +64,6 @@ App-boot 负责 profile 解析和 patch 优先级规则。HMR 读取启动器提
 
 </details>
 
-<a id="model-experience"></a>
 ## 模型体验
 
 ### 被重载的插件
@@ -81,6 +80,7 @@ App-boot 负责 profile 解析和 patch 优先级规则。HMR 读取启动器提
 
 重载提供上下文的插件可能改变后续请求前缀；HMR 不改写对话历史。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -93,3 +93,5 @@ App-boot 负责 profile 解析和 patch 优先级规则。HMR 读取启动器提
 <a id="dev-note"></a>
 
 无。
+
+<a id="model-experience"></a>

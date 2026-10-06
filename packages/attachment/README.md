@@ -1,3 +1,8 @@
+---
+description: "The durable binary attachment and named user-document capability families, with local implementations and a model-facing personal-document Consumer."
+kind: "package-group"
+---
+
 # attachment/ - durable attachment capability family
 
 English | [中文](README.zh.md)

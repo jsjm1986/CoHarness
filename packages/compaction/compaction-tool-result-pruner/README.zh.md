@@ -107,6 +107,7 @@ kind: "package-reference"
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -124,6 +125,7 @@ kind: "package-reference"
 
 替换较早的结果会使从第一个改变的 token 起的复用失效。当其路由、envelope 与之前的历史保持一致时，已剪枝前缀可以复用。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

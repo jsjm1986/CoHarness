@@ -1,3 +1,8 @@
+---
+description: "Official DeepSeek Harness brand occupants for the Web client's sidebar and conversation Hero slots"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-brand-official
 
 English | [中文](README.zh.md)
@@ -10,10 +15,21 @@ The three occupants install as one declaration-aware registration set through ne
 
 This package gives an `official` client build the DeepSeek Harness mark and name in the sidebar. Other build profiles keep the shell's fish mark and local-build label, while the conversation hero always uses the animated fish. Choose it for deployments branded as DeepSeek Harness; deployments with another identity should provide a replacement brand package. It has no runtime state and does not affect model requests.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The plugin fills brand slots with static occupants under a build flag and otherwise registers nothing; it owns no mutable state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the package contributes browser presentation only; nothing here reaches a model request.
@@ -26,3 +42,13 @@ None; this package neither assembles nor sends a provider request.
 
 - **The package supplies one occupant set** — alternative presentation belongs in another Cordis package occupying the same slots.
 - **The browser title is independent** — `DSH_CLIENT_TITLE` selects title text at build time rather than through a UI slot.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

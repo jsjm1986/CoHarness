@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-12-upstream-sovereignty-manifest.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-12-upstream-sovereignty-manifest.md
-2026-09-12-upstream-sovereignty-manifest.md: a2c2d300e232f716e64d14abbdc0417632614046
-2026-09-12-upstream-sovereignty-manifest.zh.md: 5e443fdeb39cc350ca6363ab1d616dd67e3f6389
+/agent-note-upstream-sovereignty-manifest-and-sync-gate:
+  en: 468037dd4c57f2e1
+  zh: 2290e92b8d75f0a5
+/agent-note-upstream-sovereignty-manifest-and-sync-gate/problem:
+  en: 3850b75e524e150d
+  zh: 38960de36ec7b7ee
+/agent-note-upstream-sovereignty-manifest-and-sync-gate/decision:
+  en: 70072ec697875f75
+  zh: 52a02c1e682b4482
+/agent-note-upstream-sovereignty-manifest-and-sync-gate/alternatives-considered:
+  en: 2a1ee0c4e5d19cdc
+  zh: 937fc93d41500a35
+/agent-note-upstream-sovereignty-manifest-and-sync-gate/testing:
+  en: 1503ca0b58b783d8
+  zh: cf7e1761a15923bb
+/agent-note-upstream-sovereignty-manifest-and-sync-gate/consequences:
+  en: 548fe3daae80b02f
+  zh: 6ea1909ab3312281

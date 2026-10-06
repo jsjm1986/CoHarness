@@ -175,7 +175,7 @@ async function launchScrollWorld(options: ScrollWorldOptions): Promise<ScrollWor
     scaffold.ctx.on('agent/assistant-stream', ({ frame }) => { assistantFrames.push(frame) })
     page = await newEnglishPage(browser, 900)
     const tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     // Session-list bootstrap can replace the controlled search state. Wait
     // for the seeded baseline before openSeed starts the lazy content query
@@ -277,7 +277,7 @@ async function openSeed(page: Page, fixture: ChatScrollFixture, tailMarker?: str
   // Search collapsed into a header action; expand it before filling.
   const searchButton = page.getByRole('button', { name: 'Search sessions' })
   if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
-  const search = page.getByRole('textbox', { name: 'Search sessions...', exact: true })
+  const search = page.getByRole('textbox', { name: 'Search sessions…', exact: true })
   // Cold summaries initially show the temporary workspace basename, so the
   // persisted first-prompt marker is the stable user-facing identity. The
   // query itself triggers lazy content-index reconciliation; no transient
@@ -506,7 +506,7 @@ describe('web e2e: long Chat scroll contract', () => {
       let releaseGate: (() => void) | undefined
       const gate = new Promise<void>((resolve) => { releaseGate = resolve })
       releaseHistory = () => { releaseGate?.() }
-      await world.page.route('**/api/session.history', async (route) => {
+      await world.page.route(/\/api\/session\.history(?:\?.*)?$/, async (route) => {
         const request = route.request().postDataJSON() as {
           method?: string
           payload?: { beforeSeq?: number }
@@ -555,7 +555,7 @@ describe('web e2e: long Chat scroll contract', () => {
       await settled
       await expect.poll(() => world.page.locator('[data-streaming="true"]').count(), { timeout: 15_000 }).toBe(0)
       await world.page.getByText(LIVE_TEXT_DONE, { exact: false }).last().waitFor({ timeout: 15_000 })
-      await world.page.unroute('**/api/session.history')
+      await world.page.unroute(/\/api\/session\.history(?:\?.*)?$/)
 
       let additionalPages = 0
       while (additionalPages < 8) {
@@ -651,6 +651,20 @@ describe('web e2e: long Chat scroll contract', () => {
       const liveRowSelector = `[data-chat-call-id="${LIVE_TOOL_CALL_ID}"] [data-sample="bash"]`
       const liveRow = world.page.locator(liveRowSelector)
       await wheelUntilVisible(world.page, liveRowSelector, -300)
+      // The live row sits in the transcript tail: "visible" there still leaves
+      // the reader bottom-pinned, where expansion legitimately re-follows to
+      // the new floor. Bring the row to mid-viewport — visibly inside and off
+      // the floor, so the click neither auto-scrolls nor re-pins.
+      await liveRow.evaluate((row) => {
+        const host = row.closest<HTMLElement>('[data-conversation-scroll]')
+        if (host === null) throw new Error('live tool row lost its conversation scrollport')
+        const top = row.getBoundingClientRect().top - host.getBoundingClientRect().top
+        host.scrollTop = Math.max(0, host.scrollTop + top - host.clientHeight / 2)
+      })
+      await expect.poll(
+        async () => (await scrollGeometry(world.page)).distanceFromBottom,
+        { timeout: 10_000 },
+      ).toBeGreaterThan(32)
       const toolAnchor = await liveRow.evaluate((row) => {
         const flow = row.closest<HTMLElement>('[data-chat-anchor-key]')
         const host = row.closest<HTMLElement>('[data-conversation-scroll]')

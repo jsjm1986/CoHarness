@@ -1,7 +1,7 @@
 /** Test adapter for the production conversation.details.tool registration. */
 import type { HostDescription } from '@deepseek-ai/dsh-client-connection/client'
 import type {
-  ChatConversationViewNode, ChatSnapshot, ConversationNode, RunningToolCall, SessionId,
+  ChatConversationViewNode, ChatSnapshot, ConversationNode, ConversationSnapshot, RunningToolCall, SessionId,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionProviderComponent, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { DetailsSlotProps, DetailsToolOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/src/client/contract/slots.ts'
@@ -64,10 +64,14 @@ export function renderToolDetails(
     // PropsRenderSlots keeps its key generic even for this one-key share;
     // recover the concrete owner selected by the adapter's fixed slot.
     const details = owner as unknown as DetailsToolOwnerProps
+    // Direct panel tests run without an assembled Session; the recorded todo
+    // history reads as absent, mirroring an uninstalled todo view.
+    const snapshot = { views: { get: () => undefined }, hasMore: false } as unknown as ConversationSnapshot
     return <ToolDetails
       block={details.block}
       cwd={details.cwd}
       useHostDescription={selector => selector(description)}
+      useSession={selector => selector(snapshot)}
       t={t}
     />
   }

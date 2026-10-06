@@ -72,6 +72,7 @@
     { "path": "./packages/extensions/cordis-client-runner" },
     { "path": "./packages/extensions/ui-cordis" },
     { "path": "./packages/test-support/client-runtime" },
+    { "path": "./packages/test-support/remote-mock" },
     { "path": "./packages/client/ui-layout" },
     { "path": "./packages/client/ui-usage-alert" },
     { "path": "./packages/client/ui-sidebar" },
@@ -100,6 +101,7 @@
     { "path": "./packages/client/ui-agent-preset" },
     { "path": "./packages/client/ui-permission-presets" },
     { "path": "./packages/client/ui-plan" },
+    { "path": "./packages/client/ui-plugin-manager/tsconfig.client.json" },
     { "path": "./packages/client/ui-settings-plugins" },
     { "path": "./packages/client/ui-user-questions" },
     { "path": "./packages/client/ui-trajectory" },
@@ -111,9 +113,13 @@
     { "path": "./packages/client/ui-settings-plugin-inventory" },
     { "path": "./packages/client/ui-settings-unarchive-sessions" },
     { "path": "./packages/client/locale" },
+    { "path": "./packages/client/shortcuts/tsconfig.client.json" },
+    { "path": "./packages/client/ui-shortcuts" },
     { "path": "./packages/client/ui-renderer" },
     { "path": "./packages/client/web" },
     { "path": "./packages/experimental/client-ui-agent-team" },
+    { "path": "./packages/experimental/client-ui-voice-input" },
+    { "path": "./packages/experimental/speech-to-text" },
     { "path": "./apps/web" }
   ]
 }

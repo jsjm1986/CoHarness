@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-composer-mobile-model-seat.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-composer-mobile-model-seat.md
-2026-08-17-composer-mobile-model-seat.md: d2b4bc8bac3625682f21a740966d90e1c9acff77
-2026-08-17-composer-mobile-model-seat.zh.md: 696ecb2808609ac376c764e276b87cf05a83861a
+/agent-note-mobile-composer-reserves-the-model-seat:
+  en: 9a5591d19572404d
+  zh: aa8c9cdfa41525d5
+/agent-note-mobile-composer-reserves-the-model-seat/problem:
+  en: 99f9eebcf7d1d535
+  zh: ea2823400a45e21e
+/agent-note-mobile-composer-reserves-the-model-seat/decision:
+  en: 39dcc3fcb21f4077
+  zh: 558faaa1eff9e117
+/agent-note-mobile-composer-reserves-the-model-seat/verification:
+  en: b96a68812be0013b
+  zh: 09ea1c5cd028b015
+/agent-note-mobile-composer-reserves-the-model-seat/alternatives-considered:
+  en: da8ed1a762f47df9
+  zh: cbe5710e6ddec742
+/agent-note-mobile-composer-reserves-the-model-seat/consequences:
+  en: 0f1704ce020c2920
+  zh: 97d0da9d70514584

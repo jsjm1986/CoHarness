@@ -94,6 +94,7 @@ loopback 始终被绕过——`localhost`、整个 `127.0.0.0/8` 段、`::1`、`
 
 **运行时不变式：** 不发布伴生入口。本包唯一的可变状态——生效中的策略——由单元测试对照它所安装的 dispatcher 断言：测试会对该注册执行 dispose（资源释放）并观察一个真实的 loopback 代理。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -108,6 +109,9 @@ loopback 始终被绕过——`localhost`、整个 `127.0.0.0/8` 段、`::1`、`
 - **执行模型编写代码的 worker 完全不获得代理**——`ptc-runtime` worker 与 `workflow` worker 都不接收代理配置，它们自身的请求直连。代理 URL 可能携带 `user:password`，而两者运行的都是模型写的脚本。
 - **防回归门禁只看源码，看不到依赖内部**——`verify-no-bare-dispatcher` 解析 `packages/*/*/src` 与 `apps/*/src`；测试、脚本以及第三方 SDK 的内部都在其之外。这正是每个出网点还各配一份 `egress.spec.ts` 的原因。
 
+
+**运行时不变量：** 包伴生入口不注册运行时检查。本启动库不暴露 Cordis 事件流或由 owner 管理的可变数据；出站测试会对照它安装的 dispatcher 断言生效策略。
+
 <a id="dev-note"></a>
 ### 开发备注
 
@@ -117,5 +121,3 @@ loopback 始终被绕过——`localhost`、整个 `127.0.0.0/8` 段、`::1`、`
 userland undici 能触及 Node 内置的 `fetch`，依赖的是两者都会写入 legacy 的 `Symbol.for('undici.globalDispatcher.1')` 槽位。那是跨版本的隐式耦合，不是约定——参见 [corepack#834](https://github.com/nodejs/corepack/issues/834) 中它失效的实例。`tests/install.spec.ts` 断言真实请求会抵达一个 loopback 代理，因此破坏该耦合的版本升级会在那里失败，而不是流到线上。
 
 </details>
-
-**运行时不变量：** 包伴生入口不注册运行时检查。本启动库不暴露 Cordis 事件流或由 owner 管理的可变数据；出站测试会对照它安装的 dispatcher 断言生效策略。

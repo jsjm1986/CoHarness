@@ -1,3 +1,8 @@
+---
+description: "Shell plugin: three-column AppFrame with drag handles, ctx.layout viewing-state service (navigation + panels)"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-layout
 
 English | [中文](README.zh.md)
@@ -14,10 +19,21 @@ The `/client` exports are the plugin body (`apply`/`inject`), `LayoutController`
 
 This package provides the Web GUI's three-column AppFrame, edge-column widths, and `ctx.layout` presentation control. The right column concedes space before the center; its occupant renders fullscreen while the frame retains the wide-screen track underneath. The theme presenter owns color scheme, alias tokens, content font size, and document metadata. Layout state resets on reload.
 
+## Table of Contents
+
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. Panel geometry and collapse are presentation-local service state; the frame's slot registrations prove disposal through the HMR-safety spec.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the layout shell manages browser viewing state; nothing here reaches a model request.
@@ -31,3 +47,13 @@ None; this package neither assembles nor sends a provider request.
 - **Panel widths are transient** — reload restores their defaults; the sidebar restores account-scoped Session tabs, visibility, and splits.
 - **Insufficient space collapses the auxiliary panel** — the frame reports available room and the tab owner applies the collapse; a width preference does not imply visibility.
 - **No scroll anchoring during squeeze reflow** — layout changes may move the reader's viewport.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

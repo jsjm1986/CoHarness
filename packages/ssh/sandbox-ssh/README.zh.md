@@ -51,6 +51,7 @@ kind: "package-reference"
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -60,6 +61,7 @@ kind: "package-reference"
 
 本提供方不贡献请求前缀内容。面向模型的工具与结果由消费方负责。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 <a id="known-limitations-and-deferred-work"></a>

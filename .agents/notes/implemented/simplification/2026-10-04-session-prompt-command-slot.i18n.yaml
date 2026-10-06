@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-04-session-prompt-command-slot.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-10-04-session-prompt-command-slot.md
+/agent-note-remove-the-unproduced-command-slot-from-session-prompt:
+  en: 4864235c9be854c2
+  zh: 9ec574a988e2dafa
+/agent-note-remove-the-unproduced-command-slot-from-session-prompt/problem:
+  en: 12738f5f06bbcb6c
+  zh: 644bce451741d0c9
+/agent-note-remove-the-unproduced-command-slot-from-session-prompt/decision:
+  en: fe1d256edd6e0bb1
+  zh: 523bec3c46c00269
+/agent-note-remove-the-unproduced-command-slot-from-session-prompt/files:
+  en: a509d0bac0b5b0b1
+  zh: 8be9e23030ecb122
+/agent-note-remove-the-unproduced-command-slot-from-session-prompt/alternatives-considered:
+  en: 23d2363d2c8a8a91
+  zh: fd25ad6d956cb9ef
+/agent-note-remove-the-unproduced-command-slot-from-session-prompt/consequences:
+  en: c376be8aaea11d50
+  zh: 5d6bd6ab1fcb8d2d

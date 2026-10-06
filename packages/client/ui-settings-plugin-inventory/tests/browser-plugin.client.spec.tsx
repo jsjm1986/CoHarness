@@ -10,15 +10,17 @@ import { apply, inject, NS } from '../src/client/index.ts'
 import { PluginInventorySettingsTab } from '../src/client/PluginInventorySettingsTab.tsx'
 import type { PluginInventorySettingsTabInjected } from '../src/client/PluginInventorySettingsTab.tsx'
 import type { ClientModuleLoader } from '@deepseek-ai/dsh-client-modules/client'
+import type { ChangeResult, PluginInfo } from '@deepseek-ai/dsh-api-remotes/client'
 import { apply as nodeApply } from '../src/index.ts'
 
 usePinnedBrowserLanguages('zh-CN')
 afterEach(cleanup)
 
 const EMPTY = { entries: [] }
-type ListResult =
-  | { readonly ok: true; readonly value: typeof EMPTY }
+type RemoteAnswer<V> =
+  | { readonly ok: true; readonly value: V }
   | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
+type ListResult = RemoteAnswer<typeof EMPTY>
 
 async function bench() {
   const ctx = new Context()
@@ -34,10 +36,17 @@ async function bench() {
   const list = vi.fn<() => Promise<ListResult>>()
     .mockResolvedValue({ ok: true, value: EMPTY })
   ctx.provide('remote.pluginInventory', { list })
+  const listPlugins = vi.fn<() => Promise<RemoteAnswer<PluginInfo[]>>>()
+    .mockResolvedValue({ ok: true, value: [] })
+  const setPluginEnabled = vi.fn<() => Promise<RemoteAnswer<ChangeResult>>>()
+    .mockResolvedValue({ ok: true, value: { changed: true, application: 'applied', stage: 'enable', target: 'x' } })
+  const access = vi.fn<() => Promise<RemoteAnswer<{ manage: boolean }>>>()
+    .mockResolvedValue({ ok: true, value: { manage: true } })
+  ctx.provide('remote.pluginManager', { listPlugins, setPluginEnabled, access })
   const retry = vi.fn(async () => {})
   const state = { getSnapshot: () => ({ syncing: false, failures: [] }), subscribe: () => () => {} }
   ctx.provide('modules', { entries: { state, retry } } as unknown as ClientModuleLoader)
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, retry, state }
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, listPlugins, setPluginEnabled, access, retry, state }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -49,7 +58,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-plugin-inventory browser plugin', () => {
   it('declares only the services used by the Settings Remote contribution', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginInventory', 'modules'])
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginInventory', 'remote.pluginManager', 'modules'])
   })
 
   it('registers a localized tab without reading the Remote eagerly', async () => {
@@ -66,6 +75,11 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
 
     const injected = (entry.inject as unknown as () => PluginInventorySettingsTabInjected)()
     expect(injected.hooks.clientSync).toBe(b.state)
+    const text = { en: 'Local tools', zh: '本地工具' }
+    expect(injected.resolveText(text)).toBe('本地工具')
+    b.locale.setLocale('en')
+    expect(injected.resolveText(text)).toBe('Local tools')
+    b.locale.setLocale('zh')
     injected.retryClient()
     expect(b.retry).toHaveBeenCalledOnce()
     const failure = new Error('page retry failed')
@@ -78,6 +92,16 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
     expect(b.list).toHaveBeenCalledOnce()
     b.list.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
     await expect(injected.list()).rejects.toThrow('pluginInventory.list failed: REMOTE_ERROR: unavailable')
+    await expect(injected.management()).resolves.toEqual({ status: 'granted', plugins: [] })
+    b.access.mockResolvedValueOnce({ ok: true, value: { manage: false } })
+    await expect(injected.management()).resolves.toEqual({ status: 'denied' })
+    b.access.mockResolvedValueOnce({ ok: false, error: { code: 'gateway/unknown-remote', message: 'no such remote' } })
+    b.listPlugins.mockResolvedValueOnce({ ok: false, error: { code: 'plugin-management/forbidden', message: 'denied' } })
+    await expect(injected.management()).resolves.toEqual({ status: 'denied' })
+    b.listPlugins.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'offline' } })
+    await expect(injected.management()).rejects.toThrow('pluginManager.listPlugins failed: REMOTE_ERROR: offline')
+    b.setPluginEnabled.mockResolvedValueOnce({ ok: false, error: { code: 'plugin-management/forbidden', message: 'denied' } })
+    await expect(injected.setPluginEnabled('include:x' as never, false)).rejects.toThrow('pluginManager.setPluginEnabled failed: plugin-management/forbidden: denied')
     await b.ctx.fiber.dispose()
   })
 

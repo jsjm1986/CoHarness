@@ -140,7 +140,7 @@ describe('same-session goal snapshot through the ACP automation driver', () => {
     // The wrap-up instruction is one plugin-sourced context injected after the
     // terminal tool result, and the model still answers inside the same turn.
     const wrapups = events.filter(event => event.type === 'user/message'
-      && event.data.source.kind === 'plugin' && event.data.source.plugin === 'tool-goal')
+      && event.data.source.kind === 'tool-goal')
     expect(wrapups).toHaveLength(1)
     const wrapupText = wrapups.map(event => event.type === 'user/message' ? event.data.content : [])[0]
     expect(JSON.stringify(wrapupText)).toContain('<goal_complete>')

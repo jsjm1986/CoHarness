@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-13-safari-textarea-soft-wrap-reflow.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-13-safari-textarea-soft-wrap-reflow.md
-2026-08-13-safari-textarea-soft-wrap-reflow.md: fb264a8e6fbe24369584f2427bbb0c462b450ecf
-2026-08-13-safari-textarea-soft-wrap-reflow.zh.md: f4cdf9b38ca8ca093cf388973d40e652d76a2f27
+/agent-note-safari-textarea-soft-wrap-shrink-recovery:
+  en: 39eedc6bbf874e7f
+  zh: 55147635dac47401
+/agent-note-safari-textarea-soft-wrap-shrink-recovery/problem:
+  en: d3f1caac034789e2
+  zh: 53de6f4cab9a5ff5
+/agent-note-safari-textarea-soft-wrap-shrink-recovery/decision:
+  en: 40801b93785a0e49
+  zh: c0c6e3d604e41236
+/agent-note-safari-textarea-soft-wrap-shrink-recovery/verification:
+  en: f7f92e29df3438be
+  zh: 9f79fe41ff220ea9
+/agent-note-safari-textarea-soft-wrap-shrink-recovery/alternatives-considered:
+  en: 08ca11a658de27c7
+  zh: 549ad1a3d5fd5f1f
+/agent-note-safari-textarea-soft-wrap-shrink-recovery/consequences:
+  en: f8312f03a743e733
+  zh: 14d0535d7cb5cc4a

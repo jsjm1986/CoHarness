@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-workspace-sidebar-order-and-folding.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-11-workspace-sidebar-order-and-folding.md
-2026-08-11-workspace-sidebar-order-and-folding.md: c49f8d4bbf3cfe09a0fde298d2b384defdf488f6
-2026-08-11-workspace-sidebar-order-and-folding.zh.md: 8f38f3990a0505b2042f9a50ca908ea72b649375
+/agent-note-workspace-sidebar-order-and-folding:
+  en: 4a7b4917b7ebe32c
+  zh: 4322730c083bf41e
+/agent-note-workspace-sidebar-order-and-folding/problem:
+  en: 2de3e9192fdb6832
+  zh: 5dcc7b961ec023c6
+/agent-note-workspace-sidebar-order-and-folding/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-workspace-sidebar-order-and-folding/decision/workspace-order:
+  en: 196f2ffce970059c
+  zh: c775786482419352
+/agent-note-workspace-sidebar-order-and-folding/decision/session-folding-and-view-order:
+  en: 8a7fde87c5edb083
+  zh: 11494faf11d70268
+/agent-note-workspace-sidebar-order-and-folding/decision/drag-and-compact-chrome:
+  en: 98a97b82d87e8d4f
+  zh: fd89fec5cd2d21c1
+/agent-note-workspace-sidebar-order-and-folding/alternatives-considered:
+  en: 0dd05225c02b5d08
+  zh: 26901e84bfa93bfd
+/agent-note-workspace-sidebar-order-and-folding/consequences:
+  en: fa78ab5c35614b32
+  zh: 7f01770c0fbe537c
+/agent-note-workspace-sidebar-order-and-folding/testing:
+  en: f7a1f18737ddb170
+  zh: 91302d05f51276da

@@ -18,7 +18,9 @@ export function parsedToolCall(block: ToolCallBlock): ParsedToolCall | null {
   const cached = parsedCalls.get(block)
   if (cached !== undefined || parsedCalls.has(block)) return cached ?? null
   const call = 'kind' in block ? block.call : block
-  if (call === null) {
+  // A still-preparing call head has no dispatched arguments yet; it parses as
+  // unavailable the same way a window-truncated call head does.
+  if (call === null || !('argsRaw' in call)) {
     parsedCalls.set(block, null)
     return null
   }

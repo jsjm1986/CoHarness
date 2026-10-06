@@ -19,8 +19,9 @@ afterEach(() => {
 
 const stabilize: Stabilizer = async (fn) => { await act(async () => { await fn() }) }
 
-async function bench() {
+async function bench(onPrincipalChange?: (cleanup: () => void | Promise<void>) => () => void) {
   const ctx = new Context()
+  ctx.provide('connection', { onPrincipalChange } as never)
   await ctx.plugin(SlotRegistry).await()
   const slots = ctx.get('slots') as SlotRegistry
   ctx.provide('sessions', new TestSessions(stabilize, ctx))
@@ -87,4 +88,19 @@ describe('UI renderer plugin', () => {
     expect(ctx.get('uiRenderer')).toBeUndefined()
     expect(() => slots.renderSlot('root', {})).toThrow('not installed')
   })
+})
+
+it('withdraws all account UI synchronously and conceals detached content when a disposer fails', async () => {
+  let withdraw: (() => void | Promise<void>) | undefined
+  const { ctx, slots } = await bench((cleanup) => { withdraw = cleanup; return () => {} })
+  slots.register({ name: 'root' }, () => <div>Private conversation</div>)
+  const first = container(), second = container()
+  act(() => { mounted.push(ctx.uiRenderer.mount(first), ctx.uiRenderer.mount(second)) })
+  const detached = document.createElement('div')
+  detached.textContent = 'Private portal'
+  document.body.append(detached)
+  vi.spyOn(first, 'replaceChildren').mockImplementationOnce(() => { throw new Error('fixture disposal failed') })
+  act(() => { expect(() => withdraw?.()).toThrow('Client account renderer cleanup failed') })
+  expect(document.body.textContent).not.toContain('Private')
+  act(() => { expect(() => withdraw?.()).not.toThrow() })
 })

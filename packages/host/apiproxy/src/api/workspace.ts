@@ -39,11 +39,18 @@ export interface WorkspaceView {
 export interface WorkspaceApi {
   /**
    * Lists all workspaces in the registry's durable display order, plus the
-   * registry-global archive set (the reconnect baseline of
-   * `host/archived-sessions-changed`). Archived sessions stay in their
-   * workspace's `sessionIds` account; grouping surfaces hide them.
+   * registry-global archive and pin sets (the reconnect baselines of
+   * `host/archived-sessions-changed` and `host/pinned-sessions-changed`).
+   * Archived sessions stay in their workspace's `sessionIds` account;
+   * grouping surfaces hide them. The pin set is ordered, most recently
+   * pinned first.
    */
-  list(request: RpcRequest<{}>): Promise<RpcResponse<{ items: WorkspaceView[]; archivedSessionIds: SessionId[]; archiveRevision?: number }>>
+  list(request: RpcRequest<{}>): Promise<RpcResponse<{
+    items: WorkspaceView[]
+    archivedSessionIds: SessionId[]
+    pinnedSessionIds: SessionId[]
+    archiveRevision?: number
+  }>>
 
   /**
    * Creates (or idempotently resolves) a workspace over an EXISTING directory
@@ -101,10 +108,13 @@ export interface WorkspaceApi {
    * disappears from every grouping surface but keeps its session log and its
    * workspace accounting slot (a future unarchive restores its position).
    * Idempotent for an already archived id. A session neither live nor in
-   * session persistence fails with `session-not-found`. Returns the full
-   * updated set (same snapshot the changed frame carries).
+   * session persistence fails with `session-not-found`. Without
+   * `stopActivity` a session whose providers report running work fails with
+   * `session-active` naming that activity; with it the archive lands first
+   * and the providers are asked to stop the work. Returns the full updated
+   * set (same snapshot the changed frame carries).
    */
-  archiveSession(request: RpcRequest<{ sessionId: SessionId }>):
+  archiveSession(request: RpcRequest<{ sessionId: SessionId; stopActivity?: boolean }>):
   Promise<RpcResponse<{ archivedSessionIds: SessionId[]; archiveRevision?: number }>>
 
   /**
@@ -116,4 +126,23 @@ export interface WorkspaceApi {
    */
   unarchiveSession(request: RpcRequest<{ sessionId: SessionId }>):
   Promise<RpcResponse<{ archivedSessionIds: SessionId[]; archiveRevision?: number }>>
+
+  /**
+   * Adds one known unarchived session to the registry-global pin set,
+   * surfacing it ahead of every unpinned session on grouping surfaces.
+   * Idempotent for an already pinned id. An archived session fails with
+   * `bad-request`; a session neither live nor in session persistence fails
+   * with `session-not-found`. Returns the full pin set, most recently
+   * pinned first.
+   */
+  pinSession(request: RpcRequest<{ sessionId: SessionId }>):
+  Promise<RpcResponse<{ pinnedSessionIds: SessionId[] }>>
+
+  /**
+   * Drops one session from the registry-global pin set. An id that is not
+   * pinned is not an error: the call is idempotent, so a lost race with
+   * another surface resolves as a no-op. Returns the full pin set.
+   */
+  unpinSession(request: RpcRequest<{ sessionId: SessionId }>):
+  Promise<RpcResponse<{ pinnedSessionIds: SessionId[] }>>
 }

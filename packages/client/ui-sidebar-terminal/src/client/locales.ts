@@ -33,7 +33,7 @@ export const en = {
   connecting: 'Connecting…', disconnected: 'Disconnected.', reconnect: 'Reconnect',
   readonly: 'This view is read-only.', control: 'Take control',
   closed: 'Terminal closed.', exited: 'Process exited ({code})', failed: 'Terminal error: {message}',
-  forbidden: 'This account lacks the user qualification and writable project authorization required for terminal access.',
+  forbidden: 'This account lacks the user qualification or a writable project permission required for terminal access.',
   rename: 'Terminal name', unavailable: 'Unavailable', retry: 'Retry',
   cleanupFailed: 'Terminal “{title}” could not be ended: {message}',
   missingTerminal: 'This terminal no longer exists. Open a new terminal.',

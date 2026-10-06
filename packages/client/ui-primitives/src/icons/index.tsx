@@ -3,6 +3,7 @@
  * stroked) and take {size, className}. Batch A mirrors the deepsuite icon
  * library (same figma source); batch B glyphs are harness-only figma extracts.
  */
+import { useId } from 'react'
 import type { IconProps } from './props.ts'
 
 export type { IconProps } from './props.ts'
@@ -890,6 +891,17 @@ export const IconSkillOutline16 = ({ size = 16, className }: IconProps) => (
   </svg>
 )
 
+/** deliver_doc (present/deliverables tool-row glyph; document + tray) */
+export const IconDeliverDoc16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M6.15479 4.91687H9.84543" stroke="currentColor" />
+    <path d="M11.8798 9.55347V2.71525C11.8798 2.37416 11.564 2.09766 11.1744 2.09766H4.82577C4.43618 2.09766 4.12036 2.37416 4.12036 2.71525V9.55347" stroke="currentColor" />
+    <path d="M2.28735 13.8022V8.84792C2.28735 8.77514 2.36262 8.72673 2.42884 8.75693L13.2936 13.7112C13.3914 13.7558 13.3596 13.9022 13.2521 13.9022H2.38735C2.33213 13.9022 2.28735 13.8575 2.28735 13.8022Z" stroke="currentColor" />
+    <path d="M7.46929 10.979L13.5783 8.7416C13.6435 8.7177 13.7126 8.76601 13.7126 8.83551L13.7125 13.8022C13.7125 13.8574 13.6678 13.9022 13.6125 13.9022H7.99999" stroke="currentColor" />
+    <path d="M6.15479 7.2395H9.05644" stroke="currentColor" />
+  </svg>
+)
+
 /** ic_ds_question_outline_14 (figma extract): ring + question glyph. */
 export const IconQuestionOutline14 = ({ size = 14, className }: IconProps) => (
   <svg width={size} height={size} className={className} viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -917,6 +929,95 @@ export const IconArchiveOutline20 = ({ size = 20, className }: IconProps) => (
       fill="currentColor"
     />
     <path d="M12.7962 12.5661V11.0832H7.20548V12.5661L12.7962 12.5661Z" fill="currentColor" />
+  </svg>
+)
+
+/** ic_ds_archive_outline_16 — filled box glyph on the 16-grid, weight-matched to the set's fill icons. */
+export const IconArchiveOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M2.6 2C1.99118 2 1.5 2.49118 1.5 3.1V4.9C1.5 5.50882 1.99118 6 2.6 6H13.4C14.0088 6 14.5 5.50882 14.5 4.9V3.1C14.5 2.49118 14.0088 2 13.4 2H2.6ZM2.9 3.4H13.1C13.2105 3.4 13.3 3.48954 13.3 3.6V4.4C13.3 4.51046 13.2105 4.6 13.1 4.6H2.9C2.78954 4.6 2.7 4.51046 2.7 4.4V3.6C2.7 3.48954 2.78954 3.4 2.9 3.4ZM2.7 6.2V13.1C2.7 13.7088 3.19118 14.2 3.8 14.2H12.2C12.8088 14.2 13.3 13.7088 13.3 13.1V6.2H2.7ZM4.1 7.4V12.6C4.1 12.7105 4.18954 12.8 4.3 12.8H11.7C11.8105 12.8 11.9 12.7105 11.9 12.6V7.4H4.1ZM6.3 8.8C6.14175 8.8 6 8.92157 6 9.1C6 9.27843 6.14175 9.4 6.3 9.4H9.7C9.85825 9.4 10 9.27843 10 9.1C10 8.92157 9.85825 8.8 9.7 8.8H6.3Z"
+      fill="currentColor"
+    />
+  </svg>
+)
+
+/** IconArchiveOutline16's restore companion: same filled box, the slot replaced by an up arrow. */
+export const IconUnarchiveOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M2.6 2C1.99118 2 1.5 2.49118 1.5 3.1V4.9C1.5 5.50882 1.99118 6 2.6 6H13.4C14.0088 6 14.5 5.50882 14.5 4.9V3.1C14.5 2.49118 14.0088 2 13.4 2H2.6ZM2.9 3.4H13.1C13.2105 3.4 13.3 3.48954 13.3 3.6V4.4C13.3 4.51046 13.2105 4.6 13.1 4.6H2.9C2.78954 4.6 2.7 4.51046 2.7 4.4V3.6C2.7 3.48954 2.78954 3.4 2.9 3.4ZM2.7 6.2V13.1C2.7 13.7088 3.19118 14.2 3.8 14.2H12.2C12.8088 14.2 13.3 13.7088 13.3 13.1V6.2H2.7ZM4.1 7.4V12.6C4.1 12.7105 4.18954 12.8 4.3 12.8H11.7C11.8105 12.8 11.9 12.7105 11.9 12.6V7.4H4.1Z"
+      fill="currentColor"
+    />
+    <path d="M8 8.4L5.1 10.9H6.5V12.3C6.5 12.4657 6.63431 12.6 6.8 12.6H9.2C9.36569 12.6 9.5 12.4657 9.5 12.3V10.9H10.9L8 8.4Z" fill="currentColor" />
+  </svg>
+)
+
+/** Archived-filter menu glyph: archive box with a check, the "only archived" choice. */
+export const IconArchiveCheckOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M2.6 2C1.99118 2 1.5 2.49118 1.5 3.1V4.9C1.5 5.50882 1.99118 6 2.6 6H13.4C14.0088 6 14.5 5.50882 14.5 4.9V3.1C14.5 2.49118 14.0088 2 13.4 2H2.6ZM2.9 3.4H13.1C13.2105 3.4 13.3 3.48954 13.3 3.6V4.4C13.3 4.51046 13.2105 4.6 13.1 4.6H2.9C2.78954 4.6 2.7 4.51046 2.7 4.4V3.6C2.7 3.48954 2.78954 3.4 2.9 3.4ZM2.7 6.2V13.1C2.7 13.7088 3.19118 14.2 3.8 14.2H12.2C12.8088 14.2 13.3 13.7088 13.3 13.1V6.2H2.7ZM4.1 7.4V12.6C4.1 12.7105 4.18954 12.8 4.3 12.8H11.7C11.8105 12.8 11.9 12.7105 11.9 12.6V7.4H4.1Z"
+      fill="currentColor"
+    />
+    <path d="M10.8 7.6L7.1 11.8L5.2 9.9L6 9.1L7.1 10.2L10 6.8L10.8 7.6Z" fill="currentColor" />
+  </svg>
+)
+
+/** Archived-filter menu glyph: archive box struck through, the "hide archived" choice. */
+export const IconArchiveOffOutline16 = ({ size = 16, className }: IconProps) => {
+  // The mask carves whitespace along the slash out of the box fill, so the
+  // id must stay unique per rendered instance.
+  const maskId = `dsh-archive-off-${useId().replaceAll(':', '')}`
+  return (
+    <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16">
+        <rect x="0" y="0" width="16" height="16" fill="white" stroke="none" />
+        <path d="m2.5 13.5 11-11" stroke="black" strokeWidth="3" />
+      </mask>
+      <g mask={`url(#${maskId})`}>
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M2.6 2C1.99118 2 1.5 2.49118 1.5 3.1V4.9C1.5 5.50882 1.99118 6 2.6 6H13.4C14.0088 6 14.5 5.50882 14.5 4.9V3.1C14.5 2.49118 14.0088 2 13.4 2H2.6ZM2.9 3.4H13.1C13.2105 3.4 13.3 3.48954 13.3 3.6V4.4C13.3 4.51046 13.2105 4.6 13.1 4.6H2.9C2.78954 4.6 2.7 4.51046 2.7 4.4V3.6C2.7 3.48954 2.78954 3.4 2.9 3.4ZM2.7 6.2V13.1C2.7 13.7088 3.19118 14.2 3.8 14.2H12.2C12.8088 14.2 13.3 13.7088 13.3 13.1V6.2H2.7ZM4.1 7.4V12.6C4.1 12.7105 4.18954 12.8 4.3 12.8H11.7C11.8105 12.8 11.9 12.7105 11.9 12.6V7.4H4.1Z"
+          fill="currentColor"
+        />
+      </g>
+      <path d="m2.5 13.5 11-11" stroke="currentColor" strokeLinecap="round" strokeWidth="1.2" />
+    </svg>
+  )
+}
+
+/** View-options menu glyph: a Workspace folder carrying a child branch. */
+export const IconWorkspaceTreeOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none"
+    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" strokeWidth={1}>
+    <path d="M14.5 12.05c0 .8-.65 1.45-1.46 1.45H3.46c-.8 0-1.46-.65-1.46-1.45v-8.1c0-.8.65-1.45 1.46-1.45h2.4c.49 0 .94.24 1.21.65l.5.73c.27.4.73.65 1.21.65h4.26c.8 0 1.46.65 1.46 1.45v6.02Z" />
+    <path d="M8.7 8.1v3M11.7 8.1v3" />
+  </svg>
+)
+
+/** View-options menu glyph: one flat bulleted list. */
+export const IconFlatListOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none"
+    stroke="currentColor" strokeLinecap="round" aria-hidden="true" strokeWidth={1}>
+    <path d="M6 3.5h7.5M6 8h7.5M6 12.5h7.5" />
+    <path d="M2.5 3.5h.01M2.5 8h.01M2.5 12.5h.01" />
+  </svg>
+)
+
+/** Order menu glyph: up/down chevron pair for the manual-order choice. */
+export const IconChevronsUpDownOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none"
+    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" strokeWidth={1}>
+    <path d="m5 6.5 3-3 3 3" />
+    <path d="m5 9.5 3 3 3-3" />
   </svg>
 )
 
@@ -974,5 +1075,41 @@ export const IconWrapLinesOutline16 = ({ size = 16, className }: IconProps) => (
   <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none"
     stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
     <path d="M1.5 3.5h13M1.5 7.5h10.25a2.5 2.5 0 0 1 0 5H8m2-2-2 2 2 2M1.5 11.5h3" />
+  </svg>
+)
+
+/** ic_ds pin outline: the pin-session menu and hover-action glyph. */
+export const IconPinOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path
+      d="M9.96976 1.70572L13.1554 3.93629L10.9019 8.12317L11.5158 11.605L10.7192 12.7427L2.52767 7.00693L3.3243 5.86922L6.80612 5.25528L9.96976 1.70572Z"
+      stroke="currentColor" strokeLinejoin="round"
+    />
+    <path
+      d="M6.05285 9.47511C6.27284 9.16094 6.70586 9.08458 7.02003 9.30457C7.3342 9.52455 7.41055 9.95757 7.19057 10.2717L3.98587 14.4708L3.21223 13.9291L6.05285 9.47511Z"
+      fill="currentColor"
+    />
+  </svg>
+)
+
+/** ic_ds pin fill: the pinned-session marker and unpin glyph. */
+export const IconPinFill16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path
+      d="M9.96976 1.70572L13.1554 3.93629L10.9019 8.12317L11.5158 11.605L10.7192 12.7427L2.52767 7.00693L3.3243 5.86922L6.80612 5.25528L9.96976 1.70572Z"
+      fill="currentColor" stroke="currentColor" strokeLinejoin="round"
+    />
+    <path
+      d="M6.05285 9.47511C6.27284 9.16094 6.70586 9.08458 7.02003 9.30457C7.3342 9.52455 7.41055 9.95757 7.19057 10.2717L3.98587 14.4708L3.21223 13.9291L6.05285 9.47511Z"
+      fill="currentColor"
+    />
+  </svg>
+)
+
+/** ic_ds_microphone_outline_16 — upstream rc.2 voice-input glyph (1px outline). */
+export const IconMicrophoneOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth={1} aria-hidden="true">
+    <rect x={5} y={1.5} width={6} height={9} rx={3} />
+    <path d="M2.35 8.675C3.075 11.3 5.2 13.125 8 13.125C10.8 13.125 12.925 11.3 13.65 8.675M8 13.125V15" />
   </svg>
 )

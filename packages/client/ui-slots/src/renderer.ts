@@ -46,6 +46,17 @@ export function standardHookPropName(name: string): string {
 export type KeyedStandardSource = (key: string) => HostObservable<unknown> | undefined
 
 /**
+ * One plugin's contribution to the root-scope standard kit: bare hook sources
+ * keyed by their bare name — the rendered prop is `use<Name>` through
+ * {@link standardHookPropName} — so entries under any scope subscribe to
+ * plugin-owned root data (panel selection, …) without holding the service.
+ */
+export interface RootStandardSourceContribution {
+  /** Fixed root hook sources; each key must be unique across contributors. */
+  readonly hooks?: Readonly<Record<string, HostObservable<unknown>>>
+}
+
+/**
  * Type-erased store instance face at the render boundary (the typed twin is
  * {@link StoreInstance}): a bare snapshot source plus the draft-stripped
  * action callbacks. No React hook crosses this boundary — the render machinery
@@ -191,6 +202,24 @@ export interface SlotRendererHost {
     /** Workspace list source backing the useWorkspaces standard hook. */
     list: HostObservable<unknown>
   }
+  /**
+   * Root-contribution roster revision: bumps on every provideRoot install and
+   * disposal so the root outlet can rebuild the contributed standard props.
+   * @returns the monotonic roster version.
+   */
+  getRootRevision(): number
+  /**
+   * Subscribe to root-contribution roster changes.
+   * @param fn - change callback.
+   * @returns unsubscribe.
+   */
+  subscribeRootRevision(fn: () => void): () => void
+  /**
+   * Snapshot the contributed root hook sources by bare name. Read once per
+   * {@link getRootRevision} value — a fresh record per roster change.
+   * @returns name → bare source.
+   */
+  rootSources(): Readonly<Record<string, HostObservable<unknown>>>
   /**
    * Installed locale face backing the `t` standard seat (absent until the
    * locale plugin installs one; rendering an entry that declared `locale:`

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { defaultModelFromPolicy } from '../src/apply-model-governance.ts'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { ModelGovernanceService, type ModelRegistrationEvent, type UsageEvent } from '../src/model-governance.ts'
 import { UserService } from '../src/users.ts'
@@ -11,7 +11,7 @@ import { UserService } from '../src/users.ts'
 async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'hgw-governance-'))
   const db = openDb(join(root, 'g.sqlite'))
-  const cfg = loadConfig({ HGW_USERS_ROOT: join(root, 'users') })
+  const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users') })
   const users = new UserService(db, cfg)
   const admin = await users.create({ username: 'admin-governance', password: 'pw-12345678', role: 'admin' })
   const user = await users.create({ username: 'user-governance', password: 'pw-12345678', role: 'user' })
@@ -98,6 +98,17 @@ describe('ModelGovernanceService', () => {
     expect(() => governance.setUserAccess(user.id, 'missing', 'm', true)).toThrow(/unknown model/)
     expect(() => governance.ingest({ kind: 'user', id: user.id }, event({ occurredAt: -1 }))).toThrow(/occurredAt/)
     expect(() => governance.setQuota('role', 'owner', 1, null)).toThrow(/admin or user/)
+  })
+
+  it('reads back stored role limits, preserving zero and unlimited', async () => {
+    const { governance, user } = await setup()
+    expect(governance.roleQuota('user')).toEqual({ tokenLimit: null, companyCostMicrosLimit: null })
+    governance.setQuota('role', 'user', 0, 1_250_000)
+    expect(governance.roleQuota('user')).toEqual({ tokenLimit: 0, companyCostMicrosLimit: 1_250_000 })
+    expect(governance.roleQuota('admin')).toEqual({ tokenLimit: null, companyCostMicrosLimit: null })
+    // User overrides keep their own storage and do not shadow the role read.
+    governance.setQuota('user', String(user.id), 999, null)
+    expect(governance.roleQuota('user')).toEqual({ tokenLimit: 0, companyCostMicrosLimit: 1_250_000 })
   })
 
   it('reports missing usage and intake lag in the SQLite fallback', async () => {

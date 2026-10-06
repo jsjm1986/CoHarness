@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-27-typescript-sdk-and-sdk-subagent-backend.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-27-typescript-sdk-and-sdk-subagent-backend.md
-2026-07-27-typescript-sdk-and-sdk-subagent-backend.md: f538aa97d419aa70a2d28eb3019f1b7e018f4ea4
-2026-07-27-typescript-sdk-and-sdk-subagent-backend.zh.md: f141e836a116ccfb333d79ed8fc3a725249263b2
+/agent-note-typescript-sdk-client-and-the-sdk-subagent-backend:
+  en: 2fac49345d1586e3
+  zh: 568067008166eb51
+/agent-note-typescript-sdk-client-and-the-sdk-subagent-backend/problem:
+  en: 87caba2d548b6afd
+  zh: a612a5c4056077a6
+/agent-note-typescript-sdk-client-and-the-sdk-subagent-backend/decision:
+  en: 825ff4d3e8a1e1b5
+  zh: 27612cb51e42ea61
+/agent-note-typescript-sdk-client-and-the-sdk-subagent-backend/testing:
+  en: 4a3ba80f6bf6d474
+  zh: d74a94c62ee6e726
+/agent-note-typescript-sdk-client-and-the-sdk-subagent-backend/alternatives-considered:
+  en: 42a49e07ac2fe745
+  zh: 8267141eebb06308
+/agent-note-typescript-sdk-client-and-the-sdk-subagent-backend/consequences:
+  en: f2a3bd97631abb20
+  zh: 91f94e4b19fc57cd

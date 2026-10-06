@@ -1,3 +1,8 @@
+---
+description: "This family owns persistent workspaces: user directories with titles and ordered session membership."
+kind: "package-group"
+---
+
 # workspace/ — workspace entity family
 
 English | [中文](README.zh.md)

@@ -145,7 +145,14 @@ function startInvariantHost(root: Context): InvariantHost {
   const serviceFiber = mount(InvariantRegistry, { enabled: true })
   const testPath = expect.getState().testPath ?? ''
   const companionPaths = testInvariantCompanionPaths(testPath)
+  // Teardown may outrun startup: mounting a companion on an inactive root
+  // throws `INACTIVE_EFFECT` out of the ready chain. Treat that race as
+  // disposition — joined plugins observe the settled root through their own
+  // readiness chain instead of a startup rejection. Read through a function
+  // so the check is re-evaluated after async module loads.
+  const rootActive = (): boolean => root.fiber.state === FiberState.ACTIVE
   const ready = requireActive(serviceFiber, 'invariant service').then(async () => {
+    if (!rootActive()) return
     const companions = await Promise.all(companionPaths.map(async (path) => {
       const load = testInvariantCompanions[path]
       if (load === undefined) {
@@ -157,6 +164,9 @@ function startInvariantHost(root: Context): InvariantHost {
       }
       return { companion, path }
     }))
+    // Companion module loads are async; re-check after them for the same
+    // teardown race as above.
+    if (!rootActive()) return
     const companionFibers = companions.map(({ companion, path }) => ({
       fiber: mount(companion),
       path,
@@ -227,6 +237,9 @@ function joinInvariantStartup(
       throw error
     }
   })
+  // A root that settles before this chain resolves leaves no one awaiting the
+  // rejection; mark it handled while awaiters still observe it through `joined`.
+  void readiness.catch(() => undefined)
   const joined = Object.create(fiber) as PluginFiber
   joined.then = readiness.then.bind(readiness)
   return joined

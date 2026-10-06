@@ -1,3 +1,8 @@
+---
+description: "Log-only session feedback producer and human-facing slash command"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-command-feedback
 
 English | [中文](README.zh.md)
@@ -8,6 +13,20 @@ Trigger-independent session feedback plus human-facing `/feedback` capture. The 
 
 `dsh-command-feedback` lets a user tell the harness what they think of a session. Typing `/feedback` plus a remark records it and acknowledges the session and anonymous user ids; the Web feedback dialog records a category and an optional description through the `sessionFeedback` Host Remote. Recording is immediate and never starts model work: the model neither sees the remark nor is interrupted by it. The package also owns the fixed category taxonomy every feedback surface files under. It ships with the standard `dsh` base and needs no configuration; headless, ACP, and JSON-RPC entry points provide no slash commands.
 
+## Table of Contents
+
+- [Command contract](#command-contract)
+- [Session-sharing disclosure](#session-sharing-disclosure)
+- [What this plugin does and does not do](#what-this-plugin-does-and-does-not-do)
+- [Composition](#composition)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="command-contract"></a>
 ## Command contract
 
 | Input | Result |
@@ -17,6 +36,7 @@ Trigger-independent session feedback plus human-facing `/feedback` capture. The 
 
 Surrounding whitespace is discarded, but feedback is otherwise unparsed: no truncation, case folding, or control words. Text that looks like another command, such as `/feedback /plan felt slow`, is feedback content. Repeated commands each produce their own event; nothing is replaced or merged.
 
+<a id="session-sharing-disclosure"></a>
 ## Session-sharing disclosure
 
 The acknowledgement names the receiving session id and reports how that session is shared, read from the mounted [`telemetry`](../../session/session-telemetry/README.md) service through the plugin context (`ctx.get('telemetry')`, never a declared injection). The disclosure is one sentence chosen from the backend's [`SessionTelemetrySharingStatus`](../../session/session-telemetry/README.md):
@@ -30,6 +50,7 @@ The acknowledgement names the receiving session id and reports how that session 
 
 The disclosure states the deployment's current sharing policy only; it never promises delivery or retention. With `full` or `feedback-only`, records are handed to the backend's non-blocking enqueue and the SDK owns batching, retry, and loss policy, so the sentence claims nothing about what reached a collector; `disabled` claims nothing about future reconfiguration. The disclosure adds no event and never enters the model surface.
 
+<a id="what-this-plugin-does-and-does-not-do"></a>
 ## What this plugin does and does not do
 
 `recordFeedback(session, record)` is the command-independent write path. It appends `feedback/record` with the record's optional `text` (blank text normalizes to absent) and `category`; an entirely empty record still marks that feedback was filed. A different UI, hook, or host integration can call it without constructing a slash command. The `/feedback` handler uses that producer and starts no model work. The optional [`dsh-session-telemetry-otel`](../../session/session-telemetry-otel) consumer observes the event without changing its capture contract.
@@ -38,6 +59,7 @@ The feedback text appears in exactly one durable payload: `feedback/record`. [`d
 
 The event is authoritative rather than the command record because feedback may arrive through a trigger other than `/feedback`. Keeping the payload out of `command/run` avoids two records carrying the same text.
 
+<a id="composition"></a>
 ## Composition
 
 The producer injects only `commands`. A custom app mounts the registry plus this plugin:
@@ -51,10 +73,12 @@ The producer injects only `commands`. A custom app mounts the registry plus this
 
 The shipped `dsh` base mounts this command unconditionally; it has no configuration and no dependency on the persisted-goal stack. The Web client exposes it through the command adapter. Headless mode, ACP automation, and JSON-RPC do not provide a command adapter, so they do not expose it.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. The package's only effects are one append to the owning session log and a global command registration; there is no mutable relation to assert.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Human `/feedback` capture
@@ -80,3 +104,13 @@ Independent of the model request path. Recording appends to the session log only
 - **No visible acknowledgement on a fresh session** — the web transcript renders command rows only once a session is active, so `/feedback` on a still-blank session records the event but shows no acknowledgement row. Recording feedback after the first message renders normally.
 - **Web only among the shipped entry points** — headless mode, ACP automation, and JSON-RPC do not provide a command adapter, so `/feedback` is unavailable there.
 - **`zod` is a runtime dependency of generated Typert faces, not of `src`.** The published `./typert` and `./remote` exports resolve to unbundled `lib/typert.*.js` files with bare `zod` imports. The manifest must retain `zod`; `knip.config.ts` adds a workspace-scoped exception only when neither generated JavaScript face exists, while a built checkout lets Knip observe the import directly.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

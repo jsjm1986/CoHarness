@@ -1,3 +1,8 @@
+---
+description: "TypeScript project analyzer and model-driven Typert artifact generator"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-typert-generator
 
 English | [中文](README.zh.md)
@@ -10,6 +15,19 @@ The analyzer can use independent `ts.Program` instances seeded from `tsconfig.ho
 
 `dsh-typert-generator` lets maintainers turn public TypeScript types into build artifacts and compiler-independent models. Packages opt in through the `./typert` and optional `./client/typert` exports, and generation rejects declarations, publish lists, Remote exports, or Zod projections that it cannot represent correctly. Repository builds emit executable schema factories and matching declarations, while tools can call `WorkspaceAnalyzer` for inspection or catalog generation without publishing artifacts. Generation runs only at build time and never in a live agent session.
 
+## Table of Contents
+
+- [Analysis Model](#analysis-model)
+- [Emission and Opt-in Publication](#emission-and-opt-in-publication)
+- [Repository-specific Cordis projection](#repository-specific-cordis-projection)
+- [Invariants](#invariants)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="analysis-model"></a>
 ## Analysis Model
 
 Each face contains package exports, Cordis services and events, explicitly tagged objects and schemas, and a type graph for their reachable declarations. The graph preserves declaration identity, generic parameters and applications, explicit inheritance, conditional and mapped types, import attributes, abstract modifiers, and source JSDoc. Service and `@typert object` APIs expose public instance members only; constructors, static members, and non-public members are excluded.
@@ -18,6 +36,7 @@ Each face contains package exports, Cordis services and events, explicitly tagge
 
 Remote methods returning `Iterable` or `AsyncIterable` require `@Remote({ mode: 'stream' })`. Missing stream metadata fails during analysis; iterator protocol methods are not expanded into wire payload schemas.
 
+<a id="emission-and-opt-in-publication"></a>
 ## Emission and Opt-in Publication
 
 `FaceModelEmitter` consumes only the model. It emits executable JavaScript containing supported Zod schemas and a `TYPERT` contribution, plus a declaration file whose schemas are typed as `z.ZodType<SourceType>` through the package's public export. Unsupported Zod projections fail instead of flattening or weakening the source type.
@@ -26,14 +45,17 @@ Remote methods returning `Iterable` or `AsyncIterable` require `@Remote({ mode: 
 
 Publication is package opt-in, and business packages without the corresponding public entry do not need Typert artifacts. The repository's Host tsdown runs workspace Typert generation with `tsconfig.host.json` as its only program seed; it produces both Host reflection artifacts and the `typert.remote-client.*` projection of Host Remote contracts for the Client. The subsequent Client tsdown neither starts Typert nor analyzes `tsconfig.client.json`. Static consumers can still call `WorkspaceAnalyzer` directly, explicitly select a face and package subset, and process packages in batches without publishing or loading runtime artifacts.
 
+<a id="repository-specific-cordis-projection"></a>
 ## Repository-specific Cordis projection
 
 The root package export includes the model-driven extraction, completeness checks, and deterministic text renderers used by this repository's Cordis catalogs. They accept a `CordisCatalogPolicy`; repository-owned type links, foundation/exemption classifications, and inherited Cordis entries remain in `scripts/gen-cordis-catalog.ts` and are passed in explicitly. The generator package therefore contains projection mechanics, not a hidden copy of this repository's documentation taxonomy.
 
+<a id="invariants"></a>
 ## Invariants
 
 **Runtime invariant:** No companion is published. A compile-time transform from source types to `FaceModel`/`TypeGraph` data; its output is asserted by generator specs and it runs no runtime state.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the build-time generator runs outside any agent runtime and touches no model request.
@@ -49,3 +71,13 @@ No direct effect; generated artifacts reach a request only when a consumer place
 - The Zod emitter supports a deliberate subset of the modeled TypeScript graph. Generic schema declarations and computed constructs such as conditional or mapped schema roots fail until a concrete schema-factory policy exists.
 - Cross-face links are represented for analysis, but no generated schema currently requires a runtime cross-face Zod import.
 - Discovery follows source files reachable from concrete public exports; declarations that are neither exported nor imported by that graph are intentionally outside the package model.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -7,12 +7,13 @@
  * @module dsh-llm-pi-ai/login
  */
 
-import type { AuthEvent, AuthPrompt, AuthType, Provider } from '@earendil-works/pi-ai'
+import type { AuthEvent, AuthPrompt, AuthType, MutableModels, Provider } from '@earendil-works/pi-ai'
 import type { Context } from '@deepseek-ai/cordis'
 import type { AuthorizationMethod, AuthorizationPrompt, AuthorizationSession } from '@deepseek-ai/dsh-authorization'
 import { isCredentialKeySegment } from '@deepseek-ai/dsh-credentials'
+import { LlmError } from '@deepseek-ai/dsh-llm'
 import { catalogProvider, catalogProviderIds } from './catalog.ts'
-import { recordKeyFor } from './auth.ts'
+import { credentialStoreFrom, recordKeyFor } from './auth.ts'
 import type { PiAiAuthInjection } from './adapter.ts'
 import { createModels } from './models.ts'
 
@@ -109,6 +110,40 @@ function restate(prompt: AuthPrompt): AuthorizationPrompt {
 }
 
 /**
+ * The collection one login attempt runs against: a fresh `Models` whose
+ * credential writes commit through that attempt's session, so a withdrawn
+ * login cannot publish and a write already admitted to storage completes as
+ * the attempt's record. The mutation closure also refuses any record other
+ * than the flow's own key.
+ * @param ctx - the plugin context carrying `ctx.credentials`.
+ * @param auth - the injectables the collection is built with.
+ * @param session - the attempt whose commit owns the record write.
+ * @param providerId - the catalog provider being signed into.
+ * @returns a mutable collection holding no providers.
+ */
+export function loginCollectionFor(
+  ctx: Context,
+  auth: PiAiAuthInjection,
+  session: AuthorizationSession,
+  providerId: string,
+): MutableModels {
+  const owned = recordKeyFor(providerId)
+  return createModels({
+    ...auth,
+    credentials: credentialStoreFrom(ctx, {
+      modifyRecord: (key, mutate) => {
+        if (key !== owned) {
+          return Promise.reject(new LlmError(
+            `llm-pi-ai: a login collection may write only the record its flow owns ("${key}" is not "${owned}")`,
+            'FOREIGN_CREDENTIAL_KEY'))
+        }
+        return session.commit(mutate)
+      },
+    }),
+  })
+}
+
+/**
  * Register one authorization flow per installed provider that ships a login.
  *
  * Registration is unconditional on configuration: a provider has to be signed
@@ -143,7 +178,7 @@ export function registerPiAiFlows(ctx: Context, auth: PiAiAuthInjection): void {
         // A collection of its own, holding only the provider being signed
         // into: login is not serving requests, and the credential it produces
         // lands in the shared store either way.
-        const models = createModels(auth)
+        const models = loginCollectionFor(ctx, auth, session, providerId)
         models.setProvider(provider)
         // Total over the two ids declared above, and the seam only ever hands
         // back one a flow declared.

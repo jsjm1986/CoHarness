@@ -13,7 +13,7 @@
 // ChatNodeSeat subscribes to one Node key, so Assistant deltas and Tool
 // lifecycle updates replace only their own row without remounting it.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type {
   ConversationTimelineSnapshot, PendingSubmission, TurnNavigationItem,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -139,6 +139,24 @@ function nodeTurn(node: { readonly location: { readonly kind: string; readonly t
     : undefined
 }
 
+/** Chat node kinds that never fold into a turn's collapsed process window. */
+const TURN_PROCESS_INDEPENDENT: ReadonlySet<string> = new Set([
+  'system-prompt', 'user', 'steering', 'turn-process', 'turn-error', 'turn-max-tokens', 'turn-tail',
+])
+
+/**
+ * A turn still running — or one that ended aborted or errored — keeps its
+ * process window open: its evidence is the failure surface, not decoration.
+ * @param node - the node whose turn location decides openness.
+ * @returns whether the owning turn's process window defaults to open.
+ */
+function turnProcessAlwaysOpen(node: ChatNode | undefined): boolean {
+  const location = node?.location
+  if (location === undefined || (location.kind !== 'turn' && location.kind !== 'step')) return false
+  const reason = location.turn.end?.data.reason.kind
+  return location.turn.status === 'open' || reason === 'aborted' || reason === 'error'
+}
+
 /** Return submission ids already represented by durable nodes or queue rows. */
 function observedRpcIds(
   order: readonly string[],
@@ -189,7 +207,7 @@ function TurnStatus({ startTime, t }: {
       {t('chat.deepDiving')}
       {showClock && (
         <span className={css.turnStatusClock} aria-hidden>
-          {formatRunDuration(elapsedMs, t)}
+          {formatRunDuration(elapsedMs, t).map(part => part.text).join('')}
         </span>
       )}
     </div>
@@ -203,7 +221,7 @@ function TurnStatus({ startTime, t }: {
 export function ChatView({
   useSession, useSessions, useStore, renderSlot, sessionId, openFile, openDetails, openExternalLink, loadOlder,
   loadHistoryUntil, loadImage, inspectCall, chatScroll, forkAt,
-  fileMentions, t,
+  fileMentions, presentation, t,
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
   const nodeStore = useSession(s => s.chat.nodes)
@@ -221,6 +239,10 @@ export function ChatView({
   const historyWindowMode = useSession(s => s.historyWindowMode)
   const loadingOlder = useSession(s => s.loadingOlder)
   const selectedCallId = useStore(s => s.selection?.callId)
+  const presentationPolicy = useSyncExternalStore(
+    listener => presentation.subscribe(listener),
+    () => presentation.getSnapshot(),
+  )
   const [fileOpenError, setFileOpenError] = useState<{ path: string; message: string; options?: { line?: number } } | null>(null)
   const [fileOpenBusy, setFileOpenBusy] = useState(false)
   const [activeTurn, setActiveTurn] = useState<number | null>(null)
@@ -342,19 +364,33 @@ export function ChatView({
     }
     return result
   }, [nodeStore, order])
-  const visibleOrder = useMemo(() => order.filter((key) => {
-    const node = nodeStore.get(key) as ChatNode | undefined
-    if (node === undefined) return false
-    const turn = nodeTurn(node)
-    if (turn === undefined) return true
-    const process = processByTurn.get(turn)
-    if (process === undefined || process.answerAnchorSeq === null || node.kind === 'turn-process') return true
-    const open = processOpen.get(turn) ?? (turn === runningTurn)
-    if (open) return true
-    if (node.kind === 'user' || node.kind === 'steering') return true
-    if (node.kind === 'assistant-step' && node.data.finalNode?.seq === process.answerAnchorSeq) return true
-    return !(node.anchorSeq >= process.controlAnchorSeq && node.anchorSeq < process.answerAnchorSeq)
-  }), [nodeStore, order, processByTurn, processOpen, runningTurn])
+  /**
+   * Keys of nodes folded behind a closed turn's process toggle. Folded nodes
+   * stay mounted — a late-arriving reply or in-flight stream mutates while
+   * hidden and must paint complete when the toggle opens.
+   */
+  const foldedKeys = useMemo(() => {
+    const folded = new Set<string>()
+    for (const key of order) {
+      const node = nodeStore.get(key) as ChatNode | undefined
+      if (node === undefined) continue
+      const turn = nodeTurn(node)
+      if (turn === undefined) continue
+      const process = processByTurn.get(turn)
+      if (process === undefined || node.kind === 'turn-process') continue
+      const open = processOpen.get(turn)
+        ?? (!presentationPolicy.foldCompletedTurns || turn === runningTurn || turnProcessAlwaysOpen(node))
+      if (open) continue
+      if (TURN_PROCESS_INDEPENDENT.has(node.kind)) continue
+      if (process.answerAnchorSeq !== null
+        && node.kind === 'assistant-step' && node.data.finalNode?.seq === process.answerAnchorSeq) continue
+      // A turn without an assistant answer folds everything after its first
+      // evidence — that is where a late question reply lands.
+      if (node.anchorSeq >= process.controlAnchorSeq
+        && (process.answerAnchorSeq === null || node.anchorSeq < process.answerAnchorSeq)) folded.add(key)
+    }
+    return folded
+  }, [nodeStore, order, processByTurn, processOpen, runningTurn, presentationPolicy])
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
@@ -717,13 +753,15 @@ export function ChatView({
                 </button>
               </div>
             )}
-            {visibleOrder.map((nodeKey) => {
+            {order.map((nodeKey) => {
               const node = nodeStore.get(nodeKey) as ChatNode | undefined
               const turn = node === undefined ? undefined : nodeTurn(node)
               const process = turn === undefined ? undefined : processByTurn.get(turn)
               const open = turn === undefined || process === undefined
                 ? true
-                : processOpen.get(turn) ?? (turn === runningTurn)
+                : processOpen.get(turn)
+                  ?? (!presentationPolicy.foldCompletedTurns || turn === runningTurn || turnProcessAlwaysOpen(node))
+              const folded = foldedKeys.has(nodeKey)
               const turnProcess = node?.kind === 'turn-process' && turn !== undefined
                 ? { open, setOpen: (value: boolean) => {
                   setProcessOpen((previous) => {
@@ -737,6 +775,7 @@ export function ChatView({
                 <ChatNodeSeat
                   key={nodeKey}
                   nodeKey={nodeKey}
+                  folded={folded}
                   useSession={useSession}
                   selectedCallId={selectedCallId}
                   cwd={cwd}
@@ -746,6 +785,7 @@ export function ChatView({
                   forkAt={forkAt}
                   renderMessageImages={renderMessageImages}
                   fileMentions={fileMentions}
+                  presentation={presentationPolicy}
                   {...turnProcess === undefined ? {} : { turnProcess }}
                   renderSlot={renderSlot}
                   t={t}

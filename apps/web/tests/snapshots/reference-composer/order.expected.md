@@ -9,17 +9,17 @@
     - img
   - button "Open right sidebar":
     - img
+- button "Process details":
+  - text: Process details
+  - img
 - button "System prompt":
   - img
   - img
   - text: System prompt
 - text: Research notes what changed? Referenced session · Research notes
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Session recall Research notes":
-  - img
-  - text: Session recall Research notes
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -27,7 +27,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -35,4 +35,5 @@
 - group "Session statistics":
   - img
   - text: 1 turns · 1 steps
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

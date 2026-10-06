@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-persistence-gateway/README.md
-README.md: ea7d8b641d553f19a4c13e68a757115e398faa7a
-README.zh.md: aa74bca86752aea67f09d9ed4150424ba2ff0c3f
+/:
+  en: 6d21b9f6a9990d1d
+  zh: 61495d48365178df
+/deepseek-ai-dsh-session-persistence-gateway:
+  en: 9824430286cf8372
+  zh: ead3fb5dbc106114
+/deepseek-ai-dsh-session-persistence-gateway/summary:
+  en: 0aa0b096348fe16e
+  zh: a85c0292c4e30bf6
+/deepseek-ai-dsh-session-persistence-gateway/table-of-contents:
+  en: b317899eb8a6b8be
+  zh: 1024630c103cdc60
+/deepseek-ai-dsh-session-persistence-gateway/persistence-contract:
+  en: 3aed7b9d8471787e
+  zh: 7d7e79aea3beff4c
+/deepseek-ai-dsh-session-persistence-gateway/configuration:
+  en: d8a947aefc465fcd
+  zh: 8e8333e2fc4bf88d
+/deepseek-ai-dsh-session-persistence-gateway/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-session-persistence-gateway/model-experience/resumed-shared-conversation-history:
+  en: 6dae9c35f0d7402c
+  zh: 366044992c90d9e3
+/deepseek-ai-dsh-session-persistence-gateway/model-experience/resumed-shared-conversation-history/what-the-model-sees:
+  en: 78cb88f16bb922d6
+  zh: e75c37afecb4a407
+/deepseek-ai-dsh-session-persistence-gateway/model-experience/resumed-shared-conversation-history/token-effect:
+  en: 8aa21daa949fd437
+  zh: e151f35cbc2e48a5
+/deepseek-ai-dsh-session-persistence-gateway/model-experience/resumed-shared-conversation-history/kv-cache-effect:
+  en: 86292740e9b8298b
+  zh: 79aa8e5359b706f4
+/deepseek-ai-dsh-session-persistence-gateway/known-limitations-and-deferred-work:
+  en: 961f769960af5d61
+  zh: 37747d66c1052782
+/deepseek-ai-dsh-session-persistence-gateway/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

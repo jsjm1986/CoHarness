@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-31-browser-derived-initial-locale.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-31-browser-derived-initial-locale.md
-2026-07-31-browser-derived-initial-locale.md: 5a48dba839a19fc099a31d9dee4dbfda15debbd5
-2026-07-31-browser-derived-initial-locale.zh.md: 60ecb20e3ce0b349ce6e98624ad9e36671ab2027
+/agent-note-the-settings-language-a-fresh-browser-opens-in-comes-from-the-browser:
+  en: ac7acdf7d23506e3
+  zh: e5b5647505f400c0
+/agent-note-the-settings-language-a-fresh-browser-opens-in-comes-from-the-browser/problem:
+  en: 8d3720037c774c90
+  zh: 9bc8f68d4a511a89
+/agent-note-the-settings-language-a-fresh-browser-opens-in-comes-from-the-browser/decision:
+  en: 451ccce6358d9f39
+  zh: 08dec8a37a7b7093
+/agent-note-the-settings-language-a-fresh-browser-opens-in-comes-from-the-browser/alternatives-considered:
+  en: 73e57b687662db97
+  zh: c38c048c64771a70
+/agent-note-the-settings-language-a-fresh-browser-opens-in-comes-from-the-browser/consequences:
+  en: b74fce1b4a8b824a
+  zh: 6716f3e1ca148628

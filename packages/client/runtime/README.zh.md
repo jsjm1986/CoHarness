@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-runtime
 
 [English](README.md) | 中文
@@ -16,28 +21,64 @@
 
 `Session.readCallHistory(callId, signal)` 通过已注册的 Conversation 定义组装独立聊天快照。它使用该 Session 的普通传输或带父地址的子会话传输，不改变可见历史，并随读取者或 Session 生命周期取消。调用者持有读取结果，不另建 Session 或持久缓存。
 
+池化浏览器 Session 键编码所属 runtime 与原始 Host ID。列表、作用域 store、Workbench 窗格、保留的 binding、文件观察及已声明的 Remote 事件地址使用该键；runtime 保留原始 wire ID 和持久事件。多个 runtime 共有的裸 ID 会被拒绝，不会任意选择归属。`host.describe.runtimeTarget` 在打开历史前固定引导连接身份。已保留的 generation 不能改标为另一个 runtime。
+
+`usingRuntime` 在发现、异步操作和后续 Session 引用接管期间持有目标，不授予权限。消费者合并导航与所有者生命周期；取消只释放本次操作的持有，不释放其他消费者。引导目标和其他目标都等待各自的首个 Session 列表基线。
+
+引导连接明确失去授权时，先撤下池内所有 Session，再由 Connection 执行页面清理与重载。其他 runtime 被拒绝只撤下该 runtime。普通重连失败保留当前账号已授权的缓存。
+
+Session 权限目录要求存在当前所有者。撤下 runtime 时，先移除 Session 列表归属，再允许连接释放发布后续目录变化。未解析或已撤权的 Session 没有目录，不会回退到其他 runtime 的选项；在途读取在返回前复核归属。
+
 ## 概述
 
 使用 `dsh-client-runtime` 作为客户端对象层：它引导 Cordis 浏览器上下文，持有 `Session`/`Workspace` 运行时对象、共享宿主事件流的分发、投影存储与会话视图订阅的历史分页。客户端会话一律由宿主创建；域包经此层读取属主事件与投影切片，自身不持有会话状态。
 
+## 目录
+
+- [权限资格](#permission-qualification)
+- [Workspace 文件资源](#workspace-file-resources)
+- [Slot 声明注入](#slot-declaration-injection)
+- [Session 所有权](#session-ownership)
+- [Workspace 与 Session 列表](#workspace-and-session-lists)
+- [New Session 与 blank 镜像](#new-session-and-the-blank-mirror)
+- [待处理队列投影](#pending-queue-projection)
+- [Conversation 组装](#conversation-assembly)
+- [Trajectory 请求数据](#trajectory-request-data)
+- [PTC mode 子调用树](#ptc-mode-child-call-tree)
+- [Session 标题投影](#session-title-projection)
+- [模型重试投影](#model-retry-projection)
+- [会话 fork](#session-forking)
+- [会话模型选择](#session-model-selection)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="permission-qualification"></a>
 ## 权限资格
 
 `SessionBinding.hostDescription` 保留所属会话连接的描述源，也涵盖工作台单独暂存的运行时目标。现有 UI 策略携带当前账户的派生权限资格。`permissionAvailabilitySource` 观察这两个来源，不缓存第二份目录；未知目标不会借用其他窗格的独立本机状态。
 
+<a id="workspace-file-resources"></a>
 ## Workspace 文件资源
 
 `WorkspaceResourceRegistry` 按明确的 runtime 目标和 Session 相对资源地址保留元数据。启动连接使用独立的 `base` 身份；各项目连接在 Host 握手声明支持文件后，以自己的 API client 注册 `workspaceResourceProvider(api)`。文件请求不从当前焦点面板推导目标。Host 的 `workspaceFileMaxResources` 配置限制每个 runtime 保留的记录数；空闲记录按使用顺序淘汰，全部记录活跃时拒绝超限接入。
 
 订阅与 pin 共用元数据读取，最后一个持有者释放时取消未完成读取。文件变化由现有 Host 流交付，打开更多文件不会增加流。重连取消旧代次请求并复核保留的元数据，版本不同则标记 changed，直到显式重新加载。临时失败保留元数据，权限拒绝、provider 移除或 runtime 移除会清除它。预览内容只保存在视图中，通过有界且带版本保护的 RPC 读取。
 
+`source(request)` 暴露原生 `getSnapshot`/`subscribe` 快照协议，消费方通过渲染器的 `keyedHooks` 机制绑定它，而不直接持有 registry。
+
 <a id="slot-declaration-injection"></a>
 
+<a id="slot-declaration-injection"></a>
 ## Slot 声明注入
 
 `ctx.slots.inject(name, callback)` 将完整的 `SlotMap` key 作为贡献项的依赖，适用于贡献方插件可独立于声明条目激活的情形。声明存在时，它会同步运行 `callback`，否则等待；声明折叠会 dispose（资源释放）回调 effect，重新声明则会再次运行回调。控制器归调用方的插件 fiber 所有，因此卸载贡献方会取消等待或移除其活跃注册项。直接调用 `slots.register()` 向未声明 slot 注册仍会抛出异常。
 
 回调返回一个同步 disposer 或由多个 disposer 构成的 iterable。因此，generator 可以 yield 多个 `slots.register()` 调用，并将它们组成一项事务：setup 失败会回滚先前 yield 的 effect，teardown 则按逆序运行它们。声明生命周期使用专用的单调 declaration epoch（声明代次），因此，即使折叠与重新声明合并在同一次 renderer 通知中，回调仍会重启，而普通条目变更不会重启它。声明绑定的 teardown 与账本变更同步运行，在同一 tick 内的后续注册之前释放运行时资源。详见 [slot 声明注入决策](../../../.agents/notes/implemented/architecture/2026-08-05-slot-declaration-injection.zh.md)。
 
+<a id="session-ownership"></a>
 ## Session 所有权
 
 `retain(target, { source, signal? })` 持有确切的本地代次，并启动共享历史打开过程。`binding` 可立即使用；`ready` 等待当前引用的打开尝试。取消等待不会释放引用，也不会取消其他消费方。清理时调用 `release()`、使用 disposal 协议，或者通过 `using(target, options, operation)` 在回调结束后释放。根节点销毁会使所有引用失效，包括尚未完成的就绪等待。
@@ -50,6 +91,7 @@
 
 `commitSessionNavigation()` 在打开尝试完成前持有目标，确认历史可用后只提交当前意图。接收视图先获取自己的引用，再释放临时引用。加载失败保留原视图；取消同时抑制过期提交和过期错误。`SessionReference.ready` 的语义不变：它表示尝试结束，不等同于加载成功。
 
+<a id="workspace-and-session-lists"></a>
 ## Workspace 与 Session 列表
 
 Workspace 和 Session 列表各自具有单调的 `pending` → `ready` 基线阶段，也有各自的刷新活动／错误状态。列表请求期间到达的增量插入或更新／移除／顺序帧与一元变更回显会在其响应之上回放。每次成功的 Workspace 基线都会重新建立 Host 持久 Workspace 顺序，因此重连会接纳该客户端离线期间提交的变更。`WorkspaceRuntime.insertBefore` 会立即安装乐观顺序；只有最新一元回声可以替换它，更新的 Host 顺序帧优先于旧回声，而最新请求被拒时会恢复最近一次由 Host 确认的顺序，不会恢复更早且尚未提交的拖拽。已移除的 Workspace id 会保留进程本地删除标记，避免延迟到达的 changed 帧将其复活。Workspace 新近程度只在两条基线都 ready 后派生，且绝不改变 Workspace 列表顺序。
@@ -68,13 +110,16 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 
 `SessionListState.jobsBySession` 按 last-wins 镜像宿主的 `session/jobs` 帧，以会话为键，不需要 Session 实例。被清空的集合存为缺失的键，因此「缺失」与 `[]` 是同一种表示，消费方永远不必检测哨兵值。两处清理让它不至于比它所反映的真相活得更久：`session/subscribed` 丢弃该会话的镜像，因为新一代只为非空集合发送 baseline，被留下的列表会变成幽灵；`host/session-removed` 再丢一次，因为 owner 销毁是在 mux 流上移除记录的，而移除帧走 host 流，两者没有相对顺序。
 
+`SessionListState.observedJobs` 承载 `sessions.observeJob(sessionId, jobId)` 累积的实时输出视图：每个任务一条引用计数的轮询循环按观察节奏发出 `jobs.output` 读，每次响应推进 `from` 游标并对保留尾部限长；业务拒绝存为终态 `error`，传输失败会重试，最后一个观察者释放时中止循环并丢弃该条目。`sessions.killJob(sessionId, jobId)` 发出 `jobs.kill` 并仅以受理结果作结——行的收敛走下一帧 `session/jobs`。
+
 `SessionRuntime.search(query, signal)` 是基于 `session.search` RPC 的无状态单次操作。它返回经过排序的会话／snippet 对，但不会将查询条件、加载状态或错误状态写入共享 Session 列表，因此每个 UI 所有者都自行负责防抖、取消、抑制陈旧响应和回退呈现。`searchResultLimit` 将 `SESSION_SEARCH_RESULT_LIMIT`——即响应 schema 自身强制执行的上限——作为注入的呈现数据重新公开，使客户端插件无需复制该值。它是协议常量而非逐连接状态，因此连接 handle 不携带它。
 
+<a id="new-session-and-the-blank-mirror"></a>
 ## New Session 与 blank 镜像
 
 刚预留的草稿仍为空白时，列表行会携带仅客户端使用的 `workspaceId` 提示，因此 Host 刷新期间占位行仍留在目标 Workspace 下；首条可见内容或移除后提示会清掉，且不会发送到 wire。
 
-`WorkspaceRuntime.connectWorkspace(workspaceId)` 解析 New Session 流程最终落入的会话：它从列表镜像收集该 Workspace 的既有空会话（`blank && cwd == workspace.path && sessionIds.includes(id)`——Host 自己的成员规则，绝不只按 cwd，避免劫持 cwd 匹配但未入账的空白会话），排除已归档行，再让 `SessionRuntime.createOrReuse()` 返回首个与插件创建选项兼容的候选项，或者创建新会话。新建分支携带稳定的 draft id 和预分配 Session id；收到可见消息前，这对身份会保存在受限浏览器存储中，因此刷新或并发的新会话操作会复用同一 reservation，但不会保存凭据。共享的 `startSession` 操作优先使用明确指定的 Workspace，其次使用当前 Session 所属 Workspace，再其次使用派生的最近活跃 Workspace；一个 Workspace 都没有时则清空选择，进入空白 New Session 页面。`SessionSummary.blank` 镜像 Host 的“没有可见内容”位：由 `session.list`／`host/session-added` 帧播种，只有收到非空对话事件才转为非 blank，因此已受理但最终为空的轮次仍可复用；列表重拉会在合并本地已观测证据后重新对齐。列表界面隐藏 blank 行；store 保留每一行。`SessionRuntime.create` 接受可选的、由调用方预先分配的 SessionId，失败时抛出 `SessionCreateError`（携带 `requestedSessionId`）。
+`WorkspaceRuntime.connectWorkspace(workspaceId)` 解析 New Session 流程最终落入的会话：它从列表镜像收集该 Workspace 的既有空会话（`blank && cwd == workspace.path && sessionIds.includes(id)`——Host 自己的成员规则，绝不只按 cwd，避免劫持 cwd 匹配但未入账的空白会话），排除已归档行，再让 `SessionRuntime.createOrReuse()` 返回首个与插件创建选项兼容的候选项，或者创建新会话。新建分支携带稳定的 draft id 和预分配 Session id；收到可见消息前，这对身份会保存在受限浏览器存储中，因此刷新或并发的新会话操作会复用同一 reservation，但不会保存凭据。草稿预留保存原始 Host ID；仅对池化创建返回值解码回该表示，避免再次创建时把浏览器键预留为新的 Session。共享的 `startSession` 操作优先使用明确指定的 Workspace，其次使用当前 Session 所属 Workspace，再其次使用派生的最近活跃 Workspace；一个 Workspace 都没有时则清空选择，进入空白 New Session 页面。`SessionSummary.blank` 镜像 Host 的“没有可见内容”位：由 `session.list`／`host/session-added` 帧播种，只有收到非空对话事件才转为非 blank，因此已受理但最终为空的轮次仍可复用；列表重拉会在合并本地已观测证据后重新对齐。列表界面隐藏 blank 行；store 保留每一行。`SessionRuntime.create` 接受可选的、由调用方预先分配的 SessionId，失败时抛出 `SessionCreateError`（携带 `requestedSessionId`）。
 
 `WorkspaceRuntime.openWorkspace(workspaceId)` 从现有列表快照中选择该 Workspace 最新的、当前用户可见、非空、未归档的根 Session，不额外请求列表；没有符合条件的历史 Session 时委托 `connectWorkspace`，因此调用方仍会得到正常复用或新建的空会话。启动流程与 Hero 工作区选择器使用历史优先入口，明确的新会话操作继续调用 `connectWorkspace`。
 
@@ -82,10 +127,12 @@ SlotRegistry 分别为 renderer 提供 `useSessions` 与 `useWorkspaces` 的裸 
 
 `Session.composerPhase` 把任何可见的非命令 Chat Node 视为对话内容，因此客户端插件可以在不打开轮次的情况下投影持久用户输入，而仅包含通用命令行的窗口仍保持 Host blank 状态。列表隐藏和空白会话复用仍遵循 Host blank 位。缺少插件输入 Node 的历史窗口会恢复该空白状态，直到加载更早页面后该 Node 恢复。
 
+<a id="pending-queue-projection"></a>
 ## 待处理队列投影
 
 `ConversationSnapshot.queue` 是 Host 提供的 `agent.inbox.nextTurn` 权威瞬态快照；待处理的 next-step steering（中途引导）不进入此投影。每行携带其 `MessageId`、所有内容块均为文本时的完整可编辑文本，以及扁平化预览；图片块会从预览中省略，因为对话 dock 会单独渲染其持久化缩略图。本地提交会记录预期的 transcript、queued 或 steering 位置，直到观察到携带匹配 `rpcId` 的 Host 状态。Host 根据持久 `agent/inbox/spliced` 变更派生完整 `session/queue` 快照，并在重连时发送基线；面向单条消息的 `agent/inbox/inserted`、`claimed` 与 `discarded` 通知不用于重建该投影。`Session.updateQueue()` 经 Host 侧 `Inbox.splice()` 发送编辑／移除操作，客户端不做乐观变更，因此下一份 Host 快照是唯一可见的提交结果，claim 竞态则可能呈现 `queue-item-not-found`。
 
+<a id="conversation-assembly"></a>
 ## Conversation 组装
 
 每个 `Session` 都把连续事件窗口交给 `ConversationNodeAssembler`。`open()` 与 `loadOlder()` 在该会话尚未补全时请求 `detail: 'conversation'`；`ensureHistoryDetail()` 拉取 `detail: 'full'` 并按 seq 合并。窗口的 `baseSeq` 与尾部包含 `omittedSpans`，因此 conversation 档空洞不是 mux 缺口（[两档会话历史传输](../../../.agents/notes/implemented/architecture/2026-08-18-conversation-history-tier.zh.md)）。处于舞台的会话从 `historyWindowMode: 'tail'` 开始；接受 prompt 或观察到 `running` 后在后台最多补齐 `LIVE_HISTORY_RETAINED_PAGES` 页更早页面（[有界活动窗口](../../../.agents/notes/implemented/bug-fix/2026-09-03-bounded-live-window-and-incremental-reconnect.zh.md)），空闲且处于舞台的阅读器接近顶部时会自动请求一页更早历史。较早历史控件在自动分页失败或触及上限时保留为无障碍重试入口。释放最后一个引用会销毁浏览器窗口；再次获取引用时重新读取尾页。模型请求和实时事件流不等待补齐。普通会话在第一页完成后还会异步请求有界的 `session.historyIndex`；索引只包含轮次范围和简短预览，尚未驻留的标记会先读取所需的更早页面再跳转。插件注册业务 Definition，把单个事件映射为稳定的 `{kind, id}`，在唯一 start 事件处创建 State，折叠有关联的 update，再为已注册的视图目标构造最终节点。Assembler 负责 Context 索引、只读前序 Context 查询，以及引用稳定的 Turn/Step Location 索引。实时 append 只对每个 Definition 求值一次，并且只更新命中的 Context；加载更早分页时保留已有 Context 与节点身份，只匹配新 prepend 的事件，并重放前序依赖或 Location 事实发生变化的 Context。完整替换仅用于首次打开、舞台重进、对仍在加载的窗口的重连，以及恢复的尾页不再与窗口相接的情况；对已打开窗口的重连和其余缺口修复都会把恢复的尾页合并进现有窗口，不会丢弃已显示历史。
@@ -100,34 +147,42 @@ Definition 作者只根据当前事件完成匹配，为每条关联事件提供
 
 Chat builder 为每个 Session 保留一个 mutable keyed store。内容更新只通知受影响的 node key；结构变化才重建顺序和 Location 成员关系；prepend 只增加行，不替换既有 keyed value。每个 Assistant chunk 都会更新 Definition State，但最多每个 animation frame 请求一次物化；final message 与 Turn/Step 关闭会立即发布。参见 [Client Tool 展示所有权决策](../../../.agents/notes/implemented/architecture/2026-08-08-client-tool-presentation-ownership.zh.md)。
 
+<a id="trajectory-request-data"></a>
 ## Trajectory 请求数据
 
 Trajectory Definition 组装出一条按时间顺序排列、以用途为判别字段的提供方请求流。助手请求始终携带数值型 `turn` 与 `step`；压缩请求携带 `step: 0`，其 `turn` 所有者可以是 `null`。这个 null 所有者表示手动压缩独立运行在两个轮次之间，并不表示它属于任一相邻轮次。由取消定稿的 `assistant/message` 会保留持久结果 seq 和提供方信息，但不会将请求标记为完成；`step/end` 会把该请求归类为错误。`session/end-seed` 边界会在边界时刻将未匹配的压缩请求以错误状态结束，错误固定为 `Compaction was interrupted before completion.`；后续 start 会投影为独立请求，而不会覆盖这项遗留的未匹配请求。
 
+<a id="ptc-mode-child-call-tree"></a>
 ## PTC mode 子调用树
 
 每个 `ToolCallBlock` 都通过 `subCalls` 按启动顺序递归拥有自己的子调用。Chat 的 Tool Definition 按 call id 关联 root call 与 result，把 Code Dispatch 的 start/settlement 记录折叠进该 root Context，并投影为一棵 keyed 递归树；child call 不会成为独立 Chat root。start 落在已加载窗口之外时，其 settlement 仍以 `callTime: null` 渲染。一次 child 更新只复制其祖先链，因此未变化的 sibling 保持对象身份。会引入环或超过固定 256 层深度上限的边会被消费，但不会修改树。Trajectory 的 Tool Definition 为自己的 target 独立组装同一种嵌套数据契约。
 
+<a id="session-title-projection"></a>
 ## Session 标题投影
 
 `SessionManager` 独立于列表和 Session 实例到达情况，保留最近一次通过验证的 `session/title` 控制快照。seq 更高的事件会替换旧快照，标题时间戳计入列表新近程度；订阅基线会先丢弃 seq 超过其 `lastSeq` 的任何已保留标题，再接收可选的折叠标题。显式移除 Session 也会清除已保留标题。因此，面向客户端的 `SessionSummary.title` 只包含实际的持久化标题；`displayTitle` 始终存在，并依次回退到 cwd basename 和 Session id。冷态持久化会话会保持该回退值，直到打开或恢复会话，促使主机折叠并投影由日志支撑的标题。`ISession.rename` 用 unary 响应中的 `{title, seq}` 直接结算 `title` 投影格，遵循同一 seq 高者胜规则——列表行和所有 `useProjection('title')` 读者在推送帧到达前即更新；推送帧随后重放同一 seq 时为无操作。
 
 每个 Session 从自身的 `inbox` 投影存储读取冷会话待处理输入，保持 runtime 隔离。Session 释放时关闭投影订阅。
 
+<a id="model-retry-projection"></a>
 ## 模型重试投影
 
 Host 所属的 LLM（大语言模型）retry invariant 会在持久追加边界验证按提供方路由的 `llm/retry` 与 `llm/retry-started` 记录，包括标识、顺序、计时器、整数、状态、提供方延迟和非空诊断字段约定。客户端的 Retry、Assistant 与 Turn Error Definition 把这些记录和 Assistant、Turn／Step 事件一起折叠：失败步骤的流式输出片段会被移除，并在 retry 事件的序列位置插入一条持久重试提示。该提示在匹配的 started 记录到达前为 `scheduled`；如果所属 Step 或 Turn 先关闭，则标记为 `cancelled`，started 记录到达后则标记为 `started`。normal mode 提示携带其有限上限；always mode 提示保持显式无界。没有重试的终态 `turn/end` 错误会从持久消息与可选错误码投影出一个 `turn-error` 节点；AUTH 投影会把可能回显凭据片段的提供方文案替换为 `API key is invalid`，Gateway 会话持久化和授权内部细节会改为安全的重试提示，不暴露解析器或存储细节。进入重试的失败只保留该次尝试的重试提示。窗口重建与历史回放使用同一组 Definition，因此刷新既不会让已丢弃的分片重新出现，也不会丢失终态失败反馈。可见但尚未定稿的输出会在终态错误旁冻结为中断的 Assistant 节点。
 
 reason 为 `max-tokens` 的 `turn/end` 会在该轮位置投影出一个 `turn-max-tokens` 节点：一条 warning 样式的本地化提示，说明回答在单次请求的输出 token 上限处停止，已截断的输出保留在对话流中，并提示发送“继续”可在新一轮接着输出。事件本身不携带 token 数量，提示因此不显示任何数字。窗口重建与历史回放使用同一 Definition 重建该节点，刷新和恢复后结束原因保持一致。
 
+<a id="session-forking"></a>
 ## 会话 fork
 
 `ISessions.fork({sessionId, atSeq?, increaseTitle?})` 只在子会话摘要已能在本地寻址后才完成；该摘要携带源会话的谱系和 cwd，且 `blank: false`，由调用方决定是否打开。`increaseTitle: true` 会在 client 端根据源会话的持久化标题重命名子会话：尾部 `(N)` 或 `（N）` 递增并保留括号样式，其余标题追加 ` (1)`；源会话没有持久化标题时跳过改名，改名失败时拒绝 promise 但保留已创建的子会话。该选项不会进入 Host fork 请求。即使响应为 `workspace-attach-failed`，其中仍会标识 Host 已发布的子会话，因此 `SessionManager` 会先将这一部分成功对账，再让 `SessionForkError` 到达调用方，避免重试创建重复的子会话。
 
+<a id="session-model-selection"></a>
 ## 会话模型选择
 
 每个常驻 `Session` 都拥有一个 `modelSelection` 快照，其中包含当前模型选择、按提供方分组的目录、逐提供方失败记录，以及 `idle`／`loading`／`ready`／`selecting`／`error` 状态。历史记录会建立或刷新当前模型选择，打开选择器会刷新目录；选择失败会保留上一次模型选择和可用分组。目录与选择操作共用单调递增的代次，因此较旧响应无法覆盖较新的模型选择。重连重建会恢复 Host 报告的模型选择，同时不替换未变化的选择子结构。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为会话对象层会选择后续 Host 请求使用的提供方／模型路由，但不添加任何模型可见内容。
@@ -136,7 +191,18 @@ reason 为 `max-tokens` 的 `turn/end` 会在该轮位置投影出一个 `turn-m
 
 更改模型选择可能改变提供方侧的缓存复用，或使其失效；该包本身不会改变提示词前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **`loader.unload` 是 stub**：它会抛出 not-implemented；客户端没有从 fiber dispose 到注册与样式移除的卸载链。
 - **插件 bundle 从该包导入值时必须使用 `/client` 子路径**：裸包名不在 loader externals 表中，会内联第二个模块实例；其私有 scope-tag Symbol 永远无法匹配。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

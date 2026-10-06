@@ -1,6 +1,97 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/fs/tool-fs-search/README.md
-README.md: 97ab8997e0e80d4b6217ea5beeb4247e0e627836
-README.zh.md: 9a08efe36d9d35d8b341925179873a5e9eee8ef1
+/:
+  en: e7dc8e2a51b03faa
+  zh: 61495d48365178df
+/deepseek-ai-dsh-tool-fs-search:
+  en: 9c1a781b649a20fd
+  zh: 83325e58a97b2728
+/deepseek-ai-dsh-tool-fs-search/summary:
+  en: a2d8407299a71efe
+  zh: d43338a4c7954a39
+/deepseek-ai-dsh-tool-fs-search/table-of-contents:
+  en: 83d26943ae08fad2
+  zh: e6fe0cb7952b86d8
+/deepseek-ai-dsh-tool-fs-search/deployment-requirement-no-host-rg-co-located-workdir-filesystem:
+  en: 048ae7a5fb47c49e
+  zh: 0d1bfec555110c1f
+/deepseek-ai-dsh-tool-fs-search/config:
+  en: 5e5b58a2d598b7dd
+  zh: 09a5ac415d4cbdce
+/deepseek-ai-dsh-tool-fs-search/tools:
+  en: e4072b8dde66656f
+  zh: f355ace8a376ec00
+/deepseek-ai-dsh-tool-fs-search/two-budgets-two-artifacts:
+  en: c539602650a2212f
+  zh: cf7eb74865cba271
+/deepseek-ai-dsh-tool-fs-search/errors:
+  en: ba92c7431bcc506b
+  zh: c887ab10dd7609ef
+/deepseek-ai-dsh-tool-fs-search/invariants:
+  en: a1c2c4d37fefdd89
+  zh: 5bd70e4ccfed7a17
+/deepseek-ai-dsh-tool-fs-search/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-tool-fs-search/model-experience/system-prompt:
+  en: cf78b9dd5596495f
+  zh: bd44560f8c2435e8
+/deepseek-ai-dsh-tool-fs-search/model-experience/system-prompt/what-the-model-sees:
+  en: 0700638250399773
+  zh: a42336403025e9bd
+/deepseek-ai-dsh-tool-fs-search/model-experience/system-prompt/what-the-model-sees/glob-guidance:
+  en: c8f798f1bf500fe7
+  zh: 9f56b60ec8ae1779
+/deepseek-ai-dsh-tool-fs-search/model-experience/system-prompt/what-the-model-sees/grep-guidance:
+  en: 7ed8e5efe4deb2de
+  zh: eb8419d4579aeab2
+/deepseek-ai-dsh-tool-fs-search/model-experience/system-prompt/token-effect:
+  en: c10c8a3e9e470e62
+  zh: c2a2404bfa4fd60a
+/deepseek-ai-dsh-tool-fs-search/model-experience/system-prompt/kv-cache-effect:
+  en: db2f355d8209a537
+  zh: bd91d8e33a7042f6
+/deepseek-ai-dsh-tool-fs-search/model-experience/tool-schemas:
+  en: 3039bc5e7a796b21
+  zh: 6b7a9eaf69c9ea53
+/deepseek-ai-dsh-tool-fs-search/model-experience/tool-schemas/what-the-model-sees:
+  en: ab07aaec26eaa89a
+  zh: 693c46c42ebc3030
+/deepseek-ai-dsh-tool-fs-search/model-experience/tool-schemas/token-effect:
+  en: 023a80f81229887f
+  zh: 5410d27cde4fb656
+/deepseek-ai-dsh-tool-fs-search/model-experience/tool-schemas/kv-cache-effect:
+  en: 4555717d7b481f52
+  zh: 88d5f239ac01f197
+/deepseek-ai-dsh-tool-fs-search/model-experience/results-and-spill-notices:
+  en: e9d1330ebd642a0d
+  zh: f9bc6dffb0afd878
+/deepseek-ai-dsh-tool-fs-search/model-experience/results-and-spill-notices/what-the-model-sees:
+  en: 3a357b506d327e18
+  zh: b2d97abd9af096d4
+/deepseek-ai-dsh-tool-fs-search/model-experience/results-and-spill-notices/token-effect:
+  en: 033a5b99fec018a1
+  zh: 79fc41e856cd9925
+/deepseek-ai-dsh-tool-fs-search/model-experience/results-and-spill-notices/kv-cache-effect:
+  en: f5d5f97a153f7c70
+  zh: 14660e568cd51bdc
+/deepseek-ai-dsh-tool-fs-search/model-experience/tool-errors:
+  en: 2d4f2c8605eccab3
+  zh: 67f1f0218f73c6bf
+/deepseek-ai-dsh-tool-fs-search/model-experience/tool-errors/what-the-model-sees:
+  en: 375c4554a70d93a4
+  zh: 372a088c6ecf68ab
+/deepseek-ai-dsh-tool-fs-search/model-experience/tool-errors/token-effect:
+  en: 681cadd5be7b8ac1
+  zh: 1f0102977ea02785
+/deepseek-ai-dsh-tool-fs-search/model-experience/tool-errors/kv-cache-effect:
+  en: f5d5f97a153f7c70
+  zh: 9258d5dec67946b4
+/deepseek-ai-dsh-tool-fs-search/known-limitations-and-deferred-work:
+  en: b2a40dd6d212c117
+  zh: 03b269dfadc91493
+/deepseek-ai-dsh-tool-fs-search/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

@@ -30,7 +30,7 @@ describe('web e2e: rail search click survives its own document-level bubble', ()
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 
@@ -53,7 +53,7 @@ describe('web e2e: rail search click survives its own document-level bubble', ()
 
     const wideSearch = page.getByRole('button', { name: 'Search sessions' })
     await expect.poll(async () => wideSearch.getAttribute('aria-expanded'), { timeout: 10_000 }).toBe('true')
-    const input = page.getByPlaceholder('Search sessions...')
+    const input = page.getByPlaceholder('Search sessions…')
     await expect.poll(
       async () => input.evaluate(el => document.activeElement === el),
       { timeout: FOCUS_SETTLE_MS + 10_000 },

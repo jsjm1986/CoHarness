@@ -1,6 +1,43 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/util/timeout/README.md
-README.md: 6b61e0f2e1966a1578219376f840956f4f896994
-README.zh.md: 7350e0d817929faf31f7d0f65c3604e204c9e53f
+/:
+  en: fb62472acb68b006
+  zh: 0a51af1cad6486b4
+/dsh-timeout:
+  en: 64daf091fe2905e7
+  zh: 1b8ead36320fbd86
+/dsh-timeout/summary:
+  en: 13fc36a866f4ae6d
+  zh: 02a9ab4bd48e968a
+/dsh-timeout/table-of-contents:
+  en: e33eb48e718c268e
+  zh: 35ce0493ed98ba23
+/dsh-timeout/api:
+  en: 0a573a0b3a120fdf
+  zh: ff8d693fb168b046
+/dsh-timeout/the-timeoutms-0-sentinel:
+  en: 102693f811f1140a
+  zh: f57adf306b7f8adc
+/dsh-timeout/usage-shape:
+  en: db9a4211981d16be
+  zh: fe6af064215f15d6
+/dsh-timeout/what-does-not-get-a-timeout:
+  en: 8ce1592801aa821c
+  zh: 882f06c3e3ea187f
+/dsh-timeout/invariants:
+  en: 5e59c59f775022cf
+  zh: 93814fec4d411f9a
+/dsh-timeout/model-experience:
+  en: 5c35c77e4625b8ac
+  zh: 8142da11ba1a6d11
+/dsh-timeout/model-experience/kv-cache-effect:
+  en: 04cc18d90bf9382d
+  zh: d1d9f9093628b57c
+/dsh-timeout/known-limitations-and-deferred-work:
+  en: 22c6e6d0cd2311e0
+  zh: de229d8bbba818aa
+/dsh-timeout/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

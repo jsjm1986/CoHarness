@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-17-image-dimension-admission-limit.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-image-dimension-admission-limit.md
-2026-08-17-image-dimension-admission-limit.md: 027259c0949d142ce8d8af27e7daa2abd54769ab
-2026-08-17-image-dimension-admission-limit.zh.md: 38422615aa93b7f1639877d7d3751322c77de1eb
+/agent-note-per-side-image-dimension-admission-limit:
+  en: 752ef8b930d96c38
+  zh: f8cfa309ab9c5ce2
+/agent-note-per-side-image-dimension-admission-limit/problem:
+  en: c847d52dadaf8cbe
+  zh: 1180a05023cde210
+/agent-note-per-side-image-dimension-admission-limit/decision:
+  en: 31610ac007354d1c
+  zh: 5a4267e37a065b5c
+/agent-note-per-side-image-dimension-admission-limit/alternatives-considered:
+  en: b4e0adf615dd84a2
+  zh: 0a42d94c4f92eadb
+/agent-note-per-side-image-dimension-admission-limit/related:
+  en: 9f43e7111bf227f0
+  zh: a1559e70e41ee28b
+/agent-note-per-side-image-dimension-admission-limit/consequences:
+  en: d8fafc0f7328632c
+  zh: 1312076f59c01709

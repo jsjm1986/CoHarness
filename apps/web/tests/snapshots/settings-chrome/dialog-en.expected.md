@@ -42,6 +42,15 @@
   - button "System" [pressed]:
     - img
     - text: System
+  - text: Work details Choose how much detail to show for tool calls
+  - button "Detailed":
+    - text: Detailed
+    - img
+  - text: Show coding view Shows trajectory and this turn’s code diff, and enables switching among the full Agent presets
+  - switch "Show coding view" [checked]
+  - text: Keyboard shortcuts
+  - paragraph: View and edit available shortcuts and input actions
+  - button "Edit shortcuts"
   - text: Send behavior while busy What Enter and the Send button do while the agent is running; Cmd/Ctrl+Enter uses the other behavior
   - button "Queue":
     - text: Queue
@@ -53,3 +62,7 @@
   - text: Fill Text size
   - slider "Text size": "14"
   - status: 14px
+  - text: Performance & usage Choose how much performance and usage detail to show
+  - button "Detailed":
+    - text: Detailed
+    - img

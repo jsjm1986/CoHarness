@@ -3,12 +3,13 @@
  * project scope selector, root-conversation visibility UI, and project
  * read-only composer policy.
  */
+import { clientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientContext, SessionCreateOptions, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import {
-  CollaborationClient, createBrowserCollaborationTransport,
+  CollaborationClient, createBrowserCollaborationTransport, conversationProject,
   type CollaborationVisibility,
 } from './collaboration-client.ts'
 import {
@@ -52,11 +53,6 @@ class ProjectReadOnlyError extends Error {
 /** Required services for collaboration slots, session creation, and copy. */
 export const inject = ['slots', 'sessions', 'locale']
 
-/** Pure selector installed only while the active project membership is read-only. */
-function selectProjectReadOnly(_owner: ComposerChainProps): ProjectReadOnlyMatch {
-  return 'project-read-only'
-}
-
 /**
  * Compose Gateway collaboration behavior and presentation.
  * @param ctx - client root context.
@@ -97,9 +93,15 @@ export function apply(ctx: ClientContext): void {
   ctx.on('sessions/prepare-create', async (_options, next): Promise<SessionCreateOptions> => {
     const prepared = await next()
     const snapshot = collaboration.getSnapshot()
-    if (snapshot.status !== 'ready' || snapshot.context?.scope.kind !== 'project') return prepared
-    if (snapshot.context.scope.mode === 'ro') throw new ProjectReadOnlyError()
-    return { ...prepared, visibility: snapshot.stagedVisibility }
+    const target = prepared.runtimeTarget
+    const id = target?.kind === 'personal' ? undefined : target?.kind === 'project' ? target.projectId
+      : snapshot.context?.scope.kind === 'project' ? snapshot.context.scope.projectId : undefined
+    if (snapshot.status !== 'ready' || id === undefined) return prepared
+    const mode = snapshot.context?.projects.find(project => project.projectId === id)?.mode
+      ?? (snapshot.context?.scope.kind === 'project' && snapshot.context.scope.projectId === id ? snapshot.context.scope.mode : undefined)
+    if (mode !== 'rw') throw new ProjectReadOnlyError()
+    return { ...prepared, visibility: snapshot.context?.scope.kind === 'project' && snapshot.context.scope.projectId === id
+      ? snapshot.stagedVisibility : 'project' }
   })
 
   ctx.on('sessions/confirm-blank-reuse', async (request, next): Promise<boolean> => {
@@ -109,7 +111,9 @@ export function apply(ctx: ClientContext): void {
     if (snapshot.status !== 'ready' || snapshot.context?.scope.kind !== 'project') return true
     const expected = request.options.visibility
     if (expected === undefined) return false
-    return collaboration.matchesConversationVisibility(request.sessionId, expected)
+    const id = request.options.runtimeTarget === undefined
+      ? request.sessionId : clientSessionKey(request.options.runtimeTarget, request.sessionId)
+    return collaboration.matchesConversationVisibility(id, expected)
   })
 
   const hooks = { collaboration }
@@ -164,13 +168,20 @@ export function apply(ctx: ClientContext): void {
     let disposeComposer: (() => void) | undefined
     const reconcile = (): void => {
       const scope = collaboration.getSnapshot().context?.scope
-      const readOnly = scope?.kind === 'project' && scope.mode === 'ro'
+      const snapshot = collaboration.getSnapshot()
+      const readOnly = (scope?.kind === 'project' && scope.mode === 'ro') || snapshot.context?.projects.some(project => project.mode === 'ro') === true
       if (readOnly && disposeComposer === undefined) {
         disposeComposer = ctx.slots.inject('conversation.composer', () => ctx.slots.register({
           name: 'conversation.composer',
           priority: 100,
           locale: NS,
-          select: selectProjectReadOnly,
+          select: (owner: ComposerChainProps): ProjectReadOnlyMatch | null => {
+            const current = collaboration.getSnapshot()
+            const id = conversationProject(current, owner.session?.sessionId)
+            const project = current.context?.projects.find(project => project.projectId === id)
+            const mode = project?.mode ?? (current.context?.scope.kind === 'project' && current.context.scope.projectId === id ? current.context.scope.mode : undefined)
+            return mode === 'ro' ? 'project-read-only' : null
+          },
         }, ReadOnlyComposer))
       } else if (!readOnly && disposeComposer !== undefined) {
         disposeComposer()

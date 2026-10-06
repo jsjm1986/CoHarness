@@ -18,6 +18,8 @@ Options:
   --dump-config                  print the composed profile tree and exit
   --dump-default-config          print the profile tree without its user layer
                                  or --patch overlays and exit
+  --dump-config-schema           print JSON Schema for profile entries and
+                                 patches without mounting
 
 Examples:
   dsh web                                   boot the web profile (same as: dsh --profile web)

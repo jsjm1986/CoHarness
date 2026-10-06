@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-04-drop-windows-powershell-picker-fallback.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-04-drop-windows-powershell-picker-fallback.md
-2026-08-04-drop-windows-powershell-picker-fallback.md: 619afd31d9ec78cdb8565e29fa942b7db8749365
-2026-08-04-drop-windows-powershell-picker-fallback.zh.md: 14716f405e98385b7277ce0814adf32190be36b7
+/agent-note-drop-the-windows-powershell-picker-fallback:
+  en: a40f0823f21e54ba
+  zh: 66ebf6d6db71c1a9
+/agent-note-drop-the-windows-powershell-picker-fallback/problem:
+  en: 8d0ea545d88ba1bc
+  zh: 2d9f31c16ba0b93c
+/agent-note-drop-the-windows-powershell-picker-fallback/decision:
+  en: 9acef917d8b92222
+  zh: 549cee3837d1f908
+/agent-note-drop-the-windows-powershell-picker-fallback/alternatives-considered:
+  en: 28dde3e7ec38d42c
+  zh: 40fef782293203aa
+/agent-note-drop-the-windows-powershell-picker-fallback/consequences:
+  en: 349d5acc42af0ce4
+  zh: e9fd414f469440d4

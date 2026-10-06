@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-library"
+---
+
 # @deepseek-ai/dsh-client-test-runtime
 
 [English](README.md) | 中文
@@ -14,10 +19,22 @@
 
 `SlotTestRuntime.create()` 让 Vitest 套件在 jsdom 中驱动生产 slot、store、带类型的 Session 与 Workspace fixture，并对局部 DOM 断言。面向插件激活、重载、重连与清理的测试，`createClientTest` 使用具名端点 Remote mock 启动 web profile 的 bundle roster，无需业务 Host。缺失服务与未打桩调用会明确失败。整机 fixture 拥有启动和销毁，局部 runtime 提供幂等销毁。通过 `devDependencies` 将本包用于客户端测试；它不是产品插件。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。围绕生产 slot 注册表的纯测试类型替身组装；它不拥有产品运行时状态。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无；本包是浏览器侧测试基础设施，不会发起任何模型请求。
@@ -26,7 +43,18 @@
 
 无；本包既不组装也不发送提供方请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 - **仅可经仓内源码别名消费。** spec 通过 tsconfig `paths` 解析到 `src`；构建产物 `lib/` 再导出 `@deepseek-ai/dsh-client-runtime/client`，而该 bundle 是无 Node ESM 导出的浏览器 loader 脚本，故 `lib/index.js` 在纯 Node 下不可导入。所有消费方都是仓内 Vitest 套件；不存在 Node 兼容的运行时入口。
 - **会话快照是 fixture 数据，不是重放历史。** `updateSnapshot` 直写快照 store；wire 到快照的运算仍由 runtime 包自身测试与 replay e2e 把守。因此 fixture 可以表达生产投影永不产出的状态。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

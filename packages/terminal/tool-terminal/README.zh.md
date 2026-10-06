@@ -112,6 +112,9 @@ kind: "package-reference"
 
 -----
 
+
+**运行时不变式：** 不发布伴生入口。这个无状态适配器只贡献工具与提示词指引；PTY 生命周期与后台任务关系仍由其组合的服务持有。
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -163,6 +166,7 @@ spawn 返回 id 与有界启动输出。发送与读取返回有界终端文本�
 
 仅追加；新结果位于可复用请求前缀之后。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -182,5 +186,3 @@ spawn 返回 id 与有界启动输出。发送与读取返回有界终端文本�
 无。
 
 </details>
-
-**运行时不变式：** 不发布伴生入口。这个无状态适配器只贡献工具与提示词指引；PTY 生命周期与后台任务关系仍由其组合的服务持有。

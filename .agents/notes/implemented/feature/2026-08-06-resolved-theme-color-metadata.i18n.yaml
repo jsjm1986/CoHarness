@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-resolved-theme-color-metadata.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-06-resolved-theme-color-metadata.md
-2026-08-06-resolved-theme-color-metadata.md: 2f7a6f0bde5e75aeb6769939cae54d5319aa5bae
-2026-08-06-resolved-theme-color-metadata.zh.md: 0312794c607b59f4772d498e1533e0af70b9fbbe
+/agent-note-resolved-theme-color-metadata:
+  en: 7e7952e9ae3a2312
+  zh: 7962e7c4daccfe60
+/agent-note-resolved-theme-color-metadata/problem:
+  en: 299531f88cd79512
+  zh: a7d08b9c42ec11b0
+/agent-note-resolved-theme-color-metadata/decision:
+  en: 67e1181e06af5eef
+  zh: fef6d6c143149ef7
+/agent-note-resolved-theme-color-metadata/verification:
+  en: 24ee2ca8b3c993f7
+  zh: 44b83aa0c2e78ed4
+/agent-note-resolved-theme-color-metadata/alternatives-considered:
+  en: f49e99ffbc397443
+  zh: 3ad3ba3df87c0081
+/agent-note-resolved-theme-color-metadata/consequences:
+  en: ea4b1129869f0581
+  zh: f88f4948b951c598

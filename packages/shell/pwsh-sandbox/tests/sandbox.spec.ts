@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { SandboxProvider, SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox'
 import type { ConfinedArgv, RunnerFailureRule, SandboxExecutionPolicy, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
@@ -20,6 +20,18 @@ import { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { SandboxPwshExecutor } from '../src/index.ts'
 import { classifyRunnerFailure, isRunnerSpawnFailure, matchesSignature } from '../src/helpers.ts'
+import type { ShellExecSpec, ShellExecution, ShellRunResult } from '@deepseek-ai/dsh-shell'
+
+/** Historical foreground shorthand over the unified execute() seam. */
+async function run(x: { execute(spec: ShellExecSpec): Promise<ShellExecution> }, spec: ShellExecSpec): Promise<ShellRunResult> {
+  return (await x.execute(spec)).result()
+}
+
+/** Historical background shorthand: execute with no deadline armed. */
+function start(x: { execute(spec: ShellExecSpec): Promise<ShellExecution> }, spec: ShellExecSpec): Promise<ShellExecution> {
+  return x.execute({ ...spec, onExpiry: 'none' })
+}
+
 
 // The same probe pwsh-local's suites and the vitest coverage exemption use:
 // spawnSync never throws on a missing binary (it reports status null), and
@@ -28,7 +40,15 @@ function pwshAvailable(): boolean {
   return spawnSync(resolvePwshPath(), ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '$true'], { encoding: 'utf8' }).status === 0
 }
 
-const spillDir = mkdtempSync(join(tmpdir(), 'dsh-pwsh-sandbox-spec-'))
+let spillDir: string
+
+beforeAll(() => {
+  spillDir = mkdtempSync(join(tmpdir(), 'dsh-pwsh-sandbox-spec-'))
+})
+
+afterAll(() => {
+  rmSync(spillDir, { recursive: true, force: true })
+})
 
 /** One recorded provider call: the argv handed over and the policy it rode with. */
 interface ConfineCall {
@@ -65,6 +85,7 @@ async function setup(
     }
   }
   const ctx = new Context()
+  onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(FakeSandboxProvider)
   await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: spillDir })
@@ -152,7 +173,20 @@ describe('helpers (pure)', () => {
 })
 
 describe('SandboxPwshExecutor asynchronous confinement', () => {
-  it('reports synchronous subprocess spawn errors through asynchronous start rejection', async () => {
+  it('reports caller cancellation when a failed launch result is read after abort', async () => {
+    const failure = Object.assign(new Error('launch refused'), { code: 'ENOENT', syscall: 'spawn node', path: 'node' })
+    const { ctx, executor } = await setup(() => passthrough(['node']), throwingSubprocessRuntime(failure))
+    const controller = new AbortController()
+    const reason = new Error('caller abandoned the failed launch')
+    try {
+      const execution = await executor.execute(executor.resolve({ command: 'Write-Output ready', signal: controller.signal }))
+      await execution.done
+      controller.abort(reason)
+      await expect(execution.result()).rejects.toBe(reason)
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('reports synchronous subprocess spawn errors through the prepared handle result', async () => {
     const RO: SandboxPolicy = { mode: 'read-only', workspaceRoot: spillDir }
     const contexts: Context[] = []
     try {
@@ -162,12 +196,12 @@ describe('SandboxPwshExecutor asynchronous confinement', () => {
         runnerFailureRules: [{ fatalSignatures: ['fake-runner: '] }],
       }), throwingSubprocessRuntime(attributable))
       contexts.push(closed.ctx)
-      await expect(closed.executor.start(closed.executor.resolve({ command: 'echo never', sandboxPolicy: RO })))
+      await expect(run(closed.executor, closed.executor.resolve({ command: 'echo never', sandboxPolicy: RO })))
         .rejects.toThrow(SandboxUnavailableError)
       const foreign = Object.assign(new Error('sync-emfile-start'), { code: 'EMFILE', syscall: 'spawn', path: 'node' })
       const passthroughError = await setup(undefined, throwingSubprocessRuntime(foreign))
       contexts.push(passthroughError.ctx)
-      await expect(passthroughError.executor.start(passthroughError.executor.resolve({ command: 'echo never', sandboxPolicy: RO })))
+      await expect(run(passthroughError.executor, passthroughError.executor.resolve({ command: 'echo never', sandboxPolicy: RO })))
         .rejects.toThrow('sync-emfile-start')
     } finally { await Promise.all(contexts.map(ctx => ctx.fiber.dispose())) }
   })
@@ -189,8 +223,8 @@ describe('SandboxPwshExecutor asynchronous confinement', () => {
       }
     }
     const { ctx, executor } = await setup(() => passthrough(['node']), Subprocess)
-    const pending = executor.run(executor.resolve({ command: 'Write-Output ready', signal: controller.signal }))
-    const rejected = expect(pending).rejects.toBe(reason)
+    const pending = run(executor, executor.resolve({ command: 'Write-Output ready', signal: controller.signal }))
+    const rejected = expect(pending).resolves.toMatchObject({ aborted: true, timedOut: false })
     try {
       await entered.promise
       controller.abort(reason)
@@ -199,7 +233,7 @@ describe('SandboxPwshExecutor asynchronous confinement', () => {
     } finally { completion.reject(reason); await pending.catch(() => {}); await ctx.fiber.dispose() }
   })
 
-  it.each(['run', 'start'] as const)('cancels %s before a late confinement reply can spawn', async (operation) => {
+  it.each(['kill', 'none'] as const)('cancels %s before a late confinement reply can spawn', async (onExpiry) => {
     const entered = Promise.withResolvers<AbortSignal>()
     const response = Promise.withResolvers<ConfinedArgv>()
     const spawned = vi.fn()
@@ -213,7 +247,7 @@ describe('SandboxPwshExecutor asynchronous confinement', () => {
     }, Subprocess)
     const controller = new AbortController()
     const reason = new Error('cancel pending confinement')
-    const pending = executor[operation](executor.resolve({ command: 'Write-Output ready', signal: controller.signal }))
+    const pending = executor.execute(executor.resolve({ onExpiry, command: 'Write-Output ready', signal: controller.signal }))
     const rejected = expect(pending).rejects.toBe(reason)
     const signal = await entered.promise
     controller.abort(reason)
@@ -230,21 +264,25 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
   // unit tests never attempt writes outside the system temp directory. On
   // win32 there is no POSIX mode denial; the real-sandbox denial coverage
   // lives in tests/acl.e2e.ts, where the ACL runner denies scratch paths.
-  const readOnlyDir = mkdtempSync(join(tmpdir(), 'dsh-pwsh-sandbox-ro-'))
-  if (process.platform !== 'win32') chmodSync(readOnlyDir, 0o555)
-  const deniedWriteCommand = `[IO.File]::WriteAllText('${join(readOnlyDir, 'probe.txt')}', 'x')`
+  let readOnlyDir: string
+  let deniedWriteCommand: string
+
+  beforeAll(() => {
+    readOnlyDir = mkdtempSync(join(tmpdir(), 'dsh-pwsh-sandbox-ro-'))
+    if (process.platform !== 'win32') chmodSync(readOnlyDir, 0o555)
+    deniedWriteCommand = `[IO.File]::WriteAllText('${join(readOnlyDir, 'probe.txt')}', 'x')`
+  })
 
   afterAll(() => {
     if (process.platform !== 'win32') chmodSync(readOnlyDir, 0o755)
     rmSync(readOnlyDir, { recursive: true, force: true })
-    rmSync(spillDir, { recursive: true, force: true })
   })
 
   const RO: SandboxExecutionPolicy = { mode: 'read-only', workspaceRoot: '/ws' }
 
   it('wraps the exact pwsh argv through ctx.sandbox with the per-call policy', async () => {
     const { executor, calls } = await setup()
-    const result = await executor.run(executor.resolve({ command: 'echo wrapped', sandboxPolicy: RO }))
+    const result = await run(executor, executor.resolve({ command: 'echo wrapped', sandboxPolicy: RO }))
     expect(result.exitCode).toBe(0)
     expect(calls).toHaveLength(1)
     const call = calls[0]
@@ -259,14 +297,14 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
   it('advertises the deployment default mode and stamps the deployment policy when none rides the request', async () => {
     const { executor, calls } = await setup()
     expect(executor.sandboxMode).toBe('workspace-write')
-    const result = await executor.run(executor.resolve({ command: 'echo fallback' }))
+    const result = await run(executor, executor.resolve({ command: 'echo fallback' }))
     expect(result.exitCode).toBe(0)
     expect(calls[0]?.policy.mode).toBe('workspace-write')
   }, 30_000)
 
   it('danger-full-access bypasses confine entirely and stamps full-access facts', async () => {
     const { executor, calls } = await setup()
-    const result = await executor.run(executor.resolve({ command: 'echo full', sandboxPolicy: { mode: 'danger-full-access', workspaceRoot: '/ws' } }))
+    const result = await run(executor, executor.resolve({ command: 'echo full', sandboxPolicy: { mode: 'danger-full-access', workspaceRoot: '/ws' } }))
     expect(result.exitCode).toBe(0)
     expect(calls).toHaveLength(0)
     expect(result.sandbox).toEqual({ mode: 'danger-full-access', denied: false })
@@ -281,7 +319,7 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
       denialSignatures: [],
       runnerFailureRules: [],
     }))
-    await expect(executor.run(executor.resolve({ command: 'echo never', sandboxPolicy: RO, signal: controller.signal })))
+    await expect(run(executor, executor.resolve({ command: 'echo never', sandboxPolicy: RO, signal: controller.signal })))
       .rejects.toThrow('caller-cancel')
   }, 30_000)
 
@@ -290,7 +328,7 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
   // (the ACL runner denies scratch paths — unit tests never leave temp).
   it.skipIf(process.platform === 'win32')('classifies a failed write against the backend denial dialect', async () => {
     const { executor } = await setup()
-    const result = await executor.run(executor.resolve({
+    const result = await run(executor, executor.resolve({
       command: deniedWriteCommand,
       sandboxPolicy: RO,
     }))
@@ -305,7 +343,7 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
       denialSignatures: [],
       runnerFailureRules: [{ fatalSignatures: ['fake-runner: '] }],
     }))
-    await expect(executor.run(executor.resolve({ command: 'echo never-runs', sandboxPolicy: RO })))
+    await expect(run(executor, executor.resolve({ command: 'echo never-runs', sandboxPolicy: RO })))
       .rejects.toThrow(SandboxUnavailableError)
   }, 30_000)
 
@@ -317,15 +355,38 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
       denialSignatures: [],
       runnerFailureRules: [{ fatalSignatures: ['fake-runner: '] }],
     }), throwingSubprocessRuntime(attributable))
-    await expect(closed.run(closed.resolve({ command: 'echo never', sandboxPolicy: RO })))
+    await expect(run(closed, closed.resolve({ command: 'echo never', sandboxPolicy: RO })))
       .rejects.toThrow(SandboxUnavailableError)
 
     const foreign = Object.assign(new Error('sync-emfile'), { code: 'EMFILE', syscall: 'spawn', path: 'node' })
     const { executor: passthroughError } = await setup(undefined, throwingSubprocessRuntime(foreign))
-    await expect(passthroughError.run(passthroughError.resolve({ command: 'echo never', sandboxPolicy: RO })))
+    await expect(run(passthroughError, passthroughError.resolve({ command: 'echo never', sandboxPolicy: RO })))
       .rejects.toThrow('sync-emfile')
   }, 30_000)
 
+  it('a SYNCHRONOUS spawn rejection in start() is contained into the settled handle with the same attribution split', async () => {
+    // execute() never throws: facts install before any settlement can run, so
+    // a sync spawn throw surfaces exactly like the async one — through the
+    // killed handle and the foreground projection's attribution.
+    const attributable = Object.assign(new Error('sync-enoent-start'), { code: 'ENOENT', syscall: 'spawn node', path: 'node' })
+    const { executor: closed } = await setup(() => ({
+      argv: ['node', '--', 'pwsh'],
+      enforcement: 'full',
+      denialSignatures: [],
+      runnerFailureRules: [{ fatalSignatures: ['fake-runner: '] }],
+    }), throwingSubprocessRuntime(attributable))
+    const contained = (await start(closed, closed.resolve({ command: 'echo never', sandboxPolicy: RO })))
+    await contained.done
+    expect(contained.status).toBe('killed')
+    await expect(contained.result()).rejects.toThrow(SandboxUnavailableError)
+
+    const foreign = Object.assign(new Error('sync-emfile-start'), { code: 'EMFILE', syscall: 'spawn', path: 'node' })
+    const { executor: passthroughError } = await setup(undefined, throwingSubprocessRuntime(foreign))
+    const passed = (await start(passthroughError, passthroughError.resolve({ command: 'echo never', sandboxPolicy: RO })))
+    await passed.done
+    expect(passed.status).toBe('killed')
+    await expect(passed.result()).rejects.toThrow('sync-emfile-start')
+  }, 30_000)
 
   it('a runner that REFUSES at runtime (fatal signature, nonzero exit) fails closed too', async () => {
     const { executor } = await setup(() => ({
@@ -334,13 +395,13 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
       denialSignatures: [],
       runnerFailureRules: [{ fatalSignatures: ['fake-runner: '] }],
     }))
-    await expect(executor.run(executor.resolve({ command: 'echo never-runs', sandboxPolicy: RO })))
+    await expect(run(executor, executor.resolve({ command: 'echo never-runs', sandboxPolicy: RO })))
       .rejects.toThrow(SandboxUnavailableError)
   }, 30_000)
 
   it('background confined runs stamp clean facts at settlement', async () => {
     const { executor } = await setup()
-    const clean = await executor.start(executor.resolve({ command: 'echo background-ok', sandboxPolicy: RO }))
+    const clean = (await start(executor, executor.resolve({ command: 'echo background-ok', sandboxPolicy: RO })))
     await clean.done
     expect(clean.sandbox).toEqual({ mode: 'read-only', denied: false, enforcement: 'full' })
   }, 30_000)
@@ -349,10 +410,10 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
   // coverage lives in tests/acl.e2e.ts.
   it.skipIf(process.platform === 'win32')('background denied writes stamp denied facts at settlement', async () => {
     const { executor } = await setup()
-    const denied = await executor.start(executor.resolve({
+    const denied = (await start(executor, executor.resolve({
       command: deniedWriteCommand,
       sandboxPolicy: RO,
-    }))
+    })))
     await denied.done
     expect(denied.sandbox).toEqual({ mode: 'read-only', denied: true, enforcement: 'full' })
   }, 30_000)
@@ -364,7 +425,7 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
       denialSignatures: [],
       runnerFailureRules: [{ fatalSignatures: ['fake-runner: '] }],
     }))
-    const proc = await executor.start(executor.resolve({ command: 'echo never', sandboxPolicy: RO }))
+    const proc = (await start(executor, executor.resolve({ command: 'echo never', sandboxPolicy: RO })))
     await proc.done
     expect(proc.sandbox).toEqual({ mode: 'read-only', denied: false, enforcement: 'full', runnerFailed: true })
     // The failure note surfaces through the read path.
@@ -374,10 +435,10 @@ describe.skipIf(!pwshAvailable())('SandboxPwshExecutor', () => {
 
   it('danger-full-access background runs bypass confine and carry no facts', async () => {
     const { executor, calls } = await setup()
-    const proc = await executor.start(executor.resolve({
+    const proc = (await start(executor, executor.resolve({
       command: 'echo full-bg',
       sandboxPolicy: { mode: 'danger-full-access', workspaceRoot: '/ws' },
-    }))
+    })))
     await proc.done
     expect(calls).toHaveLength(0)
     expect(proc.sandbox).toBeUndefined()

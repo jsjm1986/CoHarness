@@ -32,8 +32,7 @@ function appendPair(ctx: Context, override: Record<string, unknown> = {}) {
   session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: renderParticipantNotice(PARTICIPANT) }],
     source: {
-      kind: 'plugin',
-      plugin: 'collaboration-context',
+      kind: 'collaboration-context',
       form: 'notice',
       summary: participantNoticeSummary(PARTICIPANT),
       participantMessageId: participantMessage.id,
@@ -56,7 +55,7 @@ describe('collaboration-context invariant', () => {
     const ctx = await setup()
     const session = appendPair(ctx)
     const notice = session.snapshotEvents().find(event => event.type === 'user/message'
-      && event.data.source.kind === 'plugin')
+      && event.data.source.kind === 'collaboration-context')
     if (notice?.type !== 'user/message') throw new Error('missing notice')
     const corrupt = ctx.sessions.create(SessionId('collaboration-corrupt'))
     corrupt.append('user/message', createUserMessage({

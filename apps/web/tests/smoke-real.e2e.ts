@@ -80,10 +80,32 @@ function waitForReadyLine(child: ChildProcess): Promise<string> {
   })
 }
 
+const authenticatedCookies = new Map<string, Promise<{ origin: string; cookie: string }>>()
+
+/** Exchange a printed process token once for Node-side HTTP probes. */
+function authenticatedWeb(launchUrl: string): Promise<{ origin: string; cookie: string }> {
+  const existing = authenticatedCookies.get(launchUrl)
+  if (existing !== undefined) return existing
+  const exchange = (async () => {
+    const response = await fetch(launchUrl, { redirect: 'manual' })
+    const setCookie = response.headers.get('set-cookie')
+    if (response.status !== 303 || setCookie === null) {
+      throw new Error(`dsh web authentication returned HTTP ${String(response.status)}`)
+    }
+    return {
+      origin: new URL(launchUrl).origin,
+      cookie: setCookie.split(';', 1)[0]!,
+    }
+  })()
+  authenticatedCookies.set(launchUrl, exchange)
+  return exchange
+}
+
 async function rpc<T>(baseUrl: string, method: string, payload: unknown): Promise<T> {
-  const response = await fetch(`${baseUrl}/api/${method}`, {
+  const authenticated = await authenticatedWeb(baseUrl)
+  const response = await fetch(`${authenticated.origin}/api/${method}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', cookie: authenticated.cookie },
     body: JSON.stringify({
       type: 'client-request',
       rpcId: `smoke-${method}`,
@@ -215,8 +237,9 @@ describe('dsh web keyless CLI smoke', () => {
     )
     try {
       const readyUrl = await waitForReadyLine(child)
-      expect(readyUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
-      expect((await fetch(readyUrl)).status).toBe(200)
+      expect(readyUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/\?token=\S+$/)
+      const authenticated = await authenticatedWeb(readyUrl)
+      expect((await fetch(authenticated.origin, { headers: { cookie: authenticated.cookie } })).status).toBe(200)
     } finally {
       const closed = child.exitCode === null
         ? new Promise<void>((resolveClose) => { child.once('close', () => { resolveClose() }) })
@@ -291,7 +314,7 @@ describe('dsh web keyless CLI smoke', () => {
       const workspaceMessage = captured.messages?.find(message =>
         message.role === 'user' && textOfContent(message.content).includes('web-workspace-context-probe'))
       const expectedWebSection = readFileSync(WEB_SURFACE_PROMPT, 'utf8').trimEnd()
-        .replace('{{webUrl}}', baseUrl)
+        .replace('{{webUrl}}', new URL(baseUrl).origin)
       expect(textOfContent(captured.system)).toContain(expectedWebSection)
       expect(workspaceMessage?.role).toBe('user')
       const blocks = (workspaceMessage?.content ?? []) as MessagesContentBlock[]

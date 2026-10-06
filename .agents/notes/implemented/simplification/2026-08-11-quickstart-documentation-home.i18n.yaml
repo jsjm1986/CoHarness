@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-11-quickstart-documentation-home.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-11-quickstart-documentation-home.md
-2026-08-11-quickstart-documentation-home.md: 3fd98843fc0e3e09fc1f4a5623729511aba98def
-2026-08-11-quickstart-documentation-home.zh.md: 63871b01c4b552834907ecd41ea089c71ed246d8
+/agent-note-route-documentation-roots-to-quick-start:
+  en: 308b99c972916366
+  zh: 438e1479f623272a
+/agent-note-route-documentation-roots-to-quick-start/problem:
+  en: 97b157a75599090f
+  zh: 2343cd46f1d6fca3
+/agent-note-route-documentation-roots-to-quick-start/decision:
+  en: dd78f7bdfaef9fe0
+  zh: a128465f23a64e59
+/agent-note-route-documentation-roots-to-quick-start/alternatives-considered:
+  en: 814cf3741c8da2a0
+  zh: 1868471a42729cff
+/agent-note-route-documentation-roots-to-quick-start/consequences:
+  en: 1fb599d45cf112e8
+  zh: 9c70bef75cf77a76

@@ -1,6 +1,6 @@
 /** Contributes workbench controls without importing the conversation renderer. */
-import { WorkspaceResourceError, commitSessionNavigation, parseWorkspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
-import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
+import { WorkspaceResourceError, clientSessionKey, commitSessionNavigation, parseClientSessionKey, parseWorkspaceResourceAddress, workspaceResourceAddress } from '@deepseek-ai/dsh-client-runtime/client'
+import type { WorkspaceResourceOpenRequest, WorkspaceResourceSource } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientContext, ConversationViewport, SessionId, SessionRuntimeTarget } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -18,10 +18,11 @@ import { en as pdfEn, zh as pdfZh } from './pdf/locales.ts'
 import { en as officeEn, zh as officeZh } from './office/locales.ts'
 import { en as markdownEn, zh as markdownZh } from './markdown/locales.ts'
 import { en as htmlEn, zh as htmlZh } from './html/locales.ts'
+import { en as excelEn, zh as excelZh } from './excel/locales.ts'
+import { Config } from '../config.ts'
 import { createReadHtmlRelative } from './html/read-relative.ts'
 import { packHtml } from './html/pack.ts'
 import { createHtmlDocument } from './html/bootstrap.ts'
-import { FontNotice } from './office/FontNotice.tsx'
 import { en, NS, zh } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -39,6 +40,9 @@ function controller(ctx: ClientContext): ConversationViewport {
 
 /** Optional workbench management methods contributed onto the conversation viewport. */
 type WorkbenchViewport = ConversationViewport & {
+  reconcileSessionKeys?: (resolve: (id: SessionId, version: 2 | 3) => SessionId | undefined) => void
+  sessionKeyVersion?: () => 2 | 3
+  needsCatalogRestore?: () => boolean
   listWorkbenches?: () => readonly { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number }[]
   currentWorkbench?: () => { id: string; name: string; paneIds: readonly SessionId[]; updatedAt: number }
   createWorkbench?: (name: string) => string
@@ -54,6 +58,7 @@ type WorkbenchViewport = ConversationViewport & {
 export function apply(ctx: ClientContext): void {
   const viewport = controller(ctx)
   const connection = ctx.get('connection') as ConnectionHandle | undefined
+  const config = Config((globalThis as { __DSH_WORKBENCH_CONFIG__?: unknown }).__DSH_WORKBENCH_CONFIG__ ?? {})
   const chooser = createWorkbenchStore()
   const lifetime = new AbortController()
   let disposed = false
@@ -64,6 +69,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('sidebarOffice', { zh: officeZh, en: officeEn }))
   ctx.effect(() => ctx.locale.register('sidebarMarkdown', { zh: markdownZh, en: markdownEn }))
   ctx.effect(() => ctx.locale.register('sidebarHtml', { zh: htmlZh, en: htmlEn }))
+  ctx.effect(() => ctx.locale.register('sidebarExcel', { zh: excelZh, en: excelEn }), 'ui-workbench: excel dictionaries')
   const openResource = (request: WorkspaceResourceOpenRequest): void => {
     const target = ctx.sessions.runtimeTargetFor?.(request.sessionId) ?? { kind: 'base' as const }
     if (target.kind !== request.runtimeTarget.kind || (target.kind === 'project' && request.runtimeTarget.kind === 'project' && target.projectId !== request.runtimeTarget.projectId)) {
@@ -82,18 +88,37 @@ export function apply(ctx: ClientContext): void {
   }), 'ui-workbench: workspace file tab')
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
     name: 'sidebar.right.pane.tab', key: 'workspace-file', locale: NS,
-    inject: sessionId => ({
-      ...createWorkspacePreviewReaders(connection),
-      pdfT: ctx.locale.bind('sidebarPdf'),
-      officeT: ctx.locale.bind('sidebarOffice'),
-      markdownT: ctx.locale.bind('sidebarMarkdown'),
-      htmlT: ctx.locale.bind('sidebarHtml'),
-      resources: ctx.workspaceResources,
-      renderHtml: async (data, read, request, lifetime, signal) =>
-        createHtmlDocument(await packHtml(data, createReadHtmlRelative(read, request, lifetime), signal)),
-      fontNotice: FontNotice,
-      runtimeTarget: () => ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const },
-    }),
+    inject: (sessionId) => {
+      const runtimeTarget = () => ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const }
+      const sourceFor = (address: string): WorkspaceResourceSource | undefined => {
+        // The empty key is a hidden tab: no source, no subscription.
+        if (address === '') return undefined
+        const parsed = parseWorkspaceResourceAddress(address)
+        if (parsed === undefined || parsed.sessionId !== sessionId) return undefined
+        return ctx.workspaceResources.source({
+          sessionId, path: parsed.path,
+          address: workspaceResourceAddress(sessionId, parsed.path),
+          runtimeTarget: runtimeTarget(),
+        })
+      }
+      return {
+        ...createWorkspacePreviewReaders(connection),
+        pdfT: ctx.locale.bind('sidebarPdf'),
+        officeT: ctx.locale.bind('sidebarOffice'),
+        markdownT: ctx.locale.bind('sidebarMarkdown'),
+        htmlT: ctx.locale.bind('sidebarHtml'),
+        excelT: ctx.locale.bind('sidebarExcel'),
+        excelLimits: config.excel,
+        keyedHooks: { workspaceResource: sourceFor },
+        reloadResource: request => ctx.workspaceResources.source(request).reload(),
+        revokeResource: (request, message) => {
+          ctx.workspaceResources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', message))
+        },
+        renderHtml: async (data, read, request, lifetime, signal) =>
+          createHtmlDocument(await packHtml(data, createReadHtmlRelative(read, request, lifetime), signal)),
+        runtimeTarget,
+      }
+    },
   }, WorkspaceFileTab))
   ctx.on('workspace/resource-open', (request) => {
     if (ctx.get('workspaceResources')?.hasProvider(request.runtimeTarget) !== true || connection === undefined) return
@@ -101,17 +126,23 @@ export function apply(ctx: ClientContext): void {
     return true
   })
   const chooseSession = async (item: import('./catalog.ts').WorkbenchConversation, replace: boolean, navigation = ctx.sessions.beginNavigation()) => {
+    const original = item.sessionId
+    const id = ctx.sessions.keyFor?.(original, item.runtime) ?? original
     const current = viewport.snapshot.getSnapshot()
-    if (!replace && current.paneIds.length >= 4 && !current.paneIds.includes(item.sessionId)) {
+    if (current.pendingIdentity === true) return { ok: false as const, reason: 'unknown' as const }
+    if (!replace && current.paneIds.length >= 4 && !current.paneIds.includes(id)) {
       return { ok: false as const, reason: 'limit' as const }
     }
-    const available = await ctx.sessions.ensureSession?.(item.runtime, item.sessionId)
-    if (disposed || navigation.aborted || available !== true) return { ok: false as const, reason: 'unknown' as const }
-    let result: ReturnType<ConversationViewport['add']> = { ok: false, reason: 'unknown' }
-    await commitSessionNavigation(ctx.sessions, item.sessionId, AbortSignal.any([navigation, lifetime.signal]), () => {
-      result = replace ? viewport.replaceActive(item.sessionId) : viewport.add(item.sessionId)
+    if (ctx.sessions.usingRuntime === undefined) return { ok: false as const, reason: 'unknown' as const }
+    return ctx.sessions.usingRuntime(item.runtime, AbortSignal.any([navigation, lifetime.signal]), async (signal) => {
+      const available = await ctx.sessions.ensureSession?.(item.runtime, original, signal)
+      if (disposed || navigation.aborted || available !== true) return { ok: false as const, reason: 'unknown' as const }
+      let result: ReturnType<ConversationViewport['add']> = { ok: false, reason: 'unknown' }
+      await commitSessionNavigation(ctx.sessions, id, signal, () => {
+        result = replace ? viewport.replaceActive(id) : viewport.add(id)
+      })
+      return result
     })
-    return result
   }
   // The files entry appears wherever the toolbar hosts a Session: the toolbar
   // row above the workbench grid and the Session header's leading seat in the
@@ -119,6 +150,8 @@ export function apply(ctx: ClientContext): void {
   // state, so evaluate it at render time instead of freezing it into the
   // inject face.
   const filesAvailable = (sessionId: SessionId) => () =>
+    (ctx.sessions.runtimeIdentityFor === undefined || ctx.sessions.runtimeIdentityFor(sessionId) !== undefined)
+    &&
     connection?.isLoopback === false
     && ctx.get('workspaceResources')?.hasProvider(ctx.sessions.runtimeTargetFor?.(sessionId) ?? { kind: 'base' as const }) === true
   const openFiles = (sessionId: SessionId) => () => {
@@ -150,35 +183,89 @@ export function apply(ctx: ClientContext): void {
         chooseSession,
         focusSession: (id: SessionId) => { viewport.focus(id) },
         createSession: async (target: SessionRuntimeTarget, replace: boolean) => {
+          if (viewport.snapshot.getSnapshot().pendingIdentity === true) return { ok: false as const, reason: 'unknown' as const }
           // Enforce capacity before creating a Session; recheck after the async
           // create in case another navigation filled the last slot meanwhile.
           if (!replace && viewport.snapshot.getSnapshot().paneIds.length >= 4) return { ok: false as const, reason: 'limit' as const }
           const navigation = ctx.sessions.beginNavigation()
-          const id = await ctx.sessions.createSession?.(target)
-          if (id === undefined) return { ok: false as const, reason: 'unknown' as const }
-          return disposed || navigation.aborted ? { ok: false as const, reason: 'unknown' as const } : chooseSession({
-            sessionId: id,
-            runtime: target,
-            visibility: target.kind === 'personal' ? 'personal' : 'project',
-            creatorUserId: 0,
-            creatorDisplayName: '',
-            updatedAt: Date.now(),
-            blank: true,
-            canWrite: true,
-          }, replace, navigation)
+          if (ctx.sessions.usingRuntime === undefined) return { ok: false as const, reason: 'unknown' as const }
+          return ctx.sessions.usingRuntime(target, AbortSignal.any([navigation, lifetime.signal]), async (signal) => {
+            const id = await ctx.sessions.createSession?.(target, signal)
+            if (id === undefined) return { ok: false as const, reason: 'unknown' as const }
+            return disposed || navigation.aborted ? { ok: false as const, reason: 'unknown' as const } : chooseSession({
+              sessionId: parseClientSessionKey(id)?.sessionId ?? id,
+              runtime: target,
+              visibility: target.kind === 'personal' ? 'personal' : 'project',
+              creatorUserId: 0,
+              creatorDisplayName: '',
+              updatedAt: Date.now(),
+              blank: true,
+              canWrite: true,
+            }, replace, navigation)
+          })
         },
         hydrateCatalog: async (catalog: WorkbenchCatalog, paneIds: readonly SessionId[]) => {
           if (isDisposed()) return
           ctx.sessions.setBaseRuntimeTarget?.(catalog.activeRuntime)
-          await Promise.allSettled(paneIds.flatMap((id) => {
-            const item = catalog.items.find(candidate => candidate.sessionId === id)
-            return item === undefined || ctx.sessions.ensureSession === undefined
-              ? []
-              : [ctx.sessions.ensureSession(item.runtime, id)]
-          }))
-          if (!disposed) viewport.markCatalogReady()
+          const workbench = viewport as WorkbenchViewport
+          if (workbench.needsCatalogRestore?.() === false) { viewport.markCatalogReady(); return }
+          const version = workbench.sessionKeyVersion?.()
+          // A partial personal directory cannot disambiguate any legacy raw ID.
+          if (version === 2 && !catalog.personalComplete) return
+          const ids = version === undefined ? paneIds : version === 2
+            ? workbench.currentWorkbench?.().paneIds ?? [] : viewport.snapshot.getSnapshot().paneIds
+          const candidatesFor = (id: SessionId, version: 2 | 3 | undefined) => catalog.items.filter(candidate =>
+            version === 2 || (version === undefined && parseClientSessionKey(id) === undefined)
+              ? candidate.sessionId === id : clientSessionKey(candidate.runtime, candidate.sessionId) === id)
+          const items = ids.flatMap((id) => {
+            const candidates = candidatesFor(id, version)
+            // Old records without a runtime never choose the first colliding ID.
+            const item = candidates.length === 1 ? candidates[0] : undefined
+            return item === undefined ? [] : [item]
+          })
+          const targets = [...new Map(items.map(item => [item.runtime.kind === 'personal' ? 'personal'
+            : `project:${item.runtime.projectId}`, item.runtime])).values()]
+          const restore = async (): Promise<void> => {
+            const unavailable = new Set<SessionId>()
+            const denied = new Set<SessionId>()
+            if (viewport.snapshot.getSnapshot().mode === 'workbench') {
+              await Promise.all(items.map(async (item) => {
+                const key = ctx.sessions.keyFor?.(item.sessionId, item.runtime) ?? item.sessionId
+                try {
+                  if (await ctx.sessions.ensureSession?.(item.runtime, item.sessionId, lifetime.signal) !== true) denied.add(key)
+                } catch (error) {
+                  if (error instanceof WorkspaceResourceError && error.code === 'access-revoked'
+                    || error instanceof Error && 'status' in error && (error.status === 401 || error.status === 403)) denied.add(key)
+                  else unavailable.add(key)
+                }
+              }))
+            }
+            if (!disposed) {
+              workbench.reconcileSessionKeys?.((id, version) => {
+                const matches = candidatesFor(id, version)
+                const item = matches.length === 1 ? matches[0] : undefined
+                if (matches.length === 0 && version === 3 && !catalog.personalComplete
+                  && parseClientSessionKey(id)?.runtime.kind === 'personal') {
+                  unavailable.add(id)
+                  return id
+                }
+                const key = item === undefined ? undefined : ctx.sessions.keyFor?.(item.sessionId, item.runtime) ?? item.sessionId
+                return key === undefined || denied.has(key) ? undefined : key
+              })
+              viewport.markCatalogReady(unavailable)
+            }
+          }
+          const hold = async (index: number): Promise<void> => {
+            const target = targets[index]
+            if (target === undefined) return restore()
+            if (ctx.sessions.usingRuntime === undefined) throw new Error('Runtime discovery requires an owned runtime operation')
+            return ctx.sessions.usingRuntime(target, lifetime.signal, () => hold(index + 1))
+          }
+          await hold(0)
         },
-        markCatalogReady: () => { if (!disposed) viewport.markCatalogReady() },
+        catalogUnavailable: () => {
+          if (!disposed && connection?.hostDescription.getSnapshot()?.executionAuthorityRequired === false) viewport.markCatalogReady()
+        },
         setMode: (mode: 'single' | 'workbench') => { viewport.setMode(mode) },
         filesAvailable: () => {
           const sessionId = activeSessionId()

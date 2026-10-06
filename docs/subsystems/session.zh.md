@@ -11,8 +11,8 @@
 仅追加的事件类型。可通过声明合并扩展：插件通过 declaration merging 声明额外的事件类型。例如[压缩（compaction） seam](compaction.zh.md) 添加了 `compaction/start` / `compaction/summary` / `compaction/end`，`@deepseek-ai/dsh-hook-protocol` 为钩子桥接添加了仅记录日志的 `hook/invoked` / `hook/result` 记录。与 `compaction/*` 一样，这些都不是 `SurfaceEventType`（没有 `surfaceOp`）。生成的[持久化日志事件目录](../persistence-catalog.zh.md)列举了所有成员（核心与合并扩展的），包含其 payload、surface 标记与声明位置。
 
 ```ts type-equiv
-/** A user-role specialization of the one shared message representation. */
-interface UserMessage extends Message {
+/** A user-role specialization of the shared message representation. */
+interface UserMessage extends MessageBase {
   readonly role: 'user'
 }
 ```
@@ -53,7 +53,27 @@ interface SessionEventMap {
    * project their `content` verbatim; `source` tells them apart.
    */
   'user/message': UserMessage
-  /** Rendered system prompt on the model-visible surface. */
+  /** An incremental agent session change admitted at the named turn and step. */
+  'developer/message': {
+    turn: number
+    step: number
+    message: DeveloperMessage
+    /** Earlier request/header defining every tool addition; required exactly when additions are present. */
+    headerSeq?: SessionSeq
+  }
+  /**
+   * The rendered system prompt on the model-visible surface. The loop appends
+   * the first one as surface node 0 before the step's first `user/message`.
+   * A prepared in-history route can append nonempty changes in a continuing
+   * series. An incapable route or new series normalizes text to the first system
+   * node. Normalization empties nonempty later nodes, then rewrites the head if
+   * needed, through logged per-node replacements. An empty rendering always
+   * clears all active system nodes, leaving no older instructions model-visible.
+   * Empty later nodes are dormant and project to no message; an empty head with
+   * no active later node records "no system prompt". Restored nonempty text follows
+   * the same route and series rule; empty nodes never restore older text.
+   */
+
   'system/message': { turn: number; step: number; message: SystemMessage }
   /**
    * Assembled assistant message for one step (derived history uses this).
@@ -101,7 +121,7 @@ interface SessionEventMap {
     message: ToolResultMessage
     /**
      * Optional failure identity and raw user-facing reason, outside model content;
-     * allowed only when the tool-result block has `isError: true`.
+     * allowed only when the message has `isError: true`.
      */
     error?: { name: string; code: string; reason?: string }
     meta?: JsonValue
@@ -115,7 +135,7 @@ interface SessionEventMap {
   'request/header': {
     header: EpochHeader
     reason: RequestHeaderReason
-    /** A changed header also begins a distinct model-message series. */
+    /** This request begins a distinct model-message series, independently of the header reason. */
     startsSeries?: true
   }
   /**
@@ -124,19 +144,23 @@ interface SessionEventMap {
    */
   'request/context': RequestContext
   /**
-   * Marks the end of a constructor seed. Events before it have smaller seq
-   * values and came from the seed (resume, fork, or replay); this lifecycle
-   * produced none of them. This log-only event is the durable projection of
-   * {@link Session.firstLiveSeq}. Its payload is empty — position and `time`
-   * carry the meaning.
+   * Separates inherited or restored history from later lifecycle-owned work.
+   * This log-only marker need not be at {@link Session.firstLiveSeq}: a fork
+   * seed can already contain its tagged marker and child-owned synthetic
+   * closers before construction.
+
    *
-   * Locate the LAST one in stored history. A seed already ending in one is not
-   * re-marked, so reopening an untouched session does not grow its log per
-   * pickup and the event need not be at the current `firstLiveSeq`.
+   * A fresh fork child owns one `{ inherited: true }` marker at its exact
+   * inherited-prefix cut, even when that prefix ends in an ancestor marker.
+   * `buildForkSeed` appends that marker before any synthetic closers; the
+   * `Session` constructor supplies it when given only the inherited prefix.
+   * The last tagged marker is the current Session's cut; untagged markers
+   * keep ordinary restore and replay lifecycle boundaries.
+
    *
-   * `Session`'s constructor is the only legitimate writer. The invariant
-   * companion deliberately constrains nothing here, so a plugin appending one
-   * would silently classify every live bracket before it as seed history.
+   * Only the `Session` constructor and `buildForkSeed` may create this marker.
+   * The invariant companion deliberately constrains nothing here, so a plugin
+   * appending one would silently classify every live bracket before it as seed history.
    *
    * An owner of a standalone open/close bracket (`compaction/start` …
    * `compaction/end`) reads it because seed history and live work are otherwise
@@ -149,11 +173,13 @@ interface SessionEventMap {
 }
 ```
 
-`UserMessage` 是普通提示词、注入上下文、steering（中途引导）与实时收件箱事件共享的带标识且冻结的 user-role 值。事件包装层只会增加事件本地的位置或结果事实；条目待处理期间，loop 只额外附加驱动器自有的路由状态。
+<a id="the-request-header-event-requestheader"></a>
 
-### `TodoItem`：一条待办项
+<a id="todoitem--one-todo-list-entry"></a>
 
-这是 `todo/write` 事件全量列表快照中的单元。它有意保持精简：一行 `content` 加一个三态 `status`（没有 id、优先级或 `activeForm`）；列表在每次写入时整体替换，因此条目无需稳定标识。见 [todo_write Agent Note](../../.agents/notes/implemented/feature/2026-06-29-todo-write-tool.zh.md)。
+### `TodoItem`——一条待办事项
+
+`todo/write` 事件整列表快照的单元。刻意保持精简——一行 `content` 与三态 `status`（无 id、优先级或 `activeForm`）：每次写入都整体替换列表，因此条目无需稳定身份。见 [todo_write Agent Note](../../.agents/notes/implemented/feature/2026-06-29-todo-write-tool.zh.md)。
 
 ```ts type-equiv
 /**
@@ -174,8 +200,6 @@ interface TodoItem {
 }
 ```
 
-<a id="the-request-header-event-requestheader"></a>
-
 ### 请求头事件：`request/header`
 
 请求信封（即 `EpochHeader`：调用配置 + 适配器所提供默认值的标记 + 已组装的工具 schema）会作为会话状态写入日志，因此每个对话请求都是日志的纯函数（见可重建性 Agent Note）。渲染后的系统提示词则属于派生历史：一个 `system/message` surface 事件，与其他 surface 节点一样计价和回放。带有 reason `'initial'` 或 `'resume'` 的完整 `request/header` 快照记录每个 agent loop 实例的边界；之后请求发生变化时，系统会以 reason `'change'` 记录另一份完整快照。`foldRequestHeader(events)` 通过选择最新快照重建请求头。该事件不是 `SurfaceEventType`，不产生 LLM 消息。
@@ -194,14 +218,16 @@ interface EpochHeader {
   adapterDefaults?: LlmCallConfigAdapterDefaults
   /** Assembled tool schemas; absent for a tool-less request. */
   tools?: ToolSchema[]
+  /** Retired request text; system prompts belong to system/message events.
+   * @persistenceReserved
+   */
+  system?: never
 }
 ```
 
-规范形式：空工具列表表示为字段缺失，与请求构建方式一致。包含旧版 `request/header-delta` 事件或完整快照原因为 `fallback` 的旧版 v0 日志，会在 seed、append 和持久化加载边界被拒绝，而不会以不完整方式回放。
-
 ### 路由容量事件：`request/context`
 
-请求所解析到的路由的上下文元数据是独立的已记录状态，在同一步骤内紧随 `request/header` 追加，且仅在提供方、模型或容量与上一条记录不同时追加。它保持在 `EpochHeader` 之外，因为该类型是 `headerEquals` 逐字段比较的重建约定。容量描述的是路由，不是请求输入，把它折叠进去会让一次容量变化被登记为请求信封的 `change`，也会把适配器元数据拉进 loop 的重建不变式。与 `request/header` 一样，它不是 `SurfaceEventType`，也不产生 LLM 消息。`session.requestContext()` 以增量方式归并最新一条记录。适配器不公布容量的路由会以缺失 `contextWindow` 的形式记录，因此新记录可以清除较早路由的容量。
+请求所解析路由的上下文元数据是独立的日志状态，在同一 step 内随 `request/header` 追加，且仅在 provider、model 或容量相较上一条记录有变化时写入。它保持在 `EpochHeader` 之外，因为该类型是由 `headerEquals` 逐字段比较的重建约定：容量描述的是路由而非请求输入，折叠进去会让容量变化注册为请求信封 `change`，并把适配器元数据拖进循环的重建不变量。与 `request/header` 一样，它不是 `SurfaceEventType`，不产生 LLM 消息。`session.requestContext()` 增量折叠最新记录。适配器未通告容量的路由按 `contextWindow` 缺失记录，因此新记录会清除旧路由的容量。
 
 ```ts type-equiv
 /** Registration-bound metadata for one resolved model route. */
@@ -303,12 +329,15 @@ type SessionEvent<T extends SessionEventType = SessionEventType> = {
  */
 type SurfaceEventType =
   | 'system/message'
+  | 'developer/message'
   | 'user/message'
   | 'assistant/message'
   | 'tool/result'
 ```
 
-### `SurfaceOp`：事件如何进入 surface
+`'append'` 是常规的尾部追加路径。`replace` 会遮蔽从 `startSeq` 到 `endSeq`（含两端）的 surface 条目（两者都必须是有效的 surface seq；`startSeq === endSeq` 时仅替换单个条目），并在原位置插入新事件。当节点 0 持有 `system/message` 时，覆盖它的区间必须是一个恰好只替换该节点的 `system/message`。
+
+### `SurfaceOp`——事件进入 surface 的方式
 
 ```ts type-equiv
 /**
@@ -334,7 +363,7 @@ type SurfaceOp =
   | { op: 'replace'; startSeq: SessionSeq; endSeq: SessionSeq }
 ```
 
-`'append'` 是常规的尾部追加路径。`replace` 会遮蔽从 `startSeq` 到 `endSeq`（含两端）的 surface 条目（两者都必须是有效的 surface seq；`startSeq === endSeq` 时仅替换单个条目），并在原位置插入新事件。当节点 0 持有 `system/message` 时，覆盖它的区间必须是一个恰好只替换该节点的 `system/message`。
+`'append'` 是常规的尾部追加路径。`replace` 遮蔽从 `startSeq` 到 `endSeq`（含两端）的 surface 条目（两者都必须是有效的 surface seq；`startSeq === endSeq` 替换单条），并在原位插入新事件。
 
 ### `SurfaceIntent`：`session.append()` 的参数
 
@@ -465,28 +494,27 @@ declare class Session {
   /** The session identity, derived from its durable header's single copy. */
   get id(): SessionId;
   /**
-     * The first seq appended IN THIS PROCESS: the length of the constructor
-     * seed (0 without one). Events with smaller seq values entered through
-     * construction — replay, fork, or resume — and were never published on the
-     * `session/event` firehose (constructor seeds do not emit), so consumers
-     * that replay the log as a publication substitute (telemetry adoption)
-     * start here. Distinct from {@link inheritedEventCount}, the DURABLE
-     * fork-lineage cut: a resumed session's constructor seed is its full stored
-     * log, while the inherited count keeps the original fork value — this field is the
-     * in-process construction fact.
+     * The constructor seed length (0 without one), before any marker appended
+     * during construction. Seed events never publish on `session/event`; a
+     * marker appended before the store attaches occupies this seq without
+     * publishing either, so consumers that replay the log as a publication
+     * substitute (telemetry adoption) start here. Otherwise this seq is
+     * available for the next append.
      *
-     * Not persisted itself: a seeded session projects it into the log as the
-     * `session/end-seed` event, which is what a consumer reading STORED history
-     * reads. Locate the LAST such event, not necessarily one at this seq — a
-     * seed already ending in one is not re-marked, so reopening an untouched
-     * session leaves that event at a smaller seq than `firstLiveSeq`. Prefer
-     * this field in-process: it is exact before the marker reaches storage.
-     *
-     * When this lifecycle appends the marker, it occupies this seq before the
-     * store attaches and therefore does not publish either. Otherwise this seq
-     * holds an ordinary published write.
+     * This in-process offset is not persisted. A fork seed can already contain
+     * the child's inherited marker and synthetic closers, so its child-owned
+     * history starts at {@link inheritedEventCount}, before this offset. A
+     * resumed Session's seed contains its full stored log, while its inherited
+     * count keeps the durable fork cut. Consumers needing complete canonical
+     * history start at seq 0.
      */
   readonly firstLiveSeq: SessionLogOffset;
+  /**
+     * First event produced for this object lifecycle. A new fork includes its
+     * child-owned seed marker and closers; a restored Session starts after its
+     * complete stored prefix. This in-process capture offset is not persisted.
+     */
+  readonly firstLifecycleSeq: SessionLogOffset;
   /**
      * Create a detached session by validating and snapshotting borrowed seed
      * events and storage metadata.
@@ -632,6 +660,12 @@ declare class Session {
      */
   requestContext(): RequestContext | undefined;
   /**
+     * Fold unseen committed events into capability-independent tool history.
+     * Initial access reconstructs inherited history; later reads consume only new events.
+     * @returns an immutable snapshot for LLM request projection, including historical addition definitions.
+     */
+  toolHistory(): ToolHistory;
+  /**
      * Derive the LLM message history by walking the ordered sequences of
      * message-producing events maintained by `surfaceOp` markers. The
      * surface is the single source of derived history: every message-producing
@@ -713,38 +747,45 @@ interface TurnEndReasonMap {
    * emits this marker, and the events recorded before the crash remain intact.
    */
   interrupted: { kind: 'interrupted' }
+  /**
+   * Fork-seed construction closed a turn that was still open at the fork
+   * boundary in the source session. Only fork seeds carry this marker — the
+   * loop never emits it — and the source events before the boundary remain
+   * intact in the child.
+   */
+  forked: { kind: 'forked' }
 }
 ```
 
-`max-tokens` 与模型调用中同名的 `FinishReason` 对应：只要轮次内有任何步骤以 `max-tokens` 结束，整个轮次就以 `max-tokens` 而不是 `completed` 结束（即使之后继续执行，截断事实仍优先），让消费方能够区分正常停止和截断停止。取消和错误仍是不同的结果。`interrupted` 是唯一不会由任何 loop 发出的原因：它由崩溃恢复合成（见 [persistence.md](persistence.zh.md)）。该 map 可通过合并扩展。
+`max-tokens` 镜像同名的模型调用 `FinishReason`：一轮内任何 `max-tokens` 步骤都使整轮以 `max-tokens` 而非 `completed` 结束（截断事实优先于后续续接），因此消费方能区分干净停止与被截断。取消与错误仍是独立结果。`interrupted` 是唯一没有 loop 发射的原因——它由崩溃恢复合成（见 [persistence.md](persistence.zh.md)）。该映射可合并扩展。
 
-## 执行封闭与独立事件
+## 执行包围区间与独立事件
 
-一个轮次包围一次模型循环执行，而不是整个会话日志。AgentLoop 只会在轮次内进入 pre-step 批次时记录注入的 `user/message` 事件；插件所属的纯日志事件仍可出现在 `turn/end` 与下一个 `turn/start` 之间，占用事件 seq 但不递增轮次编号。持久化会将每个连续且已接受的事件纳入有界持久化批次，而崩溃修复只关闭确实仍处于开放状态的尾部轮次。需要即时持久性屏障的生产方会显式等待 `ctx.sessions.flush(session)`。
+一个轮次包围一次 model-loop 执行，而非整个会话日志。AgentLoop 只记录进入轮次内 pre-step 批次的注入 `user/message` 事件；插件自持的 log-only 事件仍可能出现在 `turn/end` 与下一个 `turn/start` 之间，消耗事件 seq 但不递增轮次号。持久化把每个连续接受的事件纳入有界持久批次，而崩溃修复只关闭真正未闭合的尾部轮次。需要即时持久屏障的生产方显式等待 `ctx.sessions.flush(session)`。
 
-可选的 `dsh-session/invariant` 配套插件会强制核心拥有的关系：轮次与步骤编号、执行事件封闭，以及同一步骤内的工具调用／结果配对。可合并扩展事件的关系由声明它的插件拥有，因此核心不会仅因没有开放轮次就拒绝未知事件。见[独立事件决策](../../.agents/notes/implemented/simplification/2026-07-28-remove-synthetic-log-only-turns.zh.md)。
+可选的 `dsh-session/invariant` 伴随件强制 core 自持的关系：轮次与步数编号、执行事件包围、同步工具调用/结果配对。可合并扩展的事件关系归声明它的插件所有，因此 core 不会仅因没有打开的轮次而拒绝未知事件。见[独立事件决策](../../.agents/notes/implemented/simplification/2026-07-28-remove-synthetic-log-only-turns.zh.md)。
 
-## 种子结束边界：`session/end-seed`
+## 结束种子边界：`session/end-seed`
 
-用显式 seed 构造的 Session（restore、fork 或 replay）会紧接该 constructor seed 之后追加这个仅日志事件，作为自己的第一次实时写入。在它之前的事件具有更小的 seq，且经由构造进入。它是 `firstLiveSeq` 的持久投影：该字段为持有对象的 consumer 回答本 lifecycle 的写入从哪里开始，该事件则为只持有存储字节的 consumer 回答同一问题。它不定义 fork ownership；`isSeeded` 与 `inheritedEventCount` 才定义。payload 为空，因此位置与 `time` 承载全部含义，且不产生任何消息。`Session` 的构造函数是唯一合法的写入方。
+以显式 seed 构造的 Session——restore、fork 或 replay——会紧随该构造器 seed 追加这条 log-only 事件，作为其首个实时写入。它之前的事件 seq 更小，均来自构造过程。它是 `firstLiveSeq` 的持久投影：该字段回答持有对象的 consumer「本生命周期的写入从哪里开始」，而事件为只持有存储字节的 consumer 回答同一问题。它不定义 fork 归属；归属由 `isSeeded` 加 `inheritedEventCount` 定义。载荷为空，因此位置与 `time` 承载全部含义，且不产生任何消息。`Session` 的构造器是唯一合法写入方。
 
-显式传入的空种子会在 seq 0 写入 `session/end-seed`，从而把从空日志恢复的会话与全新会话区分开来。种子本身已以 `session/end-seed` 结尾时不会重复标记，因此重新打开一个未被改动的会话不会每次拾起都增长日志。应定位存储历史中的最后一条 `session/end-seed`，而不是假定 `firstLiveSeq` 处一定有一条：在一次没有产生工作的拾起之后，该事件的 seq 会小于下一个生命周期的 `firstLiveSeq`。
+显式提供的空 seed 会在 seq 0 写入 `session/end-seed`，从而区分空续接会话与全新会话。已以 `session/end-seed` 结尾的 seed 不再重复标记，因此重新打开未动过的会话不会随每次拾取增长日志。应在存储历史中定位**最后一条** `session/end-seed`，而不是假定它就在 `firstLiveSeq`：空载拾取之后，该事件的 seq 小于下一生命周期的 `firstLiveSeq`。
 
-它之所以必要，是因为种子历史与实时工作在字节层面完全相同，这会让任何拥有独立开／闭括号的插件失效：一个未配对的 `compaction/start`，无论写入方是在压缩中途崩溃、还是此刻正在压缩，读起来都一样。在 `session/end-seed` 之前的开启标记来自构造种子，并且属于一个已结束的生命周期，无论结束原因为何（崩溃、进程接替，或从仍在运行的父会话 fork 出来），因此其所有方可以视之为已死。这只覆盖*本*会话继承的括号：另一个并发存活的会话可能在同一段历史上持有开放括号，而它自己的边界在别处，因此容忍并发写入方还需要日志之外的存活信号。核心写入该边界但不从中读取任何内容——括号的词汇表仍归其所属插件，这也正是崩溃修复只关闭轮次／步骤／工具边界而从不处理 `compaction/*` 的原因。
+它存在的理由：seed 历史与实时工作在其他方面字节一致，使任何拥有独立开/闭括号的插件无法判定——一条未配对的 `compaction/start` 无论写入方在压缩中途崩溃还是正在压缩，读起来都一样。位于 `session/end-seed` 之前的开括号来自构造器 seed，属于某个已结束的生命周期（无论终结者是崩溃、正常退出的进程，还是从仍在运行的父会话 fork 而出），其持有方可以将其视为死亡。这只覆盖**本**会话继承的括号：并发存活的会话对同一历史持有开括号时另有自身边界，因此要容忍并发写入方还需日志之外的存活信号。Core 只写边界、不从中读取——括号词汇归其持有插件所有，这就是崩溃修复只关闭 turn/step/tool 边界而绝不碰 `compaction/*` 的原因。
 
-按真人活动排序 Session 的消费方会排除该边界：接手 Session 不算工作，因此按日志尾部排序会把每个打开过的 Session 顶到最前。
+按人工活动排序会话的 consumer 会排除此边界：拾取会话不算工作，若按日志尾部排序，每个被打开的会话都会浮到顶部。
 
-## 插件贡献的仅日志事件
+## 插件贡献的 log-only 事件
 
-插件可以通过 declaration merging 添加额外的 `SessionEventMap` 类型。这些是**仅日志**事件：不是 `SurfaceEventType`（不携带 `surfaceOp`，不参与派生历史）。事件所有方决定它们属于一个开放的执行轮次，还是可以独立位于轮次之间，并在自己的不变量配套插件中强制所需关系。生成的[持久化日志事件目录](../persistence-catalog.zh.md)会列出每个核心或插件贡献的事件，以及其 payload、surface 标记和声明位置；压缩 seam 的 `compaction/*` 语义在 [compaction.md](compaction.zh.md) 中讨论。
+插件可以通过声明合并追加 `SessionEventMap` 类型。这些类型是 **log-only**：不是 `SurfaceEventType`（不携带 `surfaceOp`，对派生历史无贡献）。其持有方决定它们属于打开的执行轮次还是可以独立于轮次存在，并在自己的 invariant 伴随件中强制任何关系。生成的[持久化日志事件目录](../persistence-catalog.zh.md)枚举每个 core 与插件贡献的事件及其载荷、surface 徽标与声明位置；compaction seam 的 `compaction/*` 语义见 [compaction.md](compaction.zh.md)。
 
-如果同一个插件事件族中的多条事件要组装成一个 Web Client Conversation Node，该事件族中的每条 start、update、result、resource 或 interruption 事件都必须携带或独立推导出同一个稳定业务 id。此要求只约束需要关联的 Node 事件族，并不要求每条 Session 事件都有业务 id；Client 因此无须根据相邻关系猜测归属，也无须扫描历史。参见 [Conversation Node 实操手册](../cookbook/adding-a-conversation-node.zh.md)。
+当一个插件自持族内多条事件装配成一个 Web Client Conversation Node 时，该族内每个 start、update、result、resource 或 interruption 事件都携带或可独立派生同一个稳定业务 id。该要求适用于相关联的 Node 族，而非每条 Session 事件；它让客户端无需依赖相邻关系或扫描历史即可归组每条事件。见 [Conversation Node 手册](../cookbook/adding-a-conversation-node.zh.md)。
 
-钩子桥接层的 `hook/invoked` / `hook/result` 对（来自 `@deepseek-ai/dsh-hook-protocol`）通过 `handlerId` 关联。`UserPromptSubmit`、`PreToolUse`、`PostToolUse` 与 `Stop` 在 loop 已打开的轮次内触发，因此其 `hook/*` 记录天然位于轮次之内。`SessionStart` 不生成 `hook/*` 记录，因为它在轮次 1 之前运行；其上下文会在 inbox 中保持待处理，直到唤醒交付打开一个轮次（见[钩子桥接 Agent Note](../../.agents/notes/implemented/feature/2026-06-30-hook-bridges.zh.md)）。
+hook 桥的 `hook/invoked` / `hook/result` 配对（来自 `@deepseek-ai/dsh-hook-protocol`）按 `handlerId` 关联。`UserPromptSubmit`、`PreToolUse`、`PostToolUse` 与 `Stop` 在循环打开的轮次内触发，因此它们的 `hook/*` 记录天然被轮次包围。`SessionStart` 没有 `hook/*` 记录，因为它在轮次 1 之前运行；其上下文留在 inbox 中处于待决，直到一次唤醒投递打开轮次（见 [hook 桥 Agent Note](../../.agents/notes/implemented/feature/2026-06-30-hook-bridges.zh.md)）。
 
-## 持久性约定
+## 持久化约定
 
-持久化后端依赖的约定如下：持久日志无损保存每个事件，**包括** `assistant/chunk`；`seq` 必须连续，因此不能从规范日志中过滤分片。后端可以为事件批次选择自己的存储编码，只要 `load` 返回与追加时完全一致的事件即可（JSONL 后端默认启用的打包分片行就是此类编码；见 [persistence.md](persistence.zh.md)）。所有 `event.data` 都必须可序列化为 JSON；`Session.append` 会从源头强制这一要求（遇到不可序列化数据时抛出），因此错误事件绝不会进入日志，`session.snapshotEvents()` 始终与后端可持久化的内容一致。新增会携带不可序列化数据、破坏核心执行嵌套或违反事件所有方声明关系的事件类型，都会构成磁盘格式的破坏性变更。
+持久化后端依赖的事实：持久日志无损持久每条事件，**包括** `assistant/chunk`——`seq` 必须保持连续，因此 chunk 不能从规范日志中过滤。后端可以为事件批次选择自己的存储编码，只要 `load` 返回逐字追加以的事件（JSONL 后端默认的打包 chunk 行就是这样一种编码——见 [persistence.md](persistence.zh.md)）。所有 `event.data` 必须可 JSON 序列化；`Session.append` 在源头强制执行（对不可序列化数据抛错），因此坏事件永不进入日志，`session.snapshotEvents()` 始终等于后端可持久的内容。新增携带不可序列化数据、破坏 core 执行嵌套或违反其持有方声明关系的事件类型，是对磁盘格式的破坏性变更。
 
 消费此约定的后端见 [persistence.md](persistence.zh.md)。
 
@@ -755,6 +796,25 @@ interface TurnEndReasonMap {
 ## Cordis API
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+
+<a id="ctxsessioncontroller--apisessioncontroller"></a>
+
+### `ctx.sessionController` — `ApiSessionController`
+
+The Host Session-resolution surface published as the `sessionController` cordis service.
+
+```ts cordis-catalog
+/**
+ * Resolve one Session identity to its live Agent.
+ * @param sessionId - the Session identity to resolve.
+ * @returns the live Agent, or a typed refusal preserving the resolver's code.
+ */
+resolveAgent(sessionId: SessionId): Promise<ApiRemoteAgentResult>
+```
+
+Types: [SessionId](core.zh.md)
+
+Source: [`packages/api/remotes/src/session-controller.ts`](../../packages/api/remotes/src/session-controller.ts)
 
 <a id="ctxsessions--sessionstore"></a>
 
@@ -882,10 +942,12 @@ get(id: SessionId): Session | undefined
 list(): Session[]
 
 /**
- * Create a live child session from a stable prefix of a live source.
+ * Create a live child session from an exact prefix of a live source.
  * `boundary` is an inclusive source event seq; omitted means the source's
- * current last event. The selected slice may end with a between-turn event
- * but must not end inside an open turn.
+ * current last event. An open tail receives synthetic tool results and
+ * step/turn closers with the forked cause. Closed steps and turns remain
+ * unchanged, including any failed tool calls already missing results.
+ * `inheritedEventCount` counts only copied source events, excluding these closers.
  *
  * @param source - Live source session object or id.
  * @param boundary - Inclusive source event seq to fork through; omitted means

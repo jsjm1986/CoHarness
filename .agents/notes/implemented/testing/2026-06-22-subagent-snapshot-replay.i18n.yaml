@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-22-subagent-snapshot-replay.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-06-22-subagent-snapshot-replay.md
-2026-06-22-subagent-snapshot-replay.md: bdd4e93ea185c5483c2ff81eba617baaf8cc40b2
-2026-06-22-subagent-snapshot-replay.zh.md: 48691fe4db94febba8d041cf750b69aa9849dd52
+/agent-note-per-session-snapshot-replay-for-nested-agents:
+  en: c9bd2d7fed842314
+  zh: ba5074e3d6cb5eb5
+/agent-note-per-session-snapshot-replay-for-nested-agents/problem:
+  en: f3cd65ed9d329d88
+  zh: 641d4860c1bd4fbc
+/agent-note-per-session-snapshot-replay-for-nested-agents/decision:
+  en: 2ec116629f3eccc6
+  zh: d799b0235164744a
+/agent-note-per-session-snapshot-replay-for-nested-agents/decision/1-the-calling-session-id-rides-on-the-model-request:
+  en: b4e3c1f78dfc6e0d
+  zh: 8552ada466524d52
+/agent-note-per-session-snapshot-replay-for-nested-agents/decision/2-replay-binds-live-sessions-to-recorded-scripts-by-first-call-order:
+  en: 19909a0c9a224173
+  zh: 833551bd624eaf3b
+/agent-note-per-session-snapshot-replay-for-nested-agents/alternatives-considered:
+  en: 3954c7796af23292
+  zh: 9407ba687028e293
+/agent-note-per-session-snapshot-replay-for-nested-agents/alternatives-considered/3-the-harness-harvests-every-log-primary-first:
+  en: 2b11ee5a240e4623
+  zh: 718c55a7af73eff1
+/agent-note-per-session-snapshot-replay-for-nested-agents/alternatives-considered/4-scenarios:
+  en: df94b45dacfacfe7
+  zh: 573ec61e4b2e0d56
+/agent-note-per-session-snapshot-replay-for-nested-agents/consequences:
+  en: 0b0696a2ec533e34
+  zh: 01a962cc99175e94

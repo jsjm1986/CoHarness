@@ -5,6 +5,7 @@ import { WorkspaceResourceError, workspaceResourceAddress } from '@deepseek-ai/d
 import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
 import { createReadHtmlRelative, normalizeWorkspacePath } from '../src/client/html/read-relative.ts'
+import { MAX_ASSET_BYTES } from '../src/client/html/pack.ts'
 import type { ReadWorkspaceFileData } from '../src/client/html/read-relative.ts'
 
 const sessionId = 'html-session' as SessionId
@@ -31,11 +32,12 @@ describe('normalizeWorkspacePath', () => {
 
 describe('createReadHtmlRelative', () => {
   it('decodes a relative URL once and reads the sibling resource on the same runtime and Session', async () => {
-    const read = vi.fn<ReadWorkspaceFileData>().mockResolvedValue({ data: utf8('x'), version: 'v7' })
+    const read = vi.fn<ReadWorkspaceFileData>().mockResolvedValue({ bytes: btoa('x'), version: 'v7' })
     const lifetime = new AbortController()
     const loading = new AbortController()
     const readRelative = createReadHtmlRelative(read, request, lifetime.signal)
-    await expect(readRelative('../a%20b.js?v=1#fragment', loading.signal)).resolves.toEqual(utf8('x'))
+    const bytes = await readRelative('../a%20b.js?v=1#fragment', loading.signal)
+    expect([...bytes]).toEqual([...utf8('x')])
     const call = read.mock.calls[0]!
     expect(call[0]).toEqual({
       resource: {
@@ -44,6 +46,7 @@ describe('createReadHtmlRelative', () => {
         path: 'a b.js',
         address: workspaceResourceAddress(sessionId, 'a b.js'),
       },
+      maxBytes: MAX_ASSET_BYTES,
     })
     const signal = call[1]
     expect(signal.aborted).toBe(false)
@@ -80,7 +83,7 @@ describe('createReadHtmlRelative', () => {
     const result = readRelative('./late.js', loading.signal)
     const rejected = expect(result).rejects.toMatchObject({ name: 'AbortError' })
     loading.abort()
-    pending.resolve({ data: utf8('late'), version: 'v1' })
+    pending.resolve({ bytes: btoa('late'), version: 'v1' })
     await rejected
   })
 })

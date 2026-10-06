@@ -4,7 +4,7 @@ Status: implemented
 
 English | [中文](2026-09-22-gateway-profile-management-authority.zh.md)
 
-API Remotes mounts the generated Plugin Manager contribution in the actual Client assembly. Plain-Node built-artifact tests cross the real HTTP carrier to verify all eight management methods refuse a denied policy, an authorized inventory read succeeds, and removing the required policy fails closed. General Host event subscriptions do not carry installation logs. The administrative installation stream forwards only its request’s events, rechecks authority for each frame, and waits for package cleanup on cancellation.
+API Remotes mounts the generated Plugin Manager contribution in the actual Client assembly. Plain-Node built-artifact tests cross the real HTTP carrier to verify inventory reads stay open without a grant, the six mutation methods refuse a denied policy, `access` reports the grant, and removing the required policy fails writes closed while reads still succeed. General Host event subscriptions do not carry installation logs. The administrative installation stream forwards only its request’s events, rechecks authority for each frame, and waits for package cleanup on cancellation.
 
 ## Problem
 
@@ -12,7 +12,7 @@ Profile operations install and execute Host code outside the workspace sandbox. 
 
 ## Decision
 
-[Plugin Manager](../../../../packages/boot/plugin-manager/README.md) checks deployment authorization before each public operation and again after entering a queued writer or configuration operation. Its tool checks the same policy before requesting approval. Independent local profiles retain local-operator access; Gateway launch patches require the policy provider, including as a Loader dependency. A missing provider cannot restore local access.
+[Plugin Manager](../../../../packages/boot/plugin-manager/README.md) checks deployment authorization before each mutation and again after entering a queued writer or configuration operation; inventory reads stay open to every caller that reaches the service, and `access()` reports the manage grant so interfaces can gate controls without probing a write. Its tool checks the same policy before requesting approval. Independent local profiles retain local-operator access; Gateway launch patches require the policy provider, including as a Loader dependency. A missing provider cannot restore local access.
 
 [Gateway Execution](../../../../packages/context/gateway-execution/README.md) owns the provider. An interactive call requires a live ordinary HTTP principal or a purpose-restricted profile-management principal and a fresh Gateway administrator check. Agent-initiated operations instead check the actual Agent's [complete verified participant set](2026-09-22-verified-execution-participants.md); every contributor must retain administrator authority. A valid older assertion, browser role, or inherited asynchronous request context cannot preserve a revoked role. Authentication, execution authority, collaboration, governance and isolation entries are protected from direct toggles and bundle replacement, including patches against their owning entries.
 

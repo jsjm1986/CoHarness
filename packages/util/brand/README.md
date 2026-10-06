@@ -1,3 +1,8 @@
+---
+description: "Type-only Branded<B> nominal-typing primitive for the DeepSeek Harness"
+kind: "package-library"
+---
+
 # dsh-brand
 
 English | [中文](README.zh.md)
@@ -8,6 +13,15 @@ The `Branded<B>` and `BrandedNumber<B>` nominal-typing primitives — a tiny, **
 
 `dsh-brand` makes structurally identical strings or numbers non-interchangeable at the type level: a `SessionId` cannot be passed where a `ToolCallId` is expected, and an event sequence cannot be passed where a log offset is required. `brandString<T>()` and `brandNumber<T>()` apply nominal brands without shared runtime state, so owning packages can define domain types without importing an unrelated capability.
 
+## Table of Contents
+
+- [What `Branded` is](#what-branded-is)
+- [Policy: brand values that cross package boundaries](#policy-brand-values-that-cross-package-boundaries)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="what-branded-is"></a>
 ## What `Branded` is
 
 A brand makes structurally-identical strings or numbers non-interchangeable at the type level: a `SessionId` cannot be passed where a `CallId` is expected, and an event sequence cannot be passed where a log offset is required, even though both pairs are plain `string`s or `number`s at runtime.
@@ -43,6 +57,7 @@ export function SessionSeq(value: number): SessionSeq {
 
 The owning factory validates requirements such as non-negative safe-integer range before the cast. Comparison, arithmetic, logging, JSON serialization, and wire transport retain ordinary number behavior; arithmetic produces an unbranded number that the owner must admit again before it re-enters the domain.
 
+<a id="policy-brand-values-that-cross-package-boundaries"></a>
 ## Policy: brand values that cross package boundaries
 
 A package brands the values it owns — `CallId` in `dsh-llm`, the shared agent/session `SessionId` in `dsh-session`, `JobId` in `dsh-jobs`, and `SessionSeq` versus `SessionLogOffset` in `dsh-session`. Brand cross-package values that could plausibly be confused with another value of the same primitive; not every string or number needs one.
@@ -50,3 +65,13 @@ A package brands the values it owns — `CallId` in `dsh-llm`, the shared agent/
 This package owns only the primitive. Keeping it dependency-free lets `dsh-jobs`, for example, brand `JobId` without importing an unrelated capability package merely to reach `Branded`.
 
 **Runtime invariant:** No companion is published. This pure utility owns no event stream or mutable runtime data; its value algebra is enforced by unit tests.
+
+<a id="dev-note"></a>
+## Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

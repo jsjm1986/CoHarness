@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-06-11-vendor-cordis-as-source.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-06-11-vendor-cordis-as-source.md
-2026-06-11-vendor-cordis-as-source.md: 265966ad0a28900f511efb3091889081d56db2b4
-2026-06-11-vendor-cordis-as-source.zh.md: af8c640e2164c2f14183b29f371e234e59035180
+/agent-note-vendor-cordis-as-source-not-npm-dependencies:
+  en: 4f125d2c8de13bd7
+  zh: dd25306689cba2d7
+/agent-note-vendor-cordis-as-source-not-npm-dependencies/problem:
+  en: 687496e73272e6d4
+  zh: 028321fecd7515aa
+/agent-note-vendor-cordis-as-source-not-npm-dependencies/decision:
+  en: cb1204eba1b19dad
+  zh: 60414f422fffc14e
+/agent-note-vendor-cordis-as-source-not-npm-dependencies/alternatives-considered:
+  en: 64ff3ce2bb8dec68
+  zh: ef42194367b94e51
+/agent-note-vendor-cordis-as-source-not-npm-dependencies/consequences:
+  en: 2f8b89b580ee845f
+  zh: 9e6cb5fee676bbd0

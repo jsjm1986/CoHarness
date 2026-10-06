@@ -7,13 +7,15 @@
 // both grep and glob is pinned here too.
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import {
   createSnapshotStore, EMPTY_CONVERSATION_VIEWS,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ConversationSnapshot, RunningToolCall, SessionId, SessionListState, ToolResultNode, WorkspaceListState,
+  ConversationSnapshot, RunningToolCall, SessionId, SessionListState, StartedToolCall, ToolResultNode,
+  WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ToolResultView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -26,11 +28,17 @@ import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/t
 import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
 import { SearchRow, searchToolview } from '../src/client/tool/toolviews/search-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
+import type { UseDisclosure } from '../src/client/contract/slots.ts'
 
 /** SearchRow now composes ToolRow, so its props include the locale `t` seat. */
 type SearchRowProps = Parameters<typeof SearchRow>[0]
 
 afterEach(cleanup)
+
+const useDisclosure: UseDisclosure = () => {
+  const [expanded, setExpanded] = useState(false)
+  return { expanded, setExpanded, toggle: () => { setExpanded(value => !value) } }
+}
 
 /** Conversation-locale translate stub for the render sites' `t` seat. */
 const t: GenericToolCardProps['t'] = makeTranslate(zh, commonZh)
@@ -65,8 +73,8 @@ const resultPaths = (over?: Partial<Extract<ToolResultView, { card: 'search'; sh
   card: 'search', shape: 'paths', paths: ['src/a.ts', 'src/b.ts'], truncated: false, total: 2, ...over,
 })
 
-const runningGrep = (over?: Partial<RunningToolCall>): RunningToolCall => ({
-  callId: 'c1', name: 'grep', argsRaw: GREP_ARGS,
+const runningGrep = (over?: Partial<StartedToolCall>): StartedToolCall => ({
+  phase: 'start', callId: 'c1', name: 'grep', argsRaw: GREP_ARGS,
   turn: 1, step: 1, time: 1_000, callView: { card: 'generic', title: 'Grep foo', kind: 'search' }, subCalls: [], ...over,
 })
 
@@ -185,8 +193,9 @@ describe('searchCardModel', () => {
 })
 
 describe('chat row search body (GenericToolCard fallback)', () => {
-  const ownerProps = (block: RunningToolCall | ToolResultNode, toolName: string): GenericToolCardProps => ({
-    callId: 'c1', toolName, block, openFile: vi.fn(), t,
+  const ownerProps = (block: StartedToolCall | ToolResultNode, toolName: string): GenericToolCardProps => ({
+    callId: 'c1', toolName, openFile: vi.fn(), t, useDisclosure,
+    ...('kind' in block ? { phase: 'result' as const, block } : { phase: block.phase, block }),
   })
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
   const toggleRow = (view: { container: HTMLElement }) => {
@@ -237,6 +246,7 @@ describe('chat row search body (GenericToolCard fallback)', () => {
 describe('SearchRow keyed card', () => {
   const rowProps = (block: RunningToolCall | ToolResultNode, toolName: string): SearchRowProps => ({
     callId: 'c1', toolName, block, openFile: vi.fn(), sessionId: SID, t,
+    useDisclosure,
   } as unknown as SearchRowProps)
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -383,10 +393,10 @@ describe('DetailsPanel Output section (search)', () => {
     if (selection !== null) chat.actions.select(selection)
     const sessions = createSnapshotStore<SessionListState>({
       ids: [], byId: {}, archivedById: {}, current: undefined, phase: 'ready',
-      subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+      subagentsByParent: {}, jobsBySession: {}, observedJobs: {}, currentAddress: undefined,
     })
     const workspaces = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
       baselinesReady: true, recentWorkspaceId: undefined,
     })
     return render(
@@ -397,6 +407,7 @@ describe('DetailsPanel Output section (search)', () => {
         useSession={bindSnapshotSelector({ getSnapshot: () => snapshot, subscribe: () => () => {} })}
         useSessions={bindSnapshotSelector(sessions)}
         useWorkspaces={bindSnapshotSelector(workspaces)}
+        usePanelInfo={(() => { throw new Error('unused') })}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
           setDraft: () => {},
@@ -406,6 +417,8 @@ describe('DetailsPanel Output section (search)', () => {
           addDocuments: () => true,
           removeDocument: () => {},
           pruneDocuments: () => {},
+          captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
+          insertText: () => false,
           submit: () => {},
         }}
         useProjection={(() => undefined)}
@@ -424,7 +437,7 @@ describe('DetailsPanel Output section (search)', () => {
     return {
       sessionId: SID, views: EMPTY_CONVERSATION_VIEWS,
       chat: over.chat ?? toolChatSnapshot(nodes, runningCalls),
-      nodes: [], turnTimings: new Map(), turnEnds: new Map(), partial: null, runningCalls: [],
+      nodes: [], turnTimings: new Map(), turnEnds: new Map(), openTurn: undefined, partial: null, runningCalls: [],
       pending: [], queue: [], running: false, composerPhase: 'active', removed: false,
       openState: 'open', openError: null, hasMore: false, loadingOlder: false, historyWindowMode: 'tail', historyDetail: 'full',
       promptError: null, blank: false, subagent: null, lastAgentError: null, ...over,

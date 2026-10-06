@@ -4,8 +4,9 @@ import { findToolCall } from './tool-node-reader.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import { resolveSlotLabel, type BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  resolveWorkspacePath, workspacePathForResource, workspaceResourceAddress, type ISessions, type SessionId,
+  createSnapshotStore, resolveWorkspacePath, workspacePathForResource, workspaceResourceAddress, type ISessions, type SessionId,
   permissionAvailabilitySource, permissionUnavailableReason, commitSessionNavigation,
+  type ObservableSnapshot,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
@@ -38,19 +39,28 @@ import { DisplaySettingsRow } from './settings/DisplaySettingsRow.tsx'
 import type { DisplaySettingsRowInjected } from './settings/DisplaySettingsRow.tsx'
 import { WorkbenchDisplayRow } from './settings/WorkbenchDisplayRow.tsx'
 import { ChatView } from './chat/ChatView.tsx'
-import { StatsPills } from './chat/StatsPills.tsx'
+import { StatsPills, type StatsPillsInjected } from './chat/StatsPills.tsx'
 import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { queueDockEntry } from './queue/QueueDock.tsx'
 import { ConversationPane, ConversationRoot } from './skeleton/ConversationRoot.tsx'
 import { ConversationViewportController, createConversationViewportStore } from './viewport.ts'
+import type { ShortcutCommandId, ShortcutFixedCommand } from '@deepseek-ai/dsh-client-shortcuts/client'
+import { installStopShortcut } from './stop-shortcut.ts'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
 import { DetailsPanel } from './skeleton/DetailsPanel.tsx'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
-import { CONVERSATION_SETTINGS_NAMESPACE, type ConversationSettings } from '../submission-settings.ts'
+import { CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_TRANSCRIPT_VIEW_MODE, type ConversationSettings } from '../submission-settings.ts'
 import { ConversationDisplaySettings } from './display-settings.ts'
+import { TranscriptViewPolicy } from './transcript-view.ts'
+import { PerformanceUsagePolicy } from './performance-usage.ts'
+import { LinkOpeningPolicy } from './link-opening.ts'
+import { derivePresentationPolicy } from './presentation-policy.ts'
+import { TranscriptViewRow, type TranscriptViewRowInjected } from './settings/TranscriptViewRow.tsx'
+import { PerformanceUsageRow, type PerformanceUsageRowInjected } from './settings/PerformanceUsageRow.tsx'
+import { LinkOpeningRow, type LinkOpeningRowInjected } from './settings/LinkOpeningRow.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -86,6 +96,15 @@ const ABSENT_MENU_LAUNCHER = {
   getSnapshot: (): string | null => null,
   subscribe: () => () => {},
 }
+/** Registered identity of the developer-tools-gated trajectory view. */
+const TRAJECTORY_VIEW_ID = 'trajectory'
+
+/** Structural minimum of ui-sidebar-right's tab-type registry, reached via `ctx.reflect.get`. */
+interface BrowserTabsRegistry {
+  get(kind: string): unknown
+  subscribe(listener: () => void): () => void
+}
+
 const EMPTY_DOCUMENTS: readonly [] = []
 const ABSENT_DOCUMENTS = {
   getSnapshot: () => EMPTY_DOCUMENTS,
@@ -158,7 +177,6 @@ export function apply(ctx: Context): void {
 
 
   registerConversationNodes(ctx)
-  registerChatNodeRenderers(ctx)
 
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-conversation: dictionaries')
 
@@ -175,10 +193,52 @@ export function apply(ctx: Context): void {
   })
   const submissionPolicy = new ComposerSubmissionPolicy(conversationSettings)
   const displaySettings = new ConversationDisplaySettings(conversationSettings)
+  const transcriptView = new TranscriptViewPolicy(
+    conversationSettings, 'dshDesktop' in globalThis ? 'standard' : DEFAULT_TRANSCRIPT_VIEW_MODE)
+  const presentation = derivePresentationPolicy(transcriptView.mode)
+  const performancePolicy = new PerformanceUsagePolicy(conversationSettings)
+  const linkOpening = new LinkOpeningPolicy(conversationSettings)
   ctx.effect(() => () => {
     submissionPolicy.dispose()
     displaySettings.dispose()
+    transcriptView.dispose()
+    performancePolicy.dispose()
+    linkOpening.dispose()
   }, 'ui-conversation: settings observers')
+  registerChatNodeRenderers(ctx, performancePolicy.mode)
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'transcript-view',
+    order: 12,
+    locale: NS,
+    inject: (): TranscriptViewRowInjected => ({
+      hooks: { transcriptView: transcriptView.mode, settings: transcriptView.settings },
+      setTranscriptView: (mode) => { transcriptView.setMode(mode) },
+    }),
+  }, TranscriptViewRow))
+
+  // The destination choice only exists while a built-in Browser tab type is
+  // registered; assemblies without one keep the external default. The registry
+  // comes through the reflect layer: ui-sidebar-right's own project reference
+  // points back here, so a typed Context merge would close a reference cycle.
+  const sidebarRightTabs = ctx.reflect.get('sidebarRightTabs') as BrowserTabsRegistry | undefined
+  const browserAvailable: ObservableSnapshot<boolean> = sidebarRightTabs === undefined
+    ? { getSnapshot: () => false, subscribe: () => () => {} }
+    : {
+      getSnapshot: () => sidebarRightTabs.get('browser') !== undefined,
+      subscribe: listener => sidebarRightTabs.subscribe(listener),
+    }
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'link-opening',
+    order: 17,
+    locale: NS,
+    inject: (): LinkOpeningRowInjected => ({
+      hooks: { linkOpening: linkOpening.destination, browserAvailable, settings: linkOpening.settings },
+      setLinkOpening: (destination) => { linkOpening.setDestination(destination) },
+    }),
+  }, LinkOpeningRow))
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -203,6 +263,16 @@ export function apply(ctx: Context): void {
     locale: NS,
     inject: displaySettingsInject,
   }, DisplaySettingsRow))
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'performance-usage',
+    order: 32,
+    locale: NS,
+    inject: (): PerformanceUsageRowInjected => ({
+      hooks: { performanceUsage: performancePolicy.mode, settings: performancePolicy.settings },
+      setPerformanceUsage: (mode) => { performancePolicy.setMode(mode) },
+    }),
+  }, PerformanceUsageRow))
   // Same display-settings face inside the workbench sidebar panel: the hole is
   // declared by ui-workbench's sidebar registration and owned by this package.
   ctx.slots.inject('conversation.workbench.display', () => ctx.slots.register({
@@ -216,19 +286,26 @@ export function apply(ctx: Context): void {
   // persisted: a fresh page load keeps the open-jump-to-bottom default.
   const chatScrollPositions = new Map<SessionId, ChatScrollPosition>()
 
+  const developerTools = ctx.settingsScope.developerTools.enabled
   const viewTabs = (): ViewTab[] => {
     const tabs: ViewTab[] = []
+    const developerViews = developerTools.getSnapshot()
     for (const entry of slots.entries('conversation.view')) {
       /* v8 ignore next -- unreachable: list registration validates id at load. */
       if (entry.options.id === undefined) continue
+      if (!developerViews && entry.options.id === TRAJECTORY_VIEW_ID) continue
       tabs.push({ id: entry.options.id, label: resolveSlotLabel(entry.options.label) ?? entry.options.id })
     }
     return tabs
   }
   const views = {
     list: viewTabs,
-    subscribe: (fn: () => void) => slots.subscribe('conversation.view', fn),
-    version: () => slots.getVersion('conversation.view'),
+    subscribe: (fn: () => void) => {
+      const stopSlot = slots.subscribe('conversation.view', fn)
+      const stopPreference = developerTools.subscribe(fn)
+      return () => { stopSlot(); stopPreference() }
+    },
+    version: () => slots.getVersion('conversation.view') + (developerTools.getSnapshot() ? 0 : 1),
   }
 
   // The per-session input machine registry (SessionInputResolver face; published as
@@ -240,6 +317,45 @@ export function apply(ctx: Context): void {
   // here, and the bar reads its own session's store. It cannot flow the other
   // way: this package must not import the plugins that would know.
   const composerBlocks = new ComposerBlockRegistry()
+
+  // Fixed input commands: the shortcuts catalog's non-editable rows plus the
+  // double-Escape cancellation. When no composition carries the shortcuts
+  // service the scope never runs and the composer keeps its local arbitration.
+  const stop = (sessionId: SessionId): void => {
+    scopedConversation(sessions, sessionId).cancel().catch(() => {
+      // Stop failure is published through Session promptError.
+    })
+  }
+  const stopShortcut = createSnapshotStore<readonly string[]>([])
+  ctx.inject(['shortcuts'], (scope) => {
+    const fixedInputs: readonly ShortcutFixedCommand[] = [
+      { id: 'fixed.send' as ShortcutCommandId, label: () => t('input.send'), keys: ['Enter'],
+        bindings: [{ code: 'Enter', modifiers: [] }], group: 'input' },
+      { id: 'fixed.newline' as ShortcutCommandId, label: () => t('shortcut.newline'),
+        keys: scope.shortcuts.describeBinding({ code: 'Enter', modifiers: ['shift'] }).keys,
+        bindings: [{ code: 'Enter', modifiers: ['shift'] }], group: 'input' },
+      { id: 'fixed.complementary' as ShortcutCommandId, label: () => t('shortcut.complementary'),
+        keys: scope.shortcuts.describeBinding({ code: 'Enter', modifiers: ['primary'] }).keys,
+        bindings: [{ code: 'Enter', modifiers: ['control'] }, { code: 'Enter', modifiers: ['meta'] }], group: 'input' },
+      { id: 'fixed.slash' as ShortcutCommandId, label: () => t('shortcut.slash'), keys: ['/'],
+        bindings: [{ code: 'Slash', modifiers: [] }], group: 'input' },
+      { id: 'fixed.mention' as ShortcutCommandId, label: () => t('shortcut.mention'), keys: ['@'],
+        bindings: [{ code: 'Digit2', modifiers: ['shift'] }], group: 'input' },
+    ]
+    for (const command of fixedInputs) {
+      scope.effect(() => scope.shortcuts.registerFixed(command), `ui-conversation: ${command.id}`)
+    }
+    scope.effect(() => installStopShortcut(scope.shortcuts, sessions, stop), 'ui-conversation: fixed stop input')
+    scope.effect(() => {
+      const command: ShortcutFixedCommand = {
+        id: 'response.stop' as ShortcutCommandId, label: () => t('input.stop'), keys: ['Esc', 'Esc'],
+        bindings: [{ code: 'Escape', modifiers: [] }], group: 'input',
+      }
+      const dispose = scope.shortcuts.registerFixed(command)
+      stopShortcut.set(command.keys)
+      return () => { stopShortcut.set([]); dispose() }
+    }, 'ui-conversation: fixed stop reference')
+  })
 
   // The input machine feeds every session-scope slot
   // component through the standard provide channel — the 'input' hook plus
@@ -259,8 +375,11 @@ export function apply(ctx: Context): void {
 
   // Resident current-session-optional shell. It owns the stable Hero/composer
   // frame while strict session slots fill only their session-bound regions.
+  // The reserved `conversation` key keeps the layout's main selection on this
+  // surface until a global panel is explicitly selected.
   slots.register({
-    name: 'conversation',
+    name: 'main',
+    key: 'conversation',
     locale: NS,
     store: viewportStore,
     children: {
@@ -325,9 +444,11 @@ export function apply(ctx: Context): void {
         const navigation = AbortSignal.any([sessions.beginNavigation(), lifetime.signal])
         const nextId = await workspaces.openWorkspace(workspaceId)
         if (navigation.aborted) return
-        if (workspaces.list.getSnapshot().archivedSessionIds.includes(nextId)) throw new Error(t('placeholder.unavailable'))
+        const archived = (id: SessionId): boolean => sessions.list.getSnapshot().archivedById[id] !== undefined
+          || workspaces.list.getSnapshot().archivedSessionIds.includes(id)
+        if (archived(nextId)) throw new Error(t('placeholder.unavailable'))
         await commitSessionNavigation(sessions, nextId, navigation, () => {
-          if (workspaces.list.getSnapshot().archivedSessionIds.includes(nextId)) throw new Error(t('placeholder.unavailable'))
+          if (archived(nextId)) throw new Error(t('placeholder.unavailable'))
           sessions.open(nextId)
           if (options.discardDraft === true && sessionId !== undefined && nextId !== sessionId) {
             inputHub.discardDraft(sessionId)
@@ -407,6 +528,7 @@ export function apply(ctx: Context): void {
           stop: undefined,
           command: undefined,
           hooks: {
+            stopShortcut,
             busyEnter: submissionPolicy.busyEnter,
             notices: ABSENT_NOTICES,
             lexicon: ABSENT_LEXICON,
@@ -474,11 +596,7 @@ export function apply(ctx: Context): void {
               span: { ...selection, draftRev: snapshot.draftRev },
             })
           },
-        stop: () => {
-          scopedConversation(sessions, sessionId).cancel().catch(() => {
-            // Stop failure surfaces via snapshot.promptError; nothing to restore.
-          })
-        },
+        stop: () => { stop(sessionId) },
         command: async (line) => {
           const permission = /^\/permission\s+(\S+)\s*$/.exec(line)?.[1]
           if (permission !== undefined
@@ -489,6 +607,7 @@ export function apply(ctx: Context): void {
           return result.ok && result.value.matched
         },
         hooks: {
+          stopShortcut,
           busyEnter: submissionPolicy.busyEnter,
           notices: shell.notices,
           lexicon: shell.lexicon,
@@ -539,8 +658,11 @@ export function apply(ctx: Context): void {
           layout.openDetails(sessionId, target)
         },
         openExternalLink: (url) => {
-          if (ctx.bail('web/browser-open', { sessionId, url }) !== true) window.open(url, '_blank', 'noopener,noreferrer')
+          if (linkOpening.destination.getSnapshot() === 'sidebar'
+            && ctx.bail('web/browser-open', { sessionId, url }) === true) return
+          window.open(url, '_blank', 'noopener,noreferrer')
         },
+        presentation,
         fileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner),
         openFile: async (path, options) => {
           const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
@@ -570,7 +692,7 @@ export function apply(ctx: Context): void {
         // the first view, and the untouched inspect target stays inert.
         inspectCall: (callId) => {
           actions.setInspect({ callId })
-          actions.setView('trajectory')
+          actions.setView(TRAJECTORY_VIEW_ID)
         },
         chatScroll: {
           save: (position) => {
@@ -593,7 +715,13 @@ export function apply(ctx: Context): void {
 
   // Session stats stick with the composer; the two pills expose time and
   // token/cache details without adding another runtime or transport path.
-  slots.register({ name: 'conversation.composer.dock', id: 'stats', order: 0, locale: NS }, StatsPills)
+  slots.register({
+    name: 'conversation.composer.dock',
+    id: 'stats',
+    order: 0,
+    locale: NS,
+    inject: (): StatsPillsInjected => ({ hooks: { performanceUsage: performancePolicy.mode } }),
+  }, StatsPills)
 
   // Class-plugin mount (packages/AGENTS.md service form): the service
   // registers itself as `conversation` and lives on its own child fiber.

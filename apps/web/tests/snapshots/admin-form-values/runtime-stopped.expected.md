@@ -1,0 +1,4 @@
+- main:
+  - heading "工作台已手动停止" [level=1]
+  - paragraph: 后台请求不会自动启动。您可以主动启动并打开工作台。
+  - button "启动并打开"

@@ -1,2 +1,17 @@
-/** Node-side half: the workbench is a browser-only presentation plugin. */
-export function apply(): void {}
+/** Host configuration injection for browser spreadsheet preview limits. */
+import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-host-webserver'
+import type { Config } from './config.ts'
+
+export { Config } from './config.ts'
+
+/**
+ * Embed validated spreadsheet limits in browser pages.
+ * @param ctx - Host context serving browser pages.
+ * @param config - Parser limits adopted when the page loads.
+ */
+export function apply(ctx: Context, config: Config): void {
+  ctx.on('webserver/index-inject', (table) => {
+    table.push({ kind: 'global', name: '__DSH_WORKBENCH_CONFIG__', value: config })
+  })
+}

@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/hooks/hook-protocol/README.md
-README.md: e7d1db920a5f8a8b8b15312de23f662603de56fc
-README.zh.md: 5a9e8265298a29b1c4eb1f5d29a334b5d363ac54
+/:
+  en: 3e8a2282afaf885d
+  zh: 0a51af1cad6486b4
+/deepseek-ai-dsh-hook-protocol:
+  en: 7b85bb86f79f9f64
+  zh: 357dafc0ef29c179
+/deepseek-ai-dsh-hook-protocol/summary:
+  en: e8ab847d0db16043
+  zh: 5c1e72f4b4a54fe1
+/deepseek-ai-dsh-hook-protocol/table-of-contents:
+  en: 77f5ddd63573e0ae
+  zh: 05805c6bd2d3d7b9
+/deepseek-ai-dsh-hook-protocol/what-s-shared-here-vs-per-dialect-the-bridges:
+  en: a0373339c2328bed
+  zh: ccfe8ad0d64bad84
+/deepseek-ai-dsh-hook-protocol/primitives:
+  en: 90a752821b5f69e2
+  zh: f21c65b5229ed312
+/deepseek-ai-dsh-hook-protocol/hook-session-events:
+  en: 48f770482ad1e4aa
+  zh: 2e4332931c6b6172
+/deepseek-ai-dsh-hook-protocol/model-experience:
+  en: 53d2f59435a4a88f
+  zh: 79c8fc2849b20718
+/deepseek-ai-dsh-hook-protocol/model-experience/kv-cache-effect:
+  en: e290ccc9b3c92c08
+  zh: fde69420b9e7de36
+/deepseek-ai-dsh-hook-protocol/known-limitations-and-deferred-work:
+  en: 5d577c8ebe290af5
+  zh: 978a115569f9fad8
+/deepseek-ai-dsh-hook-protocol/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

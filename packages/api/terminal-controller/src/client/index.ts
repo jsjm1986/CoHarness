@@ -1,6 +1,5 @@
 /** Client terminal model service; views are keyed independently from Host terminal identities. */
 import { Service, type Context } from '@deepseek-ai/cordis'
-import terminalRemote from '@deepseek-ai/dsh-api-terminal-controller/remote'
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-api-gateway/client'
@@ -333,11 +332,23 @@ export class ClientTerminals extends Service {
 export const inject = ['remote', 'sessions', 'connection', 'projectUiPolicy']
 
 /**
- * Install the Client terminal models.
+ * Remote namespaces this plugin self-mounts through `ctx.remote.$mount`. The
+ * generated contribution exists only in built `lib/`; test assemblies stand in
+ * by providing `remote.terminal` before this row activates, and apply then
+ * takes the provided namespace instead of mounting its own.
+ */
+export const remoteNamespaces = ['terminal'] as const
+
+/**
+ * Install the Client terminal models, self-mounting the generated terminal
+ * Remote contribution unless the assembly already provides `remote.terminal`.
  * @param ctx - Client root Context.
  */
 export async function apply(ctx: Context): Promise<void> {
-  await ctx.remote.$mount(terminalRemote)
+  if (ctx.get('remote.terminal') === undefined) {
+    const { default: terminalRemote } = await import('@deepseek-ai/dsh-api-terminal-controller/remote')
+    await ctx.remote.$mount(terminalRemote)
+  }
   const connection = ctx.get('connection') as ConnectionHandle
   new ClientTerminals(ctx, ctx.get('remote.terminal') as TerminalRemote, {
     key: sessionId => sessionPersistenceKey(ctx.sessions, sessionId,

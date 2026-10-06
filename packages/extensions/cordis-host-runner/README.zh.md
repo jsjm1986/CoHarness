@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-cordis-host-runner
 
 [English](README.md) | 中文
@@ -8,6 +13,21 @@
 
 `dsh-cordis-host-runner` 提供运行时检查，并为程序调用方和浏览器控件保留进程内动态定义。Host 部分在 `node:vm` 中运行；浏览器部分使用 Client runner 和审批 UI。定义在重启后消失。Agent 通过 `tool-cordis` 发现 API，通过 Plugin Manager 安装持久化 bundle；没有模型工具创建动态定义。
 
+## 目录
+
+- [功能](#what-it-does)
+- [存储立场](#storage-stance)
+- [信任立场](#trust-stance)
+- [配置](#config)
+- [导出形状](#export-shape)
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="what-it-does"></a>
 ## 功能
 
 分两个阶段：`define` 只做登记，一切带副作用的动作都挂在一次 run 上。
@@ -27,10 +47,12 @@
 
 本功能拥有六组转发事件：请求开始与结束、包激活与撤回、inspect 查询与结束。本包在 client-safe 的 [`./types`](src/types.ts) 子路径上同时声明官方 `cordis/*` 名称和当前 `@deepseek-ai/cordis/*` 名称；[`@deepseek-ai/dsh-api-remotes`](../../api/remotes/README.zh.md) 将两者都列入名单，Gateway Client 则把每对名称视为同一订阅组。这个 Host runner 只发出重命名后的名称，因此每次状态变化只产生一个帧。载荷保持一致，只包含元数据或 JSON 查询数据，绝不包含动态包源码。
 
+<a id="storage-stance"></a>
 ## 存储立场
 
 注册表就是进程内存，也是唯一真源。历史工具调用保留提交的源码及结果元数据，但不会恢复可执行定义：因此进程重启后确实没有任何定义，这是合理的；而 id 已无法解析的卡片会如实说明这一点，不会假装自己还能运行。本包不向磁盘写任何东西，也不会自动恢复任何定义；刷新过的页面手上什么都没有，直到有人再次运行某个包——正是这一步让它绑定存活的 host 半并重新取回浏览器半。
 
+<a id="trust-stance"></a>
 ## 信任立场
 
 受管部署在 Host 求值、实际 Plugin 激活（包括依赖稍后出现时的重新激活）、动态注册工具执行、Host handler 调用和浏览器成功结算时，都要求 `pluginManagementAuthorization`。设置 `executionAuthorityRequired` 后，策略缺失会拒绝执行。运行器在等待清理结束后重新验证，不在 Package 或 Run 上缓存授权。会话归属和浏览器协作 ACL 仍独立检查。撤销执行权限后，拒绝及所有者清理仍可终止任务。没有受管标记的独立本机部署保留本地执行能力。
@@ -39,22 +61,35 @@ vm 沙箱隔离全局变量，但不是安全边界：Node 全局变量不存在
 
 <a id="config"></a>
 
+<a id="config"></a>
 ## 配置
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `vmTimeoutMs` | `5000` | host 半求值与激活允许的毫秒数；同步 vm 工作和异步完成都受约束 |
+| `clientInspectTimeoutMs` | `10000` | 等待有效 Client 检查响应的最长时间；1 到 2147483647 毫秒之间的整数 |
 
-就这一个字段：一次 run 请求等的是人，所以这趟往返本身没有任何截止期限。dispose（资源释放）会先关闭接纳再撤回定义；定义在激活等待期间被移除时，迟到的 fiber 不能再发布回注册表。
+一次 run 请求等的是人，所以这趟往返本身没有任何截止期限。dispose（资源释放）会先关闭接纳再撤回定义；定义在激活等待期间被移除时，迟到的 fiber 不能再发布回注册表。
 
+<a id="client-inspection"></a>
+### Client 检查
+
+装载 Gateway 时，没有活动事件流的 Client 查询在发送前就会失败。此检查不订阅断连：已发送的查询仍沿用原期限。没有 Gateway 的独立事件传输保持相同的超时行为。
+
+Client 查询在 `clientInspectTimeoutMs` 内接受首个有效页面响应。某个页面失败不会阻止其他页面成功回答。若没有有效结果，查询返回首个 Client 错误或输出校验诊断；若没有页面回答，则提示调用方打开或重新连接 Harness 页面后重试。取消和注册表卸载也会结束待处理查询。页面重连不会重放错过的请求，因此需在连接恢复后重试。Host 查询不受此超时影响。
+
+<a id="export-shape"></a>
 ## 导出形状
 
 服务包：默认导出 `DynamicCordisRunnerService`（服务键 `dynamicCordisRunner`），`./types` 则承载 `dynamicCordisRunner` remote namespace 与其消费方共享的载荷形状。`define`／`undefine` 的形状留在包内部，因为它们从不跨 wire。
 
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。定义及其沙箱化 fiber 是私有注册表状态，其挂载/调用/撤回生命周期由 runner 的规格断言；不发布可独立观测的投影。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 转达给所属会话的运行结果、拒绝与诊断
@@ -75,9 +110,20 @@ vm 沙箱隔离全局变量，但不是安全边界：Node 全局变量不存在
 
 **运行时不变式：** 不发布伴生入口。definition registry 位于进程内存中且没有可观察的事件流；它唯一负责的关系是运行中的 definition 拥有已结算的 host-half fiber 及其 handler table，该关系在单个等待完成的操作中建立和解除，因此由包测试直接断言。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - Client 激活需要已连接页面，并在有要求时获得用户批准。待处理回执不证明浏览器装载或渲染成功；`cordis_inspect_self` 提供已记录的诊断。
 - 动态定义仅存在于当前进程。历史源码及结果仍可读取，但不会恢复可执行代码。
 - VM 不是操作系统隔离边界。程序化和浏览器执行路径必须自行实施服务授权，不能依赖模型工具已经退役。
 - **`zod` 是生成的 TypeRT 契约面的运行时依赖，不是 `src` 的依赖。** `./typert` 与 `./remote` 解析到 `lib/typert.*.js`，`tsc` 以不打包的形式产出它们，其中带有裸的 `import { z } from 'zod'`，所以本包必须声明它（沿用 `@deepseek-ai/dsh-goal` 的先例）。只有当两份生成 JavaScript 契约面都不存在时，`knip.config.ts` 才注入 workspace 级例外；已构建 checkout 则由 Knip 直接观察该导入。`src` 里没有任何代码 import zod。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

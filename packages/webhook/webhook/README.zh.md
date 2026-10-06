@@ -51,6 +51,7 @@ kind: "package-reference"
 
 [Webhook 子系统参考](../../../docs/subsystems/webhook.zh.md)说明入口与执行身份。交付的 profile 默认关闭 webhook 入口；原始适配器不提供 Gateway 端点管理或持久去重。
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -68,6 +69,7 @@ kind: "package-reference"
 
 初始提示词开启一个新会话，因此它建立而不是使该会话的可复用请求前缀失效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -77,7 +79,6 @@ kind: "package-reference"
 - **无完成结果** — HTTP 接受与规则结算都不报告 Agent 成功、idle 或输出。
 - **受信任回调必须配合取消** — 运行时 teardown 会中止并等待回调，但无法终止任意同进程代码。
 - **Workspace 创建可能比失败的会话尝试更长寿** — 空 Workspace 会保留，因为另一个并发调用者可能已经使用它。
-
 
 <a id="dev-note"></a>
 ### 开发备注

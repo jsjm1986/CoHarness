@@ -18,7 +18,7 @@
 # environment; DEEPSEEK_BASE_URL follows the same environment ladder. Neither
 # is inlined, so this file names no secret and no route.
 - id: llm-deepseek
-  name: '@deepseek-ai/dsh-llm-deepseek'
+  name: '@deepseek-ai/dsh-llm-deepseek-api-key'
 
 # JSONL persistence; $DSH_SESSION_ROOT wins over ./.sessions in the process cwd.
 - id: sessions

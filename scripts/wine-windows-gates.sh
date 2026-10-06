@@ -19,6 +19,9 @@
 set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
+# The scratch tree has no Git metadata or Windows Git executable.
+DSH_CLIENT_COMMIT_HASH="$(git -C "$repo_root" rev-parse HEAD)"
+export DSH_CLIENT_COMMIT_HASH
 node_major="${DSH_WINE_NODE_MAJOR:-${PRIMARY_NODE_VERSION:-24}}"
 cache_dir="${DSH_WINE_GATE_CACHE_DIR:-$repo_root/.cache/wine-windows}"
 
@@ -161,22 +164,23 @@ supportedArchitectures:
   cpu: [current, x64]
 EOF
   # The hoisted linker — used only by this lane — has an upstream rename
-  # race (pnpm/pnpm#12880): parallel linkers staging a nested package copy
-  # (observed on the tree's nested esbuild versions) rename their _tmp_*
-  # directory onto a path another racer already claimed, and the loser
-  # exits ERR_PNPM_ENOENT although an identical re-install succeeds.
-  # Exactly that signature earns up to two retries on a clean tree — the
-  # snapshot contains no node_modules, so wiping them restores the
-  # pre-install state; any other failure, or the race still standing after
-  # the final attempt, fails loud with the log tail.
+  # race (pnpm/pnpm#12880): concurrent hoist-copies whose destinations nest
+  # (observed on the tree's nested esbuild versions) let the parent's
+  # swap-rename carry off a sibling's staged _tmp_* directory, and the loser
+  # exits ERR_PNPM_ENOENT although an identical re-install succeeds. Warm
+  # retries proved unreliable here — the race won five straight attempts —
+  # so the install is pinned to one CPU: the worker pool sizes itself at
+  # availableParallelism()-1, and a single worker serializes every staged
+  # rename (the same mitigation the issue reports). Upstream fixed the copy
+  # itself in pnpm 11.28.4 (pnpm/pnpm#14242); this pinning can retire once
+  # packageManager reaches it.
   local attempt
   for attempt in 1 2 3; do
-    (cd "$scratch/tree" && pnpm install --frozen-lockfile --ignore-scripts > "$scratch/logs/install.log" 2>&1) \
+    (cd "$scratch/tree" && taskset -c 0 pnpm install --frozen-lockfile --ignore-scripts > "$scratch/logs/install.log" 2>&1) \
       && return 0
     grep -q 'ERR_PNPM_ENOENT.*rename.*_tmp_' "$scratch/logs/install.log" || break
     (( attempt < 3 )) || break
-    echo "wine-windows-gates: pnpm hoisted-linker rename race (pnpm/pnpm#12880) on install attempt $attempt; retrying on a clean tree" >&2
-    find "$scratch/tree" -name node_modules -type d -prune -exec rm -rf {} +
+    echo "wine-windows-gates: pnpm hoisted-linker rename race (pnpm/pnpm#12880) on install attempt $attempt; retrying in place" >&2
   done
   tail -40 "$scratch/logs/install.log" >&2
   return 1
@@ -239,12 +243,16 @@ cat "$scratch/logs/smoke.log"
 grep -q '^smoke: win32 x64' "$scratch/logs/smoke.log" || { echo 'wine-windows-gates: Windows Node smoke did not report win32 x64' >&2; exit 1; }
 
 # ---- the two blocking surfaces, concurrently ------------------------------
-# The build preserves the face order from package.json: compile and bundle the
-# Host face before compiling and bundling the Client face.
+# The build mirrors the root build:lib:host and build:lib:client scripts:
+# compile and bundle the Host face, bundle apps/desktop from the Host lib/
+# outputs when the desktop app ships, then compile and bundle the Client face.
 # Both statuses are captured so one failure cannot hide the other's result.
 build_gate() {
   wine_node "$scratch/logs/host-tsc.log" --max-old-space-size=4096 "$tsc_js" -b tsconfig.host.json --pretty false || return $?
   wine_node "$scratch/logs/host-tsdown.log" "$tsdown_js" --env.DSH_BUILD_FACE host || return $?
+  if [[ -d apps/desktop ]]; then
+    (cd apps/desktop && wine_node "$scratch/logs/desktop-tsdown.log" "../../$tsdown_js") || return $?
+  fi
   wine_node "$scratch/logs/client-tsc.log" "$tsc_js" -b tsconfig.client.json --pretty false || return $?
   wine_node "$scratch/logs/client-tsdown.log" "$tsdown_js" --env.DSH_BUILD_FACE client
 }
@@ -272,9 +280,10 @@ report() {
     for log in "$@"; do tail -n 200 "$log" >&2 || true; done
   fi
 }
-report 'build (Host tsc/tsdown, Client tsc/tsdown)' "$build_status" \
+report 'build (Host tsc/tsdown, desktop tsdown, Client tsc/tsdown)' "$build_status" \
   "$scratch/logs/host-tsc.log" \
   "$scratch/logs/host-tsdown.log" \
+  "$scratch/logs/desktop-tsdown.log" \
   "$scratch/logs/client-tsc.log" \
   "$scratch/logs/client-tsdown.log"
 report 'production site (vitepress build)' "$site_status" "$scratch/logs/site.log"

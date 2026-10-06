@@ -9,13 +9,21 @@
     - img
   - button "Open right sidebar":
     - img
-- button "2 tool calls · 1 intermediate message":
+- button "2 tool calls · 1 intermediate message" [expanded]:
   - text: 2 tool calls · 1 intermediate message
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - text: "Run two shell commands: wait for cancellation, then write skipped.txt."
-- group "Message timing": "{{date}} {{clock}}"
+- group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
+- button "Context injection runtime-context":
+  - img
+  - img
+  - text: Context injection runtime-context
 - 'button "Failed Bash Error: tool call aborted" [expanded]':
   - img
   - text: "Failed Bash Error: tool call aborted"
@@ -32,7 +40,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -44,4 +52,5 @@
   - button "20 tok · Cache hit 0%":
     - img
     - text: 20 tokCache hit 0%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

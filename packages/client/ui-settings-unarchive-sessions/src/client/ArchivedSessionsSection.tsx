@@ -58,11 +58,18 @@ export function ArchivedSessionsSection(props: ArchivedSessionsSectionProps): Re
   const { t, unarchive, useSessions, useWorkspaces } = props
   const sessions = useSessions(state => state)
   const workspaces = useWorkspaces(state => state.items)
-  const archivedSessionIds = useWorkspaces(state => state.archivedSessionIds)
+  const workspaceArchivedIds = useWorkspaces(state => state.archivedSessionIds)
   const [query, setQuery] = useState('')
   const ungrouped = t('ungrouped')
   const summaries = sessions.byId
   const archivedSummaries = sessions.archivedById
+
+  // The Session list's archived partition merges every pooled runtime's set;
+  // the Workspace mirror covers a non-pooled runtime.
+  const archivedSessionIds = useMemo<SessionId[]>(() => [...new Set([
+    ...(Object.keys(archivedSummaries) as SessionId[]),
+    ...workspaceArchivedIds,
+  ])], [archivedSummaries, workspaceArchivedIds])
 
   // Archive order is oldest first; the page lists the most recently archived
   // Session first. A member with no loaded summary is not addressable here.

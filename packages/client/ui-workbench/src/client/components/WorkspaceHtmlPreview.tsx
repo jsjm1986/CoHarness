@@ -1,12 +1,15 @@
 /** Complete HTML rendered in a script-enabled opaque iframe over the authorized resource lifetime. */
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import { WorkspaceResourceError, isWorkspaceAccessFailure } from '@deepseek-ai/dsh-client-runtime/client'
-import type { WorkspaceResourceRegistry, WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
+import { isWorkspaceAccessFailure } from '@deepseek-ai/dsh-client-runtime/client'
+import type { WorkspaceResourceOpenRequest } from '@deepseek-ai/dsh-client-runtime/client'
+import { workspaceFileBytes } from '../html/read-relative.ts'
 import type { ReadWorkspaceFileData, WorkspaceFileData } from '../html/read-relative.ts'
+import { MAX_TOTAL_BYTES } from '../html/pack.ts'
 import type {} from '../html/locales.ts'
+import type { WorkspacePreviewResource } from './WorkspaceFileTab.tsx'
 import css from './Workbench.module.css'
 
 /** @param path - workspace-relative filename. @returns whether the HTML renderer handles its content. */
@@ -53,66 +56,75 @@ function HtmlFrame({ data, read, request, lifetime, renderHtml, t }: {
 }
 
 /** Render a versioned HTML document without adding a second resource subscription or cache.
- * @param props - existing resource, authorized complete-file reader, and localized actions.
+ * @param props - preview metadata/callbacks, authorized complete-file reader, and localized actions.
  * @returns source changes, failures, and the isolated HTML document.
  */
-export function WorkspaceHtmlPreview({ request, resources, read, htmlT, renderHtml, close, labels }: {
+export function WorkspaceHtmlPreview({ request, resource, read, htmlT, renderHtml, close, labels }: {
   request: WorkspaceResourceOpenRequest
-  resources: WorkspaceResourceRegistry
+  resource: WorkspacePreviewResource
   read: ReadWorkspaceFileData
   renderHtml: RenderWorkspaceHtml
   htmlT: PropsLocale<'sidebarHtml'>['t']
   close: () => void
   labels: { close: string; reload: string; changed: string }
 }) {
-  const source = useMemo(() => resources.source(request), [resources, request])
-  const state = useSyncExternalStore(source.subscribe, source.get, source.get)
+  const { metadata, revoke } = resource
   const [result, setResult] = useState<WorkspaceFileData>()
   const [error, setError] = useState<Error>()
   const [attempt, setAttempt] = useState(0)
   const [pending, setPending] = useState(false)
-  const denied = isWorkspaceAccessFailure(state.error) || isWorkspaceAccessFailure(error)
-  const version = state.value?.changed === true && result !== undefined ? result.version : state.value?.version
+  const [reloading, setReloading] = useState(false)
+  const denied = metadata.accessDenied || isWorkspaceAccessFailure(error)
+  const version = metadata.value?.changed === true && result !== undefined ? result.version : metadata.value?.version
   const lifetime = useMemo(() => new AbortController(), [request, denied])
   useEffect(() => () => { lifetime.abort() }, [lifetime])
   useEffect(() => {
     if (denied) { setResult(undefined); return }
+    // The user's metadata reload owns this transition: while its stat is open,
+    // the still-old snapshot cannot authorize a new content read.
+    if (reloading) return
     if (version === undefined) return
     const abort = new AbortController()
     const signal = AbortSignal.any([abort.signal, lifetime.signal])
     setPending(true)
     setError(undefined)
-    void read({ resource: request, version }, signal).then((value) => {
+    void read({ resource: request, version, maxBytes: MAX_TOTAL_BYTES }, signal).then((value) => {
       if (!signal.aborted) setResult(value)
     }, (cause: unknown) => {
       if (signal.aborted) return
       const failure = cause instanceof Error ? cause : new Error(String(cause))
       setResult(undefined)
       setError(failure)
-      if (isWorkspaceAccessFailure(failure)) resources.disconnect(request.runtimeTarget, new WorkspaceResourceError('access-revoked', failure.message))
+      if (isWorkspaceAccessFailure(failure)) revoke(failure.message)
     }).finally(() => { if (!signal.aborted) setPending(false) })
     return () => { abort.abort() }
-  }, [read, request, resources, version, attempt, denied, lifetime])
+  }, [read, request, revoke, version, attempt, denied, lifetime, reloading])
+  const data = useMemo(() => result === undefined ? undefined : workspaceFileBytes(result), [result])
   const reload = async (): Promise<void> => {
-    setError(undefined)
-    setResult(undefined)
-    await source.reload()
-    setAttempt(value => value + 1)
+    setReloading(true)
+    try {
+      await resource.reload()
+      setError(undefined)
+      setResult(undefined)
+      setAttempt(value => value + 1)
+    } finally {
+      setReloading(false)
+    }
   }
-  const failure = error ?? state.error
+  const failure = error ?? metadata.error
   return <section aria-label={request.path} className={css.filePreview}>
     <div className={css.filePreviewActions}>
       <Button size="sm" onClick={close}>{labels.close}</Button>
-      <Button size="sm" disabled={pending || denied || state.status === 'loading'} onClick={() => { void reload() }}>{labels.reload}</Button>
+      <Button size="sm" disabled={pending || denied || reloading || metadata.status === 'loading'} onClick={() => { void reload() }}>{labels.reload}</Button>
     </div>
     {failure !== undefined && <p role="alert">{failure.message}</p>}
-    {!denied && state.value?.changed === true && <p role="status">{labels.changed}</p>}
-    {!denied && result !== undefined && (
+    {!denied && metadata.value?.changed === true && <p role="status">{labels.changed}</p>}
+    {!denied && data !== undefined && (
       <HtmlFrame
-        key={request.address} data={result.data} read={read} request={request}
+        key={request.address} data={data} read={read} request={request}
         lifetime={lifetime.signal} renderHtml={renderHtml} t={htmlT}
       />
     )}
-    {!denied && result === undefined && (pending || state.status === 'loading') && <p role="status">{htmlT('loading')}</p>}
+    {!denied && data === undefined && (pending || metadata.status === 'loading') && <p role="status">{htmlT('loading')}</p>}
   </section>
 }

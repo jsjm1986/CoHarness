@@ -74,6 +74,7 @@ kind: "package-reference"
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -91,6 +92,7 @@ kind: "package-reference"
 
 不变的工具目录会保留工具定义前缀。结果追加到历史；更换提供方或目录可能降低前缀复用率。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与待办事项
 
 <a id="known-limitations-and-deferred-work"></a>

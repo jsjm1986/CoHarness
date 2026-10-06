@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-29-derived-shipped-preset-root.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-29-derived-shipped-preset-root.md
-2026-08-29-derived-shipped-preset-root.md: 7f92b99b65aa032d8e52774f562d45f979e9635e
-2026-08-29-derived-shipped-preset-root.zh.md: ae43b90f1da87f51b62a3e6c7dc176dd8ecf7199
+/agent-note-derive-the-shipped-preset-root-for-every-profile-composition:
+  en: 11c907aefd2f0f80
+  zh: 4bff30e739567ffd
+/agent-note-derive-the-shipped-preset-root-for-every-profile-composition/problem:
+  en: c9adfbf5606254c0
+  zh: 97546419c15a5e94
+/agent-note-derive-the-shipped-preset-root-for-every-profile-composition/decision:
+  en: 40b6a3a7c522fab4
+  zh: 66223bc32caa8d7d
+/agent-note-derive-the-shipped-preset-root-for-every-profile-composition/alternatives-considered:
+  en: c64b38c753e65ab9
+  zh: 78ed21740b72de47
+/agent-note-derive-the-shipped-preset-root-for-every-profile-composition/consequences:
+  en: 9251beaeb873c52a
+  zh: 2c96803cfb8b1ae2
+/agent-note-derive-the-shipped-preset-root-for-every-profile-composition/testing:
+  en: 9b3aca9d87f09b7e
+  zh: e5171aad97076722

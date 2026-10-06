@@ -147,14 +147,19 @@ export class FakeApiClient implements IApiClient {
     attachedSessions: number
     home: string
     canOpenPath: boolean
+    fileManager?: 'finder' | 'explorer' | 'directory' | null
   }>> =
     () => Promise.resolve(ok({
-      version: '0-fake', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true,
+      version: '0-fake', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true, fileManager: 'directory',
     }))
   onPickDirectory: (payload: unknown) => Promise<RpcResponse<{ path: string | null }>> =
     () => Promise.resolve(ok({ path: null }))
   onOpenPath: (payload: unknown) => Promise<RpcResponse<{ opened: true }>> =
     () => Promise.resolve(ok({ opened: true as const }))
+  onFileApplications: (payload: unknown) => Promise<RpcResponse<{
+    applications: { id: string; name: string; default: boolean; icon: string | null }[]
+  }>> =
+    () => Promise.resolve(ok({ applications: [] }))
 
   onListDirectory: (payload: unknown) => Promise<RpcResponse<{
     path: string
@@ -237,17 +242,47 @@ export class FakeApiClient implements IApiClient {
     interrupt: (payload: unknown) => this.record('subagent.interrupt', payload, this.onSubagentInterrupt(payload)),
   }
 
+  onJobsOutput: (payload: { sessionId?: SessionId; jobId: string; from?: number }, signal?: AbortSignal) => Promise<RpcResponse<{
+    job: { id: never; kind: string; label: string; status: 'completed'; startedAt: number; output: { total: number; earliest: number } }
+    output: { total: number; earliest: number }
+    chunks: { at: number; text: string }[]
+    next: number
+    lossy?: true
+  }>> = payload => Promise.resolve(ok({
+    job: { id: payload.jobId as never, kind: 'fake', label: 'fake', status: 'completed', startedAt: 0, output: { total: 0, earliest: 0 } },
+    output: { total: 0, earliest: 0 },
+    chunks: [],
+    next: 0,
+  }))
+  onJobsKill: (payload: { sessionId: SessionId; jobId: string }) => Promise<RpcResponse<{ outcome: 'requested' | 'already-finished' }>> =
+    () => Promise.resolve(ok({ outcome: 'already-finished' as const }))
+  lastJobsOutputSignal: AbortSignal | undefined
+
+  readonly jobs: IApiClient['jobs'] = {
+    output: (payload: unknown, signal?: AbortSignal) => {
+      this.lastJobsOutputSignal = signal
+      return this.record('jobs.output', payload, this.onJobsOutput(payload as { jobId: string }, signal))
+    },
+    kill: (payload: unknown) =>
+      this.record('jobs.kill', payload, this.onJobsKill(payload as { sessionId: SessionId; jobId: string })),
+  }
+
   readonly host: IApiClient['host'] = {
     describe: (payload: unknown) => this.record('host.describe', payload, this.onDescribe(payload)),
     pickDirectory: (payload: unknown) => this.record('host.pickDirectory', payload, this.onPickDirectory(payload)),
     listDirectory: (payload: unknown) => this.record('host.listDirectory', payload, this.onListDirectory(payload)),
     createDirectory: (payload: unknown) => this.record('host.createDirectory', payload, this.onCreateDirectory(payload)),
     openPath: (payload: unknown) => this.record('host.openPath', payload, this.onOpenPath(payload)),
+    fileApplications: (payload: unknown) => this.record('host.fileApplications', payload, this.onFileApplications(payload)),
   }
 
-  // The archive-set field defaults at the binding below so list stubs keep
-  // the pre-archive `{ items }` shape; a stub carrying the field wins.
-  onWorkspaceList: (payload: unknown) => Promise<RpcResponse<{ items: WorkspaceView[]; archivedSessionIds?: SessionId[] }>> =
+  // The archive/pin-set fields default at the binding below so list stubs
+  // keep the pre-archive `{ items }` shape; a stub carrying the field wins.
+  onWorkspaceList: (payload: unknown) => Promise<RpcResponse<{
+    items: WorkspaceView[]
+    archivedSessionIds?: SessionId[]
+    pinnedSessionIds?: SessionId[]
+  }>> =
     () => Promise.resolve(ok({ items: [] }))
   onWorkspaceCreate: (payload: unknown) => Promise<RpcResponse<{ workspace: WorkspaceView; created: boolean }>> =
     () => Promise.resolve(ok({ workspace: fakeWorkspace('fk-ws'), created: true }))
@@ -270,10 +305,22 @@ export class FakeApiClient implements IApiClient {
   onWorkspaceUnarchiveSession: (payload: unknown) => Promise<RpcResponse<{ archivedSessionIds: SessionId[] }>> =
     () => Promise.resolve(ok({ archivedSessionIds: [] }))
 
+  onWorkspacePinSession: (payload: unknown) => Promise<RpcResponse<{ pinnedSessionIds: SessionId[] }>> =
+    payload => Promise.resolve(ok({ pinnedSessionIds: [(payload as { sessionId: SessionId }).sessionId] }))
+
+  onWorkspaceUnpinSession: (payload: unknown) => Promise<RpcResponse<{ pinnedSessionIds: SessionId[] }>> =
+    () => Promise.resolve(ok({ pinnedSessionIds: [] }))
+
   readonly workspace: IApiClient['workspace'] = {
     list: (payload: unknown) => this.record('workspace.list', payload, this.onWorkspaceList(payload).then(response => (
       response.result.ok
-        ? { ...response, result: { ok: true as const, value: { archivedSessionIds: [] as SessionId[], ...response.result.value } } }
+        ? {
+          ...response,
+          result: {
+            ok: true as const,
+            value: { archivedSessionIds: [] as SessionId[], pinnedSessionIds: [] as SessionId[], ...response.result.value },
+          },
+        }
         : response
     )) as ReturnType<IApiClient['workspace']['list']>),
     create: (payload: unknown) => this.record('workspace.create', payload, this.onWorkspaceCreate(payload)),
@@ -287,6 +334,10 @@ export class FakeApiClient implements IApiClient {
       this.record('workspace.archiveSession', payload, this.onWorkspaceArchiveSession(payload)),
     unarchiveSession: (payload: unknown) =>
       this.record('workspace.unarchiveSession', payload, this.onWorkspaceUnarchiveSession(payload)),
+    pinSession: (payload: unknown) =>
+      this.record('workspace.pinSession', payload, this.onWorkspacePinSession(payload)),
+    unpinSession: (payload: unknown) =>
+      this.record('workspace.unpinSession', payload, this.onWorkspaceUnpinSession(payload)),
   }
 
   readonly workspaceChanges: IApiClient['workspaceChanges'] = {

@@ -1,7 +1,7 @@
 - region "To-dos":
   - button "To-dos 1 completed · 1 in progress"
 - img
-- text: Ongoing Goal Keep the composer context panels aligned
+- text: Ongoing goal Keep the composer context panels aligned
 - button "Pause goal":
   - img
 - button "Edit goal":
@@ -16,7 +16,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

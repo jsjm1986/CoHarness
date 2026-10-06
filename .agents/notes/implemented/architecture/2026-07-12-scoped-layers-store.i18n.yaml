@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-12-scoped-layers-store.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-12-scoped-layers-store.md
-2026-07-12-scoped-layers-store.md: 221711748007d5f909aec3fdfcf3919884d11cdb
-2026-07-12-scoped-layers-store.zh.md: 97ad637b91a2b9b2cad9847d8b4cdbe23ff14a48
+/agent-note-shared-scoped-layer-storage:
+  en: fd7fb761274acf79
+  zh: 78f68d9b8479b3d5
+/agent-note-shared-scoped-layer-storage/problem:
+  en: 3311caec0070bd9d
+  zh: 39a9f8f8704fac8b
+/agent-note-shared-scoped-layer-storage/decision:
+  en: 768283e6addd3cad
+  zh: 0fd0ee059e29d425
+/agent-note-shared-scoped-layer-storage/public-interface:
+  en: 0715a821e0557fdf
+  zh: 421e666d72d830bc
+/agent-note-shared-scoped-layer-storage/storage-contract:
+  en: 52f52a40b758712c
+  zh: 8e77970909fe5bc1
+/agent-note-shared-scoped-layer-storage/registry-migrations:
+  en: 9000e39069a37b47
+  zh: 8686c3c3375306aa
+/agent-note-shared-scoped-layer-storage/alternatives-considered:
+  en: 5caff1302cc1613e
+  zh: 607632db56cdfbac
+/agent-note-shared-scoped-layer-storage/consequences:
+  en: b4ec0d1c65fad3dd
+  zh: e24f78a6300e76f2
+/agent-note-shared-scoped-layer-storage/verification:
+  en: f30bbe52d7a4c658
+  zh: 900d8f775170b0d9

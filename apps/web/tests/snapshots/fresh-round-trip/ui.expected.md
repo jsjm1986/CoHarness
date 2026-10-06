@@ -14,14 +14,18 @@
 - button "1 tool call · 2 intermediate messages":
   - text: 1 tool call · 2 intermediate messages
   - img
+- button "System prompt":
+  - img
+  - img
+  - text: System prompt
 - text: "Use the bash tool to run exactly: echo WEB_E2E_OK. Then reply with the single word DONE and stop."
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - button "Copy":
   - img
-- button "Think The command executed successfully and output \"WEB_E2E_OK\". I just need to reply with \"DONE\".":
+- button "Thinking The command executed successfully and output \"WEB_E2E_OK\". I just need to reply with \"DONE\".":
   - img
   - img
-  - text: Think The command executed successfully and output "WEB_E2E_OK". I just need to reply with "DONE".
+  - text: Thinking The command executed successfully and output "WEB_E2E_OK". I just need to reply with "DONE".
 - paragraph: DONE
 - button "Copy":
   - img
@@ -35,7 +39,7 @@
   - "button \"Ran for {{duration}}\"":
     - img
     - text: "Ran for {{duration}}"
-- group "Message timing": "{{clock}}"
+- group "Message time and speed": "{{clock}}"
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -43,7 +47,7 @@
   - img
 - button "Commands":
   - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
+- 'button "Access mode, current: Workspace write"': Workspace write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
@@ -56,4 +60,5 @@
   - button "15.8K tok · Cache hit 99%":
     - img
     - text: 15.8K tokCache hit 99%
+- separator "Adjust transcript content width"
 - separator "Adjust transcript content width"

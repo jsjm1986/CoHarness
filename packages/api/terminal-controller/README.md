@@ -7,6 +7,8 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
+Pending authorization, allocation and retained terminals prevent idle Session purge. Terminal creation rechecks a removal reservation after authorization, so an already submitted form cannot allocate a shell into a Session being deleted.
+
 ## Summary
 
 Open the execution environment's default shell in a Session workspace from the Web sidebar. Reconnect to existing processes and close their complete provider-owned process ranges. Terminal output stays outside the Agent transcript. Keeping a terminal open retains its process and a bounded screen buffer.
@@ -25,11 +27,13 @@ Open the execution environment's default shell in a Session workspace from the W
 <a id="use-this-package"></a>
 ## Use this package
 
-The Client plugin owns its generated `remote.terminal` namespace and releases it when unloaded. The shared Remote assembly does not mount a second copy.
+SSH-bound Sessions resolve shell discovery and PTY allocation through their standing execution realm. A missing remote subprocess provider fails the operation; it never falls back to the Host process environment.
+
+The Client plugin mounts its generated `remote.terminal` namespace unless the assembly already provides it, and releases a self-mounted namespace when unloaded. The shared Remote assembly does not mount a second copy.
 
 The Web bundle mounts this package with the subprocess provider, sandbox policy and Typert Gateway. Sandbox policy supplies only the fallback working directory for Sessions without a cwd. `remote.terminal` exposes `environment`, `shells`, `list`, `create`, `retain`, `follow`, `write`, `resize`, `rename` and `close`; each ordinary operation is scoped by Session and creator identity. Gateway personal workspaces require user qualification; projects additionally require project authorization and writable membership. Qualification changes revoke retained grants and await process cleanup. Listing reads retained Host terminals directly, so viewing an offline Session neither activates an Agent nor produces a recovery error.
 
-Shell discovery lists the execution environment's declared default shell first. Only when the provider omits that default does resolution use `/bin/sh` on POSIX or `cmd.exe` on Windows. An optional `shell` profile overrides that choice with executable `path`, display `name` and `args` (default `[]`). The selector also probes `shellCandidates` through the execution provider and omits only confirmed lookup misses. Creation accepts a discovered `shellPath` and verifies it again; resolution or transport failure is reported without launching a different shell. Environment lookup returns the working directory and limits without resolving a shell, so an unavailable default does not prevent reattaching to an existing process. Automatic POSIX profiles start interactively, and PowerShell uses `-NoLogo`, so completion and startup configuration remain shell-owned. The Session workspace supplies the initial directory. User terminals run with the execution environment’s system-user permissions, independently of the Agent’s sandbox mode and approval policy. Operating-system and container restrictions still apply; DSH does not elevate the user. The subprocess provider retains its credential-environment scrubbing.
+Shell discovery lists the execution environment's declared default shell first. Only when the provider omits that default does resolution use `/bin/sh` on POSIX or `cmd.exe` on Windows. An optional `shell` profile overrides that choice with executable `path`, display `name` and `args` (default `[]`). The selector also probes `shellCandidates` through the execution provider and omits confirmed lookup misses. It lists each executable name once, ignoring letter case and `.exe`, and keeps the earliest entry, because PATH lookup can reach the default through another directory, such as `/usr/bin/bash` for `/bin/bash` on merged-`/usr` systems. Creation accepts a discovered `shellPath` and verifies it again; resolution or transport failure is reported without launching a different shell. Environment lookup returns the working directory and limits without resolving a shell, so an unavailable default does not prevent reattaching to an existing process. Automatic POSIX profiles start interactively, and PowerShell uses `-NoLogo`, so completion and startup configuration remain shell-owned. The Session workspace supplies the initial directory. User terminals run with the execution environment’s system-user permissions, independently of the Agent’s sandbox mode and approval policy. Operating-system and container restrictions still apply; DSH does not elevate the user. The subprocess provider retains its credential-environment scrubbing.
 
 | Configuration | Default | Meaning |
 |---|---|---|

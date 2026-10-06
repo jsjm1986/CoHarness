@@ -1,3 +1,8 @@
+---
+description: "This family provides authorized retrieval over live and durable session logs, independently of compaction."
+kind: "package-group"
+---
+
 # session-query/ — session retrieval capability family
 
 English | [中文](README.zh.md)

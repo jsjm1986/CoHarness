@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-22-document-manager-attach-existing-documents.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-22-document-manager-attach-existing-documents.md
-2026-08-22-document-manager-attach-existing-documents.md: d44a656c456f1b0f0b522c1e393838847a07d091
-2026-08-22-document-manager-attach-existing-documents.zh.md: 75be1efa61983974652ff70845d4aeab4e04cd78
+/agent-note-attach-existing-documents-from-the-manager:
+  en: 0428d1fb2081aff2
+  zh: c6db267929835a23
+/agent-note-attach-existing-documents-from-the-manager/problem:
+  en: ad2db0a6f859b615
+  zh: b5f309313cc22e8b
+/agent-note-attach-existing-documents-from-the-manager/decision:
+  en: 14ec08f2ccc67fe0
+  zh: 47a0d39ee71418d1
+/agent-note-attach-existing-documents-from-the-manager/alternatives-considered:
+  en: 95d48154cf484ead
+  zh: 160e193b2203fce4
+/agent-note-attach-existing-documents-from-the-manager/consequences:
+  en: bb80daa2b2748aed
+  zh: 13648c591f5faa42
+/agent-note-attach-existing-documents-from-the-manager/verification:
+  en: 695e42c0867f69d0
+  zh: ad37ddb5e3ae903d

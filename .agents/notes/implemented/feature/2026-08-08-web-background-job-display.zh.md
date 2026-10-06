@@ -14,9 +14,9 @@ Status: implemented
 
 ## 决策
 
-任务状态以**每会话一帧的整份快照**到达浏览器，在注册表每一个会改变该会话可见内容的提交点推出。客户端保持一份 last-wins 镜像，由一个 header 入口渲染。没有 RPC，没有轮询，客户端不需要任何过期状态管理。
+任务状态以**每会话一帧的整份快照**到达浏览器，在注册表每一个会改变该会话可见内容的提交点推出。客户端保持一份 last-wins 镜像，由一个 header 入口渲染。名册本身没有 RPC，没有轮询，客户端不需要任何过期状态管理。
 
-本次只交付列表。每个任务的流式输出与人类发起的中断是各自独立的阶段，而通道的形状让两者都不必推翻它。
+这一帧仍是唯一的名册通道；单任务输出与人类 kill 经同一载体上的游标读与一元受理到达——[输出与 kill note](2026-09-30-web-job-output-and-kill.zh.md) 拥有那一期——两者都不必推翻它。
 
 ### 线路形状
 
@@ -36,9 +36,11 @@ export interface JobView {
   kind: string
   label: string
   status: 'running' | 'stopping' | 'completed' | 'killed' | 'failed'
+  progress?: string
   detail?: string
   startedAt: number
   finishedAt?: number
+  output: { total: number; earliest: number; spillPaths?: string[] }
 }
 ```
 
@@ -46,7 +48,7 @@ export interface JobView {
 
 线路上的 `kind` 是 `string` 而非 `JobKind`。kind 映射由生产者插件按声明合并扩展，客户端构建无法枚举这个闭集；遇到无法识别的 kind，呈现层走一条有文档的默认分支。
 
-`JobSnapshot` 的三个字段被刻意省去：`ownerSession`（帧的 `sessionId` 已经带了）、`reported`（内部的通知投递位，对用户无意义），以及 `outputLimitBytes`（生产者拥有的模型呈现策略）。
+`output` 携带环的绝对坐标，使一行是否可观察成为名册数据而非探测读；字节本身仍走 `jobs.output`。注册表视图的两个字段被刻意省去：`owner`（帧的 `sessionId` 已经带了）与 `outputLimitBytes`（生产者拥有的模型呈现策略）。
 
 这一帧带整份快照而非增量，理由就是 [`session/queue`](../../../../packages/host/apiproxy/src/api/events.ts) 为自己写下的那条：启动、中断、结算、重连，以及第二个浏览器标签页，全都通过同一个权威值收敛。一个会话的任务集是个位数，帧很小。
 
@@ -89,15 +91,13 @@ abstract onJobsChanged(listener: JobsChangedListener): () => void
 
 [`@deepseek-ai/dsh-client-ui-jobs`](../../../../packages/client/ui-jobs/README.zh.md) 在 `conversation.session.header.actions` 注册一个条目，排在 subagent 目录之后。呈现契约归它自己的 README；值得记在这里的决策是：会话没有任务时控件根本不渲染；活跃角标为零时省略，让只剩历史的会话保留一个安静的入口；终态行保持可见，因为失败任务的 `detail` 是其失败唯一可读之处。
 
-因此一个运行中的一次性后台 subagent 会同时出现在那里和 subagent 目录里。两者回答不同的问题——目录负责进入子会话的 transcript，而这个列表是中断能力唯一可能附着的句柄——在这里屏蔽 `kind: 'subagent'` 会让中断那一期恰好对这批任务没有入口。
+因此一个运行中的一次性后台 subagent 会同时出现在那里和 subagent 目录里。两者回答不同的问题——目录负责进入子会话的 transcript，而这个列表是停止控件附着的句柄——在这里屏蔽 `kind: 'subagent'` 会让这批任务没有中断入口。
 
 ### 刻意不做的事
 
-**没有任何 Web 路径调用 `ctx.jobs.read()`。** 它消费唯一的输出游标，浏览器读一次就悄悄拿走了模型 `job_output` 永远看不到的字节。这该是一条有测试兜底的不变量而不是一条约定，因为它的故障在调用点完全不可见。
+**没有任何 Web 路径调用 `ctx.jobs.read()`。** 它消费唯一的输出游标，浏览器读一次就悄悄拿走了模型 `job_output` 永远看不到的字节。观察通道因此落在 `jobs.output` 背后的非消费 `readAt` 上（见[输出与 kill note](2026-09-30-web-job-output-and-kill.zh.md)）；这条不变量对它同样成立，并且该有测试兜底而不是一条约定，因为故障在调用点完全不可见。
 
-**不做中断。** 那一期欠一个 seam 目前没有回答的决策：`kill()` 会把终态投递标为已上报，所以照今天的契约写出来的人类中断，会让模型一直以为它的任务还在跑。
-
-**帧上不带输出水位。** 输出那一期的增量通道才是锚点字段该出现的地方；现在加就是一个没有读者的字段。
+**帧上不带输出字节。** 输出走 `jobs.output` 的游标拉取；帧只携带环的坐标，这正是名册行判断能否展开面板所需的全部。
 
 ## 备选方案
 
@@ -129,7 +129,7 @@ abstract onJobsChanged(listener: JobsChangedListener): () => void
 
 **终态行会堆积。** 注册表把已结算任务留到 owner 销毁，所以一个跑了很多后台命令的长会话会积出长列表。如果真的成为抱怨，给终态尾巴加上限是呈现层改动而非协议改动。
 
-**`stopping` 今天几乎不可达。** 只有模型的 `job_kill` 会产生它，所以这个状态会被渲染但在人类中断落地之前很少见到。现在就纳入联合类型，是因为把它留在外面会让那一期变成一次线路变更。
+**`stopping` 表示一次进行中的 kill。** 模型的 `job_kill` 与列表的两段式停止都会产生它；这个状态留在联合类型里，因为拿掉它会是一次没有读者收益的线路变更。
 
 **一个运行中的 subagent 有两个入口。** 这是刻意接受的，且被限制在一次性后台委派这一种情况。如果实际用起来读着像噪声，修法是呈现层的——可以让目录行引用那个任务，而不是让任务列表隐藏这个 kind。
 

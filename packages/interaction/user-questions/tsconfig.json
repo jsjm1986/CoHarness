@@ -15,13 +15,25 @@
       "path": "../../core/scope"
     },
     {
+      "path": "../../core/session"
+    },
+    {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../session/session-projection"
+    },
+    {
+      "path": "../../typert/protocol"
     },
     {
       "path": "../../../vendor/cordis"
     },
     {
       "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

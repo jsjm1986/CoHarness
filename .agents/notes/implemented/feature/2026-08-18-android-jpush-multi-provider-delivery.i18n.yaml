@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-android-jpush-multi-provider-delivery.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-android-jpush-multi-provider-delivery.md
-2026-08-18-android-jpush-multi-provider-delivery.md: f5057f902ceaa26863e6ed575f8765e9fd16446a
-2026-08-18-android-jpush-multi-provider-delivery.zh.md: 2a77200995d1c7fa382fcfdb49583048a03ae31d
+/agent-note-android-jpush-multi-provider-delivery:
+  en: ce4628ee245fadfa
+  zh: 8bc4398fe2d73f98
+/agent-note-android-jpush-multi-provider-delivery/problem:
+  en: 145b617cc1e2dae8
+  zh: b6881c0f508da3b0
+/agent-note-android-jpush-multi-provider-delivery/decision:
+  en: 5204ddaf73d7b224
+  zh: 01a282b36d8b29a4
+/agent-note-android-jpush-multi-provider-delivery/alternatives-considered:
+  en: b23266a357cee3f9
+  zh: 620ff246821870c5
+/agent-note-android-jpush-multi-provider-delivery/consequences:
+  en: d9e60081697da636
+  zh: b9c7c67121be288e
+/agent-note-android-jpush-multi-provider-delivery/verification:
+  en: 4ac5504361ddc682
+  zh: 00857e28405c09e4

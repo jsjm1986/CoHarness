@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-03-history-read-survives-concurrent-resume.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-03-history-read-survives-concurrent-resume.md
-2026-09-03-history-read-survives-concurrent-resume.md: ce5df3d41af3815742b17d2ee56c557ab2f62565
-2026-09-03-history-read-survives-concurrent-resume.zh.md: bb8ad13b79530565ed7280f2d2661c8b4e873daa
+/agent-note-a-detached-history-read-survives-the-resume-that-opening-the-session-triggers:
+  en: 5122391057639538
+  zh: dc1d024fae1394ae
+/agent-note-a-detached-history-read-survives-the-resume-that-opening-the-session-triggers/problem:
+  en: 610ef5fe358993c0
+  zh: 35f08a91b589ce85
+/agent-note-a-detached-history-read-survives-the-resume-that-opening-the-session-triggers/decision:
+  en: 218f50f88f1e1540
+  zh: 035d39ed7c9df711
+/agent-note-a-detached-history-read-survives-the-resume-that-opening-the-session-triggers/alternatives-considered:
+  en: d200026632a89a9d
+  zh: 3cd0bb9d8a830f21
+/agent-note-a-detached-history-read-survives-the-resume-that-opening-the-session-triggers/consequences:
+  en: 16c4b4fc798f5d47
+  zh: ba3f754acbb320cb

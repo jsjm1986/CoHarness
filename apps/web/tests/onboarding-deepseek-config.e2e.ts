@@ -34,7 +34,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     page = await browser.newPage({ viewport: { width: 1440, height: 960 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)
     page.on('console', message => browserConsole.push(message.text()))
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 
@@ -129,7 +129,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
       released = true
       for (const resolve of heldRoutes.splice(0)) resolve()
     }
-    await page.route('**/api/settings.describe', async (route) => {
+    await page.route(/\/api\/settings\.describe(?:\?.*)?$/, async (route) => {
       if (!released) await new Promise<void>((resolve) => { heldRoutes.push(resolve) })
       await route.continue()
     })
@@ -137,10 +137,11 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     await page.reload({ waitUntil: 'commit' })
     await page.waitForSelector('[class*="frame"]', { timeout: 15_000 })
     // The app is painted and interactive while the step is still deciding.
+    await expect.poll(() => heldRoutes.length).toBeGreaterThan(0)
     await page.waitForTimeout(600)
     releaseDescribe()
     await page.waitForTimeout(400)
-    await page.unroute('**/api/settings.describe')
+    await page.unroute(/\/api\/settings\.describe(?:\?.*)?$/)
     acknowledgeReloadConnectionLoss(tripwire, warningsBefore)
     expect(await page.evaluate(() =>
       (window as unknown as { __takeoverSightings: string[] }).__takeoverSightings)).toEqual([])

@@ -4,7 +4,7 @@ Status: implemented
 
 [English](2026-09-22-gateway-profile-management-authority.md) | 中文
 
-API Remotes 在实际 Client 组装中挂载生成的 Plugin Manager 贡献。普通 Node 发行产物测试穿过真实 HTTP 传输，验证八个管理方法均拒绝被禁止的政策、已授权清单读取成功，以及移除必需政策后关闭访问。通用 Host 事件订阅不携带安装日志。管理安装流只转发本次请求的事件，逐帧重新核验权限，并在取消时等待包操作清理。
+API Remotes 在实际 Client 组装中挂载生成的 Plugin Manager 贡献。普通 Node 发行产物测试穿过真实 HTTP 传输，验证清单读取在无授权时保持开放、六个变更方法拒绝被禁止的政策、`access` 报告授权状态，以及移除必需政策后写入关闭而读取仍成功。通用 Host 事件订阅不携带安装日志。管理安装流只转发本次请求的事件，逐帧重新核验权限，并在取消时等待包操作清理。
 
 ## 问题
 
@@ -12,7 +12,7 @@ Profile 操作会在工作区沙箱之外安装并执行 Host 代码。工具审
 
 ## 决策
 
-[Plugin Manager](../../../../packages/boot/plugin-manager/README.zh.md) 在每个公开操作前检查部署授权，并在进入排队的写入或配置操作后再次检查。工具在请求审批前检查同一策略。独立本机 profile 保留本机操作者权限；Gateway 启动 patch 要求授权提供者，并将其声明为 Loader 依赖。提供者缺失不能恢复本机权限。
+[Plugin Manager](../../../../packages/boot/plugin-manager/README.zh.md) 在每次变更前检查部署授权，并在进入排队的写入或配置操作后再次检查；清单读取对所有能到达服务的调用者开放，`access()` 报告管理授权，界面可据此禁用控件而无需试探写入。工具在请求审批前检查同一策略。独立本机 profile 保留本机操作者权限；Gateway 启动 patch 要求授权提供者，并将其声明为 Loader 依赖。提供者缺失不能恢复本机权限。
 
 [Gateway Execution](../../../../packages/context/gateway-execution/README.zh.md) 拥有该提供者。交互调用要求仍在处理中的普通 HTTP 主体，或限定用途的 profile 管理主体，并接受 Gateway 的实时管理员检查。Agent 发起的操作则检查真正 Agent 的[完整已验证参与者集合](2026-09-22-verified-execution-participants.zh.md)；每位贡献者都必须保留管理员权限。尚未过期的旧断言、浏览器角色或继承的异步请求上下文都不能保留已经撤销的角色。认证、执行授权、协作、治理和隔离条目不能被直接关闭或通过组合包替换，针对其父条目的 patch 也受保护。
 

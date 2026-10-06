@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-06-onboarding-step-owned-takeover-chrome.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-06-onboarding-step-owned-takeover-chrome.md
-2026-08-06-onboarding-step-owned-takeover-chrome.md: bc0a216cf0aa741bd0e7e845d4f5dbab526abf46
-2026-08-06-onboarding-step-owned-takeover-chrome.zh.md: d236a5e095d94c54f91c437852c1c7be7d58c86f
+/agent-note-onboarding-takeover-chrome-moves-into-the-step:
+  en: d397b324bfb1b035
+  zh: fc84f075182936da
+/agent-note-onboarding-takeover-chrome-moves-into-the-step/problem:
+  en: 35a765381990c1c4
+  zh: 4be102f6da9193a3
+/agent-note-onboarding-takeover-chrome-moves-into-the-step/decision:
+  en: 028b27bd6322c8f9
+  zh: 862e9195a6547aa4
+/agent-note-onboarding-takeover-chrome-moves-into-the-step/alternatives-considered:
+  en: 14039829f4891ef6
+  zh: aca8fbfb8a64b569
+/agent-note-onboarding-takeover-chrome-moves-into-the-step/consequences:
+  en: fdb1eaf083484bea
+  zh: fc9d038d661ae2cf
+/agent-note-onboarding-takeover-chrome-moves-into-the-step/testing:
+  en: 9acea80f921d37aa
+  zh: f8698492b7f433d4

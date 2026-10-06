@@ -1,11 +1,11 @@
 /**
- * Compact Enter-behavior row stylesheet contract, asserted against the CSS text.
+ * Compact Settings selector-row stylesheet contract, asserted against the CSS text.
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const css = readFileSync(fileURLToPath(new URL('../src/client/settings/EnterBehaviorRow.module.css', import.meta.url)), 'utf8')
+const css = readFileSync(fileURLToPath(new URL('../src/client/settings/SettingsSelectRow.module.css', import.meta.url)), 'utf8')
 
 /**
  * Inner text of one `@media` block.
@@ -15,7 +15,7 @@ const css = readFileSync(fileURLToPath(new URL('../src/client/settings/EnterBeha
 function mediaBody(query: string): string {
   const marker = `@media ${query}`
   const start = css.indexOf(marker)
-  if (start === -1) throw new Error(`EnterBehaviorRow.module.css has no @media ${query}`)
+  if (start === -1) throw new Error(`SettingsSelectRow.module.css has no @media ${query}`)
   const open = css.indexOf('{', start)
   let depth = 0
   for (let i = open; i < css.length; i += 1) {
@@ -26,10 +26,10 @@ function mediaBody(query: string): string {
       if (depth === 0) return css.slice(open + 1, i)
     }
   }
-  throw new Error(`EnterBehaviorRow.module.css @media ${query} is unbalanced`)
+  throw new Error(`SettingsSelectRow.module.css @media ${query} is unbalanced`)
 }
 
-describe('EnterBehaviorRow.module.css compact', () => {
+describe('SettingsSelectRow.module.css compact', () => {
   it('stacks the title above the selector under 768px', () => {
     const compact = mediaBody('(max-width: 767px)')
     expect(compact).toContain('flex-direction: column')

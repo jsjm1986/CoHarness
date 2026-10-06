@@ -7,21 +7,55 @@
     "noUncheckedIndexedAccess": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "@deepseek-ai/cordis": ["../vendor/cordis/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-attachment": ["../packages/attachment/attachment/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-typert-protocol": ["../packages/typert/protocol/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-brand": ["../packages/util/brand/src/index.ts"],
-      "@deepseek-ai/dsh-llm": ["../packages/llm/llm/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-llm/discovery": ["../packages/llm/llm/src/discovery.ts"],
-      "@deepseek-ai/dsh-session-format": ["../packages/session/session-format/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-session-format-catalog": ["../packages/session/session-format-catalog/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-session-format/surface": ["../packages/session/session-format/lib/types/surface.d.ts"],
-      "@deepseek-ai/dsh-util-crypto": ["../packages/util/crypto/src/index.ts"],
-      "@deepseek-ai/dsh-util-values": ["../packages/util/values/src/index.ts"]
+      "@deepseek-ai/cordis": [
+        "../vendor/cordis/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-attachment": [
+        "../packages/attachment/attachment/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-typert-protocol": [
+        "../packages/typert/protocol/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-brand": [
+        "../packages/util/brand/src/index.ts"
+      ],
+      "@deepseek-ai/dsh-llm": [
+        "../packages/llm/llm/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-llm/discovery": [
+        "../packages/llm/llm/src/discovery.ts"
+      ],
+      "@deepseek-ai/dsh-session-format": [
+        "../packages/session/session-format/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-session-format-catalog": [
+        "../packages/session/session-format-catalog/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-session-format/surface": [
+        "../packages/session/session-format/lib/types/surface.d.ts"
+      ],
+      "@deepseek-ai/dsh-util-crypto": [
+        "../packages/util/crypto/src/index.ts"
+      ],
+      "@deepseek-ai/dsh-util-values": [
+        "../packages/util/values/src/index.ts"
+      ],
+      "@deepseek-ai/dsh-managed-data": [
+        "../packages/util/managed-data/lib/types/index.d.ts"
+      ],
+      "@deepseek-ai/dsh-atomic-write": [
+        "../packages/util/atomic-write/lib/types/index.d.ts"
+      ]
     },
     "noEmit": true,
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "scripts"]
+  "include": [
+    "src",
+    "tests",
+    "scripts"
+  ]
 }

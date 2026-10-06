@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-23-acp-automation-only-protocol.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-07-23-acp-automation-only-protocol.md
-2026-07-23-acp-automation-only-protocol.md: 7cd18d49ea5e074acea6d4e1e22a30afcc6fd5eb
-2026-07-23-acp-automation-only-protocol.zh.md: f49c88b8f5851a62a661e2215092b50044b29109
+/agent-note-acp-as-an-automation-only-protocol:
+  en: 4926ea5b364c6289
+  zh: e95510de8ee4f616
+/agent-note-acp-as-an-automation-only-protocol/problem:
+  en: 5123f99030ae618e
+  zh: fa62dc7b9a4b9fef
+/agent-note-acp-as-an-automation-only-protocol/decision:
+  en: 3780f6c9d092b812
+  zh: e423f8106223b9b7
+/agent-note-acp-as-an-automation-only-protocol/snapshot-boundary:
+  en: 0de11ab0d38e84c2
+  zh: 56d71d33274f1058
+/agent-note-acp-as-an-automation-only-protocol/alternatives-considered:
+  en: 13192a25709b5d95
+  zh: 6cadde33a58510b5
+/agent-note-acp-as-an-automation-only-protocol/consequences:
+  en: eaecefc1c762613d
+  zh: e2e99072177fb5ba

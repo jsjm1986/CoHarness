@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-02-message-fork-actions-require-completed-turn-tail.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-02-message-fork-actions-require-completed-turn-tail.md
-2026-08-02-message-fork-actions-require-completed-turn-tail.md: abdcbc79948c67619bb70a8a87741046f65b8838
-2026-08-02-message-fork-actions-require-completed-turn-tail.zh.md: dc6506bf470443b5de6a7984f983f4cca81452a0
+/agent-note-message-fork-actions-require-a-completed-turn-tail:
+  en: 4987ca73c85ff2d9
+  zh: d3a7e3f86c9f3557
+/agent-note-message-fork-actions-require-a-completed-turn-tail/problem:
+  en: 095f6de8ec217789
+  zh: c7f4db105665ffe2
+/agent-note-message-fork-actions-require-a-completed-turn-tail/decision:
+  en: 89021a55ddbab15b
+  zh: 450aab3e8bd317fe
+/agent-note-message-fork-actions-require-a-completed-turn-tail/alternatives-considered:
+  en: 4825d6d3879d251c
+  zh: a2a9062f5f95790b
+/agent-note-message-fork-actions-require-a-completed-turn-tail/consequences:
+  en: 0f61fc1dd3e36ff0
+  zh: 58fdf3c312fa17ad

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-29-human-transcript-append-origin.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-29-human-transcript-append-origin.md
-2026-07-29-human-transcript-append-origin.md: e39e2014debd159931b8717d4a69b01d6171b5c6
-2026-07-29-human-transcript-append-origin.zh.md: ddc9305bf0d673f2648d1d7408ff040909ba76ed
+/agent-note-the-human-transcript-projects-append-origin-events:
+  en: 2388feacd3537645
+  zh: eab2552415e6d8f8
+/agent-note-the-human-transcript-projects-append-origin-events/problem:
+  en: d45ee300acfb2301
+  zh: 679d4f3eb85fe83c
+/agent-note-the-human-transcript-projects-append-origin-events/decision:
+  en: 6f826e9e3b4ef6a1
+  zh: 0f7aba0579b85622
+/agent-note-the-human-transcript-projects-append-origin-events/deferred:
+  en: 80d88ae7bef11bfd
+  zh: b37e816a95a118a7
+/agent-note-the-human-transcript-projects-append-origin-events/alternatives-considered:
+  en: dc8afc6addcbea40
+  zh: 0e6152d22c327052
+/agent-note-the-human-transcript-projects-append-origin-events/consequences:
+  en: e3cf2b6978a8ac99
+  zh: b0091e060f8a5236

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-03-project-remote-authorization-coverage.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-03-project-remote-authorization-coverage.md
+/agent-note-project-scope-remote-authorization-coverage-and-catalog-absent-services:
+  en: 7adaf7f04cc5315d
+  zh: 9cd37e42cffb4db0
+/agent-note-project-scope-remote-authorization-coverage-and-catalog-absent-services/problem:
+  en: f7a4f97a8fa362ac
+  zh: 8d14ade07a65af8e
+/agent-note-project-scope-remote-authorization-coverage-and-catalog-absent-services/decision:
+  en: 74960ebf643a19e6
+  zh: 3de65d823d17eb8d
+/agent-note-project-scope-remote-authorization-coverage-and-catalog-absent-services/alternatives-considered:
+  en: 8f7a3ca93c9d5cc9
+  zh: 3e58104da71ca16d
+/agent-note-project-scope-remote-authorization-coverage-and-catalog-absent-services/consequences:
+  en: 8e39c67dcd6dbbe3
+  zh: de657c01b184ffb7
+/agent-note-project-scope-remote-authorization-coverage-and-catalog-absent-services/testing:
+  en: 752dc48dfacd20f6
+  zh: a5a2948b9d44185c

@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-02-desktop-profile-plugin-management.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-desktop-profile-plugin-management.md
+/agent-note-desktop-installed-carriers-may-manage-the-reserved-desktop-profile-s-plugins:
+  en: b4c0f713877436d1
+  zh: 09f6200c88bf5c57
+/agent-note-desktop-installed-carriers-may-manage-the-reserved-desktop-profile-s-plugins/problem:
+  en: 77294bd371ae8971
+  zh: 9eff4d070256ebf0
+/agent-note-desktop-installed-carriers-may-manage-the-reserved-desktop-profile-s-plugins/decision:
+  en: 490ce2d1535c74ed
+  zh: 9f13ea9c3657f39a
+/agent-note-desktop-installed-carriers-may-manage-the-reserved-desktop-profile-s-plugins/alternatives-considered:
+  en: 93edd0df08a95600
+  zh: 31f91a88ea7a5b66
+/agent-note-desktop-installed-carriers-may-manage-the-reserved-desktop-profile-s-plugins/consequences:
+  en: 64311c81556b9d6d
+  zh: 9952eb6f7e8ba91b

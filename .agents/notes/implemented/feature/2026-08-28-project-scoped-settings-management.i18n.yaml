@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-28-project-scoped-settings-management.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-28-project-scoped-settings-management.md
-2026-08-28-project-scoped-settings-management.md: 517a0c6629677447d7a8b3fb535be8a1aeaf92ee
-2026-08-28-project-scoped-settings-management.zh.md: 531fcb720ff59b118aa3c65905fef8501612ef85
+/agent-note-project-scoped-settings-management:
+  en: 48b56d365c9a05da
+  zh: e775a6556527e69b
+/agent-note-project-scoped-settings-management/problem:
+  en: 09704289179e6942
+  zh: d3ef1cd1bf0598e1
+/agent-note-project-scoped-settings-management/decision:
+  en: 165e70426d53b994
+  zh: c0ff089c9a5b741f
+/agent-note-project-scoped-settings-management/alternatives-considered:
+  en: 96c6131cbb144064
+  zh: 0df798f1015e840f
+/agent-note-project-scoped-settings-management/consequences:
+  en: 293824c77ccf317e
+  zh: 59afc01100368df9

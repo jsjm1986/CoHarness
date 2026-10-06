@@ -3,14 +3,13 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { targetEnvironment } from '../src/runner-launch.ts'
 import { bindManagedProcess } from '../src/spawn.ts'
 import { launchWindowsJob, probeWindowsJob } from '../src/windows-job.ts'
 
-const scratch = mkdtempSync(join(tmpdir(), 'dsh-native-windows-'))
-afterAll(() => { rmSync(scratch, { recursive: true, force: true }) })
+let scratch: string
 
 function spec(argv: string[], graceMs = 100, env?: NodeJS.ProcessEnv): SubprocessSpawnSpec {
   return {
@@ -85,6 +84,13 @@ function directSpawnFailure(argv: readonly string[], cwd = scratch): Promise<Spa
 const windowsNative = process.platform === 'win32' && probeWindowsJob()
 
 describe.skipIf(!windowsNative)('Windows Job native containment', () => {
+  beforeAll(() => {
+    scratch = mkdtempSync(join(tmpdir(), 'dsh-native-windows-'))
+  })
+  afterAll(() => {
+    if (scratch) rmSync(scratch, { recursive: true, force: true })
+  })
+
   it('keeps ordinary descendants free of visible console windows', async () => {
     const fixture = fileURLToPath(new URL('../../win32-process/tests/fixtures/console-state.ts', import.meta.url))
     const script = `

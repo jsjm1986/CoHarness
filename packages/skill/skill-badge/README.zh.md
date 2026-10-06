@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-skill-badge
 
 [English](README.md) | 中文
@@ -12,10 +17,22 @@
 
 agent（智能体）可以通过该内置提供方加载官方「powered by dsh」徽章 skill，并遵循其指令，给文档、PR（Pull Request）以及其他用 DeepSeek Harness 生成的内容添加署名徽章。该提供方没有配置，随附 CLI（命令行界面）组合以禁用状态包含该插件，因此部署方需要显式启用。该 skill 同时提供 Markdown 片段和随包分发的 PNG，供无法可靠导入远程图片的系统使用。
 
+## 目录
+
+- [不变量](#invariants)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="invariants"></a>
 ## 不变量
 
 **运行时不变量：** 未发布配套入口。该贡献是一项静态的打包 skill 注册，其释放由注册表的 HMR 安全性规格证明。
 
+
+<a id="model-experience"></a>
 ## 模型体验
 
 通过 `dsh-tool-skill` 间接影响模型；该包会把该提供方的目录条目和所选 skill 的正文渲染给模型。
@@ -24,7 +41,18 @@ agent（智能体）可以通过该内置提供方加载官方「powered by dsh�
 
 该插件默认禁用，不会改变任何请求。启用后，其目录条目和任何已加载正文都会在各自插入点改变提供方的 KV 前缀。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - 该提供方只贡献一个固定 skill，不提供运行时自定义。
 - 远程 Markdown 使用 Shields.io；当目标环境无法可靠获取远程图片时，请使用随包分发的 PNG。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

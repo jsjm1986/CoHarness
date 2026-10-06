@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-03-pi-ai-declared-provider-catalog.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-03-pi-ai-declared-provider-catalog.md
-2026-08-03-pi-ai-declared-provider-catalog.md: 571986a94c8547538b44b11510609e0000923537
-2026-08-03-pi-ai-declared-provider-catalog.zh.md: d6f616f48d71378b90238b6087dfa48700e4d911
+/agent-note-pi-ai-routes-are-declared-providers-not-catalog-lookups:
+  en: a60d163448180b90
+  zh: b2505355e2dee3bb
+/agent-note-pi-ai-routes-are-declared-providers-not-catalog-lookups/problem:
+  en: 6ff66991b8f65078
+  zh: 8e0f865bc23d66db
+/agent-note-pi-ai-routes-are-declared-providers-not-catalog-lookups/decision:
+  en: 8f92a891aca041ab
+  zh: 601795126323d94d
+/agent-note-pi-ai-routes-are-declared-providers-not-catalog-lookups/decision/snapshots-not-a-shared-collection:
+  en: b0d9845f1f74d0d8
+  zh: 54379578be9ecd3a
+/agent-note-pi-ai-routes-are-declared-providers-not-catalog-lookups/decision/the-directory-replaces-atomically:
+  en: 4ee8334b30b602c0
+  zh: 721a8b3eb772ff16
+/agent-note-pi-ai-routes-are-declared-providers-not-catalog-lookups/decision/a-capability-whose-only-level-does-nothing-is-reported-unavailable:
+  en: 2e28526fbfe4c87b
+  zh: 32a189f305bf742e
+/agent-note-pi-ai-routes-are-declared-providers-not-catalog-lookups/decision/credentials-stay-outside-pi-ai:
+  en: 00ec0761c67c440f
+  zh: fec539d212752faf
+/agent-note-pi-ai-routes-are-declared-providers-not-catalog-lookups/alternatives-considered:
+  en: 72a0bb9703015d91
+  zh: 5fe67c02b8d3a235
+/agent-note-pi-ai-routes-are-declared-providers-not-catalog-lookups/consequences:
+  en: 29008b331d2b6357
+  zh: eb391191e5dd1332
+/agent-note-pi-ai-routes-are-declared-providers-not-catalog-lookups/testing:
+  en: 0229baf467c59853
+  zh: 805ced8cbb44304b

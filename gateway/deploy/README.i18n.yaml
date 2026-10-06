@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gateway/deploy/README.md
-README.md: 782eae39f0f9a664276409ab192cf3f5a7ef3a14
-README.zh.md: bd76ba641a5e887cdda42709a7b2d77ee7cc2a7b
+/production-deployment-runbook:
+  en: bab9204fe333e354
+  zh: dda096b4b8c30c4b
+/production-deployment-runbook/prerequisites:
+  en: 2d51a5fadb66766e
+  zh: 99955f92a7d497d9
+/production-deployment-runbook/install:
+  en: 5cccb5ea9e609bd1
+  zh: 6ef396b0913ae2ae
+/production-deployment-runbook/per-user-provisioning:
+  en: 1e5a5a0691167c7a
+  zh: 3d6029d7d42b3345
+/production-deployment-runbook/database-cutover-and-rollback:
+  en: 8765a3c3b973ca05
+  zh: 4096b9a05eb923c2
+/production-deployment-runbook/android-shell-and-push-providers:
+  en: 27bfd905af326534
+  zh: e27e57ea234c3657
+/production-deployment-runbook/tls-entry-and-cutover:
+  en: e11c4cf23d729987
+  zh: 3b08f471a6e2e763
+/production-deployment-runbook/acceptance:
+  en: 6381007832bdb568
+  zh: 6e4727e1fad60137
+/production-deployment-runbook/macos-variant-launchd-tunnel-entry:
+  en: a20ac5c0443ec2df
+  zh: 9c70de64f5c40a45
+/production-deployment-runbook/upgrades-and-backup:
+  en: 7da872bec4f69148
+  zh: 83b89065f5c9cd65

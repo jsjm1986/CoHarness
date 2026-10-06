@@ -7,6 +7,7 @@
     "adb",
     "bwrap",
     "icacls",
+    "pwsh",
     "sandbox-exec",
     "uv",
     "where.exe"
@@ -23,7 +24,6 @@
     "@deepseek-ai/dsh-experimental-browser-use-runtime",
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp",
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native",
-    "@deepseek-ai/dsh-skill-office",
     "@yao-pkg/pkg",
     "@yarnpkg/cli-dist",
     "lightningcss"
@@ -89,7 +89,8 @@
         "*/tests/**/*.e2e.ts",
         "*/tests/**/*.snapshot.ts",
         "acp-agent/tests/fixtures/subagent-activation-limit.ts",
-        "headless-agent/tests/fixtures/serial-preset.ts"
+        "headless-agent/tests/fixtures/serial-preset.ts",
+        "acp-agent/tests/fixtures/shell/tool-pwsh/driver.ts"
       ],
       "project": [
         "**/*.ts"
@@ -396,6 +397,18 @@
         "src/**/*.ts"
       ]
     },
+    "packages/util/native-command": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreBinaries": [
+        "gio"
+      ]
+    },
     "packages/attachment/attachment": {
       "project": [
         "src/**/*.ts"
@@ -500,11 +513,30 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/llm/llm-deepseek": {
+    "packages/experimental/agent-team": {
       "entry": [
-        "tests/**/*.spec.ts",
-        "tests/**/*.e2e.ts",
-        "tests/messages/fixtures/history.ts"
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/experimental/speech-to-text-sensevoice": {
+      "entry": [
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "sherpa-onnx-node"
+      ]
+    },
+    "packages/experimental/schedule-bundle": {
+      "entry": [
+        "tests/**/*.spec.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -512,6 +544,26 @@
       ],
       "ignoreDependencies": [
         "@deepseek-ai/.+"
+      ]
+    },
+    "packages/experimental/voice-input-bundle": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/llm/llm-deepseek": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts",
+        "tests/fixtures/history.ts",
+        "tests/fixtures/input-history.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
       ]
     },
     "packages/llm/llm-pi-ai": {
@@ -840,6 +892,9 @@
         "@deepseek-ai/.+",
         "ws",
         "@types/ws"
+      ],
+      "ignore": [
+        "tests/profiles/headless/tests/profile-resolution.ts"
       ]
     },
     "packages/client/modules": {
@@ -954,6 +1009,10 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app"
       ]
     },
     "packages/session/session-persistence-sqlite": {
@@ -1058,18 +1117,22 @@
         "@deepseek-ai/cordis-plugin-timer",
         "metadata-lib",
         "resolution-lib",
-        "@scope/resolution-lib",
         "real-name",
         "missing-local",
         "undeclared-local",
         "conditional-lib",
         "broken-lib",
         "added-lib",
-        "legacy-missing"
+        "legacy-missing",
+        "@deepseek-ai/dsh-core",
+        "@scope/tools",
+        "left-pad",
+        "my-plugin"
       ],
       "ignoreUnresolved": [
         "./relative.cjs",
-        "#.+"
+        "#.+",
+        "./caller.cjs"
       ]
     },
     "packages/bundle/sdk-minimal": {
@@ -1127,8 +1190,14 @@
     },
     "packages/experimental/agent-team-profile": {
       "ignoreDependencies": [
-        "@deepseek-ai/dsh-experimental-agent-team",
-        "@deepseek-ai/dsh-experimental-tool-agent-team"
+        "@deepseek-ai/.+"
+      ],
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
       ]
     },
     "packages/experimental/auto-review": {
@@ -1248,7 +1317,8 @@
     "packages/api/terminal-controller": {
       "entry": [
         "tests/**/*.spec.ts",
-        "tests/**/*.e2e.ts"
+        "tests/**/*.e2e.ts",
+        "tests/remote-standin.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -1298,11 +1368,6 @@
         "tests/**/*.ts"
       ]
     },
-    "packages/experimental/agent-team-web-profile": {
-      "ignoreDependencies": [
-        "@deepseek-ai/dsh-experimental-client-ui-agent-team"
-      ]
-    },
     "packages/client/ui-settings-unarchive-sessions": {
       "entry": [
         "tests/**/*.spec.tsx"
@@ -1321,6 +1386,51 @@
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ]
+    },
+    "packages/skill/skill-office": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/session/session-format-v6-to-v7": {
+      "entry": [
+        "src/**/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "packages/client/ui-plugin-manager": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+      ],
+      "ignoreDependencies": [
+        "zod"
+      ]
+    },
+    "packages/experimental/api-speech-to-text": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "zod"
       ]
     }
   }

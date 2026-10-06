@@ -260,8 +260,10 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
         const synthetic = loaded.events.find(e => e.type === 'tool/result')
         expect(synthetic?.type === 'tool/result' && synthetic.data).toMatchObject({
           message: {
+            role: 'tool',
+            toolCallId: ToolCallId('call-x'),
+            isError: true,
             source: { kind: 'tool', callId: ToolCallId('call-x') },
-            content: [{ type: 'tool-result', toolCallId: ToolCallId('call-x'), isError: true }],
           },
           error: { code: TOOL_NOT_STARTED },
         })
@@ -306,16 +308,17 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
         expect(synthetic?.type === 'tool/result' && synthetic.data.error).toEqual({
           name: 'ToolOutcomeUnknownError', code: TOOL_OUTCOME_UNKNOWN,
         })
-        if (synthetic?.type !== 'tool/result' || synthetic.data.message.content[0].content[0]?.type !== 'text') {
+        const syntheticResult = synthetic?.type === 'tool/result' ? synthetic.data.message.content[0] : undefined
+        if (syntheticResult?.type !== 'text') {
           throw new Error('expected a text tool result')
         }
-        expect(synthetic.data.message.content[0].content[0].text).toContain('retry only if the operation is read-only or idempotent')
-        expect(synthetic.data.message.content[0].content[0].text).toContain('if it may have side effects, first verify external state or ask the user')
+        expect(syntheticResult.text).toContain('retry only if the operation is read-only or idempotent')
+        expect(syntheticResult.text).toContain('if it may have side effects, first verify external state or ask the user')
         const resumed = Session.create(m.id, loaded.events, loaded.meta)
-        const resumedResult = resumed.deriveMessages().find(message => message.content.some(block => block.type === 'tool-result'))
-        expect(resumedResult?.content[0]).toMatchObject({
-          type: 'tool-result', toolCallId: ToolCallId('call-risk'), isError: true,
-        })
+        const resumedResult = resumed.deriveMessages().find(
+          message => message.role === 'tool' && message.toolCallId === ToolCallId('call-risk'),
+        )
+        expect(resumedResult).toMatchObject({ role: 'tool', isError: true })
       } finally {
         await dispose()
       }

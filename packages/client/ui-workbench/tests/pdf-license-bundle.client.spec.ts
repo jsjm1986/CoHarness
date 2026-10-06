@@ -56,7 +56,7 @@ describe('published PDF.js licenses', () => {
       const client = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.js'], packageRoot, task.timeout)
       const pdf = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.pdf.js'], packageRoot, task.timeout)
       expect([...client.matchAll(/require\.async\("(\.\/client[^"/]*\.js)"\)/gu)].map(match => match[1]))
-        .toEqual(['./client.pdf.js'])
+        .toEqual(['./client.pdf.js', './client.LazyExcelBody.js'])
       expect(client).not.toMatch(/\brequire\("\.\/client[^"/]*\.js"\)/u)
       expect([...pdf.matchAll(/require\("(\.\/client[^"/]*\.js)"\)/gu)].map(match => match[1]))
         .toEqual([])

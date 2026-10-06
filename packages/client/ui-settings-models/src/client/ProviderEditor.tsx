@@ -225,11 +225,17 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   // catalogs declare `inputModalities`, while pi-ai rows declare `input` and
   // `reasoningEfforts`. Shared id/name/capacity checks remain in both paths,
   // but an unrelated family's fields must not block this card.
+  const ownedModels = schema.getPath(draft, ['models'])
   const modelFailure = layout === 'deepseek'
-    ? validateDeepSeekModels(schema.getPath(draft, ['models']))
+    ? validateDeepSeekModels(ownedModels)
     : layout === 'pi-ai'
-      ? validatePiAiModels(schema.getPath(draft, ['models']))
+      ? validatePiAiModels(ownedModels)
       : undefined
+  // An organization provider can never be enabled without a model, so an
+  // owned empty list is a delete-the-provider decision, not a valid write —
+  // the organization validator would reject it with a raw path message.
+  const emptyOrgModels = props.credentialScope === 'organization'
+    && Array.isArray(ownedModels) && ownedModels.length === 0
   const keyFailure = apiKeyFailure(keyDraft)
   // What a probe or a write must carry: the typed key with paste whitespace
   // removed. A blank field yields an empty string, which both call sites read
@@ -284,6 +290,12 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       /* v8 ignore next 3 -- unreachable from the card: the same failure disables submit */
       if (failure !== undefined) {
         return `${t('model')} ${String(failure.index + 1)}: ${t(failure.key)}`
+      }
+      /* v8 ignore next 3 -- unreachable from the card: the same check disables submit */
+      if (props.credentialScope === 'organization'
+        && Array.isArray(schema.getPath(next, ['models']))
+        && (schema.getPath(next, ['models']) as unknown[]).length === 0) {
+        return t('providerModelsRequired')
       }
     }
     /* v8 ignore next -- apply is only reachable from the rendered card, which required a resolved node */
@@ -525,11 +537,14 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
             {`${t('model')} ${String(modelFailure.index + 1)}: ${t(modelFailure.key)}`}
           </p>
         )}
+      {emptyOrgModels && props.credentialOnly !== true
+        ? <p className={styles['advancedHint']}>{t('providerModelsRequired')}</p>
+        : null}
       <EditorFooter
         t={t}
         busy={busy}
         submitDisabled={disabled || layout === 'unknown'
-          || (props.credentialOnly !== true && modelFailure !== undefined)
+          || (props.credentialOnly !== true && (modelFailure !== undefined || emptyOrgModels))
           || shownKeyFailure !== undefined
           || (props.credentialRequired === true && keyValue.length === 0)}
         submitLabelKey={props.submitLabelKey ?? 'apply'}

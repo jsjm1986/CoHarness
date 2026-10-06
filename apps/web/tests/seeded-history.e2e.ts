@@ -16,7 +16,7 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, ContextFormed, Message } from '@deepseek-ai/dsh-llm'
 import { deriveEventMessage, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { TokenMeter } from '@deepseek-ai/dsh-token-meter'
@@ -30,10 +30,16 @@ import {
 import { newEnglishPage, saveFailureShot } from './support.ts'
 import { normalizeAria } from './aria-normalize.ts'
 
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'fixture': { kind: 'fixture' } & ContextFormed
+  }
+}
+
 const OVERLAY = fileURLToPath(new URL('./seeded-history.overlay.yml', import.meta.url))
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/seeded-history', import.meta.url))
-const SEED = fileURLToPath(new URL('../../../snapshots/web/seeded-history/session.v6.jsonl', import.meta.url))
+const SEED = fileURLToPath(new URL('../../../snapshots/web/seeded-history/session.v7.jsonl', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/ui.expected.md', import.meta.url))
 // Command-row goldens over the same conversation after direct host commands.
 const COMMAND_ROW_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/command-row.expected.md', import.meta.url))
@@ -111,11 +117,6 @@ function withCompaction(raw: string, meter: TokenMeter): string {
         return message === null ? 0 : meter.estimateMessage(message)
       }
       const content = data.content as ContentBlock[]
-      if (row.type === 'tool/result') {
-        return meter.estimateMessage({
-          content: [{ type: 'tool-result', toolCallId: data.callId, content, isError: data.isError === true }],
-        } as unknown as Message)
-      }
       // An empty-content assistant message derives no transcript entry.
       if (row.type === 'assistant/message' && content.length === 0) return 0
       return meter.estimateMessage({ content } as unknown as Message)
@@ -151,7 +152,7 @@ function withCompaction(raw: string, meter: TokenMeter): string {
           text: '<context_checkpoint>Model-only compact checkpoint.</context_checkpoint>',
         }],
         source: {
-          kind: 'plugin', plugin: 'compact', compactionId, sourceCommandId: commandId,
+          kind: 'compact-checkpoint', compactionId, sourceCommandId: commandId,
         },
       },
       surfaceOp: { op: 'replace', startSeq: first, endSeq: last },
@@ -208,7 +209,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   }, 120_000)
 
@@ -306,7 +307,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // sidebar open above on purpose: a bounded cold page serves only the
     // persisted projection cache, which a never-opened seed has not written,
     // so the baseline the client actually renders is the attached fold.
-    const response = await fetch(`${scaffold.baseUrl}/api/session.history`, {
+    const response = await scaffold.hostFetch('/api/session.history', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -496,9 +497,9 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // where neither half repeats the other (the dispatched `/` and its
     // argument stay out of the title, and the settlement text never restates
     // the command's own name).
-    await page.getByRole('button', { name: 'Access mode, current: Workspace Write' }).click()
-    await page.getByRole('menuitem', { name: 'Read Only' }).click()
-    await page.getByRole('button', { name: 'Access mode, current: Read Only' }).waitFor({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Access mode, current: Workspace write' }).click()
+    await page.getByRole('menuitem', { name: 'Read only' }).click()
+    await page.getByRole('button', { name: 'Access mode, current: Read only' }).waitFor({ timeout: 10_000 })
     // Scoped to the row itself, so unrelated page text that happens to read
     // `permission` (a future resident slash menu) cannot satisfy or break it.
     const row = page.locator('[data-variant="others"]').filter({ hasText: 'preset read-only' })
@@ -553,7 +554,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     if (agent === undefined) throw new Error('seeded session did not attach an agent')
     agent.session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'Short injected context.' }],
-      source: { kind: 'plugin', plugin: 'fixture' },
+      source: { kind: 'fixture' },
     }), { surfaceOp: 'append' })
 
     const disclosure = page.getByRole('button', { name: 'Context injection fixture', exact: true })
@@ -584,7 +585,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     const actual = normalizeAria(raw, scaffold.workspaceCwd)
     expect(actual).toBe(raw)
     expect(normalizeAria(raw.replace('45s', '46s'), scaffold.workspaceCwd)).not.toBe(actual)
-    expect(await page.getByRole('group', { name: 'Message timing', exact: true }).count()).toBeGreaterThan(0)
+    expect(await page.getByRole('group', { name: 'Message time and speed', exact: true }).count()).toBeGreaterThan(0)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'literal-values.expected.md'), actual, MODE)
   })
 

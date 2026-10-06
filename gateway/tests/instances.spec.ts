@@ -3,17 +3,26 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { loadConfig } from '../src/config.ts'
+import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
-import { InstanceManager, RuntimeLeaseUnavailableError } from '../src/instances.ts'
-import type { InstanceRepository, RuntimeTarget } from '../src/instances.ts'
+import { InstanceManager, RuntimeLeaseUnavailableError, RuntimeStartBlockedError } from '../src/instances.ts'
+import type { InstanceRepository, RuntimeTarget, RuntimeStopReason } from '../src/instances.ts'
 import type { InstanceProc } from '../src/launcher.ts'
+import { runtimeRelay } from './runtime-relay.ts'
 import { UserService } from '../src/users.ts'
 
 const FAKE_DSH = `const fs=require('fs'),crypto=require('crypto'),http=require('http');const c=JSON.parse(fs.readFileSync(3,'utf8'));const material=(kind,nonce)=>'dsh-gateway-readiness-v1\\0'+kind+'\\0'+nonce+'\\0'+c.runtime.kind+'\\0'+String(c.runtime.id)+'\\0'+String(c.runtime.generation);const proof=(kind,nonce)=>crypto.createHmac('sha256',c.token).update(material(kind,nonce)).digest('base64url');http.createServer((q,s)=>{if(q.url==='/exit'){s.end('bye');process.exit(0);return}if(q.url==='/api/internal/gateway/readiness'){const nonce=q.headers['x-dsh-gateway-readiness-nonce'];const request=q.headers['x-dsh-gateway-readiness-request'];if(typeof nonce!=='string'||request!==proof('request',nonce)){s.statusCode=403;s.end();return}s.setHeader('content-type','application/json');s.end(JSON.stringify({version:1,runtime:c.runtime,proof:proof('response',nonce)}));return}s.end('ok')}).listen(Number(process.argv[1]),'127.0.0.1')`
 
 let manager: InstanceManager | undefined
-afterEach(async () => { await manager?.stopAll() })
+const isolatedCleanup: Array<() => void | Promise<void>> = []
+afterEach(async () => {
+  const failures: unknown[] = []
+  try { await manager?.stopAll() } catch (error) { failures.push(error) }
+  for (const cleanup of isolatedCleanup.splice(0).reverse()) {
+    try { await cleanup() } catch (error) { failures.push(error) }
+  }
+  if (failures.length > 0) throw new AggregateError(failures, 'Instance fixture cleanup failed')
+})
 
 async function setup(extraEnv: Record<string, string> = {}) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
@@ -59,7 +68,7 @@ async function setup(extraEnv: Record<string, string> = {}) {
     '',
   ].join('\n'))
   const db = openDb(join(root, 'g.sqlite'))
-  const cfg = loadConfig({
+  const cfg = testConfig(root, {
     HGW_USERS_ROOT: join(root, 'users'),
     HGW_PROJECT_RUNTIMES_ROOT: join(root, 'project-runtimes'),
     HGW_DSH_REPO_ROOT: root,
@@ -74,19 +83,36 @@ async function setup(extraEnv: Record<string, string> = {}) {
   return { root, db, cfg, users, alice, manager }
 }
 
+async function setupIsolated() {
+  const fixture = await setup()
+  isolatedCleanup.push(() => rmSync(fixture.root, { recursive: true, force: true }))
+  isolatedCleanup.push(() => { fixture.db.close() })
+  const portFile = join(fixture.root, 'child-port')
+  const port = await runtimeRelay(portFile, dispose => { isolatedCleanup.push(dispose) })
+  fixture.db.prepare('UPDATE instances SET port=? WHERE user_id=?').run(port, fixture.alice.id)
+  const source = FAKE_DSH.replace(".listen(Number(process.argv[1]),'127.0.0.1')",
+    ".listen(0,'127.0.0.1',function(){fs.writeFileSync(process.argv[1],String(this.address().port))})")
+  fixture.cfg.dshCommand = [process.execPath, '-e', source, portFile]
+  return fixture
+}
+
 class ProjectRepository implements InstanceRepository {
   private state = 'stopped'
   private generation = 0
+  private reason: RuntimeStopReason | null = null
 
   constructor(private readonly projectPath: string, private readonly port: number) {}
 
   initialize(): Promise<void> { return Promise.resolve() }
   portOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.port) }
   stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve(this.state) }
+  stopReasonOf(_target: RuntimeTarget): Promise<RuntimeStopReason | null> { return Promise.resolve(this.reason) }
+  startEligibility(_target: RuntimeTarget): Promise<{ stopReason: RuntimeStopReason | null }> { return Promise.resolve({ stopReason: this.reason }) }
   generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.generation) }
   touch(_target: RuntimeTarget, _at: number): Promise<void> { return Promise.resolve() }
   beginStart(_target: RuntimeTarget, _at: number, _runtimeTokenHash: Buffer): Promise<number> {
     this.state = 'starting'
+    this.reason = null
     this.generation += 1
     return Promise.resolve(this.generation)
   }
@@ -96,7 +122,8 @@ class ProjectRepository implements InstanceRepository {
   }
   idleTargets(_cutoff: number): Promise<RuntimeTarget[]> { return Promise.resolve([]) }
   idleTarget(_target: RuntimeTarget, _cutoff: number): Promise<boolean> { return Promise.resolve(false) }
-  markStopping(_target: RuntimeTarget): Promise<void> {
+  markStopping(_target: RuntimeTarget, reason: RuntimeStopReason = 'manual'): Promise<void> {
+    this.reason = reason
     this.state = 'stopping'
     return Promise.resolve()
   }
@@ -127,6 +154,8 @@ class SurvivorRepository implements InstanceRepository {
   initialize(_instancesOutliveGateway: boolean): Promise<void> { return Promise.resolve() }
   portOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(this.port) }
   stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve('ready') }
+  stopReasonOf(_target: RuntimeTarget): Promise<RuntimeStopReason | null> { return Promise.resolve(null) }
+  startEligibility(_target: RuntimeTarget): Promise<{ stopReason: null }> { return Promise.resolve({ stopReason: null }) }
   generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(7) }
   touch(_target: RuntimeTarget, _at: number): Promise<void> { return Promise.resolve() }
   beginStart(_target: RuntimeTarget, _at: number, _runtimeTokenHash: Buffer): Promise<number> {
@@ -158,6 +187,8 @@ class FailingStopRepository implements InstanceRepository {
   initialize(): Promise<void> { return Promise.resolve() }
   portOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(43100) }
   stateOf(_target: RuntimeTarget): Promise<string> { return Promise.resolve('ready') }
+  stopReasonOf(_target: RuntimeTarget): Promise<RuntimeStopReason | null> { return Promise.resolve(null) }
+  startEligibility(_target: RuntimeTarget): Promise<null> { return Promise.resolve(null) }
   generationOf(_target: RuntimeTarget): Promise<number> { return Promise.resolve(1) }
   touch(_target: RuntimeTarget, _at: number): Promise<void> { return Promise.resolve() }
   beginStart(): Promise<number> { throw new Error('stopAll regression never starts runtimes') }
@@ -283,7 +314,7 @@ describe('InstanceManager', () => {
     }))
     writeFileSync(join(peerDir, 'index.js'), "export default 'profile-peer'\n")
 
-    await manager.ensureRunning(alice)
+    await manager.ensureRunning(alice, 'explicit')
     // The bundle patch becomes the instance's home-level user layer, applied
     // by dsh over every profile without touching the launch argv.
     expect(readFileSync(join(dshHome, 'cordis.patch.yml'), 'utf8')).toBe(
@@ -308,7 +339,7 @@ describe('InstanceManager', () => {
 
     writeFileSync(join(root, 'plugins', 'dsh-model-governance', 'lib', 'index.js'), 'export default \'refreshed\'\n')
     await manager.stop(alice.id)
-    await manager.ensureRunning(alice)
+    await manager.ensureRunning(alice, 'explicit')
     expect(readFileSync(join(modules, 'dsh-model-governance', 'lib', 'index.js'), 'utf8')).toBe(
       "export default 'refreshed'\n",
     )
@@ -417,13 +448,13 @@ describe('InstanceManager', () => {
     const seed = join(root, 'company.env')
     writeFileSync(seed, 'DEEPSEEK_API_KEY=company-key\n')
     cfg.defaultEnvFile = seed
-    await manager.ensureRunning(alice)
+    await manager.ensureRunning(alice, 'explicit')
     const target = join(root, 'users', 'alice', 'dsh', '.env')
     expect(readFileSync(target, 'utf8')).toBe('DEEPSEEK_API_KEY=company-key\n')
     // Rotation: a changed company file reaches the instance on its next start.
     writeFileSync(seed, 'DEEPSEEK_API_KEY=rotated\n')
     await manager.stop(alice.id)
-    await manager.ensureRunning(alice)
+    await manager.ensureRunning(alice, 'explicit')
     expect(readFileSync(target, 'utf8')).toBe('DEEPSEEK_API_KEY=rotated\n')
   })
 
@@ -460,13 +491,74 @@ describe('InstanceManager', () => {
     expect(await manager.stateOf(alice.id)).not.toBe('ready')
   })
 
+  it('preserves a manual stop across manager reconstruction and permits only an explicit start', async () => {
+    const { alice, db, cfg, manager: first } = await setupIsolated()
+    await first.ensureRunning(alice)
+    await first.stop(alice.id)
+    manager = new InstanceManager(db, cfg)
+    await manager.stop(alice.id, 'access-change')
+    expect(await manager.stopReasonOf(alice.id)).toBe('manual')
+    await expect(manager.ensureRunning(alice)).rejects.toBeInstanceOf(RuntimeStartBlockedError)
+    await expect(manager.ensureRunning(alice, 'webhook')).rejects.toBeInstanceOf(RuntimeStartBlockedError)
+    expect(await manager.isLive(alice.id)).toBe(false)
+    await manager.ensureRunning(alice, 'explicit')
+    expect(await manager.isLive(alice.id)).toBe(true)
+    expect(await manager.stopReasonOf(alice.id)).toBeNull()
+  })
+
+  it('records idle reaping and allows an authorized webhook start', async () => {
+    const { alice, db, manager } = await setupIsolated()
+    await manager.ensureRunning(alice)
+    db.prepare('UPDATE instances SET last_activity_at=0 WHERE user_id=?').run(alice.id)
+    expect(await manager.reapIdle()).toBe(1)
+    expect(await manager.stopReasonOf(alice.id)).toBe('idle')
+    await manager.ensureRunning(alice, 'webhook')
+    expect(await manager.isLive(alice.id)).toBe(true)
+    await manager.stop(alice.id, 'shutdown')
+    await expect(manager.ensureRunning(alice, 'webhook')).rejects.toBeInstanceOf(RuntimeStartBlockedError)
+  })
+
+  it('refuses maintenance admission before generating or spawning a runtime', async () => {
+    const { alice, manager } = await setupIsolated()
+    manager.startAdmission = async () => { throw new RuntimeStartBlockedError('maintenance') }
+    await expect(manager.ensureRunning(alice, 'explicit')).rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE' })
+    expect(await manager.stateOf(alice.id)).toBe('stopped')
+    expect(await manager.isLive(alice.id)).toBe(false)
+  })
+
+  it.each(['disabled', 'deleted'] as const)('does not offer an explicit-start bypass for a %s SQLite owner', async state => {
+    const { alice, db, manager } = await setupIsolated()
+    if (state === 'disabled') db.prepare("UPDATE users SET status='disabled' WHERE id=?").run(alice.id)
+    else db.prepare('UPDATE users SET deleted_at=? WHERE id=?').run(Date.now(), alice.id)
+    for (const intent of ['passive', 'explicit'] as const) {
+      await expect(manager.ensureRunning(alice, intent)).rejects.toMatchObject({
+        code: 'INSTANCE_UNAVAILABLE', reason: 'unavailable',
+      })
+      expect(await manager.stateOf(alice.id)).toBe('stopped')
+      expect(await manager.isLive(alice.id)).toBe(false)
+    }
+  })
+
+  it('classifies a disabled manual-stop owner from current rows before touching its runtime files', async () => {
+    const { alice, db, root, manager } = await setupIsolated()
+    await manager.stop(alice.id, 'manual')
+    db.prepare("UPDATE users SET status='disabled' WHERE id=?").run(alice.id)
+    expect(alice.status).toBe('active')
+    for (const intent of ['passive', 'webhook'] as const) {
+      await expect(manager.ensureRunning(alice, intent)).rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE', reason: 'unavailable' })
+      expect(await manager.isLive(alice.id)).toBe(false)
+    }
+    expect(existsSync(join(root, 'users', alice.username, 'dsh', 'profiles', 'web'))).toBe(false)
+    expect(await manager.stopReasonOf(alice.id)).toBe('manual')
+  })
+
   it('serializes concurrent stop and ensureRunning so state and process stay consistent (no orphan)', async () => {
     const { alice, manager } = await setup()
     await manager.ensureRunning(alice)
     const port = await manager.portOf(alice.id)
 
     // stop enqueued before ensureRunning: final state is ready, and it is reachable.
-    await Promise.all([manager.stop(alice.id), manager.ensureRunning(alice)])
+    await Promise.all([manager.stop(alice.id), manager.ensureRunning(alice, 'explicit')])
     expect(await manager.stateOf(alice.id)).toBe('ready')
     expect((await fetch(`http://127.0.0.1:${port}/`)).status).toBe(200)
 
@@ -498,7 +590,7 @@ describe('InstanceManager', () => {
     await entered
 
     let restarted = false
-    const restart = manager.ensureRunning(project).then((result) => {
+    const restart = manager.ensureRunning(project, 'explicit').then((result) => {
       restarted = true
       return result
     })
@@ -538,10 +630,10 @@ describe('InstanceManager', () => {
     const target = { kind: 'project' as const, id: project.id }
     const projectManager = new InstanceManager(new ProjectRepository(projectPath, 43240), cfg)
     manager = projectManager
-    const first = await projectManager.ensureRunning(project)
+    const first = await projectManager.ensureRunning(project, 'explicit')
     await projectManager.operationRef(target, 1, first.generation)
     await projectManager.stop(target)
-    const second = await projectManager.ensureRunning(project)
+    const second = await projectManager.ensureRunning(project, 'explicit')
     expect(second.generation).toBeGreaterThan(first.generation)
     await projectManager.operationRef(target, 1, second.generation)
     await projectManager.operationRef(target, -1, first.generation)
@@ -552,5 +644,108 @@ describe('InstanceManager', () => {
     // Keep the original setup manager from retaining an unused process map in
     // case the fixture changes its default cleanup order later.
     await initialManager.stopAll()
+  })
+
+  it('reattaches a supervisor-owned ready runtime in isLive without launching it', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'live-survivor')
+    mkdirSync(projectPath, { recursive: true })
+    const attached = {
+      hasExited: () => false,
+      isAlive: vi.fn(async () => true),
+      terminate: vi.fn(async () => {}),
+    }
+    const launcher = {
+      instancesOutliveGateway: true,
+      start: async () => { throw new Error('isLive must never launch a new generation') },
+      attach: vi.fn(() => attached),
+    }
+    const liveManager = new InstanceManager(
+      new SurvivorRepository(projectPath, 43260),
+      cfg,
+      launcher,
+      { principalPublicKey: '' },
+    )
+    manager = liveManager
+    expect(await liveManager.isLive({ kind: 'project', id: 41 })).toBe(true)
+    expect(launcher.attach).toHaveBeenCalledTimes(1)
+    expect(attached.isAlive).toHaveBeenCalled()
+    expect(await liveManager.isLive({ kind: 'project', id: 41 })).toBe(true)
+    expect(launcher.attach).toHaveBeenCalledTimes(1)
+    await liveManager.stopAll()
+    expect(attached.terminate).not.toHaveBeenCalled()
+  })
+
+  it('does not publish a supervisor handle whose durable state moved on during attach', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'moving-survivor')
+    mkdirSync(projectPath, { recursive: true })
+    let state = 'ready'
+    const repository = new (class extends SurvivorRepository {
+      override stateOf(): Promise<string> { return Promise.resolve(state) }
+    })(projectPath, 43261)
+    const attached = {
+      hasExited: () => false,
+      isAlive: vi.fn(async () => true),
+      terminate: vi.fn(async () => {}),
+    }
+    const launcher = {
+      instancesOutliveGateway: true,
+      start: async () => { throw new Error('isLive must never launch a new generation') },
+      attach: () => {
+        state = 'stopping'
+        return attached
+      },
+    }
+    const liveManager = new InstanceManager(repository, cfg, launcher, { principalPublicKey: '' })
+    manager = liveManager
+    expect(await liveManager.isLive({ kind: 'project', id: 41 })).toBe(false)
+    expect(attached.isAlive).not.toHaveBeenCalled()
+  })
+
+  it('keeps a ready row not-live when the launcher does not outlive the Gateway', async () => {
+    const { root, cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const projectPath = join(root, 'local-row')
+    mkdirSync(projectPath, { recursive: true })
+    const launcher = {
+      instancesOutliveGateway: false,
+      start: async () => { throw new Error('isLive must never launch') },
+      attach: vi.fn(() => ({ hasExited: () => false, isAlive: async () => true, terminate: async () => {} })),
+    }
+    const liveManager = new InstanceManager(
+      new SurvivorRepository(projectPath, 43262),
+      cfg,
+      launcher,
+      { principalPublicKey: '' },
+    )
+    manager = liveManager
+    expect(await liveManager.isLive({ kind: 'project', id: 41 })).toBe(false)
+    expect(launcher.attach).not.toHaveBeenCalled()
+  })
+
+  it('rolls back a lease admission when the durable touch fails', async () => {
+    const { cfg } = await setup({ HGW_GUARD_PATCH: 'off' })
+    const repository = new (class extends FailingStopRepository {
+      override touch(): Promise<void> { return Promise.reject(new Error('durable touch failed')) }
+    })(new Set<number>())
+    const touchManager = new InstanceManager(repository, cfg)
+    manager = touchManager
+    await expect(touchManager.wsRef({ kind: 'user', id: 1 }, 1)).rejects.toThrow('durable touch failed')
+    expect(touchManager['wsRefs'].size).toBe(0)
+    expect(touchManager['wsTotals'].size).toBe(0)
+  })
+
+  it('keeps a lease release applied when the durable touch fails', async () => {
+    const { db, alice, manager } = await setup()
+    db.prepare(`UPDATE instances SET state='ready' WHERE user_id=?`).run(alice.id)
+    await manager.wsRef(alice.id, 1)
+    await manager.operationRef(alice.id, 1)
+    db.prepare('DROP TABLE instances').run()
+    await expect(manager.wsRef(alice.id, -1)).rejects.toThrow()
+    await expect(manager.operationRef(alice.id, -1)).rejects.toThrow()
+    expect(manager['wsRefs'].size).toBe(0)
+    expect(manager['wsTotals'].size).toBe(0)
+    expect(manager['operationRefs'].size).toBe(0)
+    expect(manager['operationTotals'].size).toBe(0)
   })
 })

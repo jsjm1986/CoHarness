@@ -20,14 +20,13 @@ export function apply(ctx: Context): void {
     const args = exec.arguments as { run_in_background?: boolean } | undefined
     if (exec.name !== 'bash' || args?.run_in_background !== true) return next()
     const jobs = exec.agent?.ctx.get('jobs')
-    if (jobs === undefined) return next()
-    const dispose = jobs.onJobsChanged((owner) => {
-      for (const job of jobs.list(owner)) {
-        if (job.status !== 'running' || held.has(job.id)) continue
-        held.add(job.id)
-        // Teardown can reject the detached wait; the waiter only matters while live.
-        void jobs.wait(job.id, 600_000, owner).catch(() => {})
-      }
+    const owner = exec.agent?.id
+    if (jobs === undefined || owner === undefined) return next()
+    const dispose = jobs.events.subscribe({ owner }, (event) => {
+      if (event.type !== 'registered' || event.job.status !== 'running' || held.has(event.job.id)) return
+      held.add(event.job.id)
+      // Teardown can reject the detached wait; the waiter only matters while live.
+      void jobs.wait(event.job.id, 600_000, owner).catch(() => {})
     })
     try { return await next() } finally { dispose() }
   }, { global: true })

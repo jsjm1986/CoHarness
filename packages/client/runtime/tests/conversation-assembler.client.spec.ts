@@ -1066,7 +1066,7 @@ describe('ConversationNodeAssembler', () => {
     )).toThrow(/Definition "undefined-update" returned undefined from update/)
   })
 
-  it('rejects a duplicate start before mutating the existing Context', () => {
+  it('folds a superseding durable start through update without replacing the Context', () => {
     const definition: ConversationNodeDefinition<number> = {
       kind: 'single-start',
       match: event => (event.type as string) === 'command/run' ? { id: 'one', role: 'start' } : null,
@@ -1084,9 +1084,9 @@ describe('ConversationNodeAssembler', () => {
     ], false)
     assembler.flush()
 
-    expect(() => assembler.append(
-      input(at(2, 'command/run', { commandId: 'two', name: 'x' })),
-    )).toThrow(/received more than one start Match/)
+    // A second start-roled Match — a transient start superseded by a durable
+    // one — updates the already-started Context instead of throwing.
+    assembler.append(input(at(2, 'command/run', { commandId: 'two', name: 'x' })))
     assembler.flush()
     expect([...chatSnapshot(assembler)?.nodes.values() ?? []][0]?.data).toBe(1)
   })

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-29-web-fetch-public-network-pinning.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-29-web-fetch-public-network-pinning.md
-2026-08-29-web-fetch-public-network-pinning.md: e5ed6480375329064a4506943c29814a880d1ece
-2026-08-29-web-fetch-public-network-pinning.zh.md: bcbe88363c178e35582197e21fd3d777a2d656dd
+/agent-note-pin-webfetch-requests-to-validated-public-addresses:
+  en: f88900a294bb756b
+  zh: 9e91283853261be3
+/agent-note-pin-webfetch-requests-to-validated-public-addresses/problem:
+  en: 6850a62b0287d8f6
+  zh: dfc30db37c31508c
+/agent-note-pin-webfetch-requests-to-validated-public-addresses/decision:
+  en: be4162328dcb569b
+  zh: 7af89bc2c18cc6fa
+/agent-note-pin-webfetch-requests-to-validated-public-addresses/alternatives-considered:
+  en: 1cd4cbec7cd4663d
+  zh: 1efb71e7efcaf3eb
+/agent-note-pin-webfetch-requests-to-validated-public-addresses/consequences:
+  en: 7a093fe4811cbeba
+  zh: 929b8884469f0537
+/agent-note-pin-webfetch-requests-to-validated-public-addresses/testing:
+  en: 63aa779a3a8448a8
+  zh: 5931aa6d3c941a0e

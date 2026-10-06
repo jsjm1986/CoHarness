@@ -16,7 +16,7 @@ const EXACT_DIR = fileURLToPath(new URL('./snapshots/diff-context', import.meta.
 const BOUNDED_DIR = fileURLToPath(new URL('./snapshots/diff-bounded', import.meta.url))
 // The ACP owner retains its live recording. The bounded script is authored upstream;
 // both replace only model responses while this browser scenario executes the real tools.
-const EXACT_FIXTURE = fileURLToPath(new URL('../../../examples/acp-agent/tests/snapshots/fs-edit/session.v6.jsonl', import.meta.url))
+const EXACT_FIXTURE = fileURLToPath(new URL('../../../examples/acp-agent/tests/snapshots/fs-edit/session.v7.jsonl', import.meta.url))
 const BOUNDED_FIXTURE = join(BOUNDED_DIR, 'session.v3.jsonl')
 const UNTOUCHED = Buffer.from('unrelated file\r\nkeep these bytes\n', 'utf8')
 const settings = (prefix: string): string =>
@@ -57,7 +57,7 @@ describe.skipIf(MODE === 'record').each(CASES)('web e2e: $name', (scenario) => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
   })
 
@@ -87,7 +87,7 @@ describe.skipIf(MODE === 'record').each(CASES)('web e2e: $name', (scenario) => {
     const result = events.find(event => event.type === 'tool/result'
       && event.data.message.source.callId === editCall.data.callId)
     if (result?.type !== 'tool/result') throw new Error('the real edit produced no durable result')
-    expect(result.data.message.content[0].isError).toBe(false)
+    expect(result.data.message.isError).toBe(false)
     expect(result.data.meta).toEqual({
       diffs: [{ path: scenario.file, oldText: scenario.before.slice(0, -1), newText: scenario.after.slice(0, -1) }],
     })

@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/typert/generator/README.md
-README.md: 472c04347035e048bbf61c2fa25ca42cc0f36f98
-README.zh.md: 209f762003d6975ab85f9f75fa382a21512ec16b
+/:
+  en: 8beedff947acac51
+  zh: 0a51af1cad6486b4
+/deepseek-ai-dsh-typert-generator:
+  en: 6e829c0da0a0bf61
+  zh: ffc0b0f548309053
+/deepseek-ai-dsh-typert-generator/summary:
+  en: c481285bb066ad9f
+  zh: b5d9e32c7747f04a
+/deepseek-ai-dsh-typert-generator/table-of-contents:
+  en: 9cc88b0a61cf31ef
+  zh: e439612a5f040854
+/deepseek-ai-dsh-typert-generator/analysis-model:
+  en: 9ba7f7bba8555d2d
+  zh: 37fd56c2c93a457a
+/deepseek-ai-dsh-typert-generator/emission-and-opt-in-publication:
+  en: d0c07968aceb3508
+  zh: f234e6c216e28571
+/deepseek-ai-dsh-typert-generator/repository-specific-cordis-projection:
+  en: 7eee571694af672d
+  zh: d1922320c67f59d8
+/deepseek-ai-dsh-typert-generator/invariants:
+  en: da3a24f7f381a949
+  zh: cc73ac5e08655cb8
+/deepseek-ai-dsh-typert-generator/model-experience:
+  en: e6641e8b5e5f42ca
+  zh: 2fdc0d3fde7e9216
+/deepseek-ai-dsh-typert-generator/model-experience/kv-cache-effect:
+  en: 09310605f7d136d4
+  zh: be1897b8a12a5389
+/deepseek-ai-dsh-typert-generator/known-limitations-and-deferred-work:
+  en: 115ecd0c51bcbf0b
+  zh: e29b99c2066e693b
+/deepseek-ai-dsh-typert-generator/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

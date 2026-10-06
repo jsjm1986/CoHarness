@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isIP } from 'node:net'
 import type { Duplex } from 'node:stream'
-import httpProxy from 'http-proxy'
+import * as httpProxy from 'http-proxy-3'
 import { writeRuntimeGrantsFile } from './apply-grants.ts'
 import {
   ensureModelGovernanceForProject,
@@ -10,8 +10,8 @@ import {
   writeProjectModelGovernanceFile,
 } from './apply-model-governance.ts'
 import type { UserRow } from './auth.ts'
-import { waitingPage } from './html.ts'
-import { RuntimeLeaseUnavailableError, type RuntimeTarget } from './instances.ts'
+import { gateCopy, gateLanguage, stoppedPage, waitingPage } from './html.ts'
+import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayRequestContext, type ProxyHandler, type UpgradeHandler } from './server.ts'
@@ -89,8 +89,8 @@ export function createProxyHandlers(
   const unsubscribeAccess = deps.accessMonitor?.subscribe(async (subject) => {
     invalidateAccess(subject)
     if (subject.restartRuntime !== true) return
-    if (subject.userId !== undefined) await instances.stop({ kind: 'user', id: subject.userId })
-    if (subject.projectId !== undefined) await instances.stop({ kind: 'project', id: subject.projectId })
+    if (subject.userId !== undefined) await instances.stop({ kind: 'user', id: subject.userId }, 'access-change')
+    if (subject.projectId !== undefined) await instances.stop({ kind: 'project', id: subject.projectId }, 'access-change')
   })
 
   async function revalidate(token: string | undefined, context: GatewayRequestContext): Promise<boolean> {
@@ -132,16 +132,25 @@ export function createProxyHandlers(
     if (runtime.user !== undefined) {
       writeRuntimeGrantsFile(runtime.dshHome, await runtimeDirectoryGrants(runtime.user, projects), cfg.usersRoot)
       if (deps.governance !== undefined) await writeModelGovernanceFile(cfg, deps.governance, runtime.user)
-      return
+    } else {
+      if (runtime.project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
+      writeRuntimeGrantsFile(runtime.dshHome, [{
+        path: runtime.project.path,
+        mode: 'rw',
+        label: runtime.project.name,
+      }], cfg.projectRuntimesRoot)
+      if (deps.governance !== undefined) {
+        await writeProjectModelGovernanceFile(cfg, deps.governance, runtime.project)
+      }
     }
-    if (runtime.project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
-    writeRuntimeGrantsFile(runtime.dshHome, [{
-      path: runtime.project.path,
-      mode: 'rw',
-      label: runtime.project.name,
-    }], cfg.projectRuntimesRoot)
-    if (deps.governance !== undefined) {
-      await writeProjectModelGovernanceFile(cfg, deps.governance, runtime.project)
+    if (deps.pluginState !== undefined) {
+      // Desired state is newer than what this instance last applied when the
+      // manager's write-back already carried it: only pending revisions write.
+      const pending = await deps.pluginState.projection(runtime.target)
+      if (pending !== null && pending !== 'current') {
+        await deps.pluginState.project(runtime.dshHome, pending.state)
+        await deps.pluginState.markApplied(runtime.target, pending.revision)
+      }
     }
   }
   instances.beforeUse = async (runtime): Promise<void> => {
@@ -157,6 +166,18 @@ export function createProxyHandlers(
     ? { kind: 'user', id: context.runtime.id }
     : { kind: 'project', id: context.runtime.id }
 
+  function refuseStopped(req: IncomingMessage, res: ServerResponse, target: RuntimeTarget): void {
+    res.setHeader('cache-control', 'no-store')
+    const lang = gateLanguage(req.headers.cookie)
+    if (wantsHtml(req)) {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      res.end(stoppedPage(target, lang))
+    } else {
+      res.writeHead(409, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: { code: 'INSTANCE_STOPPED', message: `${gateCopy(lang)('stoppedHeading')} ${gateCopy(lang)('stoppedBody')}` } }))
+    }
+  }
+
   async function ensureReady(
     req: IncomingMessage,
     res: ServerResponse | null,
@@ -166,12 +187,21 @@ export function createProxyHandlers(
     // Trust the live handle, not the `ready` row: an external kill or crash
     // leaves the row stale, and proxying that port yields instance-unreachable.
     if (!await instances.isLive(target)) {
+      if (await instances.stopReasonOf(target) === 'manual') {
+        if (res !== null) refuseStopped(req, res, target)
+        return null
+      }
+      const gate = await deps.maintenanceGate?.()
+      if (gate !== undefined && gate !== 'open') {
+        if (res !== null) { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: gate })) }
+        return null
+      }
       const pending = instances.ensureRunning(context.runtime)
       if (res !== null) {
         const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
         if (wantsHtml(req)) {
           res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...retryHeaders })
-          res.end(waitingPage())
+          res.end(waitingPage(gateLanguage(req.headers.cookie)))
         } else {
           res.writeHead(503, { 'content-type': 'application/json', ...retryHeaders })
           res.end(JSON.stringify({
@@ -235,11 +265,16 @@ export function createProxyHandlers(
         } else {
           await instances.touch(ready.target)
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof RuntimeStartBlockedError) {
+          if (error.code === 'INSTANCE_STOPPED') refuseStopped(req, res, ready.target)
+          else { res.writeHead(503, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: error.reason })) }
+          return
+        }
         const retryHeaders = { 'cache-control': 'no-store', 'retry-after': '2' }
         if (wantsHtml(req)) {
           res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...retryHeaders })
-          res.end(waitingPage())
+          res.end(waitingPage(gateLanguage(req.headers.cookie)))
         } else {
           res.writeHead(503, { 'content-type': 'application/json', ...retryHeaders })
           res.end(JSON.stringify({
@@ -293,6 +328,14 @@ export function createProxyHandlers(
         }
         res.once('finish', finish)
         res.once('close', finish)
+        // Attribute client disconnects: the public tunnel logs a generic
+        // "context canceled" without the path, so a close before the response
+        // completes gets its own line naming the canceled request.
+        res.once('close', () => {
+          if (!res.writableFinished) {
+            console.error(`[gateway] client disconnected mid-response: ${req.method} ${pathname} -> ${ready.target.kind} ${String(ready.target.id)}`)
+          }
+        })
         try {
           server.web(req, res, targetOptions(ready.port, principal), () => {
             if (!res.headersSent) {

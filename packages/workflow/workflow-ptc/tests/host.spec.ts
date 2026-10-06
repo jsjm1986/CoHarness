@@ -1,3 +1,4 @@
+import type { ExecutionInheritance, ExecutionInputId, ExecutionScopeId } from '@deepseek-ai/dsh-execution-authority'
 import { Context } from '@deepseek-ai/cordis'
 import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
 import type { PtcBindingFunction, PtcRunRequest, PtcRunResult, PtcRunSpec } from '@deepseek-ai/dsh-ptc-runtime'
@@ -56,6 +57,35 @@ async function setup(execute?: (bindings: HostBindings, spec: PtcRunSpec) => Pro
 }
 
 describe('workflow host callback validation', () => {
+  it('binds delayed worker child requests to the workflow initiator', async () => {
+    const entered = Promise.withResolvers<undefined>(), resume = Promise.withResolvers<undefined>()
+    const f = await setup(async (bindings) => {
+      entered.resolve(undefined)
+      await resume.promise
+      await bindings.startChild!({ prompt: 'delegated after another human request' })
+      return completed
+    })
+    const original: ExecutionInheritance = { parentSessionId: f.parent.id,
+      scopeId: '10000000-0000-4000-8000-000000000001' as ExecutionScopeId,
+      inputs: ['00000000-0000-4000-8000-000000000001' as ExecutionInputId], primaryActorUserId: 1, unverifiedHistory: false }
+    let current = original
+    const bind = vi.fn((_agent: unknown, scope: ExecutionInheritance, work: () => unknown) => {
+      expect(scope).toEqual(original)
+      const latest = current
+      current = scope
+      try { return work() } finally { current = latest }
+    })
+    f.ctx.provide('executionAuthority', { capture: () => current, runCaptured: bind } as never)
+    const run = f.start()
+    await entered.promise
+    current = { ...original, primaryActorUserId: 2 }
+    resume.resolve(undefined)
+    try {
+      expect((await run.result).stopReason).toBe('completed')
+      expect(bind).toHaveBeenCalledOnce()
+    } finally { await run.dispose() }
+  })
+
   it.each([
     ['startChild', null, 'requires an object'],
     ['startChild', [], 'requires an object'],

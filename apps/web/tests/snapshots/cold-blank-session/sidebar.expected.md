@@ -1,1 +1,3 @@
-- tree "Sessions": No sessions yet
+- tree "Sessions":
+  - img
+  - text: No sessions yet

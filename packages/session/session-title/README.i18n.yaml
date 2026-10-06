@@ -1,6 +1,46 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/session/session-title/README.md
-README.md: 26f3b3ca344783b988661d1fc69cb519cfcdf354
-README.zh.md: f7df3b0edda1eceb4f343350836c86380a3eb737
+/:
+  en: adc15846d0fb229b
+  zh: 61495d48365178df
+/deepseek-ai-dsh-session-title:
+  en: 4c9192d741e1b444
+  zh: 45d620411991a160
+/deepseek-ai-dsh-session-title/summary:
+  en: e118294657a08540
+  zh: 729ff2c88ca3c971
+/deepseek-ai-dsh-session-title/table-of-contents:
+  en: ad0db0f21f89bc10
+  zh: 3229aad78f4068d9
+/deepseek-ai-dsh-session-title/service-sessiontitleservice-ctx-key-sessiontitle:
+  en: c06d5821247f267a
+  zh: 81471254b3174357
+/deepseek-ai-dsh-session-title/configuration:
+  en: 12f05e5e1bc440f4
+  zh: f0fd0a12ac3cd162
+/deepseek-ai-dsh-session-title/provider-contract:
+  en: ff375c509ce6f141
+  zh: 317b0c1593ba6d93
+/deepseek-ai-dsh-session-title/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-session-title/model-experience/session-title-state:
+  en: 9cbc63f58901ad4a
+  zh: a3b3049b2392eaf0
+/deepseek-ai-dsh-session-title/model-experience/session-title-state/what-the-model-sees:
+  en: afa80385f0e94fc1
+  zh: 47728506e55e29de
+/deepseek-ai-dsh-session-title/model-experience/session-title-state/token-effect:
+  en: 3b9d201fd468e785
+  zh: 14ab9ab70c39fa4f
+/deepseek-ai-dsh-session-title/model-experience/session-title-state/kv-cache-effect:
+  en: 2e04436408a67949
+  zh: 74c956e0f06f2315
+/deepseek-ai-dsh-session-title/known-limitations-and-deferred-work:
+  en: 9625c4b9edb84e7d
+  zh: f5581332a4eb5dd6
+/deepseek-ai-dsh-session-title/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

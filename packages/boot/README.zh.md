@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # boot/：共享的 app bin 启动粘合层
 
 [English](README.md) | 中文

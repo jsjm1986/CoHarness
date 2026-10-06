@@ -71,6 +71,7 @@
    render stays static. */
 .railIn .iconButton,
 .railIn .newSession,
+.railIn .panelList,
 .railIn .regionArea {
   animation: rail-in 150ms var(--ds-ease-in-out) backwards;
 }
@@ -281,6 +282,77 @@
 
 .collapsed .newSessionLabel {
   max-width: 0;
+}
+
+/* Global panel rows: one nav column between New Session and the browsing
+   region; hidden outright while no panel plugin is registered. */
+.panelList {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+/* Panel entries share the New Session bar's radius and inset, the session
+   rows' hover/selected surface, and the primary ink. */
+.panelRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 2px;
+  min-height: 36px;
+  padding: 7px 8px;
+  box-sizing: border-box;
+  border: none;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  line-height: 22px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.panelRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.panelRow.panelActive {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.panelRow:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+}
+
+.panelGlyph {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.panelTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collapsed .panelList {
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.collapsed .panelRow {
+  width: 36px;
+  height: 36px;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
 }
 
 /* Region seat: always mounted so the foot never moves. Its trailing margin

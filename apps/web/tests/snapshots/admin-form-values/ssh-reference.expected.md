@@ -1,0 +1,3 @@
+- text: 密码凭据引用
+- textbox "密码凭据引用 可选；填写连接运行时能解析的凭据名称，不填写密码。留空使用 OpenSSH 配置。": SSH_FIXTURE_PASSWORD
+- text: 可选；填写连接运行时能解析的凭据名称，不填写密码。留空使用 OpenSSH 配置。

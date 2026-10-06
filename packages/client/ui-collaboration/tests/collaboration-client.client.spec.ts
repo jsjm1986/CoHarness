@@ -698,4 +698,117 @@ describe('CollaborationClient', () => {
     await failure
     expect(failureClient.getSnapshot().conversations).toEqual({})
   })
+
+  it('re-reads the account context after a project mutation instead of joining the pending read', async () => {
+    const initial = deferred<CollaborationContext>()
+    const postMutation = deferred<CollaborationContext>()
+    const loadContext = vi.fn()
+      .mockImplementationOnce(() => initial.promise)
+      .mockImplementationOnce(() => postMutation.promise)
+    const createProject = vi.fn(async () => ({ projectId: 11 }))
+    const client = new CollaborationClient(transport({ loadContext, createProject }))
+    const slow = client.load()
+    const created = client.createProject('审计二期')
+    // The forced refresh must not join the read issued before the mutation.
+    initial.resolve(projectContext)
+    postMutation.resolve({
+      ...projectContext,
+      projects: [...projectContext.projects, { projectId: 11, name: '审计二期', path: '/projects/audit2', mode: 'rw' }],
+    })
+    await expect(created).resolves.toBe(11)
+    await slow
+    expect(loadContext).toHaveBeenCalledTimes(2)
+    expect(client.getSnapshot().context?.projects).toHaveLength(3)
+    expect(client.getSnapshot().contextVerified).toBe(true)
+
+    // A late rejection of the superseded read cannot undo the held context.
+    const second = deferred<CollaborationContext>()
+    const rejected = deferred<CollaborationContext>()
+    const retry = vi.fn()
+      .mockImplementationOnce(() => rejected.promise)
+      .mockImplementationOnce(() => second.promise)
+    const clientRetry = new CollaborationClient(transport({ loadContext: retry, createProject }))
+    const stale = clientRetry.load()
+    const accepted = clientRetry.createProject('审计二期')
+    second.resolve(projectContext)
+    rejected.reject(new Error('stale read failed'))
+    await expect(accepted).resolves.toBe(11)
+    await stale
+    expect(clientRetry.getSnapshot()).toMatchObject({ contextVerified: true, context: projectContext })
+    client.dispose()
+    clientRetry.dispose()
+  })
+
+  it('coalesces a subscriber-reentered load onto the same context request', async () => {
+    const loadContext = vi.fn(async () => projectContext)
+    const client = new CollaborationClient(transport({ loadContext }))
+    client.subscribe(() => { if (client.getSnapshot().status === 'loading') void client.load() })
+    await client.load()
+    expect(loadContext).toHaveBeenCalledOnce()
+    client.dispose()
+  })
+
+  it('cannot restore account eligibility from an invalidated initial response', async () => {
+    const pending = deferred<CollaborationContext>()
+    const loadContext = vi.fn()
+      .mockImplementationOnce(() => pending.promise)
+      .mockResolvedValue(projectContext)
+    const client = new CollaborationClient(transport({ loadContext }))
+    const first = client.load()
+    client.invalidateContext()
+    pending.resolve(projectContext)
+    await first
+    expect(client.getSnapshot().contextVerified).toBe(false)
+    expect(client.getSnapshot().context).toBeUndefined()
+    const rejected = deferred<CollaborationContext>()
+    const retry = vi.fn()
+      .mockImplementationOnce(() => rejected.promise)
+      .mockResolvedValue(projectContext)
+    const failing = new CollaborationClient(transport({ loadContext: retry }))
+    const read = failing.load()
+    failing.invalidateContext()
+    rejected.reject(new Error('stale initial read'))
+    await read
+    expect(failing.getSnapshot().contextVerified).toBe(false)
+    expect(failing.getSnapshot().context).toBeUndefined()
+    client.dispose()
+    failing.dispose()
+  })
+
+  it('publishes nothing when a pending context read settles after dispose', async () => {
+    const pending = deferred<CollaborationContext>()
+    const loadContext = vi.fn(() => pending.promise)
+    const client = new CollaborationClient(transport({ loadContext }))
+    const read = client.load()
+    client.dispose()
+    pending.resolve(projectContext)
+    await read
+    expect(client.getSnapshot().contextVerified).toBe(false)
+    expect(client.getSnapshot().context).toBeUndefined()
+  })
+})
+
+it('loads sharing in a project pane from a personal page and sends its explicit project', async () => {
+  const { clientSessionKey } = await import('@deepseek-ai/dsh-client-runtime/client')
+  const key = clientSessionKey({ kind: 'project', projectId: 9 }, 'child' as never)
+  const personal = clientSessionKey({ kind: 'personal' }, 'child' as never)
+  const api = transport({ loadContext: vi.fn().mockResolvedValue(personalContext) })
+  const client = new CollaborationClient(api)
+  try {
+    await client.load()
+    await client.loadConversation(personal)
+    expect(api.loadConversation).not.toHaveBeenCalled()
+    await client.loadConversation(key)
+    expect(api.loadConversation).toHaveBeenCalledWith(key, expect.any(AbortSignal))
+    expect(client.getSnapshot().conversations[key]?.status).toBe('ready')
+    await client.refresh()
+    expect(client.getSnapshot().conversations[key]?.status).toBe('ready')
+    const fetcher = vi.fn().mockResolvedValue(Response.json(detail))
+    const browser = createBrowserCollaborationTransport({ fetch: fetcher, reload: vi.fn() })
+    await browser.loadConversation(key, new AbortController().signal)
+    expect(fetcher).toHaveBeenCalledWith('/account/api/conversations/child?projectId=9', expect.any(Object))
+    await browser.setVisibility(key, 'private', new AbortController().signal)
+    expect(fetcher).toHaveBeenLastCalledWith('/account/api/conversations/child?projectId=9', expect.objectContaining({ method: 'PATCH' }))
+    expect(() => browser.loadConversation(personal, new AbortController().signal)).toThrow('no project sharing')
+  } finally { client.dispose() }
 })

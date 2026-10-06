@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-mobile-responsive-presentation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-23-mobile-responsive-presentation.md
-2026-08-23-mobile-responsive-presentation.md: 4a4f889c9302d43c0aa680fb9cfdd00d0fd2c5da
-2026-08-23-mobile-responsive-presentation.zh.md: 684b667dcad2aee44c05db4d36cb2ed2d946952f
+/agent-note-mobile-responsive-presentation-for-the-web-workbench:
+  en: bf14baafe5d32d45
+  zh: c4bd3a47d2a9cf80
+/agent-note-mobile-responsive-presentation-for-the-web-workbench/problem:
+  en: 1e08bcc8e80cd872
+  zh: 37925942099eca7f
+/agent-note-mobile-responsive-presentation-for-the-web-workbench/decision:
+  en: 60b430d92b33dd68
+  zh: c0c60142c1329eec
+/agent-note-mobile-responsive-presentation-for-the-web-workbench/alternatives-considered:
+  en: 2dabb5a744dd18bc
+  zh: 58b5409e3d5ffd5d
+/agent-note-mobile-responsive-presentation-for-the-web-workbench/consequences:
+  en: 59c2c02890aee3eb
+  zh: abb6df3e2d62fcb1
+/agent-note-mobile-responsive-presentation-for-the-web-workbench/risks:
+  en: d5ccfa2fb9c5bbf7
+  zh: 9f554c44cff2069a
+/agent-note-mobile-responsive-presentation-for-the-web-workbench/implementation-evidence:
+  en: 9fc9dce7827ff993
+  zh: 92ad7a07401687fe

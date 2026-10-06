@@ -31,7 +31,7 @@ export const en: Record<WorkflowRunKey, string> = {
   'run.members.one': '{count} member',
   'run.members.other': '{count} members',
   'run.empty': 'No members started',
-  'phase.unassigned': 'Unphased',
+  'phase.unassigned': 'No phase',
   'phase.empty': 'Empty phase name',
   'statusCount.running': 'Running {count}',
   'statusCount.completed': 'Completed {count}',

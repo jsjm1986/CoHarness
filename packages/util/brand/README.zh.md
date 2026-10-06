@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-library"
+---
+
 # dsh-brand
 
 [English](README.md) | 中文
@@ -8,6 +13,15 @@
 
 `dsh-brand` 让结构相同的字符串或数字在类型层面不可互换：`SessionId` 无法传给期望 `ToolCallId` 的位置，事件序号也无法传给需要日志偏移量的位置。`brandString<T>()` 与 `brandNumber<T>()` 在不持有共享运行时状态的情况下应用名义品牌，让所属包可以定义领域类型，而无需导入不相关的能力。
 
+## 目录
+
+- [`Branded` 是什么](#what-branded-is)
+- [策略：为跨包边界的值添加品牌](#policy-brand-values-that-cross-package-boundaries)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="what-branded-is"></a>
 ## `Branded` 是什么
 
 品牌使结构相同的字符串或数字在类型层面不可互换：`SessionId` 不能传给期望 `CallId` 的位置，事件序号也不能传给要求日志偏移的位置，尽管它们在运行时都只是普通的 `string` 或 `number`。
@@ -43,6 +57,7 @@ export function SessionSeq(value: number): SessionSeq {
 
 所属工厂在断言之前校验非负安全整数范围等要求。比较、算术、日志记录、JSON 序列化与线上传输保持普通数字的行为；算术运算得到的是无品牌数字，所属方必须重新接纳后才能让它回到该领域。
 
+<a id="policy-brand-values-that-cross-package-boundaries"></a>
 ## 策略：为跨包边界的值添加品牌
 
 包为自己拥有的值添加品牌：`CallId` 位于 `dsh-llm`，共享的 agent/会话 `SessionId` 位于 `dsh-session`，`JobId` 位于 `dsh-jobs`，`SessionSeq` 与 `SessionLogOffset` 亦位于 `dsh-session`。为可能与同一原始类型的其他值混淆的跨包值添加品牌，但无需为每个字符串或数字都添加。
@@ -50,3 +65,13 @@ export function SessionSeq(value: number): SessionSeq {
 该包只负责这一原语。保持无依赖意味着，例如 `dsh-jobs` 可以为 `JobId` 使用品牌类型，而无需仅为使用 `Branded` 而导入不相关的功能包。
 
 **运行时不变式：** 不发布伴生入口。这个纯工具不拥有事件流或可变运行时数据；其值代数由单元测试保障。
+
+<a id="dev-note"></a>
+## 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+无。
+
+</details>

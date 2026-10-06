@@ -14,7 +14,7 @@ import { expandAssistantStream } from '@deepseek-ai/dsh-llm'
 import {
   ToolCallId,
   createAssistantMessage,
-  createMessage,
+  createSystemMessage,
   createToolResultMessage,
   createUserMessage,
 } from '@deepseek-ai/dsh-llm'
@@ -203,11 +203,7 @@ function appendRequestHeader(session: Session, turn: number, step: number): void
   session.append('system/message', {
     turn,
     step,
-    message: createMessage({
-      role: 'system',
-      content: [{ type: 'text', text: `Synthetic performance system prompt for turn ${String(turn)}, step ${String(step)}.` }],
-      source: { kind: 'plugin', plugin: 'test-fixture' },
-    }),
+    message: createSystemMessage(`Synthetic performance system prompt for turn ${String(turn)}, step ${String(step)}.`),
   }, { surfaceOp: 'append' })
   session.append('request/header', {
     header: {
@@ -969,14 +965,14 @@ async function expandSessionSearch(page: Page): Promise<Locator> {
   // Search collapsed into a header action; expand it before filling.
   const searchButton = page.getByRole('button', { name: 'Search sessions' })
   if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
-  return page.getByRole('textbox', { name: /Search sessions\.\.\.|Search name, keywords\.\.\./ })
+  return page.getByRole('textbox', { name: /Search sessions…|Search name, keywords\.\.\./ })
 }
 
 async function openPerformancePage(
   world: PerformanceWorld,
   expectedSessions: number,
 ): Promise<Locator> {
-  await world.page.goto(world.scaffold.baseUrl, { waitUntil: 'load' })
+  await world.page.goto(world.scaffold.authenticatedUrl, { waitUntil: 'load' })
   await world.page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
   const group = world.page.getByRole('treeitem').first()
   // Workspace grouping renders the stable `Independent sessions` bucket label without a
@@ -1065,9 +1061,9 @@ async function continueConversation(
       if (toolResult?.type !== 'tool/result') {
         throw new Error(`continued turn ${String(index)} did not log its tool result`)
       }
-      const resultBlock = toolResult.data.message.content.find(block => block.type === 'tool-result')
-      expect(resultBlock?.isError).toBe(false)
-      expect(resultBlock?.content
+      const message = toolResult.data.message
+      expect(message.isError).toBe(false)
+      expect(message.content
         .filter(block => block.type === 'text')
         .map(block => block.text)
         .join('')).toContain(spec.toolResultMarker)
@@ -1512,7 +1508,7 @@ describe('manual web performance: complex workspace and history', () => {
     })
     let testFailure: unknown
     try {
-      await world.page.goto(world.scaffold.baseUrl, { waitUntil: 'load' })
+      await world.page.goto(world.scaffold.authenticatedUrl, { waitUntil: 'load' })
       await world.page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
       await connectFreshWorkspace(world.page, world.scaffold.workspaceCwd, 'continuous-conversation-perf')
       const cdp = await world.page.context().newCDPSession(world.page)

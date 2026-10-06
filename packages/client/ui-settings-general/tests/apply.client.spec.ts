@@ -50,6 +50,7 @@ async function bench(isLoopback = true) {
     api: { settings: { describe: settingsDescribe, openDocument: settingsOpenDocument } },
     isLoopback,
   } as never)
+  ctx.provide('shortcuts', { register: vi.fn(() => () => {}) } as never)
   new TestRemote(ctx)
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
   return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, settingsDescribe, settingsOpenDocument }
@@ -79,7 +80,7 @@ function generalEntry(slots: SlotRegistry) {
 
 describe('ui-settings-general apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'settingsScope'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'settingsScope', 'shortcuts'])
   })
 
   it('fills all five seats for declarations before or after apply', async () => {
@@ -94,7 +95,7 @@ describe('ui-settings-general apply', () => {
     // The nav label is a locale-following thunk; owners resolve at read time.
     expect(resolveSlotLabel(entry.options.label)).toBe('通用设置')
     expect(before.slots.spec('settings.general.item')).toEqual({ kind: 'list', scope: 'root' })
-    expect(before.slots.entries('settings.general.item')).toEqual([])
+    expect(before.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual(['developer-tools'])
     // The onboarding hole stays declared for feature-owned steps; this plugin
     // no longer seats one.
     expect(before.slots.entries('settings.onboarding')).toEqual([])
@@ -193,7 +194,7 @@ describe('ui-settings-general apply', () => {
     for (const [name, component] of SEATS) {
       expect(b.slots.entries(name)[0]!.component).toBe(component)
     }
-    expect(b.slots.entries('settings.general.item')).toEqual([])
+    expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual(['developer-tools'])
     expect(b.slots.spec('settings.general.item')).toEqual({ kind: 'list', scope: 'root' })
     // The recovered registrations still ride the locale path.
     b.locale.setLocale('en')

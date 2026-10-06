@@ -1,3 +1,8 @@
+---
+description: "English | 中文"
+kind: "package-group"
+---
+
 # identity/ — 共享身份
 
 [English](README.md) | 中文

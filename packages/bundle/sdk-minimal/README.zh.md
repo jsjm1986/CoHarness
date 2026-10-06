@@ -72,6 +72,7 @@ dsh --profile sdk-minimal
 
 -----
 
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -89,6 +90,7 @@ dsh --profile sdk-minimal
 
 当 persona、平台、提供方、模型与 bundle patch 栈固定时保持稳定。Profile 变更在下一个进程生效。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>

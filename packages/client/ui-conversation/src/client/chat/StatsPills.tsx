@@ -8,8 +8,9 @@
 import { memo, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconDatabaseOutline16, IconGaugeOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ConversationSnapshot, UseProjection } from '@deepseek-ai/dsh-client-runtime/client'
-import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ConversationSnapshot, ObservableSnapshot, UseProjection } from '@deepseek-ai/dsh-client-runtime/client'
+import type { InjectFace, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PerformanceUsageMode } from '../../submission-settings.ts'
 // Type-only: merges the sessionStats key into SessionProjectionMap for useProjection.
 import type {} from '@deepseek-ai/dsh-session-stats/client'
 import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
@@ -57,8 +58,16 @@ export function billedInputTokens(usage: TokenUsageProjection): number {
   return usage.uncachedInputTokens + usage.cacheReadTokens + usage.cacheWriteTokens
 }
 
+/** Registration-side inject face carrying the live performance detail preference. */
+export interface StatsPillsInjected {
+  hooks: {
+    /** Persisted statistics detail bound as usePerformanceUsage. */
+    performanceUsage: ObservableSnapshot<PerformanceUsageMode>
+  }
+}
+
 /** Props: the conversation-snapshot selector plus the projection read seat. */
-export interface StatsPillsProps {
+export interface StatsPillsProps extends InjectFace<StatsPillsInjected> {
   useSession: SnapshotSelectorHook<ConversationSnapshot>
   useProjection: UseProjection
   /** The owning dock's locale seat. */
@@ -251,7 +260,8 @@ function UsagePill({ usage, t, dialog }: {
   )
 }
 
-export const StatsPills = memo(function StatsPills({ useSession, useProjection, t }: StatsPillsProps) {
+export const StatsPills = memo(function StatsPills({ useSession, useProjection, usePerformanceUsage, t }: StatsPillsProps) {
+  const mode = usePerformanceUsage(value => value)
   const settledNodes = useSession(s => s.chat.legacy.nodes)
   const usage = useProjection('tokenUsage')
   // One exclusive slot for both dialogs: opening either pill closes the other.
@@ -266,6 +276,21 @@ export const StatsPills = memo(function StatsPills({ useSession, useProjection, 
   // billing (e.g. every request failed) shows its counts without a usage pill.
   const hasTokens = usage !== undefined
     && (billedInputTokens(usage) > 0 || usage.outputTokens > 0)
+  if (mode === 'compact') {
+    const speed = stats.decodeMs > 0
+      ? t('message.tokensPerSecond', { tps: formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1_000)) })
+      : null
+    const cacheHit = hasTokens ? cacheHitPercent(usage) : null
+    if (speed === null && cacheHit === null) return null
+    return (
+      <div className={css.root} data-composer-stats role="group" aria-label={t('stats.details')}>
+        {speed !== null && <span className={css.pill}><IconGaugeOutline16 />{speed}</span>}
+        {cacheHit !== null && (
+          <span className={css.pill}><IconDatabaseOutline16 />{t('stats.cacheHit', { percent: cacheHit })}</span>
+        )}
+      </div>
+    )
+  }
   if (stats.steps === 0 && !hasTokens) return null
   // data-composer-stats: InputBar's `.root:has([data-composer-stats])` rule
   // tightens the composer's bottom clearance only while this row renders.

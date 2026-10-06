@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-05-context-meter-blind-to-compaction.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-05-context-meter-blind-to-compaction.md
-2026-08-05-context-meter-blind-to-compaction.md: a23e51771c74e350fd3fb04e3a23ab3cdfb6092e
-2026-08-05-context-meter-blind-to-compaction.zh.md: 12fd41af0d8c8864a120f26d91148543f74b2e2b
+/agent-note-the-context-meter-could-not-see-a-compaction:
+  en: c2047ad095fef921
+  zh: e68242f1511758a6
+/agent-note-the-context-meter-could-not-see-a-compaction/problem:
+  en: 0dc225b8bcc3856c
+  zh: f3ccfdffbeb5000b
+/agent-note-the-context-meter-could-not-see-a-compaction/decision:
+  en: 9d663b4adc495ee0
+  zh: 22a5061346f7fc47
+/agent-note-the-context-meter-could-not-see-a-compaction/alternatives-considered:
+  en: fc6a1271cf58c9e9
+  zh: 65f970e267160e68
+/agent-note-the-context-meter-could-not-see-a-compaction/consequences:
+  en: e70f1a9510123cc4
+  zh: 7cbc1d5bf16df6b5
+/agent-note-the-context-meter-could-not-see-a-compaction/testing:
+  en: e9df7c2b3a892d51
+  zh: e9830d0de0ae8ff5

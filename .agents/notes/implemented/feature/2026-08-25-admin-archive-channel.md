@@ -12,7 +12,7 @@ Runtime archive membership was stored only in each Workspace registry. The regul
 
 **Gateway owns an organization-scoped archive lifecycle index while each runtime retains the local Workspace projection.** The Admin SPA exposes a root-conversation archive channel with server-side filters, a paged event reader, export, batch restore, a 30-day configurable trash window, and explicit purge. Runtime snapshots carry a monotonic revision and retained Workspace placement; Gateway commands remain pending until the owning runtime acknowledges them. Project transcripts are read from PostgreSQL; personal transcripts are read by starting their runtime on demand.
 
-The index keeps a root record even when a personal transcript is not present in PostgreSQL, so legacy JSONL runtimes can backfill metadata without copying full logs. Search stores only title, Session ID, and user/assistant text. Administrator reads, exports, and mutations write audit events without storing message content in the audit row.
+The index keeps a root record even when a personal transcript is not present in PostgreSQL, so legacy JSONL runtimes can backfill metadata without copying full logs. Each record carries an immutable runtime identity: a snapshot locks the claimed row `FOR UPDATE`, validates the declared lineage against owned sessions, and leaves a same-owner newer revision untouched while rejecting any foreign claim. Search stores only title, Session ID, and user/assistant text. Administrator reads, exports, and mutations write audit events without storing message content in the audit row.
 
 ## Alternatives considered
 

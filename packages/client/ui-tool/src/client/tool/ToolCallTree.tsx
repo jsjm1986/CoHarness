@@ -1,33 +1,52 @@
 /** Root/subcall Tool composition with one keyed atomic dispatch path. */
 import { memo, useMemo, type ReactNode } from 'react'
-import type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ToolCallOwnerProps, ToolTreeProps } from '../contract/slots.ts'
+import { createSnapshotStore, type ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
+import type {
+  ToolCallHookContext, ToolCallOwnerProps, ToolCallPhaseProps, ToolTreeProps,
+} from '../contract/slots.ts'
 import { toolRowModel } from './models/tool-call-model.ts'
+import { bindToolCallDisclosure } from './tool-call-disclosure.ts'
 import { GenericToolCard } from './toolviews/GenericToolCard.tsx'
 import css from './ToolCallTree.module.css'
 
-/** Resolve a Tool call's wire name from either lifecycle form. */
-function callName(node: ToolCallBlock): string {
-  return 'kind' in node ? node.call?.name ?? '' : node.name
+/** Resolve a Tool call's current lifecycle stage for the owner share. */
+function toolCallPhase(block: ToolCallBlock): ToolCallPhaseProps {
+  if ('kind' in block) return { phase: 'result', block }
+  return block.phase === 'preparing' ? { phase: 'preparing', block } : { phase: 'start', block }
+}
+
+/** Resolve a Tool call's wire name from its current stage. */
+function callName(call: ToolCallPhaseProps): string {
+  return call.phase === 'result' ? call.block.call?.name ?? '' : call.block.name
 }
 
 /** One atomic call dispatched through the Tool-owned keyed slot. */
 const ToolCall = memo(function ToolCall({
-  renderSlot, callId, toolName, block, openFile, selected, cwd, home, openCallDetails, inspectCall, nested, renderMessageImages,
-  t, children,
+  renderSlot, callId, toolName, call, assistant, openFile, selected, cwd, home, openCallDetails, inspectCall, nested,
+  renderMessageImages, t, children,
 }: Pick<ToolTreeProps, 'renderSlot' | 'openFile' | 'cwd' | 'inspectCall' | 'openCallDetails' | 'renderMessageImages' | 't'> & {
   callId: string
   toolName: string
-  block: ToolCallBlock
+  call: ToolCallPhaseProps
+  assistant: ToolCallHookContext['assistant']
   selected: boolean
   home?: string | undefined
   nested?: boolean | undefined
   children?: ReactNode
 }) {
+  const preparing = call.phase === 'preparing'
+  const hookContext = useMemo<ToolCallHookContext>(() => ({
+    callId,
+    assistant: preparing ? assistant : undefined,
+    disclosure: createSnapshotStore(false),
+  }), [assistant, callId, preparing])
+  const useDisclosure = useMemo(
+    () => bindToolCallDisclosure(hookContext.disclosure), [hookContext])
   const owner: ToolCallOwnerProps = useMemo(() => ({
     callId,
     toolName,
-    block,
+    useDisclosure,
+    ...call,
     openFile,
     cwd,
     home,
@@ -35,12 +54,12 @@ const ToolCall = memo(function ToolCall({
     renderMessageImages,
     openDetails: openCallDetails === undefined ? undefined : () => { openCallDetails(callId) },
     inspect: () => { inspectCall(callId) },
-  }), [callId, toolName, block, openFile, cwd, home, nested, renderMessageImages, openCallDetails, inspectCall])
+  }), [callId, toolName, useDisclosure, call, openFile, cwd, home, nested, renderMessageImages, openCallDetails, inspectCall])
   // An Auto-review denial is the call's whole story: route it through the
   // generic row so a keyed toolview cannot hide the denial behind its own card.
   const autoReviewDenied = useMemo(
-    () => toolRowModel(toolName, block).autoReviewDenial !== null,
-    [toolName, block],
+    () => call.phase === 'result' && toolRowModel(toolName, call.block).autoReviewDenial !== null,
+    [toolName, call],
   )
   return (
     <div
@@ -53,6 +72,7 @@ const ToolCall = memo(function ToolCall({
         ? <GenericToolCard {...owner} t={t} />
         : renderSlot('tool.call.toolview', owner, {
           entryKey: toolName,
+          hookContext,
           fallback: <GenericToolCard {...owner} t={t} />,
         })}
       {children}
@@ -61,20 +81,23 @@ const ToolCall = memo(function ToolCall({
 })
 
 const ToolCallBranch = memo(function ToolCallBranch({
-  renderSlot, block, selectedCallId, cwd, home, openFile, openCallDetails, inspectCall, nested, renderMessageImages, t,
+  renderSlot, block, assistant, selectedCallId, cwd, home, openFile, openCallDetails, inspectCall, nested, renderMessageImages, t,
 }: Pick<ToolTreeProps, 'renderSlot' | 'selectedCallId' | 'cwd' | 'openFile' | 'inspectCall' | 'openCallDetails' | 'renderMessageImages' | 't'> & {
   block: ToolCallBlock
+  assistant: ToolCallHookContext['assistant']
   home?: string | undefined
   nested?: boolean | undefined
 }) {
+  const call = useMemo(() => toolCallPhase(block), [block])
   return (
     <ToolCall
       renderSlot={renderSlot}
-      callId={block.callId}
-      toolName={callName(block)}
-      block={block}
+      callId={call.block.callId}
+      toolName={callName(call)}
+      call={call}
+      assistant={assistant}
       openFile={openFile}
-      selected={block.callId === selectedCallId}
+      selected={call.block.callId === selectedCallId}
       cwd={cwd}
       home={home}
       nested={nested}
@@ -83,13 +106,14 @@ const ToolCallBranch = memo(function ToolCallBranch({
       inspectCall={inspectCall}
       t={t}
     >
-      {block.subCalls.length > 0 ? (
+      {call.phase !== 'preparing' && call.block.subCalls.length > 0 ? (
         <div className={css.subCalls} data-subcalls>
-          {block.subCalls.map(child => (
+          {call.block.subCalls.map(child => (
             <ToolCallBranch
               key={child.callId}
               renderSlot={renderSlot}
               block={child}
+              assistant={assistant}
               selectedCallId={selectedCallId}
               cwd={cwd}
               home={home}
@@ -117,11 +141,16 @@ export function ToolCallTree({
   renderSlot, node, selectedCallId, cwd, openFile, openCallDetails, inspectCall, renderMessageImages, useHostDescription, t,
 }: ToolTreeProps) {
   const home = useHostDescription(description => description?.home)
-  const block = node.data.root
+  // A preparing call's partial argument prefix lives on the owning Step's
+  // assistant-step Location data; the source exists only for step-scoped roots.
+  const assistant = node.location.kind === 'step'
+    ? node.location.step.data.source('assistant-step')
+    : undefined
   return (
     <ToolCallBranch
       renderSlot={renderSlot}
-      block={block}
+      block={node.data.root}
+      assistant={assistant}
       selectedCallId={selectedCallId}
       cwd={cwd}
       home={home}

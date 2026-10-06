@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-22-evidence-based-larger-hosted-runners.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-22-evidence-based-larger-hosted-runners.md
-2026-07-22-evidence-based-larger-hosted-runners.md: daecdb5bb1b7dfe9595e06f7168794b7d56d7366
-2026-07-22-evidence-based-larger-hosted-runners.zh.md: 9bea72d368077c7f22aec87d5b02260483480f16
+/agent-note-evidence-based-larger-hosted-runners:
+  en: 290608d1cdc78691
+  zh: ee20a189353821e1
+/agent-note-evidence-based-larger-hosted-runners/problem:
+  en: 651b39177cbf1cc8
+  zh: 5821de3e12016bcb
+/agent-note-evidence-based-larger-hosted-runners/decision:
+  en: f00491acddef834b
+  zh: df0198050a888768
+/agent-note-evidence-based-larger-hosted-runners/alternatives-considered:
+  en: c3c112359821ee6c
+  zh: ecef79762aee61b2
+/agent-note-evidence-based-larger-hosted-runners/consequences:
+  en: f0477a4da0120674
+  zh: 1f9b541c99f7a77c

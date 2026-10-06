@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-05-workspace-blank-session-reuse-membership.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-05-workspace-blank-session-reuse-membership.md
-2026-08-05-workspace-blank-session-reuse-membership.md: 84e9e26c2da87a8c195ff0d810e54667786ab2d5
-2026-08-05-workspace-blank-session-reuse-membership.zh.md: 044122ed21d2febac2fa5c0d547e0e6c65754fb8
+/agent-note-workspace-new-session-reuse-hijacked-cwd-matching-unaccounted-blank-sessions:
+  en: 4ec330d363bd0eec
+  zh: 9bf31e1ef87949f5
+/agent-note-workspace-new-session-reuse-hijacked-cwd-matching-unaccounted-blank-sessions/problem:
+  en: e88a96f6c3576bb5
+  zh: 13d244b137e16e49
+/agent-note-workspace-new-session-reuse-hijacked-cwd-matching-unaccounted-blank-sessions/decision:
+  en: 2703f84da2aa9984
+  zh: 34620848014afd22
+/agent-note-workspace-new-session-reuse-hijacked-cwd-matching-unaccounted-blank-sessions/alternatives-considered:
+  en: f32b97e47e5d0836
+  zh: fbe1846c33fd39bf
+/agent-note-workspace-new-session-reuse-hijacked-cwd-matching-unaccounted-blank-sessions/consequences:
+  en: ac2bf702d7097bcb
+  zh: bf0932abeada115a
+/agent-note-workspace-new-session-reuse-hijacked-cwd-matching-unaccounted-blank-sessions/testing:
+  en: 555f8a438937e597
+  zh: 7baead43e847f782

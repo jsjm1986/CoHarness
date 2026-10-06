@@ -1,6 +1,37 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-07-19-fresh-agent-ralph-workflow-tool.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-19-fresh-agent-ralph-workflow-tool.md
-2026-07-19-fresh-agent-ralph-workflow-tool.md: 4ec2a4d804ef4869c7d12f4b5a1c1b5ae63bd36d
-2026-07-19-fresh-agent-ralph-workflow-tool.zh.md: 5d6a5d00feb285bfadda9b49368c15b672ea70f4
+/agent-note-fresh-agent-ralph-workflow-tool:
+  en: fa01a47773703ae3
+  zh: 3277d56a08e2603d
+/agent-note-fresh-agent-ralph-workflow-tool/problem:
+  en: 0e0d035870e8de36
+  zh: 94af16be297aa639
+/agent-note-fresh-agent-ralph-workflow-tool/decision:
+  en: 6de055f7290e1769
+  zh: ee0023a678b308b1
+/agent-note-fresh-agent-ralph-workflow-tool/decision/per-run-workflow-provider-route:
+  en: d0da42d3984d2b20
+  zh: 72b15f1b59ca007d
+/agent-note-fresh-agent-ralph-workflow-tool/decision/per-run-workflow-child-ceiling:
+  en: ceb1db29a4b87672
+  zh: cdcebdadaee6fe83
+/agent-note-fresh-agent-ralph-workflow-tool/decision/ralph-rounds-and-handoff:
+  en: e61bc86cc48f3085
+  zh: 0268ff3f702a7fdc
+/agent-note-fresh-agent-ralph-workflow-tool/decision/model-and-ui:
+  en: 753bcc44d6d75c53
+  zh: 6c412dd1b37e6403
+/agent-note-fresh-agent-ralph-workflow-tool/testing:
+  en: d542eb85464a822f
+  zh: 4547c1dafaf79f73
+/agent-note-fresh-agent-ralph-workflow-tool/alternatives-considered:
+  en: b9344f0f8b2c6575
+  zh: 4c2bd1c6f84a68a0
+/agent-note-fresh-agent-ralph-workflow-tool/consequences:
+  en: 21cb4b1f8512b65d
+  zh: 3778a5bb27a42d79
+/agent-note-fresh-agent-ralph-workflow-tool/known-limitations-and-deferred-work:
+  en: 9b49e2370e2c9f56
+  zh: 3f62c44727ce1304

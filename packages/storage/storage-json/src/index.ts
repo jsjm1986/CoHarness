@@ -6,6 +6,7 @@
  * @module @deepseek-ai/dsh-storage-json
  */
 
+import { registerManagedDataPath } from '@deepseek-ai/dsh-managed-data'
 import { mkdir } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -107,6 +108,7 @@ function validateDescriptor(descriptor: KvUnitDescriptor): void {
  * @param config - Validated configuration.
  */
 export function apply(ctx: Context, config: Config) {
+  registerManagedDataPath({ owner: '@deepseek-ai/dsh-storage-json', kind: 'directory', path: config.root }, process.env.DSH_MANAGED_DATA_MANIFEST)
   const backend = new JsonStorageBackend(config.root)
   ctx.effect(() => {
     const unregister = ctx.storage.backend.register('json', backend)

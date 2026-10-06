@@ -47,7 +47,9 @@ class FakeWebSocket extends EventTarget {
   }
 }
 
-afterEach(() => {
+const mountedContexts: Context[] = []
+afterEach(async () => {
+  for (const ctx of mountedContexts.splice(0).reverse()) await ctx.fiber.dispose()
   delete (globalThis as Win).location
   sockets.length = 0
   if (originalWebSocket === undefined) delete (globalThis as WebSocketGlobal).WebSocket
@@ -56,6 +58,7 @@ afterEach(() => {
 
 async function mount(): Promise<ConnectionHandle> {
   const ctx = new Context()
+  mountedContexts.push(ctx)
   await ctx.plugin({ apply, inject: [] })
   const handle = ctx.get('connection') as ConnectionHandle | undefined
   if (handle === undefined) throw new Error('ctx.connection not provided')
@@ -200,6 +203,8 @@ describe('connection client apply', () => {
     }
     ;(globalThis as WebSocketGlobal).WebSocket = FakeWebSocket as unknown as typeof WebSocket
     const handle = await mount()
+    handle.confirmPrincipal?.(7)
+    handle.setBaseTarget?.({ kind: 'personal' })
     const target = handle.forTarget?.({ kind: 'project', projectId: 42 })
     expect(target).toBeDefined()
     const seen: string[] = []
@@ -228,7 +233,10 @@ describe('connection client apply', () => {
     }
     ;(globalThis as WebSocketGlobal).WebSocket = FakeWebSocket as unknown as typeof WebSocket
     const fetch = vi.spyOn(globalThis, 'fetch')
-    const client = (await mount()).api as WebApiClient
+    const handle = await mount()
+    handle.confirmPrincipal?.(7)
+    handle.setBaseTarget?.({ kind: 'personal' })
+    const client = handle.api as WebApiClient
     const envelopes: RpcMessage[][] = []
     client.subscribeEnvelopes((batch) => { envelopes.push([...batch]) })
     const opened: string[] = []
@@ -240,8 +248,8 @@ describe('connection client apply', () => {
     const hostFrame = host.next()
     await vi.waitFor(() => { expect(sockets).toHaveLength(2) })
     expect(sockets.map(socket => socket.url)).toEqual([
-      'ws://localhost:3080/api/events.mux',
-      'ws://localhost:3080/api/events.host',
+      'ws://localhost:3080/api/events.mux?dshTarget=personal&dshPrincipal=7',
+      'ws://localhost:3080/api/events.host?dshTarget=personal&dshPrincipal=7',
     ])
     await vi.waitFor(() => { expect(opened).toEqual(['mux', 'host']) })
 
@@ -319,16 +327,19 @@ describe('connection client apply', () => {
       hostname: 'harness.example', search: '', origin: 'https://harness.example',
     }
     ;(globalThis as WebSocketGlobal).WebSocket = FakeWebSocket as unknown as typeof WebSocket
-    const client = (await mount()).api
+    const handle = await mount()
+    handle.confirmPrincipal?.(7)
+    handle.setBaseTarget?.({ kind: 'personal' })
+    const client = handle.api
     const abort = new AbortController()
     const iterator = client.events.mux({}, abort.signal)[Symbol.asyncIterator]()
     const pending = iterator.next()
-    await vi.waitFor(() => { expect(sockets[0]?.url).toBe('wss://harness.example/api/events.mux') })
+    await vi.waitFor(() => { expect(sockets[0]?.url).toBe('wss://harness.example/api/events.mux?dshTarget=personal&dshPrincipal=7') })
     abort.abort()
     await expect(pending).resolves.toMatchObject({ done: true })
   })
 
-  it('closes a WebSocket immediately when its signal was already aborted', async () => {
+  it('does not allocate a WebSocket when its signal was already aborted', async () => {
     ;(globalThis as Win).location = {
       hostname: 'localhost', search: '', origin: 'http://localhost:3080',
     }
@@ -338,8 +349,7 @@ describe('connection client apply', () => {
     abort.abort()
     const iterator = client.events.mux({}, abort.signal)[Symbol.asyncIterator]()
     await expect(iterator.next()).resolves.toMatchObject({ done: true })
-    expect(sockets).toHaveLength(1)
-    expect(sockets[0]?.readyState).toBe(FakeWebSocket.CLOSED)
+    expect(sockets).toHaveLength(0)
   })
 
   it('carries RPC calls without requiring secure-context randomUUID', async () => {
@@ -468,9 +478,10 @@ describe('connection client apply', () => {
     ;(globalThis as Win).location = { hostname: 'localhost', search: '?fixture' }
     ;(globalThis as WebSocketGlobal).WebSocket = FakeWebSocket as unknown as typeof WebSocket
     const handle = await mount()
+    const remoteSession = vi.fn(() => 's1' as SessionId)
     const release = handle.registerSessionTargetResolver!(id => id === 's1'
       ? { kind: 'project', projectId: 7 }
-      : undefined)
+      : undefined, remoteSession)
     try {
       const pooled = handle.forTarget!({ kind: 'project', projectId: 7 })
       expect(handle.forSession!('s1' as SessionId)).toBe(pooled)
@@ -481,6 +492,8 @@ describe('connection client apply', () => {
       // A derived handle resolves sessions through the shared resolver.
       expect(pooled.forSession!('s1' as SessionId)).toBe(pooled)
       expect(pooled.forSession!('other' as SessionId)).toBe(handle)
+      expect(pooled.sessionForRemote!('feedback/record', { request: { sessionId: 's1' } })).toBe('s1')
+      expect(remoteSession).toHaveBeenCalledWith('feedback/record', { request: { sessionId: 's1' } })
 
       const original = globalThis.fetch
       globalThis.fetch = (input: URL | RequestInfo, init?: RequestInit) => {
@@ -513,4 +526,30 @@ describe('connection client apply', () => {
       release()
     }
   })
+})
+
+it('opens an explicit personal carrier when the bootstrap connection belongs to a project', async () => {
+  ;(globalThis as Win).location = { hostname: 'localhost', search: '?fixture' }
+  const handle = await mount()
+  handle.setBaseTarget!({ kind: 'project', projectId: 7 })
+  expect(handle.forTarget!({ kind: 'project', projectId: 7 })).toBe(handle)
+  const personal = handle.forTarget!({ kind: 'personal' })
+  expect(personal).not.toBe(handle)
+  expect(handle.forTarget!({ kind: 'personal' })).toBe(personal)
+  expect(personal.forTarget!({ kind: 'project', projectId: 7 })).toBe(handle)
+  const oldFetch = globalThis.fetch
+  const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const request = JSON.parse(init?.body as string) as { rpcId: string }
+    return Response.json({ type: 'server-response', rpcId: request.rpcId, result: { ok: true, value: {
+      version: '0', cwd: '/personal', home: '/home', attachedSessions: 0, canOpenPath: false, runtimeTarget: { kind: 'personal' },
+    } } })
+  })
+  globalThis.fetch = fetcher
+  try {
+    await personal.api.host.describe({})
+    const input = fetcher.mock.calls[0]?.[0]
+    if (input === undefined) throw new Error('Personal runtime was not requested')
+    const url = new URL(input instanceof Request ? input.url : input)
+    expect(url.searchParams.get('dshTarget')).toBe('personal')
+  } finally { globalThis.fetch = oldFetch }
 })

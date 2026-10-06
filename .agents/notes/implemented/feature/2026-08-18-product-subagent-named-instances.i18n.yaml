@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-product-subagent-named-instances.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-product-subagent-named-instances.md
-2026-08-18-product-subagent-named-instances.md: 759d3941ff8404138954c409f0fd4949e357200e
-2026-08-18-product-subagent-named-instances.zh.md: 6faf0e70f639cbc6528e27b800b8e5f99f0d6c86
+/agent-note-product-subagent-named-instances:
+  en: 213fbd2e81f3a6bb
+  zh: bc6dc74d11496453
+/agent-note-product-subagent-named-instances/problem:
+  en: c02e078a03f02d34
+  zh: 410af4e4554baf96
+/agent-note-product-subagent-named-instances/decision:
+  en: 03026d1b6246b9e7
+  zh: 3b5fc185a0ffa44b
+/agent-note-product-subagent-named-instances/decision/ownership-and-lifecycle:
+  en: e9f675e5ca6c6b7d
+  zh: eb8ba5c13f3a16e1
+/agent-note-product-subagent-named-instances/verification:
+  en: 7ef84f8c0219cbb1
+  zh: cb1ca7b3cae76b62
+/agent-note-product-subagent-named-instances/alternatives-considered:
+  en: 615804147791aeaf
+  zh: a2ac62bc75606925
+/agent-note-product-subagent-named-instances/consequences:
+  en: 34b8f30c72c1ab88
+  zh: 7c2e0f77ba7ef8cc

@@ -23,6 +23,8 @@ afterEach(() => {
 // The shell never reads the global hooks itself, but they ride the standard
 // props share; stub them as never-called functions.
 const neverHook = (() => { throw new Error('shell must not read global hooks') }) as never
+/** No global panels are registered in this bench: the panel list answers empty and PanelRow never mounts. */
+const emptyPanels: SidebarRootComponentProps['usePanels'] = selector => selector([])
 
 function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; width?: number } = {}) {
   const startSession = vi.fn()
@@ -38,6 +40,7 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
     <SidebarRoot
       collapsed={current.collapsed} width={current.width}
       useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
+      usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
       startSession={startSession} toggleSidebar={toggleSidebar} t={t}
       renderSlot={((
         key: string,
@@ -111,6 +114,7 @@ describe('SidebarRoot shell', () => {
       collapsed={false} width={300}
       useSessions={neverHook} useWorkspaces={neverHook}
       useViewport={selector => selector({ mode: 'workbench', paneIds: [], paneRatios: [] })}
+      usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
       exitWorkbench={exitWorkbench}
       startSession={startSession} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, owner: SidebarSectionOwnerProps) =>
@@ -128,6 +132,7 @@ describe('SidebarRoot shell', () => {
       collapsed={false} width={300}
       useSessions={neverHook} useWorkspaces={neverHook}
       useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
+      usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
       startSession={startSession} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, owner: SidebarSectionOwnerProps) =>
         <div data-testid="region" data-wide={owner.wide} />) as SidebarRootComponentProps['renderSlot']}
@@ -142,6 +147,7 @@ describe('SidebarRoot shell', () => {
     const { container } = render(<SidebarRoot
       collapsed={false} width={300}
       useSessions={neverHook} useWorkspaces={neverHook} useViewport={selector => selector({ mode: 'single', paneIds: [], paneRatios: [] })}
+      usePanels={emptyPanels} usePanelInfo={neverHook} selectPanel={vi.fn()}
       startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}

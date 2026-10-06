@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-08-lightweight-routine-documentation-translation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-08-lightweight-routine-documentation-translation.md
-2026-08-08-lightweight-routine-documentation-translation.md: ff4d6005588b562018bf1ee40d6dabb5569766f0
-2026-08-08-lightweight-routine-documentation-translation.zh.md: 42645f010d81f43d29411b0cfa4b094f23003f6f
+/agent-note-lightweight-routine-documentation-translation:
+  en: 58561d0069f0cb8d
+  zh: 346fb7a699c96e26
+/agent-note-lightweight-routine-documentation-translation/problem:
+  en: 61b3ba3a39013e54
+  zh: 0c1fdc9499fbb06b
+/agent-note-lightweight-routine-documentation-translation/decision:
+  en: fe9cdae5354c55f9
+  zh: 13d4b303ffeb75e6
+/agent-note-lightweight-routine-documentation-translation/alternatives-considered:
+  en: b025dfdd6bc934ee
+  zh: 0596de95a41bc386
+/agent-note-lightweight-routine-documentation-translation/consequences:
+  en: b70c457d85cfdade
+  zh: 581f8b9102979b8b

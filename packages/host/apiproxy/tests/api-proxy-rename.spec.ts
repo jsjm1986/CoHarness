@@ -46,7 +46,7 @@ async function composed(withTitles = true): Promise<Context> {
       })
       const agent = { id: session.id, session, status: 'idle', ctx: ownerCtx } as Agent
       await ctx.agents.register(agent)
-      return { agent, dispose: () => Promise.resolve() }
+      return { agent, dispose: () => Promise.resolve() , tryDisposeIdle: async () => false }
     },
     resume: () => Promise.reject(new Error('resume must not run: every source is attached')),
   })

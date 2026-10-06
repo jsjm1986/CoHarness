@@ -10,7 +10,7 @@ Documents lived only in the active runtime and the Gateway transfer path knew on
 
 ## Decision
 
-Migration 012 adds an organization-scoped metadata catalog, operation items, and append-only history. Runtime roots continue to own file bytes and paths. Host document routes reconcile metadata after listings and writes, while signed Gateway runtime routes derive the current scope from the authenticated runtime identity. Unknown project ownership fails closed for destructive mutations.
+Migration 012 adds an organization-scoped metadata catalog, operation items, and append-only history. Runtime roots continue to own file bytes and paths. Host document routes reconcile metadata after listings and writes, while signed Gateway runtime routes derive the current scope from the authenticated runtime identity. Project authority requires an active organization membership, plus a current project membership unless the actor is an organization administrator — a read-only membership permits overview, history and read operations only, writes additionally require `rw` access and the applicable document-owner checks, and project ownership derives from `owner_user_id` rather than the historical `created_by`. Unknown project ownership fails closed for destructive mutations.
 
 The transfer broker accepts authorized personal/project pairs, including project-to-project copies. A short-lived metadata plan is consumed by commit; retries recheck authorization and preserve per-file outcomes. Target folders are listed or created through the target runtime, and administrator fan-out is restricted to organization administrators. The browser receives metadata only for the all-scope overview and can enter a scope or create a snapshot before previewing content.
 

@@ -62,6 +62,14 @@ export interface ProjectDetail extends ProjectRow {
   invitations?: ProjectInvitation[]
 }
 
+/** One stored project membership row as seen from the member's account side. */
+export interface UserProjectMembership {
+  projectId: number
+  name: string
+  path: string
+  mode: GrantMode
+}
+
 /**
  * Normalize a project name used by the project catalog and managed directory root.
  * @param name - administrator-supplied project name
@@ -325,6 +333,14 @@ export class ProjectService {
     ).all(id) as Array<{ userId: number }>).map(r => r.userId).sort((a, b) => a - b)
     this.db.prepare(`DELETE FROM projects WHERE id = ?`).run(id)
     return ids
+  }
+
+  membershipsFor(userId: number): UserProjectMembership[] {
+    return this.db.prepare(
+      `SELECT p.id AS projectId, p.name AS name, p.path AS path, m.mode AS mode
+       FROM project_members m JOIN projects p ON p.id = m.project_id
+       WHERE m.user_id = ? ORDER BY p.name`,
+    ).all(userId) as UserProjectMembership[]
   }
 
   setMember(projectId: number, userId: number, mode: GrantMode): void {

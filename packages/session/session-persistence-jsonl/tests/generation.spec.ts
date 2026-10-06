@@ -376,7 +376,8 @@ describe('JSONL immutable generation publication', () => {
       events[0], events[1],
       expect.objectContaining({ type: 'system/message', seq: 2, surfaceOp: 'append', data: expect.objectContaining({ message: expect.objectContaining({ role: 'system', content: [] }) as unknown }) as unknown }) as unknown,
       ...events.slice(2).map(event => event.seq === 3
-        ? { ...event, seq: 4, surfaceOp: { op: 'replace', startSeq: 3, endSeq: 3 }, sourceEventSeqs: [3] }
+        ? { ...event, seq: 4, surfaceOp: { op: 'replace', startSeq: 3, endSeq: 3 }, sourceEventSeqs: [3],
+          data: { ...(event.data as Record<string, unknown>), source: { kind: 'plugin:summary-fixture' } } }
         : event.seq === 4 ? { ...event, seq: 5, data: { header: { config }, reason: 'initial' } } : { ...event, seq: event.seq + 1 }),
     ]
 
@@ -386,8 +387,8 @@ describe('JSONL immutable generation publication', () => {
     expect(await readFile(request.sourcePath)).toEqual(source)
     const written = (await readFile(request.currentPath, 'utf8')).trimEnd().split('\n')
       .map(row => JSON.parse(row) as unknown)
-    expect(written).toEqual([header(6), ...canonical])
-    expect((await readdir(root)).sort()).toEqual(['session.v2.jsonl', 'session.v6.jsonl'])
+    expect(written).toEqual([header(7), ...canonical])
+    expect((await readdir(root)).sort()).toEqual(['session.v2.jsonl', 'session.v7.jsonl'])
   })
 
   it('returns migrated events while publication is still waiting for verification', async () => {
