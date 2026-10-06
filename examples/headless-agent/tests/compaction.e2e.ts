@@ -31,7 +31,9 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('compaction: a long session compa
       await writeFile(join(workdir, `file${i}.txt`), `This is file number ${i}. `.repeat(50))
     }
 
-    // Reasoning tokens require a larger generation cap than the retained checkpoint.
+    // Reasoning tokens count toward the summary call's generation cap: the
+    // default thinking effort can consume a tight cap before any checkpoint
+    // text, so keep it well above the retained region.
     ctx = await codingHarness(workdir, {
       persona: SYSTEM_PROMPT,
       modelContextWindow: 2000,
@@ -41,7 +43,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('compaction: a long session compa
         headroomTokens: 200,
         summarizationProvider: '',
         summarizationModel: '',
-        maxTokens: 1024,
+        maxTokens: 4096,
         compactionRetries: 1,
       },
       persistenceRoot: join(workdir, '.sessions'),
@@ -74,7 +76,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('compaction: a long session compa
     // It succeeded at least once: a `compaction/summary` event describing the summary and a
     // replace-op user/message (the surface mutation) both landed.
     const summaries = events.filter(e => e.type === 'compaction/summary')
-    expect(summaries.length).toBeGreaterThan(0)
+    expect(summaries.length, JSON.stringify(ends.map(event => event.data.error))).toBeGreaterThan(0)
     const replaceNode = events.find((e) => {
       const se = e as unknown as { type: string; surfaceOp?: unknown }
       return se.type === 'user/message' && typeof se.surfaceOp === 'object' && se.surfaceOp !== null
