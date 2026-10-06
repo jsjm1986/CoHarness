@@ -56,10 +56,16 @@ function taskText(body: Record<string, unknown>): string {
 function deepSeekBaseUrl(): string {
   const configured = (process.env.DEEPSEEK_BASE_URL ?? OFFICIAL_DEEPSEEK_BASE_URL)
     .replace(/\/+$/, '')
-  if (configured !== OFFICIAL_DEEPSEEK_BASE_URL) {
+  // The harness env pin names the Messages root since the protocol migration;
+  // the Responses bridge still calls OpenAI-compatible /chat/completions on the
+  // bare host.
+  const host = configured === `${OFFICIAL_DEEPSEEK_BASE_URL}/anthropic`
+    ? OFFICIAL_DEEPSEEK_BASE_URL
+    : configured
+  if (host !== OFFICIAL_DEEPSEEK_BASE_URL) {
     throw new Error('Codex DeepSeek e2e requires the official DeepSeek base URL')
   }
-  return configured
+  return host
 }
 
 async function completeWithDeepSeek(
