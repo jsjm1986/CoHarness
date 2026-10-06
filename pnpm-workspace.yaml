@@ -33,6 +33,10 @@ overrides:
   # Two zod copies in one graph poison `~standard` schema typing (mcp-client's
   # CallToolResult validate narrows to never); 4.5 changed the interface.
   zod: '4.4.3'
+  # Dependabot's 30-day cooldown resolves fresh micromark deps to 2.0.2 while
+  # the committed graph holds 2.0.3; mixing both breaks Extension assignability
+  # (ui-primitives fromMarkdown overloads). Keep the whole graph on 2.0.3.
+  micromark-util-types: '2.0.3'
 
 peerDependencyRules:
   allowedVersions:
