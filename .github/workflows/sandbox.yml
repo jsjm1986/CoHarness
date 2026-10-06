@@ -65,15 +65,21 @@ jobs:
         include:
           - os: ubuntu-latest
             runner: bwrap
+            timeout: 20
           - os: ubuntu-24.04
             runner: landlock
+            timeout: 20
           - os: ubuntu-24.04-arm
             runner: landlock
+            timeout: 20
+          # seatbelt adds the full darwin unit suite under the sandbox e2e; hosted
+          # macOS runner speed varies enough that 20m sits under the real wall time.
           - os: macos-latest
             runner: seatbelt
+            timeout: 35
     name: sandbox e2e (${{ matrix.runner }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: ${{ matrix.timeout }}
     steps:
       - uses: actions/checkout@v7
         with:
