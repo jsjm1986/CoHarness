@@ -12,6 +12,7 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { installJobArchiveAdmission } from './archive-admission.ts'
+import { installJobIdleVeto } from './idle-release.ts'
 import type { JobEvents, JobId, JobOutputRead, JobRead, JobSpec, JobView } from './types.ts'
 
 export { JobId } from './types.ts'
@@ -94,6 +95,9 @@ export abstract class JobRegistry extends Service {
     // Archive admission: the Workspace registry asks what still runs for a
     // Session before hiding it; owned jobs answer here for every implementation.
     installJobArchiveAdmission(ctx, this)
+    // Idle veto: a running or stopping job keeps its owning Agent busy, so
+    // `tryDisposeIdle` cannot retire the owner mid-flight.
+    installJobIdleVeto(ctx, this)
   }
 
   /** Lifecycle and output events, filtered per subscription. */
