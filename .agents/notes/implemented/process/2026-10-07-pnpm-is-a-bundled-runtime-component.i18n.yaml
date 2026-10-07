@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-07-pnpm-is-a-bundled-runtime-component.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-07-pnpm-is-a-bundled-runtime-component.md
+/agent-note-the-pnpm-dependency-is-a-bundled-runtime-component:
+  en: c9258eeabf501980
+  zh: 911f3a1b8b703d3d
+/agent-note-the-pnpm-dependency-is-a-bundled-runtime-component/problem:
+  en: 5c5ca7c84daa4dd5
+  zh: 1aa0cca02d655aeb
+/agent-note-the-pnpm-dependency-is-a-bundled-runtime-component/decision:
+  en: b4f81af03ada01f9
+  zh: 34e64c6d12dfe5e6
+/agent-note-the-pnpm-dependency-is-a-bundled-runtime-component/alternatives-considered:
+  en: a2cf16a6e6b1af19
+  zh: 2bb6334d2609eaa4
+/agent-note-the-pnpm-dependency-is-a-bundled-runtime-component/consequences:
+  en: c367219034bae420
+  zh: df88d9943a0ea435
