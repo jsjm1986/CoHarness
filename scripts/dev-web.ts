@@ -128,7 +128,7 @@ export async function watchClientPlugins(
   const initialBuilds = new Promise<void>((resolve) => { resolveInitialBuilds = resolve })
   const initialized = new WeakSet<object>()
   const readiness: { expectedBuilds?: number; initializedBuilds: number } = { initializedBuilds: 0 }
-  const bundles = await build({
+  const handle = await build({
     cwd: root,
     workspace: [...pluginDirs],
     watch: true,
@@ -147,10 +147,10 @@ export async function watchClientPlugins(
       ? { inputOptions: { watch: { watcher: { usePolling: true, pollInterval } } } }
       : {},
   })
-  readiness.expectedBuilds = bundles.length
+  readiness.expectedBuilds = handle.bundles.length
   if (readiness.initializedBuilds >= readiness.expectedBuilds) resolveInitialBuilds?.()
   await initialBuilds
-  return bundles
+  return handle.bundles
 }
 
 /**
