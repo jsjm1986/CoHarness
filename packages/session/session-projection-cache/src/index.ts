@@ -95,6 +95,13 @@ export class SessionProjectionCache extends Service {
 
   private table?: KvTable<SessionId, CheckpointRecord>
   private readonly dirty = new Map<Session, DirtyState>()
+  // Writes suspend inside `sessions.flush`, so two writes for one session can
+  // be in flight at once (creation's write overlapping a turn/end write, for
+  // example). The write chain orders puts by arrival, not by trigger, so an
+  // older cut could land last and erase fresher rows. The epoch counter lets
+  // each write recognize that a newer write started while it awaited and skip
+  // publishing its stale cut.
+  private readonly writeEpochs = new WeakMap<Session, number>()
 
   constructor(ctx: Context, public config: Config) {
     super(ctx, 'sessionProjectionCache')
@@ -243,6 +250,8 @@ export class SessionProjectionCache extends Service {
    * @returns resolution after durability and event emission.
    */
   async write(session: Session): Promise<void> {
+    const epoch = (this.writeEpochs.get(session) ?? 0) + 1
+    this.writeEpochs.set(session, epoch)
     const rows = this.ctx.sessionProjections.checkpoint(session)
     this.markClean(session)
     // Durability barrier: the checkpoint cut was taken above, so flushing
@@ -253,6 +262,9 @@ export class SessionProjectionCache extends Service {
     // already gone; persistence's own retirement drain covers that path and
     // any residual overreach is caught by the cold read's anchored floor.
     if (this.ctx.sessions.get(session.id) === session) await this.ctx.sessions.flush(session)
+    // A newer write started while this one awaited its flush; publishing this
+    // cut now would overwrite fresher rows with stale ones.
+    if (this.writeEpochs.get(session) !== epoch) return
     await this.put(
       session.id,
       identityOf(session.header, session.inheritedEventCount),

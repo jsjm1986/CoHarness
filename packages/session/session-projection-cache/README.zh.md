@@ -61,7 +61,7 @@ kind: "package-reference"
 
 调用方提供该会话完整有序的日志（session-query 观察层是出厂生产者）；缓存在可用时以检查点行为每个单元播种，把供入事件折叠到切点，并刷新记录而不自行读取持久化。来自另一 Session 格式世代或生命周期的行永不匹配：每条记录绑定完整身份（`formatVersion`、`createdAt`、`cwd`、`isSeeded`、`inheritedEventCount`）。`hydratePrepared(session, events)` 是对已准备好的未发布 Session 做同样的播种再折叠，不写任何内容。
 
-`write(session)` 是所有必写点共用的同步切面检查点；载体可以直接调用（非 fail-soft——由 fail-soft 包装层负责遏制）。
+`write(session)` 是所有必写点共用的同步切面检查点；载体可以直接调用（非 fail-soft——由 fail-soft 包装层负责遏制）。仍在等待 flush 的写若发现已有更新的写启动，则丢弃自己的旧切面而不再发布——最后触发的写始终赢得该会话的持久记录。
 
 <a id="upgrade-compatibility"></a>
 ## 升级兼容性
