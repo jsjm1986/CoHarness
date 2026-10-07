@@ -217,6 +217,33 @@ describe('SessionProjectionCache write policy', () => {
       .toEqual({ ver: 1, seq: end.seq, val: { marks: ['a'] } })
   })
 
+  it('drops the older cut when a write outlives a newer one across the flush await', async () => {
+    const { ctx, root, cache } = await harness()
+    const id = SessionId('overlapped')
+    const created = whenWritten(ctx, id)
+    const session = ctx.sessions.create(id)
+    await created
+
+    // Park the older write inside its durability flush so the newer write
+    // publishes first; the parked cut must then be dropped, not written —
+    // the write chain orders puts by arrival, not by trigger.
+    let release!: () => void
+    const gate = new Promise<boolean>((resolve) => { release = () => resolve(true) })
+    vi.spyOn(ctx.sessions, 'flush').mockImplementationOnce(() => gate)
+    const stale = cache.write(session)
+    mark(session, ['fresh'])
+    const fresh = cache.write(session)
+    await whenWritten(ctx, id)
+    const republished = whenWritten(ctx, id)
+    release()
+    await Promise.all([stale, fresh])
+    expect(await Promise.race([
+      republished.then(() => true),
+      new Promise(resolve => setTimeout(resolve, 200)).then(() => false),
+    ])).toBe(false)
+    expect((await storedRows(root, id))?.['cache-test/marks']?.val).toEqual({ marks: ['fresh'] })
+  })
+
   it('writes a checkpoint at session creation, capturing the seed-derived cut', async () => {
     const { ctx, root } = await harness()
     // A forked child seeded with its ancestor's title-like event: no
