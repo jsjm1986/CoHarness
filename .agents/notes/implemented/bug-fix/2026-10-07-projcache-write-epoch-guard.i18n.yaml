@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-07-projcache-write-epoch-guard.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-07-projcache-write-epoch-guard.md
+/agent-note-projection-cache-writes-drop-superseded-cuts:
+  en: 6123b381c500b333
+  zh: da429b8aa8d7b640
+/agent-note-projection-cache-writes-drop-superseded-cuts/problem:
+  en: abd1f621493e06b8
+  zh: ea3a259a499c864b
+/agent-note-projection-cache-writes-drop-superseded-cuts/decision:
+  en: ca8645ea38567321
+  zh: 426da5420eca4a07
+/agent-note-projection-cache-writes-drop-superseded-cuts/alternatives-considered:
+  en: e6166b2504811bcb
+  zh: 0ffac605968a2cbe
+/agent-note-projection-cache-writes-drop-superseded-cuts/consequences:
+  en: 6520c405199af39d
+  zh: 7925b8d05e6aaf40

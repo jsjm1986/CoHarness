@@ -61,7 +61,7 @@ The zero-I/O rung: client values viewed straight from the identity-matching stor
 
 The caller supplies the session's complete ordered log (the session-query observation layer is the shipped producer); the cache seeds each unit from its checkpoint row when usable, folds the supplied events to the cut, and refreshes the record without reading persistence itself. A row seeded from another Session format generation or lifecycle never matches: each record binds the complete identity (`formatVersion`, `createdAt`, `cwd`, `isSeeded`, `inheritedEventCount`). `hydratePrepared(session, events)` is the same seed-then-fold for an already-prepared unpublished Session, writing nothing.
 
-`write(session)` is the synchronous-cut checkpoint all mandatory points use; carriers may call it directly (not fail-soft — the fail-soft wrappers own containment).
+`write(session)` is the synchronous-cut checkpoint all mandatory points use; carriers may call it directly (not fail-soft — the fail-soft wrappers own containment). A write still awaiting its flush when a newer write starts drops its stale cut instead of publishing — the latest-triggered write always wins the session's durable row.
 
 <a id="upgrade-compatibility"></a>
 ## Upgrade compatibility
