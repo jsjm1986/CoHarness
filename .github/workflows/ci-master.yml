@@ -85,7 +85,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/action-setup@v6.0.10
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
@@ -127,7 +127,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/action-setup@v6.0.10
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
@@ -173,7 +173,7 @@ jobs:
           reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
           /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
 
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/action-setup@v6.0.10
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
@@ -264,7 +264,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/action-setup@v6.0.10
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
@@ -358,7 +358,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/action-setup@v6.0.10
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
