@@ -241,6 +241,9 @@ jobs:
       - name: Build single-exe
         env:
           DSH_BUILD_CLIENT_PROFILE: coharness
+          # `tsc -b` over the full host graph exceeds V8's ~4 GB default heap
+          # on the hosted macOS runners; Linux/Windows tolerate the same cap.
+          NODE_OPTIONS: '--max-old-space-size=8192'
         run: pnpm exec tsx scripts/build-exe-for-python-sdk.ts --targets=${{ matrix.target }}
 
       - name: Resolve platform outputs (POSIX)
