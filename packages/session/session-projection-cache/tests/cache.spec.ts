@@ -228,7 +228,7 @@ describe('SessionProjectionCache write policy', () => {
     // publishes first; the parked cut must then be dropped, not written —
     // the write chain orders puts by arrival, not by trigger.
     let release!: () => void
-    const gate = new Promise<boolean>((resolve) => { release = () => resolve(true) })
+    const gate = new Promise<boolean>((resolve) => { release = () => { resolve(true) } })
     vi.spyOn(ctx.sessions, 'flush').mockImplementationOnce(() => gate)
     const stale = cache.write(session)
     mark(session, ['fresh'])
