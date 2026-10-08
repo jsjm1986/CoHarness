@@ -177,9 +177,13 @@ it('hands checkpoint ownership to a live Goal turn and allows purge after explic
     ctx.goals.pause(handle.agent, goal)
   } finally { release.resolve(undefined) }
   await handle.agent.whenIdle()
-  await vi.waitFor(() => { using _reservation = ctx.agents.reserveRemoval([handle.agent.id]) })
-  expect(ctx.goals.get(handle.agent)).toMatchObject({ phase: 'paused', roundsStarted: 1 })
-  expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeDefined()
-  expect(await owner.withReleased([handle.agent.id], remove)).toBe('removed')
+  // The driver's post-abort checkpoint still holds a use claim that can land
+  // after a claim-free sample; 'pending lifecycle operation' is the designed
+  // refusal while it settles, so admission itself is the wait condition.
+  await vi.waitFor(async () => {
+    expect(ctx.goals.get(handle.agent)).toMatchObject({ phase: 'paused', roundsStarted: 1 })
+    expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeDefined()
+    expect(await owner.withReleased([handle.agent.id], remove)).toBe('removed')
+  })
   expect(remove).toHaveBeenCalledOnce()
 })

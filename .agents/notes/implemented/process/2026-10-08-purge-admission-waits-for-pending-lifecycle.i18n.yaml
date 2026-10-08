@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-08-purge-admission-waits-for-pending-lifecycle.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-08-purge-admission-waits-for-pending-lifecycle.md
+/agent-note-purge-admission-waits-for-pending-lifecycle-settlement:
+  en: 39a2925fa6f3a687
+  zh: 68c8040fc29eb898
+/agent-note-purge-admission-waits-for-pending-lifecycle-settlement/problem:
+  en: f5b4f15edd92906e
+  zh: a2c18da781808f12
+/agent-note-purge-admission-waits-for-pending-lifecycle-settlement/decision:
+  en: 0b9fa79816794f23
+  zh: 049b4d3960fd6baf
+/agent-note-purge-admission-waits-for-pending-lifecycle-settlement/alternatives-considered:
+  en: cc33a596a9a9efc1
+  zh: 484adfdf21b44ab0
+/agent-note-purge-admission-waits-for-pending-lifecycle-settlement/testing:
+  en: 31618e3af5ccac54
+  zh: 6238a1b726602f38
+/agent-note-purge-admission-waits-for-pending-lifecycle-settlement/consequences:
+  en: 7ae383bacd69538d
+  zh: f27c2155fafff303
