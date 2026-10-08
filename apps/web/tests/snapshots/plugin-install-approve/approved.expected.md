@@ -1,0 +1,12 @@
+- dialog "Installed":
+  - button "Close":
+    - img
+  - status: Installed
+  - paragraph: approval-fixture-addon
+  - paragraph: Local directory
+  - paragraph: Version 1.0.0
+  - status: "Install scripts allowed for approval-fixture-addon@file:{{fixtureSource}}"
+  - button "Show install details":
+    - text: Show install details
+    - img
+  - button "Enable now"

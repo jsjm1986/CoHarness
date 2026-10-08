@@ -60,6 +60,7 @@
     "@deepseek-ai/dsh-atomic-write": "workspace:*",
     "@deepseek-ai/dsh-util-values": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
+    "@pnpm/building.policy": "1100.1.6",
     "execa": "^10.0.0",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
@@ -103,6 +104,6 @@
     "@deepseek-ai/dsh-session-projection": "workspace:*",
     "@deepseek-ai/dsh-sandbox": "workspace:*",
     "@deepseek-ai/dsh-user-approval": "workspace:*",
-    "pnpm": "11.7.0"
+    "pnpm": "11.28.4"
   }
 }
