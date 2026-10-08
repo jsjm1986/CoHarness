@@ -27,6 +27,10 @@ Upstream alpha.2 registers HTML and Markdown document bodies in `ui-sidebar-docu
 
 **A content cache beside the registry.** Rejected by [the document-preview operations note](../architecture/2026-09-08-document-preview-operations.md): a second owner duplicates addressing, cancellation, and subscription lifetime that the request's abort signal already provides.
 
+## Testing
+
+The [HTML preview component suite](../../../../packages/client/ui-workbench/tests/workspace-html.client.spec.tsx) holds packaging promises across unmount and renderer replacement. Completion after unmount cannot create a Blob URL; rejection from a canceled renderer cannot replace the active iframe with a failure state. Removing either cancellation check fails its focused regression. The deferred packaging fixtures settle their promises before restoring the global Blob URL hooks.
+
 ## Consequences
 
 Markdown and HTML previews now behave like upstream's on the surfaces that matter — incremental text for Markdown, a fully packaged opaque iframe for HTML — while ACL, versioning, cancellation, and runtime targeting stay exactly those of the existing file tab. HTML dependency graphs pay bounded whole-file memory; unsupported traversals are documented in the package README rather than silently half-loaded. The [recorded browser scenario](../../../../apps/web/tests/workspace-files.e2e.ts) exercises Markdown rendering, the sandboxed packaged frame, and the shared change/reload path.
