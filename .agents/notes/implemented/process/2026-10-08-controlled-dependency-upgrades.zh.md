@@ -12,6 +12,10 @@ Status: implemented
 
 [`scripts/verify-dependency-cohorts.ts`](../../../../scripts/verify-dependency-cohorts.ts) 读取 `pnpm-lock.yaml` 的 importer 表，任何直接声明的 `vitest` 或 `@vitest/*` 条目解析到与根 `devDependencies.vitest` 不同的版本即拒绝（忽略 peer 依赖后缀）。该校验在 `pnpm run constraints` 内执行，并作为独立的 `pnpm run verify-dependency-cohorts` 步骤运行于 `ci.yml` 的 `pr-scope` job 中——位于分类器运行时安装之后、scope 分类之前，因此家族漂移会在 lane 选择前失败。
 
+同一预检在范围分类之前运行纯源码的 [CI 工作流约束测试](../../../../scripts/ci-workflow.spec.ts)。工作流断言失败时，消费者矩阵不会被选中。该预检无条件运行，不允许在断言失败后继续执行。
+
+浏览器验证在 Pull Request、合并后巡检和手动完整审计三个入口保留失败截图、DOM 与夹具策略证据。仅在失败时执行的上传包含隐藏文件，并使用按尝试编号区分的名称，因此重跑会保留先前的失败制品。入口在生成浏览器证据之前失败时，会报告文件缺失而不替换原始失败。
+
 仅含安装器更新的 diff 会选中其运行时和平台消费者。[`scripts/ci-pr-proofs.ts`](../../../../scripts/ci-pr-proofs.ts) 根据改动路径确定必需的验证，而不依赖候选计划的 `reason` 字段。对不受信任的执行者，绑定凭据的验证明确标记为 withheld。冻结基线保留历史 `action-only` 原因供比较；默认的 `shadow` 执行将其分类与当前候选分类合并。
 
 [`.github/dependabot.yml`](../../../../.github/dependabot.yml) 定义每周版本更新计划、分生态 Pull Request 限额，以及 `vitest` 与 `bundled-pnpm` 更新分组。Vitest 家族、pnpm 和 `@vitejs/plugin-react` 的主版本升级需要经过评审的迁移；不相关的主版本仍可提出。`pnpm/action-setup` 仅暂留精确版本 `6.1.0`，等待 macOS Intel 引导验证（#254），并非否定整个 6.x 系列。6.0.10 同样会自更新 pnpm。

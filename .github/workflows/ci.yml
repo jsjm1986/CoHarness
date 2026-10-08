@@ -105,6 +105,9 @@ jobs:
       - name: Verify dependency cohorts before lane selection
         run: pnpm run verify-dependency-cohorts
 
+      - name: Validate workflow contracts before lane selection
+        run: pnpm exec vitest run scripts/ci-workflow.spec.ts
+
       - name: Classify pull-request scope
         id: scope
         env:
@@ -714,6 +717,17 @@ jobs:
       - name: Run full web verification
         if: needs.pr-scope.outputs.snapshot_mode == 'full'
         run: pnpm run check:ci:web:full
+
+      - name: Upload browser failure evidence
+        if: failure() && (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-failure-evidence-${{ github.run_attempt }}
+          path: .artifacts/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Summarize golden changes and replay status
         if: always() && (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
         env:
@@ -1008,6 +1022,16 @@ jobs:
       - name: Run full Linux audit
         run: pnpm run check:ci:linux-primary
 
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: full-audit-failure-evidence-${{ github.run_attempt }}
+          path: .artifacts/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Preserve gate evidence
         if: always()
         uses: ./.github/actions/gate-evidence
@@ -1119,9 +1143,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: web-sweep-failure-evidence
+          name: web-sweep-failure-evidence-${{ github.run_attempt }}
           path: .artifacts/
-          if-no-files-found: ignore
+          include-hidden-files: true
+          if-no-files-found: warn
           retention-days: 14
       - name: Preserve gate evidence
         if: always()
