@@ -26,7 +26,7 @@ The 11.x line keeps the bundled-JavaScript distribution contract: `exports['.']`
 
 ## Testing
 
-[`scripts/pnpm-runtime-component.spec.ts`](../../../../scripts/pnpm-runtime-component.spec.ts) contracts the pins, distribution metadata, entrypoint execution, relocation, and the Wine pipeline shape; [`packages/boot/plugin-manager/tests/build-approval.spec.ts`](../../../../packages/boot/plugin-manager/tests/build-approval.spec.ts) exercises the policy contract including capture, denials, and malformed module state; `manager.spec.ts` runs the real pinned pnpm through a blocked install, approval, and retry build; [`apps/web/tests/plugin-install-approve.e2e.ts`](../../../../apps/web/tests/plugin-install-approve.e2e.ts) covers the assembled browser scenario end to end.
+[`scripts/pnpm-runtime-component.spec.ts`](../../../../scripts/pnpm-runtime-component.spec.ts) contracts the pins, distribution metadata, entrypoint execution, relocation, and the Wine pipeline shape; [`packages/boot/plugin-manager/tests/build-approval.spec.ts`](../../../../packages/boot/plugin-manager/tests/build-approval.spec.ts) exercises the policy contract including capture, denials, and malformed module state; `manager.spec.ts` runs the real pinned pnpm through a blocked install, approval, and retry build; [`apps/web/tests/plugin-install-approve.e2e.ts`](../../../../apps/web/tests/plugin-install-approve.e2e.ts) covers the assembled browser scenario end to end; [`scripts/client-tsconfig.spec.ts`](../../../../scripts/client-tsconfig.spec.ts) asserts through compiler-parsed project inputs that every Host-owned web e2e root, including that scenario, stays out of the client program.
 
 ## Consequences
 

@@ -26,7 +26,7 @@ pnpm 的 hoisted linker 曾存在上游 rename 竞态（pnpm/pnpm#12880）：目
 
 ## Testing
 
-[`scripts/pnpm-runtime-component.spec.ts`](../../../../scripts/pnpm-runtime-component.spec.ts) 固化 pin、分发元数据、入口执行、迁址与 Wine 管线形态；[`packages/boot/plugin-manager/tests/build-approval.spec.ts`](../../../../packages/boot/plugin-manager/tests/build-approval.spec.ts) 覆盖策略契约，包括捕获、拒绝与畸形模块状态；`manager.spec.ts` 用真实固定版 pnpm 跑完被拦安装、批准与重试构建；[`apps/web/tests/plugin-install-approve.e2e.ts`](../../../../apps/web/tests/plugin-install-approve.e2e.ts) 端到端覆盖组装后的浏览器场景。
+[`scripts/pnpm-runtime-component.spec.ts`](../../../../scripts/pnpm-runtime-component.spec.ts) 固化 pin、分发元数据、入口执行、迁址与 Wine 管线形态；[`packages/boot/plugin-manager/tests/build-approval.spec.ts`](../../../../packages/boot/plugin-manager/tests/build-approval.spec.ts) 覆盖策略契约，包括捕获、拒绝与畸形模块状态；`manager.spec.ts` 用真实固定版 pnpm 跑完被拦安装、批准与重试构建；[`apps/web/tests/plugin-install-approve.e2e.ts`](../../../../apps/web/tests/plugin-install-approve.e2e.ts) 端到端覆盖组装后的浏览器场景；[`scripts/client-tsconfig.spec.ts`](../../../../scripts/client-tsconfig.spec.ts) 通过编译器解析的项目输入断言，包括该场景在内的每个 Host 侧 web e2e 根文件都不会进入 client 程序。
 
 ## Consequences
 
