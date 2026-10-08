@@ -100,17 +100,22 @@ jobs:
       # functional probe (and the run-guard below) is the arbiter anyway.
       - name: Install bubblewrap (unrestrict userns)
         if: matrix.runner == 'bwrap'
+        timeout-minutes: 3
+        run: bash scripts/prepare-ci-bubblewrap.sh
+
+      - uses: ./.github/actions/prepare-ci-apt
+        if: matrix.runner == 'landlock'
+
+      - name: Install musl toolchain
+        if: matrix.runner == 'landlock'
+        timeout-minutes: 5
         run: |
           sudo apt-get update -q
-          sudo apt-get install -yq bubblewrap
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 \
-            || echo "apparmor userns knob absent — the functional probe decides"
+          sudo apt-get install -yq musl-tools
 
       - name: Build Landlock launcher for this architecture
         if: matrix.runner == 'landlock'
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -yq musl-tools
           pnpm --dir native/system run build:ts
           pnpm --dir native/system run build:native
 

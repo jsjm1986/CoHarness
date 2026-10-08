@@ -48,21 +48,24 @@ const request: WorkspaceResourceOpenRequest = {
 }
 const file = (text: string, version = 'v1') => ({ bytes: btoa(text), version })
 
-function harness(read: ReadWorkspaceFileData) {
+function harness(read: ReadWorkspaceFileData, initialRenderer: RenderWorkspaceHtml = renderHtml) {
   const resources = new WorkspaceResourceRegistry()
   let version = 'v1'
   resources.register(request.runtimeTarget, {
     stat: async () => ({ sessionId: id, path: request.path, type: 'file', version, bytes: 10, changed: false }),
   }, 5)
   const close = vi.fn()
-  const view = render(<PreviewResourceBinding resources={resources} request={request}>{resource =>
+  const mount = (renderer: RenderWorkspaceHtml) => <PreviewResourceBinding resources={resources} request={request}>{resource =>
     <WorkspaceHtmlPreview request={request} resource={resource} read={read}
-      renderHtml={renderHtml} htmlT={htmlT} close={close}
+      renderHtml={renderer} htmlT={htmlT} close={close}
       labels={{ close: 'Close', reload: 'Reload', changed: 'File changed' }} />
-  }</PreviewResourceBinding>)
+  }</PreviewResourceBinding>
+  const view = render(mount(initialRenderer))
   return { ...view, resources, close, change() {
     version = 'v2'
     resources.handleChange(request.runtimeTarget, { sessionId: id, path: request.path, version })
+  }, rerenderHtml(renderer: RenderWorkspaceHtml) {
+    view.rerender(mount(renderer))
   } }
 }
 
@@ -131,6 +134,61 @@ describe('WorkspaceHtmlPreview', () => {
     view.unmount()
     await act(async () => { pending.reject(new Error('late failure')) })
     expect(view.container.childElementCount).toBe(0)
+  })
+
+  it('creates no Blob URL when packing completes after unmount', async () => {
+    const packing = Promise.withResolvers<string>()
+    const renderer = vi.fn<RenderWorkspaceHtml>().mockReturnValue(packing.promise)
+    const read = vi.fn<ReadWorkspaceFileData>().mockResolvedValue(file('<p>v1</p>'))
+    const view = harness(read, renderer)
+    try {
+      await waitFor(() => { expect(renderer).toHaveBeenCalledOnce() })
+      const packingSignal = renderer.mock.calls[0]![4]
+      expect(packingSignal.aborted).toBe(false)
+      view.unmount()
+      expect(packingSignal.aborted).toBe(true)
+      await act(async () => {
+        packing.resolve('<html/>')
+        await packing.promise
+      })
+      expect(create).not.toHaveBeenCalled()
+      expect(revoke).not.toHaveBeenCalled()
+      expect(view.container.childElementCount).toBe(0)
+    } finally {
+      view.unmount()
+      packing.resolve('<html/>')
+      await act(async () => { await Promise.allSettled([packing.promise]) })
+    }
+  })
+
+  it('keeps the current iframe when a superseded packer rejects', async () => {
+    const stale = Promise.withResolvers<string>()
+    const first = vi.fn<RenderWorkspaceHtml>().mockReturnValue(stale.promise)
+    const second = vi.fn<RenderWorkspaceHtml>().mockResolvedValue('<html/>')
+    const read = vi.fn<ReadWorkspaceFileData>().mockResolvedValue(file('<p>v1</p>'))
+    const view = harness(read, first)
+    try {
+      await waitFor(() => { expect(first).toHaveBeenCalledOnce() })
+      const firstSignal = first.mock.calls[0]![4]
+      expect(firstSignal.aborted).toBe(false)
+      view.rerenderHtml(second)
+      await waitFor(() => { expect(second).toHaveBeenCalledOnce() })
+      expect(firstSignal.aborted).toBe(true)
+      const iframe = await waitFor(() => view.getByTitle(en.frame))
+      const url = iframe.getAttribute('src')
+      stale.reject(new Error('superseded pack'))
+      await act(async () => { await Promise.allSettled([stale.promise]) })
+      const current = view.getByTitle(en.frame)
+      expect(current === iframe).toBe(true)
+      expect(current.getAttribute('src')).toBe(url)
+      expect(view.queryByRole('alert')).toBeNull()
+      expect(create).toHaveBeenCalledOnce()
+      expect(revoke).not.toHaveBeenCalled()
+    } finally {
+      view.unmount()
+      stale.reject(new Error('superseded pack'))
+      await act(async () => { await Promise.allSettled([stale.promise]) })
+    }
   })
 
   it('reports a read rejection and permits retry', async () => {
