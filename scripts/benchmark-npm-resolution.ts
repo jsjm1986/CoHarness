@@ -7,6 +7,8 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { parseArgs } from 'node:util'
+import { setTimeout as pollDelay } from 'node:timers/promises'
+import { linuxProcessGroupHasLiveMembers } from '../packages/subprocess/subprocess-local/src/proc-stat.ts'
 
 const TARGET_PACKAGE = '@deepseek-ai/dsh'
 const DEFAULT_TIMEOUT_MS = 300_000
@@ -273,23 +275,22 @@ function npmExecutable(): string {
   return process.platform === 'win32' ? 'npm.cmd' : 'npm'
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise(resolveDelay => setTimeout(resolveDelay, ms))
-}
-
 function signalProcessTree(child: ChildProcess, signal: 'SIGTERM' | 'SIGKILL'): void {
   if (child.pid === undefined) {
     child.kill(signal)
     return
   }
   if (process.platform === 'win32') {
-    const force = signal === 'SIGKILL' ? ['/F'] : []
-    const result = spawnSync('taskkill', ['/PID', String(child.pid), '/T', ...force], {
+    // Windows console processes have no cooperative SIGTERM; stop the tree before its root disappears.
+    const result = spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
       stdio: 'ignore',
       windowsHide: true,
+      timeout: FORCED_EXIT_TIMEOUT_MS,
     })
     if (result.error !== undefined) throw result.error
-    if (result.status !== 0 && child.exitCode === null && child.signalCode === null) child.kill(signal)
+    if (result.status !== 0 && child.exitCode === null && child.signalCode === null) {
+      throw new Error(`taskkill failed to terminate process tree ${child.pid} (status ${String(result.status)})`)
+    }
     return
   }
   try {
@@ -299,12 +300,29 @@ function signalProcessTree(child: ChildProcess, signal: 'SIGTERM' | 'SIGKILL'): 
   }
 }
 
+function processTreeCanExecute(child: ChildProcess): boolean {
+  if (child.pid === undefined) return false
+  if (process.platform === 'win32') return child.exitCode === null && child.signalCode === null
+  try {
+    process.kill(-child.pid, 0)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false
+    throw error
+  }
+  return process.platform !== 'linux' || linuxProcessGroupHasLiveMembers(child.pid) !== false
+}
+
+function assertNever(value: never): never {
+  throw new Error(`unexpected command completion: ${String(value)}`)
+}
+
 /**
- * Run one command with bounded process-tree termination after its deadline.
+ * Run one command with process-tree termination on timeout or caller cancellation.
  * @param command - Executable path or name.
  * @param args - Arguments passed without shell interpolation on POSIX.
- * @param options - Working directory, environment, timeout, and termination grace.
+ * @param options - Working directory, environment, timeout, termination grace, and caller lifetime.
  * @returns Exit facts, captured output, duration, and whether timeout handling began.
+ * @throws The caller's abort reason after its process tree and output pipes settle.
  */
 export async function runCommandWithTimeout(
   command: string,
@@ -314,14 +332,16 @@ export async function runCommandWithTimeout(
     readonly env: NodeJS.ProcessEnv
     readonly timeoutMs: number
     readonly terminationGraceMs?: number
+    readonly signal?: AbortSignal
   },
 ): Promise<{ status: number | null; signal: NodeJS.Signals | null; durationMs: number; output: string; timedOut: boolean }> {
+  options.signal?.throwIfAborted()
   const started = performance.now()
   const child = spawn(command, [...args], {
     cwd: options.cwd,
     detached: process.platform !== 'win32',
     env: options.env,
-    shell: process.platform === 'win32',
+    shell: process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command),
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let output = ''
@@ -334,28 +354,66 @@ export async function runCommandWithTimeout(
     child.once('close', (status, signal) => { resolveExit({ status, signal }) })
   })
   let timeout: NodeJS.Timeout | undefined
+  let graceTimeout: NodeJS.Timeout | undefined
+  let forcedTimeout: NodeJS.Timeout | undefined
+  let onAbort: (() => void) | undefined
+  const exitPoll = new AbortController()
   try {
     const first = await Promise.race([
       exited.then(outcome => ({ type: 'exit' as const, outcome })),
       new Promise<{ type: 'timeout' }>((resolveTimeout) => {
         timeout = setTimeout(() => { resolveTimeout({ type: 'timeout' }) }, options.timeoutMs)
       }),
+      new Promise<{ type: 'aborted'; reason: unknown }>((resolveAbort) => {
+        onAbort = () => { resolveAbort({ type: 'aborted', reason: options.signal?.reason }) }
+        options.signal?.addEventListener('abort', onAbort, { once: true })
+        if (options.signal?.aborted === true) onAbort()
+      }),
     ])
-    if (first.type === 'exit') {
-      return { ...first.outcome, durationMs: performance.now() - started, output, timedOut: false }
+    switch (first.type) {
+      case 'exit':
+        return { ...first.outcome, durationMs: performance.now() - started, output, timedOut: false }
+      case 'timeout':
+      case 'aborted':
+        break
+      default:
+        assertNever(first)
     }
 
     signalProcessTree(child, 'SIGTERM')
-    await delay(options.terminationGraceMs ?? TERMINATION_GRACE_MS)
-    signalProcessTree(child, 'SIGKILL')
-    const forced = await Promise.race([
-      exited,
-      delay(FORCED_EXIT_TIMEOUT_MS).then(() => undefined),
+    const groupState = { exited: false }
+    const treeClosed = (async () => {
+      while (processTreeCanExecute(child)) await pollDelay(15, undefined, { signal: exitPoll.signal })
+      groupState.exited = true
+      return exited
+    })()
+    const graceful = await Promise.race([
+      treeClosed,
+      new Promise<undefined>((resolveGrace) => {
+        graceTimeout = setTimeout(() => { resolveGrace(undefined) }, options.terminationGraceMs ?? TERMINATION_GRACE_MS)
+      }),
     ])
-    if (forced === undefined) throw new Error('timed-out process tree did not exit after SIGKILL')
+    if (graceful !== undefined) {
+      if (first.type === 'aborted') throw first.reason
+      return { ...graceful, durationMs: performance.now() - started, output, timedOut: true }
+    }
+    // Group absence ends signalling even when an inherited output pipe closes later.
+    if (!groupState.exited) signalProcessTree(child, 'SIGKILL')
+    const forced = await Promise.race([
+      treeClosed,
+      new Promise<undefined>((resolveForced) => {
+        forcedTimeout = setTimeout(() => { resolveForced(undefined) }, FORCED_EXIT_TIMEOUT_MS)
+      }),
+    ])
+    if (forced === undefined) throw new Error('process tree or output pipes did not settle during termination')
+    if (first.type === 'aborted') throw first.reason
     return { ...forced, durationMs: performance.now() - started, output, timedOut: true }
   } finally {
+    exitPoll.abort()
     if (timeout !== undefined) clearTimeout(timeout)
+    if (graceTimeout !== undefined) clearTimeout(graceTimeout)
+    if (forcedTimeout !== undefined) clearTimeout(forcedTimeout)
+    if (onAbort !== undefined) options.signal?.removeEventListener('abort', onAbort)
   }
 }
 
@@ -376,6 +434,7 @@ async function runNpm(
   cwd: string,
   registry: string,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<{ durationMs: number; output: string; timedOut: boolean }> {
   const npmrc = join(cwd, '.npmrc')
   const globalNpmrc = join(cwd, '.npmrc-global')
@@ -404,6 +463,7 @@ async function runNpm(
       npm_config_update_notifier: 'false',
     },
     timeoutMs,
+    ...signal === undefined ? {} : { signal },
   })
   if (result.timedOut) return result
   if (result.status !== 0) {
@@ -418,6 +478,7 @@ async function runNpm(
  * @param dependencies - Root dependencies whose install layout npm computes.
  * @param timeoutMs - Hard wall-clock limit for the npm child process.
  * @param timeoutSubject - What the limit guards, named in the timeout diagnostic.
+ * @param signal - Caller lifetime; cancellation waits for npm and registry cleanup.
  * @returns The package lock plus timing and registry-request observations.
  */
 export async function resolveNpmPackageLock(
@@ -425,7 +486,9 @@ export async function resolveNpmPackageLock(
   dependencies: Readonly<Record<string, string>>,
   timeoutMs: number,
   timeoutSubject = 'npm resolution',
+  signal?: AbortSignal,
 ): Promise<NpmPackageLockResolution> {
+  signal?.throwIfAborted()
   let registryRequests = 0
   let archiveRequests = 0
   const unknownPackages = new Set<string>()
@@ -462,17 +525,19 @@ export async function resolveNpmPackageLock(
     })
     response.end(body)
   })
-  const port = await listen(server)
-  registry = `http://127.0.0.1:${String(port)}/`
-  const consumer = mkdtempSync(join(tmpdir(), 'dsh-npm-resolution-'))
+  let consumer: string | undefined
   try {
+    const port = await listen(server)
+    registry = `http://127.0.0.1:${String(port)}/`
+    signal?.throwIfAborted()
+    consumer = mkdtempSync(join(tmpdir(), 'dsh-npm-resolution-'))
     writeFileSync(join(consumer, 'package.json'), `${JSON.stringify({
       name: 'dsh-npm-resolution-benchmark',
       version: '0.0.0',
       private: true,
       dependencies,
     }, null, 2)}\n`)
-    const result = await runNpm(consumer, registry, timeoutMs)
+    const result = await runNpm(consumer, registry, timeoutMs, signal)
     if (result.timedOut) throw new Error(`${timeoutSubject} exceeded ${String(timeoutMs)} ms`)
     return {
       durationMs: result.durationMs,
@@ -483,8 +548,8 @@ export async function resolveNpmPackageLock(
     }
   } finally {
     server.closeAllConnections()
-    await close(server)
-    rmSync(consumer, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 })
+    if (server.listening) await close(server)
+    if (consumer !== undefined) rmSync(consumer, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 })
   }
 }
 
@@ -493,14 +558,16 @@ export async function resolveNpmPackageLock(
  * @param index - Package metadata exposed through the local registry.
  * @param targetVersion - Version of `@deepseek-ai/dsh` to install.
  * @param timeoutMs - Hard wall-clock limit for the npm child process.
+ * @param signal - Caller lifetime; cancellation publishes no benchmark result.
  * @returns Timing and registry-request observations.
  */
 export async function benchmarkNpmResolution(
   index: RegistryIndex,
   targetVersion: string,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<BenchmarkRun> {
-  const result = await resolveNpmPackageLock(index, { [TARGET_PACKAGE]: targetVersion }, timeoutMs)
+  const result = await resolveNpmPackageLock(index, { [TARGET_PACKAGE]: targetVersion }, timeoutMs, 'npm resolution', signal)
   return {
     durationMs: result.durationMs,
     registryRequests: result.registryRequests,
