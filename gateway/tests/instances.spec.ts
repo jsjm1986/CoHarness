@@ -11,7 +11,7 @@ import type { InstanceProc } from '../src/launcher.ts'
 import { runtimeRelay } from './runtime-relay.ts'
 import { UserService } from '../src/users.ts'
 
-const FAKE_DSH = `const fs=require('fs'),crypto=require('crypto'),http=require('http');const c=JSON.parse(fs.readFileSync(3,'utf8'));const material=(kind,nonce)=>'dsh-gateway-readiness-v1\\0'+kind+'\\0'+nonce+'\\0'+c.runtime.kind+'\\0'+String(c.runtime.id)+'\\0'+String(c.runtime.generation);const proof=(kind,nonce)=>crypto.createHmac('sha256',c.token).update(material(kind,nonce)).digest('base64url');http.createServer((q,s)=>{if(q.url==='/exit'){s.end('bye');process.exit(0);return}if(q.url==='/api/internal/gateway/readiness'){const nonce=q.headers['x-dsh-gateway-readiness-nonce'];const request=q.headers['x-dsh-gateway-readiness-request'];if(typeof nonce!=='string'||request!==proof('request',nonce)){s.statusCode=403;s.end();return}s.setHeader('content-type','application/json');s.end(JSON.stringify({version:1,runtime:c.runtime,proof:proof('response',nonce)}));return}s.end('ok')}).listen(Number(process.argv[1]),'127.0.0.1')`
+const FAKE_DSH = `const fs=require('fs'),crypto=require('crypto'),http=require('http');const c=JSON.parse(fs.readFileSync(3,'utf8'));const material=(kind,nonce)=>'dsh-gateway-readiness-v1\\0'+kind+'\\0'+nonce+'\\0'+c.runtime.kind+'\\0'+String(c.runtime.id)+'\\0'+String(c.runtime.generation);const proof=(kind,nonce)=>crypto.createHmac('sha256',c.token).update(material(kind,nonce)).digest('base64url');http.createServer((q,s)=>{if(q.url==='/exit'){s.end('bye');process.exit(0);return}if(q.url==='/api/internal/gateway/readiness'){const nonce=q.headers['x-dsh-gateway-readiness-nonce'];const request=q.headers['x-dsh-gateway-readiness-request'];if(typeof nonce!=='string'||request!==proof('request',nonce)){s.statusCode=403;s.end();return}s.setHeader('content-type','application/json');s.end(JSON.stringify({version:1,runtime:c.runtime,proof:proof('response',nonce)}));return}s.end('ok')}).listen(0,'127.0.0.1',function(){fs.writeFileSync(process.env.DSH_HOME+'/child-port',String(this.address().port))})`
 
 let manager: InstanceManager | undefined
 const isolatedCleanup: Array<() => void | Promise<void>> = []
@@ -23,6 +23,14 @@ afterEach(async () => {
   }
   if (failures.length > 0) throw new AggregateError(failures, 'Instance fixture cleanup failed')
 })
+
+// Hold an OS-assigned relay port that forwards to the listener a fixture
+// child publishes into its own $DSH_HOME/child-port. The durable port is
+// allocated atomically by the kernel; children bind ephemeral listeners, so
+// no fixture port is a fixed literal that concurrent processes can claim.
+async function claimRuntimePort(dshHome: string): Promise<number> {
+  return runtimeRelay(join(dshHome, 'child-port'), dispose => { isolatedCleanup.push(dispose) })
+}
 
 async function setup(extraEnv: Record<string, string> = {}) {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
@@ -68,6 +76,8 @@ async function setup(extraEnv: Record<string, string> = {}) {
     '',
   ].join('\n'))
   const db = openDb(join(root, 'g.sqlite'))
+  isolatedCleanup.push(() => rmSync(root, { recursive: true, force: true }))
+  isolatedCleanup.push(() => { db.close() })
   const cfg = testConfig(root, {
     HGW_USERS_ROOT: join(root, 'users'),
     HGW_PROJECT_RUNTIMES_ROOT: join(root, 'project-runtimes'),
@@ -76,24 +86,18 @@ async function setup(extraEnv: Record<string, string> = {}) {
     HGW_INSTANCE_PORT_BASE: '43100',
     ...extraEnv,
   })
-  cfg.dshCommand = [process.execPath, '-e', FAKE_DSH, '{port}']
+  cfg.dshCommand = [process.execPath, '-e', FAKE_DSH]
   const users = new UserService(db, cfg)
+  const realCreate = users.create.bind(users)
+  users.create = async (input) => {
+    const row = await realCreate(input)
+    const port = await claimRuntimePort(join(cfg.usersRoot, input.username, 'dsh'))
+    db.prepare('UPDATE instances SET port=? WHERE user_id=?').run(port, row.id)
+    return row
+  }
   const alice = await users.create({ username: 'alice', password: 'pw-123456' })
   manager = new InstanceManager(db, cfg)
   return { root, db, cfg, users, alice, manager }
-}
-
-async function setupIsolated() {
-  const fixture = await setup()
-  isolatedCleanup.push(() => rmSync(fixture.root, { recursive: true, force: true }))
-  isolatedCleanup.push(() => { fixture.db.close() })
-  const portFile = join(fixture.root, 'child-port')
-  const port = await runtimeRelay(portFile, dispose => { isolatedCleanup.push(dispose) })
-  fixture.db.prepare('UPDATE instances SET port=? WHERE user_id=?').run(port, fixture.alice.id)
-  const source = FAKE_DSH.replace(".listen(Number(process.argv[1]),'127.0.0.1')",
-    ".listen(0,'127.0.0.1',function(){fs.writeFileSync(process.argv[1],String(this.address().port))})")
-  fixture.cfg.dshCommand = [process.execPath, '-e', source, portFile]
-  return fixture
 }
 
 class ProjectRepository implements InstanceRepository {
@@ -208,8 +212,8 @@ describe('InstanceManager', () => {
   it('spawns, reports ready, and dedupes concurrent starts', async () => {
     const { alice, manager } = await setup()
     const [a, b] = await Promise.all([manager.ensureRunning(alice), manager.ensureRunning(alice)])
-    expect(a.port).toBe(43100)
-    expect(b.port).toBe(43100)
+    expect(a.port).toBe(await manager.portOf(alice.id))
+    expect(b.port).toBe(a.port)
     expect(await manager.stateOf(alice.id)).toBe('ready')
     const response = await fetch(`http://127.0.0.1:${a.port}/`)
     expect(response.status).toBe(200)
@@ -468,7 +472,7 @@ describe('InstanceManager', () => {
     const seed = join(root, 'company.env')
     writeFileSync(seed, 'DEEPSEEK_API_KEY=company-key\n')
     cfg.defaultEnvFile = seed
-    manager = new InstanceManager(new ProjectRepository(projectPath, 43190), cfg)
+    manager = new InstanceManager(new ProjectRepository(projectPath, await claimRuntimePort(dshHome)), cfg)
 
     await manager.ensureRunning({ kind: 'project', id: 41, name: 'Compiler', path: projectPath })
 
@@ -492,7 +496,7 @@ describe('InstanceManager', () => {
   })
 
   it('preserves a manual stop across manager reconstruction and permits only an explicit start', async () => {
-    const { alice, db, cfg, manager: first } = await setupIsolated()
+    const { alice, db, cfg, manager: first } = await setup()
     await first.ensureRunning(alice)
     await first.stop(alice.id)
     manager = new InstanceManager(db, cfg)
@@ -507,7 +511,7 @@ describe('InstanceManager', () => {
   })
 
   it('records idle reaping and allows an authorized webhook start', async () => {
-    const { alice, db, manager } = await setupIsolated()
+    const { alice, db, manager } = await setup()
     await manager.ensureRunning(alice)
     db.prepare('UPDATE instances SET last_activity_at=0 WHERE user_id=?').run(alice.id)
     expect(await manager.reapIdle()).toBe(1)
@@ -519,7 +523,7 @@ describe('InstanceManager', () => {
   })
 
   it('refuses maintenance admission before generating or spawning a runtime', async () => {
-    const { alice, manager } = await setupIsolated()
+    const { alice, manager } = await setup()
     manager.startAdmission = async () => { throw new RuntimeStartBlockedError('maintenance') }
     await expect(manager.ensureRunning(alice, 'explicit')).rejects.toMatchObject({ code: 'INSTANCE_UNAVAILABLE' })
     expect(await manager.stateOf(alice.id)).toBe('stopped')
@@ -527,7 +531,7 @@ describe('InstanceManager', () => {
   })
 
   it.each(['disabled', 'deleted'] as const)('does not offer an explicit-start bypass for a %s SQLite owner', async state => {
-    const { alice, db, manager } = await setupIsolated()
+    const { alice, db, manager } = await setup()
     if (state === 'disabled') db.prepare("UPDATE users SET status='disabled' WHERE id=?").run(alice.id)
     else db.prepare('UPDATE users SET deleted_at=? WHERE id=?').run(Date.now(), alice.id)
     for (const intent of ['passive', 'explicit'] as const) {
@@ -540,7 +544,7 @@ describe('InstanceManager', () => {
   })
 
   it('classifies a disabled manual-stop owner from current rows before touching its runtime files', async () => {
-    const { alice, db, root, manager } = await setupIsolated()
+    const { alice, db, root, manager } = await setup()
     await manager.stop(alice.id, 'manual')
     db.prepare("UPDATE users SET status='disabled' WHERE id=?").run(alice.id)
     expect(alice.status).toBe('active')
@@ -575,7 +579,8 @@ describe('InstanceManager', () => {
     mkdirSync(projectPath, { recursive: true })
     const project = { kind: 'project' as const, id: 41, name: 'Compiler', path: projectPath }
     const target = { kind: 'project' as const, id: project.id }
-    manager = new InstanceManager(new ProjectRepository(projectPath, 43210), cfg)
+    const port = await claimRuntimePort(join(root, 'project-runtimes', '41', 'dsh'))
+    manager = new InstanceManager(new ProjectRepository(projectPath, port), cfg)
     await manager.ensureRunning(project)
     let enter!: () => void
     let release!: () => void
@@ -599,7 +604,7 @@ describe('InstanceManager', () => {
 
     release()
     await expect(destructive).resolves.toBe('deleted')
-    await expect(restart).resolves.toMatchObject({ port: 43210 })
+    await expect(restart).resolves.toMatchObject({ port })
     expect(await manager.stateOf(target)).toBe('ready')
   })
 
@@ -628,7 +633,8 @@ describe('InstanceManager', () => {
     mkdirSync(projectPath, { recursive: true })
     const project = { kind: 'project' as const, id: 41, name: 'Generation', path: projectPath }
     const target = { kind: 'project' as const, id: project.id }
-    const projectManager = new InstanceManager(new ProjectRepository(projectPath, 43240), cfg)
+    const projectPort = await claimRuntimePort(join(root, 'project-runtimes', '41', 'dsh'))
+    const projectManager = new InstanceManager(new ProjectRepository(projectPath, projectPort), cfg)
     manager = projectManager
     const first = await projectManager.ensureRunning(project, 'explicit')
     await projectManager.operationRef(target, 1, first.generation)

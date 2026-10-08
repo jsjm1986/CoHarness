@@ -9,7 +9,7 @@ The setup tutorial takes a new contributor from prerequisites to a checked check
 ### Prerequisites
 
 - Node.js supports 22.19+ and 24+. CI covers 22.19, 24, and 26; see the [Node engine floor Agent Note](../.agents/notes/implemented/process/2026-07-06-node-engine-floor.md).
-- Corepack-enabled pnpm. The repo pins `pnpm@11.7.0` in `package.json`; run `corepack enable` if `pnpm --version` does not resolve through Corepack.
+- Corepack-enabled pnpm. The repo pins `pnpm@11.28.4` in `package.json`; run `corepack enable` if `pnpm --version` does not resolve through Corepack.
 - Git 2.26 or newer; hook setup enables Git's worktree-specific configuration extension.
 - Optional: a DeepSeek API key for the Web, headless, and ACP automation demos and real-API e2e tests.
 
@@ -121,6 +121,8 @@ Contributors can opt into the comprehensive local gate set with `pnpm run check:
 ### CI gates
 
 The keyless [CI workflow](../.github/workflows/ci.yml) selects lanes by impact. Shared Session, Cordis, Typert, Gateway, LLM, subagent, sandbox, subprocess, terminal, vendored, native, and client-connection changes keep the full runtime inventory; ordinary leaf-package changes can use scoped coverage and consumers. The independent Gateway checks run for cloud-control-plane changes, while model-visible skills and preset inputs remain runtime inputs. Artifact consumers wait for one build within their lane. Release and Sandbox workflows are path-scoped, with scheduled or manual runs preserving platform coverage; the CI `full-audit` dispatch runs the complete Linux runtime and browser inventory for release candidates. The separate real-API workflow runs `pnpm run test:e2e` with its configured worker bound. The [upstream upgrade playbook](cookbook/upstream-upgrade-playbook.md) defines the two change tracks and the evidence record. See [scripts/run-gates.ts](../scripts/run-gates.ts) and the workflow files for the current gate and job inventory.
+
+Dependency changes go through executed preflight and proof selection rather than manifest review alone: the scope job runs `pnpm run verify-dependency-cohorts` before lane selection, so a Vitest-family drift fails before classification, and installer or runtime inputs keep the runtime, platform, and packaging proofs their workflow owners select. The [controlled dependency upgrades](../.agents/notes/implemented/process/2026-10-08-controlled-dependency-upgrades.md) Agent Note owns the Dependabot cadence, grouping, and hold policy.
 
 ### Daily commands
 

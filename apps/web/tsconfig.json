@@ -88,6 +88,7 @@
     "tests/desktop-confirmation.e2e.ts",
     "tests/user-terminal.e2e.ts",
     "tests/plugin-administration.e2e.ts",
+    "tests/plugin-install-approve.e2e.ts",
     "tests/admin-form-values.e2e.ts",
     "tests/agent-preset-selection.e2e.ts",
     "tests/agent-preset-authoring.e2e.ts",

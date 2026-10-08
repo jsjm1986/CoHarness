@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { load as parseYaml } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
-import { classifyCiPrScope } from './ci-pr-scope.ts'
 import { classifyCiPrProofs, parseProviderAcceptance } from './ci-pr-proofs.ts'
 
 const root = resolve(import.meta.dirname, '..')
@@ -17,10 +16,10 @@ interface Workflow {
 function workflow(name: string): Workflow {
   return parseYaml(readFileSync(join(root, '.github/workflows', name), 'utf8')) as Workflow
 }
-function proofs(paths: string[]) { return classifyCiPrProofs(paths, classifyCiPrScope(paths, '')) }
+function proofs(paths: string[]) { return classifyCiPrProofs(paths) }
 
 describe('additional PR proof selection', () => {
-  it('keeps ordinary prose and permitted action pin changes outside expensive proof lanes', () => {
+  it('keeps ordinary prose outside expensive proof lanes', () => {
     for (const paths of [['docs/testing.md'], ['packages/llm/llm/README.md'], ['gateway/README.md'],
       ['packages/core/agent-loop/tests/README.md'], ['apps/web/tests/README.md'],
       ['AGENTS.md', 'SKILL.md', 'docs/testing.md', 'packages/llm/llm/README.md']]) {
@@ -30,7 +29,24 @@ describe('additional PR proof selection', () => {
         proof: 'piAi', status: 'unsupported', affected: false, providers: ['azure-openai', 'anthropic'], reasons: [],
       }])
     }
-    expect(Object.values(classifyCiPrProofs(['.github/workflows/release.yml'], { reason: 'action-only' }).reasons).flat()).toEqual([])
+  })
+
+  it('requires the existing installation and packaging proofs for installer changes', () => {
+    const paths = ['.github/workflows/ci.yml', '.github/workflows/landlock-run.yml', '.github/workflows/release.yml']
+    const result = proofs(paths)
+    expect(result).toMatchObject({
+      releasePack: true, vendorPack: true, nativePack: true, sandbox: true, nativeWindows: true,
+    })
+    expect(result.reasons.releasePack).toContain('workflow-input:.github/workflows/release.yml')
+    expect(result.reasons.nativePack).toContain('workflow-input:.github/workflows/landlock-run.yml')
+    const untrusted = classifyCiPrProofs(paths, undefined, { untrustedActor: true })
+    expect(untrusted).toMatchObject({
+      releasePack: true, vendorPack: true, nativePack: true, sandbox: true, nativeWindows: true,
+      provider: false, piAi: false,
+    })
+    expect(untrusted.unsupportedProofs).toContainEqual(expect.objectContaining({
+      proof: 'provider', status: 'withheld', providers: ['deepseek'],
+    }))
   })
 
   it('keeps model/preset content and source-of-record vendor metadata in scope', () => {
@@ -101,7 +117,7 @@ describe('additional PR proof selection', () => {
         writeFileSync(join(fixture, '.github/workflows', file), readFileSync(join(root, '.github/workflows', file)))
       }
       writeFileSync(join(fixture, '.github/workflows/release.yml'), 'on:\n  push:\n    paths: []\n')
-      expect(() => classifyCiPrProofs(['docs/testing.md'], { reason: 'docs-only' }, fixture)).toThrow('release.yml must retain')
+      expect(() => classifyCiPrProofs(['docs/testing.md'], fixture)).toThrow('release.yml must retain')
     } finally { rmSync(fixture, { recursive: true, force: true }) }
   })
 })
@@ -132,7 +148,7 @@ describe('reusable proof workflows', () => {
     const paths = ['pnpm-lock.yaml']
     const trusted = proofs(paths)
     expect(trusted).toMatchObject({ provider: true, sandbox: true, nativeWindows: true })
-    const untrusted = classifyCiPrProofs(paths, classifyCiPrScope(paths, ''), undefined, { untrustedActor: true })
+    const untrusted = classifyCiPrProofs(paths, undefined, { untrustedActor: true })
     expect(untrusted).toMatchObject({ provider: false, piAi: false, sandbox: true, nativeWindows: true })
     expect(untrusted.reasons.provider).toEqual(trusted.reasons.provider)
     expect(untrusted.unsupportedProofs).toContainEqual(expect.objectContaining({

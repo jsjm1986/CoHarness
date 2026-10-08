@@ -73,8 +73,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --filter @deepseek-ai/node-addon-system-workspace... --frozen-lockfile
 
+      - uses: ./.github/actions/prepare-ci-apt
+        if: runner.os == 'Linux'
       - name: Install musl toolchain
         if: runner.os == 'Linux'
+        timeout-minutes: 5
         run: |
           sudo apt-get update -q
           sudo apt-get install -yq musl-tools

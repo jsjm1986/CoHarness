@@ -54,9 +54,8 @@ jobs:
   # appear on pull-request check panels. The self-hosted standby lanes there
   # require DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true.
 
-  # Pull-request changes that only update workflow action pins or documentation
-  # do not need the release-sized coverage, browser, runtime, and native lanes.
-  # Source and dependency changes keep the complete existing PR gate set.
+  # Documentation-only pull requests omit unrelated runtime lanes. Dependency
+  # and installer changes retain their installation and packaging consumers.
   pr-scope:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -102,6 +101,12 @@ jobs:
 
       - name: Install scope classifier runtime
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Verify dependency cohorts before lane selection
+        run: pnpm run verify-dependency-cohorts
+
+      - name: Validate workflow contracts before lane selection
+        run: pnpm exec vitest run scripts/ci-workflow.spec.ts
 
       - name: Classify pull-request scope
         id: scope
@@ -395,7 +400,9 @@ jobs:
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
+      - uses: ./.github/actions/prepare-ci-apt
       - name: Install benchmark browser and hosted dependencies
+        timeout-minutes: 5
         run: pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium
 
       - name: Run performance benchmarks
@@ -681,12 +688,19 @@ jobs:
         if: needs.pr-scope.outputs.snapshot_mode == 'full' || (needs.pr-scope.outputs.snapshot_mode == 'focused' && contains(needs.pr-scope.outputs.web_groups, 'settings'))
         run: npm ci --prefix gateway/admin-ui
 
+      - uses: ./.github/actions/prepare-ci-apt
+        if: >-
+          (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
+          && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
+          || github.event.pull_request.head.repo.full_name != github.repository
+          || github.event.pull_request.user.login == 'dependabot[bot]')
       - name: Install Playwright Chromium and hosted dependencies
         if: >-
           (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
           && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
           || github.event.pull_request.head.repo.full_name != github.repository
           || github.event.pull_request.user.login == 'dependabot[bot]')
+        timeout-minutes: 5
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium webkit
 
       # The persistent VM image owns Playwright's Linux system packages; do
@@ -712,6 +726,17 @@ jobs:
       - name: Run full web verification
         if: needs.pr-scope.outputs.snapshot_mode == 'full'
         run: pnpm run check:ci:web:full
+
+      - name: Upload browser failure evidence
+        if: failure() && (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-failure-evidence-${{ github.run_attempt }}
+          path: .artifacts/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Summarize golden changes and replay status
         if: always() && (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
         env:
@@ -1000,11 +1025,23 @@ jobs:
       - name: Fetch pinned public upstream inputs
         run: node scripts/fetch-upstream-baseline.ts
 
+      - uses: ./.github/actions/prepare-ci-apt
       - name: Install Playwright Chromium and hosted dependencies
+        timeout-minutes: 5
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
 
       - name: Run full Linux audit
         run: pnpm run check:ci:linux-primary
+
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: full-audit-failure-evidence-${{ github.run_attempt }}
+          path: .artifacts/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Preserve gate evidence
         if: always()
@@ -1095,7 +1132,9 @@ jobs:
       - name: Install Admin browser dependencies
         run: npm ci --prefix gateway/admin-ui
 
+      - uses: ./.github/actions/prepare-ci-apt
       - name: Install Playwright Chromium and hosted dependencies
+        timeout-minutes: 5
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
 
       - name: Populate the PR browser cache from master
@@ -1117,9 +1156,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: web-sweep-failure-evidence
+          name: web-sweep-failure-evidence-${{ github.run_attempt }}
           path: .artifacts/
-          if-no-files-found: ignore
+          include-hidden-files: true
+          if-no-files-found: warn
           retention-days: 14
       - name: Preserve gate evidence
         if: always()
@@ -1305,7 +1345,9 @@ jobs:
       # download the full dependency closure once and keep it for the next
       # run. The `wine` dispatcher package (not bare `wine64`) is what puts a
       # binary on PATH.
+      - uses: ./.github/actions/prepare-ci-apt
       - name: Install Wine
+        timeout-minutes: 5
         run: |
           if compgen -G "$HOME/wine-debs/*.deb" > /dev/null; then
             # The restored archive is the full --download-only closure of

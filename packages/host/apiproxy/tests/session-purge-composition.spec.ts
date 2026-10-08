@@ -140,13 +140,17 @@ it.each(['pause', 'failure'] as const)('retains Goal data during its checkpoint 
       expect(remove).not.toHaveBeenCalled()
     } finally { releasePause.resolve(undefined) }
   }
-  await vi.waitFor(() => { using _reservation = ctx.agents.reserveRemoval([handle.agent.id]) })
   stop()
-  expect(ctx.goals.get(handle.agent)).toMatchObject({
-    phase: outcome === 'pause' ? 'paused' : 'active', activation: 'disarmed', roundsStarted: 0,
+  // A post-checkpoint claim (e.g. disarm re-drive) can land after a claim-free
+  // sample; admission itself is the wait condition, and the designed refusal
+  // retries until the pending lifecycle operation settles.
+  await vi.waitFor(async () => {
+    expect(ctx.goals.get(handle.agent)).toMatchObject({
+      phase: outcome === 'pause' ? 'paused' : 'active', activation: 'disarmed', roundsStarted: 0,
+    })
+    expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeDefined()
+    expect(await owner.withReleased([handle.agent.id], remove)).toBe('removed')
   })
-  expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeDefined()
-  expect(await owner.withReleased([handle.agent.id], remove)).toBe('removed')
   expect(remove).toHaveBeenCalledOnce()
   expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeUndefined()
 })
@@ -177,9 +181,13 @@ it('hands checkpoint ownership to a live Goal turn and allows purge after explic
     ctx.goals.pause(handle.agent, goal)
   } finally { release.resolve(undefined) }
   await handle.agent.whenIdle()
-  await vi.waitFor(() => { using _reservation = ctx.agents.reserveRemoval([handle.agent.id]) })
-  expect(ctx.goals.get(handle.agent)).toMatchObject({ phase: 'paused', roundsStarted: 1 })
-  expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeDefined()
-  expect(await owner.withReleased([handle.agent.id], remove)).toBe('removed')
+  // The driver's post-abort checkpoint still holds a use claim that can land
+  // after a claim-free sample; 'pending lifecycle operation' is the designed
+  // refusal while it settles, so admission itself is the wait condition.
+  await vi.waitFor(async () => {
+    expect(ctx.goals.get(handle.agent)).toMatchObject({ phase: 'paused', roundsStarted: 1 })
+    expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeDefined()
+    expect(await owner.withReleased([handle.agent.id], remove)).toBe('removed')
+  })
   expect(remove).toHaveBeenCalledOnce()
 })

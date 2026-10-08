@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as yaml from 'js-yaml'
@@ -254,6 +255,7 @@ describe('CI workflow', () => {
     })
     expect(node24Bench.steps).toContainEqual({
       name: 'Install benchmark browser and hosted dependencies',
+      'timeout-minutes': 5,
       run: 'pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium',
     })
     expect(JSON.stringify(node24Bench.steps)).not.toContain('DSH_CI_FAILOVER_LINUX')
@@ -311,6 +313,131 @@ describe('CI workflow', () => {
       reason: '${{ steps.scope.outputs.reason }}',
       web_groups: '${{ steps.scope.outputs.web_groups }}',
     })
+  })
+
+  it('verifies dependency cohorts after classifier install and before scope classification', () => {
+    const scope = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'pr-scope')
+    const steps = (scope.steps as unknown[]).filter(isRecord)
+    const install = steps.findIndex(step => step.name === 'Install scope classifier runtime')
+    const cohorts = steps.findIndex(step => step.name === 'Verify dependency cohorts before lane selection')
+    const classify = steps.findIndex(step => step.name === 'Classify pull-request scope')
+    expect(install).toBeGreaterThanOrEqual(0)
+    expect(cohorts).toBeGreaterThan(install)
+    expect(classify).toBeGreaterThan(cohorts)
+    // A cohort violation must fail the lane selection, never degrade to a
+    // conditional or warning step.
+    expect(steps[cohorts]?.['continue-on-error']).toBeUndefined()
+    expect(steps[cohorts]?.if).toBeUndefined()
+    expect(steps[cohorts]?.run).toBe('pnpm run verify-dependency-cohorts')
+  })
+
+  it('validates workflow contracts before selecting consumer lanes', () => {
+    const workflow = loadWorkflow('.github/workflows/ci.yml')
+    assertWorkflowPreflight(workflow)
+    const cloned = structuredClone(workflow)
+    const scope = workflowJob(cloned, 'pr-scope')
+    if (!Array.isArray(scope.steps)) throw new TypeError('pr-scope must define steps')
+    const contracts = scope.steps.filter(isRecord)
+      .findIndex(step => step.name === 'Validate workflow contracts before lane selection')
+    expect(contracts).toBeGreaterThanOrEqual(0)
+    scope.steps[contracts] = { ...(scope.steps[contracts] as Record<string, unknown>), 'timeout-minutes': 2 }
+    assertWorkflowPreflight(cloned)
+  })
+
+  it.each(['missing', 'conditional', 'allowed-failure', 'after-selection'] as const)('rejects %s workflow preflight', (kind) => {
+    const workflow = loadWorkflow('.github/workflows/ci.yml')
+    const scope = workflowJob(workflow, 'pr-scope')
+    if (!Array.isArray(scope.steps)) throw new TypeError('pr-scope must define steps')
+    const rawSteps: unknown[] = scope.steps
+    const steps = rawSteps.filter(isRecord)
+    const contracts = steps.findIndex(step => step.name === 'Validate workflow contracts before lane selection')
+    const selection = steps.findIndex(step => step.id === 'scope')
+    expect(contracts).toBeGreaterThanOrEqual(0)
+    expect(selection).toBeGreaterThanOrEqual(0)
+    switch (kind) {
+      case 'missing':
+        rawSteps.splice(contracts, 1)
+        break
+      case 'conditional':
+        steps[contracts]!.if = 'false'
+        break
+      case 'allowed-failure':
+        steps[contracts]!['continue-on-error'] = true
+        break
+      case 'after-selection': {
+        const [contract] = rawSteps.splice(contracts, 1)
+        const remaining = rawSteps.filter(isRecord)
+        const laterSelection = remaining.findIndex(step => step.id === 'scope')
+        rawSteps.splice(laterSelection + 1, 0, contract)
+        break
+      }
+      default: {
+        const unreachable: never = kind
+        throw new Error(String(unreachable))
+      }
+    }
+    expect(() => { assertWorkflowPreflight(workflow) }).toThrow()
+  })
+
+  it.each(browserEvidenceOwners.map(owner => owner.job))('retains browser failure evidence in %s', (job) => {
+    const owner = browserEvidenceOwners.find(candidate => candidate.job === job)!
+    assertBrowserFailureEvidence(loadWorkflow('.github/workflows/ci.yml'), owner)
+  })
+
+  for (const owner of browserEvidenceOwners) {
+    it.each(['remove-uploader', 'success-condition', 'hide-hidden', 'flat-name', 'gates-only'] as const)(
+      `rejects ${owner.job} browser evidence mutation: %s`, (kind) => {
+        const mutated = structuredClone(loadWorkflow('.github/workflows/ci.yml'))
+        const job = workflowJob(mutated, owner.job)
+        if (!Array.isArray(job.steps)) throw new TypeError(`${owner.job} must define steps`)
+        const rawSteps: unknown[] = job.steps
+        const index = rawSteps.findIndex(step => isRecord(step) && step.name === 'Upload browser failure evidence')
+        expect(index).toBeGreaterThanOrEqual(0)
+        const uploader = rawSteps[index]
+        if (!isRecord(uploader) || !isRecord(uploader.with)) throw new TypeError(`${owner.job} uploader must define fields`)
+        switch (kind) {
+          case 'remove-uploader':
+            rawSteps.splice(index, 1)
+            break
+          case 'success-condition':
+            uploader.if = 'success()'
+            break
+          case 'hide-hidden':
+            uploader.with['include-hidden-files'] = false
+            break
+          case 'flat-name':
+            uploader.with.name = 'failure-evidence'
+            break
+          case 'gates-only':
+            uploader.with.path = '.artifacts/gates/'
+            break
+          default: {
+            const unreachable: never = kind
+            throw new Error(String(unreachable))
+          }
+        }
+        expect(() => { assertBrowserFailureEvidence(mutated, owner) }).toThrow()
+      },
+    )
+  }
+
+  it('keeps the native-pack proof on the checked-in platform matrix', () => {
+    const workflow = loadWorkflow('.github/workflows/landlock-run.yml')
+    const matrix = workflowJob(workflow, 'matrix')
+    const matrixSteps = (matrix.steps as unknown[]).filter(isRecord)
+    expect(matrixSteps.some(step =>
+      typeof step.run === 'string' && step.run.includes('node ./scripts/github-matrix.mjs ci'))).toBe(true)
+    const native = workflowJob(workflow, 'native')
+    expect(native.needs).toBe('matrix')
+    expect(native.strategy).toMatchObject({ matrix: '${{ fromJson(needs.matrix.outputs.ci) }}' })
+    const generated = spawnSync(process.execPath,
+      [resolve(root, 'native/system/scripts/github-matrix.mjs'), 'ci'], { encoding: 'utf8' })
+    expect(generated.error).toBeUndefined()
+    expect(generated.signal).toBeNull()
+    expect(generated.status, generated.stderr).toBe(0)
+    const legs = JSON.parse(generated.stdout) as { include: { platform: string; runner: string }[] }
+    expect(legs.include.map(leg => leg.platform).sort())
+      .toEqual(['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64'])
   })
 
   it('exempts push from cancellation, so one master merge does not cancel the running drill', () => {
@@ -738,7 +865,17 @@ describe('Python release workflows', () => {
     expect(manylinuxAddon).toMatchObject({ if: "runner.os == 'Linux'" })
     expect(JSON.stringify(manylinuxAddon)).toContain('manylinux_2_28_x86_64')
     expect(JSON.stringify(manylinuxAddon)).toContain('manylinux_2_28_aarch64')
-    expect(JSON.stringify(manylinuxAddon)).toContain('npm_config_build_from_source=true pnpm run install')
+    assertInstalledNodePtyInstallCommand(workflow)
+    const missingBypass = structuredClone(workflow)
+    const missingBuild = workflowJob(missingBypass, 'build')
+    if (!Array.isArray(missingBuild.steps)) throw new TypeError('Python wheel builder build must define steps')
+    const missingStep = missingBuild.steps.filter(isRecord)
+      .find(step => step.name === 'Rebuild Linux node-pty against manylinux 2.28')
+    if (missingStep === undefined || typeof missingStep.run !== 'string') {
+      throw new TypeError('Python wheel builder build must define the manylinux node-pty rebuild')
+    }
+    missingStep.run = missingStep.run.replace('pnpm --config.verify-deps-before-run=false run install', 'pnpm run install')
+    expect(() => { assertInstalledNodePtyInstallCommand(missingBypass) }).toThrow()
     expect(JSON.stringify(manylinuxAddon)).toContain('$HOME/setup-pnpm:$HOME/setup-pnpm:ro')
     expect(JSON.stringify(manylinuxAddon)).toContain('node-pty-glibc-versions.txt')
     expect(JSON.stringify(manylinuxAddon)).toContain('le 2.28')
@@ -870,6 +1007,84 @@ function expectExternalCapacityExpression(value: unknown, external: string, port
   expect(value).toContain('DSH_CI_ENTERPRISE_RUNNERS_ENABLED')
   expect(value).toContain(`&& '${external}'`)
   expect(value).toContain(`|| '${portable}'`)
+}
+
+const browserEvidenceOwners = [
+  {
+    job: 'web-verification',
+    artifact: 'web-failure-evidence-${{ github.run_attempt }}',
+    condition: "failure() && (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')",
+    consumers: ['Run focused web verification', 'Run full web verification'],
+  },
+  {
+    job: 'full-audit',
+    artifact: 'full-audit-failure-evidence-${{ github.run_attempt }}',
+    condition: 'failure()',
+    consumers: ['Run full Linux audit'],
+  },
+  {
+    job: 'web-snapshot-sweep',
+    artifact: 'web-sweep-failure-evidence-${{ github.run_attempt }}',
+    condition: 'failure()',
+    consumers: ['Run the consumer inventory with the browser snapshot'],
+  },
+] as const
+type BrowserEvidenceOwner = typeof browserEvidenceOwners[number]
+
+function assertBrowserFailureEvidence(workflow: unknown, owner: BrowserEvidenceOwner): void {
+  if (!isRecord(workflow)) throw new TypeError('workflow must be an object')
+  const job = workflowJob(workflow, owner.job)
+  if (!Array.isArray(job.steps)) throw new TypeError(`${owner.job} must define steps`)
+  const steps = job.steps.filter(isRecord)
+  const index = steps.findIndex(step => step.name === 'Upload browser failure evidence')
+  expect(index).toBeGreaterThanOrEqual(0)
+  for (const consumer of owner.consumers) {
+    const consumerIndex = steps.findIndex(step => step.name === consumer)
+    expect(consumerIndex).toBeGreaterThanOrEqual(0)
+    expect(consumerIndex).toBeLessThan(index)
+  }
+  const uploader = steps[index]!
+  expect(uploader.uses).toBe('actions/upload-artifact@v7')
+  expect(uploader.if).toBe(owner.condition)
+  expect(uploader.with).toMatchObject({
+    name: owner.artifact,
+    path: '.artifacts/',
+    'include-hidden-files': true,
+    'if-no-files-found': 'warn',
+    'retention-days': 14,
+  })
+}
+
+function assertWorkflowPreflight(workflow: unknown): void {
+  if (!isRecord(workflow)) throw new TypeError('workflow must be an object')
+  const scope = workflowJob(workflow, 'pr-scope')
+  if (!Array.isArray(scope.steps)) throw new TypeError('pr-scope must define steps')
+  const steps = scope.steps.filter(isRecord)
+  const install = steps.findIndex(step => step.name === 'Install scope classifier runtime')
+  const cohorts = steps.findIndex(step => step.name === 'Verify dependency cohorts before lane selection')
+  const contracts = steps.findIndex(step => step.name === 'Validate workflow contracts before lane selection')
+  const selection = steps.findIndex(step => step.id === 'scope')
+  expect(install).toBeGreaterThanOrEqual(0)
+  expect(cohorts).toBeGreaterThan(install)
+  expect(contracts).toBeGreaterThan(cohorts)
+  expect(selection).toBeGreaterThan(contracts)
+  expect(steps[contracts]).toMatchObject({
+    name: 'Validate workflow contracts before lane selection',
+    run: 'pnpm exec vitest run scripts/ci-workflow.spec.ts',
+  })
+  expect(steps[contracts]?.if).toBeUndefined()
+  expect(steps[contracts]?.['continue-on-error']).toBeUndefined()
+}
+
+function assertInstalledNodePtyInstallCommand(workflow: unknown): void {
+  if (!isRecord(workflow) || !isRecord(workflow.jobs)) throw new TypeError('Python wheel builder must define jobs')
+  const build = workflowJob(workflow, 'build')
+  if (!Array.isArray(build.steps)) throw new TypeError('Python wheel builder build must define steps')
+  const step = build.steps.filter(isRecord).find(entry => entry.name === 'Rebuild Linux node-pty against manylinux 2.28')
+  if (step === undefined || typeof step.run !== 'string') {
+    throw new TypeError('Python wheel builder build must define the manylinux node-pty rebuild')
+  }
+  expect(step.run).toContain('npm_config_build_from_source=true pnpm --config.verify-deps-before-run=false run install')
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

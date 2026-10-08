@@ -27,6 +27,10 @@ Status: implemented
 
 **在注册表旁加内容缓存。** 已被[文档预览操作 note](../architecture/2026-09-08-document-preview-operations.zh.md) 否决：第二个 owner 会重复请求的 abort 信号已经提供的寻址、取消与订阅生命周期。
 
+## 测试
+
+[HTML 预览组件测试](../../../../packages/client/ui-workbench/tests/workspace-html.client.spec.tsx)把打包 Promise 保留到卸载或渲染器替换之后再结算。卸载后的完成不能创建 Blob URL；来自已取消渲染器的拒绝不能把当前 iframe 替换为失败状态。分别移除两个取消检查时，对应的定点回归都会失败。延迟打包夹具在恢复全局 Blob URL 钩子之前结算自己持有的 Promise。
+
 ## 影响
 
 Markdown 与 HTML 预览在关键面上与上游行为一致——Markdown 增量文本、HTML 完整打包的不透明 iframe——而 ACL、版本、取消与 runtime 定向与既有文件标签完全相同。HTML 依赖图付出有界的整文件内存；不支持的遍历在包 README 中明确记录而不是静默半加载。[录制的浏览器场景](../../../../apps/web/tests/workspace-files.e2e.ts) 覆盖 Markdown 渲染、沙箱打包 frame 以及共享的变更/重载路径。
