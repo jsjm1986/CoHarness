@@ -9,6 +9,7 @@ import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ProjectService } from '../src/projects.ts'
+import { runtimeRelay } from './runtime-relay.ts'
 import { UserService } from '../src/users.ts'
 
 const WS_MODULE = createRequire(join(process.cwd(), 'noop.js')).resolve('ws')
@@ -34,7 +35,7 @@ const server = http.createServer((req, res) => {
 })
 const wss = new WebSocketServer({ server })
 wss.on('connection', (socket, req) => { socket.send(JSON.stringify({ host: req.headers.host })) })
-server.listen(Number(process.argv[1]), '127.0.0.1')
+server.listen(0, '127.0.0.1', function () { fs.writeFileSync(process.env.DSH_HOME + '/child-port', String(this.address().port)) })
 `
 
 let cleanup: Array<() => Promise<void> | void> = []
@@ -44,7 +45,7 @@ async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'hgw-'))
   const db = openDb(join(root, 'g.sqlite'))
   const cfg = testConfig(root, { HGW_USERS_ROOT: join(root, 'users'), HGW_READINESS_TIMEOUT_MS: '10000', HGW_INSTANCE_PORT_BASE: '43300' })
-  cfg.dshCommand = [process.execPath, '-e', ECHO_DSH, '{port}']
+  cfg.dshCommand = [process.execPath, '-e', ECHO_DSH]
   const deps = {
     cfg,
     users: new UserService(db, cfg),
@@ -52,8 +53,20 @@ async function setup() {
     audit: new AuditService(db),
     instances: new InstanceManager(db, cfg),
   }
+  // The durable port is an OS-assigned relay that forwards to the listener a
+  // fixture child publishes into $DSH_HOME/child-port; no fixed literal port
+  // is ever bound by a child, so concurrent workers cannot collide with it.
+  const claim = async (username: string, userId: number) => {
+    const port = await runtimeRelay(
+      join(root, 'users', username, 'dsh', 'child-port'),
+      dispose => { cleanup.push(dispose) },
+    )
+    db.prepare('UPDATE instances SET port=? WHERE user_id=?').run(port, userId)
+  }
   const admin = await deps.users.create({ username: 'admin', password: 'pw-12345678', role: 'admin' })
+  await claim('admin', admin.id)
   const alice = await deps.users.create({ username: 'alice', password: 'pw-12345678' })
+  await claim('alice', alice.id)
   cleanup.push(() => deps.instances.stopAll())
   return { deps, alice, admin, root }
 }
