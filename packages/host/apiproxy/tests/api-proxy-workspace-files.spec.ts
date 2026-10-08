@@ -238,7 +238,9 @@ describe('workspaceFiles RPC', () => {
     const payload = { sessionId: session.id, path: 'file' }
     writeFileSync(join(root, 'file'), 'old')
     const metadata = expectOk(await api.workspaceFiles.stat(request(payload)))
-    writeFileSync(join(root, 'file'), 'new')
+    // A same-size rewrite can share the host's mtime tick; a different size
+    // changes the version tuple deterministically on every filesystem.
+    writeFileSync(join(root, 'file'), 'newer content')
     expect((await api.workspaceFiles.read(request({ ...payload, version: metadata.version }), new AbortController().signal)).result).toMatchObject({ ok: false, error: { code: 'workspace-file/stale-version' } })
     const read = ctx.fs.readByteRange.bind(ctx.fs)
     vi.spyOn(ctx.fs, 'readByteRange').mockImplementation(async (...args) => {
