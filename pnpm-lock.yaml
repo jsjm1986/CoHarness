@@ -156,8 +156,8 @@ importers:
         specifier: 7.0.2001
         version: 7.0.2001
       pnpm:
-        specifier: 11.7.0
-        version: 11.7.0
+        specifier: 11.28.4
+        version: 11.28.4
       publint:
         specifier: ^0.3.24
         version: 0.3.24
@@ -1649,6 +1649,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      '@pnpm/building.policy':
+        specifier: 1100.1.6
+        version: 1100.1.6
       execa:
         specifier: ^10.0.0
         version: 10.0.0
@@ -1711,8 +1714,8 @@ importers:
         specifier: workspace:*
         version: link:../../interaction/user-approval
       pnpm:
-        specifier: 11.7.0
-        version: 11.7.0
+        specifier: 11.28.4
+        version: 11.28.4
 
   packages/boot/workspace-dependencies:
     dependencies:
@@ -16050,6 +16053,42 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
+  '@pnpm/building.policy@1100.1.6':
+    resolution: {integrity: sha512-Tt0UwRREMW7k9P/nKIHbuZBYIKsbPS6ZOEMFuBjmP8j+i+bTTIncbhbbEjvNOV5uYT6dlF5DcYTqwSdygkEsRg==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/config.matcher@1100.0.3':
+    resolution: {integrity: sha512-1FJ4HDyY/LeJF386CdFXTzLbiCCb6FI/iE1uwDmbJWSstd3brUwYJy/wYjk1CTV7Y4DswRnTk985/be3A+Ej7A==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/config.version-policy@1100.2.7':
+    resolution: {integrity: sha512-uJeTtybyq7whHRfhdtYHDsnOvdqM4Oh68NtVoO8ur4jhSWwKg2S0e2sqkid3u/e+Q+Cb7xS5ghYgVT/9ZUtdXw==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/constants@1102.0.1':
+    resolution: {integrity: sha512-vLulGZ3iRt6kHcwbGYckrUF2Rd18nfGtpFjyRgbKmEyxLcZmFTBOWKFZSEyS3VVnxFEI7bTPNOGmRC0lD4U1qg==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/crypto.hash@1100.0.8':
+    resolution: {integrity: sha512-P61jKyGamjmhXvev2NiGGJX8ivLYEFNdXV9HIrBcY/qz1ScyYMSbZn6aAYHcxSwdZ4RqFLka82PCGlS/0aBnKA==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/deps.path@1101.0.6':
+    resolution: {integrity: sha512-sU8MOW1R/SnNyms/VP4ALFKavknXdhT35uvwOwFjcJc1Vw6g86ethbc3ZYEqEQniGU6idBfLWEL7KLdp009O4A==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/error@1100.2.2':
+    resolution: {integrity: sha512-OVUBUOtFou4xLyrnoETrplOX1FszsAVSfiq/H0DaN+g4nvqOlLPe12pLCoR2/P2Va9yEsInjgsXyrY29Ujgi7g==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/fs.graceful-fs@1100.2.5':
+    resolution: {integrity: sha512-yvGmy0mxhZRjJJy5NPLfpDTSoPkjuAQnZq4mTv/isuStN3+jKST/gyWmUzgwWke2DFFB8/WyYwFi2wU7Uc78gQ==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/types@1102.1.1':
+    resolution: {integrity: sha512-rPauWzpgjzxE/l5OS8gGdeW0K1oF3PPjraGzNg4CA4bbaTDdE2BwmUWJHaADbSF0/EqI0WufrZkSavVTzKFBEg==}
+    engines: {node: '>=22.13'}
+
   '@protobufjs/aspromise@1.1.2':
     resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
 
@@ -19697,8 +19736,8 @@ packages:
     resolution: {integrity: sha512-ZIfcLJC+7E7FBFnDxm9MPmt7D+DidyQ26lewieO75AdhA2ayMtsJSES0iWzqJQbcVRSrTufQoy0DR94xHue0oA==}
     engines: {node: '>=10.4.0'}
 
-  pnpm@11.7.0:
-    resolution: {integrity: sha512-GcyFLBIMcSV2DyRD7mvgyltA+fUFmN4aCaHxd1A+AQ5Xwjx3ZG4B52HeWb+HT7IqM5jDOrlpH8E+uUa28PTWIA==}
+  pnpm@11.28.4:
+    resolution: {integrity: sha512-+QWmFWP4m0mikmNNPYfQJM/eqdzPXGayzMJhZ1+nsndDIKlZ20cubKp/n/cxRwnNUNBsj9ZK3bYGRzd6eNJQ/w==}
     engines: {node: '>=22.13'}
     hasBin: true
 
@@ -20167,6 +20206,10 @@ packages:
   split2@4.2.0:
     resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
     engines: {node: '>= 10.x'}
+
+  'ssri@13.0.1':
+    resolution: {integrity: sha512-QUiRf1+u9wPTL/76GTYlKttDEBWV1ga9ZXW8BG6kfdeyyM8LGPix9gROyg9V2+P0xNyF3X2Go526xKFdMZrHSQ==}
+    engines: {node: ^20.17.0 || >=22.9.0}
 
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
@@ -22807,6 +22850,47 @@ snapshots:
     dependencies:
       playwright: 1.63.0-alpha-2026-08-31
       playwright-core: 1.63.0-alpha-2026-08-31
+
+  '@pnpm/building.policy@1100.1.6':
+    dependencies:
+      '@pnpm/config.version-policy': 1100.2.7
+      '@pnpm/deps.path': 1101.0.6
+      '@pnpm/types': 1102.1.1
+
+  '@pnpm/config.matcher@1100.0.3':
+    dependencies:
+      escape-string-regexp: 5.0.0
+
+  '@pnpm/config.version-policy@1100.2.7':
+    dependencies:
+      '@pnpm/config.matcher': 1100.0.3
+      '@pnpm/error': 1100.2.2
+      '@pnpm/types': 1102.1.1
+      semver: 7.8.5
+
+  '@pnpm/constants@1102.0.1': {}
+
+  '@pnpm/crypto.hash@1100.0.8':
+    dependencies:
+      '@pnpm/fs.graceful-fs': 1100.2.5
+      ssri: 13.0.1
+
+  '@pnpm/deps.path@1101.0.6':
+    dependencies:
+      '@pnpm/crypto.hash': 1100.0.8
+      '@pnpm/types': 1102.1.1
+      semver: 7.8.5
+
+  '@pnpm/error@1100.2.2':
+    dependencies:
+      '@pnpm/constants': 1102.0.1
+
+  '@pnpm/fs.graceful-fs@1100.2.5':
+    dependencies:
+      '@pnpm/error': 1100.2.2
+      graceful-fs: 4.2.11
+
+  '@pnpm/types@1102.1.1': {}
 
   '@protobufjs/aspromise@1.1.2': {}
 
@@ -26620,7 +26704,7 @@ snapshots:
       base64-js: 1.5.1
       xmlbuilder: 15.1.1
 
-  pnpm@11.7.0: {}
+  pnpm@11.28.4: {}
 
   points-on-curve@0.2.0: {}
 
@@ -27191,6 +27275,10 @@ snapshots:
   speakingurl@14.0.1: {}
 
   split2@4.2.0: {}
+
+  'ssri@13.0.1':
+    dependencies:
+      minipass: 7.1.3
 
   stackback@0.0.2: {}
 

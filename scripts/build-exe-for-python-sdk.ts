@@ -8,7 +8,7 @@
 
 import { spawn } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
-import { chmod, copyFile, cp, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, cp, lstat, mkdir, readFile, readdir, realpath, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { parseArgs } from 'node:util'
@@ -302,6 +302,7 @@ class SingleExeBuild {
       '--config.node-linker=hoisted',
       '--config.auto-install-peers=false',
       '--config.link-workspace-packages=true',
+      '--config.hoist-workspace-packages=false',
       this.staging,
     ])
     await this.restoreLegacyHoists()
@@ -386,7 +387,7 @@ class SingleExeBuild {
       const destination = remaining
       const source = await realpath(destination)
       const nestedNodeModules = join(source, 'node_modules')
-      await rm(destination, { recursive: true, force: true })
+      await unlink(destination)
       await cp(source, destination, {
         recursive: true,
         dereference: true,

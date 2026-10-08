@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-08-pnpm-hoisted-installer-fix.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-08-pnpm-hoisted-installer-fix.md
+/agent-note-pnpm-hoisted-installer-fix-through-a-compatible-11-x-distribution:
+  en: eb56fba902fd7996
+  zh: 7f24671457279e6b
+/agent-note-pnpm-hoisted-installer-fix-through-a-compatible-11-x-distribution/problem:
+  en: 0d28dd6068276d90
+  zh: be8e1f47f8e48193
+/agent-note-pnpm-hoisted-installer-fix-through-a-compatible-11-x-distribution/decision:
+  en: db23670ee08ebd7b
+  zh: 77133a6e9fe2eed9
+/agent-note-pnpm-hoisted-installer-fix-through-a-compatible-11-x-distribution/alternatives-considered:
+  en: 644a7cefc45ecb38
+  zh: 733b5cf53451afc5
+/agent-note-pnpm-hoisted-installer-fix-through-a-compatible-11-x-distribution/testing:
+  en: 7be4e25d358dbc0b
+  zh: 4ab480fb14743296
+/agent-note-pnpm-hoisted-installer-fix-through-a-compatible-11-x-distribution/consequences:
+  en: 8e7d2250318ccc27
+  zh: e9c0ab014736e735

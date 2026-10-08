@@ -4,7 +4,7 @@
   "license": "MIT",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@11.28.4",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
@@ -268,7 +268,7 @@
     "micromark-extension-gfm": "^3.0.0",
     "oxlint": "1.80.0",
     "oxlint-tsgolint": "7.0.2001",
-    "pnpm": "11.7.0",
+    "pnpm": "11.28.4",
     "publint": "^0.3.24",
     "smol-toml": "^1.7.1",
     "spdx-expression-parse": "^5.0.0",

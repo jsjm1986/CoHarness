@@ -865,7 +865,17 @@ describe('Python release workflows', () => {
     expect(manylinuxAddon).toMatchObject({ if: "runner.os == 'Linux'" })
     expect(JSON.stringify(manylinuxAddon)).toContain('manylinux_2_28_x86_64')
     expect(JSON.stringify(manylinuxAddon)).toContain('manylinux_2_28_aarch64')
-    expect(JSON.stringify(manylinuxAddon)).toContain('npm_config_build_from_source=true pnpm run install')
+    assertInstalledNodePtyInstallCommand(workflow)
+    const missingBypass = structuredClone(workflow)
+    const missingBuild = workflowJob(missingBypass, 'build')
+    if (!Array.isArray(missingBuild.steps)) throw new TypeError('Python wheel builder build must define steps')
+    const missingStep = missingBuild.steps.filter(isRecord)
+      .find(step => step.name === 'Rebuild Linux node-pty against manylinux 2.28')
+    if (missingStep === undefined || typeof missingStep.run !== 'string') {
+      throw new TypeError('Python wheel builder build must define the manylinux node-pty rebuild')
+    }
+    missingStep.run = missingStep.run.replace('pnpm --config.verify-deps-before-run=false run install', 'pnpm run install')
+    expect(() => { assertInstalledNodePtyInstallCommand(missingBypass) }).toThrow()
     expect(JSON.stringify(manylinuxAddon)).toContain('$HOME/setup-pnpm:$HOME/setup-pnpm:ro')
     expect(JSON.stringify(manylinuxAddon)).toContain('node-pty-glibc-versions.txt')
     expect(JSON.stringify(manylinuxAddon)).toContain('le 2.28')
@@ -1064,6 +1074,17 @@ function assertWorkflowPreflight(workflow: unknown): void {
   })
   expect(steps[contracts]?.if).toBeUndefined()
   expect(steps[contracts]?.['continue-on-error']).toBeUndefined()
+}
+
+function assertInstalledNodePtyInstallCommand(workflow: unknown): void {
+  if (!isRecord(workflow) || !isRecord(workflow.jobs)) throw new TypeError('Python wheel builder must define jobs')
+  const build = workflowJob(workflow, 'build')
+  if (!Array.isArray(build.steps)) throw new TypeError('Python wheel builder build must define steps')
+  const step = build.steps.filter(isRecord).find(entry => entry.name === 'Rebuild Linux node-pty against manylinux 2.28')
+  if (step === undefined || typeof step.run !== 'string') {
+    throw new TypeError('Python wheel builder build must define the manylinux node-pty rebuild')
+  }
+  expect(step.run).toContain('npm_config_build_from_source=true pnpm --config.verify-deps-before-run=false run install')
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
