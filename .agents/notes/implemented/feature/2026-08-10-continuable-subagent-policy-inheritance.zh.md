@@ -14,6 +14,8 @@ Status: implemented
 
 `startContinuable` 在其第一次 await（`prepareContinuable`）之前完成捕获，沿用与一次性路径相同的「父级后续切换属于父级的未来」边界。快照放在 `MaterializeInputs.create` 中传递，因此只有全新物化会在未发布的设置阶段、排在任何 fork 种子之后追加这些事件。冷恢复（cold resume）不传入 `create` 输入，也不追加任何内容：持久化的子日志已经携带委派事件，而回放该日志本身就是状态。子 agent 的生效策略由持久化子日志拥有，而不是当前 Activation，也不是发起恢复的父级，因此父级在驻留纪元（residency epoch）之间的切换绝不会追溯性地改变一个持久化子 agent。
 
+SDK 的继承回放通过共享的[基于 Promise 的后台测试夹具](../../../../packages/test-support/session-snapshot/tests/fixtures/subagent-send-message-fence.ts)，把子级首次步骤排在父级首轮结束之后。子级在父级活跃轮次内结算属于合法的 steering，但它消耗的模型调用序列不同于记录中的空闲后续轮次。夹具固定该顺序，不限制生产调度、不依赖固定时间延迟，也不改写已提交的 Session 比对基准。
+
 ## 考虑过的替代方案
 
 - **一项通用 child 设置贡献**：不予采纳。贡献只接收子级上下文，因此无法在委派边界捕获父级的覆盖项；在冷恢复与全新创建时都应用它会导致重复追加或重复捕获；而且没有任何机制把它的捕获绑定到 start 调用的同步前缀，await 前捕获的保证会因此丢失。
@@ -25,5 +27,5 @@ Status: implemented
 
 - 默认组合包的后台委派（`backgroundMode: continuable`）现在会继承父级显式的沙箱覆盖项，并把子级钉定为 `'never'` 审批；未组合任一策略服务的组合保持原有行为。
 - `dsh-subagent` 新增针对 `dsh-sandbox-policy` 与 `dsh-user-approval` 的可选 peer 类型（即一次性驱动器所用的 `ctx.get` 模式）；`dsh-subagent-in-process-driver` 完全移除自己的策略服务 peer 与类型导入，委托给共享辅助函数。
-- 可继续测试套件（`packages/subagent/subagent/tests/continuation-inheritance.spec.ts`）锁定全新启动的种子写入、await 前捕获、默认值省略、冷恢复快照稳定性与 fork 种子优先级；ACP 快照场景 `subagent-continuable-inheritance` 经组装后的应用锁定子级的委派事件与只读运行时上下文，移除捕获时即失败。
+- 可继续测试套件（`packages/subagent/subagent/tests/continuation-inheritance.spec.ts`）锁定全新启动的种子写入、await 前捕获、默认值省略、冷恢复快照稳定性与 fork 种子优先级；ACP 与 SDK 快照场景 `subagent-continuable-inheritance` 经组装后的应用锁定子级的委派事件与只读运行时上下文，移除捕获时即失败。
 - 进程外提供方（`acp`、`dsh-sdk`、`claude-code`、`codex`）不支持可继续子 agent（没有 `prepareContinuable`），其一次性子 agent 保留自身的部署策略（`inheritsParentContext = false`）；跨进程策略传播仍不在范围内。
