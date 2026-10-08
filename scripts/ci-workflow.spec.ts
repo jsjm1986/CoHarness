@@ -254,6 +254,7 @@ describe('CI workflow', () => {
     })
     expect(node24Bench.steps).toContainEqual({
       name: 'Install benchmark browser and hosted dependencies',
+      'timeout-minutes': 5,
       run: 'pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium',
     })
     expect(JSON.stringify(node24Bench.steps)).not.toContain('DSH_CI_FAILOVER_LINUX')
