@@ -395,7 +395,9 @@ jobs:
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
+      - uses: ./.github/actions/prepare-ci-apt
       - name: Install benchmark browser and hosted dependencies
+        timeout-minutes: 5
         run: pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium
 
       - name: Run performance benchmarks
@@ -681,12 +683,19 @@ jobs:
         if: needs.pr-scope.outputs.snapshot_mode == 'full' || (needs.pr-scope.outputs.snapshot_mode == 'focused' && contains(needs.pr-scope.outputs.web_groups, 'settings'))
         run: npm ci --prefix gateway/admin-ui
 
+      - uses: ./.github/actions/prepare-ci-apt
+        if: >-
+          (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
+          && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
+          || github.event.pull_request.head.repo.full_name != github.repository
+          || github.event.pull_request.user.login == 'dependabot[bot]')
       - name: Install Playwright Chromium and hosted dependencies
         if: >-
           (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
           && (vars.DSH_CI_FAILOVER_LINUX != 'selfhosted'
           || github.event.pull_request.head.repo.full_name != github.repository
           || github.event.pull_request.user.login == 'dependabot[bot]')
+        timeout-minutes: 5
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium webkit
 
       # The persistent VM image owns Playwright's Linux system packages; do
@@ -1000,7 +1009,9 @@ jobs:
       - name: Fetch pinned public upstream inputs
         run: node scripts/fetch-upstream-baseline.ts
 
+      - uses: ./.github/actions/prepare-ci-apt
       - name: Install Playwright Chromium and hosted dependencies
+        timeout-minutes: 5
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
 
       - name: Run full Linux audit
@@ -1095,7 +1106,9 @@ jobs:
       - name: Install Admin browser dependencies
         run: npm ci --prefix gateway/admin-ui
 
+      - uses: ./.github/actions/prepare-ci-apt
       - name: Install Playwright Chromium and hosted dependencies
+        timeout-minutes: 5
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
 
       - name: Populate the PR browser cache from master
@@ -1305,7 +1318,9 @@ jobs:
       # download the full dependency closure once and keep it for the next
       # run. The `wine` dispatcher package (not bare `wine64`) is what puts a
       # binary on PATH.
+      - uses: ./.github/actions/prepare-ci-apt
       - name: Install Wine
+        timeout-minutes: 5
         run: |
           if compgen -G "$HOME/wine-debs/*.deb" > /dev/null; then
             # The restored archive is the full --download-only closure of
