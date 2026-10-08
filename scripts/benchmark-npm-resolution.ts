@@ -288,7 +288,7 @@ function signalProcessTree(child: ChildProcess, signal: 'SIGTERM' | 'SIGKILL'): 
       timeout: FORCED_EXIT_TIMEOUT_MS,
     })
     if (result.error !== undefined) throw result.error
-    if (result.status !== 0 && child.exitCode === null && child.signalCode === null) {
+    if (result.status !== 0) {
       throw new Error(`taskkill failed to terminate process tree ${child.pid} (status ${String(result.status)})`)
     }
     return
@@ -323,6 +323,7 @@ function assertNever(value: never): never {
  * @param options - Working directory, environment, timeout, termination grace, and caller lifetime.
  * @returns Exit facts, captured output, duration, and whether timeout handling began.
  * @throws The caller's abort reason after its process tree and output pipes settle.
+ * @throws A termination failure when process-tree or output-pipe settlement is unconfirmed.
  */
 export async function runCommandWithTimeout(
   command: string,
