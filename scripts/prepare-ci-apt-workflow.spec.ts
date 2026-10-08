@@ -197,6 +197,7 @@ describe.runIf(process.platform !== 'win32')('prepare-ci-apt composite action', 
     if (!isRecord(action) || !isRecord(action.runs) || !Array.isArray(action.runs.steps)) throw new TypeError('action must define steps')
     const bashStep = (action.runs.steps as Step[]).find(step => isRecord(step) && step.shell === 'bash')
     if (!isRecord(bashStep) || typeof bashStep.run !== 'string') throw new TypeError('action must define a bash run block')
+    const runBlock = bashStep.run
 
     const markerDir = mkdtempSync(join(tmpdir(), 'apt-action-'))
     const stubDir = mkdtempSync(join(tmpdir(), 'apt-action-bin-'))
@@ -215,7 +216,7 @@ describe.runIf(process.platform !== 'win32')('prepare-ci-apt composite action', 
       if (environment.RUNNER_OS !== undefined) env.RUNNER_OS = environment.RUNNER_OS
       let status: number | null = null
       try {
-        execFileSync('/bin/bash', ['-c', bashStep.run], { env, cwd: markerDir, timeout: 5_000, stdio: 'pipe' })
+        execFileSync('/bin/bash', ['-c', runBlock], { env, cwd: markerDir, timeout: 5_000, stdio: 'pipe' })
         status = 0
       } catch (error) {
         status = (error as { status?: number }).status ?? null
