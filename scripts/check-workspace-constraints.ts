@@ -18,6 +18,7 @@ import type { DshBundleManifest } from '../packages/util/package-manifest/src/ty
 import { OPTIONAL_BUNDLES, bundlePatchFiles } from '../packages/boot/app-boot/src/profile.ts'
 import { isPrivateWorkspaceDirectory } from './workspace-package-policy.ts'
 import { collectProjectReferenceFaceViolations } from './project-reference-faces.ts'
+import { collectDependencyCohortViolations } from './verify-dependency-cohorts.ts'
 
 const root = resolve(import.meta.dirname, '..')
 // Publication rules cover these package trees; dependency rules read all pnpm members.
@@ -645,6 +646,7 @@ export function main(): void {
   const manifests = readWorkspaceManifests(root)
   const errors = [
     ...checkRepositoryVersion(),
+    ...collectDependencyCohortViolations(root),
     ...workspaceManifests().flatMap(checkWorkspaceManifest),
     ...checkWorkspaceProtocol(manifests),
     ...checkExperimentalDependencyIsolation(manifests),

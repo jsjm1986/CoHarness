@@ -16,9 +16,25 @@ updates:
       # vite migration, not standalone bumps.
       - dependency-name: "@vitejs/plugin-react"
         update-types: ["version-update:semver-major"]
+      # Test helpers share Vitest's mock types and coverage protocol.
+      # Major migrations update the complete family and its consumers together.
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+      bundled-pnpm:
+        patterns:
+          - "pnpm"
+    open-pull-requests-limit: 2
     schedule:
-      interval: "cron"
-      cronjob: "0 4 * * *"
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
       timezone: "Asia/Shanghai"
     cooldown:
       default-days: 30
@@ -28,9 +44,11 @@ updates:
 
   - package-ecosystem: "uv"
     directory: "/python/sdk"
+    open-pull-requests-limit: 1
     schedule:
-      interval: "cron"
-      cronjob: "0 4 * * *"
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
       timezone: "Asia/Shanghai"
     cooldown:
       default-days: 30
@@ -40,9 +58,16 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
+    ignore:
+      # Held pending macOS Intel bootstrap verification (#254).
+      # A replacement must pass the selected installation and packaging proofs.
+      - dependency-name: "pnpm/action-setup"
+        versions: ["6.1.0"]
+    open-pull-requests-limit: 1
     schedule:
-      interval: "cron"
-      cronjob: "0 4 * * *"
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
       timezone: "Asia/Shanghai"
     cooldown:
       default-days: 30

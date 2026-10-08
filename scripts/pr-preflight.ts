@@ -212,7 +212,7 @@ export function planPrPreflight(base: string, cwd: string, environment: NodeJS.P
       ...scope.paths.untracked.map(path => `+untracked input: ${path}`)].join('\n')
     selectionPlans = resolveCiPrScopePlans(paths, diff, root, environment)
     runtimeSelection = selectionPlans.execution
-    proofs = classifyCiPrProofs(paths, selectionPlans.candidate, root)
+    proofs = classifyCiPrProofs(paths, root)
   } catch (error) { diagnostics.push({ code: 'selection-policy', path: 'scripts/web-test-policy.json', message: message(error) }) }
   const commands = runtimeSelection === null ? [] : plannedCommands(runtimeSelection, paths)
   if (proofs !== null) commands.push(...proofCommands(proofs, commands))

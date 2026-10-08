@@ -71,6 +71,7 @@
     "plan-review.e2e.ts": "conversation",
     "plugin-administration.e2e.ts": "settings",
     "plugin-config.e2e.ts": "settings",
+    "plugin-install-approve.e2e.ts": "settings",
     "produced-file-mentions.e2e.ts": "conversation",
     "produced-files.e2e.ts": "documents",
     "project-collaboration.e2e.ts": "workbench",

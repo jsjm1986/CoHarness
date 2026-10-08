@@ -53,3 +53,5 @@
               - id: deepseek-v4-pro
     - id: parent-sandbox-override
       name: '../../../packages/test-support/session-snapshot/tests/fixtures/parent-sandbox-override.ts'
+    - id: subagent-send-message-fence
+      name: '../../../packages/test-support/session-snapshot/tests/fixtures/subagent-send-message-fence.ts'

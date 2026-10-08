@@ -54,9 +54,8 @@ jobs:
   # appear on pull-request check panels. The self-hosted standby lanes there
   # require DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true.
 
-  # Pull-request changes that only update workflow action pins or documentation
-  # do not need the release-sized coverage, browser, runtime, and native lanes.
-  # Source and dependency changes keep the complete existing PR gate set.
+  # Documentation-only pull requests omit unrelated runtime lanes. Dependency
+  # and installer changes retain their installation and packaging consumers.
   pr-scope:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -102,6 +101,12 @@ jobs:
 
       - name: Install scope classifier runtime
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Verify dependency cohorts before lane selection
+        run: pnpm run verify-dependency-cohorts
+
+      - name: Validate workflow contracts before lane selection
+        run: pnpm exec vitest run scripts/ci-workflow.spec.ts
 
       - name: Classify pull-request scope
         id: scope
@@ -721,6 +726,17 @@ jobs:
       - name: Run full web verification
         if: needs.pr-scope.outputs.snapshot_mode == 'full'
         run: pnpm run check:ci:web:full
+
+      - name: Upload browser failure evidence
+        if: failure() && (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-failure-evidence-${{ github.run_attempt }}
+          path: .artifacts/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Summarize golden changes and replay status
         if: always() && (needs.pr-scope.outputs.snapshot_mode == 'focused' || needs.pr-scope.outputs.snapshot_mode == 'full')
         env:
@@ -1017,6 +1033,16 @@ jobs:
       - name: Run full Linux audit
         run: pnpm run check:ci:linux-primary
 
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: full-audit-failure-evidence-${{ github.run_attempt }}
+          path: .artifacts/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Preserve gate evidence
         if: always()
         uses: ./.github/actions/gate-evidence
@@ -1130,9 +1156,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: web-sweep-failure-evidence
+          name: web-sweep-failure-evidence-${{ github.run_attempt }}
           path: .artifacts/
-          if-no-files-found: ignore
+          include-hidden-files: true
+          if-no-files-found: warn
           retention-days: 14
       - name: Preserve gate evidence
         if: always()

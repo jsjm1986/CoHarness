@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-08-atomic-fixture-runtime-ports.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-08-atomic-fixture-runtime-ports.md
+/agent-note-atomic-loopback-ports-for-process-backed-gateway-fixtures:
+  en: e0a549f25bcc3a64
+  zh: 15354ddbfe7fea08
+/agent-note-atomic-loopback-ports-for-process-backed-gateway-fixtures/problem:
+  en: 030dfc1041c5addc
+  zh: eeb6c024c4854010
+/agent-note-atomic-loopback-ports-for-process-backed-gateway-fixtures/decision:
+  en: 408993863c53f96f
+  zh: bd178f495086d563
+/agent-note-atomic-loopback-ports-for-process-backed-gateway-fixtures/alternatives-considered:
+  en: 648c817fec2211cb
+  zh: e2c2a02350d59b65
+/agent-note-atomic-loopback-ports-for-process-backed-gateway-fixtures/testing:
+  en: 74fbcaa90178ffac
+  zh: f09dfc47fd24c92b
+/agent-note-atomic-loopback-ports-for-process-backed-gateway-fixtures/consequences:
+  en: 878b9a12df54bd1d
+  zh: e2576da50a1fd073

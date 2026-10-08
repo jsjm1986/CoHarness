@@ -22,7 +22,7 @@ Status: implemented
 
 **当下的结果是 toast。** 要等下次启动的变更、被更高层覆盖的变更、被取消的运行、被拒绝的操作，各弹一条 toast 后自行消失；页面上不留任何东西。
 
-**被拦下的安装脚本在失败界面批准。** pnpm 11 把依赖脚本留作未决时，失败的运行报告待决定的包名（[管理器的授权](2026-09-14-current-profile-plugin-management.zh.md)），失败界面列出它们并以**允许这些脚本并重试**取代普通重试；store 带着 `approvedBuilds` 用同一个已检查的 subject 再跑一次，安装完成界面说明允许了哪些脚本。正因如此，`pnpm-workspace.yaml` 不在恢复的文件之列。没有待决定的名字时，失败退回到手动放行的提示。
+**被拦下的安装脚本在失败界面批准。** pnpm 把依赖脚本留作未决时，失败的运行报告待决定的 `allowBuilds` 键（[管理器的授权](2026-09-14-current-profile-plugin-management.zh.md) 使它们在回滚后仍然持久），失败界面列出它们并以**允许这些脚本并重试**取代普通重试；store 带着 `approvedBuilds` 用同一个已检查的 subject 再跑一次，安装完成界面说明允许了哪些脚本。正因如此，`pnpm-workspace.yaml` 不在恢复的文件之列。没有待决定的名字时，失败退回到手动放行的提示。
 
 ## 考虑过的替代方案
 
@@ -40,4 +40,4 @@ Status: implemented
 
 ## 测试
 
-`packages/boot/plugin-manager/tests/install-spec.spec.ts` 钉住 spec 形式与失败分类器的输入；`manager.spec.ts` 用桩住的注册表查询和真实目录驱动 `inspect`，流式转发一次运行，停下一次运行并检查恢复后的文件，并检查变更事件；`operations.spec.ts` 覆盖注册表查询。`packages/client/ui-plugin-manager/tests` 覆盖 store 的阶段、经宿主确认的取消、装后启用、toast 与页面的四个画面；`apps/web/tests/plugin-manager.e2e.ts` 经真实宿主拒绝已装名字、不存在的路径和坏名字，并实时切换一个组合包及其中一行，`plugin-install-cancel.e2e.ts` 从对话框停下一个真实子进程、检查恢复后的文件，并在第二次尝试时装成，`plugin-install-approve.e2e.ts` 用假 pnpm 把脚本留作未决、从对话框允许后在重试中装上。
+`packages/boot/plugin-manager/tests/install-spec.spec.ts` 钉住 spec 形式与失败分类器的输入；`manager.spec.ts` 用桩住的注册表查询和真实目录驱动 `inspect`，流式转发一次运行，停下一次运行并检查恢复后的文件，并检查变更事件；`operations.spec.ts` 覆盖注册表查询。`packages/client/ui-plugin-manager/tests` 覆盖 store 的阶段、经宿主确认的取消、装后启用、toast 与页面的四个画面；`manager.spec.ts` 驱动一次真实 pnpm 运行，让被拦下的构建进入待批准、获准后在重试中完成构建；`build-approval.spec.ts` 覆盖策略契约；`apps/web/tests/plugin-install-approve.e2e.ts` 运行组装后的浏览器场景——拦截画面、批准与重试构建。
