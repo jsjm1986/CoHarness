@@ -293,22 +293,40 @@ function signalProcessTree(child: ChildProcess, signal: 'SIGTERM' | 'SIGKILL'): 
     }
     return
   }
+  signalProcessGroup(child.pid, signal)
+}
+
+function signalProcessGroup(processGroupId: number, signal: 'SIGTERM' | 'SIGKILL' | 0): void {
   try {
-    process.kill(-child.pid, signal)
+    process.kill(-processGroupId, signal)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
+  }
+}
+
+/** A denied probe means the group exists but signalling is not permitted. */
+function signallingDenied(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException).code === 'EPERM'
+}
+
+function processGroupExists(processGroupId: number): boolean {
+  try {
+    process.kill(-processGroupId, 0)
+    return true
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    // Only ESRCH proves the group is gone. A denied probe cannot prove
+    // liveness either, so settle falls back to the owned close event and the
+    // forced-settlement bound instead of looping on an unobservable group.
+    if (code === 'ESRCH' || code === 'EPERM') return false
+    throw error
   }
 }
 
 function processTreeCanExecute(child: ChildProcess): boolean {
   if (child.pid === undefined) return false
   if (process.platform === 'win32') return child.exitCode === null && child.signalCode === null
-  try {
-    process.kill(-child.pid, 0)
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false
-    throw error
-  }
+  if (!processGroupExists(child.pid)) return false
   return process.platform !== 'linux' || linuxProcessGroupHasLiveMembers(child.pid) !== false
 }
 
@@ -381,7 +399,13 @@ export async function runCommandWithTimeout(
         assertNever(first)
     }
 
-    signalProcessTree(child, 'SIGTERM')
+    try {
+      signalProcessTree(child, 'SIGTERM')
+    } catch (error) {
+      if (!signallingDenied(error)) throw error
+      // The sandbox denies signalling this group; liveness probing reports the
+      // same denial, so observe the already-owned close/pipe settlement only.
+    }
     const groupState = { exited: false }
     const treeClosed = (async () => {
       while (processTreeCanExecute(child)) await pollDelay(15, undefined, { signal: exitPoll.signal })
@@ -399,7 +423,13 @@ export async function runCommandWithTimeout(
       return { ...graceful, durationMs: performance.now() - started, output, timedOut: true }
     }
     // Group absence ends signalling even when an inherited output pipe closes later.
-    if (!groupState.exited) signalProcessTree(child, 'SIGKILL')
+    if (!groupState.exited) {
+      try {
+        signalProcessTree(child, 'SIGKILL')
+      } catch (error) {
+        if (!signallingDenied(error)) throw error
+      }
+    }
     const forced = await Promise.race([
       treeClosed,
       new Promise<undefined>((resolveForced) => {
