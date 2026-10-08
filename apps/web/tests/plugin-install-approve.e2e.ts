@@ -102,7 +102,8 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
     }
   }
   signal.addEventListener('abort', onAbort)
-  const world = await mkdtemp(join(tmpdir(), 'dsh-web-approve-'))
+  // Canonical roots keep pnpm's source key independent of host tmpdir symlinks.
+  const world = await realpath(await mkdtemp(join(tmpdir(), 'dsh-web-approve-')))
   const subprocessCtx = new Context()
   const failures: unknown[] = []
   try {
@@ -196,8 +197,7 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
         dependencies?: Record<string, string>
       }
       expect(blockedManifest.dependencies?.[ADDON]).toBeUndefined()
-      // Goldens stay portable: substitute the ephemeral source-qualified key
-      // after normalization, which has already folded the absolute tail.
+      // Source identity is pinned above; goldens substitute only its temporary path.
       const fixtureSource = `${ADDON}@file:{{fixtureSource}}`
       const normalizedKey = pendingKey.replaceAll(world, '{{cwd}}')
       await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'blocked.expected.md'),

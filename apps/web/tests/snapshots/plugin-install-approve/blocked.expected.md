@@ -14,7 +14,7 @@
     - paragraph: These packages have install scripts that pnpm did not run.
     - list:
       - listitem:
-        - code: "approval-fixture-addon@file:{{fixtureSource}}"
+        - code: approval-fixture-addon@file:{{fixtureSource}}
     - paragraph: Once allowed, the scripts run here with your permissions, and the permission is saved in this profile; you will not be asked again.
     - paragraph: Allow only packages you trust.
     - button "Allow these scripts and retry"
