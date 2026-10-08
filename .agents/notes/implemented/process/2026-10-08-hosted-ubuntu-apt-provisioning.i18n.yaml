@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-08-hosted-ubuntu-apt-provisioning.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-08-hosted-ubuntu-apt-provisioning.md
+/agent-note-bounded-authenticated-apt-provisioning-on-hosted-ubuntu-runners:
+  en: db747b112cd4c83f
+  zh: f1fea62463b1e2f5
+/agent-note-bounded-authenticated-apt-provisioning-on-hosted-ubuntu-runners/problem:
+  en: 4a8c4d48fd77c6aa
+  zh: 176c44007c651371
+/agent-note-bounded-authenticated-apt-provisioning-on-hosted-ubuntu-runners/decision:
+  en: f0f319f251f2e3e1
+  zh: a84888054454e5af
+/agent-note-bounded-authenticated-apt-provisioning-on-hosted-ubuntu-runners/alternatives-considered:
+  en: 8deb02b5044a32d5
+  zh: 972561d9d2406a10
+/agent-note-bounded-authenticated-apt-provisioning-on-hosted-ubuntu-runners/testing:
+  en: c3b2e8c58eb43d0b
+  zh: e45df8aea3965c81
+/agent-note-bounded-authenticated-apt-provisioning-on-hosted-ubuntu-runners/consequences:
+  en: 0a0127134f553547
+  zh: 0085d35d51d699fd

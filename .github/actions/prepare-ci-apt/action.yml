@@ -1,0 +1,15 @@
+name: Prepare Hosted Ubuntu APT
+description: Configure canonical Ubuntu HTTPS archives and bounded APT requests on ephemeral hosted runners.
+runs:
+  using: composite
+  steps:
+    - name: Configure hosted Ubuntu package networking
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ "${RUNNER_ENVIRONMENT:-}" != github-hosted || "${RUNNER_OS:-}" != Linux ]]; then
+          echo 'prepare-ci-apt is restricted to GitHub-hosted Linux runners' >&2
+          exit 1
+        fi
+        node_bin="$(command -v node)"
+        sudo "$node_bin" scripts/prepare-ci-apt.mjs --apply
