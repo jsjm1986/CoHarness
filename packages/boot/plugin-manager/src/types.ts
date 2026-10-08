@@ -198,9 +198,13 @@ export interface ChangeResult {
   packageResult?: PackageResult
   /** The bundle an installation added, once pnpm and the bundle check accepted it. */
   bundle?: string
-  /** Exact package names awaiting explicit script approval in the profile's pnpm settings, read after a failed run. */
+  /**
+   * Exact `allowBuilds` keys awaiting an explicit script decision in the profile's `pnpm-workspace.yaml`
+   * — bare package names for registry packages, source-qualified keys for file/git sources; reported
+   * after a failed run.
+   */
   pendingBuilds?: string[]
-  /** Package script permissions saved before this installation attempt. */
+  /** `allowBuilds` keys approved before this installation attempt. */
   approvedBuilds?: string[]
   /** The registries the installation asked, in order; `packageResult` is the last one's run. */
   registries?: Registry[]
@@ -218,7 +222,10 @@ export type PluginInstallRequestId = Branded<'PluginInstallRequestId'>
 export interface InstallBundleOptions {
   enabled?: boolean
   requestId?: PluginInstallRequestId
-  /** Explicitly allow these pending packages' scripts for this profile, then install; a name no longer pending refuses the call. */
+  /**
+   * Explicitly allow these pending `allowBuilds` keys' scripts for this profile, then install;
+   * a key no longer pending refuses the call.
+   */
   approvedBuilds?: string[]
   /** The registry asked first; absent, the configured one. The configured fallbacks follow while a registry is unreachable or stale. */
   registry?: Registry

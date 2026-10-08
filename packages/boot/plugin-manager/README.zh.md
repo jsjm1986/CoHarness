@@ -57,7 +57,7 @@ kind: "package-reference"
 
 工具和 Remote 的取消信号会停止正在运行的包管理器操作。启用安装内容之前，管理器会重新核验调用者的当前权限。启用前被拒绝的安装会在包管理器进程结束后恢复清单和锁文件；已经完成的 bundle 移除不会回滚。
 
-pnpm 11 拦下依赖脚本时，失败的安装在 `pendingBuilds` 里报告 profile 中所有待决定的包名，包括先前尝试留下的；失败的运行会恢复 `package.json` 与 `pnpm-lock.yaml`，但有意不恢复 pnpm 记录这些名字的 `pnpm-workspace.yaml`。Web 插件页提供**允许这些脚本并重试**；工具可以在用户于对话中批准这些脚本后，通过 `install_bundle` 的 `approvedBuilds` 代为授权。服务只校验待决定的名字，不核实对话中的批准。授权按包名保存在当前 profile，允许以宿主用户的权限执行命令，并在再次安装失败后保留。只能批准当前未决定的名字；已有的拒绝与通配规则不能通过此操作覆盖。`allowBuilds` 里出现 YAML 锚点或别名时拒绝授权。重试保留原来的启用选择。
+pnpm 拦下依赖脚本时，失败的安装在 `pendingBuilds` 里报告 profile 中所有待决定的 `allowBuilds` 键，包括先前尝试留下的；失败的运行会恢复 `package.json` 与 `pnpm-lock.yaml`，但有意不恢复 `pnpm-workspace.yaml`；pnpm 将未决定的构建记录在 `node_modules/.modules.yaml` 中，因此管理器在回滚前把它们捕获为 `pnpm-workspace.yaml` 里的 `allowBuilds` 待决定条目，使 `node_modules` 清理之后仍可批准。Web 插件页提供**允许这些脚本并重试**；工具可以在用户于对话中批准这些脚本后，通过 `install_bundle` 的 `approvedBuilds` 代为授权。服务只校验待决定的键，不核实对话中的批准。授权按精确的 `allowBuilds` 键保存在当前 profile——注册表包是裸包名，file 或 git 依赖是 pnpm 记录的源限定键——允许以宿主用户的权限执行命令，并在再次安装失败后保留。只能批准当前未决定的键；已有的拒绝与通配规则不能通过此操作覆盖。`allowBuilds` 里出现 YAML 锚点或别名时拒绝授权。重试保留原来的启用选择。
 
 Gateway 管理的运行时在每次变更前重新核验管理员身份，工具审批或 Full access 不能代替此授权。读操作（`listPlugins`、`listBundles`、`listVersionExemptions`、`registries`、`waitForInstall`、`access`）对所有能到达服务的调用者开放，`access()` 报告 `{ manage }`，界面可以据此禁用控件而无需试探写入。`authorization: required` 在授权提供者不可用时拒绝变更但保留读取；独立本机 profile 默认使用 `local`。Gateway 在持久写锁和配置队列内再次检查授权，拒绝已撤销的权限。受保护的部署插件及其父条目不能被组合包 patch 替换或关闭。
 
