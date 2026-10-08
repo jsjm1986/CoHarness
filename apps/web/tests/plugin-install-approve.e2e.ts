@@ -5,9 +5,9 @@
  */
 
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
@@ -185,7 +185,7 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
       expect(undecided).toHaveLength(1)
       const pendingKey = undecided[0]!
       expect(pendingKey.startsWith(`${ADDON}@file:`)).toBe(true)
-      expect(pendingKey.endsWith('/home/addon'), pendingKey).toBe(true)
+      expect(await realpath(resolve(profileDir, pendingKey.slice(`${ADDON}@file:`.length))), pendingKey).toBe(await realpath(addon))
       expect(pendingKey).not.toBe(ADDON)
       const items = blocked.getByRole('listitem')
       expect(await items.count()).toBe(1)
