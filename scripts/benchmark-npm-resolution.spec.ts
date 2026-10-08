@@ -55,6 +55,53 @@ function processCanExecute(pid: number): boolean {
   }
 }
 
+/**
+ * Write a two-generation fixture: a parent applying `sigtermHandler` and a
+ * descendant that publishes [ppid, pid] to <root>/ready.json once it listens.
+ */
+function writeDescendantTree(root: string, sigtermHandler: string, stdio: string): { script: string; marker: string } {
+  const script = join(root, 'fixture.cjs')
+  const marker = join(root, 'ready.json')
+  const descendantSource = [
+    "const fs = require('node:fs')",
+    "process.on('SIGTERM', () => {})",
+    `fs.writeFileSync(${JSON.stringify(`${marker}.tmp`)}, JSON.stringify([process.ppid, process.pid]))`,
+    `fs.renameSync(${JSON.stringify(`${marker}.tmp`)}, ${JSON.stringify(marker)})`,
+    'setInterval(() => {}, 1000)',
+  ].join(';\n')
+  writeFileSync(script, [
+    "const { spawn } = require('node:child_process')",
+    `process.on('SIGTERM', ${sigtermHandler})`,
+    `spawn(process.execPath, ['-e', ${JSON.stringify(descendantSource)}], { stdio: ${stdio} })`,
+    'setInterval(() => {}, 1000)',
+  ].join(';\n'))
+  return { script, marker }
+}
+
+/**
+ * Abort `operation` and settle it into its rejection reason plus post-cancel
+ * liveness of the two published pids; resolves only through the rejection
+ * branch, so a returned fixture still fails the test.
+ */
+function observeCancellation(
+  operation: Promise<unknown>,
+  controller: AbortController,
+  reason: Error,
+  parentPid: number,
+  descendantPid: number,
+): Promise<{ error: unknown; parentCanExecute: boolean; descendantCanExecute: boolean }> {
+  const settlement = operation.then(
+    () => { throw new Error('fixture returned before caller cancellation') },
+    (error: unknown) => ({
+      error,
+      parentCanExecute: processCanExecute(parentPid),
+      descendantCanExecute: processCanExecute(descendantPid),
+    }),
+  )
+  controller.abort(reason)
+  return settlement
+}
+
 describe('npm resolution benchmark', () => {
   it('parses repeat, timeout, threshold, and ref options', () => {
     expect(parseBenchmarkOptions([])).toEqual({ runs: 1, timeoutMs: 300_000 })
@@ -230,21 +277,7 @@ describe('npm resolution benchmark', () => {
   it('settles the parent and descendant before reporting caller cancellation', async ({ signal }) => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-command-cancel tree-'))
     roots.push(root)
-    const script = join(root, 'fixture.cjs')
-    const marker = join(root, 'ready.json')
-    const descendantSource = [
-      "const fs = require('node:fs')",
-      "process.on('SIGTERM', () => {})",
-      `fs.writeFileSync(${JSON.stringify(`${marker}.tmp`)}, JSON.stringify([process.ppid, process.pid]))`,
-      `fs.renameSync(${JSON.stringify(`${marker}.tmp`)}, ${JSON.stringify(marker)})`,
-      'setInterval(() => {}, 1000)',
-    ].join(';\n')
-    writeFileSync(script, [
-      "const { spawn } = require('node:child_process')",
-      "process.on('SIGTERM', () => {})",
-      `spawn(process.execPath, ['-e', ${JSON.stringify(descendantSource)}], { stdio: ['ignore', 'inherit', 'ignore'] })`,
-      'setInterval(() => {}, 1000)',
-    ].join(';\n'))
+    const { script, marker } = writeDescendantTree(root, '() => {}', '[\'ignore\', \'inherit\', \'ignore\']')
     const controller = new AbortController()
     const reason = new Error('fixture caller cancelled')
     const operation = runCommandWithTimeout(process.execPath, [script], {
@@ -257,16 +290,7 @@ describe('npm resolution benchmark', () => {
         operation.then(() => { throw new Error('fixture exited before readiness') }),
       ])
       const [parentPid, descendantPid] = JSON.parse(readFileSync(marker, 'utf8')) as [number, number]
-      const settlement = operation.then(
-        () => { throw new Error('fixture returned before caller cancellation') },
-        (error: unknown) => ({
-          error,
-          parentCanExecute: processCanExecute(parentPid),
-          descendantCanExecute: processCanExecute(descendantPid),
-        }),
-      )
-      controller.abort(reason)
-      const outcome = await settlement
+      const outcome = await observeCancellation(operation, controller, reason, parentPid, descendantPid)
       expect(outcome.error).toBe(reason)
       expect(outcome.parentCanExecute).toBe(false)
       expect(outcome.descendantCanExecute).toBe(false)
@@ -281,21 +305,7 @@ describe('npm resolution benchmark', () => {
   it.skipIf(process.platform === 'win32')('waits for a redirected descendant after its parent closes', async ({ signal }) => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-command-parent-close-'))
     roots.push(root)
-    const script = join(root, 'fixture.cjs')
-    const marker = join(root, 'ready.json')
-    const descendantSource = [
-      "const fs = require('node:fs')",
-      "process.on('SIGTERM', () => {})",
-      `fs.writeFileSync(${JSON.stringify(`${marker}.tmp`)}, JSON.stringify([process.ppid, process.pid]))`,
-      `fs.renameSync(${JSON.stringify(`${marker}.tmp`)}, ${JSON.stringify(marker)})`,
-      'setInterval(() => {}, 1000)',
-    ].join(';\n')
-    writeFileSync(script, [
-      "const { spawn } = require('node:child_process')",
-      "process.on('SIGTERM', () => process.exit(0))",
-      `spawn(process.execPath, ['-e', ${JSON.stringify(descendantSource)}], { stdio: 'ignore' })`,
-      'setInterval(() => {}, 1000)',
-    ].join(';\n'))
+    const { script, marker } = writeDescendantTree(root, '() => process.exit(0)', '\'ignore\'')
     const controller = new AbortController()
     const reason = new Error('fixture redirected descendant cancelled')
     const operation = runCommandWithTimeout(process.execPath, [script], {
@@ -310,16 +320,7 @@ describe('npm resolution benchmark', () => {
       ])
       members = JSON.parse(readFileSync(marker, 'utf8')) as [number, number]
       const [parentPid, descendantPid] = members
-      const settlement = operation.then(
-        () => { throw new Error('fixture returned before caller cancellation') },
-        (error: unknown) => ({
-          error,
-          parentCanExecute: processCanExecute(parentPid),
-          descendantCanExecute: processCanExecute(descendantPid),
-        }),
-      )
-      controller.abort(reason)
-      const outcome = await settlement
+      const outcome = await observeCancellation(operation, controller, reason, parentPid, descendantPid)
       expect(outcome.error).toBe(reason)
       expect(outcome.parentCanExecute).toBe(false)
       expect(outcome.descendantCanExecute).toBe(false)
