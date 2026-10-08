@@ -16,6 +16,8 @@ On a failed plugin installation the plugin manager calls `capturePendingBuilds` 
 
 The 11.x line keeps the bundled-JavaScript distribution contract: `exports['.']` resolves `package.json`, `bin/pnpm.mjs` imports the shipped `dist` bundle, and no `preinstall`/`install`/`postinstall` hook runs at payload install, so the deny-by-default `allowBuilds` policy needs no exemption. The pnpm 12 major hold from [pnpm is a bundled runtime component](2026-10-07-pnpm-is-a-bundled-runtime-component.md) is unchanged — its distribution-form and CLI-parity audit remains a separate migration decision.
 
+The Python runtime deployment disables implicit workspace hoists while retaining its declared workspace dependencies. The deploy tree therefore contains the runtime closure rather than the synthetic carrier's self-link or unrelated workspace aliases. Materialization unlinks each proven package link before copying its files. The manylinux addon rebuild invokes the installed node-pty package's explicit install script with automatic dependency verification disabled; published npm artifacts do not contain that package's development-only TypeScript preparation inputs.
+
 ## Alternatives considered
 
 - **Keep the taskset pin.** It serializes the entire install behind `availableParallelism()-1` wherever it applies and leaves the race live in every other hoisted-install consumer.

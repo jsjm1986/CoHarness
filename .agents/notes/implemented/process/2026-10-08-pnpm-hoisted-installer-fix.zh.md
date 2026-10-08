@@ -16,6 +16,8 @@ pnpm 的 hoisted linker 曾存在上游 rename 竞态（pnpm/pnpm#12880）：目
 
 11.x 系列保持了 JavaScript 打包分发契约：`exports['.']` 解析出 `package.json`，`bin/pnpm.mjs` 导入随包分发的 `dist` bundle，且 payload 安装不触发 `preinstall`/`install`/`postinstall`，因此 deny-by-default 的 `allowBuilds` 策略无需豁免。[pnpm is a bundled runtime component](2026-10-07-pnpm-is-a-bundled-runtime-component.zh.md) 对 pnpm 12 的主版本暂留不变——其分发形态与 CLI 一致性审计仍是独立的迁移决策。
 
+Python 运行时部署禁用隐式工作区提升，同时保留已声明的工作区依赖。因此，部署树包含运行时依赖闭包，而不包含合成载体的自身链接或无关工作区别名。实体化在复制文件之前解除每个已确认的包链接。manylinux 插件重建显式调用已安装 node-pty 包的 install 脚本，并禁用自动依赖验证；发布的 npm 制品不包含该包仅供开发使用的 TypeScript 准备输入。
+
 ## Alternatives considered
 
 - **保留 taskset 钉法。** 它在生效处把整个安装串行化在 `availableParallelism()-1` 之后，并让竞态继续在每一个 hoisted-install 消费者中存活。

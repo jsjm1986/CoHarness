@@ -185,7 +185,7 @@ it('blocks a file-source install script, surfaces the pending key, and builds it
       expect(undecided).toHaveLength(1)
       const pendingKey = undecided[0]!
       expect(pendingKey.startsWith(`${ADDON}@file:`)).toBe(true)
-      expect(pendingKey.endsWith('/home/addon')).toBe(true)
+      expect(pendingKey.endsWith('/home/addon'), pendingKey).toBe(true)
       expect(pendingKey).not.toBe(ADDON)
       const items = blocked.getByRole('listitem')
       expect(await items.count()).toBe(1)
