@@ -323,7 +323,7 @@ export function clientSurfacePackages(root: string): ReadonlySet<string> {
  * path falls through to the full inventory rather than silently skipping a lane.
  *
  * @param paths - Repository-relative paths changed by the pull request.
- * @param diff - Zero-context unified diff for identifying pin-only workflow edits.
+ * @param _diff - Zero-context diff retained by the frozen comparison interface; candidate selection uses changed paths.
  * @param clientPackages - Keys of browser-rendered packages, from {@link clientSurfacePackages}.
  * @param policy - The checked-in web test policy; defaults to loading it from the repository.
  * @param goldenOwners - Golden directory to referencing scenario keys; defaults to scanning the repository.
@@ -331,7 +331,7 @@ export function clientSurfacePackages(root: string): ReadonlySet<string> {
  */
 export function classifyCiPrScope(
   paths: readonly string[],
-  diff: string,
+  _diff: string,
   clientPackages: ReadonlySet<string> = new Set(),
   policy: WebTestPolicy = loadWebTestPolicy(resolve(import.meta.dirname, '..')),
   goldenOwners: ReadonlyMap<string, readonly string[]> = scanGoldenOwners(resolve(import.meta.dirname, '..')),
@@ -391,38 +391,6 @@ export function classifyCiPrScope(
     consumerReasons: { python: ['unknown-or-empty-diff'], gateway: ['unknown-or-empty-diff'], adminUi: ['unknown-or-empty-diff'], android: ['unknown-or-empty-diff'] },
   }
 
-  const changedLines = diff
-    .split('\n')
-    .filter(line => (line.startsWith('+') || line.startsWith('-')) && !line.startsWith('+++') && !line.startsWith('---'))
-  // A pin bump changes complete `uses:` lines and nothing else: a `run:` line
-  // that merely contains the ref text is a real command edit, not a pin bump.
-  const SETUP_USES = /^\s*-\s*uses:\s*pnpm\/action-setup@v[\d.]+\s*$/
-  const normalizeRef = (line: string): string => line.replace(/pnpm\/action-setup@v[\d.]+/, 'pnpm/action-setup@')
-  const added = changedLines.filter(line => line.startsWith('+')).map(line => line.slice(1))
-  const removed = changedLines.filter(line => line.startsWith('-')).map(line => line.slice(1))
-  const normalizedAdded = added.map(normalizeRef).sort()
-  const normalizedRemoved = removed.map(normalizeRef).sort()
-  const actionOnly = !sharedWebInput && paths.every(path => path.startsWith('.github/workflows/'))
-    && added.length > 0
-    && added.length === removed.length
-    && [...added, ...removed].every(line => SETUP_USES.test(line))
-    && normalizedAdded.every((line, index) => line === normalizedRemoved[index])
-  if (actionOnly) return {
-    ...common,
-    runExpensive: false,
-    reason: 'action-only',
-    gatewayMode: 'skip',
-    adminUiMode: 'skip',
-    androidMode: 'skip',
-    consumerReasons: { python: [], gateway: [], adminUi: [], android: [] },
-    coverageMode: 'skip',
-    snapshotMode: 'skip',
-    webGroups: [],
-    webScenarios: [],
-    compatMode: 'skip',
-    pythonMode: 'skip',
-    windowsMode: 'skip',
-  }
   if (inertOnly && !modelInput) return {
     ...common,
     runExpensive: false,
@@ -663,7 +631,7 @@ function main(): void {
   const diff = execFileSync('git', ['diff', '--unified=0', range], { encoding: 'utf8', maxBuffer: 100 * 1024 * 1024 })
   const plans = resolveCiPrScopePlans(paths, diff, process.cwd())
   const result = plans.execution
-  const proofs = classifyCiPrProofs(paths, plans.candidate, process.cwd(), {
+  const proofs = classifyCiPrProofs(paths, process.cwd(), {
     untrustedActor: process.env.DSH_CI_UNTRUSTED_ACTOR === 'true',
   })
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
@@ -745,7 +713,7 @@ function main(): void {
  * @returns previous consumer decisions without duplicating the upstream classifier.
  */
 export function previousConsumerSelection(paths: readonly string[], candidate: CiPrScope): CiPrScope {
-  const inert = candidate.reason === 'docs-only' || candidate.reason === 'action-only'
+  const inert = candidate.reason === 'docs-only'
   return {
     ...candidate,
     pythonMode: paths.length === 0 || (!inert && paths.some(path => path.startsWith('python/') || DEPENDENCY_PATH.test(path))) ? 'full' : 'skip',

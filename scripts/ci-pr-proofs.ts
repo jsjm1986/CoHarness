@@ -2,7 +2,6 @@
 import { readFileSync } from 'node:fs'
 import { posix, resolve } from 'node:path'
 import { load as parseYaml } from 'js-yaml'
-import type { CiPrScope } from './ci-pr-scope.ts'
 import scopePolicy from './ci-scope-policy.json' with { type: 'json' }
 
 /** Existing proof owners joined by the PR's required summary. */
@@ -99,13 +98,12 @@ function matchesWorkflow(path: string, patterns: readonly string[]): boolean {
 /**
  * Select required native, provider, kernel and packed-install verification.
  * @param paths - Complete changed paths, including both sides of renames.
- * @param candidate - Candidate CI classification from the shared scope policy.
  * @param root - Repository holding the existing workflow input definitions.
  * @param options - `untrustedActor` withholds credential-bound proofs (GitHub keeps secrets from forks and Dependabot).
  * @returns Required proofs, unsupported provider impact and their justification. Unknown inputs affect every proof.
  */
 export function classifyCiPrProofs(
-  paths: readonly string[], candidate: Pick<CiPrScope, 'reason'>, root = resolve(import.meta.dirname, '..'),
+  paths: readonly string[], root = resolve(import.meta.dirname, '..'),
   options: { readonly untrustedActor?: boolean } = {},
 ): CiPrProofs {
   const providerAcceptance = parseProviderAcceptance(scopePolicy.providerAcceptance)
@@ -115,7 +113,7 @@ export function classifyCiPrProofs(
   const policies = Object.fromEntries(Object.entries(WORKFLOW_INPUTS).map(([proof, file]) => [proof, workflowPaths(root, file)]))
   const add = (proof: PrProofName, reason: string): void => { reasons[proof].push(reason) }
   const changed = [...new Set(paths.map(path => path.replaceAll('\\', '/')))].sort()
-  if (candidate.reason !== 'action-only') for (const path of changed.filter(runtimeInput)) {
+  for (const path of changed.filter(runtimeInput)) {
     let known = false
     for (const [proof, patterns] of Object.entries(policies)) if (matchesWorkflow(path, patterns)) {
       add(proof as keyof typeof WORKFLOW_INPUTS, `workflow-input:${path}`)
