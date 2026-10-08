@@ -30,6 +30,6 @@ CI now records enough scope metadata for independent lane selection while preser
 
 ## Tests
 
-`pnpm exec vitest run scripts/ci-pr-scope.spec.ts scripts/ci-workflow.spec.ts scripts/run-gates.spec.ts scripts/incremental-coverage.spec.ts` passes. The tests cover action-only, documentation-only, model-input, shared-runtime, Gateway, and source/dependency classifications plus the gate graph and strict coverage-map parsing.
+`pnpm exec vitest run scripts/ci-pr-scope.spec.ts scripts/ci-workflow.spec.ts scripts/run-gates.spec.ts scripts/incremental-coverage.spec.ts` exercises these contracts locally. The tests cover documentation-only, installer, model-input, shared-runtime, Gateway, and source/dependency classifications plus the gate graph and strict coverage-map parsing; installer changes additionally select the runtime and platform proof lanes ([controlled dependency upgrades](2026-10-08-controlled-dependency-upgrades.md)).
 
 The [candidate-bound evidence decision](2026-09-21-candidate-bound-gate-evidence.md) extends consumer selection and publication acceptance while retaining this note’s coverage and versioning rules.

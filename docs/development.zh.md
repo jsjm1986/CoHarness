@@ -126,6 +126,8 @@ vendor manifest 守卫检查 `vendor/*/src` 下的改动是否连同对应的 `v
 
 keyless [CI 工作流](../.github/workflows/ci.yml) 按影响范围选择 lane。Session、Cordis、Typert、Gateway、LLM、子代理、sandbox、subprocess、terminal、vendor、native 和 client-connection 的改动保留完整运行时库存；普通叶子包改动可以使用限定范围的 coverage 和 consumer。云端控制面改动会运行独立 Gateway 检查，模型可见的 skill 和 preset 输入继续按运行时输入处理。产物消费方在各自 lane 内等待一次 build。Release 与 Sandbox 工作流按路径触发，同时保留 scheduled 或手动运行以覆盖平台验证；CI 的 `full-audit` 手动 dispatch 可为发布候选运行完整 Linux 运行时和浏览器库存。单独的真实 API 工作流按其配置的 worker 上限运行 `pnpm run test:e2e`。[上游升级操作手册](cookbook/upstream-upgrade-playbook.zh.md)定义两条变更轨道和证据记录。当前门禁和 job 清单以 [scripts/run-gates.ts](../scripts/run-gates.ts) 和工作流文件为准。
 
+依赖改动要先通过已执行的预检和 proof 选择，而不只是 manifest 评审：scope job 在 lane 选择之前运行 `pnpm run verify-dependency-cohorts`，Vitest 家族漂移会在分类之前失败；安装器或运行时输入继续保留其 workflow 所有者选中的 runtime、platform 与打包 proof。Dependabot 的节奏、分组与暂留策略归属见[受控的依赖升级](../.agents/notes/implemented/process/2026-10-08-controlled-dependency-upgrades.zh.md) Agent Note。
+
 ### 日常命令
 
 运行 `pnpm run pr:preflight --base <verified-base-ref>`，一起检查已提交和工作区变更。只读报告列出选中的 CI 检查、生成文件、双语配对与缺失入口；它不表示这些检查已通过，也不要求在本地重复全部 CI 工作。`--check` 运行列出的机械检查。`--fix-generated` 显式修复登记的确定性输出，留下可审查的差异；请手动更新译文，仅在审阅两种语言后确认指定配对。详见[验证提速决策](../.agents/notes/implemented/process/2026-09-22-pr-verification-throughput.zh.md)。
