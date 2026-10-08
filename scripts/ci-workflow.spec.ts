@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as yaml from 'js-yaml'
@@ -311,6 +312,41 @@ describe('CI workflow', () => {
       reason: '${{ steps.scope.outputs.reason }}',
       web_groups: '${{ steps.scope.outputs.web_groups }}',
     })
+  })
+
+  it('verifies dependency cohorts after classifier install and before scope classification', () => {
+    const scope = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'pr-scope')
+    const steps = (scope.steps as unknown[]).filter(isRecord)
+    const install = steps.findIndex(step => step.name === 'Install scope classifier runtime')
+    const cohorts = steps.findIndex(step => step.name === 'Verify dependency cohorts before lane selection')
+    const classify = steps.findIndex(step => step.name === 'Classify pull-request scope')
+    expect(install).toBeGreaterThanOrEqual(0)
+    expect(cohorts).toBeGreaterThan(install)
+    expect(classify).toBeGreaterThan(cohorts)
+    // A cohort violation must fail the lane selection, never degrade to a
+    // conditional or warning step.
+    expect(steps[cohorts]?.['continue-on-error']).toBeUndefined()
+    expect(steps[cohorts]?.if).toBeUndefined()
+    expect(steps[cohorts]?.run).toBe('pnpm run verify-dependency-cohorts')
+  })
+
+  it('keeps the native-pack proof on the checked-in platform matrix', () => {
+    const workflow = loadWorkflow('.github/workflows/landlock-run.yml')
+    const matrix = workflowJob(workflow, 'matrix')
+    const matrixSteps = (matrix.steps as unknown[]).filter(isRecord)
+    expect(matrixSteps.some(step =>
+      typeof step.run === 'string' && step.run.includes('node ./scripts/github-matrix.mjs ci'))).toBe(true)
+    const native = workflowJob(workflow, 'native')
+    expect(native.needs).toBe('matrix')
+    expect(native.strategy).toMatchObject({ matrix: '${{ fromJson(needs.matrix.outputs.ci) }}' })
+    const generated = spawnSync(process.execPath,
+      [resolve(root, 'native/system/scripts/github-matrix.mjs'), 'ci'], { encoding: 'utf8' })
+    expect(generated.error).toBeUndefined()
+    expect(generated.signal).toBeNull()
+    expect(generated.status, generated.stderr).toBe(0)
+    const legs = JSON.parse(generated.stdout) as { include: { platform: string; runner: string }[] }
+    expect(legs.include.map(leg => leg.platform).sort())
+      .toEqual(['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64'])
   })
 
   it('exempts push from cancellation, so one master merge does not cancel the running drill', () => {

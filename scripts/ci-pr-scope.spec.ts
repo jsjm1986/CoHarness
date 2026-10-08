@@ -19,11 +19,22 @@ describe('classifyCiPrScope', () => {
     expect(scopePolicy.modelInputPrefixes).toContain('apps/cli/config/')
     expect(scopePolicy.gatewayPrefixes).toContain('gateway/')
   })
-  it('skips expensive lanes for pnpm action pin updates', () => {
-    expect(classifyCiPrScope(
-      ['.github/workflows/ci.yml', '.github/workflows/e2e.yml'],
-      '-      - uses: pnpm/action-setup@v6.0.9\n+      - uses: pnpm/action-setup@v6.0.10',
-    )).toMatchObject({ runExpensive: false, reason: 'action-only', changedDocsOnly: false, coverageMode: 'skip', snapshotMode: 'skip' })
+  it('keeps installer pin updates in the runtime and platform inventory', () => {
+    for (const [removed, added] of [['6.0.9', '6.0.10'], ['6.0.10', '6.1.0']] as const) {
+      expect(classifyCiPrScope(
+        ['.github/workflows/ci.yml', '.github/workflows/e2e.yml'],
+        `-      - uses: pnpm/action-setup@v${removed}\n+      - uses: pnpm/action-setup@v${added}`,
+      )).toMatchObject({
+        runExpensive: true,
+        reason: 'full',
+        changedDocsOnly: false,
+        coverageMode: 'full',
+        snapshotMode: 'scoped',
+        compatMode: 'full',
+        pythonMode: 'full',
+        windowsMode: 'full',
+      })
+    }
   })
 
   it('does not read a run line mentioning the action ref as a pin update', () => {

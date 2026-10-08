@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { classifyCiPrProofs } from './ci-pr-proofs.ts'
+import { classifyCiPrScope } from './ci-pr-scope.ts'
 import { requiredPrJobs, verifyPrResults } from './verify-pr-results.ts'
 
 const commit = 'a'.repeat(40)
@@ -26,6 +28,32 @@ describe('current candidate CI result admission', () => {
     const jobs = requiredPrJobs(input, commit)
     expect(jobs).toEqual(['node-24', 'pr-scope', 'web-verification'])
     expect(verifyPrResults(input, { ...results(jobs), 'windows-native': { result: 'skipped' } }, commit)).toEqual(jobs)
+  })
+
+  it('requires installer proofs through the complete classification path', () => {
+    const paths = ['.github/workflows/ci.yml', '.github/workflows/landlock-run.yml']
+    const input = {
+      ...plan(),
+      scope: classifyCiPrScope(paths, ''),
+      proofs: classifyCiPrProofs(paths, undefined, { untrustedActor: true }),
+    }
+    const jobs = requiredPrJobs(input, commit)
+    for (const job of ['native-pack', 'windows-native', 'python-runtime']) {
+      expect(jobs).toContain(job)
+    }
+    // Credential-bound proofs stay withheld from the untrusted actor and are
+    // not required, while the installer proofs still gate admission.
+    expect(jobs).not.toContain('provider-proof')
+    expect(jobs).not.toContain('pi-ai-proof')
+    expect(verifyPrResults(input, results(jobs), commit)).toEqual(jobs)
+    for (const job of ['native-pack', 'windows-native']) {
+      for (const result of ['skipped', 'cancelled', 'failure', undefined] as const) {
+        const outcomes = results(jobs)
+        if (result === undefined) Reflect.deleteProperty(outcomes, job)
+        else outcomes[job] = { result }
+        expect(() => verifyPrResults(input, outcomes, commit), `${job} ${String(result)}`).toThrow(`${job}:`)
+      }
+    }
   })
 
   it('requires every selected consumer and real environment proof', () => {

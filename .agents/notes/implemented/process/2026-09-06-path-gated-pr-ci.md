@@ -10,11 +10,11 @@ Every pull request started the complete coverage, browser snapshot, release-shap
 
 ## Decision
 
-The CI workflow adds a small `pr-scope` classifier. It marks a pull request as light when the diff contains only documentation or only `pnpm/action-setup` pin replacements inside workflow files. Light pull requests retain static analysis, Node compatibility, and the keyless Python SDK check; coverage, build-backed consumers, release-shaped Python runtime, and both Windows lanes are omitted. All source, dependency, lockfile, and workflow-logic changes retain the complete pull-request lane set.
+The CI workflow adds a small `pr-scope` classifier, [`scripts/ci-pr-scope.ts`](../../../../scripts/ci-pr-scope.ts). A diff touching only documentation omits unrelated runtime and platform consumers; every unknown input defaults to the full lane inventory, and installer pin bumps receive the runtime and platform proof lanes their workflow owners select ([controlled dependency upgrades](2026-10-08-controlled-dependency-upgrades.md)).
 
-`all checks passed` now requires the always-run static, compatibility, Python SDK, and scope jobs. It requires the expensive jobs only when `pr-scope` selects the full lane set. A skipped expensive job is therefore an intentional result with an explicit scope reason, while a skipped always-run job still fails the verdict.
+[`scripts/ci-pr-scope.ts`](../../../../scripts/ci-pr-scope.ts) emits the commit-bound validation plan. The `all checks passed` job uses [`scripts/verify-pr-results.ts`](../../../../scripts/verify-pr-results.ts) to require success from every selected job and permit intentional omissions.
 
-The classifier runs from the trusted pull-request base SHA after a full checkout. It is a small TypeScript module with unit coverage so workflow edits can test the action-only, documentation-only, and full-change classifications without needing GitHub Actions.
+The scope command computes changed paths against the base SHA from GitHub's pull-request event after a full checkout. Default `shadow` execution takes the union of frozen and candidate lane selections; an explicit `candidate` policy selects the candidate plan. Local tests exercise documentation-only, installer, and source/dependency classifications without GitHub Actions.
 
 ## Alternatives considered
 
@@ -28,8 +28,8 @@ The classifier runs from the trusted pull-request base SHA after a full checkout
 
 ## Consequences
 
-Action-pin and documentation pull requests no longer allocate the long-running coverage, browser, packaging, Wine, and native Windows runners. Product, dependency, lockfile, and workflow-logic changes keep the existing release-sized validation. The workflow still exposes one stable aggregate check, and the aggregate log records whether the expensive lanes were selected and why.
+Documentation pull requests no longer allocate the long-running coverage, browser, packaging, Wine, and native Windows runners. Unrecognized, product, dependency, lockfile, installer, and workflow-logic changes keep the release-sized validation the selected plan names. The workflow still exposes one stable aggregate check, and the aggregate log records whether the expensive lanes were selected and why.
 
 ## Testing
 
-The scope classifier unit tests cover action-only, documentation-only, and source/dependency changes. The CI workflow contract test covers the scope job, conditional expensive jobs, and aggregate dependency contract. A subsequent pull request must exercise both a light diff and a full diff through GitHub Actions before the optimization is treated as complete.
+The scope classifier unit tests cover documentation-only, installer, and source/dependency changes, and the CI workflow contract test covers the scope job, conditional expensive jobs, and aggregate dependency contract. Local coverage exercises classification and the result-admission contract only; hosted lane execution on the real runner matrix remains the CI proof that selected jobs actually pass.

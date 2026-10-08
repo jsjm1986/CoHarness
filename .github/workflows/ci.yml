@@ -54,9 +54,8 @@ jobs:
   # appear on pull-request check panels. The self-hosted standby lanes there
   # require DSH_CI_SELF_HOSTED_STANDBY_ENABLED=true.
 
-  # Pull-request changes that only update workflow action pins or documentation
-  # do not need the release-sized coverage, browser, runtime, and native lanes.
-  # Source and dependency changes keep the complete existing PR gate set.
+  # Documentation-only pull requests omit unrelated runtime lanes. Dependency
+  # and installer changes retain their installation and packaging consumers.
   pr-scope:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -102,6 +101,9 @@ jobs:
 
       - name: Install scope classifier runtime
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Verify dependency cohorts before lane selection
+        run: pnpm run verify-dependency-cohorts
 
       - name: Classify pull-request scope
         id: scope

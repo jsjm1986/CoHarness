@@ -57,6 +57,7 @@
     "check:windows-wine": "bash scripts/wine-windows-gates.sh",
     "clean": "tsx scripts/clean.ts",
     "constraints": "tsx scripts/check-workspace-constraints.ts",
+    "verify-dependency-cohorts": "tsx scripts/verify-dependency-cohorts.ts",
     "demo:acp": "node --import tsx packages/examples/acp-demo/src/bin.ts --config examples/acp-agent/cordis.yml",
     "demo:cordis": "node scripts/demo-cordis.mjs",
     "demo:ptc": "node scripts/demo-ptc.mjs",
