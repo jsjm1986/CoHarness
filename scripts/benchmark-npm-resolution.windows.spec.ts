@@ -1,5 +1,4 @@
 /** A failed taskkill cannot establish descendant exit from the parent's exit alone. */
-import type { ChildProcess } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -26,7 +25,7 @@ async function abortWindowsCommand(status: number, reason: Error): Promise<void>
     stdout,
     stderr,
     kill: vi.fn(),
-  }) as ChildProcess
+  })
   childProcesses.spawn.mockReturnValue(child)
   childProcesses.spawnSync.mockReturnValue({ status })
   vi.stubGlobal('process', Object.create(process, { platform: { value: 'win32' } }))
