@@ -140,13 +140,17 @@ it.each(['pause', 'failure'] as const)('retains Goal data during its checkpoint 
       expect(remove).not.toHaveBeenCalled()
     } finally { releasePause.resolve(undefined) }
   }
-  await vi.waitFor(() => { using _reservation = ctx.agents.reserveRemoval([handle.agent.id]) })
   stop()
-  expect(ctx.goals.get(handle.agent)).toMatchObject({
-    phase: outcome === 'pause' ? 'paused' : 'active', activation: 'disarmed', roundsStarted: 0,
+  // A post-checkpoint claim (e.g. disarm re-drive) can land after a claim-free
+  // sample; admission itself is the wait condition, and the designed refusal
+  // retries until the pending lifecycle operation settles.
+  await vi.waitFor(async () => {
+    expect(ctx.goals.get(handle.agent)).toMatchObject({
+      phase: outcome === 'pause' ? 'paused' : 'active', activation: 'disarmed', roundsStarted: 0,
+    })
+    expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeDefined()
+    expect(await owner.withReleased([handle.agent.id], remove)).toBe('removed')
   })
-  expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeDefined()
-  expect(await owner.withReleased([handle.agent.id], remove)).toBe('removed')
   expect(remove).toHaveBeenCalledOnce()
   expect(await ctx.sessionPersistence.stat(handle.agent.id)).toBeUndefined()
 })
