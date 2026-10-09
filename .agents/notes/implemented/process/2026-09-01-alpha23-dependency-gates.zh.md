@@ -14,6 +14,8 @@ Status: implemented
 
 `scripts/benchmark-npm-resolution.ts` 提供只读元数据本地 registry resolver。`scripts/verify-npm-install-layout.ts` 构造两个不兼容的合成 DSH 发行版，让 npm 计算 hoisted lock 布局，检查每条已解析 production/optional 边的嵌套与根路径，并要求 Cordis 只存在一份共享路径。本 fork 的完整 DSH peer 图循环过多，npm 严格 solver 会耗尽 Node 堆；因此布局探针先检查源码发行版的 1,244 条 peer 范围，再只在 npm 调用的合成元数据中移除 DSH peer 信息，并直接将全部 2,488 条合成 DSH peer 范围与各自发行版本比对。源码清单和独立的归属门禁仍保留 peer 声明。
 
+npm 解析器持有临时 registry、消费目录与子进程，直至清理完成。调用方取消会启动进程树终止，只有进程与输出管道关闭后才以调用方的原始原因拒绝；启动前取消不会创建进程。POSIX 命令使用 detached 进程组，并执行有界 TERM/KILL 阶段。Windows 控制台进程树使用有界的 `taskkill /PID <pid> /T /F`，因为这类进程不支持协作式 SIGTERM。进程树终止失败会明确报错，而不是仅杀死根进程就报告清理完成。所属测试把生命周期信号传入解析器，并为既有 npm 执行预算与清理留出时间；registry 仍仅监听回环地址，原子分配临时端口，且只提供元数据。父进程管道关闭不等于进程树退出；解析器等待其持有的 POSIX 进程组退出，并复用 provider 的纯 Node Linux 观测实现区分存活成员与 zombie/dead 条目，不把平台绑定加载进仅使用源码的脚本。
+
 归属门禁运行在静态 CI 与 hygiene 中；双发行版布局门禁在 release workflow 的 build 与发布之前运行。两者都是只读操作，只使用临时元数据或临时 consumer。
 
 本笔记收窄了 [npm 发布序列笔记](2026-08-10-npm-release-sequences.zh.md)中的 packed-install 决策：原有 release 探针继续验证打包内容和可执行文件启动，本次升级门禁则验证范围解析与跨发行版放置。
@@ -34,4 +36,4 @@ Status: implemented
 
 ## 测试
 
-验证器套件覆盖错误区段、重复声明、运行时 import 归属、合成 registry 克隆、npm 元数据解析、路径隔离和共享 Cordis 放置。当前 workspace 上 `CI=true pnpm run verify-package-dependencies` 与 `CI=true pnpm run verify-npm-install-layout` 均通过。
+验证器套件覆盖错误区段、重复声明、运行时 import 归属、合成 registry 克隆、npm 元数据解析、路径隔离和共享 Cordis 放置。当前 workspace 上 `CI=true pnpm run verify-package-dependencies` 与 `CI=true pnpm run verify-npm-install-layout` 均通过。取消用例在拒绝时观测父进程与后代进程的存活状态、取消原因的精确身份、启动前取消，以及 POSIX 正常关闭后没有强制信号。原生 Windows CI 负责证明 Windows 终止行为。

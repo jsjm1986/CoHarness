@@ -117,6 +117,9 @@ describe('Linux process inspector', () => {
     const fake = fakeInternals()
     expect(linuxProcessGroupHasLiveMembers(77, fake.internals)).toBeUndefined()
 
+    fake.dirs.set('/proc', ['13'])
+    expect(linuxProcessGroupHasLiveMembers(77, fake.internals)).toBeUndefined()
+
     fake.dirs.set('/proc', ['self', '10', '11', '12'])
     fake.files.set('/proc/10/stat', stat(10, 77, 10, -1, '500', 1, 'Z'))
     fake.files.set('/proc/11/stat', stat(11, 77, 10, -1, '501', 1, 'X'))
