@@ -1355,6 +1355,17 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
       </section>
     )
 
+  const failureBlock = state.status === 'error' && !refreshing
+    ? (
+      <div className={css.failure}>
+        <p className={css.statusWithDot} role="alert">
+          <StateDot state="error" />{t(state.refreshStatus === 'failed' ? 'refreshError' : 'error')}
+        </p>
+        <Button variant="outline" size="sm" onClick={props.refresh}>{t('retry')}</Button>
+      </div>
+    )
+    : null
+
   return (
     <section className={css.page} data-plugin-panel aria-busy={state.status === 'loading' || refreshing}>
       {showsCards
@@ -1434,16 +1445,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
             onDone={props.dismissNotice}
           />
         )}
-      {!showsCards && state.status === 'error' && !refreshing
-        ? (
-          <div className={css.failure}>
-            <p className={css.statusWithDot} role="alert">
-              <StateDot state="error" />{t(state.refreshStatus === 'failed' ? 'refreshError' : 'error')}
-            </p>
-            <Button variant="outline" size="sm" onClick={props.refresh}>{t('retry')}</Button>
-          </div>
-        )
-        : null}
+      {!showsCards ? failureBlock : null}
       {loaded && openPkg !== undefined && openRow !== undefined
         ? (
           <RowDetail
@@ -1489,16 +1491,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
       {showsCards ? renderGroup('config', t('configTitle'), configCards) : null}
       {/* A failed package read trails the groups it left incomplete: right under Official on a
           first-load failure, and after the kept cards when a refresh fails over stale data. */}
-      {loaded && showsCards && state.status === 'error' && !refreshing
-        ? (
-          <div className={css.failure}>
-            <p className={css.statusWithDot} role="alert">
-              <StateDot state="error" />{t(state.refreshStatus === 'failed' ? 'refreshError' : 'error')}
-            </p>
-            <Button variant="outline" size="sm" onClick={props.refresh}>{t('retry')}</Button>
-          </div>
-        )
-        : null}
+      {loaded && showsCards ? failureBlock : null}
       {showsCards && activated !== undefined && !state.install.open
         ? renderSlot('plugins.bundle.activation', {
           packageName: activated.name,

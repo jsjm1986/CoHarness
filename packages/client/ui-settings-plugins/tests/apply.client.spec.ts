@@ -92,7 +92,8 @@ describe('ui-settings-plugins apply', () => {
     const entries = slots.entries('plugins.item')
     expect(entries.map(entry => entry.options.id))
       .toEqual(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
-    expect(resolveSlotLabel(entries[0]!.options.label)).toBe('终端')
+    expect(entries.map(entry => resolveSlotLabel(entry.options.label)))
+      .toEqual(['终端', 'Agent 循环', 'Subagent', '模型选择', '网页搜索'])
   })
 
   it('injects one business face per card', async () => {
@@ -148,6 +149,22 @@ describe('ui-settings-plugins apply', () => {
     } finally {
       await ctx.fiber.dispose()
       refresh.mockRestore()
+    }
+  })
+
+  it('drops the connection-scoped model catalog when the connection resets', async () => {
+    const reset = vi.spyOn(SubagentModelSelectionCardController.prototype, 'resetConnection')
+    const { ctx, slots } = await bench()
+    try {
+      declarePluginsItem(slots)
+      await ctx.plugin({ inject: [...inject], apply }).await()
+
+      ctx.emit('connection/reset')
+
+      expect(reset).toHaveBeenCalledOnce()
+    } finally {
+      await ctx.fiber.dispose()
+      reset.mockRestore()
     }
   })
 

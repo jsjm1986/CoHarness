@@ -20,6 +20,7 @@ import { SubagentLimitsCard } from '../src/client/SubagentLimitsCard.tsx'
 import type { SubagentLimitsCardProps } from '../src/client/SubagentLimitsCard.tsx'
 import type { SubagentLimitsCardState } from '../src/client/subagent-limits-card-controller.ts'
 import type { WebSearchCardProps } from '../src/client/WebSearchCard.tsx'
+import { PluginForm } from '../src/client/PluginForm.tsx'
 import type { AgentLoopCardState } from '../src/client/agent-loop-card-controller.ts'
 import type { BashCardState } from '../src/client/bash-card-controller.ts'
 import type { CardFieldState, CardShell } from '../src/client/card-form.ts'
@@ -82,6 +83,25 @@ describe('Subagent limits card', () => {
     expect(screen.getByText(en.readOnlyProject)).toBeTruthy()
     expect(screen.getByText(en.subagentDepthInvalid)).toBeTruthy()
     expect(screen.getAllByRole('button', { name: en.reset }).every(button => (button as HTMLButtonElement).disabled)).toBe(true)
+  })
+
+  it('renders nothing while its namespace is unavailable, and answers only its one-liner for a summary', () => {
+    const fields = { maxDepth: field('1'), maxActiveSubagents: field('8') }
+    const props: SubagentLimitsCardProps = {
+      ...globalStandard, ...cardActions(), t, view: 'page',
+      useSubagentLimitsCard: bindSnapshotSelector(createSnapshotStore<SubagentLimitsCardState>({
+        ...settled, available: false, ...fields,
+      })),
+    }
+    const { container } = render(<div />)
+    render(<SubagentLimitsCard {...props} />)
+    expect(container.textContent).toBe('')
+    expect(screen.queryByLabelText(en.subagentMaxDepth)).toBeNull()
+
+    cleanup()
+    render(<SubagentLimitsCard {...props} view="summary" useSubagentLimitsCard={bindSnapshotSelector(createSnapshotStore<SubagentLimitsCardState>({ ...settled, ...fields }))} />)
+    expect(screen.getByText(en.subagentDescription)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.save })).toBeNull()
   })
 })
 
@@ -249,10 +269,24 @@ describe('AgentLoopCard', () => {
 
     expect(actions.resetField).toHaveBeenCalledWith('maxParallelToolCalls')
   })
+
+  it('renders nothing while its namespace is unavailable, and answers only its one-liner for a summary', () => {
+    const store = createSnapshotStore<AgentLoopCardState>({ ...settled, available: false, maxParallelToolCalls: field('10') })
+    const props: AgentLoopCardProps = { ...globalStandard, ...cardActions(), t, view: 'page', useAgentLoopCard: bindSnapshotSelector(store) }
+    const { container } = render(<div />)
+    render(<AgentLoopCard {...props} />)
+    expect(container.textContent).toBe('')
+    expect(screen.queryByLabelText(en.agentLoopMaxParallel)).toBeNull()
+
+    cleanup()
+    render(<AgentLoopCard {...props} view="summary" useAgentLoopCard={bindSnapshotSelector(createSnapshotStore({ ...settled, maxParallelToolCalls: field('10') }))} />)
+    expect(screen.getByText(en.agentLoopDescription)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.save })).toBeNull()
+  })
 })
 
 describe('WebSearchCard', () => {
-  function renderWebSearch(state: Partial<WebSearchCardState> = {}) {
+  function renderWebSearch(state: Partial<WebSearchCardState> = {}, view: 'summary' | 'page' = 'page') {
     const store = createSnapshotStore<WebSearchCardState>({
       ...settled,
       baseURL: field(''),
@@ -263,10 +297,22 @@ describe('WebSearchCard', () => {
       ...state,
     })
     const actions = cardActions()
-    const props: WebSearchCardProps = { ...globalStandard, ...actions, t, view: 'page', useWebSearchCard: bindSnapshotSelector(store) }
+    const props: WebSearchCardProps = { ...globalStandard, ...actions, t, view, useWebSearchCard: bindSnapshotSelector(store) }
     render(<WebSearchCard {...props} />)
     return actions
   }
+
+  it('renders nothing while its namespace is unavailable, and answers only its one-liner for a summary', () => {
+    const { container } = render(<div />)
+    renderWebSearch({ available: false })
+    expect(container.textContent).toBe('')
+    expect(screen.queryByLabelText(en.webSearchBaseUrl)).toBeNull()
+
+    cleanup()
+    renderWebSearch({}, 'summary')
+    expect(screen.getByText(en.webSearchDescription)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.save })).toBeNull()
+  })
 
   it('reports whether a key is configured without ever showing one', () => {
     renderWebSearch({ apiKeyConfigured: true })
@@ -352,5 +398,57 @@ describe('Subagent model selection card', () => {
     rerender(<SubagentModelSelectionCard {...props} />)
     expect(screen.getByText(en.subagentModelSelectionOff)).toBeTruthy()
     expect(screen.getByRole('switch').hasAttribute('disabled')).toBe(true)
+  })
+
+  it('renders nothing while its namespace is unavailable, and answers only its one-liner for a summary', () => {
+    const idle: SubagentModelSelectionCardState = { ...settled, enabled: true, catalogStatus: 'idle', catalogPartial: false, conflicted: false, candidates: [] }
+    const props: SubagentModelSelectionCardProps = { ...globalStandard, t, view: 'page',
+      useSubagentModelSelectionCard: bindSnapshotSelector(createSnapshotStore({ ...idle, available: false })),
+      toggleModel: vi.fn(), toggleEnabled: vi.fn(), retryCatalog: vi.fn(), save: vi.fn(), discard: vi.fn() }
+    const { container } = render(<div />)
+    render(<SubagentModelSelectionCard {...props} />)
+    expect(container.textContent).toBe('')
+    expect(screen.queryByRole('switch')).toBeNull()
+
+    cleanup()
+    render(<SubagentModelSelectionCard {...props} view="summary" useSubagentModelSelectionCard={bindSnapshotSelector(createSnapshotStore(idle))} />)
+    expect(screen.getByText(en.subagentModelSelectionToggle)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.save })).toBeNull()
+  })
+})
+
+describe('PluginForm', () => {
+  it('renders nothing while its namespace is unavailable', () => {
+    const { container } = render(
+      <PluginForm t={t} state={{ ...settled, available: false }} onSave={vi.fn()} onDiscard={vi.fn()}>
+        <span>field</span>
+      </PluginForm>,
+    )
+    expect(container.textContent).toBe('')
+  })
+
+  it('names the owner that keeps the settings read-only', () => {
+    const reasons = [
+      ['project', en.readOnlyProject],
+      ['account', en.readOnlyAccount],
+      ['organization', en.readOnlyOrganization],
+      ['deployment', en.readOnlyDeployment],
+      [undefined, en.readOnly],
+    ] as const
+    const { rerender } = render(
+      <PluginForm t={t} state={{ ...settled, writable: false, writableReason: 'project' }} onSave={vi.fn()} onDiscard={vi.fn()}>
+        <span>field</span>
+      </PluginForm>,
+    )
+    for (const [reason, text] of reasons) {
+      rerender(
+        <PluginForm t={t}
+          state={{ ...settled, writable: false, ...(reason === undefined ? {} : { writableReason: reason }) }}
+          onSave={vi.fn()} onDiscard={vi.fn()}>
+          <span>field</span>
+        </PluginForm>,
+      )
+      expect(screen.getByText(text)).toBeTruthy()
+    }
   })
 })
