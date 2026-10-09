@@ -131,8 +131,6 @@ export const coverageBaselineFiles: readonly string[] = [
   'packages/client/ui-settings-models/src/client/ModelsSection.tsx',
   'packages/client/ui-settings-models/src/client/index.ts',
   'packages/client/ui-settings-models/src/client/model-capabilities.ts',
-  'packages/client/ui-settings-plugin-inventory/src/client/PluginInventorySettingsTab.tsx',
-  'packages/client/ui-settings-plugin-inventory/src/client/index.ts',
   'packages/client/ui-settings-plugins/src/client/PluginCard.tsx',
   'packages/client/ui-settings/src/client/index.ts',
   'packages/client/ui-settings/src/client/settings-scope.ts',

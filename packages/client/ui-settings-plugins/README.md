@@ -7,11 +7,11 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-The **Plugins** settings section and its **Plugin configuration** tab. The section owns the heading and compact tab chrome; feature plugins contribute pages through `settings.plugins.tab`. This package's own tab shows one expandable card per Host plugin whose configuration a user owns. A card shows the plugin's name and what it governs; expanding it in place reveals hand-written controls bound to that plugin's settings namespace, each field marking whether the user overrode it and offering a reset back to the value the deployment composed.
+The **Plugins** settings section and its **Plugin configuration** tab. The section owns the heading and compact tab chrome; feature plugins contribute pages through `settings.plugins.tab`, and a lone contribution renders without the tab strip. Install, removal, and enablement live on the sidebar's Plugins page, which the section links to through the manager's `pluginNavigation` service. This package's own tab shows one expandable card per Host plugin whose configuration a user owns. A card shows the plugin's name and what it governs; expanding it in place reveals hand-written controls bound to that plugin's settings namespace, each field marking whether the user overrode it and offering a reset back to the value the deployment composed.
 
 ## Summary
 
-Use the **Built-in plugins** settings section to inspect the plugins this deployment ships, and the **Official** group of the sidebar's Plugins page to configure the host-plane plugins that expose settings. Each configuration page shows which values the user overrode, lets them reset those to deployment defaults, keeps edits local until save, and drops them when the page is left. If the configuration changed after the page loaded, the save is rejected instead of overwriting the newer values.
+Use the sidebar's **Plugins** page to inspect and manage the plugins this deployment ships, and its **Official** group to configure the host-plane plugins that expose settings. Each configuration page shows which values the user overrode, lets them reset those to deployment defaults, keeps edits local until save, and drops them when the page is left. If the configuration changed after the page loaded, the save is rejected instead of overwriting the newer values.
 
 ## Table of Contents
 

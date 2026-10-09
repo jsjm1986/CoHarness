@@ -243,9 +243,6 @@
     - id: ui-plugin-manager
       name: '@deepseek-ai/dsh-client-ui-plugin-manager'
 
-    - id: ui-settings-plugin-inventory
-      name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'
-
     - id: ui-settings-unarchive-sessions
       name: '@deepseek-ai/dsh-client-ui-settings-unarchive-sessions'
 

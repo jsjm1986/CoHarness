@@ -95,7 +95,7 @@ function cardActions() {
   return { edit: vi.fn(), resetField: vi.fn(), save: vi.fn(), discard: vi.fn() }
 }
 
-function renderSection(rows: readonly PluginsSettingsTabEntry[]) {
+function renderSection(rows: readonly PluginsSettingsTabEntry[], openPluginManager?: () => void) {
   const props = {
     t,
     useTabs: (selector: (value: readonly PluginsSettingsTabEntry[]) => unknown) => selector(rows),
@@ -103,7 +103,7 @@ function renderSection(rows: readonly PluginsSettingsTabEntry[]) {
       <span>{options.only}</span>
     ),
   } as unknown as PluginsSettingsSectionProps
-  render(<PluginsSettingsSection {...props} />)
+  render(<PluginsSettingsSection {...props} openPluginManager={openPluginManager} />)
 }
 
 /**
@@ -148,23 +148,43 @@ describe('PluginsSettingsSection', () => {
   it('defaults to the first ordered tab and mounts another only after selection', () => {
     renderSection([
       { id: 'configurable', order: 0, label: en.configurableTab },
-      { id: 'all', order: 10, label: 'Plugin list' },
+      { id: 'diagnostics', order: 10, label: 'Diagnostics' },
     ])
 
     const configurable = screen.getByRole('tab', { name: en.configurableTab })
-    const all = screen.getByRole('tab', { name: 'Plugin list' })
+    const diagnostics = screen.getByRole('tab', { name: 'Diagnostics' })
     expect(configurable.getAttribute('aria-selected')).toBe('true')
     expect(screen.getByText('configurable')).toBeTruthy()
-    expect(screen.queryByText('all')).toBeNull()
+    expect(screen.queryByText('diagnostics')).toBeNull()
 
-    fireEvent.click(all)
-    expect(all.getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByText('all')).toBeTruthy()
+    fireEvent.click(diagnostics)
+    expect(diagnostics.getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByText('diagnostics')).toBeTruthy()
     expect(screen.getByText('configurable').closest('[role="tabpanel"]')).toHaveProperty('hidden', true)
 
     fireEvent.click(configurable)
     expect(configurable.getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByText('all').closest('[role="tabpanel"]')).toHaveProperty('hidden', true)
+    expect(screen.getByText('diagnostics').closest('[role="tabpanel"]')).toHaveProperty('hidden', true)
+  })
+
+  it('skips the tab strip when a single contribution owns the section', () => {
+    renderSection([{ id: 'configurable', order: 0, label: en.configurableTab }])
+
+    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.getByText('configurable')).toBeTruthy()
+  })
+
+  it('links to the Plugins panel only when the manager provides the service', () => {
+    renderSection([{ id: 'configurable', order: 0, label: en.configurableTab }])
+    expect(screen.queryByRole('button', { name: en.managerLink })).toBeNull()
+
+    cleanup()
+    const openPluginManager = vi.fn()
+    renderSection([{ id: 'configurable', order: 0, label: en.configurableTab }], openPluginManager)
+    const link = screen.getByRole('button', { name: en.managerLink })
+    fireEvent.click(link)
+    expect(openPluginManager).toHaveBeenCalledOnce()
   })
 
   it('leads with its own heading and intro', () => {
@@ -177,28 +197,28 @@ describe('PluginsSettingsSection', () => {
   it('moves focus and selection with standard horizontal tab keys', () => {
     renderSection([
       { id: 'configurable', order: 0, label: en.configurableTab },
-      { id: 'all', order: 10, label: 'Plugin list' },
-      { id: 'diagnostics', order: 20, label: 'Diagnostics' },
+      { id: 'diagnostics', order: 10, label: 'Diagnostics' },
+      { id: 'third', order: 20, label: 'Third' },
     ])
 
     const configurable = screen.getByRole('tab', { name: en.configurableTab })
-    const all = screen.getByRole('tab', { name: 'Plugin list' })
     const diagnostics = screen.getByRole('tab', { name: 'Diagnostics' })
+    const third = screen.getByRole('tab', { name: 'Third' })
     expect(configurable.getAttribute('tabindex')).toBe('0')
-    expect(all.getAttribute('tabindex')).toBe('-1')
+    expect(diagnostics.getAttribute('tabindex')).toBe('-1')
 
     configurable.focus()
     fireEvent.keyDown(configurable, { key: 'ArrowRight' })
-    expect(document.activeElement).toBe(all)
-    expect(all.getAttribute('aria-selected')).toBe('true')
-
-    fireEvent.keyDown(all, { key: 'End' })
     expect(document.activeElement).toBe(diagnostics)
-    fireEvent.keyDown(diagnostics, { key: 'ArrowRight' })
+    expect(diagnostics.getAttribute('aria-selected')).toBe('true')
+
+    fireEvent.keyDown(diagnostics, { key: 'End' })
+    expect(document.activeElement).toBe(third)
+    fireEvent.keyDown(third, { key: 'ArrowRight' })
     expect(document.activeElement).toBe(configurable)
     fireEvent.keyDown(configurable, { key: 'ArrowLeft' })
-    expect(document.activeElement).toBe(diagnostics)
-    fireEvent.keyDown(diagnostics, { key: 'Home' })
+    expect(document.activeElement).toBe(third)
+    fireEvent.keyDown(third, { key: 'Home' })
     expect(document.activeElement).toBe(configurable)
 
     fireEvent.keyDown(configurable, { key: 'Escape' })

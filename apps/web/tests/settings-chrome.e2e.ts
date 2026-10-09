@@ -26,7 +26,6 @@ const DIALOG_EXPECTED = join(SNAPSHOT_DIR, 'dialog.expected.md')
 const PLUGINS_EXPECTED = join(SNAPSHOT_DIR, 'plugins.expected.md')
 // The English fallback surface: a browser naming no shipped language.
 const DIALOG_EN_EXPECTED = join(SNAPSHOT_DIR, 'dialog-en.expected.md')
-const PLUGIN_ROW_SELECTOR = '[data-plugin-entry$="ui-settings"]'
 const MODE = webSnapshotMode()
 
 describe('web e2e: settings modal and General preferences', () => {
@@ -96,38 +95,33 @@ describe('web e2e: settings modal and General preferences', () => {
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DIALOG_EXPECTED, snapshot, MODE)
     // Section switch: aria-current moves (the Models page itself has its own scenario file).
-    await dialog.getByRole('button', { name: '模型' }).click()
-    await expect.poll(() => dialog.getByRole('button', { name: '模型' }).getAttribute('aria-current'), { timeout: 5_000 }).toBe('true')
+    await dialog.getByRole('button', { name: '模型', exact: true }).click()
+    await expect.poll(() => dialog.getByRole('button', { name: '模型', exact: true }).getAttribute('aria-current'), { timeout: 5_000 }).toBe('true')
     expect(await dialog.getByRole('button', { name: '通用设置' }).getAttribute('aria-current')).toBeNull()
-    // Plugins is a read-only projection of the same assembled Loader tree.
-    // Capture one stable shipped row rather than the whole inventory so adding
-    // an unrelated plugin does not rewrite this surface's golden.
+    // Plugins is configuration-only: the sidebar Plugins panel owns install
+    // and enablement, and with one shipped tab no tab strip renders. Capture
+    // one stable shipped card rather than the whole section so adding an
+    // unrelated configurable plugin does not rewrite this surface's golden.
     await dialog.getByRole('button', { name: '插件', exact: true }).click()
     await dialog.getByRole('heading', { name: '插件', exact: true }).waitFor({ timeout: 10_000 })
-    await dialog.getByRole('tab', { name: '插件列表', exact: true }).click()
-    await dialog.getByRole('button', { name: '全局插件' }).click()
-    const pluginRow = dialog.locator(PLUGIN_ROW_SELECTOR)
+    expect(await dialog.getByRole('tab').count()).toBe(0)
+    const pluginRow = dialog.locator('li:has-text("限制 agent 运行的每一条命令")')
     await pluginRow.waitFor({ timeout: 10_000 })
-    const globalScope = dialog.locator('[data-plugin-scope="global"]')
-    const countNode = globalScope.locator('[data-plugin-count]')
-    const expectedPluginCount = [...scaffold.ctx.loader.entries()]
-      .filter(entry => !entry.options.group)
-      .length
-    expect(await dialog.getByRole('searchbox', { name: '搜索插件' }).count()).toBe(1)
-    expect(await countNode.getAttribute('data-plugin-count')).toBe(String(expectedPluginCount))
-    expect(await globalScope.locator('[data-plugin-entry]').count()).toBe(expectedPluginCount)
     expect(await dialog.getByRole('button', { name: '插件', exact: true }).getAttribute('aria-current')).toBe('true')
-    expect(await dialog.getByRole('tab', { name: '插件列表', exact: true }).getAttribute('aria-selected')).toBe('true')
-    expect(await dialog.getByRole('button', { name: '模型' }).getAttribute('aria-current')).toBeNull()
+    expect(await dialog.getByRole('button', { name: '模型', exact: true }).getAttribute('aria-current')).toBeNull()
     const pluginsSnapshot = await captureStableAria(
       page,
-      PLUGIN_ROW_SELECTOR,
+      'li:has-text("限制 agent 运行的每一条命令")',
       scaffold.workspaceCwd,
     )
     await compareOrRefreshGolden(PLUGINS_EXPECTED, pluginsSnapshot, MODE)
+    // The link leaves for the sidebar Plugins panel, which surfaces once the
+    // dialog closes.
+    await dialog.getByRole('button', { name: '在“插件”面板中管理安装与启用', exact: true }).click()
     // Close path 1: Escape.
     await page.keyboard.press('Escape')
     await expect.poll(() => page.getByRole('dialog', { name: '设置' }).count(), { timeout: 5_000 }).toBe(0)
+    expect(await page.getByRole('button', { name: '添加插件', exact: true }).count()).toBe(1)
     expect(await trigger.getAttribute('aria-expanded')).toBe('false')
     // Close path 2: the header close button (focus lands there on open).
     await trigger.click()

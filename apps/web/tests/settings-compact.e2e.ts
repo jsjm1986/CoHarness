@@ -71,7 +71,7 @@ describe('web e2e: compact settings overlay', () => {
 
     const generalTab = dialog.getByRole('button', { name: '通用设置' })
     const modelsTab = dialog.getByRole('button', { name: '模型' })
-    const pluginsTab = dialog.getByRole('button', { name: '插件' })
+    const pluginsTab = dialog.getByRole('button', { name: '插件', exact: true })
     const presetsTab = dialog.getByRole('button', { name: 'Agent 预设' })
     const generalTabBox = await generalTab.boundingBox()
     if (generalTabBox === null) throw new Error('settings compact general tab has no box')

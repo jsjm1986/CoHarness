@@ -54,10 +54,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /**
      * One page inside the Plugins settings section. The section owner renders
      * localized entry labels as tabs and mounts each contribution inside its
-     * corresponding tab panel. Options: `id` (tab key), `order` (tab order),
-     * and `label` (registrant-localized tab text). Declared at runtime by the
-     * feature that owns the Plugins section; the type lives here so inventory
-     * and configuration plugins collaborate without depending on one another.
+     * corresponding tab panel; a sole contribution renders without the tab
+     * strip. Options: `id` (tab key), `order` (tab order), and `label`
+     * (registrant-localized tab text). Declared at runtime by the feature that
+     * owns the Plugins section; the type lives here so contributing plugins
+     * collaborate without depending on one another.
      */
     'settings.plugins.tab': { kind: 'list'; scope: 'root'; owner: SettingsPluginsTabOwnerProps }
     /**

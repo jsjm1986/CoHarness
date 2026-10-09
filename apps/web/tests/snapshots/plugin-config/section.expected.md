@@ -21,29 +21,26 @@
     - img
     - text: 关闭
   - heading "插件" [level=2]
-  - paragraph: 配置和查看本部署已安装的插件。
-  - tablist "插件视图":
-    - tab "插件配置" [selected]
-    - tab "插件列表"
-  - tabpanel "插件配置":
-    - list:
-      - listitem:
-        - 'button "展开设置: 终端"':
-          - text: 终端 限制 agent 运行的每一条命令。
-          - img
-      - listitem:
-        - 'button "展开设置: Agent 循环"':
-          - text: Agent 循环 Agent 如何派发工具调用。
-          - img
-      - listitem:
-        - 'button "展开设置: Subagent"':
-          - text: Subagent 设置 Subagent 的递归层级和并行数量。
-          - img
-      - listitem:
-        - 'button "展开设置: 模型选择"':
-          - text: 模型选择 允许 Agent 为 Subagent 选择模型
-          - img
-      - listitem:
-        - 'button "展开设置: 网页搜索"':
-          - text: 网页搜索 DeepSeek 搜索提供方。
-          - img
+  - paragraph: 配置本部署已安装的插件。
+  - button "在“插件”面板中管理安装与启用"
+  - list:
+    - listitem:
+      - 'button "展开设置: 终端"':
+        - text: 终端 限制 agent 运行的每一条命令。
+        - img
+    - listitem:
+      - 'button "展开设置: Agent 循环"':
+        - text: Agent 循环 Agent 如何派发工具调用。
+        - img
+    - listitem:
+      - 'button "展开设置: Subagent"':
+        - text: Subagent 设置 Subagent 的递归层级和并行数量。
+        - img
+    - listitem:
+      - 'button "展开设置: 模型选择"':
+        - text: 模型选择 允许 Agent 为 Subagent 选择模型
+        - img
+    - listitem:
+      - 'button "展开设置: 网页搜索"':
+        - text: 网页搜索 DeepSeek 搜索提供方。
+        - img

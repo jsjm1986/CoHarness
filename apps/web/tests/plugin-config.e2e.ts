@@ -61,9 +61,9 @@ describe('web e2e: plugin configuration section', () => {
     await expect
       .poll(() => dialog.getByRole('button', { name: '插件', exact: true }).getAttribute('aria-current'), { timeout: 5_000 })
       .toBe('true')
-    await expect
-      .poll(() => dialog.getByRole('tab', { name: '插件配置', exact: true }).getAttribute('aria-selected'), { timeout: 5_000 })
-      .toBe('true')
+    // With a single shipped tab the section renders no strip; the manager
+    // link is the landmark that says the section finished composing.
+    await dialog.getByRole('button', { name: '在“插件”面板中管理安装与启用', exact: true }).waitFor({ timeout: 10_000 })
     return dialog
   }
 

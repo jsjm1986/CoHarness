@@ -7,6 +7,7 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { PluginEntryId, PluginInstallRequestId } from '@deepseek-ai/dsh-api-remotes/client'
 import { bindSnapshotSelector, stubMutationScope } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SettingsMirrorSnapshot, SettingsMutationScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ClientEntryState } from '@deepseek-ai/dsh-client-modules/client'
 import { createSnapshotStore, type SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { StrictMode, type ReactNode } from 'react'
 import { createNavigationStore } from '../src/client/navigation-store.ts'
@@ -94,6 +95,7 @@ const NO_CONFIG: ConfigLedger = { items: [], bundles: new Set(), rows: new Set()
 function renderTab(
   state: Partial<PluginManagerState> = {}, config: Partial<ConfigLedger> = {},
   bodies: SlotBodies = {}, forms: Record<string, ConfigPageForm> = {},
+  sync: ClientEntryState = { syncing: false, failures: [] },
 ) {
   const ctx = new Context()
   onTestFinished(async () => { await ctx.fiber.dispose() })
@@ -125,6 +127,7 @@ function renderTab(
     cancelConfirm: vi.fn(),
     setRowEnabled: vi.fn(),
     dismissNotice: vi.fn(),
+    retryClient: vi.fn(),
   }
   const unusedStandardHook = (): never => { throw new Error('Plugin manager fixture does not provide global state') }
   const standard = {
@@ -141,6 +144,7 @@ function renderTab(
     ...actions,
     usePluginManager: bindSnapshotSelector(store),
     useConfigLedger: bindSnapshotSelector(ledger),
+    useClientSync: bindSnapshotSelector(createSnapshotStore<ClientEntryState>(sync)),
     useConfigurations: bindSnapshotSelector(createSnapshotStore<SettingsMirrorSnapshot>({
       status: 'ready', error: null,
       view: { writable: true, hasDocument: true, namespaces: Object.keys(forms).map(ns => ({
@@ -194,6 +198,21 @@ function renderTab(
 }
 
 describe('PluginManagerPage', () => {
+  it('surfaces this page\'s module-sync state and routes its retry without touching Host enablement', () => {
+    const idle = renderTab()
+    expect(document.querySelector('[data-client-sync-failure]')).toBeNull()
+    idle.unmount()
+    const syncing = renderTab({}, {}, {}, {}, { syncing: true, failures: [] })
+    expect(screen.getByText('Syncing plugins on this page…')).toBeDefined()
+    syncing.unmount()
+    const failed = renderTab({}, {}, {}, {}, { syncing: false, failures: [{ id: 'dsh-x', message: 'import failed' }] })
+    const panel = document.querySelector('[data-client-sync-failure]')!
+    expect(within(panel as HTMLElement).getByText('dsh-x: import failed')).toBeDefined()
+    fireEvent.click(within(panel as HTMLElement).getByRole('button', { name: 'Retry this page' }))
+    expect(failed.actions.retryClient).toHaveBeenCalledTimes(1)
+    expect(failed.actions.setEnabled).not.toHaveBeenCalled()
+  })
+
   it('opens the requested bundle after its inventory arrives and falls back when it is absent', () => {
     const b = renderTab({ status: 'loading' })
     act(() => { b.navigation.actions.setView({ kind: 'package', name: 'dsh-better-sidebar' }) })

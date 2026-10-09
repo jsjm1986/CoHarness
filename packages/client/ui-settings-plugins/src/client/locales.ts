@@ -7,7 +7,7 @@ export type PluginsSettingsLocaleKey =
   | 'subagentModelSelectionOff' | 'subagentModelSelectionPartial' | 'subagentModelSelectionRequired'
   | 'subagentModelSelectionRetry' | 'subagentModelSelectionTitle' | 'subagentModelSelectionToggle'
   | 'subagentModelSelectionUnavailable' | 'subagentModelSelectionUnavailableGroup'
-  | 'nav' | 'title' | 'intro' | 'tabs' | 'configurableTab' | 'empty'
+  | 'nav' | 'title' | 'intro' | 'tabs' | 'configurableTab' | 'empty' | 'managerLink'
   | 'overridden' | 'reset' | 'readOnly' | 'readOnlyProject' | 'readOnlyAccount' | 'readOnlyOrganization' | 'readOnlyDeployment' | 'expand' | 'collapse'
   | 'save' | 'saving' | 'discard' | 'unsaved' | 'saveFailed' | 'invalidNumber'
   | 'bashTitle' | 'bashDescription' | 'bashTimeoutMs' | 'bashTimeoutMsHint'
@@ -37,9 +37,10 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   subagentModelSelectionOff: 'Subagents use configured defaults or inherit the parent agent\'s model. Saved model choices are retained.',
   nav: 'Plugins',
   title: 'Plugins',
-  intro: 'Configure and inspect the plugins installed in this deployment.',
+  intro: 'Configure the plugins installed in this deployment.',
   tabs: 'Plugin views',
   configurableTab: 'Plugin configuration',
+  managerLink: 'Manage installed plugins in the Plugins panel',
   empty: 'This deployment exposes no plugin settings.',
   overridden: 'Overridden',
   reset: 'Reset to default',
@@ -110,9 +111,10 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   subagentModelSelectionOff: '关闭后，Subagent 使用配置的默认模型或继承父 Agent 的模型；已选模型会保留。',
   nav: '插件',
   title: '插件',
-  intro: '配置和查看本部署已安装的插件。',
+  intro: '配置本部署已安装的插件。',
   tabs: '插件视图',
   configurableTab: '插件配置',
+  managerLink: '在“插件”面板中管理安装与启用',
   empty: '本部署没有开放任何插件设置。',
   overridden: '已覆盖',
   reset: '恢复默认',

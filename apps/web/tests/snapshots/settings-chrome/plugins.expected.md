@@ -1,5 +1,4 @@
 - listitem:
-  - "button \"ui-settings, {{entry}}:ui-settings, 已启用\"":
-    - strong: ui-settings
+  - 'button "展开设置: 终端"':
+    - text: 终端 限制 agent 运行的每一条命令。
     - img
-    - code: "{{entry}}:ui-settings"

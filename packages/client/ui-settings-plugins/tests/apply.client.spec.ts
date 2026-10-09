@@ -103,6 +103,23 @@ describe('ui-settings-plugins apply', () => {
   })
 
 
+  it('hands the section a manager link only when pluginNavigation exists', async () => {
+    const { ctx, slots } = await bench()
+    declareRoot(slots)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+
+    const section = slots.entries('settings.section')[0]!
+    const face = (): Record<string, unknown> => section.inject!()
+    expect(face()['openPluginManager']).toBeUndefined()
+
+    const openBundle = vi.fn()
+    ctx.provide('pluginNavigation', { openBundle })
+    const linked = face()['openPluginManager']
+    if (typeof linked !== 'function') throw new Error('expected the manager link')
+    Reflect.apply(linked, undefined, [])
+    expect(openBundle).toHaveBeenCalledWith()
+  })
+
   it('injects a live tab projection, the card directory, and one business face per card', async () => {
     const { ctx, slots } = await bench()
     declareRoot(slots)

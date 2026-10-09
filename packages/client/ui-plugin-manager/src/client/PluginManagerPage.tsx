@@ -1276,6 +1276,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
   }
   const state = props.usePluginManager(snapshot => snapshot)
   const ledger = props.useConfigLedger(snapshot => snapshot)
+  const clientSync = props.useClientSync(snapshot => snapshot)
   // What is open; a package that leaves the list (uninstalled) drops back to the cards.
   const view = props.useStore(state => state.view), { setView } = props.actions
   const [activation, setActivation] = useState<string | null>(null)
@@ -1292,8 +1293,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
   const noticeLine = state.notice === null || state.notice.kind === 'refresh-failed' ? null : noticeText(state.notice, t)
 
   // The page manages what the person installed, what the installation ships for them to switch on, and a
-  // selected name the Host cannot read; the installation's other bundles are inspected in the Settings
-  // Plugins section's Plugin list tab.
+  // selected name the Host cannot read.
   const listed = state.packages.filter(pkg => !BUILTIN_PROFILE_BUNDLES.has(pkg.name)
     && (pkg.installed || pkg.optional || pkg.error !== undefined))
   const mine = listed.filter(pkg => pkg.installed || !pkg.optional)
@@ -1382,6 +1382,24 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
           </header>
         )
         : null}
+      {clientSync.syncing ? (
+        <p className={`${css.status} ${css.statusWithDot}`} role="status">
+          <StateDot state="ongoing" />{t('clientSyncing')}
+        </p>
+      ) : null}
+      {clientSync.failures.length === 0 ? null : (
+        <div className={css.failure} data-client-sync-failure>
+          <p className={css.statusWithDot} role="alert">
+            <StateDot state="error" />{t('clientSyncFailed')}
+          </p>
+          <ul>
+            {clientSync.failures.map(failure => <li key={failure.id}>{failure.id}: {failure.message}</li>)}
+          </ul>
+          <Button variant="outline" size="sm" disabled={clientSync.syncing} onClick={props.retryClient}>
+            {t('clientSyncRetry')}
+          </Button>
+        </div>
+      )}
       {showsCards && state.status === 'loading' ? <ListSkeleton label={t('loading')} /> : null}
       {showsCards && state.status === 'unavailable' ? (
         <p className={`${css.status} ${css.statusWithDot}`} role="status">

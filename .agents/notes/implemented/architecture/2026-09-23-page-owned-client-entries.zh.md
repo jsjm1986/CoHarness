@@ -14,7 +14,7 @@ Status: implemented
 
 [Web 内核](../../../../packages/client/web/README.zh.md)保留 CoHarness 平台种子、runtime 预加载、AbortSignal 兼容和鉴权组装。在 Cordis 之前创建模块系统，不意味着需要第二个条目所有者：`bootClient` 将真实 Loader 交给同一控制器。其状态是带显式结构类型的裸可观察值，避免仅为类型声明就让 bootstrap 机制依赖 Workbench runtime。
 
-[Client HMR](../../../../packages/client/hmr/README.zh.md)将经过校验的传输帧交给控制器。[插件清单](../../../../packages/client/ui-settings-plugin-inventory/README.zh.md)通过框架绑定的 hook 读取状态，且只重试当前页面。Host 启用状态、账号和项目权限、其他浏览器页面保持独立。本地预设分组与搜索保持原位。
+[Client HMR](../../../../packages/client/hmr/README.zh.md)将经过校验的传输帧交给控制器。侧边栏[“插件”页](../../../../packages/client/ui-plugin-manager/README.zh.md)通过框架绑定的 hook 读取状态，且只重试当前页面。Host 启用状态、账号和项目权限、其他浏览器页面保持独立。
 
 生产环境保持图传输启用，产物轮询遵循[显式开发配置](2026-08-23-production-client-hmr-opt-in.zh.md)。这既保留实时成员变化，也不增加周期性文件系统工作。
 

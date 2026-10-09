@@ -184,7 +184,6 @@ flowchart TD
     pkg_client_ui_settings["client-ui-settings"]
     pkg_client_ui_settings_general["client-ui-settings-general"]
     pkg_client_ui_settings_models["client-ui-settings-models"]
-    pkg_client_ui_settings_plugin_inventory["client-ui-settings-plugin-inventory"]
     pkg_client_ui_settings_plugins["client-ui-settings-plugins"]
     pkg_client_ui_settings_unarchive_sessions["client-ui-settings-unarchive-sessions"]
     pkg_client_ui_shortcuts["client-ui-shortcuts"]
@@ -1506,6 +1505,7 @@ flowchart TD
   pkg_client_ui_layout --> pkg_client_ui_theme
   pkg_client_ui_plugin_manager --> pkg_api_remotes
   pkg_client_ui_plugin_manager --> pkg_client_locale
+  pkg_client_ui_plugin_manager --> pkg_client_modules
   pkg_client_ui_plugin_manager --> pkg_client_runtime
   pkg_client_ui_plugin_manager --> pkg_client_ui_layout
   pkg_client_ui_plugin_manager --> pkg_client_ui_renderer
@@ -1579,6 +1579,7 @@ flowchart TD
   pkg_client_ui_settings_plugins --> pkg_client_connection
   pkg_client_ui_settings_plugins --> pkg_client_locale
   pkg_client_ui_settings_plugins --> pkg_client_runtime
+  pkg_client_ui_settings_plugins --> pkg_client_ui_plugin_manager
   pkg_client_ui_settings_plugins --> pkg_client_ui_settings
   pkg_client_ui_settings_unarchive_sessions --> pkg_client_locale
   pkg_client_ui_settings_unarchive_sessions --> pkg_client_runtime
@@ -1832,14 +1833,6 @@ flowchart TD
   pkg_client_ui_schedule --> pkg_schedule
   pkg_client_ui_schedule --> pkg_session
   pkg_client_ui_schedule --> pkg_util_values
-  pkg_client_ui_settings_plugin_inventory --> pkg_agent_presets
-  pkg_client_ui_settings_plugin_inventory --> pkg_api_remotes
-  pkg_client_ui_settings_plugin_inventory --> pkg_client_locale
-  pkg_client_ui_settings_plugin_inventory --> pkg_client_modules
-  pkg_client_ui_settings_plugin_inventory --> pkg_client_runtime
-  pkg_client_ui_settings_plugin_inventory --> pkg_client_ui_agent_preset
-  pkg_client_ui_settings_plugin_inventory --> pkg_client_ui_settings
-  pkg_client_ui_settings_plugin_inventory --> pkg_package_manifest
   pkg_client_ui_sidebar_browser --> pkg_client_connection
   pkg_client_ui_sidebar_browser --> pkg_client_locale
   pkg_client_ui_sidebar_browser --> pkg_client_runtime
@@ -2164,7 +2157,7 @@ flowchart TD
 | [`client-runtime`](../packages/client/runtime) | `client` | [`agent`](../packages/core/agent), [`api-remotes`](../packages/api/remotes), [`attachment`](../packages/attachment/attachment), [`client-connection`](../packages/client/connection), [`commands`](../packages/interaction/commands), [`host-apiproxy`](../packages/host/apiproxy), [`llm`](../packages/llm/llm), [`llm-retry`](../packages/llm/llm-retry), [`permission-presets`](../packages/interaction/permission-presets), [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`session-title`](../packages/session/session-title), [`tools`](../packages/core/tools), [`typert-protocol`](../packages/typert/protocol), [`typert-registry`](../packages/typert/registry), [`util-crypto`](../packages/util/crypto) |
 | [`client-shortcuts`](../packages/client/shortcuts) | `client` | [`brand`](../packages/util/brand), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`host-webserver`](../packages/host/webserver), [`util-crypto`](../packages/util/crypto), [`util-values`](../packages/util/values) |
 | [`client-ui-layout`](../packages/client/ui-layout) | `client` | [`brand`](../packages/util/brand), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-shortcuts`](../packages/client/shortcuts), [`client-ui-theme`](../packages/client/ui-theme) |
-| [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | `client` | [`api-remotes`](../packages/api/remotes), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-layout`](../packages/client/ui-layout), [`client-ui-renderer`](../packages/client/ui-renderer), [`client-ui-settings`](../packages/client/ui-settings), [`client-ui-sidebar`](../packages/client/ui-sidebar), [`package-manifest`](../packages/util/package-manifest), [`plugin-manager`](../packages/boot/plugin-manager), [`timeout`](../packages/util/timeout), [`typert-protocol`](../packages/typert/protocol), [`util-crypto`](../packages/util/crypto) |
+| [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager) | `client` | [`api-remotes`](../packages/api/remotes), [`client-locale`](../packages/client/locale), [`client-modules`](../packages/client/modules), [`client-runtime`](../packages/client/runtime), [`client-ui-layout`](../packages/client/ui-layout), [`client-ui-renderer`](../packages/client/ui-renderer), [`client-ui-settings`](../packages/client/ui-settings), [`client-ui-sidebar`](../packages/client/ui-sidebar), [`package-manifest`](../packages/util/package-manifest), [`plugin-manager`](../packages/boot/plugin-manager), [`timeout`](../packages/util/timeout), [`typert-protocol`](../packages/typert/protocol), [`util-crypto`](../packages/util/crypto) |
 | [`client-ui-renderer`](../packages/client/ui-renderer) | `client` | [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime) |
 | [`client-ui-settings`](../packages/client/ui-settings) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-runtime`](../packages/client/runtime), [`settings`](../packages/settings/settings) |
 | [`client-ui-sidebar`](../packages/client/ui-sidebar) | `client` | [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-layout`](../packages/client/ui-layout) |
@@ -2174,7 +2167,7 @@ flowchart TD
 | [`client-ui-input-trigger`](../packages/client/ui-input-trigger) | `client` | [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`file-reference`](../packages/context/file-reference) |
 | [`client-ui-settings-general`](../packages/client/ui-settings-general) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-shortcuts`](../packages/client/shortcuts), [`client-ui-settings`](../packages/client/ui-settings), [`client-ui-sidebar`](../packages/client/ui-sidebar), [`settings`](../packages/settings/settings) |
 | [`client-ui-settings-models`](../packages/client/ui-settings-models) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-settings`](../packages/client/ui-settings) |
-| [`client-ui-settings-plugins`](../packages/client/ui-settings-plugins) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-settings`](../packages/client/ui-settings) |
+| [`client-ui-settings-plugins`](../packages/client/ui-settings-plugins) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-plugin-manager`](../packages/client/ui-plugin-manager), [`client-ui-settings`](../packages/client/ui-settings) |
 | [`client-ui-settings-unarchive-sessions`](../packages/client/ui-settings-unarchive-sessions) | `client` | [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-settings`](../packages/client/ui-settings) |
 | [`client-ui-shortcuts`](../packages/client/ui-shortcuts) | `client` | [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-shortcuts`](../packages/client/shortcuts), [`client-ui-layout`](../packages/client/ui-layout), [`client-ui-renderer`](../packages/client/ui-renderer), [`client-ui-settings`](../packages/client/ui-settings) |
 | [`client-ui-usage-alert`](../packages/client/ui-usage-alert) | `client` | [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-layout`](../packages/client/ui-layout) |
@@ -2208,7 +2201,6 @@ flowchart TD
 | [`client-ui-model-selection`](../packages/client/ui-model-selection) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-commands`](../packages/client/ui-commands), [`client-ui-conversation`](../packages/client/ui-conversation), [`client-ui-input-trigger`](../packages/client/ui-input-trigger) |
 | [`client-ui-permission-presets`](../packages/client/ui-permission-presets) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-commands`](../packages/client/ui-commands), [`client-ui-conversation`](../packages/client/ui-conversation), [`client-ui-input-trigger`](../packages/client/ui-input-trigger), [`client-ui-settings`](../packages/client/ui-settings), [`permission-presets`](../packages/interaction/permission-presets) |
 | [`client-ui-schedule`](../packages/client/ui-schedule) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-conversation`](../packages/client/ui-conversation), [`client-ui-layout`](../packages/client/ui-layout), [`client-ui-renderer`](../packages/client/ui-renderer), [`client-ui-sidebar`](../packages/client/ui-sidebar), [`client-ui-sidebar-right`](../packages/client/ui-sidebar-right), [`client-ui-tool`](../packages/client/ui-tool), [`client-ui-workspace`](../packages/client/ui-workspace), [`schedule`](../packages/schedule/schedule), [`session`](../packages/core/session), [`util-values`](../packages/util/values) |
-| [`client-ui-settings-plugin-inventory`](../packages/client/ui-settings-plugin-inventory) | `client` | [`agent-presets`](../packages/preset/agent-presets), [`api-remotes`](../packages/api/remotes), [`client-locale`](../packages/client/locale), [`client-modules`](../packages/client/modules), [`client-runtime`](../packages/client/runtime), [`client-ui-agent-preset`](../packages/client/ui-agent-preset), [`client-ui-settings`](../packages/client/ui-settings), [`package-manifest`](../packages/util/package-manifest) |
 | [`client-ui-sidebar-browser`](../packages/client/ui-sidebar-browser) | `client` | [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-layout`](../packages/client/ui-layout), [`client-ui-renderer`](../packages/client/ui-renderer), [`client-ui-sidebar-right`](../packages/client/ui-sidebar-right), [`session`](../packages/core/session) |
 | [`client-ui-sidebar-terminal`](../packages/client/ui-sidebar-terminal) | `client` | [`api-remotes`](../packages/api/remotes), [`api-terminal-controller`](../packages/api/terminal-controller), [`client-locale`](../packages/client/locale), [`client-ui-conversation`](../packages/client/ui-conversation), [`client-ui-layout`](../packages/client/ui-layout), [`client-ui-renderer`](../packages/client/ui-renderer), [`client-ui-sidebar-right`](../packages/client/ui-sidebar-right), [`client-ui-theme`](../packages/client/ui-theme), [`session`](../packages/core/session) |
 | [`client-ui-skill`](../packages/client/ui-skill) | `client` | [`api-remotes`](../packages/api/remotes), [`client-connection`](../packages/client/connection), [`client-locale`](../packages/client/locale), [`client-runtime`](../packages/client/runtime), [`client-ui-input-trigger`](../packages/client/ui-input-trigger), [`client-ui-tool`](../packages/client/ui-tool) |

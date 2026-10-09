@@ -93,6 +93,8 @@ function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
   }
   const probe = { fastest: overrides.fastest ?? vi.fn(() => Promise.resolve(ok(null))) }
   const bind = vi.fn((spec: { namespace: string }) => `form:${spec.namespace}`)
+  const clientRetry = vi.fn(() => Promise.resolve())
+  const logger = { error: vi.fn() }
   const ctx = {
     settingsScope: {
       describe: () => ({
@@ -104,6 +106,13 @@ function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
       bind,
     },
     remote: { pluginManager: plugins, pluginInventory: inventory, pluginRegistryProbe: probe },
+    modules: {
+      entries: {
+        state: { getSnapshot: () => ({ syncing: false, failures: [] }), subscribe: () => () => {} },
+        retry: clientRetry,
+      },
+    },
+    logger,
   } as never
   const controller = new PluginManagerController(ctx)
   onTestFinished(() => { controller.dispose() })
@@ -114,7 +123,7 @@ function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
     await vi.waitFor(() => { expect(state().install.phase).toBe('starting') })
     return state().install.requestId as PluginInstallRequestId
   }
-  return { plugins, inventory, probe, controller, face, state, started, bind }
+  return { plugins, inventory, probe, controller, face, state, started, bind, clientRetry, logger }
 }
 
 it('hands a custom page the namespace scope of its entry, bound once', () => {
@@ -123,6 +132,14 @@ it('hands a custom page the namespace scope of its entry, bound once', () => {
   expect(bind).toHaveBeenCalledExactlyOnceWith({ namespace: 'bundle#row', source: 'host' })
   expect(face.configForm('bundle#row')).toBe('form:bundle#row' as never)
   expect(bind).toHaveBeenCalledTimes(1)
+})
+
+it('exposes the page\'s module sync state and logs a rejected page retry', async () => {
+  const { face, clientRetry, logger } = bench()
+  expect(face.hooks.clientSync.getSnapshot()).toEqual({ syncing: false, failures: [] })
+  clientRetry.mockRejectedValueOnce(new Error('sync refused'))
+  face.retryClient()
+  await vi.waitFor(() => { expect(logger.error).toHaveBeenCalledTimes(1) })
 })
 
 describe('packageView', () => {

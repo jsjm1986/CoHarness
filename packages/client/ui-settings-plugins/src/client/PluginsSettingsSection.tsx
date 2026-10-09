@@ -20,6 +20,11 @@ export interface PluginsSettingsSectionInjected {
     /** Ordered, locale-aware projection of the Plugins tab ledger. */
     tabs: HostObservable<readonly PluginsSettingsTabEntry[]>
   }
+  /**
+   * Open the Plugins panel, which owns install, removal, and enablement;
+   * `undefined` in compositions without the manager.
+   */
+  openPluginManager: (() => void) | undefined
 }
 
 /** Props the renderer binds for the section. */
@@ -30,7 +35,7 @@ export type PluginsSettingsSectionProps =
   & InjectFace<PluginsSettingsSectionInjected>
 
 /** Render one Plugins page whose contents arrive from feature-owned tabs. */
-export function PluginsSettingsSection({ t, renderSlot, useTabs }: PluginsSettingsSectionProps) {
+export function PluginsSettingsSection({ t, renderSlot, useTabs, openPluginManager }: PluginsSettingsSectionProps) {
   const tabsId = useId()
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
   const rows = useTabs(value => value)
@@ -53,7 +58,17 @@ export function PluginsSettingsSection({ t, renderSlot, useTabs }: PluginsSettin
     <div className={css.section}>
       <h2 className={css.heading}>{t('title')}</h2>
       <p className={css.intro}>{t('intro')}</p>
-      {rows.length === 0 ? <p className={css.empty}>{t('empty')}</p> : (
+      {openPluginManager === undefined ? null : (
+        <button type="button" className={css.managerLink} onClick={openPluginManager}>
+          {t('managerLink')}
+        </button>
+      )}
+      {rows.length === 0 ? <p className={css.empty}>{t('empty')}</p> : rows.length === 1 ? (
+        // A lone contribution needs no tab strip; the panel renders directly.
+        rows.map(row => (
+          <div key={row.id} className={css.panel}>{renderSlot('settings.plugins.tab', {}, { only: row.id })}</div>
+        ))
+      ) : (
         <>
           <div className={css.tabs} role="tablist" aria-label={t('tabs')}>
             {rows.map((row, index) => {

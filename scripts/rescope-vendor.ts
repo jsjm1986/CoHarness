@@ -104,9 +104,6 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   // shipped-presets port that exports SHIPPED_PRESET_ROOT.
   { file: 'apps/web/tests/agent-preset-authoring.e2e.ts', upstream: ['cordis'] },
   { file: 'packages/preset/agent-presets/tests/session.spec.ts', upstream: ['cordis'] },
-  // The inventory tab's `cordis` key is a local dictionary key, not a package
-  // specifier; its runtime namespace is `settings.pluginInventory`.
-  { file: 'packages/client/ui-settings-plugin-inventory/src/client/PluginInventorySettingsTab.tsx', upstream: ['cordis'] },
   // The preset's own composition: its header comment and its system prompt name
   // the preset a model mounts, so the scoped name would send the model after an
   // id no roster reports.
@@ -151,7 +148,6 @@ const GENERIC_SKIPS: readonly GenericSkip[] = [
   { file: 'packages/typert/protocol/src/types.ts', upstream: ['cordis'] },
   { file: 'scripts/gen-cordis-catalog.ts', upstream: ['cordis'] },
   // The UI locale namespace and input-trigger source id are product keys.
-  { file: 'packages/client/ui-settings-plugin-inventory/src/client/PluginInventorySettingsTab.tsx', upstream: ['cordis'] },
   { file: 'packages/extensions/ui-cordis/src/client/CordisActionRow.tsx', upstream: ['cordis'] },
   { file: 'packages/extensions/ui-cordis/src/client/CordisDefineRow.tsx', upstream: ['cordis'] },
   { file: 'packages/extensions/ui-cordis/src/client/CordisPanel.tsx', upstream: ['cordis'] },

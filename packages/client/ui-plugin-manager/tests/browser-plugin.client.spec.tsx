@@ -9,6 +9,7 @@ import type { ILayout, PanelInfo } from '@deepseek-ai/dsh-client-ui-layout/clien
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { stubDeveloperTools, stubMutationScope, TestRemote, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SettingsMirrorSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ClientEntryState } from '@deepseek-ai/dsh-client-modules/client'
 import { apply, inject, NS, PANEL_ID } from '../src/client/index.ts'
 import { PluginManagerPage } from '../src/client/PluginManagerPage.tsx'
 import { PluginRefreshToast, type PluginRefreshToastFace } from '../src/client/PluginRefreshToast.tsx'
@@ -56,7 +57,10 @@ async function bench() {
   const selectPanel = vi.fn<ILayout['selectPanel']>((activePanelId) => { panelInfo.set({ activePanelId }) })
   ctx.provide('layout', { panelInfo, selectPanel, beginNavigation: () => new AbortController().signal,
     toggleSidebar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn() })
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, remote, selectPanel, panelInfo }
+  const clientSync = createSnapshotStore<ClientEntryState>({ syncing: false, failures: [] })
+  const retryClient = vi.fn(() => Promise.resolve())
+  ctx.provide('modules', { entries: { state: clientSync, retry: retryClient } } as never)
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, remote, selectPanel, panelInfo, clientSync, retryClient }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -89,12 +93,19 @@ describe('ui-plugin-manager browser plugin', () => {
     removeRoot()
     b.selectPanel(null)
     expect(navigation.getSnapshot()).toEqual({ view: { kind: 'package', name: 'dsh-navigation-test' } })
+    // A caller naming no bundle opens the plugin list itself.
+    b.ctx.pluginNavigation.openBundle()
+    expect(b.panelInfo.getSnapshot().activePanelId).toBe(PANEL_ID)
+    expect(navigation.getSnapshot()).toEqual({ view: { kind: 'list' } })
   })
 
   it('shares refresh failures with the overlay after navigation and releases both registrations across reloads', async () => {
     const b = await bench()
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
+    // The navigation service answers before the panel's slot ever mounts.
+    b.ctx.pluginNavigation.openBundle()
+    expect(b.selectPanel).toHaveBeenCalledWith(PANEL_ID)
     expect(b.slots.entries('shell.overlay')).toHaveLength(0)
     const removeRoot = declare(b.slots)
     const mainInjected: object = b.slots.entries('main')[0]!.inject!()
@@ -127,7 +138,7 @@ describe('ui-plugin-manager browser plugin', () => {
   })
 
   it('declares only the services the page and its Remote methods use', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe', 'settingsScope', 'layout'])
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe', 'settingsScope', 'layout', 'modules'])
   })
 
   it('registers the sidebar entry and its page, which reads the Host only once rendered and follows Host changes', async () => {
@@ -179,6 +190,10 @@ describe('ui-plugin-manager browser plugin', () => {
     expect(face.resolveText(text)).toBe('Local tools')
     b.locale.setLocale('zh')
     expect(face.hooks.configLedger.getSnapshot()).toEqual({ items: [], bundles: new Set(), rows: new Set() })
+    // Page diagnostics expose the module system's sync state and route its retry.
+    expect(face.hooks.clientSync).toBe(b.clientSync)
+    face.retryClient()
+    expect(b.retryClient).toHaveBeenCalledTimes(1)
     // A Host change before the first render is not a reason to read.
     b.remote.$dispatch('plugin-manager/changed', [{ reason: 'install' }])
     b.ctx.emit('connection/reset')

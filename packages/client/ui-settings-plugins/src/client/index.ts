@@ -16,6 +16,8 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // and the ctx.settingsScope Context merge. Cross-plugin collaboration goes
 // through the service, never a value import (client bundle purity gate).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: the ctx.pluginNavigation Context merge the manager provides.
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: the ctx.remote Context merge and the forwarded-event key face.
@@ -103,6 +105,11 @@ export function apply(ctx: ClientContext): void {
   let tabsRevision = -1
   let tabs: readonly PluginsSettingsTabEntry[] = []
   const sectionInjected = (): PluginsSettingsSectionInjected => ({
+    // Install and enablement live on the Plugins panel; a composition
+    // without the manager hides the link.
+    openPluginManager: ctx.get('pluginNavigation') === undefined
+      ? undefined
+      : () => { ctx.get('pluginNavigation')?.openBundle() },
     hooks: {
       tabs: {
         getSnapshot: () => {
