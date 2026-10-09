@@ -171,10 +171,12 @@ export function PluginsPage() {
     <PageHeader title={t('title')} description={t('pageDescription')} />
     <Section title={t('targetSection')}><div className="sectionBody">
       <ErrorBanner message={error} />
-      <Field label={t('targetField')}><select className="select" aria-label={t('targetAria')} value={selected} onChange={event => {
-        generation.current++; setBinding(null); setSelected(event.target.value)
-      }}><option value="">{t('targetPlaceholder')}</option>{targets.map(target => <option key={target.key} value={target.key}>{target.label}</option>)}</select></Field>
-      <Button onClick={() => { setBinding(null); setReload(value => value + 1) }}>{t('pageReload')}</Button>
+      <div className="targetPicker">
+        <Field label={t('targetField')}><select className="select" aria-label={t('targetAria')} value={selected} onChange={event => {
+          generation.current++; setBinding(null); setSelected(event.target.value)
+        }}><option value="">{t('targetPlaceholder')}</option>{targets.map(target => <option key={target.key} value={target.key}>{target.label}</option>)}</select></Field>
+        <Button onClick={() => { setBinding(null); setReload(value => value + 1) }}>{t('pageReload')}</Button>
+      </div>
       {loading ? <LoadingState label={t('targetLoading')} /> : null}
       {binding === null ? null : <p className="muted">
         {binding.generation === null ? t('instanceStopped') : t('instanceRunning', { generation: `${binding.generation}` })}

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-09-admin-shell-cache-and-section-layout.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-09-admin-shell-cache-and-section-layout.md
+/agent-note-admin-spa-cache-policy-and-section-control-rows:
+  en: 38452adf75d320e7
+  zh: 9d0236ace19a8c7e
+/agent-note-admin-spa-cache-policy-and-section-control-rows/problem:
+  en: 73d0e34d08649321
+  zh: 291221ac79d621e9
+/agent-note-admin-spa-cache-policy-and-section-control-rows/decision:
+  en: 9cd3cad1d6ed4619
+  zh: 2eddc6d2f831c25e
+/agent-note-admin-spa-cache-policy-and-section-control-rows/alternatives-considered:
+  en: a592fe8c1791361b
+  zh: dbbde5dce98d712f
+/agent-note-admin-spa-cache-policy-and-section-control-rows/consequences:
+  en: f435b66b7b655255
+  zh: f31e0196785a71de
+/agent-note-admin-spa-cache-policy-and-section-control-rows/verification:
+  en: 1f4892acd2e3be91
+  zh: 20e2096e7d32b187

@@ -114,17 +114,17 @@ export function DeploymentPage() {
             </div>
             {state.reason === null ? null : <p>{t('maintenanceReasonLine', { reason: state.reason })}</p>}
             {state.mode === 'serving' ? (
-              <div className="formGrid">
+              <>
                 <Field label={t('fieldReason')} hint={t('hintReason')}>
                   <input className="input" value={reason} onChange={event => { setReason(event.target.value) }} placeholder={t('placeholderReason')} />
                 </Field>
-                <div>
+                <div className="formActions">
                   <Button variant="primary" icon={Wrench} disabled={acting}
                     onClick={() => void run(() => setMaintenance('enter', reason.trim() === '' ? undefined : reason.trim()), t('noticeEnteredMaintenance'))}>
                     {t('enterMaintenance')}
                   </Button>
                 </div>
-              </div>
+              </>
             ) : (
               <div className="statusRow">
                 {state.mode === 'maintenance' ? (

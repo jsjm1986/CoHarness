@@ -20,8 +20,8 @@ function inside(rootReal: string, fileReal: string): boolean {
   return fileReal === rootReal || fileReal.startsWith(prefix)
 }
 
-function send(res: ServerResponse, status: number, body: string | Buffer, type: string): void {
-  res.writeHead(status, { 'content-type': type })
+function send(res: ServerResponse, status: number, body: string | Buffer, type: string, cache: string): void {
+  res.writeHead(status, { 'content-type': type, 'cache-control': cache })
   res.end(body)
 }
 
@@ -68,15 +68,20 @@ export function serveAdmin(
   let fileReal: string
   try { fileReal = realpathSync(join(rootReal, rel)) } catch {
     if (spa) return false
-    send(res, 404, 'not found', 'text/plain')
+    send(res, 404, 'not found', 'text/plain', 'no-store')
     return true
   }
   if (!inside(rootReal, fileReal)) {
-    send(res, 404, 'not found', 'text/plain')
+    send(res, 404, 'not found', 'text/plain', 'no-store')
     return true
   }
 
   const type = TYPES[extname(fileReal)] ?? 'application/octet-stream'
-  send(res, 200, method === 'HEAD' ? '' : readFileSync(fileReal), type)
+  // The SPA shell must never be pinned: its hashed asset URLs change with
+  // every release, and a cached shell would keep loading the old bundle.
+  // Content-hashed files under assets/ are safe to cache for the client only —
+  // `private` keeps the authenticated bundle out of shared caches.
+  const cache = spa ? 'no-store' : 'private, max-age=31536000, immutable'
+  send(res, 200, method === 'HEAD' ? '' : readFileSync(fileReal), type, cache)
   return true
 }

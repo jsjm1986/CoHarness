@@ -68,7 +68,7 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 
 ## 管理端与项目授权
 
-`/admin` 托管从 `gateway/admin-ui` 构建到 `gateway/public/admin` 的 Vite SPA；`/admin/api/*` 是网关 JSON API（非 `admin` 角色 403）。管理员发起项目有两种创建模式：**默认目录**只提交名称，并以 `0770` 权限创建或复用 `<HGW_PROJECTS_ROOT>/<name>`；**现有目录**提交名称以及从 Gateway 宿主机选择的目录。用户发起项目仍只提交名称，并在 `HGW_USER_PROJECTS_ROOT` 下分配目录。两种来源使用同一套工作空间、共享运行时、成员和对话模型。用户创建的项目把创建者设为 `rw` 所有者，并提供邀请生命周期操作；管理员可以在同一列表中查看两种来源并按来源筛选。
+`/admin` 托管从 `gateway/admin-ui` 构建到 `gateway/public/admin` 的 Vite SPA；外壳 `index.html` 携带 `cache-control: no-store`，使版本切换不会让被钉住的外壳继续引用已删除的哈希分块，`assets/*` 按内容哈希命名并携带 `private, max-age=31536000, immutable`。`/admin/api/*` 是网关 JSON API（非 `admin` 角色 403）。管理员发起项目有两种创建模式：**默认目录**只提交名称，并以 `0770` 权限创建或复用 `<HGW_PROJECTS_ROOT>/<name>`；**现有目录**提交名称以及从 Gateway 宿主机选择的目录。用户发起项目仍只提交名称，并在 `HGW_USER_PROJECTS_ROOT` 下分配目录。两种来源使用同一套工作空间、共享运行时、成员和对话模型。用户创建的项目把创建者设为 `rw` 所有者，并提供邀请生命周期操作；管理员可以在同一列表中查看两种来源并按来源筛选。
 
 `GET /admin/api/project-directories` 为现有目录浏览器提供数据。本地启动器模式从 `/` 开始，因此 macOS 外接磁盘显示在 `/Volumes` 下；systemd 模式显示只包含 `HGW_PROJECT_PATH_ROOTS` 的虚拟根，且配置根本身只能导航。每次响应包含一层排序后的目录，最多 1,000 条；隐藏目录带标记，并在 UI 中默认隐藏，直到管理员启用显示。离开 systemd 根的规范符号链接会被省略。浏览器绝不会读取管理员客户端的文件系统。最终创建项目时会再次解析和校验所选路径，并用稳定诊断拒绝非绝对路径、不存在、不是目录、不可访问、配置根外、Gateway 自有/保留、用户 home 和既有项目重叠的路径。受管名称会被修剪且必须恰好构成一个目录段，因此 `.`/`..`、分隔符、控制字符和经符号链接解析的逃逸都会被拒绝。重命名项目只改变目录中的名称，删除项目会保留宿主机文件。
 
