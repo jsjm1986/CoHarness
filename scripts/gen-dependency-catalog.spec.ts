@@ -146,7 +146,7 @@ describe('published npm dependency catalog', () => {
     expect(() => computeDependencyCatalog(root)).toThrow('expected the public npm registry and hoisted install strategy')
   })
 
-  it('isolates scoped registries, resolver settings, and caches from user, global, and environment configuration', async () => {
+  it('isolates scoped registries, resolver settings, and caches from user, global, and environment configuration', async ({ signal }) => {
     const root = fixture()
     const userConfig = join(root, 'user.npmrc')
     const globalConfig = join(root, 'global.npmrc')
@@ -163,13 +163,13 @@ describe('published npm dependency catalog', () => {
     }
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
     const args = ['config', 'list', '--json', '--registry=https://registry.npmjs.org/', '--loglevel=error']
-    const before = await runCommandWithTimeout(npm, args, { cwd: root, env: inherited, timeoutMs: 30_000 })
+    const before = await runCommandWithTimeout(npm, args, { cwd: root, env: inherited, timeoutMs: 30_000, signal })
     expect(before).toMatchObject({ status: 0, signal: null, timedOut: false })
     expect(JSON.parse(before.output)).toMatchObject({
       '@deepseek-ai:registry': 'https://user-override.invalid/', 'install-strategy': 'nested',
     })
     const isolated = createNpmResolutionEnvironment(root, inherited)
-    const after = await runCommandWithTimeout(npm, args, { cwd: root, env: isolated, timeoutMs: 30_000 })
+    const after = await runCommandWithTimeout(npm, args, { cwd: root, env: isolated, timeoutMs: 30_000, signal })
     expect(after).toMatchObject({ status: 0, signal: null, timedOut: false })
     const settings = JSON.parse(after.output) as Record<string, unknown>
     expect(settings).toMatchObject({
@@ -180,7 +180,7 @@ describe('published npm dependency catalog', () => {
     expect(settings['@other:registry']).toBeUndefined()
     expect(isolated['NPM_CONFIG_USER_AGENT']).toBeUndefined()
     expect(inherited['npm_config_userconfig']).toBe(userConfig)
-  })
+  }, 90_000)
 
   it('keeps the checked-in JSON synchronized with its recorded npm resolution', () => {
     expect(isDependencyCatalogCurrent(resolve(import.meta.dirname, '..'))).toBe(true)
