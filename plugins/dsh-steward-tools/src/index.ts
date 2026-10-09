@@ -40,7 +40,11 @@ function argsOf(exec: ToolExecution): StewardQueryArgs | undefined {
   const args = typeof exec.arguments === 'object' && exec.arguments !== null
     ? exec.arguments as Record<string, unknown>
     : undefined
-  return typeof args?.sql === 'string' ? args as unknown as StewardQueryArgs : undefined
+  if (typeof args?.sql !== 'string') return undefined
+  const out: StewardQueryArgs = { sql: args.sql }
+  if (args.dry_run === true) out.dry_run = true
+  if (typeof args.row_limit === 'number') out.row_limit = args.row_limit
+  return out
 }
 
 /** Approval ids keyed by owning session so entries die with their session. */
