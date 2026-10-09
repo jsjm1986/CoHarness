@@ -1262,6 +1262,11 @@
       "reason": "the desktop file sidebar is part of the rejected upstream ui-package tree; workspace browsing is owned by the cloud Workbench"
     },
     {
+      "package": "client/ui-settings-plugin-inventory",
+      "reason": "the inventory tab duplicated install, removal, and enablement already owned by the sidebar Plugins panel; it is not carried",
+      "replacedBy": "client/ui-plugin-manager"
+    },
+    {
       "package": "credentials/deepseek-account",
       "reason": "official account credentials excluded"
     },

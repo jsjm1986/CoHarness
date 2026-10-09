@@ -85,7 +85,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-ui-settings` | no | Settings domain base plugin: the settings-namespace scope service and the canonical settings slot-type contract |
 | `@deepseek-ai/dsh-client-ui-settings-general` | no | Settings ownerless-copy and product onboarding plugin: the General section, shell trigger/header chrome content, settings dictionaries, and the versioned welcome notice |
 | `@deepseek-ai/dsh-client-ui-settings-models` | no | Models settings and shared product-onboarding dialogs over existing settings and credential joins |
-| `@deepseek-ai/dsh-client-ui-settings-plugins` | no | Plugins settings section with feature-owned tabs and configurable host-plane plugin cards |
+| `@deepseek-ai/dsh-client-ui-settings-plugins` | no | Official plugin configuration items on the Plugins page, one page per configurable host-plane namespace |
 | `@deepseek-ai/dsh-client-ui-settings-unarchive-sessions` | no | Archived-session settings page: the registry-global archive set with one Unarchive action per row |
 | `@deepseek-ai/dsh-client-ui-shortcuts` | no | Keyboard shortcut reference, recording, and local preference editing |
 | `@deepseek-ai/dsh-client-ui-sidebar` | no | Sidebar plugin: session multi-level tree, search, grouping, state dots |

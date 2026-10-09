@@ -4067,10 +4067,6 @@ importers:
         version: 19.3.0
 
   packages/client/ui-settings-plugins:
-    dependencies:
-      clsx:
-        specifier: ^2.0.0
-        version: 2.1.1
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~
