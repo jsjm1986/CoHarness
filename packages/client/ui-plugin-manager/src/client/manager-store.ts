@@ -591,7 +591,13 @@ export class PluginManagerController {
         }
         return scope as SettingsMutationScope<T>
       },
-      ensure: () => { if (this.getSnapshot().status === 'idle') void this.load() },
+      ensure: () => {
+        if (this.getSnapshot().status === 'idle') void this.load()
+        // The Configuration group filters item registrations against the
+        // served namespaces; the shared describe mirror reads lazily, so the
+        // page's own mount is what starts it.
+        void this.ctx.settingsScope.describe().ensure()
+      },
       refresh: () => { void this.refresh() },
       openInstall: () => {
         const install = this.getSnapshot().install

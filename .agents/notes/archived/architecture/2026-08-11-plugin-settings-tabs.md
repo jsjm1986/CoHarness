@@ -1,6 +1,7 @@
 # Agent Note: Feature-owned tabs in Plugins settings
 
 Status: implemented
+Archived: 2026-10-10
 
 English | [中文](2026-08-11-plugin-settings-tabs.zh.md)
 

@@ -71,12 +71,11 @@ describe('web e2e: compact settings overlay', () => {
 
     const generalTab = dialog.getByRole('button', { name: '通用设置' })
     const modelsTab = dialog.getByRole('button', { name: '模型' })
-    const pluginsTab = dialog.getByRole('button', { name: '插件', exact: true })
     const presetsTab = dialog.getByRole('button', { name: 'Agent 预设' })
     const generalTabBox = await generalTab.boundingBox()
     if (generalTabBox === null) throw new Error('settings compact general tab has no box')
     expect(generalTabBox.height).toBeGreaterThanOrEqual(44)
-    for (const tab of [generalTab, modelsTab, pluginsTab, presetsTab]) {
+    for (const tab of [generalTab, modelsTab, presetsTab]) {
       const box = await tab.boundingBox()
       if (box === null) throw new Error('settings compact tab has no box')
       expect(box.x).toBeGreaterThanOrEqual(dialogBox.x - 1)
@@ -143,9 +142,8 @@ describe('web e2e: compact settings overlay', () => {
     })
     expect(lastOrgVisible).toBe(true)
 
-    await pluginsTab.click()
-    await expect.poll(() => pluginsTab.getAttribute('aria-current'), { timeout: 5_000 }).toBe('true')
-    await dialog.getByRole('heading', { name: '插件' }).waitFor({ timeout: 10_000 })
+    // The sidebar Plugins panel holds the plugins surface; the dialog offers no such tab.
+    expect(await dialog.getByRole('button', { name: '插件', exact: true }).count()).toBe(0)
 
     await presetsTab.click()
     await expect.poll(() => presetsTab.getAttribute('aria-current'), { timeout: 5_000 }).toBe('true')

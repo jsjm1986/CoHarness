@@ -25,7 +25,7 @@ import { AccountPreferencesMirror } from './account-scope.ts'
 
 export type {
   SettingsGeneralItemOwnerProps, SettingsHeaderOwnerProps, SettingsOnboardingOwnerProps,
-  SettingsPluginsTabOwnerProps, SettingsSectionOwnerProps, SettingsTriggerOwnerProps,
+  SettingsSectionOwnerProps, SettingsTriggerOwnerProps,
 } from './contract/slots.ts'
 export type { SettingsScopeController, SettingsScopeBinder, SettingsMutationScope } from './settings-scope.ts'
 export type { DeveloperToolsPreference } from './developer-tools.ts'

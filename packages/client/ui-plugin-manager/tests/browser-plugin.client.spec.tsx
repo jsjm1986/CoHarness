@@ -90,24 +90,26 @@ describe('ui-plugin-manager browser plugin', () => {
     b.selectPanel(PANEL_ID)
     expect(navigation.getSnapshot()).toEqual({ view: { kind: 'list' } })
     b.ctx.pluginNavigation.openBundle('dsh-navigation-test')
+    // A caller naming an official plugin opens that plugin's own page.
+    b.ctx.pluginNavigation.openItem('speech-to-text')
+    expect(b.panelInfo.getSnapshot().activePanelId).toBe(PANEL_ID)
+    expect(navigation.getSnapshot()).toEqual({ view: { kind: 'item', id: 'speech-to-text' } })
     removeRoot()
     b.selectPanel(null)
-    expect(navigation.getSnapshot()).toEqual({ view: { kind: 'package', name: 'dsh-navigation-test' } })
-    // A caller naming no bundle opens the plugin list itself.
-    b.ctx.pluginNavigation.openBundle()
-    expect(b.panelInfo.getSnapshot().activePanelId).toBe(PANEL_ID)
-    expect(navigation.getSnapshot()).toEqual({ view: { kind: 'list' } })
+    expect(navigation.getSnapshot()).toEqual({ view: { kind: 'item', id: 'speech-to-text' } })
   })
 
   it('shares refresh failures with the overlay after navigation and releases both registrations across reloads', async () => {
     const b = await bench()
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    // The navigation service answers before the panel's slot ever mounts.
-    b.ctx.pluginNavigation.openBundle()
-    expect(b.selectPanel).toHaveBeenCalledWith(PANEL_ID)
     expect(b.slots.entries('shell.overlay')).toHaveLength(0)
     const removeRoot = declare(b.slots)
+    // The navigation service arrives with the panel registration and answers
+    // before the panel ever renders.
+    await vi.waitFor(() => { expect(b.ctx.get('pluginNavigation')).toBeDefined() })
+    b.ctx.pluginNavigation.openItem('speech-to-text')
+    expect(b.selectPanel).toHaveBeenCalledWith(PANEL_ID)
     const mainInjected: object = b.slots.entries('main')[0]!.inject!()
     const face = mainInjected as PluginManagerFace
     const overlayInjected: object = b.slots.entries('shell.overlay')[0]!.inject!()

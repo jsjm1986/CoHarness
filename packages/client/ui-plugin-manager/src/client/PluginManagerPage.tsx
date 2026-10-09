@@ -127,7 +127,9 @@ const ITEM_ARTWORK = new Map<string, (props: IconProps) => ReactNode>([
   ['shell', PluginArtworkTerminal],
   ['agent-loop', PluginArtworkLoop],
   ['subagent', PluginArtworkSubagent],
+  ['subagent-model-selection', PluginArtworkSubagent],
   ['web-search', PluginArtworkSearch],
+  ['web-search-deepseek', PluginArtworkSearch],
 ])
 
 /** An official plugin's card and page artwork; plugins without their own get the default. */
@@ -1330,15 +1332,17 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
       onSetEnabled={(enabled) => { setActivation(enabled ? pkg.name : null); props.setEnabled(pkg.name, enabled) }}
     />
   )
-  // The Official group: the bundles the installation ships, then the plugins that registered their configuration.
-  const officialCards = [
-    ...official.map(packageCard),
-    ...ledger.items.map(item => (
+  // The Official group holds only the bundles the installation ships; the
+  // Configuration group lists the settings cards for namespaces the Host
+  // serves, so a card whose plugin was never composed leaves no empty shell.
+  const officialCards = official.map(packageCard)
+  const configCards = ledger.items
+    .filter(item => configurations?.some(configuration => configuration.ns === item.id) ?? false)
+    .map(item => (
       <ItemCard key={`item:${item.id}`} item={item} t={t} renderSlot={renderSlot} onOpen={() => { setView({ kind: 'item', id: item.id }) }} />
-    )),
-  ]
+    ))
   // One group of cards under its heading and count; the Official group comes first, and a group with nothing in it takes no room.
-  const renderGroup = (id: 'official' | 'bundles', heading: string, cards: readonly ReactNode[]): ReactNode => cards.length === 0
+  const renderGroup = (id: 'official' | 'bundles' | 'config', heading: string, cards: readonly ReactNode[]): ReactNode => cards.length === 0
     ? null
     : (
       <section className={css.group} data-plugin-scope="global" data-plugin-group={id}>
@@ -1464,30 +1468,28 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
           />
         )
         : null}
-      {loaded && openItem !== undefined
+      {/* An item's page is a settings surface, independent of the bundle-list load. */}
+      {openItem !== undefined
         ? <ItemDetail form={formFor(openItem.id)} item={openItem} t={t} renderSlot={renderSlot} onBack={() => { setView({ kind: 'list' }) }} />
         : null}
-      {loaded && showsCards
-        ? officialCards.length === 0 && mine.length === 0 && state.status !== 'error'
-          ? <p className={css.empty}>{t('empty')}</p>
-          : (
-            <>
-              {renderGroup('official', t('officialTitle'), officialCards)}
-              {renderGroup('bundles', t('bundlesTitle'), mine.map(packageCard))}
-              {/* A failed package read trails the groups it left incomplete: right under Official on a
-                  first-load failure, and after the kept cards when a refresh fails over stale data. */}
-              {state.status === 'error' && !refreshing
-                ? (
-                  <div className={css.failure}>
-                    <p className={css.statusWithDot} role="alert">
-                      <StateDot state="error" />{t(state.refreshStatus === 'failed' ? 'refreshError' : 'error')}
-                    </p>
-                    <Button variant="outline" size="sm" onClick={props.refresh}>{t('retry')}</Button>
-                  </div>
-                )
-                : null}
-            </>
-          )
+      {loaded && showsCards && officialCards.length === 0 && mine.length === 0 && configCards.length === 0 && state.status !== 'error'
+        ? <p className={css.empty}>{t('empty')}</p>
+        : null}
+      {loaded && showsCards ? renderGroup('official', t('officialTitle'), officialCards) : null}
+      {loaded && showsCards ? renderGroup('bundles', t('bundlesTitle'), mine.map(packageCard)) : null}
+      {/* The Configuration group answers to the settings document, not the profile: it renders in every package-list state. */}
+      {showsCards ? renderGroup('config', t('configTitle'), configCards) : null}
+      {/* A failed package read trails the groups it left incomplete: right under Official on a
+          first-load failure, and after the kept cards when a refresh fails over stale data. */}
+      {loaded && showsCards && state.status === 'error' && !refreshing
+        ? (
+          <div className={css.failure}>
+            <p className={css.statusWithDot} role="alert">
+              <StateDot state="error" />{t(state.refreshStatus === 'failed' ? 'refreshError' : 'error')}
+            </p>
+            <Button variant="outline" size="sm" onClick={props.refresh}>{t('retry')}</Button>
+          </div>
+        )
         : null}
       {showsCards && activated !== undefined && !state.install.open
         ? renderSlot('plugins.bundle.activation', {

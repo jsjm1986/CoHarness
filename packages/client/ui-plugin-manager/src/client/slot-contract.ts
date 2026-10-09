@@ -1,8 +1,8 @@
 /**
  * The slots the Plugins page declares for other plugins. Three carry a
- * plugin's own configuration: the official plugins listed beside the official
- * bundles, one bundle's configuration on its page, and one row's configuration
- * opened from that row. Three more take contributions to any detail page —
+ * plugin's own configuration: the official plugins listed in the page's
+ * Configuration group, one bundle's configuration on its page, and one row's
+ * configuration opened from that row. Three more take contributions to any detail page —
  * its head actions, the badges beside its title, and the sections under its
  * own content — from a plugin that has something to say about bundles, rows,
  * or official plugins it does not own. A registrant merges this contract with
@@ -78,13 +78,15 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** Optional guidance after the user enables a bundle from the list, keyed by npm package name. */
     'plugins.bundle.activation': { kind: 'keyed'; scope: 'root'; owner: PluginActivationOwnerProps }
     /**
-     * One official plugin the Plugins page lists in its Official group after
-     * the official bundles: `label` is the card's title and `order` its place.
-     * The page renders the entry as the card's one-liner (`view: 'summary'`)
-     * and, once the card is opened, as the body of the plugin's own page
-     * (`view: 'page'`). OCCUPIED by the official settings pages, one companion
-     * package per host-plane namespace; a bundle's configuration belongs in
-     * `plugins.bundle.config` or `plugins.row.config` instead.
+     * One official plugin the Plugins page lists in its Configuration group:
+     * `id` is the host-plane settings namespace the entry edits, `label` the
+     * card's title, and `order` its place. The page renders the entry as the
+     * card's one-liner (`view: 'summary'`) and, once the card is opened, as
+     * the body of the plugin's own page (`view: 'page'`, with `form` bound to
+     * the namespace). A card lists only while the Host serves its namespace,
+     * so a plugin the composition never loads leaves no empty shell. A
+     * bundle's configuration belongs in `plugins.bundle.config` or
+     * `plugins.row.config` instead.
      */
     'plugins.item': { kind: 'list'; scope: 'root'; owner: PluginConfigViewProps }
     /**

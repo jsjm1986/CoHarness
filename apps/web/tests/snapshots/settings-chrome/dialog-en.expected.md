@@ -7,9 +7,6 @@
     - button "Models":
       - img
       - text: Models
-    - button "Plugins":
-      - img
-      - text: Plugins
     - button "Agent presets":
       - img
       - text: Agent presets

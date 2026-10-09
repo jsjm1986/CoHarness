@@ -1,4 +1,11 @@
-/** Locale bundles for the plugin configuration section and its plugin cards. */
+/** Locale bundles for the plugin configuration cards on the Plugins page. */
+
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    /** Plugin configuration card copy. */
+    'settings.plugins': PluginsSettingsLocaleKey
+  }
+}
 
 /** Locale keys these surfaces render. */
 export type PluginsSettingsLocaleKey =
@@ -7,8 +14,7 @@ export type PluginsSettingsLocaleKey =
   | 'subagentModelSelectionOff' | 'subagentModelSelectionPartial' | 'subagentModelSelectionRequired'
   | 'subagentModelSelectionRetry' | 'subagentModelSelectionTitle' | 'subagentModelSelectionToggle'
   | 'subagentModelSelectionUnavailable' | 'subagentModelSelectionUnavailableGroup'
-  | 'nav' | 'title' | 'intro' | 'tabs' | 'configurableTab' | 'empty' | 'managerLink'
-  | 'overridden' | 'reset' | 'readOnly' | 'readOnlyProject' | 'readOnlyAccount' | 'readOnlyOrganization' | 'readOnlyDeployment' | 'expand' | 'collapse'
+  | 'overridden' | 'reset' | 'readOnly' | 'readOnlyProject' | 'readOnlyAccount' | 'readOnlyOrganization' | 'readOnlyDeployment'
   | 'save' | 'saving' | 'discard' | 'unsaved' | 'saveFailed' | 'invalidNumber'
   | 'bashTitle' | 'bashDescription' | 'bashTimeoutMs' | 'bashTimeoutMsHint'
   | 'bashMaxOutputBytes' | 'bashMaxOutputBytesHint'
@@ -35,13 +41,6 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   subagentModelSelectionRequired: 'Select at least one model before saving.',
   subagentModelSelectionConflict: 'Settings changed elsewhere. Discard your draft and try again.',
   subagentModelSelectionOff: 'Subagents use configured defaults or inherit the parent agent\'s model. Saved model choices are retained.',
-  nav: 'Plugins',
-  title: 'Plugins',
-  intro: 'Configure the plugins installed in this deployment.',
-  tabs: 'Plugin views',
-  configurableTab: 'Plugin configuration',
-  managerLink: 'Manage installed plugins in the Plugins panel',
-  empty: 'This deployment exposes no plugin settings.',
   overridden: 'Overridden',
   reset: 'Reset to default',
   readOnly: 'This deployment stores settings read-only.',
@@ -49,8 +48,6 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   readOnlyAccount: 'This setting belongs to the current account.',
   readOnlyOrganization: 'This setting is managed by the organization.',
   readOnlyDeployment: 'This setting is managed by the deployment.',
-  expand: 'Show settings',
-  collapse: 'Hide settings',
   save: 'Save',
   saving: 'Saving…',
   discard: 'Discard',
@@ -109,13 +106,6 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   subagentModelSelectionRequired: '保存前请至少选择一个模型。',
   subagentModelSelectionConflict: '设置已在其他位置更新。请放弃修改后重试。',
   subagentModelSelectionOff: '关闭后，Subagent 使用配置的默认模型或继承父 Agent 的模型；已选模型会保留。',
-  nav: '插件',
-  title: '插件',
-  intro: '配置本部署已安装的插件。',
-  tabs: '插件视图',
-  configurableTab: '插件配置',
-  managerLink: '在“插件”面板中管理安装与启用',
-  empty: '本部署没有开放任何插件设置。',
   overridden: '已覆盖',
   reset: '恢复默认',
   readOnly: '本部署的设置为只读。',
@@ -123,8 +113,6 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   readOnlyAccount: '此设置属于当前账户。',
   readOnlyOrganization: '此设置由组织管理员管理。',
   readOnlyDeployment: '此设置由部署管理员管理。',
-  expand: '展开设置',
-  collapse: '收起设置',
   save: '保存',
   saving: '保存中…',
   discard: '放弃修改',

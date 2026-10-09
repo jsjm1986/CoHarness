@@ -19,20 +19,17 @@ async function openPluginsPanel(page: Page, url: string) {
 }
 
 /**
- * Open the Plugins settings section after the panel is mounted; the terminal
- * card's staged timeout edit is the page-owned state these tests track across
- * live composition.
+ * Open the terminal item's page inside the sidebar Plugins panel; its staged
+ * timeout edit is the page-owned state these tests track across live
+ * composition.
  */
 async function openPluginSettings(page: Page, url: string) {
   await openPluginsPanel(page, url)
-  await page.getByRole('button', { name: '设置', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '设置' })
+  const panel = page.locator('[data-plugin-panel]')
   try {
-    await dialog.getByRole('button', { name: '插件', exact: true }).click()
-    await dialog.getByText('终端', { exact: true }).waitFor()
-    await dialog.getByText('终端', { exact: true }).click()
-    await dialog.getByLabel('命令超时（毫秒）').waitFor()
-    return dialog
+    await panel.getByRole('button', { name: '查看 终端', exact: true }).click()
+    await panel.getByLabel('命令超时（毫秒）').waitFor()
+    return panel
   } catch (error) {
     await saveFailureShot(page, 'web-e2e-client-plugins')
     throw error
@@ -216,8 +213,8 @@ it('reports bootstrap rebuilds without remounting the settings page or navigatin
     scaffold.ctx.clientModules.rebuilt('@deepseek-ai/dsh-client-modules')
     const failure = page.locator('[data-client-sync-failure]')
     await failure.getByText(/replacing bootstrap module .* requires a page reload/).waitFor()
-    // The settings dialog is open for the staged draft; dispatch the retry at DOM level.
-    await failure.getByRole('button', { name: '重试本页面同步' }).evaluate((el: HTMLButtonElement) => { el.click() })
+    // The banner sits above the panel's item page, so the retry clicks directly.
+    await failure.getByRole('button', { name: '重试本页面同步' }).click()
     await failure.getByText(/replacing bootstrap module .* requires a page reload/).waitFor()
     await compareOrRefreshGolden(join(EXPECTED, 'bootstrap-rebuild.expected.md'), await captureStableAria(page, '[data-client-sync-failure]', scaffold.workspaceCwd), webSnapshotMode())
     expect(await originalInput.evaluate(input => input.isConnected)).toBe(true)

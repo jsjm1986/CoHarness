@@ -1,46 +1,27 @@
-- dialog "设置":
-  - navigation:
-    - text: 设置
-    - button "通用设置":
-      - img
-      - text: 通用设置
-    - button "模型":
-      - img
-      - text: 模型
-    - button "插件":
-      - img
-      - text: 插件
-    - button "Agent 预设":
-      - img
-      - text: Agent 预设
-    - button "已归档会话":
-      - img
-      - text: 已归档会话
-  - button "打开配置文件"
-  - button "关闭":
-    - img
-    - text: 关闭
-  - heading "插件" [level=2]
-  - paragraph: 配置本部署已安装的插件。
-  - button "在“插件”面板中管理安装与启用"
-  - list:
-    - listitem:
-      - 'button "展开设置: 终端"':
-        - text: 终端 限制 agent 运行的每一条命令。
-        - img
-    - listitem:
-      - 'button "展开设置: Agent 循环"':
-        - text: Agent 循环 Agent 如何派发工具调用。
-        - img
-    - listitem:
-      - 'button "展开设置: Subagent"':
-        - text: Subagent 设置 Subagent 的递归层级和并行数量。
-        - img
-    - listitem:
-      - 'button "展开设置: 模型选择"':
-        - text: 模型选择 允许 Agent 为 Subagent 选择模型
-        - img
-    - listitem:
-      - 'button "展开设置: 网页搜索"':
-        - text: 网页搜索 DeepSeek 搜索提供方。
-        - img
+- heading "插件" [level=1]
+- text: 安装、启用和配置插件
+- button "插件说明":
+  - img
+- button "刷新" [disabled]
+- button "添加插件" [disabled]:
+  - img
+  - text: 添加插件
+- status: 本部署没有可管理的 profile，无法安装或启停插件。
+- heading "插件配置" [level=3]
+- text: "5"
+- list:
+  - listitem:
+    - button "查看 终端": 终端
+    - text: 限制 agent 运行的每一条命令。
+  - listitem:
+    - button "查看 Agent 循环": Agent 循环
+    - text: Agent 如何派发工具调用。
+  - listitem:
+    - button "查看 Subagent": Subagent
+    - text: 设置 Subagent 的递归层级和并行数量。
+  - listitem:
+    - button "查看 模型选择": 模型选择
+    - text: 允许 Agent 为 Subagent 选择模型
+  - listitem:
+    - button "查看 网页搜索": 网页搜索
+    - text: DeepSeek 搜索提供方。

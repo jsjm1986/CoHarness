@@ -1,6 +1,7 @@
 # Agent Note: “插件”设置中的功能自有标签页
 
 Status: implemented
+Archived: 2026-10-10
 
 [English](2026-08-11-plugin-settings-tabs.md) | 中文
 

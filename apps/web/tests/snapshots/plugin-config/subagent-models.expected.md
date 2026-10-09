@@ -1,15 +1,17 @@
-- listitem:
-  - 'button "收起设置: 模型选择" [expanded]':
-    - text: 模型选择 允许 Agent 为 Subagent 选择模型 未保存
-    - img
-  - text: 允许 Agent 为 Subagent 选择模型
-  - switch "允许 Agent 为 Subagent 选择模型" [checked]
-  - paragraph: 开启后，Agent 可以从下方授权模型中，为每个 Subagent 选择提供方、模型和推理强度。仅影响新会话。
-  - group "Agent 可选择的模型":
-    - text: Agent 可选择的模型 DeepSeek
-    - checkbox "DeepSeek-V4-Flash DeepSeek · deepseek-official/deepseek-v4-flash" [checked]
-    - text: DeepSeek-V4-Flash DeepSeek · deepseek-official/deepseek-v4-flash
-    - checkbox "DeepSeek-V4-Flash-Vision-Exp DeepSeek · deepseek-official/deepseek-v4-flash-vision-exp"
-    - text: DeepSeek-V4-Flash-Vision-Exp DeepSeek · deepseek-official/deepseek-v4-flash-vision-exp
-  - button "放弃修改"
-  - button "保存"
+- button "返回插件列表":
+  - img
+  - text: 插件列表
+- heading "模型选择" [level=3]
+- paragraph: 允许 Agent 为 Subagent 选择模型
+- text: 允许 Agent 为 Subagent 选择模型
+- switch "允许 Agent 为 Subagent 选择模型" [checked]
+- paragraph: 开启后，Agent 可以从下方授权模型中，为每个 Subagent 选择提供方、模型和推理强度。仅影响新会话。
+- group "Agent 可选择的模型":
+  - text: Agent 可选择的模型 DeepSeek
+  - checkbox "DeepSeek-V4-Flash DeepSeek · deepseek-official/deepseek-v4-flash" [checked]
+  - text: DeepSeek-V4-Flash DeepSeek · deepseek-official/deepseek-v4-flash
+  - checkbox "DeepSeek-V4-Flash-Vision-Exp DeepSeek · deepseek-official/deepseek-v4-flash-vision-exp"
+  - text: DeepSeek-V4-Flash-Vision-Exp DeepSeek · deepseek-official/deepseek-v4-flash-vision-exp
+- text: 未保存
+- button "放弃修改"
+- button "保存"

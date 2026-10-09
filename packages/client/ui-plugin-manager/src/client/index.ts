@@ -33,12 +33,16 @@ declare module '@deepseek-ai/cordis' {
     /** Cross-plugin navigation to the Plugins panel. */
     pluginNavigation: {
       /**
-       * Open the Plugins panel without changing the current Session: a
-       * package name selects that bundle's details, an omitted name shows
-       * the plugin list. An absent bundle displays the list after loading.
-       * @param packageName - npm package name of the bundle.
+       * Open the Plugins panel without changing the current Session. An
+       * absent bundle displays the list after loading.
+       * @param packageName - npm package name of the bundle whose details open.
        */
-      openBundle(packageName?: string): void
+      openBundle(packageName: string): void
+      /**
+       * Open the Plugins panel on one official plugin's own page.
+       * @param itemId - the plugin's `plugins.item` entry id.
+       */
+      openItem(itemId: string): void
     }
   }
 }
@@ -106,21 +110,9 @@ export function apply(ctx: ClientContext): void {
       dismissNotice: face.dismissNotice,
     }),
   }, PluginRefreshToast))
-  // The navigation service is provided at activation, not when the panel
-  // first renders: callers like the Plugins settings link route through it
-  // without ever having mounted the panel.
-  const handle = createNavigationStore(), instance = handle.create()
-  const store: typeof handle = { ...handle, create: () => instance }
-  ctx.effect(() => {
-    const disposeNavigation = ctx.reflect.provide('pluginNavigation', {
-      openBundle: (packageName?: string) => {
-        ctx.layout.selectPanel(PANEL_ID)
-        instance.actions.setView(packageName === undefined ? { kind: 'list' } : { kind: 'package', name: packageName })
-      },
-    })
-    return () => { void disposeNavigation() }
-  }, 'ui-plugin-manager: navigation')
   ctx.slots.inject('main', function* () {
+    const handle = createNavigationStore(), instance = handle.create()
+    const store: typeof handle = { ...handle, create: () => instance }
     yield ctx.slots.register({
       name: 'main',
       key: PANEL_ID,
@@ -140,6 +132,17 @@ export function apply(ctx: ClientContext): void {
     yield ctx.layout.panelInfo.subscribe(() => {
       if (ctx.layout.panelInfo.getSnapshot().activePanelId !== PANEL_ID) instance.actions.setView({ kind: 'list' })
     })
+    const disposeNavigation = ctx.reflect.provide('pluginNavigation', {
+      openBundle: (packageName: string) => {
+        ctx.layout.selectPanel(PANEL_ID)
+        instance.actions.setView({ kind: 'package', name: packageName })
+      },
+      openItem: (itemId: string) => {
+        ctx.layout.selectPanel(PANEL_ID)
+        instance.actions.setView({ kind: 'item', id: itemId })
+      },
+    })
+    yield () => { void disposeNavigation() }
   })
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist',

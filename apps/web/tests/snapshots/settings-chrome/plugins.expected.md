@@ -1,4 +1,0 @@
-- listitem:
-  - 'button "展开设置: 终端"':
-    - text: 终端 限制 agent 运行的每一条命令。
-    - img
