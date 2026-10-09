@@ -432,6 +432,14 @@ a {
   padding: 18px;
 }
 
+/* Bare banners and paragraphs in flush sections still need side room; strips
+   (tableWrap, filterPanel, archiveBulkBar) supply their own padding. */
+.section > .errorBanner,
+.section > p {
+  margin-left: 18px;
+  margin-right: 18px;
+}
+
 .button {
   display: inline-flex;
   align-items: center;

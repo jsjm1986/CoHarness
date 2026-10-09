@@ -96,7 +96,7 @@ export function AuditPage() {
         meta={hasFilters ? t('metaFiltered') : undefined}
       />
       <ErrorBanner message={error} />
-      <Section title={t('sectionFilters')}>
+      <Section flush title={t('sectionFilters')}>
         <form className="filterPanel" onSubmit={onFilter}>
           <div className="filterGrid">
             <Field label={t('userIdLabel')}>
@@ -118,7 +118,7 @@ export function AuditPage() {
           </div>
         </form>
       </Section>
-      <Section className="responsiveSection" title={t('eventsTitle')} meta={loading ? undefined : t('pageIndicator', { page: String(page) })}>
+      <Section flush className="responsiveSection" title={t('eventsTitle')} meta={loading ? undefined : t('pageIndicator', { page: String(page) })}>
         {loading ? <LoadingState label={t('loadingEvents')} /> : rows.length === 0 ? (
           <EmptyState icon={ScrollText} title={t('emptyTitle')} detail={hasFilters ? t('emptyDetailFiltered') : t('emptyDetail')} />
         ) : (

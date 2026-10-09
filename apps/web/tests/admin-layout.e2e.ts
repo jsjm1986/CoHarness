@@ -103,14 +103,18 @@ it('keeps admin form controls aligned inside their sections', async () => {
     const pluginSectionBox = await boxOf(pluginSection)
     expect(Math.abs(bottom(selectBox) - bottom(reloadBox))).toBeLessThanOrEqual(4)
     inside(reloadBox, pluginSectionBox)
+    // Free-form content sits in the padded body band, not against the card edge.
+    expect(selectBox.x - pluginSectionBox.x).toBeGreaterThanOrEqual(16)
 
     // Deployment: the maintenance action sits in its own row below the reason field.
     await page.goto(`${base}/admin/deployment`)
     const deploySection = page.locator('section.section', { has: page.getByLabel('维护事由') })
+    const deploySectionBox = await boxOf(deploySection)
     const reasonBox = await boxOf(deploySection.getByLabel('维护事由'))
     const enterBox = await boxOf(deploySection.getByRole('button', { name: '进入维护窗口' }))
     expect(enterBox.y).toBeGreaterThanOrEqual(bottom(reasonBox))
-    inside(enterBox, await boxOf(deploySection))
+    inside(enterBox, deploySectionBox)
+    expect(reasonBox.x - deploySectionBox.x).toBeGreaterThanOrEqual(16)
 
     // Phone width: controls wrap instead of escaping their sections.
     await page.setViewportSize({ width: 390, height: 844 })

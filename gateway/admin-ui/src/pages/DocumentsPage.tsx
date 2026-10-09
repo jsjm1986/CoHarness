@@ -250,7 +250,7 @@ export function DocumentsPage() {
         <Metric label={t('scopeProject')} value={metrics?.project.toLocaleString() ?? '—'} />
         <Metric label={t('metricFailures24h')} value={metrics?.failures24h.toLocaleString() ?? '—'} tone={metrics !== null && metrics.failures24h > 0 ? 'warning' : undefined} />
       </div>
-      <Section title={t('filterSection')}>
+      <Section flush title={t('filterSection')}>
         <form className="filterPanel" onSubmit={apply}>
           <div className="filterGrid">
             <Field label={t('labelQuery')}><div className="inputWithIcon"><Search aria-hidden="true" /><input className="input" value={draft.query} onChange={event => setDraft({ ...draft, query: event.target.value })} placeholder={t('queryPlaceholder')} /></div></Field>
@@ -262,14 +262,14 @@ export function DocumentsPage() {
           <div className="filterActions"><Button type="button" onClick={reset}>{t('reset')}</Button><Button type="submit" variant="primary" icon={Filter}>{t('applyFilters')}</Button></div>
         </form>
       </Section>
-      <Section className="responsiveSection" title={t('catalogSection')} meta={loading ? undefined : t('recordCount', { count: String(rows.length) })}>
-        {selectedIds.size > 0 && <div className="filterActions" role="toolbar" aria-label={t('batchAria')}><span className="muted">{t('selectedCount', { count: String(selectedIds.size) })}</span><Button type="button" variant="danger" loading={batchAction} onClick={() => void changeSelectedState('trash')}>{t('trash')}</Button><Button type="button" loading={batchAction} onClick={() => void changeSelectedState('restore')}>{t('restore')}</Button><Button type="button" variant="danger" loading={batchAction} onClick={requestBatchPurge}>{t('purge')}</Button><Button type="button" disabled={batchAction} onClick={() => setSelectedIds(new Set())}>{t('clearSelection')}</Button></div>}
+      <Section flush className="responsiveSection" title={t('catalogSection')} meta={loading ? undefined : t('recordCount', { count: String(rows.length) })}>
+        {selectedIds.size > 0 && <div className="sectionBody filterActions" role="toolbar" aria-label={t('batchAria')}><span className="muted">{t('selectedCount', { count: String(selectedIds.size) })}</span><Button type="button" variant="danger" loading={batchAction} onClick={() => void changeSelectedState('trash')}>{t('trash')}</Button><Button type="button" loading={batchAction} onClick={() => void changeSelectedState('restore')}>{t('restore')}</Button><Button type="button" variant="danger" loading={batchAction} onClick={requestBatchPurge}>{t('purge')}</Button><Button type="button" disabled={batchAction} onClick={() => setSelectedIds(new Set())}>{t('clearSelection')}</Button></div>}
         {loading ? <LoadingState label={t('loadingCatalog')} /> : rows.length === 0 ? <EmptyState icon={Archive} title={t('emptyTitle')} detail={t('emptyDetail')} /> : <>
           <div className="tableWrap desktopOnly"><table className="dataTable documentsTable"><thead><tr><th><span className="visuallyHidden">{t('columnSelect')}</span></th><th>{t('columnDocument')}</th><th>{t('labelScope')}</th><th>{t('labelOwner')}</th><th>{t('labelSize')}</th><th>{t('labelState')}</th><th>{t('labelSource')}</th><th>{t('columnUpdated')}</th><th /></tr></thead><tbody>{rows.map(row => <DocumentTableRow key={row.catalogId} row={row} selected={selectedIds.has(row.catalogId)} onSelect={() => setSelectedIds(previous => { const next = new Set(previous); if (next.has(row.catalogId)) next.delete(row.catalogId); else next.add(row.catalogId); return next })} onOpen={() => void openDetail(row)} />)}</tbody></table></div>
           <div className="mobileList">{rows.map(row => <article className="mobileItem" key={row.catalogId} onClick={() => void openDetail(row)}><div className="mobileItemHeader"><input type="checkbox" aria-label={t('selectRow', { name: row.name })} checked={selectedIds.has(row.catalogId)} onChange={event => { event.stopPropagation(); setSelectedIds(previous => { const next = new Set(previous); if (next.has(row.catalogId)) next.delete(row.catalogId); else next.add(row.catalogId); return next }) }} onClick={event => event.stopPropagation()} /><strong>{row.name}</strong><StatusBadge tone={row.scope.kind === 'project' ? 'info' : 'neutral'}>{row.scope.label}</StatusBadge></div><div className="mobileItemBody"><span className="muted">{row.owner?.displayName ?? t('unassigned')} · {formatBytes(row.bytes)}</span><span className="codeText">{row.catalogId}</span></div></article>)}</div>
         </>}
         {!loading && (nextCursor !== undefined || page > 0) && (
-          <div className="filterActions" aria-label={t('paginationAria')}>
+          <div className="sectionBody filterActions" aria-label={t('paginationAria')}>
             <Button type="button" disabled={page === 0} onClick={() => { const next = page - 1; setPage(next); void reload(active, true, next, pageCursors[next]) }}>{t('prevPage')}</Button>
             <span className="muted">{t('pageIndicator', { page: String(page + 1) })}</span>
             <Button type="button" disabled={nextCursor === undefined} onClick={() => { const next = page + 1; setPage(next); void reload(active, true, next, nextCursor) }}>{t('nextPage')}</Button>

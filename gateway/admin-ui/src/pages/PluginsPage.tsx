@@ -169,7 +169,7 @@ export function PluginsPage() {
   }, [selected, targets, t])
   return <div className="page">
     <PageHeader title={t('title')} description={t('pageDescription')} />
-    <Section title={t('targetSection')}><div className="sectionBody">
+    <Section title={t('targetSection')}>
       <ErrorBanner message={error} />
       <div className="targetPicker">
         <Field label={t('targetField')}><select className="select" aria-label={t('targetAria')} value={selected} onChange={event => {
@@ -182,7 +182,7 @@ export function PluginsPage() {
         {binding.generation === null ? t('instanceStopped') : t('instanceRunning', { generation: `${binding.generation}` })}
       </p>}
       {binding === null ? null : <TargetPolicy kind={binding.target.kind} id={binding.target.id} t={t} />}
-    </div></Section>
+    </Section>
     {binding === null ? null : <BoundPlugins key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} binding={binding} invalidate={invalidate} t={t} />}
     <PluginPermissions />
   </div>
@@ -193,7 +193,6 @@ function BoundPlugins({ binding, invalidate, t }: { readonly binding: PluginMana
   const composition = usePluginComposition(binding.target.kind, binding.target.id, binding, invalidate)
   const stopped = binding.generation === null
   return <Section title={t('title')}>
-    <div className="sectionBody">
       <LifecycleLine t={t} />
       <ErrorBanner message={composition.error} />
       {composition.notice === '' ? null : <p role="status" className="muted">{composition.notice}</p>}
@@ -202,6 +201,5 @@ function BoundPlugins({ binding, invalidate, t }: { readonly binding: PluginMana
         : <div className="adminPluginManager"><Manager target={binding} invalidate={invalidate} composition={composition} t={t} /></div>}
       <DraftBar composition={composition} t={t} />
       <CompositionView composition={composition} open={stopped} t={t} />
-    </div>
   </Section>
 }

@@ -81,7 +81,6 @@ export function ResourcePermissions({ name, description, saved, read, write, kin
   }
 
   return <Section title={allowUser ? t('titleUser', { name }) : t('titleProject', { name })}>
-    <div className="sectionBody">
     <p className="muted">{description}</p>
     {allowUser ? null : <p className="muted">{t('projectOnlyHint', { name })}</p>}
     <ErrorBanner message={error} />
@@ -105,7 +104,6 @@ export function ResourcePermissions({ name, description, saved, read, write, kin
       setPolicy(null); setNotice(''); setReload(value => value + 1)
     }}>{t('reread')}</Button>}
     {notice === '' ? null : <p role="status">{notice}</p>}
-    </div>
     </div>
   </Section>
 }

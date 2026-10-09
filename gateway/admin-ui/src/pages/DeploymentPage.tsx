@@ -140,7 +140,7 @@ export function DeploymentPage() {
 
       <NodeConfigurationSection />
 
-      <Section title={t('nodesTitle')} meta={t('nodesMeta')}>
+      <Section flush title={t('nodesTitle')} meta={t('nodesMeta')}>
         {state === null ? null : state.nodes.length === 0 ? <EmptyState title={t('nodesEmpty')} /> : (
           <div className="tableWrap" role="region" aria-label={t('nodesTableAria')} tabIndex={0}>
             <table className="dataTable">
@@ -192,6 +192,7 @@ export function DeploymentPage() {
       </Section>
 
       <Section
+        flush
         title={t('backupsTitle')}
         meta={t('backupsMeta')}
         actions={<Button icon={DatabaseBackup} disabled={acting || state?.mode !== 'maintenance' || !state.writersQuiesced}
@@ -234,7 +235,7 @@ export function DeploymentPage() {
         )}
       </Section>
 
-      <Section title={t('operationsTitle')} meta={t('operationsMeta')}>
+      <Section flush title={t('operationsTitle')} meta={t('operationsMeta')}>
         {state === null ? null : state.operations.length === 0 ? <EmptyState title={t('operationsEmpty')} /> : (
           <div className="tableWrap" role="region" aria-label={t('operationsTableAria')} tabIndex={0}>
             <table className="dataTable">

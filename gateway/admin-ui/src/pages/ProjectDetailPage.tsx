@@ -408,6 +408,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
             <p className="sectionHint">{t('configSectionHint')}</p>
           </Section>
           <Section
+            flush
             className="projectUsageSection"
             title={t('usageSectionTitle')}
             meta={usage?.month}
@@ -475,7 +476,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
               </>
             )}
           </Section>
-          <Section className="responsiveSection" title={t('contributorsTitle')} meta={contributors === null ? undefined : t('contributorsMeta', { count: String(contributors.rows.length) })}>
+          <Section flush className="responsiveSection" title={t('contributorsTitle')} meta={contributors === null ? undefined : t('contributorsMeta', { count: String(contributors.rows.length) })}>
             {contributors === null ? <LoadingState label={t('loadingContributors')} /> : (
               <>
                 <p className="sectionHint">{t('contributorsHint', { tokens: contributors.unattributed.totalTokens.toLocaleString() })}</p>
@@ -499,6 +500,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
             )}
           </Section>
           <Section
+            flush
             className="responsiveSection"
             title={t('modelAccessTitle')}
             meta={t('modelAccessMeta', {
@@ -566,7 +568,7 @@ function ProjectDetail({ projectId }: { projectId: number }) {
               </>
             )}
           </Section>
-          <Section className="responsiveSection" title={t('membersTitle')} meta={t('membersMeta', { count: String(users.length) })}>
+          <Section flush className="responsiveSection" title={t('membersTitle')} meta={t('membersMeta', { count: String(users.length) })}>
             {users.length === 0 ? (
               <EmptyState icon={Users} title={t('membersEmptyTitle')} detail={t('membersEmptyDetail')} />
             ) : (

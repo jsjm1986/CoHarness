@@ -102,7 +102,7 @@ export function ProjectListPage() {
         <button type="button" aria-pressed={originFilter === 'admin'} onClick={() => setOriginFilter('admin')}>{t('originAdmin')}</button>
         <button type="button" aria-pressed={originFilter === 'user'} onClick={() => setOriginFilter('user')}>{t('originUser')}</button>
       </div>
-      <Section className="responsiveSection" title={t('sectionTitle')} meta={loading ? undefined : t('recordCount', { count: String(projects.length) })}>
+      <Section flush className="responsiveSection" title={t('sectionTitle')} meta={loading ? undefined : t('recordCount', { count: String(projects.length) })}>
         {loading ? <LoadingState label={t('loadingProjects')} /> : projects.length === 0 ? (
           <EmptyState
             icon={FolderKanban}

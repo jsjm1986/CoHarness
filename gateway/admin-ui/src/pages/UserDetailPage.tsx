@@ -195,8 +195,7 @@ function UserDetail({ userId }: { userId: number }) {
       {loading && user === null ? <LoadingState label={t('loadingUser')} /> : user === null ? null : (
         <>
           <Section title={t('sectionAccount')}>
-            <div className="sectionBody">
-              <dl className="definitionGrid">
+            <dl className="definitionGrid">
                 <Definition label={t('defUsername')}><span className="codeText">@{user.username}</span></Definition>
                 <Definition label={t('defDisplayName')}>{user.displayName === '' ? t('notSet') : user.displayName}</Definition>
                 <Definition label={t('defAutoReview')}><AutoReviewBadge eligible={user.autoReviewEligible} /></Definition>
@@ -208,12 +207,10 @@ function UserDetail({ userId }: { userId: number }) {
                 </Definition>
                 <Definition label={t('defPort')}><span className="codeText">{user.port}</span></Definition>
                 <Definition label={t('defHomePath')}><span className="codeText">{user.homePath}</span></Definition>
-              </dl>
-            </div>
+            </dl>
           </Section>
 
           <Section title={t('sectionQualifications')} className="responsiveSection">
-            <div className="sectionBody">
               <p className="muted">{t('qualificationsHint')}</p>
               <div className="qualificationGrid">
                 <UserQualificationCard
@@ -245,7 +242,6 @@ function UserDetail({ userId }: { userId: number }) {
                   write={setPluginPolicy}
                 />
               </div>
-            </div>
           </Section>
 
           <UserModelAccess key={`${userId}:${user.role}`} userId={userId} role={user.role} />
@@ -313,6 +309,7 @@ function UserModelAccess({ userId, role }: { userId: number; role: UserRole }) {
   const overrideCount = [...overrides.values()].length
   return (
     <Section
+      flush
       className="responsiveSection"
       title={t('sectionModels')}
       meta={models === null ? undefined : t('modelsMeta', { count: String(models.length), overrides: String(overrideCount) })}
@@ -471,6 +468,7 @@ function UserMemberships({ userId, role }: { userId: number; role: UserRole }) {
 
   return (
     <Section
+      flush
       className="responsiveSection"
       title={t('sectionMemberships')}
       meta={memberships === null ? undefined : t('membershipsMeta', { count: String(memberships.length) })}
@@ -641,7 +639,6 @@ function UserQuota({ userId }: { userId: number }) {
 
   return (
     <Section title={t('sectionQuota')} meta={quota === null ? undefined : quotaSummary}>
-      <div className="sectionBody">
         <p className="muted">{t('quotaHint')}</p>
         <ErrorBanner message={error} />
         {loading ? <LoadingState label={t('loadingQuota')} /> : (
@@ -669,7 +666,6 @@ function UserQuota({ userId }: { userId: number }) {
             </div>
           </form>
         )}
-      </div>
     </Section>
   )
 }
