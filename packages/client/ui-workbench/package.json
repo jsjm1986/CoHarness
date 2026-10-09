@@ -78,7 +78,7 @@
     "exceljs": "4.4.0",
     "fast-xml-parser": "5.11.1",
     "fflate": "^0.8.3",
-    "papaparse": "5.5.3",
+    "papaparse": "5.7.0",
     "pdfjs-dist": "6.3.289",
     "react-dom": "^19.3.0",
     "@types/react-dom": "~19.2.4",
