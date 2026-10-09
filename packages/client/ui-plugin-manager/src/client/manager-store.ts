@@ -25,7 +25,7 @@ import type {
   Registry,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import { normalizeRegistry, NPMMIRROR_REGISTRY, OFFICIAL_NPM_REGISTRY, REGISTRY_URL } from '@deepseek-ai/dsh-plugin-manager/registry'
-import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type ProjectUiPolicySnapshot, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientEntryState } from '@deepseek-ai/dsh-client-modules/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { LocalizedText, PluginLocalizedMeta } from '@deepseek-ai/dsh-package-manifest'
@@ -320,6 +320,12 @@ export interface PluginManagerFace {
      * entries this browser failed to import or tear down.
      */
     clientSync: HostObservable<ClientEntryState>
+    /**
+     * The deployment's account scope for this runtime, bound by the renderer
+     * as useScopePolicy. Personal runtimes and shared project runtimes carry
+     * separate compositions; the page labels which one it edits.
+     */
+    scopePolicy: HostObservable<ProjectUiPolicySnapshot>
   }
   /**
    * Re-run client-module synchronization for this page. Only the local module
@@ -581,6 +587,7 @@ export class PluginManagerController {
         configLedger,
         configurations: this.ctx.settingsScope.describe(),
         clientSync: this.ctx.modules.entries.state,
+        scopePolicy: this.ctx.projectUiPolicy,
       },
       retryClient: () => { void this.ctx.modules.entries.retry().catch((error: unknown) => { this.ctx.logger.error(error) }) },
       configForm: <T>(id: string): SettingsMutationScope<T> => {

@@ -76,6 +76,7 @@ export function apply(ctx: ClientContext): void {
       if (scope?.kind !== 'project') projectUiPolicy?.set('personal')
       else projectUiPolicy?.set('project', scope.uiThemePolicy ?? 'follow-user', {
         projectId: scope.projectId,
+        projectName: scope.projectName,
         canManage: scope.canManage === true,
       })
     }

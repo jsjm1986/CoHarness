@@ -1279,6 +1279,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
   const state = props.usePluginManager(snapshot => snapshot)
   const ledger = props.useConfigLedger(snapshot => snapshot)
   const clientSync = props.useClientSync(snapshot => snapshot)
+  const scopePolicy = props.useScopePolicy(snapshot => snapshot)
   // What is open; a package that leaves the list (uninstalled) drops back to the cards.
   const view = props.useStore(state => state.view), { setView } = props.actions
   const [activation, setActivation] = useState<string | null>(null)
@@ -1369,6 +1370,13 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
                   </Button>
                 </Tooltip>
               </div>
+              {scopePolicy.accountPermissions === 'unknown' ? null : (
+                <div className={css.scopeLine} data-plugin-scope-line>
+                  {scopePolicy.scope === 'project'
+                    ? scopePolicy.projectName === undefined ? t('scopeProjectUnnamed') : t('scopeProject', { name: scopePolicy.projectName })
+                    : t('scopePersonal')}
+                </div>
+              )}
             </div>
             <div className={css.toolbar}>
               <Tooltip label={t('refresh')} delayMs={500} focusDelayMs={500} side="bottom" portal disabled={!refreshable || refreshing}>

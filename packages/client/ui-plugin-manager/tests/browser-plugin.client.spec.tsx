@@ -4,7 +4,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import { createSnapshotStore, SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, ProjectUiPolicyRuntime, SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ILayout, PanelInfo } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { stubDeveloperTools, stubMutationScope, TestRemote, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
@@ -60,7 +60,9 @@ async function bench() {
   const clientSync = createSnapshotStore<ClientEntryState>({ syncing: false, failures: [] })
   const retryClient = vi.fn(() => Promise.resolve())
   ctx.provide('modules', { entries: { state: clientSync, retry: retryClient } } as never)
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, remote, selectPanel, panelInfo, clientSync, retryClient }
+  const scopePolicy = new ProjectUiPolicyRuntime()
+  ctx.provide('projectUiPolicy', scopePolicy)
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, remote, selectPanel, panelInfo, clientSync, retryClient, scopePolicy }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -140,7 +142,7 @@ describe('ui-plugin-manager browser plugin', () => {
   })
 
   it('declares only the services the page and its Remote methods use', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe', 'settingsScope', 'layout', 'modules'])
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe', 'settingsScope', 'layout', 'modules', 'projectUiPolicy'])
   })
 
   it('registers the sidebar entry and its page, which reads the Host only once rendered and follows Host changes', async () => {

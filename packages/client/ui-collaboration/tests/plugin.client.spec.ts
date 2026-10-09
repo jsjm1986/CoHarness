@@ -130,6 +130,7 @@ describe('ui-collaboration apply', () => {
         'child' as SessionId,
       )
       expect(share.hooks.collaboration).toBe(b.scope.hooks.collaboration)
+      expect(b.policy.getSnapshot()).toMatchObject({ scope: 'project', projectId: 9, projectName: '支付重构' })
 
       b.scope.stageVisibility('private')
       const prepared = await b.ctx.waterfall(

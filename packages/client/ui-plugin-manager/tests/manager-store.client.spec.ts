@@ -6,6 +6,7 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { BundleInfo, ChangeResult, ManagementError, PluginEntryId, PluginInfo, PluginInstallRequestId } from '@deepseek-ai/dsh-api-remotes/client'
 import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
+import { ProjectUiPolicyRuntime } from '@deepseek-ai/dsh-client-runtime/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConfigLedger } from '../src/client/config-ledger.ts'
 import { offeredRegistries, packageView, PluginManagerController, rowKey, sortPackages } from '../src/client/manager-store.ts'
@@ -112,6 +113,7 @@ function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
         retry: clientRetry,
       },
     },
+    projectUiPolicy: new ProjectUiPolicyRuntime(),
     logger,
   } as never
   const controller = new PluginManagerController(ctx)
@@ -140,6 +142,11 @@ it('exposes the page\'s module sync state and logs a rejected page retry', async
   clientRetry.mockRejectedValueOnce(new Error('sync refused'))
   face.retryClient()
   await vi.waitFor(() => { expect(logger.error).toHaveBeenCalledTimes(1) })
+})
+
+it('exposes the runtime\'s account scope so the page labels the target it edits', () => {
+  const { face } = bench()
+  expect(face.hooks.scopePolicy.getSnapshot().scope).toBe('personal')
 })
 
 describe('packageView', () => {

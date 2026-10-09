@@ -8,7 +8,7 @@ import type { PluginEntryId, PluginInstallRequestId } from '@deepseek-ai/dsh-api
 import { bindSnapshotSelector, stubMutationScope } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SettingsMirrorSnapshot, SettingsMutationScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ClientEntryState } from '@deepseek-ai/dsh-client-modules/client'
-import { createSnapshotStore, type SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type ProjectUiPolicySnapshot, type SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { StrictMode, type ReactNode } from 'react'
 import { createNavigationStore } from '../src/client/navigation-store.ts'
 import { PluginManagerPage } from '../src/client/PluginManagerPage.tsx'
@@ -105,6 +105,7 @@ function renderTab(
   state: Partial<PluginManagerState> = {}, config: Partial<ConfigLedger> = {},
   bodies: SlotBodies = {}, forms: Record<string, ConfigPageForm> = {},
   sync: ClientEntryState = { syncing: false, failures: [] },
+  scopePolicy: ProjectUiPolicySnapshot = { scope: 'personal', theme: 'follow-user', revision: 0, accountPermissions: 'unknown' },
 ) {
   const ctx = new Context()
   onTestFinished(async () => { await ctx.fiber.dispose() })
@@ -154,6 +155,7 @@ function renderTab(
     usePluginManager: bindSnapshotSelector(store),
     useConfigLedger: bindSnapshotSelector(ledger),
     useClientSync: bindSnapshotSelector(createSnapshotStore<ClientEntryState>(sync)),
+    useScopePolicy: bindSnapshotSelector(createSnapshotStore<ProjectUiPolicySnapshot>(scopePolicy)),
     useConfigurations: bindSnapshotSelector(createSnapshotStore<SettingsMirrorSnapshot>({
       status: 'ready', error: null,
       view: { writable: true, hasDocument: true, namespaces: Object.keys(forms).map(ns => ({
@@ -220,6 +222,23 @@ describe('PluginManagerPage', () => {
     fireEvent.click(within(panel as HTMLElement).getByRole('button', { name: 'Retry this page' }))
     expect(failed.actions.retryClient).toHaveBeenCalledTimes(1)
     expect(failed.actions.setEnabled).not.toHaveBeenCalled()
+  })
+
+  it('labels the runtime scope the page edits once the account is verified', () => {
+    const unverified = renderTab()
+    expect(document.querySelector('[data-plugin-scope-line]')).toBeNull()
+    unverified.unmount()
+    const personal = renderTab({}, {}, {}, {}, { syncing: false, failures: [] },
+      { scope: 'personal', theme: 'follow-user', revision: 1, accountPermissions: 'standard' })
+    expect(document.querySelector('[data-plugin-scope-line]')?.textContent).toBe(en.scopePersonal)
+    personal.unmount()
+    const named = renderTab({}, {}, {}, {}, { syncing: false, failures: [] },
+      { scope: 'project', theme: 'follow-user', revision: 1, accountPermissions: 'standard', projectId: 4, projectName: 'Rig' })
+    expect(document.querySelector('[data-plugin-scope-line]')?.textContent).toBe(en.scopeProject.replace('{name}', 'Rig'))
+    named.unmount()
+    renderTab({}, {}, {}, {}, { syncing: false, failures: [] },
+      { scope: 'project', theme: 'follow-user', revision: 1, accountPermissions: 'standard', projectId: 4 })
+    expect(document.querySelector('[data-plugin-scope-line]')?.textContent).toBe(en.scopeProjectUnnamed)
   })
 
   it('opens the requested bundle after its inventory arrives and falls back when it is absent', () => {
