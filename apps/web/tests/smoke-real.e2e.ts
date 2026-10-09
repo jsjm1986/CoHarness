@@ -2,9 +2,9 @@
 // The explicit live entry loads credentials before this file and fails on missing build inputs.
 //
 // Selector convention: CSS Modules hash as [hash]_[local], so class-substring
-// selectors are unreliable — anchor on data-* attributes (data-variant /
-// data-sample) or visible text. The one [class*=] use below
-// (frame/handle) rides local names that survive hashing as suffixes; prefer
+// selectors are unreliable — anchor on data-* attributes (data-viewport /
+// data-variant / data-sample) or visible text. The one [class*=] use below
+// (handle) rides local names that survive hashing as suffixes; prefer
 // data-* for anything new.
 //
 // Flow order matters: chat rounds first (the bash round reuses the first
@@ -188,13 +188,13 @@ async function screen(page: Page, name: string): Promise<void> {
 
 /** First column track (px string) of the frame grid. */
 async function firstTrack(page: Page): Promise<string> {
-  return (await page.locator('[class*="frame"]').evaluate(
+  return (await page.locator('[data-viewport]').evaluate(
     el => getComputedStyle(el).gridTemplateColumns)).split(' ')[0]!
 }
 
 /** Last column track (details) as a number of pixels. */
 async function detailsTrack(page: Page): Promise<number> {
-  const cols = await page.locator('[class*="frame"]').evaluate(
+  const cols = await page.locator('[data-viewport]').evaluate(
     el => getComputedStyle(el).gridTemplateColumns)
   return Number(cols.split(' ').pop()!.replace('px', ''))
 }
@@ -557,9 +557,9 @@ describe.skipIf(!live)('web smoke (real host, real key)', () => {
 
   it('cold start: loading page settles into the three-column frame', async () => {
     onTestFailed(() => saveFailureShot(page, 'w5-cold-start'))
-    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await page.waitForSelector('[data-viewport]', { timeout: 30_000 })
     expect(await page.locator('text=Failed to load plugins').count()).toBe(0)
-    const template = await page.locator('[class*="frame"]').evaluate(el => getComputedStyle(el).gridTemplateColumns)
+    const template = await page.locator('[data-viewport]').evaluate(el => getComputedStyle(el).gridTemplateColumns)
     expect(template.split(' ').length).toBe(3)
     await screen(page, '01-cold-start')
   })
@@ -654,7 +654,7 @@ describe.skipIf(!live)('web smoke (real host, real key)', () => {
     expect(after).not.toBe(before)
     await screen(page, '10-sidebar-dragged')
     await page.reload({ waitUntil: 'load' })
-    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await page.waitForSelector('[data-viewport]', { timeout: 30_000 })
     expect(await firstTrack(page)).toBe(before)
   })
 
@@ -678,7 +678,7 @@ describe.skipIf(!live)('web smoke (real host, real key)', () => {
   it('reload recovery: history replays after a fresh boot', async () => {
     onTestFailed(() => saveFailureShot(page, 'w5-reload'))
     await page.reload({ waitUntil: 'load' })
-    await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
+    await page.waitForSelector('[data-viewport]', { timeout: 30_000 })
     await page.locator('p').filter({ hasText: ROUND_DONE_MARKER }).waitFor({ timeout: 30_000 })
     await screen(page, '12-reload-recovery')
   })
