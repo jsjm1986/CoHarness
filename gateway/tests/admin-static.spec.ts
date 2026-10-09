@@ -61,9 +61,13 @@ describe('admin static hosting', () => {
     const { base, cookie } = await setupWithAdminAssets()
     const page = await fetch(`${base}/admin`, { headers: { cookie, accept: 'text/html' } })
     expect(page.status).toBe(200)
+    // The shell references content-hashed entrypoints; pinning it would load a
+    // stale bundle after a release swap.
+    expect(page.headers.get('cache-control')).toBe('no-store')
     expect(await page.text()).toContain('data-testid="admin-app"')
     const nested = await fetch(`${base}/admin/projects/1`, { headers: { cookie, accept: 'text/html' } })
     expect(nested.status).toBe(200)
+    expect(nested.headers.get('cache-control')).toBe('no-store')
     expect(await nested.text()).toContain('data-testid="admin-app"')
   })
 
@@ -90,8 +94,11 @@ describe('admin static hosting', () => {
     const js = await fetch(`${base}/admin/assets/app.js`, { headers: { cookie } })
     expect(js.status).toBe(200)
     expect(js.headers.get('content-type')).toMatch(/javascript/)
+    // Content-hashed assets cache privately forever; they stay out of shared caches.
+    expect(js.headers.get('cache-control')).toBe('private, max-age=31536000, immutable')
     expect(await js.text()).toBe('window.__admin=1')
     const escape = await fetch(`${base}/admin/assets/leak.txt`, { headers: { cookie } })
     expect(escape.status).toBe(404)
+    expect(escape.headers.get('cache-control')).toBe('no-store')
   })
 })

@@ -71,7 +71,6 @@ export function TerminalsPage() {
     <PageHeader title={t('pageTitle')} description={t('pageDescription')} />
     <TerminalPermissions />
     <Section title={t('sectionProcesses')}>
-      <div className="sectionBody">
       <ErrorBanner message={error} />
       <div className="formGrid">
       <Field label={t('scopeLabel')}><select className="select" aria-label={t('scopeAria')} value={selected} disabled={acting} onChange={event => {
@@ -97,7 +96,6 @@ export function TerminalsPage() {
         </table></div>}
       </>}
       {notice === '' ? null : <p role="status">{notice}</p>}
-      </div>
     </Section>
     <ConfirmDialog open={confirm !== null} title={t('closeTerminal')} description={t('closeDescription', { id: confirm?.id ?? '' })}
       confirmLabel={t('confirmClose')} pending={acting} onConfirm={() => void close()} onClose={() => { if (!acting) setConfirm(null) }} />

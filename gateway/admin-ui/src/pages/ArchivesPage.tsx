@@ -275,7 +275,7 @@ export function ArchivesPage() {
         )}
       />
       <ErrorBanner message={error} />
-      <Section title={t('emptySectionTitle')} meta={emptyScanned ? t('emptyMetaScanned') : t('emptyMetaAdminOnly')}>
+      <Section flush title={t('emptySectionTitle')} meta={emptyScanned ? t('emptyMetaScanned') : t('emptyMetaAdminOnly')}>
         <div className="archiveBulkBar">
           <span>{t('emptyHint')}</span>
           <div className="pageActionGroup">
@@ -315,7 +315,7 @@ export function ArchivesPage() {
           </>
         )}
       </Section>
-      <Section title={t('filterTitle')}>
+      <Section flush title={t('filterTitle')}>
         <form className="filterPanel" onSubmit={onFilter}>
           <div className="filterGrid">
             <Field label={t('stateLabel')}>
@@ -342,7 +342,7 @@ export function ArchivesPage() {
           </div>
         </form>
       </Section>
-      <Section className="responsiveSection" title={t('recordsTitle')} meta={loading ? undefined : t('pageIndicator', { page: String(page) })}>
+      <Section flush className="responsiveSection" title={t('recordsTitle')} meta={loading ? undefined : t('pageIndicator', { page: String(page) })}>
         {loading ? <LoadingState label={t('loadingRecords')} /> : rows.length === 0 ? (
           <EmptyState icon={Archive} title={t('emptyTitle')} detail={hasFilters ? t('emptyDetailFiltered') : t('emptyDetailNone')} />
         ) : (

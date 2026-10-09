@@ -130,7 +130,7 @@ export function UsersPage() {
         actions={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>{t('createUser')}</Button>}
       />
       <ErrorBanner message={error} />
-      <Section className="responsiveSection" title={t('sectionTitle')} meta={loading ? undefined : t('recordCount', { count: String(users.length) })}>
+      <Section flush className="responsiveSection" title={t('sectionTitle')} meta={loading ? undefined : t('recordCount', { count: String(users.length) })}>
         {loading ? <LoadingState label={t('loadingUsers')} /> : users.length === 0 ? (
           <EmptyState
             icon={Users}

@@ -105,6 +105,7 @@ export function DesktopsPage() {
       <DesktopPermissions />
       <ErrorBanner message={error} />
       <Section
+        flush
         title={t('sectionResources')}
         meta={<IconButton label={t('refresh')} icon={RefreshCw} variant="secondary" onClick={() => void reload()} />}
       >
@@ -150,12 +151,12 @@ export function DesktopsPage() {
         )}
       </Section>
       {selected === null ? null : (
-        <Section title={t('detailSectionTitle', { key: selected.resourceKey })} meta={detailLoading ? t('loading') : t('grantsQueueMeta', { grants: String(activeGrants.length), queue: String(liveQueue.length) })}>
+        <Section flush title={t('detailSectionTitle', { key: selected.resourceKey })} meta={detailLoading ? t('loading') : t('grantsQueueMeta', { grants: String(activeGrants.length), queue: String(liveQueue.length) })}>
           {detailLoading ? <LoadingState label={t('loadingDetail')} /> : detail === null ? (
             <EmptyState icon={Monitor} title={t('detailErrorTitle')} detail={t('detailErrorDetail')} />
           ) : (
             <>
-              <div className="filterActions">
+              <div className="sectionBody filterActions">
                 <Button type="button" variant="danger" icon={ShieldOff} disabled={detail.resource?.state !== 'unavailable'} onClick={() => setConfirm({ kind: 'clear', resource: detail.resource! })}>{t('clearUnavailable')}</Button>
                 {detail.resource?.stateNote === null || detail.resource?.stateNote === undefined ? null : <span className="muted">{detail.resource.stateNote}</span>}
               </div>

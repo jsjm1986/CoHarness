@@ -169,18 +169,20 @@ export function PluginsPage() {
   }, [selected, targets, t])
   return <div className="page">
     <PageHeader title={t('title')} description={t('pageDescription')} />
-    <Section title={t('targetSection')}><div className="sectionBody">
+    <Section title={t('targetSection')}>
       <ErrorBanner message={error} />
-      <Field label={t('targetField')}><select className="select" aria-label={t('targetAria')} value={selected} onChange={event => {
-        generation.current++; setBinding(null); setSelected(event.target.value)
-      }}><option value="">{t('targetPlaceholder')}</option>{targets.map(target => <option key={target.key} value={target.key}>{target.label}</option>)}</select></Field>
-      <Button onClick={() => { setBinding(null); setReload(value => value + 1) }}>{t('pageReload')}</Button>
+      <div className="targetPicker">
+        <Field label={t('targetField')}><select className="select" aria-label={t('targetAria')} value={selected} onChange={event => {
+          generation.current++; setBinding(null); setSelected(event.target.value)
+        }}><option value="">{t('targetPlaceholder')}</option>{targets.map(target => <option key={target.key} value={target.key}>{target.label}</option>)}</select></Field>
+        <Button onClick={() => { setBinding(null); setReload(value => value + 1) }}>{t('pageReload')}</Button>
+      </div>
       {loading ? <LoadingState label={t('targetLoading')} /> : null}
       {binding === null ? null : <p className="muted">
         {binding.generation === null ? t('instanceStopped') : t('instanceRunning', { generation: `${binding.generation}` })}
       </p>}
       {binding === null ? null : <TargetPolicy kind={binding.target.kind} id={binding.target.id} t={t} />}
-    </div></Section>
+    </Section>
     {binding === null ? null : <BoundPlugins key={`${binding.target.kind}:${binding.target.id}:${binding.generation ?? 'stopped'}`} binding={binding} invalidate={invalidate} t={t} />}
     <PluginPermissions />
   </div>
@@ -191,7 +193,6 @@ function BoundPlugins({ binding, invalidate, t }: { readonly binding: PluginMana
   const composition = usePluginComposition(binding.target.kind, binding.target.id, binding, invalidate)
   const stopped = binding.generation === null
   return <Section title={t('title')}>
-    <div className="sectionBody">
       <LifecycleLine t={t} />
       <ErrorBanner message={composition.error} />
       {composition.notice === '' ? null : <p role="status" className="muted">{composition.notice}</p>}
@@ -200,6 +201,5 @@ function BoundPlugins({ binding, invalidate, t }: { readonly binding: PluginMana
         : <div className="adminPluginManager"><Manager target={binding} invalidate={invalidate} composition={composition} t={t} /></div>}
       <DraftBar composition={composition} t={t} />
       <CompositionView composition={composition} open={stopped} t={t} />
-    </div>
   </Section>
 }

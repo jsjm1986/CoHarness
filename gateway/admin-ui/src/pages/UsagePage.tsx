@@ -236,7 +236,7 @@ export function UsagePage() {
         <Metric label={t('metricPersonalCost')} value={formatMoney(totals.companyCost, 2)} />
         <Metric label={t('metricQuotaAlerts')} value={totals.alerts.toLocaleString()} tone={totals.alerts > 0 ? 'warning' : undefined} />
       </div>
-      <Section className="responsiveSection" title={t('usersTitle')} meta={loading ? undefined : t('usersMeta', { count: String(rows.length), timeZone: overview?.timeZone ?? '' })}>
+      <Section flush className="responsiveSection" title={t('usersTitle')} meta={loading ? undefined : t('usersMeta', { count: String(rows.length), timeZone: overview?.timeZone ?? '' })}>
         {loading ? <LoadingState label={t('loadingUsage')} /> : rows.length === 0 ? (
           <EmptyState icon={Gauge} title={t('emptyTitle')} detail={t('emptyDetail')} />
         ) : (
@@ -281,7 +281,7 @@ export function UsagePage() {
           </>
         )}
       </Section>
-      <Section className="responsiveSection" title={t('healthTitle')} meta={health?.timeZone}>
+      <Section flush className="responsiveSection" title={t('healthTitle')} meta={health?.timeZone}>
         {health === null ? <LoadingState label={t('loadingHealth')} /> : (
           <div className="usageHealthMetrics" aria-label={t('healthAria')}>
             <Metric

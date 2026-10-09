@@ -45,12 +45,15 @@ export function Section({
   title,
   meta,
   actions,
+  flush = false,
   children,
   className = '',
 }: {
   title?: string
   meta?: ReactNode
   actions?: ReactNode
+  /** Content that intentionally spans the card edge to edge (tables, filter strips, metric grids) instead of the padded body. */
+  flush?: boolean
   children: ReactNode
   className?: string
 }) {
@@ -65,7 +68,7 @@ export function Section({
           {actions === undefined ? null : <div className="sectionActions">{actions}</div>}
         </div>
       )}
-      {children}
+      {flush ? children : <div className="sectionBody">{children}</div>}
     </section>
   )
 }

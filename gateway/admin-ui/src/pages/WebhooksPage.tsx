@@ -263,6 +263,7 @@ export function WebhooksPage() {
       {error === '' ? null : <ErrorBanner message={error} />}
       {notice === '' ? null : <p role="status">{notice}</p>}
       <Section
+        flush
         title={t('sectionEndpoints')}
         actions={<>
           <IconButton label={t('refresh')} icon={RefreshCw} onClick={refresh} />

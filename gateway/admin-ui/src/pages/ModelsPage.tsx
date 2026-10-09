@@ -358,6 +358,7 @@ function PersonalRegistrationAudit({
   const summary = report?.summary
   return (
     <Section
+      flush
       className="responsiveSection"
       title={t('personalTitle')}
       meta={summary === undefined ? undefined : t('personalMeta', { providerCount: String(summary.providerCount), modelCount: String(summary.modelCount) })}
@@ -484,6 +485,7 @@ function ModelDirectory({
   const t = useMemo(() => modelsPageT(), [])
   return (
     <Section
+      flush
       className="responsiveSection"
       title={t('directoryTitle')}
       meta={loading ? undefined : t('directoryMeta', { count: String(models.length) })}
