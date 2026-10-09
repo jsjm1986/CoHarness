@@ -98,6 +98,8 @@ interface InstanceOwner {
   username: string
   homePath: string
   name?: string
+  /** Reserved project category for project owners. */
+  projectKind?: 'standard' | 'steward'
 }
 
 /** Re-check a persisted project path immediately before it becomes a runtime cwd. */
@@ -137,6 +139,12 @@ export interface ProjectRuntime {
   id: number
   name: string
   path: string
+  /**
+   * True for the reserved steward space: the runtime is resident (idle-reaper
+   * exempt, supervisor restart policy), privileged-confined, and mounts the
+   * steward tools package.
+   */
+  steward?: boolean
 }
 
 /** Fully resolved launch facts passed to policy projection and launch drivers. */
@@ -536,16 +544,25 @@ export class InstanceManager {
       || resolve(owner.homePath) !== resolve(subject.path)) {
       throw new Error(`project runtime ${String(subject.id)} ownership changed before launch`)
     }
+    // Steward privileges only apply while the space is enabled; a disabled
+    // steward row launches as an ordinary confined project runtime. The
+    // database kind, not the caller's flag, authorizes the privileged unit so
+    // a forged subject cannot elevate a standard project.
+    const steward = subject.steward === true && owner.projectKind === 'steward' && this.cfg.steward.enabled
     const projectPath = validateProjectRuntimePath(this.cfg, subject.path)
     return {
       kind: 'project',
       ownerId: subject.id,
       target,
-      project: { ...subject, path: projectPath },
+      project: { ...subject, path: projectPath, steward },
       username: `project-${String(subject.id)}`,
       runtimeKey: `project-${String(subject.id)}`,
-      systemUser: this.cfg.projectRuntimeUser,
-      privileged: false,
+      systemUser: steward ? this.cfg.steward.runtimeUser : this.cfg.projectRuntimeUser,
+      // The steward unit runs privileged so its agent can reach the release
+      // tree and deployment tooling it maintains; ordinary project runtimes
+      // stay masked to their project path.
+      privileged: steward,
+      resident: steward,
       port: await this.portOf(target),
       homePath: projectPath,
       dshHome: join(this.cfg.projectRuntimesRoot, String(subject.id), 'dsh'),
@@ -669,6 +686,7 @@ export class InstanceManager {
     for (const name of [
       'dsh-model-governance',
       'dsh-directory-guard',
+      'dsh-steward-tools',
       'dsh-experimental-computer-use-cua-driver-mcp',
     ]) {
       this.removeInstalledPolicyPackage(join(legacyParent, name))
@@ -707,6 +725,22 @@ export class InstanceManager {
         }
       }
       if (runtime.kind === 'project') patchText += PROJECT_RUNTIME_PATCH
+      if (runtime.project?.steward === true) {
+        // The resident steward mounts its operator tools from a deployment
+        // package, exactly like the model-governance mount: the patch file
+        // declares the plugin entries and permission presets the package owns.
+        const stewardPackage = this.cfg.steward.toolsPackage
+        const stewardPatch = join(stewardPackage, 'cordis.patch.yml')
+        if (!existsSync(join(stewardPackage, 'package.json')) || !existsSync(stewardPatch)) {
+          throw new Error(`steward tools package is incomplete: ${stewardPackage}`)
+        }
+        this.materializePolicyPackage(
+          stewardPackage,
+          join(packageParent, 'dsh-steward-tools'),
+          [stewardPatch],
+        )
+        patchText += readFileSync(stewardPatch, 'utf8').trimEnd() + '\n'
+      }
       patchText += '- id: plugin-manager\n  inject: [pluginManagementAuthorization]\n  config:\n    authorization: required\n'
       patchText += '- id: api-gateway\n  inject: [executionAuthority]\n'
       if (this.cfg.desktopId !== undefined) {
@@ -913,12 +947,16 @@ export class InstanceManager {
     const row = await this.repository.owner(target)
     if (row === null) return undefined
     const runtimeKey = row.kind === 'user' ? row.username : `project-${String(row.id)}`
+    const steward = row.projectKind === 'steward' && this.cfg.steward.enabled
     return this.launcher.attach!({
       kind: row.kind,
       ownerId: row.id,
       username: row.username,
       runtimeKey,
-      systemUser: row.kind === 'user' ? `harness-${row.username}` : this.cfg.projectRuntimeUser,
+      systemUser: row.kind === 'user' ? `harness-${row.username}`
+        : steward ? this.cfg.steward.runtimeUser : this.cfg.projectRuntimeUser,
+      privileged: steward,
+      resident: steward,
       port: await this.portOf(target),
       homePath: row.homePath,
       dshHome: row.kind === 'user'

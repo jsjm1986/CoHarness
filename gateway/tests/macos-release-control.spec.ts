@@ -45,6 +45,8 @@ function release(root: string, name: string): string {
     'plugins/dsh-directory-guard/cordis.patch.yml',
     'plugins/dsh-model-governance/lib/index.js',
     'plugins/dsh-model-governance/cordis.patch.yml',
+    'plugins/dsh-steward-tools/lib/index.js',
+    'plugins/dsh-steward-tools/cordis.patch.yml',
   ]) {
     const file = join(directory, path)
     mkdirSync(resolve(file, '..'), { recursive: true })

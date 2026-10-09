@@ -15,6 +15,7 @@ import {
   type ProjectDetail,
   type ProjectInvitation,
   type ProjectInvitationStatus,
+  type ProjectKind,
   type ProjectOrigin,
   type ProjectThemePolicy,
   type ProjectRow,
@@ -125,32 +126,38 @@ export class PostgresProjectService {
   private async insert(input: {
     name: string
     canonical: string
-    createdBy: number
+    createdBy: number | null
     origin: ProjectOrigin
     ownerUserId: number | null
+    kind?: ProjectKind
   }): Promise<ProjectRow> {
     try {
       const publicId = await transaction(this.context.pool, async (client) => {
-        const createdBy = await internalUserId(client, this.context.organizationId, input.createdBy)
-        if (createdBy === null) throw new Error(`unknown user ${String(input.createdBy)}`)
+        const createdBy = input.createdBy === null
+          ? null
+          : await internalUserId(client, this.context.organizationId, input.createdBy)
+        if (createdBy === null && input.createdBy !== null) throw new Error(`unknown user ${String(input.createdBy)}`)
         const owner = input.ownerUserId === null
           ? null
           : await internalUserId(client, this.context.organizationId, input.ownerUserId)
         if (input.ownerUserId !== null && owner === null) throw new Error(`unknown user ${String(input.ownerUserId)}`)
         await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`gateway-port:${this.context.nodeId}`])
         const project = await client.query<{ id: string; public_id: string }>(`INSERT INTO harness.projects(
-          organization_id,name,created_by,origin,owner_user_id,model_access_default_allowed
-        ) VALUES($1,$2,$3,$4,$5,true) RETURNING id,public_id::text`, [
-          this.context.organizationId, input.name, createdBy, input.origin, owner,
+          organization_id,name,created_by,origin,owner_user_id,model_access_default_allowed,kind
+        ) VALUES($1,$2,$3,$4,$5,true,$6) RETURNING id,public_id::text`, [
+          this.context.organizationId, input.name, createdBy, input.origin, owner, input.kind ?? 'standard',
         ])
         const row = project.rows[0]
         if (row === undefined) throw new Error('project insert returned no row')
         await client.query(`INSERT INTO harness.project_mounts(
           organization_id,project_id,node_id,local_path,canonical_path
         ) VALUES($1,$2,$3,$4,$4)`, [this.context.organizationId, row.id, this.context.nodeId, input.canonical])
-        await client.query(`INSERT INTO harness.project_members(
+        // The steward space keeps an empty member list: admission comes from
+        // the steward qualification lane, so no creator row is written.
+        const member = input.kind === 'steward' ? null : owner ?? createdBy
+        if (member !== null) await client.query(`INSERT INTO harness.project_members(
           organization_id,project_id,user_id,access_mode
-        ) VALUES($1,$2,$3,'rw')`, [this.context.organizationId, row.id, owner ?? createdBy])
+        ) VALUES($1,$2,$3,'rw')`, [this.context.organizationId, row.id, member])
         const [port] = await allocateInstancePorts(
           client,
           this.context.nodeId,
@@ -176,6 +183,80 @@ export class PostgresProjectService {
     }
   }
 
+  /**
+   * Seed the reserved steward space, or return the existing row. The caller
+   * provisions the workspace directory first so the mount records a canonical
+   * path that already exists on this node.
+   */
+  async ensureSteward(input: { name: string; path: string; createdBy?: number }): Promise<ProjectRow> {
+    const existing = await this.stewardProject()
+    if (existing !== null) {
+      const detail = await this.getById(existing.id)
+      if (detail !== null) return detail
+    }
+    const name = normalizeProjectName(input.name)
+    const canonical = resolveProjectDirectory(input.path)
+    await this.assertNotReserved(canonical)
+    try {
+      return await this.insert({
+        name,
+        canonical,
+        createdBy: input.createdBy ?? null,
+        origin: 'admin',
+        ownerUserId: null,
+        kind: 'steward',
+      })
+    } catch (error) {
+      // A name collision with an administrator-created project must not block
+      // seeding; fall back to a suffixed reserved name once.
+      if (error instanceof Error && error.message.startsWith('duplicate project name')) {
+        return this.insert({
+          name: normalizeProjectName(`${name}-steward`),
+          canonical,
+          createdBy: input.createdBy ?? null,
+          origin: 'admin',
+          ownerUserId: null,
+          kind: 'steward',
+        })
+      }
+      throw error
+    }
+  }
+
+  /** Current steward project target visible on this node, when seeded. */
+  async stewardProject(): Promise<{ id: number; name: string; path: string } | null> {
+    const result = await this.context.pool.query<{ public_id: string; name: string; path: string }>(
+      `SELECT p.public_id::text,p.name::text,pm.local_path path
+      FROM harness.projects p
+      JOIN harness.project_mounts pm ON pm.project_id=p.id AND pm.organization_id=p.organization_id
+        AND pm.node_id=$2 AND pm.status='active'
+      WHERE p.organization_id=$1 AND p.kind='steward' AND p.status='active'
+      ORDER BY p.public_id LIMIT 1`,
+      [this.context.organizationId, this.context.nodeId],
+    )
+    const row = result.rows[0]
+    return row === undefined ? null : { id: publicNumber(row.public_id, 'project'), name: row.name, path: row.path }
+  }
+
+  /** Reserved kind of a project by internal row id, or null when unknown. */
+  async kindOfInternal(internalId: string): Promise<ProjectKind | null> {
+    const result = await this.context.pool.query<{ kind: ProjectKind }>(
+      'SELECT kind FROM harness.projects WHERE organization_id=$1 AND id=$2',
+      [this.context.organizationId, internalId],
+    )
+    return result.rows[0]?.kind ?? null
+  }
+
+  /** Refuse mutations that would break the reserved steward space. */
+  private async assertNotSteward(projectInternalId: string | null): Promise<void> {
+    if (projectInternalId === null) return
+    const result = await this.context.pool.query<{ kind: ProjectKind }>(
+      'SELECT kind FROM harness.projects WHERE organization_id=$1 AND id=$2',
+      [this.context.organizationId, projectInternalId],
+    )
+    if (result.rows[0]?.kind === 'steward') throw new CollaborationDeniedError('steward-reserved')
+  }
+
   async list(): Promise<ProjectRow[]> {
     const result = await this.context.pool.query<{
       public_id: string
@@ -183,6 +264,7 @@ export class PostgresProjectService {
       path: string
       member_count: string
       origin: ProjectOrigin
+      kind: ProjectKind
       model_access_default_allowed: boolean
       ui_theme_policy: ProjectThemePolicy
       owner_id: string | null
@@ -193,7 +275,7 @@ export class PostgresProjectService {
       creator_username: string | null
       creator_display_name: string | null
     }>(`SELECT p.public_id::text,p.name::text,pm.local_path path,COUNT(m.user_id)::text member_count,
-      p.origin,p.model_access_default_allowed,p.ui_theme_policy,
+      p.origin,p.kind,p.model_access_default_allowed,p.ui_theme_policy,
       owner.id owner_id,owner.public_id::text owner_public_id,owner.username::text owner_username,owner.display_name owner_display_name,
       creator.public_id::text creator_public_id,creator.username::text creator_username,creator.display_name creator_display_name
       FROM harness.projects p
@@ -210,6 +292,7 @@ export class PostgresProjectService {
       path: row.path,
       memberCount: Number(row.member_count),
       origin: row.origin,
+      kind: row.kind,
       modelAccessDefaultAllowed: row.model_access_default_allowed,
       uiThemePolicy: row.ui_theme_policy,
       owner: row.owner_id === null ? null : {
@@ -231,6 +314,7 @@ export class PostgresProjectService {
       path: string
       member_count: string
       origin: ProjectOrigin
+      kind: ProjectKind
       model_access_default_allowed: boolean
       ui_theme_policy: ProjectThemePolicy
       owner_id: string | null
@@ -241,7 +325,7 @@ export class PostgresProjectService {
       creator_username: string | null
       creator_display_name: string | null
     }>(`SELECT p.id internal_id,p.public_id::text,p.name::text,pm.local_path path,
-      COUNT(m.user_id)::text member_count,p.origin,p.model_access_default_allowed,p.ui_theme_policy,
+      COUNT(m.user_id)::text member_count,p.origin,p.kind,p.model_access_default_allowed,p.ui_theme_policy,
       owner.id owner_id,owner.public_id::text owner_public_id,owner.username::text owner_username,owner.display_name owner_display_name,
       creator.public_id::text creator_public_id,creator.username::text creator_username,creator.display_name creator_display_name
       FROM harness.projects p
@@ -275,6 +359,7 @@ export class PostgresProjectService {
       path: row.path,
       memberCount: Number(row.member_count),
       origin: row.origin,
+      kind: row.kind,
       modelAccessDefaultAllowed: row.model_access_default_allowed,
       uiThemePolicy: row.ui_theme_policy,
       owner: row.owner_id === null ? null : {
@@ -293,6 +378,7 @@ export class PostgresProjectService {
 
   async rename(id: number, name: string): Promise<void> {
     const normalized = normalizeProjectName(name)
+    await this.assertNotSteward(await internalProjectId(this.context.pool, this.context.organizationId, id))
     try {
       await this.context.pool.query(`UPDATE harness.projects SET name=$3,updated_at=now(),version=version+1
         WHERE organization_id=$1 AND public_id=$2`, [this.context.organizationId, id, normalized])
@@ -319,6 +405,7 @@ export class PostgresProjectService {
     return transaction(this.context.pool, async (client) => {
       const projectId = await internalProjectId(client, this.context.organizationId, id)
       if (projectId === null) return []
+      await this.assertNotSteward(projectId)
       const members = await client.query<{ public_id: string }>(`SELECT u.public_id::text
         FROM harness.project_members m
         JOIN harness.users u ON u.id=m.user_id AND u.organization_id=m.organization_id
@@ -335,6 +422,7 @@ export class PostgresProjectService {
       const project = await internalProjectId(client, this.context.organizationId, projectId)
       const user = await internalUserId(client, this.context.organizationId, userId)
       if (project === null) throw new Error(`unknown project ${String(projectId)}`)
+      await this.assertNotSteward(project)
       if (user === null) throw new Error(`unknown user ${String(userId)}`)
       const owner = await client.query<{ owner_user_id: string | null }>(
         'SELECT owner_user_id FROM harness.projects WHERE organization_id=$1 AND id=$2 FOR UPDATE',
@@ -350,6 +438,11 @@ export class PostgresProjectService {
 
   async removeMember(projectId: number, userId: number): Promise<void> {
     await transaction(this.context.pool, async (client) => {
+      const project = await internalProjectId(client, this.context.organizationId, projectId)
+      // A memberless steward row must still refuse the mutation rather than
+      // reporting success for a membership that can never exist.
+      await this.assertNotSteward(project)
+      if (project === null) return
       const membership = await client.query<{ project_id: string; user_id: string }>(`SELECT
         m.project_id,m.user_id
         FROM harness.project_members m
@@ -410,6 +503,7 @@ export class PostgresProjectService {
     try {
       const projectId = await internalProjectId(this.context.pool, this.context.organizationId, input.projectId)
       if (projectId === null) throw new Error(`unknown project ${String(input.projectId)}`)
+      await this.assertNotSteward(projectId)
       const inviteeId = await internalUserId(this.context.pool, this.context.organizationId, input.inviteeUserId)
       if (inviteeId === null) throw new Error(`unknown user ${String(input.inviteeUserId)}`)
       const inviterId = await internalUserId(this.context.pool, this.context.organizationId, input.inviterUserId)

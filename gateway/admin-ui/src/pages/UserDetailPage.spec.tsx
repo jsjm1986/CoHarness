@@ -23,6 +23,8 @@ vi.mock('../api.ts', () => ({
   setDesktopPolicy: vi.fn(),
   getPluginPolicy: vi.fn(),
   setPluginPolicy: vi.fn(),
+  getStewardPolicy: vi.fn(),
+  setStewardPolicy: vi.fn(),
   listModels: vi.fn(),
   getModelAccess: vi.fn(),
   setModelAccess: vi.fn(),
@@ -124,6 +126,7 @@ describe('UserDetailPage', () => {
     vi.mocked(api.getTerminalPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: false, revision: '0' })
     vi.mocked(api.getDesktopPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: false, revision: '0' })
     vi.mocked(api.getPluginPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: false, revision: '0' })
+    vi.mocked(api.getStewardPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: false, revision: '0' })
     vi.mocked(api.listModels).mockResolvedValue([model])
     vi.mocked(api.getModelAccess).mockResolvedValue({ effective: { version: 1, defaultAllowed: false, models: [{ provider: model.provider, model: model.model, allowed: false }] }, overrides: [] })
     vi.mocked(api.listUserMemberships).mockResolvedValue({ memberships: [{ projectId: 7, name: 'Shared', path: '/srv/shared', mode: 'ro' }] })

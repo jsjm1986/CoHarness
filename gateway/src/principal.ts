@@ -26,7 +26,15 @@ export type GatewayPrincipalPurpose = 'archive-read' | 'document-admin' | 'termi
 
 export type PrincipalScope =
   | { kind: 'personal' }
-  | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw'; canManage?: boolean }
+  | {
+      kind: 'project'
+      projectId: number
+      projectName: string
+      mode: 'ro' | 'rw'
+      canManage?: boolean
+      /** True when the scope is the reserved steward maintenance space. */
+      steward?: boolean
+    }
 
 export interface GatewayPrincipalClaims {
   version: 1

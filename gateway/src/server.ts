@@ -72,6 +72,8 @@ export interface GatewayDeps {
   desktopAccess?: Pick<import('./desktop-access.ts').DesktopAccess, 'get' | 'set'>
   /** Optional administrator-owned plugin-management qualification store. */
   pluginAccess?: Pick<import('./plugin-access.ts').PluginAccess, 'get' | 'set'>
+  /** Optional administrator-owned steward-space qualification store. */
+  stewardAccess?: Pick<import('./steward-access.ts').StewardAccess, 'get' | 'set'>
   pluginManagement?: Pick<import('./plugin-management.ts').GatewayPluginManagement, 'target' | 'invoke' | 'state' | 'saveState'>
   /** Optional durable plugin desired-state store backing spawn projection and runtime write-back. */
   pluginState?: Pick<import('./plugin-state.ts').PostgresPluginState, 'get' | 'set' | 'readForSubject' | 'publishForSubject' | 'projection' | 'markApplied' | 'applied' | 'observed' | 'project'>
@@ -532,14 +534,16 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       if (project === undefined || project === null) throw new CollaborationDeniedError('not-member')
       const detail = await deps.projects.getById(projectId)
       const canManage = user.role === 'admin' || project.administrator || detail?.owner?.id === user.id
+      const steward = project.kind === 'steward'
       return {
         context: {
           user,
           scope: {
             kind: 'project', projectId, projectName: project.name, mode: project.mode, canManage,
+            ...(steward ? { steward: true } : {}),
             ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
           },
-          runtime: { kind: 'project', id: projectId, name: project.name, path: project.path },
+          runtime: { kind: 'project', id: projectId, name: project.name, path: project.path, steward },
         },
         resetScope: false,
       }
@@ -559,14 +563,16 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
     }
     const detail = await deps.projects.getById(projectId)
     const canManage = user.role === 'admin' || project.administrator || detail?.owner?.id === user.id
+    const steward = project.kind === 'steward'
     return {
       context: {
         user,
         scope: {
           kind: 'project', projectId, projectName: project.name, mode: project.mode, canManage,
+          ...(steward ? { steward: true } : {}),
           ...(detail?.uiThemePolicy === undefined ? {} : { uiThemePolicy: detail.uiThemePolicy }),
         },
-        runtime: { kind: 'project', id: projectId, name: project.name, path: project.path },
+        runtime: { kind: 'project', id: projectId, name: project.name, path: project.path, steward },
       },
       resetScope: false,
     }
@@ -870,6 +876,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         id: value.projectId,
         name: project.name,
         path: project.path,
+        steward: project.kind === 'steward',
       }, 'explicit')
       finish(`project:${value.projectId}`)
       return
@@ -1117,6 +1124,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         : {
           ...resolved.context.scope,
           canManage: activeProject.canManage === true,
+          ...(activeProject.kind === 'steward' ? { steward: true } : {}),
           ...(activeProject.uiThemePolicy === undefined ? {} : { uiThemePolicy: activeProject.uiThemePolicy }),
         }
       send(res, 200, JSON.stringify({
@@ -1744,7 +1752,7 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
           send(res, 404, 'not found', 'text/plain')
           return
         }
-        await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path })
+        await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path, steward: project.kind === 'steward' })
         redirect(res, '/', [scopeCookie(`project:${project.id}`, cfg)])
         return
       }

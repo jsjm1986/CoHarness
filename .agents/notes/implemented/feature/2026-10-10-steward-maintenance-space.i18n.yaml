@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-10-steward-maintenance-space.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-10-steward-maintenance-space.md
+/agent-note-steward-maintenance-space-is-a-reserved-project-with-a-resident-runtime:
+  en: c51822f8d73cf0a9
+  zh: bf8ac150f127bb79
+/agent-note-steward-maintenance-space-is-a-reserved-project-with-a-resident-runtime/problem:
+  en: fc1f7c0d4487df2f
+  zh: 5726a7517627791b
+/agent-note-steward-maintenance-space-is-a-reserved-project-with-a-resident-runtime/decision:
+  en: 8e3d527a23db331b
+  zh: 1497e69e364cc9d3
+/agent-note-steward-maintenance-space-is-a-reserved-project-with-a-resident-runtime/alternatives-considered:
+  en: 2aaf6b70034e770e
+  zh: 30222e191abf28f2
+/agent-note-steward-maintenance-space-is-a-reserved-project-with-a-resident-runtime/consequences:
+  en: a9b1f98c9f802a0d
+  zh: acae48359be13426

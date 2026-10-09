@@ -601,7 +601,7 @@ describe('gateway server', () => {
     expect(project.status).toBe(204)
     expect(project.headers.get('set-cookie')).toContain('hgw_scope=project:42')
     expect(ensureRunning).toHaveBeenNthCalledWith(1, {
-      kind: 'project', id: 42, name: 'Shared project', path: '/shared',
+      kind: 'project', id: 42, name: 'Shared project', path: '/shared', steward: false,
     }, 'explicit')
 
     const personal = await fetch(`${base}/account/api/scope`, {

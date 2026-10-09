@@ -208,6 +208,28 @@ describe('ScopeControl', () => {
     view.unmount()
   })
 
+  it('labels the steward space instead of the read-write badge', () => {
+    const stewardContext: CollaborationContext = {
+      ...projectContext,
+      scope: { kind: 'project', projectId: 11, projectName: '维护中枢', mode: 'rw', steward: true },
+      projects: [
+        ...projectContext.projects,
+        { projectId: 11, name: '维护中枢', path: '/srv/steward', mode: 'rw', kind: 'steward' },
+      ],
+    }
+    render(<ScopeControl {...scopeProps(snapshot({ context: stewardContext }))} />)
+    const trigger = screen.getByRole('button', { name: '切换个人或项目空间' })
+    expect(trigger.textContent).toContain('维护中枢')
+    expect(trigger.textContent).toContain('维护')
+    expect(trigger.textContent).not.toContain('可编辑')
+
+    fireEvent.click(trigger)
+    const stewardItem = screen.getByRole('menuitem', { name: /维护中枢/ })
+    expect(stewardItem.textContent).toContain('维护')
+    expect(stewardItem.textContent).not.toContain('可编辑')
+    expect(screen.getByRole('menuitem', { name: /支付重构/ }).textContent).toContain('可编辑')
+  })
+
   it('renders a compact rail trigger and omits create visibility for read-only projects', () => {
     const context: CollaborationContext = {
       ...projectContext,

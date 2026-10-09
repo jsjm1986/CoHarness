@@ -12,6 +12,8 @@ export interface ProjectScopeView {
   /** Whether this account may manage the project's shared configuration. */
   canManage?: boolean
   origin?: 'admin' | 'user'
+  /** Reserved space category; `steward` marks the resident maintenance space. */
+  kind?: 'standard' | 'steward'
   owner?: { id: number; username: string; displayName: string } | null
   uiThemePolicy?: ProjectThemePolicy
 }
@@ -68,7 +70,7 @@ export interface AccountConversationView {
 
 /** Stable collaboration denial used by HTTP and runtime transports. */
 export class CollaborationDeniedError extends Error {
-  constructor(readonly code: 'not-member' | 'conversation-not-found' | 'forbidden' | 'visibility-locked') {
+  constructor(readonly code: 'not-member' | 'conversation-not-found' | 'forbidden' | 'visibility-locked' | 'steward-reserved') {
     super(code)
     this.name = 'CollaborationDeniedError'
   }

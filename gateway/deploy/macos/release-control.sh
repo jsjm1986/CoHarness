@@ -64,7 +64,9 @@ validate_release() {
     plugins/dsh-directory-guard/lib/index.js \
     plugins/dsh-directory-guard/cordis.patch.yml \
     plugins/dsh-model-governance/lib/index.js \
-    plugins/dsh-model-governance/cordis.patch.yml
+    plugins/dsh-model-governance/cordis.patch.yml \
+    plugins/dsh-steward-tools/lib/index.js \
+    plugins/dsh-steward-tools/cordis.patch.yml
   do
     [[ -s "$release/$required" ]] || fail "release payload is missing or empty: $release/$required"
   done

@@ -63,6 +63,13 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_JPUSH_MASTER_SECRET` | （未设置） | 仅所有者可读的 JPush Master Secret；两项同时设置后才启用 JPush |
 | `HGW_MEMORY_MAX` / `HGW_CPU_QUOTA` | `1G` / `100%` | 每实例 systemd 资源限额 |
 | `HGW_GATEWAY_DIR` | 网关根目录 | 对实例遮蔽的目录（`InaccessiblePaths`）；release 模式固定为 `<HGW_RELEASE_ROOT>/gateway` |
+| `HGW_STEWARD` | `off` | `on` 时为每个组织保留一个维护中枢空间（仅 PostgreSQL 部署） |
+| `HGW_STEWARD_ROOT` | `~/harness-steward` | 拥有维护工作区的绝对非根目录；启用时并入 systemd 项目路径根，且不得与 Gateway 保留目录重叠 |
+| `HGW_STEWARD_WORKSPACE` | `<HGW_STEWARD_ROOT>/workspace` | 常驻维护运行时的工作目录；必须是 steward 根的严格子目录 |
+| `HGW_STEWARD_SOURCE` | （空） | 以其 `HEAD` 在维护工作区供给 `git worktree` 的仓库检出；为空时保留普通目录 |
+| `HGW_STEWARD_TOOLS_PACKAGE` | `<仓库>/plugins/dsh-steward-tools` | 物化进维护运行时 profile 的 steward 查询工具包；release 模式固定在 `HGW_RELEASE_ROOT` 内 |
+| `HGW_STEWARD_RUNTIME_USER` | `HGW_PROJECT_RUNTIME_USER` | 维护 systemd 单元使用的专用 Linux 账户；不得为 `root` |
+| `HGW_STEWARD_PROJECT_NAME` | `维护中枢` | 保留维护项目的显示名称 |
 
 生产安装、切流与验收见 [deploy/README.md](deploy/README.zh.md)。
 
@@ -91,6 +98,14 @@ SSH 目标元数据在 `/admin/ssh` 管理。可选的 `passwordRef` 是连接�
 `/admin/plugins` 选择用户或项目管理对象，绑定其在当前节点上的运行实例，适配上游管理流程，支持包检查、安装、脚本批准、取消、启停和移除。节点或代次不匹配时必须重新读取选择。页面不会启动已停止的实例。一个融合矩阵直接读写 PostgreSQL 中保存的运行时插件组合：「当前」列展示运行实例的插件清单，实例停止时展示 profile 文件最近观测到的状态，其中开关通过运行实例立即生效；「启动时」列以乐观 `revision` 起草受管理的 patch 行和组合包选择，冲突时重新读取最新已保存状态而不是覆盖，下一次启动把已保存的组合投影进 profile 文件，而正在运行的实例会在下一次发布时收敛到该状态。所选对象的插件管理资格可在页面内就地编辑；项目授权保留在独立区块。安装输出仅留在管理员请求中；传输丢失意味着结果未确认，不会自动重试。已注册的非账户设置以配置卡片呈现，继续使用现有设置所有者。表单显示解析值、继承值、归属和重启要求，只携带当前版本提交已编辑路径。秘密需明确选择保留、替换或移除本层值，绝不读回原值。发生冲突时保留草稿，管理员放弃后才能采用当前值。账户偏好仍在账户设置中管理。明确失去权限会清除私有操作流程及日志；旧目标迟到的响应不能使新目标失效。
 
 干净的 Admin 检出需要根目录和 Admin 的锁定依赖。独立测试或构建前执行 `npm run prepare:remotes --prefix gateway/admin-ui`；完整根构建已经生成这两个 codec。浏览器门禁在共享运行时构建后构建 Admin 产物，并通过真实 Gateway 路由比较[安装区域快照](../apps/web/tests/plugin-administration.e2e.ts)。
+
+## 维护中枢空间
+
+`HGW_STEWARD=on` 为每个组织保留一个项目空间（`kind='steward'`，默认名称 `维护中枢`），作为维护部署本身的常驻运行时。迁移 051 增加项目类别、按用户授权的 `steward_access_policies` 资格通道和 `steward_query_log` 审计表；启动时播种项目行、供给 `HGW_STEWARD_WORKSPACE`（配置了 `HGW_STEWARD_SOURCE` 时为其 `git worktree`），并调用一次 `ensureRunning`——崩溃由 supervisor 的 `Restart=always` 恢复，管理员显式停止则保持停止，直到下一次 Gateway 启动或显式拉起。本地 launcher 没有 supervisor，常驻语义只覆盖 Gateway 进程存活期。
+
+维护空间的准入由资格通道单独决定：启用的 `steward_access_policies` 行让任何活跃用户以 `rw` 进入，无资格的组织管理员同样被拒绝——成员表保持为空，成员与邀请变更一律拒绝。管理员在用户详情页以版本栅栏编辑按用户资格。维护运行时运行固定组装（`dsh-steward-tools` 经 profile 补丁挂载）；插件状态与插件管理写入拒绝 steward owner，因此常驻运行时永远不会因组装变更重启自己。
+
+Agent 的 `steward_query` 工具到达 `POST /internal/runtime/steward/query`：校验运行时令牌、确认目标项目是活跃的 steward 行、在服务端重新分类 SQL，并把每次尝试连同运行时 generation 写入 `steward_query_log`。判为只读的语句在 `READ ONLY` 事务内执行——关键字测试只选择通道，由 PostgreSQL 强制只读，因此 `EXPLAIN ANALYZE` 和可写 CTE 会失败并被审计，而不是被夹带放行——外加语句（64 KiB）、行数（至多 5000）、结果（256 KiB）与超时（15 秒）限额；`dry_run` 改为返回 `EXPLAIN` 计划。写语句需要同一 steward 项目会话内、仍具资格的应答者在 15 分钟内授予的 `allowed-once` 交互批准；审批上的 advisory 锁把并发写串行化，使一次批准恰好只能放行一次写入，写入随后在同时写入审计行的事务内执行。v1 刻意不提供通用运行时调用代理和发版激活自动化：代码改动仍走 worktree → PR → 发版流水线，审计 SQL 之外的管理操作仍在 `/admin` 完成。
 
 ## 用户终端
 

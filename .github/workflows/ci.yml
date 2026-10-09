@@ -825,6 +825,8 @@ jobs:
       # ci face emits transpile-only because this lane has no workspace lib/types.
       - name: Build the directory guard bundle used by Gateway tests
         run: gateway/node_modules/.bin/tsc -p plugins/dsh-directory-guard/tsconfig.ci.json
+      - name: Build the steward tools bundle used by Gateway tests
+        run: gateway/node_modules/.bin/tsc -p plugins/dsh-steward-tools/tsconfig.ci.json
       # loadConfig's source-run default resolves tsx/esm to an absolute path
       # under the repo root (instances spawn outside it); this lane has no root
       # install, so provide the root devDependency for the resolution test.

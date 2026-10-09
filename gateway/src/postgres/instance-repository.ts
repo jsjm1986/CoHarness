@@ -207,6 +207,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
       LEFT JOIN harness.projects p ON p.id=i.project_id AND p.organization_id=i.organization_id
       WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND i.observed_state='ready'
         AND i.last_activity_at < to_timestamp($3/1000.0)
+        AND (p.kind IS NULL OR p.kind<>'steward')
       ORDER BY kind,public_id`, [this.context.organizationId, this.context.nodeId, cutoff])
     return result.rows.map(row => ({ kind: row.kind, id: publicNumber(row.public_id, row.kind) }))
   }
@@ -217,6 +218,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
       ${owner.join}
       WHERE i.organization_id=$1 AND i.assigned_node_id=$2 AND ${owner.predicate}
         AND i.observed_state='ready' AND i.last_activity_at < to_timestamp($4/1000.0)
+        ${target.kind === 'project' ? `AND owner.kind<>'steward'` : ''}
       LIMIT 1`, [this.context.organizationId, this.context.nodeId, target.id, cutoff])
     return result.rows.length > 0
   }
@@ -246,6 +248,8 @@ export class PostgresInstanceRepository implements InstanceRepository {
     username: string
     homePath: string
     name?: string
+    /** Reserved kind for project targets; absent for user targets. */
+    projectKind?: 'standard' | 'steward'
   } | null> {
     if (target.kind === 'user') {
       const result = await this.context.pool.query<{
@@ -269,7 +273,8 @@ export class PostgresInstanceRepository implements InstanceRepository {
       public_id: string
       name: string
       local_path: string
-    }>(`SELECT p.public_id::text,p.name::text,m.local_path
+      kind: 'standard' | 'steward'
+    }>(`SELECT p.public_id::text,p.name::text,m.local_path,p.kind
       FROM harness.projects p
       JOIN harness.instances i ON i.project_id=p.id AND i.organization_id=p.organization_id
       JOIN harness.project_mounts m ON m.project_id=p.id AND m.organization_id=p.organization_id
@@ -279,6 +284,7 @@ export class PostgresInstanceRepository implements InstanceRepository {
     const row = result.rows[0]
     return row === undefined ? null : {
       kind: 'project',
+      projectKind: row.kind,
       id: publicNumber(row.public_id, 'project'),
       username: `project-${row.public_id}`,
       name: row.name,

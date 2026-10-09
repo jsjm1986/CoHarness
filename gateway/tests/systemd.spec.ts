@@ -89,6 +89,13 @@ describe('renderUserUnit', () => {
     expect(unit).toContain('CPUQuota=100%')
   })
 
+  it('restarts resident units unconditionally and ordinary units on failure', () => {
+    expect(unit).toContain('Restart=on-failure')
+    const resident = renderUserUnit({ ...ALICE, resident: true }, grants, OPTS)
+    expect(resident).toContain('Restart=always')
+    expect(resident).not.toContain('Restart=on-failure')
+  })
+
   it('rejects grant paths that would break the unit file (newline / colon)', () => {
     expect(() => renderUserUnit(ALICE, [{ path: '/data/evil\nExecStart=/bin/sh', mode: 'rw' }], OPTS)).toThrow()
     expect(() => renderUserUnit(ALICE, [{ path: '/data/a:b', mode: 'rw' }], OPTS)).toThrow()

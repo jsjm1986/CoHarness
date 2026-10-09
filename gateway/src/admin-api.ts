@@ -43,6 +43,7 @@ import { MaintenanceError } from './postgres/maintenance-service.ts'
 import { BackupError } from './postgres/backup-service.ts'
 import { DeploymentCommandError } from './deployment-commands.ts'
 import { ResourceAccessError, resourcePolicyOwner } from './resource-access.ts'
+import { stewardPolicyOwner } from './steward-access.ts'
 import { readResponseJson, ResponseBodyTooLargeError } from './response-budget.ts'
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -584,19 +585,21 @@ async function dispatch(
   }
 
   if ((pathname === '/admin/api/desktops/permissions' || pathname === '/admin/api/terminals/permissions'
-    || pathname === '/admin/api/ssh/permissions' || pathname === '/admin/api/plugins/permissions') && (method === 'GET' || method === 'POST')) {
+    || pathname === '/admin/api/ssh/permissions' || pathname === '/admin/api/plugins/permissions'
+    || pathname === '/admin/api/steward/permissions') && (method === 'GET' || method === 'POST')) {
     const resource = pathname.includes('/terminals/') ? 'terminal' : pathname.includes('/ssh/') ? 'ssh'
-      : pathname.includes('/plugins/') ? 'plugin' : 'desktop'
+      : pathname.includes('/plugins/') ? 'plugin' : pathname.includes('/steward/') ? 'steward' : 'desktop'
     const access = resource === 'terminal' ? deps.terminalAccess : resource === 'ssh' ? deps.sshAccess
-      : resource === 'plugin' ? deps.pluginAccess : deps.desktopAccess
+      : resource === 'plugin' ? deps.pluginAccess : resource === 'steward' ? deps.stewardAccess : deps.desktopAccess
     if (access === undefined) { sendError(res, 503, `${resource}-access-unavailable`); return true }
+    const ownerOf = resource === 'steward' ? stewardPolicyOwner : resourcePolicyOwner
     if (method === 'GET') {
       const query = new URL(req.url ?? pathname, 'http://admin').searchParams
-      const owner = resourcePolicyOwner(query.get('kind'), Number(query.get('id')), resource)
+      const owner = ownerOf(query.get('kind'), Number(query.get('id')), resource)
       sendJson(res, 200, await access.get(owner))
     } else {
       const input = parseObject(body)
-      const owner = resourcePolicyOwner(input.kind, input.id, resource)
+      const owner = ownerOf(input.kind, input.id, resource)
       const result = await access.set(owner, input.enabled, input.revision)
       await write(`admin.${resource}s.permission`, { ...result })
       sendJson(res, 200, result)
@@ -1464,7 +1467,7 @@ async function dispatch(
     if (project === null) { sendError(res, 404, 'project not found'); return true }
     const target = { kind: 'project' as const, id: projectId }
     if (op !== 'start') await deps.instances.stop(target)
-    if (op !== 'stop') await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path }, 'explicit')
+    if (op !== 'stop') await deps.instances.ensureRunning({ kind: 'project', id: project.id, name: project.name, path: project.path, steward: project.kind === 'steward' }, 'explicit')
     await write(`admin.project-instances.${op}`, { projectId })
     sendNoContent(res)
     return true

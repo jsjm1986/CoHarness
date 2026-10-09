@@ -22,6 +22,7 @@ interface AccessRow {
   creator_public_id: string
   access_mode: 'ro' | 'rw' | null
   administrator: boolean
+  project_kind: 'standard' | 'steward'
 }
 
 interface LockedAuthority {
@@ -41,8 +42,10 @@ export class PostgresCollaborationService {
       path: string
       access_mode: 'ro' | 'rw'
       administrator: boolean
-    }>(`SELECT p.public_id::text,p.name::text,pm.local_path path,
-      CASE WHEN membership.role='admin' THEN 'rw'::text
+      kind: 'standard' | 'steward'
+    }>(`SELECT p.public_id::text,p.name::text,pm.local_path path,p.kind,
+      CASE WHEN p.kind='steward' THEN 'rw'::text
+        WHEN membership.role='admin' THEN 'rw'::text
         WHEN membership.role='member' THEN member.access_mode ELSE NULL END access_mode,
       membership.role='admin' administrator
       FROM harness.users actor
@@ -54,7 +57,14 @@ export class PostgresCollaborationService {
       LEFT JOIN harness.project_members member ON member.organization_id=p.organization_id
         AND member.project_id=p.id AND member.user_id=actor.id
       WHERE actor.organization_id=$1 AND actor.public_id=$2 AND actor.status='active'
-        AND p.status='active' AND (membership.role='admin' OR member.user_id IS NOT NULL)
+        AND p.status='active'
+        -- The steward space keeps no member rows: the qualification lane alone
+        -- admits at rw, so organization admins without a grant are denied and
+        -- qualified members do not need a project membership.
+        AND (p.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL)
+          OR p.kind='steward' AND EXISTS (
+            SELECT 1 FROM harness.steward_access_policies sp
+            WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled))
         AND ($4::bigint IS NULL OR p.public_id=$4)
       ORDER BY p.name,p.public_id`,
     [this.context.organizationId, userId, this.context.nodeId, projectId ?? null])
@@ -64,6 +74,7 @@ export class PostgresCollaborationService {
       path: row.path,
       mode: row.access_mode,
       administrator: row.administrator,
+      kind: row.kind,
     }))
   }
 
@@ -80,13 +91,15 @@ export class PostgresCollaborationService {
     publicId: number
     name: string
     path: string
+    kind: 'standard' | 'steward'
   } | null> {
     const result = await this.context.pool.query<{
       id: string
       public_id: string
       name: string
       path: string
-    }>(`SELECT p.id,p.public_id::text,p.name::text,pm.local_path path
+      kind: 'standard' | 'steward'
+    }>(`SELECT p.id,p.public_id::text,p.name::text,pm.local_path path,p.kind
       FROM harness.projects p
       JOIN harness.project_mounts pm ON pm.project_id=p.id AND pm.organization_id=p.organization_id
         AND pm.node_id=$2 AND pm.status='active'
@@ -98,14 +111,16 @@ export class PostgresCollaborationService {
       publicId: publicNumber(row.public_id, 'project'),
       name: row.name,
       path: row.path,
+      kind: row.kind,
     }
   }
 
   private async accessRow(queryable: PoolClient | PostgresRuntimeContext['pool'], userId: number, sessionId: string): Promise<AccessRow | null> {
     const result = await queryable.query<AccessRow>(`SELECT c.id session_id,r.id root_session_id,
       p.id project_id,p.public_id::text project_public_id,r.visibility,r.creator_user_id,
-      creator.public_id::text creator_public_id,
-      CASE WHEN membership.role='admin' THEN 'rw'::text
+      creator.public_id::text creator_public_id,p.kind project_kind,
+      CASE WHEN p.kind='steward' THEN 'rw'::text
+        WHEN membership.role='admin' THEN 'rw'::text
         WHEN membership.role='member' THEN member.access_mode ELSE NULL END access_mode,
       COALESCE(membership.role='admin',false) administrator
       FROM harness.conversation_sessions c
@@ -118,7 +133,10 @@ export class PostgresCollaborationService {
         AND membership.user_id=actor.id AND membership.status='active'
       LEFT JOIN harness.project_members member ON member.organization_id=r.organization_id
         AND member.project_id=r.project_id AND member.user_id=actor.id
-      WHERE c.organization_id=$1 AND c.id=$3 AND c.status<>'deleted' AND r.status<>'deleted'`,
+      WHERE c.organization_id=$1 AND c.id=$3 AND c.status<>'deleted' AND r.status<>'deleted'
+        AND (p.kind<>'steward' OR EXISTS (
+          SELECT 1 FROM harness.steward_access_policies sp
+          WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled))`,
     [this.context.organizationId, userId, sessionId])
     return result.rows[0] ?? null
   }
@@ -132,13 +150,18 @@ export class PostgresCollaborationService {
     const lock = rootLock === 'update' ? 'FOR UPDATE OF r' : 'FOR SHARE OF r'
     const result = await client.query<AccessRow>(`SELECT c.id session_id,r.id root_session_id,
       p.id project_id,p.public_id::text project_public_id,r.visibility,r.creator_user_id,
-      creator.public_id::text creator_public_id,NULL::text access_mode,false administrator
+      creator.public_id::text creator_public_id,p.kind project_kind,NULL::text access_mode,false administrator
       FROM harness.conversation_sessions c
       JOIN harness.conversation_sessions r ON r.id=c.root_session_id AND r.organization_id=c.organization_id
       JOIN harness.projects p ON p.id=r.project_id AND p.organization_id=r.organization_id AND p.status='active'
       JOIN harness.users creator ON creator.id=r.creator_user_id AND creator.organization_id=r.organization_id
       WHERE c.organization_id=$1 AND c.id=$2 AND c.status<>'deleted' AND r.status<>'deleted'
-      ${lock}`, [this.context.organizationId, sessionId])
+        AND (p.kind<>'steward' OR EXISTS (
+          SELECT 1 FROM harness.users ua
+          JOIN harness.steward_access_policies sp ON sp.organization_id=ua.organization_id
+            AND sp.user_id=ua.id AND sp.enabled
+          WHERE ua.organization_id=$1 AND ua.public_id=$3 AND ua.status='active'))
+      ${lock}`, [this.context.organizationId, sessionId, userId])
     const access = result.rows[0]
     if (access === undefined) return null
     const actor = await client.query<{ user_id: string; organization_role: 'admin' | 'member' }>(`SELECT
@@ -150,6 +173,18 @@ export class PostgresCollaborationService {
       FOR SHARE OF actor,membership`, [this.context.organizationId, userId])
     const current = actor.rows[0]
     if (current === undefined) return { access, authority: null }
+    // A steward row already proved an active qualification in the outer WHERE;
+    // the lane grants rw and keeps the membership table unused for this space.
+    if (access.project_kind === 'steward') {
+      return {
+        access: { ...access, access_mode: 'rw' },
+        authority: {
+          userId: current.user_id,
+          accessMode: 'rw',
+          administrator: current.organization_role === 'admin',
+        },
+      }
+    }
     if (current.organization_role === 'admin') {
       return {
         access: { ...access, access_mode: 'rw', administrator: true },
@@ -235,8 +270,12 @@ export class PostgresCollaborationService {
       LEFT JOIN harness.users participant ON participant.id=cp.user_id
         AND participant.organization_id=cp.organization_id
       WHERE r.organization_id=$1 AND p.public_id=$2 AND r.id=r.root_session_id
-        AND r.status<>'deleted' AND (membership.role='admin' OR member.user_id IS NOT NULL)
+        AND r.status<>'deleted'
         AND (membership.role='admin' OR r.visibility='project' OR creator.id=actor.id)
+        AND (p.kind='steward' AND EXISTS (
+            SELECT 1 FROM harness.steward_access_policies sp
+            WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled)
+          OR p.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL))
       GROUP BY r.id,creator.public_id,creator.display_name
       ORDER BY r.updated_at DESC,r.id`, [this.context.organizationId, projectId, userId])
     return result.rows.map(row => ({
@@ -281,6 +320,7 @@ export class PostgresCollaborationService {
       r.has_visible_content,r.visible_content_seq::text,
       (extract(epoch FROM r.last_prompt_at)*1000)::bigint::text last_prompt_at_ms,
       CASE WHEN p.id IS NULL THEN true
+        WHEN p.kind='steward' THEN true
         WHEN membership.role='admin' THEN true
         ELSE member.access_mode='rw' END can_write
       FROM harness.conversation_sessions r
@@ -298,8 +338,12 @@ export class PostgresCollaborationService {
           WHERE archive.organization_id=r.organization_id AND archive.root_session_id=r.id
             AND (archive.state IN ('trash','purged') OR archive.restored_at IS NULL))
         AND ((r.project_id IS NULL AND r.creator_user_id=actor.id)
-          OR (p.id IS NOT NULL AND (membership.role='admin' OR member.user_id IS NOT NULL)
-            AND (membership.role='admin' OR r.visibility='project' OR r.creator_user_id=actor.id)))
+          OR (p.id IS NOT NULL
+            AND (membership.role='admin' OR r.visibility='project' OR r.creator_user_id=actor.id)
+            AND (p.kind='steward' AND EXISTS (
+                SELECT 1 FROM harness.steward_access_policies sp
+                WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled)
+              OR p.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL))))
       ORDER BY r.updated_at DESC,r.id`, [this.context.organizationId, userId])
     return result.rows.map(row => ({
       sessionId: row.session_id,
@@ -335,8 +379,12 @@ export class PostgresCollaborationService {
         AND membership.user_id=actor.id AND membership.status='active'
       LEFT JOIN harness.project_members member ON member.organization_id=r.organization_id
         AND member.project_id=r.project_id AND member.user_id=actor.id
-      WHERE membership.role='admin' OR (member.user_id IS NOT NULL
-        AND (r.visibility='project' OR r.creator_user_id=actor.id))`,
+      WHERE (p.kind='steward' AND EXISTS (
+          SELECT 1 FROM harness.steward_access_policies sp
+          WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled)
+        AND (membership.role='admin' OR r.visibility='project' OR r.creator_user_id=actor.id)
+        OR p.kind<>'steward' AND (membership.role='admin' OR (member.user_id IS NOT NULL
+          AND (r.visibility='project' OR r.creator_user_id=actor.id))))`,
     [this.context.organizationId, userId, projectId, sessionIds])
     return result.rows.map(row => row.session_id)
   }

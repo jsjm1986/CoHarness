@@ -12,13 +12,16 @@ export class ResourceAccessError extends Error {
   constructor(readonly status: 400 | 404 | 409, message: string) { super(message) }
 }
 
+/** Qualification lanes backed by a shared `<resource>_access_policies` table. */
+export type ResourceLane = 'desktop' | 'terminal' | 'ssh' | 'plugin' | 'steward'
+
 /**
  * Validate owner coordinates received from an administrative API.
  * @param kind - requested account or project scope.
  * @param id - public owner identifier from the request.
  * @returns validated coordinates within the server-owned organization.
  */
-export function resourcePolicyOwner(kind: unknown, id: unknown, resource: 'desktop' | 'terminal' | 'ssh' | 'plugin'): ResourcePolicyOwner {
+export function resourcePolicyOwner(kind: unknown, id: unknown, resource: ResourceLane): ResourcePolicyOwner {
   if ((kind !== 'user' && kind !== 'project') || typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
     throw new ResourceAccessError(400, `invalid ${resource} policy owner`)
   }
@@ -27,7 +30,7 @@ export function resourcePolicyOwner(kind: unknown, id: unknown, resource: 'deskt
 
 /** PostgreSQL owns revisions and publishes changes to the existing access outbox. */
 export class ResourceAccess {
-  constructor(private readonly context: PostgresRuntimeContext, private readonly resource: 'desktop' | 'terminal' | 'ssh' | 'plugin') {}
+  constructor(private readonly context: PostgresRuntimeContext, private readonly resource: ResourceLane) {}
 
   /**
    * Read the current decision, retaining a false default for unconfigured owners.

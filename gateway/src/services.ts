@@ -105,6 +105,16 @@ export interface GatewayProjectService {
   getById(id: number): Awaitable<ProjectDetail | null>
   /** Batch detail lookup used by account catalog pages to avoid N+1 queries. */
   getByIds?(ids: readonly number[]): Awaitable<ProjectDetail[]>
+  /**
+   * Seed the reserved steward space once or return the existing row. The
+   * steward project has no member rows; admission comes from the steward
+   * qualification lane. Absent where the catalog backend has no steward support.
+   */
+  ensureSteward?(input: { name: string; path: string; createdBy?: number }): Awaitable<ProjectRow>
+  /** Current steward project target for this node, when seeded. */
+  stewardProject?(): Awaitable<{ id: number; name: string; path: string } | null>
+  /** Reserved kind of a project by internal row id, or null when unknown. */
+  kindOfInternal?(internalId: string): Awaitable<import('./projects.ts').ProjectKind | null>
   rename(id: number, name: string): Awaitable<void>
   remove(id: number): Awaitable<number[]>
   setMember(projectId: number, userId: number, mode: GrantMode): Awaitable<void>

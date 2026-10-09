@@ -4,10 +4,13 @@ import { DesktopAccess } from './desktop-access.ts'
 import { PluginAccess } from './plugin-access.ts'
 import { PostgresPluginState } from './plugin-state.ts'
 import { SshAccess } from './ssh-access.ts'
+import { StewardAccess } from './steward-access.ts'
 import { TerminalAccess } from './terminal-access.ts'
 import { GatewayPluginManagement } from './plugin-management.ts'
 import { GatewayTerminalManagement } from './terminal-management.ts'
 import { randomBytes } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync } from 'node:fs'
 import type { Server } from 'node:http'
 import { join } from 'node:path'
 import { createAdminApiHandler } from './admin-api.ts'
@@ -38,6 +41,7 @@ import {
   OrganizationModelCredentialCipher,
 } from './organization-model-credentials.ts'
 import { PostgresProjectService } from './postgres/project-service.ts'
+import { StewardQueryService } from './postgres/steward-query.ts'
 import { checkPostgresReadiness, resolvePostgresRuntimeContext } from './postgres/runtime-context.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import { PostgresSshTargetService } from './postgres/ssh-target-service.ts'
@@ -384,6 +388,7 @@ const webhookDeliveries = new PostgresWebhookDeliveryService(context)
 const webhookEndpoints = new PostgresWebhookEndpointService(context,
   new WebhookSecretCipher(loadOrganizationModelCredentialKey(cfg.webhookSecretKeyFile)))
 const pluginState = new PostgresPluginState(context)
+const stewardQuery = new StewardQueryService(context, cfg.steward.enabled)
 const deps: GatewayDeps = {
   cfg,
   auth,
@@ -402,6 +407,7 @@ const deps: GatewayDeps = {
   pluginAccess: new PluginAccess(context),
   terminalAccess: new TerminalAccess(context),
   sshAccess: new SshAccess(context),
+  stewardAccess: new StewardAccess(context),
   sshTargets: new PostgresSshTargetService(context),
   pluginManagement: new GatewayPluginManagement({ users, projects, instances, cfg, pluginState }, principalKeys.signer, context.nodeId),
   pluginState,
@@ -531,6 +537,7 @@ const server = createGatewayServer(deps, {
     principals: principalKeys.signer,
     governance,
     pluginState: deps.pluginState,
+    stewardQuery,
     push,
     documentTransfer: createDocumentTransferHandler({
       instances: deps.instances,
@@ -614,6 +621,7 @@ const server = createGatewayServer(deps, {
 server.listen(cfg.port, '127.0.0.1', () => {
   console.log(`[gateway] listening on http://127.0.0.1:${cfg.port}`)
 })
+
 const intake = createUsageIntakeServer(governance, audit, {
   open: async () => (await maintenanceGate()) === 'open',
   track: trackWriter,
@@ -654,6 +662,37 @@ const fencedTask = (label: string, operation: () => Promise<void>): SingleFlight
     if (await maintenanceGate() !== 'open') return
     await operation()
   }))
+
+/**
+ * Seed the reserved steward space and ensure its resident runtime. A crash
+ * is healed by the supervisor's restart policy (systemd `Restart=always`);
+ * an explicit administrator stop stays stopped until a gateway boot or an
+ * explicit start — no periodic revive fights a deliberate halt. The local
+ * launcher has no supervisor, so residency there lasts only as long as this
+ * gateway process. The fenced run retries when a boot-time maintenance
+ * window closes.
+ */
+const ensureStewardSpace = async (): Promise<void> => {
+  if (!cfg.steward.enabled || projects.ensureSteward === undefined) return
+  mkdirSync(cfg.steward.workspacePath, { recursive: true })
+  if (cfg.steward.sourcePath !== '' && !existsSync(join(cfg.steward.workspacePath, '.git'))) {
+    const worktree = (args: readonly string[]): void => {
+      execFileSync('git', ['-C', cfg.steward.sourcePath, 'worktree', 'add', ...args, cfg.steward.workspacePath, 'HEAD'], { stdio: 'pipe' })
+    }
+    try {
+      worktree(['-b', 'steward-workspace'])
+    } catch {
+      // The provisioning branch survives a deleted workspace directory;
+      // fall back to a detached checkout rather than resetting its commits.
+      worktree(['--detach'])
+    }
+  }
+  const steward = await projects.ensureSteward({ name: cfg.steward.projectName, path: cfg.steward.workspacePath })
+  await instances.ensureRunning({ kind: 'project', id: steward.id, name: steward.name, path: steward.path, steward: true }, 'explicit')
+}
+const stewardEnsure = fencedTask('steward space', ensureStewardSpace)
+onWritesReopened = () => stewardEnsure.run()
+stewardEnsure.run()
 
 const reaperTask = fencedTask('idle reaper', async () => {
   await deps.instances.reapIdle()

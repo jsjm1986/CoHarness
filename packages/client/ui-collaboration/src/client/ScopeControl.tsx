@@ -122,7 +122,9 @@ export function ScopeControl({
       <span className={css.scopeRow}>
         <span className={css.scopeName}>{project.name}</span>
         <span className={css.scopeMode}>
-          {project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
+          {project.kind === 'steward'
+            ? t('scope.steward')
+            : project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
         </span>
       </span>
     ),
@@ -319,7 +321,9 @@ export function ScopeControl({
                 <span className={css.label}>{currentLabel}</span>
                 {projectScope !== undefined && (
                   <span className={css.mode}>
-                    {projectScope.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
+                    {projectScope.steward === true
+                      ? t('scope.steward')
+                      : projectScope.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
                   </span>
                 )}
                 <IconChevronDownOutline14 className={css.chevron} />
