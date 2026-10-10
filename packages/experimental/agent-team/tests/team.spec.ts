@@ -8,7 +8,7 @@ import { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { SessionId, type Session } from '@deepseek-ai/dsh-session'
+import { SessionId, type Session, type SessionEvent } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SubagentService from '@deepseek-ai/dsh-subagent'
 import { deliverSubagentPrompt, type HostPromptDeliverer } from '@deepseek-ai/dsh-subagent/internal'
@@ -22,6 +22,12 @@ import type { TeamMemberSnapshot, TeamMessageSnapshot, TeamTaskSnapshot } from '
 const SIGNAL = new AbortController().signal
 const roots: string[] = []
 const contexts: Context[] = []
+
+/** Provider/model pair as recorded by request headers and selection events. */
+interface Route {
+  readonly provider: string
+  readonly model: string
+}
 
 afterEach(async () => {
   vi.useRealTimers()
@@ -189,6 +195,70 @@ describe('Team identity and provisioning', () => {
     }))
     expect(service.listMembers(lead)[1]).not.toHaveProperty('model')
     await Promise.resolve()
+  })
+
+  it('shows the durable pending selection and last-used route over the declared model', async () => {
+    const { ctx, lead } = await setup(['hang'])
+    // The host API layer owns and types the `modelSelection` unit; this test
+    // registers a structural equivalent so the roster's projection path runs.
+    ;(ctx.sessionProjections.register as (definition: unknown) => () => void)({
+      key: 'modelSelection',
+      stateSchema: { parse: (value: unknown) => value },
+      init: () => ({ pending: null, lastUsed: null }),
+      apply: (
+        state: { pending: Route | null; lastUsed: Route | null },
+        event: SessionEvent,
+      ) => {
+        if ((event as { type: string }).type === 'model/selection') {
+          return { lastUsed: state.lastUsed, pending: event.data as Route }
+        }
+        if (event.type !== 'request/header') return state
+        const config = event.data.header.config
+        const lastUsed = { provider: config.provider, model: config.model }
+        const pending = state.pending !== null
+          && state.pending.provider === lastUsed.provider
+          && state.pending.model === lastUsed.model
+          ? null
+          : state.pending
+        return { lastUsed, pending }
+      },
+      stateVersion: 1,
+    })
+    const leadRow = () => ctx.agentTeams.listMembers(lead)[0]
+    expect(leadRow()).toMatchObject({ name: 'lead', model: 'mock' })
+
+    const appendHeader = (session: Session, model: string): void => {
+      session.append('request/header', {
+        header: { config: { provider: 'mock', model } },
+        reason: 'change',
+      })
+    }
+    const appendSelection = (session: Session, model: string): void => {
+      // The host API layer owns the `model/selection` declaration; its durable
+      // payload is a plain provider/model route.
+      ;(session.append as (type: string, data: unknown) => void)(
+        'model/selection', { provider: 'mock', model })
+    }
+
+    appendHeader(lead.session, 'served-model')
+    expect(leadRow()).toMatchObject({ model: 'served-model' })
+
+    appendSelection(lead.session, 'pending-model')
+    expect(leadRow()).toMatchObject({ model: 'pending-model' })
+
+    // A later request on a different route does not consume the pending choice.
+    appendHeader(lead.session, 'unrelated-model')
+    expect(leadRow()).toMatchObject({ model: 'pending-model' })
+
+    // The matching request consumes it, so the newest used route wins again.
+    appendHeader(lead.session, 'pending-model')
+    appendHeader(lead.session, 'newest-model')
+    expect(leadRow()).toMatchObject({ model: 'newest-model' })
+
+    const worker = await spawn(ctx, lead, 'model-worker')
+    const live = await waitRunning(ctx, worker.member.id)
+    appendSelection(live.session, 'worker-model')
+    expect(ctx.agentTeams.listMembers(lead)[1]).toMatchObject({ name: 'model-worker', model: 'worker-model' })
   })
 
   it('creates fresh and fork teammates with immutable names and bounded roster size', async () => {

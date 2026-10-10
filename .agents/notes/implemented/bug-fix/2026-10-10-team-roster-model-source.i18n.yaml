@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-10-team-roster-model-source.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-10-team-roster-model-source.md
+/agent-note-team-roster-model-reads-the-member-s-durable-selection-not-the-spawn-stamp:
+  en: 631650a28aab4cb6
+  zh: 05920a8c5f8b48bd
+/agent-note-team-roster-model-reads-the-member-s-durable-selection-not-the-spawn-stamp/problem:
+  en: c50dde7b49adc177
+  zh: 2e64ec6a976bf0a7
+/agent-note-team-roster-model-reads-the-member-s-durable-selection-not-the-spawn-stamp/decision:
+  en: 81621502fb363cd3
+  zh: 496ee7dbe2f11f62
+/agent-note-team-roster-model-reads-the-member-s-durable-selection-not-the-spawn-stamp/alternatives-considered:
+  en: 64f2c36a25690120
+  zh: 5cdcda0fda7892ce
+/agent-note-team-roster-model-reads-the-member-s-durable-selection-not-the-spawn-stamp/consequences:
+  en: a5f7fb0e55f03d94
+  zh: 4688597eef7779db
+/agent-note-team-roster-model-reads-the-member-s-durable-selection-not-the-spawn-stamp/verification:
+  en: 34238f7e07983964
+  zh: d4f13984e3ebc830

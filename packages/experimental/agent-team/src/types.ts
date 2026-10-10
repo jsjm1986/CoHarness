@@ -64,6 +64,7 @@ export interface TeamMemberView {
   readonly description?: string
   readonly provider?: string
   readonly context?: 'fresh' | 'fork'
+  /** Model the member's next request would use: its durable pending selection or last-used route, else its declared creation model. */
   readonly model?: string
   readonly diagnostics: string[]
 }
