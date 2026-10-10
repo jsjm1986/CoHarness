@@ -313,11 +313,47 @@ describe('SessionPreparations reservation', () => {
     expect(preparations.takeReady(id)).toBeUndefined()
   })
 
-  it('rejects publication while only an inspection exists', async () => {
+  it('yields a ready inspection entry to a publisher without granting a reservation', async () => {
     const preparations = new SessionPreparations<PreparedSource, string>(1)
     const source = prepared('inspection-publication')
     await preparations.inspect(source.session.id, () => Promise.resolve(source))
-    expect(() => preparations.reservationFor(source.session)).toThrow(/cannot publish/)
+    expect(preparations.reservationFor(source.session)).toBeUndefined()
+    expect(preparations.has(source.session.id)).toBe(false)
+    const reservation = await preparations.reserve(
+      source.session.id,
+      () => Promise.resolve(source),
+      committed,
+    )
+    expect(reservation?.source).toBe(source)
+    preparations.release(reservation!, false)
+  })
+
+  it('yields an in-flight load and an in-flight commit to a publisher', async () => {
+    const preparations = new SessionPreparations<PreparedSource, string>(1)
+    const id = SessionId('in-flight-publication')
+    const loadGate = Promise.withResolvers<PreparedSource>()
+    const observed = preparations.inspect(id, () => loadGate.promise)
+    const candidate = prepared(id)
+    expect(preparations.reservationFor(candidate.session)).toBeUndefined()
+    loadGate.resolve(candidate)
+    await expect(observed).resolves.toBe(candidate)
+    expect(preparations.has(id)).toBe(false)
+
+    const commitStarted = Promise.withResolvers<undefined>()
+    const commitGate = Promise.withResolvers<{ source: PreparedSource; state: string }>()
+    const reservation = preparations.reserve(
+      id,
+      () => Promise.resolve(candidate),
+      () => {
+        commitStarted.resolve(undefined)
+        return commitGate.promise
+      },
+    )
+    await commitStarted.promise
+    expect(preparations.reservationFor(candidate.session)).toBeUndefined()
+    commitGate.resolve({ source: candidate, state: 'committed' })
+    await expect(reservation).resolves.toBeUndefined()
+    expect(preparations.has(id)).toBe(false)
   })
 })
 

@@ -611,7 +611,7 @@ describe('PersistenceCoordinator stored identity', () => {
     }
   })
 
-  it('reserves a cold id across asynchronous storage repair', async () => {
+  it('lets a live publish win over an in-flight cold load', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const backend = new ControlledBackend()
@@ -635,19 +635,46 @@ describe('PersistenceCoordinator stored identity', () => {
       const loading = coordinator.load(id)
       await vi.waitFor(() => { expect(backend.loadAttempts).toBe(1) })
 
-      await expect(ctx.plugin(Object.assign((inner: Context) => {
-        inner.sessions.create(id, { seed: [start], meta: header })
-      }, { inject: ['sessions'] }))).rejects.toThrow(/persisted state already owns this identity/)
-      expect(ctx.sessions.get(id)).toBeUndefined()
+      let live!: Session
+      await ctx.plugin(Object.assign((inner: Context) => {
+        live = inner.sessions.create(id, { seed: [start], meta: header })
+      }, { inject: ['sessions'] }))
+      expect(ctx.sessions.get(id)).toBe(live)
 
+      // The abandoned cold read converges on the live session path; its open
+      // turn applies the ordinary live-load refusal rather than vetoing the
+      // publication that already won.
       loadGate.resolve(true)
-      const loaded = await loading
-      expect(loaded.events.map(event => event.type)).toEqual(['turn/start', 'turn/end'])
-
-      const resumed = ctx.sessions.create(id, { seed: loaded.events, meta: loaded.meta })
-      await expect(ctx.sessions.flush(resumed)).resolves.toBe(true)
+      await expect(loading).rejects.toThrow(/live turn is open/)
+      await expect(ctx.sessions.flush(live)).resolves.toBe(true)
     } finally {
       loadGate.resolve(true)
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('publishes a new Session over an inspection-cached ready entry', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const id = SessionId('inspection-then-publish')
+    const header = meta(id)
+    backend.store.set(id, { meta: header, events: oneTurnLog() })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+
+    try {
+      // A read-only inspection leaves a cached ready entry; it is a shared
+      // view, not an identity owner, so publication must not be vetoed.
+      await coordinator.inspect(id)
+      const inspection = await coordinator.inspect(id)
+      const published = ctx.sessions.create(id, { seed: inspection.events, meta: inspection.meta })
+      await expect(ctx.sessions.flush(published)).resolves.toBe(true)
+      expect(ctx.sessions.get(id)).toBe(published)
+    } finally {
       await fiber.dispose()
       await ctx.fiber.dispose()
     }
@@ -2317,7 +2344,7 @@ describe('PersistenceCoordinator retirement', () => {
     }
   })
 
-  it('a racing cold load survives retirement cleanup and rejects same-id reuse', async () => {
+  it('a racing cold load survives retirement cleanup and converges on a live publisher', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     const backend = new ControlledBackend()
@@ -2347,19 +2374,16 @@ describe('PersistenceCoordinator retirement', () => {
       appendGate.resolve(true)
       await vi.waitFor(() => { expect(backend.loadAttempts).toBe(baselineLoads + 1) })
 
-      await expect(ctx.plugin(Object.assign((inner: Context) => {
-        inner.sessions.create(id)
-      }, { inject: ['sessions'] }))).rejects.toThrow(/persisted state already owns this identity/)
-
-      loadGate.resolve(true)
-      await expect(coldLoad).resolves.toMatchObject({
-        events: [{ seq: 0 }, { seq: 1 }],
-      })
-
+      // A live publish wins over the in-flight cold read; the publisher's own
+      // adoption still enforces the durable prefix, so an empty-seed reuse
+      // fails its initialization as an id collision rather than clobbering.
       let reuse!: Session
       await ctx.plugin(Object.assign((inner: Context) => {
         reuse = inner.sessions.create(id)
       }, { inject: ['sessions'] }))
+
+      loadGate.resolve(true)
+      await expect(coldLoad).rejects.toThrow(/id collision/)
       await expect(ctx.sessions.flush(reuse)).rejects.toThrow(/id collision/)
       await vi.waitFor(() => {
         expect(backend.store.get(id)?.events.map(event => event.seq)).toEqual([0, 1])

@@ -37,6 +37,7 @@ import type {
 } from './index.ts'
 import type { SessionLocation } from './errors.ts'
 import {
+  SessionAlreadyExistsError,
   SessionFormatUnsupportedError,
   SessionPersistenceCorruptionError,
   sessionFormatVersionRefusal,
@@ -1092,12 +1093,22 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       if (this.ctx.sessions.get(id) !== undefined) {
         throw new Error(`cannot prepare session "${id}" while it is live`)
       }
-      const reservation = await this.preparations.reserve(
-        id,
-        () => this.serialize(id, () => this.prepareCore(id)),
-        source => this.serialize(id, () => this.commitPrepared(source), signal),
-        signal,
-      )
+      let reservation: SessionPreparationReservation<PreparedSessionSource<TornMarker>, SessionState> | undefined
+      try {
+        reservation = await this.preparations.reserve(
+          id,
+          () => this.serialize(id, () => this.prepareCore(id)),
+          source => this.serialize(id, () => this.commitPrepared(source), signal),
+          signal,
+        )
+      } catch (error: unknown) {
+        signal?.throwIfAborted()
+        if (error instanceof SessionAlreadyExistsError
+          || this.ctx.sessions.get(id) !== undefined) {
+          throw new Error(`cannot prepare session "${id}" while it is live`)
+        }
+        throw error
+      }
       if (reservation === undefined) continue
       if (this.ctx.sessions.get(id) !== undefined) {
         this.preparations.release(reservation, false)
@@ -1127,11 +1138,22 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       await this.waitForRetirement(id)
       const live = this.ctx.sessions.get(id)
       if (live !== undefined) return this.loadLiveSnapshot(live)
-      const reservation = await this.preparations.reserve(
-        id,
-        () => this.serialize(id, () => this.prepareCore(id)),
-        source => this.serialize(id, () => this.commitPrepared(source)),
-      )
+      let reservation: SessionPreparationReservation<PreparedSessionSource<TornMarker>, SessionState> | undefined
+      try {
+        reservation = await this.preparations.reserve(
+          id,
+          () => this.serialize(id, () => this.prepareCore(id)),
+          source => this.serialize(id, () => this.commitPrepared(source)),
+        )
+      } catch (error: unknown) {
+        // A live Session published while the cold read ran is the authority;
+        // its snapshot answers the same request. The prepareCore refusal means
+        // the id was live during the read; if it has since left, retry cleanly.
+        const attached = this.ctx.sessions.get(id)
+        if (attached !== undefined) return this.loadLiveSnapshot(attached)
+        if (error instanceof SessionAlreadyExistsError) continue
+        throw error
+      }
       if (reservation === undefined) continue
       const attached = this.ctx.sessions.get(id)
       if (attached !== undefined) {
@@ -1182,6 +1204,9 @@ export class PersistenceCoordinator<TornMarker = unknown> {
         signal?.throwIfAborted()
         const attached = this.ctx.sessions.get(id)
         if (attached !== undefined) return this.inspectLive(attached)
+        // prepareCore's refusal means the id was live during the read; when
+        // it has since left, a retry observes the settled state.
+        if (error instanceof SessionAlreadyExistsError) continue
         throw error
       }
     }
@@ -1332,6 +1357,11 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       // Preserve complete interrupted events and synthesize only missing closers.
       const closers = interruptedTurnClosers(storedEvents).map(adoptSessionEvent)
       const balanced = [...storedEvents, ...closers]
+      // A Session published during the storage reads above already owns this
+      // identity; refuse here instead of letting the detached prepare surface
+      // its collision as corruption. Callers converging on a live id turn this
+      // refusal into the live view or the "while it is live" conflict.
+      if (this.ctx.sessions.get(id) !== undefined) throw new SessionAlreadyExistsError(id)
       const session = this.ctx.sessions.prepare(id, {
         seed: balanced,
         meta: currentMeta,
@@ -1353,10 +1383,12 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       }
     } catch (error: unknown) {
       // An unsupported format is a refusal over an intact log, not damage —
-      // surface it unwrapped so callers can point at the raw artifact. Read
-      // failures (migration conflicts, timeouts) are transient, never damage.
+      // surface it unwrapped so callers can point at the raw artifact. A live
+      // Session claiming the id mid-read is an identity conflict, likewise not
+      // damage. Read failures (migration conflicts, timeouts) are transient.
       if (error instanceof SessionFormatUnsupportedError
         || error instanceof SessionFormatUnsupportedMigrationError
+        || error instanceof SessionAlreadyExistsError
         || error instanceof SessionPersistenceReadError
         || error instanceof SessionPersistenceCorruptionError) throw error
       throw new SessionPersistenceCorruptionError(
