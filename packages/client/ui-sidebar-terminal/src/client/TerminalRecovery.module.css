@@ -1,0 +1,9 @@
+/* Failed recovery surfaces as an error-tinted ghost capsule inside the
+   composer tool row, beside the neutral chips it shares the line with. */
+.retry {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.retry:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+}
