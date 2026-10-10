@@ -293,7 +293,7 @@ function mount(
     renderSlotChain,
     selectWorkspace: retargetWorkspace,
     t,
-  } as unknown as ConversationRootProps
+  } as ConversationRootProps
   const view = render(<ConversationRoot {...props} />)
   return {
     view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open, displaySettings,

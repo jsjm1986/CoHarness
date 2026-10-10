@@ -432,7 +432,7 @@ describe('StewardDock', () => {
       useSession: vi.fn(), useSessions: vi.fn(), useWorkspaces: vi.fn(),
       useCollaboration: <T,>(selector: (snapshot: CollaborationSnapshot) => T): T => selector(state),
       t,
-    } as unknown as StewardDockProps
+    } as StewardDockProps
   }
 
   it('announces the audited maintenance channel inside steward scope', () => {

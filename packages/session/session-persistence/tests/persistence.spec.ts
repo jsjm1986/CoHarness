@@ -1402,6 +1402,52 @@ describe('PersistenceCoordinator session preparations', () => {
     }
   })
 
+  it('adopts a session that goes live after the cold read is reserved', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const prepareId = SessionId('prepare-live-after-reserve')
+    const loadId = SessionId('load-live-after-reserve')
+    const inspectId = SessionId('inspect-live-after-reserve')
+    for (const id of [prepareId, loadId, inspectId]) {
+      backend.store.set(id, { meta: meta(id), events: oneTurnLog() })
+    }
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+
+    try {
+      const prepareLive = Session.create(prepareId, oneTurnLog(), meta(prepareId))
+      const prepareGet = vi.spyOn(ctx.sessions, 'get')
+        .mockReturnValueOnce(undefined)
+        .mockReturnValueOnce(undefined)
+        .mockReturnValueOnce(prepareLive)
+      await expect(coordinator.prepare(prepareId)).rejects.toThrow(/while it is live/)
+      prepareGet.mockRestore()
+
+      const loadLive = Session.create(loadId, oneTurnLog(), meta(loadId))
+      const loadGet = vi.spyOn(ctx.sessions, 'get')
+        .mockReturnValueOnce(undefined)
+        .mockReturnValueOnce(undefined)
+        .mockReturnValueOnce(loadLive)
+      await expect(coordinator.load(loadId)).resolves.toMatchObject({ meta: { id: loadId } })
+      loadGet.mockRestore()
+
+      const inspectLive = Session.create(inspectId, oneTurnLog(), meta(inspectId))
+      const inspectGet = vi.spyOn(ctx.sessions, 'get')
+        .mockReturnValueOnce(undefined)
+        .mockReturnValueOnce(undefined)
+        .mockReturnValueOnce(undefined)
+        .mockReturnValueOnce(inspectLive)
+      await expect(coordinator.inspect(inspectId)).resolves.toMatchObject({ meta: { id: inspectId } })
+      inspectGet.mockRestore()
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('rejects a prepared commit when durable state already has a live owner', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

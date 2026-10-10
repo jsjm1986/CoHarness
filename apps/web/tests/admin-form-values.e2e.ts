@@ -327,7 +327,7 @@ it('preserves stored values through built forms and keeps every mobile destinati
     await page.getByRole('button', { name: '更多管理功能', exact: true }).click()
     const more = page.getByRole('dialog', { name: '更多管理功能', exact: true })
     await compareOrRefreshGolden(join(DIRECTORY, 'more-navigation.expected.md'), await more.ariaSnapshot(), webSnapshotMode())
-    expect(await more.getByRole('link').count()).toBe(8)
+    expect(await more.getByRole('link').count()).toBe(9)
     await more.getByLabel('界面语言', { exact: true }).selectOption('en')
     await page.getByRole('button', { name: 'More administration features', exact: true }).waitFor()
     expect(await page.evaluate(() => localStorage.getItem('coharness-admin-language'))).toBe('en')

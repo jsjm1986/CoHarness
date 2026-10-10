@@ -123,8 +123,10 @@ describe('delegated execution policy', () => {
     const scope: ExecutionInheritance = { parentSessionId: SessionId('parent'), scopeId: 'scope-1' as never,
       inputs: [], primaryActorUserId: 1, unverifiedHistory: false }
     const child = Session.create(SessionId('child'))
-    expect(() => appendDelegatedPolicyOverrides(ctx, child,
-      { sandboxMode: undefined, approvalPolicy: undefined, executionScope: scope })).toThrow(/authority provider/)
+    expect(() => {
+      appendDelegatedPolicyOverrides(ctx, child,
+        { sandboxMode: undefined, approvalPolicy: undefined, executionScope: scope })
+    }).toThrow(/authority provider/)
     expect(child.ownEvents()).toEqual([])
   })
 
