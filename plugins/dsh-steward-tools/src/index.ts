@@ -11,11 +11,15 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { GatewayRuntime } from '@deepseek-ai/dsh-gateway-runtime'
 import type { Session } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-system-prompt'
 import { defineTool, type PreToolDecision, type ToolExecution } from '@deepseek-ai/dsh-tools'
 import { isReadOnly, statementPreview } from './query.ts'
 
 export const name = 'dsh-steward-tools'
-export const inject = ['tools', 'gatewayRuntime']
+export const inject = ['tools', 'gatewayRuntime', 'systemPrompt']
+
+/** Prompt section telling the model it runs inside the audited maintenance channel. */
+const STEWARD_POLICY_SECTION = 'steward:policy'
 
 const TOOL = 'steward_query'
 const MAX_ROW_LIMIT = 5_000
@@ -67,12 +71,23 @@ function renderResult(result: StewardQueryWire): string {
 }
 
 /**
- * Mount the steward tool surface: one audited SQL tool plus a pre-execute
- * listener that routes write statements through the session approval channel.
- * @param ctx - registrant context providing `tools` and `gatewayRuntime`.
+ * Mount the steward tool surface: the channel persona section, one audited
+ * SQL tool, and a pre-execute listener that routes write statements through
+ * the session approval channel.
+ * @param ctx - registrant context providing `tools`, `gatewayRuntime`, and `systemPrompt`.
  */
 export function apply(ctx: Context): void {
   const gateway: GatewayRuntime = ctx.gatewayRuntime
+  ctx.effect(() => ctx.systemPrompt.section({
+    name: STEWARD_POLICY_SECTION,
+    order: ctx.systemPrompt.getSectionOrder('STEWARD_POLICY'),
+    text: 'You are the steward: the resident maintenance channel for this deployment. '
+      + 'Database access goes through steward_query, the audited SQL channel — read statements '
+      + 'run inside a read-only transaction, and statements that write, alter, or administer '
+      + 'execute only after the operator approves them in this conversation. Every statement '
+      + 'is journaled. Prefer dry_run previews before writes, keep result sets narrow, and '
+      + 'explain what you are inspecting or changing.',
+  }), 'steward.policy()')
   const approvals: ApprovalIndex = new Map()
   ctx.on('session/event', (session, event) => {
     if (event.type !== 'approval/asked') return

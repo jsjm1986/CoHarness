@@ -182,9 +182,10 @@ export class StewardQueryService {
   /**
    * A write needs a committed approval interaction that was raised inside a
    * conversation rooted in this steward project — an approval granted in any
-   * other space does not carry over — whose responder still holds the steward
-   * qualification, recorded inside the approval TTL. The advisory lock on the
-   * approval id serializes concurrent writers: the second writer's follow-up
+   * other space does not carry over — whose responder is still an active
+   * administrator holding an enabled steward qualification, recorded inside
+   * the approval TTL. The advisory lock on the approval id serializes
+   * concurrent writers: the second writer's follow-up
    * SELECT runs with a fresh READ COMMITTED snapshot and sees the first
    * write's committed audit row, so an `allowed-once` verdict green-lights
    * exactly one write. The outcome column stores the literal wire verdict
@@ -198,6 +199,8 @@ export class StewardQueryService {
       JOIN harness.conversation_sessions root ON root.organization_id=c.organization_id
         AND root.id=c.root_session_id AND root.project_id=$3
       JOIN harness.users u ON u.organization_id=r.organization_id AND u.id=r.responder_user_id AND u.status='active'
+      JOIN harness.memberships m ON m.organization_id=u.organization_id AND m.user_id=u.id
+        AND m.status='active' AND m.role='admin'
       JOIN harness.steward_access_policies sp ON sp.organization_id=u.organization_id AND sp.user_id=u.id AND sp.enabled
       WHERE r.organization_id=$1 AND r.interaction_kind='approval' AND r.interaction_id=$2
         AND r.responded_at > now() - interval '${APPROVAL_TTL_MINUTES} minutes'

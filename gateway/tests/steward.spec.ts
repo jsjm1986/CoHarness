@@ -41,6 +41,7 @@ describePg('PostgreSQL steward space', () => {
   let stewardQueries: StewardQueryService
   let stewardAccess: StewardAccess
   let admin: { id: string; publicId: number }
+  let admin2: { id: string; publicId: number }
   let member: { id: string; publicId: number }
   let outsider: { id: string; publicId: number }
   let stewardInternalId: string
@@ -94,6 +95,7 @@ describePg('PostgreSQL steward space', () => {
       `INSERT INTO harness.organizations(slug,display_name) VALUES($1,'Steward') RETURNING id`, [slug])).rows[0]!.id
     await pool.query('INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,$2)', [organizationId, nodeName])
     admin = await addUser('steward-admin', 'admin')
+    admin2 = await addUser('steward-admin2', 'admin')
     member = await addUser('steward-member', 'member')
     outsider = await addUser('steward-outsider', 'member')
     context = await resolvePostgresRuntimeContext(pool, slug, nodeName)
@@ -155,35 +157,52 @@ describePg('PostgreSQL steward space', () => {
     await projects.rename(standardPublicId, 'Standard renamed')
   })
 
-  it('admits through the qualification lane alone', async () => {
+  it('admits only an administrator holding the qualification', async () => {
     expect(await collaboration.projectForUser(stewardPublicId, admin.publicId)).toBeNull()
     expect(await collaboration.projectForUser(stewardPublicId, member.publicId)).toBeNull()
-    await qualify(member.publicId, true)
-    expect(await collaboration.projectForUser(stewardPublicId, member.publicId))
-      .toMatchObject({ mode: 'rw', kind: 'steward' })
+    // The lane layers on the administrator role: a member cannot be granted.
+    await expect(stewardAccess.set({ kind: 'user', id: member.publicId }, true, '0'))
+      .rejects.toMatchObject({ status: 409 })
+    expect(await collaboration.projectForUser(stewardPublicId, member.publicId)).toBeNull()
+    // A historical row written for a member stays dead at read time.
+    await pool.query(`INSERT INTO harness.steward_access_policies(organization_id,user_id,enabled,revision)
+      VALUES($1,$2,true,1)`, [organizationId, member.id])
+    expect(await collaboration.projectForUser(stewardPublicId, member.publicId)).toBeNull()
     expect((await collaboration.projectForUser(standardPublicId, member.publicId))?.mode).toBe('rw')
     expect(await collaboration.projectForUser(standardPublicId, admin.publicId)).not.toBeNull()
     await qualify(admin.publicId, true)
     expect(await collaboration.projectForUser(stewardPublicId, admin.publicId)).toMatchObject({ mode: 'rw' })
+    // A role downgrade ends admission immediately even while the grant row stays.
+    await pool.query(`UPDATE harness.memberships SET role='member'
+      WHERE organization_id=$1 AND user_id=$2`, [organizationId, admin.id])
+    expect(await collaboration.projectForUser(stewardPublicId, admin.publicId)).toBeNull()
+    await pool.query(`UPDATE harness.memberships SET role='admin'
+      WHERE organization_id=$1 AND user_id=$2`, [organizationId, admin.id])
+    expect(await collaboration.projectForUser(stewardPublicId, admin.publicId)).toMatchObject({ mode: 'rw' })
+    // Stale rows stay revocable through the API.
     await qualify(member.publicId, false)
-    expect(await collaboration.projectForUser(stewardPublicId, member.publicId)).toBeNull()
-    await qualify(member.publicId, true)
+    await expect(stewardAccess.get({ kind: 'user', id: member.publicId })).resolves.toMatchObject({ enabled: false })
   })
 
   it('gates conversation access and writes through the lane', async () => {
-    const sessionId = await addConversation(stewardInternalId, member.id, 'project')
+    const sessionId = await addConversation(stewardInternalId, admin.id, 'project')
     await expect(collaboration.access(outsider.publicId, sessionId, 'read'))
       .rejects.toBeInstanceOf(CollaborationDeniedError)
-    const access = await collaboration.access(member.publicId, sessionId, 'write')
+    await expect(collaboration.access(member.publicId, sessionId, 'read'))
+      .rejects.toBeInstanceOf(CollaborationDeniedError)
+    const access = await collaboration.access(admin.publicId, sessionId, 'write')
     expect(access).toMatchObject({ canRead: true, canWrite: true })
-    const listed = await collaboration.listConversations(member.publicId, stewardPublicId)
+    const listed = await collaboration.listConversations(admin.publicId, stewardPublicId)
     expect(listed.map(row => row.sessionId)).toContain(sessionId)
-    expect(await collaboration.readableSessionIds(member.publicId, stewardPublicId, [sessionId]))
+    expect(await collaboration.readableSessionIds(admin.publicId, stewardPublicId, [sessionId]))
       .toEqual([sessionId])
-    // A private steward conversation stays with its creator for non-admin qualifiers.
+    expect(await collaboration.readableSessionIds(member.publicId, stewardPublicId, [sessionId])).toEqual([])
+    // Every qualified entrant is an administrator, so a private steward
+    // conversation is still readable by other qualified administrators.
+    await qualify(admin2.publicId, true)
     const privateId = await addConversation(stewardInternalId, admin.id, 'private')
     expect(await collaboration.readableSessionIds(member.publicId, stewardPublicId, [privateId])).toEqual([])
-    expect(await collaboration.readableSessionIds(admin.publicId, stewardPublicId, [privateId])).toEqual([privateId])
+    expect(await collaboration.readableSessionIds(admin2.publicId, stewardPublicId, [privateId])).toEqual([privateId])
   })
 
   it('excludes the steward instance from idle reaping at the repository level', async () => {
@@ -241,22 +260,28 @@ describePg('PostgreSQL steward space', () => {
     expect(plan.plan?.length).toBeGreaterThan(0)
 
     // An unqualified responder's approval does not authorize a write.
-    const stewardSession = await addConversation(stewardInternalId, member.id, 'project')
+    const stewardSession = await addConversation(stewardInternalId, admin.id, 'project')
     const outsiderApproval = await addApproval(stewardSession, outsider.id)
     await expect(stewardQueries.query(subject, {
       sql: 'UPDATE harness.projects SET name=name', dryRun: false, approvalId: outsiderApproval, rowLimit: 500,
     })).rejects.toMatchObject({ status: 403, code: 'steward-approval-invalid' })
 
-    // A qualified responder's approval inside the steward space executes.
-    const granted = await addApproval(stewardSession, member.id)
+    // A member's approval cannot authorize a write even in the steward space.
+    const memberApproval = await addApproval(stewardSession, member.id)
+    await expect(stewardQueries.query(subject, {
+      sql: 'UPDATE harness.projects SET name=name', dryRun: false, approvalId: memberApproval, rowLimit: 500,
+    })).rejects.toMatchObject({ status: 403, code: 'steward-approval-invalid' })
+
+    // A qualified administrator's approval inside the steward space executes.
+    const granted = await addApproval(stewardSession, admin.id)
     const applied = await stewardQueries.query(subject, {
       sql: 'UPDATE harness.projects SET name=name WHERE false', dryRun: false, approvalId: granted, rowLimit: 500,
     })
     expect(applied).toMatchObject({ classification: 'write', rowCount: 0 })
 
     // An approval granted in a different project does not carry over.
-    const foreignSession = await addConversation(standardInternalId, member.id, 'project')
-    const foreignApproval = await addApproval(foreignSession, member.id)
+    const foreignSession = await addConversation(standardInternalId, admin.id, 'project')
+    const foreignApproval = await addApproval(foreignSession, admin.id)
     await expect(stewardQueries.query(subject, {
       sql: 'UPDATE harness.projects SET name=name', dryRun: false, approvalId: foreignApproval, rowLimit: 500,
     })).rejects.toMatchObject({ status: 403, code: 'steward-approval-invalid' })
@@ -267,7 +292,7 @@ describePg('PostgreSQL steward space', () => {
     const tally = Object.fromEntries(journal.rows.map(row => [`${row.status}:${row.classification}`, Number(row.count)]))
     expect(tally['ok:read']).toBe(1)
     expect(tally['ok:write']).toBe(2)
-    expect(tally['denied:write']).toBe(4)
+    expect(tally['denied:write']).toBe(5)
   })
 
   it('lets Postgres enforce read-only execution beyond the keyword classifier', async () => {
@@ -290,15 +315,15 @@ describePg('PostgreSQL steward space', () => {
 
   it('spends an allowed-once approval on exactly one write, including under concurrency', async () => {
     const subject = { organizationId, projectInternalId: stewardInternalId, generation: 1 }
-    const stewardSession = await addConversation(stewardInternalId, member.id, 'project')
-    const approval = await addApproval(stewardSession, member.id)
+    const stewardSession = await addConversation(stewardInternalId, admin.id, 'project')
+    const approval = await addApproval(stewardSession, admin.id)
     const write = { sql: 'UPDATE harness.projects SET name=name WHERE false', dryRun: false, rowLimit: 500 }
 
     await stewardQueries.query(subject, { ...write, approvalId: approval })
     await expect(stewardQueries.query(subject, { ...write, approvalId: approval }))
       .rejects.toMatchObject({ status: 403, code: 'steward-approval-invalid' })
 
-    const concurrent = await addApproval(stewardSession, member.id)
+    const concurrent = await addApproval(stewardSession, admin.id)
     const [first, second] = await Promise.allSettled([
       stewardQueries.query(subject, { ...write, approvalId: concurrent }),
       stewardQueries.query(subject, { ...write, approvalId: concurrent }),
@@ -321,8 +346,8 @@ describePg('PostgreSQL steward space', () => {
   })
 
   it('steward access policies stay user-scoped and versioned', async () => {
-    expect(await stewardAccess.get({ kind: 'user', id: member.publicId })).toMatchObject({ enabled: true })
-    await expect(stewardAccess.set({ kind: 'user', id: member.publicId }, false, '999'))
+    expect(await stewardAccess.get({ kind: 'user', id: admin2.publicId })).toMatchObject({ enabled: true })
+    await expect(stewardAccess.set({ kind: 'user', id: admin2.publicId }, false, '999'))
       .rejects.toMatchObject({ status: 409 })
     // The user-only shape is enforced at the schema level, not just the API.
     await expect(pool.query(`INSERT INTO harness.steward_access_policies(

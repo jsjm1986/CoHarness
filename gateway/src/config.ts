@@ -173,6 +173,12 @@ export interface StewardSpaceConfig {
   sourcePath: string
   /** Steward-tools policy package directory materialized into the steward profile (HGW_STEWARD_TOOLS_PACKAGE). */
   toolsPackage: string
+  /**
+   * Extra read-only roots projected into the steward runtime's directory
+   * grants beyond the deployment tree itself — for example a releases
+   * collection or a log directory (HGW_STEWARD_READ_ROOTS, JSON array).
+   */
+  readRoots: string[]
   /** Linux account steward systemd units run under (HGW_STEWARD_RUNTIME_USER, default HGW_PROJECT_RUNTIME_USER). */
   runtimeUser: string
 }
@@ -330,6 +336,26 @@ function parseDesktopDriverArgs(value: string): string[] {
   if (!Array.isArray(parsed) || parsed.length > 64
     || parsed.some(arg => typeof arg !== 'string' || arg === '' || arg.length > 4096 || /[\u0000-\u001f\u007f]/u.test(arg))) {
     throw new Error('HGW_DESKTOP_DRIVER_ARGS must be a JSON array of at most 64 non-empty strings without control characters')
+  }
+  return parsed as string[]
+}
+
+/**
+ * Parse HGW_STEWARD_READ_ROOTS: a JSON array of absolute directory paths the
+ * steward runtime may read on top of its workspace and the deployment tree.
+ * @param value - raw environment value.
+ * @returns validated absolute paths, preserving deployment order.
+ */
+function parseStewardReadRoots(value: string): string[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(value)
+  } catch {
+    throw new Error('HGW_STEWARD_READ_ROOTS must be a JSON array of absolute paths')
+  }
+  if (!Array.isArray(parsed) || parsed.length > 64
+    || parsed.some(path => typeof path !== 'string' || !posix.isAbsolute(path) || /[\u0000-\u001f\u007f]/u.test(path))) {
+    throw new Error('HGW_STEWARD_READ_ROOTS must be a JSON array of at most 64 absolute paths without control characters')
   }
   return parsed as string[]
 }
@@ -678,6 +704,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
       toolsPackage: releaseStewardToolsPackage
         ?? env.HGW_STEWARD_TOOLS_PACKAGE
         ?? join(dshRepoRoot, 'plugins/dsh-steward-tools'),
+      readRoots: env.HGW_STEWARD_READ_ROOTS === undefined ? [] : parseStewardReadRoots(env.HGW_STEWARD_READ_ROOTS),
       runtimeUser: stewardRuntimeUser,
     },
   }

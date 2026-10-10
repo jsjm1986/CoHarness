@@ -1,4 +1,5 @@
 /** Administrator-owned resource qualification, separate from per-Session confirmation and leases. */
+import type { PoolClient } from 'pg'
 import { transaction } from './postgres/database.ts'
 import type { PostgresRuntimeContext } from './postgres/runtime-context.ts'
 
@@ -75,6 +76,7 @@ export class ResourceAccess {
       [this.context.organizationId, id])
       const current = rows.rows[0]
       if ((current?.revision ?? '0') !== revision) throw new ResourceAccessError(409, `${this.resource} policy changed; reload before saving`)
+      if (enabled) await this.checkEnabledOwner(client, owner, id)
       if (current?.enabled === enabled) return { ...owner, enabled, revision }
       const result = current === undefined
         ? await client.query<{ revision: string }>(`INSERT INTO harness.${this.resource}_access_policies(organization_id,${column},enabled,revision)
@@ -84,4 +86,14 @@ export class ResourceAccess {
       return { ...owner, enabled, revision: result.rows[0]!.revision }
     })
   }
+
+  /**
+   * Lane-specific precondition for an enabling write, invoked inside the policy
+   * transaction after the owner row is locked. Lanes without prerequisites keep
+   * the default no-op.
+   * @param client - the open policy transaction.
+   * @param owner - account or project being enabled.
+   * @param internalId - the owner's primary key inside this organization.
+   */
+  protected async checkEnabledOwner(client: PoolClient, owner: ResourcePolicyOwner, internalId: string): Promise<void> {}
 }

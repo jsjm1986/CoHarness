@@ -10,7 +10,7 @@ export type UserRole = AdminUser['role']
 
 export type UserActionRunner = (key: string, action: () => Promise<void>) => Promise<boolean>
 
-export function UserIdentity({ user }: { user: AdminUser }) {
+export function UserIdentity({ user }: { user: Pick<AdminUser, 'id' | 'username' | 'displayName'> }) {
   const initial = (user.displayName || user.username).slice(0, 1)
   return (
     <div className="userIdentity">

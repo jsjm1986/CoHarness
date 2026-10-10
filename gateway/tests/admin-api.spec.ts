@@ -1,6 +1,7 @@
 import { TerminalManagementError } from '../src/terminal-management.ts'
 import { WebhookReceiptError } from '../src/postgres/webhook-delivery-service.ts'
 import { DesktopAccessError } from '../src/desktop-access.ts'
+import { ResourceAccessError } from '../src/resource-access.ts'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -826,6 +827,46 @@ describe('admin desktop coordination API', () => {
     expect((await fetch(`${url}?kind=all&id=1`, { headers: { cookie } })).status).toBe(400)
     delete deps[`${resource}Access`]
     expect((await fetch(`${url}?kind=user&id=1`, { headers: { cookie } })).status).toBe(503)
+  })
+
+  it('serves the steward overview and keeps steward writes admin-scoped', async () => {
+    const { base, cookie, deps } = await setup()
+    const entries = [{
+      userId: 7, username: 'root', displayName: 'Root', role: 'admin' as const,
+      userStatus: 'active', membershipStatus: 'active',
+      grantable: true, qualified: true, effective: true, revision: '3',
+    }]
+    const list = vi.fn(async () => entries)
+    const get = vi.fn(async () => ({ kind: 'user' as const, id: 7, enabled: true, revision: '3' }))
+    const set = vi.fn(async () => ({ kind: 'user' as const, id: 7, enabled: true, revision: '4' }))
+    deps.stewardAccess = { get, set, list }
+
+    const overview = await fetch(`${base}/admin/api/steward`, { headers: { cookie } })
+    expect(overview.status).toBe(200)
+    expect(await overview.json()).toEqual({ enabled: false, space: null, members: entries })
+    expect(list).toHaveBeenCalledOnce()
+
+    const url = `${base}/admin/api/steward/permissions`
+    const saved = await fetch(url, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'user', id: 7, enabled: true, revision: '3' }),
+    })
+    expect(saved.status).toBe(200)
+    expect(set).toHaveBeenCalledWith({ kind: 'user', id: 7 }, true, '3')
+    expect(await deps.audit.query({ action: 'admin.stewards.permission' })).toHaveLength(1)
+    // Steward policies are user-scoped; project owners are rejected.
+    expect((await fetch(url, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'project', id: 1, enabled: true, revision: '0' }),
+    })).status).toBe(400)
+    set.mockRejectedValueOnce(new ResourceAccessError(409, 'steward qualification requires an active organization administrator'))
+    expect((await fetch(url, {
+      method: 'POST', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'user', id: 9, enabled: true, revision: '0' }),
+    })).status).toBe(409)
+    delete deps.stewardAccess
+    expect((await fetch(`${base}/admin/api/steward`, { headers: { cookie } })).status).toBe(503)
+    expect((await fetch(`${url}?kind=user&id=7`, { headers: { cookie } })).status).toBe(503)
   })
 
   it('lists resources and returns a resource snapshot for administrators', async () => {

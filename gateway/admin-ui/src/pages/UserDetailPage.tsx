@@ -244,11 +244,13 @@ function UserDetail({ userId }: { userId: number }) {
                   write={setPluginPolicy}
                 />
                 <UserQualificationCard
+                  key={`steward:${userId}:${user.role}:${user.status}`}
                   name={t('qualStewardName')}
                   description={t('qualStewardDescription')}
                   userId={userId}
                   read={getStewardPolicy}
                   write={setStewardPolicy}
+                  ineligible={user.role === 'admin' && user.status === 'active' ? undefined : t('qualStewardRequiresAdmin')}
                 />
               </div>
           </Section>

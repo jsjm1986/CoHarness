@@ -299,6 +299,20 @@ describe('loadConfig', () => {
       .toThrow(/HGW_STEWARD_RUNTIME_USER/)
   })
 
+  it('parses steward read-only roots and rejects malformed declarations', () => {
+    expect(loadConfig({}).steward.readRoots).toEqual([])
+    expect(loadConfig({ HGW_STEWARD_READ_ROOTS: '["/srv/releases","/var/log/gateway"]' }).steward.readRoots)
+      .toEqual(['/srv/releases', '/var/log/gateway'])
+
+    expect(() => loadConfig({ HGW_STEWARD_READ_ROOTS: 'not json' })).toThrow(/HGW_STEWARD_READ_ROOTS/)
+    expect(() => loadConfig({ HGW_STEWARD_READ_ROOTS: '{"/srv":true}' })).toThrow(/HGW_STEWARD_READ_ROOTS/)
+    expect(() => loadConfig({ HGW_STEWARD_READ_ROOTS: '["relative/path"]' })).toThrow(/HGW_STEWARD_READ_ROOTS/)
+    expect(() => loadConfig({ HGW_STEWARD_READ_ROOTS: '["/srv",7]' })).toThrow(/HGW_STEWARD_READ_ROOTS/)
+    expect(() => loadConfig({ HGW_STEWARD_READ_ROOTS: '["/srv/bad\n"]' })).toThrow(/HGW_STEWARD_READ_ROOTS/)
+    expect(() => loadConfig({ HGW_STEWARD_READ_ROOTS: JSON.stringify(Array.from({ length: 65 }, () => '/srv')) }))
+      .toThrow(/HGW_STEWARD_READ_ROOTS/)
+  })
+
   it('rejects an invalid instance port base', () => {
     expect(() => loadConfig({ HGW_INSTANCE_PORT_BASE: '1023' })).toThrow(/HGW_INSTANCE_PORT_BASE/)
     expect(() => loadConfig({ HGW_INSTANCE_PORT_BASE: '65536' })).toThrow(/HGW_INSTANCE_PORT_BASE/)

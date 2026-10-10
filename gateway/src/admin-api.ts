@@ -584,6 +584,20 @@ async function dispatch(
     return true
   }
 
+  if (pathname === '/admin/api/steward' && method === 'GET') {
+    if (deps.stewardAccess === undefined) { sendError(res, 503, 'steward-access-unavailable'); return true }
+    const space = await deps.projects.stewardProject?.() ?? null
+    sendJson(res, 200, {
+      enabled: deps.cfg.steward.enabled,
+      space: space === null ? null : {
+        ...space,
+        runtime: await deps.instances.stateOf({ kind: 'project', id: space.id }),
+      },
+      members: await deps.stewardAccess.list(),
+    })
+    return true
+  }
+
   if ((pathname === '/admin/api/desktops/permissions' || pathname === '/admin/api/terminals/permissions'
     || pathname === '/admin/api/ssh/permissions' || pathname === '/admin/api/plugins/permissions'
     || pathname === '/admin/api/steward/permissions') && (method === 'GET' || method === 'POST')) {

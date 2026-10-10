@@ -646,6 +646,31 @@ export function setStewardPolicy(policy: AdminResourcePolicy): Promise<AdminReso
   return request('/admin/api/steward/permissions', { method: 'POST', body: JSON.stringify(policy) })
 }
 
+/** One organization member's steward qualification as the management surface lists it. */
+export interface StewardAccessEntry {
+  userId: number
+  username: string
+  displayName: string
+  role: 'admin' | 'member'
+  userStatus: string
+  membershipStatus: string
+  grantable: boolean
+  qualified: boolean
+  effective: boolean
+  revision: string
+}
+
+/** Steward space overview: provisioning plus every member's qualification state. */
+export interface StewardOverview {
+  enabled: boolean
+  space: { id: number; name: string; path: string; runtime: string } | null
+  members: StewardAccessEntry[]
+}
+
+export function getStewardOverview(signal?: AbortSignal): Promise<StewardOverview> {
+  return request('/admin/api/steward', { signal })
+}
+
 /** Administrator-registered OpenSSH target with its project shares. */
 export interface AdminSshTarget {
   publicId: number

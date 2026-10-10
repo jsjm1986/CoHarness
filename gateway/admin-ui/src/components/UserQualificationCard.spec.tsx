@@ -42,6 +42,31 @@ describe('UserQualificationCard', () => {
     expect(screen.getByText(/版本 2/)).toBeTruthy()
   })
 
+  it('locks granting for an ineligible account and explains why', async () => {
+    render(<UserQualificationCard name="维护空间" description="叠加在管理员身份之上的授权。" userId={1}
+      read={api.getSshPolicy} write={api.setSshPolicy} ineligible="仅活跃组织管理员可被授予。" />)
+    const checkbox = await screen.findByRole('checkbox', { name: '授予此用户维护空间资格' })
+    expect((checkbox as HTMLInputElement).disabled).toBe(true)
+    expect(screen.getByText('仅活跃组织管理员可被授予。')).toBeTruthy()
+    expect(screen.getByText('不可授予')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /保存维护空间授权/ })).toBeNull()
+    expect(api.setSshPolicy).not.toHaveBeenCalled()
+  })
+
+  it('keeps a stale grant revocable for an ineligible account', async () => {
+    vi.mocked(api.getSshPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: true, revision: '3' })
+    vi.mocked(api.setSshPolicy).mockResolvedValue({ kind: 'user', id: 1, enabled: false, revision: '4' })
+    const user = userEvent.setup()
+    render(<UserQualificationCard name="维护空间" description="叠加在管理员身份之上的授权。" userId={1}
+      read={api.getSshPolicy} write={api.setSshPolicy} ineligible="仅活跃组织管理员可被授予。" />)
+    const checkbox = await screen.findByRole('checkbox')
+    expect((checkbox as HTMLInputElement).disabled).toBe(true)
+    expect(screen.getByText('授权已失效')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '清除失效授权' }))
+    expect(api.setSshPolicy).toHaveBeenCalledWith({ kind: 'user', id: 1, enabled: false, revision: '3' })
+    expect(await screen.findByRole('status')).toHaveProperty('textContent', '资格已撤销，已通知运行中的会话重新核验。')
+  })
+
   it('shows a reload action when the initial read fails', async () => {
     vi.mocked(api.getSshPolicy).mockRejectedValueOnce(new Error('network unavailable'))
     const user = userEvent.setup()

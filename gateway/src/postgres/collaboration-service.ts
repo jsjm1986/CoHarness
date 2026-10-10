@@ -58,11 +58,11 @@ export class PostgresCollaborationService {
         AND member.project_id=p.id AND member.user_id=actor.id
       WHERE actor.organization_id=$1 AND actor.public_id=$2 AND actor.status='active'
         AND p.status='active'
-        -- The steward space keeps no member rows: the qualification lane alone
-        -- admits at rw, so organization admins without a grant are denied and
-        -- qualified members do not need a project membership.
+        -- The steward space keeps no member rows: admission needs an active
+        -- administrator membership plus an enabled qualification row, so the
+        -- lane can never outlive a role downgrade.
         AND (p.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL)
-          OR p.kind='steward' AND EXISTS (
+          OR p.kind='steward' AND membership.role='admin' AND EXISTS (
             SELECT 1 FROM harness.steward_access_policies sp
             WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled))
         AND ($4::bigint IS NULL OR p.public_id=$4)
@@ -134,9 +134,9 @@ export class PostgresCollaborationService {
       LEFT JOIN harness.project_members member ON member.organization_id=r.organization_id
         AND member.project_id=r.project_id AND member.user_id=actor.id
       WHERE c.organization_id=$1 AND c.id=$3 AND c.status<>'deleted' AND r.status<>'deleted'
-        AND (p.kind<>'steward' OR EXISTS (
+        AND (p.kind<>'steward' OR (membership.role='admin' AND EXISTS (
           SELECT 1 FROM harness.steward_access_policies sp
-          WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled))`,
+          WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled)))`,
     [this.context.organizationId, userId, sessionId])
     return result.rows[0] ?? null
   }
@@ -158,6 +158,8 @@ export class PostgresCollaborationService {
       WHERE c.organization_id=$1 AND c.id=$2 AND c.status<>'deleted' AND r.status<>'deleted'
         AND (p.kind<>'steward' OR EXISTS (
           SELECT 1 FROM harness.users ua
+          JOIN harness.memberships um ON um.organization_id=ua.organization_id
+            AND um.user_id=ua.id AND um.status='active' AND um.role='admin'
           JOIN harness.steward_access_policies sp ON sp.organization_id=ua.organization_id
             AND sp.user_id=ua.id AND sp.enabled
           WHERE ua.organization_id=$1 AND ua.public_id=$3 AND ua.status='active'))
@@ -173,8 +175,9 @@ export class PostgresCollaborationService {
       FOR SHARE OF actor,membership`, [this.context.organizationId, userId])
     const current = actor.rows[0]
     if (current === undefined) return { access, authority: null }
-    // A steward row already proved an active qualification in the outer WHERE;
-    // the lane grants rw and keeps the membership table unused for this space.
+    // A steward row already proved administrator membership plus an enabled
+    // qualification in the outer WHERE; the lane grants rw and keeps the
+    // project's member table unused for this space.
     if (access.project_kind === 'steward') {
       return {
         access: { ...access, access_mode: 'rw' },
@@ -272,7 +275,7 @@ export class PostgresCollaborationService {
       WHERE r.organization_id=$1 AND p.public_id=$2 AND r.id=r.root_session_id
         AND r.status<>'deleted'
         AND (membership.role='admin' OR r.visibility='project' OR creator.id=actor.id)
-        AND (p.kind='steward' AND EXISTS (
+        AND (p.kind='steward' AND membership.role='admin' AND EXISTS (
             SELECT 1 FROM harness.steward_access_policies sp
             WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled)
           OR p.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL))
@@ -340,7 +343,7 @@ export class PostgresCollaborationService {
         AND ((r.project_id IS NULL AND r.creator_user_id=actor.id)
           OR (p.id IS NOT NULL
             AND (membership.role='admin' OR r.visibility='project' OR r.creator_user_id=actor.id)
-            AND (p.kind='steward' AND EXISTS (
+            AND (p.kind='steward' AND membership.role='admin' AND EXISTS (
                 SELECT 1 FROM harness.steward_access_policies sp
                 WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled)
               OR p.kind<>'steward' AND (membership.role='admin' OR member.user_id IS NOT NULL))))
@@ -379,10 +382,11 @@ export class PostgresCollaborationService {
         AND membership.user_id=actor.id AND membership.status='active'
       LEFT JOIN harness.project_members member ON member.organization_id=r.organization_id
         AND member.project_id=r.project_id AND member.user_id=actor.id
-      WHERE (p.kind='steward' AND EXISTS (
+      -- Admission already requires an administrator, whose role bypasses the
+      -- visibility gate; keep the arm flat rather than re-checking visibility.
+      WHERE (p.kind='steward' AND membership.role='admin' AND EXISTS (
           SELECT 1 FROM harness.steward_access_policies sp
           WHERE sp.organization_id=actor.organization_id AND sp.user_id=actor.id AND sp.enabled)
-        AND (membership.role='admin' OR r.visibility='project' OR r.creator_user_id=actor.id)
         OR p.kind<>'steward' AND (membership.role='admin' OR (member.user_id IS NOT NULL
           AND (r.visibility='project' OR r.creator_user_id=actor.id))))`,
     [this.context.organizationId, userId, projectId, sessionIds])

@@ -10,6 +10,7 @@ Tool surface for the reserved **steward** maintenance runtime: one audited SQL c
 - Read statements (`SELECT`/`WITH`/`VALUES`/`TABLE`/`SHOW`/`EXPLAIN`) execute directly. Anything else first asks the operator through the session approval channel, then carries the granted approval id to the Gateway, which re-verifies it against `conversation_interaction_responses` before executing.
 - `dry_run` returns the statement's `EXPLAIN` plan without executing — including for writes, which need no approval because nothing is applied.
 - Every attempt — read, denied, failed, applied — is journaled by the Gateway in `harness.steward_query_log`.
+- Registers the `steward:policy` system-prompt section so the model knows it runs in the maintenance channel: audited SQL, read-only transactions, in-conversation write approval, journaling.
 
 ## Boundary (honest limits)
 
@@ -20,4 +21,4 @@ Tool surface for the reserved **steward** maintenance runtime: one audited SQL c
 
 ## Tests
 
-`tests/query.spec.ts` covers statement classification and the approval-prompt preview. The executor contract is covered by Gateway tests beside `steward-query.ts`.
+`tests/query.spec.ts` covers statement classification and the approval-prompt preview; `tests/composition.spec.ts` covers the registered section, tool, and their disposal. The executor contract is covered by Gateway tests beside `steward-query.ts`.

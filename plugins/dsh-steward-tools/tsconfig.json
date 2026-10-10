@@ -15,7 +15,8 @@
       "@deepseek-ai/cordis": ["../../vendor/cordis/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-tools": ["../../packages/core/tools/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-session": ["../../packages/core/session/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-gateway-runtime": ["../../packages/context/gateway-runtime/lib/types/index.d.ts"]
+      "@deepseek-ai/dsh-gateway-runtime": ["../../packages/context/gateway-runtime/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-system-prompt": ["../../packages/core/system-prompt/lib/types/index.d.ts"]
     }
   },
   "include": ["src", "tests"]

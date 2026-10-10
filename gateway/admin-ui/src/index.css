@@ -1621,6 +1621,15 @@ a {
   gap: 12px;
 }
 
+.ruleList {
+  margin: 0;
+  padding-inline-start: 1.2em;
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
 .definitionRow {
   min-width: 0;
 }

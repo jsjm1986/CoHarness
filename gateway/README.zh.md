@@ -69,6 +69,7 @@ DeepSeek Harness 公网化门户网关：PostgreSQL 支撑的登录/会话、用
 | `HGW_STEWARD_SOURCE` | （空） | 以其 `HEAD` 在维护工作区供给 `git worktree` 的仓库检出；为空时保留普通目录 |
 | `HGW_STEWARD_TOOLS_PACKAGE` | `<仓库>/plugins/dsh-steward-tools` | 物化进维护运行时 profile 的 steward 查询工具包；release 模式固定在 `HGW_RELEASE_ROOT` 内 |
 | `HGW_STEWARD_RUNTIME_USER` | `HGW_PROJECT_RUNTIME_USER` | 维护 systemd 单元使用的专用 Linux 账户；不得为 `root` |
+| `HGW_STEWARD_READ_ROOTS` | （空） | 维护运行时在部署树之外可读的额外绝对目录 JSON 数组——例如日志目录 |
 | `HGW_STEWARD_PROJECT_NAME` | `维护中枢` | 保留维护项目的显示名称 |
 
 生产安装、切流与验收见 [deploy/README.md](deploy/README.zh.md)。
@@ -103,7 +104,7 @@ SSH 目标元数据在 `/admin/ssh` 管理。可选的 `passwordRef` 是连接�
 
 `HGW_STEWARD=on` 为每个组织保留一个项目空间（`kind='steward'`，默认名称 `维护中枢`），作为维护部署本身的常驻运行时。迁移 051 增加项目类别、按用户授权的 `steward_access_policies` 资格通道和 `steward_query_log` 审计表；启动时播种项目行、供给 `HGW_STEWARD_WORKSPACE`（配置了 `HGW_STEWARD_SOURCE` 时为其 `git worktree`），并调用一次 `ensureRunning`——崩溃由 supervisor 的 `Restart=always` 恢复，管理员显式停止则保持停止，直到下一次 Gateway 启动或显式拉起。本地 launcher 没有 supervisor，常驻语义只覆盖 Gateway 进程存活期。
 
-维护空间的准入由资格通道单独决定：启用的 `steward_access_policies` 行让任何活跃用户以 `rw` 进入，无资格的组织管理员同样被拒绝——成员表保持为空，成员与邀请变更一律拒绝。管理员在用户详情页以版本栅栏编辑按用户资格。维护运行时运行固定组装（`dsh-steward-tools` 经 profile 补丁挂载）；插件状态与插件管理写入拒绝 steward owner，因此常驻运行时永远不会因组装变更重启自己。
+维护空间的准入把授权叠加在管理员身份之上：启用的 `steward_access_policies` 行让活跃组织管理员以 `rw` 进入，无授权的管理员和持有授权行的普通成员同样被拒——成员表保持为空，成员与邀请变更一律拒绝。对非管理员的启用写入在授权事务内失败，每条准入路径读时复核角色，降级立即终止准入，迁移 052 删除永不可能生效的授权行。管理员在 `/admin/steward` 页集中管理授权，也可在用户详情页以版本栅栏逐用户编辑。steward 运行时的目录授权覆盖其工作区（`rw`）加部署树（`HGW_RELEASE_ROOT` 布局下是 releases 集合目录，否则是仓库根）以及 `HGW_STEWARD_READ_ROOTS` 声明的根（`ro`）。维护运行时运行固定组装（`dsh-steward-tools` 经 profile 补丁挂载）；插件状态与插件管理写入拒绝 steward owner，因此常驻运行时永远不会因组装变更重启自己。
 
 Agent 的 `steward_query` 工具到达 `POST /internal/runtime/steward/query`：校验运行时令牌、确认目标项目是活跃的 steward 行、在服务端重新分类 SQL，并把每次尝试连同运行时 generation 写入 `steward_query_log`。判为只读的语句在 `READ ONLY` 事务内执行——关键字测试只选择通道，由 PostgreSQL 强制只读，因此 `EXPLAIN ANALYZE` 和可写 CTE 会失败并被审计，而不是被夹带放行——外加语句（64 KiB）、行数（至多 5000）、结果（256 KiB）与超时（15 秒）限额；`dry_run` 改为返回 `EXPLAIN` 计划。写语句需要同一 steward 项目会话内、仍具资格的应答者在 15 分钟内授予的 `allowed-once` 交互批准；审批上的 advisory 锁把并发写串行化，使一次批准恰好只能放行一次写入，写入随后在同时写入审计行的事务内执行。v1 刻意不提供通用运行时调用代理和发版激活自动化：代码改动仍走 worktree → PR → 发版流水线，审计 SQL 之外的管理操作仍在 `/admin` 完成。
 

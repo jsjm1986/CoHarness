@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { dirname } from 'node:path'
 import { isIP } from 'node:net'
 import type { Duplex } from 'node:stream'
 import * as httpProxy from 'http-proxy-3'
@@ -10,8 +11,10 @@ import {
   writeProjectModelGovernanceFile,
 } from './apply-model-governance.ts'
 import type { UserRow } from './auth.ts'
+import type { GatewayConfig } from './config.ts'
+import type { EffectiveGrant } from './projects.ts'
 import { gateCopy, gateLanguage, stoppedPage, waitingPage } from './html.ts'
-import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, type RuntimeTarget } from './instances.ts'
+import { RuntimeLeaseUnavailableError, RuntimeStartBlockedError, type ProjectRuntime, type RuntimeTarget } from './instances.ts'
 import { PRINCIPAL_HEADER, type GatewayPrincipalSigner } from './principal.ts'
 import { runtimeDirectoryGrants } from './runtime-directory-grants.ts'
 import { parseCookies, SESSION_COOKIE, type GatewayAccessInvalidation, type GatewayDeps, type GatewayRequestContext, type ProxyHandler, type UpgradeHandler } from './server.ts'
@@ -36,6 +39,26 @@ function publicLocation(value: string): string {
   }
   if (!isLoopbackHostname(target.hostname)) return value
   return `${target.pathname}${target.search}${target.hash}` || '/'
+}
+
+/**
+ * Directory grants projected into a project runtime's policy file. A standard
+ * project only gets its own workspace at rw; the steward space additionally
+ * reads the deployment tree — the releases collection under managed layouts,
+ * the repository root otherwise — plus operator-declared roots such as a log
+ * directory, because the channel exists to inspect what it maintains.
+ * @param cfg - resolved gateway configuration.
+ * @param project - the runtime's project owner facts.
+ * @returns the grant rows written to `directory-grants.json`.
+ */
+export function projectRuntimeGrants(cfg: GatewayConfig, project: ProjectRuntime): EffectiveGrant[] {
+  const grants: EffectiveGrant[] = [{ path: project.path, mode: 'rw', label: project.name }]
+  if (project.steward === true) {
+    const deploymentRoot = cfg.releaseRoot === undefined ? cfg.dshRepoRoot : dirname(cfg.releaseRoot)
+    grants.push({ path: deploymentRoot, mode: 'ro', label: deploymentRoot })
+    for (const path of cfg.steward.readRoots) grants.push({ path, mode: 'ro', label: path })
+  }
+  return grants
 }
 
 /** Keep high-volume resumable data-plane requests out of one-row-per-request audit logs. */
@@ -134,11 +157,7 @@ export function createProxyHandlers(
       if (deps.governance !== undefined) await writeModelGovernanceFile(cfg, deps.governance, runtime.user)
     } else {
       if (runtime.project === undefined) throw new Error(`runtime ${runtime.runtimeKey} has no owner facts`)
-      writeRuntimeGrantsFile(runtime.dshHome, [{
-        path: runtime.project.path,
-        mode: 'rw',
-        label: runtime.project.name,
-      }], cfg.projectRuntimesRoot)
+      writeRuntimeGrantsFile(runtime.dshHome, projectRuntimeGrants(cfg, runtime.project), cfg.projectRuntimesRoot)
       if (deps.governance !== undefined) {
         await writeProjectModelGovernanceFile(cfg, deps.governance, runtime.project)
       }
