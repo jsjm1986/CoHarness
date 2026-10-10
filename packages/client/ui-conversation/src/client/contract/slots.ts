@@ -10,7 +10,7 @@ import type {
   ObservableSnapshot, PendingWait, SessionId, SessionPendingEntry, ToolCallBlock,
   TurnLocation, WorkspaceId,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationViewportSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationViewportSnapshot, ProjectUiPolicySnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageId } from '@deepseek-ai/dsh-client-connection/client'
 import type { PermissionCatalog } from '@deepseek-ai/dsh-permission-presets/client'
@@ -585,6 +585,12 @@ export interface ConversationInjected {
     composerBlock: ObservableSnapshot<ComposerBlock | undefined>
     /** Account-backed transcript width and font-size preferences. */
     displaySettings: ObservableSnapshot<ConversationDisplaySettingsSnapshot>
+    /**
+     * Runtime-owned account scope policy (the projectUiPolicy service face):
+     * the pane reads the steward marker for the composer placeholder without
+     * importing the collaboration plugin that publishes it.
+     */
+    projectPolicy: ObservableSnapshot<ProjectUiPolicySnapshot>
   }
   /** Persist a transcript width from the desktop resize handle. */
   setDisplayWidth: (value: number) => void

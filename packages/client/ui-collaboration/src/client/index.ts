@@ -79,6 +79,7 @@ export function apply(ctx: ClientContext): void {
         projectId: scope.projectId,
         projectName: scope.projectName,
         canManage: scope.canManage === true,
+        steward: scope.steward === true,
       })
     }
     const unsubscribe = collaboration.subscribe(syncPolicy)

@@ -10,7 +10,7 @@ import {
   createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS, SessionCreateError,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  ConversationSnapshot, SessionId, SessionListState, WorkspaceId, WorkspaceListState, WorkspaceView,
+  ConversationSnapshot, ProjectUiPolicySnapshot, SessionId, SessionListState, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationPaneProps, ConversationPaneProps as ConversationRootProps } from '../src/client/skeleton/ConversationRoot.tsx'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
@@ -111,6 +111,8 @@ function mount(
     summaryOrigin?: 'subagent'
     /** A composer block another plugin raised for this session. */
     composerBlock?: { reason: string }
+    /** Account scope policy driving the pane's steward placeholder. */
+    projectPolicy?: ProjectUiPolicySnapshot
     /** Client-local Workspace hint retained while a blank draft awaits Host attachment. */
     summaryWorkspaceId?: WorkspaceId
     /** Mutable view ledger used by registration-order regressions. */
@@ -278,6 +280,9 @@ function mount(
     useProjection: (() => undefined),
     useComposerBlock: (select: (value: ComposerBlock | undefined) => unknown) => select(options.composerBlock),
     useDisplaySettings: bindSnapshotSelector(displaySettings),
+    useProjectPolicy: bindSnapshotSelector(createSnapshotStore<ProjectUiPolicySnapshot>(options.projectPolicy ?? {
+      scope: 'personal', theme: 'follow-user', revision: 0, accountPermissions: 'unknown',
+    })),
     setDisplayWidth: (value: number) => {
       const width = Math.min(1080, Math.max(560, Math.round(value)))
       displaySettings.set({ ...displaySettings.getSnapshot(), chatContentWidth: width, chatFullWidth: false })
@@ -470,6 +475,22 @@ describe('ConversationRoot resident composer', () => {
     })
     expect(typeof (seat('conversation.input.model') as { onOpenSettings?: unknown } | undefined)?.onOpenSettings).toBe('function')
     expect(seat('conversation.input.plan')).toEqual({ locked: true })
+  })
+
+  it('hints the steward contract in the composer while the reserved space is active', () => {
+    const policy = (steward?: boolean): ProjectUiPolicySnapshot => ({
+      scope: 'project', theme: 'follow-user', revision: 1, accountPermissions: 'standard',
+      ...(steward === undefined ? {} : { steward }),
+    })
+    const steward = mount(conversationSnapshot(), undefined, undefined, { projectPolicy: policy(true) })
+    expect((steward.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
+      .toBe('询问维护中枢，或描述要检查的对象…')
+    const ordinary = mount(conversationSnapshot(), undefined, undefined, { projectPolicy: policy() })
+    expect((ordinary.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
+      .toBe('给智能体发消息')
+    const personal = mount(conversationSnapshot())
+    expect((personal.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
+      .toBe('给智能体发消息')
   })
 
   it('lets the no-workspace posture win over a block', () => {

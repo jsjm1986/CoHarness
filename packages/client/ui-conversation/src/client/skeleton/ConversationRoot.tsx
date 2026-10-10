@@ -146,7 +146,7 @@ export type ConversationPaneProps = ConversationPaneSlotProps
 /** Render one Session's complete conversation surface. */
 export function ConversationPane({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
-  useDisplaySettings, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace,
+  useDisplaySettings, useProjectPolicy, setDisplayWidth, renderSlot, renderSlotChain, selectWorkspace,
   t, compact = false, active = true, workbench = false, headerLeading,
 }: ConversationPaneProps) {
   const openState = useSession(s => s.openState)
@@ -163,6 +163,7 @@ export function ConversationPane({
   // send; its reason is already localized by whoever raised it.
   const composerBlock = useComposerBlock(block => block)
   const displaySettings = useDisplaySettings(value => value)
+  const stewardScope = useProjectPolicy(policy => policy.steward === true)
   const displaySettingsRef = useRef(displaySettings)
   displaySettingsRef.current = displaySettings
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -333,7 +334,11 @@ export function ConversationPane({
         // block keeps the model seat live because choosing a model is how the
         // user clears it.
         ? { blocked: composerBlock, placeholder: composerBlock.reason }
-        : hero ? { placeholder: t('placeholder.hero') } : {}),
+        : hero ? { placeholder: t('placeholder.hero') }
+          // The steward maintenance space speaks to a runtime that operates
+          // on the deployment itself; its composer hints at that contract
+          // instead of the generic agent prompt.
+          : stewardScope ? { placeholder: t('placeholder.steward') } : {}),
     overlay: renderSlot('conversation.input.overlay', {}),
     leftItems: zone === undefined ? null : renderSlot('conversation.input.left', zone),
     rightItems: zone === undefined ? null : renderSlot('conversation.input.right', zone),

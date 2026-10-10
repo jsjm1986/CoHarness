@@ -32,10 +32,12 @@ export function StewardDock({ useCollaboration, t }: StewardDockProps) {
   )
   if (!steward) return null
   return (
-    <div className={css.banner} role="note">
-      <IconShieldOutline16 size={14} className={css.icon} />
-      <strong className={css.lead}>{t('steward.banner.lead')}</strong>
-      <span>{t('steward.banner.rest')}</span>
+    <div className={css.dock}>
+      <div className={css.bar} role="note">
+        <span className={css.glyph} aria-hidden><IconShieldOutline16 size={16} /></span>
+        <span className={css.lead}>{t('steward.banner.lead')}</span>
+        <span className={css.rest}>{t('steward.banner.rest')}</span>
+      </div>
     </div>
   )
 }

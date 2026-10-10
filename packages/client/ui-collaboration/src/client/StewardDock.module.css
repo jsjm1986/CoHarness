@@ -1,25 +1,60 @@
-/* Amber notice above the composer in the reserved steward space: the warn
-   family marks maintenance scope as a caution surface without claiming an
-   error state. The scope switcher carries the same palette. */
-.banner {
-  display: flex;
-  align-items: baseline;
-  gap: var(--dsw-space-2);
+/* Amber dock card above the composer in the reserved steward space. The
+   geometry is the composer-stack family contract shared with GoalBar,
+   TodoPanel, and QueueDock — inset dock column, 0.5px hairline, radius-lg,
+   36px row — while the warn palette keeps the maintenance identity. */
+
+.dock {
   box-sizing: border-box;
+  width: calc(
+    100% -
+    var(--dsh-composer-side-clearance) -
+    var(--dsh-composer-side-clearance) -
+    var(--dsh-composer-dock-inset) -
+    var(--dsh-composer-dock-inset) -
+    var(--dsh-composer-dock-inset) -
+    var(--dsh-composer-dock-inset)
+  );
+  margin: 0 auto;
+}
+
+.bar {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: calc(var(--dsh-composer-card-max-width) - 4 * var(--dsh-composer-dock-inset));
+  height: 36px;
+  margin: 0 auto;
   padding: var(--dsw-space-1) var(--dsw-space-3);
-  border-radius: var(--dsw-radius-md);
+  border: 0.5px solid var(--dsw-alias-state-warn-secondary);
+  border-radius: var(--dsw-radius-lg);
   background: var(--dsw-alias-state-warn-tertiary);
-  color: var(--dsw-alias-state-warn-label);
-  font-size: 12px;
-  line-height: 18px;
 }
 
-.icon {
+.glyph {
+  display: inline-flex;
   flex: none;
-  align-self: center;
+  color: var(--dsw-alias-state-warn-primary);
 }
 
+/* Matches the dock-family label (13/24 medium) so the card reads as one of
+   the composer-stack cards, tinted rather than alarmed. */
 .lead {
   flex: none;
-  font-weight: 600;
+  font-size: 13px;
+  line-height: 24px;
+  font-weight: 500;
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.rest {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-state-warn-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
