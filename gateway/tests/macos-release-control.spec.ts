@@ -25,6 +25,29 @@ function executable(path: string, source: string): void {
   chmodSync(path, 0o700)
 }
 
+/** The host-platform addon payloads `validate_release` requires of a compiled release. */
+function hostNativePaths(): string[] {
+  const uname = (flag: string): string =>
+    spawnSync('uname', [flag], { encoding: 'utf8' }).stdout.trim()
+  const darwin = `native/system/packages/darwin-${uname('-m')}/bin/system.node`
+  const linux = (arch: string): string[] => [
+    `native/system/packages/linux-${arch}/bin/landlock-run`,
+    `native/system/packages/linux-${arch}/bin/glibc/system.node`,
+    `native/system/packages/linux-${arch}/bin/musl/system.node`,
+  ]
+  switch (`${uname('-s')}-${uname('-m')}`) {
+    case 'Darwin-arm64':
+    case 'Darwin-x86_64':
+      return [darwin]
+    case 'Linux-x86_64':
+      return linux('x64')
+    case 'Linux-aarch64':
+      return linux('arm64')
+    default:
+      return []
+  }
+}
+
 function release(root: string, name: string): string {
   const directory = join(root, name)
   for (const path of [
@@ -47,6 +70,7 @@ function release(root: string, name: string): string {
     'plugins/dsh-model-governance/cordis.patch.yml',
     'plugins/dsh-steward-tools/lib/index.js',
     'plugins/dsh-steward-tools/cordis.patch.yml',
+    ...hostNativePaths(),
   ]) {
     const file = join(directory, path)
     mkdirSync(resolve(file, '..'), { recursive: true })
@@ -217,6 +241,37 @@ printf '%s\n' "$*" > "$CAPTURE"
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('release has no complete compiled Gateway payload')
+    expect(realpathSync(join(root, 'current'))).toBe(realpathSync(previous))
+    expect(existsSync(join(root, '.activation.lock'))).toBe(false)
+  })
+
+  it('rejects a compiled release missing the host native addon before switching current', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-release-native-'))
+    const previous = release(root, 'release-one')
+    const candidate = release(root, 'release-two')
+    pointCurrent(root, previous)
+    const missing = hostNativePaths()[0]
+    expect(missing).toBeDefined()
+    unlinkSync(join(candidate, missing as string))
+    const envFile = environmentFile(root)
+    const state = join(root, 'state')
+    const bin = fakeTools(root, state)
+    writeFileSync(join(state, 'pid'), '100\n')
+    writeFileSync(join(state, 'cwd'), `${realpathSync(previous)}/gateway\n`)
+
+    const result = spawnSync('/bin/bash', [control, 'activate', candidate], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH ?? ''}`,
+        FAKE_STATE: state,
+        HGW_GATEWAY_ENV_FILE: envFile,
+      },
+    })
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(`release payload is missing or empty`)
+    expect(result.stderr).toContain(missing as string)
     expect(realpathSync(join(root, 'current'))).toBe(realpathSync(previous))
     expect(existsSync(join(root, '.activation.lock'))).toBe(false)
   })
