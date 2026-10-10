@@ -261,6 +261,20 @@ describe('Team identity and provisioning', () => {
     expect(ctx.agentTeams.listMembers(lead)[1]).toMatchObject({ name: 'model-worker', model: 'worker-model' })
   })
 
+  it('persists the activated member model so an inactive row outlives its Agent', async () => {
+    const { ctx, lead } = await setup([textResponse('worker done')])
+    const started = await spawn(ctx, lead, 'settled-worker')
+    await waitNoAgent(ctx, started.member.id)
+    // The child inherits the parent's route; the durable snapshot must carry
+    // it so the inactive row reports the member's own stamp.
+    expect(durable(lead).members[0]?.model).toBe('mock')
+    expect(ctx.agentTeams.listMembers(lead)[1]).toMatchObject({
+      name: 'settled-worker',
+      status: 'inactive',
+      model: 'mock',
+    })
+  })
+
   it('creates fresh and fork teammates with immutable names and bounded roster size', async () => {
     const { ctx, lead } = await setup([
       textResponse('lead answer'),

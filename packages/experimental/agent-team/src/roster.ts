@@ -145,7 +145,7 @@ export class TeamRoster {
     }]
     for (const member of state.members.values()) {
       const live = this.ctx.agents.get(member.id)
-      const model = live === undefined ? root.options.model : this.memberModel(live)
+      const model = live === undefined ? member.model : this.memberModel(live)
       result.push({
         id: member.id,
         name: member.name,
@@ -317,9 +317,12 @@ export class TeamRoster {
       }
       throw error
     }
+    const liveChild = this.ctx.agents.get(childId)
+    const declaredModel = liveChild === undefined ? undefined : this.memberModel(liveChild)
     const active = {
       ...member,
       phase: 'active' as const,
+      ...declaredModel === undefined ? {} : { model: declaredModel },
     } satisfies TeamMemberSnapshot
     // Once the continuation accepted its first prompt, it is a real child. If
     // this checkpoint fails, keep the in-memory active edge instead of inventing
@@ -464,7 +467,7 @@ export class TeamRoster {
   /** Build one runtime member row after successful creation. */
   private memberView(member: TeamMemberSnapshot & { readonly phase: 'active' }): TeamMemberView {
     const live = this.ctx.agents.get(member.id)
-    const model = live === undefined ? undefined : this.memberModel(live)
+    const model = live === undefined ? member.model : this.memberModel(live)
     return {
       id: member.id,
       name: member.name,

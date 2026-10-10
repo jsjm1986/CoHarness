@@ -52,6 +52,12 @@ export interface TeamMemberSnapshot {
   readonly provider: string
   readonly context: 'fresh' | 'fork'
   readonly phase: TeamMemberPhase
+  /**
+   * The route the member's own session would resume with, captured from the
+   * live child Agent when it first became active. Absent on members activated
+   * before this field existed and on members that never reached `active`.
+   */
+  readonly model?: string
   readonly error?: string
 }
 
@@ -64,7 +70,12 @@ export interface TeamMemberView {
   readonly description?: string
   readonly provider?: string
   readonly context?: 'fresh' | 'fork'
-  /** Model the member's next request would use: its durable pending selection or last-used route, else its declared creation model. */
+  /**
+   * Model the member's next request would use: a live member resolves its
+   * durable pending selection or last-used route; an inactive member shows
+   * the declared route persisted on its snapshot at activation. Absent for
+   * members activated before that field existed or that never activated.
+   */
   readonly model?: string
   readonly diagnostics: string[]
 }
