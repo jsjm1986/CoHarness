@@ -40,6 +40,21 @@ export interface AuditQueryFilter {
 
 const MAX_LIMIT = 500
 
+/** Action names whose durable suffix already declares the failed result. */
+const FAILURE_ACTION_SUFFIX = /(?:\.(?:failed|denied|locked|error)|-failed)$/
+
+/**
+ * Durable outcome for one audit row: the HTTP status when the row records a
+ * request, otherwise the result declared by the action name.
+ * @param action - durable audit action.
+ * @param status - HTTP status recorded for request rows.
+ * @returns the outcome stored and filtered on.
+ */
+export function auditOutcome(action: string, status: number | undefined): 'success' | 'failure' {
+  if (status !== undefined) return status >= 400 ? 'failure' : 'success'
+  return FAILURE_ACTION_SUFFIX.test(action) ? 'failure' : 'success'
+}
+
 /** LIKE literal escaping shared by the local store; ESCAPE '\\' accompanies every use. */
 function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, match => `\\${match}`)
@@ -67,8 +82,9 @@ function whereClauses(filter: AuditQueryFilter): { clauses: string[]; params: un
   if (filter.actionPrefix !== undefined) { clauses.push(`audit_log.action LIKE ? ESCAPE '\\'`); params.push(`${escapeLike(filter.actionPrefix)}%`) }
   if (filter.queryText !== undefined) { clauses.push(`audit_log.action LIKE ? ESCAPE '\\'`); params.push(`%${escapeLike(filter.queryText)}%`) }
   if (filter.family !== undefined) clauses.push(FAMILY_CLAUSES[filter.family])
-  if (filter.outcome === 'failure') clauses.push('audit_log.status >= 400')
-  else if (filter.outcome === 'success') clauses.push('(audit_log.status IS NULL OR audit_log.status < 400)')
+  const failureMatch = `(COALESCE(audit_log.status, 0) >= 400 OR audit_log.action LIKE '%.failed' ESCAPE '\\' OR audit_log.action LIKE '%.denied' ESCAPE '\\' OR audit_log.action LIKE '%.locked' ESCAPE '\\' OR audit_log.action LIKE '%.error' ESCAPE '\\' OR audit_log.action LIKE '%-failed' ESCAPE '\\')`
+  if (filter.outcome === 'failure') clauses.push(failureMatch)
+  else if (filter.outcome === 'success') clauses.push(`NOT ${failureMatch}`)
   if (filter.fromMs !== undefined) { clauses.push('audit_log.ts >= ?'); params.push(filter.fromMs) }
   if (filter.toMs !== undefined) { clauses.push('audit_log.ts <= ?'); params.push(filter.toMs) }
   return { clauses, params }
@@ -97,7 +113,7 @@ export class AuditService {
        ${where} ORDER BY audit_log.id DESC LIMIT ? OFFSET ?`,
     ).all(...params, Math.min(Math.max(filter.limit ?? 200, 1), MAX_LIMIT), Math.max(filter.offset ?? 0, 0)) as
       Array<{ id: number; ts: number; user_id: number | null; username: string | null; display_name: string | null; action: string; method_path: string; status: number | null; ip: string; detail: string }>
-    return rows.map(r => ({ id: r.id, ts: r.ts, userId: r.user_id, username: r.username, displayName: r.display_name, action: r.action, methodPath: r.method_path, status: r.status, ip: r.ip, detail: r.detail }))
+    return rows.map(r => ({ id: r.id, ts: r.ts, userId: r.user_id, username: r.username, displayName: r.display_name, action: r.action, methodPath: r.method_path, status: r.status, ip: r.ip, detail: r.detail, outcome: auditOutcome(r.action, r.status ?? undefined) }))
   }
 
   /**

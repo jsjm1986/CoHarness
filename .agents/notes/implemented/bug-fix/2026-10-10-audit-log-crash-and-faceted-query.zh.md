@@ -12,7 +12,7 @@
 
 崩溃链:`connectFromPool` 为每个检出 client 挂一次性 `error` 守卫,只记录错误码;`transaction`、`steward-query` 及其 `explain` 路径在失败时改为 `release(error)` 归还,死连接被销毁而不是再次出借。审计端点把 `limit` 钳到 500、`offset` 下限为 0,对非整数 `userId`、未知 `family`/`outcome` 与 `from > to` 返回 HTTP 400。
 
-数据模型:`server.ts` 与 `proxy.ts` 停写成功的 `api` 行,仅 `status >= 400` 的行保留;迁移 `053` 删除历史成功 `api` 行。Admin API 包装层在 catch 中为失败的写端点记录 `admin.request` 行,拒绝与错误不再静默。`login.failed` 与 `login.locked` 改写 `{ username }` JSON。`auditSummary` 放行 `username`、`model`、`provider`、`purpose`、`subject`、steward 的 `classification`/`dryRun`/`rowCount`/`resultBytes`/`approvalId` 及 `target`/`subject` 坐标,原始 detail 仍不投影。
+数据模型:`server.ts` 与 `proxy.ts` 停写成功的 `api` 行,仅 `status >= 400` 的行保留;迁移 `053` 删除历史成功 `api` 行。Admin API 包装层在 catch 中为失败的写端点记录 `admin.request` 行,拒绝与错误不再静默。`login.failed` 与 `login.locked` 改写 `{ username }` JSON。`auditSummary` 放行 `username`、`model`、`provider`、`purpose`、`subject`、steward 的 `classification`/`dryRun`/`rowCount`/`resultBytes`/`approvalId` 及 `target`/`subject` 坐标,原始 detail 仍不投影。非请求行此前一律落成 `outcome='success'`,因为持久列只从 HTTP status 推导——`login.failed` 显示成了成功徽标。`auditOutcome` 现在优先按 status 推导,无 status 时按动作名的失败后缀(`.failed`/`.denied`/`.locked`/`.error`/`-failed`)判定;迁移 `054` 回填历史行。
 
 Steward 镜像:`journal()` 为每次尝试写一条有界的 `audit_events` 行;写路径把镜像插入放进写事务内,审计写入失败会回滚语句。语句原文与错误消息只留在 `steward_query_log`;控制台只看到分类、裁决、大小与审批回执。被拒的写只记一次 `denied`——外层 catch 不再把它重复记为 `error`。
 
@@ -32,4 +32,4 @@ Steward 镜像:`journal()` 为每次尝试写一条有界的 `audit_events` 行;
 
 ## 验证
 
-`postgres.spec` 在事务中途终止检出后端,断言进程存活且连接池恢复;`steward.spec` 断言镜像行与日志行 1:1 相等且不含语句原文;`audit.spec` 覆盖 family/outcome/actor/转义子串筛选、钳制分页、操作者 join 与 `count`;`admin-api.spec` 覆盖非法筛选 400、`x-total-count`、用户名投影与失败删除的单条 `admin.request` 行。迁移 053 已在生产库激活时干净应用。
+`postgres.spec` 在事务中途终止检出后端,断言进程存活且连接池恢复,并验证 `outcome` 按 status 或动作名后缀推导;`steward.spec` 断言镜像行与日志行 1:1 相等且不含语句原文;`audit.spec` 覆盖 family/outcome/actor/转义子串筛选——含无 HTTP status 的失败行——钳制分页、操作者 join 与 `count`;`admin-api.spec` 覆盖非法筛选 400、`x-total-count`、用户名投影与失败删除的单条 `admin.request` 行。迁移 053 在激活前已在生产库分批预执行,登记时成为空操作;迁移 054 在激活时干净应用。

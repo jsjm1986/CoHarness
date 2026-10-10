@@ -42,14 +42,23 @@ function subjectInto(metadata: AuditSummary['metadata'], subject: Record<string,
  * @param row - database-owned result and serialized operation detail.
  * @returns bounded fields shared by PostgreSQL and local SQLite administrators.
  */
-export function auditSummary(row: Pick<AuditRow, 'detail' | 'status' | 'outcome'>): AuditSummary {
+export function auditSummary(row: Pick<AuditRow, 'detail' | 'status' | 'outcome'> & Partial<Pick<AuditRow, 'action'>>): AuditSummary {
   const outcome = row.status !== null && row.status >= 400 ? 'failure'
     : row.outcome === 'failure' ? 'failure'
       : row.outcome === 'unknown' ? 'unknown'
         : row.outcome === 'success' || row.status !== null && row.status >= 200 && row.status < 400 ? 'success' : 'recorded'
   const metadata: AuditSummary['metadata'] = {}
   let parsed: unknown
-  try { parsed = JSON.parse(row.detail) } catch { return { outcome, metadata } }
+  try {
+    parsed = JSON.parse(row.detail)
+  } catch {
+    // login.failed/login.locked rows written before the structured detail carry
+    // the attempted username as a bare string; the name pattern bounds exposure.
+    if ((row.action === 'login.failed' || row.action === 'login.locked') && NAME_PATTERN.test(row.detail)) {
+      metadata.username = row.detail
+    }
+    return { outcome, metadata }
+  }
   const detail = fields(parsed)
   if (detail === undefined) return { outcome, metadata }
   for (const [key, value] of Object.entries(detail)) {

@@ -35,6 +35,7 @@ describe('AuditService', () => {
     const audit = new AuditService(openDb(join(mkdtempSync(join(tmpdir(), 'hgw-')), 'g.sqlite')))
     audit.write({ userId: 1, action: 'login.failed', status: 401 })
     audit.write({ userId: 1, action: 'login', ip: '1.1.1.1' })
+    audit.write({ userId: 1, action: 'model.denied' })
     audit.write({ userId: 1, action: 'api', methodPath: 'POST /api/x', status: 503 })
     audit.write({ userId: 1, action: 'admin.users.set' })
     audit.write({ userId: 1, action: 'steward.query' })
@@ -42,8 +43,11 @@ describe('AuditService', () => {
     expect(audit.query({ family: 'admin' })).toHaveLength(1)
     expect(audit.query({ family: 'steward' })).toHaveLength(1)
     expect(audit.query({ family: 'api' })).toHaveLength(1)
-    expect(audit.query({ family: 'model' })).toHaveLength(0)
-    expect(audit.query({ outcome: 'failure' }).map(r => r.action)).toEqual(['api', 'login.failed'])
+    expect(audit.query({ family: 'model' })).toHaveLength(1)
+    // Non-request rows fail by action-name suffix even without an HTTP status.
+    expect(audit.query({ outcome: 'failure' }).map(r => r.action)).toEqual(['api', 'model.denied', 'login.failed'])
+    expect(audit.query({ outcome: 'failure' })[0]?.outcome).toBe('failure')
+    expect(audit.query({ outcome: 'success', family: 'auth' }).map(r => r.action)).toEqual(['login'])
     expect(audit.query({ outcome: 'success', family: 'admin' })).toHaveLength(1)
     expect(audit.query({ queryText: 'login' })).toHaveLength(2)
     // `_` and `%` in user input match literally, never as wildcards.

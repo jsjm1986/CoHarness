@@ -1,5 +1,5 @@
 import { isIP } from 'node:net'
-import type { AuditFamily, AuditQueryFilter, AuditRow } from '../audit.ts'
+import { auditOutcome, type AuditFamily, type AuditQueryFilter, type AuditRow } from '../audit.ts'
 import { publicNumber, type PostgresRuntimeContext } from './runtime-context.ts'
 
 const MAX_LIMIT = 500
@@ -75,7 +75,7 @@ export class PostgresAuditService {
       entry.action,
       entry.methodPath === undefined || entry.methodPath === '' ? null : 'http',
       sourceIp(entry.ip),
-      entry.status !== undefined && entry.status >= 400 ? 'failure' : 'success',
+      auditOutcome(entry.action, entry.status),
       entry.status ?? null,
       JSON.stringify({ methodPath: entry.methodPath ?? '', detail: detailValue(entry.detail) }),
     ])
