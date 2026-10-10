@@ -265,15 +265,29 @@ export function captureDelegatedPolicyOverrides(parent: Agent): DelegatedPolicyO
  * child's effective policy is reconstructable from its log alone. Appends land
  * after any fork seed, so fresh policy wins stale seed state; later child
  * switches still win over these events.
+ * @param childCtx - the unpublished child's own context, resolving the authority writer.
  * @param childSession - the unpublished child's session.
  * @param overrides - the policy captured at delegation.
  */
 export function appendDelegatedPolicyOverrides(
+  childCtx: Context,
   childSession: Session,
   overrides: DelegatedPolicyOverrides,
 ): void {
   if (overrides.executionScope !== undefined) {
-    childSession.append('gateway/execution', { kind: 'inherit', scope: overrides.executionScope })
+    // The authority writer owns scoped-event ordering: it emits the
+    // `gateway/scoped-execution` reader admission before the first scoped
+    // event, unless an inherited fork prefix already admitted it. A raw append
+    // would leave scoped children unreadable.
+    const authority = executionAuthorityOf(childCtx)
+    if (authority === undefined) {
+      if (overrides.executionScope.scopeId !== undefined) {
+        throw new Error('A scoped delegation cannot persist without its execution authority provider')
+      }
+      childSession.append('gateway/execution', { kind: 'inherit', scope: overrides.executionScope })
+    } else {
+      authority.inherit(childSession, overrides.executionScope)
+    }
   }
   if (overrides.sandboxMode !== undefined) {
     childSession.append('sandbox/mode', { mode: overrides.sandboxMode, source: 'delegation' })
