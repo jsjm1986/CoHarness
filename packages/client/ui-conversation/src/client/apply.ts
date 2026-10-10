@@ -6,7 +6,7 @@ import { resolveSlotLabel, type BoundActions } from '@deepseek-ai/dsh-client-ui-
 import {
   createSnapshotStore, resolveWorkspacePath, workspacePathForResource, workspaceResourceAddress, type ISessions, type SessionId,
   permissionAvailabilitySource, permissionUnavailableReason, commitSessionNavigation,
-  type ObservableSnapshot,
+  type ObservableSnapshot, type ProjectUiPolicySnapshot,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
@@ -113,6 +113,15 @@ const ABSENT_DOCUMENTS = {
 /** No session, therefore no host catalog read; same one-identity rule as above. */
 const ABSENT_PERMISSION_CATALOG = {
   getSnapshot: (): PermissionCatalog | undefined => undefined,
+  subscribe: () => () => {},
+}
+/** Personal-scope policy placeholder while the projectUiPolicy service is
+   absent (standalone profiles); one frozen snapshot so hook caching holds. */
+const ABSENT_POLICY_SNAPSHOT: ProjectUiPolicySnapshot = Object.freeze({
+  scope: 'personal', theme: 'follow-user', revision: 0, accountPermissions: 'unknown',
+})
+const ABSENT_POLICY = {
+  getSnapshot: (): ProjectUiPolicySnapshot => ABSENT_POLICY_SNAPSHOT,
   subscribe: () => () => {},
 }
 
@@ -439,6 +448,7 @@ export function apply(ctx: Context): void {
       hooks: {
         composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId),
         displaySettings,
+        projectPolicy: ctx.get('projectUiPolicy') ?? ABSENT_POLICY,
       },
       selectWorkspace: async (workspaceId, options: WorkspaceSelectionOptions = {}) => {
         const navigation = AbortSignal.any([sessions.beginNavigation(), lifetime.signal])

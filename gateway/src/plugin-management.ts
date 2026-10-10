@@ -237,6 +237,11 @@ export class GatewayPluginManagement {
     }
     const owner = target.kind === 'user' ? await this.deps.users.getById(target.id) : await this.deps.projects.getById(target.id)
     if (owner === null) throw new PluginManagementError(404, 'profile runtime owner not found')
+    // The steward space mounts a fixed composition: a live mutation here could
+    // restart the resident runtime it would be administered through.
+    if (target.kind === 'project' && 'kind' in owner && owner.kind === 'steward') {
+      throw new PluginManagementError(403, 'steward runtime composition is fixed')
+    }
     return target.kind === 'project' && 'name' in owner ? owner.name : ''
   }
 }

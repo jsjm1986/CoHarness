@@ -1,0 +1,9 @@
+# dsh-steward-tools bundle patch.
+#
+# Mount the steward tool surface inside the reserved maintenance runtime. The
+# steward composition is otherwise fixed by the Gateway: plugin management is
+# already denied for steward targets, so a mounted tool can never restart the
+# runtime it runs in.
+- insert:
+    - id: steward-tools
+      name: '@deepseek-ai/dsh-steward-tools'

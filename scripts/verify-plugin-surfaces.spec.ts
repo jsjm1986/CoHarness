@@ -30,6 +30,7 @@ describe('verify-plugin-surfaces', () => {
     expect(facts.externalPluginBundles).toEqual([
       '@deepseek-ai/dsh-directory-guard',
       '@deepseek-ai/dsh-model-governance',
+      '@deepseek-ai/dsh-steward-tools',
     ])
     expect(facts.dynamicClientPackages.length).toBe(58)
     expect(facts.dynamicClientPackages).toContain('@deepseek-ai/dsh-client-ui-workbench')

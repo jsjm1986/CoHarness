@@ -127,6 +127,9 @@ function verifyArtifacts(): void {
     'plugins/dsh-model-governance/lib/index.js',
     'plugins/dsh-model-governance/lib/outbox.js',
     'plugins/dsh-model-governance/cordis.patch.yml',
+    'plugins/dsh-steward-tools/lib/index.js',
+    'plugins/dsh-steward-tools/lib/query.js',
+    'plugins/dsh-steward-tools/cordis.patch.yml',
     'packages/context/archive-gateway/lib/index.js',
   ]) requireFile(resolve(root, path), failures)
   if (!gatewayRuntimePackageLinksValid()) {
@@ -153,6 +156,11 @@ if (!process.argv.includes('--verify-only')) {
     {
       label: 'model governance plugin',
       cwd: resolve(root, 'plugins/dsh-model-governance'),
+      args: ['run', 'build'],
+    },
+    {
+      label: 'steward tools plugin',
+      cwd: resolve(root, 'plugins/dsh-steward-tools'),
       args: ['run', 'build'],
     },
     { label: 'Gateway artifact', cwd: resolve(root, 'gateway'), args: ['run', 'build'] },

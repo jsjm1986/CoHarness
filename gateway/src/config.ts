@@ -146,6 +146,41 @@ export interface GatewayConfig {
   desktopDriverCommand?: string
   /** Driver argv replacing the default `mcp` arguments (HGW_DESKTOP_DRIVER_ARGS, JSON string array). */
   desktopDriverArgs?: string[]
+  /** Resident steward space provisioning and launch identity (HGW_STEWARD_*). */
+  steward: StewardSpaceConfig
+}
+
+/** Resident steward space configuration; disabled unless HGW_STEWARD=on. */
+export interface StewardSpaceConfig {
+  /** Reserved steward space toggle; postgres deployments only (HGW_STEWARD). */
+  enabled: boolean
+  /** Reserved project display name (HGW_STEWARD_PROJECT_NAME). */
+  projectName: string
+  /**
+   * Root owning the steward workspace. The systemd launcher treats it as an
+   * additional project path root so the privileged steward unit passes path
+   * validation while ordinary project units keep it masked
+   * (HGW_STEWARD_ROOT).
+   */
+  root: string
+  /** Steward workspace directory — the resident runtime's cwd (HGW_STEWARD_WORKSPACE). */
+  workspacePath: string
+  /**
+   * Git repository the workspace forks from as a detached worktree
+   * (HGW_STEWARD_SOURCE). Empty keeps a plain directory: the agent still has
+   * shell and file tools, just no repository checkout.
+   */
+  sourcePath: string
+  /** Steward-tools policy package directory materialized into the steward profile (HGW_STEWARD_TOOLS_PACKAGE). */
+  toolsPackage: string
+  /**
+   * Extra read-only roots projected into the steward runtime's directory
+   * grants beyond the deployment tree itself — for example a releases
+   * collection or a log directory (HGW_STEWARD_READ_ROOTS, JSON array).
+   */
+  readRoots: string[]
+  /** Linux account steward systemd units run under (HGW_STEWARD_RUNTIME_USER, default HGW_PROJECT_RUNTIME_USER). */
+  runtimeUser: string
 }
 
 const gatewayRoot = resolve(import.meta.dirname, '..')
@@ -301,6 +336,26 @@ function parseDesktopDriverArgs(value: string): string[] {
   if (!Array.isArray(parsed) || parsed.length > 64
     || parsed.some(arg => typeof arg !== 'string' || arg === '' || arg.length > 4096 || /[\u0000-\u001f\u007f]/u.test(arg))) {
     throw new Error('HGW_DESKTOP_DRIVER_ARGS must be a JSON array of at most 64 non-empty strings without control characters')
+  }
+  return parsed as string[]
+}
+
+/**
+ * Parse HGW_STEWARD_READ_ROOTS: a JSON array of absolute directory paths the
+ * steward runtime may read on top of its workspace and the deployment tree.
+ * @param value - raw environment value.
+ * @returns validated absolute paths, preserving deployment order.
+ */
+function parseStewardReadRoots(value: string): string[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(value)
+  } catch {
+    throw new Error('HGW_STEWARD_READ_ROOTS must be a JSON array of absolute paths')
+  }
+  if (!Array.isArray(parsed) || parsed.length > 64
+    || parsed.some(path => typeof path !== 'string' || !posix.isAbsolute(path) || /[\u0000-\u001f\u007f]/u.test(path))) {
+    throw new Error('HGW_STEWARD_READ_ROOTS must be a JSON array of at most 64 absolute paths without control characters')
   }
   return parsed as string[]
 }
@@ -534,6 +589,34 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     throw new Error('HGW_DESKTOP_DRIVER_COMMAND must be a non-empty executable name or path without control characters')
   }
   const desktopDriverArgs = env.HGW_DESKTOP_DRIVER_ARGS === undefined ? undefined : parseDesktopDriverArgs(env.HGW_DESKTOP_DRIVER_ARGS)
+  const stewardEnabled = env.HGW_STEWARD === 'on'
+  const stewardRoot = normalizedAbsolutePath(env.HGW_STEWARD_ROOT ?? join(homedir(), 'harness-steward'))
+  const stewardWorkspacePath = normalizedAbsolutePath(env.HGW_STEWARD_WORKSPACE ?? join(stewardRoot, 'workspace'))
+  const stewardSourcePath = env.HGW_STEWARD_SOURCE === undefined ? '' : normalizedAbsolutePath(env.HGW_STEWARD_SOURCE)
+  const releaseStewardToolsPackage = releaseRoot === undefined
+    ? undefined
+    : join(releaseRoot, 'plugins/dsh-steward-tools')
+  if (releaseStewardToolsPackage !== undefined && env.HGW_STEWARD_TOOLS_PACKAGE !== undefined) {
+    requireReleasePath(env.HGW_STEWARD_TOOLS_PACKAGE, releaseStewardToolsPackage, 'HGW_STEWARD_TOOLS_PACKAGE')
+  }
+  const stewardRuntimeUser = env.HGW_STEWARD_RUNTIME_USER ?? projectRuntimeUser
+  if (stewardEnabled) {
+    if (!posix.isAbsolute(stewardRoot) || stewardRoot === '/') {
+      throw new Error('HGW_STEWARD_ROOT must be an absolute path')
+    }
+    if (!strictlyNestedPath(stewardRoot, stewardWorkspacePath)) {
+      throw new Error('HGW_STEWARD_WORKSPACE must be a strict descendant of HGW_STEWARD_ROOT')
+    }
+    if (pathsOverlap(stewardRoot, usersRoot) || pathsOverlap(stewardRoot, projectRuntimesRoot)
+      || pathsOverlap(stewardRoot, userProjectsRoot) || pathsOverlap(stewardRoot, projectsRoot)
+      || pathsOverlap(stewardRoot, gatewayDir) || pathsOverlap(stewardRoot, principalKeyDir)
+      || pathsOverlap(stewardRoot, runtimeCredentialDir)) {
+      throw new Error('HGW_STEWARD_ROOT overlaps a reserved Gateway directory')
+    }
+    if (!SYSTEMD_ACCOUNT_RE.test(stewardRuntimeUser) || stewardRuntimeUser === 'root') {
+      throw new Error('HGW_STEWARD_RUNTIME_USER is not a valid systemd account')
+    }
+  }
   const memoryMax = systemdMemoryValue(env.HGW_MEMORY_MAX ?? '1G', 'HGW_MEMORY_MAX')
   const cpuQuota = systemdCpuValue(env.HGW_CPU_QUOTA ?? '100%', 'HGW_CPU_QUOTA')
   const systemdUnitDir = env.HGW_SYSTEMD_UNIT_DIR ?? '/etc/systemd/system'
@@ -551,7 +634,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     publicOrigins,
     usersRoot,
     projectRuntimesRoot,
-    projectPathRoots: configuredProjectPathRoots,
+    // The steward root joins the masked project path roots so ordinary
+    // project units cannot see the maintenance workspace while the
+    // privileged steward unit passes the same containment validation.
+    projectPathRoots: stewardEnabled ? [...configuredProjectPathRoots, stewardRoot] : configuredProjectPathRoots,
     userProjectsRoot,
     projectsRoot,
     projectRuntimeUser,
@@ -609,5 +695,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
     desktopDriverPackage,
     desktopDriverCommand,
     desktopDriverArgs,
+    steward: {
+      enabled: stewardEnabled,
+      projectName: env.HGW_STEWARD_PROJECT_NAME ?? '维护中枢',
+      root: stewardRoot,
+      workspacePath: stewardWorkspacePath,
+      sourcePath: stewardSourcePath,
+      toolsPackage: releaseStewardToolsPackage
+        ?? env.HGW_STEWARD_TOOLS_PACKAGE
+        ?? join(dshRepoRoot, 'plugins/dsh-steward-tools'),
+      readRoots: env.HGW_STEWARD_READ_ROOTS === undefined ? [] : parseStewardReadRoots(env.HGW_STEWARD_READ_ROOTS),
+      runtimeUser: stewardRuntimeUser,
+    },
   }
 }

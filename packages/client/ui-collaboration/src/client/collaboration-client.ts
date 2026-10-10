@@ -25,6 +25,8 @@ export interface ProjectMembership {
   owner?: { id: number; username: string; displayName: string } | null
   /** Theme policy applied while this project is active. */
   uiThemePolicy?: ProjectThemePolicy
+  /** Reserved space category; `steward` marks the resident maintenance space. */
+  kind?: 'standard' | 'steward'
 }
 
 /** One project invitation returned by the account API. */
@@ -59,7 +61,16 @@ export interface UserSummary {
 /** Active Gateway scope for the browser page. */
 export type CollaborationScope =
   | { kind: 'personal' }
-  | { kind: 'project'; projectId: number; projectName: string; mode: 'ro' | 'rw'; canManage?: boolean; uiThemePolicy?: ProjectThemePolicy }
+  | {
+    kind: 'project'
+    projectId: number
+    projectName: string
+    mode: 'ro' | 'rw'
+    canManage?: boolean
+    uiThemePolicy?: ProjectThemePolicy
+    /** True while the active scope is the reserved steward maintenance space. */
+    steward?: boolean
+  }
 
 /** Target scope shown while the Gateway prepares the next runtime. */
 export type CollaborationScopeTarget =
@@ -275,6 +286,7 @@ function project(value: unknown): ProjectMembership {
     ...(row.origin === 'admin' || row.origin === 'user' ? { origin: row.origin } : {}),
     ...(row.owner === null ? { owner: null } : row.owner === undefined ? {} : { owner: actor(row.owner) }),
     ...(row.uiThemePolicy === undefined ? {} : { uiThemePolicy: themePolicy(row.uiThemePolicy) }),
+    ...(row.kind === 'steward' ? { kind: 'steward' as const } : {}),
   }
 }
 
@@ -318,6 +330,7 @@ export function parseCollaborationContext(value: unknown): CollaborationContext 
         projectName: string(scope.projectName),
         mode: mode(scope.mode),
         ...(scope.canManage === true ? { canManage: true } : {}),
+        ...(scope.steward === true ? { steward: true } : {}),
         ...(scope.uiThemePolicy === undefined ? {} : { uiThemePolicy: themePolicy(scope.uiThemePolicy) }),
       }
       : (() => { throw new Error('invalid collaboration response') })()

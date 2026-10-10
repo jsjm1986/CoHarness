@@ -13,7 +13,7 @@ import { testConfig } from './test-config.ts'
 import { openDb } from '../src/db.ts'
 import { InstanceManager } from '../src/instances.ts'
 import { ProjectService } from '../src/projects.ts'
-import { createProxyHandlers } from '../src/proxy.ts'
+import { createProxyHandlers, projectRuntimeGrants } from '../src/proxy.ts'
 import { GatewayPrincipalSigner, PRINCIPAL_HEADER } from '../src/principal.ts'
 import { createGatewayServer, type GatewayDeps } from '../src/server.ts'
 import { UserService } from '../src/users.ts'
@@ -135,8 +135,7 @@ describe('proxy handlers', () => {
     const port = await deps.instances.portOf(1)
     expect(echoed.host).toBe(`127.0.0.1:${port}`)
     expect(echoed.origin).toBe(`http://127.0.0.1:${port}`)
-    const audited = await deps.audit.query({ action: 'api' })
-    expect(audited[0]?.methodPath).toBe('POST /api/echo')
+    expect(await deps.audit.query({ action: 'api' })).toEqual([])
     const grantsFile = join(root, 'users', 'alice', 'dsh', 'directory-grants.json')
     expect(existsSync(grantsFile)).toBe(true)
     expect(JSON.parse(readFileSync(grantsFile, 'utf8'))).toEqual(await deps.projects.effectiveGrants(1))
@@ -374,5 +373,66 @@ describe('proxy handlers', () => {
     const websocket = JSON.parse(first) as { principal: string }
     expect(websocket.principal).not.toBe('forged')
     expect(signer?.verify(websocket.principal).runtime).toEqual({ kind: 'user', id: 1, generation: 1 })
+  })
+})
+
+describe('projectRuntimeGrants', () => {
+  const steward = { kind: 'project' as const, id: 7, name: 'Steward', path: '/srv/steward/workspace', steward: true }
+  const standard = { kind: 'project' as const, id: 8, name: 'Standard', path: '/srv/standard' }
+
+  it('grants only the workspace read-write to a standard project', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-grants-'))
+    try {
+      const cfg = testConfig(root)
+      expect(projectRuntimeGrants(cfg, standard)).toEqual([
+        { path: '/srv/standard', mode: 'rw', label: 'Standard' },
+      ])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('adds the deployment collection and declared roots read-only for the steward', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-grants-'))
+    try {
+      const base = testConfig(root, {
+        HGW_STEWARD: 'on',
+        HGW_STEWARD_ROOT: join(root, 'steward'),
+        HGW_STEWARD_READ_ROOTS: '["/srv/logs","/srv/more"]',
+      })
+      const cfg = { ...base, releaseRoot: '/srv/releases/coharness-abc' }
+      expect(projectRuntimeGrants(cfg, steward)).toEqual([
+        { path: '/srv/steward/workspace', mode: 'rw', label: 'Steward' },
+        { path: '/srv/releases', mode: 'ro', label: '/srv/releases' },
+        { path: '/srv/logs', mode: 'ro', label: '/srv/logs' },
+        { path: '/srv/more', mode: 'ro', label: '/srv/more' },
+      ])
+      // Without a managed release layout the repository root is the deployment tree.
+      expect(projectRuntimeGrants({ ...cfg, releaseRoot: undefined }, steward)[1])
+        .toMatchObject({ path: base.dshRepoRoot, mode: 'ro' })
+      expect(projectRuntimeGrants(cfg, standard)).toEqual([
+        { path: '/srv/standard', mode: 'rw', label: 'Standard' },
+      ])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('never projects gateway state or credential locations into steward grants', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hgw-grants-'))
+    try {
+      const base = testConfig(root, { HGW_STEWARD: 'on', HGW_STEWARD_ROOT: join(root, 'steward') })
+      const cfg = { ...base, releaseRoot: '/srv/releases/coharness-abc' }
+      const sensitive = [
+        base.stateRoot, base.principalKeyDir, base.runtimeCredentialDir,
+        base.organizationModelCredentialKeyFile, base.webhookSecretKeyFile, base.databaseUrlFile,
+      ].filter((path): path is string => path !== undefined)
+      const paths = projectRuntimeGrants(cfg, steward).map(grant => grant.path)
+      for (const secret of sensitive) {
+        expect(paths.some(granted => secret.startsWith(`${granted}/`) || secret === granted)).toBe(false)
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

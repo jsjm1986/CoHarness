@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-10-audit-log-crash-and-faceted-query.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-10-audit-log-crash-and-faceted-query.md
+/agent-note-audit-log-crash-chain-failure-only-api-rows-and-faceted-admin-audit:
+  en: ff47a79ae6d92630
+  zh: 0ea11cf105e36454
+/agent-note-audit-log-crash-chain-failure-only-api-rows-and-faceted-admin-audit/problem:
+  en: 8f59a3f9ecc0bec2
+  zh: f98a2144964d7b94
+/agent-note-audit-log-crash-chain-failure-only-api-rows-and-faceted-admin-audit/decision:
+  en: 861c568c8c5a372b
+  zh: d93490f8e75d5d71
+/agent-note-audit-log-crash-chain-failure-only-api-rows-and-faceted-admin-audit/alternatives-considered:
+  en: c4e8729d87892424
+  zh: 37231f24cd6b90fd
+/agent-note-audit-log-crash-chain-failure-only-api-rows-and-faceted-admin-audit/consequences:
+  en: 38017ad7c4324540
+  zh: 37b253031587831c
+/agent-note-audit-log-crash-chain-failure-only-api-rows-and-faceted-admin-audit/verification:
+  en: a34660335ced5571
+  zh: 96be89b5a314513d

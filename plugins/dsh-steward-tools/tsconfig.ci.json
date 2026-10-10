@@ -1,0 +1,8 @@
+{
+  // The standalone Gateway lane cannot produce the workspace's emitted
+  // lib/types, so this face emits the bundle transpile-only for Gateway tests
+  // to materialize. Type fidelity is checked by the base configs once the
+  // workspace has been built.
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": { "noCheck": true, "types": [] }
+}

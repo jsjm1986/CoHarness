@@ -162,6 +162,7 @@
         "packages/host/apiproxy",
         "packages/client/connection",
         "plugins/dsh-directory-guard",
+        "plugins/dsh-steward-tools",
         "gateway"
       ],
       "lanes": [

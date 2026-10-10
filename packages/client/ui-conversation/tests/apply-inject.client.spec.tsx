@@ -19,6 +19,7 @@ import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope, stubDeve
 import type { SessionBehaviorOverrides } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { ISession, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import { ProjectUiPolicyRuntime } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {
   ChatViewInjected, ComposerBarInjected, ConversationInjected, ConversationSessionHeaderInjected,
@@ -152,6 +153,21 @@ describe('conversation slot inject API', () => {
     expect(b.runtime.sessions.calls).toContainEqual({
       method: 'fork', args: [{ sessionId: ROOT, atSeq: 17, increaseTitle: true }],
     })
+    await b.runtime.dispose()
+  })
+
+  it('binds the live scope policy into the pane hooks while the service is present', async () => {
+    const b = await bench()
+    // The absent service binds the static personal placeholder; a provided
+    // runtime publishes through the same face (the steward marker the pane
+    // reads for the composer hint).
+    const absent = b.residentApi(ROOT)
+    expect(absent.hooks.projectPolicy.getSnapshot().scope).toBe('personal')
+    const policy = new ProjectUiPolicyRuntime()
+    b.runtime.provide('projectUiPolicy', policy)
+    const live = b.residentApi(ROOT)
+    policy.set('project', 'follow-user', { projectId: 7, steward: true })
+    expect(live.hooks.projectPolicy.getSnapshot().steward).toBe(true)
     await b.runtime.dispose()
   })
 

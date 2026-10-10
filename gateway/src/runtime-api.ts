@@ -37,6 +37,7 @@ import type { PostgresInstanceRepository } from './postgres/instance-repository.
 import type { PostgresCollaborationService } from './postgres/collaboration-service.ts'
 import { SshTargetError, type PostgresSshTargetService } from './postgres/ssh-target-service.ts'
 import { PluginStateError } from './plugin-state.ts'
+import { StewardQueryError } from './postgres/steward-query.ts'
 import { internalUserId, type PostgresRuntimeContext } from './postgres/runtime-context.ts'
 import type { GatewayPushService } from './push-notifications.ts'
 import type { GatewayModelGovernanceService } from './services.ts'
@@ -130,6 +131,8 @@ interface RuntimeApiDependencies {
   sshTargets?: Pick<PostgresSshTargetService, 'resolveForRuntime'>
   /** Optional durable plugin desired-state store; absent in compositions without PostgreSQL. */
   pluginState?: Pick<import('./plugin-state.ts').PostgresPluginState, 'readForSubject' | 'publishForSubject'>
+  /** Optional audited SQL channel for the resident steward runtime. */
+  stewardQuery?: Pick<import('./postgres/steward-query.ts').StewardQueryService, 'query' | 'stewardTarget'>
 }
 
 function send(res: ServerResponse, status: number, value: unknown): void {
@@ -796,6 +799,25 @@ export function createRuntimeApiHandler(
         }
         res.writeHead(204, { 'cache-control': 'no-store' })
         res.end()
+        return true
+      }
+      if (pathname === '/internal/runtime/steward/query' && req.method === 'POST') {
+        if (deps.stewardQuery === undefined) { send(res, 503, { error: 'steward-unavailable' }); return true }
+        // The runtime token must resolve to the steward project row itself;
+        // no assertion or scope shape substitutes for that binding.
+        if (subject.target.kind !== 'project' || !(await deps.stewardQuery.stewardTarget(subject.projectInternalId))) {
+          throw new CollaborationDeniedError('forbidden')
+        }
+        const payload = record(JSON.parse(body))
+        if (typeof payload?.sql !== 'string' || payload.sql.trim() === '') {
+          throw new StewardQueryError(400, 'steward-invalid-statement', 'sql must be a non-empty string')
+        }
+        const approvalId = typeof payload.approvalId === 'string' && payload.approvalId !== '' ? payload.approvalId : undefined
+        const rowLimit = safeInteger(payload.rowLimit, 1) ? Math.min(payload.rowLimit as number, 5_000) : 500
+        send(res, 200, await deps.stewardQuery.query(
+          { organizationId: subject.organizationId, projectInternalId: subject.projectInternalId!, generation: subject.generation },
+          { sql: payload.sql, dryRun: payload.dryRun === true, approvalId, rowLimit },
+        ))
         return true
       }
       if (pathname === '/internal/runtime/plugin-state' && (req.method === 'GET' || req.method === 'POST')) {
@@ -1737,6 +1759,10 @@ export function createRuntimeApiHandler(
       }
       if (error instanceof PluginStateError) {
         send(res, error.status, { error: error.message })
+        return true
+      }
+      if (error instanceof StewardQueryError) {
+        send(res, error.status, { error: error.code, message: error.message })
         return true
       }
       if (error instanceof SyntaxError || (error instanceof Error && error.message.startsWith('invalid '))) {

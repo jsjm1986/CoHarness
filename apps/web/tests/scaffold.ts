@@ -1060,7 +1060,9 @@ async function persistSeedSession(
 /**
  * Capture the region's aria snapshot at a settled milestone: poll until two
  * consecutive normalized captures are equal — a single-shot capture races the
- * last React commits.
+ * last React commits. A captured model trigger must be idle: its `aria-busy`
+ * loading state does not appear in the aria snapshot and otherwise holds
+ * steady across both captures.
  * @param page - the page under test.
  * @param selector - the region locator selector.
  * @param workspaceCwd - normalization input.
@@ -1071,10 +1073,11 @@ export async function captureStableAria(page: Page, selector: string, workspaceC
   let previous = normalizeAria(await region.ariaSnapshot(), workspaceCwd)
   await expect.poll(async () => {
     const current = normalizeAria(await region.ariaSnapshot(), workspaceCwd)
-    const stable = current === previous
+    const busy = await region.locator('[data-model-trigger][aria-busy="true"]').count() !== 0
+    const stable = current === previous && !busy
     previous = current
     return stable
-  }, { timeout: 5_000, message: 'aria snapshot did not stabilize' }).toBe(true)
+  }, { timeout: 10_000, message: 'aria snapshot did not stabilize' }).toBe(true)
   return previous
 }
 

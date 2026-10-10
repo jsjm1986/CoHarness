@@ -1,4 +1,4 @@
-import type { AuditRow } from './audit.ts'
+import type { AuditQueryFilter, AuditRow } from './audit.ts'
 import type { GatewayAccountPreferencesService } from './account-preferences.ts'
 import type { UserRow } from './auth.ts'
 import type {
@@ -105,6 +105,16 @@ export interface GatewayProjectService {
   getById(id: number): Awaitable<ProjectDetail | null>
   /** Batch detail lookup used by account catalog pages to avoid N+1 queries. */
   getByIds?(ids: readonly number[]): Awaitable<ProjectDetail[]>
+  /**
+   * Seed the reserved steward space once or return the existing row. The
+   * steward project has no member rows; admission comes from the steward
+   * qualification lane. Absent where the catalog backend has no steward support.
+   */
+  ensureSteward?(input: { name: string; path: string; createdBy?: number }): Awaitable<ProjectRow>
+  /** Current steward project target for this node, when seeded. */
+  stewardProject?(): Awaitable<{ id: number; name: string; path: string } | null>
+  /** Reserved kind of a project by internal row id, or null when unknown. */
+  kindOfInternal?(internalId: string): Awaitable<import('./projects.ts').ProjectKind | null>
   rename(id: number, name: string): Awaitable<void>
   remove(id: number): Awaitable<number[]>
   setMember(projectId: number, userId: number, mode: GrantMode): Awaitable<void>
@@ -158,15 +168,9 @@ export interface GatewayAuditService {
     ip?: string
     detail?: string
   }): Awaitable<void>
-  query(filter?: {
-    userId?: number
-    action?: string
-    actionPrefix?: string
-    fromMs?: number
-    toMs?: number
-    offset?: number
-    limit?: number
-  }): Awaitable<AuditRow[]>
+  query(filter?: AuditQueryFilter): Awaitable<AuditRow[]>
+  /** Row count matching the same filter as `query`, for pagination totals. */
+  count?(filter?: AuditQueryFilter): Awaitable<number>
 }
 
 /** Organization document metadata and audited ownership operations. */

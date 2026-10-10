@@ -26,7 +26,7 @@ The adjacent V6 → V7 Session migration and the released V7 codec. V7 rewrites 
 
 The generated first-party Session format catalog imports this edge through `dsh.sessionFormatMigration` metadata. Persistence providers read V6 through the released V6 codec and reconstruct V7 in memory for reads; an explicit write open publishes a separate V7 generation. Existing V6 generation bytes, inode, and modification time remain unchanged; their presence never permits fallback from a broken V7 generation.
 
-V6 `kind: 'plugin'` message sources are rewritten to the namespaced `plugin:<name>` form using the producer's plugin identity; sources already carrying a qualified kind keep their value. Tool-result blocks nested inside assistant messages move to their own `tool`-role messages, and opaque producer events whose type is not in the released V6 catalog are admitted under a `x/` producer namespace instead of failing admission.
+V6 `kind: 'plugin'` message sources are rewritten to the namespaced `plugin:<name>` form using the producer's plugin identity; sources already carrying a qualified kind keep their value. Tool-result blocks nested inside assistant messages move to their own `tool`-role messages, and opaque producer events whose type no V6 writer could emit are admitted under a `plugin:` namespace instead of failing admission.
 
 <a id="implementation"></a>
 ## Implementation

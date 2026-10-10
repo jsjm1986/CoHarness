@@ -9,14 +9,17 @@
   en: c2320daf2514d280
   zh: 1b840f4201871ee5
 /harness-gateway/configuration-environment-variables-see-src-config-ts:
-  en: aa26b0cab1e4d787
-  zh: c2f05014f16e617a
+  en: 1a855fa4d92a671a
+  zh: 5ba1af171bb9fe0d
 /harness-gateway/admin-console-and-project-grants:
-  en: 3bfccee3fd1cb4d6
-  zh: 83a7bbacee2fff94
+  en: 7b4ac059338278de
+  zh: e42d617a8470830a
 /harness-gateway/plugin-management:
   en: 44ec9ebc7e288aee
   zh: 5040cf211a5305ac
+/harness-gateway/steward-maintenance-space:
+  en: 4574e730c3bee6f0
+  zh: 1bc9f482b2028e25
 /harness-gateway/user-terminals:
   en: bc98d4118d93d62c
   zh: 80109f508a0090ed

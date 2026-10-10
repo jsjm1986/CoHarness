@@ -78,6 +78,29 @@ describe('response parsing', () => {
     expect(parseConversationDetail({ ...detail, conversation: null })).toEqual({ ...detail, conversation: null })
   })
 
+  it('carries steward space markers and drops unrecognized kind values', () => {
+    const stewardContext = parseCollaborationContext({
+      ...projectContext,
+      scope: { kind: 'project', projectId: 11, projectName: '维护中枢', mode: 'rw', steward: true },
+      projects: [
+        { projectId: 9, name: '支付重构', path: '/srv/pay', mode: 'rw' },
+        { projectId: 11, name: '维护中枢', path: '/srv/steward', mode: 'rw', kind: 'steward' },
+      ],
+    })
+    expect(stewardContext.scope).toMatchObject({ kind: 'project', projectId: 11, steward: true })
+    expect(stewardContext.projects[1]).toMatchObject({ projectId: 11, kind: 'steward' })
+    expect(stewardContext.projects[0]).not.toHaveProperty('kind')
+
+    // Unknown future kinds and non-boolean steward flags stay inert for this build.
+    const future = parseCollaborationContext({
+      ...projectContext,
+      scope: { kind: 'project', projectId: 9, projectName: '支付重构', mode: 'rw', steward: 'yes' },
+      projects: [{ projectId: 9, name: '支付重构', path: '/srv/pay', mode: 'rw', kind: 'archive' }],
+    })
+    expect(future.scope).not.toHaveProperty('steward')
+    expect(future.projects[0]).not.toHaveProperty('kind')
+  })
+
   it('rejects malformed account-context fields at the HTTP boundary', () => {
     const invalid: unknown[] = [
       null,

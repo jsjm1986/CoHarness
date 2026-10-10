@@ -1285,5 +1285,23 @@ describe('dialect member admission', () => {
       event('invented/event', 0, { anything: true }),
       event('user/message', 0, USER_MESSAGE),
     ]), {}, 0)).toThrow()
+    expect(() => migrateVersion(6, turnWithStep([
+      event('invented/event', 0, { anything: true }),
+      event('user/message', 0, USER_MESSAGE),
+    ]), {}, 0)).toThrow(/format v6 contains unknown event type/)
+  })
+
+  it('carries V6-era gateway scope events through migration while keeping foreign records opaque', () => {
+    const scoped = event('gateway/scoped-execution', 0, { version: 1 })
+    const continuation = event('gateway/continuation', 0, {
+      key: 'goal:example:1', scope: { parentSessionId: 's', inputs: [], unverifiedHistory: true },
+    })
+    const foreign = event('developer/message', 0, { content: [] }, { ignorable: true })
+    const migrated = migrateVersion(6, turnWithStep([scoped, continuation, foreign]), {}, 0)
+    const types = migrated.events.map(item => item.type)
+    expect(types).toContain('gateway/scoped-execution')
+    expect(types).toContain('gateway/continuation')
+    expect(types).toContain('plugin:developer/message')
+    expect(migrated.events.find(item => item.type === 'gateway/scoped-execution')?.data).toEqual({ version: 1 })
   })
 })
