@@ -709,8 +709,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         const form = new URLSearchParams(await readBody(req))
         const username = form.get('username') ?? ''
         const result = await auth.login(username, form.get('password') ?? '', clientIp(req), req.headers['user-agent'] ?? '')
-        if (result === 'locked') { await audit.write({ action: 'login.locked', ip: clientIp(req), detail: username }); send(res, 429, loginPage(gateT('loginLocked'), gateLanguage(req.headers.cookie))); return }
-        if (result === 'invalid') { await audit.write({ action: 'login.failed', ip: clientIp(req), detail: username }); send(res, 401, loginPage(gateT('loginInvalid'), gateLanguage(req.headers.cookie))); return }
+        if (result === 'locked') { await audit.write({ action: 'login.locked', ip: clientIp(req), detail: JSON.stringify({ username }) }); send(res, 429, loginPage(gateT('loginLocked'), gateLanguage(req.headers.cookie))); return }
+        if (result === 'invalid') { await audit.write({ action: 'login.failed', ip: clientIp(req), detail: JSON.stringify({ username }) }); send(res, 401, loginPage(gateT('loginInvalid'), gateLanguage(req.headers.cookie))); return }
         await audit.write({ userId: result.user.id, action: 'login', ip: clientIp(req) })
         redirect(res, '/', [sessionCookie(result.token, cfg)])
         return
@@ -917,6 +917,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       const abort = requestAbort(req, res)
       if (!isScopedUploadDataPath(req.method, pathname)) {
         res.once('finish', () => {
+          // Successful data-plane traffic is transport noise; only failures are audit-worthy.
+          if (res.statusCode < 400) return
           void Promise.resolve(audit.write({
             userId: user.id,
             action: 'api',
@@ -982,6 +984,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
         }
       })
       res.once('finish', () => {
+        // Successful data-plane traffic is transport noise; only failures are audit-worthy.
+        if (res.statusCode < 400) return
         void Promise.resolve(audit.write({
           userId: user.id,
           action: 'api',
@@ -1055,6 +1059,8 @@ export function createGatewayServer(deps: GatewayDeps, handlers: GatewayHandlers
       req.once('aborted', onRequestAbort)
       res.once('close', onResponseClose)
       res.once('finish', () => {
+        // Successful data-plane traffic is transport noise; only failures are audit-worthy.
+        if (res.statusCode < 400) return
         void Promise.resolve(audit.write({
           userId: user.id,
           action: 'api',

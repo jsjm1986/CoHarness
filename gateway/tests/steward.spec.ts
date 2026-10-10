@@ -293,6 +293,18 @@ describePg('PostgreSQL steward space', () => {
     expect(tally['ok:read']).toBe(1)
     expect(tally['ok:write']).toBe(2)
     expect(tally['denied:write']).toBe(5)
+
+    // Every journaled attempt is mirrored once into the administrator-facing
+    // audit log, without the statement text, which stays inside steward_query_log.
+    const mirror = await pool.query<{ outcome: string; count: string; detail: Record<string, unknown> }>(
+      `SELECT outcome,COUNT(*)::text count,detail FROM harness.audit_events
+      WHERE organization_id=$1 AND action='steward.query' GROUP BY outcome,detail`, [organizationId])
+    const journaled = journal.rows.reduce((sum, row) => sum + Number(row.count), 0)
+    expect(mirror.rows.reduce((sum, row) => sum + Number(row.count), 0)).toBe(journaled)
+    expect(journaled).toBe(8)
+    expect(mirror.rows.every(row => JSON.stringify(row.detail).includes('UPDATE') === false)).toBe(true)
+    expect(mirror.rows.some(row => row.outcome === 'failure')).toBe(true)
+    expect(mirror.rows.some(row => row.outcome === 'success')).toBe(true)
   })
 
   it('lets Postgres enforce read-only execution beyond the keyword classifier', async () => {

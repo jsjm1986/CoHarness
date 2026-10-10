@@ -1,5 +1,6 @@
 /** Audited SQL execution channel for the resident steward runtime. */
 import type { PoolClient } from 'pg'
+import { connectFromPool } from './database.ts'
 import type { PostgresRuntimeContext } from './runtime-context.ts'
 
 /** Rejected steward statements carry a wire status plus a stable code. */
@@ -56,6 +57,32 @@ function classify(sql: string): 'read' | 'write' {
   return READONLY_HEAD.test(stripped) ? 'read' : 'write'
 }
 
+/**
+ * Bounded administrator-facing summary of one steward query attempt. The
+ * statement text and any error message stay in `steward_query_log`; the audit
+ * console receives only classification, verdict, and size facts.
+ */
+function stewardAuditDetail(
+  classification: 'read' | 'write',
+  status: 'ok' | 'denied' | 'error',
+  rowCount: number | null,
+  bytes: number | null,
+  dryRun: boolean,
+  approvalId: string | undefined,
+): string {
+  return JSON.stringify({
+    methodPath: '',
+    detail: {
+      classification,
+      status,
+      rowCount: rowCount ?? 0,
+      resultBytes: bytes ?? 0,
+      dryRun,
+      ...(approvalId === undefined ? {} : { approvalId }),
+    },
+  })
+}
+
 export class StewardQueryService {
   constructor(
     private readonly context: PostgresRuntimeContext,
@@ -101,7 +128,8 @@ export class StewardQueryService {
       throw new StewardQueryError(403, 'steward-approval-required', 'write statements require an approved in-session interaction')
     }
 
-    const client = await this.context.pool.connect()
+    const client = await connectFromPool(this.context.pool)
+    let failure: Error | null = null
     try {
       await client.query(classification === 'read' ? 'BEGIN READ ONLY' : 'BEGIN')
       await client.query(`SET LOCAL statement_timeout = ${STATEMENT_TIMEOUT_MS}`)
@@ -136,6 +164,12 @@ export class StewardQueryService {
           this.context.organizationId, subject.projectInternalId, subject.generation, statement,
           classification, false, input.approvalId ?? null, responderInternalId, rowCount, bytes,
         ])
+        await client.query(`INSERT INTO harness.audit_events(
+            organization_id,actor_user_id,action,resource_type,source_ip,outcome,status_code,detail)
+          VALUES($1,$2,'steward.query','steward',NULL,'success',NULL,$3::jsonb)`, [
+          this.context.organizationId, responderInternalId,
+          stewardAuditDetail(classification, 'ok', rowCount, bytes, false, input.approvalId),
+        ])
         await client.query('COMMIT')
       } else {
         await client.query('COMMIT')
@@ -152,16 +186,23 @@ export class StewardQueryService {
       }
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {})
-      const message = error instanceof Error ? error.message : String(error)
-      await this.journal(subject, statement, classification, false, 'error', null, null, null, message, input.approvalId)
+      // Denied writes journal 'denied' before throwing; only execution failures land here.
+      if (!(error instanceof StewardQueryError)) {
+        const message = error instanceof Error ? error.message : String(error)
+        await this.journal(subject, statement, classification, false, 'error', null, null, null, message, input.approvalId)
+      }
+      failure = error instanceof Error ? error : new Error(String(error))
       throw error
     } finally {
-      client.release()
+      // Releasing with the error destroys a dead connection instead of lending it out again.
+      if (failure === null) client.release()
+      else client.release(failure)
     }
   }
 
   private async explain(subject: StewardQuerySubject, statement: string, classification: 'read' | 'write', approvalId: string | undefined): Promise<StewardQueryResult> {
-    const client = await this.context.pool.connect()
+    const client = await connectFromPool(this.context.pool)
+    let failure: Error | null = null
     try {
       await client.query('BEGIN READ ONLY')
       await client.query(`SET LOCAL statement_timeout = ${STATEMENT_TIMEOUT_MS}`)
@@ -173,9 +214,11 @@ export class StewardQueryService {
       await client.query('ROLLBACK').catch(() => {})
       const message = error instanceof Error ? error.message : String(error)
       await this.journal(subject, statement, classification, true, 'error', null, null, null, message, approvalId)
+      failure = error instanceof Error ? error : new Error(String(error))
       throw error
     } finally {
-      client.release()
+      if (failure === null) client.release()
+      else client.release(failure)
     }
   }
 
@@ -234,6 +277,15 @@ export class StewardQueryService {
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [
         this.context.organizationId, subject.projectInternalId, subject.generation, statement,
         classification, dryRun, approvalId ?? null, responderInternalId, status, rowCount, bytes, error,
+      ])
+      // Mirror every journaled attempt into the administrator-facing audit log;
+      // the statement itself stays in steward_query_log only.
+      await this.context.pool.query(`INSERT INTO harness.audit_events(
+          organization_id,actor_user_id,action,resource_type,source_ip,outcome,status_code,detail)
+        VALUES($1,$2,'steward.query','steward',NULL,$3,NULL,$4::jsonb)`, [
+        this.context.organizationId, responderInternalId,
+        status === 'ok' ? 'success' : 'failure',
+        stewardAuditDetail(classification, status, rowCount, bytes, dryRun, approvalId),
       ])
     } catch (journalError) {
       console.error('[gateway] steward query journal failed:', journalError)

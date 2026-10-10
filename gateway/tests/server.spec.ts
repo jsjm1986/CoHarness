@@ -197,14 +197,12 @@ describe('gateway server', () => {
       documents: [],
     })
     expect(documentTransferList).toHaveBeenCalledOnce()
-    expect(await deps.audit.query({ action: 'api' })).toEqual([
-      expect.objectContaining({ methodPath: 'POST /api/documents/transfer/list', status: 200 }),
-    ])
+    expect(await deps.audit.query({ action: 'api' })).toEqual([])
   })
 
   it('maps an unexpected document scope listing failure to a retryable response', async () => {
     const documentTransferList = vi.fn(async () => { throw new Error('runtime detail') })
-    const { base } = await setup({}, { documentTransferList })
+    const { deps, base } = await setup({}, { documentTransferList })
     const cookie = await login(base, 'root-admin', 'pw-12345678')
     const response = await fetch(`${base}/api/documents/transfer/list`, {
       method: 'POST',
@@ -216,6 +214,9 @@ describe('gateway server', () => {
     expect(await response.json()).toEqual({
       error: { code: 'DOCUMENT_TRANSFER_UNAVAILABLE', message: 'Document scope listing is temporarily unavailable.' },
     })
+    expect(await deps.audit.query({ action: 'api' })).toEqual([
+      expect.objectContaining({ methodPath: 'POST /api/documents/transfer/list', status: 503 }),
+    ])
   })
 
   it('dispatches target-scope upload requests before the runtime proxy', async () => {

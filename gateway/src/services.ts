@@ -1,4 +1,4 @@
-import type { AuditRow } from './audit.ts'
+import type { AuditQueryFilter, AuditRow } from './audit.ts'
 import type { GatewayAccountPreferencesService } from './account-preferences.ts'
 import type { UserRow } from './auth.ts'
 import type {
@@ -168,15 +168,9 @@ export interface GatewayAuditService {
     ip?: string
     detail?: string
   }): Awaitable<void>
-  query(filter?: {
-    userId?: number
-    action?: string
-    actionPrefix?: string
-    fromMs?: number
-    toMs?: number
-    offset?: number
-    limit?: number
-  }): Awaitable<AuditRow[]>
+  query(filter?: AuditQueryFilter): Awaitable<AuditRow[]>
+  /** Row count matching the same filter as `query`, for pagination totals. */
+  count?(filter?: AuditQueryFilter): Awaitable<number>
 }
 
 /** Organization document metadata and audited ownership operations. */

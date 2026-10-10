@@ -696,6 +696,32 @@ describe('admin JSON API', () => {
     expect(rows.every(r => r.detail === undefined)).toBe(true)
   })
 
+  it('rejects invalid audit filters and reports the total row count', async () => {
+    const { base, cookie, deps, member } = await setup()
+    deps.audit.write({ userId: member.id, action: 'login', ip: '1.1.1.1' })
+    for (const bad of ['userId=abc', 'userId=-1', 'family=nonsense', 'outcome=maybe', 'from=5&to=1', 'limit=NaN']) {
+      const res = await fetch(`${base}/admin/api/audit?${bad}`, { headers: { cookie } })
+      expect(res.status).toBe(400)
+    }
+    const res = await fetch(`${base}/admin/api/audit?family=auth&userId=${member.id}`, { headers: { cookie } })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('x-total-count')).toBe('1')
+    const rows = await res.json() as Array<{ action: string; username: string | null }>
+    expect(rows).toEqual([expect.objectContaining({ action: 'login', username: 'worker' })])
+  })
+
+  it('records a failed mutating admin request once', async () => {
+    const { base, cookie, deps, admin } = await setup()
+    const res = await fetch(`${base}/admin/api/users/${admin.id}`, {
+      method: 'DELETE', headers: { cookie, origin: base },
+    })
+    expect(res.status).toBe(409)
+    const rows = await deps.audit.query({ action: 'admin.request' })
+    expect(rows).toEqual([
+      expect.objectContaining({ userId: admin.id, methodPath: `DELETE /admin/api/users/${admin.id}`, status: 409 }),
+    ])
+  })
+
   it('returns safe audit targets and revisions while withholding secrets and raw details', async () => {
     const { base, cookie, deps, admin } = await setup()
     await deps.audit.write({ userId: admin.id, action: 'admin.ssh-targets.update', status: 200,

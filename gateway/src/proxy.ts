@@ -320,6 +320,8 @@ export function createProxyHandlers(
       const pathname = new URL(req.url ?? '/', 'http://x').pathname
       if (pathname.startsWith('/api/') && !isDocumentUploadDataPath(req.method, pathname)) {
         res.once('finish', () => {
+          // Successful RPC traffic is transport noise; only failures are audit-worthy.
+          if (res.statusCode < 400) return
           void Promise.resolve(audit.write({
             userId: context.user.id,
             action: 'api',

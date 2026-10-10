@@ -172,7 +172,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51], current: 51 })
+      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53], current: 53 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -188,7 +188,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 51 })
+      .toEqual({ applied: [], current: 53 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -457,6 +457,35 @@ describePg('PostgreSQL baseline', () => {
     } finally {
       await pool.query('DELETE FROM harness.schema_migrations WHERE version=$1', [unknownVersion])
     }
+  })
+
+  it('survives a checked-out client being terminated mid-transaction', async () => {
+    // The gateway crash chain: PostgreSQL kills an idle-in-transaction backend,
+    // the checked-out client emits 'error', and an unhandled event would crash
+    // the process. The connect() wrapper must absorb it while the query rejects.
+    const client = await pool.connect()
+    let failure: Error | null = null
+    try {
+      await client.query('BEGIN')
+      const backend = await client.query<{ pg_backend_pid: number }>('SELECT pg_backend_pid()')
+      const terminated = await pool.query<{ pg_terminate_backend: boolean }>(
+        'SELECT pg_terminate_backend($1)', [backend.rows[0]!.pg_backend_pid])
+      expect(terminated.rows[0]!.pg_terminate_backend).toBe(true)
+      // Terminating the backend races this client's socket close; an in-flight
+      // query rejects through the promise while no 'error' event may escape
+      // as uncaught.
+      try {
+        await client.query('SELECT pg_sleep(30)')
+        throw new Error('the terminated backend answered a query')
+      } catch (queryError) {
+        failure = queryError instanceof Error ? queryError : new Error(String(queryError))
+      }
+      expect(failure.message).not.toBe('the terminated backend answered a query')
+    } finally {
+      if (failure === null) client.release()
+      else client.release(failure)
+    }
+    expect((await pool.query('SELECT 1 AS one')).rows[0]).toMatchObject({ one: 1 })
   })
 
   it('rejects a document owner from another organization', async () => {

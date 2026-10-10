@@ -26,6 +26,7 @@ function jsonOk(body: unknown = {}, status = 200) {
   return {
     ok: true,
     status,
+    headers: { get: () => null },
     json: async () => body,
   }
 }

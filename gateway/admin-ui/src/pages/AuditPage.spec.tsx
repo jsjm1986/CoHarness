@@ -8,9 +8,9 @@ vi.mock('../api.ts', () => ({ listAudit: vi.fn() }))
 afterEach(cleanup)
 
 it('shows target, revision and unknown execution beside a successful request', async () => {
-  vi.mocked(listAudit).mockResolvedValue([{ id: 1, ts: 1, userId: 2, action: 'admin.webhook-deliveries.redispatch',
-    status: 200, methodPath: '', ip: '127.0.0.1', outcome: 'success',
-    metadata: { targetId: 7, revision: '12', state: 'unknown' } }])
+  vi.mocked(listAudit).mockResolvedValue({ entries: [{ id: 1, ts: 1, userId: 2, username: 'admin', displayName: 'Admin',
+    action: 'admin.webhook-deliveries.redispatch', status: 200, methodPath: '', ip: '127.0.0.1', outcome: 'success',
+    metadata: { targetId: 7, revision: '12', state: 'unknown' } }], total: 1 })
   render(<AuditPage />)
   const table = within(await screen.findByRole('table'))
   expect(table.getByText('请求成功 · HTTP 200')).toBeTruthy()
@@ -19,4 +19,5 @@ it('shows target, revision and unknown execution beside a successful request', a
   expect(table.getByText('配置代次')).toBeTruthy()
   expect(table.getByText('12')).toBeTruthy()
   expect(table.getByText('unknown')).toBeTruthy()
+  expect(table.getByText('@admin')).toBeTruthy()
 })

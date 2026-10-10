@@ -1,4 +1,5 @@
 import { auditSummary } from './audit-summary.ts'
+import type { AuditFamily } from './audit.ts'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -84,6 +85,7 @@ function isCodedError(error: unknown): error is Error & { code: string } {
 }
 
 const ADMIN_USAGE_SUMMARY_CONCURRENCY = 8
+const AUDIT_FAMILIES: ReadonlySet<string> = new Set(['admin', 'auth', 'model', 'steward', 'api', 'other'])
 
 async function mapInBatches<T, R>(
   values: readonly T[],
@@ -178,6 +180,15 @@ export function createAdminApiHandler(
       if (res.writableEnded) throw error
       const mapped = mapError(error)
       if (mapped.status === 500) console.error('[gateway] admin api failed:', error)
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        // Mutating endpoints that throw leave no per-endpoint audit row; record the
+        // failed attempt here so administrative denials and errors are never silent.
+        try {
+          await deps.audit.write({ userId: admin.id, action: 'admin.request', methodPath: `${req.method ?? 'GET'} ${pathname}`, status: mapped.status, ip: req.socket.remoteAddress ?? '' })
+        } catch (auditError) {
+          console.error('[gateway] admin api audit write failed:', auditError)
+        }
+      }
       sendError(res, mapped.status, mapped.error)
     }
     return true
@@ -1563,23 +1574,44 @@ async function dispatch(
       const raw = q.get(key)
       if (raw === null || raw === '') return undefined
       const n = Number(raw)
-      return Number.isFinite(n) ? n : undefined
+      if (!Number.isFinite(n)) throw new Error('invalid audit filter')
+      return n
     }
-    const action = q.get('action')
-    const actionPrefix = q.get('actionPrefix')
-    const rows = (await deps.audit.query({
+    const text = (key: string): string | undefined => {
+      const raw = q.get(key)
+      return raw === null || raw.trim() === '' ? undefined : raw.trim()
+    }
+    const family = text('family')
+    if (family !== undefined && !AUDIT_FAMILIES.has(family)) throw new Error('invalid audit family')
+    const outcome = text('outcome')
+    if (outcome !== undefined && outcome !== 'success' && outcome !== 'failure') throw new Error('invalid audit outcome')
+    const filter = {
       userId: num('userId'),
-      action: action !== null && action !== '' ? action : undefined,
-      actionPrefix: actionPrefix !== null && actionPrefix !== '' ? actionPrefix : undefined,
+      actor: text('actor'),
+      action: text('action'),
+      actionPrefix: text('actionPrefix'),
+      queryText: text('q'),
+      family: family as AuditFamily | undefined,
+      outcome: outcome as 'success' | 'failure' | undefined,
       fromMs: num('from') ?? num('fromMs'),
       toMs: num('to') ?? num('toMs'),
       limit: num('limit'),
       offset: num('offset'),
-    })).map(r => ({
-      id: r.id, ts: r.ts, userId: r.userId, action: r.action, methodPath: r.methodPath, status: r.status, ip: r.ip,
+    }
+    if (filter.userId !== undefined && (!Number.isInteger(filter.userId) || filter.userId <= 0)) {
+      throw new Error('invalid audit userId')
+    }
+    if (filter.fromMs !== undefined && filter.toMs !== undefined && filter.fromMs > filter.toMs) {
+      throw new Error('invalid audit time range')
+    }
+    const [rows, total] = await Promise.all([deps.audit.query(filter), deps.audit.count?.(filter)])
+    const entries = rows.map(r => ({
+      id: r.id, ts: r.ts, userId: r.userId, username: r.username ?? null, displayName: r.displayName ?? null,
+      action: r.action, methodPath: r.methodPath, status: r.status, ip: r.ip,
       ...auditSummary(r),
     }))
-    sendJson(res, 200, rows)
+    if (total !== undefined) res.setHeader('x-total-count', String(total))
+    sendJson(res, 200, entries)
     return true
   }
 

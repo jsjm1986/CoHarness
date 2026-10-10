@@ -53,12 +53,16 @@ export type ProjectDirectoryListing = {
   truncated: boolean
 }
 
+export type AuditFamily = 'admin' | 'auth' | 'model' | 'steward' | 'api' | 'other'
+
 export type AuditEntry = {
   outcome: 'success' | 'failure' | 'recorded' | 'unknown'
   metadata: Record<string, string | number | boolean>
   id: number
   ts: number
   userId: number | null
+  username: string | null
+  displayName: string | null
   action: string
   methodPath: string
   status: number | null
@@ -67,11 +71,22 @@ export type AuditEntry = {
 
 export type AuditFilter = {
   userId?: number
+  actor?: string
+  action?: string
   actionPrefix?: string
+  query?: string
+  family?: AuditFamily
+  outcome?: 'success' | 'failure'
   from?: number
   to?: number
   limit?: number
   offset?: number
+}
+
+export type AuditPage = {
+  entries: AuditEntry[]
+  /** Matching rows across all pages; absent when the server predates the total header. */
+  total: number | null
 }
 
 export type ConversationArchiveState = 'archived' | 'trash' | 'purged'
@@ -385,16 +400,34 @@ export function removeMember(projectId: number, userId: number): Promise<void> {
   return request(`/admin/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' })
 }
 
-export function listAudit(filter: AuditFilter = {}): Promise<AuditEntry[]> {
+export async function listAudit(filter: AuditFilter = {}): Promise<AuditPage> {
   const q = new URLSearchParams()
   if (filter.userId !== undefined) q.set('userId', String(filter.userId))
+  if (filter.actor !== undefined && filter.actor !== '') q.set('actor', filter.actor)
+  if (filter.action !== undefined && filter.action !== '') q.set('action', filter.action)
   if (filter.actionPrefix !== undefined && filter.actionPrefix !== '') q.set('actionPrefix', filter.actionPrefix)
+  if (filter.query !== undefined && filter.query !== '') q.set('q', filter.query)
+  if (filter.family !== undefined) q.set('family', filter.family)
+  if (filter.outcome !== undefined) q.set('outcome', filter.outcome)
   if (filter.from !== undefined) q.set('from', String(filter.from))
   if (filter.to !== undefined) q.set('to', String(filter.to))
   if (filter.limit !== undefined) q.set('limit', String(filter.limit))
   if (filter.offset !== undefined) q.set('offset', String(filter.offset))
   const qs = q.toString()
-  return request(`/admin/api/audit${qs === '' ? '' : `?${qs}`}`)
+  const res = await fetch(`/admin/api/audit${qs === '' ? '' : `?${qs}`}`, { credentials: 'same-origin' })
+  if (!res.ok) {
+    let message = `Request failed (${String(res.status)})`
+    try {
+      const body = await res.json() as { error?: unknown }
+      if (typeof body.error === 'string' && body.error !== '') message = body.error
+    } catch {
+      // Keep the status-only diagnostic when a proxy returns a non-JSON body.
+    }
+    throw new AdminRequestError(res.status, message)
+  }
+  const totalHeader = res.headers.get('x-total-count')
+  const total = totalHeader === null ? null : Number(totalHeader)
+  return { entries: await res.json() as AuditEntry[], total: total !== null && Number.isFinite(total) ? total : null }
 }
 
 export function listArchives(filter: {
