@@ -334,11 +334,12 @@ export function ConversationPane({
         // block keeps the model seat live because choosing a model is how the
         // user clears it.
         ? { blocked: composerBlock, placeholder: composerBlock.reason }
-        : hero ? { placeholder: t('placeholder.hero') }
-          // The steward maintenance space speaks to a runtime that operates
-          // on the deployment itself; its composer hints at that contract
-          // instead of the generic agent prompt.
-          : stewardScope ? { placeholder: t('placeholder.steward') } : {}),
+        // The steward maintenance space speaks to a runtime that operates
+        // on the deployment itself; its composer hints at that contract
+        // instead of the generic agent prompt, in the hero and the docked
+        // bar alike.
+        : stewardScope ? { placeholder: t('placeholder.steward') }
+          : hero ? { placeholder: t('placeholder.hero') } : {}),
     overlay: renderSlot('conversation.input.overlay', {}),
     leftItems: zone === undefined ? null : renderSlot('conversation.input.left', zone),
     rightItems: zone === undefined ? null : renderSlot('conversation.input.right', zone),

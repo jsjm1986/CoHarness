@@ -485,6 +485,12 @@ describe('ConversationRoot resident composer', () => {
     const steward = mount(conversationSnapshot(), undefined, undefined, { projectPolicy: policy(true) })
     expect((steward.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
       .toBe('询问维护中枢，或描述要检查的对象…')
+    const stewardHero = mount(
+      conversationSnapshot({ composerPhase: 'blank', blank: true }), undefined, undefined,
+      { projectPolicy: policy(true), summaryBlank: true },
+    )
+    expect((stewardHero.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
+      .toBe('询问维护中枢，或描述要检查的对象…')
     const ordinary = mount(conversationSnapshot(), undefined, undefined, { projectPolicy: policy() })
     expect((ordinary.view.container.querySelector('textarea') as HTMLTextAreaElement).placeholder)
       .toBe('给智能体发消息')
