@@ -70,12 +70,25 @@ export const RELEASED_V6_EVENT_TYPES: ReadonlySet<string> = new Set([
 /* jscpd:ignore-end */
 
 /**
+ * Event types genuine V6 writers could emit. `gateway/continuation` and
+ * `gateway/scoped-execution` joined `SessionEventMap` during the V6 era;
+ * event-map additions are not structural, so writers kept appending them to
+ * V6 logs after the released vocabulary above froze. `developer/message` is
+ * V7-native and stays foreign to V6 sources.
+ */
+export const ADMITTED_V6_EVENT_TYPES: ReadonlySet<string> = new Set([
+  ...RELEASED_V6_EVENT_TYPES,
+  'gateway/continuation',
+  'gateway/scoped-execution',
+])
+
+/**
  * Keep unknown ignorable events opaque after header promotion.
  * @param event - original V6 event; this incoming identity conversion is applied once.
  * @returns the same event or an ignorable namespaced event retaining its payload and coordinates.
  */
 export function namespaceV6OpaqueEvent(event: SessionFormatEvent): SessionFormatEvent {
-  return event['ignorable'] === true && !RELEASED_V6_EVENT_TYPES.has(event.type)
+  return event['ignorable'] === true && !ADMITTED_V6_EVENT_TYPES.has(event.type)
     ? { ...event, type: `plugin:${event.type}`, ignorable: true }
     : event
 }

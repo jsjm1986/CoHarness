@@ -21,6 +21,9 @@ import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import {
   PersistenceCoordinator,
+  SessionFormatUnsupportedError,
+  SessionPersistenceCorruptionError,
+  SessionPersistenceNotFoundError,
   SessionPersistenceRevision,
   SessionPersistenceReadError,
   type SessionPersistencePage,
@@ -695,6 +698,41 @@ describe('cold history recovery view', () => {
     expect(third.result.value.events).toHaveLength(2)
     expect(inspect).toHaveBeenCalledTimes(2)
     expect(revisionOf).toHaveBeenCalledTimes(5)
+  })
+
+  it('maps detached stored-log failures onto category-specific public errors', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const cases: [Error, string, string][] = [
+      [new SessionPersistenceNotFoundError('session "gone" not found'), 'session-not-found',
+        'session "gone" not found'],
+      [new SessionFormatUnsupportedError('format v6 contains unknown event type "x/y" at seq 1 (raw log: /tmp/secret/session.v6.jsonl)'), 'internal',
+        'uses a stored log this build cannot read'],
+      [new SessionPersistenceCorruptionError('stored log is corrupt: bad row (raw log: /tmp/secret/session.v6.jsonl)', {}), 'internal',
+        'failed stored-log validation'],
+    ]
+    let failure: Error = cases[0]![0]
+    const meta = header('gone', 1000)
+    const inspect = vi.fn(() => Promise.reject(failure))
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve(([meta]).map(header => ({ header }))),
+      listHeaders: () => Promise.resolve([meta]),
+      inspect,
+      locate: () => undefined,
+    } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+    const sessionId = sid('gone')
+    for (const [error, code, messagePart] of cases) {
+      failure = error
+      const response = await api.sessions.history(request({ sessionId }))
+      expect(response.result.ok).toBe(false)
+      if (!response.result.ok) {
+        expect(response.result.error.code).toBe(code)
+        expect(response.result.error.message).toContain(messagePart)
+        expect(response.result.error.message).not.toContain('/tmp/secret')
+      }
+    }
   })
 
   it('shows in-memory interruption repair without activating the session', async () => {

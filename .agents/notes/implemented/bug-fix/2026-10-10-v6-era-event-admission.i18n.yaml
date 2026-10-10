@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-10-v6-era-event-admission.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-10-v6-era-event-admission.md
+/agent-note-v6-era-event-types-rejected-by-their-own-migration:
+  en: 5ed03674f0d65cdb
+  zh: 629a88e6a3e4e588
+/agent-note-v6-era-event-types-rejected-by-their-own-migration/problem:
+  en: 9e4a269f45c6354d
+  zh: 6881aa5d9b68058b
+/agent-note-v6-era-event-types-rejected-by-their-own-migration/decision:
+  en: 1e9d4c114204e409
+  zh: 711d56fecaa9309b
+/agent-note-v6-era-event-types-rejected-by-their-own-migration/alternatives-considered:
+  en: df1b7144199fe9d2
+  zh: f0980b3839549144
+/agent-note-v6-era-event-types-rejected-by-their-own-migration/consequences:
+  en: fac16c015e17dfd6
+  zh: 08e7cc71610153c4
+/agent-note-v6-era-event-types-rejected-by-their-own-migration/verification:
+  en: 5e923e88b7570ed9
+  zh: 3d2f487119e26a0c
