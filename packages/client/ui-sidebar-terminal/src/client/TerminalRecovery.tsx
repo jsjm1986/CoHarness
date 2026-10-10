@@ -1,8 +1,10 @@
 /** A Session composer lifetime restores retained Host terminals without saving sidebar layout. */
 import { useEffect, useState, type ReactNode } from 'react'
+import { Button, IconWarningOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from './locales.ts'
+import css from './TerminalRecovery.module.css'
 
 /** The plugin deduplicates concurrent recovery; the component only owns an error notice. */
 export interface TerminalRecoveryInjected {
@@ -25,5 +27,16 @@ export function TerminalRecovery({ restore, t }: PropsRuntime<'conversation.inpu
     })
     return () => { active = false }
   }, [restore, attempt])
-  return error === undefined ? null : <button type="button" title={t('recoveryFailed', { message: error })} onClick={() => { setError(undefined); setAttempt(value => value + 1) }}>{t('retryRecovery')}</button>
+  return error === undefined ? null : (
+    <Button
+      size="sm"
+      variant="ghost"
+      icon={<IconWarningOutline16 />}
+      className={css.retry}
+      title={t('recoveryFailed', { message: error })}
+      onClick={() => { setError(undefined); setAttempt(value => value + 1) }}
+    >
+      {t('retryRecovery')}
+    </Button>
+  )
 }
