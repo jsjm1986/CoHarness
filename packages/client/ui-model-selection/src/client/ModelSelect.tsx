@@ -685,7 +685,7 @@ export function ModelSelect(
         aria-expanded={open}
         aria-controls={open ? `${id}-menu` : undefined}
         title={triggerLabel}
-        aria-busy={busy}
+        aria-busy={state.status === 'loading' || busy}
         data-selection-focus={selectionFocus ? '' : undefined}
         onBlur={() => { setSelectionFocus(false) }}
         disabled={locked}

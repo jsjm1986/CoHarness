@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-11-stable-aria-waits-for-idle-model-trigger.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-11-stable-aria-waits-for-idle-model-trigger.md
+/agent-note-stable-aria-captures-wait-for-an-idle-model-trigger:
+  en: 272c302b96e57141
+  zh: 3186f1b503c8a975
+/agent-note-stable-aria-captures-wait-for-an-idle-model-trigger/problem:
+  en: 3c8f3a88d1887d05
+  zh: a334584203192671
+/agent-note-stable-aria-captures-wait-for-an-idle-model-trigger/decision:
+  en: c65ae738124f4b9c
+  zh: d05bd759c298f2be
+/agent-note-stable-aria-captures-wait-for-an-idle-model-trigger/alternatives-considered:
+  en: 6f4926b388f9944e
+  zh: 88dd80cb6f7b7708
+/agent-note-stable-aria-captures-wait-for-an-idle-model-trigger/consequences:
+  en: ca5793188a7caf8e
+  zh: c16873440b0761d1
+/agent-note-stable-aria-captures-wait-for-an-idle-model-trigger/verification:
+  en: 759467ac3610df92
+  zh: 8b8788c88feb02ae
+/agent-note-stable-aria-captures-wait-for-an-idle-model-trigger/related:
+  en: fb2cea9754cb50d2
+  zh: 8b20c17785ab9007
