@@ -705,7 +705,7 @@ describe('cold history recovery view', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(UserQuestionService)
     const cases: [Error, string, string][] = [
-      [new SessionPersistenceNotFoundError('session "gone" not found'), 'session-not-found',
+      [new SessionPersistenceNotFoundError(sid('gone')), 'session-not-found',
         'session "gone" not found'],
       [new SessionFormatUnsupportedError('format v6 contains unknown event type "x/y" at seq 1 (raw log: /tmp/secret/session.v6.jsonl)'), 'internal',
         'uses a stored log this build cannot read'],
