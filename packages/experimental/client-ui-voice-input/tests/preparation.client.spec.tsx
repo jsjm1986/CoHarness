@@ -6,13 +6,16 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { SpeechPreparationState, SpeechPreparationStep, SpeechProviderId } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 import { afterEach, expect, it, vi } from 'vitest'
-import { PreparationCard, VoicePreparation } from '../src/client/PreparationCard.tsx'
+import { PreparationCard, VoicePluginsItem, VoicePreparation } from '../src/client/PreparationCard.tsx'
 import type { VoiceInputProps } from '../src/client/VoiceInput.tsx'
 import type { SpeechReadiness } from '../src/client/readiness.ts'
 import { zh } from '../src/client/locales.ts'
 
 afterEach(() => { cleanup(); vi.useRealTimers() })
 const id = 'local' as SpeechProviderId, t = makeTranslate(zh, commonZh)
+/** The global seat a `plugins.item` entry receives; these tests never read it. */
+const unusedGlobalHook = (): never => { throw new Error('fixture provides no global state') }
+const globalStandard = { useSessions: unusedGlobalHook, useWorkspaces: unusedGlobalHook, usePanelInfo: unusedGlobalHook }
 const steps: SpeechPreparationStep[] = [
   { kind: 'check', status: 'complete' }, { kind: 'model', status: 'complete' },
   { kind: 'vad', status: 'complete' }, { kind: 'verify', status: 'running', startedAt: 0 }, { kind: 'load', status: 'pending' },
@@ -177,6 +180,23 @@ it('offers Host sources, submits a manual choice, and retains it for retry', asy
   fireEvent.change(picker, { target: { value: '' } })
   fireEvent.click(screen.getByRole('button', { name: zh.retryPrepare }))
   await waitFor(() => { expect(b.prepare).toHaveBeenLastCalledWith(id) })
+})
+
+it('answers only its one-liner for the Plugins page summary, the full surface on its page', () => {
+  const store = createSnapshotStore<SpeechReadiness>({ connected: true, error: null, catalog: {
+    selection: { providerId: id, language: 'auto' }, maxAudioBytes: 100, maxDurationSeconds: 120,
+    providers: [{ id, name: 'SenseVoiceSmall', location: 'host-local', languages: ['auto'], preparation: { phase: 'ready' } }],
+  } })
+  const props = { useSpeechReadiness: bindSnapshotSelector(store), configure: vi.fn(async () => {}),
+    prepare: vi.fn(async () => {}), cancelPreparation: vi.fn(async () => {}), t, view: 'summary' as const,
+    ...globalStandard }
+  render(<VoicePluginsItem {...props} />)
+  expect(screen.getByText(zh.itemSummary)).toBeTruthy()
+  expect(screen.queryByLabelText(zh.provider)).toBeNull()
+  cleanup()
+  render(<VoicePluginsItem {...props} view="page" />)
+  expect(screen.queryByText(zh.itemSummary)).toBeNull()
+  expect(screen.getByLabelText(zh.provider)).toBeTruthy()
 })
 
 it('respects a fixed private source and removes a choice that the Host withdraws', async () => {

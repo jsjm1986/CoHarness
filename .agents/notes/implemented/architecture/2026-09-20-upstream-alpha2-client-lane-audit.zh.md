@@ -34,7 +34,7 @@ Status: implemented
 - `client/ui-primitives`（5 个文件）—— `darwin-desktop` 没有 Electron 消费方；`Checkbox` 与 `SiteGlyph` 尚未移植。`MarkdownDelegate` 与 `file-link` 已通过[账户隔离的辅助侧栏](2026-09-23-account-scoped-auxiliary-sidebar.zh.md)承接。`rank-by-name.ts` 现已移植——上游共享的有序子序列排序支撑 `ui-commands` 与 `ui-skill` 的菜单过滤。`FoldToggle.tsx`/`file-size.ts` 仅服务未携带的上游界面（FileCard 轨与折叠转写视图）。
 - `client/ui-settings-general`（4 个文件）——桌面更新指示器及其 bridge/source 仅属 Electron。
 - `client/ui-settings-models`（7 个文件）——`ModelRow`/`ModelInputTypes` 是上游目录编辑器的共享字段行，`WelcomeNotice`/`welcome-store`/`operations`/`onboarding-copy` 驱动上游首跑目录引导；本地编辑器保留各自内联字段且无首跑模型引导。
-- `client/ui-settings-plugins`——[Subagent 限制](2026-09-23-scoped-subagent-limits.zh.md)与上游字段帮助已适配到键控 `settings.plugin.item` 卡片。模型选择控件复用同一命名空间卡片所有者及 Host 原子写入；Admin 配置集成仍需本地消费者；设置外壳不同不免除这些要求。
+- `client/ui-settings-plugins`——[Subagent 限制](2026-09-23-scoped-subagent-limits.zh.md)与上游字段帮助已适配到 `plugins.item` 卡片。模型选择控件复用同一命名空间卡片所有者及 Host 原子写入；Admin 配置集成仍需本地消费者；设置外壳不同不免除这些要求。
 - `client/ui-sidebar`（`HeaderLeadingControls`）——依赖 `isDarwinDesktop` 的 macOS 桌面侧栏控件。
 - `client/ui-subagent`（`sidebar-chat/`、`subagent-lineage.ts`）——基于未携带的 `ui-sidebar-right`/`client-resources` 的右侧栏会话视图；本地 subagent 经 `SubagentHeaderLineage`/`SubagentReadOnlyComposer` 在会话内呈现，谱系推导由本地自有实现承担。
 - `client/ui-theme`（`FontSizeRow*`）——上游的内容字号偏好设置行；本地主题设置仅暴露 `AppearanceRow`，不携带字号设置。
@@ -45,7 +45,7 @@ Status: implemented
 
 **保留的本地组装：**
 
-- `client/ui-settings-plugins`——`AgentLoopCard`、`BashCard`、`ConfigurablePluginsTab`、`PluginsSettingsSection`、`slot-contract.ts`：本地键控卡片拥有设置分区。每项上游交互和配置行为仍需承接或明确的产品决定。
+- `client/ui-settings-plugins`——`AgentLoopCard`、`BashCard`、`PluginForm`：本地卡片拥有「插件」页上的 `plugins.item` 配置条目。每项上游交互和配置行为仍需承接或明确的产品决定。
 - `client/ui-sidebar` `locales.ts`——上游 `panels.label` 喂给本地 `SidebarRoot` 不渲染的全局面板 `<nav>`。
 
 ## 备选方案

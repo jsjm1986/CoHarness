@@ -14,7 +14,7 @@ Adopt alpha.2 `WebBootGraph.batches` and `ClientEntries` in [client/modules](../
 
 The [Web kernel](../../../../packages/client/web/README.md) retains CoHarness platform seeds, runtime preloading, AbortSignal compatibility, and authenticated composition. Creating the module system before Cordis does not require a second entry owner: `bootClient` hands the real Loader to that same controller. Its status is a bare observable value with an explicit structural type, avoiding a dependency from bootstrap machinery into the Workbench runtime solely for a type declaration.
 
-[Client HMR](../../../../packages/client/hmr/README.md) forwards validated transport frames to the controller. The [plugin inventory](../../../../packages/client/ui-settings-plugin-inventory/README.md) reads its status through a framework-bound hook and retries only the current page. Host enablement, account and project authority, and other browser pages remain independent. The local preset grouping and search stay in place.
+[Client HMR](../../../../packages/client/hmr/README.md) forwards validated transport frames to the controller. The sidebar [Plugins page](../../../../packages/client/ui-plugin-manager/README.md) reads its status through a framework-bound hook and retries only the current page. Host enablement, account and project authority, and other browser pages remain independent.
 
 Production graph transport remains enabled while artifact polling follows the [explicit development setting](2026-08-23-production-client-hmr-opt-in.md). This preserves live membership changes without adding periodic filesystem work.
 

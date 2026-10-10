@@ -303,9 +303,6 @@
         "packages/client/ui-settings-models/src/onboarding-copy.ts"
       ]
     },
-    "client/ui-settings-plugin-inventory": {
-      "sovereignty": "adapted"
-    },
     "client/ui-settings-plugins": {
       "sovereignty": "adapted",
       "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
@@ -1263,6 +1260,11 @@
     {
       "package": "client/ui-sidebar-files",
       "reason": "the desktop file sidebar is part of the rejected upstream ui-package tree; workspace browsing is owned by the cloud Workbench"
+    },
+    {
+      "package": "client/ui-settings-plugin-inventory",
+      "reason": "the inventory tab duplicated install, removal, and enablement already owned by the sidebar Plugins panel; it is not carried",
+      "replacedBy": "client/ui-plugin-manager"
     },
     {
       "package": "credentials/deepseek-account",

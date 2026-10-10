@@ -34,7 +34,7 @@ The `dsh-v0.1.5-alpha.1 → dsh-v0.1.6-alpha.2` residue report listed 20 stale f
 - `client/ui-primitives` (5 files) — `darwin-desktop` has no Electron consumer; `Checkbox` and `SiteGlyph` remain unported. `MarkdownDelegate` and `file-link` are adopted through the [account-scoped sidebar](2026-09-23-account-scoped-auxiliary-sidebar.md). `rank-by-name.ts` is now ported — upstream's shared ordered-subsequence ranking backs `ui-commands` and `ui-skill` menu filtering. `FoldToggle.tsx`/`file-size.ts` serve only unported upstream surfaces (the FileCard rail and folded transcript view).
 - `client/ui-settings-general` (4 files) — the desktop updater indicator and its update bridge/source are Electron-only.
 - `client/ui-settings-models` (7 files) — `ModelRow`/`ModelInputTypes` are shared field rows for upstream's catalog editors and the `WelcomeNotice`/`welcome-store`/`operations`/`onboarding-copy` surface drives upstream's first-run catalog onboarding; local editors keep their own inline fields and have no first-run model onboarding.
-- `client/ui-settings-plugins` — [Subagent limits](2026-09-23-scoped-subagent-limits.md) and upstream field help are adapted to the keyed `settings.plugin.item` cards. Model-selection controls use the same namespace-card owner and atomic Host writes; Admin configuration integration still requires a local consumer; the different settings shell does not waive them.
+- `client/ui-settings-plugins` — [Subagent limits](2026-09-23-scoped-subagent-limits.md) and upstream field help are adapted to the `plugins.item` cards. Model-selection controls use the same namespace-card owner and atomic Host writes; Admin configuration integration still requires a local consumer; the different settings shell does not waive them.
 - `client/ui-sidebar` (`HeaderLeadingControls`) — macOS-desktop sidebar controls depending on `isDarwinDesktop`.
 - `client/ui-subagent` (`sidebar-chat/`, `subagent-lineage.ts`) — a right-sidebar conversation view over uncarried `ui-sidebar-right`/`client-resources`; local subagents render inside the conversation via `SubagentHeaderLineage`/`SubagentReadOnlyComposer`, which owns its own lineage derivation.
 - `client/ui-theme` (`FontSizeRow*`) — upstream's content font-size preference row; the local theme settings expose `AppearanceRow` only and carry no font-size setting.
@@ -45,7 +45,7 @@ The `dsh-v0.1.5-alpha.1 → dsh-v0.1.6-alpha.2` residue report listed 20 stale f
 
 **Retained local composition:**
 
-- `client/ui-settings-plugins` — `AgentLoopCard`, `BashCard`, `ConfigurablePluginsTab`, `PluginsSettingsSection`, `slot-contract.ts`: the local keyed-item cards own the settings section. Individual upstream interaction and configuration behaviors still require adoption or an explicit product decision.
+- `client/ui-settings-plugins` — `AgentLoopCard`, `BashCard`, `PluginForm`: the local cards own the `plugins.item` configuration entries on the Plugins page. Individual upstream interaction and configuration behaviors still require adoption or an explicit product decision.
 - `client/ui-sidebar` `locales.ts` — upstream's `panels.label` feeds a global-panels `<nav>` the local `SidebarRoot` does not render.
 
 ## Alternatives considered

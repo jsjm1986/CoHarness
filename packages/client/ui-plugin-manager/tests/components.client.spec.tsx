@@ -7,7 +7,8 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { PluginEntryId, PluginInstallRequestId } from '@deepseek-ai/dsh-api-remotes/client'
 import { bindSnapshotSelector, stubMutationScope } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SettingsMirrorSnapshot, SettingsMutationScope } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { createSnapshotStore, type SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientEntryState } from '@deepseek-ai/dsh-client-modules/client'
+import { createSnapshotStore, type ProjectUiPolicySnapshot, type SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { StrictMode, type ReactNode } from 'react'
 import { createNavigationStore } from '../src/client/navigation-store.ts'
 import { PluginManagerPage } from '../src/client/PluginManagerPage.tsx'
@@ -91,9 +92,20 @@ function subjectOf(owner: unknown): PluginsSubject | undefined {
 
 const NO_CONFIG: ConfigLedger = { items: [], bundles: new Set(), rows: new Set() }
 
+/** A minimal accepted-values form: the Configuration group only needs the namespace key it is listed under. */
+function configFormStub(): ConfigPageForm {
+  return {
+    state: { status: 'ready', value: {}, base: {}, user: {}, revision: 0, writable: true,
+      writableReason: undefined, write: { status: 'idle' }, mode: 'host' },
+    mutate: vi.fn(async () => true),
+  }
+}
+
 function renderTab(
   state: Partial<PluginManagerState> = {}, config: Partial<ConfigLedger> = {},
   bodies: SlotBodies = {}, forms: Record<string, ConfigPageForm> = {},
+  sync: ClientEntryState = { syncing: false, failures: [] },
+  scopePolicy: ProjectUiPolicySnapshot = { scope: 'personal', theme: 'follow-user', revision: 0, accountPermissions: 'unknown' },
 ) {
   const ctx = new Context()
   onTestFinished(async () => { await ctx.fiber.dispose() })
@@ -125,6 +137,7 @@ function renderTab(
     cancelConfirm: vi.fn(),
     setRowEnabled: vi.fn(),
     dismissNotice: vi.fn(),
+    retryClient: vi.fn(),
   }
   const unusedStandardHook = (): never => { throw new Error('Plugin manager fixture does not provide global state') }
   const standard = {
@@ -141,6 +154,8 @@ function renderTab(
     ...actions,
     usePluginManager: bindSnapshotSelector(store),
     useConfigLedger: bindSnapshotSelector(ledger),
+    useClientSync: bindSnapshotSelector(createSnapshotStore<ClientEntryState>(sync)),
+    useScopePolicy: bindSnapshotSelector(createSnapshotStore<ProjectUiPolicySnapshot>(scopePolicy)),
     useConfigurations: bindSnapshotSelector(createSnapshotStore<SettingsMirrorSnapshot>({
       status: 'ready', error: null,
       view: { writable: true, hasDocument: true, namespaces: Object.keys(forms).map(ns => ({
@@ -194,6 +209,38 @@ function renderTab(
 }
 
 describe('PluginManagerPage', () => {
+  it('surfaces this page\'s module-sync state and routes its retry without touching Host enablement', () => {
+    const idle = renderTab()
+    expect(document.querySelector('[data-client-sync-failure]')).toBeNull()
+    idle.unmount()
+    const syncing = renderTab({}, {}, {}, {}, { syncing: true, failures: [] })
+    expect(screen.getByText('Syncing plugins on this page…')).toBeDefined()
+    syncing.unmount()
+    const failed = renderTab({}, {}, {}, {}, { syncing: false, failures: [{ id: 'dsh-x', message: 'import failed' }] })
+    const panel = document.querySelector('[data-client-sync-failure]')!
+    expect(within(panel as HTMLElement).getByText('dsh-x: import failed')).toBeDefined()
+    fireEvent.click(within(panel as HTMLElement).getByRole('button', { name: 'Retry this page' }))
+    expect(failed.actions.retryClient).toHaveBeenCalledTimes(1)
+    expect(failed.actions.setEnabled).not.toHaveBeenCalled()
+  })
+
+  it('labels the runtime scope the page edits once the account is verified', () => {
+    const unverified = renderTab()
+    expect(document.querySelector('[data-plugin-scope-line]')).toBeNull()
+    unverified.unmount()
+    const personal = renderTab({}, {}, {}, {}, { syncing: false, failures: [] },
+      { scope: 'personal', theme: 'follow-user', revision: 1, accountPermissions: 'standard' })
+    expect(document.querySelector('[data-plugin-scope-line]')?.textContent).toBe(en.scopePersonal)
+    personal.unmount()
+    const named = renderTab({}, {}, {}, {}, { syncing: false, failures: [] },
+      { scope: 'project', theme: 'follow-user', revision: 1, accountPermissions: 'standard', projectId: 4, projectName: 'Rig' })
+    expect(document.querySelector('[data-plugin-scope-line]')?.textContent).toBe(en.scopeProject.replace('{name}', 'Rig'))
+    named.unmount()
+    renderTab({}, {}, {}, {}, { syncing: false, failures: [] },
+      { scope: 'project', theme: 'follow-user', revision: 1, accountPermissions: 'standard', projectId: 4 })
+    expect(document.querySelector('[data-plugin-scope-line]')?.textContent).toBe(en.scopeProjectUnnamed)
+  })
+
   it('opens the requested bundle after its inventory arrives and falls back when it is absent', () => {
     const b = renderTab({ status: 'loading' })
     act(() => { b.navigation.actions.setView({ kind: 'package', name: 'dsh-better-sidebar' }) })
@@ -308,6 +355,8 @@ describe('PluginManagerPage', () => {
     const { actions, set, setLanguage } = renderTab(
       { status: 'error', refreshStatus: 'failed' },
       { items: [{ id: 'bash', label: 'Shell' }] },
+      {},
+      { bash: configFormStub() },
     )
     if (view === 'configuration detail') fireEvent.click(screen.getByRole('button', { name: en.openDetail.replace('{name}', 'Shell') }))
     for (const dict of [en, zh]) {
@@ -760,19 +809,21 @@ describe('PluginManagerPage', () => {
       'plugins.row.config:dsh-better-sidebar#sidebar': view => view === 'summary' ? 'The sidebar row.' : <form aria-label="row form" />,
     }
 
-    it('lists an official plugin after the official bundles with its summary, and opens its page', () => {
+    it('lists an official plugin in the Configuration group with its summary, and opens its page', () => {
       renderTab(
         { packages: [pkg({ name: '@deepseek-ai/dsh-experimental-agent-team-profile', installed: false, optional: true, enabled: false })] },
         { items: [{ id: 'bash', label: 'Shell' }] },
         bodies,
+        { bash: configFormStub() },
       )
       const official = document.querySelector('[data-plugin-group="official"]') as HTMLElement
       expect(within(official).getAllByRole('listitem').map(card => card.getAttribute('data-plugin-item') ?? card.getAttribute('data-plugin-package')))
-        .toEqual(['@deepseek-ai/dsh-experimental-agent-team-profile', 'bash'])
-      expect(document.querySelector('[data-plugin-count]')?.textContent).toBe('2')
-      expect(within(official).getByText('Limits every command.')).toBeTruthy()
+        .toEqual(['@deepseek-ai/dsh-experimental-agent-team-profile'])
+      const config = document.querySelector('[data-plugin-group="config"]') as HTMLElement
+      expect(within(config).getAllByRole('listitem').map(card => card.getAttribute('data-plugin-item'))).toEqual(['bash'])
+      expect(within(config).getByText('Limits every command.')).toBeTruthy()
       // An official plugin has no switch of its own: the Host composes it.
-      expect(within(official).queryByRole('switch', { name: en.enableToggle.replace('{name}', 'Shell') })).toBeNull()
+      expect(within(config).queryByRole('switch', { name: en.enableToggle.replace('{name}', 'Shell') })).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: en.openDetail.replace('{name}', 'Shell') }))
       const detail = document.querySelector('[data-plugin-item-detail="bash"]') as HTMLElement
       expect(within(detail).getByRole('heading', { level: 3 }).textContent).toBe('Shell')
@@ -780,17 +831,41 @@ describe('PluginManagerPage', () => {
       expect(within(detail).getByRole('form', { name: 'bash form' })).toBeTruthy()
       fireEvent.click(within(detail).getByRole('button', { name: en.backToList }))
       expect(document.querySelector('[data-plugin-item-detail]')).toBeNull()
-      expect(screen.getByRole('heading', { name: en.officialTitle })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: en.configTitle })).toBeTruthy()
+    })
+
+    it('lists no card for an official plugin whose namespace the Host does not serve', () => {
+      renderTab({}, { items: [{ id: 'bash', label: 'Shell' }] }, bodies)
+
+      expect(document.querySelector('[data-plugin-group="config"]')).toBeNull()
+      expect(screen.queryByRole('button', { name: en.openDetail.replace('{name}', 'Shell') })).toBeNull()
+    })
+
+    it('keeps the Configuration group and an item page under an unavailable bundle list', () => {
+      renderTab(
+        { status: 'unavailable' },
+        { items: [{ id: 'bash', label: 'Shell' }] },
+        bodies,
+        { bash: configFormStub() },
+      )
+      expect(screen.getByRole('status').textContent).toContain(en.unavailable)
+      expect(document.querySelector('[data-plugin-group="official"]')).toBeNull()
+      const config = document.querySelector('[data-plugin-group="config"]') as HTMLElement
+      expect(within(config).getByRole('button', { name: en.openDetail.replace('{name}', 'Shell') })).toBeTruthy()
+      fireEvent.click(within(config).getByRole('button', { name: en.openDetail.replace('{name}', 'Shell') }))
+      expect(document.querySelector('[data-plugin-item-detail="bash"]')).not.toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: en.backToList }))
+      expect(document.querySelector('[data-plugin-group="config"]')).not.toBeNull()
     })
 
     it('counts an official plugin as content: the empty line waits for a page with nothing at all', () => {
-      renderTab({ packages: [] }, { items: [{ id: 'bash', label: 'Shell' }] }, bodies)
+      renderTab({ packages: [] }, { items: [{ id: 'bash', label: 'Shell' }] }, bodies, { bash: configFormStub() })
       expect(screen.queryByText(en.empty)).toBeNull()
       expect(screen.getByRole('button', { name: en.openDetail.replace('{name}', 'Shell') })).toBeTruthy()
     })
 
     it('gives an official plugin without artwork of its own the default artwork', () => {
-      renderTab({ packages: [] }, { items: [{ id: 'custom-tool', label: 'Custom' }] })
+      renderTab({ packages: [] }, { items: [{ id: 'custom-tool', label: 'Custom' }] }, {}, { 'custom-tool': configFormStub() })
       const card = document.querySelector('[data-plugin-item="custom-tool"]') as HTMLElement
       const stops = [...card.querySelectorAll('stop')].map(stop => stop.getAttribute('stop-color'))
       expect(stops).toEqual(['#54ECE7', '#658EFF'])
@@ -845,6 +920,7 @@ describe('PluginManagerPage', () => {
         { packages: [pkg({ rows: [row()] })] },
         { items: [{ id: 'bash', label: 'Shell' }], rows: new Set(['dsh-better-sidebar#sidebar']) },
         bodies,
+        { bash: configFormStub() },
       )
       // The cards carry none of it.
       expect(screen.queryByRole('button', { name: /^act / })).toBeNull()

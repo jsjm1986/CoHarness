@@ -1,12 +1,10 @@
 /**
- * Compact plugins settings stylesheet contract, asserted against the CSS text.
+ * Compact plugin-form stylesheet contract, asserted against the CSS text.
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const section = readFileSync(fileURLToPath(new URL('../src/client/PluginsSettingsSection.module.css', import.meta.url)), 'utf8')
-const card = readFileSync(fileURLToPath(new URL('../src/client/PluginCard.module.css', import.meta.url)), 'utf8')
 const fields = readFileSync(fileURLToPath(new URL('../src/client/fields.module.css', import.meta.url)), 'utf8')
 
 /**
@@ -32,18 +30,7 @@ function mediaBody(source: string, query: string): string {
   throw new Error(`stylesheet @media ${query} is unbalanced`)
 }
 
-describe('plugins settings compact styles', () => {
-  it('gives inner tabs the touch target under 768px', () => {
-    const compact = mediaBody(section, '(max-width: 767px)')
-    expect(compact).toContain('min-height: var(--dsw-touch-target)')
-    expect(compact).toContain('max-width: none')
-  })
-
-  it('gives plugin card headers the touch target on coarse pointers', () => {
-    const coarse = mediaBody(card, '(pointer: coarse)')
-    expect(coarse).toContain('min-height: var(--dsw-touch-target)')
-  })
-
+describe('plugin form compact styles', () => {
   it('makes plugin fields full width under 768px', () => {
     const compact = mediaBody(fields, '(max-width: 767px)')
     expect(compact).toContain('width: 100%')

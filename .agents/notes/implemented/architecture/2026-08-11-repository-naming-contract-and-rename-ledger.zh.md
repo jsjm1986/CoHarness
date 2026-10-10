@@ -332,8 +332,8 @@ PascalCase 标识符内部使用 `Ui`，不要使用 `UI`。除非清单明确�
 - 保留 MCP、Todo、应用启动、基础组合包、web-app 组合包和 CLI 名称。保留目录选择器能力和 Host 后端名称；只重命名未加限定词的 Client `browse` 呈现。
 - 保留 `@deepseek-ai/dsh-client-ui-directory-picker-native`；其后缀说明它是在重命名后的 `-browse` 变体旁使用原生选择器的呈现。保留 `SURFACE_PACKAGES`；在目录选择器自动选择器中，它是客户端呈现端面的包映射，并与 `BACKEND_PACKAGES` 对照。
 - 保留 `@deepseek-ai/dsh-host-plugin-inventory`、`ctx.pluginInventory`、`pluginInventory/list` Remote 以及 `PluginInventory*` 载荷类型。它们准确命名由 Host 拥有的只读清单；只有适配器类和作用域过宽的客户端呈现名称需要修改。
-- 保留 `ConfigurablePluginsTab`。该 tab 渲染具有可编辑配置的插件，不拥有完整的 Plugins 设置分区。
-- 保留共享的 `settings.plugins.tab` slot。它属于 Plugins 设置分区。清单包只把自己的 locale namespace 改为 `settings.pluginInventory`，不会创建独立的 tab slot。
+- `ConfigurablePluginsTab`/`PluginsSettingsSection` 框架与 `settings.plugins.tab`/`settings.plugin.item` slot 随 Plugins 设置分区一并移除；自带卡片注册为侧边栏「插件」页上的 `plugins.item` 条目。
+- `client/ui-settings-plugin-inventory` 包已删除；它适配的 Host 清单（`dsh-host-plugin-inventory`、`ctx.pluginInventory`、`pluginInventory/list` Remote、`PluginInventory*` 载荷类型）保留。
 - 保留 `@deepseek-ai/dsh-message-feedback` 能力、`messageFeedback` Remote、assistant-action entry id `feedback`、hook key `feedback` 和 locale namespace `feedback`。它们所在的接口已经把作用域限定为消息反馈或本地 assistant-message slot。只修改作用域过宽的 Client 包名和导出的 UI 名称。
 - 保留 `RemoteFailure`、`RemoteResult` 和 `SessionRemotes`。前两者是 Typert 载体结果值，后者是客户端 Session 集群使用的一组 Remote 命名空间。它们都不是 store、controller、registry 或 runtime。
 - 保留用户命令 `/export`、Host 路由 `/api/session.export`、`DownloadsApi` 及其 `sessionLog` 操作。命令说明用户动作，Host 路由导出归档，API 则归类直接 HTTP 下载。重命名的 Client controller 拥有独立的浏览器下载步骤。

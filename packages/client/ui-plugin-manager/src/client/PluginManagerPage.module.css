@@ -64,6 +64,13 @@
   color: var(--dsw-alias-label-caption);
 }
 
+.scopeLine {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-caption);
+}
+
 .toolbar {
   display: flex;
   align-items: center;

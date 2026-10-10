@@ -1,7 +1,9 @@
 /** Provider-owned preparation steps and persisted recognition preferences. */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Button, DisclosureRow, IconChevronDownOutline14, StateDot, type StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+// Type-only: merges the Plugins page's `plugins.item` contract.
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { SpeechPreparationState, SpeechProviderId, SpeechProviderView, SpeechSelectionPatch } from '@deepseek-ai/dsh-experimental-speech-to-text/types'
 import type { VoiceInputInjected } from './VoiceInput.tsx'
 import { NS } from './locales.ts'
@@ -160,4 +162,11 @@ export function VoicePreparation({ useSpeechReadiness, ...props }: Pick<InjectFa
     {!catalog && <p role="status">{props.t('loading')}</p>}
     {readiness.error && <p role="alert">{props.t('failed', { message: readiness.error })}</p>}
   </div>
+}
+
+/** The Plugins page's voice entry: its one-liner in the Configuration group, its surface on the item page. */
+export function VoicePluginsItem(props: PropsRuntime<'plugins.item'> & PropsLocale<typeof NS>
+  & Pick<InjectFace<VoiceInputInjected>, 'useSpeechReadiness' | 'configure' | 'prepare' | 'cancelPreparation'>): ReactNode {
+  if (props.view === 'summary') return props.t('itemSummary')
+  return <VoicePreparation {...props} />
 }

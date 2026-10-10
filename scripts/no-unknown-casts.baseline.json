@@ -763,28 +763,6 @@
     "b062facb57a674904c28623f0ba6edfd69ec4b1dc4c101b58b9d9a8abb63558a": 1,
     "fa8fcb25ebdc6a11c86bba4105f957170b4623b2e8dd570773adf2de13609e3f": 1
   },
-  "packages/client/ui-settings-plugin-inventory/tests/browser-plugin.client.spec.tsx": {
-    "04984a2ce1486250236e638e0197da0a1a840855ed3975c59130a85358c7e5fe": 1,
-    "35ffb5b0e8fb9b68196409f4c4dba7f2ac420800169bc50bf764665d3873f5c0": 1
-  },
-  "packages/client/ui-settings-plugin-inventory/tests/components.client.spec.tsx": {
-    "3b5c341b13167d33532f21cc09380de90c5c488a3d3869f91b6381fee5394134": 1,
-    "79c53da50aa08004e201cebca842267ae2650a543b435a7906960f6492c2398b": 1,
-    "cce779b3f60ebbadd524376047258bfbcbf362abab0496f65306b0835026dc89": 1
-  },
-  "packages/client/ui-settings-plugins/tests/apply.client.spec.ts": {
-    "3007bc9a32411c76a33fcf82ab983bebd2aa57932abd8ca58c53810f7052632a": 2,
-    "3d455f54ba188122f29085e9d462bebbca24c517057052f346229efd175e6e3c": 1
-  },
-  "packages/client/ui-settings-plugins/tests/section.client.spec.tsx": {
-    "1801ac5ea91974165d074c23e2aa169f90bc1e34f125c7b7082bed866313ba93": 1,
-    "252f2597d1e941ff8ac02900fabeaaac283a39666e8877eaaceb184635b2a644": 1,
-    "4dbaba8b8058e9705d719f230fe51a80c5bd8535d4c849799228618940ba7809": 1,
-    "7b4311e81ff165e70f8dc4235ddb1cf3acaf649137b21458bf2ee7fffd6201b8": 1,
-    "80a3707e62438edd38b1cab59ca4fcad72296524fa522fd41c5eb68b22039fbf": 2,
-    "ca1a3589bbc88433fdd6b8046cae005e9d65892194f06e23c1be10eca01ee245": 1,
-    "fc819a8f00497253d2231099c726434b4ed85f9677af7d287111e52c09f005a7": 1
-  },
   "packages/client/ui-settings-unarchive-sessions/tests/browser-plugin.client.spec.tsx": {
     "04984a2ce1486250236e638e0197da0a1a840855ed3975c59130a85358c7e5fe": 1,
     "f90d7fe8efc54254e5b3f08c40f7a463ff286b19dc707d77497d237b21f27d38": 1

@@ -33,11 +33,16 @@ declare module '@deepseek-ai/cordis' {
     /** Cross-plugin navigation to the Plugins panel. */
     pluginNavigation: {
       /**
-       * Open a bundle's details without changing the current Session.
-       * An absent bundle displays the plugin list after loading.
-       * @param packageName - npm package name of the bundle.
+       * Open the Plugins panel without changing the current Session. An
+       * absent bundle displays the list after loading.
+       * @param packageName - npm package name of the bundle whose details open.
        */
       openBundle(packageName: string): void
+      /**
+       * Open the Plugins panel on one official plugin's own page.
+       * @param itemId - the plugin's `plugins.item` entry id.
+       */
+      openItem(itemId: string): void
     }
   }
 }
@@ -64,7 +69,7 @@ export const NS = 'pluginManager'
 export const PANEL_ID = 'plugins' as MainPanelId
 
 /** Services required by the sidebar registration and the Remote methods; the inventory says whether the Host manages a profile. */
-export const inject = ['slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe', 'settingsScope', 'layout']
+export const inject = ['slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe', 'settingsScope', 'layout', 'modules', 'projectUiPolicy']
 
 /**
  * Contribute the Plugins entry to the sidebar with the management page it
@@ -131,6 +136,10 @@ export function apply(ctx: ClientContext): void {
       openBundle: (packageName: string) => {
         ctx.layout.selectPanel(PANEL_ID)
         instance.actions.setView({ kind: 'package', name: packageName })
+      },
+      openItem: (itemId: string) => {
+        ctx.layout.selectPanel(PANEL_ID)
+        instance.actions.setView({ kind: 'item', id: itemId })
       },
     })
     yield () => { void disposeNavigation() }

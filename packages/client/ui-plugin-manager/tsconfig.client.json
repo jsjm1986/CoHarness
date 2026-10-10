@@ -25,6 +25,9 @@
       "path": "../locale"
     },
     {
+      "path": "../modules"
+    },
+    {
       "path": "../runtime"
     },
     {

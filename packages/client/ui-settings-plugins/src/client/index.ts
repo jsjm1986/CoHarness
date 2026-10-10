@@ -1,30 +1,29 @@
 /**
- * Plugins settings surface, browser half — one section whose feature-owned
- * tabs include configurable Host plugin cards and read-only inventory.
+ * Plugin configuration cards, browser half — the official settings cards the
+ * Plugins page lists in its Configuration group and opens as per-plugin
+ * detail pages.
  *
- * The section declares `settings.plugins.tab`; its own `configurable` tab then
- * declares `settings.plugin.item` and renders whatever cards were registered
- * into it. The cards this package ships are the host-plane sections the
- * deployment already exposes; each binds its namespace through the client
- * settings scope, which keeps them unaware of one another and of other tabs.
+ * The manager page declares `plugins.item`; this package registers one card
+ * per host-plane namespace it edits. Each card binds its namespace through
+ * the client settings scope, which keeps them unaware of one another, and
+ * supplies its own staged edits with save and discard — the page renders the
+ * one-liner (`view: 'summary'`) or the form (`view: 'page'`), never a card's
+ * internals.
  */
 
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-// Type-only: the settings shell's SlotMap merge (the 'settings.section' entry)
-// and the ctx.settingsScope Context merge. Cross-plugin collaboration goes
-// through the service, never a value import (client bundle purity gate).
+// Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
+// goes through the service, never a value import (client bundle purity gate).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: merges the Plugins page's `plugins.item` slot contract.
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: the ctx.remote Context merge and the forwarded-event key face.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import { AgentLoopCard } from './AgentLoopCard.tsx'
 import { BashCard } from './BashCard.tsx'
-import { ConfigurablePluginsTab } from './ConfigurablePluginsTab.tsx'
-import { PluginsSettingsSection } from './PluginsSettingsSection.tsx'
-import type { PluginsSettingsSectionInjected, PluginsSettingsTabEntry } from './PluginsSettingsSection.tsx'
 import { WebSearchCard } from './WebSearchCard.tsx'
 import { SubagentModelSelectionCard } from './SubagentModelSelectionCard.tsx'
 import { SUBAGENT_MODEL_SELECTION_NS, SubagentModelSelectionCardController } from './subagent-model-selection-card-controller.ts'
@@ -32,15 +31,10 @@ import { SubagentLimitsCard } from './SubagentLimitsCard.tsx'
 import { SubagentLimitsCardController } from './subagent-limits-card-controller.ts'
 import { AGENT_LOOP_NS, AgentLoopCardController } from './agent-loop-card-controller.ts'
 import { SHELL_NS, BashCardController } from './bash-card-controller.ts'
-import { ConfigurablePluginsTabController } from './tab-store.ts'
 import { WEB_SEARCH_NS, WebSearchCardController } from './web-search-card-controller.ts'
 import { en, zh } from './locales.ts'
 
-export type { PluginsSettingsSectionInjected, PluginsSettingsSectionProps } from './PluginsSettingsSection.tsx'
-export type { ConfigurablePluginsTabProps } from './ConfigurablePluginsTab.tsx'
-export type { ConfigurablePluginsTabFace, ConfigurablePluginsTabState } from './tab-store.ts'
-export type { PluginCardProps } from './PluginCard.tsx'
-export type { SettingsPluginItemOwnerProps } from './slot-contract.ts'
+export type { PluginFormProps } from './PluginForm.tsx'
 export type { FieldProps } from './fields.tsx'
 export type {
   CardActions, CardFieldSpec, CardFieldState, CardSecretSpec, CardShell,
@@ -56,13 +50,13 @@ const NS = 'settings.plugins'
 export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
 
 /**
- * Mount the plugin configuration section and the cards this package ships.
+ * Mount the plugin configuration cards this package ships on the Plugins page.
  * @param ctx - the browser plugin context.
  */
 export function apply(ctx: ClientContext): void {
   const { api } = ctx.get('connection') as ConnectionHandle
   const t = ctx.locale.bind(NS)
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-plugins: section dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-plugins: dictionaries')
 
   const bash = new BashCardController(ctx.settingsScope.bind({ namespace: SHELL_NS }))
   const agentLoop = new AgentLoopCardController(ctx.settingsScope.bind({ namespace: AGENT_LOOP_NS }))
@@ -87,105 +81,46 @@ export function apply(ctx: ClientContext): void {
     'ui-settings-plugins: subagent model connection')
   ctx.effect(() => () => { subagentModels.dispose() }, 'ui-settings-plugins: subagent model form')
 
-  // Which namespaces the Host serves comes from the shared describe mirror,
-  // whose owning plugin already refreshes it on document commits and
-  // reconnects — the tab only derives.
-  const configurable = new ConfigurablePluginsTabController(
-    ctx.settingsScope.describe(), () => ctx.slots.entries('settings.plugin.item'))
-  ctx.effect(() => () => { configurable.dispose() }, 'ui-settings-plugins: tab directory')
-  // A card registered after the first read joins the list without a wire call.
-  ctx.effect(
-    () => ctx.slots.subscribe('settings.plugin.item', () => { configurable.refresh() }),
-    'ui-settings-plugins: card ledger',
-  )
-
-  let tabsVersion = -1
-  let tabsRevision = -1
-  let tabs: readonly PluginsSettingsTabEntry[] = []
-  const sectionInjected = (): PluginsSettingsSectionInjected => ({
-    hooks: {
-      tabs: {
-        getSnapshot: () => {
-          const version = ctx.slots.getVersion('settings.plugins.tab')
-          const revision = ctx.locale.getSnapshot().revision
-          if (version !== tabsVersion || revision !== tabsRevision) {
-            tabsVersion = version
-            tabsRevision = revision
-            tabs = ctx.slots.entries('settings.plugins.tab')
-              .map(entry => ({
-                /* v8 ignore next -- list-slot registration requires id */
-                id: entry.options.id ?? '',
-                order: entry.options.order ?? 0,
-                label: resolveSlotLabel(entry.options.label) ?? '',
-              }))
-              .sort((a, b) => a.order - b.order)
-          }
-          return tabs
-        },
-        subscribe: (listener) => {
-          const offLedger = ctx.slots.subscribe('settings.plugins.tab', listener)
-          const offLocale = ctx.locale.subscribe(listener)
-          return () => {
-            offLedger()
-            offLocale()
-          }
-        },
-      },
-    },
-  })
-
-  // This package owns the one Plugins navigation entry and the tab chrome;
-  // feature plugins contribute pages without competing for Settings nav rows.
-  ctx.slots.inject('settings.section', () => ctx.slots.register({
-    name: 'settings.section',
-    id: 'plugins',
-    order: 15,
-    label: () => t('nav'),
-    locale: NS,
-    inject: sectionInjected,
-    children: { 'settings.plugins.tab': { kind: 'list', scope: 'root' } },
-  }, PluginsSettingsSection))
-
-  // The existing configuration page is one ordinary tab. It keeps ownership
-  // of the card slot and the shipped card contributions below.
-  ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
-    name: 'settings.plugins.tab',
-    id: 'configurable',
-    order: 0,
-    label: () => t('configurableTab'),
-    locale: NS,
-    inject: () => configurable.inject(),
-    children: { 'settings.plugin.item': { kind: 'keyed', scope: 'root' } },
-  }, ConfigurablePluginsTab))
-
-  ctx.slots.inject('settings.plugin.item', function* () {
+  // One card per host-plane namespace, listed on the Plugins page in
+  // registration order; the card's own page shows its staged form.
+  ctx.slots.inject('plugins.item', function* () {
     yield ctx.slots.register({
-      name: 'settings.plugin.item',
-      key: SHELL_NS,
+      name: 'plugins.item',
+      id: SHELL_NS,
+      order: 10,
+      label: () => t('bashTitle'),
       locale: NS,
       inject: () => bash.inject(),
     }, BashCard)
     yield ctx.slots.register({
-      name: 'settings.plugin.item',
-      key: AGENT_LOOP_NS,
+      name: 'plugins.item',
+      id: AGENT_LOOP_NS,
+      order: 20,
+      label: () => t('agentLoopTitle'),
       locale: NS,
       inject: () => agentLoop.inject(),
     }, AgentLoopCard)
     yield ctx.slots.register({
-      name: 'settings.plugin.item',
-      key: 'subagent',
+      name: 'plugins.item',
+      id: 'subagent',
+      order: 30,
+      label: () => t('subagentTitle'),
       locale: NS,
       inject: () => subagent.inject(),
     }, SubagentLimitsCard)
     yield ctx.slots.register({
-      name: 'settings.plugin.item',
-      key: SUBAGENT_MODEL_SELECTION_NS,
+      name: 'plugins.item',
+      id: SUBAGENT_MODEL_SELECTION_NS,
+      order: 40,
+      label: () => t('subagentModelSelectionTitle'),
       locale: NS,
       inject: () => subagentModels.inject(),
     }, SubagentModelSelectionCard)
     yield ctx.slots.register({
-      name: 'settings.plugin.item',
-      key: WEB_SEARCH_NS,
+      name: 'plugins.item',
+      id: WEB_SEARCH_NS,
+      order: 50,
+      label: () => t('webSearchTitle'),
       locale: NS,
       inject: () => webSearch.inject(),
     }, WebSearchCard)

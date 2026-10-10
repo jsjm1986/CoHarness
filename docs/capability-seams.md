@@ -24,7 +24,6 @@ flowchart LR
   svc_hmr["ctx.hmr<br/>Serialized module and configuration reloads"]
   pkg_app_boot["app-boot"]
   svc_pluginManager["ctx.pluginManager<br/>Current-profile plugin and bundle management"]
-  pkg_ui_settings_plugin_inventory["ui-settings-plugin-inventory"]
   pkg_ui_plugin_manager["ui-plugin-manager"]
   svc_pluginRegistryProbe["ctx.pluginRegistryProbe<br/>Registry reachability probing for the install dialog"]
   svc_profileContext["ctx.profileContext<br/>Launcher-owned profile data"]
@@ -493,7 +492,6 @@ flowchart LR
   svc_pluginManagementAuthorization --> pkg_cordis_host_runner
   svc_pluginManagementAuthorization --> pkg_plugin_manager
   svc_pluginManager --> pkg_plugin_manager
-  svc_pluginManager --> pkg_ui_settings_plugin_inventory
   svc_pluginRegistryProbe --> pkg_ui_plugin_manager
   svc_profileContext --> pkg_plugin_manager
   svc_ptcRuntime --> pkg_tools
@@ -596,7 +594,7 @@ flowchart LR
 | `ctx.executionAuthority` | `seam` | [`execution-authority`](../packages/context/execution-authority) | [`gateway-execution`](../packages/context/gateway-execution) | [`host-apiproxy`](../packages/host/apiproxy), [`subagent`](../packages/subagent/subagent), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver), [`experimental-agent-team`](../packages/experimental/agent-team), [`experimental-auto-review`](../packages/experimental/auto-review) | - | Input transports stamp authenticated participants; delegated work retains their restrictions and privileged operations recheck current grants. |
 | `ctx.pluginManagementAuthorization` | `seam` | [`plugin-manager`](../packages/boot/plugin-manager) | [`gateway-execution`](../packages/context/gateway-execution) | [`plugin-manager`](../packages/boot/plugin-manager), [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | Managed runtimes require current administrator authority before profile and dynamic-plugin operations, including queued changes. |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | Owns module and exact configuration watchers; application mutations share its queue and automatic reloads await the application file lock. |
-| `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager), `ui-settings-plugin-inventory` | - | Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers. |
+| `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers. |
 | `ctx.pluginRegistryProbe` | `core` | `ui-plugin-manager` | - | `ui-plugin-manager` | - | Races the configured public registries through the Host fetch proxy and caches the first answer the Plugins-page install dialog can preselect. |
 | `ctx.profileContext` | `core` | [`app-boot`](../packages/boot/app-boot) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | The dsh launcher supplies data-only profile locations and composition inputs; reload scheduling belongs to dsh-hmr. |
 | `ctx.officeToPdf` | `core` | [`office-to-pdf`](../packages/document/office-to-pdf) | - | [`host-apiproxy`](../packages/host/apiproxy) | - | Authorized deferred source reads feed a bounded Host converter using the declared native engine or Node WASM. |

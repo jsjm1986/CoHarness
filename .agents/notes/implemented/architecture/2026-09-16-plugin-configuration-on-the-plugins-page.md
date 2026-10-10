@@ -10,23 +10,23 @@ A plugin's settings lived in Settings, on the Plugins section's configuration ta
 
 ## Decision
 
-**The Plugins page hosts configuration; Settings keeps the inventory.** The page declares three slots as children of its `main` entry. `plugins.item` (list) lists an official plugin in the Official group by its `label`. `plugins.bundle.config` (keyed by the bundle's package name) renders on the bundle's page between its description and its rows. `plugins.row.config` (keyed by `<package name>#<row id>`) gives that row a configure control that opens its own page. The [plugin metadata decision](2026-09-18-localized-package-metadata.md) owns that page's title and description; its slot key and technical identities do not change with the displayed text.
+**The Plugins page hosts configuration; Settings keeps the inventory.** The page declares three slots as children of its `main` entry. `plugins.item` (list) lists an official plugin in the Configuration group by its `label`, filtered to entries whose id names a settings namespace the Host serves. `plugins.bundle.config` (keyed by the bundle's package name) renders on the bundle's page between its description and its rows. `plugins.row.config` (keyed by `<package name>#<row id>`) gives that row a configure control that opens its own page. The [plugin metadata decision](2026-09-18-localized-package-metadata.md) owns that page's title and description; its slot key and technical identities do not change with the displayed text.
 
 The page passes `view: 'page'` for each form. Official plugin cards and details also use `view: 'summary'`; a row's detail page uses it only when the plugin has no display description. Bundle configuration renders only `page`. The page draws the title, icon, and crumb, projects the three ledgers into one observable (`configLedgerSource`) beside its store, and never names a configurable plugin. Sidebar navigation and installation-request ownership follow the [sidebar management decision](2026-09-09-plugin-management-in-the-web-sidebar.md).
 
 **Attribution is declared by the registrant, in the slot name and key.** No manifest field, no registration metadata, and no owner information from the settings service: an official page registers without a bundle, a bundle's page with its package name, a row's page with the bundle and the row id its patch declares. A community bundle that ships no browser half has no configuration page; the page renders no generic form from a settings schema.
 
-**Only a save writes.** The form has no discard control or unsaved marker; leaving a page drops its staged edits on unmount. A save writes through the client settings scope with the revision fence.
+**Only a save writes.** A bundle-registered form may carry no discard control, leaving a page drops its staged edits on unmount, and the shipped items' `PluginForm` footer offers save and discard; a save writes through the client settings scope with the revision fence.
 
-**The four host-plane pages register while the Host serves their namespaces.** Each page's package registers it through `ctx.slots.inject` when the shared settings mirror shows the namespace and disposes it when the namespace goes, so a deployment that does not compose the owning plugin shows no trace of it; since [settings pages as companion packages](2026-09-17-settings-pages-as-companion-packages.md) that is one companion package per page, and `ui-settings-plugins` keeps the Settings section as the **Built-in plugins** shell around the inventory tab. The `settings.plugin.item` slot is retired.
+**The four host-plane pages register while the Host serves their namespaces.** Each page's package registers it through `ctx.slots.inject` when the shared settings mirror shows the namespace and disposes it when the namespace goes, so a deployment that does not compose the owning plugin shows no trace of it; since [settings pages as companion packages](2026-09-17-settings-pages-as-companion-packages.md) that is one companion package per page. `ui-settings-plugins` registers the shipped cards as `plugins.item` entries directly; the `settings.plugins.tab` and `settings.plugin.item` slots are retired with the Settings section.
 
-**The Official group.** The optional bundles the installation ships open the group, tagged **Beta** where the package is experimental, with no official tag; the configuration pages follow. The [optional-bundle decision for experimental capabilities](2026-09-21-experimental-capabilities-as-optional-bundles.md) names the entries.
+**The Official group.** The optional bundles the installation ships open the group, tagged **Beta** where the package is experimental, with no official tag; the Configuration group of official items follows it. The [optional-bundle decision for experimental capabilities](2026-09-21-experimental-capabilities-as-optional-bundles.md) names the entries.
 
 ## Consequences
 
 - A bundle's browser half registers a form with one slot registration and its own dictionary; the bundle's patch must declare the row under the id in the key, and the registration exists while the row that carries the bundle's browser half is on: `dsh-client-modules` attaches that half to the row whose specifier is the bare package name, so a row-level page keyed to a subpath row disappears with the root row, not with its own.
-- The four pages use the existing forms and settings write path; `ui-settings-plugins` owns the Settings section, and the configuration pages live on the Plugins page.
-- Settings lists the inventory only; the Settings browser goldens cover that read-only section.
+- The pages use the existing forms and settings write path; `ui-settings-plugins` owns the shipped item registrations, and the configuration pages live on the Plugins page.
+- Settings has no Plugins surface; the read-only inventory is gone with it, and the `plugin-config` web lane covers the Configuration items.
 
 ## Alternatives considered
 

@@ -5,35 +5,31 @@
  */
 
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+// Type-only: merges the Plugins page's `plugins.item` contract.
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { SecretField, ValueField } from './fields.tsx'
-import { PluginCard } from './PluginCard.tsx'
+import { PluginForm } from './PluginForm.tsx'
 import type { WebSearchCardFace } from './web-search-card-controller.ts'
-import type {} from './slot-contract.ts'
 
 /** Props the renderer binds for the web-search card. */
 export type WebSearchCardProps =
-  PropsRuntime<'settings.plugin.item'>
+  PropsRuntime<'plugins.item'>
   & PropsLocale<'settings.plugins'>
   & InjectFace<WebSearchCardFace>
 
 /**
  * Render the web-search card.
- * @param props - locale copy, the card snapshot, and its form actions.
- * @returns the card.
+ * @param props - locale copy, the card snapshot, its form actions, and the view the page asks for.
+ * @returns the card's content for the asked view, or nothing when the namespace is unavailable.
  */
 export function WebSearchCard(props: WebSearchCardProps) {
   const { t } = props
   const state = props.useWebSearchCard(snapshot => snapshot)
+  if (!state.available) return null
+  if (props.view === 'summary') return t('webSearchDescription')
   const disabled = !state.writable
   return (
-    <PluginCard
-      t={t}
-      titleKey="webSearchTitle"
-      descriptionKey="webSearchDescription"
-      state={state}
-      onSave={props.save}
-      onDiscard={props.discard}
-    >
+    <PluginForm t={t} state={state} onSave={props.save} onDiscard={props.discard}>
       <SecretField
         id="plugin-config-web-search-key"
         label={t('webSearchApiKey')}
@@ -72,6 +68,6 @@ export function WebSearchCard(props: WebSearchCardProps) {
         onEdit={(text) => { props.edit('maxUses', text) }}
         onReset={() => { props.resetField('maxUses') }}
       />
-    </PluginCard>
+    </PluginForm>
   )
 }

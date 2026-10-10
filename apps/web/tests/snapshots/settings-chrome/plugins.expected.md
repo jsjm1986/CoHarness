@@ -1,5 +1,0 @@
-- listitem:
-  - "button \"ui-settings, {{entry}}:ui-settings, 已启用\"":
-    - strong: ui-settings
-    - img
-    - code: "{{entry}}:ui-settings"

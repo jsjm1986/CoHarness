@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-10-plugins-page-runtime-scope-label.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-10-plugins-page-runtime-scope-label.md
+/agent-note-plugins-page-labels-the-runtime-scope-it-edits:
+  en: fc7c074cfd510b81
+  zh: 20de22c4c3fb487d
+/agent-note-plugins-page-labels-the-runtime-scope-it-edits/problem:
+  en: 7aa544f42eac91a1
+  zh: 048751e01cf3b7c6
+/agent-note-plugins-page-labels-the-runtime-scope-it-edits/decision:
+  en: 8aea7f50ebc71023
+  zh: 740aab38eee31b06
+/agent-note-plugins-page-labels-the-runtime-scope-it-edits/alternatives-considered:
+  en: 2eec54dba0e49d6a
+  zh: 19bd78b94e1dfe5b
+/agent-note-plugins-page-labels-the-runtime-scope-it-edits/consequences:
+  en: 637c7b627bc6d304
+  zh: 12fd3370435569e9

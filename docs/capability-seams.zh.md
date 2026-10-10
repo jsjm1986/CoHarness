@@ -26,7 +26,6 @@ flowchart LR
   svc_hmr["ctx.hmr<br/>Serialized module and configuration reloads"]
   pkg_app_boot["app-boot"]
   svc_pluginManager["ctx.pluginManager<br/>Current-profile plugin and bundle management"]
-  pkg_ui_settings_plugin_inventory["ui-settings-plugin-inventory"]
   pkg_ui_plugin_manager["ui-plugin-manager"]
   svc_pluginRegistryProbe["ctx.pluginRegistryProbe<br/>Registry reachability probing for the install dialog"]
   svc_profileContext["ctx.profileContext<br/>Launcher-owned profile data"]
@@ -495,7 +494,6 @@ flowchart LR
   svc_pluginManagementAuthorization --> pkg_cordis_host_runner
   svc_pluginManagementAuthorization --> pkg_plugin_manager
   svc_pluginManager --> pkg_plugin_manager
-  svc_pluginManager --> pkg_ui_settings_plugin_inventory
   svc_pluginRegistryProbe --> pkg_ui_plugin_manager
   svc_profileContext --> pkg_plugin_manager
   svc_ptcRuntime --> pkg_tools
@@ -598,7 +596,7 @@ flowchart LR
 | `ctx.executionAuthority` | `seam` | [`execution-authority`](../packages/context/execution-authority) | [`gateway-execution`](../packages/context/gateway-execution) | [`host-apiproxy`](../packages/host/apiproxy), [`subagent`](../packages/subagent/subagent), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver), [`experimental-agent-team`](../packages/experimental/agent-team), [`experimental-auto-review`](../packages/experimental/auto-review) | - | 输入传输层记录已认证参与人；委派工作继承其权限限制，特权操作重新核验当前授权。 |
 | `ctx.pluginManagementAuthorization` | `seam` | [`plugin-manager`](../packages/boot/plugin-manager) | [`gateway-execution`](../packages/context/gateway-execution) | [`plugin-manager`](../packages/boot/plugin-manager), [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | 受管运行时在 profile 和动态插件操作前核验当前管理员权限，包括排队等待的变更。 |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | 拥有模块与精确配置 watcher；应用变更共享其队列，自动重载等待应用文件锁。 |
-| `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager), `ui-settings-plugin-inventory` | - | 与 CLI 共享 profile 包操作，并向 Web 与 agent 调用方报告持久化与运行中状态。 |
+| `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | 与 CLI 共享 profile 包操作，并向 Web 与 agent 调用方报告持久化与运行中状态。 |
 | `ctx.pluginRegistryProbe` | `core` | `ui-plugin-manager` | - | `ui-plugin-manager` | - | 通过 Host fetch 代理竞速已配置的公共 registry，缓存首个应答供插件页安装对话框预选。 |
 | `ctx.profileContext` | `core` | [`app-boot`](../packages/boot/app-boot) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | dsh 启动器提供纯数据 profile 位置与组合输入；重载调度属于 dsh-hmr。 |
 | `ctx.officeToPdf` | `core` | [`office-to-pdf`](../packages/document/office-to-pdf) | - | [`host-apiproxy`](../packages/host/apiproxy) | - | 已授权的延迟源读取交由有界 Host 转换器处理，采用声明的原生引擎或 Node WASM。 |

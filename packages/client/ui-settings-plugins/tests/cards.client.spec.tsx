@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
- * What the section and its cards show: the empty line when no plugin
- * contributed one, a card that renders nothing while its namespace is
- * unavailable, and the save footer that decides when staged edits are written.
+ * What the Plugins page's configuration entries show: a one-liner for
+ * `view: 'summary'`, nothing while the namespace is unavailable, and the page
+ * form whose save footer decides when staged edits are written.
  */
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -13,10 +13,6 @@ import { AgentLoopCard } from '../src/client/AgentLoopCard.tsx'
 import type { AgentLoopCardProps } from '../src/client/AgentLoopCard.tsx'
 import { BashCard } from '../src/client/BashCard.tsx'
 import type { BashCardProps } from '../src/client/BashCard.tsx'
-import { ConfigurablePluginsTab } from '../src/client/ConfigurablePluginsTab.tsx'
-import type { ConfigurablePluginsTabProps } from '../src/client/ConfigurablePluginsTab.tsx'
-import { PluginsSettingsSection } from '../src/client/PluginsSettingsSection.tsx'
-import type { PluginsSettingsSectionProps, PluginsSettingsTabEntry } from '../src/client/PluginsSettingsSection.tsx'
 import { WebSearchCard } from '../src/client/WebSearchCard.tsx'
 import { SubagentModelSelectionCard, type SubagentModelSelectionCardProps } from '../src/client/SubagentModelSelectionCard.tsx'
 import type { SubagentModelSelectionCardState } from '../src/client/subagent-model-selection-card-controller.ts'
@@ -24,16 +20,21 @@ import { SubagentLimitsCard } from '../src/client/SubagentLimitsCard.tsx'
 import type { SubagentLimitsCardProps } from '../src/client/SubagentLimitsCard.tsx'
 import type { SubagentLimitsCardState } from '../src/client/subagent-limits-card-controller.ts'
 import type { WebSearchCardProps } from '../src/client/WebSearchCard.tsx'
+import { PluginForm } from '../src/client/PluginForm.tsx'
 import type { AgentLoopCardState } from '../src/client/agent-loop-card-controller.ts'
 import type { BashCardState } from '../src/client/bash-card-controller.ts'
 import type { CardFieldState, CardShell } from '../src/client/card-form.ts'
-import type { ConfigurablePluginsTabState } from '../src/client/tab-store.ts'
 import type { WebSearchCardState } from '../src/client/web-search-card-controller.ts'
 import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
-const t = (key: keyof typeof en) => en[key]
+// `TranslateNS` accepts the namespace's merged key set; the fixture needs only this package's dictionary.
+const t = (key: string) => (en as Record<string, string>)[key] ?? key
+
+/** The global seat a `plugins.item` entry receives; the card bodies under test never read it. */
+const unusedGlobalHook = (): never => { throw new Error('card fixture provides no global state') }
+const globalStandard = { useSessions: unusedGlobalHook, useWorkspaces: unusedGlobalHook, usePanelInfo: unusedGlobalHook }
 
 /** A settled form: nothing staged, everything served. */
 const settled: CardShell = {
@@ -51,11 +52,10 @@ describe('Subagent limits card', () => {
       ...settled, maxDepth: field('1'), maxActiveSubagents: field('8'),
     }
     const actions = cardActions()
-    const props = {
-      t, ...actions, useSubagentLimitsCard: bindSnapshotSelector(createSnapshotStore(state)),
-    } as unknown as SubagentLimitsCardProps
+    const props: SubagentLimitsCardProps = {
+      ...globalStandard, t, ...actions, view: 'page', useSubagentLimitsCard: bindSnapshotSelector(createSnapshotStore(state)),
+    }
     const { rerender } = render(<SubagentLimitsCard {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Show settings: Subagent' }))
     fireEvent.click(screen.getByRole('button', { name: en.subagentDepthHelpLabel }))
     const depth = screen.getByLabelText(en.subagentMaxDepth)
     const help = screen.getByRole('region', { name: en.subagentDepthHelpLabel })
@@ -84,6 +84,25 @@ describe('Subagent limits card', () => {
     expect(screen.getByText(en.subagentDepthInvalid)).toBeTruthy()
     expect(screen.getAllByRole('button', { name: en.reset }).every(button => (button as HTMLButtonElement).disabled)).toBe(true)
   })
+
+  it('renders nothing while its namespace is unavailable, and answers only its one-liner for a summary', () => {
+    const fields = { maxDepth: field('1'), maxActiveSubagents: field('8') }
+    const props: SubagentLimitsCardProps = {
+      ...globalStandard, ...cardActions(), t, view: 'page',
+      useSubagentLimitsCard: bindSnapshotSelector(createSnapshotStore<SubagentLimitsCardState>({
+        ...settled, available: false, ...fields,
+      })),
+    }
+    const { container } = render(<div />)
+    render(<SubagentLimitsCard {...props} />)
+    expect(container.textContent).toBe('')
+    expect(screen.queryByLabelText(en.subagentMaxDepth)).toBeNull()
+
+    cleanup()
+    render(<SubagentLimitsCard {...props} view="summary" useSubagentLimitsCard={bindSnapshotSelector(createSnapshotStore<SubagentLimitsCardState>({ ...settled, ...fields }))} />)
+    expect(screen.getByText(en.subagentDescription)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.save })).toBeNull()
+  })
 })
 
 /** One control's state, defaulting to an inherited value. */
@@ -95,36 +114,7 @@ function cardActions() {
   return { edit: vi.fn(), resetField: vi.fn(), save: vi.fn(), discard: vi.fn() }
 }
 
-function renderSection(rows: readonly PluginsSettingsTabEntry[]) {
-  const props = {
-    t,
-    useTabs: (selector: (value: readonly PluginsSettingsTabEntry[]) => unknown) => selector(rows),
-    renderSlot: (_name: string, _owner: unknown, options: { only?: string }) => (
-      <span>{options.only}</span>
-    ),
-  } as unknown as PluginsSettingsSectionProps
-  render(<PluginsSettingsSection {...props} />)
-}
-
-/**
- * Render the tab over the namespaces it was told to dispatch, with `cards`
- * standing in for the slot ledger: a key it names renders that text, and one
- * it does not renders nothing, exactly as an unclaimed key does.
- */
-function renderConfigurable(namespaces: string[], cards: Record<string, string> = {}, loaded = true) {
-  const store = createSnapshotStore<ConfigurablePluginsTabState>({ loaded, namespaces })
-  const props = {
-    t,
-    useConfigurablePlugins: bindSnapshotSelector(store),
-    renderSlot: (_name: string, _owner: object, opts?: { entryKey?: string }) => {
-      const card = opts?.entryKey === undefined ? undefined : cards[opts.entryKey]
-      return card === undefined ? null : <li>{card}</li>
-    },
-  } as unknown as ConfigurablePluginsTabProps
-  render(<ConfigurablePluginsTab {...props} />)
-}
-
-function renderBash(state: Partial<BashCardState> = {}) {
+function renderBash(state: Partial<BashCardState> = {}, view: 'summary' | 'page' = 'page') {
   const store = createSnapshotStore<BashCardState>({
     ...settled,
     timeoutMs: field('60000'),
@@ -132,104 +122,10 @@ function renderBash(state: Partial<BashCardState> = {}) {
     ...state,
   })
   const actions = cardActions()
-  const props = { ...actions, t, useBashCard: bindSnapshotSelector(store) } as unknown as BashCardProps
+  const props: BashCardProps = { ...globalStandard, ...actions, t, view, useBashCard: bindSnapshotSelector(store) }
   render(<BashCard {...props} />)
   return actions
 }
-
-describe('PluginsSettingsSection', () => {
-  it('says so when no plugin contributed a tab', () => {
-    renderSection([])
-
-    expect(screen.getByText(en.empty)).toBeTruthy()
-    expect(screen.queryByRole('tab')).toBeNull()
-  })
-
-  it('defaults to the first ordered tab and mounts another only after selection', () => {
-    renderSection([
-      { id: 'configurable', order: 0, label: en.configurableTab },
-      { id: 'all', order: 10, label: 'Plugin list' },
-    ])
-
-    const configurable = screen.getByRole('tab', { name: en.configurableTab })
-    const all = screen.getByRole('tab', { name: 'Plugin list' })
-    expect(configurable.getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByText('configurable')).toBeTruthy()
-    expect(screen.queryByText('all')).toBeNull()
-
-    fireEvent.click(all)
-    expect(all.getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByText('all')).toBeTruthy()
-    expect(screen.getByText('configurable').closest('[role="tabpanel"]')).toHaveProperty('hidden', true)
-
-    fireEvent.click(configurable)
-    expect(configurable.getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByText('all').closest('[role="tabpanel"]')).toHaveProperty('hidden', true)
-  })
-
-  it('leads with its own heading and intro', () => {
-    renderSection([{ id: 'configurable', order: 0, label: en.configurableTab }])
-
-    expect(screen.getByRole('heading', { name: en.title })).toBeTruthy()
-    expect(screen.getByText(en.intro)).toBeTruthy()
-  })
-
-  it('moves focus and selection with standard horizontal tab keys', () => {
-    renderSection([
-      { id: 'configurable', order: 0, label: en.configurableTab },
-      { id: 'all', order: 10, label: 'Plugin list' },
-      { id: 'diagnostics', order: 20, label: 'Diagnostics' },
-    ])
-
-    const configurable = screen.getByRole('tab', { name: en.configurableTab })
-    const all = screen.getByRole('tab', { name: 'Plugin list' })
-    const diagnostics = screen.getByRole('tab', { name: 'Diagnostics' })
-    expect(configurable.getAttribute('tabindex')).toBe('0')
-    expect(all.getAttribute('tabindex')).toBe('-1')
-
-    configurable.focus()
-    fireEvent.keyDown(configurable, { key: 'ArrowRight' })
-    expect(document.activeElement).toBe(all)
-    expect(all.getAttribute('aria-selected')).toBe('true')
-
-    fireEvent.keyDown(all, { key: 'End' })
-    expect(document.activeElement).toBe(diagnostics)
-    fireEvent.keyDown(diagnostics, { key: 'ArrowRight' })
-    expect(document.activeElement).toBe(configurable)
-    fireEvent.keyDown(configurable, { key: 'ArrowLeft' })
-    expect(document.activeElement).toBe(diagnostics)
-    fireEvent.keyDown(diagnostics, { key: 'Home' })
-    expect(document.activeElement).toBe(configurable)
-
-    fireEvent.keyDown(configurable, { key: 'Escape' })
-    expect(document.activeElement).toBe(configurable)
-    expect(configurable.getAttribute('aria-selected')).toBe('true')
-  })
-})
-
-describe('ConfigurablePluginsTab', () => {
-  it('says so when no plugin contributed a card', () => {
-    renderConfigurable([], { bash: 'shell' })
-
-    expect(screen.getByText(en.empty)).toBeTruthy()
-    expect(screen.queryByText('shell')).toBeNull()
-  })
-
-  it('withholds the empty line until the Host has answered once', () => {
-    // An unanswered read is not the statement that this deployment configures
-    // no plugin; saying it anyway would flash a wrong answer on every open.
-    renderConfigurable([], { bash: 'shell' }, false)
-
-    expect(screen.queryByText(en.empty)).toBeNull()
-  })
-
-  it('dispatches one card per namespace, keyed by it', () => {
-    renderConfigurable(['bash', 'agent-loop'], { bash: 'shell', 'agent-loop': 'loop' })
-
-    expect(screen.getAllByRole('listitem').map(item => item.textContent)).toEqual(['shell', 'loop'])
-    expect(screen.queryByText(en.empty)).toBeNull()
-  })
-})
 
 describe('BashCard', () => {
   it('renders nothing while its namespace is unavailable', () => {
@@ -240,20 +136,16 @@ describe('BashCard', () => {
     expect(screen.queryByText(en.bashTitle)).toBeNull()
   })
 
-  it('shows the plugin and reveals its fields only once expanded', () => {
-    renderBash()
-    expect(screen.getByText(en.bashTitle)).toBeTruthy()
+  it('answers only its one-liner when the page asks for a summary', () => {
+    renderBash({}, 'summary')
+
+    expect(screen.getByText(en.bashDescription)).toBeTruthy()
     expect(screen.queryByLabelText(en.bashTimeoutMs)).toBeNull()
-
-    fireEvent.click(screen.getByText(en.bashTitle))
-
-    expect(screen.getByLabelText(en.bashTimeoutMs)).toBeTruthy()
-    expect(screen.getByLabelText(en.bashMaxOutputBytes)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.save })).toBeNull()
   })
 
   it('stages an edit instead of writing it', () => {
     const actions = renderBash()
-    fireEvent.click(screen.getByText(en.bashTitle))
 
     fireEvent.change(screen.getByLabelText(en.bashTimeoutMs), { target: { value: '9000' } })
 
@@ -263,7 +155,6 @@ describe('BashCard', () => {
 
   it('offers the reset for an overridden field only', () => {
     const actions = renderBash({ timeoutMs: field('9000', { overridden: true }) })
-    fireEvent.click(screen.getByText(en.bashTitle))
 
     // One badge and one reset: the output cap is still inherited.
     expect(screen.getAllByText(en.overridden)).toHaveLength(1)
@@ -274,7 +165,6 @@ describe('BashCard', () => {
 
   it('addresses each of its two fields separately', () => {
     const actions = renderBash({ maxOutputBytes: field('64000', { overridden: true }) })
-    fireEvent.click(screen.getByText(en.bashTitle))
 
     fireEvent.change(screen.getByLabelText(en.bashMaxOutputBytes), { target: { value: '1024' } })
     fireEvent.click(screen.getByRole('button', { name: en.reset }))
@@ -285,7 +175,6 @@ describe('BashCard', () => {
 
   it('keeps save and discard inert until something is staged', () => {
     renderBash()
-    fireEvent.click(screen.getByText(en.bashTitle))
 
     expect(screen.getByRole('button', { name: en.save })).toHaveProperty('disabled', true)
     expect(screen.getByRole('button', { name: en.discard })).toHaveProperty('disabled', true)
@@ -294,7 +183,6 @@ describe('BashCard', () => {
 
   it('writes the staged edits when saved, and drops them when discarded', () => {
     const actions = renderBash({ dirty: true, timeoutMs: field('9000', { overridden: true }) })
-    fireEvent.click(screen.getByText(en.bashTitle))
 
     fireEvent.click(screen.getByRole('button', { name: en.save }))
     fireEvent.click(screen.getByRole('button', { name: en.discard }))
@@ -303,7 +191,7 @@ describe('BashCard', () => {
     expect(actions.discard).toHaveBeenCalledOnce()
   })
 
-  it('marks a card holding unsaved edits, collapsed or not', () => {
+  it('marks a form holding unsaved edits', () => {
     renderBash({ dirty: true })
 
     expect(screen.getByText(en.unsaved)).toBeTruthy()
@@ -311,7 +199,6 @@ describe('BashCard', () => {
 
   it('blocks the save while a draft is invalid, and says why', () => {
     renderBash({ dirty: true, invalid: true, timeoutMs: field('soon', { invalid: true }) })
-    fireEvent.click(screen.getByText(en.bashTitle))
 
     expect(screen.getByRole('button', { name: en.save })).toHaveProperty('disabled', true)
     expect(screen.getByRole('button', { name: en.discard })).toHaveProperty('disabled', false)
@@ -320,7 +207,6 @@ describe('BashCard', () => {
 
   it('reports a save in flight and refuses another', () => {
     renderBash({ dirty: true, saving: true })
-    fireEvent.click(screen.getByText(en.bashTitle))
 
     expect(screen.getByRole('button', { name: en.saving })).toHaveProperty('disabled', true)
     expect(screen.getByRole('button', { name: en.discard })).toHaveProperty('disabled', true)
@@ -328,27 +214,15 @@ describe('BashCard', () => {
 
   it('reports a save the deployment did not accept', () => {
     renderBash({ dirty: true, failed: true })
-    fireEvent.click(screen.getByText(en.bashTitle))
 
     expect(screen.getByText(en.saveFailed)).toBeTruthy()
   })
 
   it('says the document is read-only and disables its controls', () => {
     renderBash({ writable: false })
-    fireEvent.click(screen.getByText(en.bashTitle))
 
     expect(screen.getByRole('status')).toHaveProperty('textContent', en.readOnly)
     expect(screen.getByLabelText(en.bashTimeoutMs)).toHaveProperty('disabled', true)
-  })
-
-  it('collapses again on a second click', () => {
-    renderBash()
-    fireEvent.click(screen.getByText(en.bashTitle))
-    expect(screen.getByLabelText(en.bashTimeoutMs)).toBeTruthy()
-
-    fireEvent.click(screen.getByText(en.bashTitle))
-
-    expect(screen.queryByLabelText(en.bashTimeoutMs)).toBeNull()
   })
 })
 
@@ -360,14 +234,15 @@ describe('AgentLoopCard', () => {
       maxParallelToolCalls: field('10'),
     })
     const actions = cardActions()
-    const props = {
+    const props: AgentLoopCardProps = {
+      ...globalStandard,
       ...actions,
       t,
+      view: 'page',
       useAgentLoopCard: bindSnapshotSelector(store),
-    } as unknown as AgentLoopCardProps
+    }
     render(<AgentLoopCard {...props} />)
 
-    fireEvent.click(screen.getByText(en.agentLoopTitle))
     fireEvent.change(screen.getByLabelText(en.agentLoopMaxParallel), { target: { value: '2' } })
     fireEvent.click(screen.getByRole('button', { name: en.save }))
 
@@ -381,22 +256,37 @@ describe('AgentLoopCard', () => {
       maxParallelToolCalls: field('2', { overridden: true }),
     })
     const actions = cardActions()
-    const props = {
+    const props: AgentLoopCardProps = {
+      ...globalStandard,
       ...actions,
       t,
+      view: 'page',
       useAgentLoopCard: bindSnapshotSelector(store),
-    } as unknown as AgentLoopCardProps
+    }
     render(<AgentLoopCard {...props} />)
 
-    fireEvent.click(screen.getByText(en.agentLoopTitle))
     fireEvent.click(screen.getByRole('button', { name: en.reset }))
 
     expect(actions.resetField).toHaveBeenCalledWith('maxParallelToolCalls')
   })
+
+  it('renders nothing while its namespace is unavailable, and answers only its one-liner for a summary', () => {
+    const store = createSnapshotStore<AgentLoopCardState>({ ...settled, available: false, maxParallelToolCalls: field('10') })
+    const props: AgentLoopCardProps = { ...globalStandard, ...cardActions(), t, view: 'page', useAgentLoopCard: bindSnapshotSelector(store) }
+    const { container } = render(<div />)
+    render(<AgentLoopCard {...props} />)
+    expect(container.textContent).toBe('')
+    expect(screen.queryByLabelText(en.agentLoopMaxParallel)).toBeNull()
+
+    cleanup()
+    render(<AgentLoopCard {...props} view="summary" useAgentLoopCard={bindSnapshotSelector(createSnapshotStore({ ...settled, maxParallelToolCalls: field('10') }))} />)
+    expect(screen.getByText(en.agentLoopDescription)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.save })).toBeNull()
+  })
 })
 
 describe('WebSearchCard', () => {
-  function renderWebSearch(state: Partial<WebSearchCardState> = {}) {
+  function renderWebSearch(state: Partial<WebSearchCardState> = {}, view: 'summary' | 'page' = 'page') {
     const store = createSnapshotStore<WebSearchCardState>({
       ...settled,
       baseURL: field(''),
@@ -407,14 +297,25 @@ describe('WebSearchCard', () => {
       ...state,
     })
     const actions = cardActions()
-    const props = { ...actions, t, useWebSearchCard: bindSnapshotSelector(store) } as unknown as WebSearchCardProps
+    const props: WebSearchCardProps = { ...globalStandard, ...actions, t, view, useWebSearchCard: bindSnapshotSelector(store) }
     render(<WebSearchCard {...props} />)
     return actions
   }
 
+  it('renders nothing while its namespace is unavailable, and answers only its one-liner for a summary', () => {
+    const { container } = render(<div />)
+    renderWebSearch({ available: false })
+    expect(container.textContent).toBe('')
+    expect(screen.queryByLabelText(en.webSearchBaseUrl)).toBeNull()
+
+    cleanup()
+    renderWebSearch({}, 'summary')
+    expect(screen.getByText(en.webSearchDescription)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.save })).toBeNull()
+  })
+
   it('reports whether a key is configured without ever showing one', () => {
     renderWebSearch({ apiKeyConfigured: true })
-    fireEvent.click(screen.getByText(en.webSearchTitle))
 
     expect(screen.getByText(en.webSearchApiKeySet)).toBeTruthy()
     expect(screen.getByLabelText(en.webSearchApiKey)).toHaveProperty('type', 'password')
@@ -422,7 +323,6 @@ describe('WebSearchCard', () => {
 
   it('keeps the key control usable while the settings document is read-only', () => {
     const actions = renderWebSearch({ writable: false })
-    fireEvent.click(screen.getByText(en.webSearchTitle))
 
     const key = screen.getByLabelText(en.webSearchApiKey)
     expect(key).toHaveProperty('disabled', false)
@@ -437,7 +337,6 @@ describe('WebSearchCard', () => {
     // A key coming from the process environment: the settings document is
     // writable, the credential is not.
     renderWebSearch({ apiKeyConfigured: true, apiKeyWritable: false })
-    fireEvent.click(screen.getByText(en.webSearchTitle))
 
     expect(screen.getByLabelText(en.webSearchApiKey)).toHaveProperty('disabled', true)
     expect(screen.getByLabelText(en.webSearchBaseUrl)).toHaveProperty('disabled', false)
@@ -448,7 +347,6 @@ describe('WebSearchCard', () => {
       baseURL: field('https://search.test/v1', { overridden: true }),
       maxUses: field('3', { overridden: true }),
     })
-    fireEvent.click(screen.getByText(en.webSearchTitle))
 
     fireEvent.change(screen.getByLabelText(en.webSearchBaseUrl), { target: { value: 'https://other.test' } })
     fireEvent.change(screen.getByLabelText(en.webSearchMaxUses), { target: { value: '4' } })
@@ -477,10 +375,9 @@ describe('Subagent model selection card', () => {
     const toggleModel = vi.fn()
     const toggleEnabled = vi.fn()
     const retryCatalog = vi.fn()
-    const props = { t, useSubagentModelSelectionCard: bindSnapshotSelector(store),
-      toggleModel, toggleEnabled, retryCatalog, save: vi.fn(), discard: vi.fn() } as unknown as SubagentModelSelectionCardProps
+    const props: SubagentModelSelectionCardProps = { ...globalStandard, t, view: 'page', useSubagentModelSelectionCard: bindSnapshotSelector(store),
+      toggleModel, toggleEnabled, retryCatalog, save: vi.fn(), discard: vi.fn() }
     const { rerender } = render(<SubagentModelSelectionCard {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Show settings: Model selection' }))
     expect(screen.getByText(en.subagentModelSelectionConflict)).toBeTruthy()
     expect(screen.getByText(en.subagentModelSelectionPartial)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
@@ -501,5 +398,57 @@ describe('Subagent model selection card', () => {
     rerender(<SubagentModelSelectionCard {...props} />)
     expect(screen.getByText(en.subagentModelSelectionOff)).toBeTruthy()
     expect(screen.getByRole('switch').hasAttribute('disabled')).toBe(true)
+  })
+
+  it('renders nothing while its namespace is unavailable, and answers only its one-liner for a summary', () => {
+    const idle: SubagentModelSelectionCardState = { ...settled, enabled: true, catalogStatus: 'idle', catalogPartial: false, conflicted: false, candidates: [] }
+    const props: SubagentModelSelectionCardProps = { ...globalStandard, t, view: 'page',
+      useSubagentModelSelectionCard: bindSnapshotSelector(createSnapshotStore({ ...idle, available: false })),
+      toggleModel: vi.fn(), toggleEnabled: vi.fn(), retryCatalog: vi.fn(), save: vi.fn(), discard: vi.fn() }
+    const { container } = render(<div />)
+    render(<SubagentModelSelectionCard {...props} />)
+    expect(container.textContent).toBe('')
+    expect(screen.queryByRole('switch')).toBeNull()
+
+    cleanup()
+    render(<SubagentModelSelectionCard {...props} view="summary" useSubagentModelSelectionCard={bindSnapshotSelector(createSnapshotStore(idle))} />)
+    expect(screen.getByText(en.subagentModelSelectionToggle)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.save })).toBeNull()
+  })
+})
+
+describe('PluginForm', () => {
+  it('renders nothing while its namespace is unavailable', () => {
+    const { container } = render(
+      <PluginForm t={t} state={{ ...settled, available: false }} onSave={vi.fn()} onDiscard={vi.fn()}>
+        <span>field</span>
+      </PluginForm>,
+    )
+    expect(container.textContent).toBe('')
+  })
+
+  it('names the owner that keeps the settings read-only', () => {
+    const reasons = [
+      ['project', en.readOnlyProject],
+      ['account', en.readOnlyAccount],
+      ['organization', en.readOnlyOrganization],
+      ['deployment', en.readOnlyDeployment],
+      [undefined, en.readOnly],
+    ] as const
+    const { rerender } = render(
+      <PluginForm t={t} state={{ ...settled, writable: false, writableReason: 'project' }} onSave={vi.fn()} onDiscard={vi.fn()}>
+        <span>field</span>
+      </PluginForm>,
+    )
+    for (const [reason, text] of reasons) {
+      rerender(
+        <PluginForm t={t}
+          state={{ ...settled, writable: false, ...(reason === undefined ? {} : { writableReason: reason }) }}
+          onSave={vi.fn()} onDiscard={vi.fn()}>
+          <span>field</span>
+        </PluginForm>,
+      )
+      expect(screen.getByText(text)).toBeTruthy()
+    }
   })
 })

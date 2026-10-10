@@ -262,7 +262,6 @@
     "client/ui-settings": "settings",
     "client/ui-settings-general": "settings",
     "client/ui-settings-models": "settings",
-    "client/ui-settings-plugin-inventory": "settings",
     "client/ui-settings-plugins": "settings",
     "client/ui-settings-unarchive-sessions": "settings",
     "client/ui-shortcuts": [

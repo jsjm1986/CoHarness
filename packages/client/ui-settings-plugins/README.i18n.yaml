@@ -3,38 +3,38 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-settings-plugins/README.md
 /:
-  en: dec9673bd727954e
+  en: 70fcbb55853a15d6
   zh: 61495d48365178df
 /dsh-client-ui-settings-plugins:
-  en: 14177e9a63e35917
-  zh: 8053f4d5e0fb9b58
+  en: b3f959da7fb1ef7d
+  zh: 4e1e8cc699000385
 /dsh-client-ui-settings-plugins/summary:
-  en: d4320f1dba0f03e7
-  zh: f548d702455289cc
+  en: 754902de3a2d3db5
+  zh: b92b6fad042d822f
 /dsh-client-ui-settings-plugins/table-of-contents:
   en: 6e8d92945cfa4e11
   zh: 6827cb51ca55fc8e
 /dsh-client-ui-settings-plugins/what-appears-here:
-  en: 909104e776d17d67
-  zh: 19684c71affae0dc
+  en: 26624fe099921bfb
+  zh: 7313181db1e6879a
 /dsh-client-ui-settings-plugins/extension-point:
-  en: 3a60debeb5181dc3
-  zh: a11ec4088f555547
+  en: d944391a7dd5320b
+  zh: aa00f85ae001fc3d
 /dsh-client-ui-settings-plugins/writes:
-  en: fbb4822ff60c7581
-  zh: dc018eda3a900e5f
+  en: ced63964ab447a24
+  zh: 42f57278db111619
 /dsh-client-ui-settings-plugins/invariants:
-  en: 5493f471ff20bdce
-  zh: dc98720f1c65904a
+  en: e0a1e4d047714943
+  zh: 1f5447851a8fdce8
 /dsh-client-ui-settings-plugins/model-experience:
   en: 6b7c6f82ab6c8435
   zh: 3328550d96a6368b
 /dsh-client-ui-settings-plugins/model-experience/kv-cache-effect:
   en: ca75c51c89c2c9b0
-  zh: ba249b9030927950
+  zh: 2026c1566df4f78c
 /dsh-client-ui-settings-plugins/known-limitations-and-deferred-work:
-  en: 8db075d6f3b1a1e6
-  zh: 79634b5fbe645123
+  en: 0d00e3bf351df936
+  zh: d6d0f631cf46c403
 /dsh-client-ui-settings-plugins/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

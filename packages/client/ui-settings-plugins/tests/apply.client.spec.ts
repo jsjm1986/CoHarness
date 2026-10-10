@@ -8,9 +8,6 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
-import type {
-  ConfigurablePluginsTabFace, PluginsSettingsSectionInjected,
-} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import { SubagentModelSelectionCardController } from '../src/client/subagent-model-selection-card-controller.ts'
 import { apply as nodeApply } from '../src/index.ts'
 
@@ -44,8 +41,8 @@ async function bench(served?: string[]) {
         },
       },
     }))
-  // The section binds its scopes through the Settings surface's service, and
-  // forwarded Host events reach it through the same `$dispatch` handoff the
+  // The cards bind their scopes through the Settings surface's service, and
+  // forwarded Host events reach them through the same `$dispatch` handoff the
   // connection sink makes.
   new TestRemote(ctx)
   ctx.provide('connection', {
@@ -59,10 +56,11 @@ async function bench(served?: string[]) {
   return { ctx, slots: ctx.get('slots') as SlotRegistry, describeCredentials, describeSettings }
 }
 
-function declareRoot(slots: SlotRegistry): () => void {
+/** Stand in for the Plugins page: it declares `plugins.item` for its entries. */
+function declarePluginsItem(slots: SlotRegistry): () => void {
   return slots.register({
     name: 'root',
-    children: { 'settings.section': { kind: 'list', scope: 'root' } },
+    children: { 'plugins.item': { kind: 'list', scope: 'root' } },
   } as never, () => null)
 }
 
@@ -71,7 +69,7 @@ describe('ui-settings-plugins apply', () => {
     const refresh = vi.spyOn(SubagentModelSelectionCardController.prototype, 'refreshCatalog')
     const { ctx, slots } = await bench()
     try {
-      declareRoot(slots)
+      declarePluginsItem(slots)
       await ctx.plugin({ inject: [...inject], apply }).await()
       ctx.remote.$dispatch('llm/adapters-updated', [])
       expect(refresh).toHaveBeenCalledOnce()
@@ -85,111 +83,34 @@ describe('ui-settings-plugins apply', () => {
     expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'settingsScope'])
   })
 
-  it('registers one Plugins section and declares the tab and card slots', async () => {
+  it('keys each card it ships on the settings namespace that card edits', async () => {
     const { ctx, slots } = await bench()
-    declareRoot(slots)
+    declarePluginsItem(slots)
 
     await ctx.plugin({ inject: [...inject], apply }).await()
 
-    const section = slots.entries('settings.section')[0]!
-    expect(section.options).toMatchObject({ id: 'plugins', order: 15 })
-    // The nav label is a locale-following thunk; owners resolve it at read time.
-    expect(resolveSlotLabel(section.options.label)).toBe('插件')
-    expect(slots.spec('settings.plugins.tab')).toMatchObject({ kind: 'list', scope: 'root' })
-    const tab = slots.entries('settings.plugins.tab')[0]!
-    expect(tab.options).toMatchObject({ id: 'configurable', order: 0 })
-    expect(resolveSlotLabel(tab.options.label)).toBe('插件配置')
-    expect(slots.spec('settings.plugin.item')).toMatchObject({ kind: 'keyed', scope: 'root' })
+    const entries = slots.entries('plugins.item')
+    expect(entries.map(entry => entry.options.id))
+      .toEqual(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
+    expect(entries.map(entry => resolveSlotLabel(entry.options.label)))
+      .toEqual(['终端', 'Agent 循环', 'Subagent', '模型选择', '网页搜索'])
   })
 
-
-  it('injects a live tab projection, the card directory, and one business face per card', async () => {
+  it('injects one business face per card', async () => {
     const { ctx, slots } = await bench()
-    declareRoot(slots)
+    declarePluginsItem(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
 
-    const section = slots.entries('settings.section')[0]!
-    const sectionFace = (section.inject as unknown as () => PluginsSettingsSectionInjected)()
-    const initialTabs = sectionFace.hooks.tabs.getSnapshot()
-    expect(initialTabs).toEqual([
-      { id: 'configurable', order: 0, label: '插件配置' },
-    ])
-    expect(sectionFace.hooks.tabs.getSnapshot()).toBe(initialTabs)
-
-    const listener = vi.fn()
-    const unsubscribe = sectionFace.hooks.tabs.subscribe(listener)
-    slots.register({ name: 'settings.plugins.tab', id: 'plain' } as never, () => null)
-    expect(sectionFace.hooks.tabs.getSnapshot()).toEqual([
-      { id: 'configurable', order: 0, label: '插件配置' },
-      { id: 'plain', order: 0, label: '' },
-    ])
-    unsubscribe()
-
-    const tab = slots.entries('settings.plugins.tab')[0]!
-    const tabFace = (tab.inject as unknown as () => ConfigurablePluginsTabFace)()
-    expect(Object.keys(tabFace.hooks)).toEqual(['configurablePlugins'])
-    for (const entry of slots.entries('settings.plugin.item')) {
+    for (const entry of slots.entries('plugins.item')) {
       const face = (entry as { inject?: () => unknown }).inject?.() as { hooks: Record<string, unknown> }
       // Each card injects exactly one snapshot store plus its own actions.
       expect(Object.keys(face.hooks)).toHaveLength(1)
     }
   })
 
-  it('keys each card it ships on the settings namespace that card edits', async () => {
-    const { ctx, slots } = await bench()
-    declareRoot(slots)
-
-    await ctx.plugin({ inject: [...inject], apply }).await()
-
-    expect(slots.entries('settings.plugin.item').map(entry => entry.options.key))
-      .toEqual(['shell', 'agent-loop', 'subagent', 'subagent-model-selection', 'web-search-deepseek'])
-  })
-
-  it('dispatches the served namespaces its cards claim, and no others', async () => {
-    // ui-theme is served but belongs to another surface, and a deployment
-    // composing no PowerShell/POSIX executor serves no `bash` at all.
-    const { ctx, slots } = await bench(['agent-loop', 'ui-theme', 'web-search-deepseek'])
-    declareRoot(slots)
-    await ctx.plugin({ inject: [...inject], apply }).await()
-
-    const tab = slots.entries('settings.plugins.tab')[0]!
-    const face = (tab.inject as unknown as () => ConfigurablePluginsTabFace)()
-    await vi.waitFor(() => {
-      expect(face.hooks.configurablePlugins.getSnapshot().namespaces)
-        .toEqual(['agent-loop', 'web-search-deepseek'])
-    })
-  })
-
-  it('re-reads the served namespaces when the Host commits a settings document', async () => {
-    // Which namespaces the Host serves is a registration fact the wire never
-    // announces on its own, so the tab rides the invalidation that can
-    // accompany a changed composition.
-    const { ctx, slots, describeSettings } = await bench(['bash'])
-    declareRoot(slots)
-    await ctx.plugin({ inject: [...inject], apply }).await()
-    await vi.waitFor(() => { expect(describeSettings).toHaveBeenCalled() })
-    describeSettings.mockClear()
-
-    ctx.remote.$dispatch('settings/document-updated', ['bash', 1])
-
-    await vi.waitFor(() => { expect(describeSettings).toHaveBeenCalled() })
-  })
-
-  it('re-reads the served namespaces after a reconnect', async () => {
-    const { ctx, slots, describeSettings } = await bench(['bash'])
-    declareRoot(slots)
-    await ctx.plugin({ inject: [...inject], apply }).await()
-    await vi.waitFor(() => { expect(describeSettings).toHaveBeenCalled() })
-    describeSettings.mockClear()
-
-    ctx.emit('connection/reset')
-
-    await vi.waitFor(() => { expect(describeSettings).toHaveBeenCalled() })
-  })
-
   it('re-reads the credential when the Host reports the watched reference changed', async () => {
     const { ctx, slots, describeCredentials } = await bench()
-    declareRoot(slots)
+    declarePluginsItem(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
     await vi.waitFor(() => { expect(describeCredentials).toHaveBeenCalled() })
     describeCredentials.mockClear()
@@ -203,7 +124,7 @@ describe('ui-settings-plugins apply', () => {
 
   it('ignores a credential change for a reference no card watches', async () => {
     const { ctx, slots, describeCredentials } = await bench()
-    declareRoot(slots)
+    declarePluginsItem(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
     await vi.waitFor(() => { expect(describeCredentials).toHaveBeenCalled() })
     describeCredentials.mockClear()
@@ -214,27 +135,58 @@ describe('ui-settings-plugins apply', () => {
     expect(describeCredentials).not.toHaveBeenCalled()
   })
 
+  it('re-reads the subagent catalog when the Host commits a settings document', async () => {
+    const refresh = vi.spyOn(SubagentModelSelectionCardController.prototype, 'refreshCatalog')
+    const { ctx, slots } = await bench()
+    try {
+      declarePluginsItem(slots)
+      await ctx.plugin({ inject: [...inject], apply }).await()
+      refresh.mockClear()
+
+      ctx.remote.$dispatch('settings/document-updated', ['subagent-model-selection', 1])
+
+      expect(refresh).toHaveBeenCalledOnce()
+    } finally {
+      await ctx.fiber.dispose()
+      refresh.mockRestore()
+    }
+  })
+
+  it('drops the connection-scoped model catalog when the connection resets', async () => {
+    const reset = vi.spyOn(SubagentModelSelectionCardController.prototype, 'resetConnection')
+    const { ctx, slots } = await bench()
+    try {
+      declarePluginsItem(slots)
+      await ctx.plugin({ inject: [...inject], apply }).await()
+
+      ctx.emit('connection/reset')
+
+      expect(reset).toHaveBeenCalledOnce()
+    } finally {
+      await ctx.fiber.dispose()
+      reset.mockRestore()
+    }
+  })
+
   it('registers into a declaration that arrives after apply', async () => {
     const { ctx, slots } = await bench()
     await ctx.plugin({ inject: [...inject], apply }).await()
 
-    declareRoot(slots)
+    declarePluginsItem(slots)
 
-    await vi.waitFor(() => { expect(slots.entries('settings.section')).toHaveLength(1) })
+    await vi.waitFor(() => { expect(slots.entries('plugins.item')).toHaveLength(5) })
   })
 
   it('collapses every contribution on teardown', async () => {
     const { ctx, slots } = await bench()
-    declareRoot(slots)
+    declarePluginsItem(slots)
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(slots.entries('settings.plugin.item')).toHaveLength(5)
+    expect(slots.entries('plugins.item')).toHaveLength(5)
 
     await fiber.dispose()
 
-    expect(slots.entries('settings.section')).toHaveLength(0)
-    expect(slots.spec('settings.plugins.tab')).toBeUndefined()
-    expect(slots.spec('settings.plugin.item')).toBeUndefined()
+    expect(slots.entries('plugins.item')).toHaveLength(0)
   })
 })
 

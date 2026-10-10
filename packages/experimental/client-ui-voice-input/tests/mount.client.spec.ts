@@ -55,7 +55,7 @@ async function fixture(fail = false) {
   await ctx.plugin(SlotRegistry)
   ctx.slots.register({ name: 'root', children: {
     'conversation.input.right': { kind: 'list', scope: 'session' },
-    'settings.plugins.tab': { kind: 'list', scope: 'root' },
+    'plugins.item': { kind: 'list', scope: 'root' },
   } } as never,
   () => null)
   if (fail) vi.spyOn(ctx.slots, 'inject').mockImplementationOnce(() => { throw new Error('slot failed') })
@@ -73,7 +73,13 @@ it('withdraws its Remote, localized slot and microphone captures on disposal', a
     const actions = entry!.inject!()
     assertVoiceActions(actions)
     actions.openSettings()
-    expect(b.navigations).toEqual([{ section: 'plugins' }])
+    // Without a composed manager the control falls back to plain Settings.
+    expect(b.navigations).toEqual([{}])
+    const openItem = vi.fn()
+    b.ctx.provide('pluginNavigation', { openBundle: vi.fn(), openItem })
+    actions.openSettings()
+    expect(openItem).toHaveBeenCalledWith('speech-to-text')
+    expect(b.navigations).toHaveLength(1)
     const finished = actions.createRecording()
     assert(finished instanceof Recording)
     await finished.dispose()
@@ -85,7 +91,8 @@ it('withdraws its Remote, localized slot and microphone captures on disposal', a
     await actions.prepare('local' as SpeechProviderId, { downloadSource: 'https://hf-mirror.com' })
     expect(b.prepare).toHaveBeenLastCalledWith('local', { downloadSource: 'https://hf-mirror.com' })
     await actions.cancelPreparation('local' as SpeechProviderId)
-    const item = b.ctx.slots.entries('settings.plugins.tab')[0]!
+    const item = b.ctx.slots.entries('plugins.item')[0]!
+    expect(item.options).toMatchObject({ id: 'speech-to-text' })
     expect(item.locale).toBe('voice-input')
     expect(item.inject!().hooks).toBe(actions.hooks)
     const failure = { ok: false, error: new RemoteError('gateway/internal', 'offline', {}) }
@@ -102,7 +109,7 @@ it('withdraws its Remote, localized slot and microphone captures on disposal', a
     await fiber.dispose()
     expect(dispose).toHaveBeenCalledOnce()
     expect(b.ctx.slots.entries('conversation.input.right')).toHaveLength(0)
-    expect(b.ctx.slots.entries('settings.plugins.tab')).toHaveLength(0)
+    expect(b.ctx.slots.entries('plugins.item')).toHaveLength(0)
     expect(b.unmount).toHaveBeenCalledOnce()
   } finally { await b.ctx.fiber.dispose() }
 })

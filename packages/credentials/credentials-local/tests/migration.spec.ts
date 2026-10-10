@@ -8,7 +8,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
+import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { LocalCredentialProvider, renderFlatLayoutMigration } from '../src/index.ts'
 
 /** Credential documents are seeded owner-only, exactly as the provider creates them. */
@@ -105,10 +105,11 @@ describe('flat-layout boot migration', () => {
       await held
     })
     await holding
-    // The boot sees the flat text, then waits for the lock; the "other
-    // process" completes the migration in the meantime.
+    // The "other process" writes the way a real concurrent migrator does —
+    // atomically — so the boot's unlocked recognize reads either the flat
+    // text or the winner, never a torn document, whatever the interleaving.
     const booting = boot({ path, watch: false })
-    await writeCredentials(path, winner)
+    await writeFileAtomic(path, winner, { mode: 0o600, dirMode: 0o700 })
     release()
     await holder
     const ctx = await booting

@@ -1,4 +1,4 @@
-// Web e2e scenario: the configurable tab in Plugins settings — the cards a
+// Web e2e scenario: the Plugins page's Configuration group — the cards a
 // deployment's exposed host-plane namespaces produce, one field edited through the real
 // wire down to `$DSH_HOME/settings.yaml`, and the override badge and reset
 // that layering produces. Zero model calls: everything is client state plus
@@ -30,7 +30,7 @@ describe('web e2e: plugin configuration section', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
     browser = await chromium.launch()
-    // Chinese browser: the section asserts the localized copy the client
+    // Chinese browser: the panel asserts the localized copy the client
     // derives from it, as the rest of the settings surface does.
     page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)
@@ -44,27 +44,31 @@ describe('web e2e: plugin configuration section', () => {
   })
 
   /**
-   * Open the settings dialog on the Plugins section. The scenarios share one
-   * page so the settings document accumulates across them, so this leaves any
-   * dialog a previous scenario opened closed first — its mask would otherwise
-   * swallow the trigger click.
+   * Bring the sidebar Plugins panel back to its card list. The scenarios
+   * share one page so the settings document accumulates across them; a
+   * previous scenario may have left an item's page open, which its crumb
+   * closes first.
    */
   async function openPlugins() {
-    if (await page.getByRole('dialog', { name: '设置' }).count() > 0) {
-      await page.keyboard.press('Escape')
-      await expect.poll(() => page.getByRole('dialog', { name: '设置' }).count(), { timeout: 5_000 }).toBe(0)
+    const panel = page.locator('[data-plugin-panel]')
+    if (await panel.count() === 0) {
+      await page.getByRole('navigation', { name: '面板' }).getByRole('button', { name: '插件', exact: true }).click()
+      await panel.waitFor({ timeout: 10_000 })
     }
-    await page.getByRole('button', { name: '设置', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: '设置' })
-    await dialog.waitFor({ timeout: 10_000 })
-    await dialog.getByRole('button', { name: '插件', exact: true }).click()
-    await expect
-      .poll(() => dialog.getByRole('button', { name: '插件', exact: true }).getAttribute('aria-current'), { timeout: 5_000 })
-      .toBe('true')
-    await expect
-      .poll(() => dialog.getByRole('tab', { name: '插件配置', exact: true }).getAttribute('aria-selected'), { timeout: 5_000 })
-      .toBe('true')
-    return dialog
+    const back = panel.getByRole('button', { name: '返回插件列表', exact: true })
+    if (await back.count() > 0) await back.click()
+    // The Configuration group lists the namespaces this composition serves.
+    const group = panel.locator('[data-plugin-group="config"]')
+    await group.getByRole('button', { name: '查看 终端', exact: true }).waitFor({ timeout: 10_000 })
+    return panel
+  }
+
+  /** Open one configuration item's page inside the panel. */
+  async function openItem(name: string) {
+    const panel = await openPlugins()
+    await panel.getByRole('button', { name: `查看 ${name}`, exact: true }).click()
+    await panel.locator('[data-plugin-item-detail]').waitFor({ timeout: 10_000 })
+    return panel
   }
 
   /** The settings document as the Host has written it so far. */
@@ -74,27 +78,26 @@ describe('web e2e: plugin configuration section', () => {
 
   it('shows one card per exposed host-plane namespace', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-config-cards'))
-    const dialog = await openPlugins()
+    const panel = await openPlugins()
 
     // Each card belongs to a Host settings namespace served by this composition.
-    await dialog.getByText('终端', { exact: true }).waitFor({ timeout: 10_000 })
-    expect(await dialog.getByText('Agent 循环', { exact: true }).count()).toBe(1)
-    expect(await dialog.getByText('网页搜索', { exact: true }).count()).toBe(1)
-    expect(await dialog.getByText('Subagent', { exact: true }).count()).toBe(1)
-    // Collapsed: a card's fields appear only once it is expanded.
-    expect(await dialog.getByLabel('命令超时（毫秒）').count()).toBe(0)
+    const group = panel.locator('[data-plugin-group="config"]')
+    for (const name of ['终端', 'Agent 循环', 'Subagent', '模型选择', '网页搜索']) {
+      await expect.poll(async () => group.getByRole('button', { name: `查看 ${name}`, exact: true }).count(), { timeout: 10_000 }).toBe(1)
+    }
+    // The form lives on the item's own page: the card shows the one-liner only.
+    expect(await panel.getByLabel('命令超时（毫秒）').count()).toBe(0)
 
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(SECTION_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
   it('stages an edit and writes it only when saved', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-config-write'))
-    const dialog = await openPlugins()
-    await dialog.getByText('终端', { exact: true }).click()
+    const panel = await openItem('终端')
 
-    const timeout = dialog.getByLabel('命令超时（毫秒）')
+    const timeout = panel.getByLabel('命令超时（毫秒）')
     await timeout.waitFor({ timeout: 10_000 })
     // The composed default this deployment ships, before any user layer.
     expect(await timeout.inputValue()).toBe('60000')
@@ -104,7 +107,7 @@ describe('web e2e: plugin configuration section', () => {
     // Nothing crosses the wire until the user saves: leaving the control is
     // not a decision to store the value.
     expect(await settingsDocument()).not.toContain('timeoutMs')
-    const save = dialog.getByRole('button', { name: '保存', exact: true })
+    const save = panel.getByRole('button', { name: '保存', exact: true })
     await expect.poll(() => save.isEnabled(), { timeout: 5_000 }).toBe(true)
     await save.click()
 
@@ -112,8 +115,8 @@ describe('web e2e: plugin configuration section', () => {
       .toBe(true)
     // Presence in the user layer is what the badge reports, and the reset is
     // offered only for a field that has one.
-    await expect.poll(() => dialog.getByText('已覆盖').count(), { timeout: 5_000 }).toBe(1)
-    expect(await dialog.getByRole('button', { name: '恢复默认' }).count()).toBe(1)
+    await expect.poll(() => panel.getByText('已覆盖').count(), { timeout: 5_000 }).toBe(1)
+    expect(await panel.getByRole('button', { name: '恢复默认' }).count()).toBe(1)
     // A settled form offers no save to repeat.
     await expect.poll(() => save.isDisabled(), { timeout: 5_000 }).toBe(true)
     expect(tripwire.pageErrors).toEqual([])
@@ -121,13 +124,12 @@ describe('web e2e: plugin configuration section', () => {
 
   it('drops a staged edit on discard without touching the document', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-config-discard'))
-    const dialog = await openPlugins()
-    await dialog.getByText('终端', { exact: true }).click()
-    const timeout = dialog.getByLabel('命令超时（毫秒）')
+    const panel = await openItem('终端')
+    const timeout = panel.getByLabel('命令超时（毫秒）')
     await timeout.waitFor({ timeout: 10_000 })
 
     await timeout.fill('7000')
-    await dialog.getByRole('button', { name: '放弃修改' }).click()
+    await panel.getByRole('button', { name: '放弃修改' }).click()
 
     await expect.poll(() => timeout.inputValue(), { timeout: 5_000 }).toBe('12000')
     expect(await settingsDocument()).toContain('timeoutMs: 12000')
@@ -136,47 +138,44 @@ describe('web e2e: plugin configuration section', () => {
 
   it('refuses to save a draft that is not a number', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-config-invalid'))
-    const dialog = await openPlugins()
-    await dialog.getByText('终端', { exact: true }).click()
-    const timeout = dialog.getByLabel('命令超时（毫秒）')
+    const panel = await openItem('终端')
+    const timeout = panel.getByLabel('命令超时（毫秒）')
     await timeout.waitFor({ timeout: 10_000 })
 
     await timeout.fill('soon')
 
-    const save = dialog.getByRole('button', { name: '保存', exact: true })
+    const save = panel.getByRole('button', { name: '保存', exact: true })
     await expect.poll(() => save.isDisabled(), { timeout: 5_000 }).toBe(true)
-    expect(await dialog.getByText('请填数字；留空表示使用默认值。').count()).toBe(1)
-    await dialog.getByRole('button', { name: '放弃修改' }).click()
+    expect(await panel.getByText('请填数字；留空表示使用默认值。').count()).toBe(1)
+    await panel.getByRole('button', { name: '放弃修改' }).click()
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
   it('clears the field back to the composed default on reset', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-config-reset'))
-    const dialog = await openPlugins()
-    await dialog.getByText('终端', { exact: true }).click()
-    const timeout = dialog.getByLabel('命令超时（毫秒）')
+    const panel = await openItem('终端')
+    const timeout = panel.getByLabel('命令超时（毫秒）')
     await timeout.waitFor({ timeout: 10_000 })
     expect(await timeout.inputValue()).toBe('12000')
 
     // The reset stages the composed default; the document still carries the
     // override until the save lands.
-    await dialog.getByRole('button', { name: '恢复默认' }).click()
+    await panel.getByRole('button', { name: '恢复默认' }).click()
     await expect.poll(() => timeout.inputValue(), { timeout: 5_000 }).toBe('60000')
     expect(await settingsDocument()).toContain('timeoutMs: 12000')
 
-    await dialog.getByRole('button', { name: '保存', exact: true }).click()
+    await panel.getByRole('button', { name: '保存', exact: true }).click()
 
     await expect.poll(async () => (await settingsDocument()).includes('timeoutMs'), { timeout: 10_000 })
       .toBe(false)
     expect(await timeout.inputValue()).toBe('60000')
-    expect(await dialog.getByText('已覆盖').count()).toBe(0)
+    expect(await panel.getByText('已覆盖').count()).toBe(0)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
   it('keeps edits made while a real settings save is awaiting its reply', async () => {
-    const dialog = await openPlugins()
-    await dialog.getByText('终端', { exact: true }).click()
-    const timeout = dialog.getByLabel('命令超时（毫秒）')
+    const panel = await openItem('终端')
+    const timeout = panel.getByLabel('命令超时（毫秒）')
     await timeout.fill('9000')
     const arrived = Promise.withResolvers<undefined>()
     const release = Promise.withResolvers<undefined>()
@@ -191,13 +190,13 @@ describe('web e2e: plugin configuration section', () => {
       } finally { drained.resolve(undefined) }
     }, { times: 1 })
     try {
-      await dialog.getByRole('button', { name: '保存', exact: true }).click()
+      await panel.getByRole('button', { name: '保存', exact: true }).click()
       await arrived.promise
       expect(await settingsDocument()).toContain('timeoutMs: 9000')
       await timeout.fill('12000')
       release.resolve(undefined)
       await drained.promise
-      const save = dialog.getByRole('button', { name: '保存', exact: true })
+      const save = panel.getByRole('button', { name: '保存', exact: true })
       await expect.poll(() => save.isEnabled()).toBe(true)
       expect(await timeout.inputValue()).toBe('12000')
       await save.click()
@@ -211,9 +210,8 @@ describe('web e2e: plugin configuration section', () => {
   it('shows a refused credential replacement without erasing the draft or the stored key', async () => {
     const ref = credentialRef('DEEPSEEK_API_KEY')
     await scaffold.ctx.credentials.set(ref, 'plugin-fixture-original')
-    const dialog = await openPlugins()
-    await dialog.getByText('网页搜索', { exact: true }).click()
-    const key = dialog.getByLabel('API Key', { exact: true })
+    const panel = await openItem('网页搜索')
+    const key = panel.getByLabel('API Key', { exact: true })
     await key.fill('plugin-fixture-replacement')
     const removeLayer = scaffold.ctx.credentials.registerReadOnlyLayer({
       id: 'plugin-card-refusal', owns: candidate => candidate === ref,
@@ -221,32 +219,31 @@ describe('web e2e: plugin configuration section', () => {
       describe: async () => ({ configured: true, writable: false, source: 'acceptance' }),
     })
     try {
-      await dialog.getByRole('button', { name: '保存', exact: true }).click()
-      await dialog.getByText('本部署没有接受这些值，已保留供你修改。', { exact: true }).waitFor()
+      await panel.getByRole('button', { name: '保存', exact: true }).click()
+      await panel.getByText('本部署没有接受这些值，已保留供你修改。', { exact: true }).waitFor()
       expect(await key.inputValue()).toBe('plugin-fixture-replacement')
       expect((await scaffold.ctx.credentials.resolve(ref))?.value).toBe('plugin-fixture-original')
-      const snapshot = await captureStableAria(page, 'li:has(#plugin-config-web-search-key)', scaffold.workspaceCwd)
+      const snapshot = await captureStableAria(page, '[data-plugin-item-detail="web-search-deepseek"]', scaffold.workspaceCwd)
       await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'refused-key.expected.md'), snapshot, MODE)
     } finally { removeLayer() }
     expect(tripwire.pageErrors).toEqual([])
   })
 
   it('edits subagent depth and capacity through the real settings owner', async () => {
-    const dialog = await openPlugins()
-    await dialog.getByText('Subagent', { exact: true }).click()
-    const depth = dialog.getByLabel('最大递归深度', { exact: true })
-    const capacity = dialog.getByLabel('Subagent 并行数量上限', { exact: true })
+    const panel = await openItem('Subagent')
+    const depth = panel.getByLabel('最大递归深度', { exact: true })
+    const capacity = panel.getByLabel('Subagent 并行数量上限', { exact: true })
     expect(await depth.inputValue()).toBe('1')
     expect(await capacity.inputValue()).toBe('8')
-    await dialog.getByRole('button', { name: '最大递归深度说明', exact: true }).click()
-    await dialog.getByRole('button', { name: 'Subagent 并行数量上限说明', exact: true }).click()
-    const snapshot = await captureStableAria(page, 'li:has(#plugin-config-subagent-depth)', scaffold.workspaceCwd)
+    await panel.getByRole('button', { name: '最大递归深度说明', exact: true }).click()
+    await panel.getByRole('button', { name: 'Subagent 并行数量上限说明', exact: true }).click()
+    const snapshot = await captureStableAria(page, '[data-plugin-item-detail="subagent"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'subagent-limits.expected.md'), snapshot, MODE)
     await depth.fill('-1')
-    await expect.poll(() => dialog.getByRole('button', { name: '保存', exact: true }).isDisabled()).toBe(true)
+    await expect.poll(() => panel.getByRole('button', { name: '保存', exact: true }).isDisabled()).toBe(true)
     await depth.fill('0')
     await capacity.fill('3')
-    await dialog.getByRole('button', { name: '保存', exact: true }).click()
+    await panel.getByRole('button', { name: '保存', exact: true }).click()
     await expect.poll(async () => (await settingsDocument()).includes('maxDepth: 0')).toBe(true)
     await expect.poll(async () => (await settingsDocument()).includes('maxActiveSubagents: 3')).toBe(true)
     expect(scaffold.ctx.subagents.resolveMaxDepth()).toBe(0)
@@ -254,16 +251,15 @@ describe('web e2e: plugin configuration section', () => {
   })
 
   it('saves model authorization atomically and retains choices when disabled', async () => {
-    const dialog = await openPlugins()
-    await dialog.getByRole('button', { name: '展开设置: 模型选择', exact: true }).click()
-    const card = dialog.locator('li').filter({ has: page.getByRole('switch', { name: '允许 Agent 为 Subagent 选择模型' }) })
+    const panel = await openItem('模型选择')
+    const card = panel.locator('[data-plugin-item-detail="subagent-model-selection"]')
     const enabled = card.getByRole('switch')
     expect(await enabled.getAttribute('aria-checked')).toBe('false')
     await enabled.click()
     await card.getByRole('checkbox', { name: /deepseek-v4-flash$/ }).waitFor()
     expect(await card.getByRole('button', { name: '保存', exact: true }).isDisabled()).toBe(true)
     await card.getByRole('checkbox', { name: /deepseek-v4-flash$/ }).check()
-    const snapshot = await captureStableAria(page, 'li:has([role="switch"])', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[data-plugin-item-detail="subagent-model-selection"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'subagent-models.expected.md'), snapshot, MODE)
     await card.getByRole('button', { name: '保存', exact: true }).click()
     await expect.poll(() => scaffold.ctx.subagentModelSelection.current()).toEqual({

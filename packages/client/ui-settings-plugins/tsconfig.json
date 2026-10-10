@@ -21,6 +21,9 @@
       "path": "../runtime"
     },
     {
+      "path": "../ui-plugin-manager/tsconfig.client.json"
+    },
+    {
       "path": "../ui-primitives"
     },
     {

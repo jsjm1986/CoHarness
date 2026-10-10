@@ -2,9 +2,9 @@
 
 [English](adding-a-settings-card.md) | 中文
 
-插件如何把自己的配置放上 Web 设置页。这条路径上没有任何一步需要改动本仓库：Host 服务每一个已注册的 settings 命名空间，而**插件配置**分区以卡片所编辑的命名空间为键，因此同时注册了两个半侧的插件会被自动配对。
+插件如何把自己的配置放上 Web「插件」页。这条路径上没有任何一步需要改动本仓库：Host 服务每一个已注册的 settings 命名空间，而该页的「插件配置」分组以条目所编辑的命名空间为键，因此同时注册了两个半侧的插件会被自动配对。
 
-两个半侧住在同一个包里——Host 半侧在 `src/`，浏览器半侧在 `src/client/`，以 `./client` 导出并用 `dsh.client` 声明。[`packages/client/ui-theme`](../../packages/client/ui-theme) 是这种打包方式的现成例子；本分区自带的卡片在 [`packages/client/ui-settings-plugins`](../../packages/client/ui-settings-plugins)。
+两个半侧住在同一个包里——Host 半侧在 `src/`，浏览器半侧在 `src/client/`，以 `./client` 导出并用 `dsh.client` 声明。[`packages/client/ui-theme`](../../packages/client/ui-theme) 是这种打包方式的现成例子；本页自带的条目在 [`packages/client/ui-settings-plugins`](../../packages/client/ui-settings-plugins)。
 
 ## 1. 注册命名空间（Host 半侧）
 
@@ -43,37 +43,39 @@ export function apply(ctx: Context, config: Config) {
 
 字段上的 `role('secret')` 让它的值不出现在任何响应里；卡片把这类字段写进 `update`/`mutate` 载荷，或改为经 `credentials` 领域寻址一个凭据引用。`applies: 'restart'` 告诉配置表层：拥有方要到下次启动才会对变更生效。
 
-## 2. 注册卡片（浏览器半侧）
+## 2. 注册条目（浏览器半侧）
 
-卡片以自己的命名空间为键注册进 `settings.plugin.item`，并拥有其中的一切——外观、控件与文案。它通过 `ctx.settingsScope` 读写，后者用读取时的 revision 为每次写入设栅：
+条目以自己的命名空间为键注册进 `plugins.item`，并拥有页面标题之下的一切——控件与文案。页面在卡片上向条目请求 `view: 'summary'`、在条目自己的页面上请求 `view: 'page'`。它通过 `ctx.settingsScope` 读写，后者用读取时的 revision 为每次写入设栅：
 
 ```ts ignore-check
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-// Type-only: the keyed slot's declaration. Cross-plugin collaboration goes
+// Type-only: the list slot's declaration. Cross-plugin collaboration goes
 // through cordis services; a value import fails the client bundle-purity gate.
-import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 
 export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
 
 export function apply(ctx: ClientContext): void {
   const card = new MyPluginCardController(ctx.settingsScope.bind({ namespace: 'my-plugin' }))
-  ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({
-    name: 'settings.plugin.item',
-    key: 'my-plugin',
+  ctx.slots.inject('plugins.item', () => ctx.slots.register({
+    name: 'plugins.item',
+    id: 'my-plugin',
+    order: 100,
+    label: () => ctx.locale.bind('settings.myPlugin')('title'),
     locale: 'settings.myPlugin',
     inject: () => card.inject(),
-  }, MyPluginCard),
+  }, MyPluginsItem),
   )
 }
 ```
 
 scope 快照携带表单所需的一切：解析后的 `value`、组装层 `base`，以及原始的 `user` 层——字段是否被覆盖，取决于它在 `user` 层中是否**出现**，而非它的值。`scope.set(field, value)` 存一个字段，`scope.unset(field)` 把它清回组装层。
 
-## 3. 标签页拿它做什么
+## 3. 分组拿它做什么
 
-**插件配置**标签页读取 Host 服务了哪些命名空间，并为每个命名空间派发一个 slot 键。当 Host 服务了某卡片的键时它被渲染，否则被跳过，因此从未组装过 Host 半侧的部署不会留下这张卡片的任何痕迹。被服务却无人认领的命名空间什么都不渲染——归其他页面所有的那些命名空间（`ui-theme`、`permission`、`llm-*`）正是这样留在本标签页之外的。
+「插件配置」分组读取 Host 服务了哪些命名空间，只保留 id 恰为其中之一名的 `plugins.item` 条目。当 Host 服务了某条目的命名空间时它被渲染，否则被跳过，因此从未组装过 Host 半侧的部署不会留下该条目的任何痕迹。被服务却无人认领的命名空间什么都不渲染——归其他表面所有的那些命名空间（`ui-theme`、`permission`、`llm-*`）正是这样留在本分组之外的。
 
-卡片按其注册进该 slot 的顺序出现；keyed entry 不声明自己的 `order`。
+条目遵循各自的注册 `order`。
 
 ## 打包
 
@@ -85,7 +87,7 @@ scope 快照携带表单所需的一切：解析后的 `value`、组装层 `base
     ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
     "./client": { "types": "./lib/types/client/index.d.ts", "default": "./lib/client.js" }
   },
-  "dsh": { "client": { "platform": "web", "inject": ["@deepseek-ai/dsh-client-ui-settings-plugins"] } }
+  "dsh": { "client": { "platform": "web", "inject": ["@deepseek-ai/dsh-client-ui-plugin-manager"] } }
 }
 ```
 
@@ -97,4 +99,4 @@ import { clientBundle } from '../tsdown.client.ts'
 export default clientBundle('@deepseek-ai/dsh-client-my-plugin', ['lib/types/index.js', 'lib/types/invariant.js'])
 ```
 
-该预设目前未发布，因此本仓库之外的包得自行复刻同样的输出格式。bundle 纯净度门禁同时拒绝跨插件的值导入，所以卡片无法导入本分区的卡片外观或其暂存表单模型——它渲染自己的那一份，并自行拥有暂存与 revision 设栅。这两条限制都记在[本分区的已知限制](../../packages/client/ui-settings-plugins/README.zh.md#known-limitations-and-deferred-work)里。
+该预设目前未发布，因此本仓库之外的包得自行复刻同样的输出格式。bundle 纯净度门禁同时拒绝跨插件的值导入，所以条目无法导入本包自带条目的表单外观或其暂存表单模型——它渲染自己的那一份，并自行拥有暂存与 revision 设栅。这两条限制都记在[本包的已知限制](../../packages/client/ui-settings-plugins/README.zh.md#known-limitations-and-deferred-work)里。

@@ -1,5 +1,5 @@
 ---
-description: "Plugins settings section with feature-owned tabs and configurable host-plane plugin cards"
+description: "Official plugin configuration items on the Plugins page, one page per configurable host-plane namespace"
 kind: "package-reference"
 ---
 
@@ -7,11 +7,11 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-The **Plugins** settings section and its **Plugin configuration** tab. The section owns the heading and compact tab chrome; feature plugins contribute pages through `settings.plugins.tab`. This package's own tab shows one expandable card per Host plugin whose configuration a user owns. A card shows the plugin's name and what it governs; expanding it in place reveals hand-written controls bound to that plugin's settings namespace, each field marking whether the user overrode it and offering a reset back to the value the deployment composed.
+The official **configuration items** on the sidebar's Plugins page: one `plugins.item` entry per host-plane settings namespace this package owns. The item's card sits in the page's **Configuration** group with a one-line summary, and opening it shows that plugin's settings form on the item's own page — hand-written controls bound to the namespace, each field marking whether the user overrode it and offering a reset back to the value the deployment composed. Install, removal, and enablement live in the same page's other groups, so the Plugins page is the single user-facing entry for both.
 
 ## Summary
 
-Use the **Built-in plugins** settings section to inspect the plugins this deployment ships, and the **Official** group of the sidebar's Plugins page to configure the host-plane plugins that expose settings. Each configuration page shows which values the user overrode, lets them reset those to deployment defaults, keeps edits local until save, and drops them when the page is left. If the configuration changed after the page loaded, the save is rejected instead of overwriting the newer values.
+Use the sidebar's **Plugins** page to inspect and manage the plugins this deployment ships, and its **Configuration** group to configure the host-plane plugins that expose settings. Each configuration page shows which values the user overrode, lets them reset those to deployment defaults, keeps edits local until save, and drops them when the page is left. If the configuration changed after the page loaded, the save is rejected instead of overwriting the newer values.
 
 ## Table of Contents
 
@@ -28,34 +28,34 @@ Use the **Built-in plugins** settings section to inspect the plugins this deploy
 <a id="what-appears-here"></a>
 ## What appears here
 
-The configurable tab reads which settings namespaces the Host serves and dispatches one slot key per namespace, so what renders is the intersection of two ledgers: the namespaces a live Host plugin registered, and the cards registered under those keys. A served namespace no card claims renders nothing — another surface owns it, or this deployment ships no browser half for it — and a card whose namespace this deployment does not serve is never dispatched, so an uncomposed plugin leaves no trace and does not hold the tab back from its empty line. The empty line waits for the Host's first answer, so an unanswered read never reads as "this deployment configures no plugin". Cards appear in the order they registered, which is stable for the cards one package installs together and not stable across plugins: apply order between packages is unconstrained.
+The Plugins page's Configuration group renders the intersection of two ledgers: the `plugins.item` entries composed clients registered, and the settings namespaces the Host serves. A served namespace no item claims renders nothing — another surface owns it, or this deployment ships no browser half for it — and an item whose namespace this deployment does not serve is filtered out, so an uncomposed plugin leaves no empty shell. Cards follow registration order, which is stable for the items one package installs together and not stable across plugins: apply order between packages is unconstrained.
 
-The cards cover the shell executor (`shell`), tool-call parallelism (`agent-loop`), delegation depth and capacity (`subagent`), exact model routes (`subagent-model-selection`), and the DeepSeek search provider (`web-search-deepseek`). Delegation controls retain the upstream integer validation, reset and explanatory help. Depth zero disables tools that inherit this setting; explicit tool depth takes precedence. Capacity counts live descendants of the same root Agent across all depths, excluding the root itself.
+The items cover the shell executor (`shell`), tool-call parallelism (`agent-loop`), delegation depth and capacity (`subagent`), exact model routes (`subagent-model-selection`), and the DeepSeek search provider (`web-search-deepseek`). Delegation controls retain the upstream integer validation, reset and explanatory help. Depth zero disables tools that inherit this setting; explicit tool depth takes precedence. Capacity counts live descendants of the same root Agent across all depths, excluding the root itself.
 
-In a project scope these cards expose only namespaces whose Host registration declares `owner: project` and `projectWrite: manager`. The project owner and organization administrators can save those shared runtime values; other members see the card and an inline owner explanation but no write request is sent. Account, organization, deployment, and model-provider settings stay on their owning surfaces.
+In a project scope these pages expose only namespaces whose Host registration declares `owner: project` and `projectWrite: manager`. The project owner and organization administrators can save those shared runtime values; other members see the form and an inline owner explanation but no write request is sent. Account, organization, deployment, and model-provider settings stay on their owning surfaces.
 
-The model-selection card starts disabled, joins live routes with removable saved routes, and saves its switch and allowlist atomically at the draft revision. A changed revision requires discarding the stale draft. Catalog failures preserve choices; reconnects clear target-specific drafts. Settings affect newly composed Sessions and never grant access beyond runtime model governance.
+The model-selection form starts disabled, joins live routes with removable saved routes, and saves its switch and allowlist atomically at the draft revision. A changed revision requires discarding the stale draft. Catalog failures preserve choices; reconnects clear target-specific drafts. Settings affect newly composed Sessions and never grant access beyond runtime model governance.
 
 <a id="extension-point"></a>
 ## Extension point
 
-The section declares `settings.plugins.tab`, a root list slot whose labels become ordered tabs. It keeps a tab mounted after its first selection, so local drafts and read-only snapshots survive tab switches. The package registers its own `configurable` contribution, which declares the nested `settings.plugin.item` slot — keyed on the settings namespace a card edits. A plugin that ships a browser half registers its own card under its own namespace and owns every part of it: chrome, controls, and copy. Keying on the namespace is what lets a plugin distributed outside this repository appear here — it registers the namespace on the Host and the card in the browser, and the tab pairs the two without learning what the namespace means. Tabs follow the contribution's `order`; cards follow registration order.
+The package registers one `plugins.item` entry per namespace it owns, keyed on the settings namespace a form edits; the slot belongs to ui-plugin-manager, which asks each item for `view: 'summary'` on the card and `view: 'page'` on the item's own page. A plugin that ships a browser half registers its own item under its own namespace and owns every part of it: controls, copy, and chrome below the page's title. Keying on the namespace is what lets a plugin distributed outside this repository appear here — it registers the namespace on the Host and the item in the browser, and the group pairs the two without learning what the namespace means.
 
 <a id="writes"></a>
 ## Writes
 
-A card stages what the user types and writes it only when they save. Each control renders staged text, so what is on screen is exactly what a save would store; **Discard** drops the drafts, and a card holding unsaved edits says so on its header even while collapsed. A reset stages the composed default rather than writing immediately, and a draft the field does not accept blocks the save instead of being dropped.
+A form stages what the user types and writes it only when they save. Each control renders staged text, so what is on screen is exactly what a save would store; **Discard** drops the drafts. A reset stages the composed default rather than writing immediately, and a draft the field does not accept blocks the save instead of being dropped.
 
 Saving writes each staged field through the client settings scope, which fences every write with the namespace revision it read. A refusal, lost write access or transport failure stops the remaining writes and retains unacknowledged drafts. Accepted fields clear only the draft submitted by that save; edits made while it was in flight remain unsaved. A multi-field save can partly succeed and does not claim transactional rollback.
 
-A key can also be written from another surface — the Models page addresses the same reference — which changes no settings section, so the card re-reads on the forwarded `credentials/reference-updated` event for the reference it watches.
+A key can also be written from another surface — the Models page addresses the same reference — which changes no settings section, so the form re-reads on the forwarded `credentials/reference-updated` event for the reference it watches.
 
 A field's presence in the raw user layer — not its value — is what marks it overridden; a reset clears that field so it re-inherits the composition layer. Secret-role fields never ride a response, so a key control starts blank, reports only whether one is configured, and writes through the credentials domain rather than the settings section; a blank draft writes nothing and keeps the stored key. A replacement requires its own successful write response: the presence of an older key cannot acknowledge it. Credential reads reject superseded responses even when the reference is unchanged.
 
 <a id="invariants"></a>
 ## Invariants
 
-**Runtime invariant:** No companion is published. Plugin configuration values live in the Host plugin settings namespaces; the section contributes tab chrome and per-field bindings over that remote document.
+**Runtime invariant:** No companion is published. Plugin configuration values live in the Host plugin settings namespaces; the package contributes item registrations and per-field bindings over that remote document.
 
 <a id="model-experience"></a>
 ## Model Experience
@@ -68,10 +68,10 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **Only host-plane plugins appear** — a plugin an agent preset mounts carries its configuration inline in that preset's `agent.cordis.yml` and cannot register a settings namespace at all (a second session mounting the same preset would fail on a duplicate registration), so this section lists nothing for it. Editing those values remains the preset editor's job.
-- **A card still needs a browser bundle** — the browser half must be a `dsh.client` package built in the client module system's lazy-CJS factory format, and the `clientBundle` preset that emits it lives in `packages/client/tsdown.client.ts` rather than a published package, so a plugin outside this repository has to reproduce that build itself. The bundle-purity gate also forbids importing this package's card chrome or form model as values, so such a card owns its own staging and revision fencing.
-- **The served namespaces re-read on two signals only** — the wire announces settings-document commits and connection resets, not registrations, so a namespace whose owner registers after the tab's read joins the list on the next document commit or reconnect.
-- **The shell card follows the composed executor** — the POSIX and PowerShell executor families share the `bash` namespace because a host composes exactly one of them, so the served schema differs by platform (PowerShell adds `pwshPath`) even though the card edits the same two fields on both, and a deployment composing neither shows no card.
+- **Only host-plane plugins appear** — a plugin an agent preset mounts carries its configuration inline in that preset's `agent.cordis.yml` and cannot register a settings namespace at all (a second session mounting the same preset would fail on a duplicate registration), so the Configuration group lists nothing for it. Editing those values remains the preset editor's job.
+- **An item still needs a browser bundle** — the browser half must be a `dsh.client` package built in the client module system's lazy-CJS factory format, and the `clientBundle` preset that emits it lives in `packages/client/tsdown.client.ts` rather than a published package, so a plugin outside this repository has to reproduce that build itself. The bundle-purity gate also forbids importing this package's form chrome or model as values, so such an item owns its own staging and revision fencing.
+- **The served namespaces re-read on two signals only** — the wire announces settings-document commits and connection resets, not registrations, so a namespace whose owner registers after the group's read joins the list on the next document commit or reconnect.
+- **The shell item follows the composed executor** — the POSIX and PowerShell executor families share the `bash` namespace because a host composes exactly one of them, so the served schema differs by platform (PowerShell adds `pwshPath`) even though the form edits the same two fields on both, and a deployment composing neither shows no item.
 
 <a id="dev-note"></a>
 ### Dev Note

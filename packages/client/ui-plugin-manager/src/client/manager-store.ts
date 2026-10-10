@@ -25,7 +25,8 @@ import type {
   Registry,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import { normalizeRegistry, NPMMIRROR_REGISTRY, OFFICIAL_NPM_REGISTRY, REGISTRY_URL } from '@deepseek-ai/dsh-plugin-manager/registry'
-import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type ProjectUiPolicySnapshot, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientEntryState } from '@deepseek-ai/dsh-client-modules/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { LocalizedText, PluginLocalizedMeta } from '@deepseek-ai/dsh-package-manifest'
 import type { SettingsDescribeFace, SettingsMutationScope } from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -313,7 +314,24 @@ export interface PluginManagerFace {
     pluginManager: SnapshotStore<PluginManagerState>
     /** The plugins carrying configuration, bound by the renderer as useConfigLedger. */
     configLedger: HostObservable<ConfigLedger>
+    /**
+     * This page's own client-module synchronization, bound by the renderer as
+     * useClientSync. Independent of Host-side enablement: it reports which graph
+     * entries this browser failed to import or tear down.
+     */
+    clientSync: HostObservable<ClientEntryState>
+    /**
+     * The deployment's account scope for this runtime, bound by the renderer
+     * as useScopePolicy. Personal runtimes and shared project runtimes carry
+     * separate compositions; the page labels which one it edits.
+     */
+    scopePolicy: HostObservable<ProjectUiPolicySnapshot>
   }
+  /**
+   * Re-run client-module synchronization for this page. Only the local module
+   * graph retries; Host-side enablement is not mutated.
+   */
+  retryClient: () => void
   /** Read the Host once the tab first renders. */
   ensure: () => void
   /** Read the Host again. */
@@ -564,7 +582,14 @@ export class PluginManagerController {
   inject(configLedger: HostObservable<ConfigLedger>, resolveText: PluginManagerFace['resolveText']): PluginManagerFace {
     return {
       resolveText,
-      hooks: { pluginManager: this.store, configLedger, configurations: this.ctx.settingsScope.describe() },
+      hooks: {
+        pluginManager: this.store,
+        configLedger,
+        configurations: this.ctx.settingsScope.describe(),
+        clientSync: this.ctx.modules.entries.state,
+        scopePolicy: this.ctx.projectUiPolicy,
+      },
+      retryClient: () => { void this.ctx.modules.entries.retry().catch((error: unknown) => { this.ctx.logger.error(error) }) },
       configForm: <T>(id: string): SettingsMutationScope<T> => {
         let scope = this.configFormCache.get(id)
         if (scope === undefined) {
@@ -573,7 +598,13 @@ export class PluginManagerController {
         }
         return scope as SettingsMutationScope<T>
       },
-      ensure: () => { if (this.getSnapshot().status === 'idle') void this.load() },
+      ensure: () => {
+        if (this.getSnapshot().status === 'idle') void this.load()
+        // The Configuration group filters item registrations against the
+        // served namespaces; the shared describe mirror reads lazily, so the
+        // page's own mount is what starts it.
+        void this.ctx.settingsScope.describe().ensure()
+      },
       refresh: () => { void this.refresh() },
       openInstall: () => {
         const install = this.getSnapshot().install

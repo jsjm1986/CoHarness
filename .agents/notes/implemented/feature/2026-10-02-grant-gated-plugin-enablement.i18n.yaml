@@ -2,18 +2,18 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-02-grant-gated-plugin-enablement.md
-/agent-note-grant-gated-plugin-enablement-in-the-web-settings-plugin-list:
-  en: 9ebac8528adaa5f9
-  zh: 47ddf3a3e4e0ac3f
-/agent-note-grant-gated-plugin-enablement-in-the-web-settings-plugin-list/problem:
-  en: 2ce4f4ea745e8b44
-  zh: 00205a54a89b6d6a
-/agent-note-grant-gated-plugin-enablement-in-the-web-settings-plugin-list/decision:
-  en: f3986e7b072ba9e9
-  zh: 213508b7fb9addd1
-/agent-note-grant-gated-plugin-enablement-in-the-web-settings-plugin-list/alternatives-considered:
+/agent-note-grant-gated-plugin-enablement-on-the-web-plugins-page:
+  en: 2535362cdc32a96d
+  zh: 42a8197fc63e613f
+/agent-note-grant-gated-plugin-enablement-on-the-web-plugins-page/problem:
+  en: f7d12981eb88e66a
+  zh: 7dfac14735ba8c52
+/agent-note-grant-gated-plugin-enablement-on-the-web-plugins-page/decision:
+  en: e3fcbae7799ddae5
+  zh: be7490e3b870f7d7
+/agent-note-grant-gated-plugin-enablement-on-the-web-plugins-page/alternatives-considered:
   en: 7b6339e352ecc816
   zh: 08127fd653037d74
-/agent-note-grant-gated-plugin-enablement-in-the-web-settings-plugin-list/consequences:
-  en: 9324a1fdbc56eda3
-  zh: 6d57428437809e9f
+/agent-note-grant-gated-plugin-enablement-on-the-web-plugins-page/consequences:
+  en: 2bbdf8d2229bea09
+  zh: a576ede7ee75be4f
