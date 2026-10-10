@@ -6,6 +6,7 @@ import { LogoutButton, type LogoutButtonProps } from '../src/client/LogoutButton
 import logoutCss from '../src/client/LogoutButton.module.css'
 import { ReadOnlyComposer, type ReadOnlyComposerProps } from '../src/client/ReadOnlyComposer.tsx'
 import { ScopeControl, type ScopeControlProps } from '../src/client/ScopeControl.tsx'
+import { StewardDock, type StewardDockProps } from '../src/client/StewardDock.tsx'
 import css from '../src/client/ScopeControl.module.css'
 import type {
   CollaborationContext, CollaborationSnapshot, ConversationDetail,
@@ -421,5 +422,41 @@ describe('ReadOnlyComposer', () => {
     render(<ReadOnlyComposer {...props} />)
     expect(screen.getByRole('status').textContent).toContain('只读项目')
     expect(screen.getByRole('status').textContent).toContain('当前成员权限不允许修改此对话。')
+  })
+})
+
+describe('StewardDock', () => {
+  function dockProps(state: CollaborationSnapshot): StewardDockProps {
+    return {
+      sessionId: 'child',
+      useSession: vi.fn(), useSessions: vi.fn(), useWorkspaces: vi.fn(),
+      useCollaboration: <T,>(selector: (snapshot: CollaborationSnapshot) => T): T => selector(state),
+      t,
+    } as unknown as StewardDockProps
+  }
+
+  it('announces the audited maintenance channel inside steward scope', () => {
+    const stewardContext: CollaborationContext = {
+      ...projectContext,
+      scope: { kind: 'project', projectId: 11, projectName: '维护中枢', mode: 'rw', steward: true },
+    }
+    render(<StewardDock {...dockProps(snapshot({ context: stewardContext }))} />)
+    const notice = screen.getByRole('note')
+    expect(notice.textContent).toContain('常驻维护通道')
+    expect(notice.textContent).toContain('全部操作留痕审计')
+    expect(notice.textContent).toContain('写语句需当场批准')
+  })
+
+  it('renders nothing in an ordinary project scope', () => {
+    const view = render(<StewardDock {...dockProps(snapshot())} />)
+    expect(view.container.childElementCount).toBe(0)
+    expect(screen.queryByRole('note')).toBeNull()
+  })
+
+  it('renders nothing while the account context is loading', () => {
+    const loading = snapshot({ contextVerified: false })
+    delete loading.context
+    const view = render(<StewardDock {...dockProps(loading)} />)
+    expect(view.container.childElementCount).toBe(0)
   })
 })

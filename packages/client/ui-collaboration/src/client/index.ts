@@ -20,6 +20,7 @@ import {
   ReadOnlyComposer, type ProjectReadOnlyMatch,
 } from './ReadOnlyComposer.tsx'
 import { ScopeControl, type ScopeControlInjected } from './ScopeControl.tsx'
+import { StewardDock, type StewardDockInjected } from './StewardDock.tsx'
 import { en, NS, zh, type CollaborationKey } from './locales.ts'
 
 export type {
@@ -156,6 +157,14 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: logoutInjected,
   }, LogoutButton))
+
+  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
+    name: 'conversation.input.dock',
+    id: 'collaboration-steward-notice',
+    order: -10,
+    locale: NS,
+    inject: (): StewardDockInjected => ({ hooks }),
+  }, StewardDock))
 
   ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
     name: 'conversation.session.header.actions',

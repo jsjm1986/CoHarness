@@ -36,6 +36,17 @@
   box-shadow: inset 0 0 0 1px var(--dsw-alias-brand-primary);
 }
 
+/* The steward space is a caution surface: warn-family amber marks the
+   trigger while maintenance scope is active. */
+.contextSteward {
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-warn-secondary);
+}
+
+.contextSteward:hover:not(:disabled),
+.contextSteward[aria-expanded='true'] {
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-warn-primary);
+}
+
 .trigger:disabled {
   color: var(--dsw-alias-label-caption);
   cursor: wait;
@@ -73,6 +84,15 @@
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
   line-height: 18px;
+}
+
+/* Steward mode pill: warn-family amber marks maintenance scope as a caution
+   surface, matching the banner in conversation.input.dock. */
+.modeSteward {
+  composes: mode;
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-state-warn-label);
+  font-weight: 600;
 }
 
 .chevron {
@@ -240,6 +260,13 @@
   line-height: 18px;
 }
 
+.scopeModeSteward {
+  composes: scopeMode;
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-state-warn-label);
+  font-weight: 600;
+}
+
 .scopeDot {
   display: inline-block;
   width: 6px;
@@ -253,6 +280,13 @@
 .scopeDotOn {
   composes: scopeDot;
   background: var(--dsw-alias-brand-primary);
+}
+
+/* Steward rows keep the amber marker in every state — the maintenance
+   identity outranks the active-scope accent. */
+.scopeDotSteward {
+  composes: scopeDot;
+  background: var(--dsw-alias-state-warn-primary);
 }
 
 .badge {

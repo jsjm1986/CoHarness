@@ -1,0 +1,25 @@
+/* Amber notice above the composer in the reserved steward space: the warn
+   family marks maintenance scope as a caution surface without claiming an
+   error state. The scope switcher carries the same palette. */
+.banner {
+  display: flex;
+  align-items: baseline;
+  gap: var(--dsw-space-2);
+  box-sizing: border-box;
+  padding: var(--dsw-space-1) var(--dsw-space-3);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-state-warn-label);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.icon {
+  flex: none;
+  align-self: center;
+}
+
+.lead {
+  flex: none;
+  font-weight: 600;
+}

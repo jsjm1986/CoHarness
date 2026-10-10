@@ -121,7 +121,7 @@ export function ScopeControl({
     label: (
       <span className={css.scopeRow}>
         <span className={css.scopeName}>{project.name}</span>
-        <span className={css.scopeMode}>
+        <span className={project.kind === 'steward' ? css.scopeModeSteward : css.scopeMode}>
           {project.kind === 'steward'
             ? t('scope.steward')
             : project.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
@@ -130,8 +130,10 @@ export function ScopeControl({
     ),
     icon: (
       <span
-        className={projectScope !== undefined && project.projectId === projectScope.projectId
-          ? css.scopeDotOn : css.scopeDot}
+        className={project.kind === 'steward'
+          ? css.scopeDotSteward
+          : projectScope !== undefined && project.projectId === projectScope.projectId
+            ? css.scopeDotOn : css.scopeDot}
         aria-hidden="true"
       />
     ),
@@ -303,7 +305,9 @@ export function ScopeControl({
           <button
             type="button"
             ref={triggerRef}
-            className={wide ? `${css.trigger} ${css.context}` : `${css.trigger} ${css.rail}`}
+            className={wide
+              ? `${css.trigger} ${css.context}${projectScope?.steward === true ? ` ${css.contextSteward}` : ''}`
+              : `${css.trigger} ${css.rail}`}
             aria-label={t('scope.aria')}
             aria-haspopup="menu"
             aria-expanded={open}
@@ -320,7 +324,7 @@ export function ScopeControl({
               <>
                 <span className={css.label}>{currentLabel}</span>
                 {projectScope !== undefined && (
-                  <span className={css.mode}>
+                  <span className={projectScope.steward === true ? css.modeSteward : css.mode}>
                     {projectScope.steward === true
                       ? t('scope.steward')
                       : projectScope.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')}
