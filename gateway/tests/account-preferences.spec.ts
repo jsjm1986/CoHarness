@@ -24,12 +24,18 @@ const VIEW: AccountPreferencesView = {
   values: {
     locale: { preference: 'zh' },
     'ui-theme': { preference: 'dark' },
-    'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFullWidth: true, chatFontSize: 15 },
+    'ui-conversation': {
+      busyEnter: 'steer', chatContentWidth: 840, chatFullWidth: true, chatFontSize: 15,
+      transcriptView: 'standard', performanceUsage: 'compact', linkOpening: 'new-tab',
+    },
   },
   overrides: {
     locale: { preference: 'zh' },
     'ui-theme': { preference: 'dark' },
-    'ui-conversation': { busyEnter: 'steer', chatContentWidth: 840, chatFullWidth: true, chatFontSize: 15 },
+    'ui-conversation': {
+      busyEnter: 'steer', chatContentWidth: 840, chatFullWidth: true, chatFontSize: 15,
+      transcriptView: 'standard', performanceUsage: 'compact', linkOpening: 'new-tab',
+    },
   },
 }
 
@@ -48,9 +54,7 @@ async function setup() {
       if (mutation.expectedRevision !== undefined && mutation.expectedRevision !== current.revision) {
         throw new Error('account preference revision conflict')
       }
-      if (mutation.namespace === 'ui-conversation'
-        && (mutation.field === 'chatContentWidth' || mutation.field === 'chatFullWidth' || mutation.field === 'chatFontSize')
-        && mutation.operation === 'set') {
+      if (mutation.namespace === 'ui-conversation' && mutation.operation === 'set') {
         current = {
           ...current,
           revision: current.revision + 1,
@@ -162,6 +166,15 @@ describe('Gateway account preferences route', () => {
     })
     expect(fill.status).toBe(200)
     expect((await fill.json()).values['ui-conversation']).toMatchObject({ chatFullWidth: false })
+
+    const view = await fetch(`${base}/account/api/preferences`, {
+      method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        namespace: 'ui-conversation', field: 'transcriptView', operation: 'set', value: 'verbose', expectedRevision: 6,
+      }),
+    })
+    expect(view.status).toBe(200)
+    expect((await view.json()).values['ui-conversation']).toMatchObject({ transcriptView: 'verbose' })
   })
 
   it('rejects out-of-range conversation display fields before the service runs', async () => {
@@ -181,6 +194,13 @@ describe('Gateway account preferences route', () => {
       }),
     })
     expect(mistyped.status).toBe(400)
+    const badMode = await fetch(`${base}/account/api/preferences`, {
+      method: 'PATCH', headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        namespace: 'ui-conversation', field: 'transcriptView', operation: 'set', value: 'normal', expectedRevision: 4,
+      }),
+    })
+    expect(badMode.status).toBe(400)
     expect(mutate).not.toHaveBeenCalled()
   })
 

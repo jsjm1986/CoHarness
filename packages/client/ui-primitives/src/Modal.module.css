@@ -20,7 +20,9 @@
     var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
-/* Dialog card: window radius, elevation-prominent, layer-2 fill, pb 24. */
+/* Dialog card: window radius, elevation-prominent, layer-2 fill, pb 24. The
+   card tops out at the padded viewport box; a taller body scrolls inside
+   `.content` while the footer stays pinned. */
 .dialog {
   position: relative;
   z-index: 1;
@@ -28,6 +30,7 @@
   flex-direction: column;
   gap: var(--dsw-space-5);
   width: min(380px, 100%);
+  max-height: 100%;
   padding: 0 0 var(--dsw-space-6);
   overflow: hidden;
   border: 0;
@@ -47,10 +50,16 @@
   outline: none;
 }
 
+/* The scrollable region every Modal consumer sizes through contentClassName:
+ * it must shrink below its content and scroll rather than clip into the
+ * pinned footer (the compact sheet binds the same contract through
+ * max-height). */
 .content {
   display: flex;
   flex-direction: column;
   width: 100%;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* Header row (figma Title row): pad l24/t22/r14/b12, SPACE_BETWEEN —
@@ -126,11 +135,6 @@
     opacity: 0.7;
   }
 
-  .content {
-    min-height: 0;
-    overflow-y: auto;
-  }
-
   .title {
     min-width: 0;
     overflow-wrap: anywhere;
@@ -197,6 +201,7 @@
 }
 
 .footer {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: flex-end;

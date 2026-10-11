@@ -5,14 +5,20 @@ import type { UserRow } from '../auth.ts'
 import {
   ACCOUNT_CHAT_CONTENT_WIDTH_RANGE,
   ACCOUNT_CHAT_FONT_SIZE_RANGE,
+  ACCOUNT_LINK_OPENINGS,
+  ACCOUNT_PERFORMANCE_USAGE_MODES,
   ACCOUNT_PREFERENCE_DEFAULTS,
+  ACCOUNT_TRANSCRIPT_VIEW_MODES,
   AccountPreferencesConflictError,
   AccountPreferencesInputError,
   DEFAULT_ACCOUNT_CHAT_CONTENT_WIDTH,
   DEFAULT_ACCOUNT_CHAT_FONT_SIZE,
+  type AccountLinkOpening,
+  type AccountPerformanceUsageMode,
   type AccountPreferenceMutation,
   type AccountPreferenceValues,
   type AccountPreferencesView,
+  type AccountTranscriptViewMode,
   type GatewayAccountPreferencesService,
   normalizeAccountPreferenceMutation,
 } from '../account-preferences.ts'
@@ -27,6 +33,9 @@ interface PreferenceRow {
   chat_content_width: number | string | null
   chat_full_width: boolean | null
   chat_font_size: number | string | null
+  transcript_view: string | null
+  performance_usage: string | null
+  link_opening: string | null
   revision: string
   migrated_at: Date | null
 }
@@ -38,6 +47,9 @@ interface LegacyPreferences {
   chatContentWidth?: number
   chatFullWidth?: boolean
   chatFontSize?: number
+  transcriptView?: AccountTranscriptViewMode
+  performanceUsage?: AccountPerformanceUsageMode
+  linkOpening?: AccountLinkOpening
 }
 
 function safeRevision(value: string | number): number {
@@ -73,6 +85,16 @@ function legacyPreferences(value: unknown): LegacyPreferences {
     && rawFontSize <= ACCOUNT_CHAT_FONT_SIZE_RANGE.max
     ? rawFontSize
     : undefined
+  const rawTranscriptView = conversation?.transcriptView
+  // Legacy saved modes read as `detailed` at the schema layer; the account
+  // column stores only current modes, so the migration folds them forward.
+  const transcriptView = ACCOUNT_TRANSCRIPT_VIEW_MODES.includes(rawTranscriptView as AccountTranscriptViewMode)
+    ? rawTranscriptView as AccountTranscriptViewMode
+    : rawTranscriptView === 'normal' || rawTranscriptView === 'expanded'
+      ? 'detailed' as const
+      : undefined
+  const rawPerformanceUsage = conversation?.performanceUsage
+  const rawLinkOpening = conversation?.linkOpening
   return {
     ...(locale === 'zh' || locale === 'en' ? { locale } : {}),
     ...(theme === 'light' || theme === 'dark' || theme === 'system' ? { theme } : {}),
@@ -80,6 +102,11 @@ function legacyPreferences(value: unknown): LegacyPreferences {
     ...(chatContentWidth === undefined ? {} : { chatContentWidth }),
     ...(typeof conversation?.chatFullWidth === 'boolean' ? { chatFullWidth: conversation.chatFullWidth } : {}),
     ...(chatFontSize === undefined ? {} : { chatFontSize }),
+    ...(transcriptView === undefined ? {} : { transcriptView }),
+    ...(ACCOUNT_PERFORMANCE_USAGE_MODES.includes(rawPerformanceUsage as AccountPerformanceUsageMode)
+      ? { performanceUsage: rawPerformanceUsage as AccountPerformanceUsageMode } : {}),
+    ...(ACCOUNT_LINK_OPENINGS.includes(rawLinkOpening as AccountLinkOpening)
+      ? { linkOpening: rawLinkOpening as AccountLinkOpening } : {}),
   }
 }
 
@@ -113,6 +140,14 @@ function storedNumber(
   return parsed
 }
 
+function storedEnum<T extends string>(value: string | null, allowed: readonly T[], field: string): T | null {
+  if (value === null) return null
+  if (!allowed.includes(value as T)) {
+    throw new Error(`account preference ${field} holds an unsupported value`)
+  }
+  return value as T
+}
+
 function viewOf(row: PreferenceRow): AccountPreferencesView {
   const chatContentWidth = storedNumber(
     row.chat_content_width,
@@ -126,6 +161,9 @@ function viewOf(row: PreferenceRow): AccountPreferencesView {
     ACCOUNT_CHAT_FONT_SIZE_RANGE,
     'chatFontSize',
   )
+  const transcriptView = storedEnum(row.transcript_view, ACCOUNT_TRANSCRIPT_VIEW_MODES, 'transcriptView')
+  const performanceUsage = storedEnum(row.performance_usage, ACCOUNT_PERFORMANCE_USAGE_MODES, 'performanceUsage')
+  const linkOpening = storedEnum(row.link_opening, ACCOUNT_LINK_OPENINGS, 'linkOpening')
   const values: AccountPreferenceValues = {
     locale: row.locale_preference === null ? {} : { preference: row.locale_preference },
     'ui-theme': { preference: row.theme_preference ?? ACCOUNT_PREFERENCE_DEFAULTS['ui-theme'].preference },
@@ -134,6 +172,9 @@ function viewOf(row: PreferenceRow): AccountPreferencesView {
       chatContentWidth,
       chatFullWidth: row.chat_full_width ?? ACCOUNT_PREFERENCE_DEFAULTS['ui-conversation'].chatFullWidth,
       chatFontSize,
+      transcriptView: transcriptView ?? ACCOUNT_PREFERENCE_DEFAULTS['ui-conversation'].transcriptView,
+      performanceUsage: performanceUsage ?? ACCOUNT_PREFERENCE_DEFAULTS['ui-conversation'].performanceUsage,
+      linkOpening: linkOpening ?? ACCOUNT_PREFERENCE_DEFAULTS['ui-conversation'].linkOpening,
     },
   }
   const overrides = {
@@ -144,6 +185,9 @@ function viewOf(row: PreferenceRow): AccountPreferencesView {
       ...(row.chat_content_width === null ? {} : { chatContentWidth }),
       ...(row.chat_full_width === null ? {} : { chatFullWidth: row.chat_full_width }),
       ...(row.chat_font_size === null ? {} : { chatFontSize }),
+      ...(transcriptView === null ? {} : { transcriptView }),
+      ...(performanceUsage === null ? {} : { performanceUsage }),
+      ...(linkOpening === null ? {} : { linkOpening }),
     },
   }
   return {
@@ -152,6 +196,22 @@ function viewOf(row: PreferenceRow): AccountPreferencesView {
     overrides,
     migrated: row.migrated_at !== null,
   }
+}
+
+/** Every preference column projected into `PreferenceRow`; shared by the SELECT and RETURNING lists. */
+const PREFERENCE_COLUMNS = 'locale_preference,theme_preference,busy_enter,'
+  + 'chat_content_width,chat_full_width,chat_font_size,'
+  + 'transcript_view,performance_usage,link_opening'
+
+/** `ui-conversation` wire field to its `harness.user_preferences` column. */
+const CONVERSATION_COLUMNS: Record<string, string> = {
+  busyEnter: 'busy_enter',
+  chatContentWidth: 'chat_content_width',
+  chatFullWidth: 'chat_full_width',
+  chatFontSize: 'chat_font_size',
+  transcriptView: 'transcript_view',
+  performanceUsage: 'performance_usage',
+  linkOpening: 'link_opening',
 }
 
 /** PostgreSQL account preference store shared by every Gateway process. */
@@ -177,18 +237,12 @@ export class PostgresAccountPreferencesService implements GatewayAccountPreferen
         ? 'locale_preference'
         : mutation.namespace === 'ui-theme'
           ? 'theme_preference'
-          : mutation.field === 'busyEnter'
-            ? 'busy_enter'
-            : mutation.field === 'chatContentWidth'
-              ? 'chat_content_width'
-              : mutation.field === 'chatFullWidth'
-                ? 'chat_full_width'
-                : 'chat_font_size'
+          : CONVERSATION_COLUMNS[mutation.field]
       const value = mutation.operation === 'unset' ? null : mutation.value
       const result = await client.query<PreferenceRow>(`UPDATE harness.user_preferences
         SET ${column}=$3,revision=revision+1,updated_at=now()
         WHERE organization_id=$1 AND user_id=$2
-        RETURNING locale_preference,theme_preference,busy_enter,chat_content_width,chat_full_width,chat_font_size,revision::text,migrated_at`, [
+        RETURNING ${PREFERENCE_COLUMNS},revision::text,migrated_at`, [
         this.context.organizationId,
         await internalUserId(client, this.context.organizationId, user.id),
         value,
@@ -202,9 +256,7 @@ export class PostgresAccountPreferencesService implements GatewayAccountPreferen
   private async ensureRow(client: import('pg').PoolClient, user: UserRow): Promise<PreferenceRow> {
     const internal = await internalUserId(client, this.context.organizationId, user.id)
     if (internal === null) throw new AccountPreferencesInputError(`unknown user ${String(user.id)}`)
-    const existing = await client.query<PreferenceRow>(`SELECT locale_preference,theme_preference,busy_enter,
-      chat_content_width,chat_full_width,chat_font_size,
-      revision::text,migrated_at
+    const existing = await client.query<PreferenceRow>(`SELECT ${PREFERENCE_COLUMNS},revision::text,migrated_at
       FROM harness.user_preferences
       WHERE organization_id=$1 AND user_id=$2
       FOR UPDATE`, [this.context.organizationId, internal])
@@ -214,12 +266,14 @@ export class PostgresAccountPreferencesService implements GatewayAccountPreferen
     const legacy = await readLegacyPreferences(this.config, user)
     const revision = legacy.locale !== undefined || legacy.theme !== undefined || legacy.busyEnter !== undefined
       || legacy.chatContentWidth !== undefined || legacy.chatFullWidth !== undefined
-      || legacy.chatFontSize !== undefined ? 1 : 0
+      || legacy.chatFontSize !== undefined || legacy.transcriptView !== undefined
+      || legacy.performanceUsage !== undefined || legacy.linkOpening !== undefined ? 1 : 0
     const migratedAt = revision === 0 ? null : new Date()
     await client.query(`INSERT INTO harness.user_preferences(
       organization_id,user_id,locale_preference,theme_preference,busy_enter,
-      chat_content_width,chat_full_width,chat_font_size,revision,migrated_at
-    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      chat_content_width,chat_full_width,chat_font_size,
+      transcript_view,performance_usage,link_opening,revision,migrated_at
+    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
     ON CONFLICT (organization_id,user_id) DO NOTHING`, [
       this.context.organizationId,
       internal,
@@ -229,12 +283,13 @@ export class PostgresAccountPreferencesService implements GatewayAccountPreferen
       legacy.chatContentWidth ?? null,
       legacy.chatFullWidth ?? null,
       legacy.chatFontSize ?? null,
+      legacy.transcriptView ?? null,
+      legacy.performanceUsage ?? null,
+      legacy.linkOpening ?? null,
       revision,
       migratedAt,
     ])
-    const inserted = await client.query<PreferenceRow>(`SELECT locale_preference,theme_preference,busy_enter,
-      chat_content_width,chat_full_width,chat_font_size,
-      revision::text,migrated_at
+    const inserted = await client.query<PreferenceRow>(`SELECT ${PREFERENCE_COLUMNS},revision::text,migrated_at
       FROM harness.user_preferences
       WHERE organization_id=$1 AND user_id=$2
       FOR UPDATE`, [this.context.organizationId, internal])

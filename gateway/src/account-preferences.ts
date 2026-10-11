@@ -7,7 +7,30 @@ export type AccountPreferenceNamespace = 'locale' | 'ui-theme' | 'ui-conversatio
 export type AccountPreferenceField =
   | { namespace: 'locale'; field: 'preference' }
   | { namespace: 'ui-theme'; field: 'preference' }
-  | { namespace: 'ui-conversation'; field: 'busyEnter' | 'chatContentWidth' | 'chatFullWidth' | 'chatFontSize' }
+  | {
+    namespace: 'ui-conversation'
+    field:
+      | 'busyEnter' | 'chatContentWidth' | 'chatFullWidth' | 'chatFontSize'
+      | 'transcriptView' | 'performanceUsage' | 'linkOpening'
+  }
+
+/** Work-details presentation modes an account may persist. */
+export const ACCOUNT_TRANSCRIPT_VIEW_MODES = ['compact', 'standard', 'detailed', 'verbose'] as const
+
+/** Detail levels an account may persist for composer statistics and usage. */
+export const ACCOUNT_PERFORMANCE_USAGE_MODES = ['compact', 'detailed'] as const
+
+/** Link destinations an account may persist for Chat HTTP(S) links. */
+export const ACCOUNT_LINK_OPENINGS = ['sidebar', 'new-tab'] as const
+
+/** Persisted work-details presentation mode. */
+export type AccountTranscriptViewMode = typeof ACCOUNT_TRANSCRIPT_VIEW_MODES[number]
+
+/** Persisted performance and usage detail level. */
+export type AccountPerformanceUsageMode = typeof ACCOUNT_PERFORMANCE_USAGE_MODES[number]
+
+/** Persisted Chat link destination. */
+export type AccountLinkOpening = typeof ACCOUNT_LINK_OPENINGS[number]
 
 /** Account-owned transcript width limits shared by the browser controls. */
 export const ACCOUNT_CHAT_CONTENT_WIDTH_RANGE = { min: 560, max: 1080 } as const
@@ -21,6 +44,15 @@ export const DEFAULT_ACCOUNT_CHAT_CONTENT_WIDTH = 748
 /** Default transcript font size when an account has no explicit override. */
 export const DEFAULT_ACCOUNT_CHAT_FONT_SIZE = 14
 
+/** Default work-details presentation when an account has no explicit override. */
+export const DEFAULT_ACCOUNT_TRANSCRIPT_VIEW: AccountTranscriptViewMode = 'detailed'
+
+/** Default usage detail when an account has no explicit override. */
+export const DEFAULT_ACCOUNT_PERFORMANCE_USAGE: AccountPerformanceUsageMode = 'detailed'
+
+/** Default Chat link destination when an account has no explicit override. */
+export const DEFAULT_ACCOUNT_LINK_OPENING: AccountLinkOpening = 'sidebar'
+
 /** Effective account preferences returned to browser clients. */
 export interface AccountPreferenceValues {
   locale: { preference?: 'zh' | 'en' }
@@ -30,6 +62,9 @@ export interface AccountPreferenceValues {
     chatContentWidth: number
     chatFullWidth: boolean
     chatFontSize: number
+    transcriptView: AccountTranscriptViewMode
+    performanceUsage: AccountPerformanceUsageMode
+    linkOpening: AccountLinkOpening
   }
 }
 
@@ -48,6 +83,9 @@ export interface AccountPreferencesView {
       chatContentWidth?: number
       chatFullWidth?: boolean
       chatFontSize?: number
+      transcriptView?: AccountTranscriptViewMode
+      performanceUsage?: AccountPerformanceUsageMode
+      linkOpening?: AccountLinkOpening
     }
   }
   /** Whether the account row has been migrated from the legacy settings file. */
@@ -96,6 +134,9 @@ export const ACCOUNT_PREFERENCE_DEFAULTS: AccountPreferenceValues = {
     chatContentWidth: DEFAULT_ACCOUNT_CHAT_CONTENT_WIDTH,
     chatFullWidth: false,
     chatFontSize: DEFAULT_ACCOUNT_CHAT_FONT_SIZE,
+    transcriptView: DEFAULT_ACCOUNT_TRANSCRIPT_VIEW,
+    performanceUsage: DEFAULT_ACCOUNT_PERFORMANCE_USAGE,
+    linkOpening: DEFAULT_ACCOUNT_LINK_OPENING,
   },
 }
 
@@ -122,6 +163,7 @@ export function normalizeAccountPreferenceMutation(
   }
   const validField = namespace === 'ui-conversation'
     ? field === 'busyEnter' || field === 'chatContentWidth' || field === 'chatFullWidth' || field === 'chatFontSize'
+      || field === 'transcriptView' || field === 'performanceUsage' || field === 'linkOpening'
     : field === 'preference'
   if (!validField) throw new AccountPreferencesInputError('unsupported account preference field')
   if (operation !== 'set' && operation !== 'unset') {
@@ -153,6 +195,18 @@ export function normalizeAccountPreferenceMutation(
   if (namespace === 'ui-conversation' && field === 'busyEnter' && operation === 'set'
     && raw !== 'queue' && raw !== 'steer') {
     throw new AccountPreferencesInputError('busyEnter preference must be queue or steer')
+  }
+  if (namespace === 'ui-conversation' && field === 'transcriptView' && operation === 'set'
+    && !ACCOUNT_TRANSCRIPT_VIEW_MODES.includes(raw as AccountTranscriptViewMode)) {
+    throw new AccountPreferencesInputError('transcriptView preference must be a supported work-details mode')
+  }
+  if (namespace === 'ui-conversation' && field === 'performanceUsage' && operation === 'set'
+    && !ACCOUNT_PERFORMANCE_USAGE_MODES.includes(raw as AccountPerformanceUsageMode)) {
+    throw new AccountPreferencesInputError('performanceUsage preference must be compact or detailed')
+  }
+  if (namespace === 'ui-conversation' && field === 'linkOpening' && operation === 'set'
+    && !ACCOUNT_LINK_OPENINGS.includes(raw as AccountLinkOpening)) {
+    throw new AccountPreferencesInputError('linkOpening preference must be sidebar or new-tab')
   }
   if (numericConversationField && operation === 'set') {
     const numberValue = typeof raw === 'number' ? raw : Number(raw)
