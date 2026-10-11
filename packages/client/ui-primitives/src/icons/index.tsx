@@ -1,7 +1,7 @@
 /**
  * ic_ds_* icon set — Lucide-backed glyphs (lucide-react, ISC). Every glyph
  * rides currentColor and takes {size, className}; stroke weight follows the
- * drawn size (2.5 at ≥16px, 2.6 at 14px, 2.8 at ≤12px). `aria-hidden` stays
+ * drawn size (2 at ≥16px, 2.2 at 14px, 2.4 at ≤12px). `aria-hidden` stays
  * absent: the a11y tree lists bare svg glyphs as `img`, which the web golden
  * snapshots depend on. Two glyphs stay custom — IconCloseFill14 (heavy
  * filled X, no Lucide analogue) and IconTreeCorner8x10 (structural
@@ -15,9 +15,7 @@ import {
   ArrowUp,
   ArrowUpRight,
   Blocks,
-  Bot,
   Brain,
-  BrainCircuit,
   ChartNoAxesColumn,
   Check,
   ChevronDown,
@@ -36,6 +34,7 @@ import {
   Clock,
   CodeXml,
   Copy,
+  Cpu,
   Database,
   Download,
   Ellipsis,
@@ -50,7 +49,7 @@ import {
   Gauge,
   GitBranch,
   Globe,
-  Layers,
+  FolderRoot,
   Lightbulb,
   Link,
   List,
@@ -95,6 +94,7 @@ import {
   Terminal,
   TriangleAlert,
   User,
+  UserRoundCog,
   WandSparkles,
   SquareTerminal,
   TextWrap,
@@ -111,10 +111,8 @@ export type { IconProps } from './props.ts'
  * glyphs stay `img` in the accessibility tree. */
 type GlyphProps = IconProps & Omit<LucideProps, 'size' | 'width' | 'height' | 'color' | 'strokeWidth' | 'fill' | 'ref'>
 
-/** Stroke weight by drawn size. Lucide's 24-grid default (2) renders ~1.3px
- * at 14-16px draws — too light against filled glyphs — so the ladder holds
- * the rendered stem at roughly 1.5-1.7px (2.5 / 2.6 / 2.8). */
-const strokeFor = (size: number): number => (size <= 12 ? 2.8 : size < 16 ? 2.6 : 2.5)
+/** Stroke weight by drawn size, per the reference kits (2 / 2.2 / 2.4). */
+const strokeFor = (size: number): number => (size <= 12 ? 2.4 : size < 16 ? 2.2 : 2)
 
 const glyph =
   (Lucide: LucideIcon, drawnSize: number, filled = false) =>
@@ -195,7 +193,7 @@ export const IconThinkOutline14 = glyph(Lightbulb, 14)
 /** ic_ds_think_outline_16 */
 export const IconThinkOutline16 = glyph(Lightbulb, 16)
 /** ic_ds_agent_preset_outline_16 */
-export const IconAgentPresetOutline16 = glyph(Bot, 16)
+export const IconAgentPresetOutline16 = glyph(UserRoundCog, 16)
 /** ic_ds_browse_outline_16 — documents browser. */
 export const IconBrowseOutline16 = glyph(FileText, 16)
 /** ic_ds_link_outline_14 */
@@ -236,6 +234,8 @@ export const IconFullscreenOutline16 = glyph(Maximize2, 16)
 export const IconCodeOutline16 = glyph(CodeXml, 16)
 /** ic_ds_cordis_plugin_outline_14 */
 export const IconCordisPluginOutline14 = glyph(Puzzle, 14)
+/** ic_ds_plugins_outline_16 */
+export const IconPluginsOutline16 = glyph(Puzzle, 16)
 /** ic_ds_api_outline_14 */
 export const IconApiOutline14 = glyph(SquareTerminal, 14)
 /** ic_ds_personalization_outline_16 */
@@ -249,7 +249,7 @@ export const IconFolderOpen16 = glyph(FolderOpen, 16)
 /** ic_ds_folder_close_16 */
 export const IconFolderClose16 = glyph(Folder, 16)
 /** ic_ds_workspace_outline_16 */
-export const IconWorkspaceOutline16 = glyph(Layers, 16)
+export const IconWorkspaceOutline16 = glyph(FolderRoot, 16)
 /** ic_ds_tree_corner_8x10 — kept custom: structural connector, not a glyph. */
 export const IconTreeCorner8x10 = ({ size = 10, className }: IconProps) => (
   <svg width={(size * 8) / 10} height={size} className={className} viewBox="-0.5 0 8.5 10.5" fill="none">
@@ -316,7 +316,7 @@ export const IconShieldOutline16 = glyph(Shield, 16)
 export const IconBrainOutline16 = glyph(Brain, 16)
 
 /** ic_ds_model_outline_16 */
-export const IconModelOutline16 = glyph(BrainCircuit, 16)
+export const IconModelOutline16 = glyph(Cpu, 16)
 /** ic_ds_wrap_lines_outline_16 */
 export const IconWrapLinesOutline16 = glyph(TextWrap, 16)
 /** ic_ds_pin_outline_16 */

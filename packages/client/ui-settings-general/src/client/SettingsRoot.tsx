@@ -17,7 +17,7 @@ import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
   ConnectionIndicator, IconAgentPresetOutline16, IconArchiveOutline16, IconCloseOutline16,
-  IconModelOutline16, IconPersonalizationOutline16, IconSettingsOutline16, holdInert, useModalLayer,
+  IconModelOutline16, IconPluginsOutline16, IconSettingsOutline16, holdInert, useModalLayer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConnectionIndicatorState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { onSettingsNavigation } from '@deepseek-ai/dsh-client-runtime/client'
@@ -31,7 +31,7 @@ const RECOVERY_CONFIRMATION_MS = 2_000
 function navIcon(id: string) {
   if (id === 'models') return <IconModelOutline16 className={css.navIcon} size={16} />
   if (id === 'agent-presets') return <IconAgentPresetOutline16 className={css.navIcon} size={16} />
-  if (id === 'plugins') return <IconPersonalizationOutline16 className={css.navIcon} size={16} />
+  if (id === 'plugins') return <IconPluginsOutline16 className={css.navIcon} size={16} />
   if (id === 'archived-sessions') return <IconArchiveOutline16 className={css.navIcon} size={16} />
   return <IconSettingsOutline16 className={css.navIcon} size={16} />
 }
