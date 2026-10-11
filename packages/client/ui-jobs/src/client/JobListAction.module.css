@@ -23,7 +23,7 @@
 }
 
 .trigger svg {
-  transition: transform 120ms ease;
+  transition: transform var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease);
 }
 
 .triggerOpen {
@@ -108,7 +108,7 @@
 
 .sectionChevron {
   transform: rotate(-90deg);
-  transition: transform 120ms ease;
+  transition: transform var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease);
 }
 
 .sectionChevronOpen {

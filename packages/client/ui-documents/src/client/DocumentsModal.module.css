@@ -758,7 +758,7 @@
   padding: var(--dsw-space-2) var(--dsw-space-1);
   border-top: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-sm);
-  transition: background-color 120ms ease;
+  transition: background-color var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease);
 }
 
 .row:hover {
@@ -893,7 +893,7 @@
   height: 100%;
   border-radius: inherit;
   background: var(--dsw-alias-state-business-primary);
-  transition: width 120ms ease;
+  transition: width var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease);
 }
 
 .confirm {
@@ -1833,7 +1833,7 @@
   min-height: 54px;
   padding: 10px 12px;
   border-radius: 10px;
-  transition: background-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+  transition: background-color var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease), box-shadow var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease), color var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease);
 }
 
 .scopeItemActive {
