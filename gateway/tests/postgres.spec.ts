@@ -45,6 +45,14 @@ import type { UserRow } from '../src/auth.ts'
 import type { UsageEvent } from '../src/model-governance.ts'
 
 const DATABASE_URL = process.env.HGW_TEST_DATABASE_URL
+// The suite drops the harness schema before running, so the database must be
+// disposable by name. The npm script guards the same pattern; keeping the check
+// here also covers direct vitest invocation.
+if (DATABASE_URL !== undefined && !/(_test|_accept|_acceptance)(\?.*)?$/.test(DATABASE_URL)) {
+  throw new Error(
+    'HGW_TEST_DATABASE_URL must select a disposable test database ending in _test, _accept, or _acceptance',
+  )
+}
 const describePg = DATABASE_URL === undefined ? describe.skip : describe
 const MIGRATIONS = resolve(import.meta.dirname, '../deploy/postgres/migrations')
 
