@@ -95,6 +95,7 @@ import {
   TriangleAlert,
   User,
   UserRoundCog,
+  Users,
   WandSparkles,
   SquareTerminal,
   TextWrap,
@@ -214,6 +215,8 @@ export const IconTrashOutline16 = glyph(Trash, 16)
 export const IconWarningOutline16 = glyph(TriangleAlert, 16)
 /** ic_ds_user_outline_16 */
 export const IconUserOutline16 = glyph(User, 16)
+/** ic_ds_users_outline_16 */
+export const IconUsersOutline16 = glyph(Users, 16)
 /** ic_ds_send_outline_16 */
 export const IconSendOutline16 = glyph(ArrowUp, 16)
 /** ic_ds_stop_fill_16 */

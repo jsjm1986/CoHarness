@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconChevronDownOutline14, IconCloseFill14, IconGlobeOutline14, IconSearchOutline16,
-  IconShareOutline16, IconPlusOutline16, IconSettingsOutline16, IconUserOutline16, IconWarningOutline16,
+  IconPlusOutline16, IconSettingsOutline16, IconUserOutline16, IconUsersOutline16, IconWarningOutline16,
   Menu, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -183,7 +183,7 @@ export function ScopeControl({
           {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
         </span>
       ),
-      icon: <IconShareOutline16 size={16} />,
+      icon: <IconUsersOutline16 size={16} />,
     })
   }
   // Keep the entry visible to every project member. The panel explains which
@@ -318,7 +318,7 @@ export function ScopeControl({
             {state.scopeError === undefined
               ? projectScope === undefined
                 ? <IconUserOutline16 size={iconSize} />
-                : <IconShareOutline16 size={iconSize} />
+                : <IconUsersOutline16 size={iconSize} />
               : <IconWarningOutline16 size={iconSize} />}
             {wide && (
               <>
