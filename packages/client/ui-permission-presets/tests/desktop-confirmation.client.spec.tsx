@@ -24,8 +24,9 @@ function fixture() {
 it('shows the exact target and saves only explicit confirmation and withdrawal gestures', async () => {
   const f = fixture()
   render(<DesktopConfirmationAction {...f.props} />)
-  expect(f.status).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: desktopEn.open }))
+  // The trigger's status dot reads eagerly at mount; opening still refreshes.
+  await waitFor(() => { expect(f.status).toHaveBeenCalledOnce() })
+  fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
   await screen.findByText('display-0')
   expect(screen.getByText('root')).toBeTruthy()
   expect(screen.getByText('node')).toBeTruthy()
@@ -45,9 +46,9 @@ it('hides the action in independent local profiles and explains unconfigured man
   f.host.set({ executionAuthorityRequired: false })
   const view = render(<DesktopConfirmationAction {...f.props} />)
   expect(screen.queryByRole('button')).toBeNull()
-  f.status.mockResolvedValueOnce(ok(null))
+  f.status.mockResolvedValue(ok(null))
   act(() => { f.host.set({ executionAuthorityRequired: true }) })
-  fireEvent.click(screen.getByRole('button', { name: desktopEn.open }))
+  fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
   await screen.findByText(desktopEn.unavailable)
   expect(screen.queryByRole('button', { name: desktopEn.confirm })).toBeNull()
   view.unmount()
@@ -57,7 +58,7 @@ it('disables confirmation for an ineligible account', async () => {
   const f = fixture()
   f.status.mockResolvedValue(ok({ ...f.value, eligible: false }))
   render(<DesktopConfirmationAction {...f.props} />)
-  fireEvent.click(screen.getByRole('button', { name: desktopEn.open }))
+  fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
   await screen.findByText(desktopEn.ineligible)
   expect(screen.getByRole('button', { name: desktopEn.confirm })).toHaveProperty('disabled', true)
   expect(f.confirm).not.toHaveBeenCalled()
@@ -66,14 +67,15 @@ it('disables confirmation for an ineligible account', async () => {
 it('clears sensitive target state on disconnect and reloads after reconnection', async () => {
   const f = fixture()
   render(<DesktopConfirmationAction {...f.props} />)
-  fireEvent.click(screen.getByRole('button', { name: desktopEn.open }))
+  fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
   await screen.findByText('display-0')
   act(() => { f.state.set('reconnecting') })
   await screen.findByText(desktopEn.disconnected)
   expect(screen.queryByText('node')).toBeNull()
   act(() => { f.state.set('connected') })
   await screen.findByText('display-0')
-  expect(f.status).toHaveBeenCalledTimes(2)
+  // Mount read + open refresh + reconnect read.
+  expect(f.status).toHaveBeenCalledTimes(3)
 })
 
 it.each([true, false])('discards a delayed read after the pane changes runtime (resolves=%s)', async (resolves) => {
@@ -81,21 +83,26 @@ it.each([true, false])('discards a delayed read after the pane changes runtime (
   first.status.mockReturnValueOnce(reply.promise)
   second.status.mockResolvedValue(ok({ ...second.value, desktop: 'display-new' }))
   const view = render(<DesktopConfirmationAction {...first.props} />)
-  fireEvent.click(screen.getByRole('button', { name: desktopEn.open }))
+  // The eager mount read is the delayed reply this case hangs.
   await waitFor(() => { expect(first.status).toHaveBeenCalledOnce() })
   const oldSignal = first.status.mock.calls[0]![1]!
   view.rerender(<DesktopConfirmationAction {...second.props} sessionId={'second-pane' as SessionId} />)
-  await screen.findByText('display-new')
+  await waitFor(() => { expect(second.status).toHaveBeenCalled() })
   expect(oldSignal.aborted).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
+  await screen.findByText('display-new')
   await act(async () => { if (resolves) reply.resolve(ok(first.value)); else reply.reject(new Error('cancelled')); await reply.promise.catch(() => undefined) })
   expect(screen.queryByText('display-0')).toBeNull()
 })
 
 it('shows read failures, retries, and requires a fresh read after a rejected save', async () => {
   const f = fixture()
+  // Mount read fails; the open-triggered refresh fails too, so the dialog
+  // still surfaces the read alert the case exercises.
+  f.status.mockResolvedValueOnce({ rpcId: 'r' as never, result: { ok: false, error: { code: 'internal', message: 'denied', details: {} } } })
   f.status.mockResolvedValueOnce({ rpcId: 'r' as never, result: { ok: false, error: { code: 'internal', message: 'denied', details: {} } } })
   render(<DesktopConfirmationAction {...f.props} />)
-  fireEvent.click(screen.getByRole('button', { name: desktopEn.open }))
+  fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
   await screen.findByRole('alert')
   fireEvent.click(screen.getByRole('button', { name: desktopEn.refresh }))
   await screen.findByText('display-0')
@@ -109,7 +116,7 @@ it.each([true, false])('discards a pending save after closing the dialog (resolv
   const f = fixture(), reply = Promise.withResolvers<ReturnType<typeof ok<DesktopConfirmation>>>()
   f.confirm.mockReturnValueOnce(reply.promise)
   render(<DesktopConfirmationAction {...f.props} />)
-  fireEvent.click(screen.getByRole('button', { name: desktopEn.open }))
+  fireEvent.click(screen.getByRole('button', { name: /Desktop access/ }))
   await screen.findByText('display-0')
   fireEvent.click(screen.getByRole('button', { name: desktopEn.confirm }))
   await screen.findByRole('button', { name: desktopEn.saving })

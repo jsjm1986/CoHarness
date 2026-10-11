@@ -6,6 +6,7 @@ export const desktopZh = {
   granted: '你已确认此根会话使用该桌面。', unconfirmed: '你尚未确认此根会话使用该桌面。',
   ineligible: '此账户、项目或会话尚不满足桌面使用条件。请联系管理员核验资格。',
   unavailable: '此运行节点尚未配置受管桌面。', failed: '无法完成桌面确认，请刷新状态后重试。',
+  statusConfirmed: '已确认', statusPending: '待确认', statusUnavailable: '不可用',
   disconnected: '连接中断，桌面确认已暂停。', confirm: '确认使用此桌面', withdraw: '撤回我的确认', saving: '正在保存…',
 }
 /** English keys match the current-account confirmation text. */
@@ -16,6 +17,7 @@ export const desktopEn: Record<keyof typeof desktopZh, string> = {
   granted: 'You confirmed this root session may use this desktop.', unconfirmed: 'You have not confirmed this root session may use this desktop.',
   ineligible: 'This account, project or session is not eligible for desktop access. Ask an administrator to check its permissions.',
   unavailable: 'This runtime has no managed desktop configured.', failed: 'Desktop confirmation could not be completed. Refresh its status and retry.',
+  statusConfirmed: 'Confirmed', statusPending: 'Pending', statusUnavailable: 'Unavailable',
   disconnected: 'Connection lost. Desktop confirmation is paused.', confirm: 'Confirm this desktop', withdraw: 'Withdraw my confirmation', saving: 'Saving…',
 }
 /** Keys for the confirmation slot namespace. */

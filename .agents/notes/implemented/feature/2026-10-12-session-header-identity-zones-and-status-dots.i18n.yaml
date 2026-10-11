@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-12-session-header-identity-zones-and-status-dots.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-12-session-header-identity-zones-and-status-dots.md
+/agent-note-session-header-split-into-identity-zones-with-state-dots-and-a-metadata-seat:
+  en: ffde3c6e108ebdab
+  zh: f0fe3bd4dcbb5801
+/agent-note-session-header-split-into-identity-zones-with-state-dots-and-a-metadata-seat/problem:
+  en: a31724d4e1ceff57
+  zh: 7c6a54859e8bcfb2
+/agent-note-session-header-split-into-identity-zones-with-state-dots-and-a-metadata-seat/decision:
+  en: eb3cf7d9f3496a0c
+  zh: 23f16271cad25e09
+/agent-note-session-header-split-into-identity-zones-with-state-dots-and-a-metadata-seat/alternatives-considered:
+  en: ab22de6164ab0158
+  zh: db3aef0f7b025919
+/agent-note-session-header-split-into-identity-zones-with-state-dots-and-a-metadata-seat/consequences:
+  en: 746499aaa52fac20
+  zh: dfd7a018ef83a3c2

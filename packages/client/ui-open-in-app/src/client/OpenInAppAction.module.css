@@ -1,5 +1,5 @@
 /* The split button shares the session header's quiet ghost spec (28px row,
-   12px tertiary label, no border); only the hairline between its halves
+   13px tertiary label, no border); only the hairline between its halves
    keeps it reading as one control. */
 
 .split {
@@ -20,7 +20,7 @@
   border: 0;
   background: none;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
   line-height: 20px;
   cursor: pointer;

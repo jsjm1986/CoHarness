@@ -70,25 +70,58 @@
 .titleRow {
   order: 0;
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 0;
+  gap: var(--dsw-space-2);
   min-height: 32px;
+  min-width: 0;
 }
 
 /* WorkbenchPaneHeader is the single source for pane identity. Keep the
    conversation tabs, but avoid repeating the same session title in each pane. */
-.workbenchPane .header .titleCluster > :not(.tabs),
-.workbenchPane .header .headerUtilities { display: none; }
+.workbenchPane .header .titleRow > :not(.tabs) { display: none; }
 /* With the title cluster reduced to tabs, the pane header already carries the
    column's chrome; keep only a small rhythm around the strip. */
 .workbenchPane .header { padding: var(--dsw-space-2) var(--dsw-space-3); }
 
+/* The header's one centered group: status dot, breadcrumb strip, and the
+   titleMeta suffix. `leading` (workbench toolbar) anchors the left edge, the
+   view tabs and action groups the right, so identity centers between the
+   controls rather than drifting with their widths. */
 .titleCluster {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: var(--dsw-space-2);
   min-width: 0;
+}
+
+.sessionDot {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+/* Screen-reader companion for the decorative status dot. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.titleMeta {
+  display: flex;
+  flex: none;
+  align-items: center;
+  min-width: 0;
+}
+
+.titleMeta:empty {
+  display: none;
 }
 
 /* Title zone keeps the header height stable: the chain never wraps, and
@@ -174,7 +207,6 @@
   flex: none;
   align-items: center;
   gap: var(--dsw-space-1);
-  margin-left: var(--dsw-space-5);
 }
 
 /* Segmented tabs (transitions `16-tabs-sliding`, MIT): the equal-column grid
@@ -642,8 +674,11 @@
 
 /* The AppFrame owns the phone-level title. Keep non-title breadcrumb segments
    and subagent lineage switchers available, but remove the ordinary current
-   title so it is not painted twice. */
-:global([data-viewport='compact']) .crumbs {
+   title so it is not painted twice. The status dot and title meta modify that
+   title, so they collapse with it. */
+:global([data-viewport='compact']) .crumbs,
+:global([data-viewport='compact']) .sessionDot,
+:global([data-viewport='compact']) .titleMeta {
   display: none;
 }
 

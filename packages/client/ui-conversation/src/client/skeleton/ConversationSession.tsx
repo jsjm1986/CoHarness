@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import type { CSSProperties } from 'react'
 import clsx from 'clsx'
+import { StateDot, type StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId, SessionListState, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationSessionHeaderSlotProps, ConversationSessionSlotProps,
@@ -60,6 +61,19 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
 }
 
 /**
+ * The title's one state marker: an interaction waiting on the human is a
+ * warning, work in flight is the animated matrix, and everything quieter
+ * draws no dot at all — an idle session has nothing to announce.
+ */
+function sessionDotState(list: SessionListState, id: SessionId): StateDotState | undefined {
+  const summary = list.byId[id]
+  if (summary === undefined) return undefined
+  if (summary.pendingInteraction !== undefined) return 'warning'
+  if (summary.running) return 'ongoing'
+  return undefined
+}
+
+/**
  * Renders Session header chrome above the resident conversation scrollport.
  * @param props - Strict Session store, view ledger, navigation, render, and locale shares.
  * @returns the hidden blank-session header or visible title and tabs.
@@ -73,6 +87,7 @@ export function ConversationSessionHeader({
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
+  const dotState = useSessions(s => sessionDotState(s, sessionId))
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
   const hideChrome = blank && composerPhase === 'blank'
@@ -85,8 +100,14 @@ export function ConversationSessionHeader({
       {!hideChrome && (
         <>
           <div className={css.titleRow}>
+            {leading}
             <div className={css.titleCluster}>
-              {leading}
+              {dotState === undefined ? null : (
+                <span className={css.sessionDot} title={t(dotState === 'warning' ? 'session.status.waiting' : 'session.status.running')}>
+                  <StateDot state={dotState} size={8} />
+                  <span className={css.srOnly}>{t(dotState === 'warning' ? 'session.status.waiting' : 'session.status.running')}</span>
+                </span>
+              )}
               <nav
                 className={css.crumbs}
                 aria-label={t('session.hierarchy')}
@@ -139,34 +160,37 @@ export function ConversationSessionHeader({
                 })}
                 {ancestry.length === 0 && <span className={css.crumbCurrent}>{sessionId}</span>}
               </nav>
-              {tabs.length > 1 && (
-                <div
-                  className={css.tabs}
-                  role="tablist"
-                  /* Pill position without measuring JS: the bar divides into equal
-                     columns and slides --dsh-tab-index to the active tab. */
-                  style={{
-                    '--dsh-tab-count': tabs.length,
-                    '--dsh-tab-index': Math.max(0, tabs.findIndex(t => t.id === active?.id)),
-                  } as CSSProperties}
-                >
-                  {tabs.map(viewTab => (
-                    <button
-                      key={viewTab.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={viewTab.id === active?.id}
-                      className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-                      onClick={() => { actions.setView(viewTab.id) }}
-                    >
-                      {viewTab.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className={css.headerActions}>
-                {renderSlot('conversation.session.header.actions', { compact })}
+              <div className={css.titleMeta}>
+                {renderSlot('conversation.session.header.titleMeta', { compact })}
               </div>
+            </div>
+            {tabs.length > 1 && (
+              <div
+                className={css.tabs}
+                role="tablist"
+                /* Pill position without measuring JS: the bar divides into equal
+                   columns and slides --dsh-tab-index to the active tab. */
+                style={{
+                  '--dsh-tab-count': tabs.length,
+                  '--dsh-tab-index': Math.max(0, tabs.findIndex(t => t.id === active?.id)),
+                } as CSSProperties}
+              >
+                {tabs.map(viewTab => (
+                  <button
+                    key={viewTab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={viewTab.id === active?.id}
+                    className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
+                    onClick={() => { actions.setView(viewTab.id) }}
+                  >
+                    {viewTab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className={css.headerActions}>
+              {renderSlot('conversation.session.header.actions', { compact })}
             </div>
             <div className={css.headerUtilities}>
               {renderSlot('conversation.session.header.utilities', { compact })}
