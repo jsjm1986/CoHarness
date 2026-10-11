@@ -84,31 +84,6 @@ export function ConversationSessionHeader({
     >
       {!hideChrome && (
         <>
-          {tabs.length > 1 && (
-            <div
-              className={css.tabs}
-              role="tablist"
-              /* Pill position without measuring JS: the bar divides into equal
-                 columns and slides --dsh-tab-index to the active tab. */
-              style={{
-                '--dsh-tab-count': tabs.length,
-                '--dsh-tab-index': Math.max(0, tabs.findIndex(t => t.id === active?.id)),
-              } as CSSProperties}
-            >
-              {tabs.map(viewTab => (
-                <button
-                  key={viewTab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={viewTab.id === active?.id}
-                  className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-                  onClick={() => { actions.setView(viewTab.id) }}
-                >
-                  {viewTab.label}
-                </button>
-              ))}
-            </div>
-          )}
           <div className={css.titleRow}>
             <div className={css.titleCluster}>
               {leading}
@@ -154,6 +129,31 @@ export function ConversationSessionHeader({
                 })}
                 {ancestry.length === 0 && <span className={css.crumbCurrent}>{sessionId}</span>}
               </nav>
+              {tabs.length > 1 && (
+                <div
+                  className={css.tabs}
+                  role="tablist"
+                  /* Pill position without measuring JS: the bar divides into equal
+                     columns and slides --dsh-tab-index to the active tab. */
+                  style={{
+                    '--dsh-tab-count': tabs.length,
+                    '--dsh-tab-index': Math.max(0, tabs.findIndex(t => t.id === active?.id)),
+                  } as CSSProperties}
+                >
+                  {tabs.map(viewTab => (
+                    <button
+                      key={viewTab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={viewTab.id === active?.id}
+                      className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
+                      onClick={() => { actions.setView(viewTab.id) }}
+                    >
+                      {viewTab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className={css.headerActions}>
                 {renderSlot('conversation.session.header.actions', { compact })}
               </div>

@@ -2433,9 +2433,6 @@ importers:
       '@deepseek-ai/dsh-office-to-pdf':
         specifier: workspace:*
         version: link:../../document/office-to-pdf
-      '@deepseek-ai/dsh-session-log-export':
-        specifier: workspace:*
-        version: link:../../session-query/session-log-export
       '@deepseek-ai/dsh-session-projection-cache':
         specifier: workspace:*
         version: link:../../session/session-projection-cache

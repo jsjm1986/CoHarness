@@ -45,7 +45,7 @@
   display: flex;
   flex-direction: column;
   flex: none;
-  padding: var(--dsw-space-3) var(--dsw-space-4) 0 var(--dsw-space-5);
+  padding: var(--dsw-space-3) var(--dsw-space-4) var(--dsw-space-2) var(--dsw-space-5);
   border-bottom: 1px solid transparent;
 }
 
@@ -77,10 +77,11 @@
 
 /* WorkbenchPaneHeader is the single source for pane identity. Keep the
    conversation tabs, but avoid repeating the same session title in each pane. */
-.workbenchPane .header .titleRow { display: none; }
-/* With the title row hidden, the header's own padding is dead space above the
-   tabs; the pane header already carries the column's chrome. */
-.workbenchPane .header { padding: 0 var(--dsw-space-3); }
+.workbenchPane .header .titleCluster > :not(.tabs),
+.workbenchPane .header .headerUtilities { display: none; }
+/* With the title cluster reduced to tabs, the pane header already carries the
+   column's chrome; keep only a small rhythm around the strip. */
+.workbenchPane .header { padding: var(--dsw-space-2) var(--dsw-space-3); }
 
 .titleCluster {
   display: flex;
@@ -171,16 +172,14 @@
    needed. Bar: hover fill, 3px pad, radius 10; pill: raised + control
    elevation; label secondary -> primary. */
 .tabs {
-  order: 1;
   position: relative;
   z-index: 1;
   display: grid;
+  flex: none;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   justify-items: stretch;
   width: fit-content;
-  margin-top: var(--dsw-space-1);
-  margin-left: var(--dsw-space-2);
   padding: 3px;
   border-radius: var(--dsw-radius-card);
   background: var(--dsw-alias-interactive-bg-hover);
@@ -205,7 +204,7 @@
 .tab {
   position: relative;
   z-index: 1;
-  padding: 5px 14px;
+  padding: 4px 14px;
   border: none;
   border-radius: var(--dsw-radius-control);
   background: transparent;
