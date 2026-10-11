@@ -1,14 +1,11 @@
 - banner:
+  - navigation "Session hierarchy":
+    - button "Use web_search once with queries" [disabled]
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "Use web_search once with queries" [disabled]
   - img
   - text: Standard mode
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - button "1 tool call · 2 intermediate messages" [expanded]:

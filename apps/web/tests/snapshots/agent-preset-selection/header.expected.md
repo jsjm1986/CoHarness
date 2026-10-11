@@ -3,10 +3,10 @@
   - button "1 subagent":
     - text: 1 subagent
     - img
+- tablist:
+  - tab "Chat" [selected]
+  - tab "Trajectory"
 - img
 - text: Minimal mode
-- button "Session log":
-  - text: Session log
-  - img
 - button "Open right sidebar":
   - img

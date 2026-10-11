@@ -337,7 +337,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     const sharing = page.getByRole('button', { name: 'Manage conversation sharing' })
     const preset = page.getByText('PTC mode', { exact: true })
     const subagents = page.getByRole('button', { name: '6 subagents' })
-    const utility = page.getByRole('button', { name: 'Session log' })
+    const utility = page.getByRole('button', { name: 'Open right sidebar' })
     await Promise.all([
       titleRow.waitFor(), title.waitFor(), sharing.waitFor(), preset.waitFor(), subagents.waitFor(), utility.waitFor(),
     ])

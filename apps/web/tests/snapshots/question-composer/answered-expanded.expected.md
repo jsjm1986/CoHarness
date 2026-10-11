@@ -1,14 +1,11 @@
 - banner:
+  - navigation "Session hierarchy":
+    - button "Use the ask_user_question tool to" [disabled]
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "Use the ask_user_question tool to" [disabled]
   - img
   - text: Standard mode
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - button "1 tool call · 2 intermediate messages" [expanded]:
@@ -35,7 +32,9 @@
   - text: Ask question 1/1 answered
 - term: Which color do you prefer?
 - definition: Blue Include accessibility notes
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - button "Thinking The user answered \"Blue\". I should now reply with the single word DONE and stop.":
   - img
   - img

@@ -156,6 +156,9 @@ describe('web e2e: Goal keeps one assistant action row per completed turn', () =
     expect(await branchButtons.evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-disabled'))))
       .toEqual([null, null])
     await branchButtons.last().focus()
+    // Focus raises the tail button's tooltip through a portal render; capture
+    // only after it mounts or the poll can converge on the pre-focus tree.
+    await page.getByRole('tooltip', { name: 'Branch into a new conversation' }).waitFor()
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])

@@ -152,6 +152,13 @@ describe('web e2e: the composer model switch is the default for later sessions',
           row.querySelector('span span')?.textContent),
       })), role)
     const checkSticky = async (surface: Locator, viewport: Locator) => {
+      // The surface enters with a scale/translate animation: its scrollport
+      // keeps measuring until the entrance settles, and the IntersectionObserver
+      // behind data-stuck can flap mid-flight. Read geometry only when settled.
+      await surface.evaluate(async (node) => {
+        await Promise.all(node.getAnimations({ subtree: true })
+          .map(animation => animation.finished.catch(() => undefined)))
+      })
       // Bound only this test's list viewport so native scrolling can cross a heading.
       await viewport.evaluate((node) => { node.style.maxHeight = '80px'; node.scrollTop = 0 })
       const heading = surface.locator('[data-menu-group-heading]').first()

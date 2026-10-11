@@ -1,7 +1,4 @@
 - banner:
-  - tablist:
-    - tab "Chat" [selected]
-    - tab "Trajectory"
   - navigation "Session hierarchy":
     - button "Ask a research subagent to"
     - button "3 subagents":
@@ -11,9 +8,9 @@
     - 'button "Switch subagent: event-sourcing researcher"': event-sourcing researcher
     - text: /
     - 'button "Switch subagent: example editor"': example editor
-  - button "Session log":
-    - text: Session log
-    - img
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
   - button "Open right sidebar":
     - img
 - button "Process details":

@@ -1,14 +1,11 @@
 - banner:
+  - navigation "Session hierarchy":
+    - button "Use only Cordis tools. First" [disabled]
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "Use only Cordis tools. First" [disabled]
   - img
   - text: Standard mode
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":

@@ -479,6 +479,12 @@ describe('web e2e: resident question composer round trip', () => {
 
     const composer = page.locator('[data-question-key]')
     await composer.waitFor({ timeout: 30_000 })
+    // The card enters with a scale animation; layout read mid-flight measures
+    // the from-frame, so wait for the entrance to settle before geometry.
+    await composer.evaluate(async (element) => {
+      await Promise.all(element.getAnimations({ subtree: true })
+        .map(animation => animation.finished.catch(() => undefined)))
+    })
     const field = composer.getByRole('textbox')
     // The empty field reserves its two lines AND the textarea fills that frame:
     // a reserved box the control does not fill leaves a strip that looks like

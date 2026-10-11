@@ -1,14 +1,11 @@
 - banner:
+  - navigation "Session hierarchy":
+    - 'button "Plan a small change: add" [disabled]'
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - 'button "Plan a small change: add" [disabled]'
   - img
   - text: Standard mode
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - img

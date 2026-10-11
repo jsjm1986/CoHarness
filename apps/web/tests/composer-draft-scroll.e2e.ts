@@ -279,8 +279,8 @@ describe('web e2e: composer draft scrolling', () => {
     await page.mouse.wheel(0, -2000)
     await expect.poll(async () => (await measureComposer(page)).scrollTop, { timeout: 10_000 }).toBe(0)
     const metrics = await measureComposer(page)
-    // The cap is the composer seat's `--dsh-composer-text-max-height` (336px =
-    // 14 x 24px lines). The count, not the pixels: it is the figma constant and
+    // The cap is the composer seat's `--dsh-composer-text-max-height` (280px =
+    // 14 x 20px lines). The count, not the pixels: it is the figma constant and
     // survives a device-pixel-ratio change.
     expect(metrics.visibleLines).toBe(14)
     // One scrolling box: the textarea is as tall as the draft, so there is no
@@ -332,8 +332,13 @@ describe('web e2e: composer draft scrolling', () => {
     // wheel-chaining handler leaves it native because the box is not yet at its
     // edge when the gesture starts (the chaining itself is owned by the unit spec).
     await page.mouse.wheel(0, 2000)
-    await expect.poll(async () => (await measureComposer(page)).scrollTop, { timeout: 10_000 })
-      .toBeGreaterThan(0)
+    // A wheel scroll animates: the box is still climbing when the first poll
+    // tick sees a nonzero offset. Wait for the draft's own end — the gesture
+    // keeps the box until it clamps, then chains onward to the conversation.
+    await expect.poll(async () => {
+      const m = await measureComposer(page)
+      return m.scrollMax - m.scrollTop
+    }, { timeout: 10_000 }).toBeLessThanOrEqual(1)
     const metrics = await measureComposer(page)
     // The caret is still on its own glyphs after the gesture.
     expect(metrics.caretGlyphGap).toBe(resting)
@@ -434,8 +439,10 @@ describe('web e2e: composer draft scrolling', () => {
     const top = await measureComposer(page)
     await input.hover()
     await page.mouse.wheel(0, 2000)
-    await expect.poll(async () => (await measureComposer(page)).scrollTop, { timeout: 10_000 })
-      .toBeGreaterThan(0)
+    await expect.poll(async () => {
+      const m = await measureComposer(page)
+      return m.scrollTop === m.scrollMax
+    }, { timeout: 10_000 }).toBe(true)
     const bottom = await measureComposer(page)
     await input.fill(DRAFT_TRAILING_NEWLINE)
     await input.hover()

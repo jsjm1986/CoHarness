@@ -366,6 +366,11 @@ describe('web e2e: seeded history renders through cold resume', () => {
     await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('true')
     const body = page.locator('[data-context-injection-body]')
     await body.waitFor({ timeout: 5_000 })
+    // The disclosure-enter animation briefly translates the body upward;
+    // measure only after it settles or the geometry reads mid-flight.
+    await body.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map(animation => animation.finished.catch(() => undefined)))
+    })
     // The instructions form names the file it reconciled above the text, and
     // the text keeps the framing the model read rather than a cleaned excerpt.
     expect(await body.locator('[data-context-files] li').allInnerTexts()).toEqual(['AGENTS.md\nloaded'])
@@ -398,7 +403,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     expect(style).toEqual({
       backgroundColor: 'rgb(249, 250, 251)',
       borderRadius: '8px',
-      color: 'rgb(129, 133, 140)',
+      color: 'rgb(113, 117, 124)',
       fontSize: '11px',
       lineHeight: '16px',
       padding: ['10px', '16px', '12px', '12px'],

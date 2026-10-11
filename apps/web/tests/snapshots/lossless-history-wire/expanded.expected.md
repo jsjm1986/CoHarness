@@ -1,12 +1,9 @@
 - banner:
+  - navigation "Session hierarchy":
+    - button "WIRE_USER_01" [disabled]
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "WIRE_USER_01" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":
