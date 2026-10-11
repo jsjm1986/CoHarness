@@ -600,6 +600,7 @@ describe('ModelSelect mount-load resilience', () => {
     const trigger = screen.getByRole('button', { name: '选择模型' })
     expect(trigger.textContent).toContain('模型加载中…')
     expect(trigger.textContent).not.toContain('选择模型')
+    expect(trigger.getAttribute('aria-busy')).toBe('true')
   })
 
   it('auto-retries a failed mount-time load with backoff until it succeeds', async () => {

@@ -13,6 +13,8 @@
       - /url: /admin/ssh
     - link "部署":
       - /url: /admin/deployment
+    - link "维护空间":
+      - /url: /admin/steward
     - link "Webhook":
       - /url: /admin/webhooks
     - link "桌面":

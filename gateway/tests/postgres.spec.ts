@@ -172,7 +172,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50], current: 50 })
+      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54], current: 54 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -188,7 +188,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 50 })
+      .toEqual({ applied: [], current: 54 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -457,6 +457,35 @@ describePg('PostgreSQL baseline', () => {
     } finally {
       await pool.query('DELETE FROM harness.schema_migrations WHERE version=$1', [unknownVersion])
     }
+  })
+
+  it('survives a checked-out client being terminated mid-transaction', async () => {
+    // The gateway crash chain: PostgreSQL kills an idle-in-transaction backend,
+    // the checked-out client emits 'error', and an unhandled event would crash
+    // the process. The connect() wrapper must absorb it while the query rejects.
+    const client = await pool.connect()
+    let failure: Error | null = null
+    try {
+      await client.query('BEGIN')
+      const backend = await client.query<{ pg_backend_pid: number }>('SELECT pg_backend_pid()')
+      const terminated = await pool.query<{ pg_terminate_backend: boolean }>(
+        'SELECT pg_terminate_backend($1)', [backend.rows[0]!.pg_backend_pid])
+      expect(terminated.rows[0]!.pg_terminate_backend).toBe(true)
+      // Terminating the backend races this client's socket close; an in-flight
+      // query rejects through the promise while no 'error' event may escape
+      // as uncaught.
+      try {
+        await client.query('SELECT pg_sleep(30)')
+        throw new Error('the terminated backend answered a query')
+      } catch (queryError) {
+        failure = queryError instanceof Error ? queryError : new Error(String(queryError))
+      }
+      expect(failure.message).not.toBe('the terminated backend answered a query')
+    } finally {
+      if (failure === null) client.release()
+      else client.release(failure)
+    }
+    expect((await pool.query('SELECT 1 AS one')).rows[0]).toMatchObject({ one: 1 })
   })
 
   it('rejects a document owner from another organization', async () => {
@@ -1510,6 +1539,7 @@ describePg('PostgreSQL baseline', () => {
       name: `Collaboration ${suffix}`,
       path: `/tmp/project-${suffix}`,
       mode: 'rw',
+      kind: 'standard',
     })
     await expect(collaboration.projectForUser(projectPublicId, administratorPublicId)).resolves.toMatchObject({
       mode: 'rw',
@@ -2518,6 +2548,29 @@ describePg('PostgreSQL baseline', () => {
       await rm(root, { recursive: true, force: true })
     }
   }, 60_000)
+
+  it('derives the durable outcome from the HTTP status or the action-name result', async () => {
+    const slug = `audit-outcome-${randomUUID()}`
+    const created = await pool.query<{ id: string }>(`INSERT INTO harness.organizations(slug,display_name)
+      VALUES($1,'Audit outcome') RETURNING id`, [slug])
+    await pool.query(`INSERT INTO harness.compute_nodes(organization_id,name) VALUES($1,'audit-node')`, [created.rows[0]!.id])
+    const context = await resolvePostgresRuntimeContext(pool, slug, 'audit-node')
+    const audit = new PostgresAuditService(context)
+    await audit.write({ action: 'login.failed' })
+    await audit.write({ action: 'model.denied' })
+    await audit.write({ action: 'admin.instances.restart-failed' })
+    await audit.write({ action: 'login' })
+    await audit.write({ action: 'api', status: 503 })
+    await audit.write({ action: 'api', status: 200 })
+    const failures = (await audit.query({ outcome: 'failure' })).map(r => r.action)
+    expect(failures).toEqual(expect.arrayContaining(['login.failed', 'model.denied', 'admin.instances.restart-failed', 'api']))
+    expect(failures).not.toContain('login')
+    const successes = (await audit.query({ outcome: 'success' })).map(r => r.action)
+    expect(successes).toContain('login')
+    expect(successes).not.toContain('login.failed')
+    const denied = (await audit.query({ action: 'model.denied' }))[0]
+    expect(denied?.outcome).toBe('failure')
+  })
 
   it('persists Auto eligibility and broadcasts revocation to another PostgreSQL connection', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'hgw-pg-auto-'))

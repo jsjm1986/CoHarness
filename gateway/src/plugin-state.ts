@@ -17,7 +17,7 @@ export interface PluginDesiredState { entries: PluginStateEntry[]; bundles: stri
 export interface PluginStateSnapshot { revision: string; state: PluginDesiredState | null }
 /** A state request was invalid, addressed a missing owner, or carried a stale revision. */
 export class PluginStateError extends Error {
-  constructor(readonly status: 400 | 404 | 409 | 500, message: string) { super(message) }
+  constructor(readonly status: 400 | 403 | 404 | 409 | 500, message: string) { super(message) }
 }
 
 /** The instance profile directory every managed runtime launches. */
@@ -231,6 +231,7 @@ export class PostgresPluginState {
     }
     return transaction(this.context.pool, async (client) => {
       const internal = await this.resolveOwner(owner, client, true)
+      await this.assertCompositionMutable(client, internal)
       const current = await client.query<{ revision: string }>(
         `SELECT revision::text FROM harness.plugin_states WHERE organization_id=$1 AND ${ownerColumn(internal)}=$2 FOR UPDATE`,
         [internal.organizationId, ownerId(internal)])
@@ -260,6 +261,19 @@ export class PostgresPluginState {
     if (subject.userInternalId !== undefined) return { organizationId: subject.organizationId, userId: subject.userInternalId }
     if (subject.projectInternalId !== undefined) return { organizationId: subject.organizationId, projectId: subject.projectInternalId }
     throw new PluginStateError(404, 'plugin state owner not found')
+  }
+
+  /**
+   * The steward runtime's composition is fixed at launch: a self-published or
+   * administrator-saved change could restart the resident maintainer out from
+   * under its own session, so project-scoped writes to the steward row fail.
+   */
+  private async assertCompositionMutable(querier: Querier, owner: InternalOwner): Promise<void> {
+    if (owner.projectId === undefined) return
+    const result = await querier.query(
+      `SELECT 1 FROM harness.projects WHERE organization_id=$1 AND id=$2 AND kind='steward'`,
+      [owner.organizationId, owner.projectId])
+    if (result.rows.length > 0) throw new PluginStateError(403, 'steward runtime composition is fixed')
   }
 
   /**
@@ -309,6 +323,7 @@ export class PostgresPluginState {
     }
     const internal = this.subjectOwner(subject)
     return transaction(this.context.pool, async (client) => {
+      await this.assertCompositionMutable(client, internal)
       const current = await client.query<{ entries: unknown; bundles: unknown; revision: string }>(
         `SELECT entries,bundles,revision::text FROM harness.plugin_states WHERE organization_id=$1 AND ${ownerColumn(internal)}=$2 FOR UPDATE`,
         [internal.organizationId, ownerId(internal)])

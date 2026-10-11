@@ -64,7 +64,7 @@ The [format references](persistence-changes/historical-formats/README.md) cover 
 | `event:subagent/descriptor` | event | `b79ada42962cad0190a9d465805260567621fa3a4abd757eb31e6016b52d5ab5` | [`event:subagent/descriptor`](#persistence-type-eventsubagentdescriptor) |
 | `event:subagent/model-selection-policy` | event | `a6567ccb2e530606b775371eb4fa31468d72084339968e8b0440a516a23b39dc` | [`event:subagent/model-selection-policy`](#persistence-type-eventsubagentmodel-selection-policy) |
 | `event:system/message` | event | `69081694be231d56fd9580ba14645fd5e35373202605d5c5c841a9435b5fa3b1` | [`event:system/message`](#persistence-type-eventsystemmessage) |
-| `event:team/member` | event | `31d13edbb5fe2f8b7a38056320a8a06275ee4426e0abf12d4741818beda5a9c9` | [`event:team/member`](#persistence-type-eventteammember) |
+| `event:team/member` | event | `61e2ba55405ca7ede6bb6bc4c47af5348fefd1b8c5f0ab20e0a4b7d5f22bc447` | [`event:team/member`](#persistence-type-eventteammember) |
 | `event:team/message/delivered` | event | `c53bff743470c8bf11be698ced047072744ef088cce663a774b456d7a8982516` | [`event:team/message/delivered`](#persistence-type-eventteammessagedelivered) |
 | `event:team/message/queued` | event | `f8acbb9e1eacad9eeb67db7bd1aa605911a94981fac4f66d2ce3300eb58f2341` | [`event:team/message/queued`](#persistence-type-eventteammessagequeued) |
 | `event:team/task` | event | `1688a2451eef9da19eaf45f12c8a27df07b1a6e56fa57ba603118f5201bb435b` | [`event:team/task`](#persistence-type-eventteamtask) |
@@ -1018,7 +1018,7 @@ Source: [`packages/core/session/src/types.ts:379`](../packages/core/session/src/
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMemberSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:228`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:240`](../packages/experimental/agent-team/src/types.ts)
 
 <a id="teammessagedelivered--log-only"></a>
 
@@ -1036,7 +1036,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:228`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMessageId](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:234`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:246`](../packages/experimental/agent-team/src/types.ts)
 
 <a id="teammessagequeued--log-only"></a>
 
@@ -1049,7 +1049,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:234`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMessageSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:232`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:244`](../packages/experimental/agent-team/src/types.ts)
 
 <a id="teamtask--log-only"></a>
 
@@ -1062,7 +1062,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:232`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamTaskSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:230`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/experimental/agent-team/src/types.ts:242`](../packages/experimental/agent-team/src/types.ts)
 
 ### `todo/*`
 
@@ -4877,7 +4877,7 @@ Sources: [`packages/core/session/src/types.ts:379`](../packages/core/session/src
 
 ### `event:team/member`
 
-SHA-256: `31d13edbb5fe2f8b7a38056320a8a06275ee4426e0abf12d4741818beda5a9c9`
+SHA-256: `61e2ba55405ca7ede6bb6bc4c47af5348fefd1b8c5f0ab20e0a4b7d5f22bc447`
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4891,9 +4891,9 @@ SHA-256: `31d13edbb5fe2f8b7a38056320a8a06275ee4426e0abf12d4741818beda5a9c9`
 
 ### `event:team/member.data`
 
-SHA-256: `b59b71a5417cfb3acca0a32fcd4f8f31b875e7d5acdca1344dc9a05214414702`
+SHA-256: `c024a36f1555607da300384ac7a79ef106d2044cfe75c915b6deb39e02de7dba`
 
-Sources: [`packages/experimental/agent-team/src/types.ts:228`](../packages/experimental/agent-team/src/types.ts)
+Sources: [`packages/experimental/agent-team/src/types.ts:240`](../packages/experimental/agent-team/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4932,7 +4932,7 @@ SHA-256: `c53bff743470c8bf11be698ced047072744ef088cce663a774b456d7a8982516`
 
 SHA-256: `7a1a83b0dd7c3a67d46d2b703e204a69b1db4e596b867777c1dde1d9ac65662e`
 
-Sources: [`packages/experimental/agent-team/src/types.ts:234`](../packages/experimental/agent-team/src/types.ts)
+Sources: [`packages/experimental/agent-team/src/types.ts:246`](../packages/experimental/agent-team/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4961,7 +4961,7 @@ SHA-256: `f8acbb9e1eacad9eeb67db7bd1aa605911a94981fac4f66d2ce3300eb58f2341`
 
 SHA-256: `54de4759e70a805bdec293dcfbc01eba51781a2d9e007777f5bf0d65f72976d9`
 
-Sources: [`packages/experimental/agent-team/src/types.ts:232`](../packages/experimental/agent-team/src/types.ts)
+Sources: [`packages/experimental/agent-team/src/types.ts:244`](../packages/experimental/agent-team/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -5000,7 +5000,7 @@ SHA-256: `1688a2451eef9da19eaf45f12c8a27df07b1a6e56fa57ba603118f5201bb435b`
 
 SHA-256: `e86d247d466ec6dc9d302824b7dc0acedab882027775f25abb824df4794468b7`
 
-Sources: [`packages/experimental/agent-team/src/types.ts:230`](../packages/experimental/agent-team/src/types.ts)
+Sources: [`packages/experimental/agent-team/src/types.ts:242`](../packages/experimental/agent-team/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6505,7 +6505,7 @@ One of:
 
 ### `packages/experimental/agent-team/src/types.ts#TeamMemberSnapshot`
 
-SHA-256: `6598cd6da253948d6b207c6374a45335804c79b576866d6215649c2d1bc85e25`
+SHA-256: `5414fccb3ac68b960b81d1be8429c7469de28ff9993dc5700e218276ca9404a5`
 
 Sources: [`packages/experimental/agent-team/src/types.ts:48`](../packages/experimental/agent-team/src/types.ts)
 
@@ -6515,6 +6515,7 @@ Sources: [`packages/experimental/agent-team/src/types.ts:48`](../packages/experi
 | `description` | required | `string` |
 | `error` | optional | `string` |
 | `id` | required | `string` |
+| `model` | optional | `string` |
 | `name` | required | `string` |
 | `phase` | required | [`packages/experimental/agent-team/src/types.ts#TeamMemberPhase`](#persistence-type-packagesexperimentalagent-teamsrctypeststeammemberphase) |
 | `provider` | required | `string` |
@@ -6525,7 +6526,7 @@ Sources: [`packages/experimental/agent-team/src/types.ts:48`](../packages/experi
 
 SHA-256: `875001c5c73c85effac87c7c61b0e3f8cbad89efb14609b52a25a96aa61959ba`
 
-Sources: [`packages/experimental/agent-team/src/types.ts:101`](../packages/experimental/agent-team/src/types.ts)
+Sources: [`packages/experimental/agent-team/src/types.ts:113`](../packages/experimental/agent-team/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6543,7 +6544,7 @@ Sources: [`packages/experimental/agent-team/src/types.ts:101`](../packages/exper
 
 SHA-256: `d3025ea22de86f1f6f2c57577752f77af69619964d11686429fb5839f0c899c6`
 
-Sources: [`packages/experimental/agent-team/src/types.ts:113`](../packages/experimental/agent-team/src/types.ts)
+Sources: [`packages/experimental/agent-team/src/types.ts:125`](../packages/experimental/agent-team/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6560,7 +6561,7 @@ Sources: [`packages/experimental/agent-team/src/types.ts:113`](../packages/exper
 
 SHA-256: `51edec100659da3a9bd9c3f6ba1180f5e64ec9a1585e5057080df45c180bd357`
 
-Sources: [`packages/experimental/agent-team/src/types.ts:75`](../packages/experimental/agent-team/src/types.ts)
+Sources: [`packages/experimental/agent-team/src/types.ts:87`](../packages/experimental/agent-team/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6579,7 +6580,7 @@ Sources: [`packages/experimental/agent-team/src/types.ts:75`](../packages/experi
 
 SHA-256: `b2d2a01e51341a3bfec809198952c8c830a7899f4cb6ecd3c1dc0b5d9a2af943`
 
-Sources: [`packages/experimental/agent-team/src/types.ts:72`](../packages/experimental/agent-team/src/types.ts)
+Sources: [`packages/experimental/agent-team/src/types.ts:84`](../packages/experimental/agent-team/src/types.ts)
 
 One of:
 

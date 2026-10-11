@@ -9,6 +9,7 @@ import {
   getModelAccess,
   getPluginPolicy,
   getSshPolicy,
+  getStewardPolicy,
   getTerminalPolicy,
   getUser,
   getUserQuota,
@@ -24,6 +25,7 @@ import {
   setPluginPolicy,
   setQuota,
   setSshPolicy,
+  setStewardPolicy,
   setTerminalPolicy,
   type AdminUser,
   type GrantMode,
@@ -240,6 +242,15 @@ function UserDetail({ userId }: { userId: number }) {
                   userId={userId}
                   read={getPluginPolicy}
                   write={setPluginPolicy}
+                />
+                <UserQualificationCard
+                  key={`steward:${userId}:${user.role}:${user.status}`}
+                  name={t('qualStewardName')}
+                  description={t('qualStewardDescription')}
+                  userId={userId}
+                  read={getStewardPolicy}
+                  write={setStewardPolicy}
+                  ineligible={user.role === 'admin' && user.status === 'active' ? undefined : t('qualStewardRequiresAdmin')}
                 />
               </div>
           </Section>

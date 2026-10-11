@@ -42,6 +42,9 @@ export interface EffectiveGrant {
   label: string
 }
 
+/** Reserved project category; rows absent from legacy catalogs read as `standard`. */
+export type ProjectKind = 'standard' | 'steward'
+
 export interface ProjectRow {
   id: number
   name: string
@@ -49,6 +52,8 @@ export interface ProjectRow {
   memberCount: number
   /** Whether an administrator imported the directory or the owner created it. */
   origin: ProjectOrigin
+  /** Reserved space category; `steward` marks the resident maintenance space. */
+  kind?: ProjectKind
   /** Whether project model authorization follows the organization catalog by default. */
   modelAccessDefaultAllowed?: boolean
   owner?: ProjectActor | null

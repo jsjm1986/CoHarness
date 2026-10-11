@@ -113,6 +113,17 @@ describe('ui-collaboration apply', () => {
     expect(inject).toEqual(['slots', 'sessions', 'locale'])
   })
 
+  it('publishes the steward marker while the reserved maintenance space is active', async () => {
+    const b = await bench({ ...baseContext,
+      scope: { kind: 'project', projectId: 26, projectName: '维护中枢', mode: 'rw', steward: true },
+      projects: [{ projectId: 26, name: '维护中枢', path: '/srv/steward', mode: 'rw', kind: 'steward' }],
+    })
+    try {
+      expect(b.policy.getSnapshot().steward).toBe(true)
+      await b.fiber.dispose()
+    } finally { b.restore() }
+  })
+
   it('registers scope and sharing entries and injects staged visibility into root-session creates', async () => {
     const b = await bench(baseContext)
     try {

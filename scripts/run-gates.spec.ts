@@ -727,6 +727,7 @@ describe('Node 24 lane ownership', () => {
       'web-fixtures',
       'test-dsh-directory-guard',
       'test-dsh-model-governance',
+      'test-dsh-steward-tools',
       'build',
       'node-compat',
       'publint',
@@ -794,9 +795,9 @@ describe('Node 24 lane ownership', () => {
 
 describe('plugin test gates', () => {
   it.each(['ci-primary', 'ci-linux-primary', 'ci-consumers', 'ci-consumers-scoped', 'check-all'] as const)(
-    'runs both source suites as required gates in %s', (mode) => {
+    'runs the source plugin suites as required gates in %s', (mode) => {
       const gates = withPnpmEntrypoint(() => gatesForMode(mode))
-      for (const plugin of ['dsh-directory-guard', 'dsh-model-governance']) {
+      for (const plugin of ['dsh-directory-guard', 'dsh-model-governance', 'dsh-steward-tools']) {
         const subject = gates.find(item => item.id === `test-${plugin}`)
         expect(subject).toMatchObject({
           args: ['/private/pnpm.cjs', 'exec', 'vitest', 'run', '--config', `plugins/${plugin}/vitest.config.ts`],
@@ -807,10 +808,10 @@ describe('plugin test gates', () => {
     },
   )
 
-  it.each(['dsh-directory-guard', 'dsh-model-governance'])('reports a failing %s process as a required failure', async (plugin) => {
+  it.each(['dsh-directory-guard', 'dsh-model-governance', 'dsh-steward-tools'])('reports a failing %s process as a required failure', async (plugin) => {
     const gates = withPnpmEntrypoint(() => gatesForMode('ci-consumers-scoped'))
       .filter(item => item.id.startsWith('test-dsh-'))
-    expect(gates).toHaveLength(2)
+    expect(gates).toHaveLength(3)
     const results = await runGates(gates, 2, subject => runGate({
       ...subject,
       command: process.execPath,

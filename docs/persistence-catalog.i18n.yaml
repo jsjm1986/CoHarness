@@ -9,8 +9,8 @@
   en: e7c80d1de4d328b4
   zh: d9f368c27fd9f998
 /session-persistence-event-catalog/persistence-type-fingerprints:
-  en: b9a8dae2660273e1
-  zh: def80fe1a6c604de
+  en: b256463af3dababd
+  zh: 0b57637a0ac7be5e
 /session-persistence-event-catalog/event-envelope:
   en: d2a72a5dd53465de
   zh: f72516172489be77
@@ -228,17 +228,17 @@
   en: a640800a38b3c874
   zh: a640800a38b3c874
 /session-persistence-event-catalog/events/team/team-member-log-only:
-  en: 675c88d989debd9e
-  zh: 1ee40c03b614ca86
+  en: 14913bc654554f87
+  zh: b3eee664fb2d5034
 /session-persistence-event-catalog/events/team/team-message-delivered-log-only:
-  en: acd70d1c6448fcc4
-  zh: 2fa091126a3d105c
+  en: 12bf6edcb2011211
+  zh: 9e06f48086d4f351
 /session-persistence-event-catalog/events/team/team-message-queued-log-only:
-  en: 0e11d1924c885092
-  zh: b10ca4b689ae775c
+  en: d3f567f368aa3631
+  zh: efdc6e942d40064a
 /session-persistence-event-catalog/events/team/team-task-log-only:
-  en: 95bd872077e033b4
-  zh: 950a09a71fb2a8c9
+  en: 9061a6eb50da5018
+  zh: 49eb5722bc82ee77
 /session-persistence-event-catalog/events/todo:
   en: 308d4bb4b6b96e35
   zh: 308d4bb4b6b96e35
@@ -1230,11 +1230,11 @@
   en: 8d2e7c85b61e15bd
   zh: abcd0526467f42f3
 /session-persistence-event-catalog/resolved-persistence-types/event-team-member:
-  en: 3ab3358651532d35
-  zh: 9309d15864cfa774
+  en: 970563b97d355a94
+  zh: 626faee896be37db
 /session-persistence-event-catalog/resolved-persistence-types/event-team-member-data:
-  en: 0d1a432ed54817fc
-  zh: 1ca9877f7c3e92d8
+  en: b6d600f99cbcd796
+  zh: 8fa4489abee43843
 /session-persistence-event-catalog/resolved-persistence-types/event-team-member-data-member-context:
   en: 32b7452f3cc60677
   zh: 5e9ddf3205554874
@@ -1242,14 +1242,14 @@
   en: 2d0d9c1624c64b15
   zh: 15ca2ca5216b3fd5
 /session-persistence-event-catalog/resolved-persistence-types/event-team-message-delivered-data:
-  en: cd5f3629a832d018
-  zh: 94c7a01919962692
+  en: d89142149be50a16
+  zh: 5455cb2afab6c5d1
 /session-persistence-event-catalog/resolved-persistence-types/event-team-message-queued:
   en: bedc0a52088ab660
   zh: 8cfe7cd162fc4952
 /session-persistence-event-catalog/resolved-persistence-types/event-team-message-queued-data:
-  en: ba0207fc928686b2
-  zh: c8bc36ecacc6bd22
+  en: 01c55f20baac3de0
+  zh: 9d7b77504b55c746
 /session-persistence-event-catalog/resolved-persistence-types/event-team-message-queued-data-message-delivery:
   en: 4fe234afd2316f1d
   zh: 6f9d1319a80b8278
@@ -1257,8 +1257,8 @@
   en: 5c3c2715afa83832
   zh: e9e1b9825736cc46
 /session-persistence-event-catalog/resolved-persistence-types/event-team-task-data:
-  en: 43b96ecd502f7a54
-  zh: 1a76e47a801b3c0f
+  en: cefb8a9819613e25
+  zh: c6d24988b900e37b
 /session-persistence-event-catalog/resolved-persistence-types/event-todo-write:
   en: 3955dbfb66d1338b
   zh: ec9f786d69ccdf01
@@ -1650,20 +1650,20 @@
   en: 7cecc3ac08f0fef2
   zh: c6da2262836394fd
 /session-persistence-event-catalog/resolved-persistence-types/packages-experimental-agent-team-src-types-ts-teammembersnapshot:
-  en: 9400ad1879be2d7a
-  zh: 7bcc94f6ebea3bf0
+  en: 1ec63dba8be733cc
+  zh: 2481bfe4f52d80ef
 /session-persistence-event-catalog/resolved-persistence-types/packages-experimental-agent-team-src-types-ts-teammessagesnapshot:
-  en: b67a6e473c373cc1
-  zh: 5756e49bf66c0134
+  en: 5f0e8450e71173ae
+  zh: a7dbf76c361993a3
 /session-persistence-event-catalog/resolved-persistence-types/packages-experimental-agent-team-src-types-ts-teammessagesource:
-  en: f00f897e214001bf
-  zh: 23e9439243f796e0
+  en: ae7d8791dc6b1156
+  zh: 2a36799d687cba84
 /session-persistence-event-catalog/resolved-persistence-types/packages-experimental-agent-team-src-types-ts-teamtasksnapshot:
-  en: b6d2883915eed96a
-  zh: 2ebd0517838003e7
+  en: eb0bbf9379cfb013
+  zh: 4e250072085a21e3
 /session-persistence-event-catalog/resolved-persistence-types/packages-experimental-agent-team-src-types-ts-teamtaskstatus:
-  en: d2d9d5d1c373dc45
-  zh: 3c2b116aa592a904
+  en: ebfcadeffe37dd2f
+  zh: 02b0413d9dab6e34
 /session-persistence-event-catalog/resolved-persistence-types/packages-feedback-command-feedback-src-types-ts-feedbackrecord:
   en: 67cdd3c3088de71b
   zh: d2e8106784bcd475

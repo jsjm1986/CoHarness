@@ -106,8 +106,36 @@ export function createPostgresPool(connectionString: string, overrides: GatewayP
   return pool
 }
 
-/** Acquire one pool client without allowing an unbounded pg-pool wait list. */
-function connectFromPool(pool: Pool): Promise<PoolClient> {
+/** Clients get their checkout error guard attached exactly once across pool reuse. */
+const checkedOutErrorGuard = new WeakSet<PoolClient>()
+
+/**
+ * A server-side kill (`idle_in_transaction_session_timeout`, administrator
+ * `pg_terminate_backend`, a proxy cutting the socket) reaches a checked-out
+ * client as an `error` event. While a transaction holds the client between
+ * statements no query is in flight, so the event has nowhere to go and an
+ * unhandled emission crashes the process. The guard absorbs the event into a
+ * metadata-only diagnostic; the next statement still observes the dead
+ * connection through its own rejection. Once the client is idle again the
+ * pool's own `error` listener owns removal and may co-report the same event.
+ */
+function guardCheckedOutClient(client: PoolClient): PoolClient {
+  if (typeof client.on !== 'function' || checkedOutErrorGuard.has(client)) return client
+  checkedOutErrorGuard.add(client)
+  client.on('error', (error: unknown) => {
+    console.error(`[gateway] PostgreSQL checked-out client error (${errorCodeForDiagnostics(error)})`)
+  })
+  return client
+}
+
+/**
+ * Acquire one pool client with the checkout `error` guard attached and the
+ * bounded pg-pool wait list enforced. Callers that manage their own
+ * BEGIN/COMMIT lifecycle (rather than {@link transaction}) must check out
+ * through here so a server-side kill can never reach the process as an
+ * unhandled `error` event.
+ */
+export function connectFromPool(pool: Pool): Promise<PoolClient> {
   const state = checkoutStates.get(pool)
   /* v8 ignore next -- every production pool is created by createPostgresPool; the
      fallback keeps transaction tests and injected pools compatible. */
@@ -126,7 +154,9 @@ function connectFromPool(pool: Pool): Promise<PoolClient> {
     current.pending -= 1
     return Promise.reject(error)
   }
-  return connecting.finally(() => { current.pending -= 1 })
+  return connecting.then(
+    client => guardCheckedOutClient(client),
+  ).finally(() => { current.pending -= 1 })
 }
 
 function errorCode(error: unknown): string | undefined {
@@ -257,6 +287,7 @@ export async function transaction<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   const client = await connectWithSignal(pool, signal)
+  let failure: Error | null = null
   try {
     signal?.throwIfAborted()
     await client.query('BEGIN')
@@ -267,9 +298,13 @@ export async function transaction<T>(
     return result
   } catch (error) {
     try { await client.query('ROLLBACK') } catch { /* preserve the original failure */ }
+    failure = error instanceof Error ? error : new Error(String(error))
     throw error
   } finally {
-    client.release()
+    // Releasing with the error destroys a dead connection (for example a
+    // backend killed mid-transaction) instead of lending it out again.
+    if (failure === null) client.release()
+    else client.release(failure)
   }
 }
 

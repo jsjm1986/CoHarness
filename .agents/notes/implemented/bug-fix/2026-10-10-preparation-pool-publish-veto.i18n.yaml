@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-10-preparation-pool-publish-veto.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-10-preparation-pool-publish-veto.md
+/agent-note-preparation-pool-publish-veto-fired-on-cached-cold-reads:
+  en: baf38052737dc869
+  zh: 5efab7fcfe8ecd8c
+/agent-note-preparation-pool-publish-veto-fired-on-cached-cold-reads/problem:
+  en: 48304b2cba2af78d
+  zh: ca4d0cfce7ae9921
+/agent-note-preparation-pool-publish-veto-fired-on-cached-cold-reads/decision:
+  en: 2c10ab3f03cf0f52
+  zh: c9da691a56694536
+/agent-note-preparation-pool-publish-veto-fired-on-cached-cold-reads/alternatives-considered:
+  en: 3d89c267553241b8
+  zh: f20d8f1acbeb17b1
+/agent-note-preparation-pool-publish-veto-fired-on-cached-cold-reads/consequences:
+  en: 4cbf67a3e0aa0fd4
+  zh: f5ae254ef554504d
+/agent-note-preparation-pool-publish-veto-fired-on-cached-cold-reads/verification:
+  en: 2007fc87e33026b2
+  zh: be39b1ad8cee5f57

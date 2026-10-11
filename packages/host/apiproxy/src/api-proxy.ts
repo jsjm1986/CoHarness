@@ -4405,8 +4405,21 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             ctx.logger.warn(`session.history: ${persistenceError.code} for ${sessionId}: ${persistenceError.message}`)
             return err(request, { code: 'internal', message, details: {} })
           }
-          if (error instanceof SessionNotFound) {
-            return err(request, { code: 'session-not-found', message: error.message, details: { sessionId } })
+          if (error instanceof SessionNotFound
+            || error instanceof Error && error.name === 'SessionPersistenceNotFoundError') {
+            return err(request, { code: 'session-not-found', message: `session "${sessionId}" not found`, details: { sessionId } })
+          }
+          if (error instanceof Error
+            && (error.name === 'SessionFormatUnsupportedError' || error.name === 'SessionPersistenceCorruptionError')) {
+            // Format and corruption diagnostics carry raw-log paths; they stay in the warn log.
+            ctx.logger.warn(`session.history: ${error.name} for ${sessionId}: ${error.message}`)
+            return err(request, {
+              code: 'internal',
+              message: error.name === 'SessionFormatUnsupportedError'
+                ? `history for session "${sessionId}" uses a stored log this build cannot read`
+                : `history for session "${sessionId}" failed stored-log validation`,
+              details: {},
+            })
           }
           ctx.logger.warn(`session.history: detached read failed for ${sessionId}: ${String(error)}`)
           return err(request, {

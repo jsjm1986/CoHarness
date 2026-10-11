@@ -44,6 +44,8 @@ export interface SystemdUser {
   systemUser?: string
   /** Administrator policy removes managed-root masks and read-only system/home protection. */
   privileged?: boolean
+  /** Resident units restart on any exit instead of only on failure. */
+  resident?: boolean
   port: number
   /** Absolute writable home (also the instance cwd / workspace root). */
   homePath: string
@@ -178,7 +180,9 @@ export function renderUserUnit(
   assertResourceValue(opts.memoryMax, 'MemoryMax')
   assertResourceValue(opts.cpuQuota, 'CPUQuota')
   if (gatewayCredentialPath !== undefined) assertSafePath(gatewayCredentialPath)
-  const privileged = user.kind !== 'project' && user.privileged === true
+  // Project units may carry privileged confinement only for the reserved
+  // steward space; the flag alone decides, and every other project stays masked.
+  const privileged = user.privileged === true
   if (user.kind === 'project') {
     if (!strictlyContainsPath(opts.projectRuntimesRoot, user.dshHome)) {
       throw new Error(`project dsh home is outside projectRuntimesRoot: ${user.dshHome}`)
@@ -231,7 +235,7 @@ Environment=DSH_DIRECTORY_GRANTS=${user.dshHome}/directory-grants.json
 ${gatewayCredentialPath === undefined ? '' : `Environment=DSH_GATEWAY_CREDENTIAL_FILE=%d/dsh-gateway
 LoadCredential=dsh-gateway:${gatewayCredentialPath}
 `}ExecStart=${renderedExecStart}
-Restart=on-failure
+Restart=${user.resident === true ? 'always' : 'on-failure'}
 RestartSec=5
 
 # ── kernel confinement (authoritative directory boundary) ──

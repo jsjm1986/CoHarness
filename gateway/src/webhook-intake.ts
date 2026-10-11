@@ -249,8 +249,9 @@ export class GatewayWebhookIntake {
       if (membership === null || membership.mode !== 'rw') {
         return { state: 'rejected', errorCode: 'execution-project-access' }
       }
-      scope = { kind: 'project', projectId: target.id, projectName: membership.name, mode: membership.mode }
-      subject = { kind: 'project', id: target.id, name: membership.name, path: membership.path }
+      const steward = membership.kind === 'steward'
+      scope = { kind: 'project', projectId: target.id, projectName: membership.name, mode: membership.mode, ...(steward ? { steward: true } : {}) }
+      subject = { kind: 'project', id: target.id, name: membership.name, path: membership.path, steward }
     }
     if (!live) {
       try {

@@ -69,12 +69,16 @@ describe('startInProcessRun', () => {
       primaryActorUserId: 1,
       unverifiedHistory: false,
     }
-    const authority = { capture: () => scope, relay: vi.fn(async () => scope) }
+    const authority = { capture: () => scope, relay: vi.fn(async () => scope),
+      inherit: vi.fn((session: { append(t: string, d: unknown): void }, captured: unknown) => {
+        session.append('gateway/execution', { kind: 'inherit', scope: captured })
+      }) }
     ctx.provide('executionAuthority', authority as never)
 
     const run = await startInProcessRun(request(parent), {})
     const result = await run.result
     expect(result.stopReason).toBe('completed')
+    expect(authority.inherit).toHaveBeenCalledOnce()
     expect(authority.relay).toHaveBeenCalledOnce()
     await run.dispose()
   })

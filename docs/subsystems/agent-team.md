@@ -17,6 +17,12 @@ interface TeamMemberSnapshot {
   readonly provider: string
   readonly context: 'fresh' | 'fork'
   readonly phase: TeamMemberPhase
+  /**
+   * The route the member's own session would resume with, captured from the
+   * live child Agent when it first became active. Absent on members activated
+   * before this field existed and on members that never reached `active`.
+   */
+  readonly model?: string
   readonly error?: string
 }
 ```

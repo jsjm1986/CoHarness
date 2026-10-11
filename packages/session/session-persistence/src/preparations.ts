@@ -124,15 +124,21 @@ export class SessionPreparations<Source extends PreparedSource, CommitState> {
 
   /**
    * Return the exact reservation for Session publication, rejecting aliases.
+   * Only a held `reserved` entry owns the unpublished identity: a `loading`,
+   * `ready`, or `committing` entry is shared or in-flight preparation work,
+   * so the publishing Session is authoritative — its entry is dropped and
+   * every waiter converges through its own retry or live-session check.
    * @param session - exact Session candidate for publication.
-   * @returns its reservation, or undefined when no preparation exists.
+   * @returns its reservation, or undefined when no held reservation exists.
    */
   reservationFor(session: Session): SessionPreparationReservation<Source, CommitState> | undefined {
     const entry = this.entries.get(session.id)
     if (entry === undefined) return undefined
-    if (entry.phase === 'reserved'
-      && entry.source?.session === session
-      && entry.reservation !== undefined) {
+    if (entry.phase !== 'reserved') {
+      this.remove(entry)
+      return undefined
+    }
+    if (entry.source?.session === session && entry.reservation !== undefined) {
       return entry.reservation
     }
     throw new Error(`cannot publish session "${session.id}": persisted state already owns this identity`)

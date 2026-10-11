@@ -26,7 +26,7 @@ kind: "package-reference"
 
 生成的第一方 Session 格式目录通过 `dsh.sessionFormatMigration` 元数据引入这条边。持久化提供者经已有的 V6 编解码器读取 V6，并在读取时于内存中重建 V7；显式以写方式打开则发布一个独立的 V7 代际。既有 V6 代际的字节、inode 与修改时间保持不变；其存在绝不允许从损坏的 V7 代际回退。
 
-V6 的 `kind: 'plugin'` 消息来源会按生产者的插件身份重写为带命名空间的 `plugin:<name>` 形式；已携带限定 kind 的来源保持原值。嵌在 assistant 消息内的工具结果块移动到独立的 `tool` 角色消息；类型不在已发布 V6 目录中的不透明生产者事件，会以 `x/` 生产者命名空间准入，而不是准入失败。
+V6 的 `kind: 'plugin'` 消息来源会按生产者的插件身份重写为带命名空间的 `plugin:<name>` 形式；已携带限定 kind 的来源保持原值。嵌在 assistant 消息内的工具结果块移动到独立的 `tool` 角色消息；任何 V6 写入器都不可能产出的不透明生产者事件，会以 `plugin:` 命名空间准入，而不是准入失败。
 
 <a id="implementation"></a>
 ## 实现

@@ -12,6 +12,7 @@ import {
   PanelsTopLeft,
   Rocket,
   ScrollText,
+  ShieldCheck,
   Sparkles,
   Users,
   Webhook,
@@ -37,6 +38,7 @@ import { SshPage } from './pages/SshPage.tsx'
 import { DeploymentPage } from './pages/DeploymentPage.tsx'
 import { WebhooksPage } from './pages/WebhooksPage.tsx'
 import { TerminalsPage } from './pages/TerminalsPage.tsx'
+import { StewardPage } from './pages/StewardPage.tsx'
 
 export function App() {
   useEffect(() => {
@@ -75,6 +77,7 @@ export function App() {
             <Route path="/terminals" element={<TerminalsPage />} />
             <Route path="/ssh" element={<SshPage />} />
             <Route path="/deployment" element={<DeploymentPage />} />
+            <Route path="/steward" element={<StewardPage />} />
             <Route path="/webhooks" element={<WebhooksPage />} />
             <Route path="/desktops" element={<DesktopsPage />} />
             <Route path="/audit" element={<AuditPage />} />
@@ -97,6 +100,7 @@ const NAV_ITEMS: Array<{ to: string; labelKey: ChromeCopyKey; icon: LucideIcon; 
   { to: '/terminals', labelKey: 'navTerminals', icon: Terminal },
   { to: '/ssh', labelKey: 'navSsh', icon: Network },
   { to: '/deployment', labelKey: 'navDeployment', icon: Rocket },
+  { to: '/steward', labelKey: 'navSteward', icon: ShieldCheck },
   { to: '/webhooks', labelKey: 'navWebhooks', icon: Webhook },
   { to: '/desktops', labelKey: 'navDesktops', icon: Monitor },
   { to: '/audit', labelKey: 'navAudit', icon: ScrollText },

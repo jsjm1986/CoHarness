@@ -17,6 +17,8 @@ export interface ProjectUiPolicySnapshot {
   projectId?: number
   projectName?: string
   canManage?: boolean
+  /** Reserved maintenance-space marker while the active project is the steward space. */
+  steward?: boolean
 }
 
 /** Runtime-owned source consumed by UI features without importing collaboration. */
@@ -64,16 +66,16 @@ export class ProjectUiPolicyRuntime {
   /** Replace the active scope policy and notify consumers only when it moves.
    * @param scope - active account or project scope.
    * @param theme - project theme policy.
-   * @param details - optional public project id, display name, and management flag.
+   * @param details - optional public project id, display name, and management/steward flags.
    */
   set(
     scope: 'personal' | 'project',
     theme: ProjectThemePolicy = 'follow-user',
-    details: { projectId?: number; projectName?: string; canManage?: boolean } = {},
+    details: { projectId?: number; projectName?: string; canManage?: boolean; steward?: boolean } = {},
   ): void {
     if (this.snapshot.scope === scope && this.snapshot.theme === theme
       && this.snapshot.projectId === details.projectId && this.snapshot.projectName === details.projectName
-      && this.snapshot.canManage === details.canManage) return
+      && this.snapshot.canManage === details.canManage && this.snapshot.steward === details.steward) return
     this.snapshot = Object.freeze({
       scope, theme, revision: this.snapshot.revision + 1,
       accountPermissions: this.snapshot.accountPermissions,
@@ -81,6 +83,7 @@ export class ProjectUiPolicyRuntime {
       ...details.projectId === undefined ? {} : { projectId: details.projectId },
       ...details.projectName === undefined ? {} : { projectName: details.projectName },
       ...details.canManage === undefined ? {} : { canManage: details.canManage },
+      ...details.steward === undefined ? {} : { steward: details.steward },
     })
     for (const listener of [...this.listeners]) listener()
   }

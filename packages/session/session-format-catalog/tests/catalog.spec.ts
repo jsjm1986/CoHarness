@@ -303,6 +303,19 @@ describe('historical child prerequisite catalog', () => {
     expect(current.finish().events).toEqual([rows[0], { ...rows[1], type: 'plugin:developer/message' }])
   })
 
+  it('restores V6-era gateway scope events a released V6 reader never knew', () => {
+    const header = { type: 'session', version: 6, id: 'scoped', createdAt: 1, isSeeded: false, delegationDepth: 0 }
+    const rows = [
+      { type: 'gateway/scoped-execution', seq: 0, time: 1, data: { version: 1 } },
+      { type: 'gateway/continuation', seq: 1, time: 2, data: {
+        key: 'goal:g:1', scope: { parentSessionId: 'scoped', inputs: [], unverifiedHistory: true },
+      } },
+    ]
+    const restored = historicalSessionFormatCatalog.createRestore(header, { recovery: 'strict', validation: 'current' })
+    for (const row of rows) restored.decodeRow(row)
+    expect(restored.finish().events).toEqual(rows)
+  })
+
   it('restores V6 and preceding versions without the incoming catalog-completion edge', () => {
     const header = { type: 'session', version: 2, id: 'historical', createdAt: 1, isSeeded: false, delegationDepth: 0 }
     expect(historicalSessionFormatCatalog.readHeader(header)).toMatchObject({ status: 'migration-required' })

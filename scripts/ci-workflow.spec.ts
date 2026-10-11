@@ -40,6 +40,7 @@ describe('CI workflow', () => {
       expect(plugins.map(gate => gate.displayCommand)).toEqual([
         'pnpm exec vitest run --config plugins/dsh-directory-guard/vitest.config.ts',
         'pnpm exec vitest run --config plugins/dsh-model-governance/vitest.config.ts',
+        'pnpm exec vitest run --config plugins/dsh-steward-tools/vitest.config.ts',
       ])
       expect(plugins.every(gate => gate.allowFailure !== true)).toBe(true)
     }

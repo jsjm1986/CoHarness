@@ -31,6 +31,12 @@ export interface TeamMembership {
   readonly name: string
 }
 
+/** State of the host-registered `modelSelection` projection unit, read structurally. */
+interface ModelSelectionState {
+  readonly pending: { readonly provider: string; readonly model: string } | null
+  readonly lastUsed: { readonly provider: string; readonly model: string } | null
+}
+
 /**
  * Resolve one active Team member by model-facing name, including the Lead pseudo-row.
  * @param root - exact live Team Lead.
@@ -128,17 +134,18 @@ export class TeamRoster {
   list(membership: TeamMembership): TeamMemberView[] {
     const { root } = membership
     const state = this.journal.state(root)
+    const leadModel = this.memberModel(root)
     const result: TeamMemberView[] = [{
       id: root.id,
       name: 'lead',
       role: 'lead',
       status: root.status,
-      ...root.options.model === undefined ? {} : { model: root.options.model },
+      ...leadModel === undefined ? {} : { model: leadModel },
       diagnostics: [],
     }]
     for (const member of state.members.values()) {
       const live = this.ctx.agents.get(member.id)
-      const model = live?.options.model ?? root.options.model
+      const model = live === undefined ? member.model : this.memberModel(live)
       result.push({
         id: member.id,
         name: member.name,
@@ -310,9 +317,12 @@ export class TeamRoster {
       }
       throw error
     }
+    const liveChild = this.ctx.agents.get(childId)
+    const declaredModel = liveChild === undefined ? undefined : this.memberModel(liveChild)
     const active = {
       ...member,
       phase: 'active' as const,
+      ...declaredModel === undefined ? {} : { model: declaredModel },
     } satisfies TeamMemberSnapshot
     // Once the continuation accepted its first prompt, it is a real child. If
     // this checkpoint fails, keep the in-memory active edge instead of inventing
@@ -433,9 +443,31 @@ export class TeamRoster {
     }
   }
 
+  /**
+   * Model a member's next request would use: the host model-selection
+   * projection's pending selection or last-used route, else the member's last
+   * request header, else its declared creation model.
+   * @param agent - exact live member Agent.
+   * @returns the model shown on the member's roster row, or undefined.
+   */
+  private memberModel(agent: Agent): string | undefined {
+    // `modelSelection` is registered and typed by the host API layer; read the
+    // unit structurally and degrade to the member's own request-header fold
+    // wherever the projection is not mounted.
+    const projections = this.ctx.get('sessionProjections') as {
+      stateOf(session: Agent['session'], key: string): unknown
+    } | undefined
+    const state = projections?.stateOf(agent.session, 'modelSelection') as ModelSelectionState | undefined
+    const route = state?.pending ?? state?.lastUsed
+    if (route != null) return route.model
+    const header = agent.session.requestHeader()?.config
+    return header?.model ?? agent.options.model
+  }
+
   /** Build one runtime member row after successful creation. */
   private memberView(member: TeamMemberSnapshot & { readonly phase: 'active' }): TeamMemberView {
     const live = this.ctx.agents.get(member.id)
+    const model = live === undefined ? member.model : this.memberModel(live)
     return {
       id: member.id,
       name: member.name,
@@ -444,7 +476,7 @@ export class TeamRoster {
       description: member.description,
       provider: member.provider,
       context: member.context,
-      ...live?.options.model === undefined ? {} : { model: live.options.model },
+      ...model === undefined ? {} : { model },
       diagnostics: [],
     }
   }

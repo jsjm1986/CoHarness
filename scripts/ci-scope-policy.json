@@ -67,6 +67,7 @@
     "gateway/",
     "plugins/dsh-directory-guard/",
     "plugins/dsh-model-governance/",
+    "plugins/dsh-steward-tools/",
     "packages/api/",
     "packages/host/apiproxy/"
   ],

@@ -626,8 +626,7 @@
     "102c6ca4e41cbc4bd79577dcfa1d60516702d98d47517e6b5918e06adc62ed01": 1
   },
   "packages/client/ui-conversation/tests/skeleton.client.spec.tsx": {
-    "0076e6da06fb1fb053ac7066d51821dfbbdc598e3e715c48803c73be29803d8f": 1,
-    "13cd57c4d6532014a0da5eff7cbdb196c695d33ad5d196964d1d0b4db6379dd6": 1
+    "0076e6da06fb1fb053ac7066d51821dfbbdc598e3e715c48803c73be29803d8f": 1
   },
   "packages/client/ui-conversation/tests/stop-shortcut.client.spec.ts": {
     "37752df45f924aca735730fd67aaff41a887363ebaebea8c9af23fc1b6d9b84f": 1,

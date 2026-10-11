@@ -6,7 +6,7 @@ import { assertReleasedV6Header } from '@deepseek-ai/dsh-session-format-v5-to-v6
 import { mapEventMessages, rewriteV6MessageSource } from './sources.ts'
 import { liftToolResult } from './tool-role.ts'
 import { migrateV6EventContent } from './content.ts'
-import { namespaceV6OpaqueEvent, RELEASED_V6_EVENT_TYPES } from './extension-identities.ts'
+import { ADMITTED_V6_EVENT_TYPES, namespaceV6OpaqueEvent } from './extension-identities.ts'
 import { assertReleasedV7Header, validateDeliveryAccepted } from './validation.ts'
 import { catalogFact } from './facts.ts'
 
@@ -60,7 +60,7 @@ class ReleasedV6ToV7Stage implements SessionFormatMigrationStage {
       context.emitEvent(opaque)
       return
     }
-    if (!RELEASED_V6_EVENT_TYPES.has(event.type)) {
+    if (!ADMITTED_V6_EVENT_TYPES.has(event.type)) {
       throw new SessionFormatUnsupportedMigrationError(
         `format v6 contains unknown event type ${JSON.stringify(event.type)} at seq ${event.seq}`,
       )

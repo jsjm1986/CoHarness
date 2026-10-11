@@ -17896,7 +17896,7 @@
       "kind": "event",
       "event": "team/member",
       "surface": false,
-      "digest": "31d13edbb5fe2f8b7a38056320a8a06275ee4426e0abf12d4741818beda5a9c9",
+      "digest": "61e2ba55405ca7ede6bb6bc4c47af5348fefd1b8c5f0ab20e0a4b7d5f22bc447",
       "schema": {
         "root": 0,
         "nodes": [
@@ -17974,6 +17974,11 @@
                 "name": "id",
                 "type": 6,
                 "optional": false
+              },
+              {
+                "name": "model",
+                "type": 6,
+                "optional": true
               },
               {
                 "name": "name",
@@ -25349,11 +25354,6 @@
       ]
     },
     {
-      "digest": "31d13edbb5fe2f8b7a38056320a8a06275ee4426e0abf12d4741818beda5a9c9",
-      "names": [],
-      "sources": []
-    },
-    {
       "digest": "326a9bfda27dda5882fb3cbe6e715df41dae2298fdae3d66437457268a665693",
       "names": [
         "packages/llm/llm/src/call-config.ts#LlmCallConfigAdapterDefaults"
@@ -25856,7 +25856,7 @@
         "packages/experimental/agent-team/src/types.ts#TeamTaskSnapshot"
       ],
       "sources": [
-        "packages/experimental/agent-team/src/types.ts:75"
+        "packages/experimental/agent-team/src/types.ts:87"
       ]
     },
     {
@@ -25898,10 +25898,19 @@
       ]
     },
     {
+      "digest": "5414fccb3ac68b960b81d1be8429c7469de28ff9993dc5700e218276ca9404a5",
+      "names": [
+        "packages/experimental/agent-team/src/types.ts#TeamMemberSnapshot"
+      ],
+      "sources": [
+        "packages/experimental/agent-team/src/types.ts:48"
+      ]
+    },
+    {
       "digest": "54de4759e70a805bdec293dcfbc01eba51781a2d9e007777f5bf0d65f72976d9",
       "names": [],
       "sources": [
-        "packages/experimental/agent-team/src/types.ts:232"
+        "packages/experimental/agent-team/src/types.ts:244"
       ]
     },
     {
@@ -26092,6 +26101,11 @@
       "sources": []
     },
     {
+      "digest": "61e2ba55405ca7ede6bb6bc4c47af5348fefd1b8c5f0ab20e0a4b7d5f22bc447",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "6292bcbedaa97feaec5b48a03bb8144b581b93309d9d6c905f26da7a6a7a0a4f",
       "names": [],
       "sources": []
@@ -26123,15 +26137,6 @@
       ],
       "sources": [
         "packages/subagent/subagent/src/descriptor.ts:72"
-      ]
-    },
-    {
-      "digest": "6598cd6da253948d6b207c6374a45335804c79b576866d6215649c2d1bc85e25",
-      "names": [
-        "packages/experimental/agent-team/src/types.ts#TeamMemberSnapshot"
-      ],
-      "sources": [
-        "packages/experimental/agent-team/src/types.ts:48"
       ]
     },
     {
@@ -26455,7 +26460,7 @@
       "digest": "7a1a83b0dd7c3a67d46d2b703e204a69b1db4e596b867777c1dde1d9ac65662e",
       "names": [],
       "sources": [
-        "packages/experimental/agent-team/src/types.ts:234"
+        "packages/experimental/agent-team/src/types.ts:246"
       ]
     },
     {
@@ -26730,7 +26735,7 @@
         "packages/experimental/agent-team/src/types.ts#TeamMessageSnapshot"
       ],
       "sources": [
-        "packages/experimental/agent-team/src/types.ts:101"
+        "packages/experimental/agent-team/src/types.ts:113"
       ]
     },
     {
@@ -27508,7 +27513,7 @@
         "packages/experimental/agent-team/src/types.ts#TeamTaskStatus"
       ],
       "sources": [
-        "packages/experimental/agent-team/src/types.ts:72"
+        "packages/experimental/agent-team/src/types.ts:84"
       ]
     },
     {
@@ -27559,13 +27564,6 @@
       "digest": "b57ae1b37e52bee0a21cbdace168dc6a15582bcda8c306dad962c5dcc8a8e28b",
       "names": [],
       "sources": []
-    },
-    {
-      "digest": "b59b71a5417cfb3acca0a32fcd4f8f31b875e7d5acdca1344dc9a05214414702",
-      "names": [],
-      "sources": [
-        "packages/experimental/agent-team/src/types.ts:228"
-      ]
     },
     {
       "digest": "b63b089a00b3b9357675b3e0c3d3e9aa4fdbda1fba9c91a6b0c59ffdbb89f505",
@@ -27716,6 +27714,13 @@
       "digest": "bf16d2e98a7f13894ded2cffe5ce857bf473954a0e3c0ed9bc7739e2e1c7b78a",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "c024a36f1555607da300384ac7a79ef106d2044cfe75c915b6deb39e02de7dba",
+      "names": [],
+      "sources": [
+        "packages/experimental/agent-team/src/types.ts:240"
+      ]
     },
     {
       "digest": "c04ca7d7d5b7733834cbc49bf8c396c7d07dd9ec5f4537e45cefd44f8d2df965",
@@ -27908,7 +27913,7 @@
         "packages/experimental/agent-team/src/types.ts#TeamMessageSource"
       ],
       "sources": [
-        "packages/experimental/agent-team/src/types.ts:113"
+        "packages/experimental/agent-team/src/types.ts:125"
       ]
     },
     {
@@ -28206,7 +28211,7 @@
       "digest": "e86d247d466ec6dc9d302824b7dc0acedab882027775f25abb824df4794468b7",
       "names": [],
       "sources": [
-        "packages/experimental/agent-team/src/types.ts:230"
+        "packages/experimental/agent-team/src/types.ts:242"
       ]
     },
     {

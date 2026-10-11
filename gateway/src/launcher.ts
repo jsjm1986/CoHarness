@@ -143,8 +143,10 @@ export interface RuntimeProcessIdentity {
   runtimeKey: string
   /** Exact Linux account for systemd. */
   systemUser: string
-  /** Whether the personal runtime receives administrator filesystem policy. */
+  /** Whether the runtime receives administrator filesystem policy. */
   privileged?: boolean
+  /** Whether the supervisor must keep this runtime alive (Restart=always). */
+  resident?: boolean
   port: number
   /** Absolute writable home (also the instance cwd / workspace root). */
   homePath: string

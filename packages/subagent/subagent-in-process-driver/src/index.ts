@@ -121,7 +121,7 @@ export async function startInProcessRun(
 
   let structured: StructuredAttachment | undefined
   const setup = (childCtx: Context, child: Agent): void => {
-    appendDelegatedPolicyOverrides(child.session, inherited)
+    appendDelegatedPolicyOverrides(childCtx, child.session, inherited)
     applyChildComposition(childCtx, parent, {
       persona: request.persona,
       toolFilter: request.toolFilter,

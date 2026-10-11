@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-10-steward-admin-layered-admission.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-10-steward-admin-layered-admission.md
+/agent-note-steward-admission-layers-the-grant-on-administrator-membership:
+  en: 264defdc641aac18
+  zh: 8d6bee435c436243
+/agent-note-steward-admission-layers-the-grant-on-administrator-membership/problem:
+  en: 6c0a5d658877a380
+  zh: ac127af59828cdd0
+/agent-note-steward-admission-layers-the-grant-on-administrator-membership/decision:
+  en: a8d2cf4716a3802a
+  zh: 9fc9c587c6df4e5a
+/agent-note-steward-admission-layers-the-grant-on-administrator-membership/alternatives-considered:
+  en: 9ec0f47c56b90267
+  zh: a4f2e60b967b5487
+/agent-note-steward-admission-layers-the-grant-on-administrator-membership/consequences:
+  en: 1e6f310634f7ef61
+  zh: b14651db429603ee

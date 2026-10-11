@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-10-scoped-delegation-reader-admission.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-10-scoped-delegation-reader-admission.md
+/agent-note-delegated-policy-append-routes-scoped-scope-through-the-authority-writer:
+  en: 2fa0f4ec067dd16f
+  zh: 63b266284a715fc0
+/agent-note-delegated-policy-append-routes-scoped-scope-through-the-authority-writer/problem:
+  en: 1cde7517b78301ac
+  zh: 2a08ebcd8e01add4
+/agent-note-delegated-policy-append-routes-scoped-scope-through-the-authority-writer/decision:
+  en: c91f73765b7f1e2e
+  zh: 9c1d34637902908a
+/agent-note-delegated-policy-append-routes-scoped-scope-through-the-authority-writer/alternatives-considered:
+  en: ef3f22b358ed10fd
+  zh: 4a313aebdd1a8a16
+/agent-note-delegated-policy-append-routes-scoped-scope-through-the-authority-writer/consequences:
+  en: 04fdc37ae2d55776
+  zh: 9b034fc63eba064f
+/agent-note-delegated-policy-append-routes-scoped-scope-through-the-authority-writer/verification:
+  en: 3aad44237131f0f6
+  zh: 5946a0b6d535ac06

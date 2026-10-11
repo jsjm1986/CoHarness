@@ -402,7 +402,7 @@ function consumerSurfaceGates(): Gate[] {
 }
 
 function pluginTestGates(): Gate[] {
-  return ['dsh-directory-guard', 'dsh-model-governance'].map(plugin =>
+  return ['dsh-directory-guard', 'dsh-model-governance', 'dsh-steward-tools'].map(plugin =>
     pnpmExec(`test-${plugin}`, ['vitest', 'run', '--config', `plugins/${plugin}/vitest.config.ts`]),
   )
 }

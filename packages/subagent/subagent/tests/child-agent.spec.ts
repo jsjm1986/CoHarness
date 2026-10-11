@@ -78,24 +78,56 @@ describe('child Agent options', () => {
 })
 
 describe('delegated execution policy', () => {
-  it('retains explicit Auto identity and the captured participants in the child log', () => {
+  it('persists the captured scope through the authority writer', () => {
     const parent = parentAgent()
     const ctx = new Context()
     const scope: ExecutionInheritance = { parentSessionId: parent.id,
       inputs: ['00000000-0000-4000-8000-000000000001' as ExecutionInputId], primaryActorUserId: 1, unverifiedHistory: false }
-    ctx.provide('executionAuthority', { capture: () => scope } as never)
+    const inheritedBy: Session[] = []
+    ctx.provide('executionAuthority', {
+      capture: () => scope,
+      inherit: (session: Session, captured: ExecutionInheritance) => {
+        inheritedBy.push(session)
+        session.append('gateway/execution', { kind: 'inherit', scope: captured })
+      },
+    } as never)
     ctx.provide('permissionPresets', { current: () => 'auto' } as never)
     ctx.provide('sandboxPolicy', { overrideOf: () => 'danger-full-access' } as never)
     ctx.provide('approval', {} as never)
     const overrides = captureDelegatedPolicyOverrides({ ...parent, ctx })
     const child = Session.create(SessionId('child'))
-    appendDelegatedPolicyOverrides(child, overrides)
+    appendDelegatedPolicyOverrides(ctx, child, overrides)
+    expect(inheritedBy).toEqual([child])
     expect(child.ownEvents().map(event => [event.type, event.data])).toEqual([
       ['gateway/execution', { kind: 'inherit', scope }],
       ['sandbox/mode', { mode: 'danger-full-access', source: 'delegation' }],
       ['approval/policy', { policy: 'never', source: 'delegation' }],
       ['permission/preset', { preset: 'auto', origin: 'selection' }],
     ])
+  })
+
+  it('appends an unscoped capture directly when no authority provider is mounted', () => {
+    const ctx = new Context()
+    const scope: ExecutionInheritance = { parentSessionId: SessionId('parent'),
+      inputs: [], primaryActorUserId: 1, unverifiedHistory: false }
+    const child = Session.create(SessionId('child'))
+    appendDelegatedPolicyOverrides(ctx, child,
+      { sandboxMode: undefined, approvalPolicy: undefined, executionScope: scope })
+    expect(child.ownEvents().map(event => [event.type, event.data])).toEqual([
+      ['gateway/execution', { kind: 'inherit', scope }],
+    ])
+  })
+
+  it('refuses a scoped capture when no authority provider is mounted', () => {
+    const ctx = new Context()
+    const scope: ExecutionInheritance = { parentSessionId: SessionId('parent'), scopeId: 'scope-1' as never,
+      inputs: [], primaryActorUserId: 1, unverifiedHistory: false }
+    const child = Session.create(SessionId('child'))
+    expect(() => {
+      appendDelegatedPolicyOverrides(ctx, child,
+        { sandboxMode: undefined, approvalPolicy: undefined, executionScope: scope })
+    }).toThrow(/authority provider/)
+    expect(child.ownEvents()).toEqual([])
   })
 
   it('refuses delegation from a managed deployment with no authority provider', () => {
