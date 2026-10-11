@@ -3813,6 +3813,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                 </div>
               ) : !hasEntries ? (
                 <div className={css.emptyState}>
+                  <span className={css.emptyIcon} aria-hidden="true"><IconBrowseOutline16 size={24} /></span>
                   <p className={css.empty}>{t('modal.empty')}</p>
                   {phone && !uploadLocked && (
                     <div className={css.emptyActions}>
@@ -3827,6 +3828,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                 </div>
               ) : !hasVisibleEntries ? (
                 <div className={css.emptyState}>
+                  <span className={css.emptyIcon} aria-hidden="true"><IconSearchOutline16 size={24} /></span>
                   <p className={css.empty}>{t('modal.noResults')}</p>
                   <Button type="button" variant="ghost" onClick={() => {
                     setQuery('')

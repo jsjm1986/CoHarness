@@ -100,9 +100,13 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Selected scope reads as a raised pill over the darker rail, matching the
+   shell's sidebar-row vocabulary; the elevation token draws its own 0.5px
+   ring so the border cell stays transparent. */
 .scopeItemActive {
-  border-color: var(--dsw-alias-border-l3);
-  background: var(--dsw-alias-interactive-bg-active);
+  border-color: transparent;
+  background: var(--dsw-alias-bg-raised);
+  box-shadow: var(--dsw-elevation-control);
   color: var(--dsw-alias-label-primary);
 }
 
@@ -504,14 +508,23 @@
   width: auto;
 }
 
+/* The OS arrow sits flush against the control edge; replace it with the
+   shared 12px chevron and reserve its cell in the right padding. Data-URI
+   SVGs cannot resolve CSS variables; #81858C is the caption gray shared by
+   both themes. */
 .select {
   flex: none;
   height: 32px;
   max-width: 156px;
-  padding: 0 var(--dsw-space-5) 0 var(--dsw-space-2);
+  padding: 0 var(--dsw-space-7) 0 var(--dsw-space-2);
   border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
+  appearance: none;
   background-color: var(--dsw-alias-bg-layer-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px 12px;
   color: var(--dsw-alias-label-primary);
   font: inherit;
   font-size: 13px;
@@ -994,8 +1007,9 @@
 }
 
 .scopePickerOptionSelected {
-  border-color: var(--dsw-alias-border-l3);
-  background: var(--dsw-alias-interactive-bg-active);
+  border-color: transparent;
+  background: var(--dsw-alias-bg-raised);
+  box-shadow: var(--dsw-elevation-control);
 }
 
 .scopePickerCopy {
@@ -1293,6 +1307,20 @@
   min-height: 180px;
   color: var(--dsw-alias-label-secondary);
   text-align: center;
+}
+
+/* Empty-state hero: a 48px quiet tile so the empty copy reads as a designed
+   state instead of stray text. */
+.emptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-card);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .emptyActions {
@@ -1837,13 +1865,13 @@
 }
 
 .scopeItemActive {
-  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 28%, var(--dsw-alias-border-l2));
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 10%, var(--dsw-alias-bg-layer-1));
-  box-shadow: inset 3px 0 var(--dsw-alias-brand-primary);
+  border-color: transparent;
+  background: var(--dsw-alias-bg-raised);
+  box-shadow: var(--dsw-elevation-control);
 }
 
 .scopeItemActive .scopeItemIcon {
-  color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-primary);
 }
 
 .workbenchContent {

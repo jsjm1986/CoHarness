@@ -75,7 +75,8 @@ describe('DocumentsModal.module.css', () => {
 
   it('keeps the workbench hierarchy and skips off-screen row rendering', () => {
     expect(modal).toMatch(/\.panel\s*\{[\s\S]*border-radius:\s*14px[\s\S]*box-shadow:\s*var\(--dsw-elevation-panel\)/)
-    expect(modal).toMatch(/\.scopeItemActive\s*\{[\s\S]*box-shadow:\s*inset 3px 0 var\(--dsw-alias-brand-primary\)/)
+    expect(modal).toMatch(/\.scopeItemActive\s*\{[\s\S]*background:\s*var\(--dsw-alias-bg-raised\)/)
+    expect(modal).toMatch(/\.scopeItemActive\s*\{[\s\S]*box-shadow:\s*var\(--dsw-elevation-control\)/)
     expect(modal).toMatch(new RegExp([
       '\\.row,[\\s\\S]*\\.overviewRow,[\\s\\S]*\\.trashRow\\s*\\{',
       '[\\s\\S]*content-visibility:\\s*auto[\\s\\S]*contain-intrinsic-block-size:\\s*auto 50px',

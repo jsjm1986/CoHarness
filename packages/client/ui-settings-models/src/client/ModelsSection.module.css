@@ -737,9 +737,11 @@ select.input {
   cursor: pointer;
 }
 
+/* shadcn input focus: accent border plus a 3px ring at quarter alpha. */
 .input:focus {
   outline: none;
   border-color: var(--dsw-alias-brand-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-brand-primary) 24%, transparent);
 }
 
 .input::placeholder {
