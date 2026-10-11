@@ -50,8 +50,8 @@ export function GenericCommandCard({ node, t, runningSummary }: GenericCommandCa
       <DisclosureRow
         rowClassName={css.row}
         leadingClassName={css.leading}
-        titleClassName={css.title}
         chevronClassName={css.chevron}
+        running={state === 'running'}
         icon={leadingFor(state)}
         title={title}
         open={open}

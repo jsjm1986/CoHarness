@@ -1,15 +1,13 @@
 /** Terminal glyphs for the sidebar guide and tab title. */
 import type { ReactNode } from 'react'
-import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconTerminalOutline16, type IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
 
 /**
  * Render the tab title's terminal prompt in the surrounding text color.
  * @returns a decorative sixteen-pixel line glyph.
  */
 export function TerminalIcon(): ReactNode {
-  return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path d="m3 4 4 4-4 4M9 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
+  return <IconTerminalOutline16 aria-hidden="true" />
 }
 
 /**

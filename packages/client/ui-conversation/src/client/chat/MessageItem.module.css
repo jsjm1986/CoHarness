@@ -1,5 +1,11 @@
-/* User bubble: right-aligned column (bubble + IconActions). Figma
-   User_Bubble/message_container 659:38813 — r22 fill, actions gap 6 below. */
+/* User bubble: right-aligned column (bubble + IconActions); beui
+   message-bubble grammar (MIT) — r16, 10/14 padding. */
+
+@keyframes user-bubble-in {
+  from {
+    opacity: 0;
+  }
+}
 
 .userRow {
   display: flex;
@@ -50,9 +56,9 @@
   /* 525px cap inside the 736 column; percentage keeps narrow windows sane. */
   max-width: 100%;
   background: var(--dsw-specific-bubble);
-  border-radius: 22px;
-  /* 44px single-line bubble: 24 line + 10 vertical padding each side. */
-  padding: 10px var(--dsw-space-4);
+  border-radius: var(--dsw-radius-xl);
+  padding: 10px 14px;
+  animation: user-bubble-in var(--dsw-motion-duration-quick) var(--dsw-motion-ease-out-expo) backwards;
   font-size: var(--dsh-chat-font-size, 16px);
   line-height: calc(var(--dsh-chat-font-size, 16px) * 1.5);
   color: var(--dsw-alias-label-primary);

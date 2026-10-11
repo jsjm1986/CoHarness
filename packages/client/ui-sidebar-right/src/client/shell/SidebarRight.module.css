@@ -41,6 +41,19 @@
   pointer-events: none;
 }
 
+/* The open docked panel is the frame's second inset card (SidebarInset, MIT):
+   the details column already carries the 8px margin, so here it picks up the
+   window radius and panel elevation. The paint is gated on the open state —
+   a closed panel must stay invisible so the transcript shows through — and
+   unclipped so dockkit float cells keep their fixed-position escape.
+   Fullscreen stays edge-to-edge. */
+.panel[data-sidebar-right-open]:not([data-sidebar-right-panel='fullscreen']) {
+  border-radius: var(--dsw-radius-window);
+  background: var(--dsw-alias-bg-base);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
+  box-shadow: var(--dsw-elevation-panel);
+}
+
 /* Only docked Grid items slide. Their common ancestor remains untransformed,
    unclipped and without a stacking context, so fixed floating children escape. */
 .panel :global([data-dockkit-host='dock']),

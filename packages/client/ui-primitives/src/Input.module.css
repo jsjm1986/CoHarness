@@ -8,11 +8,15 @@
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-1);
   transition: border-color var(--dsw-motion-duration-micro, 0.14s)
-    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    box-shadow var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
+/* shadcn input focus: accent border plus a 3px ring at quarter alpha. */
 .wrap:focus-within {
   border-color: var(--dsw-alias-brand-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-brand-primary) 24%, transparent);
 }
 
 .icon {

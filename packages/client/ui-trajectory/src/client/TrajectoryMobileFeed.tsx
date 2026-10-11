@@ -3,6 +3,9 @@
 import type { ReactNode } from 'react'
 import {
   IconChevronRightOutline14,
+  IconInfoOutline16,
+  IconMinimizeOutline16,
+  IconWrenchOutline16,
   IconSettingsOutline16,
   IconSparkle16,
   IconUserOutline16,
@@ -85,61 +88,15 @@ const KIND_LABEL_KEY: Record<TrajectoryCellKind, TrajectoryKey> = {
 }
 
 function ToolIcon(): ReactNode {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M14 3.3a3.8 3.8 0 0 1-4.8 4.8l-5.1 5.1a1.6 1.6 0 1 1-2.3-2.3l5.1-5.1A3.8 3.8 0 0 1 11.7 1l-2.3 2.3 2.3 2.3L14 3.3Z" />
-    </svg>
-  )
+  return <IconWrenchOutline16 aria-hidden="true" />
 }
 
 function InformationIcon(): ReactNode {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <circle cx="8" cy="8" r="6.7" />
-      <circle cx="8" cy="5.5" r=".85" fill="currentColor" stroke="none" />
-      <path d="M8 7.75v3.4" strokeWidth="1.8" />
-    </svg>
-  )
+  return <IconInfoOutline16 aria-hidden="true" />
 }
 
 function CompactedIcon(): ReactNode {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m2.5 2.5 3.75 3.75M3 6.25h3.25V3" />
-      <path d="m13.5 2.5-3.75 3.75M13 6.25H9.75V3" />
-      <path d="m2.5 13.5 3.75-3.75M3 9.75h3.25V13" />
-      <path d="m13.5 13.5-3.75-3.75M13 9.75H9.75V13" />
-    </svg>
-  )
+  return <IconMinimizeOutline16 aria-hidden="true" />
 }
 
 function kindIcon(kind: TrajectoryCellKind): ReactNode {
@@ -387,7 +344,7 @@ export function TrajectoryMobileFeed({
                   )}
                 </span>
               </span>
-              <IconChevronRightOutline14 className={css.chevron} size={14} aria-hidden="true" />
+              <IconChevronRightOutline14 className={css.chevron} size={14} />
             </button>
           </div>
         )

@@ -1,6 +1,7 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
 import { useEffect, useSyncExternalStore } from 'react'
+import type { CSSProperties } from 'react'
 import clsx from 'clsx'
 import type { SessionId, SessionListState, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
@@ -84,7 +85,16 @@ export function ConversationSessionHeader({
       {!hideChrome && (
         <>
           {tabs.length > 1 && (
-            <div className={css.tabs} role="tablist">
+            <div
+              className={css.tabs}
+              role="tablist"
+              /* Pill position without measuring JS: the bar divides into equal
+                 columns and slides --dsh-tab-index to the active tab. */
+              style={{
+                '--dsh-tab-count': tabs.length,
+                '--dsh-tab-index': Math.max(0, tabs.findIndex(t => t.id === active?.id)),
+              } as CSSProperties}
+            >
               {tabs.map(viewTab => (
                 <button
                   key={viewTab.id}

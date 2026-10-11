@@ -99,7 +99,7 @@ export function ArchivedSessionsSection(props: ArchivedSessionsSectionProps): Re
   return (
     <div className={css.section}>
       <div className={css.search}>
-        <IconSearchOutline16 aria-hidden="true" />
+        <IconSearchOutline16 />
         <input
           type="search"
           value={query}

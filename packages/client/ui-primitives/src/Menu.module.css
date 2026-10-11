@@ -14,14 +14,14 @@
   flex-direction: column;
   gap: 0;
   border: 0;
-  border-radius: 20px;
+  border-radius: var(--dsw-radius-card);
   background: var(--dsw-specific-menu);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
-  box-shadow: var(--dsw-elevation-prominent);
+  box-shadow: var(--dsw-elevation-raised);
   /* Entrance: brief fade + slight settle from the anchor edge. The origin
      follows the open side so the card appears to grow out of its trigger. */
-  animation: menu-in var(--dsw-motion-duration-enter, 0.18s)
-    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out)) backwards;
+  animation: menu-in var(--dsw-motion-duration-pop)
+    var(--dsw-motion-ease-out-strong, var(--ds-ease-in-out)) backwards;
   /* Elevated surface: the scrollbar thumb takes the l2 elevation tokens. The
      declaration sits on the card rather than on `.scrollable .viewport`
      because the elevation is a property of this surface, and the custom
@@ -35,7 +35,7 @@
 @keyframes menu-in {
   from {
     opacity: 0;
-    transform: scale(0.97) translateY(-4px);
+    transform: scale(var(--dsw-motion-scale-modal));
   }
 }
 
@@ -71,7 +71,7 @@
 @keyframes menu-in-top {
   from {
     opacity: 0;
-    transform: scale(0.97) translateY(4px);
+    transform: scale(var(--dsw-motion-scale-modal));
   }
 }
 
@@ -131,14 +131,15 @@
   align-items: center;
   gap: var(--dsw-space-2);
   width: 100%;
-  min-height: 40px;
-  padding: var(--dsw-space-2) 10px;
+  min-height: 30px;
+  padding: 0 var(--dsw-space-2);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--dsw-radius-chip);
   background: transparent;
   cursor: pointer;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
   color: var(--dsw-alias-label-primary);
   text-align: left;
   transition: background-color var(--dsw-motion-duration-micro, 0.14s)

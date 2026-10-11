@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Button, IconDataOutline16, IconFolderOpenOutline16, IconPersonalizationOutline16,
+  Button, IconModelOutline16, IconFolderOpenOutline16, IconPersonalizationOutline16,
   IconSettingsOutline16, IconShareOutline16, IconUserOutline16, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { requestSettingsSection } from '@deepseek-ai/dsh-client-runtime/client'
@@ -192,7 +192,7 @@ export function ProjectSettingsModal({
 
       <section className={css.section} aria-labelledby="project-models-title">
         <div className={css.sectionHeading}>
-          <div className={css.icon}><IconDataOutline16 size={16} /></div>
+          <div className={css.icon}><IconModelOutline16 size={16} /></div>
           <div>
             <h3 id="project-models-title">{t('project.modelsTitle')}</h3>
             <p>{t('project.modelsDescription')}</p>
@@ -200,7 +200,7 @@ export function ProjectSettingsModal({
         </div>
         <div className={css.actions}>
           <Button variant="outline" size="sm" disabled={!canManageModels} onClick={() => { openSection('models') }}>
-            <IconDataOutline16 size={14} />{t('project.openModels')}
+            <IconModelOutline16 size={14} />{t('project.openModels')}
           </Button>
         </div>
         {!isManager

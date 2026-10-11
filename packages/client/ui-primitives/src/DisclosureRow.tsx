@@ -106,10 +106,15 @@ export const DisclosureRow = memo(function DisclosureRow({
             {leading}
           </span>
         )}
-        <TextShimmer active={running} className={contentClassName} contentClassName={contentLayoutClassName}>
-          <TextShimmer className={clsx(css.title, titleClassName)}>{title}</TextShimmer>
-          {(keepContentWhenOpen || !open) && collapsedContent}
-        </TextShimmer>
+        <span className={clsx(css.contentWrap, contentClassName)}>
+          <span className={clsx(css.contentLine, contentLayoutClassName)}>
+            {/* Only the title shimmers: the decorative copy duplicates its
+                DOM, and collapsing the whole content column would duplicate
+                every interactive summary fragment (file links, buttons). */}
+            <TextShimmer className={clsx(css.title, titleClassName)} active={running}>{title}</TextShimmer>
+            {(keepContentWhenOpen || !open) && collapsedContent}
+          </span>
+        </span>
       </div>
       {open && children}
     </div>

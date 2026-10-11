@@ -21,7 +21,7 @@
   padding: 0 0 10px;
   border: 0;
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l2-darkmode-thin);
-  border-radius: 20px;
+  border-radius: 22px;
   background: var(--dsw-specific-input-major);
   box-shadow: var(--dsw-elevation-panel);
   color: var(--dsw-alias-label-primary);
@@ -33,6 +33,15 @@
      for the rebinding contract). */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  animation: dsh-question-in var(--dsw-motion-duration-enter, 0.22s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
+}
+
+@keyframes dsh-question-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
 }
 
 .card,
@@ -466,6 +475,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+
   .option,
   .customRow {
     transition: none;

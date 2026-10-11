@@ -13,7 +13,9 @@
   cursor: pointer;
   user-select: none;
   color: var(--dsw-alias-label-primary);
-  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+  transition: background-color var(--dsw-motion-duration-quick)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    transform var(--dsw-motion-duration-quick)
     var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
@@ -22,10 +24,17 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-/* Selected is one step stronger than hover so the current session reads
-   against the rows the pointer passes over. */
+.projectRow:active,
+.sessionRow:active {
+  transform: scale(0.98);
+}
+
+/* Selected is a raised pill (beautifului SidebarNav active row, MIT) so the
+   current session reads against the rows the pointer passes over. */
 .sessionRow.selected {
-  background: var(--dsw-alias-interactive-bg-active);
+  background: var(--dsw-alias-bg-raised);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
+  box-shadow: var(--dsw-elevation-control);
 }
 
 .searchResultRow {
@@ -131,6 +140,11 @@
 
 .sessionRow .title {
   margin: 0 6px 0 var(--dsw-space-1);
+  font-size: 13.5px;
+}
+
+.sessionRow.selected .title {
+  font-weight: 500;
 }
 
 .flatSessionRowWithoutStatus .title {
@@ -185,6 +199,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  font-weight: 500;
 }
 
 .title {
@@ -224,8 +239,10 @@
 .time {
   flex: none;
   font-size: 12px;
+  font-weight: 500;
   line-height: 20px;
   color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Static pin marker occupying the same right-edge cell as the hover pin

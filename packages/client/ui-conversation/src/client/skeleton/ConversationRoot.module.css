@@ -45,7 +45,7 @@
   display: flex;
   flex-direction: column;
   flex: none;
-  padding: var(--dsw-space-3) var(--dsw-space-7) 0 var(--dsw-space-5);
+  padding: var(--dsw-space-3) var(--dsw-space-4) 0 var(--dsw-space-5);
   border-bottom: 1px solid transparent;
 }
 
@@ -138,7 +138,9 @@
 }
 
 .crumbCurrent {
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
   color: var(--dsw-alias-label-primary);
   cursor: default;
 }
@@ -163,57 +165,68 @@
   margin-left: var(--dsw-space-5);
 }
 
-/* figma Tab_Group 34:11441: 35px strip, gap 36, pad-left 8, tabs bottom-aligned. */
+/* Segmented tabs (transitions `16-tabs-sliding`, MIT): the equal-column grid
+   holds a raised pill that slides to the active index — position arithmetic
+   lives on --dsh-tab-* vars written by the component so no measuring JS is
+   needed. Bar: hover fill, 3px pad, radius 10; pill: raised + control
+   elevation; label secondary -> primary. */
 .tabs {
   order: 1;
   position: relative;
   z-index: 1;
-  display: flex;
-  gap: 36px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  justify-items: stretch;
+  width: fit-content;
   margin-top: var(--dsw-space-1);
-  padding-left: var(--dsw-space-2);
+  margin-left: var(--dsw-space-2);
+  padding: 3px;
+  border-radius: var(--dsw-radius-card);
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
-/* figma .Tab 34:11442: 13/16 text (figma wt510, rendered 500), gap 8 to the 2px bar. */
+.tabs::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--dsh-tab-count, 1));
+  border-radius: var(--dsw-radius-control);
+  background: var(--dsw-alias-bg-raised);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
+  box-shadow: var(--dsw-elevation-control);
+  transform: translateX(calc(var(--dsh-tab-index, 0) * 100%));
+  transition: transform var(--dsw-motion-duration-fast)
+    var(--dsw-motion-ease-smooth-out, var(--ds-ease-in-out));
+}
+
 .tab {
   position: relative;
-  padding: 0 0 11px;
+  z-index: 1;
+  padding: 5px 14px;
   border: none;
+  border-radius: var(--dsw-radius-control);
   background: transparent;
   font-size: 13px;
   line-height: 16px;
   font-weight: 500;
-  color: var(--dsw-alias-label-tertiary);
+  letter-spacing: -0.01em;
+  color: var(--dsw-alias-label-secondary);
   cursor: pointer;
-  transition: color var(--dsw-motion-duration-micro, 0.14s)
+  transition: color var(--dsw-motion-duration-quick)
     var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
-.tab::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: 1px;
-  left: 0;
-  height: 2px;
-  border-radius: 2px;
-  background: transparent;
-  transform: scaleX(0);
-  transform-origin: center;
-  transition: transform var(--dsw-motion-duration-enter, 0.2s)
-    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
-}
-
-/* Selected tab is blue, not ink: brand-primary resolves to neutral black in
-   this token sheet, so the selected state rides the business blue — the
-   nearest semantic token that stays blue in both themes. */
 .tabActive {
-  color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-label-primary);
 }
 
-.tabActive::after {
-  background: var(--dsw-alias-state-business-primary);
-  transform: scaleX(1);
+@media (prefers-reduced-motion: reduce) {
+  .tabs::before {
+    transition: none;
+  }
 }
 
 .viewArea {
@@ -221,6 +234,34 @@
   flex: 1;
   flex-direction: column;
   min-height: 0;
+}
+
+/* Same texts-reveal recipe as HeroShell (module-scoped keyframes cannot be
+   shared): the composer card is the last 40ms step of the stagger. */
+@keyframes hero-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(var(--dsw-motion-blur-medium));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.composerHero {
+  animation: hero-reveal var(--dsw-motion-duration-very-slow)
+    var(--dsw-motion-ease-smooth-out, var(--ds-ease-in-out))
+    calc(2 * var(--dsw-motion-duration-stagger)) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composerHero {
+    animation: none;
+  }
 }
 
 /* Composer context stack (Figma 9:937): standalone dock cards share one
@@ -241,7 +282,7 @@
   flex: none;
   flex-direction: column;
   /* One cap for every scrolling text region a composer seat can hold: the
-     InputBar draft (figma Input 75:8208 max 14 lines × 24px line) and the
+     InputBar draft (14 lines at its 24px line-height cap) and the
      takeover panels' bodies top out at the same height, so electing a
      takeover never grows the footer past the card it replaces. Declared on
      the seat because it is the chain's only shared ancestor — fallback and
@@ -563,24 +604,24 @@
   order: 0;
   flex: 1 1 auto;
   min-width: 0;
-  min-height: var(--dsw-mobile-tab-height);
-  gap: var(--dsw-space-5);
+  margin: 0;
+  align-self: center;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-inline: var(--dsw-space-2);
+  min-height: var(--dsw-mobile-tab-height);
 }
 
 :global([data-viewport='compact']) .tab {
-  flex: none;
   display: inline-flex;
-  align-items: flex-end;
-  min-height: var(--dsw-mobile-tab-height);
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--dsw-mobile-tab-height) - 12px);
+  padding: var(--dsw-space-1) var(--dsw-space-3);
   font: var(--dsw-mobile-font-secondary);
 }
 
 :global([data-viewport-short]) .tab {
-  min-height: 40px;
-  padding-bottom: 8px;
+  min-height: 28px;
 }
 
 :global([data-viewport='compact']) .titleRow {

@@ -247,7 +247,7 @@ function RowsSection({ rows, t, resolveText, toggle, configure }: {
                       ? (
                         <button type="button" className={css.rowOpen} aria-label={t('configureRow', { name: title })} onClick={() => { configure.open(row) }}>
                           <span className={css.rowId}>{title}</span>
-                          <IconChevronRightOutline14 className={css.rowOpenIcon} aria-hidden="true" />
+                          <IconChevronRightOutline14 className={css.rowOpenIcon} />
                         </button>
                       )
                       : <span className={css.rowId}>{title}</span>}
@@ -376,7 +376,7 @@ function DetailTop({ crumbLabel, crumbText, onBack, icon, actions }: {
   return (
     <div className={css.detailTop} data-window-drag>
       <button type="button" className={css.crumb} aria-label={crumbLabel} onClick={onBack}>
-        <IconChevronDownOutline14 className={css.crumbIcon} aria-hidden="true" />
+        <IconChevronDownOutline14 className={css.crumbIcon} />
         <span>{crumbText}</span>
       </button>
       <div className={css.detailHead}>
@@ -902,7 +902,7 @@ function InstallDialog({
         footer={(
           <div className={css.installFooter}>
             <p className={css.installSafety} role="note">
-              <IconWarningOutline16 size={14} aria-hidden="true" />
+              <IconWarningOutline16 size={14} />
               <span className={css.installSafetyText}>
                 <span>{t('installGuideSafety')}</span>
                 <span>{t('installUpgradeNotice')}</span>
@@ -950,7 +950,7 @@ function InstallDialog({
               aria-controls={guideId}
               onClick={() => { setGuideOpen(open => !open) }}
             >
-              <IconChevronDownOutline14 className={css.guideChevron} aria-hidden="true" />
+              <IconChevronDownOutline14 className={css.guideChevron} />
               <span>{t(guideOpen ? 'installGuideHide' : 'installGuideToggle')}</span>
             </button>
             <button
@@ -966,7 +966,7 @@ function InstallDialog({
               <span>{t('registryToggle')}</span>
               {' '}
               <span className={css.registryChosen}>{chosenTitle}</span>
-              <IconChevronDownOutline14 className={css.guideChevron} aria-hidden="true" />
+              <IconChevronDownOutline14 className={css.guideChevron} />
             </button>
           </div>
           {guideOpen
@@ -1120,7 +1120,7 @@ function InstallDialog({
             ? <span />
             : (
               <button type="button" className={css.wizardBack} aria-label={t(pending ? 'installCancelAndEdit' : 'installEditAria')} disabled={!stoppable} onClick={onCancel}>
-                <IconChevronLeftOutline14 aria-hidden="true" />
+                <IconChevronLeftOutline14 />
                 <span>{t(pending ? 'installCancelAndEdit' : 'installEdit')}</span>
               </button>
             )}
@@ -1175,7 +1175,7 @@ function InstallDialog({
           <div className={css.wizardFoot}>
             <button type="button" className={css.detailsToggle} aria-expanded={install.detailsOpen} onClick={onToggleDetails}>
               <span>{t(install.detailsOpen ? 'installDetailsHide' : 'installDetailsShow')}</span>
-              <IconChevronDownOutline14 className={css.detailsChevron} aria-hidden="true" />
+              <IconChevronDownOutline14 className={css.detailsChevron} />
             </button>
             {uncertainty === 'result' ? <Button variant="outline" size="sm" className={css.footAction} onClick={onReconcile}>{t('installReconcile')}</Button> : null}
             {pending
@@ -1377,7 +1377,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
                 <span>{t('intro')}</span>
                 <Tooltip label={t('infoDescription')} side="bottom" delayMs={300} maxWidth={300} portal openOnClick>
                   <Button variant="ghost" size="sm" className={css.infoButton} aria-label={t('infoLabel')}>
-                    <IconQuestionOutline14 size={11} aria-hidden="true" />
+                    <IconQuestionOutline14 size={11} />
                   </Button>
                 </Tooltip>
               </div>

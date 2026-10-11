@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import {
+  IconClockOutline16,
   IconEllipsisOutline16,
   IconSearchOutline16,
   Menu,
@@ -91,15 +92,7 @@ export function TrajectoryToolbar({
             title={actualDuration ? t('toolbar.useEqualWidth') : t('toolbar.useActualDuration')}
             onClick={() => { onActualDurationChange(!actualDuration) }}
           >
-            <svg
-              className={css.toggleIcon}
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden="true"
-            >
-              <circle cx="8" cy="8" r="5.25" />
-              <path d="M8 4.75V8l2.25 1.5" />
-            </svg>
+            <IconClockOutline16 className={css.toggleIcon} aria-hidden="true" />
             {t('toolbar.duration')}
           </button>
           <button
@@ -187,7 +180,7 @@ export function TrajectoryToolbar({
                 aria-expanded={false}
                 onClick={() => { setSearchOpen(true) }}
               >
-                <IconSearchOutline16 size={16} aria-hidden="true" />
+                <IconSearchOutline16 size={16} />
               </button>
               <button
                 type="button"
@@ -196,10 +189,7 @@ export function TrajectoryToolbar({
                 aria-pressed={actualDuration}
                 onClick={() => { onActualDurationChange(!actualDuration) }}
               >
-                <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <circle cx="8" cy="8" r="5.25" />
-                  <path d="M8 4.75V8l2.25 1.5" />
-                </svg>
+                <IconClockOutline16 aria-hidden="true" />
               </button>
               <Menu
                 open={menuOpen}
@@ -212,7 +202,7 @@ export function TrajectoryToolbar({
                     aria-expanded={menuOpen}
                     onClick={() => { setMenuOpen(open => !open) }}
                   >
-                    <IconEllipsisOutline16 size={16} aria-hidden="true" />
+                    <IconEllipsisOutline16 size={16} />
                   </button>
                 )}
                 items={mobileMenuItems}

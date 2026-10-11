@@ -27,6 +27,12 @@
 }
 
 .notice {
+  /* On narrow widths the notice text must ellipsize, never overlap the
+     context-meter glyph beside it. */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   width: 100%;
   max-width: var(--dsh-composer-card-max-width);
   margin-bottom: 6px;
@@ -43,12 +49,12 @@
   position: relative; /* overlay anchor positioning context */
   display: flex;
   flex-direction: column;
-  /* figma Input 75:8208: 12px between the text area and the button row; 10px
-     top pad on the card before .InputText. */
-  gap: var(--dsw-space-3);
+  /* Card rhythm: 8px between the text area and the button row; 16px side
+     padding, 12px bottom. */
+  gap: var(--dsw-space-2);
   width: 100%;
   max-width: var(--dsh-composer-card-max-width);
-  padding-top: 10px;
+  padding: var(--dsw-space-4) var(--dsw-space-4) var(--dsw-space-3);
   /* Input stroke: the light neutral (l2, one step above the menus' l1),
      drawn as the elevation hairline so it costs no layout; the shadow is the
      soft elevation tier. Fill: the input surface token (elevated in dark). */
@@ -58,8 +64,8 @@
   background: var(--dsw-specific-input-major);
   box-shadow: var(--dsw-elevation-soft);
   transition: box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 14px;
+  line-height: 20px;
   /* Elevated surface in dark, same as the menus: the draft scrollport inside
      scrolls once the composer hits its height cap, so the thumb takes the l2
      pair. Declared on the card because the elevation belongs to the surface,
@@ -103,15 +109,12 @@
   background: var(--dsw-alias-state-business-primary);
 }
 
-/* Focused draft: the hairline stroke shifts to a business-blue tint and a
-   soft outer halo joins the soft elevation — a state reply, not a ring
-   (keyboard focus already has the :focus-visible outline contract). */
+/* Focused draft: the hairline stroke strengthens one step (beautifului
+   focus-within:border-line-strong / beui prompt-input, MIT) — a state reply
+   through the stroke, no blue ring (keyboard focus already has the
+   :focus-visible outline contract). */
 .card:focus-within:not(.cardWorkspaceTrigger) {
-  --dsw-elevation-stroke-color: color-mix(
-    in srgb, var(--dsw-alias-state-business-primary) 40%, transparent);
-  box-shadow:
-    var(--dsw-elevation-soft),
-    0 0 0 3.5px color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, transparent);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l4);
 }
 
 .accessory {
@@ -130,21 +133,41 @@
   padding: 0 var(--dsw-space-3);
 }
 
+/* Attachment chips (beautifului PromptBar chip, MIT): h-26 radius 6 on the
+   inset surface with an elevation hairline, pop-in on mount. */
 .documentItem {
   display: flex;
   align-items: center;
   gap: var(--dsw-space-1);
   min-width: 0;
   max-width: min(100%, 280px);
-  padding: 5px 6px 5px 8px;
-  border: 0.5px solid var(--dsw-alias-border-l2-darkmode-thin);
-  border-radius: var(--dsw-radius-sm);
-  background: var(--dsw-alias-interactive-bg-hover);
+  box-sizing: border-box;
+  height: 26px;
+  padding: 0 6px 0 var(--dsw-space-2);
+  border: 0;
+  border-radius: var(--dsw-radius-chip);
+  background: var(--dsw-alias-bg-inset);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
+  box-shadow: var(--dsw-elevation-stroke);
   color: var(--dsw-alias-label-secondary);
+  animation: chip-pop-in var(--dsw-motion-duration-pop, 200ms) var(--dsw-motion-ease-out-strong, ease) backwards;
+}
+
+@keyframes chip-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--dsw-motion-scale-modal));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .documentItem {
+    animation: none;
+  }
 }
 
 .documentItemFailed {
-  border-color: var(--dsw-alias-state-error-primary);
+  --dsw-elevation-stroke-color: var(--dsw-alias-state-error-primary);
   background: var(--dsw-alias-interactive-bg-hover-danger);
   color: var(--dsw-alias-state-error-primary);
 }
@@ -166,7 +189,7 @@
 
 .documentName {
   color: var(--dsw-alias-label-primary);
-  font-size: 12px;
+  font-size: 11.5px;
   line-height: 16px;
 }
 
@@ -317,9 +340,10 @@
      width:100% textarea gains its padding OUTSIDE the card and text runs past
      the right padding — and wraps 28px later than the mirror/backdrop layers. */
   box-sizing: border-box;
-  /* figma .InputText 34:10434: pl 16 / pr 12 / pt 4. Backdrop MUST share these
-     metrics or the highlight ranges drift off the glyphs. */
-  padding: 4px 12px 0 16px;
+  /* 2px of horizontal breathing room inside the scrollport; the backdrop and
+     mirror layers MUST share this padding or the highlight ranges drift off
+     the glyphs. */
+  padding: 0 2px;
   font-family: var(--dsw-font-family);
   font-size: inherit;
   /* Three consumers, not two: the mirror sizes the stack, the layers must break
@@ -386,7 +410,7 @@
   /* 2px moved from the bottom pad to the top: the whole control row sits 2px
      lower in the card (it read too high against the textarea) while the card
      height and the controls' own centering stay untouched. */
-  padding: 2px var(--dsw-space-2) 6px;
+  padding: 2px 0 0;
   min-width: 0;
   /* Size container so the chips inside can collapse to icon-only when the
      card runs out of row width (the PermissionSelect / ModelSelect
@@ -413,9 +437,8 @@
   overflow: hidden;
 }
 
-/* figma 75:8208 drew 16 between + and the mode chips and 4 between Plan /
-   Read-only; the chip gap widened to 12 so the pill chips read as separate
-   controls. */
+/* Wide gaps between the tool seats and between the mode chips so the pill
+   chips read as separate controls. */
 .tools {
   /* Keep the left touch targets together. The group still shrinks before the
      card overflows: its mode chips truncate and contributed items clip. No
@@ -442,7 +465,7 @@
   gap: 12px;
 }
 
-/* Attach circle (figma + control): 28px, selector fill, primary glyph. */
+/* Attach circle: 28px transparent seat, tertiary glyph, hover fills in. */
 .add {
   display: grid;
   place-items: center;
@@ -450,23 +473,36 @@
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--dsw-radius-full);
   corner-shape: round;
-  background: var(--dsw-specific-selector);
-  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
-  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+  transition: background-color var(--dsw-motion-duration-quick)
     var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
-    transform var(--dsw-motion-duration-micro, 0.14s)
+    color var(--dsw-motion-duration-quick)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    transform var(--dsw-motion-duration-quick)
     var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
 }
 
 .add:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover-solid);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 .add:active:not(:disabled) {
-  transform: scale(0.88);
+  transform: scale(0.94);
+}
+
+/* beui prompt-input (MIT): the + rotates 45deg while its menu is open. */
+.add[aria-expanded='true'] :global(svg) {
+  transform: rotate(45deg);
+}
+
+.add :global(svg) {
+  transition: transform var(--dsw-motion-duration-fast)
+    var(--dsw-motion-ease-smooth-out, var(--ds-ease-in-out));
 }
 
 .add:disabled {
@@ -487,43 +523,6 @@
     gap: var(--dsw-space-1);
   }
 
-  .add {
-    position: relative;
-    background: transparent;
-  }
-
-  .add::before {
-    content: '';
-    position: absolute;
-    inset: 2px;
-    border-radius: 999px;
-    corner-shape: round;
-    background: transparent;
-  }
-
-  .add > * {
-    position: relative;
-  }
-
-  .add:hover:not(:disabled) {
-    background: transparent;
-  }
-
-  .add:hover:not(:disabled)::before {
-    background: var(--dsw-alias-interactive-bg-hover);
-  }
-}
-
-:global([data-viewport='compact']) .add {
-  background: var(--dsw-specific-selector);
-}
-
-:global([data-viewport='compact']) .add:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover-solid);
-}
-
-:global([data-viewport='compact']) .add::before {
-  content: none;
 }
 
 /* The visible paperclip button owns the accessible file-picker action; keep
@@ -533,13 +532,13 @@
 }
 
 /* Plan / Read-only / model — native <select>, chip-like closed chrome
-   (figma ToggleButton: 13/20 medium secondary, 12px chevron). */
+   (12px medium label, drawn chevron). */
 .select {
   max-width: 220px;
   height: 28px;
   padding: 0 var(--dsw-space-5) 0 var(--dsw-space-2);
   border: none;
-  border-radius: var(--dsw-radius-md);
+  border-radius: var(--dsw-radius-full);
   outline: none;
   background-color: transparent;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -547,18 +546,21 @@
   background-position: right 4px center;
   background-size: 12px 12px;
   color: var(--dsw-alias-label-secondary);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 20px;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
   appearance: none;
-  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+  transition: background-color var(--dsw-motion-duration-quick)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-quick)
     var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .select:hover:not(:disabled) {
   background-color: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 .select:disabled {
@@ -566,26 +568,26 @@
   cursor: default;
 }
 
-/* Primary send (figma IconButton 34:10465): 34px circle, #3964FE light /
-   #679EFE dark — the info-fill pair (500→400), NOT button-primary (ink);
-   white glyph; empty text = 0.4 opacity. */
+/* Primary send (beautifului PromptBar, MIT): 32px ink circle, base-colored
+   glyph; disabled drops to the line-strong fill with a secondary icon —
+   transitions background/color/transform 200ms. */
 .primary {
   display: grid;
   place-items: center;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--dsw-radius-full);
   corner-shape: round;
-  background: var(--dsw-alias-button-info-fill);
-  /* Static white, not the foreground token: the arrow stays white on the blue
-     fill in both themes (design 34:10465). */
-  color: #fff;
+  background: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-bg-base);
   cursor: pointer;
-  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+  transition: background-color var(--dsw-motion-duration-fast)
     var(--dsw-motion-ease-standard, ease),
-    transform var(--dsw-motion-duration-micro, 0.14s)
+    color var(--dsw-motion-duration-fast)
+    var(--dsw-motion-ease-standard, ease),
+    transform var(--dsw-motion-duration-fast)
     var(--dsw-motion-ease-emphasized, ease);
   /* Opts out of the row's 2px downward shift (.row top pad): the send circle
      keeps its original seat while the smaller chips sit lower. Transform, not
@@ -593,17 +595,41 @@
   transform: translateY(-2px);
 }
 
-.primary:hover:not(:disabled) {
-  background: var(--dsw-alias-button-info-hover);
-}
-
-.primary:active:not(:disabled) {
-  transform: translateY(-2px) scale(0.88);
+.primary:enabled:active {
+  transform: translateY(-2px) scale(0.94);
 }
 
 .primary:disabled {
-  opacity: 0.4;
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-secondary);
   cursor: default;
+}
+
+/* transitions `09-icon-swap` (MIT): the send/stop glyph enters at .25 scale
+   + 2px blur over 250ms. */
+@keyframes icon-swap {
+  from {
+    opacity: 0;
+    transform: scale(0.25);
+    filter: blur(var(--dsw-motion-blur-small));
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+.primary :global(svg) {
+  animation: icon-swap var(--dsw-motion-duration-fast)
+    var(--dsw-motion-ease-emphasized, ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primary :global(svg) {
+    animation: none;
+  }
 }
 
 .retry {
@@ -736,6 +762,11 @@
 }
 
 @media (pointer: coarse) {
+  /* Focus-zoom guard for non-compact coarse surfaces (tablet layouts). */
+  .input {
+    font-size: 16px;
+  }
+
   .add {
     width: var(--dsw-touch-target);
     height: var(--dsw-touch-target);
@@ -757,6 +788,12 @@
     gap: var(--dsw-space-2);
     padding-top: 8px;
     border-radius: var(--dsw-mobile-card-radius);
+  }
+
+  /* Mobile Safari zooms on focus for inputs below 16px — keep the draft text
+     at 16px so typing never triggers it. */
+  :global([data-viewport='compact']) .input {
+    font-size: 16px;
   }
 
   :global([data-viewport='compact']) .row {

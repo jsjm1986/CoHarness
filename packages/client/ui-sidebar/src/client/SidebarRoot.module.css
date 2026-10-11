@@ -16,6 +16,7 @@
   background: var(--dsw-specific-sidebar-fill);
   color: var(--dsw-alias-label-primary);
   font-size: 14px;
+  letter-spacing: -0.01em; /* UI chrome tracking (beautifului body, MIT) */
   /* Footer controls live in separate packages. These inherited values keep
      their row geometry aligned without coupling their CSS modules. */
   --dsh-sidebar-footer-row-height: 36px;
@@ -174,8 +175,7 @@
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 50%;
-  corner-shape: round;
+  border-radius: var(--dsw-radius-control);
   padding: 0;
   background: transparent;
   cursor: pointer;
@@ -193,7 +193,7 @@
 }
 
 .iconButton:active {
-  transform: scale(0.9);
+  transform: scale(0.96);
 }
 
 .collapsed .iconButton {
@@ -242,40 +242,39 @@
   line-height: 16px;
 }
 
-/* New Session: 38px bar, 12px radius (figma 133:7634 geometry, squared-off
-   corners); collapsed it renders as the rail's plain icon control. */
+/* New Session (beautifului SidebarNav primary, MIT): flat 32px row on the
+   accent hover pair; collapsed it renders as the rail's plain icon control. */
 .newSession {
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 38px;
+  height: 32px;
   padding: var(--dsw-space-2) var(--dsw-space-4);
   margin: 0 2px var(--dsw-space-2);
   box-sizing: border-box;
-  border: 0.5px solid var(--dsw-alias-border-l3);
-  border-radius: var(--dsw-radius-lg);
-  background: var(--dsw-alias-button-elevated-fill);
+  border: 0;
+  border-radius: var(--dsw-radius-control);
+  background: var(--dsw-alias-interactive-bg-active);
   color: var(--dsw-alias-label-primary);
-  font-size: 14px;
+  font-size: 13px;
+  letter-spacing: -0.01em; /* UI chrome tracking (beautifului body, MIT) */
   font-weight: 500;
   line-height: 22px;
   cursor: pointer;
   overflow: hidden;
-  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
-    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
-    border-color var(--dsw-motion-duration-micro, 0.14s)
-    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
+  transition:
+    background-color var(--dsw-motion-duration-fast) var(--dsw-motion-ease-standard),
+    transform var(--dsw-motion-duration-fast) var(--dsw-motion-ease-standard);
 }
 
 .newSession:hover {
-  background: var(--dsw-alias-button-floating-hover);
-  border-color: var(--dsw-alias-border-l4);
+  background: var(--dsw-alias-interactive-bg-hover-accent);
 }
 
 .newSession:active {
-  background: var(--dsw-alias-interactive-bg-active);
+  transform: scale(0.98);
 }
 
 .collapsed .newSession {
@@ -318,30 +317,43 @@
 .panelRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 0 2px;
-  min-height: 36px;
-  padding: 7px 8px;
+  gap: 6px;
+  margin: 0 var(--dsw-space-2);
+  min-height: 32px;
+  padding: 0 var(--dsw-space-2);
   box-sizing: border-box;
   border: none;
-  border-radius: var(--dsw-radius-md);
+  border-radius: var(--dsw-radius-control);
   background: transparent;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-label-secondary);
   font: inherit;
+  font-size: 14px;
+  font-weight: 500;
   line-height: 22px;
   text-align: left;
   cursor: pointer;
-  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+  transition: background-color var(--dsw-motion-duration-quick)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-quick)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    transform var(--dsw-motion-duration-quick)
     var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .panelRow:hover {
   background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 .panelRow.panelActive {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: var(--dsw-alias-bg-raised);
   color: var(--dsw-alias-label-primary);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
+  box-shadow: var(--dsw-elevation-control);
+}
+
+.panelRow:active {
+  transform: scale(0.98);
 }
 
 .panelRow:focus-visible {
@@ -354,6 +366,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 20px;
+  height: 20px;
 }
 
 .panelTitle {
@@ -371,6 +385,7 @@
 .collapsed .panelRow {
   width: 36px;
   height: 36px;
+  min-height: 36px;
   justify-content: center;
   margin: 0;
   padding: 0;
