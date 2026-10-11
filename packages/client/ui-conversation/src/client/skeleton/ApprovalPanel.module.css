@@ -28,6 +28,21 @@
      scrolls (see ui-theme styles/scrollbar.css for the rebinding contract). */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  animation: dsh-approval-in var(--dsw-motion-duration-enter, 0.22s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
+}
+
+@keyframes dsh-approval-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
 }
 
 /* Tinted full-width header band. */
@@ -95,6 +110,16 @@
   justify-content: flex-end;
   gap: var(--dsw-space-2);
   padding: 14px var(--dsw-space-4) 14px;
+}
+
+.reject {
+  transition:
+    background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    border-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .reject:hover:not(:disabled) {

@@ -180,10 +180,20 @@
   background: transparent;
   cursor: pointer;
   color: var(--dsw-alias-label-secondary);
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    transform var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
 }
 
 .iconButton:hover {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.iconButton:active {
+  transform: scale(0.9);
 }
 
 .collapsed .iconButton {
@@ -253,10 +263,19 @@
   line-height: 22px;
   cursor: pointer;
   overflow: hidden;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    border-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .newSession:hover {
   background: var(--dsw-alias-button-floating-hover);
+  border-color: var(--dsw-alias-border-l4);
+}
+
+.newSession:active {
+  background: var(--dsw-alias-interactive-bg-active);
 }
 
 .collapsed .newSession {
@@ -312,6 +331,8 @@
   line-height: 22px;
   text-align: left;
   cursor: pointer;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .panelRow:hover {

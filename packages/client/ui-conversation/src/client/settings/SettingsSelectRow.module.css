@@ -56,6 +56,8 @@
   line-height: 22px;
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .selector:hover {

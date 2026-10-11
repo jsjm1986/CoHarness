@@ -15,7 +15,8 @@
 @media (hover: hover) {
   :global([data-actions-reveal='hover']) .actions {
     opacity: 0;
-    transition: opacity 80ms ease;
+    transition: opacity var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, ease);
   }
 
   :global([data-actions-reveal='hover']:hover) .actions,
@@ -52,7 +53,8 @@
 @media (hover: hover) {
   [data-time-hover-root] :is(.timeStart, .timeEnd) {
     opacity: 0;
-    transition: opacity 80ms ease;
+    transition: opacity var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, ease);
   }
 
   [data-time-hover-root]:hover :is(.timeStart, .timeEnd),
@@ -73,11 +75,22 @@
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
+  transition:
+    background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    transform var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .action:hover {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
+}
+
+.action:active:not([data-unavailable]) {
+  transform: scale(0.84);
 }
 
 /* Unavailable stays focusable and hoverable so Tooltip can explain why. */

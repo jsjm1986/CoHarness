@@ -12,6 +12,10 @@
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .trigger {
@@ -53,10 +57,27 @@
   padding: 10px;
   overflow: auto;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--dsw-radius-xl);
   background: var(--dsw-specific-menu);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent);
+  /* Drops from the header trigger: grow out of its bottom-left corner. */
+  transform-origin: top left;
+  animation: team-panel-in var(--dsw-motion-duration-enter, 0.18s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out)) backwards;
+}
+
+@keyframes team-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
 }
 
 .toolbar,
@@ -105,11 +126,20 @@
   min-width: 0;
   padding: 8px;
   border: 0.5px solid var(--dsw-alias-border-l1);
-  border-radius: 8px;
+  border-radius: var(--dsw-radius-lg);
   background: transparent;
   color: var(--dsw-alias-label-primary);
   text-align: left;
   cursor: pointer;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    border-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
+}
+
+.member:hover:not(:disabled) {
+  border-color: var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .member:disabled {
@@ -153,7 +183,7 @@
 .form {
   padding: 9px;
   border: 0.5px solid var(--dsw-alias-border-l1);
-  border-radius: 9px;
+  border-radius: var(--dsw-radius-lg);
   background: var(--dsw-alias-bg-base);
 }
 

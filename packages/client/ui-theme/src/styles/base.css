@@ -12,6 +12,17 @@
   --ds-transition-duration: 0.2s;
   --ds-transition-duration-fast: 0.1s;
   --ds-transition-duration-slow: 0.3s;
+
+  /* Shared motion grammar. `emphasized` is the decelerating entrance curve
+     (expo-out: fast start, long settle) used by menus, popovers, sheets, and
+     dialogs; `micro` covers hover/press color and transform replies. Modules
+     pair these with their own local @keyframes (keyframes cannot be shared
+     through CSS Modules, which scope animation names per file). */
+  --dsw-motion-ease-standard: var(--ds-ease-in-out);
+  --dsw-motion-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --dsw-motion-duration-micro: 0.14s;
+  --dsw-motion-duration-enter: 0.18s;
+  --dsw-motion-duration-exit: 0.12s;
 }
 
 /* focusWithoutRing marks automatic entry/return focus; keyboard traversal

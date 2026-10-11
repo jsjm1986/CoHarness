@@ -64,6 +64,16 @@
   color: inherit;
   cursor: pointer;
   font: inherit;
+  border-radius: var(--dsw-radius-sm);
+  transition:
+    opacity var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    transform var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
+}
+
+.copyButton:active {
+  transform: scale(0.88);
 }
 
 .block :where(pre) {

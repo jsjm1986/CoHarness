@@ -16,6 +16,8 @@
   inset: 0;
   background: var(--dsw-alias-bg-mask-1);
   backdrop-filter: var(--dsw-mask-blur);
+  animation: dsw-modal-mask-in var(--dsw-motion-duration-enter, 0.2s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 /* Dialog card: r24, elevation-prominent, layer-2 fill, pb 24. */
@@ -37,6 +39,8 @@
      not inherit the page-level thumb. */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  animation: dsw-modal-in var(--dsw-motion-duration-enter, 0.24s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
 }
 
 .dialog:focus {
@@ -79,6 +83,11 @@
   background: transparent;
   cursor: pointer;
   color: var(--dsw-alias-label-secondary);
+  transition:
+    background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .close:hover {
@@ -141,8 +150,22 @@
   from { opacity: 0; transform: translateY(12px); }
 }
 
+@keyframes dsw-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+
+@keyframes dsw-modal-mask-in {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .dialog {
+  .dialog,
+  .mask {
     animation: none;
   }
 }

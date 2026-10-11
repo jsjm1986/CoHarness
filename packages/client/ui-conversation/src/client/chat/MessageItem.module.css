@@ -87,6 +87,8 @@
   color: inherit;
   font: inherit;
   text-align: left;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .compactionButton:not(:disabled) {

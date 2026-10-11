@@ -25,6 +25,11 @@
   line-height: 20px;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .main {

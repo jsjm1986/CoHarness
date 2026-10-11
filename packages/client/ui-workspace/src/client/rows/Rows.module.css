@@ -13,6 +13,8 @@
   cursor: pointer;
   user-select: none;
   color: var(--dsw-alias-label-primary);
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .projectRow:hover,
@@ -20,8 +22,10 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* Selected is one step stronger than hover so the current session reads
+   against the rows the pointer passes over. */
 .sessionRow.selected {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: var(--dsw-alias-interactive-bg-active);
 }
 
 .searchResultRow {
@@ -38,6 +42,8 @@
   cursor: pointer;
   text-align: left;
   color: var(--dsw-alias-label-primary);
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .searchResultRow:hover {
@@ -45,7 +51,7 @@
 }
 
 .searchResultRow.selected {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: var(--dsw-alias-interactive-bg-active);
 }
 
 /* Archived rows keep their slot but read as secondary text (one step down
@@ -371,6 +377,8 @@
   background: transparent;
   cursor: pointer;
   color: var(--dsw-alias-label-tertiary);
+  transition: color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .iconButton:hover {

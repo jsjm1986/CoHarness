@@ -195,6 +195,24 @@
      styles/scrollbar.css for the rebinding contract). */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  /* The card always lands above the trigger, right-aligned (ModelSelect.tsx
+     placement), so the entrance grows out of the trigger's top-right. */
+  transform-origin: bottom right;
+  animation: model-menu-in var(--dsw-motion-duration-enter, 0.18s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out)) backwards;
+}
+
+@keyframes model-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu {
+    animation: none;
+  }
 }
 
 .back {
@@ -333,6 +351,8 @@
   color: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .option:not(.modelOption):hover:not(:disabled),
@@ -405,6 +425,8 @@
   line-height: 22px;
   cursor: pointer;
   text-align: left;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .cell:hover {

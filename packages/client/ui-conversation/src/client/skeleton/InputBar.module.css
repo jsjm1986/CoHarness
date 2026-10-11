@@ -57,6 +57,7 @@
   border-radius: 22px;
   background: var(--dsw-specific-input-major);
   box-shadow: var(--dsw-elevation-soft);
+  transition: box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
   font-size: 16px;
   line-height: 24px;
   /* Elevated surface in dark, same as the menus: the draft scrollport inside
@@ -100,6 +101,17 @@
 
 .cardWorkspaceTrigger:hover::after {
   background: var(--dsw-alias-state-business-primary);
+}
+
+/* Focused draft: the hairline stroke shifts to a business-blue tint and a
+   soft outer halo joins the soft elevation — a state reply, not a ring
+   (keyboard focus already has the :focus-visible outline contract). */
+.card:focus-within:not(.cardWorkspaceTrigger) {
+  --dsw-elevation-stroke-color: color-mix(
+    in srgb, var(--dsw-alias-state-business-primary) 40%, transparent);
+  box-shadow:
+    var(--dsw-elevation-soft),
+    0 0 0 3.5px color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, transparent);
 }
 
 .accessory {
@@ -443,10 +455,18 @@
   background: var(--dsw-specific-selector);
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    transform var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
 }
 
 .add:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+.add:active:not(:disabled) {
+  transform: scale(0.88);
 }
 
 .add:disabled {
@@ -533,6 +553,8 @@
   white-space: nowrap;
   cursor: pointer;
   appearance: none;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .select:hover:not(:disabled) {
@@ -561,7 +583,10 @@
      fill in both themes (design 34:10465). */
   color: #fff;
   cursor: pointer;
-  transition: background-color 100ms ease;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, ease),
+    transform var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-emphasized, ease);
   /* Opts out of the row's 2px downward shift (.row top pad): the send circle
      keeps its original seat while the smaller chips sit lower. Transform, not
      margin, so flex centering math is untouched. */
@@ -570,6 +595,10 @@
 
 .primary:hover:not(:disabled) {
   background: var(--dsw-alias-button-info-hover);
+}
+
+.primary:active:not(:disabled) {
+  transform: translateY(-2px) scale(0.88);
 }
 
 .primary:disabled {

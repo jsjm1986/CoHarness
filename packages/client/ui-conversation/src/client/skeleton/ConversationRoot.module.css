@@ -126,6 +126,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .crumb:hover:not(:disabled) {
@@ -180,6 +185,8 @@
   font-weight: 500;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
+  transition: color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .tab::after {
@@ -191,6 +198,10 @@
   height: 2px;
   border-radius: 2px;
   background: transparent;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform var(--dsw-motion-duration-enter, 0.2s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
 }
 
 /* Selected tab is blue, not ink: brand-primary resolves to neutral black in
@@ -202,6 +213,7 @@
 
 .tabActive::after {
   background: var(--dsw-alias-state-business-primary);
+  transform: scaleX(1);
 }
 
 .viewArea {

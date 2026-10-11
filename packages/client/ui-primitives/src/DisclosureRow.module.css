@@ -66,6 +66,32 @@ button.leading {
   font-size: 14px;
   line-height: 24px;
   color: var(--dsw-alias-label-secondary);
+  transition: color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
+}
+
+.row[data-expandable]:hover .title {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Expanded content mounts under data-open (the row keeps its seat while the
+   body arrives from above, matching the disclosure direction). */
+.root[data-open] > :not(.row) {
+  animation: dsw-disclosure-enter var(--dsw-motion-duration-enter, 0.2s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
+}
+
+@keyframes dsw-disclosure-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root[data-open] > :not(.row) {
+    animation: none;
+  }
 }
 
 :global([data-viewport='compact']) .row {
