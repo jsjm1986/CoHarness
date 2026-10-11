@@ -10,6 +10,7 @@ import {
   IconEllipsisOutline16,
   IconFolderClose16,
   IconFolderOpenOutline16,
+  IconInfoOutline16,
   IconInspectOutline12,
   IconPaperclipOutline16,
   IconPlusOutline16,
@@ -3405,7 +3406,7 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
         contentClassName={css.shell as string}
         {...(pager === undefined ? {} : { footer: pager })}
       >
-        {limitsText !== '' && <p className={css.limits}>{limitsText}</p>}
+        {limitsText !== '' && <p className={css.limits}><IconInfoOutline16 size={14} aria-hidden="true" /><span>{limitsText}</span></p>}
         <div className={css.workbench}>
           <aside className={css.scopeRail} aria-label={t('scope.rail.label')}>
             <div className={css.scopeRailHeading}>{t('scope.rail.title')}</div>
@@ -3815,13 +3816,13 @@ export const DocumentsModal: FC<DocumentsModalProps> = ({
                 <div className={css.emptyState}>
                   <span className={css.emptyIcon} aria-hidden="true"><IconBrowseOutline16 size={24} /></span>
                   <p className={css.empty}>{t('modal.empty')}</p>
-                  {phone && !uploadLocked && (
+                  {!uploadLocked && (
                     <div className={css.emptyActions}>
                       <Button type="button" variant="primary" aria-label={t('modal.upload')} icon={<IconPlusOutline16 size={16} />} onClick={() => { fileInputRef.current?.click() }}>
-                        {t('modal.upload.compact')}
+                        {phone ? t('modal.upload.compact') : t('modal.upload')}
                       </Button>
                       <Button type="button" variant="outline" aria-label={t('folder.create')} disabled={busy} icon={<IconFolderClose16 size={16} />} onClick={openCreateDirectory}>
-                        {t('folder.create.compact')}
+                        {phone ? t('folder.create.compact') : t('folder.create')}
                       </Button>
                     </div>
                   )}
