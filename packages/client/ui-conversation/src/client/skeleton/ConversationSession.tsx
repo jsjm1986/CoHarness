@@ -87,7 +87,17 @@ export function ConversationSessionHeader({
           <div className={css.titleRow}>
             <div className={css.titleCluster}>
               {leading}
-              <nav className={css.crumbs} aria-label={t('session.hierarchy')}>
+              <nav
+                className={css.crumbs}
+                aria-label={t('session.hierarchy')}
+                /* The strip scrolls horizontally on overflow; map the
+                   vertical wheel onto it so a mouse wheel can reach the
+                   clipped tail without a visible scrollbar. */
+                onWheel={(e) => {
+                  const el = e.currentTarget
+                  if (el.scrollWidth > el.clientWidth) el.scrollLeft += e.deltaY
+                }}
+              >
                 {ancestry.map((summary, index) => {
                   const last = index === ancestry.length - 1
                   const title = (
