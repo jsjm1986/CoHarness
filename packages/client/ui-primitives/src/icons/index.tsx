@@ -1,7 +1,7 @@
 /**
  * ic_ds_* icon set — Lucide-backed glyphs (lucide-react, ISC). Every glyph
  * rides currentColor and takes {size, className}; stroke weight follows the
- * drawn size (2 at ≥16px, 2.2 at 14px, 2.4 at ≤12px). `aria-hidden` stays
+ * drawn size (2.5 at ≥16px, 2.6 at 14px, 2.8 at ≤12px). `aria-hidden` stays
  * absent: the a11y tree lists bare svg glyphs as `img`, which the web golden
  * snapshots depend on. Two glyphs stay custom — IconCloseFill14 (heavy
  * filled X, no Lucide analogue) and IconTreeCorner8x10 (structural
@@ -111,8 +111,10 @@ export type { IconProps } from './props.ts'
  * glyphs stay `img` in the accessibility tree. */
 type GlyphProps = IconProps & Omit<LucideProps, 'size' | 'width' | 'height' | 'color' | 'strokeWidth' | 'fill' | 'ref'>
 
-/** Stroke weight by drawn size, per the reference kits (2 / 2.2 / 2.4). */
-const strokeFor = (size: number): number => (size <= 12 ? 2.4 : size < 16 ? 2.2 : 2)
+/** Stroke weight by drawn size. Lucide's 24-grid default (2) renders ~1.3px
+ * at 14-16px draws — too light against filled glyphs — so the ladder holds
+ * the rendered stem at roughly 1.5-1.7px (2.5 / 2.6 / 2.8). */
+const strokeFor = (size: number): number => (size <= 12 ? 2.8 : size < 16 ? 2.6 : 2.5)
 
 const glyph =
   (Lucide: LucideIcon, drawnSize: number, filled = false) =>
