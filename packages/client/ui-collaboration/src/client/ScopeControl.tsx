@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   IconChevronDownOutline14, IconCloseFill14, IconGlobeOutline14, IconSearchOutline16,
-  IconPlusOutline16, IconSettingsOutline16, IconUserOutline16, IconUsersOutline16, IconWarningOutline16,
+  IconPlusOutline16, IconSettingsOutline16, IconShieldOutline16, IconUserOutline16, IconUsersOutline16,
+  IconWarningOutline16,
   Menu, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -128,15 +129,15 @@ export function ScopeControl({
         </span>
       </span>
     ),
-    icon: (
-      <span
-        className={project.kind === 'steward'
-          ? css.scopeDotSteward
-          : projectScope !== undefined && project.projectId === projectScope.projectId
+    icon: project.kind === 'steward'
+      ? <IconShieldOutline16 className={css.scopeIconSteward} size={14} />
+      : (
+        <span
+          className={projectScope !== undefined && project.projectId === projectScope.projectId
             ? css.scopeDotOn : css.scopeDot}
-        aria-hidden="true"
-      />
-    ),
+          aria-hidden="true"
+        />
+      ),
     disabled: state.scopeBusy,
   }))
   if (visibleProjects.length === 0 && normalizedProjectQuery !== '') {
@@ -318,7 +319,9 @@ export function ScopeControl({
             {state.scopeError === undefined
               ? projectScope === undefined
                 ? <IconUserOutline16 size={iconSize} />
-                : <IconUsersOutline16 size={iconSize} />
+                : projectScope.steward === true
+                  ? <IconShieldOutline16 className={css.stewardGlyph} size={iconSize} />
+                  : <IconUsersOutline16 size={iconSize} />
               : <IconWarningOutline16 size={iconSize} />}
             {wide && (
               <>
