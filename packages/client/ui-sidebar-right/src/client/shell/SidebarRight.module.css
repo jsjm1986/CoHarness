@@ -136,7 +136,7 @@
   line-height: 1;
   background: transparent;
   border: none;
-  border-radius: var(--dsw-radius-sm);
+  border-radius: var(--dsw-radius-full);
   cursor: pointer;
 }
 

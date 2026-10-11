@@ -1,0 +1,6 @@
+/* The chip title's tool glyph, beside the name the strip lays out; the glyph
+   draws on currentColor, so this ink is the chip rendering's own. */
+.titleIcon {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}

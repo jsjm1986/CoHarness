@@ -17,6 +17,7 @@ import { PresentedOpenController } from './present-open.ts'
 import { PresentRow } from './PresentRow.tsx'
 import { DeliverablesTail, type DeliverablesInjected } from './Deliverables.tsx'
 import { ReviewTab, type ReviewInjected } from './ReviewTab.tsx'
+import { ReviewTabTitle } from './ReviewTabTitle.tsx'
 import { CHANGES_REVIEW_ID, changesReviewDefinition } from './review-definition.ts'
 import { createReviewStore } from './review-store.ts'
 import { ProducedFiles } from './ProducedFiles.tsx'
@@ -152,6 +153,10 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key: 'present', locale: NS }, PresentRow))
   const t = ctx.locale.bind(NS)
   ctx.effect(() => ctx.sidebarRightTabs.register(changesReviewDefinition(t)), 'ui-deliverables: review type')
+  ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
+    { name: 'sidebar.right.pane.tab.title', key: CHANGES_REVIEW_ID },
+    ReviewTabTitle,
+  ))
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
     name: 'sidebar.right.pane.tab', key: CHANGES_REVIEW_ID, locale: NS, store: createReviewStore(),
     inject: (sessionId): ReviewInjected => {

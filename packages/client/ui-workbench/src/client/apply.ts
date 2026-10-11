@@ -27,6 +27,7 @@ import { en, NS, zh } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { WorkspaceFileTab } from './components/WorkspaceFileTab.tsx'
+import { WorkspaceFileTitle } from './components/WorkspaceFileTitle.tsx'
 import { createWorkspacePreviewReaders } from './preview-readers.ts'
 
 /** Required Cordis capabilities; slot declarations may arrive in either order. */
@@ -86,6 +87,10 @@ export function apply(ctx: ClientContext): void {
     canOpen: address => parseWorkspaceResourceAddress(address) !== undefined,
     title: address => parseWorkspaceResourceAddress(address)?.path ?? address,
   }), 'ui-workbench: workspace file tab')
+  ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
+    { name: 'sidebar.right.pane.tab.title', key: 'workspace-file' },
+    WorkspaceFileTitle,
+  ))
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
     name: 'sidebar.right.pane.tab', key: 'workspace-file', locale: NS,
     inject: (sessionId) => {

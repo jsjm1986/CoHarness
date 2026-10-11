@@ -28,6 +28,7 @@ import { ExpandButton, BlankExpandButton } from '../src/client/shell/ExpandButto
 import { GuideBody } from '../src/client/tabs/guide/GuideBody.tsx'
 import { GuideTitle } from '../src/client/tabs/guide/GuideTitle.tsx'
 import { ToolBody } from '../src/client/tabs/tool/ToolBody.tsx'
+import { ToolDetailsTitle } from '../src/client/tabs/tool/ToolDetailsTitle.tsx'
 import { GUIDE_ID } from '../src/client/tabs/guide/definition.ts'
 import { en, zh } from '../src/client/locales.ts'
 import { writeSidebarLayout } from '../src/client/persistence.ts'
@@ -122,11 +123,11 @@ describe('ui-sidebar-right apply', () => {
     expect(guide?.id).toBe(GUIDE_ID)
     expect(guide?.priority).toBe('builtin')
     expect(guide?.title('sidebar://guide')).toBe('tab.guide.title')
-    // Five registrations: the root and panel seats, the header's corner seat,
-    // and the guide body and chip title under the guide implementation's id.
-    // The guide draws no product copy of its own, so neither guide seat binds the dictionary.
+    // The builtin tool type registers its body and the chip title that resolves
+    // the call's own name; the guide follows the same two-stage path.
     expect(registered.map(entry => [entry.name, entry.key, entry.locale, entry.component])).toEqual([
       ['sidebar.right.pane.tab', 'tool-details', undefined, ToolBody],
+      ['sidebar.right.pane.tab.title', 'tool-details', undefined, ToolDetailsTitle],
       ['rightbar', undefined, undefined, RightbarRoot],
       ['rightbar.session', undefined, 'sidebarRight', RightbarSeat],
       ['conversation.session.header.corner', undefined, 'sidebarRight', ExpandButton],
@@ -347,7 +348,7 @@ describe('ui-sidebar-right apply', () => {
     expect(dictionaries.size).toBe(0)
     await ctx.plugin({ inject: [...inject], apply }).await()
     expect(ctx.sidebarRightTabs.get('guide')?.id).toBe(GUIDE_ID)
-    expect(registered).toHaveLength(8)
+    expect(registered).toHaveLength(9)
   })
 
   it('routes tool details through the bar binding and collapses on close', async () => {
