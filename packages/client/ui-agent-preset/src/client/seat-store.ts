@@ -25,8 +25,8 @@ export interface AgentPresetSeatState {
   options: readonly AgentPresetOption[]
   /** The staged choice, empty until the roster loads. */
   current: string
-  /** A rejected apply's message, cleared by the next attempt. */
-  error: string | null
+  /** An error message; explicit selection failures also carry the preset for a Toast. */
+  error: string | { readonly preset: AgentPresetOption; readonly reason: string } | null
   busy: boolean
   /**
    * One-shot cue that the chip should introduce itself (the creator-draft
@@ -98,8 +98,10 @@ export class AgentPresetSeatController {
     try {
       const response = await this.remote.agentPresets.list()
       if (generation !== this.loadGeneration) return
+      // A roster refresh can finish after a selection; leave its refusal for the chip.
+      const error = this.store.getSnapshot().error
       if (!response.ok) {
-        this.set({ error: response.error.message })
+        if (typeof error !== 'object' || error === null) this.set({ error: response.error.message })
         return
       }
       const { presets, modeSelectionEnabled } = response.value
@@ -117,13 +119,14 @@ export class AgentPresetSeatController {
         // once the flow's session is current, so the reply can arrive after
         // apply() already composed it.
         current: this.staged ?? this.currentSession()?.agentPreset ?? this.fallback,
-        error: null,
+        error: typeof error === 'object' ? error : null,
         introduce: modeSelectionEnabled && this.store.getSnapshot().introduce,
       })
       await this.apply()
     } catch (error) {
       if (generation !== this.loadGeneration) return
-      this.set({ error: messageOf(error) })
+      const current = this.store.getSnapshot().error
+      if (typeof current !== 'object' || current === null) this.set({ error: messageOf(error) })
     }
   }
 
@@ -179,7 +182,9 @@ export class AgentPresetSeatController {
     if (session === undefined || !session.blank || session.id !== expectedSessionId) return undefined
     this.stage(id)
     await this.apply()
-    return this.store.getSnapshot().error ?? undefined
+    const error = this.store.getSnapshot().error
+    if (error === null) return undefined
+    return typeof error === 'object' ? error.reason : error
   }
 
   /** Acknowledge the introduction cue once the chip has played it. */
@@ -215,6 +220,17 @@ export class AgentPresetSeatController {
     // elsewhere — but it also cannot consume it: the stage belongs to the
     // next blank session and stays pending while a non-blank is current.
     if (!session.blank) return
+    const refuse = (reason: string): void => {
+      this.set({
+        busy: false,
+        error: {
+          reason,
+          preset: this.store.getSnapshot().options.find(option => option.id === staged)
+            ?? { id: staged, trust: 'system' },
+        },
+        current: session.agentPreset ?? this.fallback,
+      })
+    }
     this.set({ busy: true, error: null })
     try {
       const response = await this.remote.agentPresets.select(session.id, staged)
@@ -227,10 +243,7 @@ export class AgentPresetSeatController {
         // this already names, and a `reason` detail holds the same cause
         // without it. Read by the detail rather than by the code, because
         // every refusal that has a cause to give names it the same way.
-        const reason = 'reason' in detail && typeof detail.reason === 'string'
-          ? detail.reason
-          : undefined
-        this.set({ busy: false, error: reason ?? error.message, current: this.fallback })
+        refuse('reason' in detail && typeof detail.reason === 'string' ? detail.reason : error.message)
         return
       }
       // Consumed: the next new session opens on the deployment default again.
@@ -238,7 +251,16 @@ export class AgentPresetSeatController {
       this.onApplied?.(session.id, response.value)
     } catch (error) {
       this.staged = undefined
-      this.set({ busy: false, error: messageOf(error), current: this.fallback })
+      refuse(messageOf(error))
+    }
+  }
+
+  /** Acknowledge a displayed refusal without dismissing a newer attempt.
+   * @param refusal - the selection error whose Toast finished.
+   */
+  dismissRefusal(refusal: AgentPresetSeatState['error']): void {
+    if (refusal !== null && typeof refusal === 'object' && this.store.getSnapshot().error === refusal) {
+      this.set({ error: refusal.reason })
     }
   }
 }

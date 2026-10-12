@@ -469,7 +469,9 @@ describe('the new-session chip controller', () => {
 
     // Showing `minimal` after a refusal would claim a composition the session
     // never got.
-    expect(controller.store.getSnapshot()).toMatchObject({ current: 'standard', error: 'already started' })
+    expect(controller.store.getSnapshot()).toMatchObject({
+      current: 'standard', error: { preset: { id: 'minimal' }, reason: 'already started' },
+    })
   })
 
   it('uses a structured refusal reason when the host supplies one', async () => {
@@ -482,7 +484,9 @@ describe('the new-session chip controller', () => {
 
     await controller.select('minimal')
 
-    expect(controller.store.getSnapshot()).toMatchObject({ current: 'standard', error: 'already started' })
+    expect(controller.store.getSnapshot()).toMatchObject({
+      current: 'standard', error: { preset: { id: 'minimal' }, reason: 'already started' },
+    })
   })
 
   it('falls back to the default when the switch never reaches the host', async () => {
@@ -493,7 +497,7 @@ describe('the new-session chip controller', () => {
     await controller.select('minimal')
 
     expect(controller.store.getSnapshot())
-      .toMatchObject({ current: 'standard', busy: false, error: 'socket closed' })
+      .toMatchObject({ current: 'standard', busy: false, error: { reason: 'socket closed' } })
   })
 
   it('ignores a pick while a switch is in flight', async () => {

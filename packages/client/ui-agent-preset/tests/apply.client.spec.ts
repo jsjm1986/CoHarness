@@ -1004,6 +1004,85 @@ describe('AgentPresetSeatController reconciliation', () => {
     expect(controller.store.getSnapshot().showPicker).toBe(false)
     expect(controller.store.getSnapshot().current).toBe('standard')
   })
+
+  const REFUSAL_ROSTER = {
+    ok: true as const,
+    value: {
+      presets: [
+        { id: 'standard', trust: 'system' as const, isDefault: true },
+        { id: 'minimal', trust: 'system' as const },
+      ],
+      authorable: true,
+      modeSelectionEnabled: true,
+    },
+  }
+
+  it.each(['returned', 'thrown'] as const)('announces a %s selection failure as a refusal', async (failure) => {
+    const select = () => failure === 'thrown'
+      ? Promise.reject(new Error('selection rejected'))
+      : Promise.resolve({ ok: false as const, error: { code: 'internal', message: 'selection rejected', details: {} } })
+    const controller = new AgentPresetSeatController(
+      { agentPresets: { select, list: () => Promise.resolve(REFUSAL_ROSTER) } } as never,
+      () => ({ id: 'blank' as never, blank: true }),
+    )
+    await controller.load()
+
+    await controller.select('minimal')
+
+    expect(controller.store.getSnapshot()).toMatchObject({
+      busy: false,
+      error: { preset: { id: 'minimal', trust: 'system' }, reason: 'selection rejected' },
+      current: 'standard',
+    })
+    // The Toast's dismissal downgrades to the bare reason, which the chip's
+    // trigger keeps as its title until the next attempt clears it.
+    controller.dismissRefusal(controller.store.getSnapshot().error)
+    expect(controller.store.getSnapshot().error).toBe('selection rejected')
+    await controller.load()
+    expect(controller.store.getSnapshot().error).toBeNull()
+  })
+
+  it('keeps the bare cause, never dismisses a newer refusal, and survives a roster refresh', async () => {
+    const reason = 'failed to import loader entry ctx (@deepseek-ai/dsh-gone): Cannot find package'
+    const controller = new AgentPresetSeatController(
+      {
+        agentPresets: {
+          list: () => Promise.resolve(REFUSAL_ROSTER),
+          select: () => Promise.resolve({
+            ok: false as const,
+            error: {
+              code: 'agent-preset/invalid',
+              message: `agent-presets: preset "minimal" failed to mount: ${reason}`,
+              details: { agentPreset: 'minimal', reason },
+            },
+          }),
+        },
+      } as never,
+      () => ({ id: 'blank' as never, blank: true }),
+    )
+    await controller.load()
+
+    // The surface reporting this names the preset itself, so carrying the
+    // roster's own "preset X failed to mount" frame would say it twice.
+    await controller.select('minimal')
+    const first = controller.store.getSnapshot().error
+    expect(first).toEqual({ preset: { id: 'minimal', trust: 'system' }, reason })
+
+    // A second refusal of the same id is a fresh announcement, not a no-op.
+    await controller.select('minimal')
+    const second = controller.store.getSnapshot().error
+    expect(second).toEqual(first)
+    expect(second).not.toBe(first)
+
+    // A roster refresh while the refusal plays must not clobber it.
+    await controller.load()
+    expect(controller.store.getSnapshot().error).toBe(second)
+
+    controller.dismissRefusal(first)
+    expect(controller.store.getSnapshot().error).toBe(second)
+    controller.dismissRefusal(second)
+    expect(controller.store.getSnapshot().error).toBe(reason)
+  })
 })
 
 it('hands the owning session to the Remote select the Gateway routes by', async () => {

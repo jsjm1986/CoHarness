@@ -189,6 +189,7 @@ export function apply(ctx: ClientContext): void {
         },
         load: () => selected.load(),
         select: (preset: string) => selected.select(preset),
+        dismissRefusal: (error) => { selected.dismissRefusal(error) },
         introduced: () => { selected.introduced() },
       }
     }
