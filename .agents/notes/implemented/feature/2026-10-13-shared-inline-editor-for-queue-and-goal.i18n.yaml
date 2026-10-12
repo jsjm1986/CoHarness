@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-13-shared-inline-editor-for-queue-and-goal.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-13-shared-inline-editor-for-queue-and-goal.md
+/agent-note-shared-inlineeditor-keeps-line-breaks-in-queue-and-goal-edits:
+  en: cc9f25d3de636179
+  zh: e0087b183a376162
+/agent-note-shared-inlineeditor-keeps-line-breaks-in-queue-and-goal-edits/problem:
+  en: 362cadb4850ce65b
+  zh: df0f57e41c7f6111
+/agent-note-shared-inlineeditor-keeps-line-breaks-in-queue-and-goal-edits/decision:
+  en: dd3a28a8a7ea1e0d
+  zh: 1a9ef34684e5af5b
+/agent-note-shared-inlineeditor-keeps-line-breaks-in-queue-and-goal-edits/alternatives-considered:
+  en: 47db84a9b0d81858
+  zh: 9e4e5cfa3048508c
+/agent-note-shared-inlineeditor-keeps-line-breaks-in-queue-and-goal-edits/consequences:
+  en: bfebc3b80636e859
+  zh: 9e0f6575ddf6bc79
+/agent-note-shared-inlineeditor-keeps-line-breaks-in-queue-and-goal-edits/verification:
+  en: c7a7a8732aa43597
+  zh: 80d58e42b458ea55
+/agent-note-shared-inlineeditor-keeps-line-breaks-in-queue-and-goal-edits/related:
+  en: 5f4c0978d2c21b2b
+  zh: e6cd76f93f4e021a

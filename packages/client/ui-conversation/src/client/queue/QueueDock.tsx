@@ -10,7 +10,7 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import type { PendingSubmission, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronUpOutline14, IconCloseOutline16,
-  IconEditOutline16, IconQueueOutline14, IconSendOutline14, IconTrashOutline16, Tooltip,
+  IconEditOutline16, IconQueueOutline14, IconSendOutline14, IconTrashOutline16, InlineEditor, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageImageLoader } from '../contract/slots.ts'
 import type { QueueAction, QueueItemId, QueueRow } from '../contract/queue.ts'
@@ -160,22 +160,12 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                 {rowCount === 1 && <span className={css.lead} aria-hidden><IconQueueOutline14 /></span>}
                 {editing?.id === row.id
                   ? (
-                    <input
-                      autoFocus
-                      className={css.editor}
-                      aria-label={t('queue.edit')}
+                    <InlineEditor
                       value={editing.text}
-                      onChange={(event) => { setEditing({ id: row.id, text: event.currentTarget.value }) }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Escape') {
-                          setEditing(null)
-                          return
-                        }
-                        if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                          event.preventDefault()
-                          void saveEdit()
-                        }
-                      }}
+                      label={t('queue.edit')}
+                      onChange={(text) => { setEditing({ id: row.id, text }) }}
+                      onSave={() => { void saveEdit() }}
+                      onCancel={() => { setEditing(null) }}
                     />
                   )
                   : (

@@ -262,11 +262,11 @@ describe('registerMediaReferences /api/file', () => {
     req.method = 'GET'
     req.url = `/api/file?path=${encodeURIComponent(path)}`
     req.socket = new EventEmitter() as never
-    const res = { writeHead: vi.fn(), end: vi.fn() } as unknown as Parameters<ConnectionHttpHandler>[1]
+    const writeHead = vi.fn()
+    const res = { writeHead, end: vi.fn() } as unknown as Parameters<ConnectionHttpHandler>[1]
     const pending = route.handler(req, res)
     req.socket.emit('close')
     await pending
-    const writeHead = res.writeHead as unknown as ReturnType<typeof vi.fn>
     expect(writeHead).toHaveBeenCalledWith(499, expect.objectContaining({ 'X-Content-Type-Options': 'nosniff' }))
   })
 
