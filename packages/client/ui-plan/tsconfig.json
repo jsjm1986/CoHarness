@@ -31,6 +31,27 @@
     },
     {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../ui-sidebar-right"
+    },
+    {
+      "path": "../ui-dockkit"
+    },
+    {
+      "path": "../ui-user-questions"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../util/crypto"
     }
   ]
 }
