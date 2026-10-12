@@ -31,7 +31,7 @@ import {
   spawnSubprocess,
   validateSubprocessSpec,
 } from './spawn.ts'
-import { prepareManagedProcessBinding } from './output.ts'
+import { logSpillFailure, prepareManagedProcessBinding } from './output.ts'
 import type { LocalSubprocessHandle, SpawnInternals } from './spawn.ts'
 import {
   launchLinuxScope,
@@ -84,18 +84,8 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     }, 'local subprocess teardown')
   }
 
-  /**
-   * Log one spill failure through the plugin logger. The collector keeps only
-   * its in-memory tail afterwards, so the model sees a truncated result with
-   * no spill path; the log line is the only trace of why.
-   */
-  private readonly reportSpillFailure = (error: unknown, label: string): void => {
-    this.ctx.logger.error(
-      `subprocess-local could not write the complete ${label} stream to its spill file; the tool result keeps only the in-memory tail and reports no full-output path. `
-      + 'A removed private spill directory under the OS temp dir (ENOENT) points at a temporary-file cleaner.',
-      error,
-    )
-  }
+  /** Spill failures reach the plugin logger; the log line is the only trace of why a result has no spill path. */
+  private readonly reportSpillFailure = logSpillFailure(this.ctx.logger, 'subprocess-local')
 
   private terminateForHostExit(): void {
     for (const handle of this.live) {

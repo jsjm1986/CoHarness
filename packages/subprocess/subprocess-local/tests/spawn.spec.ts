@@ -64,10 +64,12 @@ function shellArgv(command: string): string[] {
   }
 }
 
-const { failNextClose, failNextUnlink, failNextWrite } = vi.hoisted(() => ({
+const { failNextClose, failNextUnlink, failNextWrite, failNextOpen, unlinked } = vi.hoisted(() => ({
   failNextClose: { value: false },
   failNextUnlink: { value: false },
   failNextWrite: { value: false },
+  failNextOpen: { value: false },
+  unlinked: [] as string[],
 }))
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>()
@@ -81,11 +83,19 @@ vi.mock('node:fs', async (importOriginal) => {
       actual.closeSync(fd)
     },
     unlinkSync(path: Parameters<typeof actual.unlinkSync>[0]): void {
+      unlinked.push(String(path))
       if (failNextUnlink.value) {
         failNextUnlink.value = false
         throw Object.assign(new Error('simulated EIO on unlink'), { code: 'EIO' })
       }
       actual.unlinkSync(path)
+    },
+    openSync(...args: Parameters<typeof actual.openSync>): number {
+      if (failNextOpen.value) {
+        failNextOpen.value = false
+        throw Object.assign(new Error('simulated EEXIST on open'), { code: 'EEXIST' })
+      }
+      return actual.openSync(...args)
     },
     writeSync(...args: Parameters<typeof actual.writeSync>): number {
       if (failNextWrite.value) {
@@ -551,16 +561,6 @@ describe('OutputCollector', () => {
     expect(out.truncated).toBe(true)
   })
 
-  it('snapshot copies the retained tail with its pre-truncation byte total', () => {
-    const collector = new OutputCollector(4, 'test', spillOptions(100).options)
-    collector.push(Buffer.from('aabbcc'))
-    const snap = collector.snapshot()
-    expect(snap.totalBytes).toBe(6)
-    expect(snap.bytes.toString('utf8')).toBe('bbcc')
-    snap.bytes.write('XX')
-    expect(collector.readFrom(0).text).toBe('bbcc')
-  })
-
   it('readFrom returns increments and flags lossy reads', () => {
     const collector = new OutputCollector(10, 'test', spillOptions(100).options)
     collector.push(Buffer.from('aaaaa'))
@@ -688,6 +688,70 @@ describe('OutputCollector', () => {
     expect(out.text).toBe('ccdd')
     expect(out.truncated).toBe(true)
     expect(out.spillPath).toBeUndefined()
+  })
+
+  it('snapshot copies the retained tail with its pre-truncation byte total', () => {
+    const collector = new OutputCollector(4, 'test', spillOptions(100).options)
+    collector.push(Buffer.from('aabbcc'))
+    const snap = collector.snapshot()
+    expect(snap.totalBytes).toBe(6)
+    expect(snap.bytes.toString('utf8')).toBe('bbcc')
+    snap.bytes.write('XX')
+    expect(collector.readFrom(0).text).toBe('bbcc')
+  })
+
+  it('does not unlink a path it never created when the exclusive open fails (EEXIST)', () => {
+    const { options, failures } = spillOptions(100)
+    const collector = new OutputCollector(4, 'eexist', options)
+    collector.push(Buffer.from('aaaa'))
+    unlinked.length = 0
+    failNextOpen.value = true
+    expect(() => { collector.push(Buffer.from('bbbb')) }).not.toThrow()
+    expect(failNextOpen.value).toBe(false)
+    expect((failures[0]!.error as NodeJS.ErrnoException).code).toBe('EEXIST')
+    expect(unlinked).toEqual([])
+    expect(collector.finalize()).toEqual({ text: 'bbbb', truncated: true })
+  })
+
+  it('contains a reporter that throws and keeps collecting', () => {
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    try {
+      const collector = new OutputCollector(4, 'loud-reporter', {
+        maxBytes: 100, dir: join(spillDir, `absent-${Date.now()}`), onFailure: () => { throw new Error('logger down') },
+      })
+      collector.push(Buffer.from('aaaa'))
+      expect(() => { collector.push(Buffer.from('bbbb')) }).not.toThrow()
+      collector.push(Buffer.from('cc'))
+      expect(stderr).toHaveBeenCalledOnce()
+      expect(String(stderr.mock.calls[0]![0])).toContain('spill failure reporter threw: Error: logger down')
+      expect(collector.finalize()).toEqual({ text: 'bbcc', truncated: true })
+    } finally {
+      stderr.mockRestore()
+    }
+  })
+})
+
+describe('spill failure reporting without an owner logger', () => {
+  it('writes one stderr line for a bare spawn whose spill directory is gone', async () => {
+    const removedDir = mkdtempSync(join(tmpdir(), 'dsh-subprocess-removed-'))
+    rmSync(removedDir, { recursive: true, force: true })
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    try {
+      const result = await finish(spawnSubprocess(
+        spec('for i in $(seq 1 200); do printf "line-%04d\\n" $i; done', { stdoutMaxBytes: 500, stderrMaxBytes: 500 }),
+        { spillDir: removedDir },
+      ))
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.truncated).toBe(true)
+      expect(result.stdout.text).toContain('line-0200')
+      expect(result.stdout.spillPath).toBeUndefined()
+      const lines = stderr.mock.calls.map(call => String(call[0])).filter(line => line.includes('dsh-subprocess-local:'))
+      expect(lines).toHaveLength(1)
+      expect(lines[0]).toContain('stdout spill failed; only the in-memory tail is retained')
+      expect(lines[0]).toContain('ENOENT')
+    } finally {
+      stderr.mockRestore()
+    }
   })
 })
 

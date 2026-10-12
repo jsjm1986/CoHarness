@@ -470,46 +470,63 @@ async function durablePromptContent(
   }
 }
 
-/** Search durable content for an image reference, including nested tool results. */
+/** Search one declared content array for a direct image block. */
 function imageBlockIn(content: unknown, match: (ref: ImageAttachmentRef) => boolean): ImageAttachmentRef | undefined {
   if (!Array.isArray(content)) return undefined
   for (const value of content) {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
-    const block = value as { type?: unknown; attachment?: unknown; content?: unknown }
+    const block = value as { type?: unknown; attachment?: unknown }
     if (block.type === 'image' && typeof block.attachment === 'object' && block.attachment !== null) {
       const ref = block.attachment as ImageAttachmentRef
       if (match(ref)) return ref
-    }
-    if (block.type === 'tool-result') {
-      const nested = imageBlockIn(block.content, match)
-      if (nested !== undefined) return nested
     }
   }
   return undefined
 }
 
-/** Search every durable event carrier that can own model-visible content. */
+/** Read only first-party declared content fields; unknown event payloads stay opaque. */
 function imageInEvent(event: SessionEvent, match: (ref: ImageAttachmentRef) => boolean): ImageAttachmentRef | undefined {
   const data = event.data as {
     content?: unknown
     message?: { content?: unknown }
-    inserted?: Array<{ content?: unknown }>
-    stream?: readonly AssistantStreamRecord[]
+    inserted?: unknown
+    summary?: unknown
+    rawOutput?: unknown
   }
-  const direct = imageBlockIn(data.content, match)
-  if (direct !== undefined) return direct
-  if (data.message !== undefined) {
-    const wrapped = imageBlockIn(data.message.content, match)
-    if (wrapped !== undefined) return wrapped
-  }
-  if (data.inserted !== undefined) {
-    for (const message of data.inserted) {
-      const inserted = imageBlockIn(message.content, match)
-      if (inserted !== undefined) return inserted
+  // First-party event payloads can be present without their producer plugin mounted.
+  const type: string = event.type
+  switch (type) {
+    case 'user/message':
+    case 'tool/ptc-dispatch':
+      return imageBlockIn(data.content, match)
+    case 'system/message':
+    case 'developer/message':
+    case 'tool/result':
+    case 'team/message/queued':
+      return imageBlockIn(data.message?.content, match)
+    case 'agent/inbox/spliced': {
+      const messages = data.inserted
+      if (!Array.isArray(messages)) return undefined
+      for (const message of messages as readonly unknown[]) {
+        if (typeof message !== 'object' || message === null || Array.isArray(message)) continue
+        const found = imageBlockIn((message as { readonly content?: unknown }).content, match)
+        if (found !== undefined) return found
+      }
+      return undefined
     }
+    case 'compaction/summary':
+      return imageBlockIn(data.summary, match) ?? imageBlockIn(data.rawOutput, match)
+    case 'assistant/message': {
+      const found = imageBlockIn(data.message?.content, match)
+      if (found !== undefined) return found
+      break
+    }
+    case 'assistant/attempt': break
+    default: return undefined
   }
-  if (data.stream !== undefined) {
-    for (const timed of expandAssistantStream(data.stream)) {
+  const stream = (event.data as { stream?: readonly AssistantStreamRecord[] }).stream
+  if (stream !== undefined) {
+    for (const timed of expandAssistantStream(stream)) {
       if (timed.chunk.type === 'block-end') {
         const found = imageBlockIn([timed.chunk.block], match)
         if (found !== undefined) return found

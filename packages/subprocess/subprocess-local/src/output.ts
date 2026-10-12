@@ -8,7 +8,8 @@ import type { CollectedOutput } from '@deepseek-ai/dsh-subprocess'
 /**
  * Receives one spill failure so the owner can log it through its own logger.
  * Called at most once per collector, after the spill has been discarded and
- * the in-memory tail has kept collecting.
+ * the in-memory tail has kept collecting. A reporter that throws is contained
+ * and its failure written to stderr.
  * @param error - the `node:fs` failure from opening or appending the spill file.
  * @param label - the stream label of the collector that failed.
  */
@@ -63,6 +64,24 @@ process.once('exit', () => {
  */
 function reportSpillFailureToStderr(error: unknown, label: string): void {
   process.stderr.write(`dsh-subprocess-local: ${label} spill failed; only the in-memory tail is retained: ${String(error)}\n`)
+}
+
+/**
+ * Build the reporter an owner passes as {@link SpillOptions.onFailure}: one
+ * error-level log line naming the owner and stream, with the failure appended
+ * so its `code`, `syscall`, and `path` reach the log.
+ * @param logger - the owner's plugin logger.
+ * @param owner - the component named in the line.
+ * @returns the reporter.
+ */
+export function logSpillFailure(logger: { error(message: string, ...detail: unknown[]): void }, owner: string): SpillFailureReporter {
+  return (error, label) => {
+    logger.error(
+      `${owner} could not write the complete ${label} stream to its spill file; the result keeps only the in-memory tail and reports no full-output path. `
+      + 'A removed private spill directory under the OS temp dir (ENOENT) points at a temporary-file cleaner.',
+      error,
+    )
+  }
 }
 
 /** Inputs a managed native process needs before its output streams are bound. */
@@ -177,13 +196,18 @@ export class OutputCollector {
       if (this.spillFd === undefined) {
         // Random suffix + O_EXCL + no-follow-equivalent ('wx' fails on any
         // existing path, symlink or not) + owner-only mode: defeats spill-path
-        // prediction and symlink planting in shared tmp dirs.
-        this.spillFile = join(
+        // prediction and symlink planting in shared tmp dirs. The path is
+        // published only once the open succeeded, so a failed open (EEXIST on a
+        // planted entry included) never lets discardSpill unlink a path this
+        // process did not create.
+        const file = join(
           spill.dir,
           `dsh-subprocess-${process.pid}-${++spillCounter}-${randomBytes(6).toString('hex')}-${this.label}.log`,
         )
-        this.spillFd = openSync(this.spillFile, 'wx', 0o600)
-        for (const prior of this.chunks) writeSync(this.spillFd, prior)
+        const fd = openSync(file, 'wx', 0o600)
+        this.spillFile = file
+        this.spillFd = fd
+        for (const prior of this.chunks) writeSync(fd, prior)
       }
       writeSync(this.spillFd, chunk)
     } catch (error) {
@@ -191,7 +215,13 @@ export class OutputCollector {
       // EMFILE, or ENOSPC: the spill file is a recovery aid, not a
       // precondition of collection.
       this.discardSpill()
-      spill.onFailure(error, this.label)
+      try {
+        spill.onFailure(error, this.label)
+      } catch (reporterFailure) {
+        // The reporter runs inside the stream listener too; a failing logger
+        // must not become the uncaught exception this path exists to prevent.
+        process.stderr.write(`dsh-subprocess-local: spill failure reporter threw: ${String(reporterFailure)}\n`)
+      }
     }
   }
 

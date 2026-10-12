@@ -15,8 +15,11 @@
 | `7facb1cf65d` | 降级重放/省略路由/未接受路由警告按 route 去重 | `packages/llm/llm-deepseek/src/host.ts` |
 | `193f9ce4130` | `dsh_session_log` 加 `maxBytes`（默认 8 MiB），发送可装入的最长待传前缀，超限首事件省略并单次告警；接受记录与 envelope 携带 `sessionFormatVersion`，跨代际水位忽略 | `packages/session/session-log-deepseek`（保留 enabled:false 默认、allowedEndpoints、killSwitchEnv、audit 自有门禁） |
 | `11a0f85b340` | Python PTC 接入共享 `sandbox`/`sandboxPolicy`：`sandboxMode`、策略解析、`ConfinedArgv`、stdin 载入 bootstrap（取消逐次临时拷贝）、`AbortController` 结算 | `packages/experimental/ptc-runtime-python`；上游 `ptc-python-read-only` 夹具不携带（v4 codec + working-directory 段我们未接纳），`ptc-python-turn` expected schema 已重生成 |
+| `cafb9b93b4b`（subprocess 部分） | spill 路径在 `openSync` 成功后才发布（EEXIST 不再删外部路径）；抛错 reporter 收敛到 stderr；`logSpillFailure` 共享所有者日志行 | `packages/subprocess/subprocess-local`、`packages/ssh/ssh` |
+| `0c44e5461db` | 附件发现只扫声明的一方载体字段；opaque/ignorable 事件与 `tool-result` 嵌套不再触发存储读取 | `packages/host/apiproxy`（`imageInEvent` + `session-export.ts`，保留 `assistant/chunk` 载体） |
+| `ad83cce36ac` | V3 重启修复：`next-turn` splice 后开 `turn+1` 且非开步时合成 `turn/end interrupted`；`image/offload` `targets[].seq` 纳入引用重映射 | `packages/session/session-format-v3-to-v4`（适配到 CoHarness 折叠阶段，非逐字） |
 
-验证：`deepseek-llm-api-extensions` + `llm-deepseek` 17 测试、`session-log-deepseek` 34 测试、`ptc-runtime-python` 325 测试全过；typecheck 干净；`ptc-python-turn` 快照回放通过。决策记录：`.agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md`、`2026-10-12-python-ptc-shared-sandbox-policy.md`。
+验证：`deepseek-llm-api-extensions` + `llm-deepseek` 17 测试、`session-log-deepseek` 34 测试、`ptc-runtime-python` 325 测试、`subprocess-local` 359 测试、`session-format-v3-to-v4` 43 测试、`apiproxy` session-export 43 测试全过；typecheck 干净；`ptc-python-turn` 快照回放通过。决策记录：`.agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md`、`2026-10-12-python-ptc-shared-sandbox-policy.md`、`2026-10-12-durable-path-safety-fixes.md`。
 
 ## 待修缺口（按严重度，源码复核确认）
 

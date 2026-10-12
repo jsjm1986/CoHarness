@@ -48,6 +48,9 @@ class V3ToV4Stage implements SessionFormatMigrationStage {
   private inheritedCut: number | undefined
   private cutSeen = false
   private pending: V3PendingAttempt | undefined
+  private turn: number | undefined
+  private stepOpen = false
+  private nextTurnSpliced = false
 
   constructor(private readonly sourceHeader: SessionFormatHeader, private readonly sourceCut: number | undefined) {
     this.inheritedCut = sourceHeader.isSeeded ? undefined : 0
@@ -56,6 +59,11 @@ class V3ToV4Stage implements SessionFormatMigrationStage {
   transformEvent(event: SessionFormatEvent, context: SessionFormatMigrationContext): void {
     if (event.seq !== this.sourceSeen++) {
       throw new SessionFormatError('format v3 source events must be dense')
+    }
+    const interrupted = this.observeRestart(event)
+    if (interrupted !== undefined) {
+      this.emitGenerated({ type: 'turn/end', seq: event.seq, time: event.time,
+        data: { turn: interrupted, reason: { kind: 'interrupted' } } }, context)
     }
     if (this.isCutMarker(event)) {
       /* The boundary must not fall inside a live chunk group: folding members
@@ -128,6 +136,32 @@ class V3ToV4Stage implements SessionFormatMigrationStage {
       throw new SessionFormatError('format v3 seeded Session lacks its inherited end-seed marker')
     }
     return this.inheritedCut as number
+  }
+
+  /**
+   * Track turn boundaries so a V3 restart that spliced `next-turn` inbox rows
+   * and opened the next turn without closing the interrupted one receives a
+   * synthesized `turn/end` first. Returns the interrupted turn number, or
+   * `undefined` when the event does not expose one.
+   */
+  private observeRestart(event: SessionFormatEvent): number | undefined {
+    const data = event.data
+    const interrupted = event.type === 'turn/start' && this.turn !== undefined && !this.stepOpen
+      && this.nextTurnSpliced && isRecord(data) && data['turn'] === this.turn + 1
+      ? this.turn : undefined
+    this.nextTurnSpliced = event.type === 'agent/inbox/spliced' && isRecord(data)
+      && data['target'] === 'next-turn' && Array.isArray(data['inserted']) && data['inserted'].length > 0
+    if (event.type === 'turn/start' && isRecord(data) && typeof data['turn'] === 'number') {
+      this.turn = data['turn']
+    } else if (event.type === 'turn/end') {
+      // Target validation refuses a turn boundary that crosses an open step, so only `step/*` clears `stepOpen`.
+      this.turn = undefined
+    } else if (event.type === 'step/start') {
+      this.stepOpen = true
+    } else if (event.type === 'step/end') {
+      this.stepOpen = false
+    }
+    return interrupted
   }
 
   /** Buffer one chunk into its (turn, step) group, closing a prior group on any boundary. */
@@ -314,6 +348,17 @@ class V3ToV4Stage implements SessionFormatMigrationStage {
       case 'session/title-llm-request': {
         if (data['messageSeqs'] === undefined) return data
         return { ...data, messageSeqs: this.mappingList(data['messageSeqs'], 'messageSeqs') }
+      }
+      case 'image/offload': {
+        const targets = data['targets']
+        if (!Array.isArray(targets)) throw new SessionFormatError('v3 image/offload targets must be an array')
+        return {
+          ...data,
+          targets: targets.map((value) => {
+            if (!isRecord(value)) throw new SessionFormatError('v3 image/offload target must be an object')
+            return { ...value, seq: this.mappingNumber(value['seq']) }
+          }),
+        }
       }
       default:
         return data
