@@ -4,8 +4,12 @@
 
 pre-commit:
   jobs:
+    # The glob fires on every staged pair member, not only the sidecar: an
+    # md-only edit must not drift past the hook. Out-of-corpus matches are
+    # skipped by the gate itself (it owns the scope predicate), so the glob
+    # deliberately over-matches.
     - name: translation pairing (staged records)
-      glob: '*.i18n.yaml'
+      glob: '*.{md,i18n.yaml}'
       exclude:
         - '.agents/notes/archived/**'
       run: node_modules/.bin/tsx scripts/verify-translation-pairing.ts --cached {staged_files}
@@ -40,7 +44,7 @@ pre-commit:
 pre-merge-commit:
   jobs:
     - name: translation pairing (staged records)
-      glob: '*.i18n.yaml'
+      glob: '*.{md,i18n.yaml}'
       exclude:
         - '.agents/notes/archived/**'
       run: node_modules/.bin/tsx scripts/verify-translation-pairing.ts --cached {staged_files}

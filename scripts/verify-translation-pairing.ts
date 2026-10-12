@@ -4,7 +4,9 @@
  * exclusions, which may have neither a counterpart nor a sidecar.
  * `--list` reports state; `--write <pairs...>` records the named confirmed
  * pairs (`--write --all` records every complete pair); `--cached <pairs...>`
- * checks exact index bytes for hooks. A check or write named with pair paths
+ * checks exact index bytes for hooks and skips staged paths the pairing
+ * corpus does not govern, so the hook glob may fire on any staged Markdown.
+ * A check or write named with pair paths
  * touches only those pairs, so update iteration does not pay for a corpus
  * scan. Translation quality remains a review responsibility.
  * See `docs/i18n/README.md` for the owning contract.
@@ -101,10 +103,14 @@ const recordContext = { repoRoot: root, isTranslationPairSource, repositoryFileE
 
 // Enumerate the scope once: the whole corpus, or exactly the named pairs'
 // three files (a named pair whose files are absent is caught by the same
-// completeness rules that cover discovered remnants).
+// completeness rules that cover discovered remnants). A hook names every
+// staged path its glob matched, so an index check drops anchors the corpus
+// does not govern instead of rejecting them; a worktree check keeps the loud
+// failure for a named non-pair.
+const anchors = indexMode ? request.anchors.filter(isTranslationPairSource) : request.anchors
 const files = new Set<string>()
 if (request.scope === 'pairs') {
-  for (const anchor of request.anchors) {
+  for (const anchor of anchors) {
     const { source, zh, meta } = translationPairPaths(anchor)
     for (const file of [source, zh, meta]) {
       if (repositoryFileExists(file)) files.add(file)
@@ -127,8 +133,8 @@ const metas = [...files].filter(f => f.endsWith('.i18n.yaml')).sort()
 const sources = [...files].filter(f => f.endsWith('.md') && !f.endsWith('.zh.md')).sort()
 
 if (request.scope === 'pairs') {
-  const rejected = request.anchors.filter(anchor => !isTranslationScopeFile(anchor) || isExcluded(anchor))
-  const absent = request.anchors.filter((anchor) => {
+  const rejected = anchors.filter(anchor => !isTranslationPairSource(anchor))
+  const absent = anchors.filter((anchor) => {
     const { source, zh, meta } = translationPairPaths(anchor)
     return ![source, zh, meta].some(repositoryFileExists)
   })
