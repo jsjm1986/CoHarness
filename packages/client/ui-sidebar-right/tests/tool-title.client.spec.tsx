@@ -65,7 +65,7 @@ describe('toolCallPresentation', () => {
 
   it('ignores generic card marks and skips nodes that are not tool results', () => {
     const snap = snapshot([
-      { kind: 'text', seq: 1, time: 0 } as ConversationNode,
+      { kind: 'unknown', seq: 1, time: 0, type: 'text', data: null },
       result('call-1', 'bash', 'generic'),
       result('call-2', 'bash', undefined, [], 'terminal'),
       result('call-3', 'bash', undefined, [], null),
