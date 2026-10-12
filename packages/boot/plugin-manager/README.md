@@ -74,7 +74,7 @@ An exemption is an exact `package-name@version` mapped to a list of exact DSH ru
 
 A grant takes effect on the next composition. A live profile recomposes, so the granted plugin mounts in the running session and the result reports `applied`; a startup-only profile keeps its current entries until restart and reports `restart-required`.
 
-A compatibility refusal carries the `incompatible-version` code with each refused package's `name`, `version`, `runtimeVersion`, and unsatisfied `peers`; each surface renders that record itself. The Web page words it through its locale dictionary. Use the tool to grant an exemption and retry the original operation.
+The CLI exposes `dsh plugin --profile <profile> version-exemptions`, `allow-version <package@version> --dsh-version <runtime> --accept-risk`, and `revoke-version <package@version> --dsh-version <runtime>`. A grant prints a risk warning before saving. A compatibility refusal carries the `incompatible-version` code with each refused package's `name`, `version`, `runtimeVersion`, and unsatisfied `peers`; each surface renders that record itself. The Web page words it through its locale dictionary, and a CLI refusal prints the exact `allow-version` command. Use the tool or CLI to grant an exemption and retry the original operation.
 
 ### Configuration
 
