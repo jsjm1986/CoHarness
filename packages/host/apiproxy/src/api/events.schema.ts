@@ -59,7 +59,7 @@ export const muxFrameSchema = z.discriminatedUnion('type', [
     lastSeq: z.number().int(),
     assistantStream: z.unknown().optional(),
   }),
-  z.object({ type: z.literal('approval/requested'), sessionId: sessionIdSchema, approvalId: approvalRequestIdSchema, toolName: z.string(), callId: z.string().optional(), reason: z.string().optional() }),
+  z.object({ type: z.literal('approval/requested'), sessionId: sessionIdSchema, approvalId: approvalRequestIdSchema, toolName: z.string(), callId: z.string().optional(), reason: z.string().optional(), displayReason: z.object({ en: z.string() }).catchall(z.string()).optional() }),
   z.object({ type: z.literal('approval/resolved'), sessionId: sessionIdSchema, approvalId: approvalRequestIdSchema, outcome: z.union([z.literal('allowed-once'), z.literal('rejected'), z.literal('cancelled'), z.literal('unavailable')]) }),
   // Non-empty by wire contract: the user-questions service rejects empty
   // batches at ask() (EMPTY_QUESTIONS), so an empty frame is host breakage

@@ -903,6 +903,11 @@ export class PendingApproval {
     return this.wait.payload.reason
   }
 
+  /** The asker's localized presentation copy; the audit `reason` stays unchanged. */
+  get displayReason(): { readonly en: string; readonly [locale: string]: string } | undefined {
+    return this.wait.payload.displayReason
+  }
+
   /** The paired tool call's id when the ask names one (command-line lookup key), forwarded from the carrier payload. */
   get callId(): string | undefined {
     return this.wait.payload.callId
@@ -925,16 +930,25 @@ export class PendingApproval {
   }
 }
 
+/** Injected share of the approval takeover: the localized-copy resolver bound from the locale service. */
+export interface ApprovalInjected {
+  /**
+   * Resolve one localized-text map to the active locale's copy.
+   * @param reason - the asker's displayReason map (English required).
+   * @returns the resolved prompt text.
+   */
+  resolveReason(reason: { readonly en: string; readonly [locale: string]: string }): string
+}
+
 /**
  * Full approval-composer props: the framework runtime share (chain currency +
  * session/global standard kit) plus the chain `matched` share — the entry's
  * selector result, already narrowed to the approval carrier — plus the
- * standard locale seat. No injected share: the carrier plus the domain face
- * above carry the whole behavior surface; the paired command line derives
- * from useSession in-component.
+ * injected resolver seat and the standard locale seat; the paired command
+ * line derives from useSession in-component.
  */
 export type ApprovalComposerProps =
-  PropsRuntime<'conversation.composer'> & { matched: ApprovalWait } & PropsLocale<'conversation'>
+  PropsRuntime<'conversation.composer'> & { matched: ApprovalWait } & InjectFace<ApprovalInjected> & PropsLocale<'conversation'>
 
 /** In-memory reader position resilient to transcript width reflow. */
 export interface ChatScrollPosition {

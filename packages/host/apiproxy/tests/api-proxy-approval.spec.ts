@@ -91,9 +91,15 @@ describe('approval pending registry', () => {
     const mux = openMux(api, abort)
     const agent = agentOf(ctx)
 
-    const asked = ctx.approval.request({ agent, toolName: 'bash', reason: 'sandbox escalation' })
+    const asked = ctx.approval.request({
+      agent, toolName: 'bash', reason: 'sandbox escalation',
+      displayReason: { en: 'Sandbox asks for escalation.', zh: '沙箱请求提权。' },
+    })
     const requested = requestedOf(await mux.waitFor('approval/requested'))
-    expect(requested).toMatchObject({ toolName: 'bash', reason: 'sandbox escalation', sessionId: agent.session.id })
+    expect(requested).toMatchObject({
+      toolName: 'bash', reason: 'sandbox escalation', sessionId: agent.session.id,
+      displayReason: { en: 'Sandbox asks for escalation.', zh: '沙箱请求提权。' },
+    })
 
     const envelope = mux.envelopes.find(e => e.payload.type === 'approval/requested') as RpcRequest<MuxFrame>
     const receipt = await api.respond(answer(envelope.rpcId, requested.sessionId, requested.approvalId, 'allowed-once'))

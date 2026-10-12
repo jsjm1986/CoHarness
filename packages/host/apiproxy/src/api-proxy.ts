@@ -1306,6 +1306,7 @@ interface PendingApproval {
   toolName: string
   callId?: ToolCallId
   reason?: string
+  displayReason?: { readonly en: string; readonly [locale: string]: string }
   resolve(outcome: ApprovalOutcome): void
 }
 
@@ -1325,6 +1326,7 @@ function requestedFrame(pending: PendingApproval): RpcRequest<MuxFrame> {
       toolName: pending.toolName,
       ...pending.callId === undefined ? {} : { callId: pending.callId },
       ...pending.reason === undefined ? {} : { reason: pending.reason },
+      ...pending.displayReason === undefined ? {} : { displayReason: pending.displayReason },
     },
   }
 }
@@ -2806,6 +2808,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           toolName: req.toolName,
           ...req.callId === undefined ? {} : { callId: req.callId },
           ...req.reason === undefined ? {} : { reason: req.reason },
+          ...req.displayReason === undefined ? {} : { displayReason: req.displayReason },
           resolve: settle,
         }
         pendingApprovals.set(pending.rpcId, pending)

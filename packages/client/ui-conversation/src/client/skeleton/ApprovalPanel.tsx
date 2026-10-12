@@ -48,11 +48,13 @@ export function ApprovalPanel(props: ApprovalComposerProps) {
     if (root === undefined) return undefined
     return root.callId === approval.callId && !('kind' in root) ? commandOf(root) : undefined
   })
-  return <ApprovalFlow key={approval.key} pending={approval} t={props.t} {...command === undefined ? {} : { command }} />
+  const reason = approval.displayReason === undefined ? approval.reason : props.resolveReason(approval.displayReason)
+  return <ApprovalFlow key={approval.key} pending={approval} reason={reason} t={props.t} {...command === undefined ? {} : { command }} />
 }
 
-function ApprovalFlow({ pending, command, t }: {
+function ApprovalFlow({ pending, reason, command, t }: {
   pending: PendingApproval
+  reason: string | undefined
   command?: string
   t: ApprovalComposerProps['t']
 }) {
@@ -72,7 +74,7 @@ function ApprovalFlow({ pending, command, t }: {
             holds nothing focusable of its own, so without one a keyboard-only
             user cannot reach the command's tail before answering. */}
         <div className={css.body} data-approval-scroll="" tabIndex={0} role="group" aria-label={t('approval.detail.aria')}>
-          <div className={css.headline}>{pending.reason ?? t('approval.escalation', { toolName: pending.toolName })}</div>
+          <div className={css.headline}>{reason ?? t('approval.escalation', { toolName: pending.toolName })}</div>
           {command !== undefined && <div className={css.command}>{command}</div>}
         </div>
         <div className={css.actionRow}>
