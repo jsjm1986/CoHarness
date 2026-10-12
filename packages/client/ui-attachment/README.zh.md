@@ -35,7 +35,7 @@ kind: "package-reference"
 <a id="message-images-and-the-lightbox"></a>
 ## 消息图片与灯箱
 
-`MessageImage` 渲染一张持久化历史图片，经持有方的 `ImageLoader` 加载会话授权 URL；加载失败渲染显式重试按钮，加载完成后单击打开 `ImageLightbox`（加载中的点击被忽略）。尺寸规则对齐 DeepSeek Chat：一条消息仅有的一张图（`variant="single"`）长边 240px、展示宽高比钳制在 [0.25, 4] 之间——超出部分由 `object-fit: cover` 裁切，特别高的图锚定顶部、特别宽的图锚定左侧——且从不放大超过原始尺寸；多图中的一张（`variant="tile"`）为固定 64px 方块。`ImageGallery` 将一条消息的图片包为一个对齐的可换行弹性分组（用户消息 `end`，助手消息 `start`），按图片数量选择 variant，空列表不渲染。`ImageLightbox` 是文档级模态预览，铺在共享的对话框遮罩上（`--dsw-alias-bg-mask-1` 加 `--dsw-mask-blur`，画在独立图层上，模糊不会波及预览图本身），按 Escape、按下遮罩或点关闭按钮均可关闭，卸载时将焦点还给打开者。
+`MessageImage` 渲染一张持久化历史图片，经持有方的 `ImageLoader` 加载会话授权 URL；加载失败渲染显式重试按钮，加载完成后单击打开 `ImageLightbox`（加载中的点击被忽略）。尺寸规则对齐 DeepSeek Chat：一条消息仅有的一张图（`variant="single"`）长边 240px、展示宽高比钳制在 [0.25, 4] 之间——超出部分由 `object-fit: cover` 裁切，特别高的图锚定顶部、特别宽的图锚定左侧——且从不放大超过原始尺寸；多图中的一张（`variant="tile"`）为固定 64px 方块。`ImageGallery` 将一条消息的图片包为一个对齐的可换行弹性分组（用户消息 `end`，助手消息 `start`），按图片数量选择 variant，空列表不渲染。共享的 `ImageLightbox`（`dsh-client-ui-primitives`）是文档级模态预览，铺在共享的对话框遮罩上（`--dsw-alias-bg-mask-1` 加 `--dsw-mask-blur`，画在独立图层上，模糊不会波及预览图本身），按 Escape、按下遮罩或点关闭按钮均可关闭，卸载时将焦点还给打开者。
 
 <a id="drop-overlay"></a>
 ## 拖放遮罩

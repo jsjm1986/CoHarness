@@ -16,15 +16,19 @@
  * may add node types this renderer has no mapping for.
  */
 
-import { Fragment, createElement, useState } from 'react'
+import { Fragment, createElement, useCallback, useState } from 'react'
 import type { Key, ReactNode } from 'react'
 import clsx from 'clsx'
 import type * as Md from 'mdast'
 import type {} from 'mdast-util-math'
 import { normalizeUri } from 'micromark-util-sanitize-uri'
+import { classifyLinkPath } from '../LinkIcon.tsx'
 import { parseFileLink } from './file-link.ts'
 import { useMarkdownDelegate } from './MarkdownDelegate.tsx'
 import { CodeBlock } from './CodeBlock.tsx'
+import { HoverCard } from '../HoverCard.tsx'
+import { ImageLightbox } from '../ImageLightbox.tsx'
+import { ImagePreview } from '../ImagePreview.tsx'
 import type { CodeToolbarLabels } from '../CodeToolbar.tsx'
 import { renderTexToReact } from './katex.tsx'
 import type { PositionedBlock } from './incremental.ts'
@@ -71,6 +75,36 @@ function remoteImageUrl(url: string): string | undefined {
     // Same single failure mode as above: not an absolute URL.
     return undefined
   }
+}
+
+/** Protocols a vocabulary-rewritten image destination may carry. */
+function vocabularyImageUrl(url: string): string | undefined {
+  try {
+    const protocol = new URL(url).protocol
+    return protocol === 'http:' || protocol === 'https:' || protocol === 'blob:' || protocol === 'data:'
+      || url.startsWith('dsh-app://app/api/file?')
+      ? url
+      : undefined
+  } catch {
+    // A vocabulary result must be an absolute URL; anything else stays a miss.
+    return undefined
+  }
+}
+
+/**
+ * The displayable source for one image destination: absolute HTTP(S) as
+ * authored, otherwise the context's local-path vocabulary when it vouches for
+ * the destination. Either miss leaves the authored fallback (alt text) to the
+ * caller.
+ * @param url - The authored markdown destination.
+ * @param pathImages - Rewriting vocabulary, when the render pass has one.
+ * @returns The displayable image URL, or undefined.
+ */
+function imageSource(url: string, pathImages: MarkdownPathImages | undefined): string | undefined {
+  const remote = remoteImageUrl(sanitizeUrl(normalizeUri(url)))
+  if (remote !== undefined) return remote
+  const rewritten = pathImages?.resolve(url)
+  return rewritten === undefined ? undefined : vocabularyImageUrl(rewritten)
 }
 
 /** Link/image reference targets collected from a document (first definition per identifier wins, as in CommonMark). */
@@ -127,6 +161,24 @@ export interface MarkdownFileMentions {
 }
 
 /**
+ * Local-path image vocabulary for image destinations: the owner maps an
+ * authored destination that fails the remote-URL allowlist (an absolute local
+ * file path, for example) to a displayable URL it can vouch for. Absent
+ * wherever no such vocabulary exists, authored local destinations keep their
+ * documented fallback (the image's alt text). Rewritten destinations must be
+ * absolute; the renderer re-checks their protocol before emitting them.
+ */
+export interface MarkdownPathImages {
+  /**
+   * Resolve one authored image destination.
+   * @param value - The destination exactly as the markdown author wrote it.
+   * @returns A displayable absolute URL, or undefined when the destination
+   * names no displayable image — it then stays inert alt text.
+   */
+  resolve(value: string): string | undefined
+}
+
+/**
  * One render pass's state: immutable options and targets plus the footnote
  * numbering accumulated in document order while references render.
  */
@@ -139,6 +191,8 @@ export interface MarkdownRenderContext {
   readonly inBlockquote?: boolean
   /** Inline-code file mentions; absent wherever no opener vocabulary exists. */
   readonly fileMentions: MarkdownFileMentions | undefined
+  /** Local-path image vocabulary; absent wherever no rewriting owner exists. */
+  readonly pathImages: MarkdownPathImages | undefined
   /** Inside an anchor's children: interactive mentions must not nest there. */
   readonly inLink?: boolean
   /** Reference targets visible to this pass. */
@@ -292,11 +346,14 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
     case 'table':
       return renderTable(node, key, context)
     case 'link':
-      return renderAnchor(node.url, renderChildren(node.children, { ...context, inLink: true }), key, context.streaming)
+      return renderAnchor(
+        node.url, renderChildren(node.children, { ...context, inLink: true }), key,
+        !anchorWrapsOnlyImages(node.children), context.streaming,
+      )
     case 'linkReference':
       return renderLinkReference(node, key, context)
     case 'image':
-      return renderImage(node.url, node.alt ?? '', key)
+      return renderImage(node.url, node.alt ?? '', key, context)
     case 'imageReference':
       return renderImageReference(node, key, context)
     case 'footnoteReference':
@@ -458,6 +515,15 @@ function renderTableRow(
   return <tr key={key}>{cells}</tr>
 }
 
+/**
+ * True when an anchor's markdown children are all images, so the anchor is a
+ * clickable picture (badge, thumbnail): it already carries its own preview
+ * affordance and keeps one activation target instead of adding a hover card.
+ */
+function anchorWrapsOnlyImages(children: Md.PhrasingContent[]): boolean {
+  return children.length > 0 && children.every(child => child.type === 'image' || child.type === 'imageReference')
+}
+
 /** Anchor over an already-authored href: allowlisted or unwrapped, external links get the safe attributes. */
 function renderSafeLink(href: string, children: ReactNode[], key: Key): ReactNode {
   const safeHref = sanitizeUrl(href)
@@ -485,24 +551,40 @@ function MarkdownAnchor({ href, children }: { readonly href: string; readonly ch
 }
 
 /** Anchor over a parsed markdown destination, which hast normalized before the allowlist saw it. */
-function renderAnchor(url: string, children: ReactNode[], key: Key, streaming = false): ReactNode {
+function renderAnchor(url: string, children: ReactNode[], key: Key, glyph = true, streaming = false): ReactNode {
   const file = streaming ? undefined : parseFileLink(url)
-  if (file !== undefined) return <MarkdownFileLink key={key} file={file}>{children}</MarkdownFileLink>
+  if (file !== undefined) {
+    return <MarkdownFileLink key={key} file={file} glyph={glyph}>{children}</MarkdownFileLink>
+  }
   return renderSafeLink(normalizeUri(url), children, key)
 }
 
-function MarkdownFileLink({ file, children }: {
+function MarkdownFileLink({ file, glyph, children }: {
   readonly file: { path: string; line?: number }
+  readonly glyph: boolean
   readonly children: ReactNode[]
 }): ReactNode {
-  const { openFile } = useMarkdownDelegate()
+  const { openFile, fileImages } = useMarkdownDelegate()
   if (openFile === undefined) return <>{children}</>
-  return (
-    <button type="button" className={clsx(css.fileMention, css.fileLink)} title={file.path}
-      onClick={() => { openFile(file.path, file.line === undefined ? undefined : { line: file.line }) }}>
+  // Pure-image anchors already contain their preview and keep one navigation target.
+  const preview = glyph && classifyLinkPath(file.path) === 'image' ? fileImages : undefined
+  const src = preview?.resolve(file.path)
+  const anchor = (
+    <button
+      type="button"
+      className={clsx(css.fileMention, css.fileLink)}
+      title={src === undefined ? file.path : undefined}
+      onClick={() => { openFile(file.path, file.line === undefined ? undefined : { line: file.line }) }}
+    >
       {children}
     </button>
   )
+  if (src === undefined || preview === undefined) return anchor
+  return <HoverCard inline anchor={anchor}
+    content={<>
+      <ImagePreview src={src} alt={file.path} loadingLabel={preview.labels.loading} failedLabel={preview.labels.failed} />
+      <span className={css.previewName}>{file.path.split(/[\\/]/u).pop()}</span>
+    </>} />
 }
 
 /**
@@ -520,29 +602,44 @@ function inlineCodeHttpUrl(value: string): string | undefined {
   }
 }
 
-function renderImage(url: string, alt: string, key: Key): ReactNode {
-  const imageSrc = remoteImageUrl(sanitizeUrl(normalizeUri(url)))
-  if (imageSrc === undefined) {
-    return <span key={key} className={css.imageAlt}>{alt}</span>
-  }
-  return <MarkdownImage key={`${key}:${imageSrc}`} src={imageSrc} alt={alt} destination={url} />
+function renderImage(url: string, alt: string, key: Key, context: MarkdownRenderContext): ReactNode {
+  return <MarkdownImage key={`${key}:${url}`} destination={url} alt={alt}
+    pathImages={context.pathImages} streaming={context.streaming} inLink={context.inLink === true} />
 }
 
-/** Replace a failed remote image with its authored fallback without retrying on every render. */
-function MarkdownImage({ src, alt, destination }: { src: string; alt: string; destination: string }): ReactNode {
+function MarkdownImage({ destination, alt, pathImages, streaming, inLink }: {
+  destination: string
+  alt: string
+  pathImages: MarkdownPathImages | undefined
+  streaming: boolean
+  inLink: boolean
+}): ReactNode {
+  const { fileImages } = useMarkdownDelegate()
+  const file = streaming ? undefined : parseFileLink(destination)
+  const src = (file === undefined ? undefined : fileImages?.resolve(file.path)) ?? imageSource(destination, pathImages)
+  if (src === undefined) return <span className={css.imageAlt}>{alt}</span>
+  return <LoadedMarkdownImage key={src} src={src} alt={alt} destination={destination} preview={inLink ? undefined : fileImages} />
+}
+
+function LoadedMarkdownImage({ src, alt, destination, preview }: {
+  src: string
+  alt: string
+  destination: string
+  preview: ReturnType<typeof useMarkdownDelegate>['fileImages']
+}): ReactNode {
   const [failed, setFailed] = useState(false)
-  if (failed) return <span className={css.imageAlt}>{alt || destination}</span>
-  return (
-    <img
-      className={css.image}
-      src={src}
-      alt={alt}
-      onError={() => { setFailed(true) }}
-      loading="lazy"
-      decoding="async"
-      referrerPolicy="no-referrer"
-    />
-  )
+  const [open, setOpen] = useState(false)
+  const close = useCallback(() => { setOpen(false) }, [])
+  if (failed) return <span className={css.imageAlt}>{preview === undefined ? '' : `${preview.labels.failed} · `}{alt || destination}</span>
+  const img = <img className={css.image} src={src} alt={alt}
+    onError={() => { setFailed(true) }} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+  if (preview === undefined) return img
+  return <>
+    <button type="button" className={css.imageButton} title={preview.labels.open}
+      aria-label={alt ? `${preview.labels.open}: ${alt}` : preview.labels.open}
+      onClick={() => { setOpen(true) }}>{img}</button>
+    {open && <ImageLightbox src={src} alt={alt} labels={preview.labels} onClose={close} />}
+  </>
 }
 
 /** The bracketed source text a reference reverts to when its definition is missing. */
@@ -565,7 +662,8 @@ function renderLinkReference(
     // not an anchor, so mentions inside it stay live.
     return <Fragment key={key}>{'['}{renderChildren(node.children, context)}{referenceSuffix(node)}</Fragment>
   }
-  return renderAnchor(definition.url, renderChildren(node.children, { ...context, inLink: true }), key, context.streaming)
+  const rendered = renderChildren(node.children, { ...context, inLink: true })
+  return renderAnchor(definition.url, rendered, key, !anchorWrapsOnlyImages(node.children), context.streaming)
 }
 
 function renderImageReference(
@@ -575,7 +673,7 @@ function renderImageReference(
 ): ReactNode {
   const definition = context.targets.definitions.get(node.identifier.toUpperCase())
   if (definition === undefined) return `![${node.alt ?? ''}${referenceSuffix(node)}`
-  return renderImage(definition.url, node.alt ?? '', key)
+  return renderImage(definition.url, node.alt ?? '', key, context)
 }
 
 function renderFootnoteReference(

@@ -1,12 +1,15 @@
-// Web e2e scenario: absolute HTTP(S) Markdown images. A validated session
-// assembled through the Session API is seeded cold into the real web
-// composition, then a separate image origin proves that the browser receives
-// a real network image while local-path Markdown remains inert alt text.
+// Web e2e scenario: Markdown image rendering through the real composition.
+// A validated session assembled through the Session API is seeded cold, a
+// separate image origin proves remote loads carry no referrer, and real
+// files below the scaffold workspace exercise the authenticated /api/file
+// route, its byte cap, and the preview/lightbox affordances.
+import { mkdir, open, writeFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { createMessage, createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import {
   SESSION_FORMAT_VERSION,
@@ -32,6 +35,7 @@ const MODE = webSnapshotMode()
 const SEED_ID = 'markdown-images-web-e2e'
 const REMOTE_ALT = 'Remote test image'
 const LOCAL_ALT = 'Local test image'
+const WORKSPACE_ALT = 'Workspace test image'
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
@@ -81,7 +85,7 @@ async function stopServer(server: Server): Promise<void> {
 }
 
 /** Build one closed, invariant-checked session fixture with remote and local image Markdown. */
-function markdownImageFixture(remoteUrl: string): string {
+function markdownImageFixture(remoteUrl: string, outsidePath: string): string {
   const session = Session.create(SessionId('markdown-image-source'))
   const eventTimeOrigin = new Date().setHours(12, 0, 0, 0)
   session.append('turn/start', { turn: 1 })
@@ -115,6 +119,24 @@ function markdownImageFixture(remoteUrl: string): string {
           '',
           `![${LOCAL_ALT}](./local-image.png)`,
           '',
+          `![${WORKSPACE_ALT}]({{cwd}}/valid.png)`,
+          '',
+          '[View comparison](./valid.png)',
+          '',
+          '![Space path]({{cwd}}/test workspace/测试图.png)',
+          '',
+          '![Encoded path]({{cwd}}/test%20workspace/测试图.png)',
+          '',
+          '![Encoded filename]({{cwd}}/test%20workspace/测试%23100%25.png)',
+          '',
+          '![Oversized image]({{cwd}}/oversized.png)',
+          '',
+          `![Outside workspace image](${outsidePath})`,
+          '',
+          '![Missing image]({{cwd}}/missing.png)',
+          '',
+          '![]({{cwd}}/corrupt.png)',
+          '',
           'REMOTE_IMAGE_DONE',
         ].join('\n'),
       }],
@@ -147,19 +169,45 @@ function markdownImageFixture(remoteUrl: string): string {
   ].join('\n')
 }
 
-describe('web e2e: remote Markdown image rendering', () => {
+describe('web e2e: Markdown image rendering', () => {
   let scaffold: WebScaffold
   let imageOrigin: ImageOrigin
   let browser: Browser
   let page: Page
   let tripwire: ReturnType<typeof watchConsole>
+  const mediaResponses = new Map<string, number>()
 
   beforeAll(async () => {
     imageOrigin = await startImageOrigin()
     scaffold = await launchWebScaffold({})
-    await seedSession(scaffold, markdownImageFixture(imageOrigin.url), SEED_ID)
+    await writeFile(join(scaffold.workspaceCwd, 'valid.png'), PNG)
+    await writeFile(join(scaffold.workspaceCwd, 'local-image.png'), PNG)
+    await mkdir(join(scaffold.workspaceCwd, 'test workspace'))
+    await writeFile(join(scaffold.workspaceCwd, 'test workspace/测试图.png'), PNG)
+    await writeFile(join(scaffold.workspaceCwd, 'test workspace/测试#100%.png'), PNG)
+    await writeFile(join(scaffold.workspaceCwd, 'corrupt.png'), 'invalid image')
+    const oversized = await open(join(scaffold.workspaceCwd, 'oversized.png'), 'w')
+    try {
+      await oversized.truncate(20 * 1024 * 1024 + 1)
+    } finally {
+      await oversized.close()
+    }
+    await mkdir(scaffold.persistenceRoot, { recursive: true })
+    const outsidePath = join(scaffold.persistenceRoot, 'outside.png')
+    await writeFile(outsidePath, PNG)
+    await writeFile(
+      join(scaffold.workspaceCwd, 'active.html'),
+      '<p>File preview</p><script>document.body.dataset.scriptRan = "yes"</script>',
+    )
+    await seedSession(scaffold, markdownImageFixture(imageOrigin.url, outsidePath), SEED_ID)
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
+    page.on('response', (response) => {
+      const url = new URL(response.url())
+      if (url.pathname !== '/api/file') return
+      const path = url.searchParams.get('path')
+      if (path !== null) mediaResponses.set(path, response.status())
+    })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -171,7 +219,24 @@ describe('web e2e: remote Markdown image rendering', () => {
     await stopServer(imageOrigin.server)
   })
 
-  it.skipIf(MODE === 'record')('loads only the remote image and matches the conversation golden', async () => {
+  it('authenticates file requests and isolates directly opened active content', async () => {
+    const path = `/api/file?path=${encodeURIComponent(join(scaffold.workspaceCwd, 'active.html'))}`
+    const unauthenticated = await fetch(new URL(path, scaffold.baseUrl))
+    expect(unauthenticated.status).toBe(401)
+    await unauthenticated.body?.cancel()
+    const preview = await newEnglishPage(browser)
+    await preview.context().addCookies(await page.context().cookies())
+    try {
+      const response = await preview.goto(new URL(path, scaffold.baseUrl).href)
+      expect(response?.status()).toBe(200)
+      await preview.getByText('File preview', { exact: true }).waitFor()
+      expect(await preview.locator('body').getAttribute('data-script-ran')).toBeNull()
+    } finally {
+      await preview.close()
+    }
+  })
+
+  it.skipIf(MODE === 'record')('loads permitted images and shows authored text for failures', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-markdown-images'))
     const groupRow = page.locator('[role="treeitem"]').first()
     await groupRow.waitFor({ timeout: 15_000 })
@@ -201,19 +266,96 @@ describe('web e2e: remote Markdown image rendering', () => {
       borderRadius: '8px',
       decoding: 'async',
       loading: 'lazy',
-      maxWidth: '100%',
+      maxWidth: 'min(100%, 640px)',
       referrerPolicy: 'no-referrer',
     })
-    expect(await page.getByRole('img', { name: LOCAL_ALT }).count()).toBe(0)
-    expect(await page.getByText(LOCAL_ALT, { exact: true }).count()).toBe(1)
+    await expect.poll(() => page.getByRole('img', { name: LOCAL_ALT })
+      .evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(1)
+    for (const name of ['Space path', 'Encoded path', 'Encoded filename']) {
+      await expect.poll(() => page.getByRole('img', { name, exact: true })
+        .evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(1)
+    }
+    const workspaceImage = page.getByRole('img', { name: WORKSPACE_ALT })
+    await expect.poll(() => mediaResponses.get(join(scaffold.workspaceCwd, 'valid.png'))).toBe(200)
+    await expect.poll(() => workspaceImage.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(1)
+    const outsideImage = page.getByRole('img', { name: 'Outside workspace image' })
+    await expect.poll(() => outsideImage.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(1)
+    for (const alt of ['Oversized image', 'Missing image']) {
+      await page.getByText(`Image preview unavailable · ${alt}`, { exact: true }).waitFor()
+      expect(await page.getByRole('img', { name: alt }).count()).toBe(0)
+    }
+    await page.getByText(`Image preview unavailable · ${join(scaffold.workspaceCwd, 'corrupt.png')}`, { exact: true }).waitFor()
+    expect(mediaResponses).toEqual(new Map([
+      [join(scaffold.workspaceCwd, 'valid.png'), 200],
+      [`${scaffold.workspaceCwd}/./local-image.png`, 200],
+      [join(scaffold.workspaceCwd, 'test workspace/测试图.png'), 200],
+      [join(scaffold.workspaceCwd, 'test workspace/测试#100%.png'), 200],
+      [join(scaffold.workspaceCwd, 'oversized.png'), 413],
+      [join(scaffold.persistenceRoot, 'outside.png'), 200],
+      [join(scaffold.workspaceCwd, 'missing.png'), 404],
+      [join(scaffold.workspaceCwd, 'corrupt.png'), 200],
+    ]))
     expect(imageOrigin.requests).toEqual([{ path: '/image.png', referer: undefined }])
+
+    await page.getByRole('button', { name: `View full image: ${WORKSPACE_ALT}`, exact: true }).click()
+    const lightbox = page.getByRole('dialog', { name: 'Image preview', exact: true })
+    await lightbox.waitFor()
+    await lightbox.getByRole('button', { name: 'Close image preview' }).click()
+    await lightbox.waitFor({ state: 'detached' })
+    const link = page.getByRole('button', { name: 'View comparison', exact: true })
+    await link.hover()
+    const hoverImage = page.getByRole('img', { name: './valid.png', exact: true })
+    await hoverImage.waitFor()
+    await expect.poll(() => hoverImage.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(1)
+    await page.keyboard.press('Escape')
+    await hoverImage.waitFor({ state: 'detached' })
+    await link.press('Tab')
+    await page.keyboard.press('Shift+Tab')
+    await hoverImage.waitFor()
+    await page.keyboard.press('Escape')
+    await hoverImage.waitFor({ state: 'detached' })
 
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
       .replace(/ \d{1,2}\/\d{1,2} (?=\{\{clock\}\})/g, ' ')
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
+
+    // The hover preview clears the link's box instead of covering it.
+    await link.evaluate((element) => { element.scrollIntoView({ block: 'end' }) })
+    await page.mouse.move(0, 0)
+    await link.hover()
+    await hoverImage.waitFor()
+    const linkRect = await link.boundingBox()
+    if (linkRect === null) throw new Error('image link is not visible')
+    const previewRect = await hoverImage.evaluate((element) => {
+      const rect = element.parentElement!.parentElement!.getBoundingClientRect()
+      return { top: rect.top, bottom: rect.bottom }
+    })
+    expect(previewRect.bottom <= linkRect.y || previewRect.top >= linkRect.y + linkRect.height).toBe(true)
+    const thumbnailRect = await hoverImage.boundingBox()
+    if (thumbnailRect === null) throw new Error('image preview is not visible')
+    expect(thumbnailRect.y + thumbnailRect.height).toBeLessThanOrEqual(previewRect.bottom)
+    // Activation keeps its ordinary file-opening target. The single-session
+    // composition mounts no workspace file-preview surface, so the gesture
+    // reaches the Host's `openPath` with the workspace-resolved absolute path.
+    const openPath = vi.spyOn(scaffold.ctx.apiProxy.host, 'openPath')
+      .mockImplementation(async (request, _signal) => ({
+        rpcId: request.rpcId,
+        result: { ok: true, value: { opened: true as const } },
+      }))
+    try {
+      await page.mouse.click(linkRect.x + linkRect.width / 2, linkRect.y + linkRect.height / 2)
+      // Restore only after the call lands: an unreceived click would otherwise
+      // reach the real opener (a platform binary may be missing or visible).
+      await expect.poll(() => openPath.mock.calls.length, { timeout: 10_000 }).toBe(1)
+      const openedPath = openPath.mock.calls[0]?.[0].payload.path
+      expect(typeof openedPath === 'string' ? resolve(openedPath) : openedPath)
+        .toBe(join(scaffold.workspaceCwd, 'valid.png'))
+    } finally {
+      openPath.mockRestore()
+    }
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md'])
-  }, 60_000)
+  }, 120_000)
 })

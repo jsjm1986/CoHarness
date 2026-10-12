@@ -14,13 +14,13 @@ Local media paths in Session prose render through a same-origin file route. This
 
 `ui-primitives` owns the `MarkdownPathImages` vocabulary on `MarkdownText`. Like `fileMentions`, it applies only after a message settles so frozen streaming blocks cannot cache a vocabulary handler. The settled pass rewrites image destinations outside the remote-URL allowlist and emits only absolute `http(s)`, `blob`, or `data` results. Without a vocabulary, local destinations retain inert alt text. Failed loads replace the image with authored alt text, or its original destination when alt is empty; a different source can load again.
 
-`ui-chat` supplies a page-stable `localPathMediaUrl` vocabulary through `AssistantMarkdown`. It maps absolute POSIX paths to `api/file?path=…` resolved against `document.baseURI`, so the request stays under whatever mount the served document came from. Relative and protocol-relative paths, Windows-style paths, and non-HTTP page transports such as Electron `file://` remain inert.
+`ui-conversation` supplies a page-stable `localPathMediaUrl` vocabulary through `AssistantMarkdown`. It maps absolute POSIX paths to `api/file?path=…` resolved against `document.baseURI`, so the request stays under whatever mount the served document came from. Relative and protocol-relative paths, Windows-style paths, and non-HTTP page transports such as Electron `file://` remain inert.
 
-`session-controller` owns the `SessionMediaReferences` contribution beside `SessionFileReferences`. It registers through `connection.fetch`, which applies the same browser authentication and trust checks as `/api` RPC. The fixed same-origin endpoint gives the synchronous renderer a stable URL without an asynchronous capability negotiation.
+`api/gateway` owns the media-references contribution. It registers through `connection.http.handlePrefix` with trusted-host authority, which applies the same browser authentication and trust checks as `/api` RPC. The fixed same-origin endpoint gives the synchronous renderer a stable URL without an asynchronous capability negotiation.
 
 ## Alternatives considered
 
-**Typert gateway or workspace controller ownership.** The gateway owns Remote RPC dispatch, while the workspace controller owns registry lifecycle. Neither owns file-byte presentation; Session Controller is the consumer serving Session prose.
+**Session-controller or API-proxy ownership.** The local assembly has no session-controller host package, and `client/connection`'s host face already references `host/apiproxy`, so a route there would close a project-reference cycle. The gateway owns trusted `/api` transport registration and imports the connection host face without a cycle.
 
 **Session RPC followed by blob/data URLs.** Attachment images can use an asynchronous fetch, but this Markdown vocabulary must synchronously resolve a destination during a memoized render pass.
 

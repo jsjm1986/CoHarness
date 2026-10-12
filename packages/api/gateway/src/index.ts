@@ -7,6 +7,7 @@
 import { Context, Service, symbols } from '@deepseek-ai/cordis'
 import { createRpcStreamHttpHandler, RPC_STREAM_PATH } from '@deepseek-ai/dsh-client-connection'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
+import { registerMediaReferences } from './media-references.ts'
 import {
   RemoteError,
   remoteErrorOf,
@@ -100,6 +101,7 @@ export class TypertGatewayService extends Service implements TypertGateway {
     ctx.on('internal/service', () => {
       this.srcClaims = undefined
     })
+    registerMediaReferences(ctx)
     ctx.inject(['connection'], (connectionCtx) => {
       const streams = createRpcStreamHttpHandler((endpoint, payload, signal) => this.dispatchStream(endpoint, payload, signal))
       connectionCtx.effect(() => () => streams.close(), 'api-gateway: logical stream shutdown')

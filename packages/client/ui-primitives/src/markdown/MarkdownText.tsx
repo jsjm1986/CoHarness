@@ -20,17 +20,18 @@ import {
   collectReferenceTargets, createReferenceTargets, renderBlocks, renderFootnoteSection,
   wrapBlockChildren,
 } from './render.tsx'
-import type { MarkdownFileMentions, MarkdownLabels, MarkdownRenderContext, ReferenceTargets } from './render.tsx'
+import type { MarkdownFileMentions, MarkdownLabels, MarkdownPathImages, MarkdownRenderContext, ReferenceTargets } from './render.tsx'
 import 'katex/dist/katex.min.css'
 import css from './MarkdownText.module.css'
 
-export type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels } from './render.tsx'
+export type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels, MarkdownPathImages } from './render.tsx'
 
 /** One settled full render: parse with math, resolve references, append the footnote section. */
 function renderSettled(
   text: string,
   labels: MarkdownLabels,
   fileMentions: MarkdownFileMentions | undefined,
+  pathImages: MarkdownPathImages | undefined,
 ): ReactNode[] {
   const root = parseGfmWithMath(text)
   const targets = createReferenceTargets()
@@ -39,6 +40,7 @@ function renderSettled(
     streaming: false,
     labels,
     fileMentions,
+    pathImages,
     targets,
     footnoteOrder: [],
     footnoteCounts: new Map(),
@@ -103,6 +105,7 @@ class StreamingRenderer {
         streaming: true,
         labels: this.labels,
         fileMentions: undefined,
+        pathImages: undefined,
         targets: frameTargets,
         footnoteOrder: this.frozenFootnoteOrder,
         footnoteCounts: this.frozenFootnoteCounts,
@@ -121,6 +124,7 @@ class StreamingRenderer {
       streaming: true,
       labels: this.labels,
       fileMentions: undefined,
+      pathImages: undefined,
       targets: frameTargets,
       footnoteOrder: [...this.frozenFootnoteOrder],
       footnoteCounts: new Map(this.frozenFootnoteCounts),
@@ -146,8 +150,10 @@ class StreamingRenderer {
  * localized Markdown chrome baked into rendered elements — pass a
  * reference-stable object (memoized per locale revision), because a new
  * identity discards the streaming render cache mid-message. `fileMentions`
- * links inline-code tokens its resolver recognizes as real files; this is
- * the single streaming gate — it applies to settled renders only, because a
+ * links inline-code tokens its resolver recognizes as real files, and
+ * `pathImages` rewrites image destinations that are local file paths into
+ * displayable URLs its resolver vouches for. Those two vocabularies are the
+ * single streaming gate — they apply to settled renders only, because a
  * streaming message's vocabulary is not final and frozen cached elements
  * must not bake in handlers that could go stale. `variant="compact"` uses
  * secondary typography and tight block spacing without truncating content.
@@ -155,11 +161,12 @@ class StreamingRenderer {
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export const MarkdownText = memo(function MarkdownText({ text, streaming = false, labels: providedLabels, fileMentions, variant = 'body' }: {
+export const MarkdownText = memo(function MarkdownText({ text, streaming = false, labels: providedLabels, fileMentions, pathImages, variant = 'body' }: {
   text: string
   streaming?: boolean
   labels: MarkdownLabels
   fileMentions?: MarkdownFileMentions | undefined
+  pathImages?: MarkdownPathImages | undefined
   variant?: 'body' | 'compact'
 }) {
   // The compact variant keeps the plain fence chrome; the card toolbar rides
@@ -172,7 +179,7 @@ export const MarkdownText = memo(function MarkdownText({ text, streaming = false
   const children = useMemo(() => {
     if (!streaming) {
       streamRef.current = null
-      return renderSettled(text, labels, fileMentions)
+      return renderSettled(text, labels, fileMentions, pathImages)
     }
     if (
       streamRef.current === null
@@ -182,6 +189,6 @@ export const MarkdownText = memo(function MarkdownText({ text, streaming = false
       streamLabelsRef.current = labels
     }
     return streamRef.current.render(text)
-  }, [text, streaming, labels, fileMentions])
+  }, [text, streaming, labels, fileMentions, pathImages])
   return <div className={clsx(css.markdown, variant === 'compact' && css.compact)}>{children}</div>
 })

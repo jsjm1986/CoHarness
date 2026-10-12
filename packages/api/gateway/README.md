@@ -20,6 +20,7 @@ Two-sided Typert RPC endpoint for Host and Client Cordis environments. The Host 
 ## Table of Contents
 
 - [Host service: `TypertGatewayService` (ctx key: `typertGateway`)](#host-service-typertgatewayservice-ctx-key-typertgateway)
+- [Media references](#media-references)
 - [Client service: `ClientRemote` (ctx key: `remote`)](#client-service-clientremote-ctx-key-remote)
 - [Invariants](#invariants)
 - [Model Experience](#model-experience)
@@ -38,6 +39,11 @@ Strict mode reads generated invocation descriptors from `ctx.typert.local`. Look
 The Host entry registers a trusted-host interceptor on Connection's shared `/api` FetchHandler. Connection passes this composite handler through its HTTP bridge; the handler dispatches claimed endpoints to Gateway and unclaimed endpoints to API Proxy. Direct `invoke()` calls preserve business errors; `TypertGatewayError` distinguishes failures owned by dispatch, binding, providers, lookup, Context, arguments, and codecs. A resolver may use `TypertLookupFailure` to carry an existing RPC error, preserving its original error code for policy rejections such as cold-resume failures or ownership fences.
 
 A cancellation-aware Remote method declares `signal: AbortSignal` as its final Host parameter. The signal is descriptor metadata rather than a wire argument: Connection supplies it to the Gateway, and the Gateway injects it after decoded business parameters. SRC recognizes the reserved final name, while strict generation additionally requires the global `AbortSignal` type.
+
+<a id="media-references"></a>
+## Media references
+
+The Host entry also mounts `GET|HEAD /api/file?path=<absolute path>` through `connection.http.handlePrefix` with trusted-host authority when `connection`, `fs`, and `attachments` are composed. It reads ordinary files through `ctx.fs`, including temporary paths outside registered workspaces and files in remote providers. Neither directory containment nor MIME categories restrict access; `mime-types` supplies the response type from the resolved display path, with `application/octet-stream` for unknown extensions. GET reuses `readBytes` for preflight and ongoing byte limits; HEAD reads metadata only. All files use `ctx.attachments.imageLimits.maxImageBytes`; exceeding this limit returns 413. Responses contain the complete file, ignore Range, and carry `private, no-store`, `nosniff`, and a `sandbox; default-src 'none'` CSP so directly opened HTML/SVG cannot execute with the API origin. A closing client socket aborts an in-flight read; provider failures that are not `FsError` propagate to the Connection layer. The Markdown rewrite lives in `ui-conversation` (`AssistantMarkdown`); audio/video responses are available, while Markdown audio/video player nodes remain separate work.
 
 <a id="client-service-clientremote-ctx-key-remote"></a>
 ## Client service: `ClientRemote` (ctx key: `remote`)

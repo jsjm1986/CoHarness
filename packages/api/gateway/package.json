@@ -61,12 +61,19 @@
     "@deepseek-ai/dsh-session": "workspace:*"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-client-connection": "workspace:*",
-    "@deepseek-ai/dsh-host-webserver": "workspace:*",
-    "@deepseek-ai/dsh-typert-registry": "workspace:*",
     "@deepseek-ai/cordis": "workspace:~",
-    "zod": "^4.4.3",
+    "@deepseek-ai/dsh-attachment": "workspace:*",
+    "@deepseek-ai/dsh-client-connection": "workspace:*",
+    "@deepseek-ai/dsh-fs-local": "workspace:*",
+    "@deepseek-ai/dsh-host-webserver": "workspace:*",
+    "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
-    "@deepseek-ai/dsh-session": "workspace:*"
+    "@deepseek-ai/dsh-typert-registry": "workspace:*",
+    "@types/mime-types": "^3.0.1",
+    "zod": "^4.4.3"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-fs": "workspace:*",
+    "mime-types": "^3.0.2"
   }
 }

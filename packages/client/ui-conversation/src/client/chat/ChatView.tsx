@@ -18,6 +18,7 @@ import type {
   ConversationTimelineSnapshot, PendingSubmission, TurnNavigationItem,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { Button, IconChevronDownOutline14, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ToolCallId } from '../contract/views.ts'
 import type { ChatViewSlotProps, RenderMessageImages } from '../contract/slots.ts'
 import type { ChatNode, TurnProcessChatData } from '../contract/chat-nodes.ts'
@@ -231,6 +232,13 @@ export function ChatView({
   const pendingSubmissions = useSession(s => s.pendingSubmissions ?? EMPTY_PENDING_SUBMISSIONS)
   // Workspace root off the session list row: path summaries display relative to it.
   const cwd = useSessions(s => s.byId[sessionId]?.cwd)
+  const fileImages = useMemo(() => ({
+    resolve: (path: string) => fileMediaUrl(document.baseURI, resolveWorkspacePath(cwd, path)),
+    labels: {
+      open: t('image.open'), loading: t('image.loading'), failed: t('image.failed'),
+      dialog: t('image.dialog'), close: t('image.close'),
+    },
+  }), [cwd, t])
   const running = useSession(s => s.running)
   const openState = useSession(s => s.openState)
   const openError = useSession(s => s.openError)
@@ -745,7 +753,7 @@ export function ChatView({
   }, [chatScroll.save, loadHistoryUntil, navigation])
 
   return (
-    <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile}>
+    <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile} fileImages={fileImages}>
       <div className={css.root}>
         <div ref={listRef} className={css.scroll}>
           <TurnNavigator items={navigationItems} activeTurn={activeTurn} busyTurn={busyTurn} onNavigate={navigateToTurn} t={t} />
