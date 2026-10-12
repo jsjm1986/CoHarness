@@ -3562,6 +3562,44 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return { code: 'internal', message: 'settings service is absent: this deployment does not mount a settings provider (e.g. @deepseek-ai/dsh-settings-file) in its composition', details: {} }
   }
 
+  /**
+   * Prove one client-supplied path round-trips through the composed filesystem
+   * back to the identical Host path before a native handoff accepts it. A
+   * deployment without an `fs` capability has no filesystem authority to verify
+   * against, so its injected opener keeps its own trust.
+   * @returns the resolved Host path, or the refusal error.
+   */
+  async function verifyDesktopPath(
+    path: string, signal: AbortSignal,
+  ): Promise<{ verified: string } | { error: RpcError }> {
+    if (path.length === 0) {
+      return { error: { code: 'bad-request', message: 'a non-empty file path is required', details: { issues: [] } } }
+    }
+    const hostPath = resolve(path)
+    const fs = ctx.get('fs')
+    if (fs === undefined) return { verified: hostPath }
+    const mapped = fs.processPathFromHostPath(hostPath)
+    if (mapped !== undefined) {
+      try {
+        if (fs.processPath(await fs.resolve(mapped, { signal })) === hostPath) {
+          return { verified: hostPath }
+        }
+      } catch (error: unknown) {
+        if (isAborted(signal)) {
+          return { error: { code: 'cancelled', message: 'path open was aborted', details: {} } }
+        }
+        return {
+          error: {
+            code: 'internal',
+            message: `path verification failed: ${error instanceof Error ? error.message : String(error)}`,
+            details: {},
+          },
+        }
+      }
+    }
+    return { error: { code: 'bad-request', message: 'path has no verified Host mapping through the filesystem', details: { issues: [] } } }
+  }
+
   /** Open one Host-resolved target and map native failures onto the wire vocabulary. */
   async function openTarget(
     request: RpcRequest<unknown>, path: string, signal: AbortSignal,
@@ -5569,7 +5607,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       async openPath(request, signal) {
         const authorized = authorizePersonalConfiguration()
         if (authorized.error !== undefined) return err(request, authorized.error)
-        return openPath(request, request.payload.path, signal, request.payload.action, request.payload.application)
+        const verified = await verifyDesktopPath(request.payload.path, signal)
+        if ('error' in verified) return err(request, verified.error)
+        return openPath(request, verified.verified, signal, request.payload.action, request.payload.application)
       },
 
       async fileApplications(request, signal) {
@@ -5577,9 +5617,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         if (authorized.error !== undefined) return err(request, authorized.error)
         try {
           if (!canOpenPaths()) return ok(request, { applications: [] })
+          const verified = await verifyDesktopPath(request.payload.path, signal)
+          if ('error' in verified) return err(request, verified.error)
           const applications = defaults.fileApplications !== undefined
-            ? await defaults.fileApplications(request.payload.path, signal)
-            : await nativeFileApplications(request.payload.path, signal)
+            ? await defaults.fileApplications(verified.verified, signal)
+            : await nativeFileApplications(verified.verified, signal)
           return ok(request, { applications: [...applications] })
         } catch (error: unknown) {
           if (signal.aborted) {

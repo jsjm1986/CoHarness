@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-13-openpath-fs-roundtrip-verification.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-13-openpath-fs-roundtrip-verification.md
+/agent-note-host-openpath-verifies-client-paths-through-the-filesystem:
+  en: 795614216d9fbd04
+  zh: 9e5ad7aefd7088cf
+/agent-note-host-openpath-verifies-client-paths-through-the-filesystem/problem:
+  en: 5c1056af0b0d9f90
+  zh: ef020024cbe6f282
+/agent-note-host-openpath-verifies-client-paths-through-the-filesystem/decision:
+  en: 7e5df0aee35dd168
+  zh: 8db6793972141c13
+/agent-note-host-openpath-verifies-client-paths-through-the-filesystem/alternatives-considered:
+  en: ca6878a05bc1d733
+  zh: 189c16de60f51ecf
+/agent-note-host-openpath-verifies-client-paths-through-the-filesystem/consequences:
+  en: cbd1283a62da110e
+  zh: cda82edeb3ccdeb1
+/agent-note-host-openpath-verifies-client-paths-through-the-filesystem/verification:
+  en: c3c7ee13e668e7fb
+  zh: 63a6fe732fcdee6b
+/agent-note-host-openpath-verifies-client-paths-through-the-filesystem/related:
+  en: abf66064ffdeefb7
+  zh: ed3a7fce0524f6b1

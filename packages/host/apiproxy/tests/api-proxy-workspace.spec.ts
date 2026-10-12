@@ -246,22 +246,25 @@ describe('host.openPath', () => {
 
   it('opens through the injected native boundary', async () => {
     const opened: string[] = []
-    const { api } = await harness(undefined, undefined, {
+    const { api, root } = await harness(undefined, undefined, {
       openPath: async (path) => { opened.push(path) },
     })
-    expect((await api.host.openPath(request({ path: '/tmp/a.txt' }), new AbortController().signal)).result)
+    // The filesystem round-trip accepts only the canonical Host path a
+    // resolved target reports back, so the fixture names its realpathed root.
+    const target = join(root, 'a.txt')
+    expect((await api.host.openPath(request({ path: target }), new AbortController().signal)).result)
       .toEqual({ ok: true, value: { opened: true } })
-    expect(opened).toEqual(['/tmp/a.txt'])
+    expect(opened).toEqual([target])
   })
 
   it('propagates abort into the native boundary as a cancelled RPC error', async () => {
-    const { api } = await harness(undefined, undefined, {
+    const { api, root } = await harness(undefined, undefined, {
       openPath: (_path, signal) => new Promise((_resolve, reject) => {
         signal.addEventListener('abort', () => { reject(new Error('aborted')) }, { once: true })
       }),
     })
     const abort = new AbortController()
-    const pending = api.host.openPath(request({ path: '/tmp/a.txt' }), abort.signal)
+    const pending = api.host.openPath(request({ path: join(root, 'a.txt') }), abort.signal)
     abort.abort()
     expect((await pending).result).toMatchObject({ ok: false, error: { code: 'cancelled' } })
   })
