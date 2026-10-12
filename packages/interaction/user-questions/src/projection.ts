@@ -4,6 +4,7 @@ import { SessionLogOffset, TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session
 import type { SessionEvent, SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-agent/types'
+import type {} from '@deepseek-ai/dsh-tools/types'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, ToolSchema } from '@deepseek-ai/dsh-llm'
 import type { AskUserQuestionAnswerItem, AskUserQuestionItem, AskUserQuestionOption, PendingUserQuestion, SettledUserQuestion, UserQuestionProjectionView } from './types.ts'
@@ -160,8 +161,8 @@ export function questionsOf(argumentsText: string): readonly AskUserQuestionItem
   }))
 }
 
-function isPendingResult(message: SessionEvent<'tool/result'>['data']['message']): boolean {
-  const text = message.content.find(block => block.type === 'text')
+function isPendingResult(content: readonly ContentBlock[]): boolean {
+  const text = content.find(block => block.type === 'text')
   if (text === undefined) return false
   try {
     const parsed: unknown = JSON.parse(text.text)
@@ -195,9 +196,7 @@ function answerBatchOf(content: readonly ContentBlock[]): readonly AskUserQuesti
 
 /**
  * Close one answerable question and keep the answers it settled with.
- * A reply whose call is no longer answerable changes nothing: the splice into
- * the agent inbox and the durable user message name the same reply, so the
- * first of the two records it.
+ * A reply whose call is no longer answerable changes nothing.
  * @param view - Current question state.
  * @param callId - Call the result or reply named.
  * @param answers - The batch it carried; empty when a late reply carried none.
@@ -225,9 +224,10 @@ function settleQuestion(
  * answerable as `continued` in exactly two cases: the tool returned the
  * pending payload, or Session resume repair appended the synthetic
  * `TOOL_OUTCOME_UNKNOWN` result for a call the process never finished. An
- * answer batch settles it with that batch; any failure drops it. A late reply
- * settles a continued question the moment its message enters the agent
- * inbox, whether answered or dismissed, with the answers it carried.
+ * answer batch settles it with that batch; any failure drops it. A PTC
+ * sub-call enters the fold when its recorded result is pending. A late reply
+ * settles only when the agent admits its user message; queued inbox messages
+ * can still be discarded before that point.
  * @param fold - Current fold state.
  * @param event - Next Session event in append order.
  * @returns The same fold when the event is unrelated, otherwise the updated one.
@@ -260,7 +260,7 @@ export function applyUserQuestionEvent(fold: UserQuestionFold, event: SessionEve
     case 'tool/result': {
       const callId = event.data.message.toolCallId
       if (!view.active.some(question => question.callId === callId)) return fold
-      if (isPendingResult(event.data.message) || event.data.error?.code === TOOL_OUTCOME_UNKNOWN) {
+      if (isPendingResult(event.data.message.content) || event.data.error?.code === TOOL_OUTCOME_UNKNOWN) {
         return {
           ...fold,
           questions: {
@@ -279,11 +279,18 @@ export function applyUserQuestionEvent(fold: UserQuestionFold, event: SessionEve
           : settleQuestion(view, callId, answers),
       }
     }
-    case 'agent/inbox/spliced': {
-      const questions = event.data.inserted.reduce((current, message) => message.source.kind === 'user-question-reply'
-        ? settleQuestion(current, message.source.callId, answerBatchOf(message.content) ?? [])
-        : current, view)
-      return questions === view ? fold : { ...fold, questions }
+    case 'tool/ptc-dispatch': {
+      if (event.data.name !== ASK_USER_QUESTION_TOOL || event.data.isError || !isPendingResult(event.data.content)) return fold
+      const questions = questionsOf(JSON.stringify(event.data.arguments))
+      if (questions === null) return fold
+      const callId = event.data.subCallId
+      return {
+        ...fold,
+        questions: {
+          ...view,
+          active: [...view.active.filter(question => question.callId !== callId), { callId, questions, state: 'continued' }],
+        },
+      }
     }
     case 'user/message': {
       const source = event.data.source
@@ -320,7 +327,7 @@ export const userQuestionProjectionDefinition = {
     return fold === state ? state : { ...state, ...fold }
   },
   wire: { viewSchema: projectionViewSchema, view: state => state.questions },
-  stateVersion: 4,
+  stateVersion: 5,
 } satisfies ProjectionDefinition<'userQuestions', UserQuestionProjectionState>
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

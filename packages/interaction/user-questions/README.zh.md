@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-当工具或权限流程需要用户提供结构化答案时，使用 `ctx.userQuestions`。普通问题可以短暂等待，然后让独立工作继续；未回答的计时问题会一直附着在会话上，直到用户回答。
+当工具或权限流程需要用户提供结构化答案时，使用 `ctx.userQuestions`。`ask()` 等待该答案；`askTimed()` 可以释放 agent 去继续独立工作，同时问题在 Session 上保持可回答。
 
 ## 目录
 
@@ -37,7 +37,7 @@ kind: "package-reference"
 <a id="role"></a>
 ## 职责
 
-`UserQuestionService` 拥有每个 `TimedQuestionWait`、可取消的 Client 接手记录和无人接手计时器。有人接手时，倒计时与聚焦／编辑决策归 Client 所有。无人接手时超时只中止前台请求的 signal 并返回 pending，不中止 Turn。`userQuestions` projection 从现有 Session 事件记录开放、已继续和已结算的计时调用；记录的工具 schema 排除 legacy 调用。`answer` RPC 只接受已继续的问题，在确认每个问题恰有一条回答后 steer 回复。迟到批次保留在投影中，因为原工具结果包含的是超时而不是该回答。保留的 `dismissed` 来源结果仍可读取，但没有生产者。
+`UserQuestionService` 拥有每个 `TimedQuestionWait`、可取消的 Client 接手记录和无人接手计时器。有人接手时，倒计时与聚焦／编辑决策归 Client 所有。无人接手时超时只中止前台请求的 signal 并返回 pending，不中止 Turn。`userQuestions` projection 从现有 Session 事件记录开放、已继续和已结算的计时调用；记录的工具 schema 排除 legacy 调用。`answer` RPC 校验每个问题恰有一条回答，且每个已继续的调用只接受一条排队回复；第二次回复以 `REPLY_QUEUED` 失败。被丢弃的回复会让问题恢复为可回答。迟到批次保留在投影中，因为原工具结果包含的是超时而不是该回答。保留的 `dismissed` 来源结果仍可读取，但没有生产者。
 
 <a id="model-experience"></a>
 ## 模型体验

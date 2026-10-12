@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use `ctx.userQuestions` when a tool or permission flow needs a structured answer from the user. Ordinary questions can wait briefly and then let independent work continue; unanswered timed questions remain attached to the Session until the user answers them.
+Use `ctx.userQuestions` when a tool or permission flow needs a structured answer from the user. `ask()` waits for that answer; `askTimed()` may release the agent to continue independent work while the question remains answerable in the Session.
 
 ## Table of Contents
 
@@ -37,7 +37,7 @@ While the tool call is open, the only answer path is that request; a browser tha
 <a id="role"></a>
 ## Role
 
-`UserQuestionService` owns each `TimedQuestionWait`, its cancellable Client claims, and its unattended timer. A claimed wait leaves countdown and focus/edit decisions to the Client. An unattended timeout aborts only the foreground request signal and returns pending, never aborting the Turn. The `userQuestions` projection records open, continued, and settled timed calls from existing Session events; legacy calls are excluded by the logged tool schema. The `answer` RPC accepts only continued questions and validates one answer per question before steering the reply. A late batch stays in the projection because the original tool result contains the timeout, not that answer. The retained `dismissed` source outcome is readable but has no producer.
+`UserQuestionService` owns each `TimedQuestionWait`, its cancellable Client claims, and its unattended timer. A claimed wait leaves countdown and focus/edit decisions to the Client. An unattended timeout aborts only the foreground request signal and returns pending, never aborting the Turn. The `userQuestions` projection records open, continued, and settled timed calls from existing Session events; legacy calls are excluded by the logged tool schema. The `answer` RPC validates one answer per question and accepts one queued reply per continued call; a second reply fails with `REPLY_QUEUED`. A discarded reply leaves the question answerable. A late batch stays in the projection because the original tool result contains the timeout, not that answer. The retained `dismissed` source outcome is readable but has no producer.
 
 <a id="model-experience"></a>
 ## Model Experience

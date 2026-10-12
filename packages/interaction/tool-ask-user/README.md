@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`ask_user_question` asks the human for confirmation, a choice, or missing information. By default it keeps the original blocking legacy behavior unchanged: the model waits for an answer. The asynchronous timed variant is an explicit Cordis opt-in with `mode: timed`; it waits for a foreground window, then returns a pending result so the model can continue independent work while the question stays answerable. Within timed mode, `timeout: -1` requests an indefinite blocking wait for that call. A live child agent owned by another agent cannot call this tool. The package renders nothing; callers provide the user interaction surface.
+`ask_user_question` asks the user for confirmation, a choice, or missing information. It waits for an answer by default. With `mode: timed`, a deadline can release the model to continue independent work while the question stays answerable; `timeout: -1` waits indefinitely. A live child agent cannot call the tool. Callers provide the answer UI.
 
 ## Table of Contents
 
@@ -25,9 +25,9 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Compose this plugin wherever the model should be able to pause for a human decision: it provides the `ask_user_question` tool and needs the `ctx.userQuestions` seam with an answerer that accepts the scoped request. Without one, the tool call fails with an error instead of degrading.
+Compose this plugin with `ctx.userQuestions` when the model needs a user decision. Without an answerer, blocking calls fail; finite timed calls return pending at their deadline.
 
-Shipped presets omit config and therefore expose the original blocking legacy tool. To switch on the alternate asynchronous behavior, set `mode: timed` on the `tool-ask-user` row inside the active preset's `config.plugins` list:
+Shipped presets use blocking mode. To enable timed mode, set `mode: timed` on the `tool-ask-user` row in the active preset's `config.plugins` list:
 
 ```yaml
 - id: tool-ask-user
@@ -37,7 +37,7 @@ Shipped presets omit config and therefore expose the original blocking legacy to
     timeout: 120
 ```
 
-This snippet is a plugin row, not a top-level `--patch` entry. The shipped Web profile nests it inside `preset-standard`, so a Web profile patch must update that preset's plugin list, or the same setting can be changed in the Agent Preset editor. Use `mode: legacy` (or omit `config`) to keep the blocking schema. In timed mode, the row's `timeout` is the default for every tool call. Setting it to `-1` makes every call wait indefinitely unless the model passes a positive `timeout` argument. A `timeout: -1` argument changes only that tool call, which may contain several questions; one answer batch settles the call.
+This is a plugin row, not a top-level `--patch` entry. In the Web profile, change the `preset-standard` plugin list or use the Agent Preset editor. `mode: legacy` or omitted config keeps the blocking schema. The row's `timeout` applies to each timed call by default; `-1` waits indefinitely unless the model supplies a positive timeout. A model-supplied `-1` applies only to that call, including all its questions.
 
 ### When to call the tool
 

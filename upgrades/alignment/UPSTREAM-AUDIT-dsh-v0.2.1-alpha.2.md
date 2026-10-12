@@ -28,8 +28,9 @@
 | `b981255be6d` + `0516f66d832` | 指令文件去重副本恢复对账资格（保留内容的重复项可提升；预算省略者的重复项继承排除）；组内任一候选（含隐藏重复项）元数据/内容不可读时整组冻结，且为全组成员保留绝对路径防别名绕行 | `packages/context/agent-instructions` |
 | `02f54230705` | `discoverModels` 先解析凭据：`MISSING_CREDENTIAL` 返回空目录隐藏路由，其余错误传播 | `packages/llm/llm-deepseek-api-key` |
 | `59ba1321eba` | Windows 终端分配传 `useConptyDll: true`（node-pty 自带 OpenConsole 承载，POSIX 不变） | `packages/subprocess/subprocess-local` |
+| `edd0660b5d0` + `fc30c5a7d25`（服务端侧） | `answer` 按 Session 保留排队回复直到录取：重复提交 `REPLY_QUEUED`、丢弃/认领轮次终结释放、`agent/inbox/claimed` 接管恢复回复；fold 改为仅 `user/message` 录取时结算并折叠 pending `tool/ptc-dispatch` 子调用；Client 侧等价机制（PendingWait/publishInteraction）此前已存在 | `packages/interaction/user-questions`（projection `stateVersion` 4→5） |
 
-验证：`deepseek-llm-api-extensions` + `llm-deepseek` 17 测试、`session-log-deepseek` 34 测试、`ptc-runtime-python` 325 测试、`subprocess-local` 359 测试、`session-format-v3-to-v4` 43 测试、`apiproxy` session-export 43 测试、`tool-jobs`/`goal`/`plan`/`agent-team`/`terminal-controller`/`ssh` 799 测试全过；typecheck 干净；`verify-package-dependencies` 门禁（63 包）与其 44 spec 测试通过；`ptc-python-turn` 快照回放通过。决策记录：`.agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md`、`2026-10-12-python-ptc-shared-sandbox-policy.md`、`2026-10-12-durable-path-safety-fixes.md`、`2026-10-12-session-reliability-fixes.md`。
+验证：`deepseek-llm-api-extensions` + `llm-deepseek` 17 测试、`session-log-deepseek` 34 测试、`ptc-runtime-python` 325 测试、`subprocess-local` 359 测试、`session-format-v3-to-v4` 43 测试、`apiproxy` session-export 43 测试、`tool-jobs`/`goal`/`plan`/`agent-team`/`terminal-controller`/`ssh` 799 测试全过；typecheck 干净；`verify-package-dependencies` 门禁（63 包）与其 44 spec 测试通过；`ptc-python-turn` 快照回放通过；`user-questions` 65 测试（排队回复保留、仅录取结算、PTC 子调用 fold）。决策记录：`.agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md`、`2026-10-12-python-ptc-shared-sandbox-policy.md`、`2026-10-12-durable-path-safety-fixes.md`、`2026-10-12-session-reliability-fixes.md`。
 
 ## 待修缺口（按严重度，源码复核确认）
 
@@ -41,7 +42,6 @@
 
 ### P2 — 用户可感知（按根因族）
 
-- user-question 可靠性：缺 queued reply 追踪/跨客户端恢复/重复应答去重/延迟 settle（`packages/interaction/user-questions`）。
 - 输入回显生命周期：canceled inbox splice 不退休 steering echo、dispose 把已录取 echo 报 failed、transcript echo 不等 inbox 水位（`packages/runtime/sessions/session.ts:1209-1241`、`:873-875`）。
 - schedule/subagent 归属：创建/更新不拒子代理会话、工具不拒 delegated child、无 typed result。
 - plugin-manager/HMR 族：未装 bundle 不可移除、meta 解析失败阻塞请求、retired schedule 残留 manifest、清单无 version 不降级、install/enable/remove 不刷新解析表；package.json 变不失效 cache、缺 CJS `_load` hook。

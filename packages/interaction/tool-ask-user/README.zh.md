@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`ask_user_question` 向用户请求确认、选择或缺失的信息。默认保持原有的阻塞式 legacy 行为不变：模型会等待用户回答。异步计时模式是显式的 Cordis 选择，设置 `mode: timed` 后启用；它等待前台窗口，随后返回待处理结果，让模型继续独立工作而问题仍可回答。在 timed 模式中，`timeout: -1` 让本次调用无限期阻塞。归属于另一个 agent 的存活子级不能调用此工具。本包不渲染界面；由调用方提供用户交互表面。
+`ask_user_question` 向用户请求确认、选择或缺失的信息。默认情况下，它会等待回答。设置 `mode: timed` 后，期限到达时模型可以继续独立工作，而问题仍可回答；`timeout: -1` 则无限期等待。存活的子 agent 不能调用此工具。调用方需提供回答界面。
 
 ## 目录
 
@@ -25,9 +25,9 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-凡模型应当能够暂停等待人类决定的场景，都可组合此插件：它提供 `ask_user_question` 工具，并且需要带有接受作用域请求的 answerer 的 `ctx.userQuestions` seam。没有 answerer 接受时，工具调用会以错误失败，而不是降级。
+当模型需要用户决定时，将此插件与 `ctx.userQuestions` 组合。没有 answerer 时，阻塞式调用返回错误；有限时长的 timed 调用到期后返回 pending。
 
-随附 preset 不配置此插件，因此公开原有的阻塞式 legacy 工具。要启用异步行为，请在当前 preset 的 `config.plugins` 列表中，将 `tool-ask-user` 条目显式设为 `mode: timed`：
+随附 preset 使用阻塞模式。要启用 timed 模式，请在当前 preset 的 `config.plugins` 列表中，将 `tool-ask-user` 条目设为 `mode: timed`：
 
 ```yaml
 - id: tool-ask-user
@@ -37,7 +37,7 @@ kind: "package-reference"
     timeout: 120
 ```
 
-以上片段是插件条目，而不是顶层 `--patch` 条目。随附 Web profile 将它嵌套在 `preset-standard` 中，因此 Web profile 补丁必须更新该 preset 的插件列表，或在 Agent Preset 编辑器中修改同一设置。使用 `mode: legacy`（或省略 `config`）即可保持阻塞式 schema。在 timed 模式下，条目的 `timeout` 是每次工具调用的默认值。设为 `-1` 会让每次调用无限期等待，除非模型传入正数 `timeout` 参数。参数中的 `timeout: -1` 只影响该次工具调用；一次调用可以包含多个问题，并由整批答案结算。
+以上片段是插件条目，而不是顶层 `--patch` 条目。在 Web profile 中，请修改 `preset-standard` 的插件列表，或使用 Agent Preset 编辑器。`mode: legacy` 或省略配置会保留阻塞式 schema。条目中的 `timeout` 默认适用于每次 timed 调用；设为 `-1` 时会无限期等待，除非模型传入正数期限。模型传入的 `-1` 只适用于该次调用，包括其中的所有问题。
 
 ### 何时调用该工具
 

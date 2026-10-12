@@ -912,7 +912,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async prepare(request: DeepSeekLlmApiExtensionRequest): Promise<PreparedDeepSeekLlmApiExtensions>',
-        description: 'Prepare every currently registered field from one immutable base request. Preparation failures reject before HTTP dispatch. Field values are cloned and frozen; providers retain no mutable alias to the outgoing request.',
+        description: 'Prepare every currently registered field from one immutable base request. A provider whose preparation throws, or whose value cannot be cloned, is omitted from this request; the first such failure per field is logged. Only cancellation rejects. Field values are cloned and frozen; providers retain no mutable alias to the outgoing request.',
         parameters: [{ name: 'request', description: 'exact serialized request facts before extension fields.' }],
         returns: 'detached fields and their idempotent joint acceptance transaction.',
       },
@@ -2934,6 +2934,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['an aggregate error after all branches settle when any failed.'],
       },
       {
+        signature: 'async waitForChildren(parent: Agent): Promise<boolean>',
+        description: 'Join progressing descendants without cancelling them. Idle descendants whose inboxes require a later wake stay resident and do not delay host completion.',
+        parameters: [{ name: 'parent', description: 'the exact parent whose descendant work is observed.' }],
+        returns: 'whether work was joined; hosts recheck parent idle after true.',
+      },
+      {
         signature: 'async drainContinuableChildren(parent: Agent, childIds: readonly SessionId[]): Promise<void>',
         description: 'Release selected resident continuable direct children of one exact live parent. Other children of the same parent remain admitted and resident. Absent targets and a manager-less composition are accepted no-ops.',
         parameters: [{ name: 'parent', description: 'exact live direct parent authorizing the selected release.' }, { name: 'childIds', description: 'durable direct-child ids to release when resident.' }],
@@ -3620,8 +3626,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: '@Remote answer(agent: Agent, callId: ToolCallId, answer: AskUserQuestionAnswer): boolean',
         description: 'Answer a continued question. The reply is steered into the agent as a user message whose source names the call; that message is also the record that closes the question in the projection.',
         parameters: [{ name: 'agent', description: 'Live root agent for the owning Session.' }, { name: 'callId', description: 'Continued question identity.' }, { name: 'answer', description: 'Complete structured answer batch, one item per question of the call.' }],
-        returns: 'Whether the question was continued and accepted the answer.',
-        throws: ['{UserQuestionError} `BAD_ANSWER` when the batch does not name each question of the call exactly once.'],
+        returns: 'Whether the question is still continued; an accepted reply stays queued until the agent admits its user message.',
+        throws: ['{UserQuestionError} `BAD_ANSWER` when the batch does not name each question of the call exactly once, or `REPLY_QUEUED` when a reply is already waiting for admission.'],
       },
       {
         signature: '@Remote({ mode: \'stream\' }) async *attachWait(agent: Agent, callId: ToolCallId, signal: AbortSignal): AsyncIterable<{ remainingMs: number }>',
@@ -7174,7 +7180,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentRuntime',
-    declaration: 'export class SubagentRuntime extends TypertRemoteService {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    resolveMaxDepth(configured?: number | \'provider-managed\'): number | undefined;\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async sendMessage(sender: Agent, targetId: SessionId, content: ContentBlock[], options: SubagentSendMessageOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    async drainContinuableChildren(parent: Agent, childIds: readonly SessionId[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    @Remote(\'list\')\n    async remoteExportList(parentSessionId: SessionId, signal: AbortSignal): Promise<SubagentCatalog>;\n    @Remote(\'prompt\')\n    async prompt(request: SubagentPromptRequest, signal: AbortSignal): Promise<SubagentPromptReceipt>;\n    @Remote(\'interruptByParent\')\n    async interruptByParent(childSessionId: SessionId, parentSessionId: SessionId, mode: \'continuable\'): Promise<SubagentInterruptReceipt>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentProvider | undefined;\n    list(): string[];\n    async start(n /* …truncated — full shape in source */',
+    declaration: 'export class SubagentRuntime extends TypertRemoteService {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    resolveMaxDepth(configured?: number | \'provider-managed\'): number | undefined;\n    async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart>;\n    async sendMessage(sender: Agent, targetId: SessionId, content: ContentBlock[], options: SubagentSendMessageOptions): Promise<MessageId>;\n    interrupt(targetSessionId: SessionId, authority: SubagentInterruptAuthority): void;\n    async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>;\n    async waitForChildren(parent: Agent): Promise<boolean>;\n    async drainContinuableChildren(parent: Agent, childIds: readonly SessionId[]): Promise<void>;\n    listChildren(parentSessionId: SessionId, signal?: AbortSignal): Promise<SubagentListEntry[]>;\n    listDescendants(rootSessionId: SessionId, signal?: AbortSignal): Promise<SubagentDescendantListEntry[]>;\n    @Remote(\'list\')\n    async remoteExportList(parentSessionId: SessionId, signal: AbortSignal): Promise<SubagentCatalog>;\n    @Remote(\'prompt\')\n    async prompt(request: SubagentPromptRequest, signal: AbortSignal): Promise<SubagentPromptReceipt>;\n    @Remote(\'interruptByParent\')\n    async interruptByParent(childSessionId: SessionId, parentSessionId: SessionId, mode: \'continuable\'): Promise<SubagentInterruptReceipt>;\n    registerProvider(provider: SubagentProvider): () => void;\n    getProvider(name: string): SubagentP /* …truncated — full shape in source */',
   },
   {
     name: 'SubagentSendMessageOptions',

@@ -8657,6 +8657,9 @@ importers:
       '@deepseek-ai/dsh-session-projection':
         specifier: workspace:*
         version: link:../../session/session-projection
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
       '@deepseek-ai/dsh-typert-protocol':
         specifier: workspace:*
         version: link:../../typert/protocol
