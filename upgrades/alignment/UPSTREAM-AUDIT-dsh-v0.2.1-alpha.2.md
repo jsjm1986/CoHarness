@@ -44,7 +44,7 @@
 
 | 缺口 | 本地位置 | 上游参照 |
 |---|---|---|
-| telemetry 关闭不取消在途 export，`Promise.race` 超时后 transport 仍挂 | `packages/session/session-telemetry-otel/src/index.ts:283-297` | 上游补丁形态不同，需自研 abortable transport |
+| ~~telemetry 关闭不取消在途 export，`Promise.race` 超时后 transport 仍挂~~ — 已修：`trackedAgentFactory` 复刻 SDK 的 agentFactory 选择并登记每个 agent，`shutdown()` finally 在到期或正常完成两种结局下销毁全部（到期使在途请求直接失败、正常路径释放 SDK 空实现 transport shutdown 留下的 keepAlive socket）；两透传类型同步排除 `selfObsMeterProvider`（上游 `b11af342fe4`） | `packages/session/session-telemetry-otel/src/index.ts`（本地自研：上游 `stopPending` 依附 `dsh-otel` reporter 架构，本树直接组 SDK 管线） | Agent Note `2026-10-13-telemetry-abortable-transport` |
 
 ### P2 — 用户可感知（按根因族）
 

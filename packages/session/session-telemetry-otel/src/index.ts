@@ -35,12 +35,41 @@ import {
 } from '@opentelemetry/sdk-logs'
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http'
 import type { OTLPExporterNodeConfigBase } from '@opentelemetry/otlp-exporter-base'
+import { httpAgentFactoryFromOptions } from '@opentelemetry/otlp-exporter-base/node-http'
+import type { Agent as HttpAgent } from 'node:http'
+import type { Agent as HttpsAgent } from 'node:https'
 import { SeverityNumber, type AnyValue } from '@opentelemetry/api-logs'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 
 // The package's own manifest is the single source of the instrumentation-scope
 // version (same pattern as dsh-llm's attribution identity).
 const { version } = createRequire(import.meta.url)('../package.json') as { version: string }
+
+type TransportAgent = HttpAgent | HttpsAgent
+/** Same signature as the SDK's `HttpAgentFactory`, which the package does not re-export. */
+type TransportAgentFactory = (protocol: string) => TransportAgent | Promise<TransportAgent>
+
+/**
+ * Wrap the SDK's `agentFactory` selection — function verbatim, options object
+ * merged over `keepAlive`, SDK default `keepAlive: true` — so every agent the
+ * transport creates also lands in {@link track} for the shutdown deadline.
+ * The transport invokes the factory once per protocol and caches the result.
+ * @param config - the verbatim `exporter` config object.
+ * @param track - set receiving every created agent.
+ * @returns the `httpAgentOptions` factory handed to the exporter.
+ */
+function trackedAgentFactory(config: OTLPExporterNodeConfigBase | undefined, track: Set<TransportAgent>): TransportAgentFactory {
+  let options = config?.httpAgentOptions
+  if (config?.keepAlive !== undefined && typeof options !== 'function') options = { keepAlive: config.keepAlive, ...options }
+  const delegate: TransportAgentFactory = typeof options === 'function'
+    ? options
+    : httpAgentFactoryFromOptions(options ?? { keepAlive: true })
+  return async (protocol) => {
+    const agent = await delegate(protocol)
+    track.add(agent)
+    return agent
+  }
+}
 
 /** Session-sharing policy selected by {@link Config.mode}. */
 export enum SessionTelemetryMode {
@@ -101,20 +130,23 @@ export interface Config {
   /** Defaults to `FEEDBACK_ONLY`: capture session history only when feedback is explicitly submitted. */
   mode?: SessionTelemetryMode
   /**
-   * Passed verbatim to the SDK's OTLP/HTTP log exporter — the complete
+   * Passed verbatim to the SDK's OTLP/HTTP log exporter — the
    * `OTLPExporterNodeConfigBase` shape (`headers`, `timeoutMillis`,
-   * `compression`, `keepAlive`, …), owned and documented by the SDK. `url`
-   * is the one field this package requires and validates itself.
+   * `compression`, `keepAlive`, …) minus self-observability metering, which
+   * no owning MeterProvider exists to consume. `url` is the one field this
+   * package requires and validates itself.
    */
-  exporter?: OTLPExporterNodeConfigBase & {
+  exporter?: Omit<OTLPExporterNodeConfigBase, 'selfObsMeterProvider'> & {
     /** Full logs endpoint (e.g. `https://collector.example.com/v1/logs`). Required outside `DISABLED`; validated at load. */
     url?: string
   }
   /**
    * Passed verbatim to `BatchLogRecordProcessor` (minus the exporter slot,
-   * which this plugin fills); the SDK owns and documents these knobs.
+   * which this plugin fills, and self-observability metering, which no
+   * owning MeterProvider exists to consume); the SDK owns and documents
+   * these knobs.
    */
-  processor?: Omit<BatchLogRecordProcessorOptions, 'exporter'>
+  processor?: Omit<BatchLogRecordProcessorOptions, 'exporter' | 'selfObsMeterProvider'>
   /** Maximum time spent awaiting the SDK provider's complete shutdown path. */
   shutdownTimeoutMillis?: number
 }
@@ -159,6 +191,13 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
 
   private readonly provider: LoggerProvider | undefined
   private readonly shutdownTimeoutMillis: number
+  /**
+   * Agents the transport created through the tracking factory, at most one
+   * per protocol. The SDK never destroys them itself — its transport
+   * `shutdown()` is a no-op — so this set is the only handle the shutdown
+   * deadline has on sockets a hung export still holds.
+   */
+  private readonly transportAgents = new Set<HttpAgent | HttpsAgent>()
   override readonly sharing: SessionTelemetrySharingStatus
 
   constructor(ctx: Context, config: Config) {
@@ -219,7 +258,10 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
           // ignore the rest. App identity travels in the Resource
           // (service.name/version); the transport-level user-agent is the
           // SDK's own, per the axiom.
-          exporter: new OTLPLogExporter(config.exporter),
+          exporter: new OTLPLogExporter({
+            ...config.exporter,
+            httpAgentOptions: trackedAgentFactory(config.exporter, this.transportAgents),
+          }),
         }),
       ],
     })
@@ -275,8 +317,12 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
    * Ask the SDK to drain and quiesce, but reject after the backend-owned
    * deadline. OTel's processor export timeout wraps `exportCompleted` only;
    * shutdown awaits `exporter.forceFlush()` first, which can remain pending
-   * when the transport never obtains a socket. The provider promise remains
-   * observed after the deadline so a later rejection cannot become unhandled.
+   * when the transport never obtains a socket. On either outcome every
+   * tracked transport agent is destroyed: at the deadline this fails the
+   * in-flight request instead of leaving it pending behind the rejection,
+   * and on success it releases idle keepAlive sockets the SDK's no-op
+   * transport shutdown never closes. The provider promise remains observed
+   * after the deadline so a later rejection cannot become unhandled.
    * `DISABLED` has no provider and resolves immediately.
    * @returns resolves when the SDK pipeline quiesces or is disabled, or rejects at the configured deadline.
    */
@@ -294,6 +340,7 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
     } finally {
       /* v8 ignore else -- the Promise executor assigns timer synchronously before this race starts. */
       if (timer !== undefined) clearTimeout(timer)
+      for (const agent of this.transportAgents) agent.destroy()
     }
   }
 }

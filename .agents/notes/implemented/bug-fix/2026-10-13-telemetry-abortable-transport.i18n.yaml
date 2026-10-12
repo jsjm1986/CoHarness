@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-13-telemetry-abortable-transport.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-13-telemetry-abortable-transport.md
+/agent-note-destroy-tracked-otlp-transport-agents-at-telemetry-shutdown:
+  en: 514cce38ae8b9d21
+  zh: 53ec069a9813d2d1
+/agent-note-destroy-tracked-otlp-transport-agents-at-telemetry-shutdown/problem:
+  en: 0f0298f1f934b4fd
+  zh: 6f1bb0830b14e44a
+/agent-note-destroy-tracked-otlp-transport-agents-at-telemetry-shutdown/decision:
+  en: 2cd6bc52ad562ad9
+  zh: a6ceadb8c39d5022
+/agent-note-destroy-tracked-otlp-transport-agents-at-telemetry-shutdown/alternatives-considered:
+  en: 6c3f0ee08f9e35bc
+  zh: a250c623985ab371
+/agent-note-destroy-tracked-otlp-transport-agents-at-telemetry-shutdown/consequences:
+  en: b216370437f1c923
+  zh: dce02a8e80e3609e
+/agent-note-destroy-tracked-otlp-transport-agents-at-telemetry-shutdown/verification:
+  en: eba62160fc0c6794
+  zh: 8d065dfac82830ac
+/agent-note-destroy-tracked-otlp-transport-agents-at-telemetry-shutdown/related:
+  en: a3b94c22b140764f
+  zh: 0cbc6937dbe1db26

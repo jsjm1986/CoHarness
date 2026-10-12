@@ -75,9 +75,10 @@ afterEach(async () => {
 
 async function mockCollector(
   beforeRespond?: (requestIndex: number) => Promise<void> | void,
-): Promise<{ url: string; captures: Capture[] }> {
+): Promise<{ url: string; captures: Capture[]; openConnections: () => number }> {
   const captures: Capture[] = []
   let requestIndex = 0
+  let open = 0
   const server = createServer((request, response) => {
     const chunks: Buffer[] = []
     request.on('data', chunk => chunks.push(chunk as Buffer))
@@ -95,12 +96,16 @@ async function mockCollector(
       })()
     })
   })
+  server.on('connection', (socket) => {
+    open++
+    socket.on('close', () => { open-- })
+  })
   servers.push(server)
   server.listen(0, '127.0.0.1')
   await once(server, 'listening')
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('no port')
-  return { url: `http://127.0.0.1:${address.port}/v1/logs`, captures }
+  return { url: `http://127.0.0.1:${address.port}/v1/logs`, captures, openConnections: () => open }
 }
 
 async function boot(url: string) {
@@ -283,10 +288,10 @@ describe('OpenTelemetrySessionBackend wire', () => {
     expect(allRecords(captures).some(r => r.scope.endsWith('/ops'))).toBe(false)
   })
 
-  it('bounds the SDK forceFlush wait when an in-flight transport never settles', async () => {
+  it('bounds the SDK forceFlush wait and destroys the hung transport at the deadline', async () => {
     const gate = Promise.withResolvers<boolean>()
     const arrived = Promise.withResolvers<boolean>()
-    const { url, captures } = await mockCollector(async (index) => {
+    const { url, captures, openConnections } = await mockCollector(async (index) => {
       if (index === 0) {
         arrived.resolve(true)
         await gate.promise
@@ -312,11 +317,37 @@ describe('OpenTelemetrySessionBackend wire', () => {
     expect(performance.now() - started).toBeLessThan(1_000)
     expect(captures).toHaveLength(0)
 
-    // The outer deadline cannot cancel the SDK transport. Let it finish so
-    // the real provider promise remains clean after the test has proved the
-    // Cordis disposer no longer waits for it.
+    // The deadline destroyed the tracked agent's sockets, so the hung request
+    // failed client-side and the server side no longer holds a connection —
+    // nothing keeps the transport alive past shutdown.
+    await expect.poll(openConnections).toBe(0)
+
+    // The server-side handler of the already-received first request still
+    // completes once the gate opens; the aborted export never returns.
     gate.resolve(true)
-    await expect.poll(() => captures.length).toBeGreaterThanOrEqual(2)
+    await expect.poll(() => captures.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('releases the keepAlive transport socket after a clean shutdown', async () => {
+    const { url, captures, openConnections } = await mockCollector()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(OpenTelemetrySessionBackend, {
+      mode: SessionTelemetryMode.FEEDBACK_ONLY,
+      exporter: { url },
+      processor: { scheduledDelayMillis: 10 },
+    })
+    const session = ctx.sessions.create(SessionId('socket-release'), { meta: {} })
+    session.append('request/header', { header: { config: { provider: 'mock', model: 'mock' } }, reason: 'initial' })
+    session.append('turn/start', { turn: 1 })
+    recordFeedback(session, { text: 'report' })
+    await expect.poll(() => captures.length).toBeGreaterThanOrEqual(1)
+    expect(openConnections()).toBe(1)
+
+    await fiber.dispose()
+    // The SDK's transport shutdown is a no-op; without teardown the keepAlive
+    // agent would hold this socket (and the event loop) past disposal.
+    await expect.poll(openConnections).toBe(0)
   })
 
   it('passes exporter options beyond url and headers through to the SDK exporter', async () => {
