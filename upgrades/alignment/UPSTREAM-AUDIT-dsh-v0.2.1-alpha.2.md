@@ -27,9 +27,6 @@
 
 | 缺口 | 本地位置 | 上游参照 |
 |---|---|---|
-| 附件发现无事件类型白名单，对任意 payload 扫 content/message/inserted/stream | `packages/host/apiproxy/src/api-proxy.ts:474-520`、`packages/session-query/session-log-export/src/session-export.ts:131-191` | `0c44e5461db` |
-| spill 路径在 `openSync` 成功前发布，失败时 `discardSpill` 可能删除非本进程创建路径；`onFailure` 未隔离 | `packages/subprocess/subprocess-local/src/output.ts:181-195` | `cafb9b93b4b` |
-| V3→V4 迁移校验静默放行损坏会话 JSONL | `packages/session/session-format-v3-to-v4/src/migration.ts` | `ad83cce36ac`（谱系裁决项） |
 | telemetry 关闭不取消在途 export，`Promise.race` 超时后 transport 仍挂 | `packages/session/session-telemetry-otel/src/index.ts:283-297` | 上游补丁形态不同，需自研 abortable transport |
 
 ### P2 — 用户可感知（按根因族）
@@ -38,7 +35,7 @@
 - 输入回显生命周期：canceled inbox splice 不退休 steering echo、dispose 把已录取 echo 报 failed、transcript echo 不等 inbox 水位（`packages/runtime/sessions/session.ts:1209-1241`、`:873-875`）。
 - schedule/subagent 归属：创建/更新不拒子代理会话、工具不拒 delegated child、无 typed result。
 - plugin-manager/HMR 族：未装 bundle 不可移除、meta 解析失败阻塞请求、retired schedule 残留 manifest、清单无 version 不降级、install/enable/remove 不刷新解析表；package.json 变不失效 cache、缺 CJS `_load` hook。
-- 单点：`maxConsecutiveWakes` 默认 10（上游无默认上限，`packages/tool-jobs/src/index.ts:68`）；plan 取消后仍等模型停（plan-mode:331）；标题不保留既有合适标题；无 key 模型不隐藏；agent-instructions 失败不上报；executable 错误 `instanceof` 跨 realm 误判（应比 name）；Windows `useConptyDll` 未启用；headless 不等子代理完成；team fold `z.object().loose()` 丢 `__proto__`；V3→V4 迁移不补 interrupted turn/end（`ad83cce36ac`）。
+- 单点：`maxConsecutiveWakes` 默认 10（上游无默认上限，`packages/tool-jobs/src/index.ts:68`）；plan 取消后仍等模型停（plan-mode:331）；标题不保留既有合适标题；无 key 模型不隐藏；agent-instructions 失败不上报；executable 错误 `instanceof` 跨 realm 误判（应比 name）；Windows `useConptyDll` 未启用；headless 不等子代理完成；team fold `z.object().loose()` 丢 `__proto__`。
 - CLI：`dsh plugin allow-version`/`revoke-version`/`version-exemptions` 未实现，但 `packages/boot/app-boot/src/plugin-compatibility.ts:101` 的错误提示指引用户运行它（死路指引）。
 - 客户端：空白会话隐藏整个 header；Coding Tools 关时 Creator stage 静默丢弃；preset 拒绝无 toast；trajectory 请求生命周期与重试错误；`@` 会话引用按 createdAt 排序；provider 卡缺 `derivedCredential`（`bf0db65bb0e`，`packages/client/ui-settings-models`）；plan 文档无 preview/sidebar/持久卡；`openChildAside` 缺子会话侧栏；Tooltip 被 `.composerSeat` stacking context 压层（QueueDock/GoalBar 未传 portal）；设置面板遇 onboarding 遮罩仍可交互（`7dfad907488`）；未命名会话显示目录名而非"未命名"（`a4ac7e9eb36`/`bcf0ba45cb0`）。
 - Markdown/工具呈现：无 CodeToolbar/CodeCard（wrap 切换+复制+lang）；markdown 图片链接无 hover/内联预览；web-fetch 折叠 URL 不可点；审批面板无 `displayReason` 投影；`developer/message` 工具更新通知不渲染。
