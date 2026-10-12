@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   AssistantBlock, AssistantMessageNode, ConversationLocation, ConversationMatch,
-  ConversationNodeContext, ConversationNodeDefinition, PartialAssistant, RequestView,
+  ConversationNodeContext, ConversationNodeDefinition, RequestView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   displayFailureMessage, IncrementalAssistantBlocks, isTokenDelta, sanitizeAssistantText, toAssistantBlocks,
@@ -10,6 +10,7 @@ import type { StreamChunk } from '@deepseek-ai/dsh-llm/types'
 import { assistantStreamFirstTokenTime } from '@deepseek-ai/dsh-llm/assistant-stream'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { trajectoryNode } from './trajectory-definition-common.ts'
+import type { TrajectoryPartialAssistant } from './trajectory-contract.ts'
 
 /* jscpd:ignore-start -- Target-owned Definitions intentionally keep their event
  * state machines independent; see ../../../../../.agents/notes/implemented/
@@ -35,7 +36,6 @@ interface AssistantState {
   readonly startSeq: number
   readonly startTime: number
   readonly started: boolean
-  readonly sawChunk: boolean
   readonly blocks: IncrementalAssistantBlocks
   readonly firstVisibleSeq: number | undefined
   readonly firstVisibleTime: number | undefined
@@ -59,7 +59,6 @@ function initialState(
     startSeq,
     startTime,
     started,
-    sawChunk: false,
     blocks: new IncrementalAssistantBlocks(),
     firstVisibleSeq: undefined,
     firstVisibleTime: undefined,
@@ -125,7 +124,7 @@ function updateChunk(
   time: number,
 ): AssistantState {
   if (chunk.type === 'usage') {
-    return { ...state, sawChunk: true, usage: addUsage(state.usage, chunk.usage) }
+    return { ...state, usage: addUsage(state.usage, chunk.usage) }
   }
   switch (chunk.type) {
     case 'block-start':
@@ -144,12 +143,11 @@ function updateChunk(
       state.blocks.end(chunk.index, chunk.block)
       break
     default:
-      return { ...state, sawChunk: true }
+      return state
   }
   const visible = firstVisibleFromChunk(chunk)
   return {
     ...state,
-    sawChunk: true,
     ...(visible && state.firstVisibleSeq === undefined
       ? { firstVisibleSeq: seq, firstVisibleTime: time }
       : {}),
@@ -178,7 +176,6 @@ function settleMessage(
   const blocks = toAssistantBlocks(event.data.message.content)
   return {
     ...settleTiming(state, event),
-    sawChunk: false,
     blocks: new IncrementalAssistantBlocks(blocks),
     final: match,
     usage: event.data.usage ?? state.usage,
@@ -265,9 +262,9 @@ function assistantRequest(
   boundary: { seq: number; time: number } | undefined,
 ): Extract<RequestView, { purpose: 'assistant' }> | undefined {
   if (!state.started) return undefined
-  const status = node !== undefined && node.interrupted !== true
-    ? 'complete'
-    : state.retry !== undefined || boundary !== undefined ? 'error' : 'running'
+  const status = node !== undefined
+    ? node.interrupted === true ? 'error' : 'complete'
+    : boundary !== undefined ? 'error' : 'running'
   return {
     purpose: 'assistant',
     startSeq: state.startSeq,
@@ -361,8 +358,17 @@ const trajectoryAssistantDefinition: ConversationNodeDefinition<AssistantState> 
     if (state === undefined) return null
     const node = finalNode(state, context)
     const boundary = closedBoundary(context)
-    const partial: PartialAssistant | null = node === undefined && boundary === undefined && state.sawChunk
-      ? { turn: state.turn, step: state.step, blocks: state.blocks.snapshot() }
+    const blocks = state.blocks.snapshot()
+    const partial: TrajectoryPartialAssistant | null = node === undefined && boundary === undefined && blocks.length > 0
+      ? {
+        turn: state.turn,
+        step: state.step,
+        blocks,
+        timing: {
+          stepStartTime: state.started ? state.startTime : null,
+          firstTokenTime: state.firstTokenTime ?? null,
+        },
+      }
       : null
     const request = assistantRequest(state, node, boundary)
     if (node === undefined && partial === null && request === undefined) return null

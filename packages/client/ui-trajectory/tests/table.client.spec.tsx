@@ -2,11 +2,12 @@
 /** Trajectory ledger selection, details, status, and fold behavior. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { TrajectoryTable as LocalizedTrajectoryTable } from '../src/client/TrajectoryTable.tsx'
 import type { TrajectoryTurnModel } from '../src/client/layout.ts'
-import { t } from './locale.client.ts'
+import { deriveTrajectoryLayout } from '../src/client/layout.ts'
+import { t, tZh } from './locale.client.ts'
 
 function TrajectoryTable(
   props: Omit<ComponentProps<typeof LocalizedTrajectoryTable>, 't'>,
@@ -723,6 +724,68 @@ describe('TrajectoryTable', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Result' }))
     const errorResult = screen.getByText('ToolError: non_zero_exit')
     expect(errorResult.closest('[class*="errorPayload"]')).toBeTruthy()
+  })
+
+  it('does not expose a request placeholder as a completed assistant result', () => {
+    const turns = deriveTrajectoryLayout({
+      nodes: [], partial: null, runningCalls: [],
+      requests: [{
+        purpose: 'assistant', startSeq: 2, turn: 1, step: 1,
+        startedAt: 2_000, completedAt: null, status: 'running',
+      }],
+    }, t)
+    render(<TrajectoryTable turns={turns} requestNumbers={[{
+      turn: 1, step: 1, seq: 2, group: 'Step 1', number: 1,
+      status: 'running', startedAt: 2_000, completedAt: null,
+    }]} {...FOLD_PROPS} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Request #1' }))
+    expect(screen.getByText('Pending')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Assistant Message' })).toBeNull()
+    expect(screen.queryByText('Completed')).toBeNull()
+  })
+
+  it.each([
+    ['English', t, 'Pending', 'Completed', 'Failed', 'Last attempt error', 'Error'],
+    ['Chinese', tZh, '等待中', '已完成', '失败', '上次尝试错误', '错误'],
+  ] as const)('distinguishes retry history from the current request status in %s', (
+    _locale, translate, pending, completed, failed, lastAttemptError, error,
+  ) => {
+    const turns: readonly TrajectoryTurnModel[] = [{
+      turn: 1,
+      groups: [{ title: 'Step 1', cells: [{
+        index: 1, kind: 'message', text: 'response', timeSeconds: null,
+      }] }],
+    }]
+    const table = (status: 'running' | 'complete' | 'error') => (
+      <LocalizedTrajectoryTable
+        turns={turns} {...FOLD_PROPS} t={translate}
+        requestNumbers={[{
+          turn: 1, step: 1, group: 'Step 1', number: 1, status,
+          error: 'upstream 503', retry: 1, maxRetries: 2,
+        }]}
+      />
+    )
+    const view = render(table('running'))
+    fireEvent.click(screen.getByRole('button', { name: translate('request.label', { request: 1 }) }))
+    const panel = within(screen.getByRole('tabpanel'))
+    expect(panel.getByText(pending)).toBeTruthy()
+    expect(panel.getByText(lastAttemptError)).toBeTruthy()
+    expect(panel.queryByText(error, { exact: true })).toBeNull()
+    expect(panel.getByText('upstream 503').className).not.toContain('error')
+
+    view.rerender(table('complete'))
+    expect(panel.getByText(completed)).toBeTruthy()
+    expect(panel.getByText(lastAttemptError)).toBeTruthy()
+    expect(panel.queryByText(error, { exact: true })).toBeNull()
+    expect(panel.getByText(translate('request.retryProgress', { retry: 1, maximum: 2 }))).toBeTruthy()
+    expect(panel.getByText('upstream 503').className).not.toContain('error')
+
+    view.rerender(table('error'))
+    expect(panel.getByText(failed)).toBeTruthy()
+    expect(panel.getByText(error, { exact: true })).toBeTruthy()
+    expect(panel.queryByText(lastAttemptError)).toBeNull()
+    expect(panel.getByText('upstream 503').className).toContain('error')
   })
 
   it('marks failed requests and lays coincident request markers left to right', () => {

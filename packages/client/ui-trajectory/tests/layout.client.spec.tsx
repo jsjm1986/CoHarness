@@ -71,6 +71,20 @@ describe('TrajectoryTurn', () => {
 })
 
 describe('deriveTrajectoryLayout', () => {
+  it('marks an interrupted assistant as failed while retaining its output', () => {
+    const turns = deriveTrajectoryLayout({
+      nodes: [{
+        kind: 'assistant', seq: 3, time: 3_000, turn: 1, step: 1,
+        blocks: [{ kind: 'text', text: 'cut short' }], interrupted: true,
+      }] as unknown as ConversationSnapshot['nodes'],
+      partial: null,
+      runningCalls: [],
+    })
+    expect(turns[0]?.groups[0]?.cells).toMatchObject([{
+      kind: 'message', isError: true, outputDetail: 'cut short',
+    }])
+  })
+
   it('expands assistant blocks, hangs usage on Message, and folds call+result into Tool', () => {
     const nodes = [
       { kind: 'user', seq: 1, time: 1_000, content: [{ type: 'text', text: 'hello' }], source: null },
@@ -133,6 +147,7 @@ describe('deriveTrajectoryLayout', () => {
       turn: 2,
       step: 1,
       blocks: [{ kind: 'reasoning' as const, text: 'streaming' }],
+      timing: { stepStartTime: 3_000, firstTokenTime: 3_200 },
     }
     const request = {
       purpose: 'assistant', startSeq: 3, turn: 2, step: 1,
@@ -156,6 +171,13 @@ describe('deriveTrajectoryLayout', () => {
       text: '',
       previewMarkdown: 'streaming',
       timeSeconds: null,
+      startedAt: 3_000,
+      assistantMetrics: {
+        timingRecorded: true,
+        stepStartTime: 3_000,
+        firstTokenTime: 3_200,
+        completedTime: null,
+      },
     }])
     expect(streamed[1]?.groups[0]?.cells[0]?.requestOnly).toBeUndefined()
   })
