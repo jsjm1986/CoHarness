@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   TeamMemberView as TeamRosterMember,
@@ -8,7 +9,8 @@ import type {
 import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconChevronDownOutline14, IconCloseOutline16, IconRefreshOutline14,
-  IconUserOutline16, StateDot, type StateDotState,
+  IconUserOutline16, StateDot, Tag, Tooltip,
+  useAnchoredPosition, useDismissOnOutsidePointer, type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -64,6 +66,16 @@ export function TeamAction({
   const sessionRef = useRef(sessionId)
   const refreshGeneration = useRef(0)
   sessionRef.current = sessionId
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const triggerLabelRef = useRef<HTMLSpanElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const position = useAnchoredPosition({
+    open, anchorRef: triggerRef, panelRef, align: 'end', gap: 5, margin: 16,
+  })
+  const positioned = position !== null
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const pinnedRef = useRef(false)
 
   useEffect(() => {
     refreshGeneration.current += 1
@@ -90,33 +102,112 @@ export function TeamAction({
     }
   }, [load, sessionId])
 
+  const cancelHoverChange = (): void => {
+    clearTimeout(hoverTimer.current)
+    hoverTimer.current = undefined
+  }
+
+  useEffect(() => cancelHoverChange, [])
+
+  useLayoutEffect(() => {
+    if (open && positioned && pinnedRef.current) panelRef.current?.focus()
+  }, [open, positioned])
+
+  const changeOpen = (next: boolean): void => {
+    cancelHoverChange()
+    if (!next) pinnedRef.current = false
+    setOpen(next)
+    if (next) void refresh()
+  }
+
+  const scheduleHoverOpen = (): void => {
+    cancelHoverChange()
+    if (open) return
+    const label = triggerLabelRef.current
+    /* v8 ignore next -- the label mounts with the trigger that received the hover. */
+    if (label === null) return
+    // Icon-only trigger (label collapsed by the header container query):
+    // hover-open would surprise on such a small target, so only click opens.
+    if (getComputedStyle(label).display === 'none') return
+    hoverTimer.current = setTimeout(() => {
+      hoverTimer.current = undefined
+      changeOpen(true)
+    }, 150)
+  }
+
+  const scheduleHoverClose = (): void => {
+    cancelHoverChange()
+    if (pinnedRef.current) return
+    hoverTimer.current = setTimeout(() => {
+      hoverTimer.current = undefined
+      changeOpen(false)
+    }, 120)
+  }
+
+  useDismissOnOutsidePointer(rootRef, open, changeOpen, panelRef)
+
+  useEffect(() => {
+    if (!open) return
+    const dismiss = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      cancelHoverChange()
+      pinnedRef.current = false
+      setOpen(false)
+      if (panelRef.current?.contains(document.activeElement)) triggerRef.current?.focus()
+    }
+    document.addEventListener('keydown', dismiss)
+    return () => { document.removeEventListener('keydown', dismiss) }
+  }, [open])
+
   const teammates = view?.members.filter(member => member.role === 'teammate') ?? []
+  const compact = view !== null && view.members.length <= 1 && view.tasks.length === 0
 
   return (
-    <div className={css.root} data-team-action>
+    <div
+      ref={rootRef}
+      className={css.root}
+      data-team-action
+      onMouseLeave={scheduleHoverClose}
+    >
       <button
         type="button"
+        ref={triggerRef}
+        onMouseEnter={scheduleHoverOpen}
         className={css.trigger}
+        aria-label={t('trigger')}
+        aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => {
-          const next = !open
-          setOpen(next)
-          if (next) void refresh()
+          cancelHoverChange()
+          pinnedRef.current = true
+          if (!open) changeOpen(true)
+          else panelRef.current?.focus()
         }}
       >
         <IconUserOutline16 size={14} />
-        <span>{t('trigger')}</span>
+        <span ref={triggerLabelRef} className={css.triggerLabel}>{t('trigger')}</span>
         {teammates.length > 0 && <span className={css.count}>{teammates.length}</span>}
       </button>
-      {open && (
-        <div className={css.panel} role="dialog" aria-label={t('trigger')}>
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          className={compact ? `${css.panel} ${css.panelCompact}` : css.panel}
+          style={position ?? { visibility: 'hidden', left: 0, top: 0 }}
+          role="dialog"
+          tabIndex={-1}
+          aria-label={t('trigger')}
+          data-team-panel
+          onMouseEnter={cancelHoverChange}
+          onMouseLeave={scheduleHoverClose}
+        >
           <div className={css.toolbar}>
             <strong>{t('trigger')}</strong>
             <span className={css.spacer} />
             <button type="button" className={css.iconButton} aria-label={t('refresh')} onClick={() => { void refresh() }}>
               <IconRefreshOutline14 />
             </button>
-            <button type="button" className={css.iconButton} aria-label={t('close')} onClick={() => { setOpen(false) }}>
+            <button type="button" className={css.iconButton} aria-label={t('close')} onClick={() => { changeOpen(false) }}>
               <IconCloseOutline16 size={14} />
             </button>
           </div>
@@ -125,41 +216,83 @@ export function TeamAction({
           {view !== null && (
             <>
               <section>
-                <h3>{t('roster')}</h3>
+                <h3>
+                  {t('roster')}
+                  {view.members.length > 1 && <span className={css.count}>{view.members.length}</span>}
+                </h3>
                 <div className={css.roster}>
                   {view.members.map(member => (
-                    <button
+                    <TeamMemberRow
                       key={member.id}
-                      type="button"
-                      className={css.member}
-                      disabled={member.role === 'lead' || member.status === 'failed' || member.status === 'provisioning'}
-                      title={member.role === 'teammate' ? t('open') : undefined}
-                      onClick={() => {
-                        void openTeammate(sessionId, member).catch((reason: unknown) => { setError(String(reason)) })
-                      }}
-                    >
-                      <StateDot state={member.status === 'running' ? 'ongoing' : member.status === 'failed' ? 'error' : 'done'} />
-                      <span className={css.memberText}>
-                        <span>{member.name}</span>
-                        <small>{t(memberStatusKey(member.status))}{member.model === undefined ? '' : ` · ${t('model')}: ${member.model}`}</small>
-                        {member.diagnostics.map(diagnostic => <small key={diagnostic} className={css.diagnostic}>{diagnostic}</small>)}
-                      </span>
-                    </button>
+                      member={member}
+                      memberCount={view.members.length}
+                      sessionId={sessionId}
+                      openTeammate={openTeammate}
+                      onError={setError}
+                      t={t}
+                    />
                   ))}
                 </div>
               </section>
               <section>
-                <h3>{t('tasks')}</h3>
-                {view.tasks.length === 0 && <div className={css.notice}>{t('empty')}</div>}
-                <div className={css.tasks}>
-                  {view.tasks.map(task => <TaskCard key={task.id} task={task} t={t} />)}
-                </div>
+                {view.tasks.length === 0
+                  ? <div className={css.notice}>{t('empty')}</div>
+                  : (
+                    <>
+                      <h3>
+                        {t('tasks')}
+                        <span className={css.count}>{view.tasks.length}</span>
+                      </h3>
+                      <div className={css.tasks}>
+                        {view.tasks.map(task => <TaskCard key={task.id} task={task} t={t} />)}
+                      </div>
+                    </>
+                  )}
               </section>
             </>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
+  )
+}
+
+function TeamMemberRow({
+  member, memberCount, sessionId, openTeammate, onError, t,
+}: {
+  member: TeamRosterMember
+  memberCount: number
+  sessionId: SessionId
+  openTeammate: TeamActionInjected['openTeammate']
+  onError: (message: string) => void
+  t: TeamActionProps['t']
+}) {
+  const isCurrent = member.id === sessionId
+  const highlightCurrent = isCurrent && memberCount > 1
+  const inert = isCurrent || member.status === 'failed' || member.status === 'provisioning'
+
+  return (
+    <Tooltip label={t('open')} side="bottom" gap={4} disabled={inert}>
+      <button
+        type="button"
+        className={highlightCurrent ? `${css.member} ${css.memberCurrent}` : css.member}
+        disabled={inert}
+        onClick={() => {
+          void openTeammate(sessionId, member).catch((reason: unknown) => { onError(String(reason)) })
+        }}
+      >
+        <StateDot state={member.status === 'running' || member.status === 'provisioning' ? 'ongoing' : member.status === 'failed' ? 'error' : 'done'} />
+        <span className={css.memberText}>
+          <span className={css.memberName}>
+            <span className={css.memberNameText}>{member.name}</span>
+            {isCurrent && <Tag tone="info" className={css.currentTag}>{t('current')}</Tag>}
+          </span>
+          <small>{t(memberStatusKey(member.status))}{member.model === undefined ? '' : ` · ${t('model')}: ${member.model}`}</small>
+          {member.diagnostics.map(diagnostic => <small key={diagnostic} className={css.diagnostic}>{diagnostic}</small>)}
+        </span>
+      </button>
+    </Tooltip>
   )
 }
 

@@ -12,7 +12,7 @@ The Web Agent Teams header panel carried a hand-maintained mutation surface — 
 
 [client-ui-agent-team](../../../../packages/experimental/client-ui-agent-team/README.md) renders the read-only board: `TeamActionInjected` narrows to `load` and `openTeammate`, the task section shows identity, status, owner, blockers, readiness, write scopes, and warnings with description clamping, and the locale dictionaries and tests drop every mutation affordance. Task mutation remains available to agents through the Team tools in [agent-team](../../../../packages/experimental/agent-team/README.md); the RPC methods themselves are untouched, so no service, projection, or wire contract changes.
 
-The panel anchors to the right edge of its header trigger (`right: 0`) and falls back to a fixed bottom sheet under 768px, so a right-side trigger can no longer push content past the viewport.
+The panel renders through a portal positioned by `useAnchoredPosition`, right-aligned to its header trigger and clamped inside the viewport. Hover opens it with a trigger-to-panel crossing grace, a click pins it, and an outside pointer, Escape, or the toolbar button dismisses it; the current member is tagged and inert while every other member navigates, including the lead back to its own session.
 
 ## Alternatives considered
 

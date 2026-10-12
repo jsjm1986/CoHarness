@@ -47,6 +47,8 @@ The Client export mounts the generated `ctx.remote.agentTeams` contribution from
 
 A newer refresh invalidates older ones, so overlapping reloads can never resurrect stale state. A session switch closes the panel and discards any in-flight load for the previous session.
 
+The panel renders through a portal anchored to the trigger's right edge by `useAnchoredPosition`, which clamps it inside the viewport on every size. Hover opens it after a short delay with a trigger-to-panel crossing grace, a click pins it, and it dismisses on an outside pointer, Escape, or the toolbar close button; pinning focuses the panel and Escape returns focus to the trigger. When the header container collapses the trigger label to its icon, only click opens. Selecting a roster member navigates to that session; the current member is tagged and inert.
+
 | File | Role |
 |---|---|
 | [`src/client/mount.ts`](src/client/mount.ts) | Generated Remote, locale, navigation, and slot registrations |

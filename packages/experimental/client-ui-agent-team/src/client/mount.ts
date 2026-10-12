@@ -39,8 +39,11 @@ function registerUi(ctx: ClientContext): void {
       return await ctx.remote.agentTeams.view(leadSessionId(sessionId))
     },
     async openTeammate(sessionId: SessionId, member: TeamRosterMember): Promise<void> {
-      if (member.role !== 'teammate') return
       const parentSessionId = leadSessionId(sessionId)
+      if (member.role !== 'teammate') {
+        sessions.open(parentSessionId)
+        return
+      }
       await sessions.refreshSubagents(parentSessionId)
       // The refresh is asynchronous: skip navigation when the user has already
       // moved to another session view while it was in flight.

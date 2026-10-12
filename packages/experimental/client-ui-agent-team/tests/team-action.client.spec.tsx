@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { act } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -199,12 +200,10 @@ describe('TeamAction', () => {
     expect(await screen.findByText('Error: navigation failed')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: zh.refresh }))
     await waitFor(() => { expect(load).toHaveBeenCalledTimes(2) })
-    fireEvent.click(screen.getByRole('button', { name: /Agent Team/u }))
+    fireEvent.click(screen.getByRole('button', { name: zh.close }))
     expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Agent Team/u }))
     await screen.findByRole('dialog')
-    fireEvent.click(screen.getByRole('button', { name: zh.close }))
-    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('shows load failures', async () => {
@@ -213,5 +212,174 @@ describe('TeamAction', () => {
     }))} />)
     fireEvent.click(screen.getByRole('button', { name: /Agent Team/u }))
     expect(await screen.findByText('load failed (gateway/internal)')).toBeTruthy()
+  })
+
+  it('keeps the panel outside the root and dismisses on outside pointer or Escape', async () => {
+    const rendered = render(<TeamAction {...props(actions())} />)
+    const trigger = screen.getByRole('button', { name: /Agent Team/u })
+    fireEvent.click(trigger)
+    const panel = screen.getByRole('dialog')
+    expect(rendered.container.contains(panel)).toBe(false)
+    expect(document.activeElement).toBe(panel)
+    fireEvent.pointerDown(panel)
+    expect(screen.getByRole('dialog')).toBe(panel)
+    fireEvent.pointerDown(trigger)
+    expect(screen.getByRole('dialog')).toBe(panel)
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    fireEvent.click(trigger)
+    const reopened = await screen.findByRole('dialog')
+    fireEvent.keyDown(document.body, { key: 'a' })
+    expect(screen.getByRole('dialog')).toBe(reopened)
+    reopened.blur()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(document.activeElement).toBe(document.body)
+
+    fireEvent.click(trigger)
+    await screen.findByRole('dialog')
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('renders a single-member empty team in the compact panel', async () => {
+    const soloView: TeamView = {
+      members: [view.members[0]!],
+      tasks: [],
+    }
+    render(<TeamAction {...props(actions({
+      load: () => Promise.resolve({ ok: true, value: soloView }),
+    }))} />)
+    fireEvent.click(screen.getByRole('button', { name: /Agent Team/u }))
+    expect(await screen.findByText(zh.empty)).toBeTruthy()
+    expect(screen.getByRole('dialog').getAttribute('data-team-panel')).not.toBeNull()
+  })
+
+  it('opens on hover and preserves the trigger-to-panel crossing grace', async () => {
+    vi.useFakeTimers()
+    try {
+      const advance = async (duration: number): Promise<void> => {
+        await act(async () => { await vi.advanceTimersByTimeAsync(duration) })
+      }
+      render(<TeamAction {...props(actions())} />)
+      const trigger = screen.getByRole('button', { name: /Agent Team/u })
+      const root = trigger.parentElement!
+
+      fireEvent.mouseEnter(trigger)
+      await advance(149)
+      expect(screen.queryByRole('dialog')).toBeNull()
+      await advance(1)
+      const panel = screen.getByRole('dialog')
+
+      fireEvent.mouseEnter(trigger)
+      expect(screen.getByRole('dialog')).toBe(panel)
+
+      fireEvent.mouseLeave(root)
+      fireEvent.mouseEnter(panel)
+      await advance(120)
+      expect(screen.getByRole('dialog')).toBe(panel)
+
+      fireEvent.mouseLeave(panel)
+      await advance(119)
+      expect(screen.getByRole('dialog')).toBe(panel)
+      await advance(1)
+      expect(screen.queryByRole('dialog')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('pins a click-opened panel through hover-out until explicit dismissal', async () => {
+    vi.useFakeTimers()
+    try {
+      const advance = async (duration: number): Promise<void> => {
+        await act(async () => { await vi.advanceTimersByTimeAsync(duration) })
+      }
+      render(<TeamAction {...props(actions())} />)
+      const trigger = screen.getByRole('button', { name: /Agent Team/u })
+      const root = trigger.parentElement!
+
+      fireEvent.click(trigger)
+      await act(async () => {})
+      const panel = screen.getByRole('dialog')
+      fireEvent.mouseEnter(trigger)
+      fireEvent.mouseLeave(root)
+      await advance(300)
+      expect(screen.getByRole('dialog')).toBe(panel)
+      fireEvent.mouseEnter(panel)
+      fireEvent.mouseLeave(panel)
+      await advance(300)
+      expect(screen.getByRole('dialog')).toBe(panel)
+      fireEvent.pointerDown(document.body)
+      expect(screen.queryByRole('dialog')).toBeNull()
+
+      fireEvent.mouseEnter(trigger)
+      await advance(150)
+      const hovered = screen.getByRole('dialog')
+      fireEvent.click(trigger)
+      fireEvent.mouseLeave(root)
+      await advance(300)
+      expect(screen.getByRole('dialog')).toBe(hovered)
+      fireEvent.keyDown(trigger, { key: 'Escape' })
+      expect(screen.queryByRole('dialog')).toBeNull()
+      fireEvent.mouseEnter(trigger)
+      fireEvent.mouseLeave(root)
+      await advance(300)
+      expect(screen.queryByRole('dialog')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('opens by click only while the trigger is collapsed to its icon', async () => {
+    vi.useFakeTimers()
+    try {
+      const advance = async (duration: number): Promise<void> => {
+        await act(async () => { await vi.advanceTimersByTimeAsync(duration) })
+      }
+      render(<TeamAction {...props(actions())} />)
+      const trigger = screen.getByRole('button', { name: /Agent Team/u })
+      const label = screen.getByText(zh.trigger)
+      const computedStyle = window.getComputedStyle.bind(window)
+      vi.spyOn(window, 'getComputedStyle').mockImplementation(element =>
+        element === label ? { display: 'none' } as CSSStyleDeclaration : computedStyle(element))
+
+      fireEvent.mouseEnter(trigger)
+      await advance(300)
+      expect(screen.queryByRole('dialog')).toBeNull()
+
+      fireEvent.click(trigger)
+      await act(async () => {})
+      expect(screen.getByRole('dialog')).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps an accessible trigger name when its label is collapsed', () => {
+    render(<TeamAction {...props(actions())} />)
+    screen.getByText(zh.trigger).style.display = 'none'
+    expect(screen.getByRole('button', { name: zh.trigger })).toBeTruthy()
+  })
+
+  it('marks the current member inert and lets the lead row navigate back', async () => {
+    const openTeammate = vi.fn(() => Promise.resolve())
+    render(<TeamAction {...props(actions({ openTeammate }), 'worker-id' as SessionId)} />)
+    fireEvent.click(screen.getByRole('button', { name: /Agent Team/u }))
+    const leadRow = await screen.findByRole('button', { name: /lead/u })
+    expect(leadRow).toBeTruthy()
+    fireEvent.click(leadRow)
+    await waitFor(() => { expect(openTeammate).toHaveBeenCalledWith('worker-id' as SessionId, view.members[0]) })
+  })
+
+  it('marks the current member with a tag and disables its row', async () => {
+    render(<TeamAction {...props(actions())} />)
+    fireEvent.click(screen.getByRole('button', { name: /Agent Team/u }))
+    await screen.findByRole('dialog')
+    const currentRow = screen.getByRole('button', { name: /lead/u }) as HTMLButtonElement
+    expect(currentRow.disabled).toBe(true)
+    expect(screen.getByText(zh.current)).toBeTruthy()
   })
 })

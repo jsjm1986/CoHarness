@@ -12,7 +12,7 @@ Web Agent Teams 页头面板在 `agentTeams/createTask` 与 `agentTeams/updateTa
 
 [client-ui-agent-team](../../../../packages/experimental/client-ui-agent-team/README.zh.md) 渲染只读任务板：`TeamActionInjected` 收窄为 `load` 与 `openTeammate`；任务区展示 identity、status、owner、blocker、readiness、write scope 与 warning，并支持描述折叠展开；locale 字典与测试移除全部 mutation 控件。任务修改仍由 agent 通过 [agent-team](../../../../packages/experimental/agent-team/README.zh.md) 的 Team 工具完成；RPC 方法本身未改动，因此没有服务、projection 或 wire contract 变化。
 
-面板锚定到页头触发器的右边缘（`right: 0`），并在 768px 以下退化为固定底部面板，使右侧触发器不再把内容推出视口。
+面板通过 portal 渲染，由 `useAnchoredPosition` 锚定到页头触发器右缘并钳制在视口内。悬停经跨越宽限打开，点击钉住，外部指针、Escape 或工具栏按钮关闭；当前成员被标记且不可点击，其余成员均可导航，包括点击 lead 回到其会话。
 
 ## 备选方案
 

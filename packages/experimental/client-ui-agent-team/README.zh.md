@@ -47,6 +47,8 @@ Client export 挂载来自 [`@deepseek-ai/dsh-experimental-agent-team/remote`](.
 
 较新的 refresh 会让更早的 refresh 失效，因此重叠的重新读取不会复活陈旧状态。切换 session 会关闭 panel 并丢弃为上一个 session 发出的在途 load。
 
+panel 通过 portal 渲染，由 `useAnchoredPosition` 锚定到触发器右缘并在任意视口尺寸下钳制在视口内。悬停经短延迟打开并保留触发器到面板的跨越宽限，点击会钉住 panel；外部指针、Escape 或工具栏关闭按钮都会将其关闭。钉住时 panel 获得焦点，Escape 把焦点还给触发器。当页头容器把触发器文案折叠为纯图标时，仅点击可打开。选择 roster 成员会导航到该会话；当前成员会被标记且不可点击。
+
 | 文件 | 职责 |
 |---|---|
 | [`src/client/mount.ts`](src/client/mount.ts) | 生成的 Remote、locale、导航与 slot registration |

@@ -25,6 +25,14 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* Past this title-row width the trigger keeps only its icon. TeamAction reads
+   the collapsed state off this rule to switch from hover-open to click-only. */
+@container (max-width: 480px) {
+  .triggerLabel {
+    display: none;
+  }
+}
+
 .count {
   min-width: 16px;
   border-radius: 8px;
@@ -37,15 +45,13 @@
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 
-  position: absolute;
-  top: calc(100% + 5px);
-  /* The trigger lives in the header's right-side action cluster: anchor the
-     panel's right edge so it opens leftward and stays inside the viewport. */
-  right: 0;
+  /* Fixed so useAnchoredPosition can right-align it to the trigger and clamp
+     it inside the viewport on every size. */
+  position: fixed;
   z-index: 110;
   box-sizing: border-box;
   width: min(560px, calc(100vw - 32px));
-  max-height: min(680px, calc(100vh - 120px));
+  max-height: min(680px, calc(100vh - 32px));
   padding: 10px;
   overflow: auto;
   border: 0;
@@ -55,16 +61,8 @@
   box-shadow: var(--dsw-elevation-prominent);
 }
 
-@media (max-width: 767px) {
-  .panel {
-    position: fixed;
-    top: auto;
-    right: 16px;
-    bottom: 16px;
-    left: 16px;
-    width: auto;
-    max-height: 70vh;
-  }
+.panelCompact {
+  width: min(340px, calc(100vw - 32px));
 }
 
 .toolbar,
@@ -121,10 +119,31 @@
   cursor: default;
 }
 
+.memberCurrent {
+  border-color: var(--dsw-alias-border-l3);
+}
+
 .memberText {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.memberName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.memberNameText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.currentTag {
+  flex-shrink: 0;
 }
 
 .memberText small,

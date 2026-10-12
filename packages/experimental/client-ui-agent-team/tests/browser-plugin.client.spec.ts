@@ -89,6 +89,7 @@ async function bench(options: {
       subscribe: () => () => {},
     },
     openSubagent: (address: unknown) => { navigation.push(['open', address]) },
+    open: (id: SessionId) => { navigation.push(['openSession', id]) },
   } as never)
   ctx.provide('conversation', {})
   ctx.provide('locale', new LocaleRuntime(ctx))
@@ -147,7 +148,7 @@ describe('ui-team browser plugin', () => {
       status: 'idle',
       diagnostics: [],
     })
-    expect(b.navigation).toEqual([])
+    expect(b.navigation).toEqual([['openSession', SESSION]])
 
     await b.fiber.dispose()
     expect(b.entry()).toBeUndefined()
