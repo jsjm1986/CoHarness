@@ -93,7 +93,8 @@ export function DesktopConfirmationAction({ sessionId, connection, t }: DesktopC
     <button
       type="button"
       className={css.trigger}
-      aria-label={statusKey === undefined ? t('open') : `${t('open')} · ${t(statusKey)}`}
+      aria-label={t('open')}
+      aria-description={statusKey === undefined ? undefined : t(statusKey)}
       title={statusKey === undefined ? t('open') : `${t('open')} · ${t(statusKey)}`}
       onClick={() => { setOpen(true) }}
     >
