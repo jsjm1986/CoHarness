@@ -428,6 +428,52 @@ export class ContinuableActivationRegistry {
   }
 
   /**
+   * Join progressing descendant work without cancelling it. Idle descendants
+   * whose inboxes require a later wake stay resident and do not delay host
+   * completion.
+   * @param parent - exact live parent whose descendants are observed.
+   * @returns whether work was joined and the host must recheck parent completion.
+   */
+  async waitForChildren(parent: Agent): Promise<boolean> {
+    let observed = false
+    while (true) {
+      const pending = [...this.materializations].filter(item => item.lineage.includes(parent))
+      const children = [...this.resident.values()].filter(item => item.handle.agent !== parent && item.ancestry.has(parent))
+      observed ||= children.some(item => item.handle.agent.status !== 'idle')
+      await Promise.all(children.map(item => item.handle.agent.whenIdle()))
+      const waits: Promise<unknown>[] = pending.map(item => item.settled)
+      for (const item of children) {
+        if (item.inbox.closing !== undefined) {
+          waits.push(item.inbox.closing.catch(() => undefined))
+          continue
+        }
+        if (item.handle.agent.status !== 'idle') {
+          waits.push(item.handle.agent.whenIdle())
+          continue
+        }
+        if (item.ownedChildren.size > 0) {
+          // Published descendants are observed separately; preparation holds
+          // keep the owner pending until publication or rollback wakes it.
+          if ([...item.ownedChildren].some(id => !this.resident.has(id))) waits.push(item.poke.promise)
+          continue
+        }
+        if (item.inbox.hasPending) continue
+        waits.push(item.poke.promise)
+      }
+      if (waits.length > 0) {
+        observed = true
+        await Promise.all(waits)
+        continue
+      }
+      // A descendant can be published while whenIdle follows another child.
+      if ([...this.materializations].some(item => item.lineage.includes(parent) && !pending.includes(item))
+        || [...this.resident.values()].some(item => item.handle.agent !== parent
+          && item.ancestry.has(parent) && !children.includes(item))) continue
+      return observed
+    }
+  }
+
+  /**
    * Release selected resident direct children of one exact live parent.
    * @param parent - exact live direct parent authorizing the selected release.
    * @param childIds - durable direct-child ids to release when resident.

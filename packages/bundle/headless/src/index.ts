@@ -165,6 +165,16 @@ function streamReasoning(
   }
 }
 
+/** The continuable-subagent child join used without depending on the subagent package. */
+interface ChildWait {
+  /**
+   * Join progressing descendants of the exact live parent.
+   * @param parent - the parent whose descendant work is observed.
+   * @returns whether work was joined and parent idle must be rechecked.
+   */
+  waitForChildren(parent: Agent): Promise<boolean>
+}
+
 /** The Session facts that decide whether the runner may drive it directly. */
 interface AdoptableHeader {
   cwd?: string | undefined
@@ -370,7 +380,14 @@ async function run(ctx: Context, config: Config, io: HeadlessIo): Promise<void> 
         content: [{ type: 'text', text: task }],
         source: { kind: 'user' },
       }))
-      await agent.whenIdle()
+      const subagents = ctx.get('subagents') as ChildWait | undefined
+      while (true) {
+        await agent.whenIdle()
+        const idleSeq = agent.session.seq
+        // Child settlement can wake the parent before the child wait observes it.
+        if (!await subagents?.waitForChildren(agent)
+          && agent.status === 'idle' && agent.session.seq === idleSeq) break
+      }
     } finally {
       stopReasoning?.()
     }

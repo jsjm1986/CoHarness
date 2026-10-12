@@ -398,6 +398,17 @@ export class SubagentContinuationManager {
   }
 
   /**
+   * Join progressing descendant work without cancelling it. Idle descendants
+   * whose inboxes require a later wake stay resident and do not delay host
+   * completion.
+   * @param parent - exact live parent whose descendants are observed.
+   * @returns whether work was joined and the host must recheck parent completion.
+   */
+  async waitForChildren(parent: Agent): Promise<boolean> {
+    return this.activations.waitForChildren(parent)
+  }
+
+  /**
    * Stop only the continuable descendants of exact live host-owned parents.
    * @param parents - exact live roots whose continuable descendants must stop.
    */

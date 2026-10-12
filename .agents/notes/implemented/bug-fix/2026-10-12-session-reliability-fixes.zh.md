@@ -13,6 +13,7 @@ Status: implemented
 3. `agent-team` 用 `z.object().loose()` 校验未知插件内容块，该校验会重建对象，mailbox 折叠时丢失 own `__proto__` 键与其他特殊 own 属性。
 4. `goal-round-driver` 在取消后把已撤回 goal 尝试的排队 Round 提示词留在 agent inbox 中，之后的人类输入排在一条死消息后面等待。
 5. `plan-mode` 把用户放弃的 `exit_plan_mode` 评审当作工具失败，轮次无法结算且产生错误结果。
+6. `headless` 在任务轮次后只等父级 idle，仍在运行的可继续子级产生的结算通知——以及它驱动的父级最终作答——会随进程退出而丢失。
 
 ## 决策
 
@@ -21,6 +22,7 @@ Status: implemented
 3. 把上游 `1e6630a8568` 适配到 CoHarness fold 架构：对未知内容块只校验 `type` 标签、原样保留解码后的对象，已知变体仍走严格校验。上游的 projection checkpoint 版本提升不适用——CoHarness 每次 fold 都从日志重建状态，没有需要作废的 checkpoint 版本。
 4. 移植上游 `9a8d21dfe75`：idle 检查点上，与已启用 goal revision 精确匹配的已取消尝试会暂停该 goal；仍排队的尝试消息从 `agent.inbox` 移除；结算失败时告警并撤防。
 5. 移植上游 `18a4bc4093c`：`exit_plan_mode` 输出 schema 接受 `{ approved: boolean }`；`UserQuestionError` `ASK_CANCELLED` 结束当前轮次并返回 `{ approved: false }`，计划模式保持激活；其他错误继续抛出。
+6. 把上游 `a1da7bcfb96` 的 `waitForChildren` 部分适配到 `ContinuableActivationRegistry`：等待后代工作直到没有繁忙、关闭中或物化中的驻留 Activation，再让 headless runner 循环 `whenIdle` + `waitForChildren`，直到父级保持 idle 且 Session 序列不变。该提交的结算消息 `structured`/`diagnostic` 传递部分不适用——CoHarness `ActivationTerminal` 没有可传递的 structured 通道（属另一独立功能缺口）。
 
 ## 备选方案
 
@@ -32,13 +34,13 @@ Status: implemented
 
 ## 影响
 
-无人值守 agent 默认对每次完成都唤醒；配置了上限时保留其停摆语义。可执行文件缺失在所有 realm 上都报为缺失。Team mailbox fold 保留含 own `__proto__` 在内的 opaque 插件 JSON。取消排队中的 goal Round 会撤回其 inbox 提示词，人类输入紧随其后执行。放弃计划评审以否定结果结算轮次，而非报错。
+无人值守 agent 默认对每次完成都唤醒；配置了上限时保留其停摆语义。可执行文件缺失在所有 realm 上都报为缺失。Team mailbox fold 保留含 own `__proto__` 在内的 opaque 插件 JSON。取消排队中的 goal Round 会撤回其 inbox 提示词，人类输入紧随其后执行。放弃计划评审以否定结果结算轮次，而非报错。headless 运行现在只有在所有可继续后代结算并投递通知后才结束。
 
 ## 验证
 
-`tool-jobs`/`goal`/`plan`/`agent-team`/`terminal-controller`/`ssh` 共 799 个测试；`verify-package-dependencies` 44 个 spec 测试加上覆盖 63 个包的实际门禁；`exit_plan_mode` 集成测试证明放弃评审在不发起新模型请求的情况下结束轮次；goal 回归测试证明排队 Round 撤回后人类输入正常执行。
+`tool-jobs`/`goal`/`plan`/`agent-team`/`terminal-controller`/`ssh` 共 799 个测试；`verify-package-dependencies` 44 个 spec 测试加上覆盖 63 个包的实际门禁；`exit_plan_mode` 集成测试证明放弃评审在不发起新模型请求的情况下结束轮次；goal 回归测试证明排队 Round 撤回后人类输入正常执行；`subagent` 959 个测试含 registry 级 `waitForChildren` 加入；headless 回归测试证明结算驱动的第二轮在退出前被等待。
 
 ## 相关
 
 - [持久化路径安全修复](2026-10-12-durable-path-safety-fixes.zh.md)——同一 alpha.2 对齐行动。
-- 上游提交：`b6775f6d4f5`、`2d653be7b0e`、`f37f19ab43a`、`1e6630a8568`、`9a8d21dfe75`、`18a4bc4093c`。
+- 上游提交：`b6775f6d4f5`、`2d653be7b0e`、`f37f19ab43a`、`1e6630a8568`、`9a8d21dfe75`、`18a4bc4093c`、`a1da7bcfb96`（部分）。

@@ -108,3 +108,62 @@ describe('continuable activation registry internals', () => {
     expect(owner.ownedChildren.size).toBe(0)
   })
 })
+
+describe('waitForChildren', () => {
+  function runningActivation(childId: SessionId, parent: Agent, overrides: {
+    status?: 'running' | 'idle'
+    hasPending?: boolean
+    closing?: Promise<void>
+    ownedChildren?: readonly SessionId[]
+    onWhenIdle?: () => void
+  } = {}): Activation {
+    const activation = makeActivation(childId, parent.id)
+    const agent = {
+      id: childId,
+      get status() { return overrides.status ?? 'idle' },
+      whenIdle: () => { overrides.onWhenIdle?.(); return Promise.resolve() },
+    } as unknown as Agent
+    activation.ancestry.add(parent)
+    return {
+      ...activation,
+      handle: { agent } as unknown as AgentHandle,
+      inbox: { closing: overrides.closing, hasPending: overrides.hasPending ?? false },
+      ownedChildren: new Set(overrides.ownedChildren ?? []),
+    } as unknown as Activation
+  }
+
+  it('returns false immediately with no descendants', async () => {
+    const { registry } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    await expect(registry.waitForChildren(parent)).resolves.toBe(false)
+  })
+
+  it('parks an idle child whose inbox still holds queued work', async () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    internals.resident.set(SessionId('child-1'), runningActivation(SessionId('child-1'), parent, { hasPending: true }))
+    await expect(registry.waitForChildren(parent)).resolves.toBe(false)
+  })
+
+  it('joins a busy descendant and reports observed work', async () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    const child = runningActivation(SessionId('child-1'), parent, {
+      status: 'running',
+      onWhenIdle: () => { internals.resident.delete(SessionId('child-1')) },
+    })
+    internals.resident.set(child.childId, child)
+    await expect(registry.waitForChildren(parent)).resolves.toBe(true)
+  })
+
+  it('joins a closing descendant through its close transaction', async () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    const closing = Promise.withResolvers<undefined>()
+    internals.resident.set(SessionId('child-1'), runningActivation(SessionId('child-1'), parent, { closing: closing.promise }))
+    const wait = registry.waitForChildren(parent)
+    closing.resolve()
+    internals.resident.delete(SessionId('child-1'))
+    await expect(wait).resolves.toBe(true)
+  })
+})

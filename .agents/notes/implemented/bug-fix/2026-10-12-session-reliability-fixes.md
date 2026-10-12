@@ -13,6 +13,7 @@ Five independent reliability defects, all confirmed by upstream source compariso
 3. `agent-team` validated unknown plugin content blocks through `z.object().loose()`, which reconstructs the value and drops own `__proto__` keys and other exotic own properties on mailbox fold.
 4. `goal-round-driver` left a withdrawn goal attempt's queued round prompt in the agent inbox after cancellation, so later human input waited behind a dead goal message.
 5. `plan-mode` treated a dismissed `exit_plan_mode` review as a tool failure, leaving the turn unsettled and emitting an error result.
+6. `headless` awaited only parent idle after the task turn, so a still-running continuable child's settlement notice — and the final parent answer it drives — was lost when the process exited.
 
 ## Decision
 
@@ -21,6 +22,7 @@ Five independent reliability defects, all confirmed by upstream source compariso
 3. Adapt upstream `1e6630a8568` onto the CoHarness fold architecture: validate only the `type` tag of unknown content blocks and preserve the decoded object verbatim, keeping strict validation for known variants. The upstream projection checkpoint bump does not apply — CoHarness rebuilds state from the log on every fold, so no checkpoint version exists to invalidate.
 4. Port upstream `9a8d21dfe75`: at the idle checkpoint, a cancelled attempt that exactly matches the armed goal revision pauses the goal; a queued attempt message is removed from `agent.inbox`; settlement failure warns and disarms.
 5. Port upstream `18a4bc4093c`: the `exit_plan_mode` output schema accepts `{ approved: boolean }`; `UserQuestionError` `ASK_CANCELLED` concludes the turn and returns `{ approved: false }` with plan mode still active; other errors rethrow.
+6. Adapt the `waitForChildren` half of upstream `a1da7bcfb96` onto `ContinuableActivationRegistry`: join descendant work until no resident Activation is busy, closing, or mid-materialization, then have the headless runner loop `whenIdle` + `waitForChildren` until the parent stays idle with an unchanged Session sequence. The commit's settlement-message `structured`/`diagnostic` relay does not apply — CoHarness `ActivationTerminal` has no structured channel to relay (a separate feature gap).
 
 ## Alternatives considered
 
@@ -32,13 +34,13 @@ Five independent reliability defects, all confirmed by upstream source compariso
 
 ## Consequences
 
-Unattended agents wake for every completion by default; a configured cap keeps its stall semantics. Missing executables report as missing on every realm. Team mailbox fold preserves opaque plugin JSON including own `__proto__`. Cancelling a queued goal round withdraws its inbox prompt, so human input runs next. Dismissing a plan review settles the turn as a negative result rather than an error.
+Unattended agents wake for every completion by default; a configured cap keeps its stall semantics. Missing executables report as missing on every realm. Team mailbox fold preserves opaque plugin JSON including own `__proto__`. Cancelling a queued goal round withdraws its inbox prompt, so human input runs next. Dismissing a plan review settles the turn as a negative result rather than an error. A headless run now ends only after every continuable descendant has settled and delivered its notice.
 
 ## Verification
 
-`tool-jobs`/`goal`/`plan`/`agent-team`/`terminal-controller`/`ssh` 799 tests; `verify-package-dependencies` 44 spec tests plus the live gate over 63 packages; `exit_plan_mode` integration proves a dismissed review ends the turn without another model request; goal regression proves later human input runs after a queued round is withdrawn.
+`tool-jobs`/`goal`/`plan`/`agent-team`/`terminal-controller`/`ssh` 799 tests; `verify-package-dependencies` 44 spec tests plus the live gate over 63 packages; `exit_plan_mode` integration proves a dismissed review ends the turn without another model request; goal regression proves later human input runs after a queued round is withdrawn; `subagent` 959 tests including registry-level `waitForChildren` joins; headless regression proves a settlement-driven second turn is awaited before exit.
 
 ## Related
 
 - [Durable-path safety fixes](2026-10-12-durable-path-safety-fixes.md) — same alpha.2 alignment campaign.
-- Upstream commits: `b6775f6d4f5`, `2d653be7b0e`, `f37f19ab43a`, `1e6630a8568`, `9a8d21dfe75`, `18a4bc4093c`.
+- Upstream commits: `b6775f6d4f5`, `2d653be7b0e`, `f37f19ab43a`, `1e6630a8568`, `9a8d21dfe75`, `18a4bc4093c`, `a1da7bcfb96` (partial).
