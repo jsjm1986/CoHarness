@@ -109,6 +109,8 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
           ...options.purpose === undefined ? {} : { purpose: options.purpose },
         }, this.dependencies.prepareExtensions, (fields, error) => {
           this.dependencies.onExtensionsOmitted?.({ provider: options.provider, model: options.model, fields, error })
+        }, (error) => {
+          this.dependencies.onExtensionsUnaccepted?.({ provider: options.provider, model: options.model, error })
         })
         signal.throwIfAborted()
         const betas = [
