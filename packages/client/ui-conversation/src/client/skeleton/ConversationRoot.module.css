@@ -61,9 +61,22 @@
   pointer-events: none;
 }
 
-/* Blank hero/settling: keep the strict Session header mounted without taking
-   column space; the root-owned scrollport and composer remain below it. */
-.headerHidden {
+/* Blank Sessions retain the corner seat's navigation occupant without
+   conversation title, tabs, or utilities; an empty corner drops the row. */
+.headerBlank {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.headerBlank::after {
+  display: none;
+}
+
+.headerBlank .headerCorner {
+  align-self: flex-end;
+}
+
+.headerBlank:not(:has(.headerCorner > :first-child)) {
   display: none;
 }
 
@@ -156,6 +169,20 @@
   align-items: center;
   gap: var(--dsw-space-1);
   margin-left: var(--dsw-space-5);
+}
+
+/* The far-right corner seat reaches into the header's trailing padding; it
+   lays out only while its occupant renders something. */
+.headerCorner {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-left: var(--dsw-space-1);
+  margin-right: -16px;
+}
+
+.headerCorner:empty {
+  display: none;
 }
 
 /* figma Tab_Group 34:11441: 35px strip, gap 36, pad-left 8, tabs bottom-aligned. */

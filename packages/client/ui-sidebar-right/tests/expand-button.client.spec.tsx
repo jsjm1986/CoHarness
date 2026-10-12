@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { useSyncExternalStore } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { ExpandButton, BlankExpandButton } from '../src/client/shell/ExpandButton.tsx'
+import { ExpandButton } from '../src/client/shell/ExpandButton.tsx'
 import type { ExpandButtonProps } from '../src/client/shell/ExpandButton.tsx'
 import { createSidebarRightStore } from '../src/client/stores.ts'
 
@@ -65,20 +65,16 @@ describe('ExpandButton', () => {
   })
 })
 
-it('exposes the blank-session composer entry and removes it when header chrome becomes available', () => {
+it('exposes the corner control on a blank Session too', () => {
   const instance = createSidebarRightStore(() => ({ kind: 'guide', title: 'Start' })).create()
   const focus = vi.fn()
-  let blank = true
   const props = { sessionId: SESSION, focus, useStore: hookOf(instance), actions: instance.actions,
     useShortcuts: <T,>(selector: (entries: readonly { id: string }[]) => T): T => selector([]),
-    t: (key: string) => key, useSession: (select: (state: { blank: boolean; composerPhase: string }) => unknown) => select({ blank, composerPhase: 'blank' }),
+    t: (key: string) => key, useSession: (select: (state: { blank: boolean; composerPhase: string }) => unknown) => select({ blank: true, composerPhase: 'blank' }),
   } as unknown as ExpandButtonProps
-  const view = render(<BlankExpandButton {...props} />)
+  const view = render(<ExpandButton {...props} />)
   fireEvent.click(view.getByRole('button'))
   expect(focus).toHaveBeenCalledOnce()
   expect(instance.getSnapshot().bySession[SESSION]?.layout.expanded).toBe(true)
-  blank = false
-  view.rerender(<BlankExpandButton {...props} />)
-  expect(view.container.childElementCount).toBe(0)
   cleanup()
 })

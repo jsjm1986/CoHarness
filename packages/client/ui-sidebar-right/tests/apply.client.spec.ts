@@ -24,7 +24,7 @@ import type { createSidebarRightStore } from '../src/client/stores.ts'
 import type { RightbarActions } from '@deepseek-ai/dsh-client-ui-layout/src/client/service.ts'
 import { RightbarSeat } from '../src/client/shell/SidebarRight.tsx'
 import { RightbarRoot } from '../src/client/shell/RightbarRoot.tsx'
-import { ExpandButton, BlankExpandButton } from '../src/client/shell/ExpandButton.tsx'
+import { ExpandButton } from '../src/client/shell/ExpandButton.tsx'
 import { GuideBody } from '../src/client/tabs/guide/GuideBody.tsx'
 import { GuideTitle } from '../src/client/tabs/guide/GuideTitle.tsx'
 import { ToolBody } from '../src/client/tabs/tool/ToolBody.tsx'
@@ -122,15 +122,14 @@ describe('ui-sidebar-right apply', () => {
     expect(guide?.id).toBe(GUIDE_ID)
     expect(guide?.priority).toBe('builtin')
     expect(guide?.title('sidebar://guide')).toBe('tab.guide.title')
-    // Five registrations: the root and panel seats, the header's corner seat,
-    // and the guide body and chip title under the guide implementation's id.
+    // Registrations: the root and panel seats, the header's corner and mobile
+    // expand seats, and the guide body and chip title under the guide implementation's id.
     // The guide draws no product copy of its own, so neither guide seat binds the dictionary.
     expect(registered.map(entry => [entry.name, entry.key, entry.locale, entry.component])).toEqual([
       ['sidebar.right.pane.tab', 'tool-details', undefined, ToolBody],
       ['rightbar', undefined, undefined, RightbarRoot],
       ['rightbar.session', undefined, 'sidebarRight', RightbarSeat],
       ['conversation.session.header.corner', undefined, 'sidebarRight', ExpandButton],
-      ['conversation.input.left', undefined, 'sidebarRight', BlankExpandButton],
       ['shell.mobile.header.actions', undefined, 'sidebarRight', ExpandButton],
       ['sidebar.right.pane.tab', GUIDE_ID, undefined, GuideBody],
       ['sidebar.right.pane.tab.title', GUIDE_ID, undefined, GuideTitle],
@@ -347,7 +346,7 @@ describe('ui-sidebar-right apply', () => {
     expect(dictionaries.size).toBe(0)
     await ctx.plugin({ inject: [...inject], apply }).await()
     expect(ctx.sidebarRightTabs.get('guide')?.id).toBe(GUIDE_ID)
-    expect(registered).toHaveLength(8)
+    expect(registered).toHaveLength(7)
   })
 
   it('routes tool details through the bar binding and collapses on close', async () => {
@@ -480,9 +479,9 @@ describe('ui-sidebar-right apply', () => {
     await fiber.dispose()
   })
 
-  it('focuses the bar from the corner, blank-input, and mobile expand faces', async () => {
+  it('focuses the bar from the corner and mobile expand faces', async () => {
     const { seat, injectedOf, layout, fiber } = await boot()
-    for (const name of ['conversation.session.header.corner', 'conversation.input.left', 'shell.mobile.header.actions']) {
+    for (const name of ['conversation.session.header.corner', 'shell.mobile.header.actions']) {
       (injectedOf(seat(name)) as { focus(): void }).focus()
       expect(layout.focusRightbar).toHaveBeenCalledWith(SESSION)
     }

@@ -37,7 +37,7 @@ import { parseToolAddress, toolAddress } from './tabs/tool/address.ts'
 import { ToolBody } from './tabs/tool/ToolBody.tsx'
 import { GuideBody, type GuideInjected } from './tabs/guide/GuideBody.tsx'
 import { GuideTitle } from './tabs/guide/GuideTitle.tsx'
-import { ExpandButton, BlankExpandButton } from './shell/ExpandButton.tsx'
+import { ExpandButton } from './shell/ExpandButton.tsx'
 import { AUTO_FULLSCREEN_BELOW, RightbarSeat, type SidebarRightInjected } from './shell/SidebarRight.tsx'
 import { closeWithPaneFocus, openWithPaneFocus } from './shell/close-focus.ts'
 import { RightbarRoot, type RightbarRootInjected } from './shell/RightbarRoot.tsx'
@@ -329,10 +329,6 @@ export function apply(ctx: ClientContext): void {
       store,
       inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
     }, ExpandButton))
-    const disposeBlankExpand = ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
-      name: 'conversation.input.left', id: 'auxiliary-sidebar', locale: NS, store,
-      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
-    }, BlankExpandButton))
     const disposeMobileExpand = ctx.slots.inject('shell.mobile.header.actions', () => ctx.slots.register({
       name: 'shell.mobile.header.actions', id: 'auxiliary-sidebar', locale: NS, store,
       inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
@@ -368,7 +364,6 @@ export function apply(ctx: ClientContext): void {
       disposeGuideTitle()
       disposeGuide()
       disposeMobileExpand()
-      disposeBlankExpand()
       disposeExpand()
       disposeSeat()
       for (const dispose of disposeTypes.reverse()) dispose()

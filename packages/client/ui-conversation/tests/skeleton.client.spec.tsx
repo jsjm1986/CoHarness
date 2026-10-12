@@ -578,6 +578,19 @@ describe('ConversationRoot resident composer', () => {
     expect(b.slotCalls).toContain('conversation.session.header.utilities')
   })
 
+  it('blank phase: header keeps only the corner seat, no title or utility chrome', () => {
+    const b = mount(
+      conversationSnapshot({ composerPhase: 'blank', blank: true }),
+      undefined, undefined, { summaryBlank: true },
+    )
+    expect(b.view.container.querySelector('header')).not.toBeNull()
+    expect(b.view.container.querySelector('[data-conversation-header-corner]')).not.toBeNull()
+    expect(b.slotCalls).toContain('conversation.session.header.corner')
+    expect(b.slotCalls).not.toContain('conversation.session.header.actions')
+    expect(b.slotCalls).not.toContain('conversation.session.header.utilities')
+    expect(b.view.container.querySelector('[role="tablist"]')).toBeNull()
+  })
+
   it('sticky composer seat wraps the whole overlay chain, not only the fallback stack', () => {
     const b = mount(conversationSnapshot(), undefined, undefined, { overlayTakeover: true })
     const seat = b.view.container.querySelector('[data-composer-seat]')
@@ -600,13 +613,13 @@ describe('ConversationRoot resident composer', () => {
     const host = b.view.container.querySelector('[data-conversation-scroll]')
     const header = b.view.container.querySelector('header')
     expect(host).not.toBeNull()
-    expect(header?.getAttribute('aria-hidden')).toBe('true')
+    expect(header?.querySelector('[data-conversation-header-corner]')).not.toBeNull()
     expect(b.view.getByText('探索未至之境')).toBeTruthy()
     expect(b.view.getByText('预览版')).toBeTruthy()
     expect(b.view.queryByTestId('view-chat')).toBeNull()
     // The same machine-backed textarea is live in the hero, and the
-    // persistence mirror stays bound (ConversationSession mounts chrome-hidden
-    // for blank sessions): hero typing reaches the chat store.
+    // persistence mirror stays bound (ConversationSession hides conversation
+    // chrome for blank sessions): hero typing reaches the chat store.
     const box = b.view.getByRole('textbox')
     expect(host?.contains(box)).toBe(true)
     fireEvent.change(box, { target: { value: 'draft in hero' } })

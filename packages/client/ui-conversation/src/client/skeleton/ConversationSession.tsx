@@ -60,8 +60,10 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
 
 /**
  * Renders Session header chrome above the resident conversation scrollport.
+ * The corner seat stays mounted on a blank Session so its navigation
+ * occupant remains reachable; title, tabs, and utilities wait for content.
  * @param props - Strict Session store, view ledger, navigation, render, and locale shares.
- * @returns the hidden blank-session header or visible title and tabs.
+ * @returns the corner-only blank-session header or visible title and tabs.
  */
 export function ConversationSessionHeader({
   sessionId, useSession, useSessions, useStore, actions,
@@ -77,10 +79,12 @@ export function ConversationSessionHeader({
   const hideChrome = blank && composerPhase === 'blank'
 
   return (
-    <header
-      className={clsx(css.header, hideChrome && css.headerHidden)}
-      aria-hidden={hideChrome || undefined}
-    >
+    <header className={clsx(css.header, hideChrome && css.headerBlank)}>
+      {hideChrome && (
+        <div className={css.headerCorner} data-conversation-header-corner="">
+          {renderSlot('conversation.session.header.corner', {})}
+        </div>
+      )}
       {!hideChrome && (
         <>
           {tabs.length > 1 && (
@@ -150,6 +154,8 @@ export function ConversationSessionHeader({
             </div>
             <div className={css.headerUtilities}>
               {renderSlot('conversation.session.header.utilities', { compact })}
+            </div>
+            <div className={css.headerCorner} data-conversation-header-corner="">
               {renderSlot('conversation.session.header.corner', {})}
             </div>
           </div>

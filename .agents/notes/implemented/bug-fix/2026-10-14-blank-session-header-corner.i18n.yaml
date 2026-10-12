@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-14-blank-session-header-corner.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-14-blank-session-header-corner.md
+/agent-note-keep-the-session-header-corner-seat-mounted-on-blank-sessions:
+  en: 6447d7a5f8158f18
+  zh: 57deb0cd302d217a
+/agent-note-keep-the-session-header-corner-seat-mounted-on-blank-sessions/problem:
+  en: 7653ff9a32aba418
+  zh: ee3cc76da792453b
+/agent-note-keep-the-session-header-corner-seat-mounted-on-blank-sessions/decision:
+  en: ef39cf6d5d305005
+  zh: 026d3dcb896d0e4f
+/agent-note-keep-the-session-header-corner-seat-mounted-on-blank-sessions/alternatives-considered:
+  en: 38874f1bb9ee44fb
+  zh: b938f9520a43efa6
+/agent-note-keep-the-session-header-corner-seat-mounted-on-blank-sessions/consequences:
+  en: 25a8507082f57822
+  zh: 62671a16920f5c43
+/agent-note-keep-the-session-header-corner-seat-mounted-on-blank-sessions/verification:
+  en: 2e259911d9252659
+  zh: c0807bdaa9461507
+/agent-note-keep-the-session-header-corner-seat-mounted-on-blank-sessions/related:
+  en: 57fa163403ea6ef6
+  zh: 64ca0e3a82d03a2f
