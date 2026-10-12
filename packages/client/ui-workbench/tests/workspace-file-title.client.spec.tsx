@@ -7,7 +7,7 @@ import { WorkspaceFileTitle } from '../src/client/components/WorkspaceFileTitle.
 function props(title: string): Parameters<typeof WorkspaceFileTitle>[0] {
   return {
     useTabInfo: () => ({ tab: { title } }),
-  } as unknown as Parameters<typeof WorkspaceFileTitle>[0]
+  } as Parameters<typeof WorkspaceFileTitle>[0]
 }
 
 afterEach(cleanup)

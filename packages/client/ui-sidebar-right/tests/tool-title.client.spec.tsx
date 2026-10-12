@@ -10,22 +10,22 @@ import { ToolDetailsTitle } from '../src/client/tabs/tool/ToolDetailsTitle.tsx'
 
 const SESSION = 's-tool' as SessionId
 
-function result(callId: string, name: string | null, card?: string, subCalls: ToolCallBlock[] = []): ConversationNode {
+function result(callId: string, name: string | null, card?: string, subCalls: ToolCallBlock[] = [], callCard: string | null = 'generic'): ConversationNode {
   return {
     kind: 'tool-result', seq: 1, time: 0, callId,
     call: name === null ? null : { name, argsRaw: '{}' },
     callTime: 0, content: [], isError: false,
-    callView: { card: 'generic', title: 'call' },
+    callView: callCard === null ? null : { card: callCard, title: 'call' },
     resultView: card === undefined ? null : { card },
     subCalls,
-  } as unknown as ConversationNode
+  } as ConversationNode
 }
 
 function running(callId: string, name: string, card?: string, subCalls: ToolCallBlock[] = []): RunningToolCall {
   return {
     phase: 'start', callId, name, turn: 1, step: 1, time: 0,
     argsRaw: '{}', callView: card === undefined ? null : { card, title: 'call' }, subCalls,
-  } as unknown as RunningToolCall
+  } as RunningToolCall
 }
 
 function snapshot(nodes: ConversationNode[], runningCalls: RunningToolCall[] = []): Pick<ConversationSnapshot, 'nodes' | 'runningCalls'> {
@@ -37,7 +37,7 @@ function props(address: string, snap: Pick<ConversationSnapshot, 'nodes' | 'runn
     sessionId: SESSION,
     useSession: (selector: (snapshot: Pick<ConversationSnapshot, 'nodes' | 'runningCalls'>) => unknown) => selector(snap),
     useTabInfo: () => ({ tab: { title, navigation: { address } } }),
-  } as unknown as Parameters<typeof ToolDetailsTitle>[0]
+  } as Parameters<typeof ToolDetailsTitle>[0]
 }
 
 afterEach(cleanup)
@@ -63,7 +63,22 @@ describe('toolCallPresentation', () => {
     expect(toolCallPresentation(snap, 'call-1')?.card).toBe('web')
   })
 
+  it('ignores generic card marks and skips nodes that are not tool results', () => {
+    const snap = snapshot([
+      { kind: 'text', seq: 1, time: 0 } as ConversationNode,
+      result('call-1', 'bash', 'generic'),
+      result('call-2', 'bash', undefined, [], 'terminal'),
+      result('call-3', 'bash', undefined, [], null),
+    ], [running('call-4', 'bash', 'generic')])
+    expect(toolCallPresentation(snap, 'call-1')).toEqual({ name: 'bash', card: undefined })
+    expect(toolCallPresentation(snap, 'call-2')).toEqual({ name: 'bash', card: 'terminal' })
+    expect(toolCallPresentation(snap, 'call-3')).toEqual({ name: 'bash', card: undefined })
+    expect(toolCallPresentation(snap, 'call-4')).toEqual({ name: 'bash', card: undefined })
+  })
+
   it('returns undefined for a call outside the loaded window', () => {
+    const withSubtree = snapshot([result('call-1', 'bash', undefined, [running('sub-1', 'read')])])
+    expect(toolCallPresentation(withSubtree, 'call-9')).toBeUndefined()
     expect(toolCallPresentation(snapshot([result('call-1', 'bash')]), 'call-9')).toBeUndefined()
   })
 })
@@ -73,6 +88,15 @@ describe('ToolDetailsTitle', () => {
     const view = render(<ToolDetailsTitle {...props(
       toolAddress(SESSION, 'call-9'),
       snapshot([result('call-9', 'bash', 'terminal')]),
+    )} />)
+    expect(view.container.querySelector('svg')).not.toBeNull()
+    expect(view.container.textContent).toBe('bash')
+  })
+
+  it.each(['terminal', 'diff', 'search', 'read', 'web'])('draws the %s card glyph', (card) => {
+    const view = render(<ToolDetailsTitle {...props(
+      toolAddress(SESSION, 'call-9'),
+      snapshot([result('call-9', 'bash', card)]),
     )} />)
     expect(view.container.querySelector('svg')).not.toBeNull()
     expect(view.container.textContent).toBe('bash')

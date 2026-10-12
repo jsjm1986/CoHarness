@@ -7,7 +7,7 @@ import { ReviewTabTitle } from '../src/client/ReviewTabTitle.tsx'
 function props(title: string): Parameters<typeof ReviewTabTitle>[0] {
   return {
     useTabInfo: () => ({ tab: { title } }),
-  } as unknown as Parameters<typeof ReviewTabTitle>[0]
+  } as Parameters<typeof ReviewTabTitle>[0]
 }
 
 afterEach(cleanup)

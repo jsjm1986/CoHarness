@@ -87,7 +87,7 @@ function transport(): AccountPreferencesTransport & { calls: AccountPreferenceMu
                 [mutation.field]: mutation.operation === 'unset'
                   ? CONVERSATION_DEFAULTS[mutation.field]
                   : mutation.value,
-              } as typeof current.values['ui-conversation'],
+              },
         },
         overrides: {
           ...current.overrides,
@@ -100,7 +100,7 @@ function transport(): AccountPreferencesTransport & { calls: AccountPreferenceMu
                 : {
                   ...current.overrides['ui-conversation'],
                   [mutation.field]: mutation.value,
-                } as typeof current.overrides['ui-conversation'],
+                },
         },
       }
       return structuredClone(current)
