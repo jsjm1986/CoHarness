@@ -2950,7 +2950,7 @@ describe('Task detail rule header and run-time card', () => {
   it('explains a subagent-owned Session through the ordinary update result', async () => {
     const h = mount({ records: [cron] })
     fireEvent.click(screen.getByRole('button', { name: cron.prompt }))
-    h.updateTiming.mockResolvedValue({ ok: true, value: { id: cron.id, updated: false, code: 'subagent_session' } })
+    h.updateTiming.mockResolvedValue({ ok: true, value: { code: 'subagent_session', message: 'delegated child Session' } })
     chooseCronShape(en['rule.cronLabel'])
     fireEvent.change(screen.getByLabelText<HTMLInputElement>(en['rule.cronLabel']), {
       target: { value: '*/15 * * * *' },

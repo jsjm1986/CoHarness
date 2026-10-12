@@ -12,7 +12,7 @@
 
 import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
 import {
-  createSnapshotStore, type ObservableSnapshot, type SessionId, type SnapshotStore,
+  createSnapshotStore, type SessionId, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { messageOf, presetOptions } from './settings-store.ts'
 import type { AgentPresetOption } from './settings-store.ts'
@@ -77,20 +77,10 @@ export class AgentPresetSeatController {
      * refresh. Optional: a harness that renders no list omits it.
      */
     private readonly onApplied?: (sessionId: string, agentPreset: string) => void,
-    /**
-     * Shared developer-tool enablement observed by the selection gate.
-     * Absent keeps the seat inert — features stay disabled until an accepted
-     * value arrives.
-     */
-    private readonly developerTools?: ObservableSnapshot<boolean>,
   ) {}
 
-  /** Developer tools are the single gate over preset selection. */
-  private selectionAvailable(): boolean {
-    return this.developerTools?.getSnapshot() ?? false
-  }
-
-  private clearStage(): void {
+  /** Forget the unapplied choice without changing any Session. */
+  clearStage(): void {
     this.staged = undefined
     if (this.store.getSnapshot().introduce) this.set({ introduce: false })
   }
@@ -114,9 +104,8 @@ export class AgentPresetSeatController {
       }
       const { presets, modeSelectionEnabled } = response.value
       // A hidden picker cannot serve a staged pick: drop it rather than
-      // landing a choice no visible control reports. A stage also outlives the
-      // screen that made it; Developer tools may have gone off since.
-      if (!modeSelectionEnabled || !this.selectionAvailable()) this.clearStage()
+      // landing a choice no visible control reports.
+      if (!modeSelectionEnabled) this.clearStage()
       this.fallback = presets.find(preset => preset.isDefault)?.id ?? presets[0]?.id ?? ''
       this.set({
         showPicker: modeSelectionEnabled,
@@ -207,12 +196,17 @@ export class AgentPresetSeatController {
    * @returns once the switch settled, or immediately when there is nothing to do.
    */
   async apply(): Promise<void> {
-    // Selection composes only while the picker can report it; a stage made
-    // under a preference the user has since turned off must not land.
-    if (!this.selectionAvailable()) this.clearStage()
     const staged = this.staged
     const session = this.currentSession()
-    if (staged === undefined || session === undefined) return
+    if (staged === undefined) {
+      // A stage cleared from outside (the tools preference gate) leaves the
+      // displayed choice stale: re-derive it from the session or the
+      // deployment default so the chip reports what would actually compose.
+      const current = session?.agentPreset ?? this.fallback
+      if (current !== this.store.getSnapshot().current) this.set({ current })
+      return
+    }
+    if (session === undefined) return
     if (session.agentPreset === staged) {
       this.staged = undefined
       return

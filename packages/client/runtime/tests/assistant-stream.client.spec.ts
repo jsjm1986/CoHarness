@@ -87,7 +87,7 @@ describe('ClientAssistantStream', () => {
     const message = ev.assistant(6, 1, '你好', 1)
     expect(fold.acceptDurable(message)).toBeUndefined()
     expect(fold.acceptFrame(endCommitted('att-1', 2, 6))).toEqual({ type: 'publish', entry: { event: message } })
-    for (const [turn, step] of [[2, 1], [1, 2]]) {
+    for (const [turn, step] of [[2, 1], [1, 2]] as const) {
       expect(fold.acceptDurable(ev.stepEnd(7, turn, step))).toEqual({ type: 'publish', entry: { event: ev.stepEnd(7, turn, step) } })
     }
     const closed = ev.stepEnd(8, 1, 1)

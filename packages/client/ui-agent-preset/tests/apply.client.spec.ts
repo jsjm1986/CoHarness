@@ -92,6 +92,8 @@ async function bench(
   // default and its picker flag from them exactly as the Host does.
   let savedDefault = 'standard'
   let selectionEnabled = true
+  // The developer-tools preference on the shared `ui-settings` document.
+  let devToolsEnabled = true
   await ctx.plugin(SlotRegistry).await()
   const locale = new LocaleRuntime(ctx)
   locale.setLocale('zh')
@@ -144,7 +146,7 @@ async function bench(
             namespaces: [{
               ns: 'ui-settings',
               schema: DEVELOPER_TOOLS_ENVELOPE,
-              value: { enabled: true },
+              value: { enabled: devToolsEnabled },
               applies: 'live' as const,
               secrets: [],
               revision: 0,
@@ -174,7 +176,13 @@ async function bench(
     hostDescription: { getSnapshot: () => hostSnapshot },
   } as never)
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, calls, moveDefault }
+  return {
+    ctx,
+    slots: ctx.get('slots') as SlotRegistry,
+    calls,
+    moveDefault,
+    setDevTools: (enabled: boolean) => { devToolsEnabled = enabled },
+  }
 }
 
 function declareRoot(slots: SlotRegistry): () => void {
@@ -635,6 +643,86 @@ describe('ui-agent-preset apply', () => {
     conversation()
   })
 
+  it('lands the Creator entry pick staged while the tools preference is off', async () => {
+    const { ctx, slots, calls, setDevTools } = await bench()
+    declareRoot(slots)
+    const conversation = declareConversation(slots)
+    ctx.provide('conversation', {} as never)
+    const state: {
+      current?: string
+      byId: Record<string, { id: string; blank: boolean; agentPreset?: string }>
+    } = { byId: {} }
+    const sessions = sessionsDouble(state)
+    ctx.provide('sessions', sessions as never)
+    ctx.provide('workspaces', workspacesDouble() as never)
+    await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
+    const section = (slots.entries('settings.section')[0]!.inject as unknown as () => AgentPresetSectionInjected)()
+    const seat = (slots.entries('conversation.hero.agentPreset')[0]!
+      .inject as unknown as () => AgentPresetSeatInjected)()
+    await section.load()
+
+    setDevTools(false)
+    ctx.remote.$dispatch('settings/document-updated', ['ui-settings', 1])
+    await vi.waitFor(() => {
+      expect(seat.hooks.developerTools.getSnapshot()).toBe(false)
+    })
+
+    // The settings entry stays enabled while the preference is off, and its
+    // pick is a real choice: the stage must compose the session the flow
+    // starts rather than disappearing with the picker.
+    section.startCreatorDraft?.()
+    expect(seat.hooks.agentPresetSeat.getSnapshot().current).toBe('cordis')
+
+    state.current = 's1'
+    state.byId['s1'] = { id: 's1', blank: true }
+    sessions.notify()
+    await vi.waitFor(() => { expect(calls).toContain('select:cordis') })
+    expect(state.byId.s1.agentPreset).toBe('cordis')
+    conversation()
+  })
+
+  it('drops a staged pick when the tools preference turns off', async () => {
+    const { ctx, slots, calls, setDevTools } = await bench()
+    declareRoot(slots)
+    const conversation = declareConversation(slots)
+    ctx.provide('conversation', {} as never)
+    const state: {
+      current?: string
+      byId: Record<string, { id: string; blank: boolean; agentPreset?: string }>
+    } = { byId: {} }
+    const sessions = sessionsDouble(state)
+    ctx.provide('sessions', sessions as never)
+    ctx.provide('workspaces', workspacesDouble() as never)
+    await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
+    const seat = (slots.entries('conversation.hero.agentPreset')[0]!
+      .inject as unknown as () => AgentPresetSeatInjected)()
+    await seat.load()
+
+    await seat.select('minimal')
+    expect(seat.hooks.agentPresetSeat.getSnapshot().current).toBe('minimal')
+
+    // The pick was made under a preference the user has since turned off:
+    // composing it anyway would land a mode the picker no longer offers.
+    setDevTools(false)
+    ctx.remote.$dispatch('settings/document-updated', ['ui-settings', 1])
+    await vi.waitFor(() => {
+      expect(seat.hooks.developerTools.getSnapshot()).toBe(false)
+    })
+    // The cleared pick stops being the reported choice: the deployment
+    // default is what the next session would compose.
+    await vi.waitFor(() => {
+      expect(seat.hooks.agentPresetSeat.getSnapshot().current).toBe('standard')
+    })
+
+    state.current = 's1'
+    state.byId['s1'] = { id: 's1', blank: true }
+    sessions.notify()
+    await Promise.resolve()
+    expect(calls.filter(call => call.startsWith('select:'))).toHaveLength(0)
+    expect(state.byId.s1.agentPreset).toBeUndefined()
+    conversation()
+  })
+
   it('keeps the applied composition when the roster load lands late', async () => {
     const { ctx, slots, calls } = await bench()
     declareRoot(slots)
@@ -860,9 +948,6 @@ describe('ui-agent-preset apply', () => {
 })
 
 describe('AgentPresetSeatController reconciliation', () => {
-  /** Accepted developer-tools preference: selection gates need it on. */
-  const devToolsOn = { getSnapshot: () => true, subscribe: () => () => {} }
-
   it('does not capture a non-blank session', () => {
     const controller = new AgentPresetSeatController(
       {} as never,
@@ -880,8 +965,6 @@ describe('AgentPresetSeatController reconciliation', () => {
     const controller = new AgentPresetSeatController(
       { agentPresets: { select } } as never,
       () => current,
-      undefined,
-      devToolsOn,
     )
     const captured = controller.blankSessionId()
     if (captured === undefined) throw new Error('expected a blank session')
@@ -909,8 +992,6 @@ describe('AgentPresetSeatController reconciliation', () => {
         },
       } as never,
       () => ({ id: 's1' as never, blank: true }),
-      undefined,
-      devToolsOn,
     )
     controller.stage('minimal')
 
