@@ -32,6 +32,13 @@ export interface ProviderRow {
   apiKeyEnv: string | undefined
   /** Credential state for {@link apiKeyEnv}, once described. */
   credential: CredentialView | undefined
+  /**
+   * Credential state for the page's own derived reference — the one the
+   * editor resolves for this row while the profile names none — described
+   * only for keyless rows. The provider-card seat's `keyConfigured` fact for
+   * dormant and keyless rows, matching the editor's derivation rule.
+   */
+  derivedCredential?: CredentialView
   /** Models the current runtime policy permits through this route. */
   models: readonly ModelProviderGroup['models'][number][]
   /** Provider catalog failure, when model listing failed for this route. */
@@ -120,6 +127,18 @@ export function protocolChoices(
   const list = (node as { type?: string; list?: readonly { value?: unknown }[] } | undefined)
   if (list?.type !== 'union' || list.list === undefined) return []
   return list.list.map(entry => entry.value).filter((value): value is string => typeof value === 'string')
+}
+
+/**
+ * The credential reference the page derives for a keyless row, under the
+ * ownership scope the directory entry itself declares. External routes owe
+ * this page no credential, and a project route without its project id cannot
+ * name one — both contribute nothing to the describe.
+ */
+function derivedKeyRefOf(entry: ConfigurableProviderView): string | undefined {
+  if (entry.management === 'external') return undefined
+  if (entry.management === 'project' && entry.projectId === undefined) return undefined
+  return deriveKeyRef(entry.provider, entry.management, entry.projectId)
 }
 
 /** The credential reference a resolved profile names (its `apiKeyEnv` field). */
@@ -217,7 +236,11 @@ export class ModelsSettingsStore {
         catalogFailure: failuresByProvider.get(entry.provider),
       }
     })
-    const refs = [...new Set(rows.flatMap(row => row.apiKeyEnv === undefined ? [] : [row.apiKeyEnv]))]
+    const refs = [...new Set(rows.flatMap((row) => {
+      if (row.apiKeyEnv !== undefined) return [row.apiKeyEnv]
+      const derived = derivedKeyRefOf(row.entry)
+      return derived === undefined ? [] : [derived]
+    }))]
     let credentials: Record<string, CredentialView> = {}
     let credentialError: string | null = null
     if (refs.length > 0) {
@@ -241,12 +264,16 @@ export class ModelsSettingsStore {
       const reason = this.describeFace.getSnapshot().view?.writableReason
       if (reason === undefined) delete s.writableReason
       else s.writableReason = reason
-      s.rows = rows.map(row => ({
-        ...row,
-        ...row.apiKeyEnv !== undefined && credentials[row.apiKeyEnv] !== undefined
-          ? { credential: credentials[row.apiKeyEnv] }
-          : {},
-      }))
+      s.rows = rows.map((row) => {
+        const named = row.apiKeyEnv === undefined ? undefined : credentials[row.apiKeyEnv]
+        const derivedRef = row.apiKeyEnv === undefined ? derivedKeyRefOf(row.entry) : undefined
+        const derived = derivedRef === undefined ? undefined : credentials[derivedRef]
+        return {
+          ...row,
+          ...named === undefined ? {} : { credential: named },
+          ...derived === undefined ? {} : { derivedCredential: derived },
+        }
+      })
       s.namespaces = namespaces
     })
   }

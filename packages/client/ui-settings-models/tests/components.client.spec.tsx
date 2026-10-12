@@ -213,6 +213,7 @@ async function mountFace(
     discoverModels,
     schema: settingsSchema,
     t,
+    renderSlot: () => null,
     ...section,
   }
   const view = render(<ModelsSection {...injected} />)
@@ -259,13 +260,36 @@ describe('ModelsSection', () => {
     const renderSlot = ((key: string, _owner: unknown, options?: { entryKey?: string }) => {
       calls.push(`${key}:${options?.entryKey ?? 'root'}`)
       return <span data-testid={`slot-${calls.length}`} />
-    }) as NonNullable<ModelsSectionProps['renderSlot']>
+    }) as ModelsSectionProps['renderSlot']
     const view = await mountFace(scriptedFace(), { renderSlot })
 
     expect(calls).toContain('settings.models.provider-card:llm-pi-ai')
     expect(calls).toContain('settings.models.provider-card:llm-deepseek')
     expect(calls.at(-1)).toBe('settings.models.footer:root')
     expect(view.view.getAllByTestId(/^slot-/u).length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('derives the draft seat\'s key fact from the page\'s conventional reference', async () => {
+    interface SeatOwner { provider: { provider: string }; configured: boolean; keyConfigured: boolean }
+    const owners: SeatOwner[] = []
+    const renderSlot = ((key: string, owner: unknown) => {
+      if (key === 'settings.models.provider-card') owners.push(owner as SeatOwner)
+      return null
+    }) as ModelsSectionProps['renderSlot']
+    const scripted = scriptedFace()
+    scripted.face.credentials.describe.mockImplementation((payload: { refs: string[] }) => Promise.resolve(ok({
+      credentials: Object.fromEntries(payload.refs.map(ref => [ref, {
+        configured: ref === 'OPENAI_API_KEY' || ref === 'ANTHROPIC_API_KEY',
+        writable: true,
+      }])),
+    })))
+    await mountFace(scripted, { renderSlot })
+    owners.length = 0
+    fireEvent.click(screen.getByRole('button', { name: en.add }))
+    // The dormant row names no reference yet; the seat still reports the
+    // derived ANTHROPIC_API_KEY the editor itself displays as configured.
+    expect(owners.map(owner => [owner.provider.provider, owner.configured, owner.keyConfigured]))
+      .toContainEqual(['anthropic', false, true])
   })
 
   it('renders authorized organization models as read-only rows', async () => {
@@ -344,6 +368,7 @@ describe('ModelsSection', () => {
       discoverModels={discoverModels}
       schema={settingsSchema}
       t={t}
+      renderSlot={() => null}
     />)
 
     const missing = screen.getByRole('img', { name: en.credentialMissing })
@@ -369,6 +394,7 @@ describe('ModelsSection', () => {
       discoverModels={discoverModels}
       schema={settingsSchema}
       t={t}
+      renderSlot={() => null}
     />)
     // Now a row with an Edit button, not an open card.
     expect(screen.getAllByText(en.edit).length).toBeGreaterThan(1)
@@ -1195,6 +1221,7 @@ describe('ModelsSection', () => {
         discoverModels={discoverModels}
         schema={settingsSchema}
         t={t}
+        renderSlot={() => null}
       />)
       const key = await screen.findByLabelText<HTMLInputElement>(en.keyInput)
       expect(key.placeholder).toBe(en.keyPlaceholder)
@@ -1335,6 +1362,7 @@ describe('ModelsSection', () => {
       discoverModels={discoverModels}
       schema={settingsSchema}
       t={t}
+      renderSlot={() => null}
     />)
     expect(screen.getByText(/directory down/)).toBeTruthy()
     fireEvent.click(screen.getByText(en.retry))
@@ -1358,6 +1386,7 @@ describe('ModelsSection', () => {
       discoverModels={discoverModels}
       schema={settingsSchema}
       t={t}
+      renderSlot={() => null}
     />)
     expect(screen.getByText(en.readOnly)).toBeTruthy()
     expect(screen.getAllByText<HTMLButtonElement>(en.remove).every(button => button.disabled)).toBe(true)
@@ -1420,6 +1449,7 @@ describe('ModelsSection', () => {
       discoverModels={discoverModels}
       schema={settingsSchema}
       t={t}
+      renderSlot={() => null}
     />)
     await screen.findByText('DeepSeek')
   })

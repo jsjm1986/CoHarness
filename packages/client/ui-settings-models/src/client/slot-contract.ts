@@ -26,7 +26,11 @@ export interface ProviderCardExtrasOwnerProps {
   provider: ConfigurableProviderView
   /** Whether any layer configures this provider. */
   configured: boolean
-  /** Whether the joined API-key credential is configured. */
+  /**
+   * Whether the credential this page would use is configured: the profile's
+   * `apiKeyEnv`, or the page's derived reference while the profile names
+   * none — the same reference the row's own editor resolves.
+   */
   keyConfigured: boolean
 }
 

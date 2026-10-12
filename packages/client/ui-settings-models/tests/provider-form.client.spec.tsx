@@ -164,6 +164,7 @@ async function mountSection(
     discoverModels: scripted.discover,
     schema: settingsSchema,
     t,
+    renderSlot: () => null,
   }
   render(<ModelsSection {...injected} {...section} />)
   return { ...scripted, controller }
@@ -783,6 +784,7 @@ describe('provider rows', () => {
       api={scripted.face as never}
       schema={settingsSchema}
       t={t}
+      renderSlot={() => null}
     />)
 
     // Absent is "unknown", never "shipped": an adapter that answers nothing

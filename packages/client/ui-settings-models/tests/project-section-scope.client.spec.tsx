@@ -54,6 +54,7 @@ function props(overrides: Partial<ModelsSectionProps> = {}): ModelsSectionProps 
     discoverModels: vi.fn(),
     schema: settingsSchema,
     t: key => en[key],
+    renderSlot: () => null,
     ...overrides,
   }
 }
