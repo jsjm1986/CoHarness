@@ -580,11 +580,23 @@ describe('face-aware source classification', () => {
     const found = readPackageDependencyFacts(root, subject, 'client-host', new Set([
       CORDIS, '@f/runtime', '@f/types', '@f/nested', '@f/hidden', '@f/browser', '@f/injected',
     ]), policy({
+      requiredServicePeers: { '@f/dual': ['@f/types'] },
       configurationOnlyDevDependencies: { '@f/dual': ['@f/injected'] },
     }))
 
     expect([...found.hostRuntimeSourceUses.keys()].sort()).toEqual(['@f/nested', '@f/runtime'])
     expect([...found.configurationOnlyDevDependencies]).toEqual(['@f/injected'])
+    expect([...found.peerRequiredHostDependencies]).toEqual(['@f/types'])
+    expect(expectedPackageDependencies(found).get('@f/types')?.section).toBe('peer-dev')
+    const unrelated = readPackageDependencyFacts(root, subject, 'client-host', found.workspaceNames, policy({
+      requiredServicePeers: { '@f/other': ['@f/types'] },
+    }))
+    expect(expectedPackageDependencies(unrelated).get('@f/types')?.section).toBe('devDependencies')
+    for (const name of ['@f/missing', '@f/injected']) {
+      expect(() => readPackageDependencyFacts(root, subject, 'client-host', found.workspaceNames, policy({
+        requiredServicePeers: { '@f/dual': [name] },
+      }))).toThrow(`requiredServicePeers must name a referenced workspace package: ${name}`)
+    }
     expect(found.hostRuntimeExportUses).toEqual([
       {
         packageName: '@f/nested',
@@ -931,9 +943,50 @@ describe('dependency sections', () => {
     expect(formatPeerRequiredRuntimeDependencies({
       facts: [subject], packages: [], policyViolations: [], workspaceNames: subject.workspaceNames,
     })).toEqual([
-      'verify-package-dependencies: 1 Host runtime edge(s) remain in peerDependencies as shared workspace instances across 1 package(s):',
+      'verify-package-dependencies: 1 Host runtime edge(s) remain in peerDependencies for shared exports or required services across 1 package(s):',
       '  @deepseek-ai/dsh-probe -> @deepseek-ai/dsh-runtime: @deepseek-ai/dsh-runtime#runtimeValue',
     ])
+  })
+
+  it('requires both peer and development declarations for a service without a value import', () => {
+    const dependency = '@deepseek-ai/dsh-runtime'
+    const manifest: PackageDependencyManifest = {
+      name: '@deepseek-ai/dsh-probe',
+      devDependencies: {
+        [CORDIS]: 'workspace:~',
+        [dependency]: 'workspace:*',
+        '@deepseek-ai/dsh-types': 'workspace:*',
+      },
+      peerDependencies: { [CORDIS]: 'workspace:~' },
+    }
+    const subject: PackageDependencyFacts = {
+      ...facts(manifest),
+      hostRuntimeSourceUses: new Map(),
+      hostRuntimeExportUses: [],
+      peerRequiredHostDependencies: new Set([dependency]),
+    }
+    const state = { facts: [subject], packages: [], policyViolations: [], workspaceNames: subject.workspaceNames }
+    expect(collectPackageDependencyViolations(state)).toEqual([
+      expect.stringContaining(`${dependency} must be matching peerDependencies + devDependencies`),
+    ])
+    repairPackageDependencyManifest(subject)
+    expect(collectPackageDependencyViolations(state)).toEqual([])
+    expect(manifest.peerDependencies?.[dependency]).toBe('workspace:*')
+    delete manifest.devDependencies?.[dependency]
+    expect(collectPackageDependencyViolations(state)).toHaveLength(1)
+    repairPackageDependencyManifest(subject)
+    expect(collectPackageDependencyViolations(state)).toEqual([])
+    expect(formatPeerRequiredRuntimeDependencies(state)).toEqual([
+      'verify-package-dependencies: 1 Host runtime edge(s) remain in peerDependencies for shared exports or required services across 1 package(s):',
+      `  ${manifest.name} -> ${dependency}: required Cordis service`,
+    ])
+  })
+
+  it('rejects required service declarations for unmanaged packages', () => {
+    const { root } = generatedHostFixture('schema')
+    expect(readPackageDependencyState(root, policy({
+      requiredServicePeers: { '@fixture/missing': [CORDIS] },
+    })).policyViolations).toContain('requiredServicePeers names unmanaged package @fixture/missing')
   })
 
   it('reports wrong sections, workspace ranges, and stale peer metadata', () => {

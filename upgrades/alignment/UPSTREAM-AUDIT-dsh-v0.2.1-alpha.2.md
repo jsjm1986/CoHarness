@@ -18,8 +18,13 @@
 | `cafb9b93b4b`（subprocess 部分） | spill 路径在 `openSync` 成功后才发布（EEXIST 不再删外部路径）；抛错 reporter 收敛到 stderr；`logSpillFailure` 共享所有者日志行 | `packages/subprocess/subprocess-local`、`packages/ssh/ssh` |
 | `0c44e5461db` | 附件发现只扫声明的一方载体字段；opaque/ignorable 事件与 `tool-result` 嵌套不再触发存储读取 | `packages/host/apiproxy`（`imageInEvent` + `session-export.ts`，保留 `assistant/chunk` 载体） |
 | `ad83cce36ac` | V3 重启修复：`next-turn` splice 后开 `turn+1` 且非开步时合成 `turn/end interrupted`；`image/offload` `targets[].seq` 纳入引用重映射 | `packages/session/session-format-v3-to-v4`（适配到 CoHarness 折叠阶段，非逐字） |
+| `b6775f6d4f5` + `2d653be7b0e` | `maxConsecutiveWakes` 去掉 `.default(10)`，空闲所有者默认每次完成都唤醒 | `packages/jobs/tool-jobs` |
+| `f37f19ab43a` | 可执行文件错误按 `name` 比较（跨 realm 安全）；`SubprocessExecutableNotFoundError` 移出 `peerRequiredHostExports`，新增 `requiredServicePeers` 策略通道 | `packages/api/terminal-controller`、`packages/ssh/ssh`、`scripts/verify-package-dependencies*` |
+| `1e6630a8568` | Team mailbox fold 对未知内容块只校验 `type` 标签、保留解码 JSON（含 own `__proto__`）；上游 projection checkpoint bump 不适用（CoHarness fold 为纯重放） | `packages/experimental/agent-team/src/fold.ts` |
+| `9a8d21dfe75` | 取消的排队 goal Round 在 idle 检查点从 inbox 撤回；revision 精确匹配的取消暂停 goal；结算失败告警并撤防 | `packages/goal/goal-round-driver` |
+| `18a4bc4093c` | `exit_plan_mode` 接受 `{ approved: boolean }`；`ASK_CANCELLED` 结束轮次并返回 `{ approved: false }`，计划模式保持激活 | `packages/plan/plan-mode` |
 
-验证：`deepseek-llm-api-extensions` + `llm-deepseek` 17 测试、`session-log-deepseek` 34 测试、`ptc-runtime-python` 325 测试、`subprocess-local` 359 测试、`session-format-v3-to-v4` 43 测试、`apiproxy` session-export 43 测试全过；typecheck 干净；`ptc-python-turn` 快照回放通过。决策记录：`.agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md`、`2026-10-12-python-ptc-shared-sandbox-policy.md`、`2026-10-12-durable-path-safety-fixes.md`。
+验证：`deepseek-llm-api-extensions` + `llm-deepseek` 17 测试、`session-log-deepseek` 34 测试、`ptc-runtime-python` 325 测试、`subprocess-local` 359 测试、`session-format-v3-to-v4` 43 测试、`apiproxy` session-export 43 测试、`tool-jobs`/`goal`/`plan`/`agent-team`/`terminal-controller`/`ssh` 799 测试全过；typecheck 干净；`verify-package-dependencies` 门禁（63 包）与其 44 spec 测试通过；`ptc-python-turn` 快照回放通过。决策记录：`.agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md`、`2026-10-12-python-ptc-shared-sandbox-policy.md`、`2026-10-12-durable-path-safety-fixes.md`、`2026-10-12-session-reliability-fixes.md`。
 
 ## 待修缺口（按严重度，源码复核确认）
 
@@ -35,7 +40,7 @@
 - 输入回显生命周期：canceled inbox splice 不退休 steering echo、dispose 把已录取 echo 报 failed、transcript echo 不等 inbox 水位（`packages/runtime/sessions/session.ts:1209-1241`、`:873-875`）。
 - schedule/subagent 归属：创建/更新不拒子代理会话、工具不拒 delegated child、无 typed result。
 - plugin-manager/HMR 族：未装 bundle 不可移除、meta 解析失败阻塞请求、retired schedule 残留 manifest、清单无 version 不降级、install/enable/remove 不刷新解析表；package.json 变不失效 cache、缺 CJS `_load` hook。
-- 单点：`maxConsecutiveWakes` 默认 10（上游无默认上限，`packages/tool-jobs/src/index.ts:68`）；plan 取消后仍等模型停（plan-mode:331）；标题不保留既有合适标题；无 key 模型不隐藏；agent-instructions 失败不上报；executable 错误 `instanceof` 跨 realm 误判（应比 name）；Windows `useConptyDll` 未启用；headless 不等子代理完成；team fold `z.object().loose()` 丢 `__proto__`。
+- 单点：标题不保留既有合适标题；无 key 模型不隐藏；agent-instructions 失败不上报；Windows `useConptyDll` 未启用；headless 不等子代理完成（`a1da7bcfb96` 待复核 fork 适配）。
 - CLI：`dsh plugin allow-version`/`revoke-version`/`version-exemptions` 未实现，但 `packages/boot/app-boot/src/plugin-compatibility.ts:101` 的错误提示指引用户运行它（死路指引）。
 - 客户端：空白会话隐藏整个 header；Coding Tools 关时 Creator stage 静默丢弃；preset 拒绝无 toast；trajectory 请求生命周期与重试错误；`@` 会话引用按 createdAt 排序；provider 卡缺 `derivedCredential`（`bf0db65bb0e`，`packages/client/ui-settings-models`）；plan 文档无 preview/sidebar/持久卡；`openChildAside` 缺子会话侧栏；Tooltip 被 `.composerSeat` stacking context 压层（QueueDock/GoalBar 未传 portal）；设置面板遇 onboarding 遮罩仍可交互（`7dfad907488`）；未命名会话显示目录名而非"未命名"（`a4ac7e9eb36`/`bcf0ba45cb0`）。
 - Markdown/工具呈现：无 CodeToolbar/CodeCard（wrap 切换+复制+lang）；markdown 图片链接无 hover/内联预览；web-fetch 折叠 URL 不可点；审批面板无 `displayReason` 投影；`developer/message` 工具更新通知不渲染。

@@ -59,10 +59,12 @@ const contentBlockSchema: z.ZodType<ContentBlock> = z.lazy(() => z.union([
     content: z.array(contentBlockSchema),
     isError: z.boolean().optional(),
   }).strict(),
-  z.object({ type: z.string().min(1) }).loose().refine(
-    block => !coreContentBlockTypes.has(block.type),
-    { message: 'known content block types must match their declared fields' },
-  ),
+  // Unknown content is decoded JSON; validation must preserve its own extension keys.
+  z.custom<ContentBlock>((value) => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+    const type = (value as { type?: unknown }).type
+    return typeof type === 'string' && type.length > 0 && !coreContentBlockTypes.has(type)
+  }),
 ])) as z.ZodType<ContentBlock>
 
 const teamMemberSnapshotSchema = z.object({
