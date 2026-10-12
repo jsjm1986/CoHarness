@@ -157,25 +157,24 @@ function turnProcessAlwaysOpen(node: ChatNode | undefined): boolean {
   return location.turn.status === 'open' || reason === 'aborted' || reason === 'error'
 }
 
-/** Return submission ids already represented by durable nodes or queue rows. */
-function observedRpcIds(
+/** Return submission ids already represented by durable nodes, plus the last input's Turn. */
+function observedInputs(
   order: readonly string[],
-  nodes: { get(key: string): { readonly kind: string; readonly data: unknown } | undefined },
-  queue: readonly { readonly rpcId?: string }[],
-): ReadonlySet<string> {
+  nodes: { get(key: string): { readonly kind: string; readonly data: unknown; readonly location: ChatNode['location'] } | undefined },
+): { readonly rpcIds: ReadonlySet<string>; readonly lastInputTurn: number | undefined } {
   const observed = new Set<string>()
+  let lastInputTurn: number | undefined
   for (const key of order) {
     const node = nodes.get(key)
     if (node === undefined || (node.kind !== 'user' && node.kind !== 'steering')) continue
+    const turn = nodeTurn(node)
+    if (turn !== undefined) lastInputTurn = turn
     const source = (node.data as { readonly source?: unknown }).source as
       | { readonly kind?: unknown; readonly rpcId?: unknown }
       | undefined
     if (source?.kind === 'user' && typeof source.rpcId === 'string') observed.add(source.rpcId)
   }
-  for (const item of queue) {
-    if (item.rpcId !== undefined) observed.add(item.rpcId)
-  }
-  return observed
+  return { rpcIds: observed, lastInputTurn }
 }
 
 /** Turn-level model activity label retained across first-token, tool, and streaming phases. */
@@ -283,17 +282,26 @@ export function ChatView({
     setFileOpenBusy(false)
   }, [])
 
-  const pendingSteering = useMemo(
-    () => inbox.filter(item => item.placement === 'steering'),
-    [inbox],
-  )
-  // Keep the local echo hidden during the one-frame overlap in which its
-  // durable event or queue occurrence has landed but retirement is pending.
-  const visibleSubmissions = useMemo(() => {
-    if (pendingSubmissions.length === 0) return pendingSubmissions
-    const observed = observedRpcIds(order, nodeStore, inbox)
-    return pendingSubmissions.filter(item => !observed.has(item.requestId))
-  }, [inbox, nodeStore, order, pendingSubmissions])
+  const pendingSteering = useMemo(() => {
+    // Admitted local identities outlive their bubbles until retirement, so a
+    // stale steering row carrying the same rpcId must not reappear beside them.
+    const localIds = new Set(
+      pendingSubmissions.filter(submission => submission.placement !== 'queued')
+        .map(submission => submission.requestId as string),
+    )
+    return inbox.filter(item =>
+      item.placement === 'steering' && (item.rpcId === undefined || !localIds.has(item.rpcId)))
+  }, [inbox, pendingSubmissions])
+  // Keep the local echo hidden once its durable counterpart renders; the
+  // echo→durable swap stays atomic regardless of when retirement lands.
+  const [visibleSubmissions, lastInputTurn] = useMemo(() => {
+    if (pendingSubmissions.length === 0) return [pendingSubmissions, undefined] as const
+    const observed = observedInputs(order, nodeStore)
+    return [
+      pendingSubmissions.filter(item => item.placement !== 'queued' && !observed.rpcIds.has(item.requestId)),
+      observed.lastInputTurn,
+    ] as const
+  }, [nodeStore, order, pendingSubmissions])
   const transcriptSubmissions = useMemo(
     () => visibleSubmissions.filter(item => item.placement !== 'queued' && item.placement !== 'steering'),
     [visibleSubmissions],
@@ -308,6 +316,13 @@ export function ChatView({
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
   const runningTurn = useMemo(() => runningTurnOf(timeline), [timeline])
+  // An empty opening control follows the first local transcript echo, never steering.
+  const tailKey = order.at(-1)
+  const tailNode = tailKey === undefined ? undefined : nodeStore.get(tailKey)
+  const hoistFirstTranscript = running && tailNode?.kind === 'turn-process'
+    && tailNode.location.kind === 'turn'
+    && tailNode.location.turn.status === 'open'
+    && tailNode.location.turn.turn !== lastInputTurn
   /**
    * Merge the full-session index with loaded anchors. Index-only markers keep
    * their durable range and become clickable after `loadHistoryUntil` brings
@@ -797,6 +812,14 @@ export function ChatView({
                 double-render the same wait. */}
             {/* Turn-level loading signal: rides the whole running turn (first-token
                 wait, tool execution, streaming) so it never flickers per step. */}
+            {running && hoistFirstTranscript && transcriptSubmissions[0] !== undefined && (
+              <PendingSubmissionBubble
+                key={transcriptSubmissions[0].requestId}
+                submission={transcriptSubmissions[0]}
+                renderMessageImages={renderMessageImages}
+                t={t}
+              />
+            )}
             {running && <TurnStatus startTime={runningTurnStart} t={t} />}
             {pendingSteering.map(item => (
               <PendingSteeringBubble
@@ -814,7 +837,7 @@ export function ChatView({
                 t={t}
               />
             ))}
-            {transcriptSubmissions.map(submission => (
+            {transcriptSubmissions.slice(hoistFirstTranscript ? 1 : 0).map(submission => (
               <PendingSubmissionBubble
                 key={submission.requestId}
                 submission={submission}

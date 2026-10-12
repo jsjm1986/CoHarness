@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-13-input-echo-admission-ownership.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-13-input-echo-admission-ownership.md
+/agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention:
+  en: db6167dd0f232022
+  zh: 8e0dbf5a591dd9fe
+/agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention/problem:
+  en: 83b0a8ffd7265c3a
+  zh: 514155818648a007
+/agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention/decision:
+  en: 5d6577b4301fdfa9
+  zh: f946f668e09d4dbf
+/agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention/alternatives-considered:
+  en: 38bb30f0def72d70
+  zh: 0b1f43cba888af4e
+/agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention/consequences:
+  en: f383702f2708b3ab
+  zh: cd34aa080c2e6837
+/agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention/verification:
+  en: c5aeed530f617769
+  zh: 83352cac34df50a2
+/agent-note-input-echo-admission-ownership-queue-durable-dedup-deferred-failure-assistant-retention/related:
+  en: cd6a113eac104586
+  zh: bc09fbd7ac319be1

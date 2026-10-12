@@ -34,6 +34,18 @@ describe('ProjectionValueStore semantics', () => {
     expect(store.faceOf('test/marks').getSnapshot()).toBeUndefined()
   })
 
+  it('exposes a watermark only for keys carrying a row', () => {
+    const store = new ProjectionValueStore()
+    expect(store.seqOf('test/marks')).toBeUndefined()
+    store.apply('test/marks', { marks: ['a'] }, 4)
+    store.apply('test/marks', { marks: ['stale'] }, 2)
+    expect(store.seqOf('test/marks')).toBe(4)
+    store.seed({ asOfSeq: 6, values: {} })
+    expect(store.seqOf('test/marks')).toBeUndefined()
+    store.seed({ asOfSeq: 8, values: { 'test/marks': { marks: ['baseline'] } } })
+    expect(store.seqOf('test/marks')).toBe(8)
+  })
+
   it('applies frames last-wins by seq: replayed and stale frames drop', () => {
     const store = new ProjectionValueStore()
     store.apply('test/marks', { marks: ['a'] }, 5)

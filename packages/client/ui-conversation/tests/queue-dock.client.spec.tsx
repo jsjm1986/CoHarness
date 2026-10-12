@@ -154,6 +154,23 @@ describe('QueueDock', () => {
     expect(container.innerHTML).toBe('')
   })
 
+  it('leaves a queued transcript echo to Chat and suppresses its inbox row', () => {
+    const requestId = 'request-transcript-echo' as never
+    const snap = {
+      ...snapshotWith([{ ...row('t-1', '从对话发出'), rpcId: requestId }]),
+      pendingSubmissions: [{
+        requestId,
+        placement: 'transcript' as const,
+        time: 1,
+        text: '从对话发出',
+        images: [],
+      }],
+    }
+    const source = liveSession(snap)
+    const { container } = render(<QueueDock {...kitFor(snap)} useSession={source.useSession} />)
+    expect(container.innerHTML).toBe('')
+  })
+
   it('renders one row directly and defaults multiple rows to a collapsible count header', () => {
     const single = snapshotWith([row('i-1', 'one')])
     const source = liveSession(single)

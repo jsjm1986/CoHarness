@@ -29,8 +29,11 @@
 | `02f54230705` | `discoverModels` 先解析凭据：`MISSING_CREDENTIAL` 返回空目录隐藏路由，其余错误传播 | `packages/llm/llm-deepseek-api-key` |
 | `59ba1321eba` | Windows 终端分配传 `useConptyDll: true`（node-pty 自带 OpenConsole 承载，POSIX 不变） | `packages/subprocess/subprocess-local` |
 | `edd0660b5d0` + `fc30c5a7d25`（服务端侧） | `answer` 按 Session 保留排队回复直到录取：重复提交 `REPLY_QUEUED`、丢弃/认领轮次终结释放、`agent/inbox/claimed` 接管恢复回复；fold 改为仅 `user/message` 录取时结算并折叠 pending `tool/ptc-dispatch` 子调用；Client 侧等价机制（PendingWait/publishInteraction）此前已存在 | `packages/interaction/user-questions`（projection `stateVersion` 4→5） |
+| `820824edd74` | 输入回显录取所有权：逐身份 `queueTarget`/`queueIndex`/`queueSeq` 回执跨 `session/queue` 帧、`queuedInbox` 投影与 `agent/inbox/spliced`；queued 回显入队即退、transcript/steering 等持久录取+行移除；`canceled` splice 立即失败、离队未录取回显在下一 `request/context`/`turn/end`（seq 晚于移除观察）失败；新 follow 基线把 `asOfSeq` 及之前的队列观察身份按已观察接受；`ProjectionValueStore.seqOf` 暴露水位；`BeginSubmissionInput` 改携 `mode`，placement 由 Session 实时 running 派生 | `packages/client/runtime`（session/projection-store/contract）、`packages/client/ui-conversation`（ChatView/QueueDock/service）；上游 Playwright e2e 未移植——wire 面不同（`session/queue`+`queuedInbox` vs `session/control`/`session/follow`），需重写 |
+| `08c0e8e71b6` | 已录取本地身份抑制其仍发布的队列行直到行消失：ChatView steering 行与 QueueDock transcript 行按 `rpcId` 匹配；渲染去重只在持久节点持有 `rpcId` 后隐藏回显，队列占位不隐藏（与上游「stale inbox 行在 projection 水位追上前保留」等价，适配我们的整体快照队列面） | `packages/client/ui-conversation`（ChatView/QueueDock）、`packages/client/runtime`（session retireAdmitted） |
+| `1b55f5bea3a` | 成功 `assistant/message` 结算在流结束即发布，瞬态行保留到匹配 `step/end`（携带 `retireAttemptId`）；被中断 message/attempt 仍在流结束结算；保留期间新 attempt 请求 rebaseline；Assistant 节点把成功 message 锚定在首个可见 seq | `packages/client/runtime`（assistant-stream/session/conversation-assembler）、`packages/client/ui-conversation`（conversation-nodes/assistant） |
 
-验证：`deepseek-llm-api-extensions` + `llm-deepseek` 17 测试、`session-log-deepseek` 34 测试、`ptc-runtime-python` 325 测试、`subprocess-local` 359 测试、`session-format-v3-to-v4` 43 测试、`apiproxy` session-export 43 测试、`tool-jobs`/`goal`/`plan`/`agent-team`/`terminal-controller`/`ssh` 799 测试全过；typecheck 干净；`verify-package-dependencies` 门禁（63 包）与其 44 spec 测试通过；`ptc-python-turn` 快照回放通过；`user-questions` 65 测试（排队回复保留、仅录取结算、PTC 子调用 fold）。决策记录：`.agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md`、`2026-10-12-python-ptc-shared-sandbox-policy.md`、`2026-10-12-durable-path-safety-fixes.md`、`2026-10-12-session-reliability-fixes.md`。
+验证：`deepseek-llm-api-extensions` + `llm-deepseek` 17 测试、`session-log-deepseek` 34 测试、`ptc-runtime-python` 325 测试、`subprocess-local` 359 测试、`session-format-v3-to-v4` 43 测试、`apiproxy` session-export 43 测试、`tool-jobs`/`goal`/`plan`/`agent-team`/`terminal-controller`/`ssh` 799 测试全过；typecheck 干净；`verify-package-dependencies` 门禁（63 包）与其 44 spec 测试通过；`ptc-python-turn` 快照回放通过；`user-questions` 65 测试（排队回复保留、仅录取结算、PTC 子调用 fold）；`client-runtime` 105 定点测试（回显退役/边界/基线/移动 splice）+ `ui-conversation` 定点测试（QueueDock 抑制、回显挂载、steering 去重）。决策记录：`.agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md`、`2026-10-12-python-ptc-shared-sandbox-policy.md`、`2026-10-12-durable-path-safety-fixes.md`、`2026-10-12-session-reliability-fixes.md`、`2026-10-13-input-echo-admission-ownership.md`。
 
 ## 待修缺口（按严重度，源码复核确认）
 
@@ -42,7 +45,6 @@
 
 ### P2 — 用户可感知（按根因族）
 
-- 输入回显生命周期：canceled inbox splice 不退休 steering echo、dispose 把已录取 echo 报 failed、transcript echo 不等 inbox 水位（`packages/runtime/sessions/session.ts:1209-1241`、`:873-875`）。
 - schedule/subagent 归属：创建/更新不拒子代理会话、工具不拒 delegated child、无 typed result。
 - plugin-manager/HMR 族：未装 bundle 不可移除、meta 解析失败阻塞请求、retired schedule 残留 manifest、清单无 version 不降级、install/enable/remove 不刷新解析表；package.json 变不失效 cache、缺 CJS `_load` hook。
 - 单点：标题保留、无 key 模型隐藏、agent-instructions 组保护/去重提升、`useConptyDll` 均已移植（见上表）。

@@ -17,7 +17,7 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 // error, so scope resolution goes through the sessions service (scopeOf
 // method) instead of the standalone helper.
 import type {
-  ISessions, PendingSubmissionPlacement, PendingSubmissionRetirement, SessionFace, SessionId,
+  ISessions, PendingSubmissionRetirement, SessionFace, SessionId,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SubmitImageAttachment, SubmitOutcome } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
@@ -240,9 +240,7 @@ export class ConversationController extends Service implements IConversation {
         finishRetirement = resolve
       })
     const submission = session.beginSubmission({
-      placement: initial.running
-        ? mode === 'steer' ? 'steering' : 'queued'
-        : 'transcript' satisfies PendingSubmissionPlacement,
+      mode,
       text,
       images: attachments.map(attachment => ({
         previewUrl: attachment.previewUrl,

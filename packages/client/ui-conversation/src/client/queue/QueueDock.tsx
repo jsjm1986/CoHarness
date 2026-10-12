@@ -70,8 +70,17 @@ export type QueueDockProps = PropsRuntime<'conversation.input.dock'> & QueueDock
  */
 export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: QueueDockProps) {
   const inbox = useSession(s => s.queue)
-  const queue = useMemo(() => inbox.filter(row => row.placement === 'queued'), [inbox])
   const pendingSubmissions = useSession(s => s.pendingSubmissions ?? EMPTY_PENDING_SUBMISSIONS)
+  const queue = useMemo(() => {
+    const rows = inbox.filter(row => row.placement === 'queued')
+    // A transcript submission stays in Chat even after the Host queues its
+    // message; its Inbox row must not also surface in the Dock.
+    const inChat = new Set(
+      pendingSubmissions.filter(item => item.placement === 'transcript')
+        .map(item => item.requestId as string),
+    )
+    return inChat.size === 0 ? rows : rows.filter(row => row.rpcId === undefined || !inChat.has(row.rpcId))
+  }, [inbox, pendingSubmissions])
   const pendingQueue = useMemo(() => {
     const admitted = new Set(queue.flatMap(row => row.rpcId === undefined ? [] : [row.rpcId]))
     return pendingSubmissions.filter(submission => (
