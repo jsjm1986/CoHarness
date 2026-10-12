@@ -149,15 +149,15 @@ describe('menuReduce source-failed', () => {
   })
 })
 
-describe('menuReduce move', () => {
-  /** Two ready groups: command [goal, model], skill [commit]. */
-  function ready(): MenuState {
-    let s = open(['command', 'skill'])
-    s = menuReduce(s, { type: 'source-settled', generation: 1, source: 'command', items: [item('goal'), item('model')] })
-    s = menuReduce(s, { type: 'source-settled', generation: 1, source: 'skill', items: [item('commit')] })
-    return s
-  }
+/** Two ready groups: command [goal, model], skill [commit]. */
+function ready(): MenuState {
+  let s = open(['command', 'skill'])
+  s = menuReduce(s, { type: 'source-settled', generation: 1, source: 'command', items: [item('goal'), item('model')] })
+  s = menuReduce(s, { type: 'source-settled', generation: 1, source: 'skill', items: [item('commit')] })
+  return s
+}
 
+describe('menuReduce move', () => {
   it('cycles forward across groups and wraps', () => {
     let s = ready()
     s = menuReduce(s, { type: 'move', dir: 1 })
@@ -195,6 +195,33 @@ describe('menuReduce move', () => {
     let single = open(['command'])
     single = menuReduce(single, { type: 'source-settled', generation: 1, source: 'command', items: [item('goal')] })
     expect(menuReduce(single, { type: 'move', dir: 1 })).toBe(single)
+  })
+})
+
+describe('menuReduce hover', () => {
+  it('marks the highlight pointer-sourced so the view skips scrolling to it', () => {
+    let s = ready()
+    s = menuReduce(s, { type: 'hover', source: 'command', index: 1 })
+    expect(s.highlight).toEqual({ source: 'command', index: 1, viaPointer: true })
+    s = menuReduce(s, { type: 'hover', source: 'skill', index: 0 })
+    expect(s.highlight).toEqual({ source: 'skill', index: 0, viaPointer: true })
+  })
+
+  it('drops the pointer mark on the next move', () => {
+    let s = ready()
+    s = menuReduce(s, { type: 'hover', source: 'command', index: 1 })
+    s = menuReduce(s, { type: 'move', dir: 1 })
+    expect(s.highlight).toEqual({ source: 'skill', index: 0 })
+  })
+
+  it('is a no-op reference on a repeat hover, unknown index, unknown source, or closed menu', () => {
+    let s = ready()
+    s = menuReduce(s, { type: 'hover', source: 'command', index: 1 })
+    expect(menuReduce(s, { type: 'hover', source: 'command', index: 1 })).toBe(s)
+    expect(menuReduce(s, { type: 'hover', source: 'command', index: 9 })).toBe(s)
+    expect(menuReduce(s, { type: 'hover', source: 'ghost', index: 0 })).toBe(s)
+    const closed = menuReduce(s, { type: 'close' })
+    expect(menuReduce(closed, { type: 'hover', source: 'command', index: 0 })).toBe(closed)
   })
 })
 

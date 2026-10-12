@@ -187,6 +187,13 @@ describe('MenuView', () => {
     expect(scrollIntoView.mock.instances.at(-1)).toBe(options[1])
   })
 
+  it('does not scroll a pointer-set highlight: the row already sits under the cursor', () => {
+    const { menu } = mount(openState({ highlight: { source: 'command', index: 0, viaPointer: true } }))
+    expect(scrollIntoView).not.toHaveBeenCalled()
+    act(() => { menu.set(openState({ highlight: { source: 'command', index: 1, viaPointer: true } })) })
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+
   it('caps the list height at the design maximum when the composer sits low enough', () => {
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ bottom: 800 } as DOMRect)
     mount(openState())

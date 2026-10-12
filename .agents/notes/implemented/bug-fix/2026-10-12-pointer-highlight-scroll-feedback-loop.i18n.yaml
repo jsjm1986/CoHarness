@@ -6,17 +6,17 @@
   en: 1c436f4be0a5cf22
   zh: 15c34624852d7a99
 /agent-note-pointer-hover-must-not-drive-keep-visible-scrolling/problem:
-  en: 1a8f813c78f21727
-  zh: 9281d20d20c0a7c9
+  en: f12cbc27f3f0bf83
+  zh: 82741e173c3e0a66
 /agent-note-pointer-hover-must-not-drive-keep-visible-scrolling/decision:
-  en: 049ea8a7763e19e0
-  zh: 2dc501675bb3af32
+  en: f8627193d91c69ed
+  zh: a5e65bbf8400e97e
 /agent-note-pointer-hover-must-not-drive-keep-visible-scrolling/verification:
-  en: 50feb3f694d52f76
-  zh: fdb79d1c241e067b
+  en: 7534d569ec491ef2
+  zh: 04d1b4a69929b841
 /agent-note-pointer-hover-must-not-drive-keep-visible-scrolling/alternatives-considered:
   en: 8d683f8a8d1f7de8
   zh: cbdf7b5a043d086c
 /agent-note-pointer-hover-must-not-drive-keep-visible-scrolling/consequences:
-  en: f3075b560c2aba97
-  zh: 39489bb042108d65
+  en: 4635912eb62f67ff
+  zh: 6dfaa3b4a9b9cc3e
