@@ -897,7 +897,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-experimental-ptc-runtime-python`
 
-- `source`: [`packages/experimental/ptc-runtime-python/src/index.ts:42`](../packages/experimental/ptc-runtime-python/src/index.ts)
+- `inject`: `sandbox` · `sandboxPolicy`
+- `source`: [`packages/experimental/ptc-runtime-python/src/index.ts:45`](../packages/experimental/ptc-runtime-python/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: every cap, changeable from `cordis.yml` (no hardcoded tunables). */
@@ -2485,19 +2486,26 @@ export interface JsonRpcConfig {
 ## `@deepseek-ai/dsh-session-log-deepseek`
 
 - `inject`: `deepseekLlmApiExtensions` · `sessions`
-- `source`: [`packages/session/session-log-deepseek/src/index.ts:34`](../packages/session/session-log-deepseek/src/index.ts)
+- `refs`: `Volatile` (`@deepseek-ai/cordis`)
+- `source`: [`packages/session/session-log-deepseek/src/index.ts:35`](../packages/session/session-log-deepseek/src/index.ts)
 
 ```ts config-catalog
 /** Session-log request contribution configuration. */
 export interface Config {
   /** Contribute `dsh_session_log` to official DeepSeek requests. Defaults to `false`. */
-  enabled?: boolean
+  enabled: Volatile<boolean>
   /** Optional exact endpoint allowlist; an empty list preserves the adapter's configured endpoint. */
-  allowedEndpoints?: string[]
+  allowedEndpoints: string[]
   /** Environment key whose non-empty value disables new deliveries immediately. */
-  killSwitchEnv?: string
+  killSwitchEnv: string
   /** Emit metadata-only delivery audit records through the host logger. */
-  audit?: boolean
+  audit: boolean
+  /**
+   * Largest serialized `dsh_session_log` field, in UTF-8 bytes, that one request carries.
+   * A request uploads the longest pending event prefix that fits; later requests continue
+   * after its acceptance. Defaults to 8 MiB.
+   */
+  maxBytes: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-session-log-deepseek -->

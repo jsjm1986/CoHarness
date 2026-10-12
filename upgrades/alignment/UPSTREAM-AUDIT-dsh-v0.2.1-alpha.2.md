@@ -14,8 +14,9 @@
 | `0aed8de976d` | 请求扩展逐字段容错：provider prepare 失败只省略该字段并首次告警，仅取消整体拒绝；accept 失败经 `onExtensionsUnaccepted` 上报不致命 | `packages/llm/deepseek-llm-api-extensions`、`packages/llm/llm-deepseek` |
 | `7facb1cf65d` | 降级重放/省略路由/未接受路由警告按 route 去重 | `packages/llm/llm-deepseek/src/host.ts` |
 | `193f9ce4130` | `dsh_session_log` 加 `maxBytes`（默认 8 MiB），发送可装入的最长待传前缀，超限首事件省略并单次告警；接受记录与 envelope 携带 `sessionFormatVersion`，跨代际水位忽略 | `packages/session/session-log-deepseek`（保留 enabled:false 默认、allowedEndpoints、killSwitchEnv、audit 自有门禁） |
+| `11a0f85b340` | Python PTC 接入共享 `sandbox`/`sandboxPolicy`：`sandboxMode`、策略解析、`ConfinedArgv`、stdin 载入 bootstrap（取消逐次临时拷贝）、`AbortController` 结算 | `packages/experimental/ptc-runtime-python`；上游 `ptc-python-read-only` 夹具不携带（v4 codec + working-directory 段我们未接纳），`ptc-python-turn` expected schema 已重生成 |
 
-验证：`deepseek-llm-api-extensions` + `llm-deepseek` 17 测试、`session-log-deepseek` 34 测试全过，两包 typecheck 干净。决策记录：`.agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md`。
+验证：`deepseek-llm-api-extensions` + `llm-deepseek` 17 测试、`session-log-deepseek` 34 测试、`ptc-runtime-python` 325 测试全过；typecheck 干净；`ptc-python-turn` 快照回放通过。决策记录：`.agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md`、`2026-10-12-python-ptc-shared-sandbox-policy.md`。
 
 ## 待修缺口（按严重度，源码复核确认）
 
@@ -27,7 +28,6 @@
 | spill 路径在 `openSync` 成功前发布，失败时 `discardSpill` 可能删除非本进程创建路径；`onFailure` 未隔离 | `packages/subprocess/subprocess-local/src/output.ts:181-195` | `cafb9b93b4b` |
 | V3→V4 迁移校验静默放行损坏会话 JSONL | `packages/session/session-format-v3-to-v4/src/migration.ts` | `ad83cce36ac`（谱系裁决项） |
 | telemetry 关闭不取消在途 export，`Promise.race` 超时后 transport 仍挂 | `packages/session/session-telemetry-otel/src/index.ts:283-297` | 上游补丁形态不同，需自研 abortable transport |
-| Python PTC 不套文件 sandbox policy | `packages/ptc/ptc-runtime-python/src/index.ts:1038` 附近 | 上游共享 policy |
 
 ### P2 — 用户可感知（按根因族）
 
