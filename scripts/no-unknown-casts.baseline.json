@@ -1376,8 +1376,7 @@
   },
   "packages/experimental/client-ui-agent-team/tests/browser-plugin.client.spec.ts": {
     "22baf2573ca146a7904b9ffc8b34a43692c4e042f01f43016d85443828bc88b1": 1,
-    "87ef7d60538b938bd8b5748cf4c0a5956ecedb860826c57d9ec789daea2f0355": 5,
-    "f1958372d07fa49fe88e9a25dd46b28fbf771fc4a15f8fbb7612745132757eaa": 1
+    "87ef7d60538b938bd8b5748cf4c0a5956ecedb860826c57d9ec789daea2f0355": 4
   },
   "packages/experimental/client-ui-agent-team/tests/team-action.client.spec.tsx": {
     "032fa1f91833ea216b76d2724f073741e70ad3eafebe4fbfcb166b950618e415": 1

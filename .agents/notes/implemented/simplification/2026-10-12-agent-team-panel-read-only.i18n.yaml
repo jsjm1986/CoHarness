@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-12-agent-team-panel-read-only.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-10-12-agent-team-panel-read-only.md
+/agent-note-agent-team-panel-stays-read-only:
+  en: dbfebb5ce7fd4209
+  zh: 026f4ed047160c82
+/agent-note-agent-team-panel-stays-read-only/problem:
+  en: da7079f9aaa023c7
+  zh: 7c8c7dfeec650eaa
+/agent-note-agent-team-panel-stays-read-only/decision:
+  en: d25f647f85ff7b91
+  zh: a569ef647993df9a
+/agent-note-agent-team-panel-stays-read-only/alternatives-considered:
+  en: 8ce9eca26785bd69
+  zh: 38d0ebad8fdd9e41
+/agent-note-agent-team-panel-stays-read-only/consequences:
+  en: d95ba7a3e823d10a
+  zh: 31735039e43c04cd
