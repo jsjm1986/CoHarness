@@ -99,6 +99,8 @@ export function ModelSelect(
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const searchRef = useRef<HTMLInputElement | null>(null)
   const groupsRef = useRef<HTMLDivElement | null>(null)
+  /** Set by row pointer hover so the keep-visible scroll can skip pointer-driven highlights. */
+  const pointerHighlight = useRef(false)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const paneFocus = useRef<'drill' | 'model' | 'effort' | null>(null)
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null)
@@ -241,8 +243,13 @@ export function ModelSelect(
     return observeStickyMenuGroups(viewport)
   }, [available, open, pane, filteredGroups, presentation])
 
+  // Keyboard and programmatic highlights keep the row visible by scrolling;
+  // pointer hovers already sit under the cursor — scrolling them shifts rows
+  // beneath the pointer, which re-fires hover and loops the correction.
   useLayoutEffect(() => {
-    if (open && pane === 'model' && activeModelIndex >= 0) {
+    const viaPointer = pointerHighlight.current
+    pointerHighlight.current = false
+    if (open && pane === 'model' && activeModelIndex >= 0 && !viaPointer) {
       liveItems()[activeModelIndex]?.scrollIntoView({ block: 'nearest' })
     }
   }, [open, pane, activeModelIndex, visibleModels])
@@ -545,8 +552,9 @@ export function ModelSelect(
                       css.option, css.modelOption, selected && css.selected, index === activeModelIndex && css.optionActive,
                     )}
                     onMouseMove={busy || index === activeModelIndex ? undefined : () => {
+                      pointerHighlight.current = true
                       if (showSearch) setHighlightedIndex(index)
-                      else itemRefs.current[index]?.focus()
+                      else itemRefs.current[index]?.focus({ preventScroll: true })
                     }}
                     key={model.id}
                     title={model.name}

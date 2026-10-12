@@ -61,11 +61,14 @@ export function PopupSelectView({ popup, t }: PopupSelectViewProps) {
   const active = state.open ? state.active : null
 
   // The search input keeps focus while arrows move a virtual highlight, so
-  // the browser never scrolls the active row into view — do it here.
+  // the browser never scrolls the active row into view — do it here. Pointer
+  // hovers opt out through state.activeViaPointer: the hovered row already
+  // sits under the cursor, and scrolling it fully visible shifts rows beneath
+  // the pointer, which re-fires hover and loops the correction.
   useEffect(() => {
-    if (active === null) return
+    if (active === null || state.activeViaPointer) return
     cardRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
-  }, [active, rows, state.confirming])
+  }, [active, rows, state.confirming, state.activeViaPointer])
 
   // Focus ownership: the search input grabs on open, and ANY outside
   // pointer interaction dismisses —
