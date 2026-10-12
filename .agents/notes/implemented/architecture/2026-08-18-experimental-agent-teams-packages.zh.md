@@ -16,7 +16,7 @@ Agent Teams 的服务与工具约定仍在变化，但它需要使用真实 Sess
 
 同一个顶层检查会拒绝发布包、发布 app 或 Python runtime 通过 `dependencies`、`optionalDependencies` 或 `peerDependencies` 依赖实验性包。实验性包可以依赖发布包和其他实验性包；测试可以通过 `devDependencies` 使用它们，示例可以显式加载它们。
 
-`packages/experimental/agent-team-profile` 以可选 cordis patch 层组合宿主侧接缝，`packages/experimental/agent-team-web-profile` 增补浏览器层，`packages/experimental/client-ui-agent-team` 承载 Web UI。该 UI 包仅在宿主 Team 服务存在时挂载团队视图，通过 sessions 服务而非 workspace 浏览器打开队友会话，并经授权的 Typert 面调用 `agentTeams/*` 远端方法。
+`packages/experimental/agent-team-profile` 以可选 cordis patch 层组合宿主侧接缝，`packages/experimental/agent-team-web-profile` 增补浏览器层，`packages/experimental/client-ui-agent-team` 承载 Web UI。该 UI 包仅在宿主 Team 服务存在时挂载团队视图，通过 sessions 服务而非 workspace 浏览器打开队友会话，并经授权的 Typert 面通过 `agentTeams/view` 读取 Team 状态；只读面板决策见 [Agent Team 面板保持只读](../simplification/2026-10-12-agent-team-panel-read-only.zh.md)。
 
 通用的调用方预留 continuable child 身份和精确 direct-child drain 仍属于稳定 Subagent 服务。它们负责 Subagent 身份与 Activation 生命周期，不 import 或命名 Agent Teams；实验性 Team 服务沿允许的方向消费这些能力。
 

@@ -13,9 +13,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
-import {
-  TeamAction, type TeamActionInjected, type TeamActionResult, type TeamTaskActionResult,
-} from './TeamAction.tsx'
+import { TeamAction, type TeamActionInjected, type TeamActionResult } from './TeamAction.tsx'
 import { en, NS, zh, type TeamKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -40,19 +38,12 @@ function registerUi(ctx: ClientContext): void {
     async load(sessionId): Promise<TeamActionResult<TeamView>> {
       return await ctx.remote.agentTeams.view(leadSessionId(sessionId))
     },
-    async createTask(sessionId, input): Promise<TeamTaskActionResult> {
-      return await ctx.remote.agentTeams.createTask(leadSessionId(sessionId), input)
-    },
-    async updateTask(sessionId, input) {
-      const { owner, ...rest } = input
-      return await ctx.remote.agentTeams.updateTask(leadSessionId(sessionId), {
-        ...rest,
-        ...owner === undefined ? {} : { owner },
-      })
-    },
     async openTeammate(sessionId: SessionId, member: TeamRosterMember): Promise<void> {
-      if (member.role !== 'teammate') return
       const parentSessionId = leadSessionId(sessionId)
+      if (member.role !== 'teammate') {
+        sessions.open(parentSessionId)
+        return
+      }
       await sessions.refreshSubagents(parentSessionId)
       // The refresh is asynchronous: skip navigation when the user has already
       // moved to another session view while it was in flight.
