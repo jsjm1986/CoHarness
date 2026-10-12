@@ -273,6 +273,12 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     const timingTooltip = page.getByRole('tooltip')
     await timingTooltip.waitFor({ timeout: 5_000 })
     await expect.poll(() => timingTooltip.textContent(), { timeout: 5_000 }).toMatch(/TTFT .* Decoding/)
+    // The entrance's backwards-fill delay keeps the bubble transparent — and
+    // out of the aria tree — for a beat after mount.
+    await expect.poll(
+      () => timingTooltip.evaluate(el => +getComputedStyle(el).opacity),
+      { timeout: 5_000 },
+    ).toBe(1)
     const assistantTimingStyle = await assistantSpan.evaluate(node => ({
       background: getComputedStyle(node).backgroundImage,
       ttft: getComputedStyle(node).getPropertyValue('--trajectory-assistant-ttft'),

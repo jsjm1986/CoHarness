@@ -131,6 +131,13 @@ describe('web e2e: assistant IconActions wait for the turn to end', () => {
     await expect.poll(() => copyButtons.count(), { timeout: 10_000 }).toBe(1)
     expect(await page.getByRole('button', { name: 'Branch into a new conversation' }).count()).toBe(0)
     await copyButtons.first().focus()
+    // The tooltip bubble mounts on focus but its entrance carries a backwards
+    // fill delay, so it stays transparent — and out of the aria snapshot —
+    // until that pause ends.
+    await expect.poll(
+      () => page.getByRole('tooltip', { name: 'Copy' }).evaluate(el => +getComputedStyle(el).opacity),
+      { timeout: 5_000 },
+    ).toBe(1)
     // The shipped composition mounts no preset skills, so the request carries
     // no skill-catalog source at all — an ambient host root must not leak in.
     expect(sessionEvents.filter(event => event.type === 'user/message'
