@@ -1235,9 +1235,6 @@ importers:
 
   packages/api/gateway:
     dependencies:
-      '@deepseek-ai/dsh-fs':
-        specifier: workspace:*
-        version: link:../../fs/fs
       mime-types:
         specifier: ^3.0.2
         version: 3.0.2
@@ -1251,6 +1248,9 @@ importers:
       '@deepseek-ai/dsh-client-connection':
         specifier: workspace:*
         version: link:../../client/connection
+      '@deepseek-ai/dsh-fs':
+        specifier: workspace:*
+        version: link:../../fs/fs
       '@deepseek-ai/dsh-fs-local':
         specifier: workspace:*
         version: link:../../fs/fs-local
