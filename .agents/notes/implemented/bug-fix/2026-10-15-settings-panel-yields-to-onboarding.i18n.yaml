@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-15-settings-panel-yields-to-onboarding.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-settings-panel-yields-to-onboarding.md
+/agent-note-settings-panel-closes-when-an-onboarding-step-appears:
+  en: 9e1fa530bde83914
+  zh: c8c751bfddf9ede3
+/agent-note-settings-panel-closes-when-an-onboarding-step-appears/problem:
+  en: 7bc0d0151c4b36e5
+  zh: 9b0cfb08ec3a7adf
+/agent-note-settings-panel-closes-when-an-onboarding-step-appears/decision:
+  en: 9aa08f033b4c5b4d
+  zh: 5e6c2aa91112f8ea
+/agent-note-settings-panel-closes-when-an-onboarding-step-appears/alternatives-considered:
+  en: 953358b58e5f5525
+  zh: 3e345d4d9669784b
+/agent-note-settings-panel-closes-when-an-onboarding-step-appears/consequences:
+  en: e0a2a2eec0b8eec6
+  zh: 12b5b37e742c4a46
+/agent-note-settings-panel-closes-when-an-onboarding-step-appears/verification:
+  en: fa6e66ec245a1071
+  zh: 7fbabed7855855c7
+/agent-note-settings-panel-closes-when-an-onboarding-step-appears/related:
+  en: 4765f6a5eadaa1f5
+  zh: ad9f998ecce81ff2

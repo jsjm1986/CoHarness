@@ -53,7 +53,8 @@ function mount({
       return SEAT_CONTENT[key]
     }) as SettingsRootComponentProps['renderSlot'],
   )
-  const useSessions = ((select: (state: unknown) => unknown) => select(onboardingActive
+  let onboarding = onboardingActive
+  const useSessions = ((select: (state: unknown) => unknown) => select(onboarding
     ? { phase: 'ready', current: undefined, byId: {} }
     : {
       phase: 'ready',
@@ -105,7 +106,14 @@ function mount({
       for (const listener of [...connectionListeners]) listener()
     })
   }
-  return { view, renderSlot, bump, listeners, reconnect, setConnectionState }
+  /** Turn the mounted Session blank, which is what makes an onboarding step appear. */
+  const setOnboardingActive = (next: boolean) => {
+    act(() => {
+      onboarding = next
+      view.rerender(<SettingsRoot {...props} />)
+    })
+  }
+  return { view, renderSlot, bump, listeners, reconnect, setConnectionState, setOnboardingActive }
 }
 
 function openPanel() {
@@ -185,6 +193,16 @@ describe('SettingsPanel close paths', () => {
     openPanel()
     const dialog = screen.getByRole('dialog')
     fireEvent.click(dialog.parentElement!.firstElementChild!)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('takes the panel down when an onboarding step appears beneath it', () => {
+    const { setOnboardingActive } = mount({ onboardingActive: false })
+    openPanel()
+    expect(screen.getByRole('dialog')).toBeDefined()
+
+    // The step's overlay marks only #root inert, and the panel is portalled beside it.
+    setOnboardingActive(true)
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
