@@ -10,7 +10,7 @@ import { commandDefinition } from '../src/client/conversation-nodes/command.ts'
 import { compactionDefinition } from '../src/client/conversation-nodes/compaction.ts'
 import { unknownFallbackDefinition } from '../src/client/conversation-nodes/fallback.ts'
 import { nextStepInboxDefinition } from '../src/client/conversation-nodes/inbox.ts'
-import { messageDefinition } from '../src/client/conversation-nodes/message.ts'
+import { developerMessageDefinition, messageDefinition } from '../src/client/conversation-nodes/message.ts'
 import { retryDefinition } from '../src/client/conversation-nodes/retry.ts'
 import { systemPromptDefinition } from '../src/client/conversation-nodes/system-prompt.ts'
 import { toolDefinition } from '../src/client/conversation-nodes/tool.ts'
@@ -25,6 +25,7 @@ import type {
 const DEFINITIONS: readonly ConversationNodeDefinition[] = [
   nextStepInboxDefinition,
   messageDefinition,
+  developerMessageDefinition,
   assistantDefinition,
   toolDefinition,
   commandDefinition,
@@ -1321,6 +1322,58 @@ describe('built-in conversation node Definitions', () => {
     expect((manual?.data as ManualCompactionChatData)).toMatchObject({
       command: { commandId: 'command-1', name: 'compact', outcome: { kind: 'success' } },
       compaction: { summary: 'manual summary', summaryEventSeq: 20 },
+    })
+  })
+})
+
+describe('developer message presentation', () => {
+  it.each(['replay', 'live', 'prepend'] as const)('presents developer tool changes as a context node (%s)', (mode) => {
+    const entries = [
+      at(0, 'request/header', { reason: 'initial', header: {
+        config: { provider: 'test', model: 'test' },
+        tools: ['search', 'read_file'].map(name => ({ name, description: '', parameters: {} })),
+      } }),
+      at(1, 'user/message', {
+        ...textMessage('context', 'workspace context'),
+        source: { kind: 'context' },
+      }, { surfaceOp: 'append' }),
+      at(2, 'developer/message', { turn: 1, step: 1, message: {
+        id: 'developer', role: 'developer', source: { kind: 'tool-registry' },
+        content: [{ type: 'tool-addition', toolName: 'search' }, { type: 'tool-removal', toolName: 'old_search' }],
+      } }, { surfaceOp: 'append' }),
+      at(3, 'request/header', { reason: 'change', header: { config: { provider: 'test', model: 'test' }, tools: [] } }),
+    ]
+    const value = assembler(mode === 'replay' ? entries : [])
+    if (mode === 'live') {
+      for (const entry of entries) {
+        value.append(entry)
+        value.flush()
+      }
+    } else if (mode === 'prepend') {
+      value.replaceWindow(entries.slice(2), true)
+      value.prepend(entries.slice(0, 2), false)
+      value.flush()
+    }
+    const current = snapshot(value)
+    const developer = current.order.map(key => current.nodes.get(key))
+      .find(candidate => candidate?.kind === 'context'
+        && (candidate.data as { content: readonly { type: string }[] })
+          .content.some(block => block.type === 'tool-addition'))
+    expect(developer?.data).toMatchObject({
+      kind: 'context',
+      content: [{ type: 'tool-addition', toolName: 'search' }, { type: 'tool-removal', toolName: 'old_search' }],
+    })
+  })
+
+  it('preserves tool removals without a loaded header', () => {
+    const value = assembler([at(1, 'developer/message', { turn: 1, step: 1, message: {
+      id: 'developer', role: 'developer', source: { kind: 'tool-registry' },
+      content: [{ type: 'tool-removal', toolName: 'old_search' }],
+    } }, { surfaceOp: 'append' })])
+    const removed = node(snapshot(value), 'context')
+    expect(removed?.data).toMatchObject({
+      kind: 'context',
+      content: [{ type: 'tool-removal', toolName: 'old_search' }],
     })
   })
 })

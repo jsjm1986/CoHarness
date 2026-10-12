@@ -2155,3 +2155,8 @@
     animation: none;
   }
 }
+
+.toolUpdatePayload {
+  white-space: pre;
+  overflow-x: auto;
+}

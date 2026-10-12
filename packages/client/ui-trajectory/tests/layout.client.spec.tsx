@@ -15,7 +15,7 @@ import {
   appendTrajectoryPartialLayout as appendTrajectoryPartialLayoutWithLocale,
   deriveTrajectoryLayout as deriveTrajectoryLayoutWithLocale,
 } from '../src/client/layout.ts'
-import { t } from './locale.client.ts'
+import { t, tZh } from './locale.client.ts'
 
 const deriveTrajectoryLayout = (
   input: Parameters<typeof deriveTrajectoryLayoutWithLocale>[0],
@@ -515,6 +515,33 @@ describe('deriveTrajectoryLayout', () => {
     const message = turns[0]?.groups.flatMap(group => group.cells)
       .find(cell => cell.kind === 'message')
     expect(message).toMatchObject({ startedAt: 3_000, timeSeconds: 1 })
+  })
+
+  it.each(['tool-addition', 'tool-removal'] as const)('names a single %s without detail content', (type) => {
+    const nodes = [{
+      kind: 'context', seq: 1, time: 1_000,
+      content: [{ type, toolName: 'search' }], source: 'tool-registry',
+      producer: { role: 'inject', label: 'tool-registry' }, form: null,
+    }] as unknown as ConversationSnapshot['nodes']
+    const cells = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
+      .flatMap(turn => turn.groups.flatMap(group => group.cells))
+    expect(cells[0]?.text).toBe(type === 'tool-addition' ? 'Tool added: search' : 'Tool removed: search')
+    expect(cells[0]?.inputDetail).toBeUndefined()
+  })
+
+  it.each([
+    [t, 'Tools updated · 2 added, 1 removed', 'Added: search, read_file\nRemoved: old_search'],
+    [tZh, '工具已更新 · 新增 2 个，移除 1 个', '新增：search, read_file\n移除：old_search'],
+  ] as const)('keeps tool update details on two literal lines', (translate, text, inputDetail) => {
+    const nodes = [{
+      kind: 'context', seq: 1, time: 1_000,
+      content: [{ type: 'tool-addition', toolName: 'search' }, { type: 'tool-addition', toolName: 'read_file' }, { type: 'tool-removal', toolName: 'old_search' }],
+      source: 'tool-registry', producer: { role: 'inject', label: 'tool-registry' }, form: null,
+    }] as unknown as ConversationSnapshot['nodes']
+    const turns = deriveTrajectoryLayoutWithLocale({ nodes, partial: null, runningCalls: [] }, translate)
+    const cells = turns.flatMap(turn => turn.groups.flatMap(group => group.cells))
+    expect(cells).toMatchObject([{ text, inputDetail }])
+    expect(cells[0]?.sourceBlocks).toHaveLength(3)
   })
 })
 
