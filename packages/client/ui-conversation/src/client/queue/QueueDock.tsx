@@ -199,7 +199,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                   {editing?.id === row.id
                     ? (
                       <>
-                        <Tooltip label={t('queue.save')} side="bottom" delayMs={500}>
+                        <Tooltip portal label={t('queue.save')} side="bottom" delayMs={500}>
                           <button
                             type="button"
                             className={css.action}
@@ -210,7 +210,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                             <IconCheckOutline16 size={14} />
                           </button>
                         </Tooltip>
-                        <Tooltip label={t('queue.cancelEdit')} side="bottom" delayMs={500}>
+                        <Tooltip portal label={t('queue.cancelEdit')} side="bottom" delayMs={500}>
                           <button
                             type="button"
                             className={css.action}
@@ -225,7 +225,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                     )
                     : (
                       <>
-                        <Tooltip label={t('queue.edit')} side="bottom" delayMs={500} disabled={row.text === null}>
+                        <Tooltip portal label={t('queue.edit')} side="bottom" delayMs={500} disabled={row.text === null}>
                           <button
                             type="button"
                             className={css.action}
@@ -241,7 +241,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                             <IconEditOutline16 size={14} />
                           </button>
                         </Tooltip>
-                        <Tooltip label={t('queue.remove')} side="bottom" delayMs={500}>
+                        <Tooltip portal label={t('queue.remove')} side="bottom" delayMs={500}>
                           <button
                             type="button"
                             className={css.action}
@@ -258,7 +258,7 @@ export function QueueDock({ useSession, updateQueue, notify, loadImage, t }: Que
                             <IconTrashOutline16 size={14} />
                           </button>
                         </Tooltip>
-                        <Tooltip label={t('queue.steer')} side="bottom" delayMs={500} disabled={!running}>
+                        <Tooltip portal label={t('queue.steer')} side="bottom" delayMs={500} disabled={!running}>
                           <button
                             type="button"
                             className={css.action}

@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-15-composer-stack-tooltip-portals.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-composer-stack-tooltip-portals.md
+/agent-note-composer-stack-dock-tooltips-portal-out-of-their-stacking-context:
+  en: e70c9349e1f60a5c
+  zh: 2d07e85985509f5e
+/agent-note-composer-stack-dock-tooltips-portal-out-of-their-stacking-context/problem:
+  en: 2f47ed94d3348b2e
+  zh: c2ca5abfbea352d1
+/agent-note-composer-stack-dock-tooltips-portal-out-of-their-stacking-context/decision:
+  en: 479961419b8c9c1e
+  zh: baa20b086e456ca0
+/agent-note-composer-stack-dock-tooltips-portal-out-of-their-stacking-context/alternatives-considered:
+  en: 139b9c6f84a909ad
+  zh: e11a34d5e068492b
+/agent-note-composer-stack-dock-tooltips-portal-out-of-their-stacking-context/consequences:
+  en: 98f7df22c67853e0
+  zh: 79e07a43f1d62b2b
+/agent-note-composer-stack-dock-tooltips-portal-out-of-their-stacking-context/verification:
+  en: e5bcec933a39ecf5
+  zh: 99a515ca7324046d
+/agent-note-composer-stack-dock-tooltips-portal-out-of-their-stacking-context/related:
+  en: 80ccc7707c146276
+  zh: 184a083b3500b3f5

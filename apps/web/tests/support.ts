@@ -3,7 +3,8 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Browser, Page } from 'playwright'
+import type { Browser, Locator, Page } from 'playwright'
+import { expect } from 'vitest'
 
 /** The built page under test; `pnpm run test:web` rebuilds it before running. */
 export const DIST_INDEX = fileURLToPath(new URL('../dist/index.html', import.meta.url))
@@ -134,6 +135,28 @@ export async function saveFailureDom(page: Page, name: string): Promise<void> {
   } catch {
     // Best-effort evidence: a dead page/browser at failure time must not mask the real assertion error.
   }
+}
+
+/**
+ * Assert a visible tooltip paints above the element a user would read through
+ * it: both probes must land inside the bubble's subtree. The bubble ignores
+ * pointer events by design, so the measurement enables them for its own duration.
+ * @param tooltip - locator for the visible `[role="tooltip"]` bubble.
+ */
+export async function expectTooltipOnTop(tooltip: Locator): Promise<void> {
+  expect(await tooltip.evaluate((element) => {
+    const bubble = element as HTMLElement
+    const rect = bubble.getBoundingClientRect()
+    const previous = bubble.style.pointerEvents
+    bubble.style.pointerEvents = 'auto'
+    const hitsBubble = (y: number): boolean => {
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, y)
+      return hit !== null && (hit === bubble || bubble.contains(hit))
+    }
+    const onTop = hitsBubble(rect.top + rect.height / 2) && hitsBubble(rect.bottom - 1)
+    bubble.style.pointerEvents = previous
+    return onTop
+  })).toBe(true)
 }
 
 /**
