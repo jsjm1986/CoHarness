@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-12-gateway-proxy-error-listeners.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-gateway-proxy-error-listeners.md
+/agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing:
+  en: 5003e66bf0c80da5
+  zh: 4fe87b34957b798e
+/agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing/problem:
+  en: 49ad49bf506c2354
+  zh: 662f36c62ea36b4e
+/agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing/decision:
+  en: b92e8775d20f0c05
+  zh: 3d183b9ba31b20fb
+/agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing/alternatives-considered:
+  en: 9b4c6e6c8028eddd
+  zh: a68a82afc5ec39c6
+/agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing/consequences:
+  en: 3e516989c3e080ef
+  zh: d3ca71afb6ba075e
+/agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing/verification:
+  en: d3b929594b39827a
+  zh: a02abd9cefefd515
+/agent-note-gateway-proxy-absorbs-library-level-error-events-instead-of-crashing/related:
+  en: 6065d396378e1d4f
+  zh: e2c17d9944521122
