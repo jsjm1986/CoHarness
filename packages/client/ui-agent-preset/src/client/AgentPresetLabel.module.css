@@ -9,7 +9,7 @@
   height: 16px;
   max-width: 160px;
   padding-left: 11px;
-  border-left: 1px solid var(--dsw-alias-border-l2);
+  border-left: 0.5px solid var(--dsw-alias-border-l2);
   font-size: 12px;
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary);
