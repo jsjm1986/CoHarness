@@ -161,30 +161,30 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     await input.fill('@')
     await expect.poll(() => menu.getByRole('option').count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(2)
     const snapshot = (await captureStableAria(page, '[role="listbox"]', scaffold.workspaceCwd))
-      // Session option labels carry the rows' live creation timestamps.
-      .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, '{{timestamp}}')
+      // Session option descriptions carry the rows' live relative age.
+      .replace(/ (?:now|\d+min|\d+h|\d+d|\d+mo|\d+y)(?=\\?"|\n|$)/g, ' {{age}}')
     await compareOrRefreshGolden(MENU_EXPECTED, snapshot, MODE)
     expect(snapshot).toContain('Files & folders')
-    expect(snapshot).toContain('Session conversations')
+    expect(snapshot).toContain('Sessions')
     expect(snapshot).not.toContain('text: reference Files & folders')
-    expect(snapshot).toContain('File \u00b7 reference.txt')
+    expect(snapshot).toContain('reference.txt')
     // A seed reaches disk as a log alone, and the Host labels a session from
     // its projections: no checkpoint until the session is opened once, so the
     // row is its id. The fixture's own title (`Research notes`) is unreachable
     // here by construction; the recall test below exercises the titled path.
-    expect(snapshot).toContain(`Session \u00b7 ${SOURCE_SESSION_ID}`)
+    expect(snapshot).toContain(SOURCE_SESSION_ID)
     expect(snapshot).not.toContain('Research notes')
     expect(snapshot).not.toContain('text: Subagents')
 
     await input.fill('@reference')
-    await menu.getByRole('option', { name: /File \u00b7 reference\.txt/ }).click()
+    await menu.getByRole('option', { name: /reference\.txt/ }).click()
     const fileReference = page.locator('[data-reference-appearance="file"]')
     await expect.poll(() => fileReference.textContent()).toBe('@reference.txt')
     await expect.poll(() => fileReference.locator('svg').count()).toBe(1)
     await expect.poll(() => input.inputValue()).toBe('@reference.txt ')
 
     await input.fill('@reference-source')
-    await menu.getByRole('option', { name: new RegExp(`Session \\u00b7 ${SOURCE_SESSION_ID}`) }).click()
+    await menu.getByRole('option', { name: new RegExp(SOURCE_SESSION_ID) }).click()
     const sessionReference = page.locator('[data-reference-appearance="session"]')
     await expect.poll(() => sessionReference.textContent()).toBe(`@${SOURCE_SESSION_ID}`)
     await expect.poll(() => sessionReference.locator('svg').count()).toBe(1)

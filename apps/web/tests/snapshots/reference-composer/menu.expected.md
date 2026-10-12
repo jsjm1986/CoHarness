@@ -1,6 +1,6 @@
 - listbox "Trigger suggestions":
   - text: Files & folders
-  - option "File · reference.txt reference.txt" [selected]
-  - text: Session conversations
-  - "option \"Session · reference-order-target-session {{cwd}} · {{timestamp}}\""
-  - "option \"Session · reference-source-session {{cwd}} · {{timestamp}}\""
+  - option "reference.txt" [selected]
+  - text: Sessions
+  - "option \"reference-order-target-session {{cwd}} · {{age}}\""
+  - "option \"reference-source-session {{cwd}} · {{age}}\""

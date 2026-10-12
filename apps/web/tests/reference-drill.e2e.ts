@@ -45,7 +45,7 @@ describe.skipIf(MODE === 'record')('web e2e: @ directory drill and breadcrumb', 
     const input = page.locator('textarea').first()
     const menu = page.getByRole('listbox', { name: 'Trigger suggestions' })
     await input.fill('@')
-    const folder = menu.getByRole('option', { name: /Folder · src\// })
+    const folder = menu.getByRole('option', { name: /src\// })
     await folder.waitFor({ timeout: 15_000 })
     await folder.hover()
     await input.press('Tab')
