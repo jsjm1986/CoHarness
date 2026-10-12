@@ -42,6 +42,7 @@ const server = http.createServer((req, res) => {
     return
   }
   if (req.url === '/api/hold') { res.writeHead(200); res.write('authorized-prefix'); return }
+  if (req.url === '/api/hang-headers') { res.writeHead(200, { 'content-type': 'application/json' }); res.write('{"partial":'); return }
   if (req.url === '/api/sse') {
     res.writeHead(200, { 'content-type': 'text/event-stream' })
     res.write('data: open\\n\\n')
@@ -314,6 +315,48 @@ describe('proxy handlers', () => {
     expect(response.status).toBe(200)
     const body = await response.text()
     expect(body).toBe('data: open\n\ndata: tick\n\n')
+  })
+
+  it('survives an upstream reset that lands mid-response', async () => {
+    const { deps, base, cookie, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    cleanup.push(() => spy.mockRestore())
+    const port = await deps.instances.portOf(alice.id)
+    // Headers have flushed, so the fetch resolves while the body stays open;
+    // killing the runtime then errors the in-flight upstream response stream,
+    // which used to crash the gateway with an unhandled 'error' event.
+    const response = await fetch(`${base}/api/hang-headers`, { headers: { cookie } })
+    expect(response.status).toBe(200)
+    await fetch(`http://127.0.0.1:${port}/exit`, { signal: AbortSignal.timeout(5000) })
+    await vi.waitFor(() => {
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('proxy response stream error'))
+    }, { timeout: 5000 })
+    await response.body?.cancel().catch(() => {})
+    // An unauthenticated request never reaches instance admission, so a fast
+    // 401 proves the gateway itself is still serving after the upstream reset.
+    const probe = await fetch(`${base}/api/echo`, { signal: AbortSignal.timeout(5000) })
+    expect(probe.status).toBe(401)
+  })
+
+  it('absorbs a reset on an upgraded WebSocket connection', async () => {
+    const { deps, base, cookie, alice } = await setup(true)
+    await deps.instances.ensureRunning(alice)
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    cleanup.push(() => spy.mockRestore())
+    const ws = new WebSocket(`${base.replace('http', 'ws')}/api/events.mux`, { headers: { cookie, origin: base } })
+    cleanup.push(() => ws.terminate())
+    await once(ws, 'message', { signal: AbortSignal.timeout(5000) })
+    // A TCP reset on the client surface raises 'error' on the gateway-side
+    // socket, which http-proxy-3 forwards as an unconditional server-level
+    // 'error' event — unhandled, it used to crash the gateway process.
+    const socket = (ws as WebSocket & { _socket?: Socket })._socket
+    socket?.resetAndDestroy()
+    await vi.waitFor(() => {
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('proxy upstream error'))
+    }, { timeout: 5000 })
+    const probe = await fetch(`${base}/api/echo`, { signal: AbortSignal.timeout(5000) })
+    expect(probe.status).toBe(401)
   })
 
   it('logs the request path when a client disconnects before the response completes', async () => {

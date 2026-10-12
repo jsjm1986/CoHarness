@@ -1,4 +1,4 @@
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import { ServerResponse, type IncomingMessage } from 'node:http'
 import { dirname } from 'node:path'
 import { isIP } from 'node:net'
 import type { Duplex } from 'node:stream'
@@ -100,6 +100,24 @@ export function createProxyHandlers(
     // persists on keep-alive connections and kills any stream that pauses.
     proxyTimeout: cfg.upstreamTimeoutMs,
   })
+  // http-proxy-3 emits a server-level 'error' for failures outside the
+  // per-request callback — notably any 'error' on the client socket of an
+  // upgraded WebSocket — and rethrows it when the application adds no
+  // listener, taking the whole gateway down. Absorb it here: the per-request
+  // callback already answers what it can; this listener owns the rest.
+  server.on('error', (error: unknown, req: IncomingMessage | undefined, resOrSocket: ServerResponse | Duplex | undefined) => {
+    const code = (error as { code?: unknown })?.code
+    console.error(`[gateway] proxy upstream error${typeof code === 'string' ? ` (${code})` : ''}: ${req?.method ?? ''} ${req?.url ?? ''}`)
+    if (resOrSocket === undefined || resOrSocket === null) return
+    if (resOrSocket instanceof ServerResponse) {
+      if (!resOrSocket.destroyed && !resOrSocket.headersSent) {
+        resOrSocket.writeHead(502, { 'content-type': 'application/json' })
+        resOrSocket.end(JSON.stringify({ error: { code: 'INSTANCE_UNREACHABLE', message: 'The runtime is unavailable. Retry shortly.' } }))
+      } else if (!resOrSocket.destroyed && !resOrSocket.writableEnded) resOrSocket.end()
+      return
+    }
+    resOrSocket.destroy()
+  })
   const active = new Set<{ context: GatewayRequestContext; cancel(): void }>()
   const invalidateAccess: GatewayAccessInvalidation = (subject) => {
     for (const operation of [...active]) {
@@ -137,7 +155,7 @@ export function createProxyHandlers(
     await deps.accessMonitor?.synchronize()
     return true
   }
-  server.on('proxyRes', (proxyResponse) => {
+  server.on('proxyRes', (proxyResponse, req, res) => {
     const location = proxyResponse.headers.location
     if (typeof location === 'string') {
       const rewritten = publicLocation(location)
@@ -147,6 +165,14 @@ export function createProxyHandlers(
     if (mediaType !== undefined && STREAMING_MEDIA_TYPES.has(mediaType)) {
       proxyResponse.socket.setTimeout(0)
     }
+    // http-proxy-3 pipes proxyRes without an error listener, so an upstream
+    // reset mid-body (e.g. the runtime dying, or our own proxyReq.destroy on
+    // client disconnect) would escape as an uncaught stream error.
+    proxyResponse.once('error', (error) => {
+      const code = (error as { code?: unknown })?.code
+      console.error(`[gateway] proxy response stream error${typeof code === 'string' ? ` (${code})` : ''}: ${req.method} ${req.url}`)
+      if (!res.destroyed && !res.writableEnded) res.end()
+    })
   })
 
   // Grants handoff is intrinsic to starting an instance: the manager calls this
@@ -359,7 +385,7 @@ export function createProxyHandlers(
         })
         try {
           server.web(req, res, targetOptions(ready.port, principal), () => {
-            if (!res.headersSent) {
+            if (!res.destroyed && !res.headersSent) {
               res.writeHead(502, { 'content-type': 'application/json' })
               res.end(JSON.stringify({
                 error: { code: 'INSTANCE_UNREACHABLE', message: 'The runtime is unavailable. Retry shortly.' },
