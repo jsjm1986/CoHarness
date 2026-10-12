@@ -1,7 +1,7 @@
 import { getEventListeners } from 'node:events'
 import { Context } from '@deepseek-ai/cordis'
 import { agentEvents, type Agent, type PreStepDecision } from '@deepseek-ai/dsh-agent'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createToolResultMessage, createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { WorkflowRunId } from '@deepseek-ai/dsh-workflow'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
@@ -17,17 +17,17 @@ import * as fixtureModule from './fixtures/python-snapshot-workflow-order.mjs'
 const config = { parentSessionId: 'advanced-parent', prompt: 'workflow child prompt' }
 const fixture = fixtureModule as unknown as {
   name: string
-  apply(ctx: Context, config: { parentSessionId: string; prompt: string }): void
+  apply(ctx: Context, config: { parentSessionId: string; prompt: string; direct?: { prompt: string; callId: string } }): void
 }
 const cleanups: (() => Promise<unknown>)[] = []
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup() })
 
-async function harness() {
+async function harness(direct = false) {
   const ctx = new Context()
   const store = ctx.plugin(SessionStore)
   await store
   cleanups.push(() => store.dispose())
-  const fiber = ctx.plugin(fixture, config)
+  const fiber = ctx.plugin(fixture, { ...config, ...direct ? { direct: { prompt: config.prompt, callId: 'direct-child' } } : {} })
   await fiber
   cleanups.push(() => fiber.dispose())
   const parent = ctx.sessions.create(SessionId(config.parentSessionId))
@@ -89,6 +89,27 @@ describe('advanced Python snapshot workflow ordering', () => {
     expect((await run.result).output).toEqual([{ type: 'text', text: 'child complete' }])
     expect(adapter.requests).toHaveLength(1)
     expect(order).toEqual(['tool-workflow/agent-start', 'subagent/descriptor'])
+  })
+
+  it('waits for the parent to consume the direct start and acknowledge its request log', async () => {
+    const h = await harness(true)
+    const pending = h.step()
+    h.parent.append('turn/start', { turn: 1 })
+    h.parent.append('step/start', { turn: 1, step: 1 })
+    const callId = ToolCallId('direct-child')
+    h.parent.append('tool/call', { turn: 1, step: 1, callId, name: 'subagent', arguments: '{}' })
+    const result = h.parent.append('tool/result', {
+      turn: 1, step: 1,
+      message: createToolResultMessage({ callId, content: [{ type: 'text', text: 'started subagent child' }], isError: false }),
+    }, { surfaceOp: 'append' })
+    h.parent.append('step/start', { turn: 1, step: 2 })
+    await Promise.resolve()
+    expect(h.next).not.toHaveBeenCalled()
+    h.parent.append('session-log-deepseek/delivery-accepted', {
+      sessionId: h.parent.id, sessionFormatVersion: h.parent.header.version, throughSeq: result.seq,
+    })
+    expect(await pending).toBe(h.decision)
+    expect(h.next).toHaveBeenCalledOnce()
   })
 
   it('holds the child until the exact parent records the exact member', async () => {
