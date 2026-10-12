@@ -32,7 +32,7 @@ import type { ImageCardModel } from '../models/image-card-model.ts'
 import { CHAT_READ_MAX_LINES, type ReadCardModel } from '../models/read-card-model.ts'
 import { CHAT_SEARCH_MAX_LINES, type SearchCardModel } from '../models/search-card-model.ts'
 import { terminalBlockLabels, type TerminalCardModel } from '../models/terminal-card-model.ts'
-import { diffBlockLabels, readBlockLabels, searchBlockLabels, webBlockLabels } from '../models/primitive-labels.ts'
+import { codeToolbarLabels, diffBlockLabels, readBlockLabels, searchBlockLabels, webBlockLabels } from '../models/primitive-labels.ts'
 import type { WebCardModelProps } from '../models/web-card-model.ts'
 import { formatToolBody, type ToolRowState, type ToolRowVariant } from '../models/tool-call-model.ts'
 import { ToolDetails, type ToolDetailsModel } from './ToolDetails.tsx'
@@ -365,7 +365,8 @@ export function ToolRow({
                             <>
                               {variant === 'code' && bodyText !== null && (
                                 <div className={css.bodyScroll}>
-                                  <CodeBlock code={bodyText} lang="typescript" copyLabel={t('copy')} copiedLabel={t('copied')} className={css.codeBody} />
+                                  <CodeBlock code={bodyText} lang="typescript" copyLabel={t('copy')} copiedLabel={t('copied')}
+                                    toolbarLabels={codeToolbarLabels(t)} className={css.codeBody} />
                                 </div>
                               )}
                               {(cardBody !== null || outputText !== null) && (

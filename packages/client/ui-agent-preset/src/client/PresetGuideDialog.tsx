@@ -2,6 +2,7 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { Button, IconCloseOutline16, IconListPenOutline16, MarkdownText, Modal, SegmentedTabs, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AgentPresetSettingsKey } from './locales.ts'
 import css from './PresetGuideDialog.module.css'
 
@@ -54,10 +55,13 @@ export function trapPresetReaderTab(event: KeyboardEvent<HTMLDivElement>): void 
 /** Curated usage dictionaries contain only level-three example sections. */
 function GuideUsage({ text, t }: {
   text: string
-  t: (key: AgentPresetSettingsKey) => string
+  t: TranslateNS<'settings.agentPreset'>
 }): ReactNode {
   const labels = {
-    code: { copyLabel: t('guideCopy'), copiedLabel: t('guideCopied') },
+    code: {
+      copyLabel: t('guideCopy'), copiedLabel: t('guideCopied'),
+      toolbarLabels: { codeLabel: t('codeBlock.title'), wrapLabel: t('codeBlock.wrap'), unwrapLabel: t('codeBlock.unwrap') },
+    },
     footnotes: t('guideFootnotes'),
   }
   return text.split(/(?=^### )/m).map((section) => {
@@ -86,7 +90,7 @@ function GuideUsage({ text, t }: {
 export function PresetGuideDialog({ guide, initialPage, t, onClose }: {
   guide: PresetGuide
   initialPage: PresetGuidePage
-  t: (key: AgentPresetSettingsKey) => string
+  t: TranslateNS<'settings.agentPreset'>
   onClose: () => void
 }): ReactNode {
   const [page, setPage] = useState(initialPage)
@@ -146,7 +150,10 @@ export function PresetGuideDialog({ guide, initialPage, t, onClose }: {
                 <MarkdownText
                   text={t(guide.explanation)}
                   labels={{
-                    code: { copyLabel: t('guideCopy'), copiedLabel: t('guideCopied') },
+                    code: {
+                      copyLabel: t('guideCopy'), copiedLabel: t('guideCopied'),
+                      toolbarLabels: { codeLabel: t('codeBlock.title'), wrapLabel: t('codeBlock.wrap'), unwrapLabel: t('codeBlock.unwrap') },
+                    },
                     footnotes: t('guideFootnotes'),
                   }}
                 />

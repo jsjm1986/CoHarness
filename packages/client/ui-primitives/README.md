@@ -52,6 +52,8 @@ Use `dsh-client-ui-primitives` to build web-client controls and render agent out
 
 `MarkdownText` also accepts `variant="compact"` for secondary text such as reasoning. It keeps the same complete, sanitized Markdown and incremental parser, with tighter heading, list, code and table spacing. Code banners stay in normal flow so they cannot cover a containing disclosure’s sticky collapse control.
 
+`CodeBlock.toolbarLabels` enables the shared code-card header and spacing. `ReadBlock` and `DiffBlock` use the same header: secondary-colored language text, copy and wrap icons, and hover or keyboard-focus tooltips. Missing or unsupported languages use the owner’s localized code-block title; mixed-language diffs use that title too. Code cards share typography and content insets. Read gutters fit the largest returned line number, and diff fills cover the full scrollable row. The wrap toggle keeps a fixed accessible name and exposes its state through `aria-pressed`; its tooltip describes the next action. Wrapping is local to each mounted card and never changes copied text; code fences start wrapped, while reads and diffs preserve source columns until wrapping is enabled. Compact Markdown omits this toolbar. With `toolbarLabels`, source previews can pass `wrap` to follow their owner’s preference and show only the language and copy icon; owner CSS retains the source layout.
+
 <a id="terminal-output"></a>
 ## Terminal output
 

@@ -25,6 +25,7 @@ import { normalizeUri } from 'micromark-util-sanitize-uri'
 import { parseFileLink } from './file-link.ts'
 import { useMarkdownDelegate } from './MarkdownDelegate.tsx'
 import { CodeBlock } from './CodeBlock.tsx'
+import type { CodeToolbarLabels } from '../CodeToolbar.tsx'
 import { renderTexToReact } from './katex.tsx'
 import type { PositionedBlock } from './incremental.ts'
 import css from './MarkdownText.module.css'
@@ -35,6 +36,8 @@ export interface MarkdownCodeLabels {
   copyLabel: string
   /** Copy-button label during the post-copy confirmation window. */
   copiedLabel: string
+  /** Shared card controls; omitted in compact and owner-styled source views. */
+  toolbarLabels?: CodeToolbarLabels | undefined
 }
 
 /** Localized Markdown chrome shared by code fences and footnotes. */
@@ -341,6 +344,7 @@ function renderCode(node: Md.Code, key: Key, context: MarkdownRenderContext): Re
       streaming={context.streaming}
       copyLabel={labels.copyLabel}
       copiedLabel={labels.copiedLabel}
+      toolbarLabels={labels.toolbarLabels}
     />
   )
 }

@@ -65,12 +65,16 @@ describe('primitive compact chrome', () => {
   })
 
   it('keeps code and tool-result card chrome compact without shrinking tap targets', () => {
+    // The shared card toolbar owns its compact row: every CodeToolbar consumer
+    // (fenced code, read, diff) rides these targets.
+    const shared = load('../src/CodeCard.module.css')
+    expect(shared).toContain('@media (max-width: 767px)')
+    expect(shared).toContain('min-height: var(--dsw-touch-target)')
+    expect(shared).toContain('padding: 0 10px')
     const cards = [
       load('../src/markdown/CodeBlock.module.css'),
-      load('../src/ReadBlock.module.css'),
       load('../src/SearchBlock.module.css'),
       load('../src/TerminalBlock.module.css'),
-      load('../src/DiffBlock.module.css'),
     ]
     for (const css of cards) {
       expect(css).toContain('@media (max-width: 767px)')

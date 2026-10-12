@@ -3,7 +3,10 @@
   - text: Edit
   - button "large.txt"
   - text: +130 -130
-- button "Copy"
+- text: Code block
+- button "Wrap lines"
+- button "Copy":
+  - img
 - text: large.txt - shared heading - old setting 0 - old setting 1
 - button "Expand 253 more diff lines": … 253 more lines
 - text: + new setting 125 + new setting 126 + new setting 127 + new setting 128 └ +130 -130 · 1 file

@@ -10,8 +10,10 @@
 // --shiki-*/--dsw-* tokens.
 
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import type { CSSProperties } from 'react'
 import clsx from 'clsx'
 import { writeClipboard } from './clipboard.ts'
+import { CodeToolbar, type CodeToolbarLabels } from './CodeToolbar.tsx'
 import { ExpandButton } from './ExpandButton.tsx'
 import {
   grammarLoadCount,
@@ -21,6 +23,7 @@ import {
 } from './markdown/highlight.ts'
 import { useViewportHighlighting } from './markdown/useViewportHighlighting.ts'
 import css from './ReadBlock.module.css'
+import cardCss from './CodeCard.module.css'
 
 /**
  * Content lines shown before the height cap collapses the middle. Matches
@@ -38,7 +41,7 @@ export interface ReadBlockLine {
 }
 
 /** Localized display copy for a read block. */
-export interface ReadBlockLabels {
+export interface ReadBlockLabels extends CodeToolbarLabels {
   /** Window count note, given shown and total lines. */
   window: (shown: number, total: number) => string
   /** Copy-button idle label. */
@@ -118,6 +121,7 @@ export function ReadBlock({
   )
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [wrapped, setWrapped] = useState(false)
 
   const onCopy = useCallback(() => {
     if (copied) return
@@ -160,27 +164,21 @@ export function ReadBlock({
   const paired = lines.map((line, index): readonly [ReadBlockLine, readonly HighlightSpan[] | undefined] =>
     [line, highlighted?.[index]])
 
+  const gutterDigits = lines.reduce((digits, line) => Math.max(digits, String(line.number).length), 3)
+  const gutterStyle = { '--dsl-read-gutter': `${gutterDigits}ch` } as CSSProperties
+
   return (
-    <div ref={rootRef} className={clsx(css.block, className)} data-read="">
-      <div className={css.banner}>
-        <div className={css.label}>{label ?? ''}</div>
-        <div className={css.action}>
-          {windowed && (
-            <span className={css.count}>{copy.window(lines.length, totalLines)}</span>
-          )}
-          <span className={css.lang}>{lang ?? ''}</span>
-          {/* Hide copy on an empty window, matching TerminalBlock's empty-output
-              guard: a successful read of an empty file returns lines: [] with
-              card:'read', so this branch is reachable, and copying then would
-              wipe the clipboard with an empty string. */}
-          {lines.length > 0 && (
-            <button type="button" className={css.copyButton} onClick={onCopy}>
-              {copied ? copy.copied : copy.copy}
-            </button>
-          )}
-        </div>
-      </div>
-      <div className={css.body}>
+    <div ref={rootRef} className={clsx(cardCss.card, css.block, className)} data-read="" data-code-wrap={wrapped} style={gutterStyle}>
+      <CodeToolbar
+        lang={lang} title={label} status={windowed ? copy.window(lines.length, totalLines) : undefined}
+        labels={copy} copyLabel={copy.copy} copiedLabel={copy.copied} copied={copied} wrapped={wrapped}
+        // Hide copy on an empty window, matching TerminalBlock's empty-output
+        // guard: a successful read of an empty file returns lines: [] with
+        // card:'read', so this branch is reachable, and copying then would
+        // wipe the clipboard with an empty string.
+        onCopy={lines.length > 0 ? onCopy : undefined} onWrap={() => { setWrapped(value => !value) }}
+      />
+      <div className={cardCss.body}>
         {rows(capped ? paired.slice(0, headLines) : paired)}
         <ExpandButton hidden={hidden} expanded={expanded} onToggle={onToggle} copy={copy} className={css.expand} />
         {capped && rows(paired.slice(paired.length - tailLines))}

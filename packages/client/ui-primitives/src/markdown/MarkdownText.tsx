@@ -155,13 +155,18 @@ class StreamingRenderer {
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export const MarkdownText = memo(function MarkdownText({ text, streaming = false, labels, fileMentions, variant = 'body' }: {
+export const MarkdownText = memo(function MarkdownText({ text, streaming = false, labels: providedLabels, fileMentions, variant = 'body' }: {
   text: string
   streaming?: boolean
   labels: MarkdownLabels
   fileMentions?: MarkdownFileMentions | undefined
   variant?: 'body' | 'compact'
 }) {
+  // The compact variant keeps the plain fence chrome; the card toolbar rides
+  // the body variant's larger code card.
+  const labels = useMemo(() => variant === 'compact'
+    ? { ...providedLabels, code: { ...providedLabels.code, toolbarLabels: undefined } }
+    : providedLabels, [providedLabels, variant])
   const streamRef = useRef<StreamingRenderer | null>(null)
   const streamLabelsRef = useRef<MarkdownLabels>(labels)
   const children = useMemo(() => {

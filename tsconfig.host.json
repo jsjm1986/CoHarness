@@ -37,6 +37,7 @@
     "apps/web/tests/lifecycle-chrome.e2e.ts",
     "apps/web/tests/details-session-lifecycle.e2e.ts",
     "apps/web/tests/diff-context.e2e.ts",
+    "apps/web/tests/code-card-layout.e2e.ts",
     "apps/web/tests/plugin-config.e2e.ts",
     "apps/web/tests/settings-chrome.e2e.ts",
     "apps/web/tests/settings-compact.e2e.ts",

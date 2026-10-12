@@ -118,7 +118,8 @@ export function DetailsPanel({
                 {material.argsRaw !== null && (
                   <section className={css.section}>
                     <div className={css.sectionLabel}>{t('details.input')}</div>
-                    <CodeBlock code={pretty(material.argsRaw)} lang="json" copyLabel={t('copy')} copiedLabel={t('copied')} />
+                    <CodeBlock code={pretty(material.argsRaw)} lang="json" copyLabel={t('copy')} copiedLabel={t('copied')}
+                      toolbarLabels={{ codeLabel: t('codeBlock.title'), wrapLabel: t('codeBlock.wrap'), unwrapLabel: t('codeBlock.unwrap') }} />
                   </section>
                 )}
                 <section className={css.section}>

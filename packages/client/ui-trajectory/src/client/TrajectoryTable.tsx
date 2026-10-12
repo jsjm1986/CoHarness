@@ -258,7 +258,10 @@ function jsonTreeLabels(t: TrajectoryTranslate): JsonTreeLabels {
 
 function markdownLabels(t: TrajectoryTranslate): MarkdownLabels {
   return {
-    code: { copyLabel: t('copy'), copiedLabel: t('copied') },
+    code: {
+      copyLabel: t('copy'), copiedLabel: t('copied'),
+      toolbarLabels: { codeLabel: t('codeBlock.title'), wrapLabel: t('codeBlock.wrap'), unwrapLabel: t('codeBlock.unwrap') },
+    },
     footnotes: t('markdown.footnotes'),
   }
 }

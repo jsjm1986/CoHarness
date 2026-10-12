@@ -43,7 +43,10 @@ export function PlanPreview({ useTabInfo, usePlanDocument, loadPlan, t }: PlanPr
     ? (params !== undefined && 'planReview' in params ? params.planReview : undefined)
     : read?.status === 'ready' ? read.plan : undefined
   const labels = useMemo(() => ({
-    code: { copyLabel: t('copy'), copiedLabel: t('copied') },
+    code: {
+      copyLabel: t('copy'), copiedLabel: t('copied'),
+      toolbarLabels: { codeLabel: t('codeBlock.title'), wrapLabel: t('codeBlock.wrap'), unwrapLabel: t('codeBlock.unwrap') },
+    },
     footnotes: t('markdown.footnotes'),
   }), [t])
   if (plan === undefined) return (
