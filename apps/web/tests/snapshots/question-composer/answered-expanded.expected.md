@@ -1,11 +1,10 @@
 - banner:
   - navigation "Session hierarchy":
     - button "Use the ask_user_question tool to" [disabled]
+  - text: Standard mode
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - img
-  - text: Standard mode
   - button "Open right sidebar":
     - img
 - button "1 tool call · 2 intermediate messages" [expanded]:

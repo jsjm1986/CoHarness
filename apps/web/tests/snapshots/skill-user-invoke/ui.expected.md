@@ -1,11 +1,10 @@
 - banner:
   - navigation "Session hierarchy":
     - button "/user-invoke-demo and confirm the fixtur" [disabled]
+  - text: Standard mode
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - img
-  - text: Standard mode
   - button "Open right sidebar":
     - img
 - button "1 intermediate message":

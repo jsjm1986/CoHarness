@@ -9,11 +9,10 @@
     - button "1 subagent":
       - text: 1 subagent
       - img
+  - text: Standard mode
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - img
-  - text: Standard mode
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":

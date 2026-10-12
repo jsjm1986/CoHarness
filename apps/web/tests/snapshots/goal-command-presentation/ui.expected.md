@@ -1,11 +1,10 @@
 - banner:
   - navigation "Session hierarchy":
     - button "workspace" [disabled]
+  - text: Standard mode
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - img
-  - text: Standard mode
   - button "Open right sidebar":
     - img
 - group "Command input": /goal

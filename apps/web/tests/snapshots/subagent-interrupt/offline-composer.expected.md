@@ -1,4 +1,5 @@
 - banner:
+  - text: Running
   - navigation "Session hierarchy":
     - button "Ask a research subagent to"
     - button "1 subagent running":
@@ -6,11 +7,10 @@
       - img
     - text: /
     - 'button "Switch subagent: event-sourcing researcher"': event-sourcing researcher
+  - text: Standard mode
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - img
-  - text: Standard mode
   - button "Open right sidebar":
     - img
 - button "System prompt":

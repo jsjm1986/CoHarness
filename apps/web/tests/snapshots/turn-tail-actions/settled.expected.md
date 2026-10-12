@@ -1,11 +1,10 @@
 - banner:
   - navigation "Session hierarchy":
     - button "Begin your reply with the" [disabled]
+  - text: Standard mode
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - img
-  - text: Standard mode
   - button "Open right sidebar":
     - img
 - button "1 tool call · 2 intermediate messages" [expanded]:
