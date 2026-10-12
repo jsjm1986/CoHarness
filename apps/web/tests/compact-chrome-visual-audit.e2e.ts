@@ -254,7 +254,9 @@ describe('visual audit: compact product chrome', () => {
             }
             await toolRow.waitFor({ state: 'visible', timeout: 10_000 })
           }
-          await toolRow.click()
+          // Click the leading icon zone, not the row center: the summary's
+          // file link sits mid-row and opens a dialog instead of expanding.
+          await toolRow.click({ position: { x: 20, y: 14 } })
           await page.waitForTimeout(300)
           await shot(page, `${prefix}-05-tool-expanded`)
           findings[`${prefix}.tool`] = await dumpOverflow(page)
