@@ -22,7 +22,7 @@ import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ToolCallOwnerProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import { IconGlobeOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { webCardModel } from '../src/client/tool/models/web-card-model.ts'
+import { webCardModel, webFetchHref } from '../src/client/tool/models/web-card-model.ts'
 import { createChatStore } from '@deepseek-ai/dsh-client-ui-conversation/src/client/stores.ts'
 import { GenericToolCard } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-conversation/src/client/skeleton/DetailsPanel.tsx'
@@ -211,6 +211,22 @@ describe('chat row web body', () => {
     }), 'echo')} t={t} />)
     expect(view.container.querySelector('[data-web]')).toBeNull()
   })
+
+  it('the collapsed web_fetch summary opens the URL in a new tab without expanding', () => {
+    const view = render(<WebRow {...rowProps(settledFetch(), 'web_fetch')} />)
+    const link = view.getByRole('link', { name: 'https://example.com/page' })
+    expect(link.getAttribute('href')).toBe('https://example.com/page')
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer')
+    fireEvent.click(link)
+    fireEvent.keyDown(link, { key: 'Enter' })
+    expect(view.container.querySelector('[data-web]')).toBeNull()
+  })
+
+  it('a failed web_fetch keeps its plain error summary', () => {
+    const view = render(<WebRow {...rowProps(settledFetch({ isError: true }), 'web_fetch')} />)
+    expect(view.queryByRole('link')).toBeNull()
+  })
 })
 
 describe('DetailsPanel web Output section', () => {
@@ -323,5 +339,19 @@ describe('web toolview registration', () => {
     expect(registered[0]?.component).toBe(WebRow)
     expect(registered[1]?.component).toBe(WebRow)
     expect(webToolview.inject).toEqual(['slots'])
+  })
+})
+
+describe('webFetchHref', () => {
+  it('returns only an http(s) web_fetch URL', () => {
+    expect(webFetchHref(settledFetch())).toBe('https://example.com/page')
+    expect(webFetchHref(settledFetch({ call: { name: 'web_fetch', argsRaw: '{"url":"http://a.test/"}' } })))
+      .toBe('http://a.test/')
+    expect(webFetchHref(settledFetch({ call: { name: 'web_fetch', argsRaw: '{"url":"javascript:alert(1)"}' } })))
+      .toBeUndefined()
+    expect(webFetchHref(settledFetch({ call: { name: 'web_fetch', argsRaw: '{"url":"not a url"}' } }))).toBeUndefined()
+    expect(webFetchHref(settledFetch({ call: { name: 'web_fetch', argsRaw: '{"url":1}' } }))).toBeUndefined()
+    expect(webFetchHref(settledFetch({ call: null }))).toBeUndefined()
+    expect(webFetchHref(settledSearch())).toBeUndefined()
   })
 })
