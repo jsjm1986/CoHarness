@@ -1,17 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   TeamMemberView as TeamRosterMember,
-  TeamTaskAction,
-  TeamTaskId,
-  TeamTaskMutationResult,
   TeamTaskView as TeamTask,
   TeamView,
 } from '@deepseek-ai/dsh-experimental-agent-team/client'
 import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import {
-  IconCheckOutline14, IconChevronDownOutline14, IconCloseOutline16, IconEditOutline16, IconPlusOutline16,
-  IconRefreshOutline14, IconTrashOutline16, IconUserOutline16, StateDot,
+  IconChevronDownOutline14, IconCloseOutline16, IconRefreshOutline14,
+  IconUserOutline16, StateDot, type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -21,28 +18,9 @@ import css from './TeamAction.module.css'
 /** Generated Remote result consumed directly by the Team UI. */
 export type TeamActionResult<T> = RemoteResult<T>
 
-/** Generated Remote result whose business value preserves Team task rejections. */
-export type TeamTaskActionResult = RemoteResult<TeamTaskMutationResult>
-
 /** Business actions injected by the browser plugin. */
 export interface TeamActionInjected {
   load: (sessionId: SessionId) => Promise<TeamActionResult<TeamView>>
-  createTask: (sessionId: SessionId, input: {
-    subject: string
-    description: string
-    blockedBy: TeamTaskId[]
-    writeScopes: string[]
-  }) => Promise<TeamTaskActionResult>
-  updateTask: (sessionId: SessionId, input: {
-    taskId: TeamTaskId
-    expectedRevision: number
-    action: TeamTaskAction
-    subject?: string
-    description?: string
-    blockedBy?: TeamTaskId[]
-    writeScopes?: string[]
-    owner?: string
-  }) => Promise<TeamTaskActionResult>
   openTeammate: (sessionId: SessionId, member: TeamRosterMember) => Promise<void>
 }
 
@@ -50,27 +28,7 @@ export interface TeamActionInjected {
 export type TeamActionProps =
   PropsRuntime<'conversation.session.header.actions'> & TeamActionInjected & PropsLocale<typeof NS>
 
-interface Draft {
-  subject: string
-  description: string
-  blockers: string
-  scopes: string
-}
-
-const EMPTY_DRAFT: Draft = { subject: '', description: '', blockers: '', scopes: '' }
-
-function items(value: string): string[] {
-  return [...new Set(value.split(',').map(item => item.trim()).filter(Boolean))]
-}
-
-function taskIds(value: string): TeamTaskId[] {
-  return items(value) as TeamTaskId[]
-}
-
-/**
- * One failure line for either carrier: a Remote failure, or a Team business
- * rejection whose codes stay local to this seam and never ride the wire.
- */
+/** One failure line for the Remote carrier. */
 function failureText(error: { readonly code: string; readonly message: string }): string {
   return `${error.message} (${error.code})`
 }
@@ -95,19 +53,14 @@ function memberStatusKey(status: TeamRosterMember['status']): TeamKey {
   }
 }
 
-/** Render the live Team roster and compare-and-set task board. */
+/** Render the live Team roster and shared task board. */
 export function TeamAction({
-  sessionId, load, createTask, updateTask, openTeammate, t,
+  sessionId, load, openTeammate, t,
 }: TeamActionProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<TeamView | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
-  const [createDraft, setCreateDraft] = useState<Draft>(EMPTY_DRAFT)
-  const [editing, setEditing] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT)
-  const [pendingTasks, setPendingTasks] = useState<ReadonlySet<string>>(() => new Set())
   const sessionRef = useRef(sessionId)
   const refreshGeneration = useRef(0)
   sessionRef.current = sessionId
@@ -118,11 +71,6 @@ export function TeamAction({
     setLoading(false)
     setView(null)
     setError(null)
-    setCreating(false)
-    setCreateDraft(EMPTY_DRAFT)
-    setEditing(null)
-    setEditDraft(EMPTY_DRAFT)
-    setPendingTasks(new Set())
   }, [sessionId])
 
   const refresh = useCallback(async (): Promise<boolean> => {
@@ -142,106 +90,7 @@ export function TeamAction({
     }
   }, [load, sessionId])
 
-  const invalidateRefresh = useCallback((): void => {
-    refreshGeneration.current += 1
-    setLoading(false)
-  }, [])
-
-  const settleTask = useCallback(async (
-    taskId: string,
-    operation: () => Promise<TeamTaskActionResult>,
-  ): Promise<TeamTask | undefined> => {
-    const requestedSession = sessionId
-    invalidateRefresh()
-    setPendingTasks(current => new Set(current).add(taskId))
-    try {
-      const result = await operation()
-      if (sessionRef.current !== requestedSession) return undefined
-      if (!result.ok) {
-        setError(failureText(result.error))
-        return undefined
-      }
-      if (!result.value.ok) {
-        if (result.value.error.code === 'team-task-conflict') {
-          const reloaded = await refresh()
-          if (sessionRef.current !== requestedSession) return undefined
-          if (reloaded) setError(t('conflict'))
-        } else {
-          setError(failureText(result.value.error))
-        }
-        return undefined
-      }
-      const task = result.value.value
-      setError(null)
-      await refresh()
-      if (sessionRef.current !== requestedSession) return undefined
-      return task
-    } finally {
-      if (sessionRef.current === requestedSession) {
-        setPendingTasks((current) => {
-          const next = new Set(current)
-          next.delete(taskId)
-          return next
-        })
-      }
-    }
-  }, [invalidateRefresh, refresh, sessionId, t])
-
-  const submitCreate = async (): Promise<void> => {
-    const subject = createDraft.subject.trim()
-    const description = createDraft.description.trim()
-    /* v8 ignore next -- TaskForm disables Save while either normalized field is empty. */
-    if (subject === '' || description === '') return
-    const created = await settleTask('create', () => createTask(sessionId, {
-      subject,
-      description,
-      blockedBy: taskIds(createDraft.blockers),
-      writeScopes: items(createDraft.scopes),
-    }))
-    if (created === undefined) return
-    setCreateDraft(EMPTY_DRAFT)
-    setCreating(false)
-  }
-
-  const startEdit = (task: TeamTask): void => {
-    setEditing(task.id)
-    setEditDraft({
-      subject: task.subject,
-      description: task.description,
-      blockers: task.blockedBy.join(', '),
-      scopes: task.writeScopes.join(', '),
-    })
-  }
-
-  const submitEdit = async (task: TeamTask): Promise<void> => {
-    const requestedSession = sessionId
-    const edited = await settleTask(task.id, () => updateTask(requestedSession, {
-      taskId: task.id,
-      expectedRevision: task.revision,
-      action: 'edit',
-      subject: editDraft.subject.trim(),
-      description: editDraft.description.trim(),
-      writeScopes: items(editDraft.scopes),
-    }))
-    if (edited === undefined) return
-    const blockedBy = taskIds(editDraft.blockers)
-    if (blockedBy.length === edited.blockedBy.length
-      && blockedBy.every((blocker, index) => blocker === edited.blockedBy[index])) {
-      setEditing(null)
-      return
-    }
-    const dependencyTask = await settleTask(task.id, () => updateTask(requestedSession, {
-      taskId: task.id,
-      expectedRevision: edited.revision,
-      action: 'set_dependencies',
-      blockedBy,
-    }))
-    if (dependencyTask === undefined) return
-    setEditing(null)
-  }
-
   const teammates = view?.members.filter(member => member.role === 'teammate') ?? []
-  const assignable = view?.members.filter(member => member.status !== 'failed' && member.status !== 'provisioning') ?? []
 
   return (
     <div className={css.root} data-team-action>
@@ -300,54 +149,10 @@ export function TeamAction({
                 </div>
               </section>
               <section>
-                <div className={css.sectionTitle}>
-                  <h3>{t('tasks')}</h3>
-                  <button type="button" className={css.smallButton} onClick={() => { setCreating(true) }}>
-                    <IconPlusOutline16 size={13} /> {t('create')}
-                  </button>
-                </div>
-                {creating && (
-                  <TaskForm
-                    draft={createDraft}
-                    setDraft={setCreateDraft}
-                    pending={pendingTasks.has('create')}
-                    onSave={() => { void submitCreate() }}
-                    onCancel={() => { setCreating(false) }}
-                    t={t}
-                  />
-                )}
-                {view.tasks.length === 0 && !creating && <div className={css.notice}>{t('empty')}</div>}
+                <h3>{t('tasks')}</h3>
+                {view.tasks.length === 0 && <div className={css.notice}>{t('empty')}</div>}
                 <div className={css.tasks}>
-                  {view.tasks.map(task => editing === task.id
-                    ? (
-                      <TaskForm
-                        key={task.id}
-                        draft={editDraft}
-                        setDraft={setEditDraft}
-                        pending={pendingTasks.has(task.id)}
-                        onSave={() => { void submitEdit(task) }}
-                        onCancel={() => { setEditing(null) }}
-                        t={t}
-                      />
-                    )
-                    : (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        pending={pendingTasks.has(task.id)}
-                        assignable={assignable}
-                        t={t}
-                        onEdit={() => { startEdit(task) }}
-                        onAction={(action, owner) => {
-                          void settleTask(task.id, () => updateTask(sessionId, {
-                            taskId: task.id,
-                            expectedRevision: task.revision,
-                            action,
-                            ...owner === undefined ? {} : { owner },
-                          }))
-                        }}
-                      />
-                    ))}
+                  {view.tasks.map(task => <TaskCard key={task.id} task={task} t={t} />)}
                 </div>
               </section>
             </>
@@ -358,17 +163,12 @@ export function TeamAction({
   )
 }
 
-interface TaskCardProps {
-  task: TeamTask
-  pending: boolean
-  assignable: readonly TeamRosterMember[]
-  t: TeamActionProps['t']
-  onEdit: () => void
-  onAction: (action: TeamTaskAction, owner?: string) => void
+function taskDotState(task: TeamTask): StateDotState {
+  return task.status === 'in_progress' ? 'ongoing' : task.status === 'pending' && !task.ready ? 'warning' : 'done'
 }
 
 /** Task card with a two-line description clamp expanded from a toggle in the meta row. */
-function TaskCard({ task, pending, assignable, t, onEdit, onAction }: TaskCardProps) {
+function TaskCard({ task, t }: { task: TeamTask; t: TeamActionProps['t'] }) {
   const [expanded, setExpanded] = useState(false)
   const [clamped, setClamped] = useState(false)
   const textRef = useRef<HTMLParagraphElement>(null)
@@ -388,7 +188,10 @@ function TaskCard({ task, pending, assignable, t, onEdit, onAction }: TaskCardPr
     <article className={css.task}>
       <div className={css.taskTitle}>
         <strong>{task.subject}</strong>
-        <span>{t(statusKey(task.status))}</span>
+        <span className={css.taskState}>
+          <StateDot state={taskDotState(task)} />
+          <span>{t(statusKey(task.status))}</span>
+        </span>
       </div>
       <p ref={textRef} className={expanded ? undefined : css.clampedDescription}>{task.description}</p>
       <div className={css.meta}>
@@ -404,68 +207,12 @@ function TaskCard({ task, pending, assignable, t, onEdit, onAction }: TaskCardPr
           </button>
         )}
         <span>{task.id}</span>
+        <span>{t('owner')}: {task.ownerName ?? t('unowned')}</span>
         {task.status === 'pending' && <span>{task.ready ? t('ready') : t('blocked')}</span>}
         {task.blockedBy.length > 0 && <span>{t('blockedBy')}: {task.blockedBy.join(', ')}</span>}
         {task.writeScopes.length > 0 && <span>{t('writeScopes')}: {task.writeScopes.join(', ')}</span>}
         {task.writeScopeWarnings.map(warning => <span key={warning} className={css.warning}>{warning}</span>)}
       </div>
-      <div className={css.taskActions}>
-        <label>
-          {t('owner')}
-          <select
-            value={task.ownerName ?? ''}
-            disabled={pending || task.status === 'completed'}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-              const owner = event.target.value
-              onAction('reassign', owner === '' ? undefined : owner)
-            }}
-          >
-            <option value="">{t('unowned')}</option>
-            {assignable.map(member => <option key={member.id} value={member.name}>{member.name}</option>)}
-          </select>
-        </label>
-        <button type="button" onClick={onEdit} disabled={pending}>
-          <IconEditOutline16 size={13} /> {t('edit')}
-        </button>
-        {task.status === 'in_progress' && (
-          <button type="button" disabled={pending} onClick={() => { onAction('complete') }}>
-            <IconCheckOutline14 /> {t('complete')}
-          </button>
-        )}
-        {task.status === 'completed' && (
-          <button type="button" disabled={pending} onClick={() => { onAction('reopen') }}>
-            {t('reopen')}
-          </button>
-        )}
-        <button type="button" disabled={pending} onClick={() => { onAction('delete') }}>
-          <IconTrashOutline16 size={13} /> {t('delete')}
-        </button>
-      </div>
     </article>
-  )
-}
-
-interface TaskFormProps {
-  draft: Draft
-  setDraft: (draft: Draft) => void
-  pending: boolean
-  onSave: () => void
-  onCancel: () => void
-  t: TeamActionProps['t']
-}
-
-function TaskForm({ draft, setDraft, pending, onSave, onCancel, t }: TaskFormProps) {
-  const field = (key: keyof Draft, value: string): void => { setDraft({ ...draft, [key]: value }) }
-  return (
-    <div className={css.form}>
-      <input value={draft.subject} placeholder={t('subject')} onChange={(event: ChangeEvent<HTMLInputElement>) => { field('subject', event.target.value) }} />
-      <textarea value={draft.description} placeholder={t('description')} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => { field('description', event.target.value) }} />
-      <input value={draft.blockers} placeholder={t('blockers')} onChange={(event: ChangeEvent<HTMLInputElement>) => { field('blockers', event.target.value) }} />
-      <input value={draft.scopes} placeholder={t('scopes')} onChange={(event: ChangeEvent<HTMLInputElement>) => { field('scopes', event.target.value) }} />
-      <div className={css.formActions}>
-        <button type="button" disabled={pending || draft.subject.trim() === '' || draft.description.trim() === ''} onClick={onSave}>{t('save')}</button>
-        <button type="button" disabled={pending} onClick={onCancel}>{t('cancel')}</button>
-      </div>
-    </div>
   )
 }
