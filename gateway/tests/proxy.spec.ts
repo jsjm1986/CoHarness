@@ -350,8 +350,8 @@ describe('proxy handlers', () => {
     // A TCP reset on the client surface raises 'error' on the gateway-side
     // socket, which http-proxy-3 forwards as an unconditional server-level
     // 'error' event — unhandled, it used to crash the gateway process.
-    const socket = (ws as unknown as { _socket: Socket })._socket
-    socket.resetAndDestroy()
+    const socket = (ws as WebSocket & { _socket?: Socket })._socket
+    socket?.resetAndDestroy()
     await vi.waitFor(() => {
       expect(spy).toHaveBeenCalledWith(expect.stringContaining('proxy upstream error'))
     }, { timeout: 5000 })
