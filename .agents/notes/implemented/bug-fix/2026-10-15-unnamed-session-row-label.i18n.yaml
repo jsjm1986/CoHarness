@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-15-unnamed-session-row-label.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-unnamed-session-row-label.md
+/agent-note-unnamed-session-rows-localize-their-label-instead-of-showing-the-directory-name:
+  en: 0f02fa9e1df9a194
+  zh: 5b370745af24a201
+/agent-note-unnamed-session-rows-localize-their-label-instead-of-showing-the-directory-name/problem:
+  en: b9a2f26762b4055f
+  zh: 4a609691be6546f6
+/agent-note-unnamed-session-rows-localize-their-label-instead-of-showing-the-directory-name/decision:
+  en: 1e8eeb29ff30d16b
+  zh: 421660ab57da6418
+/agent-note-unnamed-session-rows-localize-their-label-instead-of-showing-the-directory-name/alternatives-considered:
+  en: cf38cb912c328f6d
+  zh: e2795c828ce63823
+/agent-note-unnamed-session-rows-localize-their-label-instead-of-showing-the-directory-name/consequences:
+  en: 7a1019a4683130e2
+  zh: d2bc8b3bf4983092
+/agent-note-unnamed-session-rows-localize-their-label-instead-of-showing-the-directory-name/verification:
+  en: dbcba628989bd09e
+  zh: b934c5954d31db63
+/agent-note-unnamed-session-rows-localize-their-label-instead-of-showing-the-directory-name/related:
+  en: e2d3d118e4ca98d2
+  zh: b2e60ebb405630dd
