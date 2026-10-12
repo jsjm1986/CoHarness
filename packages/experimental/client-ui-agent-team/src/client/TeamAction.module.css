@@ -45,7 +45,9 @@
 
   position: absolute;
   top: calc(100% + 5px);
-  left: 0;
+  /* The trigger lives in the header's right-side action cluster: anchor the
+     panel's right edge so it opens leftward and stays inside the viewport. */
+  right: 0;
   z-index: 110;
   box-sizing: border-box;
   width: min(560px, calc(100vw - 32px));
@@ -57,6 +59,18 @@
   background: var(--dsw-specific-menu);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent);
+}
+
+@media (max-width: 767px) {
+  .panel {
+    position: fixed;
+    top: auto;
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    width: auto;
+    max-height: 70vh;
+  }
 }
 
 .toolbar,
