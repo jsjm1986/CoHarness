@@ -10,7 +10,7 @@ Every highlight-chasing picker — both model pickers and the `/` trigger menu �
 
 ## Decision
 
-`PopupState` records `activeViaPointer` on the last `active` write, and `PopupSelectView` runs its scroll-into-view correction only for non-pointer highlights. `highlight()` — the pointer entry — sets the flag; `move()`, `setSearch()`, options load, and load failure reset it, so keyboard and programmatic highlights keep the keep-visible correction the effect exists for. `ModelSelect`'s hover path marks the same provenance through a ref and focuses hovered rows with `preventScroll`, so neither the effect nor the native focus scroll can move content under the pointer. The trigger menu's `menuReduce` stamps `viaPointer` onto the `highlight` it writes for `hover` events — `move` and settlements produce unmarked highlights — and `MenuView` skips scrolling marked rows, the same split carried inside the highlight object instead of a sibling field.
+`PopupState` records `activeViaPointer` on the last `active` write, and `PopupSelectView` runs its scroll-into-view correction only for non-pointer highlights. `highlight()` — the pointer entry — sets the flag; `move()`, `setSearch()`, options load, and load failure reset it, so keyboard and programmatic highlights keep the keep-visible correction the effect exists for. `ModelSelect`'s hover path marks the same pointer source through a ref and focuses hovered rows with `preventScroll`, so neither the effect nor the native focus scroll can move content under the pointer. The trigger menu's `menuReduce` stamps `viaPointer` onto the `highlight` it writes for `hover` events — `move` and settlements produce unmarked highlights — and `MenuView` skips scrolling marked rows, the same split carried inside the highlight object instead of a sibling field.
 
 ## Verification
 
@@ -22,10 +22,10 @@ Every highlight-chasing picker — both model pickers and the `/` trigger menu �
 
 **Move the test pointer off the list.** Rejected: the loop is a product defect — a user resting the cursor on the picker while a row highlight settles gets the same scroll chase — so the owner of the scroll decision fixes it, not the test.
 
-**Keep provenance inside each view.** Rejected: `active` already flows through `PopupState`; recording provenance there binds every producer (load, search, move, highlight) instead of duplicating the convention per consumer.
+**Keep the pointer-source flag inside each view.** Rejected: `active` already flows through `PopupState`; recording the flag there binds every producer (load, search, move, highlight) instead of duplicating the convention per consumer.
 
 ## Consequences
 
 - Pointer hovers move `aria-selected`/`data-highlighted` without touching scroll position; keyboard and programmatic highlights retain keep-visible scrolling.
-- `PopupState` gains `activeViaPointer` and `MenuState['highlight']` gains `viaPointer`; future `active`/`highlight` writers must declare pointer or programmatic provenance.
+- `PopupState` gains `activeViaPointer` and `MenuState['highlight']` gains `viaPointer`; future `active`/`highlight` writers must declare a pointer or programmatic source.
 - The [grouped fuzzy picker note](../feature/2026-10-02-grouped-fuzzy-model-picker.md) keeps ownership of grouping and sticky-heading mechanics.
