@@ -7,11 +7,11 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-The OpenTelemetry backend for [the telemetry seam](../session-telemetry/) — the only entry a deployment loads. Its `mode` decides whether the seam follows session events live, replays the canonical log only at recorded feedback, or keeps telemetry local. Uploading modes compose the OTel JS SDK as-is (`LoggerProvider` → `BatchLogRecordProcessor` → OTLP/HTTP log exporter) and map each handed-over record onto `logger.emit()`, under two instrumentation scopes: ledger records on `@deepseek-ai/dsh-session-sessionTelemetry-otel`, operational records on `@deepseek-ai/dsh-session-sessionTelemetry-otel/ops`. Resource identity contains `service.name`/`service.version` from `dsh-llm`'s `APP_IDENTITY` plus this package's anonymous `user.id` (`$DSH_HOME/.anonymous-user-id`, a random UUID created on first use and reset by deleting the file), carried once per export batch rather than per record.
+The OpenTelemetry backend for [the telemetry seam](../session-telemetry/) — the only entry a deployment loads. Its `mode` decides whether the seam follows session events live, replays the canonical log only at recorded feedback, or keeps telemetry local. Uploading modes compose a `LoggerProvider` with the package's byte/count-bounded processor and an OTLP/HTTP log exporter, mapping each handed-over record onto `logger.emit()`, under two instrumentation scopes: ledger records on `@deepseek-ai/dsh-session-sessionTelemetry-otel`, operational records on `@deepseek-ai/dsh-session-sessionTelemetry-otel/ops`. Resource identity contains `service.name`/`service.version` from `dsh-llm`'s `APP_IDENTITY` plus this package's anonymous `user.id` (`$DSH_HOME/.anonymous-user-id`, a random UUID created on first use and reset by deleting the file), carried once per export batch rather than per record.
 
 ## Summary
 
-`dsh-session-telemetry-otel` exports session records through the OTel JS SDK only after new explicit feedback, for all users and providers, including `deepseek-official`. `FEEDBACK_ONLY` releases the canonical prefix through that feedback, including context; later records wait for the next explicit feedback. `DISABLED` constructs no transport. SDK batching can finish an authorized upload without another user interaction or model call. Deployments own their redaction rules.
+`dsh-session-telemetry-otel` exports session records through the OTel JS SDK only after new explicit feedback, for all users and providers, including `deepseek-official`. `FEEDBACK_ONLY` releases the canonical prefix through that feedback, including context; later records wait for the next explicit feedback. `DISABLED` constructs no transport. The bounded queue can finish an authorized upload without another user interaction or model call. Deployments own their redaction rules.
 
 ## Table of Contents
 
@@ -38,7 +38,8 @@ The OpenTelemetry backend for [the telemetry seam](../session-telemetry/) — th
       url: https://collector.example.com/v1/logs
       headers:
         authorization: !!js `Bearer ${process.env.OTLP_TOKEN}`
-    processor: {}            # optional; passed verbatim to BatchLogRecordProcessor
+    maxRequestBytes: 4000000 # optional; uncompressed request ceiling, never above 4,000,000
+    processor: {}            # optional; count/queue/cadence/watchdog knobs of the bounded processor
 ```
 
 | `mode` | Behavior |
@@ -53,7 +54,7 @@ Upload authorization is positive and fail-closed. An unknown direct-construction
 
 The mounted service discloses the resolved mode through the seam's [`SessionTelemetrySharingStatus`](../session-telemetry/README.md#the-sharing-disclosure) `sharing` property (`full` / `feedback-only` / `disabled`), so the `/feedback` acknowledgement can report whether and how the session is shared. The disclosure is set in the constructor and is independent of capture: even `DISABLED` discloses `disabled`.
 
-`exporter.url` is required in `FULL` and `FEEDBACK_ONLY`, has no default, and must parse as `http(s)`; it is optional and unused in `DISABLED`. In uploading modes, `shutdownTimeoutMillis` is a positive finite DSH-owned outer deadline that defaults to 3000 ms, and a non-positive-integer `processor.maxExportBatchSize` also fails at plugin load because the SDK accepts it but then hangs on shutdown. Both SDK blocks pass through whole except self-observability metering (`selfObsMeterProvider`, which has no owning MeterProvider) and `exporter.httpAgentOptions`, which this package wraps so every transport agent is tracked for shutdown teardown; every other `OTLPExporterNodeConfigBase` field (`headers`, `timeoutMillis`, `compression`, `keepAlive`, …) reaches the exporter, and batching, export cadence (`scheduledDelayMillis`), retry, queue bounds, and loss policy under sustained failure are SDK behavior tuned through `processor`. The backend implements no `flush()`: the batch processor owns ordinary flushing. During shutdown, OTel awaits `exporter.forceFlush()` before the processor's `exportTimeoutMillis`-bounded completion promise; if that transport promise never settles, this package abandons the wait at `shutdownTimeoutMillis`, logs the contained shutdown failure through the coordinator, and lets application teardown continue. Either way — deadline or clean completion — every tracked transport agent is then destroyed, so a hung in-flight request fails instead of lingering and the idle keepAlive sockets the SDK's no-op transport shutdown leaves behind cannot hold the process open.
+`exporter.url` is required in `FULL` and `FEEDBACK_ONLY`, has no default, and must parse as `http(s)`; it is optional and unused in `DISABLED`. In uploading modes, `shutdownTimeoutMillis` is a positive finite DSH-owned outer deadline that defaults to 3000 ms. `maxRequestBytes` bounds each OTLP request in uncompressed UTF-8 bytes, envelope included, and may lower but never exceed the collector ceiling of 4,000,000; every `processor` knob (`maxQueueSize`, `maxExportBatchSize`, `scheduledDelayMillis`, `exportTimeoutMillis`) must be a positive integer no greater than 2,147,483,647, and `maxExportBatchSize` must not exceed `maxQueueSize` — all of these fail at plugin load. The processor measures each record once through the SDK's own request serializer and packs requests greedily under the byte and count limits; a single oversized record is diagnosed once through `ctx.logger.warn` and dropped rather than truncated, never blocking later records, and a full queue rejects new records the same way. One HTTP request owns the transport slot until settlement: `processor.exportTimeoutMillis` is a watchdog warning, not an abort. Both SDK option blocks pass through whole except self-observability metering (`selfObsMeterProvider`, which has no owning MeterProvider) and `exporter.httpAgentOptions`, which this package wraps so every transport agent is tracked for shutdown teardown; every other `OTLPExporterNodeConfigBase` field (`headers`, `timeoutMillis`, `compression`, `keepAlive`, …) reaches the exporter, and transport retry and socket behavior under sustained failure remain the SDK exporter's. The backend implements no `flush()`: the processor owns ordinary flushing. During shutdown the provider awaits the drain plus `exporter.forceFlush()`, which can remain pending when the transport never obtains a socket; if it does not settle by `shutdownTimeoutMillis`, the queued records are dropped, the contained shutdown failure is logged through the coordinator, and application teardown continues. Either way — deadline or clean completion — every tracked transport agent is then destroyed, so a hung in-flight request fails instead of lingering and the idle keepAlive sockets the SDK's no-op transport shutdown leaves behind cannot hold the process open.
 
 <a id="what-leaves-the-machine"></a>
 ## What leaves the machine
@@ -68,7 +69,7 @@ Seam record → SDK log record: `time` → `timestamp`/`observedTimestamp`; `sev
 <a id="invariants"></a>
 ## Invariants
 
-**Runtime invariant:** No companion is published. Records are handed to the vendor SDK's own batching and export pipeline; the backend owns no queueing or retry state to compare.
+**Runtime invariant:** No companion is published. The bounded queue holds records exactly as emitted; no second projection exists to compare.
 
 <a id="model-experience"></a>
 ## Model Experience

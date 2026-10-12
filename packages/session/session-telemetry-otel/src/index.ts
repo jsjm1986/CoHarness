@@ -1,13 +1,15 @@
 /**
  * OpenTelemetry Service Provider for the DeepSeek Harness telemetry capability.
  *
- * Composes the OTel JS SDK as-is — a `LoggerProvider` with a
- * `BatchLogRecordProcessor` and an OTLP/HTTP log exporter — and maps each
- * record handed over by the capture coordinator onto `logger.emit()`. After that call,
- * batching, retry, queueing, and loss policy use the SDK's documented behavior, configured
- * verbatim through the `exporter`/`processor` passthroughs. This package owns
- * capture mode and an outer shutdown deadline: the SDK's export timeout does
- * not bound its preceding `forceFlush()` wait.
+ * Composes a `LoggerProvider` with the package's byte/count-bounded processor
+ * and an OTLP/HTTP log exporter — and maps each record handed over by the
+ * capture coordinator onto `logger.emit()`. The processor measures every
+ * record once through the SDK's request serializer and packs requests
+ * greedily under the collector's uncompressed byte ceiling
+ * (`maxRequestBytes`, at most {@link TELEMETRY_MAX_REQUEST_BYTES}); one HTTP
+ * request owns the transport slot until settlement. This package also owns
+ * capture mode and an outer shutdown deadline: at that deadline queued
+ * records are dropped and every tracked transport agent is destroyed.
  *
  * @module @deepseek-ai/dsh-session-telemetry-otel
  */
@@ -28,11 +30,7 @@ import {
 } from '@deepseek-ai/dsh-session-telemetry'
 import { APP_IDENTITY } from '@deepseek-ai/dsh-llm'
 import { getOrCreateAnonymousUserId } from '@deepseek-ai/dsh-anonymous-user-id'
-import {
-  BatchLogRecordProcessor,
-  LoggerProvider,
-  type BatchLogRecordProcessorOptions,
-} from '@opentelemetry/sdk-logs'
+import { LoggerProvider } from '@opentelemetry/sdk-logs'
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http'
 import type { OTLPExporterNodeConfigBase } from '@opentelemetry/otlp-exporter-base'
 import { httpAgentFactoryFromOptions } from '@opentelemetry/otlp-exporter-base/node-http'
@@ -40,6 +38,12 @@ import type { Agent as HttpAgent } from 'node:http'
 import type { Agent as HttpsAgent } from 'node:https'
 import { SeverityNumber, type AnyValue } from '@opentelemetry/api-logs'
 import { resourceFromAttributes } from '@opentelemetry/resources'
+import {
+  ByteBoundedLogProcessor,
+  resolveTelemetryLimits,
+  resolveTelemetryProcessorConfig,
+  type TelemetryProcessorOptions,
+} from './processor.ts'
 
 // The package's own manifest is the single source of the instrumentation-scope
 // version (same pattern as dsh-llm's attribution identity).
@@ -141,12 +145,15 @@ export interface Config {
     url?: string
   }
   /**
-   * Passed verbatim to `BatchLogRecordProcessor` (minus the exporter slot,
-   * which this plugin fills, and self-observability metering, which no
-   * owning MeterProvider exists to consume); the SDK owns and documents
-   * these knobs.
+   * Count, queue, cadence, and per-request watchdog settings for the
+   * byte-bounded processor (minus the exporter slot, which this plugin
+   * fills, and self-observability metering, which no owning MeterProvider
+   * exists to consume). A watchdog warning never releases an unsettled
+   * transport slot.
    */
-  processor?: Omit<BatchLogRecordProcessorOptions, 'exporter' | 'selfObsMeterProvider'>
+  processor?: TelemetryProcessorOptions
+  /** Uncompressed OTLP request byte limit, at most 4,000,000. */
+  maxRequestBytes?: number
   /** Maximum time spent awaiting the SDK provider's complete shutdown path. */
   shutdownTimeoutMillis?: number
 }
@@ -162,6 +169,7 @@ export const Config: z<Config> = z.object({
   mode: z.union(Object.values(SessionTelemetryMode)).default(DEFAULT_TELEMETRY_MODE),
   exporter: z.any(),
   processor: z.any(),
+  maxRequestBytes: z.number(),
   shutdownTimeoutMillis: z.number(),
 })
 
@@ -190,6 +198,7 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
   static Config = Config
 
   private readonly provider: LoggerProvider | undefined
+  private readonly processor: ByteBoundedLogProcessor | undefined
   private readonly shutdownTimeoutMillis: number
   /**
    * Agents the transport created through the tracking factory, at most one
@@ -206,6 +215,7 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
     this.sharing = sharingStatusFor(mode)
     if (mode === SessionTelemetryMode.DISABLED) {
       this.provider = undefined
+      this.processor = undefined
       this.shutdownTimeoutMillis = DEFAULT_SHUTDOWN_TIMEOUT_MILLIS
       ctx.on('session/event', (session, event) => {
         if (isFeedback(session, event)) ctx.logger.warn(DISABLED_FEEDBACK_WARNING)
@@ -227,19 +237,30 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       throw new Error(`session-telemetry-otel: exporter.url must be http(s), got ${parsed.protocol}`)
     }
-    // The one processor field checked beyond the SDK's own validation: the
-    // SDK accepts a non-positive batch size, but its shutdown drain then
-    // splices empty batches without consuming the queue — dispose would hang
-    // forever with records queued. Misconfiguration fails at load instead.
-    const batchSize = config.processor?.maxExportBatchSize
-    if (batchSize !== undefined && (!Number.isInteger(batchSize) || batchSize < 1)) {
-      throw new Error(`session-telemetry-otel: processor.maxExportBatchSize must be a positive integer, got ${String(batchSize)}`)
-    }
+    const requestLimit = resolveTelemetryLimits({
+      ...(config.maxRequestBytes === undefined ? {} : { maxRequestBytes: config.maxRequestBytes }),
+      ...(config.processor === undefined ? {} : { processor: config.processor }),
+    })
     const shutdownTimeoutMillis = config.shutdownTimeoutMillis ?? DEFAULT_SHUTDOWN_TIMEOUT_MILLIS
     if (!Number.isFinite(shutdownTimeoutMillis) || shutdownTimeoutMillis <= 0 || shutdownTimeoutMillis > MAX_TIMER_DELAY_MILLIS) {
       throw new Error(`session-telemetry-otel: shutdownTimeoutMillis must be a positive finite number no greater than ${MAX_TIMER_DELAY_MILLIS}, got ${String(shutdownTimeoutMillis)}`)
     }
     this.shutdownTimeoutMillis = shutdownTimeoutMillis
+    this.processor = new ByteBoundedLogProcessor(
+      // The complete validated exporter object, verbatim: every SDK
+      // option (`timeoutMillis`, `compression`, `keepAlive`, …) reaches
+      // the exporter — rebuilding selected fields here would silently
+      // ignore the rest. App identity travels in the Resource
+      // (service.name/version); the transport-level user-agent is the
+      // SDK's own, per the axiom.
+      new OTLPLogExporter({
+        ...config.exporter,
+        httpAgentOptions: trackedAgentFactory(config.exporter, this.transportAgents),
+      }),
+      requestLimit,
+      resolveTelemetryProcessorConfig(config.processor),
+      (message, error) => { ctx.logger.warn(message, error) },
+    )
     this.provider = new LoggerProvider({
       resource: resourceFromAttributes({
         'service.name': APP_IDENTITY.product,
@@ -249,21 +270,7 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
         // aggregates by Resource, and the id is process-stable anyway.
         'user.id': getOrCreateAnonymousUserId(),
       }),
-      processors: [
-        new BatchLogRecordProcessor({
-          ...config.processor,
-          // The complete validated exporter object, verbatim: every SDK
-          // option (`timeoutMillis`, `compression`, `keepAlive`, …) reaches
-          // the exporter — rebuilding selected fields here would silently
-          // ignore the rest. App identity travels in the Resource
-          // (service.name/version); the transport-level user-agent is the
-          // SDK's own, per the axiom.
-          exporter: new OTLPLogExporter({
-            ...config.exporter,
-            httpAgentOptions: trackedAgentFactory(config.exporter, this.transportAgents),
-          }),
-        }),
-      ],
+      processors: [this.processor],
     })
     const ledger = this.provider.getLogger('@deepseek-ai/dsh-session-telemetry-otel', version)
     const enqueue: SessionTelemetrySink['emit'] = (record) => {
@@ -315,15 +322,15 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
 
   /**
    * Ask the SDK to drain and quiesce, but reject after the backend-owned
-   * deadline. OTel's processor export timeout wraps `exportCompleted` only;
-   * shutdown awaits `exporter.forceFlush()` first, which can remain pending
-   * when the transport never obtains a socket. On either outcome every
-   * tracked transport agent is destroyed: at the deadline this fails the
-   * in-flight request instead of leaving it pending behind the rejection,
-   * and on success it releases idle keepAlive sockets the SDK's no-op
-   * transport shutdown never closes. The provider promise remains observed
-   * after the deadline so a later rejection cannot become unhandled.
-   * `DISABLED` has no provider and resolves immediately.
+   * deadline. The processor's export watchdog warns without releasing an
+   * unsettled transport slot; shutdown awaits `exporter.forceFlush()` first,
+   * which can remain pending when the transport never obtains a socket. At
+   * the deadline the queued records are dropped and every tracked transport
+   * agent is destroyed: this fails the in-flight request instead of leaving
+   * it pending behind the rejection, and on success releases idle keepAlive
+   * sockets the SDK's no-op transport shutdown never closes. The provider
+   * promise remains observed after the deadline so a later rejection cannot
+   * become unhandled. `DISABLED` has no provider and resolves immediately.
    * @returns resolves when the SDK pipeline quiesces or is disabled, or rejects at the configured deadline.
    */
   async shutdown(): Promise<void> {
@@ -332,6 +339,7 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
     let timer: ReturnType<typeof setTimeout> | undefined
     const deadline = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {
+        this.processor?.stopPending()
         reject(new Error(`session-telemetry-otel: provider shutdown exceeded ${this.shutdownTimeoutMillis}ms`))
       }, this.shutdownTimeoutMillis)
     })

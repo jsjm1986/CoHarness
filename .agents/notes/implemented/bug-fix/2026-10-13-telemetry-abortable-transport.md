@@ -11,7 +11,7 @@ English | [中文](2026-10-13-telemetry-abortable-transport.zh.md)
 - A hung in-flight export kept its socket after the deadline rejected; the provider promise and the keepAlive agent lingered, so the transport the deadline was written to bound stayed alive anyway.
 - The SDK's HTTP transport `shutdown()` is a no-op and never destroys the agent it creates lazily, so even a clean shutdown left idle keepAlive sockets holding the process open past plugin disposal.
 
-Upstream's equivalent fix (`stopPending` inside its `dsh-otel` reporter) rides the reporter architecture this tree does not carry; this backend composes the raw SDK pipeline, so the abort point has to live at the one seam the SDK exposes — the agent factory.
+Upstream's equivalent fix (`stopPending` inside its `dsh-otel` reporter) rides a shared reporter service this tree does not carry; this backend composes its own pipeline, so the abort point has to live at the seam the SDK exposes — the agent factory. The byte-bounded processor's `stopPending` drops the queue at the same deadline; the agents still cover the in-flight transport the SDK cannot cancel.
 
 ## Decision
 

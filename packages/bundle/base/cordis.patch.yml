@@ -166,11 +166,11 @@
     # to ~1s against an unreachable collector: exporter.timeoutMillis is both
     # the per-attempt socket timeout and the retry deadline (1s effectively
     # disables the SDK's 5-try backoff), while maxExportBatchSize == maxQueueSize
-    # (both explicit) makes the drain a single batch. The SDK awaits
-    # exporter.forceFlush() outside exportTimeoutMillis, so the backend's 3s
-    # shutdownTimeoutMillis is the load-bearing outer bound when a transport
-    # promise never settles. Every CLI exit path drains it by disposing the root
-    # on SIGINT/SIGTERM.
+    # (both explicit) makes the drain a single batch. The byte-bounded
+    # processor treats exportTimeoutMillis as a watchdog warning, so the
+    # backend's 3s shutdownTimeoutMillis is the load-bearing outer bound when
+    # a transport promise never settles. Every CLI exit path drains it by
+    # disposing the root on SIGINT/SIGTERM.
     - id: session-telemetry-otel
       name: '@deepseek-ai/dsh-session-telemetry-otel'
       config:

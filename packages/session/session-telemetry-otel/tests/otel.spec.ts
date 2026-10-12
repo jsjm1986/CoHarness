@@ -26,6 +26,8 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import OpenTelemetrySessionBackend, { Config, DEFAULT_TELEMETRY_MODE, SessionTelemetryMode } from '../src/index.ts'
 
 interface Capture {
+  /** Uncompressed request size the byte bound applies to. */
+  bytes: number
   headers: import('node:http').IncomingHttpHeaders
   body: OtlpLogsRequest
 }
@@ -89,6 +91,7 @@ async function mockCollector(
         const raw = Buffer.concat(chunks)
         const body = request.headers['content-encoding'] === 'gzip' ? gunzipSync(raw) : raw
         captures.push({
+          bytes: body.length,
           headers: request.headers,
           body: JSON.parse(body.toString()) as OtlpLogsRequest,
         })
@@ -250,6 +253,41 @@ describe('OpenTelemetrySessionBackend wire', () => {
     expect(eventTypes(captures)).not.toContain('manual')
     expect(eventTypes(captures)).toEqual(session.snapshotEvents().map(event => event.type))
     expect(ops).toHaveLength(0)
+  })
+
+  it('bounds every OTLP request under maxRequestBytes and drops oversized records', async () => {
+    const { url, captures } = await mockCollector()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    const fiber = await ctx.plugin(OpenTelemetrySessionBackend, {
+      mode: SessionTelemetryMode.FEEDBACK_ONLY,
+      exporter: { url },
+      maxRequestBytes: 2_048,
+      processor: { scheduledDelayMillis: 5 },
+    })
+    const session = ctx.sessions.create(SessionId('byte-bound'), { meta: {} })
+    session.append('request/header', { header: { config: { provider: 'mock', model: 'mock' } }, reason: 'initial' })
+    for (let turn = 1; turn <= 6; turn++) session.append('turn/start', { turn })
+    session.append('assistant/message', {
+      turn: 6,
+      step: 1,
+      message: createAssistantMessage({
+        content: [{ type: 'text', text: 'oversized'.repeat(2_000) }],
+        source: { provider: 'mock', model: 'mock' },
+      }),
+      stream: [],
+    }, { surfaceOp: 'append' })
+    session.append('turn/end', { turn: 6, reason: { kind: 'completed' } })
+    recordFeedback(session, { text: 'report' })
+    await fiber.dispose()
+
+    expect(captures.length).toBeGreaterThan(1)
+    expect(captures.every(capture => capture.bytes <= 2_048)).toBe(true)
+    const types = eventTypes(captures)
+    expect(types).not.toContain('assistant/message')
+    expect(types).toContain('turn/end')
+    expect(warn).toHaveBeenCalledWith('Session telemetry record rejected; content was not truncated', expect.any(Error))
   })
 
   it('drains records enqueued after a timer export began: dispose during an in-flight batch', async () => {
@@ -664,10 +702,14 @@ describe('OpenTelemetrySessionBackend config fails loud', () => {
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'ftp://collector' } }, /must be http\(s\)/],
     [{ mode: 'INVALID' }, /INVALID/],
     [{ mode: 'FULL' }, /FULL/],
-    // The SDK accepts a non-positive batch size but its shutdown drain then
-    // splices empty batches forever — dispose would hang, so reject at load.
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, processor: { maxExportBatchSize: 0 } }, /maxExportBatchSize/],
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, processor: { maxExportBatchSize: 0.5 } }, /maxExportBatchSize/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, processor: { maxQueueSize: 0 } }, /maxQueueSize/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, processor: { maxQueueSize: 1, maxExportBatchSize: 2 } }, /must not exceed/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, processor: { exportTimeoutMillis: 0 } }, /exportTimeoutMillis/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, maxRequestBytes: 0 }, /maxRequestBytes/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, maxRequestBytes: 4_000_001 }, /maxRequestBytes/],
+    [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, maxRequestBytes: 1.5 }, /maxRequestBytes/],
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, shutdownTimeoutMillis: 0 }, /shutdownTimeoutMillis/],
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, shutdownTimeoutMillis: Number.POSITIVE_INFINITY }, /shutdownTimeoutMillis/],
   ])('rejects %j at plugin load', async (config, message) => {

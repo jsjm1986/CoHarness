@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-13-telemetry-byte-bounded-requests.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-13-telemetry-byte-bounded-requests.md
+/agent-note-byte-bounded-otlp-request-scheduling-for-session-telemetry:
+  en: 1428d1c9eb8b1de7
+  zh: aa30d3058abac990
+/agent-note-byte-bounded-otlp-request-scheduling-for-session-telemetry/problem:
+  en: 0645dd08d6aed043
+  zh: 21e301935b0e2e3a
+/agent-note-byte-bounded-otlp-request-scheduling-for-session-telemetry/decision:
+  en: d6ce83f8172b096f
+  zh: 7f5d63216071f370
+/agent-note-byte-bounded-otlp-request-scheduling-for-session-telemetry/alternatives-considered:
+  en: 1c0de8ee36540ae8
+  zh: 45bfd990f18b7334
+/agent-note-byte-bounded-otlp-request-scheduling-for-session-telemetry/consequences:
+  en: 138d712ff75e1cda
+  zh: 82c30e48f7102256
+/agent-note-byte-bounded-otlp-request-scheduling-for-session-telemetry/verification:
+  en: aeb8f84c3ca38dce
+  zh: 746c852a5c268f2d
+/agent-note-byte-bounded-otlp-request-scheduling-for-session-telemetry/related:
+  en: 6c9abee31e5ff7b0
+  zh: 8c393d7713395952

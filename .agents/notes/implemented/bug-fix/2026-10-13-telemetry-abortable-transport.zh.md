@@ -11,7 +11,7 @@ Status: implemented
 - 挂起的在途导出在截止拒绝后仍持有 socket;provider promise 与 keepAlive agent 继续滞留——deadline 本意要约束的 transport 照样活着。
 - SDK 的 HTTP transport `shutdown()` 是空实现，从不销毁它惰性创建的 agent，所以即使正常关闭也会留下占住进程的空闲 keepAlive socket。
 
-上游的等价修复（其 `dsh-otel` reporter 内的 `stopPending`）依附于本树没有的 reporter 架构；此后端直接组合原生 SDK 管线，取消点只能落在 SDK 暴露的唯一接缝上——agent 工厂。
+上游的等价修复（其 `dsh-otel` reporter 内的 `stopPending`）依附于本树没有的共享 reporter 服务；此后端组合自有管线，取消点只能落在 SDK 暴露的接缝上——agent 工厂。字节有界处理器的 `stopPending` 在同一截止时间丢弃队列；agent 仍覆盖 SDK 无法取消的在途传输。
 
 ## Decision
 
