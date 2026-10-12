@@ -16,7 +16,7 @@ import Include, { type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { collectConfigSchemas } from '../src/config-schema/collect.ts'
 import { generateConfigSchema } from '../src/config-schema/index.ts'
 import * as profileOperations from '../src/profile.ts'
-import type { Profile, RuntimeResolution } from '../src/profile.ts'
+import { ProfileRuntimeResolution, type Profile } from '../src/profile.ts'
 import { installRuntimeInterception } from '../src/profile-resolution/resolver.ts'
 
 const dispose = vi.hoisted(() => vi.fn())
@@ -27,7 +27,7 @@ vi.mock('../src/profile-resolution/resolver.ts', () => ({
 
 let dir: string
 let profile: Profile
-let resolution: RuntimeResolution
+let resolution: ProfileRuntimeResolution
 const modules = new Map<string, unknown>()
 const importModule = vi.fn(async (name: string): Promise<unknown> => {
   if (!modules.has(name)) throw new Error(`cannot import ${name}`)
@@ -37,7 +37,8 @@ const importModule = vi.fn(async (name: string): Promise<unknown> => {
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'dsh-config-schema-'))
   profile = { skippedBundles: [], name: 'test', dir, patchPath: join(dir, 'cordis.patch.yml'), patches: [], layers: [] }
-  resolution = { profilesDir: dir, profileDir: dir, localPackageNames: [], entries: [], linkedRoots: [] }
+  resolution = new ProfileRuntimeResolution({ installAnchor: join(dir, 'installation.json'), home: dir, profileDir: dir },
+    { profilesDir: dir, profileDir: dir, localPackageNames: [], entries: [], linkedRoots: [] })
   const loader = ModuleLoader.fromInternal()
   if (loader === undefined) throw new Error('test requires supported Node internals')
   vi.spyOn(ModuleLoader, 'fromInternal').mockReturnValue({ ...loader, import: importModule })

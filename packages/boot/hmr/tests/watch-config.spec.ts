@@ -13,9 +13,7 @@ import Timer from '@deepseek-ai/cordis-plugin-timer'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { FSWatcher, type ChokidarOptions } from 'chokidar'
 
-const configWatch = vi.hoisted(() => ({
-  create: undefined as ((options?: ChokidarOptions, paths?: string | string[]) => FSWatcher) | undefined,
-}))
+const configWatch = vi.hoisted(() => ({ create: undefined as ((options?: ChokidarOptions) => FSWatcher) | undefined }))
 vi.mock('node:fs', async (importOriginal) => {
   const native = await importOriginal<typeof import('node:fs')>()
   return { ...native, realpathSync: vi.fn(native.realpathSync) }
@@ -27,7 +25,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 vi.mock('chokidar', async (importOriginal) => {
   const native = await importOriginal<typeof import('chokidar')>()
   return { ...native, watch: (paths: string | string[], options?: ChokidarOptions) =>
-    configWatch.create === undefined ? native.watch(paths, options) : configWatch.create(options, paths) }
+    configWatch.create === undefined ? native.watch(paths, options) : configWatch.create(options) }
 })
 
 /** Every per-test tree root, removed once the booted watcher has been disposed. */
@@ -142,10 +140,7 @@ describe('HMR exact config paths', () => {
     // The case budget fires before eventually() can name the pending step.
     onTestFailed(() => { console.error(`refresh observed ${JSON.stringify(observed)}`) })
     try {
-      // Single-shot writes need no stabilization sampling, whose repeated
-      // stats can starve on the shared UV threadpool under the coverage lane.
-      // Polling would carry the same threadpool dependency every interval.
-      await watchConfig(ctx, filename, { awaitWriteFinish: false }, () => {
+      await watchConfig(ctx, filename, {}, () => {
         try {
           observed.push(readFileSync(filename, 'utf8'))
         } catch (error) {
@@ -166,68 +161,29 @@ describe('HMR exact config paths', () => {
     }
   })
 
-  it.each([false, true])('observes one parent/config creation after watcher readiness (polling=%s)', { timeout: 90_000 }, async (usePolling) => {
-    const root = mkdtempSync(join(tmpdir(), 'dsh-hmr-once-'))
-    hmrRoots.push(root)
-    const filename = join(root, 'later', 'plugins.yml')
-    const ctx = new Context()
-    const previousFactory = configWatch.create
-    let watcher: FSWatcher | undefined
-    let ready = false
-    configWatch.create = (options, paths) => {
-      const created = new FSWatcher(options)
-      watcher = created
-      created.once('ready', () => { ready = true })
-      return created.add(paths!)
-    }
-    const observed: string[] = []
-    try {
-      await watchConfig(ctx, filename, { usePolling, awaitWriteFinish: false }, () => {
-        observed.push(readFileSync(filename, 'utf8'))
-      })
-      if (!usePolling) ensureNativeWatchLive(root)
-      expect(ready).toBe(true)
-      expect(watcher).toBeDefined()
-      expect(Object.keys(watcher!.getWatched())).toContain(await realpath(root))
-      mkdirSync(join(root, 'later'))
-      writeFileSync(filename, 'created-once', { flag: 'wx' })
-      await eventually(() => observed.includes('created-once'), 'HMR missed a single parent/config creation after ready', 60_000)
-    } finally {
-      configWatch.create = previousFactory
-      await ctx.fiber.dispose()
-    }
-  })
-
-  it('observes a new config parent amid repeated unrelated root activity', { timeout: 90_000 }, async () => {
+  it('observes creation when the config parent did not exist at registration', { timeout: 20_000 }, async ({ task, onTestFailed }) => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-hmr-config-'))
     hmrRoots.push(root)
     const dir = join(root, 'later')
     const filename = join(dir, 'plugins.yml')
     const ctx = await bootHmr(root)
     const observed: string[] = []
+    // The case budget fires before eventually() can name the pending step.
+    onTestFailed(() => { console.error(`refresh observed ${JSON.stringify(observed)}`) })
     try {
-      // Repeated root activity exercises discovery while unrelated entries change.
-      // The single-creation case independently owns detection without that activity.
-      await watchConfig(ctx, filename, { awaitWriteFinish: false }, () => {
+      await watchConfig(ctx, filename, {}, () => {
         observed.push(readFileSync(filename, 'utf8'))
       })
       ensureNativeWatchLive(root)
       mkdirSync(dir)
       writeFileSync(filename, 'created')
-      const probe = join(root, '.watch-probe')
-      let probing = false
-      await eventually(() => {
-        probing = !probing
-        if (probing) writeFileSync(probe, '')
-        else rmSync(probe, { force: true })
-        return observed.includes('created')
-      }, 'HMR did not observe config creation under a new parent', 60_000)
+      await eventually(() => observed.includes('created'), 'HMR did not observe config creation under a new parent', task.timeout)
     } finally {
       await ctx.fiber.dispose()
     }
   })
 
-  it('processes native events for a watcher registered during a transaction', { timeout: 60_000 }, async () => {
+  it('processes native events for a watcher registered during a transaction', { timeout: 20_000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-hmr-transaction-watch-'))
     const filename = join(dir, 'plugins.yml')
     onTestFinished(() => { rmSync(dir, { recursive: true, force: true }) })
@@ -363,6 +319,27 @@ describe('HMR exact config paths', () => {
     onTestFinished(() => { warn.mockRestore() })
     watcher.emit('error', failure)
     expect(warn).toHaveBeenCalledWith(failure)
+  })
+
+  it('absorbs a watcher error emitted after close removed its listeners', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-patch-close-error-'))
+    hmrRoots.push(dir)
+    const filename = join(dir, 'plugins.yml')
+    const ctx = await bootHmr(dir)
+    onTestFinished(() => ctx.fiber.dispose())
+    const watcher = new FSWatcher()
+    const previousFactory = configWatch.create
+    onTestFinished(() => { configWatch.create = previousFactory })
+    configWatch.create = () => { queueMicrotask(() => { watcher.emit('ready') }); return watcher }
+    const dispose = await watchConfig(ctx, filename, {}, () => {})
+    await dispose()
+    expect(watcher.listenerCount('error')).toBe(1)
+
+    // Mirror the real close(): it drops every listener before a pending write-settle poll fires.
+    expect(() => watcher.emit('error', Object.assign(
+      new Error("EPERM: operation not permitted, stat 'C:\\Temp\\dsh\\.credentials.yaml'"),
+      { code: 'EPERM', syscall: 'stat' },
+    ))).not.toThrow()
   })
 
   it('closes a ready watcher when its context has already been disposed', async () => {

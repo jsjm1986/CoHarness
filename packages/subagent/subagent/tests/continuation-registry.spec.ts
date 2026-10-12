@@ -162,7 +162,7 @@ describe('waitForChildren', () => {
     const closing = Promise.withResolvers<undefined>()
     internals.resident.set(SessionId('child-1'), runningActivation(SessionId('child-1'), parent, { closing: closing.promise }))
     const wait = registry.waitForChildren(parent)
-    closing.resolve()
+    closing.resolve(undefined)
     internals.resident.delete(SessionId('child-1'))
     await expect(wait).resolves.toBe(true)
   })

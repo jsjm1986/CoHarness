@@ -198,6 +198,8 @@ export interface ChangeResult {
   packageResult?: PackageResult
   /** The bundle an installation added, once pnpm and the bundle check accepted it. */
   bundle?: string
+  /** The installed bundle's manifest version, when declared; pnpm's `minimumReleaseAge` can make it older than the newest release. */
+  version?: string
   /**
    * Exact `allowBuilds` keys awaiting an explicit script decision in the profile's `pnpm-workspace.yaml`
    * — bare package names for registry packages, source-qualified keys for file/git sources; reported

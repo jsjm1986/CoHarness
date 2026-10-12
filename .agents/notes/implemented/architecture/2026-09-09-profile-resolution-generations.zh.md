@@ -8,11 +8,11 @@ Status: implemented
 
 profile 从自己的包项目加载插件配置项，而 Harness 包和所选 bundle 携带的包可能位于该项目普通依赖树之外。通过共享 symlink、profile 自有链接或打包可执行文件的代理包连接两棵依赖树，会让选包结果跨进程和安装版本持续存在。这些文件需要协调和锁来维护，并向元数据读取方暴露生成的代理 manifest（元数据清单），也无法原子表示进程内变更。
 
-运行时设计保留安装优先、有序 bundle 和本地包优先于 fallback 的顺序。它覆盖插件模块内部的 import 以及 Loader 配置项的 import，并在主线程和 Harness 自有 Worker 中工作。generation 替换保留既有包映射和本地包名，允许调整 linked root 集合，不会逐项修改正在使用的表。
+运行时设计保留安装优先、有序 bundle 和本地包优先于 fallback 的顺序。它覆盖插件模块内部的 import 以及 Loader 配置项的 import，并在主线程和 Harness 自有 Worker 中工作。generation 替换固定保留映射与安装锚点，允许调整 linked root 集合、在对应插件停止后移除 profile 作用域条目和本地包名，不会逐项修改正在使用的表。
 
 ## Decision
 
-profile 启动生成一个不可变 `RuntimeResolution`，并将其安装到 Node 的 ESM 与 CommonJS 解析器。runtime 是唯一的解析后端，不提供模式选择器或磁盘物化器。`PluginPackages.replace()` 通过一次引用替换发布完整的后继 generation。
+profile 启动生成一个不可变 `RuntimeResolution`，并将其安装到 Node 的 ESM 与 CommonJS 解析器。runtime 是默认后端；`runProfile` 的 plain-Node 调用方可选 link 模式将表物化为软链接，或 dual 模式物化并校验。`PluginPackages.replace()` 通过一次引用替换发布完整的后继 generation。
 
 ### 唯一选包算法
 
@@ -107,7 +107,7 @@ runtime resolution 列出它提供的包；Loader entries 组成活动插件列�
 
 添加包的调用方先完成 pnpm 事务，再构造下一代。替换操作会拒绝改变任何既有 package name 的目录或版本。调用方先发布只增加映射的后继 generation，再挂载新的 Loader 配置项；本实现不提供该包事务。挂载失败可以留下已安装但未启用的包。
 
-修改或删除既有运行时包映射，或删除已记录的 profile 本地包名，需要重启，因为 Node 的 ESM Module Map、CommonJS cache、现存对象引用和运行中的 Worker 都可能保留旧模块 identity。这些限制不禁止从拦截范围移除 linked root。generation 换代不声称卸载模块。
+修改保留映射的规范化目录、版本或作用域，移除 installation 作用域映射，让新的本地包名覆盖既有映射，或让已发布的链接名指向不同目录，都需要重启，因为 Node 的 ESM Module Map、CommonJS cache、现存对象引用和运行中的 Worker 都可能保留旧模块 identity。后继 generation 可以在对应插件停止后移除 `scope: profile` 映射和本地包名，保留的 profile 映射可以更换声明锚点；[刷新 Note](2026-10-13-profile-package-refresh-and-manifest-invalidation.zh.md) 记录这些发布点。这些限制不禁止从拦截范围移除 linked root。generation 换代不声称卸载模块。
 
 ### 文件系统与运行时载体
 

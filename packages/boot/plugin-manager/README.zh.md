@@ -51,7 +51,7 @@ kind: "package-reference"
 
 可在浏览器使用的 `@deepseek-ai/dsh-plugin-manager/registry` 入口导出 `OFFICIAL_NPM_REGISTRY` 和 `NPMMIRROR_REGISTRY`，供消费方识别这两个公共注册表。
 
-`installBundle` 接受调用方生成的 `requestId`，`plugin-manager/install-log` 在其下流式转发每次 pnpm 运行的输出，`plugin-manager/install-state` 通告 `installing`、`cancelling` 与 `applying`；运行在排队时通告一次 `installing`，此后每问一个注册表再通告一次，`attempt` 带上这次的注册表、序号和计划长度。安装沿用查询的计划，从 `options.registry` 开始，以 `--registry` 运行 `pnpm add`，两次尝试之间恢复 profile 文件；换一个注册表能改变的失败才转问下一个，其他失败即停，错误行点名 git 或 tarball spec 自身拉取主机的失败也停，因为没有注册表能替代那台主机；`failedAt` 说明最后一次失败的运行连不上的是二者中的哪一个。`cancelInstall(requestId)` 停止运行，只在 Git 检查或 pnpm 退出且文件恢复后答复 `cancelled`，组合包已在应用时答复 `too-late`，其他 id 答复 `not-running`；安装调用随后报告 `application: 'cancelled'`。失败、被取消或装入了没有组合包 patch 的包的运行，会把 `package.json` 与 `pnpm-lock.yaml` 恢复原样；`packageResult.kind` 按退出方式与输出对最后一次运行分类，`registries` 列出问过的每个注册表，`bundle` 给出完成的运行新增的包。`listBundles` 携带每个组合包的一句话简介（包的 `description`）、其 patch 声明的行及其存活条目，以及它覆盖的内置行；它列出 profile 自己的组合包、安装提供的组合包，以及被选中却没有组合包 patch 的名字（作为 `not-bundle` 问题），未选中的普通依赖不列出。启动器的 `OPTIONAL_BUNDLES` 点名的组合包是 `optional`：随安装提供、默认关闭、由用户开启，永不可卸载，也不被任何随附模板选中（[理由](../../../.agents/notes/implemented/process/2026-09-15-shipped-optional-bundles.zh.md)）。每个完成的操作都会发出 `plugin-manager/changed`；在管理器之外应用的一代 patch（HMR 监视到 CLI 或手工编辑后）不发通知，页面要到下一次读取才知道。
+`installBundle` 接受调用方生成的 `requestId`，`plugin-manager/install-log` 在其下流式转发每次 pnpm 运行的输出，`plugin-manager/install-state` 通告 `installing`、`cancelling` 与 `applying`；运行在排队时通告一次 `installing`，此后每问一个注册表再通告一次，`attempt` 带上这次的注册表、序号和计划长度。安装沿用查询的计划，从 `options.registry` 开始，以 `--registry` 运行 `pnpm add`，两次尝试之间恢复 profile 文件；换一个注册表能改变的失败才转问下一个，其他失败即停，错误行点名 git 或 tarball spec 自身拉取主机的失败也停，因为没有注册表能替代那台主机；`failedAt` 说明最后一次失败的运行连不上的是二者中的哪一个。`cancelInstall(requestId)` 停止运行，只在 Git 检查或 pnpm 退出且文件恢复后答复 `cancelled`，组合包已在应用时答复 `too-late`，其他 id 答复 `not-running`；安装调用随后报告 `application: 'cancelled'`。失败、被取消或装入了没有组合包 patch 的包的运行，会把 `package.json` 与 `pnpm-lock.yaml` 恢复原样；`packageResult.kind` 按退出方式与输出对最后一次运行分类，`registries` 列出问过的每个注册表，`bundle` 给出完成的运行新增的包，`version` 给出安装后清单的版本，它可能与 `inspect` 之前读到的版本不同，例如注册表在两次调用之间答复了更新的发布。`listBundles` 携带每个组合包的一句话简介（包的 `description`）、其 patch 声明的行及其存活条目，以及它覆盖的内置行；它列出 profile 自己的组合包、安装提供的组合包，以及被选中却没有组合包 patch 的名字（作为 `not-bundle` 问题），未选中的普通依赖不列出。启动器的 `OPTIONAL_BUNDLES` 点名的组合包是 `optional`：随安装提供、默认关闭、由用户开启，永不可卸载，也不被任何随附模板选中（[理由](../../../.agents/notes/implemented/process/2026-09-15-shipped-optional-bundles.zh.md)）。每个完成的操作都会发出 `plugin-manager/changed`；在管理器之外应用的一代 patch（HMR 监视到 CLI 或手工编辑后）不发通知，页面要到下一次读取才知道。
 
 `waitForInstall(requestId)` 让客户端在响应丢失后等待活动安装的结果，包括不可取消的应用阶段。它返回与原调用相同的结果，请求不在活动中时返回 `null`。已完成的结果不保留；`null` 不表示成功或已取消。
 
@@ -100,6 +100,8 @@ Gateway 管理的运行时还会在每次已提交的变更后，把观测到的
 <summary>实现细节——点击展开</summary>
 
 服务与 `dsh plugin` 共用 [operations.ts](src/operations.ts) 中的包管理操作。启动器提供当前 profile；[DSH HMR](../hmr/README.zh.md) 串行执行模块重载、文件监听和管理写入。每次刷新重新读取组合包选择与 patch 层，更新原有根 Include，并等待已移除插件释放资源及剩余 Loader 树稳定。CLI 与 service 操作共用 profile manifest 写锁，防止并发包操作和 manifest 写入。HMR 不获取该锁。pnpm 在 HMR 队列之外执行；安装在 pnpm 成功后选入组合包，删除则在执行 pnpm 前取消选入并完成卸载。service 运行若在 `idleTimeoutMs` 内没有任何捕获输出即被终止，与退出状态一并报告 `timedOut`，不论信号留下什么退出状态都归类为 `timeout`，且不再转问下一个注册表，因此单次操作占用 profile 锁的时长有上界；CLI 继承终端、不捕获输出，因此不受此上界约束，由操作者中断。运行以进程退出为完成点，随后只在一个有界的宽限窗口内排空管道，因此继承管道的孙进程无法让操作挂起。被终止的运行会停止整棵进程树并等待其消失，因为生命周期脚本的存活时间超过启动它的 pnpm 进程。每个操作把它启动的 pnpm 运行记录在 `.plugin-manager/run.json` 中，并在运行结束时删除该记录。持有者进程已退出的锁会被下一个写入方接管，但该进程的 pnpm 进程树可能仍在运行，因此发现记录的操作最多等待五秒让记录中的运行停止，否则不运行 pnpm，并以指明该进程与记录文件的诊断失败。仅依赖字段变化不会触发配置重载。
+
+安装新包、启用组合包、在 HMR 下于其插件停止后停用组合包，以及成功移除，都会发布 profile 的运行时解析。共享依赖在其规范化目录、版本与作用域保持不变时可以转移到另一个组合包的声明下。没有 HMR 时，被取消选中的启动组合包仍在运行：只要存在这类不在已保存选择中的组合包，其后的包操作都保留整份当前解析表并报告 `restart-required`。其他新安装与非运行中组合包的移除在没有 HMR 时仍可发布；激活等待重启。经由固化链接后端解析的启动没有可重新发布的拦截层，这些操作会跳过发布。覆盖已安装的包不发布任何内容并报告 `restart-required`。
 
 结果包含最后尝试的阶段、目标、磁盘变化、应用状态和错误码。Web 词典呈现管理文案；pnpm 与 Loader 的诊断保持原样。无关的已有故障作为警告返回；新出现、配置变化后的故障，以及显式启用目标未激活，都会使操作失败。失败或被取消的安装会恢复 pnpm 运行前快照的 manifest 与 lockfile（[理由](../../../.agents/notes/implemented/architecture/2026-09-15-guided-plugin-installation.zh.md)）；失败的删除保留部分改动和诊断。安装按 request id 跟踪到调用结束，因此取消只针对一次运行，并且不取 profile 锁就能等待它结束。CLI 继承认证环境和终端描述符；service 使用清理后的环境并捕获输出。管理器直接读取文件和 Loader 状态，不维护第二份目标状态注册表，因此不发布单独的运行时不变式伴生入口。
 
@@ -153,8 +155,9 @@ Gateway 管理的运行时还会在每次已提交的变更后，把观测到的
 | 安装：pnpm 执行或组合包校验失败 | 恢复 pnpm 运行前快照的 `package.json` 与 `pnpm-lock.yaml`；pnpm 已下载的文件可能保留。报告安装失败。 |
 | 启用：保存选择项或加载失败 | 保留已安装的依赖和已保存的选择项。报告启用失败，允许修正、停用或卸载。 |
 | 卸载：任一步失败 | 停在失败步骤，保留已完成的改动和待重试删除的依赖，报告卸载失败。不重新启用组合包。 |
+| 包操作成功后的解析发布失败 | 保留已完成的磁盘改动与之前的运行时表。以 `application: 'failed'` 报告发布诊断；pnpm 退出码为零不代表发布成功。 |
 
-pnpm 执行和组合包校验成功即完成安装，后续启用失败不撤销安装。卸载依次执行：从 `dsh.profile.bundles` 移除组合包、卸载运行时贡献、执行 `pnpm remove`。任一步失败都不继续执行后续步骤。
+pnpm 执行和组合包校验成功即完成安装，后续发布或启用失败不撤销安装。卸载依次执行：从 `dsh.profile.bundles` 移除组合包、卸载运行时贡献、执行 `pnpm remove`，然后发布运行时解析（除非有无 HMR 仍在运行的被取消选中的启动组合包）。任一步失败都不继续执行后续步骤；移除后的发布失败不会恢复已删除的包。一个既不在 profile 依赖中也不在安装中的选中名（例如已退休的组合包）同样可移除；其移除在取消选中后结束，不运行 pnpm。
 
 恢复只重写这两份快照文件；用户编写的 patch 配置、应用数据、诊断日志以及 pnpm 已下载的文件保持原样，没有 manifest 引用的包由下一次包操作清理。
 

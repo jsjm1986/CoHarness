@@ -12,7 +12,7 @@ import {
   type ProfileResolutionBehavior,
   type RuntimeInterception,
 } from './resolver.ts'
-import type { RuntimeResolution } from '../profile.ts'
+import { ProfileRuntimeResolution, type RuntimeResolution } from '../profile.ts'
 import { readPluginMeta } from '../package-meta.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -65,11 +65,13 @@ export class PluginPackages extends Service {
   private readonly interception: RuntimeInterception | undefined
   private readonly behavior: ProfileResolutionBehavior
   private disposeWorkerResolution: (() => void) | undefined
+  private current: RuntimeResolution | undefined
 
   constructor(ctx: Context, config: PluginPackagesConfig = {}) {
     super(ctx, 'pluginPackages')
     this.behavior = config.behavior ?? 'enforce'
     if (config.resolution === undefined) return
+    this.current = config.resolution
     const interception = installRuntimeInterception(config.resolution, this.behavior)
     this.disposeWorkerResolution = registerWorkerResolution(config.resolution, this.behavior)
     this.interception = interception
@@ -81,15 +83,39 @@ export class PluginPackages extends Service {
 
   /**
    * Publish a complete successor generation for this process and subsequently created Workers.
-   * Linked roots may be removed without unloading modules or clearing Node caches.
+   * Profile mappings and local package names may be removed after their plugins stop; linked roots may also be removed.
+   * Retained profile mappings may change their declarer, but not their normalized directory, version, or scope;
+   * installation mappings must remain unchanged. Publication does not unload modules or clear Node caches.
    * @param successor - fully constructed generation accepted by {@link RuntimeInterception.replace}.
    */
   replace(successor: RuntimeResolution): void {
     if (this.interception === undefined) throw new Error('plugin-packages: runtime resolution is not installed')
     this.interception.replace(successor)
+    this.current = successor
     this.packages = new Map()
     this.disposeWorkerResolution?.()
     this.disposeWorkerResolution = registerWorkerResolution(successor, this.behavior)
+  }
+
+  /**
+   * Whether an interception owns package routing. Link-mode launches resolve through their materialized
+   * node_modules instead, so refresh callers skip rather than fail on a service that has nothing to publish.
+   */
+  get installed(): boolean {
+    return this.interception !== undefined
+  }
+
+  /**
+   * Publish the latest generation computed by the installed resolution through {@link replace}. Package contents
+   * and loaded modules are not reloaded.
+   * @throws when no resolution is installed, it is plain data rather than a {@link ProfileRuntimeResolution},
+   * reading the latest files fails, or the successor is rejected. A computed resolution without a profile can refresh.
+   */
+  async refresh(): Promise<void> {
+    if (!(this.current instanceof ProfileRuntimeResolution)) {
+      throw new Error('plugin-packages: the installed runtime resolution cannot be recomputed')
+    }
+    this.replace(await this.current.computeLatestResolution())
   }
 
   /**

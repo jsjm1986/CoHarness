@@ -1600,6 +1600,9 @@ importers:
       chokidar:
         specifier: ^5.0.0
         version: 5.0.0
+      node-addon-require-builtin:
+        specifier: ^0.1.6
+        version: 0.1.6
       picomatch:
         specifier: ^4.0.7
         version: 4.0.7
@@ -1713,6 +1716,9 @@ importers:
       '@deepseek-ai/dsh-user-approval':
         specifier: workspace:*
         version: link:../../interaction/user-approval
+      chokidar:
+        specifier: ^5.0.0
+        version: 5.0.0
       pnpm:
         specifier: 11.28.4
         version: 11.28.4
