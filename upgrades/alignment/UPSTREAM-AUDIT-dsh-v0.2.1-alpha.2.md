@@ -24,6 +24,10 @@
 | `9a8d21dfe75` | 取消的排队 goal Round 在 idle 检查点从 inbox 撤回；revision 精确匹配的取消暂停 goal；结算失败告警并撤防 | `packages/goal/goal-round-driver` |
 | `18a4bc4093c` | `exit_plan_mode` 接受 `{ approved: boolean }`；`ASK_CANCELLED` 结束轮次并返回 `{ approved: false }`，计划模式保持激活 | `packages/plan/plan-mode` |
 | `a1da7bcfb96`（部分） | `waitForChildren` 适配到 `ContinuableActivationRegistry`；headless 循环 `whenIdle` + `waitForChildren` 直到父级 idle 且 seq 不变。结算消息的 `structured`/`diagnostic` 传递不适用：我们 `ActivationTerminal` 无 structured 通道（独立功能缺口，见下） | `packages/subagent/subagent`、`packages/bundle/headless` |
+| `1d37aabe99c` | `all-prompts` 标题修订把现行 provider 生成标题作为 JSON 数据传入并附保留指令（仍贴切须原样返回；话题实质变化才改）；用户/兜底标题不进入该输入；标题计入 `maxInputBytes` | `packages/session/session-title-llm` |
+| `b981255be6d` + `0516f66d832` | 指令文件去重副本恢复对账资格（保留内容的重复项可提升；预算省略者的重复项继承排除）；组内任一候选（含隐藏重复项）元数据/内容不可读时整组冻结，且为全组成员保留绝对路径防别名绕行 | `packages/context/agent-instructions` |
+| `02f54230705` | `discoverModels` 先解析凭据：`MISSING_CREDENTIAL` 返回空目录隐藏路由，其余错误传播 | `packages/llm/llm-deepseek-api-key` |
+| `59ba1321eba` | Windows 终端分配传 `useConptyDll: true`（node-pty 自带 OpenConsole 承载，POSIX 不变） | `packages/subprocess/subprocess-local` |
 
 验证：`deepseek-llm-api-extensions` + `llm-deepseek` 17 测试、`session-log-deepseek` 34 测试、`ptc-runtime-python` 325 测试、`subprocess-local` 359 测试、`session-format-v3-to-v4` 43 测试、`apiproxy` session-export 43 测试、`tool-jobs`/`goal`/`plan`/`agent-team`/`terminal-controller`/`ssh` 799 测试全过；typecheck 干净；`verify-package-dependencies` 门禁（63 包）与其 44 spec 测试通过；`ptc-python-turn` 快照回放通过。决策记录：`.agents/notes/implemented/bug-fix/2026-10-12-deepseek-request-extension-resilience.md`、`2026-10-12-python-ptc-shared-sandbox-policy.md`、`2026-10-12-durable-path-safety-fixes.md`、`2026-10-12-session-reliability-fixes.md`。
 
@@ -41,7 +45,7 @@
 - 输入回显生命周期：canceled inbox splice 不退休 steering echo、dispose 把已录取 echo 报 failed、transcript echo 不等 inbox 水位（`packages/runtime/sessions/session.ts:1209-1241`、`:873-875`）。
 - schedule/subagent 归属：创建/更新不拒子代理会话、工具不拒 delegated child、无 typed result。
 - plugin-manager/HMR 族：未装 bundle 不可移除、meta 解析失败阻塞请求、retired schedule 残留 manifest、清单无 version 不降级、install/enable/remove 不刷新解析表；package.json 变不失效 cache、缺 CJS `_load` hook。
-- 单点：标题不保留既有合适标题；无 key 模型不隐藏；agent-instructions 失败不上报；Windows `useConptyDll` 未启用。
+- 单点：标题保留、无 key 模型隐藏、agent-instructions 组保护/去重提升、`useConptyDll` 均已移植（见上表）。
 - 子代理结算通知不携带 `structured`/`diagnostic`：我们 `ActivationTerminal` 只有 `stopReason`+`output`，带 outputSchema 的可继续子级的结构化结果不会送达父级（上游 `a1da7bcfb96` 的另一半，需扩展 terminal 类型+observer 捕获，非机械移植）。
 - CLI：`dsh plugin allow-version`/`revoke-version`/`version-exemptions` 未实现，但 `packages/boot/app-boot/src/plugin-compatibility.ts:101` 的错误提示指引用户运行它（死路指引）。
 - 客户端：空白会话隐藏整个 header；Coding Tools 关时 Creator stage 静默丢弃；preset 拒绝无 toast；trajectory 请求生命周期与重试错误；`@` 会话引用按 createdAt 排序；provider 卡缺 `derivedCredential`（`bf0db65bb0e`，`packages/client/ui-settings-models`）；plan 文档无 preview/sidebar/持久卡；`openChildAside` 缺子会话侧栏；Tooltip 被 `.composerSeat` stacking context 压层（QueueDock/GoalBar 未传 portal）；设置面板遇 onboarding 遮罩仍可交互（`7dfad907488`）；未命名会话显示目录名而非"未命名"（`a4ac7e9eb36`/`bcf0ba45cb0`）。

@@ -1,5 +1,5 @@
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import LlmRuntime, { createUserMessage, ToolCallId, isAgentLoopRequest, LlmAdapter  } from '@deepseek-ai/dsh-llm'
 import type { FinishReason, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
@@ -171,6 +171,69 @@ describe('generateSessionTitleWithLlm', () => {
         messages: options.messages,
         maxTokens: 32,
       })
+  })
+
+  it('frames the existing title as data and logs the exact stability instructions', async () => {
+    const { ctx, adapter } = await withScript(SCRIPT)
+    onTestFinished(() => ctx.fiber.dispose())
+    const providerRequest = request(ctx)
+    const currentTitle = '阳台 "番茄" 与罗勒'
+
+    await generateSessionTitleWithLlm(
+      ctx,
+      resolveSessionTitleLlmConfig(CONFIG),
+      providerRequest,
+      providerRequest.messages,
+      TITLE_PROVIDER,
+      currentTitle,
+    )
+
+    const options = adapter.requests[0]!
+    const content = options.messages[0]!.content[0]!
+    if (content.type !== 'text') throw new Error('expected title input text')
+    expect(JSON.parse(content.text.slice(content.text.indexOf('\n') + 1))).toEqual({
+      currentTitle,
+      messages: providerRequest.messages,
+    })
+    expect(options.system).toContain('return it exactly unchanged')
+    expect(options.system).toContain('acknowledgements such as "thanks"')
+    expect(options.system).toContain('materially change or expand the main topic or task')
+    expect(providerRequest.session.snapshotEvents()
+      .findLast(event => event.type === 'session/title-llm-request')?.data).toMatchObject({
+      system: options.system,
+      messages: options.messages,
+    })
+  })
+
+  it('includes the existing title in the final input byte limit', async () => {
+    const { ctx, adapter } = await withScript(SCRIPT)
+    onTestFinished(() => ctx.fiber.dispose())
+    const providerRequest = request(ctx)
+    const currentTitle = '阳台种植建议'
+    const inputBytes = Buffer.byteLength(
+      `Update the session title from this JSON object:\n${JSON.stringify({ currentTitle, messages: providerRequest.messages })}`,
+      'utf8',
+    )
+    await expect(generateSessionTitleWithLlm(
+      ctx,
+      resolveSessionTitleLlmConfig({ ...CONFIG, maxInputBytes: inputBytes - 1 }),
+      providerRequest,
+      providerRequest.messages,
+      TITLE_PROVIDER,
+      currentTitle,
+    )).rejects.toThrow(/input.*bytes.*maxInputBytes/i)
+    expect(adapter.requests).toHaveLength(0)
+    expect(providerRequest.session.snapshotEvents().some(event => event.type === 'session/title-llm-request')).toBe(false)
+
+    await generateSessionTitleWithLlm(
+      ctx,
+      resolveSessionTitleLlmConfig({ ...CONFIG, maxInputBytes: inputBytes }),
+      providerRequest,
+      providerRequest.messages,
+      TITLE_PROVIDER,
+      currentTitle,
+    )
+    expect(adapter.requests).toHaveLength(1)
   })
 
   it('uses paired explicit overrides and bounds the final framed input before model dispatch', async () => {

@@ -2015,6 +2015,99 @@ describe('workspace context request injection', () => {
     }
   })
 
+  it.each([
+    { failure: 'metadata', winner: 'edit' },
+    { failure: 'metadata', winner: 'delete' },
+    { failure: 'read', winner: 'edit' },
+    { failure: 'read', winner: 'delete' },
+  ] as const)(
+    'preserves a directory group when a hidden duplicate has a $failure failure and its winner is $winner',
+    async ({ failure, winner }) => {
+      const root = await tempRepo()
+      const home = await tempRepo()
+      const ctx = new Context()
+      try {
+        await ctx.plugin(RecordingFileSystem)
+        const fs = ctx.fs as RecordingFileSystem
+        const agentsPath = join(root, 'AGENTS.md')
+        const claudePath = join(root, 'CLAUDE.md')
+        fs.entries.set(join(root, '.git'), { type: 'directory' })
+        fs.entries.set(agentsPath, { type: 'file', content: 'shared repo rule', version: FsVersion('agents-v1') })
+        fs.entries.set(claudePath, { type: 'file', content: 'shared repo rule', version: FsVersion('claude-v1') })
+        await mountAgentInstructionsPlugin(ctx, { dshHome: home, maxBytes: 65536 })
+        const agent = await stubAgent(root)
+        await composeBaselinePrefix(ctx, agent)
+
+        expect(derivedText(agent).match(/shared repo rule/g)).toHaveLength(1)
+        expect(derivedText(agent)).not.toContain('Instructions from: CLAUDE.md')
+        await syncAgentInstructions(ctx, agent)
+        expect(agent.inbox.nextStep.filter(message => message.source.kind === 'agent-instructions')).toEqual([])
+
+        if (winner === 'edit') {
+          fs.entries.set(agentsPath, { type: 'file', content: 'new repo rule', version: FsVersion('agents-v2') })
+        } else {
+          fs.entries.delete(agentsPath)
+        }
+        const failures = failure === 'metadata' ? fs.throwOnStat : fs.throwOnRead
+        failures.add(claudePath)
+        await syncAgentInstructions(ctx, agent)
+
+        expect(agent.inbox.nextStep.filter(message => message.source.kind === 'agent-instructions')).toEqual([])
+        expect(baselineEvents(agent)).toHaveLength(1)
+
+        failures.delete(claudePath)
+        const recovered = await syncedAgentInstructions(ctx, agent)
+        expect(recovered.source).toMatchObject({
+          kind: 'agent-instructions',
+          changes: [
+            {
+              action: winner === 'edit' ? 'replace' : 'remove',
+              scope: sk('.', 'AGENTS.md'),
+              path: 'AGENTS.md',
+            },
+            { action: 'set', scope: sk('.', 'CLAUDE.md'), path: 'CLAUDE.md' },
+          ],
+        })
+        const recoveredText = blocksText(recovered.content)
+        expect(recoveredText.match(/shared repo rule/g)).toHaveLength(1)
+        if (winner === 'edit') expect(recoveredText).toContain('new repo rule')
+      } finally {
+        await ctx.fiber.dispose()
+        await rm(root, { recursive: true, force: true })
+        await rm(home, { recursive: true, force: true })
+      }
+    },
+  )
+
+  it('keeps a duplicate of budget-omitted content excluded until the baseline identity changes', async () => {
+    const root = await tempRepo()
+    const home = await tempRepo()
+    const ctx = new Context()
+    try {
+      await ctx.plugin(RecordingFileSystem)
+      const fs = ctx.fs as RecordingFileSystem
+      const agentsPath = join(root, 'AGENTS.md')
+      const claudePath = join(root, 'CLAUDE.md')
+      fs.entries.set(join(root, '.git'), { type: 'directory' })
+      fs.entries.set(agentsPath, { type: 'file', content: 'x'.repeat(1000), version: FsVersion('agents-v1') })
+      fs.entries.set(claudePath, { type: 'file', content: 'x'.repeat(1000), version: FsVersion('claude-v1') })
+      await mountAgentInstructionsPlugin(ctx, { dshHome: home, maxBytes: 120 })
+      const agent = await stubAgent(root)
+      await composeBaselinePrefix(ctx, agent)
+      expect(derivedText(agent)).not.toContain('Instructions from: CLAUDE.md')
+
+      const baselineReads = fs.readTargets.filter(target => target === claudePath).length
+      fs.entries.set(claudePath, { type: 'file', content: 'small claude rule', version: FsVersion('claude-v2') })
+      await syncAgentInstructions(ctx, agent)
+      expect(agent.inbox.nextStep.filter(message => message.source.kind === 'agent-instructions')).toEqual([])
+      expect(fs.readTargets.filter(target => target === claudePath)).toHaveLength(baselineReads)
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   it.each([10, 120])('does not expose state markers when baseline content is omitted at %i bytes', async (maxBytes) => {
     const root = await tempRepo()
     const home = await tempRepo()

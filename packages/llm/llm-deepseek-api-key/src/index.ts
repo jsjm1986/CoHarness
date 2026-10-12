@@ -1,4 +1,4 @@
-/** API-key authentication and discovery for the official DeepSeek route. */
+/** API-key authentication and credential-gated discovery for the official DeepSeek route. */
 import type { Context } from '@deepseek-ai/cordis'
 import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
@@ -67,9 +67,14 @@ export function apply(ctx: Context, config: Config): void {
     options,
     providerName: 'DeepSeek',
     resolveAuth: async connection => ({ headers: { 'x-api-key': await resolveApiKey(connection) } }),
-    discoverModels: (provider) => {
+    discoverModels: async (provider) => {
       const connection = options()
-      return Promise.resolve(connection.models.map(model => catalogModelInfo(provider, model)))
+      try { await resolveApiKey(connection) }
+      catch (error) {
+        if (error instanceof LlmError && error.code === 'MISSING_CREDENTIAL') return []
+        throw error
+      }
+      return connection.models.map(model => catalogModelInfo(provider, model))
     },
   })
   installSettingsSection(ctx, NS, SettingsSchema, plainOptions(config), {

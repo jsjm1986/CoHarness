@@ -59,7 +59,7 @@ Every field is required except the paired route override; there are no library d
 
 #### What the model sees
 
-The title model receives a fixed system instruction to return one concise unadorned title in the input language, including the configured word and CJK-character targets. Its one user message contains a JSON array of the exact selected human messages and their seqs.
+The title model receives a fixed system instruction to return one concise unadorned title in the input language, including the configured word and CJK-character targets. Its one user message contains a JSON array of the exact selected human messages and their seqs. For `all-prompts`, the helper also supplies the current title when a provider generated it, including a title inherited from the first-prompt provider; fallback and user-supplied titles are excluded from this input, and the first-prompt cadence uses only its selected messages. A supplied title moves the user message to an update form and adds preservation instructions, so an adequate existing title survives regeneration verbatim.
 
 #### Token effect
 
