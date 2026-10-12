@@ -459,6 +459,8 @@ Shared management service; reads, deletion, and timing edits never activate a Se
  *
  * The request must supply a title; a missing, blank-after-trim, or over-long
  * title rejects with `invalid_prompt` instead of deriving one from the prompt.
+ * A Session a delegated child owns rejects with `subagent_session`, because delivery
+ * can never reach it.
  * The record is built from the clock reading taken before the request joins the
  * serialized queue, so a create that waits behind a longer operation keeps its
  * request-time anchor and may already be due when the queue reaches it.
@@ -509,10 +511,13 @@ async create(sessionId: SessionId, request: ScheduleCreateRequest, signal?: Abor
  * binding without activating the Session or changing saved deliveries.
  *
  * Each supplied field replaces its stored value; an omitted field keeps it. A name or
- * instruction change alone does not reset the committed target.
+ * instruction change alone does not reset the committed target. A Session a delegated
+ * child owns returns the non-mutating `subagent_session` result, so an edit cannot
+ * re-arm a task bound to a Session delivery can never reach, and management views can
+ * explain the refusal through the ordinary result they already render.
  * @param request - Task binding, complete observed record, and any combination of timing, name, and instruction.
  * @param signal - Cancellation checked after domain readiness and FIFO waits, before persistence begins.
- * @returns The committed record, unchanged record for a no-op, or a non-mutating input/lookup/conflict result.
+ * @returns The committed record, unchanged record for a no-op, or a non-mutating input/lookup/conflict/refusal result.
  * Storage and lifecycle failures reject; cancellation after a write starts does not roll it back.
  */
 @Remote('update') async update(request: ScheduleUpdateRequest, signal?: AbortSignal): Promise<ScheduleUpdateResult>
