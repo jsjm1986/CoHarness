@@ -134,9 +134,19 @@ describe('web e2e: Markdown inline-code links', () => {
     const browserPanel = page.locator('[data-sidebar-right-panel]')
     await browserPanel.getByRole('alert').waitFor()
     expect(await browserPanel.locator('[data-sidebar-browser-frame]').count()).toBe(0)
-    const popupPromise = page.context().waitForEvent('page')
-    await inlineCodeLink.click({ modifiers: ['Shift'] })
-    const popup = await popupPromise
+    // Playwright 1.62.x ships chromium-1234, whose modifier-click default
+    // action intermittently drops the new-tab request under CPU contention
+    // (microsoft/playwright#42142; fixed in chromium-1237). Each attempt is a
+    // fresh user gesture, so re-issue it a bounded number of times rather than
+    // assume the lost one reports back.
+    let popup: Page | undefined
+    for (let attempt = 0; attempt < 3 && popup === undefined; attempt++) {
+      const popupPromise = page.context().waitForEvent('page', { timeout: 10_000 })
+        .catch(() => undefined)
+      await inlineCodeLink.click({ modifiers: ['Shift'] })
+      popup = await popupPromise
+    }
+    if (popup === undefined) throw new Error('shift+click produced no popup page after 3 attempts')
     await popup.waitForURL(linkUrl, { timeout: 15_000 })
     expect(popup.url()).toBe(linkUrl)
     await popup.close()

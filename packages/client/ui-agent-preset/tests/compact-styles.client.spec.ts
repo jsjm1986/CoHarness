@@ -55,7 +55,7 @@ describe('agent-preset compact styles', () => {
     const label = readFileSync(fileURLToPath(new URL('../src/client/AgentPresetLabel.module.css', import.meta.url)), 'utf8')
     // The suffix reads as part of the title sentence: a hairline separates it
     // from the breadcrumb strip, with no fill and no border box of its own.
-    expect(label).toContain('border-left: 1px solid var(--dsw-alias-border-l2)')
+    expect(label).toContain('border-left: 0.5px solid var(--dsw-alias-border-l2)')
     expect(label).toContain('color: var(--dsw-alias-label-tertiary)')
     expect(label).not.toContain('background')
     expect(label).not.toContain('border-radius')
