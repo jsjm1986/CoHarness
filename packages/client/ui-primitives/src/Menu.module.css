@@ -247,6 +247,14 @@
   background: var(--dsw-alias-border-l1);
 }
 
+/* A data separator directly followed by a row that starts a group draws one
+ * line, not two; a group start on the list's first row draws none. */
+.separator + .separator,
+.separator + .itemWrap > .separator:first-child,
+.itemWrap:first-child > .separator:first-child {
+  display: none;
+}
+
 /* Nested card to the right of the parent row (figma 419:16920).
  * Bottom-aligned with the parent menu card (grows upward): itemWrap sits in
  * .list's 4px pad, so bottom: -4px matches the list's outer bottom edge.

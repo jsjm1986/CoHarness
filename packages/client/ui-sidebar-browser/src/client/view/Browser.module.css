@@ -108,7 +108,7 @@
 }
 
 .address:focus {
-  outline: 1px solid var(--dsw-alias-brand-primary-new-colorprimary-new-color);
+  outline: 1px solid var(--dsw-alias-state-business-primary);
   outline-offset: -1px;
 }
 

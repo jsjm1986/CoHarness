@@ -4584,13 +4584,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             }
             selectForNextRequest(found.agent, selected)
             if (authorized.authority?.participant.scope.kind !== 'project') {
-              try {
-                await defaults.saveDefaultModelSelection?.(selected)
-              } catch (error: unknown) {
+              void defaults.saveDefaultModelSelection?.(selected)?.catch((error: unknown) => {
                 ctx.logger.warn(
                   `api-proxy: the model switch applies to this session but was not saved as the default: ${String(error)}`,
                 )
-              }
+              })
             }
             return ok(request, { selected: { ...selected } })
           } catch (error: unknown) {

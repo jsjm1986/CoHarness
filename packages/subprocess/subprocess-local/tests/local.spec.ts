@@ -826,6 +826,7 @@ describe('LocalSubprocessRuntime', () => {
       expect(logged).toHaveBeenCalledOnce()
       const [message, error] = logged.mock.calls[0] as [string, NodeJS.ErrnoException]
       expect(message).toContain('could not write the complete stdout stream')
+      expect(message).toContain('temporary-file cleaner')
       expect(error.code).toBe('ENOENT')
     } finally {
       await fiber.dispose()

@@ -76,9 +76,10 @@ function reportSpillFailureToStderr(error: unknown, label: string): void {
  */
 export function logSpillFailure(logger: { error(message: string, ...detail: unknown[]): void }, owner: string): SpillFailureReporter {
   return (error, label) => {
+    const removedDirectory = (error as NodeJS.ErrnoException).code === 'ENOENT'
     logger.error(
-      `${owner} could not write the complete ${label} stream to its spill file; the result keeps only the in-memory tail and reports no full-output path. `
-      + 'A removed private spill directory under the OS temp dir (ENOENT) points at a temporary-file cleaner.',
+      `${owner} could not write the complete ${label} stream to its spill file; the result keeps only the in-memory tail and reports no full-output path.`
+      + (removedDirectory ? ' The spill directory no longer exists; a temporary-file cleaner removing it while empty is the usual cause.' : ''),
       error,
     )
   }

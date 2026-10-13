@@ -1,16 +1,17 @@
-/** Composer context-occupancy meter: a ring beside the send button fed by the
- * `contextPressure` projection, with a click-open panel of the heuristic
- * `contextBreakdown` composition (system prompt, tools, conversation).
- * Renders nothing until a provider reports both pressure and a route
- * capacity. */
+/** Composer context-occupancy meter: a ring and percentage beside the send
+ * button fed by the `contextPressure` projection, with a click-open panel of
+ * the heuristic `contextBreakdown` composition (system prompt, tools,
+ * conversation). Renders nothing until a provider reports both pressure and a
+ * route capacity. */
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { UseProjection } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: the `contextPressure` / `contextBreakdown` projection key merges.
 import type {} from '@deepseek-ai/dsh-token-meter/client'
-import { MobileSheetBackdrop, Tooltip, useMediaQuery } from '@deepseek-ai/dsh-client-ui-primitives'
+import { MobileSheetBackdrop, Tooltip, useAnchoredPosition, useDismissOnOutsidePointer, useMediaQuery } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerBarProps } from '../contract/slots.ts'
-import { contextOccupancy, formatTokens } from '../stats.ts'
+import { contextOccupancy } from '../stats.ts'
 import css from './ContextMeter.module.css'
 
 /** Ring geometry: 14px viewBox, 2px stroke. */
@@ -31,6 +32,21 @@ const ROWS = [
   { key: 'messageTokens', label: 'context.messages', color: css.colorMessages },
 ] as const
 
+/**
+ * Format a token count for the compact context panel.
+ * @param value - token count.
+ * @param t - Conversation locale seat with shared compact-number templates.
+ * @returns Compact localized count using K or M when needed.
+ */
+function formatTokens(value: number, t: ComposerBarProps['t']): string {
+  const scaled = (candidate: number): string => candidate >= 100
+    ? String(Math.round(candidate))
+    : String(Math.round(candidate * 10) / 10)
+  if (value < 1_000) return String(value)
+  if (value < 1_000_000) return t('number.thousand', { value: scaled(value / 1_000) })
+  return t('number.million', { value: scaled(value / 1_000_000) })
+}
+
 export interface ContextMeterProps {
   useProjection: UseProjection
   /** The owning bar's locale seat, passed down as a plain prop. */
@@ -43,8 +59,18 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
   const [open, setOpen] = useState(false)
   const phone = useMediaQuery('(max-width: 767px)')
   const rootRef = useRef<HTMLSpanElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
   const context = contextOccupancy(pressure)
   const available = context !== null
+  const position = useAnchoredPosition({
+    open: open && available && !phone,
+    anchorRef: rootRef,
+    panelRef,
+    side: 'top',
+    gap: 8,
+    margin: 12,
+  })
+  useDismissOnOutsidePointer(rootRef, open && available, setOpen, panelRef)
 
   // A model switch can temporarily remove capacity while this component stays
   // mounted. Close the now-unavailable panel instead of preserving stale UI.
@@ -52,22 +78,13 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
     if (!available && open) setOpen(false)
   }, [available, open])
 
-  // Outside click / Escape close, one document listener while open (Menu's pattern).
   useEffect(() => {
     if (!open || !available) return
-    const onPointerDown = (e: PointerEvent): void => {
-      if (e.target instanceof Node && rootRef.current?.contains(e.target) === true) return
-      setOpen(false)
-    }
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') setOpen(false)
     }
-    document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
+    return () => { document.removeEventListener('keydown', onKeyDown) }
   }, [available, open])
 
   if (context === null) return null
@@ -88,6 +105,51 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
     ? [{ key: 'total', color: undefined, width: percent }]
     : ROWS.map(row => ({ key: row.key, color: row.color, width: percent * breakdown[row.key] / breakdownTotal }))
   const segments = parts.filter(part => part.width > 0)
+
+  const panel = (
+    <div
+      ref={panelRef}
+      className={css.panel}
+      style={!phone && position !== null ? position : !phone ? { visibility: 'hidden', left: 0, top: 0 } : undefined}
+      role="dialog"
+      aria-label={t('context.used')}
+    >
+      <div className={css.header}>
+        {/* Empty sides collapse through `.headline:empty` so the locale that
+            needs no leading (or trailing) text spends no header gap. */}
+        <span className={css.headline}>{headBefore}</span>
+        <span className={css.percent}>{reading}</span>
+        <span className={css.headline}>{headAfter}</span>
+        {/* `~`: usedTokens prefers projectedTokens, whose surface delta is
+            heuristically repriced on top of the provider-anchored sample. */}
+        <span className={css.figures}>
+          {`~${formatTokens(context.usedTokens, t)} / ${formatTokens(context.contextWindow, t)}`}
+        </span>
+      </div>
+      <div className={css.bar}>
+        {segments.map(segment => (
+          <div
+            key={segment.key}
+            className={segment.color === undefined ? css.segment : `${css.segment} ${segment.color}`}
+            style={{ width: `${segment.width}%` }}
+          />
+        ))}
+      </div>
+      {breakdown !== undefined && (
+        <dl className={css.rows}>
+          {ROWS.map(row => (
+            <div key={row.key} className={css.row}>
+              <dt>
+                <span className={`${css.swatch} ${row.color}`} aria-hidden />
+                {t(row.label)}
+              </dt>
+              <dd>{`~${formatTokens(breakdown[row.key], t)}`}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  )
 
   return (
     <span ref={rootRef} className={css.root}>
@@ -111,45 +173,11 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
               transform="rotate(-90 7 7)"
             />
           </svg>
+          <span>{reading}</span>
         </button>
       </Tooltip>
       {open && phone && <MobileSheetBackdrop onClose={() => { setOpen(false) }} />}
-      {open && (
-        <div className={css.panel} role="dialog" aria-label={t('context.used')}>
-          <div className={css.header}>
-            {/* Empty sides collapse through `.headline:empty` so the locale that
-                needs no leading (or trailing) text spends no header gap. */}
-            <span className={css.headline}>{headBefore}</span>
-            <span className={css.percent}>{reading}</span>
-            <span className={css.headline}>{headAfter}</span>
-            <span className={css.figures}>
-              {`~${formatTokens(context.usedTokens)} / ${formatTokens(context.contextWindow)}`}
-            </span>
-          </div>
-          <div className={css.bar}>
-            {segments.map(segment => (
-              <div
-                key={segment.key}
-                className={segment.color === undefined ? css.segment : `${css.segment} ${segment.color}`}
-                style={{ width: `${segment.width}%` }}
-              />
-            ))}
-          </div>
-          {breakdown !== undefined && (
-            <dl className={css.rows}>
-              {ROWS.map(row => (
-                <div key={row.key} className={css.row}>
-                  <dt>
-                    <span className={`${css.swatch} ${row.color}`} aria-hidden />
-                    {t(row.label)}
-                  </dt>
-                  <dd>{`~${formatTokens(breakdown[row.key])}`}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </div>
-      )}
+      {open && (phone ? panel : createPortal(panel, document.body))}
     </span>
   )
 }

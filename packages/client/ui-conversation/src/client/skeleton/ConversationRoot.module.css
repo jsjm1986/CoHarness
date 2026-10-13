@@ -82,6 +82,12 @@
 
 .titleRow {
   order: 0;
+  /* Anonymous inline-size container (CSS modules hash container-names per
+     module, so occupants match the nearest container): header occupants such
+     as the preset label shed their text at row-width breakpoints. The row is
+     a stretch item of the column header, so inline-size containment cannot
+     collapse it. */
+  container-type: inline-size;
   display: flex;
   align-items: center;
   gap: 0;

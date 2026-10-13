@@ -1,4 +1,4 @@
-import { OutputCollector, type SpillOptions } from '../src/output.ts'
+import { logSpillFailure, OutputCollector, type SpillOptions } from '../src/output.ts'
 import { spawn as nodeSpawn, spawnSync as nodeSpawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -728,6 +728,20 @@ describe('OutputCollector', () => {
     } finally {
       stderr.mockRestore()
     }
+  })
+})
+
+describe('logSpillFailure', () => {
+  it('names the removed directory only for ENOENT and appends the error for every code', () => {
+    const lines: unknown[][] = []
+    const report = logSpillFailure({ error: (...detail: unknown[]) => { lines.push(detail) } }, 'test owner')
+    report(Object.assign(new Error('gone'), { code: 'ENOENT' }), 'stdout')
+    report(Object.assign(new Error('full'), { code: 'ENOSPC' }), 'stderr')
+    expect(lines[0]![0]).toContain('test owner could not write the complete stdout stream')
+    expect(lines[0]![0]).toContain('temporary-file cleaner')
+    expect(lines[1]![0]).toContain('complete stderr stream')
+    expect(lines[1]![0]).not.toContain('temporary-file cleaner')
+    expect((lines[1]![1] as NodeJS.ErrnoException).code).toBe('ENOSPC')
   })
 })
 

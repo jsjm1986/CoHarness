@@ -67,6 +67,8 @@ export class AgentDefaultModelConfig extends Service {
     model: z.string().required(),
   })
 
+  private saves: Promise<void> = Promise.resolve()
+
   private source: () => AgentDefaultModelSettings
 
   constructor(ctx: Context, config: Config) {
@@ -91,16 +93,19 @@ export class AgentDefaultModelConfig extends Service {
 
   /**
    * Save the complete default model selection. A deployment without a settings
-   * provider keeps its composition entry.
+   * provider keeps its composition entry. Saves commit in submission order; a
+   * failed save rejects its caller without blocking later saves.
    * @param next - resolved selection accepted by an entry point.
    * @returns fulfillment after the optional settings write settles.
    */
   async saveSelection(next: ModelSelection): Promise<void> {
-    await this.ctx.get('settings')?.replace(AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE, {
+    const saved = this.saves.then(() => this.ctx.get('settings')?.replace(AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE, {
       provider: next.provider,
       model: next.model,
       ...next.reasoningEffort === undefined ? {} : { reasoningEffort: String(next.reasoningEffort) },
-    })
+    }))
+    this.saves = saved.then(() => {}, () => {})
+    await saved
   }
 }
 

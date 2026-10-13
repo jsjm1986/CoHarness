@@ -9,10 +9,11 @@
 // internally past that; submenu-bearing menus are exempt (see .scrollable).
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, ReactNode, SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import { IconCheckOutline16 } from './icons/index.tsx'
+import { focusWithoutRing } from './focus.ts'
 import { ShortcutKeys } from './ShortcutKeys.tsx'
 import { MobileSheetBackdrop } from './MobileSheetBackdrop.tsx'
 import { usePointerGrace } from './pointer-grace.ts'
@@ -188,20 +189,22 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
    * able to name by position.
    */
   const triggerRef = useRef<HTMLElement | null>(null)
+  const selectingWithTab = useRef(false)
 
   /**
    * Hand the keyboard back to the trigger that opened the menu — or, when the
    * anchor never held it, to the anchor's first button. Focus left on a removed
    * row otherwise falls to the page body, where the next Tab restarts from the
    * top of the page.
+   * @param navigation - whether explicit keyboard traversal should retain its focus indicator.
    */
-  const refocusAnchor = (): void => {
+  const refocusAnchor = (navigation = false): void => {
     const trigger = triggerRef.current
-    if (trigger !== null && document.contains(trigger) && !(trigger as HTMLButtonElement).disabled) {
-      trigger.focus()
-      return
-    }
-    rootRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+    const target = trigger !== null && document.contains(trigger) && !(trigger as HTMLButtonElement).disabled
+      ? trigger : rootRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')
+    if (target == null) return
+    if (navigation) target.focus()
+    else focusWithoutRing(target)
   }
 
   /**
@@ -212,10 +215,11 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
    * its removal produced) comes back to the trigger.
    */
   const refocusAfterSelection = (): void => {
+    const navigation = selectingWithTab.current
     queueMicrotask(() => {
       if (openRef.current) return
       const active = document.activeElement
-      if (active === null || active === document.body || listRef.current?.contains(active) === true) refocusAnchor()
+      if (active === null || active === document.body || listRef.current?.contains(active) === true) refocusAnchor(navigation)
     })
   }
   const openRef = useRef(open)
@@ -339,7 +343,7 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
         if (e.shiftKey) {
           e.preventDefault()
           onCloseRef.current()
-          refocusAnchor()
+          refocusAnchor(true)
           return
         }
         // Tab settles the row it is on; from anywhere else in the menu region
@@ -349,7 +353,9 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
         if (insideList) {
           if (focused instanceof Element && focused.getAttribute('role') === 'menuitem') {
             e.preventDefault()
-            ;(focused as HTMLElement).click()
+            selectingWithTab.current = true
+            try { (focused as HTMLElement).click() }
+            finally { selectingWithTab.current = false }
           }
           return
         }
@@ -426,7 +432,7 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
       <div
         key={entry.id}
         className={css.itemWrap}
-        onMouseEnter={() => { setOpenSubmenuId(hasSub ? entry.id : null) }}
+        onMouseEnter={hasSub ? () => { setOpenSubmenuId(entry.id) } : undefined}
         onMouseLeave={() => { setOpenSubmenuId(null) }}
       >
         <button
@@ -437,14 +443,13 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
           aria-keyshortcuts={entry.shortcut?.aria}
           aria-haspopup={hasSub ? 'menu' : undefined}
           aria-expanded={hasSub ? subOpen : undefined}
-          onFocus={() => { setOpenSubmenuId(hasSub ? entry.id : null) }}
+          onFocus={hasSub ? () => { setOpenSubmenuId(entry.id) } : undefined}
           onClick={() => {
             if (hasSub) {
               setOpenSubmenuId(entry.id)
               return
             }
             onSelect?.(entry.id)
-            refocusAfterSelection()
           }}
         >
           {entry.icon !== undefined && <span className={css.itemIcon}>{entry.icon}</span>}
@@ -462,16 +467,29 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
                 role="menuitem"
                 className={css.item}
                 disabled={sub.disabled}
+                aria-keyshortcuts={sub.shortcut?.aria}
                 onClick={() => { onSelect?.(sub.id); refocusAfterSelection() }}
               >
                 {sub.icon !== undefined && <span className={css.itemIcon}>{sub.icon}</span>}
                 <span className={css.itemLabel}>{sub.label}</span>
+                {sub.shortcut !== undefined && <span aria-hidden="true" className={css.shortcut}><ShortcutKeys keys={sub.shortcut.keys} className={css.shortcutKeys} /></span>}
               </button>
             ))}
           </div>
         )}
       </div>
     )
+  }
+
+  // Submenu exclusivity is decided from the list's own bubble, by DOM:
+  // reaching a top-level row that is not a submenu parent — by pointer or by
+  // focus, data row or component row — closes the open card. A parent opens
+  // its card in its own handlers; rows inside the card are not top-level rows.
+  const collapseSubmenuFrom = (e: SyntheticEvent<HTMLDivElement>): void => {
+    const row = e.target instanceof Element ? e.target.closest('button[role="menuitem"]') : null
+    if (row === null || row.getAttribute('aria-haspopup') === 'menu') return
+    if (row.closest('[role="menu"]') !== e.currentTarget) return
+    setOpenSubmenuId(null)
   }
 
   // Portal lists render hidden until placed: the placement effect measures
@@ -495,6 +513,8 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
         const row = e.target instanceof Element ? e.target.closest('button[role="menuitem"]') : null
         if (row !== null && row.getAttribute('aria-haspopup') !== 'menu') refocusAfterSelection()
       }}
+      onMouseOver={collapseSubmenuFrom}
+      onFocus={collapseSubmenuFrom}
     >
       {header !== undefined && header !== null && (
         <div className={css.header} role="presentation">{header}</div>
