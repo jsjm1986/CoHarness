@@ -54,3 +54,9 @@
 [data-dsh-automatic-focus]:focus:focus-visible {
   outline: none;
 }
+
+/* Touch taps flash the browser's default grey highlight over whatever they
+   press; interactive surfaces carry their own :active fills instead. */
+:root {
+  -webkit-tap-highlight-color: transparent;
+}

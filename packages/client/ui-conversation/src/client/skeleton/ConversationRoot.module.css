@@ -410,6 +410,11 @@
   scrollbar-gutter: stable;
 }
 
+:global([data-viewport='compact']) .scrollBody {
+  /* End-of-transcript momentum must not chain into the page behind it. */
+  overscroll-behavior: contain;
+}
+
 /* Two 40px hit strips flank the content column, each inner edge 24px
    outside the content column — the same offset the glow line paints at — and
    the strip extends 40px outward from there; the outer edge is clamped to

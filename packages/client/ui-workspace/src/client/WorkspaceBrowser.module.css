@@ -388,6 +388,30 @@
    drag/reorder hit testing. */
 :global([data-viewport='compact']) .list {
   padding: var(--dsw-space-1) var(--dsw-space-1) var(--dsw-space-4);
+  /* Keep momentum inside the drawer: end-of-list scrolls must not chain
+     through the scrim to the transcript behind it. */
+  overscroll-behavior: contain;
+}
+
+/* Session cells sit contiguous; an inset hairline carries the rhythm a 2px
+   gap used to. Each row lives inside its own HoverCard block wrapper (a bare
+   span), so the rule and its :last-child test run on that wrapper — the
+   row classes themselves belong to a different module's scope. */
+:global([data-viewport='compact']) .groupSection > * + *,
+:global([data-viewport='compact']) .flatList > * + * {
+  margin-top: 0;
+}
+
+:global([data-viewport='compact']) .groupSection > span:not(:last-child)::after,
+:global([data-viewport='compact']) .flatList > span:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--dsw-space-4) + var(--dsw-space-1));
+  right: 0;
+  bottom: 0;
+  height: 0.5px;
+  background: var(--dsw-alias-border-l2);
+  pointer-events: none;
 }
 
 :global([data-viewport='compact']) .groupSection + .groupSection {

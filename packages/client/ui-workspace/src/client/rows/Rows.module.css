@@ -469,6 +469,16 @@
   min-height: var(--dsw-touch-target);
 }
 
+/* Native press: an instant fill instead of the desktop scale nudge — a
+   full-width cell that squishes under the thumb reads as elastic, not
+   tappable. */
+:global([data-viewport='compact']) .projectRow:active,
+:global([data-viewport='compact']) .sessionRow:active,
+:global([data-viewport='compact']) .searchResultRow:active {
+  transform: none;
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
 :global([data-viewport='compact']) .projectRow .rowActions,
 :global([data-viewport='compact']) .sessionRow .rowActions {
   display: flex;

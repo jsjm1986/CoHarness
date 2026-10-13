@@ -566,6 +566,15 @@
   min-height: var(--dsw-touch-target);
   margin-inline: 0;
   margin-bottom: var(--dsw-space-1);
+  /* The drawer's primary action reads as the platform-primary fill, not the
+     neutral control slab — on a full-width phone CTA the grey reads as a
+     disabled band rather than a button. */
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-label-primary-foreground);
+}
+
+:global([data-viewport='compact']) .newSession:hover {
+  background: var(--dsw-alias-button-primary-hover);
 }
 
 /* The panel nav column (plugins et al.) is a secondary cluster under the

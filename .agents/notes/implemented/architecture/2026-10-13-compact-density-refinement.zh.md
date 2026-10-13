@@ -26,6 +26,8 @@ Status: implemented
 
 **抽屉栈。** 手机抽屉收窄到 `min(82%, 300px)`，遮罩后露出更多会话内容；头部堆叠（品牌行、新会话 CTA、面板导航列、分组头）削掉约 12px 纵向内距，列表更早开始。会话行保持 44px 触控目标但恢复相对时间戳（caption 层级）——没有它单行"未命名"行读起来像稀疏占位符；空闲行前导状态槽坍塌（`:has(> :only-child:empty)` 匹配 display:contents 宿主），标题落到组标签缩进附近而不是悬在行中段。
 
+**平台按压与列表节奏。** `-webkit-tap-highlight-color: transparent` 去掉浏览器默认灰色点击闪烁（可交互面本就带显式 `:active` 填充）；紧凑态下项目/会话/搜索结果行的按压反馈改为即时 `interactive-bg-active` 填充而非桌面 0.98 缩放——整宽单元格被捏扁读起来是弹性而非可点。会话单元格连续排列，行间用 0.5px 内嵌发丝线（画在每行的 HoverCard 包装 `span:not(:last-child)::after` 上——行类名属于另一个 CSS module 作用域，包装元素的兄弟位置才是可靠的分组末尾判据）。新会话 CTA 在手机上用主按钮填充——整宽中性灰块读起来像禁用条而非按钮。抽屉列表与转录滚动口加 `overscroll-behavior: contain`，触底惯性不再串到遮罩后面的页面。
+
 ## Alternatives considered
 
 **处处保持 44px 触控目标。** 否决：360–390px 宽下一行放不下五个 44px 控件的单行输入工具条和单行消息操作条；40px 族已是成文的紧凑折中（[输入区单行图标行](../bug-fix/2026-09-18-composer-single-icon-row.zh.md)），真正可交互的行（菜单行、选项行、会话行）仍保持完整触控目标。
