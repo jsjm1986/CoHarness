@@ -227,27 +227,27 @@ export function apply(ctx: Context): void {
     }),
   }, TranscriptViewRow))
 
-  // The destination choice only exists while a built-in Browser tab type is
-  // registered; assemblies without one keep the external default. The registry
-  // comes through the reflect layer: ui-sidebar-right's own project reference
-  // points back here, so a typed Context merge would close a reference cycle.
-  const sidebarRightTabs = ctx.reflect.get('sidebarRightTabs') as BrowserTabsRegistry | undefined
-  const browserAvailable: ObservableSnapshot<boolean> = sidebarRightTabs === undefined
-    ? { getSnapshot: () => false, subscribe: () => () => {} }
-    : {
-      getSnapshot: () => sidebarRightTabs.get('browser') !== undefined,
-      subscribe: listener => sidebarRightTabs.subscribe(listener),
+  // The destination choice only exists once ui-sidebar-right provides its
+  // tab-type registry; assemblies without one keep the external default and no
+  // row. The registry type stays structural: ui-sidebar-right's own project
+  // reference points back here, so a typed Context merge would close a cycle.
+  ctx.inject(['sidebarRightTabs'], (scope) => {
+    const tabs = scope.reflect.get('sidebarRightTabs') as BrowserTabsRegistry
+    const browserAvailable: ObservableSnapshot<boolean> = {
+      getSnapshot: () => tabs.get('browser') !== undefined,
+      subscribe: listener => tabs.subscribe(listener),
     }
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
-    id: 'link-opening',
-    order: 17,
-    locale: NS,
-    inject: (): LinkOpeningRowInjected => ({
-      hooks: { linkOpening: linkOpening.destination, browserAvailable, settings: linkOpening.settings },
-      setLinkOpening: (destination) => { linkOpening.setDestination(destination) },
-    }),
-  }, LinkOpeningRow))
+    scope.slots.inject('settings.general.item', () => scope.slots.register({
+      name: 'settings.general.item',
+      id: 'link-opening',
+      order: 17,
+      locale: NS,
+      inject: (): LinkOpeningRowInjected => ({
+        hooks: { linkOpening: linkOpening.destination, browserAvailable, settings: linkOpening.settings },
+        setLinkOpening: (destination) => { linkOpening.setDestination(destination) },
+      }),
+    }, LinkOpeningRow))
+  })
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',

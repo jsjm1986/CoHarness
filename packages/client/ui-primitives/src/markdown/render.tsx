@@ -22,7 +22,7 @@ import clsx from 'clsx'
 import type * as Md from 'mdast'
 import type {} from 'mdast-util-math'
 import { normalizeUri } from 'micromark-util-sanitize-uri'
-import { classifyLinkPath } from '../LinkIcon.tsx'
+import { LinkIcon, classifyLinkPath } from '../LinkIcon.tsx'
 import { parseFileLink } from './file-link.ts'
 import { useMarkdownDelegate } from './MarkdownDelegate.tsx'
 import { CodeBlock } from './CodeBlock.tsx'
@@ -322,6 +322,7 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
               aria-label={mention.label}
               onClick={mention.open}
             >
+              <LinkIcon kind={classifyLinkPath(value)} className={css.linkIcon} />
               {value}
             </button>
           </code>
@@ -525,13 +526,17 @@ function anchorWrapsOnlyImages(children: Md.PhrasingContent[]): boolean {
 }
 
 /** Anchor over an already-authored href: allowlisted or unwrapped, external links get the safe attributes. */
-function renderSafeLink(href: string, children: ReactNode[], key: Key): ReactNode {
+function renderSafeLink(href: string, children: ReactNode[], key: Key, glyph = true): ReactNode {
   const safeHref = sanitizeUrl(href)
   if (safeHref === '') return <Fragment key={key}>{children}</Fragment>
-  return <MarkdownAnchor key={key} href={safeHref}>{children}</MarkdownAnchor>
+  return <MarkdownAnchor key={key} href={safeHref} glyph={glyph}>{children}</MarkdownAnchor>
 }
 
-function MarkdownAnchor({ href, children }: { readonly href: string; readonly children: ReactNode[] }): ReactNode {
+function MarkdownAnchor({ href, glyph, children }: {
+  readonly href: string
+  readonly glyph: boolean
+  readonly children: ReactNode[]
+}): ReactNode {
   const { openExternalLink } = useMarkdownDelegate()
   const external = ['http:', 'https:'].includes(new URL(href).protocol)
   const open = external ? openExternalLink : undefined
@@ -545,6 +550,7 @@ function MarkdownAnchor({ href, children }: { readonly href: string; readonly ch
         open(href)
       }}
     >
+      {glyph && <LinkIcon kind="url" className={css.linkIcon} />}
       {children}
     </a>
   )
@@ -556,7 +562,7 @@ function renderAnchor(url: string, children: ReactNode[], key: Key, glyph = true
   if (file !== undefined) {
     return <MarkdownFileLink key={key} file={file} glyph={glyph}>{children}</MarkdownFileLink>
   }
-  return renderSafeLink(normalizeUri(url), children, key)
+  return renderSafeLink(normalizeUri(url), children, key, glyph)
 }
 
 function MarkdownFileLink({ file, glyph, children }: {
@@ -576,6 +582,7 @@ function MarkdownFileLink({ file, glyph, children }: {
       title={src === undefined ? file.path : undefined}
       onClick={() => { openFile(file.path, file.line === undefined ? undefined : { line: file.line }) }}
     >
+      {glyph && <LinkIcon kind={classifyLinkPath(file.path)} className={css.linkIcon} />}
       {children}
     </button>
   )

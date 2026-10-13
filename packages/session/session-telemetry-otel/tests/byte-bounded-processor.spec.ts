@@ -7,6 +7,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LoggerProvider, type LogRecordExporter, type ReadableLogRecord } from '@opentelemetry/sdk-logs'
+import type { AnyValue } from '@opentelemetry/api-logs'
 import { JsonLogsSerializer } from '@opentelemetry/otlp-transformer'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import { ExportResultCode, type ExportResult } from '@opentelemetry/core'
@@ -51,7 +52,7 @@ function harness(
   })
   cleanup.push(() => provider.shutdown())
   const logger = provider.getLogger('byte-bound-test')
-  return { emit: (body) => { logger.emit({ body }) }, warn, provider }
+  return { emit: (body) => { logger.emit({ body: body as AnyValue }) }, warn, provider }
 }
 
 /** Exporter that captures every request and answers immediately. */

@@ -109,7 +109,7 @@ describe('desktop path verification', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(UserQuestionService)
     await ctx.plugin(LocalFileSystem)
-    const open = vi.fn(async () => {})
+    const open = vi.fn(async (_path: string) => {})
     const api = createApiProxy(ctx, {
       cwd: '/work', defaultModelSelection: () => ({ provider: 'p', model: 'm' }), canOpenPath: () => true, openPath: open,
     })

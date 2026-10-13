@@ -19,7 +19,12 @@ usePinnedBrowserLanguages('zh-CN')
 const ROOT = 'root-1' as SessionId
 const CHILD = 'child-1' as SessionId
 
-async function bench() {
+/** ui-sidebar-right's tab-type registry with no tab type registered; the row's inject gate only needs the object. */
+function sidebarRightTabsFake() {
+  return { get: () => undefined, subscribe: () => () => {}, register: () => () => {} }
+}
+
+async function bench(withBrowserRegistry = true) {
   const runtime = await SlotTestRuntime.create()
   runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
   // The plugin injects both; these specs exercise no settings path.
@@ -41,6 +46,10 @@ async function bench() {
     'details': { kind: 'single', scope: 'session' },
     'settings.general.item': { kind: 'list', scope: 'root' },
   }, (_p: { renderSlot?: unknown }) => null)
+
+  // The product composition always carries ui-sidebar-right; the link-opening
+  // row's inject gate only needs the registry, not a 'browser' tab type.
+  if (withBrowserRegistry) runtime.provide('sidebarRightTabs', sidebarRightTabsFake())
 
   const feature = await runtime.mount({ inject: [...inject], apply })
   return { runtime, feature, slots: runtime.slots }
@@ -97,6 +106,21 @@ describe('apply wiring', () => {
     expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual([
       'transcript-view', 'link-opening', 'composer-enter', 'conversation-display', 'performance-usage',
     ])
+    await b.runtime.dispose()
+  })
+
+  it('keeps the chat view live while the optional tab registry appears and leaves', async () => {
+    const b = await bench(false)
+    const linkOpening = () => b.slots.entries('settings.general.item').some(row => row.options.id === 'link-opening')
+    expect(linkOpening()).toBe(false)
+    expect(b.slots.entries('conversation.view')).toHaveLength(1)
+    const registry = await b.runtime.mount({
+      apply(ctx) { ctx.provide('sidebarRightTabs', sidebarRightTabsFake()) },
+    })
+    await vi.waitFor(() => { expect(linkOpening()).toBe(true) })
+    await registry.dispose()
+    expect(linkOpening()).toBe(false)
+    expect(b.slots.entries('conversation.view')).toHaveLength(1)
     await b.runtime.dispose()
   })
 

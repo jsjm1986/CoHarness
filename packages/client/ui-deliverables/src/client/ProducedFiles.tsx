@@ -4,6 +4,7 @@
 // use — the Host's own opener, on the Host machine.
 
 import type { HostDescriptionSource } from '@deepseek-ai/dsh-client-connection/client'
+import { LinkIcon, classifyLinkPath } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { basename, changesForClosing, presentedForClosing, selectProducedFiles } from './turn-deliverables.ts'
@@ -62,7 +63,8 @@ export function ProducedFiles(owner: ProducedFilesProps) {
               aria-label={t('produced.open', { name: path })}
               onClick={() => { openFile(path) }}
             >
-              {basename(path)}
+              <LinkIcon kind={classifyLinkPath(path)} className={css.fileIcon} />
+              <span className={css.fileName}>{basename(path)}</span>
             </button>
           ))}
           {shown.map((_, index) => {
@@ -82,6 +84,7 @@ export function ProducedFiles(owner: ProducedFilesProps) {
             className={css.showFolder}
             onClick={() => { openFile('.') }}
           >
+            <LinkIcon kind="folder" className={css.fileIcon} />
             {t('produced.showInFolder')}
           </button>
         )}

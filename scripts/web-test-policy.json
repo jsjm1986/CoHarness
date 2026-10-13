@@ -25,6 +25,7 @@
     "chat-long-interactions.e2e.ts": "conversation",
     "chat-scroll-contract.e2e.ts": "conversation",
     "chat-sender-attribution.e2e.ts": "conversation",
+    "clickable-links-gallery.e2e.ts": "conversation",
     "client-plugin-live.e2e.ts": "lifecycle",
     "cold-blank-session.e2e.ts": "lifecycle",
     "cold-inbox.snapshot.ts": "lifecycle",
