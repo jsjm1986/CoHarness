@@ -530,6 +530,13 @@
   line-height: 18px;
 }
 
+/* An idle row's leading status slot carries nothing but the slot's
+   display:contents host element: collapse the pair so the title lands near
+   the group label's inset instead of floating mid-row. */
+:global([data-viewport='compact']) .sessionRow .slot:has(> :only-child:empty) {
+  display: none;
+}
+
 :global([data-viewport='compact']) .sessionRow.selected {
   /* Flat active fill, not the desktop raised pill: in a full-width drawer a
      lifted card reads as a button, not a selection marker. */
