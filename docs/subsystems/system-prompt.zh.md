@@ -89,6 +89,20 @@ interface PromptContext {
 }
 ```
 
+`required: true` 让一项操作性贡献在可选运行时上下文被抑制时仍然保留。`interpolate: false` 保留字面文本，包括形似变量的目录名。`AssembledContext` 将解析后的文本与该插值选择带入渲染。
+
+```ts type-equiv
+/** One resolved dynamic context contribution. */
+interface AssembledContext {
+  /** The contributing context's unique name. */
+  name: string
+  /** The resolved text before variable interpolation. */
+  text: string
+  /** Whether to interpolate prompt variables. Defaults to true; false preserves literal text. */
+  interpolate?: boolean
+}
+```
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
