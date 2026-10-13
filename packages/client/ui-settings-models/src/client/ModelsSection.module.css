@@ -907,16 +907,27 @@ select.input {
   }
 
   /* The dashed "add" boxes read as desktop placeholder cards; on the phone
-     they join the plain hairline row grammar (leading glyph + label, no
-     bounding box). */
+     they join the plain hairline row grammar — each takes its own full-width
+     row (basis 100% wraps the pair) instead of splitting one row in half. */
+  .addActions {
+    gap: 0;
+  }
+
   .addButton {
+    /* `width` covers the single-button block container (`addActionsSingle`);
+       `flex-basis` wraps the pair onto separate rows in the flex container. */
+    flex: 1 1 100%;
+    width: 100%;
     justify-content: flex-start;
     min-width: 0;
-    width: 100%;
     border: none;
     border-bottom: 0.5px solid var(--dsw-alias-border-l2);
     border-radius: 0;
     background: transparent;
+    /* Row labels align at the section's leading edge like every other
+       settings row; the button's own 14px insets belong to the pill form. */
+    padding-left: 0;
+    padding-right: 0;
   }
 
   /* Provider entries and the editor cards they open into are rows too: the
