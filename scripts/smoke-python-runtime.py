@@ -1607,7 +1607,6 @@ def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) 
             ).as_uri(), "config": {
                 "parentSessionId": SNAPSHOT_SESSION_ID,
                 "prompt": SNAPSHOT_WORKFLOW_CHILD_PROMPT,
-                "direct": {"prompt": SNAPSHOT_DIRECT_CHILD_PROMPT, "callId": "advanced-direct-child"},
             }},
         ]}])
         with DeepSeekHarness(

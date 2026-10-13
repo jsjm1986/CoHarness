@@ -2,21 +2,21 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-10-13-snapshot-child-order-barrier.md
-/agent-note-barrier-the-advanced-python-snapshot-children-behind-their-parent-handoffs:
-  en: a975a3534758d4f0
-  zh: 337ce291efa914e7
-/agent-note-barrier-the-advanced-python-snapshot-children-behind-their-parent-handoffs/problem:
-  en: bba3d51624c6556c
-  zh: b60375c6ac28ea57
-/agent-note-barrier-the-advanced-python-snapshot-children-behind-their-parent-handoffs/decision:
-  en: b0f80ab99d898924
-  zh: 383673acba39d4bd
-/agent-note-barrier-the-advanced-python-snapshot-children-behind-their-parent-handoffs/alternatives-considered:
-  en: aed9e23d49721b42
-  zh: f9f4e4da79495f5a
-/agent-note-barrier-the-advanced-python-snapshot-children-behind-their-parent-handoffs/consequences:
+/agent-note-barrier-the-advanced-python-snapshot-workflow-child-behind-its-parent-handoff:
+  en: e3e756be40bfd5a6
+  zh: 4734f5b9f343b4ee
+/agent-note-barrier-the-advanced-python-snapshot-workflow-child-behind-its-parent-handoff/problem:
+  en: 950705c46f8eae83
+  zh: 738903f509d2b2b9
+/agent-note-barrier-the-advanced-python-snapshot-workflow-child-behind-its-parent-handoff/decision:
+  en: 50273897fa3dfabe
+  zh: 4f7e0d8bdae51398
+/agent-note-barrier-the-advanced-python-snapshot-workflow-child-behind-its-parent-handoff/alternatives-considered:
+  en: 6d0c3a3fc4ccf2c6
+  zh: 796c2d63ca508ff3
+/agent-note-barrier-the-advanced-python-snapshot-workflow-child-behind-its-parent-handoff/consequences:
   en: dc7e97054c4c3794
   zh: 827440464a2af232
-/agent-note-barrier-the-advanced-python-snapshot-children-behind-their-parent-handoffs/verification:
-  en: b894f0bdca69c582
-  zh: 9389e5ef069323b6
+/agent-note-barrier-the-advanced-python-snapshot-workflow-child-behind-its-parent-handoff/verification:
+  en: d60c0f6db36eb26b
+  zh: 28c45ac083c4729a
