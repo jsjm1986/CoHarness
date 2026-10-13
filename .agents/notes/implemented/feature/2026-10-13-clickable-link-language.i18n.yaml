@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-13-clickable-link-language.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-13-clickable-link-language.md
+/agent-note-unify-clickable-link-language-and-ship-the-gallery-e2e:
+  en: 9cb137800d5485e6
+  zh: bb2a6f1db9f08457
+/agent-note-unify-clickable-link-language-and-ship-the-gallery-e2e/problem:
+  en: b196827a44750011
+  zh: e21a804c647977af
+/agent-note-unify-clickable-link-language-and-ship-the-gallery-e2e/decision:
+  en: 77738185df8ce8f7
+  zh: 2eb51bd61a481bca
+/agent-note-unify-clickable-link-language-and-ship-the-gallery-e2e/alternatives-considered:
+  en: 5054d226bd2c65e4
+  zh: 3df32f7cc614e717
+/agent-note-unify-clickable-link-language-and-ship-the-gallery-e2e/consequences:
+  en: 0a4b8b13ef8fff32
+  zh: 52353faf164762de
+/agent-note-unify-clickable-link-language-and-ship-the-gallery-e2e/verification:
+  en: de42668b7209b8e1
+  zh: e2b4f7fd9e808020
+/agent-note-unify-clickable-link-language-and-ship-the-gallery-e2e/related:
+  en: 106081b4640cf970
+  zh: 5f7a09ef0a6bdb40
