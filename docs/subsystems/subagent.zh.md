@@ -48,14 +48,19 @@ interface SubagentCapabilities {
  * {@link SubagentProvider.start}.
  */
 interface SubagentStartRequest {
+  /**
+   * Initial child directory; relative paths resolve against the parent's
+   * current directory. Omitted inherits that directory at start. Every
+   * explicit path must land inside the parent's original project directory.
+   */
+  readonly cwd?: string
   /** Optional short display label persisted with a session-backed child. */
   readonly label?: string
   /** Content delivered as the child's user message. */
   readonly prompt: ContentBlock[]
   /**
-   * The spawning agent. In-process providers derive workspace, lineage, and
-   * delegation depth from its durable session state. ACP reads only its cwd,
-   * and only when no deployment `cwd` override is configured.
+   * The spawning agent. Its effective directory supplies the default cwd;
+   * in-process children retain its origin, lineage, and delegation depth.
    */
   readonly parent: Agent
   /**
@@ -116,6 +121,8 @@ interface SubagentStartRequest {
  * the durable child descriptor.
  */
 interface ResolvedSubagentStartRequest extends SubagentStartRequest {
+  /** Absolute directory selected once before provider startup. */
+  readonly cwd: string
   /** Detached descriptor a session-backed provider persists in the child log. */
   readonly descriptor: SubagentDescriptorData
 }
@@ -233,6 +240,8 @@ interface SubagentSettledMessageSource {
  * history.
  */
 interface ContinuableCreateRequest {
+  /** Absolute initial directory captured before provider preparation. */
+  readonly cwd: string
   /** The reserved durable child session id, for provider diagnostics. */
   readonly sessionId: SessionId
   /** The delegating parent agent whose history a seeding provider reads. */
