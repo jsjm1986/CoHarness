@@ -49,6 +49,35 @@
   white-space: nowrap;
 }
 .button:hover { background: var(--dsw-alias-interactive-bg-hover); }
+
+/* Compact accessory affordance; desktop keeps the pill. */
+.chevron { display: none; }
+
+@media (max-width: 767px) {
+  .setting {
+    min-height: 0;
+    padding: var(--dsw-space-3) 0;
+  }
+
+  .settingText {
+    padding-right: 0;
+  }
+
+  .button {
+    min-width: 0;
+    height: auto;
+    min-height: var(--dsw-touch-target);
+    padding: 0 0 0 var(--dsw-space-1);
+    gap: var(--dsw-space-1);
+    border-radius: 0;
+    background: transparent;
+    color: var(--dsw-alias-label-secondary);
+  }
+
+  .button:hover { background: transparent; }
+
+  .chevron { display: inline-flex; color: var(--dsw-alias-label-tertiary); }
+}
 .dialog {
   box-sizing: border-box;
   width: min(480px, 100%);

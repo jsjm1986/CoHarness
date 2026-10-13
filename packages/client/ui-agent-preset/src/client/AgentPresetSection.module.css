@@ -479,9 +479,23 @@
   .cards {
     grid-template-columns: minmax(0, 1fr);
     grid-auto-rows: auto;
+    gap: var(--dsw-space-2);
   }
 
   .cardMain {
     min-height: var(--dsw-touch-target);
+    padding: var(--dsw-space-3);
+    gap: var(--dsw-space-1);
+  }
+
+  /* Three lines on a phone: the fourth line bought a taller card, not more
+     readable description. */
+  .cardDesc {
+    min-height: 0;
+    -webkit-line-clamp: 3;
+  }
+
+  .cardFoot {
+    padding: 2px var(--dsw-space-2);
   }
 }

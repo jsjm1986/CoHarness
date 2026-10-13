@@ -45,7 +45,7 @@ describe('SettingsRoot.module.css compact overlay', () => {
   it('uses the shared compact footer row and exposes a keyboard focus ring', () => {
     expect(block('.trigger')).toContain('height: var(--dsh-sidebar-footer-row-height, 36px)')
     expect(block('.trigger')).toContain('margin: 0 -2px')
-    expect(css).toMatch(/\.trigger:focus-visible\s*\{[\s\S]*outline:\s*2px solid var\(--dsw-alias-brand-primary\)/)
+    expect(css).toMatch(/\.trigger:focus-visible\s*\{[\s\S]*outline:\s*var\(--dsw-focus-ring-width\) solid/)
   })
 
   it('lets the options column shrink so overflow-y can scroll', () => {
@@ -71,11 +71,12 @@ describe('SettingsRoot.module.css compact overlay', () => {
     expect(compact).toMatch(/\.options\s*\{[^}]*overscroll-behavior:\s*contain/)
   })
 
-  it('signals horizontally scrollable tabs at the compact edge', () => {
+  it('lets the clipped tab label signal horizontal scroll without a gradient fade', () => {
     const compact = mediaBody('(max-width: 767px)')
     expect(compact).toMatch(/\.navList\s*\{[^}]*overscroll-behavior-x:\s*contain/)
-    expect(compact).toMatch(/\.navList::after\s*\{[^}]*pointer-events:\s*none/)
-    expect(compact).toMatch(/background:\s*linear-gradient\(to right, transparent, var\(--dsw-alias-bg-layer-2\)\)/)
+    expect(compact).toMatch(/\.navList\s*\{[^}]*overflow-x:\s*auto/)
+    expect(compact).not.toMatch(/\.navList::after/)
+    expect(compact).not.toContain('linear-gradient')
   })
 
   it('gives the close control the touch target on coarse pointers', () => {

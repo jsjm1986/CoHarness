@@ -1,6 +1,6 @@
 /** Searchable editable shortcut reference and its General Settings row. */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Button, IconCloseOutline16, IconRefreshOutline16, IconSearchOutline16, Modal, ShortcutKeys, Tooltip, Toast, focusWithoutRing, isBehindModal, rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconChevronRightOutline14, IconCloseOutline16, IconRefreshOutline16, IconSearchOutline16, Modal, ShortcutKeys, Tooltip, Toast, focusWithoutRing, isBehindModal, rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ShortcutCatalogEntry, ShortcutPlatform, Shortcuts } from '@deepseek-ai/dsh-client-shortcuts/client'
@@ -58,7 +58,7 @@ export function ShortcutsRow({ actions, t, useCatalog }: PropsRuntime<'settings.
     </div>
     <Tooltip disabled={!shortcut?.keys.length} label={t('global-hint')} shortcutKeys={shortcut?.keys}>
       <button className={css.button} type="button" aria-label={t('view')} aria-keyshortcuts={shortcut?.aria}
-        onClick={() => { actions.open() }}>{t('view')}</button>
+        onClick={() => { actions.open() }}>{t('view')}<IconChevronRightOutline14 className={css.chevron} /></button>
     </Tooltip>
   </div>
 }

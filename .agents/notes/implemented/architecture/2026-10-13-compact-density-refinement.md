@@ -30,6 +30,14 @@ Density, not re-layout. Every change is a `[data-viewport='compact']` or `pointe
 
 **Phone gestures.** The compact drawer is swipe-driven: a rightward pan starting on a 24px left-edge zone opens it and a leftward pan on the open drawer closes it, both tracking the finger with live scrim opacity and settling on a 30%-of-width or velocity threshold. `useSheetSwipeDismiss` gives Modal and Menu sheets platform-style dismissal — a downward drag anywhere on the sheet follows the finger and fades the scrim, release past 96px or velocity 0.35 closes, a short release glides back via an inline transform transition, and a scrollable ancestor that is not at its top consumes the pan instead. Listeners are native and non-passive because React binds touch handlers passive and the gesture needs `preventDefault` once intent resolves; both paths are inert above `max-width: 767px` and under `prefers-reduced-motion`.
 
+**Documents channel flat list.** Document and folder rows drop their per-row card chrome (border, radius, layer fill) below 768px for the same continuous-rows-plus-inset-hairline grammar as the session drawer, and each row's trailing cluster is the `⋯` affordance alone because its sheet already carries every verb. The search field and the upload/more pair share one toolbar row — the desktop `flex-basis: 460px` filter group forced a wrap, so the phone gives it `flex-basis: 0; min-width: 0` while the breadcrumb crumb strip relaxes to a 36px text row. The scope trigger stays a single-line picker: its second line duplicated the caption row directly underneath.
+
+**Accessory settings rows.** The shortcut row joins the label-plus-trailing-accessory grammar (`编辑快捷键 ›` over a transparent control; desktop keeps its pill), and the developer-tools toggle row takes the compact `space-3` padding the select rows already had.
+
+**Flat colors.** The compact settings tab strip's right-edge `linear-gradient` scroll fade is removed — the clipped tab label is the affordance, and the palette stays solid. Skeleton shimmers and thinking-text alpha fades keep theirs: they are transparency masks, not brand color ramps.
+
+**Cascade-order discipline.** `DocumentsModal.module.css` carries multiple `max-width: 767px` blocks plus a second unconditional layer between them; a compact rule written in the first block loses to a later plain rule at equal specificity. Phone corrections that target rules in that second layer belong in the last compact block.
+
 ## Alternatives considered
 
 **Hold the 44px touch target everywhere.** Rejected: a single-line composer toolbar and a one-row message-action strip cannot hold five 44px controls at 360–390px; the 40px family is already the codified compact compromise ([composer single icon row](../bug-fix/2026-09-18-composer-single-icon-row.md)), and genuinely interactive rows (menu rows, option rows, session rows) keep the full touch target.

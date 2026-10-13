@@ -44,9 +44,13 @@ describe('DocumentsModal.module.css', () => {
     expect(modal).toMatch(/\.selectionDelete\s*\{[\s\S]*color:\s*var\(--dsw-alias-label-primary-foreground\)/)
   })
 
-  it('gives compact upload and More controls one full toolbar track', () => {
+  it('shares the compact toolbar row between search and the action pair', () => {
     expect(modal).toMatch(/\.actionGroup\.mobileActionGroup\s*\{[\s\S]*display:\s*flex/)
     expect(modal).toMatch(/\.mobileActionGroup \.upload\s*\{[\s\S]*flex:\s*1 1 auto/)
+    const compactBlocks = modal.match(/@media \(max-width: 767px\) \{[\s\S]*?\n\}/g) ?? []
+    const compact = compactBlocks.join('\n')
+    expect(compact).toMatch(/\.filterGroup\s*\{[\s\S]*flex-basis:\s*0/)
+    expect(compact).toMatch(/\.search\s*\{[\s\S]*flex:\s*1 1 0/)
   })
 
   it('keeps compact navigation and operations in touch-safe sheets', () => {
