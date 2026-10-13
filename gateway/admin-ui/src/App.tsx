@@ -9,7 +9,6 @@ import {
   Network,
   Terminal,
   Puzzle,
-  PanelsTopLeft,
   Rocket,
   ScrollText,
   ShieldCheck,
@@ -116,13 +115,33 @@ function PluginsFallback() {
   return <p role="status">{t('loading')}</p>
 }
 
+/** The CoHarness firefly mark; silhouette parts ride `currentColor`, `.cut` cutouts take the surface behind them, and `.lamp` parts use the brand accent — both classes resolve in index.css. */
+function BrandMark() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <ellipse cx="20" cy="26" rx="10.5" ry="5.5" className="cut" stroke="currentColor" strokeWidth="2.6" transform="rotate(-28 20 26)" />
+      <ellipse cx="44" cy="20" rx="10.5" ry="5.5" className="cut" stroke="currentColor" strokeWidth="2.6" transform="rotate(-36 44 20)" />
+      <path d="M26 14 q-3.5-6-9.5-7.5 M30.5 12.5 q-.5-7-4.5-11" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <circle cx="41" cy="44.5" r="13" className="lamp" opacity=".14" />
+      <circle cx="29" cy="19" r="6.8" fill="currentColor" />
+      <ellipse cx="33.5" cy="30.5" rx="7" ry="10" fill="currentColor" transform="rotate(16 33.5 30.5)" />
+      <ellipse cx="40" cy="44" rx="6.4" ry="7.2" className="lamp" transform="rotate(16 40 44)" />
+      <circle cx="38.5" cy="42.5" r="1.8" className="cut" opacity=".8" />
+      <circle cx="52" cy="38.5" r="1.7" className="lamp" />
+      <circle cx="53.5" cy="47" r="1.3" className="lamp" />
+      <circle cx="47" cy="53.5" r="1.5" className="lamp" />
+      <circle cx="26.6" cy="18.5" r="1.5" className="cut" />
+    </svg>
+  )
+}
+
 function Brand({ compact = false }: { compact?: boolean }) {
   const t = useMemo(() => translateCopy(adminLanguage(), { zh: chromeZh, en: chromeEn }), [])
   return (
     <div className={`brand ${compact ? 'brandCompact' : ''}`}>
-      <span className="brandMark"><PanelsTopLeft aria-hidden="true" /></span>
+      <span className="brandMark"><BrandMark /></span>
       <span className="brandCopy">
-        <strong>CoHarness</strong>
+        <strong>COHARNESS</strong>
         {compact ? null : <span>{t('brandSub')}</span>}
       </span>
     </div>

@@ -7,7 +7,7 @@
 import { useId } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import {
-  CoHarnessMark, IconChevronDownOutline14, IconWorkspaceOutline16,
+  CoHarnessMascot, IconChevronDownOutline14, IconWorkspaceOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationPaneSlotProps, ConversationSlotProps } from '../contract/slots.ts'
@@ -120,11 +120,10 @@ export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
           {/* figma 34:10412: brand mark 34×34 leading the headline, gap 10. */}
           <span className={css.brandHitbox}>
             {renderSlot('conversation.hero.brand.mark', { size: 34, className: css.brandMark }, {
-              fallback: <CoHarnessMark size={34} className={css.brandMark} />,
+              fallback: <CoHarnessMascot size={40} className={css.brandMark} ambient />,
             })}
           </span>
           <span className={css.headlineText}>{t('hero.headline')}</span>
-          <span className={css.previewBadge}>{t('hero.preview')}</span>
         </div>
         <div className={css.body}>
           {/* The resident composer (ConversationRoot's root-owned scrollport;

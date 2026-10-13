@@ -405,7 +405,9 @@ function sessionStatuses(
 function SessionStatusDots({ statuses }: { statuses: readonly [SessionStatus, ...SessionStatus[]] }) {
   return (
     <>
-      <StateDot state={statuses[0].state} />
+      {/* The ongoing C-mark chase reads at 12px inside the 16px slot;
+          solid dots keep their 10px spec. */}
+      <StateDot state={statuses[0].state} size={statuses[0].state === 'ongoing' ? 12 : undefined} />
       {statuses.map(status => (
         <span className={css.visuallyHidden} key={status.label}>{status.label}</span>
       ))}

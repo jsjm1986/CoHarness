@@ -21,30 +21,50 @@ export function gateLanguage(cookieHeader: string | undefined): GatePageLanguage
 
 const GATE_COPY = {
   zh: {
-    loginTitle: '登录 - CoHarness', username: '用户名', password: '密码', signIn: '登录',
-    passwordTitle: '修改密码 - CoHarness', passwordHeading: '请设置新密码',
+    loginTitle: '登录 - COHARNESS', username: '用户名', password: '密码', signIn: '登录',
+    passwordTitle: '修改密码 - COHARNESS', passwordHeading: '请设置新密码',
     newPassword: '新密码（至少 8 位）', saveContinue: '保存并继续',
     loginLocked: '尝试过于频繁，请 10 分钟后再试', loginInvalid: '用户名或密码错误',
     passwordTooShort: '密码至少 {min} 位',
-    waitingTitle: '正在启动 - CoHarness', waitingHeading: '正在启动您的工作台…',
+    waitingTitle: '正在启动 - COHARNESS', waitingHeading: '正在启动您的工作台…',
     waitingBody: '正在准备工作台服务，页面会自动连接。', waitingProgress: '工作台启动进度',
     waitingHint: '通常需要几秒钟，页面会自动刷新。',
-    stoppedTitle: '工作台已停止 - CoHarness', stoppedHeading: '工作台已手动停止',
+    stoppedTitle: '工作台已停止 - COHARNESS', stoppedHeading: '工作台已手动停止',
     stoppedBody: '后台请求不会自动启动。您可以主动启动并打开工作台。', stoppedStart: '启动并打开',
   },
   en: {
-    loginTitle: 'Sign in - CoHarness', username: 'Username', password: 'Password', signIn: 'Sign in',
-    passwordTitle: 'Change password - CoHarness', passwordHeading: 'Set a new password',
+    loginTitle: 'Sign in - COHARNESS', username: 'Username', password: 'Password', signIn: 'Sign in',
+    passwordTitle: 'Change password - COHARNESS', passwordHeading: 'Set a new password',
     newPassword: 'New password (at least 8 characters)', saveContinue: 'Save and continue',
     loginLocked: 'Too many attempts; try again in 10 minutes.', loginInvalid: 'Incorrect username or password.',
     passwordTooShort: 'Password must be at least {min} characters.',
-    waitingTitle: 'Starting - CoHarness', waitingHeading: 'Starting your workbench…',
+    waitingTitle: 'Starting - COHARNESS', waitingHeading: 'Starting your workbench…',
     waitingBody: 'Preparing the workbench service; this page connects automatically.', waitingProgress: 'Workbench startup progress',
     waitingHint: 'This usually takes a few seconds; the page refreshes itself.',
-    stoppedTitle: 'Workbench stopped - CoHarness', stoppedHeading: 'The workbench was stopped manually',
+    stoppedTitle: 'Workbench stopped - COHARNESS', stoppedHeading: 'The workbench was stopped manually',
     stoppedBody: 'Background requests will not start it. Start it yourself to open the workbench.', stoppedStart: 'Start and open',
   },
 } as const
+
+/**
+ * The CoHarness firefly mark inlined for gate pages. Ink rides `currentColor`;
+ * wing and face cutouts use the card white; the lamp, halo, and ember dots use
+ * the brand accent.
+ */
+const BRAND_MARK = '<svg viewBox="0 0 64 64" fill="none" aria-hidden="true" width="28" height="28">'
+  + '<ellipse cx="20" cy="26" rx="10.5" ry="5.5" fill="#fff" stroke="currentColor" stroke-width="2.6" transform="rotate(-28 20 26)"/>'
+  + '<ellipse cx="44" cy="20" rx="10.5" ry="5.5" fill="#fff" stroke="currentColor" stroke-width="2.6" transform="rotate(-36 44 20)"/>'
+  + '<path d="M26 14 q-3.5-6-9.5-7.5 M30.5 12.5 q-.5-7-4.5-11" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>'
+  + '<circle cx="41" cy="44.5" r="13" fill="#2563eb" opacity=".14"/>'
+  + '<circle cx="29" cy="19" r="6.8" fill="currentColor"/>'
+  + '<ellipse cx="33.5" cy="30.5" rx="7" ry="10" fill="currentColor" transform="rotate(16 33.5 30.5)"/>'
+  + '<ellipse cx="40" cy="44" rx="6.4" ry="7.2" fill="#2563eb" transform="rotate(16 40 44)"/>'
+  + '<circle cx="38.5" cy="42.5" r="1.8" fill="#fff" opacity=".8"/>'
+  + '<circle cx="52" cy="38.5" r="1.7" fill="#2563eb"/><circle cx="53.5" cy="47" r="1.3" fill="#2563eb"/><circle cx="47" cy="53.5" r="1.5" fill="#2563eb"/>'
+  + '<circle cx="26.6" cy="18.5" r="1.5" fill="#fff"/></svg>'
+
+/** The gate-page brand lockup: firefly mark plus the COHARNESS wordmark. */
+const BRAND_LOCK = `${BRAND_MARK}<span class="brand-word">COHARNESS</span>`
 
 /** The gate-page dictionary keys; `zh` is the source of truth. */
 export type GateCopyKey = keyof (typeof GATE_COPY)['zh']
@@ -84,13 +104,17 @@ table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #e5e5ea}
 .error{color:#d70015;margin:8px 0}.muted{color:#86868b;font-size:13px}
 nav a{margin-right:16px;color:#0071e3;text-decoration:none}
+.brand{display:flex;align-items:center;gap:10px;margin:0 0 18px;font-size:15px}
+.brand svg{display:block}
+.brand .brand-word{font-weight:600;letter-spacing:.05em}
+.brand.center{justify-content:center}
 </style></head><body><main>${body}</main></body></html>`
 }
 
 export function loginPage(error = '', language: GatePageLanguage = 'zh'): string {
   const t = gateCopy(language)
   return layout(t('loginTitle'), `<div class="card" style="max-width:380px;margin:80px auto">
-<h1>CoHarness</h1>
+<h1 class="brand">${BRAND_LOCK}</h1>
 ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
 <form method="post" action="/login">
 <p><input name="username" placeholder="${t('username')}" autocomplete="username" required style="width:100%"></p>
@@ -102,6 +126,7 @@ ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
 export function passwordPage(error = '', language: GatePageLanguage = 'zh'): string {
   const t = gateCopy(language)
   return layout(t('passwordTitle'), `<div class="card" style="max-width:380px;margin:80px auto">
+<div class="brand">${BRAND_LOCK}</div>
 <h1>${t('passwordHeading')}</h1>
 ${error === '' ? '' : `<p class="error">${escapeHtml(error)}</p>`}
 <form method="post" action="/account/password">
@@ -115,6 +140,7 @@ export function waitingPage(language: GatePageLanguage = 'zh'): string {
   const t = gateCopy(language)
   return layout(t('waitingTitle'), `<div class="card" style="max-width:380px;margin:80px auto;text-align:center">
 <div role="status" aria-live="polite" aria-busy="true">
+<div class="brand center">${BRAND_LOCK}</div>
 <div class="startup-spinner" aria-hidden="true"></div>
 <h1>${t('waitingHeading')}</h1>
 <p class="muted">${t('waitingBody')}</p>
@@ -140,6 +166,7 @@ export function waitingPage(language: GatePageLanguage = 'zh'): string {
 export function stoppedPage(target: { kind: 'user' | 'project'; id: number }, language: GatePageLanguage = 'zh'): string {
   const t = gateCopy(language)
   return layout(t('stoppedTitle'), `<div class="card">
+<div class="brand">${BRAND_LOCK}</div>
 <h1>${t('stoppedHeading')}</h1><p>${t('stoppedBody')}</p>
 <form method="post" action="/account/runtime/start">
 <input type="hidden" name="kind" value="${target.kind === 'user' ? 'personal' : 'project'}">

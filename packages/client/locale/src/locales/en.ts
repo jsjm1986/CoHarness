@@ -34,7 +34,7 @@ export const en = {
   'expand': 'Expand',
   'back': 'Back',
   'brand.localBuild': 'DSH Local Build',
-  'brand.product': 'CoHarness',
+  'brand.product': 'COHARNESS',
   'unknown': 'Unknown',
   'none': 'None',
   'truncated': 'Truncated',

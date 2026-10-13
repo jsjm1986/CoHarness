@@ -11,7 +11,7 @@ const src = (rel: string): string => fileURLToPath(new URL(rel, import.meta.url)
 const STANDALONE_ERROR = 'apps/web is not a standalone application: bare Vite cannot inject window.__DSH_BOOT__. '
   + 'From a repository checkout, run `pnpm dsh web`; an installed package uses `dsh web`. '
   + 'For client-plugin HMR, run `DSH_CLIENT_HMR=1 pnpm dsh web` together with `pnpm run dev:web`.'
-const DEFAULT_CLIENT_TITLE = 'CoHarness'
+const DEFAULT_CLIENT_TITLE = 'COHARNESS'
 const LOCAL_FAVICON_ASSET = 'favicon-coharness.svg'
 
 /** Escape build-time text before placing it in the HTML title element. */
@@ -45,7 +45,7 @@ function clientDocumentTitle(): Plugin {
           short_name?: string
         }
         value.name = process.env.DSH_CLIENT_TITLE ?? DEFAULT_CLIENT_TITLE
-        value.short_name = official ? 'DSH' : 'CoHarness'
+        value.short_name = official ? 'DSH' : 'COHARNESS'
         writeFileSync(manifestPath, `${JSON.stringify(value, null, 2)}\n`)
       }
       const localPath = join(outputDirectory, LOCAL_FAVICON_ASSET)

@@ -100,6 +100,7 @@
     "tests/startup-auto-selection.e2e.ts",
     "tests/produced-files.e2e.ts",
     "tests/produced-file-mentions.e2e.ts",
+    "tests/clickable-links-gallery.e2e.ts",
     "tests/goal-bar.e2e.ts",
     "tests/goal-command-presentation.e2e.ts",
     "tests/subagent-conversation.e2e.ts",

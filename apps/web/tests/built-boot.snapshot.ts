@@ -47,9 +47,9 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
     await waitFor(() => {
       expect(document.querySelector('svg[viewBox="26 0 156 24"]')).not.toBeNull()
     }, { timeout: 10_000 })
-    expect(screen.queryByText('CoHarness')).toBeNull()
+    expect(screen.queryByText('COHARNESS')).toBeNull()
   } else {
-    expect(await screen.findByText('CoHarness')).toBeTruthy()
+    expect(await screen.findByText('COHARNESS')).toBeTruthy()
     expect(document.querySelector('svg[viewBox="26 0 156 24"]')).toBeNull()
   }
   // The compact layout dropped group session counts; the fixture workspace

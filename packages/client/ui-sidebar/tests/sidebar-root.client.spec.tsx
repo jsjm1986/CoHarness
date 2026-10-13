@@ -153,9 +153,9 @@ describe('SidebarRoot shell', () => {
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
     />)
 
-    expect(screen.getByText('CoHarness')).toBeTruthy()
+    expect(screen.getByText('COHARNESS')).toBeTruthy()
     expect(screen.getByText('0123456')).toBeTruthy()
-    expect(container.querySelector('svg[data-brand="coharness"]')).not.toBeNull()
+    expect(container.querySelector('svg[data-brand="coharness-mascot"]')).not.toBeNull()
   })
 
   it('hands the region its wide flag and clamps expandSidebar to the collapsed state', () => {

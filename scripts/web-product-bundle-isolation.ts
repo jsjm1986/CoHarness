@@ -12,8 +12,9 @@ export interface WebOutputChunk {
   modules: Record<string, unknown>
   imports: string[]
   dynamicImports: string[]
-  implicitlyLoadedBefore: string[]
-  referencedFiles: string[]
+  /** Rolldown omits these fields on chunks with no implicit predecessors or referenced assets. */
+  implicitlyLoadedBefore?: string[]
+  referencedFiles?: string[]
   viteMetadata?: { importedCss: Set<string>; importedAssets: Set<string> }
 }
 
@@ -88,8 +89,8 @@ export class WebProductBundleIsolation {
         modules: { ...item.modules },
         imports: [...item.imports],
         dynamicImports: [...item.dynamicImports],
-        implicitlyLoadedBefore: [...item.implicitlyLoadedBefore],
-        referencedFiles: [...item.referencedFiles],
+        implicitlyLoadedBefore: [...item.implicitlyLoadedBefore ?? []],
+        referencedFiles: [...item.referencedFiles ?? []],
         ...(item.viteMetadata === undefined ? {} : { viteMetadata: {
           importedCss: new Set(item.viteMetadata.importedCss),
           importedAssets: new Set(item.viteMetadata.importedAssets),
@@ -185,7 +186,7 @@ export class WebProductBundleIsolation {
         for (const id of Object.keys(item.modules)) checkModule(id)
         queue.push(
           ...item.imports, ...item.dynamicImports,
-          ...item.implicitlyLoadedBefore, ...item.referencedFiles,
+          ...item.implicitlyLoadedBefore ?? [], ...item.referencedFiles ?? [],
         )
         queue.push(...item.viteMetadata?.importedCss ?? [], ...item.viteMetadata?.importedAssets ?? [])
       } else if (cssOwners.has(file)) {

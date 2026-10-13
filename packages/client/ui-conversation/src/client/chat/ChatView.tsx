@@ -17,7 +17,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import type {
   ConversationTimelineSnapshot, PendingSubmission, TurnNavigationItem,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import { Button, IconChevronDownOutline14, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, CoHarnessMascot, IconChevronDownOutline14, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ToolCallId } from '../contract/views.ts'
 import type { ChatViewSlotProps, RenderMessageImages } from '../contract/slots.ts'
@@ -27,6 +27,7 @@ import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
+import a11yCss from './accessibility.module.css'
 
 const FOLLOW_THRESHOLD = 24
 /** Start the next older-page request before the reader reaches the exact head. */
@@ -178,6 +179,9 @@ function observedInputs(
   return { rpcIds: observed, lastInputTurn }
 }
 
+/** Brand wordmark spelled out letter-by-letter so the status pulse can stagger it. */
+const TURN_STATUS_WORD = 'COHARNESS'.split('')
+
 /** Turn-level model activity label retained across first-token, tool, and streaming phases. */
 function TurnStatus({ startTime, t }: {
   /** The running turn's logged `turn/start` time; null falls back to mount
@@ -204,7 +208,14 @@ function TurnStatus({ startTime, t }: {
   const showClock = elapsedMs >= 15_000
   return (
     <div className={css.turnStatus} role="status" aria-live="polite">
-      {t('chat.deepDiving')}
+      <span className={a11yCss.visuallyHidden}>{t('chat.deepDiving')}</span>
+      <CoHarnessMascot size={20} busy />
+      <span className={css.turnStatusWord} aria-hidden>
+        {TURN_STATUS_WORD.map((letter, i) => (
+          <span key={i} style={{ animationDelay: `${i * 0.09}s` }}>{letter}</span>
+        ))}
+      </span>
+      <span className={css.turnStatusDots} aria-hidden><i /><i /><i /></span>
       {showClock && (
         <span className={css.turnStatusClock} aria-hidden>
           {formatRunDuration(elapsedMs, t).map(part => part.text).join('')}

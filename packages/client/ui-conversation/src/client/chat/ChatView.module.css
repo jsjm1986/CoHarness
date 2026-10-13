@@ -72,32 +72,55 @@
 /* Selection still sets data-selected for details linkage; no outline —
    tool rows match Think chrome (no selected ring). */
 
-/* Turn activity keeps the former loader's one-line footprint. A pale
-   brand-blue band sweeps from left to right; reduced-motion keeps it static. */
+/* Turn activity keeps the former loader's one-line footprint: the busy
+   mascot flaps beside the brand wordmark while a blue pulse cascades
+   letter by letter, trailed by typing dots. The localized label stays
+   visually hidden for the live region; reduced-motion freezes the loop. */
 .turnStatus {
+  --turn-status-accent: #2563eb;
   align-self: flex-start;
   flex: none;
   display: inline-flex;
   align-items: center;
+  gap: var(--dsw-space-2);
   height: 26px;
   font: var(--dsw-font-s-strong-14);
   white-space: nowrap;
-  background: linear-gradient(
-    90deg,
-    var(--dsw-static-deepseek-500) 0%,
-    var(--dsw-static-deepseek-500) 40%,
-    var(--dsw-static-deepseek-200) 50%,
-    var(--dsw-static-deepseek-500) 60%,
-    var(--dsw-static-deepseek-500) 100%
-  );
-  background-position: 100% 0;
-  background-size: 250% 100%;
-  background-clip: text;
-  color: transparent;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: dsh-turn-status-shimmer 1.8s linear infinite;
+  color: var(--dsw-alias-label-primary);
 }
+
+:global(body[data-ds-dark-theme]) .turnStatus {
+  --turn-status-accent: #6b93ff;
+}
+
+.turnStatusWord {
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.turnStatusWord > span {
+  animation: dsh-turn-status-letter 1.9s ease-in-out infinite;
+}
+
+.turnStatusDots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 2px;
+}
+
+.turnStatusDots i {
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: var(--turn-status-accent);
+  animation: dsh-turn-status-dot 1.25s ease-in-out infinite;
+}
+
+.turnStatusDots i:nth-child(2) { animation-delay: .16s; }
+.turnStatusDots i:nth-child(3) { animation-delay: .32s; }
 
 .turnStatusClock {
   margin-left: var(--dsw-space-2);
@@ -105,20 +128,23 @@
   font-weight: 400;
   font-variant-numeric: tabular-nums;
   color: var(--dsw-alias-label-caption);
-  -webkit-text-fill-color: var(--dsw-alias-label-caption);
 }
 
-@keyframes dsh-turn-status-shimmer {
-  to {
-    background-position: 0 0;
-  }
+@keyframes dsh-turn-status-letter {
+  0%, 55%, 100% { opacity: .42; }
+  18% { color: var(--turn-status-accent); opacity: 1; }
+}
+
+@keyframes dsh-turn-status-dot {
+  0%, 60%, 100% { opacity: .25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .turnStatus {
-    background-position: 0 0;
-    background-size: 100% 100%;
+  .turnStatusWord > span,
+  .turnStatusDots i {
     animation: none;
+    opacity: 1;
   }
 }
 

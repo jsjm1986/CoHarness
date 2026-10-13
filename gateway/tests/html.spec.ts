@@ -3,20 +3,23 @@ import { gateCopy, gateLanguage, loginPage, passwordPage, stoppedPage, waitingPa
 
 describe('Gateway entry documents', () => {
   it('uses the CoHarness product brand across account entry and startup pages', () => {
-    expect(loginPage()).toContain('<title>登录 - CoHarness</title>')
-    expect(loginPage()).toContain('<h1>CoHarness</h1>')
-    expect(passwordPage()).toContain('<title>修改密码 - CoHarness</title>')
-    expect(waitingPage()).toContain('<title>正在启动 - CoHarness</title>')
+    expect(loginPage()).toContain('<title>登录 - COHARNESS</title>')
+    expect(loginPage()).toContain('<h1 class="brand">')
+    expect(loginPage()).toContain('>COHARNESS</span>')
+    expect(passwordPage()).toContain('<title>修改密码 - COHARNESS</title>')
+    expect(waitingPage()).toContain('<title>正在启动 - COHARNESS</title>')
+    expect(waitingPage()).toContain('>COHARNESS</span>')
+    expect(stoppedPage({ kind: 'user', id: 1 })).toContain('>COHARNESS</span>')
   })
 
   it('renders English gate pages when the language cookie selects it', () => {
-    expect(loginPage('', 'en')).toContain('<title>Sign in - CoHarness</title>')
+    expect(loginPage('', 'en')).toContain('<title>Sign in - COHARNESS</title>')
     expect(loginPage('', 'en')).toContain('placeholder="Username"')
     expect(loginPage('', 'en')).toContain('placeholder="Password"')
-    expect(passwordPage('', 'en')).toContain('<title>Change password - CoHarness</title>')
-    expect(waitingPage('en')).toContain('<title>Starting - CoHarness</title>')
+    expect(passwordPage('', 'en')).toContain('<title>Change password - COHARNESS</title>')
+    expect(waitingPage('en')).toContain('<title>Starting - COHARNESS</title>')
     expect(waitingPage('en')).toContain('Starting your workbench…')
-    expect(stoppedPage({ kind: 'user', id: 1 }, 'en')).toContain('<title>Workbench stopped - CoHarness</title>')
+    expect(stoppedPage({ kind: 'user', id: 1 }, 'en')).toContain('<title>Workbench stopped - COHARNESS</title>')
   })
 
   it('emits the matching html lang attribute per language', () => {

@@ -23,45 +23,29 @@
   overflow: visible;
 }
 
-/* figma 34:10411: brand mark + title, gap 10, centered; 26/32 wt500. The preview
-   badge is a product addition outside that source: a mono superscript pill
-   riding the title's top-right. */
+/* Brand mark + uppercase letterspaced wordmark, gap 10, centered. */
 .headline {
   display: grid;
-  grid-template-columns: 34px auto auto;
+  grid-template-columns: 40px auto;
   column-gap: 10px;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: 22px;
   line-height: 32px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.045em;
   color: var(--dsw-alias-label-primary);
 }
 
 .headlineText {
   grid-row: 1;
   grid-column: 2;
+  display: inline-flex;
+  align-items: baseline;
 }
 
-.previewBadge {
-  grid-row: 1;
-  grid-column: 3;
-  align-self: start;
-  margin-top: 2px;
-  margin-left: -3px;
-  padding: 1px 7px 0;
-  border: 0.5px solid var(--dsw-alias-interactive-bg-hover);
-  border-radius: 24px;
-  background: var(--dsw-alias-state-business-tertiary);
-  color: var(--dsw-alias-label-primary-bluish);
-  font-family: var(--ds-font-family-code);
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-/* Keep hover detection on a stationary box while the mark moves within it. */
+/* Stationary grid cell: the mark's ambient bobbing moves inside it without
+   shifting the headline layout. */
 .brandHitbox {
   grid-row: 1;
   grid-column: 1;
@@ -74,26 +58,6 @@
 .brandMark {
   color: var(--dsw-alias-label-primary);
   transform-origin: 50% 50%;
-}
-
-@keyframes hero-brand-mark {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-
-  35% {
-    transform: translate(-1px, -1px) rotate(-5deg);
-  }
-
-  70% {
-    transform: translate(1px, 0) rotate(3deg);
-  }
-}
-
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .brandHitbox:hover .brandMark {
-    animation: hero-brand-mark var(--ds-transition-duration-slow) var(--ds-ease-in-out);
-  }
 }
 
 /* Workspace row sits 12px above the input card (figma y80 → y112). The blue
@@ -211,9 +175,9 @@
 }
 
 :global([data-viewport='compact']) .headline {
-  grid-template-columns: 28px minmax(0, auto) auto;
+  grid-template-columns: 32px minmax(0, auto);
   column-gap: var(--dsw-space-2);
-  font-size: 20px;
+  font-size: 17px;
   line-height: 26px;
 }
 
