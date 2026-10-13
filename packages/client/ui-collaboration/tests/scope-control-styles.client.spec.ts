@@ -36,4 +36,22 @@ describe('ScopeControl.module.css', () => {
     expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*\.menuSearch\s*\{[^}]*min-height:\s*var\(--dsw-touch-target\)/)
     expect(css).toMatch(/\.menuSearchClear\s*\{[^}]*width:\s*24px/)
   })
+
+  it('opens the wide-mode list as an in-card drawer, not a floating overlay', () => {
+    // Doubled selectors keep the overrides ahead of Menu's .root/.list.
+    expect(css).toMatch(/\.scopeField\.scopeField\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/)
+    const sheet = css.match(/\.scopeSheet\.scopeSheet\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(sheet).toContain('order: -1')
+    expect(sheet).toContain('position: static')
+    expect(sheet).toContain('box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2)')
+    expect(sheet).toContain('--dsw-menu-surface-fill: var(--dsw-alias-bg-layer-1)')
+    expect(sheet).toContain('--dsh-menu-max-height: min(340px, 48vh)')
+  })
+
+  it('gives every scope row a deterministic identity tile', () => {
+    expect(css).toMatch(/\.tile\s*\{[^}]*width:\s*20px[^}]*border-radius:\s*var\(--dsw-radius-sm\)/)
+    for (const tone of ['tileBlue', 'tileGreen', 'tileAmber', 'tileRed', 'tileDeep', 'tileWarn']) {
+      expect(css).toContain(`.${tone}`)
+    }
+  })
 })

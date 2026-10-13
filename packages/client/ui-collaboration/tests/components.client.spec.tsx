@@ -228,11 +228,16 @@ describe('ScopeControl', () => {
     const stewardItem = screen.getByRole('menuitem', { name: /维护中枢/ })
     expect(stewardItem.textContent).toContain('维护')
     expect(stewardItem.textContent).not.toContain('可编辑')
-    // The reserved space leads with the maintenance shield, not a scope dot.
+    // The reserved space leads with the maintenance tile, not a letter tile.
     expect(stewardItem.querySelector('svg')).not.toBeNull()
-    expect(stewardItem.querySelector(`span.${css.scopeDot}`)).toBeNull()
-    expect(screen.getByRole('menuitem', { name: /支付重构/ }).textContent).toContain('可编辑')
-    expect(screen.getByRole('menuitem', { name: /支付重构/ }).querySelector(`span.${css.scopeDot}`)).not.toBeNull()
+    expect(stewardItem.querySelector(`span.${css.tileWarn}`)).not.toBeNull()
+    const projectItem = screen.getByRole('menuitem', { name: /支付重构/ })
+    expect(projectItem.textContent).toContain('可编辑')
+    // Ordinary projects lead with their letter tile; selection stays on the
+    // trailing check.
+    const tile = projectItem.querySelector(`span.${css.tile}`)
+    expect(tile).not.toBeNull()
+    expect(tile?.textContent).toBe('支')
   })
 
   it('renders a compact rail trigger and omits create visibility for read-only projects', () => {

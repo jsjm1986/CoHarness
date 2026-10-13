@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  IconChevronDownOutline14, IconCloseFill14, IconGlobeOutline14, IconSearchOutline16,
+  IconChevronDownOutline14, IconCloseFill14, IconCloseOutline16, IconGlobeOutline14, IconSearchOutline16,
   IconPlusOutline16, IconSettingsOutline16, IconShieldOutline16, IconUserOutline16, IconUsersOutline16,
   IconWarningOutline16,
   Menu, type MenuEntry,
@@ -56,6 +56,31 @@ export type ScopeControlProps =
   PropsRuntime<'sidebar.footer.action'>
   & InjectFace<ScopeControlInjected>
   & PropsLocale<typeof NS>
+
+/** Deterministic identity tile tones; a project keeps one hue across renders. */
+const tileTones = [css.tileBlue, css.tileGreen, css.tileAmber, css.tileRed, css.tileDeep] as const
+
+/**
+ * Pick a project's tile tone from its name so the same space always wears the
+ * same colour in the list and the trigger.
+ * @param name - project display name.
+ * @returns the tone class for the tile.
+ */
+function tileTone(name: string): string {
+  let sum = 0
+  for (const char of name) sum += char.codePointAt(0) ?? 0
+  return tileTones[sum % tileTones.length] ?? css.tileBlue
+}
+
+/**
+ * A project's leading glyph: the first full code point, which keeps CJK and
+ * emoji names legible instead of splitting a surrogate pair.
+ * @param name - project display name.
+ * @returns the first glyph.
+ */
+function tileGlyph(name: string): string {
+  return Array.from(name)[0] ?? ''
+}
 
 /**
  * Render the personal/project runtime selector and project create visibility.
@@ -121,6 +146,17 @@ export function ScopeControl({
     id: `scope:project:${project.projectId}`,
     label: (
       <span className={css.scopeRow}>
+        {project.kind === 'steward'
+          ? (
+            <span className={`${css.tile} ${css.tileWarn}`} aria-hidden="true">
+              <IconShieldOutline16 size={11} />
+            </span>
+          )
+          : (
+            <span className={`${css.tile} ${tileTone(project.name)}`} aria-hidden="true">
+              {tileGlyph(project.name)}
+            </span>
+          )}
         <span className={css.scopeName}>{project.name}</span>
         <span className={project.kind === 'steward' ? css.scopeModeSteward : css.scopeMode}>
           {project.kind === 'steward'
@@ -129,15 +165,6 @@ export function ScopeControl({
         </span>
       </span>
     ),
-    icon: project.kind === 'steward'
-      ? <IconShieldOutline16 className={css.scopeIconSteward} size={14} />
-      : (
-        <span
-          className={projectScope !== undefined && project.projectId === projectScope.projectId
-            ? css.scopeDotOn : css.scopeDot}
-          aria-hidden="true"
-        />
-      ),
     disabled: state.scopeBusy,
   }))
   if (visibleProjects.length === 0 && normalizedProjectQuery !== '') {
@@ -146,16 +173,15 @@ export function ScopeControl({
     })
   }
   const entries: MenuEntry[] = [
-    { type: 'label', id: 'personal-label', text: t('scope.personal') },
     {
       id: 'scope:personal',
       label: (
         <span className={css.scopeRow}>
+          <span className={`${css.tile} ${css.tileRound} ${css.tileBlue}`} aria-hidden="true">
+            <IconUserOutline16 size={11} />
+          </span>
           <span className={css.scopeName}>{t('scope.personal')}</span>
         </span>
-      ),
-      icon: (
-        <span className={projectScope === undefined ? css.scopeDotOn : css.scopeDot} aria-hidden="true" />
       ),
       disabled: state.scopeBusy,
     },
@@ -229,10 +255,21 @@ export function ScopeControl({
   const scopeTitle = state.scopeError === undefined
     ? state.scopeBusy ? t('scope.switching') : t('scope.aria')
     : t('scope.failed')
-  const iconSize = wide ? 16 : 18
   const projectSearch = (
     <>
-      <div className={css.menuHeader}>{t('scope.menuTitle')}</div>
+      <div className={css.sheetHead}>
+        <div className={css.menuHeader}>{t('scope.menuTitle')}</div>
+        {wide && (
+          <button
+            type="button"
+            className={css.sheetClose}
+            aria-label={t('manager.close')}
+            onClick={() => { setOpen(false) }}
+          >
+            <IconCloseOutline16 size={13} />
+          </button>
+        )}
+      </div>
       {context.projects.length > 0 && (
         <div className={css.menuSearch}>
           <span className={css.menuSearchIcon} aria-hidden="true">
@@ -269,8 +306,13 @@ export function ScopeControl({
         items={entries}
         header={projectSearch}
         {...managerEntries.length > 0 ? { footer: managerEntries } : {}}
-        listClassName={css.scopeMenu}
-        listStyle={menuWidth === undefined ? undefined : { width: menuWidth }}
+        /* The expanded sidebar opens the list as an in-flow drawer above its
+           trigger — a panel inside the card, not a floating overlay. The rail
+           keeps the floating menu. */
+        portal={!wide}
+        className={wide ? css.scopeField : undefined}
+        listClassName={wide ? `${css.scopeMenu} ${css.scopeSheet}` : css.scopeMenu}
+        listStyle={wide || menuWidth === undefined ? undefined : { width: menuWidth }}
         selectedIds={[
           currentScopeId,
           ...(projectScope?.mode === 'rw' ? [`visibility:${state.stagedVisibility}`] : []),
@@ -301,7 +343,6 @@ export function ScopeControl({
         }}
         side="top"
         align="start"
-        portal
         anchor={(
           <button
             type="button"
@@ -318,11 +359,23 @@ export function ScopeControl({
           >
             {state.scopeError === undefined
               ? projectScope === undefined
-                ? <IconUserOutline16 size={iconSize} />
+                ? (
+                  <span className={`${css.tile} ${css.tileRound} ${css.tileBlue}`} aria-hidden="true">
+                    <IconUserOutline16 size={wide ? 12 : 11} />
+                  </span>
+                )
                 : projectScope.steward === true
-                  ? <IconShieldOutline16 className={css.stewardGlyph} size={iconSize} />
-                  : <IconUsersOutline16 size={iconSize} />
-              : <IconWarningOutline16 size={iconSize} />}
+                  ? (
+                    <span className={`${css.tile} ${css.tileWarn}`} aria-hidden="true">
+                      <IconShieldOutline16 size={11} />
+                    </span>
+                  )
+                  : (
+                    <span className={`${css.tile} ${tileTone(projectScope.projectName)}`} aria-hidden="true">
+                      {tileGlyph(projectScope.projectName)}
+                    </span>
+                  )
+              : <IconWarningOutline16 size={wide ? 16 : 18} />}
             {wide && (
               <>
                 <span className={css.label}>{currentLabel}</span>

@@ -98,6 +98,12 @@
 .chevron {
   flex: none;
   color: var(--dsw-alias-label-caption);
+  transition: rotate var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
+}
+
+.trigger[aria-expanded='true'] .chevron {
+  rotate: 180deg;
 }
 
 /* Keep a large project roster from pushing the menu across the whole frame;
@@ -106,8 +112,92 @@
   --dsh-menu-max-height: min(480px, calc(100vh - 24px));
 }
 
+/* The expanded sidebar opens the list in flow above its trigger: the Menu
+   root turns into the footer column's block box and the list takes the row
+   before it. The doubled selector keeps these overrides ahead of Menu's
+   own .root/.list rules regardless of module concatenation order. */
+.scopeField.scopeField {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* The drawer is a surface inside the card, not an overlay: flat layer fill,
+   an inset hairline instead of a drop shadow, and a tighter height cap so a
+   long roster cannot squeeze the session rows to nothing. */
+.scopeSheet.scopeSheet {
+  order: -1;
+  position: static;
+  min-width: 0;
+  max-width: none;
+  margin-bottom: var(--dsh-sidebar-footer-row-gap, 2px);
+  border-radius: var(--dsw-radius-md);
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
+  --dsw-menu-surface-fill: var(--dsw-alias-bg-layer-1);
+  --dsw-menu-backdrop-filter: none;
+  --dsh-menu-max-height: min(340px, 48vh);
+}
+
+/* Identity tiles: the letter of the project on a deterministic solid tint.
+   Selection stays on the trailing check; the tile carries identity only. */
+.tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--dsw-radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tileRound {
+  border-radius: 50%;
+  corner-shape: round;
+}
+
+.tileBlue { background: var(--dsw-static-blue-100); color: var(--dsw-static-blue-600); }
+.tileGreen { background: var(--dsw-static-green-100); color: var(--dsw-static-green-900); }
+.tileAmber { background: var(--dsw-static-amber-100); color: var(--dsw-static-amber-600); }
+.tileRed { background: var(--dsw-static-red-100); color: var(--dsw-static-red-600); }
+.tileDeep { background: var(--dsw-static-deepseek-100); color: var(--dsw-static-deepseek-600); }
+.tileWarn {
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.sheetHead {
+  display: flex;
+  align-items: center;
+}
+
+.sheetClose {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-xs);
+  background: transparent;
+  color: var(--dsw-alias-label-caption);
+  cursor: pointer;
+}
+
+.sheetClose:hover,
+.sheetClose:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
 /* Panel-style header above the search field. */
 .menuHeader {
+  flex: 1;
+  min-width: 0;
   padding: 0 var(--dsw-space-1) var(--dsw-space-1);
   color: var(--dsw-alias-label-caption);
   font-size: 12px;
@@ -265,36 +355,6 @@
   background: var(--dsw-alias-state-warn-tertiary);
   color: var(--dsw-alias-state-warn-label);
   font-weight: 600;
-}
-
-.scopeDot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin: 0 5px;
-  border-radius: 50%;
-  corner-shape: round;
-  background: var(--dsw-alias-label-tertiary);
-}
-
-.scopeDotOn {
-  composes: scopeDot;
-  background: var(--dsw-alias-state-business-primary);
-}
-
-/* Steward rows carry the maintenance glyph instead of a selection dot: the
-   reserved space is an identity, not a state. Shares the amber warn family
-   with the trigger chrome and the dock notice. */
-.scopeIconSteward {
-  display: inline-flex;
-  flex: none;
-  color: var(--dsw-alias-state-warn-primary);
-}
-
-/* The active steward trigger carries the same glyph in warn amber. */
-.stewardGlyph {
-  flex: none;
-  color: var(--dsw-alias-state-warn-primary);
 }
 
 .badge {
