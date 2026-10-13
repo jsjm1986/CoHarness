@@ -8,7 +8,7 @@
 // Lists keep 12px clearance to the viewport's top/bottom edges and scroll
 // internally past that; submenu-bearing menus are exempt (see .scrollable).
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode, SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
@@ -20,6 +20,7 @@ import { observeComposition } from './keyboard-composition.ts'
 import { ShortcutKeys } from './ShortcutKeys.tsx'
 import { MenuSurface } from './MenuSurface.tsx'
 import { MobileSheetBackdrop } from './MobileSheetBackdrop.tsx'
+import { useSheetSwipeDismiss } from './useSheetSwipeDismiss.ts'
 import { usePointerGrace } from './pointer-grace.ts'
 import css from './Menu.module.css'
 
@@ -239,6 +240,11 @@ export function Menu({ open, anchor, items = [], children, selectedId, selectedI
   // commit (a per-commit update loop under React 19's nested-update count).
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+  // At sheet widths the menu is a bottom sheet and dismisses like one:
+  // downward drag tracks the finger unless a scrolled region inside claims
+  // the pan (useSheetSwipeDismiss).
+  const dismissSheet = useCallback(() => { onCloseRef.current() }, [])
+  useSheetSwipeDismiss(listRef, open, dismissSheet)
 
   // Portal mode: fixed-position the list from the anchor rect before paint;
   // track the anchor while open (capture-phase scroll catches nested panes).

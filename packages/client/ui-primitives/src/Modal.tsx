@@ -3,12 +3,13 @@
 // cannot leave sticky page controls above the mask. This is still an in-page
 // WebUI dialog; it never creates or targets another browser/native window.
 
-import { useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import type { KeyboardEventHandler, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import { IconCloseOutline16 } from './icons/index.tsx'
 import { useModalLayer } from './useModalLayer.ts'
+import { useSheetSwipeDismiss } from './useSheetSwipeDismiss.ts'
 import css from './Modal.module.css'
 
 interface ModalBaseProps {
@@ -54,6 +55,14 @@ export function Modal({
 }: ModalProps) {
   const dialog = useRef<HTMLDivElement>(null)
   useModalLayer(dialog, open, onClose)
+
+  // Phone sheets dismiss like platform sheets: a downward drag anywhere in
+  // the card follows the finger and fades the mask; a scrollable body claims
+  // the pan unless it is at its top (see useSheetSwipeDismiss).
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  const dismiss = useCallback(() => { onCloseRef.current() }, [])
+  useSheetSwipeDismiss(dialog, open, dismiss)
 
   if (!open) return null
 

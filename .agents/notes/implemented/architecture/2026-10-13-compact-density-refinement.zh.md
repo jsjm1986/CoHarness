@@ -28,6 +28,8 @@ Status: implemented
 
 **平台按压与列表节奏。** `-webkit-tap-highlight-color: transparent` 去掉浏览器默认灰色点击闪烁（可交互面本就带显式 `:active` 填充）；紧凑态下项目/会话/搜索结果行的按压反馈改为即时 `interactive-bg-active` 填充而非桌面 0.98 缩放——整宽单元格被捏扁读起来是弹性而非可点。会话单元格连续排列，行间用 0.5px 内嵌发丝线（画在每行的 HoverCard 包装 `span:not(:last-child)::after` 上——行类名属于另一个 CSS module 作用域，包装元素的兄弟位置才是可靠的分组末尾判据）。新会话 CTA 在手机上用主按钮填充——整宽中性灰块读起来像禁用条而非按钮。抽屉列表与转录滚动口加 `overscroll-behavior: contain`，触底惯性不再串到遮罩后面的页面。
 
+**手机手势。** 紧凑抽屉由滑动驱动：从左缘 24px 热区向右拖拽打开、在已开抽屉上向左拖拽关闭，均跟手并联动遮罩透明度，阈值为过宽度 30% 或速度阈值。`useSheetSwipeDismiss` 为 Modal 与 Menu 底部弹层提供平台式关闭——sheet 任意位置下拉跟手、遮罩渐隐，释放超过 96px 或速度 0.35 即关闭，短程释放经内联 transform 过渡滑回；不在顶部的可滚动祖先接管拖拽。监听器为原生非 passive，因为 React 的触摸绑定是 passive 而手势需要 `preventDefault`；两条路径在 `max-width: 767px` 之上和 `prefers-reduced-motion` 下均不生效。
+
 ## Alternatives considered
 
 **处处保持 44px 触控目标。** 否决：360–390px 宽下一行放不下五个 44px 控件的单行输入工具条和单行消息操作条；40px 族已是成文的紧凑折中（[输入区单行图标行](../bug-fix/2026-09-18-composer-single-icon-row.zh.md)），真正可交互的行（菜单行、选项行、会话行）仍保持完整触控目标。
@@ -42,7 +44,7 @@ Status: implemented
 
 ## Verification
 
-`apps/web/tests/mobile-density.e2e.ts` 在 390×844 下启动真实装配的应用并播种会话，断言紧凑标记生效、会话行可见尾部只剩菜单触发器、正文滚动口无横向溢出、合成悬停不产生 tooltip 气泡。`compact-chrome-styles.client.spec.ts` 与 `compact-styles.client.spec.ts` 的词法契约现在锁定 36/34/28px 头部配方和 40px 代码横幅族。390×844 截图审计覆盖了着陆页、抽屉（折叠与展开）、会话、输入区、详情浮层、轨迹流和设置底部弹层；1440×900 对照截图确认桌面框架不变。`ui-workspace`、`ui-conversation`、`ui-sidebar-right`、`ui-primitives` 测试套件全部通过。
+`apps/web/tests/mobile-density.e2e.ts` 在 390×844 下启动真实装配的应用并播种会话，断言紧凑标记生效、会话行可见尾部只剩菜单触发器、正文滚动口无横向溢出、合成悬停不产生 tooltip 气泡。`compact-chrome-styles.client.spec.ts` 与 `compact-styles.client.spec.ts` 的词法契约现在锁定 36/34/28px 头部配方和 40px 代码横幅族。390×844 截图审计覆盖了着陆页、抽屉（折叠与展开）、会话、输入区、详情浮层、轨迹流和设置底部弹层；1440×900 对照截图确认桌面框架不变。`ui-workspace`、`ui-conversation`、`ui-sidebar-right`、`ui-primitives` 测试套件全部通过。`apps/web/tests/swipe-check.e2e.ts` 在 390×844 下用真实 TouchEvent 序列回放手势层：边缘滑动打开抽屉、抽屉拖拽关闭、慢速短程拖拽 sheet 回弹、长拖拽关闭 Menu 与 Modal 弹层、已滚动 sheet 不接管拖拽。
 
 ## Related
 
