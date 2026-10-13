@@ -10,6 +10,7 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
 import GatewayRuntime, { GATEWAY_PRINCIPAL_HEADER, type GatewayRuntimeCredential } from '@deepseek-ai/dsh-gateway-runtime'
 import LlmRuntime, { createUserMessage, LlmAdapter, ToolCallId, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
@@ -180,6 +181,7 @@ async function composition(credential: GatewayRuntimeCredential, goals = false, 
     ? "- name: '@deepseek-ai/dsh-jobs-local'\n- name: '@deepseek-ai/dsh-tool-jobs'\n- name: '@deepseek-ai/dsh-experimental-auto-review'\n" : '') + (goals ? "- name: '@deepseek-ai/dsh-goal'\n- name: '@deepseek-ai/dsh-goal-round-driver'\n" : '') + (drafts
     ? "- name: '@deepseek-ai/dsh-collaboration-gateway'\n- name: '@deepseek-ai/dsh-session-persistence-gateway'\n" : ''))
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx, directory)
   cleanup.push(() => ctx.fiber.dispose())
   ctx.baseUrl = pathToFileURL(directory).href + '/'
   await ctx.plugin(Loader)

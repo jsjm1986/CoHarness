@@ -5,7 +5,7 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult, ToolExecutionToken } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { unsupportedInbox, provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { WorkflowRunId, WorkflowEngine } from '@deepseek-ai/dsh-workflow'
 import type {
   WorkflowAgentEndInfo, WorkflowAgentInfo, WorkflowResult, WorkflowRun,
@@ -627,6 +627,7 @@ describe('dsh-tool-workflow', () => {
         start: () => Promise.reject(new Error('the parked-script fixture must not start a child')),
       })
       await mountWorkflowRuntime(ctx)
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(PtcWorkflowEngine, {})
       await ctx.plugin(toolWorkflow, {})
       const session = Session.create(SessionId('caller'))
@@ -662,6 +663,7 @@ describe('dsh-tool-workflow', () => {
         start: () => Promise.reject(new Error('the scriptonly fixture must not start a child')),
       })
       await mountWorkflowRuntime(ctx)
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(PtcWorkflowEngine, {})
       await ctx.plugin(toolWorkflow, {})
       const session = Session.create(SessionId('caller'))

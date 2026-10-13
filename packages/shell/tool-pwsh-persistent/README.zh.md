@@ -25,7 +25,9 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-在 agent 需要在命令之间保持 PowerShell 状态的任何组合中加载本插件——它是 `dsh-tool-pwsh` 的持久对应物，用于依赖跨调用状态的工作。它注册 `pwsh` 工具，需要 `ctx.tools` 与 `ctx.terminals` 服务，并在执行时需要拥有者 agent 会话。
+新 shell 从 Session 的当前工作目录启动。创建后，shell 的目录与环境独立保留，不受后续 Session 目录切换影响。
+
+在 agent 需要在命令之间保持 PowerShell 状态的任何组合中加载本插件——它是 `dsh-tool-pwsh` 的持久对应物，用于依赖跨调用状态的工作。它注册 `pwsh` 工具，需要 `ctx.tools`、`ctx.terminals` 与 `ctx.workingDirectory` 服务，并在执行时需要拥有者 agent 会话。
 
 ### 何时选择
 

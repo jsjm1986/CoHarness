@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-tool-pwsh` lets the agent run PowerShell commands through a mounted shell executor. Each call uses a fresh process; with a job registry composed every command is a job from the moment it starts, so `run_in_background` returns the id at once and a foreground command that outlives its timeout returns the same id, with observable output. Commands use native Windows paths and `$env:NAME` variables without dialect translation. Calls receive the managed `DSH_*` environment, and sandboxed execution enforces Windows language-mode and named-pipe requirements. Mount it with a PowerShell executor such as `dsh-pwsh-local` and the `dsh-shell-env` plugin.
+`dsh-tool-pwsh` lets the agent run PowerShell commands through a mounted shell executor. Each call uses a fresh process; with a composed job registry every command is a job — `run_in_background` returns the id at once, and a timed-out foreground command returns the same id with observable output. Commands start in the Session's current working directory; relative `workdir` resolves against it. Commands use native Windows paths and `$env:NAME` variables without dialect translation. Calls receive the managed `DSH_*` environment, and sandboxed execution enforces Windows language-mode and named-pipe requirements. Mount it with a PowerShell executor such as `dsh-pwsh-local`, `dsh-shell-env`, and `dsh-working-directory`.
 
 ## Table of Contents
 
@@ -38,6 +38,7 @@ The common path is a PowerShell executor provider, the environment registry, and
 ```yaml
 - name: '@deepseek-ai/dsh-pwsh-local'
 - name: '@deepseek-ai/dsh-shell-env'
+- name: '@deepseek-ai/dsh-working-directory'
 - name: '@deepseek-ai/dsh-tool-pwsh'
 ```
 
@@ -64,7 +65,7 @@ Under a sandboxing executor, denied commands report `[sandbox: file access denie
 
 ### What can go wrong
 
-A composition with no PowerShell executor never activates the tool, and the injected services (`tools`, `shell`, `systemPrompt`, `shellEnv`) must all exist. Background calls without the job runtime fail with `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`, and `sandbox_permissions` without a sandboxing executor fails with `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`.
+A composition with no PowerShell executor never activates the tool, and the injected services (`tools`, `shell`, `systemPrompt`, `shellEnv`, `workingDirectory`) must all exist. Background calls without the job runtime fail with `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs`, and `sandbox_permissions` without a sandboxing executor fails with `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)`.
 
 -----
 
@@ -205,7 +206,6 @@ These limits define when the tool is a poor fit or needs special care. They are 
 - **Language mode and named-pipe capture under the Windows sandbox** — under the [Windows ACL sandbox](../../sandbox/sandbox-windows-acl/README.md), read-only pwsh starts in ConstrainedLanguage because its temp write denial makes PowerShell's AppLocker probe fail closed: `Add-Type`, non-core .NET statics (`[System.IO.*]::`, `[math]::`), COM objects, and reflection fail with "only core types" errors, and the mode cannot be lifted from inside. Workspace-write's private temp lets the probe complete, so it stays in FullLanguage unless host policy says otherwise. Both confined modes deny named-pipe opens, so a piped-stdio spawn inside a confined command fails with EPERM. The tool description teaches both contracts to the model; the backend README owns the full limitations.
 - **No persistent shell** — every call starts a fresh `pwsh -Command`; the persistent-shell counterpart is [`@deepseek-ai/dsh-tool-pwsh-persistent`](../tool-pwsh-persistent/README.md), which keeps one owner-scoped pwsh alive across calls.
 - **PowerShell-dialect contract** — the model must write PowerShell (native paths, `$env:` variables), not bash; there is no dialect translation.
-- **Session-cwd identity is not canonicalized** — the workdir base is the session header cwd as-is, unlike the bash tool's sandbox-root-canonicalized identity. Under a confining executor the policy's workspace root IS canonicalized (by the shared policy service), so the workdir and the confinement root can diverge when the raw session cwd differs from its canonical form — a parity gap deferred to the shared shell-tool base extraction.
 
 <a id="dev-note"></a>
 ### Dev Note

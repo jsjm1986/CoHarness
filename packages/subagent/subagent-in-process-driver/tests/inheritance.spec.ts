@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { mountAgentLoopTestDependencies, provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import SandboxedFileSystem from '@deepseek-ai/dsh-fs-sandbox'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import SandboxPolicyService, { setSandboxMode } from '@deepseek-ai/dsh-sandbox-policy'
@@ -40,6 +40,7 @@ async function setupWalled(script: Script): Promise<{ ctx: Context; parent: Agen
   const ctx = new Context()
   contexts.push(ctx)
   await mountAgentLoopTestDependencies(ctx)
+  provideWorkingDirectoryFixture(ctx, workspace)
   await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: workspace })
   await ctx.plugin(SandboxedFileSystem, { cwd: workspace })
   await ctx.plugin(ToolFs)

@@ -25688,7 +25688,7 @@
         "packages/core/tools/src/index.ts#ToolRestriction"
       ],
       "sources": [
-        "packages/core/tools/src/index.ts:702"
+        "packages/core/tools/src/index.ts:703"
       ]
     },
     {
@@ -26793,7 +26793,7 @@
       "digest": "83079c8a3f733ac3fa603eefa0fbb4737ca4d8b69e7e2e7298b60f9ac4098693",
       "names": [],
       "sources": [
-        "packages/skill/tool-skill/src/index.ts:40"
+        "packages/skill/tool-skill/src/index.ts:41"
       ]
     },
     {
@@ -27024,7 +27024,7 @@
       "digest": "8fcb0b44a575e998665c053643d1ab04c82f39253ebd190ac0c975b78e40b543",
       "names": [],
       "sources": [
-        "packages/core/tools/src/index.ts:34"
+        "packages/core/tools/src/index.ts:35"
       ]
     },
     {
@@ -28670,7 +28670,7 @@
         "packages/skill/tool-skill/src/index.ts#SkillCatalogSource"
       ],
       "sources": [
-        "packages/skill/tool-skill/src/index.ts:34"
+        "packages/skill/tool-skill/src/index.ts:35"
       ]
     },
     {

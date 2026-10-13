@@ -31,7 +31,7 @@ Codex 有意重新实现了 Claude Code hook 协议的一个*子集*，包括相
 
 | 关注点 | 此处（`dsh-hook-protocol`） | 桥接（`dsh-hooks-claude-code` / `-codex`） |
 |---|---|---|
-| Matcher 校验与匹配判断 | `matcherDiagnostic(pattern, mode)` 用于解析时诊断；`matchesMatcher(pattern, query, mode)` 用于隔离的运行时匹配 | 选择自身的 `mode`（`claude` = 字面量或正则，`codex` = 始终使用正则），并拒绝带有诊断的配置组 |
+| Matcher 校验与匹配判断 | `matcherDiagnostic(pattern, mode)` 用于解析时诊断；`matchesMatcher(pattern, query, mode)` 用于隔离的运行时匹配；`selectHookGroups(groups, query, mode)` 选出包含命令的匹配组 | 选择自身的 `mode`（`claude` = 字面量或正则，`codex` = 始终使用正则），并拒绝带有诊断的配置组；仅当所选组中有待运行的命令时才解析当前工作目录 |
 | 运行 hook | `runHook(bash, hook, opts, now)`：通过 `ctx.shell` 提供 stdin payload + env，再解码 | 构造每个事件的 stdin **payload** + 该方言的 **env** |
 | 解码输出 | `parseHookOutput(exit, stdout, stderr)` → 中性 `HookOutput` | 将中性 `HookOutput` 映射到扩展点特定的类型化 Decision |
 | 合并 N 个 hook | `mergeHookOutputs(outputs)` → 最严格的 `MergedHookOutcome` | （无） |
@@ -42,6 +42,7 @@ Codex 有意重新实现了 Claude Code hook 协议的一个*子集*，包括相
 ## 原语
 
 - **`matcherDiagnostic(matcher, mode)` / `matchesMatcher(matcher, query, mode)`**：缺失、`''` 或 `'*'` 时匹配全部；`claude` mode 将纯 `[A-Za-z0-9_|]+` pattern 视为字面量（管道符 = 精确匹配交替），其他 pattern 视为正则；`codex` mode 始终使用未锚定正则。桥接解析器会丢弃没有 matcher 匹配对象的事件所带的 matcher 字段，再用 `matcherDiagnostic` 拒绝事件实际使用的无效正则，并在注册任何钩子之前给出稳定诊断。运行时谓词仍会将无效 pattern 隔离为不匹配，因此直接调用本库不会向 agent loop（智能体循环）抛异常。
+- **`selectHookGroups(groups, query, mode)`**：按配置顺序返回带有 command hook 且匹配事件主题的配置组。桥接仅在该选择非空时解析 Session 的当前工作目录，因此没有匹配命令的 hook 点不付出目录校验成本。
 - **`runHook(bash, hook, options, now)`**：要求并转发调用方拥有的 `options.signal`，将 `options.payload` 序列化到 hook stdin（当且仅当 `options.trailingNewline` 时添加尾随换行符），在执行器凭证清理后合并 `options.env`（`dsh-shell` 受信任插件接口），遵循 hook 的 `timeoutSec`（否则使用 `options.defaultTimeoutMs`；默认值属于桥接，其配置默认为 lib 的 `DEFAULT_HOOK_TIMEOUT_MS` 10 分钟参考值），再解码结果（将 `options.expectedEventName` 传递给 codec）。因此取消会到达执行器的进程组终止与 join 边界。它绝不抛出异常：执行器拒绝（基础设施故障）会变为 `HookOutput`，其 `exitCode: undefined`（非阻塞错误）。`now` 会被注入，以便测试持续时间。
 - **`parseHookOutput(exitCode, stdout, stderr, expectedEventName?)`** 解码退出状态与结构化 stdout。退出码为 2 时，会以 stderr 内容阻止执行；其他失败不阻塞。匹配的 hook 特定权限决策会覆盖遗留顶层决策；事件判别字段不匹配或缺失只会抑制事件特定字段。顶层字段仍与事件无关，成功但非 JSON 的输出会留给桥接处理。
 - **`mergeHookOutputs(outputs)`**：折叠在一个点上匹配的每个 hook 结果：权限优先级为 **deny > ask > allow**，从首个 `continue:false` 起，halt 状态保持不变，阻塞原因用 `\n\n` 连接，`additionalContext`／`systemMessages` 按顺序累积。

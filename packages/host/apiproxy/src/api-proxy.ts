@@ -156,6 +156,8 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
 import type {} from '@deepseek-ai/dsh-user-approval'
 // Type-only: resolves the `schedule/changed` forward event and `ctx.get('schedule')`.
 import type {} from '@deepseek-ai/dsh-schedule/client'
+// Type-only: resolves `ctx.get('workingDirectory')` — optional in host compositions.
+import type {} from '@deepseek-ai/dsh-working-directory'
 import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
 import { inboxProjectionDefinition } from './inbox-projection.ts'
 import { modelSelectionProjectionDefinition } from './model-selection-projection.ts'
@@ -5671,8 +5673,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
     skills: {
       // Skill lookup never creates or resumes an agent: the session address
-      // resolves to a canonical cwd from the host-resident session header, and
-      // the view scope is the live agent or the preset's standing key.
+      // resolves to its recorded working directory, and the view scope is
+      // the live agent or the preset's standing key.
       async list(request) {
         const { sessionId } = request.payload
         const authorized = await authorizeSession(sessionId, 'read')
@@ -5685,12 +5687,19 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { sessionId },
           })
         }
-        if (session.header.cwd === undefined) {
+        // The recorded working directory is the catalog's directory; a
+        // composition without the service can only ever have produced the
+        // original project directory, so the header read is the exact
+        // fallback, and `ctx.get` keeps the handler independent of this
+        // plugin's inject list (the service is optional in API
+        // compositions).
+        const workingDirectory = ctx.get('workingDirectory')
+        const cwd = workingDirectory === undefined ? session.header.cwd : workingDirectory.get(session)
+        if (cwd === undefined) {
           // Every served session records its project at create time; a
           // cwd-less header is a pre-project legacy log (not served).
           return err(request, { code: 'internal', message: `session "${sessionId}" has no project cwd`, details: {} })
         }
-        const cwd = session.header.cwd
         // The host registry is layered per scope and serves every session. A
         // composition may still realm-mount its own registry instead; that
         // instance is invisible to host contexts, so address it through the

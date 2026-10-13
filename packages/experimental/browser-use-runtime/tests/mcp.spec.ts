@@ -18,6 +18,7 @@ import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import Agents from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import Projections from '@deepseek-ai/dsh-session-projection'
 import { bindScopeParent } from '@deepseek-ai/dsh-scope'
 import { BrowserMcpConfig, mountSessionMcp, validateBrowserMcpConfig } from '../src/mcp.ts'
@@ -77,6 +78,7 @@ async function load(exclusive = false, mode?: string, toolCallTimeoutMs?: number
   await writeFile(configPath, JSON.stringify([...modules.keys()].map(name => ({ id: name, name, config: name === 'loop' ? { agents: [] } : name === 'prompt' && toolOrder !== undefined ? { toolOrder } : {} }))))
   const ctx = new Context()
   contexts.push(ctx)
+  provideWorkingDirectoryFixture(ctx, root)
   ctx.baseUrl = pathToFileURL(root).href + '/'
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
@@ -143,6 +145,7 @@ it('requires a browser mode and validates launch and attachment settings', () =>
 it('waits for SystemPrompt and ToolRuntime before reserving the provider', async () => {
   const ctx = new Context()
   contexts.push(ctx)
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(BrowserUse)
   await ctx.plugin(Agents)
   const tools = ctx.plugin(Tools)

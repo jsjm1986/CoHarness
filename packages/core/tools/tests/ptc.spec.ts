@@ -9,6 +9,7 @@ import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
 import type { PtcRunRequest, PtcRunResult } from '@deepseek-ai/dsh-ptc-runtime'
 import ToolRuntime, { CodeRunFailedError, RUN_CODE_NAME, TOOL_ABORTED_BEFORE_DISPATCH, defineContentToolFixture, defineTool } from '@deepseek-ai/dsh-tools'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import type { Config, JsonSchemaNode, PostToolDecision, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -64,6 +65,7 @@ interface SetupOptions {
 
 async function setup(options: SetupOptions = {}) {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SystemPrompt, { ...options.toolOrder ? { toolOrder: options.toolOrder } : {} })
   await ctx.plugin(ToolRuntime, { mode: options.mode ?? 'ptc', ...options.maxParallelSubCalls !== undefined ? { maxParallelSubCalls: options.maxParallelSubCalls } : {} })
   let runtime: FakeRuntime | undefined
@@ -2218,7 +2220,7 @@ describe('per-program execution controls', () => {
       expect(JSON.stringify(schema.parameters)).toContain('sandbox_permissions')
       expect(schema.description).toContain('Nested tools retain their own policies')
       expect(schema.description).toContain('Programs start with an empty environment.')
-      expect(schema.description).toContain("The working directory is the Session's current directory.")
+      expect(schema.description).toContain("Each program starts in the Session's current directory. Running programs keep their initial directory.")
     } finally { await ctx.fiber.dispose() }
     const python = await setup({ runtime: { language: 'python' } })
     try {
@@ -2226,7 +2228,7 @@ describe('per-program execution controls', () => {
       expect(JSON.stringify(schema.parameters)).not.toContain('timeoutMs')
       expect(JSON.stringify(schema.parameters)).not.toContain('sandbox_permissions')
       expect(schema.description).not.toContain('Programs start with an empty environment.')
-      expect(schema.description).toContain("The working directory is the Session's current directory.")
+      expect(schema.description).toContain("Each program starts in the Session's current directory. Running programs keep their initial directory.")
       const rejected = await python.tools.execute({
         callId: ToolCallId('hidden-timeout'), name: RUN_CODE_NAME, signal: testToolSignal,
         arguments: { code: 'pass', description: 'Try unsupported timeout', timeoutMs: 5 },

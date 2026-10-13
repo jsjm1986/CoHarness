@@ -26,6 +26,12 @@
   config:
     timeoutMs: 60000
 
+- id: fs-local
+  name: '@deepseek-ai/dsh-fs-local'
+
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'
+
 - id: agent
   name: '@deepseek-ai/dsh-agent-spine-demo'
   config:

@@ -157,16 +157,21 @@ export class WorkingDirectoryService extends Service {
       if (info?.type === 'directory') {
         // A recorded directory must sit inside the project root; logs written
         // without containment, or forked and imported logs, can carry one
-        // that does not.
-        let root
-        try {
-          root = await fs.resolve(original, { signal: control })
-        } catch (error) {
-          if (control.aborted) throw error
-          return this.degraded(agent, error, current)
+        // that does not. A record equal to the root is trivially contained —
+        // an SSH-bound Session pays one remote round-trip per resolve.
+        let contained = current === original
+        if (!contained) {
+          let root
+          try {
+            root = await fs.resolve(original, { signal: control })
+          } catch (error) {
+            if (control.aborted) throw error
+            return this.degraded(agent, error, current)
+          }
+          control.throwIfAborted()
+          contained = fs.contains(root, target)
         }
-        control.throwIfAborted()
-        if (fs.contains(root, target)) {
+        if (contained) {
           this.transportWarned.delete(agent.session)
           if (this.ctx.sessionProjections.stateOf(agent.session, 'workingDirectory') === null) {
             agent.session.append('working-directory/change', { cwd: current })

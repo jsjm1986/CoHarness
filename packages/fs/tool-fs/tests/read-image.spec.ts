@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
@@ -23,6 +23,7 @@ import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
 import { AttachmentError, AttachmentId, AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import {
   applyReadImageTool,
   formatImageReadOutput,
@@ -104,6 +105,7 @@ interface SetupOptions {
 
 async function setup(options: SetupOptions = {}) {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime, { mode: options.toolMode ?? 'native' })
   if (options.toolMode === 'ptc' || options.toolMode === 'both') {
@@ -212,7 +214,7 @@ describe('read_image happy path', () => {
     expect(image.attachment.bytes).toBe(PNG_1X1.length)
     expect(image.attachment.name).toBe('red.png')
     expect(image.attachment.attachmentId).toMatch(/^sha256:[0-9a-f]{64}$/)
-    expect(text(result)).toBe(formatImageReadOutput(join(dir, 'red.png'), {
+    expect(text(result)).toBe(formatImageReadOutput(await realpath(join(dir, 'red.png')), {
       attachmentId: image.attachment.attachmentId,
       mediaType: 'image/png',
       bytes: PNG_1X1.length,
@@ -322,7 +324,7 @@ describe('read_image happy path', () => {
     const ctx = await setup()
     const result = await readImage(ctx, { file_path: 'red.png' }, agentOn('vision-model'))
     expect(result.isError).toBe(false)
-    expect(result.meta).toEqual({ path: join(dir, 'red.png') })
+    expect(result.meta).toEqual({ path: await realpath(join(dir, 'red.png')) })
     const image = result.content.find(block => block.type === 'image')
     expect(image?.attachment.width).toBe(1)
     expect(image?.attachment.height).toBe(1)
@@ -645,6 +647,7 @@ describe('image admission failures', () => {
 describe('registration surface', () => {
   it('withdraws read_image when the tool-fs fiber or the attachment store is disposed (HMR safety)', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime, { mode: 'native' })
     await ctx.plugin(LocalFileSystem, { cwd: dir })

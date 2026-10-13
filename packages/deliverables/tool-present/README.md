@@ -25,9 +25,9 @@ Use `present` to declare final files accessible through the Session filesystem, 
 <a id="use-this-package"></a>
 ## Use this package
 
-The `standard`, `ptc`, and `cordis` agent presets mount this plugin. Call `present` with `files: [{ path, description? }]` after creating the files. Files must be regular files accessible through the Session filesystem. Relative paths resolve against the Session working directory; absolute paths may name files outside it, including `/tmp` or Downloads. Missing files, directories, final symbolic links, and provider-denied paths fail the call. Files in a shell sandbox’s private `/tmp` must first be written somewhere the Session filesystem can access.
+The `standard`, `ptc`, and `cordis` agent presets mount this plugin. Call `present` with `files: [{ path, description? }]` after creating the files. Files must be regular files accessible through the Session filesystem. Relative paths resolve against the Session's current working directory, and declarations persist the canonical absolute path, so a later directory change does not redirect delivered files. Absolute paths may name files outside it, including `/tmp` or Downloads. Missing files, directories, final symbolic links, and provider-denied paths fail the call. Files in a shell sandbox’s private `/tmp` must first be written somewhere the Session filesystem can access.
 
-Mount it in an agent's Cordis composition with `tools`, `fs`, and the `turnBoundary` Session projection available:
+Mount it in an agent's Cordis composition with `tools`, `fs`, `workingDirectory`, and the `turnBoundary` Session projection available:
 
 ```yaml
 - name: '@deepseek-ai/dsh-tool-present'
@@ -51,7 +51,7 @@ The file-count limit is validated at mount. The tool requires an agent Session w
 
 The tool resolves paths through the configured filesystem provider and checks regular-file metadata without reading contents. Successful final `tools/result` notifications append `deliverables/presented`, including nested calls. A later enclosing program failure does not revoke an already completed declaration. Blocked results publish none. Each plugin instance records only calls it executed; scoped tools with the same name cannot publish through another instance.
 
-The pure `./types` entry declares `PresentedFile` and the Session event without importing Host runtime code. The Web consumer validates persisted declarations before displaying or opening them. The event stores no Session ID, so forked history resolves relative paths against the viewed Session's workspace.
+The pure `./types` entry declares `PresentedFile` and the Session event without importing Host runtime code. The Web consumer validates persisted declarations before displaying or opening them. New declarations store absolute paths; legacy relative declarations retain the viewed Session's original workspace as their base.
 
 **Runtime invariant:** No companion is published. Tool and event registrations are effect-owned, and the Session log owns file declarations; the plugin maintains no independent file-content store.
 

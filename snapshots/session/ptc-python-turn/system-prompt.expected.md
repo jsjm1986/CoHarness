@@ -66,9 +66,11 @@ class BashArgs(TypedDict):
 class BashOutput1(TypedDict):
     kind: Literal["background"]
     jobId: str
+    cwd: str
 
 class BashOutput2(TypedDict):
     kind: Literal["promoted"]
+    cwd: str
     jobId: str
     timeoutMs: float
     output: str
@@ -91,6 +93,7 @@ class BashOutput3Sandbox(TypedDict):
 
 class BashOutput3(TypedDict):
     kind: Literal["foreground"]
+    cwd: str
     exitCode: int | None
     signal: str | None
     timedOut: bool
@@ -144,6 +147,7 @@ class EditArgs(TypedDict):
     # Additional keys beyond those declared are allowed.
 
 class EditOutput(TypedDict):
+    # Canonical absolute path in the filesystem execution world.
     path: str
     before: str
     after: str
@@ -316,6 +320,7 @@ class ReadOutputLines(TypedDict):
     text: str
 
 class ReadOutput(TypedDict):
+    # Canonical absolute path in the filesystem execution world.
     path: str
     offset: int
     lines: list[ReadOutputLines]
@@ -340,6 +345,7 @@ class ReadImageOutputImage(TypedDict):
     originalDimensions: NotRequired[ReadImageOutputImageOriginalDimensions]
 
 class ReadImageOutput(TypedDict):
+    # Canonical absolute path in the filesystem execution world.
     path: str
     image: ReadImageOutputImage
 
@@ -524,6 +530,7 @@ class WriteArgs(TypedDict):
     # Additional keys beyond those declared are allowed.
 
 class WriteOutput(TypedDict):
+    # Canonical absolute path in the filesystem execution world.
     path: str
     operation: Literal["create", "update"]
     before: str | None

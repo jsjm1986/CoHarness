@@ -111,6 +111,9 @@
       "path": "../../session/session-title"
     },
     {
+      "path": "../../session/working-directory"
+    },
+    {
       "path": "../../settings/settings"
     },
     {

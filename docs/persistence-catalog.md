@@ -2057,7 +2057,7 @@ SHA-256: `a2066bd52f61218ba15b758def2641cc6a8bd3d4a594a488ee4c65be356d7e39`
 
 SHA-256: `8fcb0b44a575e998665c053643d1ab04c82f39253ebd190ac0c975b78e40b543`
 
-Sources: [`packages/core/tools/src/index.ts:34`](../packages/core/tools/src/index.ts)
+Sources: [`packages/core/tools/src/index.ts:35`](../packages/core/tools/src/index.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -3149,7 +3149,7 @@ Array of [`event:agent/inbox/spliced.data.inserted.item.source.variant-7.entries
 
 SHA-256: `83079c8a3f733ac3fa603eefa0fbb4737ca4d8b69e7e2e7298b60f9ac4098693`
 
-Sources: [`packages/skill/tool-skill/src/index.ts:40`](../packages/skill/tool-skill/src/index.ts)
+Sources: [`packages/skill/tool-skill/src/index.ts:41`](../packages/skill/tool-skill/src/index.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6487,7 +6487,7 @@ One of:
 
 SHA-256: `3cfc3a56502da1f8c6153c2c56657bab4b749056968634dd0991d325ec1c919f`
 
-Sources: [`packages/core/tools/src/index.ts:702`](../packages/core/tools/src/index.ts)
+Sources: [`packages/core/tools/src/index.ts:703`](../packages/core/tools/src/index.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7718,7 +7718,7 @@ Sources: [`packages/skill/skill/src/index.ts:147`](../packages/skill/skill/src/i
 
 SHA-256: `fc2ae6962f9f8801c2b1e414668e1e17cbb7544c4f39381198977a38bd10c093`
 
-Sources: [`packages/skill/tool-skill/src/index.ts:34`](../packages/skill/tool-skill/src/index.ts)
+Sources: [`packages/skill/tool-skill/src/index.ts:35`](../packages/skill/tool-skill/src/index.ts)
 
 | Property | Presence | Type |
 |---|---|---|

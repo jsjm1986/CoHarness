@@ -164,6 +164,18 @@ describe('Session working directories', () => {
     expect(f.harness.claim(f.agent, 'next-step', 1)).toEqual([])
   })
 
+  it('validates a directory equal to the project root with a single filesystem resolve', async () => {
+    await using f = await fixture()
+    const resolve = vi.spyOn(f.ctx.fs, 'resolve')
+    await expect(f.ctx.workingDirectory.ensure(f.agent)).resolves.toBe(f.root)
+    expect(resolve).toHaveBeenCalledOnce()
+    await mkdir(join(f.root, 'child'))
+    await f.ctx.workingDirectory.set(f.agent, 'child')
+    resolve.mockClear()
+    await expect(f.ctx.workingDirectory.ensure(f.agent)).resolves.toBe(join(f.root, 'child'))
+    expect(resolve).toHaveBeenCalledTimes(2)
+  })
+
   it('provides required user context instead of a system-prompt directory, including recovery during assembly', async () => {
     await using f = await fixture()
     const child = join(f.root, 'temporary')

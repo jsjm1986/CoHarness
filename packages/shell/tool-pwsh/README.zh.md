@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-tool-pwsh` 让 agent（智能体）通过已挂载的 shell 执行器运行 PowerShell 命令。每次调用使用全新进程；组合中有 job 注册表时，每条命令从启动那一刻起就是一个任务，因此 `run_in_background` 立即返回 id，超过超时仍在运行的前台命令返回同一个 id，输出可观测。命令使用原生 Windows 路径和 `$env:NAME` 变量，不做方言翻译。调用获得受管 `DSH_*` 环境，沙箱执行会落实 Windows 语言模式与命名管道要求。请与 `dsh-pwsh-local` 等 PowerShell 执行器及 `dsh-shell-env` 插件一起挂载。
+`dsh-tool-pwsh` 让 agent（智能体）通过已挂载的 shell 执行器运行 PowerShell 命令。每次调用使用全新进程；组合中有 job 注册表时，每条命令从启动起就是一个任务——`run_in_background` 立即返回 id，超时的前台命令返回同一个 id，输出可观测。命令从 Session 的当前工作目录启动，相对 `workdir` 从该目录解析。命令使用原生 Windows 路径和 `$env:NAME` 变量，不做方言翻译。调用获得受管 `DSH_*` 环境，沙箱执行会落实 Windows 语言模式与命名管道要求。请与 `dsh-pwsh-local` 等 PowerShell 执行器、`dsh-shell-env` 以及 `dsh-working-directory` 一起挂载。
 
 ## 目录
 
@@ -38,6 +38,7 @@ kind: "package-reference"
 ```yaml
 - name: '@deepseek-ai/dsh-pwsh-local'
 - name: '@deepseek-ai/dsh-shell-env'
+- name: '@deepseek-ai/dsh-working-directory'
 - name: '@deepseek-ai/dsh-tool-pwsh'
 ```
 
@@ -64,7 +65,7 @@ kind: "package-reference"
 
 ### 可能出什么问题
 
-没有 PowerShell 执行器的组合永远不会激活该工具，且注入的服务（`tools`、`shell`、`systemPrompt`、`shellEnv`）必须全部存在。没有任务运行时的后台调用会以 `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs` 失败；没有沙箱执行器时的 `sandbox_permissions` 会以 `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)` 失败。
+没有 PowerShell 执行器的组合永远不会激活该工具，且注入的服务（`tools`、`shell`、`systemPrompt`、`shellEnv`、`workingDirectory`）必须全部存在。没有任务运行时的后台调用会以 `background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs` 失败；没有沙箱执行器时的 `sandbox_permissions` 会以 `sandbox_permissions is not available in this composition (no sandboxing executor to escalate)` 失败。
 
 -----
 
@@ -207,7 +208,6 @@ Non-zero exits are reported as `[exit code: N]` markers; investigate failures be
 - **Windows 沙箱下的语言模式与命名管道捕获**——在 [Windows ACL 沙箱](../../sandbox/sandbox-windows-acl/README.zh.md)下，只读 pwsh 以 ConstrainedLanguage 启动，因为其临时目录写入被拒绝，导致 PowerShell 的 AppLocker 探测失败并按拒绝处理：`Add-Type`、非核心 .NET 静态调用（`[System.IO.*]::`、`[math]::`）、COM 对象与反射会以 "only core types" 错误失败，且该模式无法从内部解除。workspace-write 的私有临时目录让探测完成，因此除非宿主策略另有规定，它保持 FullLanguage。两种受限模式都拒绝命名管道打开，因此受限命令内部的管道 stdio spawn 会以 EPERM 失败。工具描述把两条约定都教给模型；完整限制以后端 README 为准。
 - **没有持久 shell**——每次调用都启动全新的 `pwsh -Command`；持久 shell 对应物是 [`@deepseek-ai/dsh-tool-pwsh-persistent`](../tool-pwsh-persistent/README.zh.md)，它跨调用保持一个按所有者隔离的 pwsh 存活。
 - **PowerShell 方言约定**——模型必须编写 PowerShell（原生路径、`$env:` 变量），而不是 bash；没有方言翻译。
-- **会话 cwd 身份未规范化**——workdir 基准就是会话头部 cwd 原样，不像 bash 工具那样以沙箱根规范化身份为准。在约束执行器下，策略的 workspace root 确实被规范化（由共享策略服务完成），因此当原始会话 cwd 与其规范形式不同时，workdir 与约束根可能分叉——这是推迟到共享 shell 工具基座抽取的对齐差距。
 
 <a id="dev-note"></a>
 ### 开发备注

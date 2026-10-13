@@ -26,10 +26,12 @@ Agents can discover and load skills during a session. Before the first request, 
 
 -----
 
+Skill discovery, catalog updates, and explicit skill invocation use the Session's current working directory.
+
 <a id="catalog-lifecycle"></a>
 ## Catalog lifecycle
 
-At every eligible `agent/pre-step`, the plugin calls `ctx.skills.snapshot()` for the calling session's cwd, forwards the pre-step abort signal to discovery, applies exact `skill` tool visibility, and renders the ordered `name` and `description` entries. When no prior catalog exists and that view is non-empty, it adds an initial durable user-role `<system-reminder>` to a downstream `enter` decision. Catalog messages contain only those summaries; skill bodies, paths, sources, providers, and `whenToUse` hints remain outside the catalog.
+At every eligible `agent/pre-step`, the plugin calls `ctx.skills.snapshot()` for the Session's current working directory, forwards the pre-step abort signal to discovery, applies exact `skill` tool visibility, and renders the ordered `name` and `description` entries. When no prior catalog exists and that view is non-empty, it adds an initial durable user-role `<system-reminder>` to a downstream `enter` decision. Catalog messages contain only those summaries; skill bodies, paths, sources, providers, and `whenToUse` hints remain outside the catalog.
 
 Every catalog message carries the `skill-catalog` source: a `catalog`-form context whose `entries` record exactly the `name` and `description` pairs it published, plus `update` on a replacement. The digest covers those durable entries, not the rendered prose, so the surrounding `<system-reminder>` framing cannot decide whether a republish is needed and consumers never re-parse the `<available_skills>` block. The plugin scans durable session events backwards without copying them and derives the comparison baseline from the newest visible `skill-catalog` message it can read; unreadable and foreign records are skipped. When the digest changes, the downstream `enter` decision receives a durable user-role message containing the complete replacement catalog; an empty replacement explicitly retires earlier names. If no catalog remains visible but a recognizable historical catalog exists, compaction hid it and the next complete observation re-establishes the current catalog. An incomplete provider snapshot emits nothing and preserves the last-good model view for retry at the next pre-step. If no prior catalog exists and the current view is empty, no tombstone is necessary.
 

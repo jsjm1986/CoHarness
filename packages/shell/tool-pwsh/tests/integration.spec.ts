@@ -24,6 +24,7 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { PwshLocalExecutor, resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
 import * as ToolPwsh from '@deepseek-ai/dsh-tool-pwsh'
 import * as BashEnvPlugin from '@deepseek-ai/dsh-shell-env'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const testToolSignal = new AbortController().signal
 
@@ -58,6 +59,7 @@ describe.skipIf(!hasPwsh)('pwsh tool over the real pwsh executor', () => {
     await writeFile(join(dir, 'greeting.txt'), 'hello pwsh\n')
 
     ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(LocalJobRegistry)

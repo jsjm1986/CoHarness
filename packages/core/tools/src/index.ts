@@ -4,6 +4,7 @@
  * @module @deepseek-ai/dsh-tools
  */
 
+import type {} from '@deepseek-ai/dsh-working-directory'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { AnonymousEntries, NamedEntries, ScopedLayers, scopeOf, scopeTarget } from '@deepseek-ai/dsh-scope'
@@ -945,6 +946,12 @@ export class ToolRuntime extends Service {
    */
   private requirePtcTransport(): ToolDefinition {
     this.ptcTransport ??= createRunCodeTool(this, {
+      resolveWorkingDirectory: async (exec) => {
+        if (exec.agent === undefined) return undefined
+        const directories = this.ctx.get('workingDirectory')
+        if (directories === undefined) throw new Error('dsh-tools: run_code with an Agent requires workingDirectory')
+        return directories.ensure(exec.agent, exec.signal)
+      },
       requireRuntime: () => this.requirePtcRuntime(this.defaultMode),
       peekApprover: () => this.ctx.get('approval'),
       resolveSandboxPolicy: (exec) => {

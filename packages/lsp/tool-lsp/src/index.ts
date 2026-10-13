@@ -3,13 +3,14 @@
  * (`goToDefinition`/`findReferences`/`goToImplementation`/`hover`); it converts one-based UTF-16
  * cursor coordinates to the seam's zero-based positions, requires the session workspace with no
  * fallback, caps and renders results, and attaches a configurable timeout budget for
- * `dsh-tool-call-timeout-policy` to enforce. It runtime-injects only `tools`, `lsp`, and `systemPrompt` and
+ * `dsh-tool-call-timeout-policy` to enforce. It runtime-injects only `tools`, `lsp`, `systemPrompt`, and `workingDirectory` and
  * imports no provider.
  *
  * Namespace plugin (named exports, no default export).
  * @module @deepseek-ai/dsh-tool-lsp
  */
 
+import type {} from '@deepseek-ai/dsh-working-directory'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -27,7 +28,6 @@ import {
   parseLspArgs,
   presentLspCall,
 } from './render.ts'
-import { sessionCwd } from './session-cwd.ts'
 
 export {
   DEFAULT_MAX_LOCATIONS,
@@ -39,13 +39,12 @@ export {
   presentLspCall,
   renderUri,
 } from './render.ts'
-export { sessionCwd } from './session-cwd.ts'
 
 /** Cordis plugin name for loader diagnostics. */
 export const name = 'tool-lsp'
 
 /** Services required by this plugin. */
-export const inject = ['tools', 'lsp', 'systemPrompt']
+export const inject = ['tools', 'lsp', 'systemPrompt', 'workingDirectory']
 
 /** Default tool-call timeout budget (ms), covering the queued open/query/close lifecycle. */
 export const DEFAULT_LSP_TOOL_TIMEOUT_MS = 60_000
@@ -179,7 +178,7 @@ export function apply(ctx: Context, config: Config): void {
     timeoutMs: resolved.timeoutMs,
     async execute(args, exec) {
       const input = parseLspArgs(args)
-      const workspaceRoot = sessionCwd(exec)
+      const workspaceRoot = exec.agent === undefined ? undefined : await ctx.workingDirectory.ensure(exec.agent, exec.signal)
       if (workspaceRoot === undefined) {
         throw new LspError('the lsp tool requires a session workspace cwd', 'LSP_WORKSPACE_REQUIRED')
       }

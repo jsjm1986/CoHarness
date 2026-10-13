@@ -21,6 +21,7 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as toolFsSearch from '@deepseek-ai/dsh-tool-fs-search'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 describe('dsh-tool-fs-search real-load-path guard', () => {
   it('has no default export and keeps name/inject/Config through unwrapExports', () => {
@@ -30,13 +31,14 @@ describe('dsh-tool-fs-search real-load-path guard', () => {
     const unwrapped = loader.unwrapExports(toolFsSearch) as Record<string, unknown>
     expect(unwrapped).toBe(toolFsSearch)
     expect(unwrapped.name).toBe('tool-fs-search')
-    expect(unwrapped.inject).toEqual(['tools', 'systemPrompt', 'subprocess'])
+    expect(unwrapped.inject).toEqual(['tools', 'systemPrompt', 'subprocess', 'workingDirectory'])
     expect(typeof unwrapped.Config).toBe('function')
     expect(typeof unwrapped.apply).toBe('function')
   })
 
   it('boots over ctx.subprocess through the unwrapped module without an inject error', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(LocalSubprocessRuntime)

@@ -25,6 +25,9 @@
     },
     {
       "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../session/working-directory"
     }
   ]
 }

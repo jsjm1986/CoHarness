@@ -74,14 +74,15 @@ The initial snapshot and changed values add user-context tokens; unchanged snaps
 
 Directory transitions append context without replacing the stable system-prompt prefix. A changed directory or recovery creates new context after retained history.
 
-<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **Missing original project** — when the current directory and the original project are both unavailable, prompt assembly rejects every model turn, including chat-only turns. The service does not choose or recreate a repository. Restore the original directory before retrying. Existing shells retain their process-local directories.
 - **Missing SSH filesystem** — an SSH-bound Session whose realm provides no `fs` cannot validate or change directories; the service fails closed rather than reading the host filesystem.
 
 <a id="dev-note"></a>
-## Dev Note
+### Dev Note
 
 <details>
 <summary>Working context for maintainers — click to expand</summary>

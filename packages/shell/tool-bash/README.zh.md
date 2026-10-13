@@ -9,7 +9,7 @@ kind: "package-reference"
 
 模型侧 `bash` 工具，注册在 `ctx.shell` 执行器 seam 上。前台执行始终位于该 seam 之后；后台进程句柄会注册到通用 `ctx.jobs` 运行时，并通过 `job_output`、`job_list` 和 `job_kill` 控制；这些工具由 `@deepseek-ai/dsh-tool-jobs` 提供。
 
-需要加载执行器 Service Provider（例如 `@deepseek-ai/dsh-bash-local`）与 [`@deepseek-ai/dsh-shell-env`](../shell-env/README.zh.md) 注册表；在每个注入服务就绪之前，插件会保持等待状态（`inject: ['tools', 'bash', 'systemPrompt', 'bashEnv']`）。工具约定是 bash 方言——请挂载能解析 bash 的执行器。
+需要加载执行器 Service Provider（例如 `@deepseek-ai/dsh-bash-local`）、[`@deepseek-ai/dsh-shell-env`](../shell-env/README.zh.md) 注册表以及 [`@deepseek-ai/dsh-working-directory`](../../session/working-directory/README.zh.md) 服务；在每个注入服务就绪之前，插件会保持等待状态（`inject: ['tools', 'shell', 'systemPrompt', 'shellEnv', 'workingDirectory']`）。工具约定是 bash 方言——请挂载能解析 bash 的执行器。
 
 包根只公开 Cordis 插件约定（`name`、`inject`、`Config`、`apply`）；结果渲染和后台进程适配仍保留在包内部。
 
@@ -17,7 +17,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-tool-bash` 让 agent（智能体）运行一次性 `bash` 命令，并接收 stdout、stderr 与退出标记。每次调用都使用全新 shell，因此 cwd、变量和函数不会保留；`run_in_background` 可启动长时间运行的工作，agent 能用 `job_output` 检查、用 `job_kill` 停止。工具描述要求 agent 在任何删除或移动之前核对解析出的绝对目标路径，并对这类路径中的变量使用 `${VAR:?}` 防护。命令会收到受管 `DSH_*` 环境；沙箱拒绝后，可携带更宽的 `sandbox_permissions`、一句 `justification` 并经用户批准重试一次。非零退出会作为结果报告，因此由 agent 决定如何响应；请使用 `dsh-bash-local` 或 `dsh-bash-sandbox` 等执行器，并加载 `dsh-shell-env`。
+`dsh-tool-bash` 让 agent（智能体）运行一次性 `bash` 命令，并接收 stdout、stderr 与退出标记。每次调用都使用全新 shell，因此 cwd、变量和函数不会保留；`run_in_background` 可启动长时间运行的工作，agent 能用 `job_output` 检查、用 `job_kill` 停止。命令从 Session 的当前工作目录启动，相对 `workdir` 从该目录解析。工具描述要求 agent 在任何删除或移动之前核对解析出的绝对目标路径，并对这类路径中的变量使用 `${VAR:?}` 防护。命令会收到受管 `DSH_*` 环境；沙箱拒绝后，可携带更宽的 `sandbox_permissions`、`justification` 并经批准重试一次。非零退出会作为结果报告。
 
 ## 目录
 
@@ -43,12 +43,12 @@ kind: "package-reference"
 | `command` | string（必填） | 通过 `bash -c` 运行。调用之间不保留状态；请使用 `workdir`，不要使用 `cd`。 |
 | `description` | string（必填） | 用一行主动语态概述命令（5～10 个词），仅用于 UI／日志显示，不影响执行。 |
 | `timeoutMs` | number | 以毫秒为单位覆盖超时时间。执行器会应用其配置的默认值和上限。 |
-| `workdir` | string | 本次调用的工作目录。默认为调用方 agent（智能体）会话 cwd 的文件系统标识（`session.header.cwd`），使每个会话都在自己的工作区中运行；相对 `workdir` 也以同一标识为基准解析。 |
+| `workdir` | string | 本次调用的工作目录。默认为 Session 的当前工作目录（`ctx.workingDirectory`），使每个会话都在自己的工作区中运行；相对 `workdir` 也以该目录为基准解析。 |
 | `run_in_background` | boolean | 立即返回 job id；不应用超时。 |
 | `sandbox_permissions` | string enum | 仅当已挂载的执行器启用沙箱时才会公开（`ctx.shell.sandboxMode` 报告一个具有限制作用的默认值）：被拒命令所需的更宽模式，取自封闭的目标词汇 `workspace-write`/`danger-full-access`（绝不能缩减为执行器默认值；有效模式按会话确定；更宽模式在执行时检查并审批，重复生效模式无需审批即可执行，更窄请求直接失败，不会向任何人发起提示）。 |
 | `justification` | string | 必须与 `sandbox_permissions` 一同提供（缺少任一项都会产生验证错误）：用一句话向用户解释此命令为何需要这项更宽权限。 |
 
-执行前，`command`、`workdir` 和 `timeoutMs` 会通过 `ctx.shell.resolve()` 依据执行器配置默认值完成解析，因此 Service Definition（`ShellExecSpec`）收到显式的 `workdir`/`timeoutMs` 值。工具层会根据调用方 agent 的 `session.header.cwd` 应用工作目录默认值，然后才调用 `resolve()`：由于 N 个会话共享一个执行器，逐会话 cwd 必须来自 `exec.agent`；只有无法取得会话 cwd 时，执行器才回退到自身配置／`process.cwd()`。存在沙箱策略时，工具会复用已经规范化的 `workspaceRoot` 作为工作目录基准，防止限制逻辑与进程启动过程对同一个会话路径拼写产生不同解析结果。
+执行前，`command`、`workdir` 和 `timeoutMs` 会通过 `ctx.shell.resolve()` 依据执行器配置默认值完成解析，因此 Service Definition（`ShellExecSpec`）收到显式的 `workdir`/`timeoutMs` 值。工具层会先根据 Session 的当前目录（`ctx.workingDirectory.ensure(exec.agent)`）应用工作目录默认值，然后才调用 `resolve()`：由于 N 个会话共享一个执行器，逐会话 cwd 必须来自 `exec.agent`；只有未绑定 agent 时，执行器才回退到自身配置／`process.cwd()`。有效目录独立于沙箱权限根目录，后者仍以 Session 的原始项目目录为锚点。
 
 ### 托管 shell 环境
 
@@ -56,7 +56,7 @@ kind: "package-reference"
 
 结果文本依次包含 stdout、可选的 `[stderr]` 段落和适用的沙箱拒绝、超时、信号、退出代码及截断标记。超时与最终退出状态分别报告；非零退出仍是由模型解释的结果，不会成为 `isError`。截断结果会链接安全的完整 spill 文件，或报告文件不可用。只有 spawn 错误和中止等基础设施故障才会产生 `isError`。
 
-已完成前台进程的规范成功值为 `{ kind: 'foreground', ...ShellRunResult }`，已发布任务则为 `{ kind: 'background', jobId }`。Native renderer 保留上述文本，包括精确的 `started background job <id>`；程序化消费方使用带类型字段，无需解析这些字符串。执行器的流上限仍是 `ShellRunResult` 的采集限制，并携带其 spill 路径。
+已完成前台进程的规范成功值为 `{ kind: 'foreground', cwd, ...ShellRunResult }`，已发布任务则为 `{ kind: 'background', jobId, cwd }`；`cwd` 是执行器解析后的启动目录，持久化展示元数据携带同一值，使已结束的调用卡片保留该次调用使用的目录。Native renderer 保留上述文本，包括精确的 `started background job <id>`；程序化消费方使用带类型字段，无需解析这些字符串。执行器的流上限仍是 `ShellRunResult` 的采集限制，并携带其 spill 路径。
 
 当 `run_in_background` 为 true 时，此插件会在 spawn 前预检 `ctx.jobs.start()`，把调用方 agent 注册为持有者，并将返回的 `ShellProcess` 句柄适配为通用的取消／完成／增量输出钩子。任务运行时负责 job id、跨会话隔离、完成通知、等待和 dispose（资源释放）清理；此插件只把 bash 退出／沙箱事实映射为任务输出和结果详情。`enableRunInBackground: false` 会移除该参数，并在执行时拒绝强制后台调用。
 

@@ -14,6 +14,12 @@
 - id: bash
   name: '@deepseek-ai/dsh-bash-local'
 
+- id: fs-local
+  name: '@deepseek-ai/dsh-fs-local'
+
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'
+
 - id: acp-agent
   name: '@deepseek-ai/dsh-acp-demo'
   config:

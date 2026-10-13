@@ -25,6 +25,8 @@ Use `dsh-tool-terminal` when an agent needs persistent terminal state or interac
 <a id="use-this-package"></a>
 ## Use this package
 
+`terminal_open` defaults to the Session's current working directory and resolves relative `cwd` overrides from it. Open terminals keep their own directory after the Session changes directory.
+
 Enable these tools when the composition mounts a terminal backend and the model should be able to use terminal state across calls — stepping a debugger, exploring in a REPL, or returning to a shell after interrupting a foreground command. The guidance section steers the model toward the one-shot bash, read, write, and edit tools for bounded operations.
 
 ### The six tools
@@ -46,7 +48,7 @@ Enable these tools when the composition mounts a terminal backend and the model 
 - name: '@deepseek-ai/dsh-tool-terminal'
 ```
 
-The tools need `ctx.terminals` — a backend must be mounted — and the system-prompt service for the guidance section. Background sends additionally require the jobs service and its model-facing controller (`@deepseek-ai/dsh-tool-jobs`).
+The tools need `ctx.terminals` — a backend must be mounted — plus the system-prompt service for the guidance section and the `ctx.workingDirectory` service for the spawn directory. Background sends additionally require the jobs service and its model-facing controller (`@deepseek-ai/dsh-tool-jobs`).
 
 ### Configuration
 

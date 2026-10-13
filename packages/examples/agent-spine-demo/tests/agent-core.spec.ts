@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { renderPrompt, TOOL_ORDER_REST } from '@deepseek-ai/dsh-system-prompt'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import * as agentCore from '../src/index.ts'
 import { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -70,6 +71,7 @@ async function mount(config: agentCore.Config, withBash = false): Promise<Contex
   process.env.DSH_HOME = await mkdtemp(join(tmpdir(), 'dsh-agent-spine-demo-home-'))
   process.env.DSH_AGENTS_HOME = await mkdtemp(join(tmpdir(), 'dsh-agent-spine-demo-agents-'))
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   if (withBash) {
     ctx.provide('shell', {
       sandboxMode: undefined,
@@ -541,7 +543,7 @@ describe('dsh-agent-spine-demo bundle', () => {
           {
             "callId": "write-skill",
             "isError": false,
-            "text": "<path>{{cwd}}/.agents/skills/hot-skill/SKILL.md</path>
+            "text": "<path>/private{{cwd}}/.agents/skills/hot-skill/SKILL.md</path>
         <type>file</type>
         <content>
         Created file

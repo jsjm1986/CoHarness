@@ -15,6 +15,8 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import Approval from '@deepseek-ai/dsh-user-approval'
+import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
+import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
 import * as AutoReview from '../src/index.ts'
 
 const worlds: Array<{ ctx: Context; root: string }> = []
@@ -90,7 +92,8 @@ async function world(managed = true) {
   ctx.loader.builtins.include = Include
   const modules = new Map<string, unknown>([
     ['@deepseek-ai/dsh-session', SessionStore], ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
-    ['@deepseek-ai/dsh-system-prompt', SystemPrompt], ['@deepseek-ai/dsh-llm', LlmRuntime],
+    ['@deepseek-ai/dsh-system-prompt', SystemPrompt], ['@deepseek-ai/dsh-fs-local', LocalFileSystem],
+    ['@deepseek-ai/dsh-working-directory', WorkingDirectory], ['@deepseek-ai/dsh-llm', LlmRuntime],
     ['@deepseek-ai/dsh-tools', ToolRuntime], ['@deepseek-ai/dsh-user-approval', Approval],
     ['fixture:execution-authority', Authority], ['@deepseek-ai/dsh-permission-presets', PermissionPresets],
     ['@deepseek-ai/dsh-experimental-auto-review', AutoReview],
@@ -122,7 +125,7 @@ async function world(managed = true) {
   fresh.append('assistant/message', { turn: 1, step: 1, stream: [], message: createMessage({ role: 'assistant', source: { kind: 'model', provider: 'review', model: 'same-model' }, content: [{ type: 'tool-call', id: callId, name: 'write_probe', arguments: '{}' }] }) }, { surfaceOp: 'append' })
   fresh.append('tool/call', { turn: 1, step: 1, callId, name: 'write_probe', arguments: '{}' })
   const execute = (session = fresh, signal = new AbortController().signal) => {
-    const agent = { id: session.id, session, options: { provider: 'review', model: 'same-model' } } as Agent
+    const agent = { id: session.id, session, options: { provider: 'review', model: 'same-model' }, ctx, inject(_message: UserMessage) {} } as Agent
     return ctx.tools.execute({ signal, agent, callId, name: 'write_probe', arguments: {} })
   }
   const autoEntry = [...ctx.loader.entries()].find(entry => entry.options.name === '@deepseek-ai/dsh-experimental-auto-review')

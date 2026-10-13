@@ -74,14 +74,15 @@ Session 投影持有有效目录，并在 Session 观察中暴露它，因此冷
 
 目录转换追加上下文，不替换稳定的系统提示词前缀。目录更改或恢复会在保留的历史之后产生新上下文。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **原始项目缺失** — 当当前目录与原始项目都不可用时，提示词组装会拒绝每一次模型轮次，包括纯聊天轮次。本服务不会选择或重建仓库。请先恢复原始目录再重试。既有 shell 保留其进程级目录。
 - **SSH 文件系统缺失** — realm 未提供 `fs` 的 SSH 绑定 Session 无法校验或更改目录；服务关闭式失败，而不是读取宿主机文件系统。
 
 <a id="dev-note"></a>
-## 开发备注
+### 开发备注
 
 <details>
 <summary>维护者工作上下文 — 点击展开</summary>

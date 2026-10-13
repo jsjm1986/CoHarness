@@ -254,13 +254,16 @@ interface ToolOutputMap {
   bash: {
     kind: "background";
     jobId: string;
+    cwd: string;
   } | {
     kind: "promoted";
+    cwd: string;
     jobId: string;
     timeoutMs: number;
     output: string;
   } | {
     kind: "foreground";
+    cwd: string;
     exitCode: number | null;
     signal: string | null;
     timedOut: boolean;
@@ -305,6 +308,7 @@ interface ToolOutputMap {
     activation: "armed" | "disarmed";
   };
   edit: {
+    /** Canonical absolute path in the filesystem execution world. */
     path: string;
     before: string;
     after: string;
@@ -382,6 +386,7 @@ interface ToolOutputMap {
     result: JsonValue;
   };
   read: {
+    /** Canonical absolute path in the filesystem execution world. */
     path: string;
     offset: number;
     lines: {
@@ -469,6 +474,7 @@ interface ToolOutputMap {
     result: JsonValue;
   };
   write: {
+    /** Canonical absolute path in the filesystem execution world. */
     path: string;
     operation: "create" | "update";
     before: string | null;

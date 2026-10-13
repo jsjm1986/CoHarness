@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { mountAgentLoopTestDependencies, provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { createUserMessage, ToolCallId  } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
@@ -35,6 +35,7 @@ async function mountRalph(script: MockScript, config: toolRalph.Config) {
   const adapter = new MockAdapter(script)
   await mountAgentLoopTestDependencies(ctx)
   const cwd = await mountExecution(ctx)
+  provideWorkingDirectoryFixture(ctx, cwd)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(spawn, { providerName: 'spawn' })
@@ -73,6 +74,7 @@ describe('dsh-tool-ralph over the real spawn and sandboxed PTC stack', () => {
     ])
     await mountAgentLoopTestDependencies(ctx)
     const cwd = await mountExecution(ctx)
+    provideWorkingDirectoryFixture(ctx, cwd)
     await ctx.plugin(AgentLoop, { agents: [] })
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(spawn, { providerName: 'spawn' })

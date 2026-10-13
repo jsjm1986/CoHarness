@@ -9,6 +9,7 @@
  * @module @deepseek-ai/dsh-hooks-claude-code
  */
 
+import type {} from '@deepseek-ai/dsh-working-directory'
 import { readFileSync } from 'node:fs'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -33,11 +34,10 @@ import {
   DEFAULT_HOOK_TIMEOUT_MS,
   DEFAULT_MODEL_FEEDBACK_MAX_CHARS,
   DEFAULT_STDERR_SUMMARY_MAX_CHARS,
-  matchesMatcher,
   mergeHookOutputs,
   runHook,
+  selectHookGroups,
   type HookOutput,
-  type MatcherGroup,
   type MergedHookOutcome,
 } from '@deepseek-ai/dsh-hook-protocol'
 // Pulls in the declaration-merged subagent events and the identity pairing their
@@ -46,9 +46,9 @@ import type { SubagentRunId } from '@deepseek-ai/dsh-subagent'
 import { parseClaudeCodeConfig, type ClaudeCodeHookConfig } from './config.ts'
 
 export const name = 'hooks-claude-code'
-// `bash` is required to run hooks; the rest are read opportunistically via
-// ctx.get so a deployment can load this bridge without every extension point present.
-export const inject = ['shell']
+// `shell` runs hooks and `workingDirectory` locates them; the rest are read
+// opportunistically via ctx.get so a deployment can omit them.
+export const inject = ['shell', 'workingDirectory']
 
 /** Plugin config: where the CC hook config lives + substitution roots. */
 export interface Config {
@@ -67,7 +67,7 @@ export interface Config {
   /**
    * Replaces `${CLAUDE_PROJECT_DIR}` in command strings AND is exported as the
    * `CLAUDE_PROJECT_DIR` env var for hook processes. When omitted, the env var
-   * defaults per-run to the agent's session workspace (`session.header.cwd`, the
+   * defaults per-run to the agent's current directory (the
    * same dir the hook runs in) — Claude Code always exports this var, and common
    * unmodified hooks reference `$CLAUDE_PROJECT_DIR` for project-relative paths.
    */
@@ -162,20 +162,20 @@ export function apply(ctx: Context, config: Config): void {
   async function runPoint(
     point: string,
     matchQuery: string,
-    payload: unknown,
+    payload: Record<string, unknown>,
     opts: { agent?: Agent; turn?: number; readonly signal: AbortSignal },
   ): Promise<MergedHookOutcome> {
-    const groups: MatcherGroup[] = parsed[point] ?? []
+    const groups = selectHookGroups(parsed[point], matchQuery, 'claude-code')
+    if (groups.length === 0) return mergeHookOutputs([])
     const outputs: HookOutput[] = []
-    // Run the hook in the agent's session workspace (the `session/new` cwd on the session
-    // header), not the executor or entry-point process's launch dir.
-    const workdir = opts.agent?.session.header.cwd
+    // Run the hook in the agent's current directory, not the executor or
+    // entry-point process's launch dir.
+    const workdir = opts.agent === undefined ? undefined : await ctx.workingDirectory.ensure(opts.agent, opts.signal)
     // CLAUDE_PROJECT_DIR: an explicit config value wins; otherwise default it to the session
     // workspace (the same dir the hook runs in).
     const projectDir = config.projectDir ?? workdir
     const hookEnv = projectDir !== undefined ? { CLAUDE_PROJECT_DIR: projectDir } : undefined
     for (const group of groups) {
-      if (!matchesMatcher(group.matcher, matchQuery, 'claude-code')) continue
       for (const hook of group.hooks) {
         const handlerId = nextHandlerId(point)
         const session = opts.agent?.session
@@ -186,7 +186,7 @@ export function apply(ctx: Context, config: Config): void {
           })
         }
         const { output, durationMs } = await runHook(ctx.shell, hook, {
-          payload,
+          payload: { ...payload, cwd: workdir ?? process.cwd() },
           defaultTimeoutMs,
           ...hookEnv ? { env: hookEnv } : {},
           ...workdir !== undefined ? { cwd: workdir } : {},
@@ -352,7 +352,6 @@ function base(ctx: Context, agent: Agent | undefined, event: string): Record<str
     transcript_path: agent === undefined
       ? ''
       : ctx.get('sessionPersistence')?.locate(agent.session.header)?.path ?? '',
-    cwd: agent?.session.header.cwd ?? process.cwd(),
     hook_event_name: event,
   }
 }
