@@ -51,9 +51,11 @@ function DetailsColumn(props: { children?: ReactNode }) {
 }
 
 /**
- * One 8px resize strip centered on a column border. Pointer capture keeps the
- * gesture on the strip; moves are rAF-batched into a single width write per
- * frame; `side` keys the hover-reveal CSS to the owning column.
+ * One 8px resize strip centered on a column border. `left` is the track edge;
+ * for details the stylesheet shifts the strip the column inset's width onto
+ * the floating panel's left border. Pointer capture keeps the gesture on the
+ * strip; moves are rAF-batched into a single width write per frame; `side`
+ * keys the hover-reveal CSS to the owning column.
  */
 function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart: () => void; onDrag: (dx: number) => void; onEnd: () => void }) {
   const [dragging, setDragging] = useState(false)

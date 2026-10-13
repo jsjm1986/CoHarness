@@ -274,9 +274,27 @@
   bottom: var(--dsw-space-2);
 }
 
+/* The medium overlay panel must cover its own scrim: the dock layer (10)
+   stacks below the scrim (14) in the frame's context, so the column carries
+   the whole panel subtree one level up. Compact needs no lift — fullscreen
+   presentation already raises the dock layer to 40. */
+.frame[data-viewport='medium'] .detailsCol {
+  z-index: 15;
+}
+
+/* The inline left centers the strip on the details track's left edge, but
+   the panel floats one inset left of it; shift the strip onto the panel's
+   left border — the seam the user sees and grabs. */
+.frame:not([data-viewport='compact']) .handle[data-side='details'] {
+  translate: calc(0px - var(--dsw-space-2)) 0;
+}
+
 /* Drag handles are frame children (columns clip overflow): an 8px hit strip
-   centered on the column border via inline left, above column content. Details
-   adds a visible 12x32 pill at vertical center; sidebar keeps only the hit strip. */
+   centered on the column border via inline left, above the dock layer (10)
+   and the overlay scrim (14) so the details strip stays grabbable where it
+   straddles the panel's edge; portalled overlays (20) and dockkit floats
+   (60) still paint above it. Details adds a visible 12x32 pill at vertical
+   center; sidebar keeps only the hit strip. */
 .handle {
   position: absolute;
   top: 0;
@@ -284,7 +302,7 @@
   width: 8px;
   margin-left: -4px;
   cursor: col-resize;
-  z-index: 2;
+  z-index: 15;
   touch-action: none;
   /* Rides the same curve as the tracks so the pill stays on the moving
      border during collapse/expand; paused while dragging (frame rule). */
