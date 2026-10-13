@@ -33,6 +33,7 @@ import {
   type ResponsesFixture,
 } from './responses-fixture.ts'
 import { cleanupRealProduct } from './real-product-cleanup.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const execFileAsync = promisify(execFile)
 const packageRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
@@ -127,6 +128,7 @@ interface RealRuntime {
 async function realRuntime(): Promise<RealRuntime> {
   const ctx = new Context()
   contexts.push(ctx)
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(LocalSubprocessRuntime)
   const handles: SubprocessHandle[] = []

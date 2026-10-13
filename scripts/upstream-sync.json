@@ -860,6 +860,9 @@
     "session/session-turn-outline": {
       "sovereignty": "tracked"
     },
+    "session/tool-working-directory": {
+      "sovereignty": "owned"
+    },
     "session/working-directory": {
       "sovereignty": "adapted",
       "note": "packages/session/working-directory/README.md"

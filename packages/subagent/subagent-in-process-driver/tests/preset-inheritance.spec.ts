@@ -15,7 +15,7 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { mountAgentLoopTestDependencies, provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import AgentPresets from '@deepseek-ai/dsh-agent-presets'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
@@ -39,6 +39,7 @@ async function setupPresetHost(): Promise<{ ctx: Context; adapter: MockAdapter; 
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   await mountAgentLoopTestDependencies(ctx)
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(AgentPresets, { default: 'coding', roots: ROOTS, includeUserRoot: false })
   const adapter = new MockAdapter([textResponse('parent idle'), textResponse('child done')])
@@ -57,6 +58,8 @@ function spawnRequest(parent: Agent) {
     label: 'child task',
     prompt: [{ type: 'text' as const, text: 'child task' }],
     parent,
+    // Direct driver calls supply the directory the service would have resolved.
+    cwd: parent.session.header.cwd ?? process.cwd(),
     signal: new AbortController().signal,
     descriptor: snapshotSubagentDescriptor({
       mode: 'one-shot' as const,

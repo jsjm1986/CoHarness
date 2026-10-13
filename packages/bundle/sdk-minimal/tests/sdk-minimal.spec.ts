@@ -35,6 +35,7 @@ describe('dsh-sdk-minimal bundle', () => {
       ['sandbox', '@deepseek-ai/dsh-sandbox-local'],
       ['filesystem', '@deepseek-ai/dsh-fs-local'],
       ['working-directory', '@deepseek-ai/dsh-working-directory'],
+      ['tool-working-directory', '@deepseek-ai/dsh-tool-working-directory'],
       ['session-projection', '@deepseek-ai/dsh-session-projection'],
       ['sandbox-policy', '@deepseek-ai/dsh-sandbox-policy'],
       ['subprocess', '@deepseek-ai/dsh-subprocess-local'],

@@ -2390,10 +2390,18 @@ def minimal_snapshot_message(message: object, cwd: Path) -> dict[str, object]:
     return {"role": role, "text": minimal_snapshot_text(message_text(message.get("content")), cwd)}
 
 
+def snapshot_directory_replacements(directory: Path, token: str) -> list[tuple[str, str]]:
+    """Pin the allocated fixture path in plain fields and JSON-quoted context text."""
+    path = str(directory)
+    return [(json.dumps(path, ensure_ascii=False)[1:-1], token), (path, token)]
+
+
 def minimal_snapshot_text(value: object, cwd: Path) -> object:
     """Replace the scenario's temporary working directory everywhere it appears."""
     if isinstance(value, str):
-        return value.replace(str(cwd), "{{cwd}}")
+        for actual, token in snapshot_directory_replacements(cwd, "{{cwd}}"):
+            value = value.replace(actual, token)
+        return value
     if isinstance(value, list):
         return [minimal_snapshot_text(item, cwd) for item in value]
     if isinstance(value, dict):

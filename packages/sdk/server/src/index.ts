@@ -18,8 +18,9 @@ import { HarnessSdkJsonRpcServer } from './server.ts'
 export * from './server.ts'
 
 export const name = 'sdk-jsonrpc-server'
-// Only the agent factory is required; initialize reads the optional LLM seam with ctx.get().
-export const inject = ['agents']
+// The optional LLM seam is read with ctx.get() during initialize; the
+// working-directory handlers require their service at activation.
+export const inject = ['agents', 'workingDirectory']
 
 /** JSON-RPC deployment config plus runtime-only test hooks. */
 export interface JsonRpcConfig {

@@ -63,6 +63,7 @@
     "@deepseek-ai/dsh-terminal-bash": "workspace:*",
     "@deepseek-ai/dsh-tool-bash-persistent": "workspace:*",
     "@deepseek-ai/dsh-tool-pwsh-persistent": "workspace:*",
+    "@deepseek-ai/dsh-tool-working-directory": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-working-directory": "workspace:*"
   },

@@ -25,6 +25,7 @@ import { PwshLocalExecutor } from '@deepseek-ai/dsh-pwsh-local'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
+import * as ToolWorkingDirectory from '@deepseek-ai/dsh-tool-working-directory'
 import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import type { UserDocStore } from '@deepseek-ai/dsh-userdoc'
@@ -648,6 +649,17 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-working-directory',
+    dir: 'tool-working-directory',
+    source: 'packages/session/tool-working-directory/src/index.ts',
+    requires: ['ctx.tools', 'ctx.workingDirectory'],
+    writes: ['tool/call', 'working-directory/change', 'user context for directory changes', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(ToolWorkingDirectory)
+    },
+    note: 'Reads or changes the calling Session directory. Existing shells and processes retain their own directories; origin metadata and permission roots stay fixed.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-workflow',

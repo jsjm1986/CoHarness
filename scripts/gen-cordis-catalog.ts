@@ -107,7 +107,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   sessionReferenceResolver: 'session-reference.md',
   sessionProjectionCache: 'session-projection.md',
   sessionProjections: 'session-projection.md',
-  workingDirectory: 'session.md',
+  workingDirectory: 'working-directory.md',
   schedule: 'schedule.md',
   sessionController: 'session.md',
   speechController: 'voice-input.md',

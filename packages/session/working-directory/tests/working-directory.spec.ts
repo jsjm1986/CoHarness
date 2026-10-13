@@ -17,7 +17,9 @@ import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import WorkingDirectory, { type Config as WorkingDirectoryConfig } from '@deepseek-ai/dsh-working-directory'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { renderContextSnapshot, renderPrompt } from '@deepseek-ai/dsh-system-prompt'
+import * as WorkingDirectoryTool from '@deepseek-ai/dsh-tool-working-directory'
 
 async function fixture(config?: (root: string) => WorkingDirectoryConfig) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-working-directory-')))
@@ -378,6 +380,22 @@ describe('Session working directories', () => {
       inject.mockRestore()
       warn.mockRestore()
     }
+  })
+
+  it('exposes reading and changing through the same model tool and unregisters it on disposal', async () => {
+    await using f = await fixture()
+    await mkdir(join(f.root, 'child'))
+    const fiber = f.ctx.plugin(WorkingDirectoryTool)
+    await fiber
+    const execute = (arguments_: { cd?: string }, withAgent = true) => f.ctx.tools.execute({
+      name: 'working_directory', callId: ToolCallId('directory-call'), arguments: arguments_,
+      signal: new AbortController().signal, ...withAgent ? { agent: f.agent } : {},
+    })
+    expect(await execute({})).toMatchObject({ value: { cwd: f.root }, isError: false })
+    expect(await execute({ cd: 'child' })).toMatchObject({ value: { cwd: join(f.root, 'child') }, isError: false })
+    expect(await execute({}, false)).toMatchObject({ isError: true })
+    await fiber.dispose()
+    expect(f.ctx.tools.schemas().some(tool => tool.name === 'working_directory')).toBe(false)
   })
 })
 

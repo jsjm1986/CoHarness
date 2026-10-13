@@ -515,6 +515,7 @@
       "@deepseek-ai/dsh-tool-web": ["./packages/web/tool-web/src"],
       "@deepseek-ai/dsh-tool-workflow": ["./packages/workflow/tool-workflow/src"],
       "@deepseek-ai/dsh-tool-workflow/invariant": ["./packages/workflow/tool-workflow/src/invariant.ts"],
+      "@deepseek-ai/dsh-tool-working-directory": ["./packages/session/tool-working-directory/src"],
       "@deepseek-ai/dsh-tool-workspace-dependencies": ["./packages/skill/tool-workspace-dependencies/src"],
       "@deepseek-ai/dsh-tools": ["./packages/core/tools/src"],
       "@deepseek-ai/dsh-tools/invariant": ["./packages/core/tools/src/invariant.ts"],

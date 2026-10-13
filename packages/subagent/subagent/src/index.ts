@@ -33,6 +33,7 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import type {} from '@deepseek-ai/dsh-working-directory'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import { assertObjectJsonSchema } from '@deepseek-ai/dsh-tools'
@@ -252,6 +253,7 @@ export class SubagentRuntime extends TypertRemoteService {
     maxContinuableActivationsPerParent: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER)
       .default(DEFAULT_MAX_CONTINUABLE_ACTIVATIONS_PER_PARENT),
   })
+  static inject = ['workingDirectory']
 
   private settingsSource: () => Config
 
@@ -777,7 +779,11 @@ export class SubagentRuntime extends TypertRemoteService {
         provider: name,
         ...request.label !== undefined ? { label: request.label } : {},
       })
-      const resolved: ResolvedSubagentStartRequest = { ...request, descriptor }
+      const cwd = request.cwd === undefined
+        ? await this.ctx.workingDirectory.ensure(request.parent, request.signal)
+        : await this.ctx.workingDirectory.resolve(request.parent, request.cwd, request.signal)
+      request.signal.throwIfAborted()
+      const resolved: ResolvedSubagentStartRequest = { ...request, cwd, descriptor }
       const run = await provider.start(resolved)
       const owned = this.leasedRuns.get(request.parent) ?? new Set<SubagentRun>()
       this.leasedRuns.set(request.parent, owned)

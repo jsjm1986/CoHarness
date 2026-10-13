@@ -11,6 +11,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import * as mock from './scripted-provider.ts'
 import * as tool from '../src/index.ts'
 import SubagentModelSelectionConfig from '../src/model-selection-settings.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 /** Shared non-aborted tool signal for package-local integration tests. */
 export const testToolSignal = new AbortController().signal
@@ -50,6 +51,7 @@ export async function setup(toolConfig: SetupConfig, mockConfig: Partial<mock.Co
     })
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(AgentLoop, { agents: [] })
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await mock.mountScriptedProvider(ctx, { name: 'mock', ...mockConfig })
     const handle = await ctx.agents.create({
@@ -68,6 +70,7 @@ export async function setup(toolConfig: SetupConfig, mockConfig: Partial<mock.Co
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(SessionProjectionRegistry)
   await mock.mountScriptedProvider(ctx, { name: 'mock', ...mockConfig })

@@ -23,10 +23,11 @@ import {
   startSdkRun,
   type SdkRunSpec,
 } from '../src/run.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const fakeRuntime = fileURLToPath(new URL('../../../sdk/client/tests/fake-runtime.ts', import.meta.url))
 
-/** A parent Agent stub. The SDK backend reads exactly one thing off it: the session header's cwd (the workspace its child inherits). */
+/** A parent Agent stub. The directory fixture reads its session header's cwd as the effective workspace the child inherits. */
 const fakeParent = { id: 'parent', session: { header: { cwd: process.cwd() } } } as unknown as Agent
 
 function request(text = 'p', signal = new AbortController().signal) {
@@ -49,6 +50,7 @@ afterEach(async () => {
 /** Mount the SDK backend pointed at the fake runtime, scripted by `fakeEnv`. */
 async function setup(fakeEnv: Record<string, string> = {}, config: Partial<sdk.Config> = {}) {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   // The Config type models the post-validation shape, so the default registry
   // name is stated here; the Loader-composition fixture omits providerName and
@@ -444,6 +446,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
 
   it('registers under the configured provider name and unregisters on fiber dispose (HMR safety)', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     const fiber = await ctx.plugin(sdk, {
       providerName: 'sdk-hmr',
@@ -469,6 +472,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
 
   it('rejects non-positive timing bounds at load', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     const base = { providerName: 'sdk', dshBin: fakeRuntime, profile: 'sdk', patches: [], dshHome: isolatedHome(), provider: 'p', model: 'm', env: {} }
     await expect(ctx.plugin(sdk, { ...base, shutdownTimeoutMs: 0 })).rejects.toThrow('shutdownTimeoutMs must be a positive finite number')
@@ -481,6 +485,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     'rejects invalid maxTokens %s at load',
     async (maxTokens) => {
       const ctx = new Context()
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SubagentRuntime)
       await expect(ctx.plugin(sdk, {
         providerName: 'sdk',
@@ -498,6 +503,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     'defensively rejects invalid maxTokens %s when apply is called directly',
     async (maxTokens) => {
       const ctx = new Context()
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SubagentRuntime)
       expect(() => { sdk.apply(ctx, {
         providerName: 'sdk',
@@ -514,25 +520,21 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     },
   )
 
-  it('rejects an empty config cwd at load', async () => {
-    const ctx = new Context()
-    await ctx.plugin(SubagentRuntime)
-    await expect(ctx.plugin(sdk, {
-      providerName: 'sdk',
-      dshBin: fakeRuntime, profile: 'sdk', patches: [], dshHome: isolatedHome(),
-      cwd: '',
-      provider: 'p',
-      model: 'm',
-      env: {},
-    })).rejects.toThrow('config cwd must not be empty')
+  it('rejects a missing request cwd at start', async () => {
+    const ctx = await setup()
+    await expect(ctx.subagents.start('dsh-sdk', {
+      label: 'p', prompt: [{ type: 'text' as const, text: 'p' }], parent: fakeParent,
+      cwd: '/nonexistent/dsh-sdk-child-workspace', signal: new AbortController().signal,
+    }))
+      .rejects.toThrow('Subagent failure (provider: DSH SDK; stage: initialize; category: configuration)')
     await ctx.fiber.dispose()
   })
 
-  it('uses a validated config cwd override instead of the parent session cwd', async () => {
+  it('uses the request-selected directory instead of the parent session cwd', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'subagent-dsh-sdk-cwd-'))
     try {
-      const ctx = await setup({ FAKE_ECHO_CWD: '1', FAKE_TEXT: 'done' }, { cwd: tmp })
-      const run = await ctx.subagents.start('dsh-sdk', request())
+      const ctx = await setup({ FAKE_ECHO_CWD: '1', FAKE_TEXT: 'done' })
+      const run = await ctx.subagents.start('dsh-sdk', { ...request(), cwd: tmp })
       const result = await run.result
       const { realpathSync } = await import('node:fs')
       expect(text(result.output)).toContain(`cwd=${realpathSync(tmp)}`)
@@ -541,16 +543,6 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     } finally {
       rmSync(tmp, { recursive: true, force: true })
     }
-  })
-
-  it('fails loud when neither config cwd nor parent session cwd exists', async () => {
-    const ctx = await setup()
-    const parent = { id: 'parent', session: { header: {} } } as unknown as Agent
-    await expect(ctx.subagents.start('dsh-sdk', {
-      label: 'p', prompt: [{ type: 'text' as const, text: 'p' }], parent, signal: new AbortController().signal,
-    }))
-      .rejects.toThrow('Subagent failure (provider: DSH SDK; stage: initialize; category: configuration)')
-    await ctx.fiber.dispose()
   })
 
   it('keeps named plugin exports with no default export (loader shape)', () => {

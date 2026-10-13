@@ -24,6 +24,7 @@ import SubagentRuntime, {
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import * as SubagentFork from '@deepseek-ai/dsh-subagent-fork-in-process'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
@@ -49,6 +50,7 @@ async function setup(
     // The missing-registry failure is checked before parent resolution, so the
     // store and the subagents service alone reach it.
     await ctx.plugin(SessionStore)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     return { ctx, parent: { id: SessionId('no-projections-parent') } as Agent }
   }
@@ -63,6 +65,7 @@ async function setup(
     ctx.provide('storageDomain', facility)
     await ctx.plugin(SessionProjectionCache, { writeEveryEvents: 100, writeIntervalMs: 60_000 })
   }
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(SubagentFork, { providerName: 'fork' })
@@ -188,6 +191,7 @@ describe('SubagentRuntime.listChildren', () => {
     contexts.push(ctx)
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     expect(ctx.get('jobs')).toBeUndefined()
     expect(ctx.get('agents')).toBeUndefined()
@@ -223,6 +227,7 @@ describe('SubagentRuntime.listChildren', () => {
     const ctx = new Context()
     contexts.push(ctx)
     await ctx.plugin(SessionProjectionRegistry)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await expect(ctx.subagents.listChildren(SessionId('no-store-parent'))).rejects.toThrow(
       expect.objectContaining({ code: 'SUBAGENT_CONTROL_SESSION_STORE_UNAVAILABLE' }) as Error,

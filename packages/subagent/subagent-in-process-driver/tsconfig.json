@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../context/execution-authority"
+    },
+    {
       "path": "../../core/agent"
     },
     {
@@ -24,6 +27,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../session/working-directory"
+    },
+    {
       "path": "../subagent"
     },
     {
@@ -31,9 +37,6 @@
     },
     {
       "path": "../../../vendor/cosmokit"
-    },
-    {
-      "path": "../../context/execution-authority"
     }
   ]
 }

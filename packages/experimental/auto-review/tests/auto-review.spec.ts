@@ -28,7 +28,6 @@ import SessionStore, {
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime, {
   NO_START_CAPABILITIES,
-  resolveChildCwd,
   snapshotSubagentDescriptor,
   type ResolvedSubagentStartRequest,
 } from '@deepseek-ai/dsh-subagent'
@@ -1295,11 +1294,7 @@ describe('out-of-process delegation boundary', () => {
     expect(timeline).toEqual(['review:deny', 'review:allow', 'provider:start'])
     expect(adapter.requests).toHaveLength(2)
     expect(providerRequest?.parent).toBe(agent)
-    expect(resolveChildCwd(
-      'remote-boundary',
-      undefined,
-      providerRequest?.parent.session.header.cwd,
-    )).toBe(process.cwd())
+    expect(providerRequest?.cwd).toBe(process.cwd())
     expect(providerRequest?.agentOptions).toBeUndefined()
     expect(providerRequest?.maxDepth).toBeUndefined()
     expect(providerRequest?.persona).toBeUndefined()

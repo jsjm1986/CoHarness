@@ -24,6 +24,7 @@ import {
   subagentModelSelectionProjectionDefinition,
 } from '../src/model-selection-state.ts'
 import { callSubagent, text } from './harness.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const ALLOWED_MODELS = [{ provider: 'alpha', model: 'fast-model' }]
 
@@ -64,6 +65,7 @@ async function boot(withPreset = true): Promise<Context> {
   await ctx.plugin(SubagentModelSelectionConfig)
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   if (withPreset) {
@@ -372,6 +374,7 @@ describe('SubagentModelSelectionConfig', () => {
   it('requires both the Host setting owner and a scoped standing preset', async () => {
     const withoutSettings = new Context()
     await mountAgentLoopTestDependencies(withoutSettings)
+    provideWorkingDirectoryFixture(withoutSettings)
     await withoutSettings.plugin(SubagentRuntime)
     expect(() => {
       tool.apply(withoutSettings, {
@@ -399,6 +402,7 @@ describe('SubagentModelSelectionConfig', () => {
     try {
       await ctx.plugin(SubagentModelSelectionConfig)
       await ctx.plugin(SessionProjectionRegistry)
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SubagentRuntime)
       const childId = SessionId('child-without-session-registry')
       const child = Session.create(childId, undefined, {

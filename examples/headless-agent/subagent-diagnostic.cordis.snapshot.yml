@@ -33,6 +33,11 @@
 - id: session-projection
   name: '@deepseek-ai/dsh-session-projection'
 
+# The subagent service requires workingDirectory; this catalog-only tree has
+# no fs/system-prompt stacks, so a stub supplies the seam in memory.
+- id: working-directory
+  name: './tests/fixtures/working-directory-stub.ts'
+
 - id: subagent
   name: '@deepseek-ai/dsh-subagent'
 

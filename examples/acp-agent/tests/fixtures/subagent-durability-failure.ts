@@ -118,6 +118,11 @@ export function apply(ctx: Context): void {
       if (message.source.kind === 'subagent-settled') childSettledOnce.resolve(undefined)
       return
     }
+    // Runtime notices (e.g. the working-directory change committed at child
+    // setup) enter the same inbox; the authored transcript counts only real
+    // deliveries so their order stays deterministic.
+    const kind = message.source.kind
+    if (kind !== 'user' && kind !== 'agent-message') return
     if (realChildId === undefined) realChildId = agent.session.header.id
     accepted += 1
     if (accepted >= CHILD_MESSAGES) followupsAccepted.resolve(undefined)
@@ -143,8 +148,12 @@ export function apply(ctx: Context): void {
   // follows its claim of the third message fails, turning that turn/end into a
   // durable error the parent never sees.
   let claimed = 0
-  ctx.on('agent/inbox/claimed', ({ agent }) => {
+  ctx.on('agent/inbox/claimed', ({ agent, message }) => {
     if (agent.session.header.parentSession === undefined) return
+    // Count only transcript deliveries; runtime notices such as the
+    // working-directory change are claimed too but are not conversation input.
+    const kind = message.source.kind
+    if (kind !== 'user' && kind !== 'agent-message') return
     claimed += 1
   })
   ctx.on('session/flush', (session) => {

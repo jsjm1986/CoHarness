@@ -1,6 +1,7 @@
 /** Local process providers do not require the optional standing-realm implementation. */
-import { realpathSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { expect, it, onTestFinished, vi } from 'vitest'
@@ -21,6 +22,27 @@ it('resolves a local workspace without presets and rejects missing providers or 
   const noDirectory = { ctx, session: { header: {} } } as Agent
   await expect(resolveChildExecution(ctx, noDirectory, undefined, signal)).rejects.toThrow('requires a Session working directory')
   expect(await resolveChildExecution(ctx, noDirectory, tmpdir(), signal)).toMatchObject({ cwd: realpathSync(tmpdir()), target: 'local' })
+})
+
+it('uses the Session working-directory service when mounted, and lets an explicit override win', async () => {
+  const ctx = new Context()
+  onTestFinished(async () => { await ctx.fiber.dispose() })
+  ctx.provide('subprocess', { marker: 'local-provider' } as never)
+  const tmp = tmpdir()
+  const ensure = vi.fn(async () => tmp)
+  ctx.provide('workingDirectory', { ensure } as never)
+  const agent = { ctx, session: { header: { cwd: '/unused-origin' } } } as Agent
+  const signal = new AbortController().signal
+  expect(await resolveChildExecution(ctx, agent, undefined, signal)).toMatchObject({
+    cwd: realpathSync(tmp), target: 'local',
+  })
+  expect(ensure).toHaveBeenCalledWith(agent, signal)
+  const override = mkdtempSync(join(tmpdir(), 'oop-override-'))
+  try {
+    expect(await resolveChildExecution(ctx, agent, override, signal)).toMatchObject({ cwd: realpathSync(override) })
+  } finally {
+    rmSync(override, { recursive: true, force: true })
+  }
 })
 
 it('refuses an SSH execution when its realm resolver is unavailable instead of borrowing local providers', async () => {

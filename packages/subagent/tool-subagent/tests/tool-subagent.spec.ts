@@ -22,6 +22,7 @@ import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-a
 import * as mock from './scripted-provider.ts'
 import * as tool from '../src/index.ts'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const testToolSignal = new AbortController().signal
 
@@ -50,6 +51,7 @@ async function setup(toolConfig: tool.Config, mockConfig: Partial<mock.Config> =
   const ctx = await projectedContext()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   await mock.mountScriptedProvider(ctx, { name: 'mock', ...mockConfig })
   await ctx.plugin(tool, toolConfig)
@@ -114,7 +116,7 @@ describe('dsh-tool-subagent', () => {
     const schema = ctx.tools.schemas().find(s => s.name === 'subagent')
     expect(schema).toBeDefined()
     const props = (schema!.parameters as { properties?: Record<string, unknown> }).properties ?? {}
-    expect(Object.keys(props).sort()).toEqual(['description', 'prompt', 'run_in_background'])
+    expect(Object.keys(props).sort()).toEqual(['cwd', 'description', 'prompt', 'run_in_background'])
     expect(schema!.description).toContain('job_output')
   })
 
@@ -122,7 +124,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await setup({ provider: 'mock', enableRunInBackground: false })
     const schema = ctx.tools.schemas().find(s => s.name === 'subagent')
     const props = (schema!.parameters as { properties?: Record<string, unknown> }).properties ?? {}
-    expect(Object.keys(props).sort()).toEqual(['description', 'prompt'])
+    expect(Object.keys(props).sort()).toEqual(['cwd', 'description', 'prompt'])
     expect(schema!.description).not.toContain('job_output')
   })
 
@@ -217,6 +219,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await mock.mountScriptedProvider(ctx, { name: 'spawn', reply: 'from spawn' })
     await mock.mountScriptedProvider(ctx, { name: 'acp', reply: 'from acp' })
@@ -238,6 +241,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'weird',
@@ -266,6 +270,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'capture',
@@ -296,6 +301,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'bare',
@@ -331,6 +337,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     // Tool first: no provider yet — the tool must be absent, not broken.
     // Direct apply (schema bypass): also covers the waiting-note's default
@@ -348,6 +355,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     tool.apply(ctx, {
       provider: 'later-continuable',
@@ -364,6 +372,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     const backend = await mock.mountScriptedProvider(ctx, { name: 'mock' }) // fresh conversation (descriptor: false)
     await ctx.plugin(tool, { provider: 'mock' })
@@ -383,6 +392,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
 
     // Arm 1: a mounted tool and its prompt section die with the plugin fiber;
@@ -419,6 +429,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await mock.mountScriptedProvider(ctx, { name: 'mock' })
     await ctx.plugin(tool, { provider: 'mock' })
@@ -455,6 +466,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'spy',
@@ -478,6 +490,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'spy',
@@ -502,6 +515,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'spy',
@@ -530,6 +544,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'spy',
@@ -557,6 +572,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'spy',
@@ -596,6 +612,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'spy',
@@ -660,6 +677,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'capture2',
@@ -717,6 +735,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'capture3',
@@ -747,6 +766,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'capture4',
@@ -772,6 +792,7 @@ describe('dsh-tool-subagent', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'p',
@@ -1099,6 +1120,7 @@ describe('dsh-tool-subagent continuable background mode', () => {
     roots.push(root)
     await ctx.plugin(JsonlSessionPersistence, { root })
     await ctx.plugin(AgentLoop, { agents: [] })
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
     await ctx.plugin(LocalJobRegistry)
@@ -1305,6 +1327,7 @@ describe('depth budget configuration', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'capture',
@@ -1343,6 +1366,7 @@ describe('depth budget configuration', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'no-depth',
@@ -1359,6 +1383,7 @@ describe('depth budget configuration', () => {
     const ctx = await projectedContext()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     ctx.subagents.registerProvider({
       name: 'external',

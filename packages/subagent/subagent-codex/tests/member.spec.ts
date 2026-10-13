@@ -28,6 +28,7 @@ import {
   recoverCodexThread,
   type CodexMemberConfig,
 } from '../src/member.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 /**
  * Member tests for persistent Codex children: the app-server speaks over an
@@ -559,6 +560,7 @@ describe('codex member plugin', () => {
     const dir = root()
     const ctx = new Context()
     contexts.push(ctx)
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     await ctx.plugin(LlmRuntime)
@@ -578,6 +580,7 @@ describe('codex member plugin', () => {
 
     const provider = ctx.subagents.getProvider('codex')!
     await expect(provider.prepareContinuable!(withExecutionContext(ctx, {
+      cwd: dir,
       sessionId: SessionId('continuable-child'),
       parent: { session: { header: { cwd: dir } } } as unknown as Agent,
       signal,

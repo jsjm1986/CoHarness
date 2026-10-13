@@ -38,6 +38,7 @@ import {
   continuationManager,
   dropContinuationActivation,
 } from './continuation-internals.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 /** Writable settings isolated to one test Context. */
 class MemorySettings extends SettingsProvider {
@@ -129,6 +130,7 @@ async function setupWith(
   }
   await ctx.plugin(AgentLoop, { agents: [] })
   if (options.schedule) await mountScheduleForOwnership(ctx)
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime, options.subagent ?? {})
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(SubagentFork, { providerName: 'fork' })
@@ -292,6 +294,7 @@ describe('continuable activation capacity', () => {
   it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])('rejects invalid configured capacity %s', async (maxActiveSubagents) => {
     const ctx = new Context()
     try {
+      provideWorkingDirectoryFixture(ctx)
       await expect(ctx.plugin(SubagentRuntime, { maxActiveSubagents })).rejects.toThrow()
     } finally {
       await ctx.fiber.dispose()
@@ -302,6 +305,7 @@ describe('continuable activation capacity', () => {
     const ctx = new Context()
     try {
       await ctx.plugin(MemorySettings)
+      provideWorkingDirectoryFixture(ctx)
       const fiber = await ctx.plugin(SubagentRuntime, { maxDepth: 4 })
       expect(ctx.settings.describe().find(section => section.ns === SUBAGENT_SETTINGS_NAMESPACE)).toMatchObject({
         owner: 'project', projectWrite: 'manager', projectWritePaths: [['maxDepth'], ['maxActiveSubagents']],
@@ -811,6 +815,28 @@ describe('SubagentRuntime.startContinuable', () => {
     expect(parent.session.snapshotEvents().filter(event => event.type === 'subagent/catalog')).toEqual([])
   })
 
+  it('rolls back a child whose setup realm has no working-directory service', async () => {
+    const { ctx, parent, adapter } = await setup([textResponse('unused')])
+    const childId = SessionId('00000000-0000-4000-8000-000000000323')
+    const create = ctx.agents.create.bind(ctx.agents)
+    const creation = vi.spyOn(ctx.agents, 'create').mockImplementation(options => create({
+      ...options,
+      setup: (childCtx, child) => options.setup?.(childCtx.isolate('workingDirectory'), child),
+    }))
+    try {
+      await expect(ctx.subagents.startContinuable({
+        ...startSpec(parent),
+        childId,
+      })).rejects.toThrow(/require the working-directory service/)
+    } finally {
+      creation.mockRestore()
+    }
+    await vi.waitFor(() => { expect(ctx.agents.get(childId)).toBeUndefined() })
+    expect(ctx.agents.list().map(agent => agent.id)).toEqual([SessionId('parent')])
+    expect(parent.session.snapshotEvents().filter(event => event.type === 'subagent/catalog')).toEqual([])
+    expect(adapter.requests).toEqual([])
+  })
+
   it('preserves prompt admission failure when Activation disposal also fails', async () => {
     const { ctx, parent } = await setup([textResponse('unused')])
     const childId = SessionId('00000000-0000-4000-8000-000000000322')
@@ -949,6 +975,7 @@ describe('SubagentRuntime.startContinuable', () => {
     // afterEach closes it before removing the root (even on a failure path).
     cleanups.push(async () => { await fresh.fiber.dispose() })
     await fresh.plugin(AgentLoop, { agents: [] })
+    provideWorkingDirectoryFixture(fresh)
     await fresh.plugin(SubagentRuntime, {})
     await fresh.plugin(SubagentSpawn, { providerName: 'spawn' })
     // The disposed lifecycle drained the parent's log durably, so the fresh
@@ -3687,6 +3714,7 @@ describe('continuable errors', () => {
       rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     })
     await ctx.plugin(AgentLoop, { agents: [] })
+    provideWorkingDirectoryFixture(ctx)
     const serviceFiber = await ctx.plugin(SubagentRuntime)
     await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
     ctx.llm.registerAdapter(['mock'], adapter)

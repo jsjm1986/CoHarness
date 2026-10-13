@@ -7,7 +7,7 @@
  */
 
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { resolveChildExecution, externalMemberAgent, type ChildExecution } from '@deepseek-ai/dsh-subagent'
@@ -42,14 +42,6 @@ export interface Config {
   command: string
   /** Arguments passed to {@link command}. */
   args: string[]
-  /**
-   * Working directory override for the child process and its ACP session.
-   * Must be non-empty; a relative path resolves against the harness launch
-   * directory at load, and the result must be an existing directory. When
-   * omitted, each child inherits its delegating parent session's cwd — and
-   * starting one from a parent session that has no cwd fails.
-   */
-  cwd?: string
   /**
    * How to auto-answer the child's `session/request_permission` prompts:
    * `reject` (default — decline every prompt) or `allow` (approve via the first
@@ -89,8 +81,8 @@ export interface Config {
    */
   stateDir?: string
   /**
-   * Workspace override for persistent ACP members; defaults to {@link cwd},
-   * else the member Session working directory. Used only with {@link resume}.
+   * Workspace override for persistent ACP members; omitted uses the member
+   * Session's working directory. Used only with {@link resume}.
    */
   memberCwd?: string
 }
@@ -99,7 +91,6 @@ export const Config: z<Config> = z.object({
   providerName: z.string().default('acp'),
   command: z.string().required(),
   args: z.array(z.string()).default([]),
-  cwd: z.string(),
   permission: z.union(['allow', 'reject'] as const).default('reject'),
   env: z.dict(z.string()).default({}),
   disposeEofGraceMs: z.number().default(DEFAULT_DISPOSE_EOF_GRACE_MS),
@@ -116,10 +107,10 @@ function assertPositiveFinite(name: string, value: number): void {
   }
 }
 
-/** The shape after schemastery applied the defaults (cwd/stateDir/memberCwd have none). */
+/** The shape after schemastery applied the defaults (stateDir/memberCwd have none). */
 type ResolvedConfig =
-  Required<Omit<Config, 'cwd' | 'stateDir' | 'memberCwd'>>
-  & Pick<Config, 'cwd' | 'stateDir' | 'memberCwd'>
+  Required<Omit<Config, 'stateDir' | 'memberCwd'>>
+  & Pick<Config, 'stateDir' | 'memberCwd'>
 
 /**
  * The ACP provider. Advertises NO start-time capabilities: an out-of-process
@@ -177,7 +168,7 @@ class AcpProvider implements SubagentProvider {
     }
     let execution: ChildExecution
     try {
-      execution = await resolveChildExecution(this.ctx, request.parent, this.config.cwd, request.signal)
+      execution = await resolveChildExecution(this.ctx, request.parent, request.cwd, request.signal)
     } catch (error: unknown) {
       const failure = acpConfigurationFailure(error)
       this.ctx.logger.warn(`subagent-acp "${this.name}": child start failed: %o`, error)
@@ -208,16 +199,7 @@ export function apply(ctx: Context, config: Config): void {
   const resolved = config as ResolvedConfig
   assertPositiveFinite('disposeEofGraceMs', resolved.disposeEofGraceMs)
   assertPositiveFinite('disposeGraceMs', resolved.disposeGraceMs)
-  // `path.resolve('')` is the process cwd — an empty string would silently
-  // reintroduce the launch-directory fallback this resolution removed.
-  if (resolved.cwd === '') {
-    throw new Error('subagent-acp: config cwd must not be empty — omit the key to inherit the parent session cwd')
-  }
-  // Interpret a relative configured cwd against the harness launch directory
-  // once at load; directory access is checked on the selected execution target.
-  const validated: ResolvedConfig = resolved.cwd === undefined
-    ? resolved
-    : { ...resolved, cwd: resolve(resolved.cwd) }
+  const validated: ResolvedConfig = resolved
 
   // Persistent members need the `llm` service for their model route AND the
   // `resume` opt-in. Without either the provider stays one-shot only: no
@@ -233,8 +215,8 @@ export function apply(ctx: Context, config: Config): void {
     const store = new ExternalBindingStore(
       join(validated.stateDir ?? join(homedir(), '.dsh', 'external-members'), 'acp.jsonl'),
     )
-    const resolveMember = async (agent: Agent, signal: AbortSignal) => {
-      const execution = await resolveChildExecution(ctx, agent, validated.memberCwd ?? validated.cwd, signal)
+    const resolveMember = async (agent: Agent, configured: string | undefined, signal: AbortSignal) => {
+      const execution = await resolveChildExecution(ctx, agent, validated.memberCwd ?? configured, signal)
       const memberConfig: AcpMemberConfig = {
         command: execution.remote
           ? await execution.subprocess.resolveExecutable(validated.command, validated.env, signal) : validated.command,
@@ -244,11 +226,11 @@ export function apply(ctx: Context, config: Config): void {
       return { execution, transport: new AcpMemberTransport(memberConfig, spec => execution.subprocess.spawn(spec)) }
     }
     prepareMember = async (request) => {
-      const { transport } = await resolveMember(request.parent, request.signal)
+      const { transport } = await resolveMember(request.parent, request.cwd, request.signal)
       await transport.probe(request.signal)
     }
     const transport = async (child: SessionId, signal: AbortSignal) => {
-      const member = await resolveMember(externalMemberAgent(ctx, child), signal)
+      const member = await resolveMember(externalMemberAgent(ctx, child), undefined, signal)
       store.assertExecution(child, member.execution)
       return member.transport
     }

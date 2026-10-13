@@ -11,6 +11,7 @@
 
 import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-working-directory'
 import type {
   Agent,
   AgentHandle,
@@ -126,6 +127,8 @@ export interface MaterializeInputs {
    * so a resume never re-captures the parent's policy.
    */
   create?: {
+    /** Absolute directory captured from the initial request. */
+    cwd: string
     seed: readonly SessionEvent[] | undefined
     meta: NonNullable<CreateAgentOptions['meta']>
     /** Exact parent-log prefix length inside {@link seed}. */
@@ -776,12 +779,17 @@ export class ContinuableActivationRegistry {
     const { childId, provider, parent, create } = inputs
     inputs.signal.throwIfAborted()
     let structured: StructuredAttachment | undefined
-    const setup = (childCtx: Context, child: Agent): void => {
+    const setup = async (childCtx: Context, child: Agent): Promise<void> => {
       // Only fresh creation appends the descriptor and delegated policy after
       // the inherited marker; a cold resume replays those persisted events.
       if (create !== undefined) {
         child.session.append('subagent/descriptor', create.descriptor)
         appendDelegatedPolicyOverrides(childCtx, child.session, create.delegatedPolicies)
+        const workingDirectory = childCtx.get('workingDirectory')
+        if (workingDirectory === undefined) {
+          throw new Error('continuable subagents require the working-directory service')
+        }
+        await workingDirectory.set(child, create.cwd, inputs.signal)
       }
       applyChildComposition(childCtx, parent, inputs.composition)
       if (inputs.outputSchema !== undefined) {

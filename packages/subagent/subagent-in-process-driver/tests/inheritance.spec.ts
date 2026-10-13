@@ -60,6 +60,8 @@ function spawnRequest(parent: Agent, agentOptions?: AgentOptions) {
     label: 'child task',
     prompt: [{ type: 'text' as const, text: 'child task' }],
     parent,
+    // Direct driver calls supply the directory the service would have resolved.
+    cwd: parent.session.header.cwd ?? process.cwd(),
     signal: new AbortController().signal,
     ...agentOptions === undefined ? {} : { agentOptions },
     descriptor: snapshotSubagentDescriptor({

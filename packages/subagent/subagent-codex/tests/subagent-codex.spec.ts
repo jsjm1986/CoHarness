@@ -28,6 +28,7 @@ import {
   type CodexRunSpec,
 } from '../src/run.ts'
 import { CodexAppServerWire } from '../src/wire.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const { hostStderrWrite } = vi.hoisted(() => ({
   hostStderrWrite: {
@@ -359,6 +360,7 @@ describe('named persistent member routes', () => {
   it('keeps default and named routes independent through registration and disposal', async () => {
     const ctx = new Context()
     try {
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SubagentRuntime)
       await ctx.plugin(LocalSubprocessRuntime)
       await ctx.plugin(LlmRuntime)
@@ -454,6 +456,7 @@ describe('task admission and package contracts', () => {
 
   it('registers the default descriptor, validates config, and unregisters on HMR', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const fiber = await ctx.plugin(codex, {})
@@ -483,6 +486,7 @@ describe('task admission and package contracts', () => {
 
   it('keeps named instances, runs, and HMR ownership isolated', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const safeChild = fakeChild()
@@ -585,6 +589,7 @@ describe('task admission and package contracts', () => {
 
   it('rejects duplicate provider names without replacing the first instance', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const firstFiber = await ctx.plugin(codex, {
@@ -620,6 +625,7 @@ describe('task admission and package contracts', () => {
 
   it('resolves the safe permission default when apply is called directly', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const child = fakeChild()
@@ -712,24 +718,32 @@ describe('task admission and package contracts', () => {
     wire.close()
   })
 
-  it('requires a parent session cwd without suggesting unsupported config', async () => {
+  it('inherits the runtime default when the parent session has no cwd', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
-    const spawn = vi.spyOn(ctx.subprocess, 'spawn')
+    const child = fakeChild()
+    const spawn = vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue(child.handle)
     await ctx.plugin(codex, {})
 
-    await expect(ctx.subagents.start('codex', withExecutionContext(ctx, {
+    const starting = ctx.subagents.start('codex', withExecutionContext(ctx, {
       prompt: [{ type: 'text', text: 'task' }],
       parent: {
         id: 'parent-without-cwd',
         session: { header: {} },
       } as unknown as Agent,
       signal: new AbortController().signal,
-    }))).rejects.toThrow(
-      'subagent-codex: no working directory for the child — delegate from a parent session that has one',
-    )
-    expect(spawn).not.toHaveBeenCalled()
+    }))
+    const initialize = await child.peer.nextMethod('initialize')
+    child.peer.respond(initialize, { userAgent: 'codex-cli 0.153.4' })
+    await child.peer.nextMethod('initialized')
+    const threadStart = await child.peer.nextMethod('thread/start')
+    expect(threadStart.params).toMatchObject({ cwd: process.cwd() })
+    child.peer.respond(threadStart, { thread: { id: 'thread-1', ephemeral: true } })
+    const run = await starting
+    expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ cwd: process.cwd() }))
+    await run.dispose()
     await ctx.fiber.dispose()
   })
 
@@ -2140,6 +2154,7 @@ describe('run lifecycle and quiescence', () => {
 
   it('uses the registered provider config and logs flattened errors', async () => {
     const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     const child = fakeChild()
@@ -2183,11 +2198,12 @@ describe('run lifecycle and quiescence', () => {
 
     const invalidCwdAbort = new AbortController()
     invalidCwdAbort.abort(new Error('cancel invalid cwd startup'))
+    // The service's pre-start abort check rethrows the signal's own reason.
     await expect(ctx.subagents.start('codex-diagnostic', withExecutionContext(ctx, {
       prompt: [{ type: 'text', text: 'task' }],
       parent: invalidCwdParent,
       signal: invalidCwdAbort.signal,
-    }))).rejects.toThrow('aborted before app-server startup')
+    }))).rejects.toThrow('cancel invalid cwd startup')
     expect(spawn).not.toHaveBeenCalled()
 
     const starting = ctx.subagents.start('codex-diagnostic', withExecutionContext(ctx, {

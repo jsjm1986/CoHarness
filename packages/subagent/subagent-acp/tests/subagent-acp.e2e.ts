@@ -9,6 +9,7 @@ import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { resolveExampleLaunch } from '@deepseek-ai/dsh-loader-smoke'
 import * as acp from '../src/index.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 /**
  * With-key cross-process boundary proof: the backend spawns the real acp-agent example, speaks ACP over
@@ -52,18 +53,19 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('ACP backend with-key e2e (drive 
   it('drives the real acp-agent example process to answer a prompt', async () => {
     workdir = await mkdtemp(join(tmpdir(), 'dsh-subagent-acp-e2e-'))
     ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     await ctx.plugin(acp, {
       providerName: 'acp',
       command: childLaunch.command,
       args: childLaunch.args,
-      cwd: workdir,
       permission: 'reject',
       env: childLaunch.env as Record<string, string>,
     })
 
     const run = await ctx.subagents.start('acp', {
+      cwd: workdir,
       prompt: [{ type: 'text', text: 'Reply with exactly the word PONG and nothing else. Do not use any tools.' }],
       parent: fakeParent(ctx),
       signal: new AbortController().signal,
@@ -82,19 +84,20 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('ACP backend with-key e2e (drive 
   it('drives the child to do real file work via its own bash tool', async () => {
     workdir = await mkdtemp(join(tmpdir(), 'dsh-subagent-acp-e2e-'))
     ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(LocalSubprocessRuntime)
     await ctx.plugin(acp, {
       providerName: 'acp',
       command: childLaunch.command,
       args: childLaunch.args,
-      cwd: workdir,
       // The child needs to act (run bash), so approve its permission prompts.
       permission: 'allow',
       env: childLaunch.env as Record<string, string>,
     })
 
     const run = await ctx.subagents.start('acp', {
+      cwd: workdir,
       prompt: [{ type: 'text', text:
         'Use the bash tool to write the text ACP_CHILD_WAS_HERE into a file named proof.txt '
         + 'in the current directory. Then reply DONE.' }],

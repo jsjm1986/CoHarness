@@ -383,6 +383,8 @@ class SkillOutput(TypedDict):
     content: str
 
 class SubagentArgs(TypedDict):
+    # Initial child working directory. Relative paths use your current directory; omitted inherits it. Later directory changes in either agent are independent.
+    cwd: NotRequired[str]
     # A short (3-5 word) description of the delegated task, for display.
     description: str
     # The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs.
@@ -405,6 +407,8 @@ class SubagentOutput3(TypedDict):
     output: list[Any]
 
 class SubagentForkArgs(TypedDict):
+    # Initial child working directory. Relative paths use your current directory; omitted inherits it. Later directory changes in either agent are independent.
+    cwd: NotRequired[str]
     # A short (3-5 word) description of the delegated task, for display.
     description: str
     # The task for the subagent. It already sees this conversation's completed turns, so build on them freely and state only what is new.
@@ -518,6 +522,15 @@ class WebSearchOutput(TypedDict):
     sources: list[WebSearchOutputSources]
     truncated: bool
 
+class WorkingDirectoryArgs(TypedDict):
+    # Existing directory inside the project to enter. Omit to read the current directory.
+    cd: NotRequired[str]
+    # Additional keys beyond those declared are allowed.
+
+class WorkingDirectoryOutput(TypedDict):
+    # Current absolute working directory.
+    cwd: str
+
 class WriteArgs(TypedDict):
     # Path to write, resolved by the filesystem backend.
     file_path: str
@@ -583,6 +596,8 @@ class Tools(Protocol):
         """Fetch the content of a specific HTTP(S) URL and return it decoded to text."""
     async def web_search(self, args: WebSearchArgs) -> WebSearchOutput:
         """Search the web for current information. Returns an optional summary answer and a list of source URLs."""
+    async def working_directory(self, args: WorkingDirectoryArgs) -> WorkingDirectoryOutput:
+        """Read the current working directory, or change it with cd. Relative paths use the current directory. Directories must stay inside the project. Existing shells and running processes keep their own directories."""
     async def write(self, args: WriteArgs) -> WriteOutput:
         """Create or fully replace a UTF-8 text file."""
 

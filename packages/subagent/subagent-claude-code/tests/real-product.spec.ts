@@ -34,6 +34,7 @@ import {
   type MessagesBehavior,
   type MessagesFixture,
 } from './messages-fixture.ts'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const observedSdkMessages = vi.hoisted((): SDKMessage[] => [])
 const sdkTestOverrides = vi.hoisted((): { maxTurns?: number } => ({}))
@@ -191,6 +192,7 @@ interface RealRuntime {
 async function realRuntime(): Promise<RealRuntime> {
   const ctx = new Context()
   contexts.push(ctx)
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(LocalSubprocessRuntime)
   const handles: SubprocessHandle[] = []

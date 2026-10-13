@@ -2445,9 +2445,9 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-sdk-jsonrpc-server`
 
-- `inject`: `agents`
+- `inject`: `agents` · `workingDirectory`
 - `refs`: `Readable` (`node:stream`) · `Writable` (`node:stream`)
-- `source`: [`packages/sdk/server/src/index.ts:25`](../packages/sdk/server/src/index.ts)
+- `source`: [`packages/sdk/server/src/index.ts:26`](../packages/sdk/server/src/index.ts)
 
 ```ts config-catalog
 /** JSON-RPC deployment config plus runtime-only test hooks. */
@@ -3093,7 +3093,8 @@ export type JournalMode = 'wal' | 'delete' | 'truncate' | 'persist'
 
 ## `@deepseek-ai/dsh-subagent`
 
-- `source`: [`packages/subagent/subagent/src/index.ts:204`](../packages/subagent/subagent/src/index.ts)
+- `inject`: `workingDirectory`
+- `source`: [`packages/subagent/subagent/src/index.ts:205`](../packages/subagent/subagent/src/index.ts)
 
 ```ts config-catalog
 /** Host configuration for continuable subagent capacity. */
@@ -3127,14 +3128,6 @@ export interface Config {
   command: string
   /** Arguments passed to {@link command}. */
   args: string[]
-  /**
-   * Working directory override for the child process and its ACP session.
-   * Must be non-empty; a relative path resolves against the harness launch
-   * directory at load, and the result must be an existing directory. When
-   * omitted, each child inherits its delegating parent session's cwd — and
-   * starting one from a parent session that has no cwd fails.
-   */
-  cwd?: string
   /**
    * How to auto-answer the child's `session/request_permission` prompts:
    * `reject` (default — decline every prompt) or `allow` (approve via the first
@@ -3174,8 +3167,8 @@ export interface Config {
    */
   stateDir?: string
   /**
-   * Workspace override for persistent ACP members; defaults to {@link cwd},
-   * else the member Session working directory. Used only with {@link resume}.
+   * Workspace override for persistent ACP members; omitted uses the member
+   * Session's working directory. Used only with {@link resume}.
    */
   memberCwd?: string
 }
@@ -3301,15 +3294,6 @@ export interface Config {
   patches: string[]
   /** Absolute isolated Harness home for every nested child process. */
   dshHome: string
-  /**
-   * Working directory override for the child process and its SDK session
-   * workspace. Must be non-empty; a relative path resolves against the
-   * harness launch directory at load, and the result must be an existing
-   * directory. When omitted, each child inherits its delegating parent
-   * session's cwd — and starting one from a parent session that has no cwd
-   * fails.
-   */
-  cwd?: string
   /** Provider route the child runtime initializes with (default `deepseek-official`). */
   provider: string
   /** Model the child runtime initializes with (default `deepseek-v4-flash`). */
@@ -4595,6 +4579,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-tool-call-timeout-policy` | `tools` | [`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts) |
 | `@deepseek-ai/dsh-tool-cordis` | `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` | [`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts) |
 | `@deepseek-ai/dsh-tool-subagent-control` | `tools` · `subagents` | [`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts) |
+| `@deepseek-ai/dsh-tool-working-directory` | `tools` · `workingDirectory` | [`packages/session/tool-working-directory/src/index.ts`](../packages/session/tool-working-directory/src/index.ts) |
 | `@deepseek-ai/dsh-user-questions` | — | [`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts) |
 | `@deepseek-ai/dsh-userdoc-context` | `agents` · `sessions` | [`packages/context/userdoc-context/src/index.ts`](../packages/context/userdoc-context/src/index.ts) |
 | `@deepseek-ai/dsh-webhook` | `agents` · `agentDefaultModel` · `agentPresets` · `permissionPresets` · `sessionTitle` · `workspaceRegistry` | [`packages/webhook/webhook/src/index.ts`](../packages/webhook/webhook/src/index.ts) |

@@ -10,6 +10,7 @@ import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import * as SubagentTool from '@deepseek-ai/dsh-tool-subagent'
 import Selection from '@deepseek-ai/dsh-tool-subagent/model-selection-settings'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 describe('serial creation listener integrations', () => {
   it('rolls back creation when a shared preset tool installation fails', async () => {
@@ -19,6 +20,7 @@ describe('serial creation listener integrations', () => {
       await mountAgentLoopTestDependencies(ctx)
       await ctx.plugin(AgentLoop, { agents: [] })
       await ctx.plugin(Selection)
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SubagentRuntime)
       await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
       const preset = createScope(ctx, { preset: 'review' })

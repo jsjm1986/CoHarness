@@ -122,6 +122,7 @@
     "@deepseek-ai/dsh-agent-instructions": "workspace:*",
     "@deepseek-ai/dsh-tool-present": "workspace:*",
     "@deepseek-ai/dsh-skill-office": "workspace:*",
+    "@deepseek-ai/dsh-tool-working-directory": "workspace:*",
     "@deepseek-ai/dsh-working-directory": "workspace:*"
   },
   "peerDependencies": {

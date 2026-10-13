@@ -22,6 +22,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const load = (path) => import(pathToFileURL(resolve(path)).href);
 const [
@@ -44,6 +45,7 @@ const storageRoot = await mkdtemp(join(tmpdir(), "jsonrpc-built-scope-"));
 const ctx = new Context();
 try {
   await ctx.plugin(agentCore, { workspaceContext: false });
+  provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SubagentRuntime);
   await ctx.plugin(JsonlSessionPersistence, { root: storageRoot });
   await new Promise((ready) => setTimeout(ready, 50));

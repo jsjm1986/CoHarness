@@ -63,6 +63,7 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [slots.md](slots.md) | the Web Client's typed React composition system: `ctx.slots.register()`, the React-free registry and type algebra, and the renderer's observable-source bindings |
 | [conversation.md](conversation.md) | the target-neutral assembly layer between a Client Session event window and browser views: per-binding registries, Turn/Step locations, and incremental Context assembly |
 | [session-projection.md](session-projection.md) | the projection seam: `SessionProjectionMap`, the pure `ProjectionDefinition` unit, `ProjectionSnapshot`'s consistent cut, the change feed |
+| [working-directory.md](working-directory.md) | the Session's effective directory: `working-directory/change` records, `ctx.workingDirectory` get/ensure/resolve/set, project containment, execution-world filesystem validation |
 | [session-telemetry.md](session-telemetry.md) | the outbound session-reporting capability seam: `SessionTelemetryRecord`/`SessionTelemetrySeverity`, the `SessionTelemetrySink` contract, and the `session-telemetry/record` redact waterfall |
 | [boot.md](boot.md) | current-profile plugin management and launcher reload coordination |
 | [mcp.md](mcp.md) | external MCP connections, scoped tools and resources, server instructions, protocol results, and configuration ownership |
