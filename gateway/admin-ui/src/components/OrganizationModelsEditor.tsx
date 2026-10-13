@@ -102,6 +102,7 @@ export function OrganizationModelsEditor({ onChanged }: { onChanged: () => void 
         t={t}
         managementScope="organization"
         providerIdPattern={ORGANIZATION_PROVIDER_PATTERN}
+        renderSlot={() => null}
       />
     </div>
   )
