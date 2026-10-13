@@ -1414,10 +1414,13 @@
     width: 100%;
     min-width: 0;
     min-height: var(--dsw-touch-target);
-    padding: var(--dsw-space-2) var(--dsw-space-3);
-    border: 0.5px solid var(--dsw-alias-border-l2);
-    border-radius: var(--dsw-radius-md);
-    background: var(--dsw-alias-bg-layer-1);
+    padding: var(--dsw-space-2) 0;
+    /* A scope picker is a list row on a phone, not a bordered card — the
+       hairline under it carries the separation. */
+    border: none;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: 0;
+    background: transparent;
     color: var(--dsw-alias-label-primary);
     text-align: left;
     cursor: pointer;
@@ -1542,9 +1545,10 @@
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr);
     align-items: start;
-    padding: var(--dsw-space-2);
-    border: 0.5px solid var(--dsw-alias-border-l2);
-    border-radius: var(--dsw-radius-md);
+    padding: var(--dsw-space-2) 0;
+    border: none;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: 0;
   }
 
   .trashActions {
@@ -1793,11 +1797,12 @@
   .overviewRow {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr) var(--dsw-touch-target);
-    min-height: 56px;
-    padding: var(--dsw-space-1);
-    border: 0.5px solid var(--dsw-alias-border-l2);
-    border-radius: var(--dsw-radius-md);
-    background: var(--dsw-alias-bg-layer-1);
+    min-height: 52px;
+    padding: 6px 0;
+    border: none;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: 0;
+    background: transparent;
   }
 
   .overviewRow .size {
@@ -2048,6 +2053,16 @@
 }
 
 @media (max-width: 767px) {
+  /* The empty state is centered placeholder content, not a drop zone card —
+     the dashed bounding box is desktop chrome. */
+  .emptyState {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+}
+
+@media (max-width: 767px) {
   .dialog {
     border: 0;
     border-radius: var(--dsw-mobile-sheet-radius) var(--dsw-mobile-sheet-radius) 0 0;
@@ -2090,6 +2105,19 @@
     padding: var(--dsw-space-1) 0;
     border-bottom: 0;
     border-radius: 0;
+  }
+
+  /* The unconditional catalog-card metrics above (60px, 10px 12px) also
+     reach the flattened overview and trash rows; re-assert the row metrics
+     here so all three lists share the same compact rhythm. */
+  .overviewRow {
+    min-height: 52px;
+    padding: 6px 0;
+  }
+
+  .trashRow {
+    min-height: 52px;
+    padding: var(--dsw-space-2) 0;
   }
 
   /* The desktop toolbar's 460px search basis wraps the action pair onto a

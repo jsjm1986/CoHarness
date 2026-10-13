@@ -103,6 +103,15 @@ describe('ModelsSection theme styles', () => {
     expect(block('.addButtonFull')).toContain('width: 100%')
   })
 
+  it('lists providers and add controls as hairline rows, not cards, under 768px', () => {
+    const compact = mediaBody(css, '(max-width: 767px)')
+    // The dashed placeholder and the outlined provider card both read as
+    // desktop chrome on a phone; the row grammar is label plus hairline.
+    expect(compact).toMatch(/\.addButton\s*\{[^}]*border:\s*none[^}]*border-bottom:\s*0\.5px solid var\(--dsw-alias-border-l2\)/)
+    expect(compact).toMatch(/\.rowCard\s*\{[^}]*border:\s*none[^}]*border-bottom:\s*0\.5px solid var\(--dsw-alias-border-l2\)/)
+    expect(compact).toMatch(/\.addCard,\s*\n?\s*\.setupCard\s*\{[^}]*background:\s*transparent/)
+  })
+
   it('gives dense model controls the touch target on coarse pointers', () => {
     const coarse = mediaBody(css, '(pointer: coarse)')
     expect(coarse).toContain('var(--dsw-touch-target)')

@@ -87,6 +87,17 @@ describe('DocumentsModal.module.css', () => {
     ].join('')))
   })
 
+  it('flattens overview and trash rows into the hairline list grammar under 768px', () => {
+    const compactBlocks = modal.match(/@media \(max-width: 767px\) \{[\s\S]*?\n\}/g) ?? []
+    const compact = compactBlocks.join('\n')
+    for (const sel of ['overviewRow', 'trashRow']) {
+      expect(compact).toMatch(new RegExp(
+        `\\.${sel}\\s*\\{[^}]*border:\\s*none[^}]*border-bottom:\\s*0\\.5px solid var\\(--dsw-alias-border-l2\\)[^}]*border-radius:\\s*0`,
+      ))
+    }
+    expect(compact).toMatch(/\.overviewRow\s*\{[^}]*background:\s*transparent/)
+  })
+
   it('keeps overview source metadata and transfer actions in one desktop row surface', () => {
     expect(modal).toMatch(/@media \(min-width: 768px\)[\s\S]*\.overviewList\s*\{[\s\S]*gap:\s*8px/)
     expect(modal).toMatch(new RegExp([
