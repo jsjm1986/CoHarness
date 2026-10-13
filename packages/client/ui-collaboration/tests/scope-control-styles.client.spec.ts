@@ -37,15 +37,31 @@ describe('ScopeControl.module.css', () => {
     expect(css).toMatch(/\.menuSearchClear\s*\{[^}]*width:\s*24px/)
   })
 
-  it('opens the wide-mode list as an in-card drawer, not a floating overlay', () => {
+  it('takes over the footer column as a transparent in-flow hub, not a card', () => {
     // Doubled selectors keep the overrides ahead of Menu's .root/.list.
     expect(css).toMatch(/\.scopeField\.scopeField\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column/)
     const sheet = css.match(/\.scopeSheet\.scopeSheet\s*\{([^}]*)\}/)?.[1] ?? ''
     expect(sheet).toContain('order: -1')
     expect(sheet).toContain('position: static')
-    expect(sheet).toContain('box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2)')
-    expect(sheet).toContain('--dsw-menu-surface-fill: var(--dsw-alias-bg-layer-1)')
-    expect(sheet).toContain('--dsh-menu-max-height: min(340px, 48vh)')
+    expect(sheet).toContain('box-shadow: none')
+    expect(sheet).toContain('--dsw-menu-surface-fill: transparent')
+    expect(sheet).toContain('--dsh-menu-max-height: min(560px, calc(100vh - 150px))')
+  })
+
+  it('carries the hub blocks on the footer surface: card, radio track, warn row', () => {
+    // The current-space card is a sibling of the trigger, not a raised panel.
+    const card = css.match(/\.currentCard\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(card).toContain('background: var(--dsw-alias-bg-layer-2)')
+    expect(card).toContain('box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2)')
+    // Visibility radio mirrors the conversation header's sliding-pill segment.
+    const seg = css.match(/\.visSeg\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(seg).toContain('grid-template-columns: 1fr 1fr')
+    expect(seg).toContain('background: var(--dsw-alias-interactive-bg-hover)')
+    const pill = css.match(/\.visSeg::before\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(pill).toContain('background: var(--dsw-alias-bg-raised)')
+    expect(pill).toContain('transform: translateX(calc(var(--dsh-vis-index, 0) * 100%))')
+    // A pending-invitation row joins the steward caution family.
+    expect(css).toMatch(/\.invRowWarn[^{]*\{[^}]*background:\s*var\(--dsw-alias-state-warn-tertiary\)/)
   })
 
   it('gives every scope row a deterministic identity tile', () => {

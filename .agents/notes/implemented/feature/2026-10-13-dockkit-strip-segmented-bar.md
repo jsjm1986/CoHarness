@@ -16,6 +16,14 @@ Inside the chip, the close shrinks to an 18px circle (12px glyph, 3px inset) and
 
 The corner clip moves to `.panelBody` (`overflow: clip; border-radius: inherit`, push presentation only): overflow never traps fixed descendants, so floats still escape, while docked hosts clip to the card's corners. Fullscreen keeps square corners. Guide capsules use `radius-full` instead of a hardcoded 24px.
 
+## Alternatives considered
+
+**Keep the editor-tab chrome and patch only the clipped corners.** Rejected: the disjoint look was the reported defect, and it leaves the docked strip in a visual language nothing else in the shell speaks.
+
+**Clip `.panel` itself instead of `.panelBody`.** Rejected: overflow clipping traps `position: fixed` floating panes and the panel's slide-off translation inside the card, so the clip must sit one level below the pane host.
+
+**Hardcode the right sidebar's 52px band height.** Rejected: any host whose neighbour owns a different header height would fork the sheet again; published inset variables keep the dockkit default unchanged for workbench panes and float headers.
+
 ## Verification
 
 `strip-styles.client.spec.ts` asserts the contract lexically against the stylesheet on disk: the track, the 38px/30px metrics, the segment typography, the raised pill (and that `markdown-tag` is gone from `.tabActive`), the caret-only slot, and the header rule. Focused suites pass (530 tests across ui-dockkit and ui-sidebar-right), and a Chromium render of the compiled sheet confirmed the track, pill, hairline, and clipped corners.

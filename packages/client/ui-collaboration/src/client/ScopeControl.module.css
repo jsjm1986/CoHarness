@@ -122,20 +122,21 @@
   width: 100%;
 }
 
-/* The drawer is a surface inside the card, not an overlay: flat layer fill,
-   an inset hairline instead of a drop shadow, and a tighter height cap so a
-   long roster cannot squeeze the session rows to nothing. */
+/* The hub renders on the footer column itself: no surface fill, shadow, or
+   radius — the current-space card, roster rows, and pinned footer each carry
+   their own chrome. The cap keeps the trigger and Settings rows reachable in
+   short windows; the roster viewport scrolls inside the bound. */
 .scopeSheet.scopeSheet {
   order: -1;
   position: static;
   min-width: 0;
   max-width: none;
   margin-bottom: var(--dsh-sidebar-footer-row-gap, 2px);
-  border-radius: var(--dsw-radius-md);
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
-  --dsw-menu-surface-fill: var(--dsw-alias-bg-layer-1);
+  border-radius: 0;
+  box-shadow: none;
+  --dsw-menu-surface-fill: transparent;
   --dsw-menu-backdrop-filter: none;
-  --dsh-menu-max-height: min(340px, 48vh);
+  --dsh-menu-max-height: min(560px, calc(100vh - 150px));
 }
 
 /* Identity tiles: the letter of the project on a deterministic solid tint.
@@ -168,12 +169,35 @@
   color: var(--dsw-alias-state-warn-label);
 }
 
-.sheetHead {
-  display: flex;
-  align-items: center;
+/* 28px variant for the hub's current-space card. Shape classes (tileRound)
+   keep owning the radius so the personal tile stays circular at any size. */
+.tileLg {
+  width: 28px;
+  height: 28px;
+  font-size: 13px;
 }
 
-.sheetClose {
+/* Space hub: the wide sheet's pinned header — a persistent working surface
+   (current space, visibility, invitations, search) above the roster. */
+.hub {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-2);
+  padding-bottom: var(--dsw-space-1);
+}
+
+.hubHead {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-1);
+  min-width: 0;
+}
+
+.hubHead .menuHeader {
+  padding-bottom: 0;
+}
+
+.hubBack {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -188,10 +212,217 @@
   cursor: pointer;
 }
 
-.sheetClose:hover,
-.sheetClose:focus-visible {
+.hubBack:hover,
+.hubBack:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
+}
+
+.hubCount {
+  flex: none;
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+/* The current-space card wears the same fill + hairline as the trigger —
+   a sibling block inside the footer column, not a raised overlay. */
+.currentCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+  padding: var(--dsw-space-2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
+}
+
+.currentTop {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  min-width: 0;
+}
+
+.currentBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.currentName {
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.currentMeta {
+  overflow: hidden;
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardAct {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-caption);
+  cursor: pointer;
+}
+
+.cardAct:hover,
+.cardAct:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Visibility radio: mirrors the conversation header's segmented control —
+   a padded track with a raised pill that slides behind the checked option
+   via --dsh-vis-index. */
+.visField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsw-space-1);
+  min-width: 0;
+}
+
+.visLabel {
+  padding: 0 var(--dsw-space-1);
+  color: var(--dsw-alias-label-caption);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.visSeg {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  border-radius: var(--dsw-radius-card);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.visSeg::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / 2);
+  border-radius: var(--dsw-radius-control);
+  background: var(--dsw-alias-bg-raised);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
+  box-shadow: var(--dsw-elevation-control);
+  transform: translateX(calc(var(--dsh-vis-index, 0) * 100%));
+  transition: transform var(--dsw-motion-duration-fast)
+    var(--dsw-motion-ease-smooth-out, var(--ds-ease-in-out));
+}
+
+.visOpt {
+  position: relative;
+  height: 24px;
+  padding: 0 var(--dsw-space-1);
+  border: 0;
+  border-radius: var(--dsw-radius-control);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-align: center;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visOptOn {
+  color: var(--dsw-alias-label-primary);
+}
+
+.visOpt:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visSeg::before {
+    transition: none;
+  }
+}
+
+/* Pending-invitation / member entry: a flat row that turns to the warn
+   family when work is waiting, matching the steward-mode treatment. */
+.invRow {
+  display: flex;
+  align-items: center;
+  gap: var(--dsw-space-2);
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 0 var(--dsw-space-2);
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.invRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.invRow:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 1px;
+}
+
+.invRowWarn,
+.invRowWarn:hover {
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.invLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .visOpt {
+    height: var(--dsw-touch-target);
+  }
+
+  .invRow {
+    min-height: var(--dsw-touch-target);
+  }
+}
+
+.sheetHead {
+  display: flex;
+  align-items: center;
 }
 
 /* Panel-style header above the search field. */

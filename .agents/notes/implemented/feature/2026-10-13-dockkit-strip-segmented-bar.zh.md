@@ -16,6 +16,14 @@ Status: implemented
 
 圆角裁剪移到 `.panelBody`（`overflow: clip; border-radius: inherit`，仅 push 形态）：overflow 不会捕获 fixed 后代，浮层照常逃逸，而停靠 host 被裁进卡片圆角。fullscreen 保持直角。Guide 胶囊改用 `radius-full` 替代硬编码 24px。
 
+## Alternatives considered
+
+**保留编辑器标签页修饰、只修圆角裁剪。** 否决：视觉割裂是被报告的缺陷本身，且停靠条会停留在 shell 中没有任何其他部位使用的视觉语言里。
+
+**改为裁剪 `.panel` 自身而非 `.panelBody`。** 否决：overflow 裁剪会把 `position: fixed` 的浮动窗格与面板的滑出位困在卡片内，因此裁剪必须落在窗格宿主的下一层。
+
+**为右侧栏硬编码 52px 条带高度。** 否决：任何邻栏头部高度不同的宿主又得派生一份面板；把 inset 发布为变量让 workbench 窗格与浮窗头继续享用 dockkit 默认值。
+
 ## Verification
 
 `strip-styles.client.spec.ts` 针对磁盘上的样式表词法断言契约：轨道、38px/30px 度量、分段字体、浮起 pill（且 `.tabActive` 不再有 `markdown-tag`）、仅含光标的槽位、头部细线。聚焦测试通过（ui-dockkit 与 ui-sidebar-right 共 530 个用例），编译样式表在 Chromium 中渲染确认了轨道、pill、细线与圆角裁剪。

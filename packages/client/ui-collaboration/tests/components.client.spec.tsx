@@ -155,11 +155,13 @@ describe('ScopeControl', () => {
     expect(trigger.textContent).toContain('支付重构')
     expect(trigger.textContent).toContain('可编辑')
     fireEvent.click(trigger)
-    expect(screen.getByText('新对话可见范围')).toBeTruthy()
-    fireEvent.click(screen.getByRole('menuitem', { name: /仅自己/ }))
+    expect(screen.getByRole('radiogroup', { name: '新对话可见范围' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: '项目公开' }).getAttribute('aria-checked')).toBe('true')
+    // A radio selection stages the setting without dismissing the hub.
+    fireEvent.click(screen.getByRole('radio', { name: '仅自己' }))
     expect(stageVisibility).toHaveBeenCalledWith('private')
+    expect(screen.getByRole('radiogroup', { name: '新对话可见范围' })).toBeTruthy()
 
-    fireEvent.click(trigger)
     fireEvent.click(screen.getByRole('menuitem', { name: '个人空间' }))
     expect(switchScope).toHaveBeenCalledWith({ kind: 'personal' })
 
@@ -170,6 +172,35 @@ describe('ScopeControl', () => {
     fireEvent.click(trigger)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByText('新对话可见范围')).toBeNull()
+  })
+
+  it('presents the wide sheet as a space hub: card, radio, back, and invitation entry', async () => {
+    const getInvitationCount = vi.fn().mockResolvedValue({ pending: 2 })
+    const loadProjectConfiguration = vi.fn().mockResolvedValue({
+      project: { id: 9, name: '支付重构', themePolicy: 'follow-user' },
+      canManage: true,
+      capabilities: {
+        themePolicy: true, runtimeSettings: false, projectModels: false, members: true, filesystem: false,
+      },
+    })
+    render(<ScopeControl {...scopeProps(snapshot(), {
+      getInvitationCount,
+      listInvitations: vi.fn().mockResolvedValue([]),
+      loadProjectConfiguration,
+      setProjectThemePolicy: vi.fn(),
+    })} />)
+    const trigger = screen.getByRole('button', { name: '切换个人或项目空间' })
+    fireEvent.click(trigger)
+    // The hub pins a back control plus the current-space card above the roster.
+    expect(screen.getByRole('radiogroup', { name: '新对话可见范围' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    expect(screen.queryByRole('radiogroup')).toBeNull()
+    fireEvent.click(trigger)
+    // Pending work shows the warn-styled invitation entry with its badge.
+    const invite = await screen.findByRole('button', { name: /邀请与待处理事项/ })
+    expect(invite.textContent).toContain('2')
+    fireEvent.click(invite)
+    expect(await screen.findByText('项目成员与邀请')).toBeTruthy()
   })
 
   it('filters a growing project roster without hiding personal scope or pinned actions', () => {
@@ -269,7 +300,7 @@ describe('ScopeControl', () => {
       setProjectThemePolicy,
     })} />)
     fireEvent.click(screen.getByRole('button', { name: '切换个人或项目空间' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '项目设置' }))
+    fireEvent.click(screen.getByRole('button', { name: '项目设置' }))
     expect(await screen.findByText('只有项目 owner 或组织管理员可以修改项目策略。')).toBeTruthy()
     expect(loadProjectConfiguration).toHaveBeenCalledWith(9)
     expect(setProjectThemePolicy).not.toHaveBeenCalled()

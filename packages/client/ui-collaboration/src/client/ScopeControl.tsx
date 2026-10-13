@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  IconChevronDownOutline14, IconCloseFill14, IconCloseOutline16, IconGlobeOutline14, IconSearchOutline16,
+  IconChevronDownOutline14, IconChevronLeftOutline14, IconCloseFill14, IconGlobeOutline14, IconSearchOutline16,
   IconPlusOutline16, IconSettingsOutline16, IconShieldOutline16, IconUserOutline16, IconUsersOutline16,
   IconWarningOutline16,
   Menu, type MenuEntry,
@@ -69,7 +69,7 @@ const tileTones = [css.tileBlue, css.tileGreen, css.tileAmber, css.tileRed, css.
 function tileTone(name: string): string {
   let sum = 0
   for (const char of name) sum += char.codePointAt(0) ?? 0
-  return tileTones[sum % tileTones.length] ?? css.tileBlue
+  return tileTones[sum % tileTones.length] ?? ''
 }
 
 /**
@@ -142,6 +142,26 @@ export function ScopeControl({
   const currentScopeId = projectScope === undefined
     ? 'scope:personal'
     : `scope:project:${projectScope.projectId}`
+  /** The current scope's identity tile, shared by the hub card and the trigger. */
+  const currentTile = (size: number, large = false): ReactNode => (
+    projectScope === undefined
+      ? (
+        <span className={`${css.tile} ${css.tileRound} ${css.tileBlue}${large ? ` ${css.tileLg}` : ''}`} aria-hidden="true">
+          <IconUserOutline16 size={size} />
+        </span>
+      )
+      : projectScope.steward === true
+        ? (
+          <span className={`${css.tile} ${css.tileWarn}${large ? ` ${css.tileLg}` : ''}`} aria-hidden="true">
+            <IconShieldOutline16 size={size} />
+          </span>
+        )
+        : (
+          <span className={`${css.tile} ${tileTone(projectScope.projectName)}${large ? ` ${css.tileLg}` : ''}`} aria-hidden="true">
+            {tileGlyph(projectScope.projectName)}
+          </span>
+        )
+  )
   const projectEntries: MenuEntry[] = visibleProjects.map(project => ({
     id: `scope:project:${project.projectId}`,
     label: (
@@ -193,39 +213,47 @@ export function ScopeControl({
   const currentProject = projectScope === undefined
     ? undefined
     : context.projects.find(project => project.projectId === projectScope.projectId)
-  const managerEntries: MenuEntry[] = []
+  const settingsAvailable = projectScope !== undefined && currentProject !== undefined
+    && loadProjectConfiguration !== undefined && setProjectThemePolicy !== undefined
+  // The wide hub carries members and settings inside its header card, so the
+  // pinned footer only keeps project creation. The rail menu keeps every
+  // capability as a footer entry.
+  const footerEntries: MenuEntry[] = []
   if (createProject !== undefined) {
-    managerEntries.push({
+    footerEntries.push({
       id: 'project:create',
       label: t('manager.createAction'),
       icon: <IconPlusOutline16 size={16} />,
     })
   }
-  if (listInvitations !== undefined) {
-    managerEntries.push({
-      id: 'project:members',
-      label: (
-        <span className={css.entryLabel}>
-          {currentProject?.canManage === true ? t('manager.membersAction') : t('manager.invitationsAction')}
-          {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
-        </span>
-      ),
-      icon: <IconUsersOutline16 size={16} />,
-    })
-  }
-  // Keep the entry visible to every project member. The panel explains which
-  // namespaces are owner-managed, so a disabled action is understandable
-  // instead of looking like a missing feature.
-  if (projectScope !== undefined
-    && loadProjectConfiguration !== undefined && setProjectThemePolicy !== undefined) {
-    managerEntries.push({
-      id: 'project:settings',
-      label: t('manager.settingsAction'),
-      icon: <IconSettingsOutline16 size={16} />,
-    })
+  if (!wide) {
+    if (listInvitations !== undefined) {
+      footerEntries.push({
+        id: 'project:members',
+        label: (
+          <span className={css.entryLabel}>
+            {currentProject?.canManage === true ? t('manager.membersAction') : t('manager.invitationsAction')}
+            {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
+          </span>
+        ),
+        icon: <IconUsersOutline16 size={16} />,
+      })
+    }
+    // Keep the entry visible to every project member. The panel explains which
+    // namespaces are owner-managed, so a disabled action is understandable
+    // instead of looking like a missing feature.
+    if (settingsAvailable) {
+      footerEntries.push({
+        id: 'project:settings',
+        label: t('manager.settingsAction'),
+        icon: <IconSettingsOutline16 size={16} />,
+      })
+    }
   }
 
-  if (projectScope?.mode === 'rw') {
+  // Visibility stays a menu section on the rail; the wide hub renders it as a
+  // segmented radio inside the current-space card.
+  if (!wide && projectScope?.mode === 'rw') {
     entries.push(
       { type: 'separator', id: 'visibility-separator' },
       { type: 'label', id: 'visibility-label', text: t('newConversation.label') },
@@ -255,46 +283,137 @@ export function ScopeControl({
   const scopeTitle = state.scopeError === undefined
     ? state.scopeBusy ? t('scope.switching') : t('scope.aria')
     : t('scope.failed')
-  const projectSearch = (
-    <>
-      <div className={css.sheetHead}>
+  const currentMeta = state.scopeError !== undefined
+    ? t('scope.failed')
+    : state.scopeBusy
+      ? t('scope.switching')
+      : projectScope === undefined
+        ? t('visibility.private')
+        : projectScope.steward === true
+          ? t('scope.steward')
+          : projectScope.mode === 'ro' ? t('scope.readOnly') : t('scope.readWrite')
+  const searchField = context.projects.length > 0 && (
+    <div className={css.menuSearch}>
+      <span className={css.menuSearchIcon} aria-hidden="true">
+        <IconSearchOutline16 size={16} />
+      </span>
+      <input
+        type="search"
+        className={css.menuSearchInput}
+        aria-label={t('scope.searchAria')}
+        placeholder={t('scope.searchPlaceholder')}
+        value={projectQuery}
+        onChange={(event) => { setProjectQuery(event.currentTarget.value) }}
+      />
+      {projectQuery.length > 0 && (
+        <button
+          type="button"
+          className={css.menuSearchClear}
+          aria-label={t('scope.searchClear')}
+          onClick={() => { setProjectQuery('') }}
+        >
+          <span aria-hidden="true"><IconCloseFill14 size={14} /></span>
+        </button>
+      )}
+    </div>
+  )
+  // Wide: the sheet becomes a space hub — a persistent working surface for
+  // settings, members, invitations, and visibility above the searchable list.
+  // Rail keeps the compact floating menu header.
+  const projectSearch = wide ? (
+    <div className={css.hub}>
+      <div className={css.hubHead}>
+        <button
+          type="button"
+          className={css.hubBack}
+          aria-label={t('manager.close')}
+          onClick={() => { setOpen(false) }}
+        >
+          <IconChevronLeftOutline14 size={14} />
+        </button>
         <div className={css.menuHeader}>{t('scope.menuTitle')}</div>
-        {wide && (
-          <button
-            type="button"
-            className={css.sheetClose}
-            aria-label={t('manager.close')}
-            onClick={() => { setOpen(false) }}
-          >
-            <IconCloseOutline16 size={13} />
-          </button>
-        )}
+        <span className={css.hubCount}>{context.projects.length}</span>
       </div>
-      {context.projects.length > 0 && (
-        <div className={css.menuSearch}>
-          <span className={css.menuSearchIcon} aria-hidden="true">
-            <IconSearchOutline16 size={16} />
+      <div className={css.currentCard}>
+        <div className={css.currentTop}>
+          {state.scopeError === undefined
+            ? currentTile(15, true)
+            : <IconWarningOutline16 size={16} />}
+          <span className={css.currentBody}>
+            <span className={css.currentName}>{currentLabel}</span>
+            <span className={css.currentMeta}>{currentMeta}</span>
           </span>
-          <input
-            type="search"
-            className={css.menuSearchInput}
-            aria-label={t('scope.searchAria')}
-            placeholder={t('scope.searchPlaceholder')}
-            value={projectQuery}
-            onChange={(event) => { setProjectQuery(event.currentTarget.value) }}
-          />
-          {projectQuery.length > 0 && (
+          {settingsAvailable && (
             <button
               type="button"
-              className={css.menuSearchClear}
-              aria-label={t('scope.searchClear')}
-              onClick={() => { setProjectQuery('') }}
+              className={css.cardAct}
+              aria-label={t('manager.settingsAction')}
+              onClick={() => {
+                setOpen(false)
+                setProjectSettingsOpen(true)
+              }}
             >
-              <span aria-hidden="true"><IconCloseFill14 size={14} /></span>
+              <IconSettingsOutline16 size={14} />
             </button>
           )}
         </div>
+        {projectScope?.mode === 'rw' && (
+          <div className={css.visField}>
+            <span className={css.visLabel}>{t('newConversation.label')}</span>
+            <div
+              className={css.visSeg}
+              role="radiogroup"
+              aria-label={t('newConversation.label')}
+              style={{ '--dsh-vis-index': state.stagedVisibility === 'private' ? 1 : 0 } as CSSProperties}
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={state.stagedVisibility === 'project'}
+                className={`${css.visOpt}${state.stagedVisibility === 'project' ? ` ${css.visOptOn}` : ''}`}
+                title={t('visibility.project.description')}
+                onClick={() => { stageVisibility('project') }}
+              >
+                {t('visibility.project')}
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={state.stagedVisibility === 'private'}
+                className={`${css.visOpt}${state.stagedVisibility === 'private' ? ` ${css.visOptOn}` : ''}`}
+                title={t('visibility.private.description')}
+                onClick={() => { stageVisibility('private') }}
+              >
+                {t('visibility.private')}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      {listInvitations !== undefined && (
+        <button
+          type="button"
+          className={`${css.invRow}${invitationCount > 0 ? ` ${css.invRowWarn}` : ''}`}
+          onClick={() => {
+            setOpen(false)
+            setManagerMode('members')
+          }}
+        >
+          <IconUsersOutline16 size={14} />
+          <span className={css.invLabel}>
+            {currentProject?.canManage === true ? t('manager.membersAction') : t('manager.invitationsAction')}
+          </span>
+          {invitationCount > 0 && <span className={css.badge}>{invitationCount}</span>}
+        </button>
       )}
+      {searchField}
+    </div>
+  ) : (
+    <>
+      <div className={css.sheetHead}>
+        <div className={css.menuHeader}>{t('scope.menuTitle')}</div>
+      </div>
+      {searchField}
     </>
   )
 
@@ -305,7 +424,7 @@ export function ScopeControl({
         onClose={() => { setOpen(false) }}
         items={entries}
         header={projectSearch}
-        {...managerEntries.length > 0 ? { footer: managerEntries } : {}}
+        {...footerEntries.length > 0 ? { footer: footerEntries } : {}}
         /* The expanded sidebar opens the list as an in-flow drawer above its
            trigger — a panel inside the card, not a floating overlay. The rail
            keeps the floating menu. */
@@ -358,23 +477,7 @@ export function ScopeControl({
             onClick={() => { setOpen(value => !value) }}
           >
             {state.scopeError === undefined
-              ? projectScope === undefined
-                ? (
-                  <span className={`${css.tile} ${css.tileRound} ${css.tileBlue}`} aria-hidden="true">
-                    <IconUserOutline16 size={wide ? 12 : 11} />
-                  </span>
-                )
-                : projectScope.steward === true
-                  ? (
-                    <span className={`${css.tile} ${css.tileWarn}`} aria-hidden="true">
-                      <IconShieldOutline16 size={11} />
-                    </span>
-                  )
-                  : (
-                    <span className={`${css.tile} ${tileTone(projectScope.projectName)}`} aria-hidden="true">
-                      {tileGlyph(projectScope.projectName)}
-                    </span>
-                  )
+              ? currentTile(wide ? 12 : 11)
               : <IconWarningOutline16 size={wide ? 16 : 18} />}
             {wide && (
               <>
