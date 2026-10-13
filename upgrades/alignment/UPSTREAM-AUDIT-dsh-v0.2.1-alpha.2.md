@@ -105,7 +105,7 @@
 - 有效目录校验遇文件系统传输错误（如 SSH 主机不可达）时沿用记录目录并告警，不阻断轮次；目录确实不存在时保持上游恢复/失败语义。
 - 发布注意：v7 读取器拒读未知必需事件（`session-format-v6-to-v7/src/validation.ts`），回滚到本批之前的 release 后，写入过 `working-directory/change` 的会话无法打开。
 
-落地进度（本地提交 ↔ 上游提交）：`64890733c97` = `79bd3d8da7d` 核心（事件、服务、prompt 段、组合挂载）+ `9c679b21f49` 准入刷新；`d86c9c803b6` = `92713fcdbd1`/`0c6b1ef7bb4` 消费面（fs/shell/terminal/hooks/skill/instructions/file-reference/present/auto-review/PTC/workflow-PTC/browser-use/apiproxy）+ 变更结果携带规范路径；`f990b3443b9` = `tool-working-directory` 工具包、子智能体 `cwd`、SDK get/set（TS+Python）、authored keyless 快照场景、目录再生成；`73381ead554` = `549c0b5e373` 文档面（subsystem 页、architecture 段、system-prompt 契约、Agent Note、本审计）。
+落地进度（本地提交 ↔ 上游提交）：`64890733c97` = `79bd3d8da7d` 核心（事件、服务、prompt 段、组合挂载）+ `9c679b21f49` 准入刷新；`d86c9c803b6` = `92713fcdbd1`/`0c6b1ef7bb4` 消费面（fs/shell/terminal/hooks/skill/instructions/file-reference/present/auto-review/PTC/workflow-PTC/browser-use/apiproxy）+ 变更结果携带规范路径；`f990b3443b9` = `tool-working-directory` 工具包、子智能体 `cwd`、SDK get/set（TS+Python）、authored keyless 快照场景、目录再生成；`73381ead554` = `549c0b5e373` 文档面（subsystem 页、architecture 段、system-prompt 契约、Agent Note、本审计）；`66c99cf365c` = `549c0b5e373`/`0c6b1ef7bb4` 残余（agent-instructions JSDoc 措辞、PTC 目录服务注释、capability-seams 三节点/边、benchmark worker fixture 挂载、schedule-catalog 注释、headless `verifyWorkingDirectory` 场景校验）。
 
 不在本次范围：上游 worktree/claude-code-mods（建在本能力之上，仍属观望项 6）；Web 端不新增"当前目录"展示（上游 alpha.2 亦无）。
 
