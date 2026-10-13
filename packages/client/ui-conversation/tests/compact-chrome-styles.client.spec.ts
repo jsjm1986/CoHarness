@@ -68,6 +68,10 @@ describe('conversation compact chrome', () => {
     // 44px touch target stays on coarse pointers that are not compact.
     expect(actions).toMatch(/@media\s*\(pointer:\s*coarse\)[^{]*\{[^@]*width:\s*var\(--dsw-touch-target\)/u)
     expect(actions).toMatch(/\[data-viewport='compact'\]\s*\)\s*\.action\s*\{[^}]*min-width:\s*40px/u)
+    // Phone keeps the primary figure per stats pill; speed and cache-hit
+    // segments hide instead of ellipsizing mid-number (dialogs keep them).
+    const pills = readFileSync(fileURLToPath(new URL('../src/client/chat/StatsPills.module.css', import.meta.url)), 'utf8')
+    expect(pills).toMatch(/\[data-viewport='compact'\]\)\s*\.detail\s*\{[^}]*display:\s*none/u)
   })
 
   it('raises a trajectory details takeover above the absolute composer seat', () => {

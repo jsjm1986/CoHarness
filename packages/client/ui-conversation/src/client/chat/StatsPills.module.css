@@ -90,3 +90,10 @@ button.pill[aria-expanded='true'] {
   width: 12px;
   height: 12px;
 }
+
+/* Phone width fits the primary figure per pill; the speed and cache-hit
+   segments ellipsize mid-number sooner than they inform. The tap-open dialogs
+   still carry every figure, and aria-labels keep the full reading. */
+:global([data-viewport='compact']) .detail {
+  display: none;
+}
