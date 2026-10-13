@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-15-client-css-injector-dedup-key.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-client-css-injector-dedup-key.md
+/agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path:
+  en: 07aaae8057ef9d6d
+  zh: 47659f454e8b1c57
+/agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path/problem:
+  en: 0d3d2204ec128a27
+  zh: 42f5ebf337ab18c1
+/agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path/decision:
+  en: 0707d752800e9c47
+  zh: 1c885cf2a14a0dea
+/agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path/alternatives-considered:
+  en: e717e9f5a42bdebc
+  zh: 51c5d5c9bfd1a037
+/agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path/consequences:
+  en: 661f0eccce5b3a69
+  zh: c2606ea07e5c8d5e
+/agent-note-client-css-injector-dedup-keys-carry-the-src-relative-path/verification:
+  en: 44c6c335157f00ba
+  zh: f2031b30a14740e5

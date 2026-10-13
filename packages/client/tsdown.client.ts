@@ -40,9 +40,14 @@ function styleInjectionModule(
   css: string,
   classMap?: Readonly<Record<string, string>>,
 ): string {
+  // Sibling directories can carry same-named stylesheets (tool/ToolDetails.module.css
+  // next to tool/components/ToolDetails.module.css); the src-relative path keeps
+  // their dedup keys distinct so neither file's rules are skipped.
+  const boundary = fileId.lastIndexOf(SOURCE_MARKER)
+  const name = boundary < 0 ? basename(fileId) : fileId.slice(boundary + SOURCE_MARKER.length)
   const source = [
     `const css = ${JSON.stringify(css)};`,
-    `const tagId = ${JSON.stringify(`${id}/${basename(fileId)}`)};`,
+    `const tagId = ${JSON.stringify(`${id}/${name}`)};`,
     'if (typeof document !== \'undefined\' && document.querySelector(\'style[data-plugin-css=\' + JSON.stringify(tagId) + \']\') === null) {',
     '  const tag = document.createElement(\'style\');',
     `  tag.dataset.plugin = ${JSON.stringify(id)};`,
