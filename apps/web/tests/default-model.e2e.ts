@@ -152,18 +152,30 @@ describe('web e2e: the composer model switch is the default for later sessions',
           row.querySelector('span span')?.textContent),
       })), role)
     const checkSticky = async (surface: Locator, viewport: Locator) => {
+      // The surface enters with a scale/translate animation: its scrollport
+      // keeps measuring until the entrance settles, and the IntersectionObserver
+      // behind data-stuck can flap mid-flight. Read geometry only when settled.
+      await surface.evaluate(async (node) => {
+        await Promise.all(node.getAnimations({ subtree: true })
+          .map(animation => animation.finished.catch(() => undefined)))
+      })
       // Bound only this test's list viewport so native scrolling can cross a heading.
       await viewport.evaluate((node) => { node.style.maxHeight = '80px'; node.scrollTop = 0 })
       const heading = surface.locator('[data-menu-group-heading]').first()
-      await expect.poll(() => heading.getAttribute('data-stuck')).toBeNull()
-      const clear = await heading.evaluate(node => getComputedStyle(node).backgroundColor)
-      expect(clear).toBe('rgba(0, 0, 0, 0)')
+      // The observer can re-apply data-stuck between an attribute poll and a
+      // style read, so each read below samples the attribute and the painted
+      // style inside one evaluation.
+      await expect.poll(() => heading.evaluate(node =>
+        node.hasAttribute('data-stuck') ? 'stuck' : getComputedStyle(node).backgroundColor,
+      )).toBe('rgba(0, 0, 0, 0)')
       await viewport.evaluate((node) => { node.scrollTop = 10 })
-      await expect.poll(() => heading.getAttribute('data-stuck')).toBe('')
-      const stuck = await heading.evaluate((node) => {
+      let stuck: { fill: string; radius: string; font: string; padding: string } | undefined
+      await expect.poll(async () => (stuck = await heading.evaluate((node) => {
+        if (!node.hasAttribute('data-stuck')) return undefined
         const style = getComputedStyle(node)
         return { fill: style.backgroundColor, radius: style.borderRadius, font: style.fontSize, padding: style.padding }
-      })
+      })) !== undefined).toBe(true)
+      if (stuck === undefined) throw new Error('data-stuck poll returned without a stuck sample')
       await viewport.evaluate((node) => { node.scrollTop = 0 })
       await expect.poll(() => heading.getAttribute('data-stuck')).toBeNull()
       return stuck
@@ -272,8 +284,11 @@ describe('web e2e: the composer model switch is the default for later sessions',
             document.body.toggleAttribute('data-ds-dark-theme', dark)
           }, { platform, dark })
           await resetScroll()
-          expect(await headings.evaluateAll(nodes => [...new Set(nodes.map(node => getComputedStyle(node).backgroundColor))]))
-            .toEqual(['rgba(0, 0, 0, 0)'])
+          // Sample data-stuck and the painted fill in one evaluation: the
+          // observer can flap the attribute between separate reads.
+          await expect.poll(() => headings.evaluateAll(nodes =>
+            [...new Set(nodes.map(node => node.hasAttribute('data-stuck') ? 'stuck' : getComputedStyle(node).backgroundColor))],
+          )).toEqual(['rgba(0, 0, 0, 0)'])
           const secondTop = await scroller.evaluate((node) => {
             const second = node.querySelectorAll('section')[1]!
             return Math.ceil(second.getBoundingClientRect().top - node.getBoundingClientRect().top) + 1
@@ -281,8 +296,9 @@ describe('web e2e: the composer model switch is the default for later sessions',
           expect(await scroller.evaluate(node => node.scrollHeight - node.clientHeight)).toBeGreaterThanOrEqual(secondTop)
           await scroller.evaluate((node) => { node.scrollTop = 10 })
           await expect.poll(readPinned).toEqual([true, false, false])
-          expect(await headings.first().evaluate(node => getComputedStyle(node).backgroundColor))
-            .toBe(dark ? 'rgba(53, 54, 56, 0.94)' : 'rgba(255, 255, 255, 0.94)')
+          await expect.poll(() => headings.first().evaluate(node =>
+            node.hasAttribute('data-stuck') ? getComputedStyle(node).backgroundColor : 'clear',
+          )).toBe(dark ? 'rgba(53, 54, 56, 0.94)' : 'rgba(255, 255, 255, 0.94)')
           await scroller.evaluate((node, top) => { node.scrollTop = top }, secondTop)
           await expect.poll(readPinned).toEqual([false, true, false])
           await scroller.evaluate((node) => { node.scrollTop = 10 })

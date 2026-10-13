@@ -9,17 +9,28 @@
      max-content sizes by the label alone, capped at half the viewport. */
   width: max-content;
   max-width: 50vw;
-  padding: 3px 7px;
-  border-radius: var(--dsw-radius-sm);
+  padding: 6px 10px;
+  border-radius: var(--dsw-radius-control);
   background: var(--dsw-alias-tooltip-bg);
   color: var(--dsw-static-neutral-bluish-00);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
   white-space: pre-line;
   /* Unbreakable tokens (URLs, paths) must not push past max-width. */
   overflow-wrap: break-word;
   pointer-events: none;
-  animation: tooltip-in 150ms var(--ds-ease-in-out);
+  /* transitions.dev tooltip timing: appear after an 80ms pause, then a 150ms
+     ease-out entrance. The delay is pure CSS (animation-delay + backwards
+     fill): the bubble still mounts and positions immediately, so leaving the
+     anchor inside the pause never flashes a stray bubble. */
+  animation:
+    tooltip-in var(--dsw-motion-duration-quick, 150ms)
+      var(--dsw-motion-ease-smooth-out, var(--ds-ease-in-out))
+      var(--dsw-motion-duration-micro, 80ms) backwards,
+    tooltip-slide-in var(--dsw-motion-duration-quick, 150ms)
+      var(--dsw-motion-ease-smooth-out, var(--ds-ease-in-out))
+      var(--dsw-motion-duration-micro, 80ms) backwards;
 }
 
 .bubble[data-portal] { z-index: 1100; }
@@ -52,8 +63,19 @@
   transform: translate(-100%, -100%);
 }
 
+/* Entrance (transitions.dev 17-tooltip, MIT): scale from .98 with a 2px
+   slide arriving from the side the bubble sits on; `translate`/`scale` are
+   individual properties so they compose with the centering `transform`. */
 @keyframes tooltip-in {
-  from { opacity: 0; }
+  from { opacity: 0; scale: var(--dsw-motion-scale-tooltip, 0.98); }
+}
+
+.bubble[data-side='top'] { --dsh-tooltip-from: 0 2px; }
+.bubble[data-side='bottom'] { --dsh-tooltip-from: 0 -2px; }
+.bubble[data-side='right'] { --dsh-tooltip-from: -2px 0; }
+
+@keyframes tooltip-slide-in {
+  from { translate: var(--dsh-tooltip-from, 0 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {

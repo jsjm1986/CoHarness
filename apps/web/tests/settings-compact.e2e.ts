@@ -61,6 +61,11 @@ describe('web e2e: compact settings overlay', () => {
     await page.getByRole('button', { name: '设置', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '设置' })
     await dialog.waitFor({ timeout: 10_000 })
+    // The panel enters with a scale/translate animation; geometry read
+    // mid-flight would measure the from-frame instead of the settled page.
+    await dialog.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map(animation => animation.finished.catch(() => undefined)))
+    })
 
     const dialogBox = await dialog.boundingBox()
     if (dialogBox === null) throw new Error('settings compact dialog has no box')

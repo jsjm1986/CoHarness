@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-12-pointer-highlight-scroll-feedback-loop.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-pointer-highlight-scroll-feedback-loop.md
+/agent-note-pointer-hover-must-not-drive-keep-visible-scrolling:
+  en: 1c436f4be0a5cf22
+  zh: 15c34624852d7a99
+/agent-note-pointer-hover-must-not-drive-keep-visible-scrolling/problem:
+  en: f12cbc27f3f0bf83
+  zh: 82741e173c3e0a66
+/agent-note-pointer-hover-must-not-drive-keep-visible-scrolling/decision:
+  en: 0d13908a5de0beb3
+  zh: a5e65bbf8400e97e
+/agent-note-pointer-hover-must-not-drive-keep-visible-scrolling/verification:
+  en: 7534d569ec491ef2
+  zh: 04d1b4a69929b841
+/agent-note-pointer-hover-must-not-drive-keep-visible-scrolling/alternatives-considered:
+  en: c847b6ccee0afd2e
+  zh: 5a4118a3d492802f
+/agent-note-pointer-hover-must-not-drive-keep-visible-scrolling/consequences:
+  en: d4f11f9d81aa992e
+  zh: 6dfaa3b4a9b9cc3e

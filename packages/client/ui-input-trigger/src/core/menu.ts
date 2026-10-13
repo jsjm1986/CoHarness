@@ -139,7 +139,7 @@ export const menuReduce: MenuReduce = (state, ev) => {
       if (target === null) return state
       const hl = state.highlight
       if (hl && hl.source === target.source && hl.index === target.index) return state
-      return { ...state, highlight: target }
+      return { ...state, highlight: { ...target, viaPointer: true } }
     }
     case 'close':
       return closed(state)

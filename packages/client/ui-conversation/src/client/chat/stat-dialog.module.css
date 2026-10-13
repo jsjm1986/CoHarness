@@ -27,6 +27,21 @@
   line-height: 18px;
   color: var(--dsw-alias-label-secondary);
   cursor: default;
+  animation: dsh-stat-dialog-in var(--dsw-motion-duration-enter, 0.2s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
+}
+
+@keyframes dsh-stat-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
 }
 
 /* Dialog heading row: the section name left, the section's headline value

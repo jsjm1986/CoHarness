@@ -11,10 +11,9 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Browser, Page, Response } from 'playwright'
 import { chromium } from 'playwright'
-import { strFromU8, unzipSync } from 'fflate'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
-import { SESSION_FORMAT_VERSION, type SessionEvent } from '@deepseek-ai/dsh-session'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, expandTurnProcesses, fixtureUserPrompts,
   launchWebScaffold, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
@@ -274,6 +273,12 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     const timingTooltip = page.getByRole('tooltip')
     await timingTooltip.waitFor({ timeout: 5_000 })
     await expect.poll(() => timingTooltip.textContent(), { timeout: 5_000 }).toMatch(/TTFT .* Decoding/)
+    // The entrance's backwards-fill delay keeps the bubble transparent — and
+    // out of the aria tree — for a beat after mount.
+    await expect.poll(
+      () => timingTooltip.evaluate(el => +getComputedStyle(el).opacity),
+      { timeout: 5_000 },
+    ).toBe(1)
     const assistantTimingStyle = await assistantSpan.evaluate(node => ({
       background: getComputedStyle(node).backgroundImage,
       ttft: getComputedStyle(node).getPropertyValue('--trajectory-assistant-ttft'),
@@ -285,106 +290,6 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     await compareOrRefreshGolden(TRAJECTORY_EXPECTED, snapshot, MODE)
     await details.getByRole('button', { name: 'Close details' }).click()
   }, 60_000)
-
-  it.skipIf(MODE === 'record')('downloads through the Session Header and /export with one dialog', async () => {
-    onTestFailed(() => saveFailureShot(page, 'web-e2e-navigation-export'))
-    await ensureSeedOpen(page)
-    const exportButton = page.getByRole('button', { name: 'Session log' })
-    expect(await exportButton.isDisabled()).toBe(false)
-    const header = exportButton.locator('xpath=ancestor::header[1]')
-    // The right Sidebar's expand button holds the header's corner; the export
-    // control sits immediately to its left.
-    const sidebarButton = page.getByRole('button', { name: 'Open right sidebar' })
-    const [buttonBox, sidebarBox, headerBox] = await Promise.all([
-      exportButton.boundingBox(), sidebarButton.boundingBox(), header.boundingBox(),
-    ])
-    if (buttonBox === null || sidebarBox === null || headerBox === null) {
-      throw new Error('Session Header export geometry is unavailable')
-    }
-    expect(headerBox.x + headerBox.width - (sidebarBox.x + sidebarBox.width)).toBeLessThanOrEqual(32)
-    expect(sidebarBox.x - (buttonBox.x + buttonBox.width)).toBeLessThanOrEqual(32)
-    const responsePromise = page.waitForResponse(response =>
-      response.request().method() === 'HEAD'
-      && new URL(response.url()).pathname === '/api/session.export', { timeout: 30_000 })
-    const downloadPromise = page.waitForEvent('download', { timeout: 30_000 })
-    // The export capsule arms a confirmation before it downloads: the first
-    // click only reveals `Confirm download?`, the second triggers the export.
-    await exportButton.click()
-    await page.getByRole('button', { name: 'Confirm download?' }).click()
-    const response = await responsePromise
-    expect(response.status()).toBe(200)
-    const download = await downloadPromise
-    expect(download.suggestedFilename()).toMatch(/^dsh-session-.+\.zip$/)
-    const dialog = page.getByRole('dialog', { name: 'Session download started' })
-    await dialog.waitFor({ timeout: 30_000 })
-    // The real host streamed the ZIP; its root entry is the persisted log
-    // text verbatim (the assembled seam: real route, real persistence read).
-    const files = unzipSync(await readFile(await download.path()))
-    // The root entry keeps the persisted artifact's base filename — the
-    // current-generation session log follows SESSION_FORMAT_VERSION.
-    const exportedLog = `session.v${SESSION_FORMAT_VERSION}`
-    expect(Object.keys(files)).toEqual([exportedLog])
-    const content = strFromU8(files[exportedLog] as Uint8Array)
-    expect(content.split('\n')[0]).toContain(SEED_ID)
-    expect(content).toContain('FIRST_DONE')
-    await dialog.getByText('Close', { exact: true }).click()
-
-    const observer = await newEnglishPage(browser)
-    const observerTripwire = watchConsole(observer)
-    const observerSlotErrors: string[] = []
-    let observerDownloads = 0
-    observer.on('download', () => { observerDownloads += 1 })
-    observer.on('console', (message) => {
-      if (message.type() === 'error' && /slot entry crashed/i.test(message.text())) {
-        observerSlotErrors.push(message.text())
-      }
-    })
-    const observerSessionBaseline = baselineResponse(observer, 'session.list')
-    const observerWorkspaceBaseline = baselineResponse(observer, 'workspace.list')
-    const [, observerSessionResponse, observerWorkspaceResponse] = await Promise.all([
-      observer.goto(scaffold.authenticatedUrl, { waitUntil: 'load' }),
-      observerSessionBaseline,
-      observerWorkspaceBaseline,
-    ])
-    await Promise.all([
-      assertBaselineSucceeded(observerSessionResponse, 'observer session.list'),
-      assertBaselineSucceeded(observerWorkspaceResponse, 'observer workspace.list'),
-    ])
-    await observer.getByText('Independent sessions', { exact: true }).waitFor({ timeout: 30_000 })
-    await ensureSeedOpen(observer)
-
-    try {
-      const input = page.locator('textarea').first()
-      const slashDownloadPromise = page.waitForEvent('download', { timeout: 30_000 })
-      await input.fill('/export')
-      await page.getByRole('option', { name: /export/iu }).waitFor({ timeout: 10_000 })
-      await input.press('Enter')
-      const slashDownload = await slashDownloadPromise
-      expect(slashDownload.suggestedFilename()).toBe(download.suggestedFilename())
-      const slashFiles = unzipSync(await readFile(await slashDownload.path()))
-      expect(Object.keys(slashFiles)).toEqual([exportedLog])
-      const slashContent = strFromU8(slashFiles[exportedLog] as Uint8Array)
-      const slashEvents = parseSessionLog(slashContent)
-      const exportRun = slashEvents.findLast(event => event.type === 'command/run' && event.data.name === 'export')
-      if (exportRun?.type !== 'command/run') throw new Error('slash ZIP has no export command/run')
-      const exportDone = slashEvents.find(event =>
-        event.type === 'command/done' && event.data.commandId === exportRun.data.commandId)
-      expect(exportDone?.type).toBe('command/done')
-      await page.getByRole('dialog', { name: 'Session download started' }).waitFor({ timeout: 30_000 })
-      await page.getByRole('dialog', { name: 'Session download started' })
-        .getByText('Close', { exact: true }).click()
-      await observer.getByText('Session log download requested.', { exact: true }).waitFor({ timeout: 30_000 })
-      expect(observerDownloads).toBe(0)
-      expect(await observer.getByRole('dialog', { name: 'Session download started' }).count()).toBe(0)
-      expect({
-        pageErrors: observerTripwire.pageErrors,
-        slotErrors: observerSlotErrors,
-        warnings: observerTripwire.warnings,
-      }).toEqual({ pageErrors: [], slotErrors: [], warnings: [] })
-    } finally {
-      await observer.close()
-    }
-  }, 120_000)
 
   it.skipIf(MODE === 'record')('focuses the ledger by dragging an overview interval', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-navigation-timeline'))

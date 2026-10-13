@@ -44,6 +44,8 @@
   font-family: inherit;
   font-size: 13px;
   line-height: 22px;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .trigger:hover {
@@ -94,6 +96,12 @@
   inset: 0;
   background: var(--dsw-alias-bg-mask-1);
   backdrop-filter: var(--dsw-mask-blur);
+  animation: settings-mask-in var(--dsw-motion-duration-enter, 0.18s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out)) backwards;
+}
+
+@keyframes settings-mask-in {
+  from { opacity: 0; }
 }
 
 /* Panel (figma Settings 501:29947): r24, white; the figma lv3 effects are
@@ -120,6 +128,22 @@
      styles/scrollbar.css for the rebinding contract). */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  animation: settings-panel-in var(--dsw-motion-duration-enter, 0.18s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out)) backwards;
+}
+
+@keyframes settings-panel-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .mask {
+    animation: none;
+  }
 }
 
 /* Nav rail (figma .Setting-nav 501:29958): 188 wide, pad (12,22,12,0),
@@ -169,6 +193,8 @@
   font-weight: 400;
   color: var(--dsw-alias-label-primary);
   text-align: left;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .navCell:hover {
@@ -238,6 +264,8 @@
   background: transparent;
   cursor: pointer;
   color: var(--dsw-alias-label-primary);
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .close:hover {

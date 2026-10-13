@@ -48,6 +48,11 @@
    the static span form keeps the resting tertiary reading. */
 button.pill {
   cursor: pointer;
+  transition:
+    background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 button.pill:hover,

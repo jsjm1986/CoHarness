@@ -7,4 +7,3 @@
   - option "Compact Compact older conversation history"
   - option "Permission Switch the permission preset (sandbox mode and approval policy)"
   - option "Model Select the model for this session"
-  - option "Export log export Download this Session log as a ZIP archive"

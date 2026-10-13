@@ -13,6 +13,7 @@
   padding: 4px calc(var(--dsh-composer-side-clearance) + 16px) 0px;
   font-size: 12px;
   line-height: 20px;
+  font-variant-numeric: tabular-nums;
   color: var(--dsw-alias-label-tertiary);
   white-space: nowrap;
   overflow: hidden;

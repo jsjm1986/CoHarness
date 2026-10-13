@@ -120,6 +120,10 @@
     background-size: 100% 100%;
     animation: none;
   }
+
+  .toBottom {
+    animation: none;
+  }
 }
 
 .hint {
@@ -147,6 +151,11 @@
   color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-interactive-bg-hover-solid);
   cursor: pointer;
+  transition:
+    background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .older button:disabled {
@@ -195,10 +204,28 @@
   box-shadow: var(--dsw-elevation-panel);
   cursor: pointer;
   pointer-events: auto;
+  animation: dsh-to-bottom-in var(--dsw-motion-duration-enter, 0.2s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
+  transition:
+    background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    transform var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .toBottom:hover {
   background: var(--dsw-alias-button-floating-hover);
+}
+
+.toBottom:active {
+  transform: scale(0.88);
+}
+
+@keyframes dsh-to-bottom-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
 }
 
 :global([data-viewport='compact']) .toBottom {

@@ -109,10 +109,30 @@
   margin-right: -3px;
 }
 
+/* Animated underline (beautifului .animated-underline, MIT): a 1px
+   currentColor bar draws left-to-right on hover, offset 3px below the
+   baseline. */
+.markdown a::after {
+  content: '';
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  bottom: -1px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 280ms var(--dsw-motion-ease-out-expo, var(--ds-ease-in-out));
+}
+
+.markdown a:hover::after,
+.markdown a:focus::after {
+  transform: scaleX(1);
+}
+
 .markdown a:hover,
 .markdown a:focus {
   outline: none;
-  text-decoration: underline var(--dsw-alias-state-business-primary);
 }
 
 .markdown a:focus-visible {
@@ -169,9 +189,10 @@
 }
 
 .markdown blockquote {
-  border-left: 2px solid var(--dsw-alias-label-caption);
+  border-left: 2px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, transparent);
   margin: var(--dsw-space-4) 0 0;
   padding-left: 14px;
+  color: var(--dsw-alias-label-secondary);
 }
 
 .markdown pre {
@@ -186,10 +207,10 @@
   box-sizing: border-box;
   font: var(--dsw-font-markdown-code);
   font-family: var(--ds-font-family-code);
-  font-size: 0.875em !important;
+  font-size: 0.9em !important;
   background-color: var(--dsw-alias-markdown-inline-code);
-  border-radius: var(--dsw-radius-sm);
-  padding: 0 5px;
+  border-radius: 4px;
+  padding: 0.125em 0.25em;
 }
 
 .markdown :where(h1, h2, h3, h4, h5, h6) code {
@@ -212,6 +233,8 @@
   max-width: 100%;
   overflow-x: auto;
   overscroll-behavior-x: contain;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
 }
 
 /* Inside a workbench pane the scroller becomes the cell-cap query container,
@@ -255,9 +278,11 @@
 
 .tableScroll th {
   text-align: start;
-  padding: 10px var(--dsw-space-4);
-  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
+  padding: 10px var(--dsw-space-3);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
   border-top: none;
+  background: var(--dsw-alias-bg-inset);
+  color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-markdown-table-head);
   max-width: 320px;
   max-width: min(30cqw, 320px);
@@ -265,8 +290,8 @@
 }
 
 .tableScroll td {
-  padding: 10px var(--dsw-space-4);
-  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+  padding: 10px var(--dsw-space-3);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
   font: var(--dsw-font-markdown-table);
   max-width: 320px;
   max-width: min(30cqw, 320px);
@@ -275,11 +300,16 @@
 
 .tableScroll th:first-child,
 .tableScroll td:first-child {
-  padding-left: 0;
+  padding-left: var(--dsw-space-3);
 }
 
-.tableScroll td:last-child {
-  padding-right: 0;
+.tableScroll td:last-child,
+.tableScroll th:last-child {
+  padding-right: var(--dsw-space-3);
+}
+
+.tableScroll tbody tr:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .tableScroll table code {

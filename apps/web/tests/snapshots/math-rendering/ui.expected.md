@@ -1,12 +1,9 @@
 - banner:
+  - navigation "Session hierarchy":
+    - button "Math rendering" [disabled]
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "Math rendering" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - button "1 intermediate message":

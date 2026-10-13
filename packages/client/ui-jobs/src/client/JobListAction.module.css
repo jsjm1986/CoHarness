@@ -7,12 +7,12 @@
   align-items: center;
   gap: 3px;
   min-height: 28px;
-  padding: 3px 2px;
+  padding: 3px 6px;
   border: 0;
-  border-radius: var(--dsw-radius-sm);
+  border-radius: var(--dsw-radius-md);
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 18px;
   cursor: pointer;
 }
@@ -23,7 +23,7 @@
 }
 
 .trigger svg {
-  transition: transform 120ms ease;
+  transition: transform var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease);
 }
 
 .triggerOpen {
@@ -108,7 +108,7 @@
 
 .sectionChevron {
   transform: rotate(-90deg);
-  transition: transform 120ms ease;
+  transition: transform var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease);
 }
 
 .sectionChevronOpen {

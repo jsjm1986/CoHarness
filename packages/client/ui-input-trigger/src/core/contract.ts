@@ -41,7 +41,12 @@ export interface MenuState {
     readonly status: 'pending' | 'ready'
     readonly items: readonly InputTriggerCandidate[]
   }[]
-  readonly highlight: { readonly source: string; readonly index: number } | null
+  readonly highlight: {
+    readonly source: string
+    readonly index: number
+    /** Set by `hover` events only: the view must not scroll pointer picks. */
+    readonly viaPointer?: boolean
+  } | null
 }
 
 /** Menu reduction events. Source failure = silent group removal (log only; no error UI tier). */

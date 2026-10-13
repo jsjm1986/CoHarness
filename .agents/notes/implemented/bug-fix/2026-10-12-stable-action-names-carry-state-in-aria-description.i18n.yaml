@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-12-stable-action-names-carry-state-in-aria-description.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-stable-action-names-carry-state-in-aria-description.md
+/agent-note-action-controls-keep-one-accessible-name-live-state-rides-in-aria-description:
+  en: db7aa1b0aeef3084
+  zh: 355466f72dae7668
+/agent-note-action-controls-keep-one-accessible-name-live-state-rides-in-aria-description/problem:
+  en: 3f536b473ad55413
+  zh: 84c1abbf6de8c282
+/agent-note-action-controls-keep-one-accessible-name-live-state-rides-in-aria-description/decision:
+  en: 68d30512e8860ce4
+  zh: be51d7011c5e69ce
+/agent-note-action-controls-keep-one-accessible-name-live-state-rides-in-aria-description/alternatives-considered:
+  en: dda13b18f4751a47
+  zh: 18ee9add22b6af6d
+/agent-note-action-controls-keep-one-accessible-name-live-state-rides-in-aria-description/consequences:
+  en: 93782ced102fc427
+  zh: ab6ab6218c149c8a
+/agent-note-action-controls-keep-one-accessible-name-live-state-rides-in-aria-description/verification:
+  en: 302f6fd075652fb7
+  zh: 747b9093f3481773
+/agent-note-action-controls-keep-one-accessible-name-live-state-rides-in-aria-description/related:
+  en: b5e8b93ce6715d3e
+  zh: a5c30f6cf4b06c73

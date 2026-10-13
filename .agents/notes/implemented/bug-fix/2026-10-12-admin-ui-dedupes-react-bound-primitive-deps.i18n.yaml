@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-12-admin-ui-dedupes-react-bound-primitive-deps.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-admin-ui-dedupes-react-bound-primitive-deps.md
+/agent-note-admin-ui-dedupes-every-react-bound-package-the-shared-primitives-import:
+  en: 39e89d4ad9b8877c
+  zh: 80246a753267c69d
+/agent-note-admin-ui-dedupes-every-react-bound-package-the-shared-primitives-import/problem:
+  en: b23446e7f39f5813
+  zh: 0b45efa692f9852d
+/agent-note-admin-ui-dedupes-every-react-bound-package-the-shared-primitives-import/decision:
+  en: b489a64019b5c09d
+  zh: 19a7bfd45e17b7d4
+/agent-note-admin-ui-dedupes-every-react-bound-package-the-shared-primitives-import/alternatives-considered:
+  en: d870417f43268322
+  zh: 44dd0712ad321080
+/agent-note-admin-ui-dedupes-every-react-bound-package-the-shared-primitives-import/consequences:
+  en: df09404be6314640
+  zh: 0c9ab68c122206b3
+/agent-note-admin-ui-dedupes-every-react-bound-package-the-shared-primitives-import/verification:
+  en: ded23ffe19af795d
+  zh: fe547114673dc839
+/agent-note-admin-ui-dedupes-every-react-bound-package-the-shared-primitives-import/related:
+  en: decb50499abed71f
+  zh: 6344c1b09e4aadb3

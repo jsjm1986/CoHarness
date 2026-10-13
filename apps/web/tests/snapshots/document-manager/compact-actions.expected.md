@@ -7,7 +7,9 @@
   - button "Add to conversation":
     - img
     - text: Add to conversation
-  - button "Preview"
+  - button "Preview":
+    - img
+    - text: Preview
   - button "Move":
     - img
     - text: Move

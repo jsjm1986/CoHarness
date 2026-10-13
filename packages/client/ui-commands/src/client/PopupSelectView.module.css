@@ -25,11 +25,22 @@
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
   border: 0;
-  border-radius: 20px;
+  border-radius: var(--dsw-radius-card);
   background: var(--dsw-specific-menu);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent);
   outline: none;
+  /* The card floats above the composer, so it grows from its anchor edge. */
+  transform-origin: bottom left;
+  animation: popup-select-in var(--dsw-motion-duration-pop)
+    var(--dsw-motion-ease-out-strong, var(--ds-ease-in-out)) backwards;
+}
+
+@keyframes popup-select-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--dsw-motion-scale-modal));
+  }
 }
 
 .viewport {

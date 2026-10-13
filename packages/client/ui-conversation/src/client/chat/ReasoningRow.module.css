@@ -16,25 +16,10 @@
   background: var(--dsw-alias-bg-base);
 }
 
-.root[data-state='running'] .row::after {
-  content: '';
-  position: absolute;
-  inset-block: 0;
-  left: 0;
-  width: 300px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent) 55%,
-    transparent 100%
-  );
-  animation: dsh-reasoning-row-sweep 2.6s ease-out infinite;
-  pointer-events: none;
-}
-
-@keyframes dsh-reasoning-row-sweep {
-  0% { left: -300px; }
-  90%, 100% { left: 100%; }
+/* The running state lives on the label shimmer (DisclosureRow's `running`);
+   the icon only brightens one step while the row is live. */
+.root[data-state='running'] .leading {
+  color: var(--dsw-alias-label-secondary);
 }
 
 .leading {
@@ -43,10 +28,6 @@
 
 .chevron {
   color: var(--dsw-alias-label-secondary);
-}
-
-.title {
-  font-weight: 400;
 }
 
 .separator {
@@ -63,7 +44,7 @@
   overflow: hidden;
   flex: 1 1 auto;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 24px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -77,13 +58,11 @@
   white-space: normal;
 }
 
+/* Expanded trace hangs off a hairline rail centred under the leading icon,
+   matching the reasoning timeline's indent (icon 16px → rail at 8px). */
 .thinkBody {
-  padding: var(--dsw-space-1) 0 var(--dsw-space-1) 22px;
+  margin-left: 8px;
+  padding: var(--dsw-space-1) 0 var(--dsw-space-1) 14px;
+  border-left: 0.5px solid var(--dsw-alias-border-l2);
   min-width: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .root[data-state='running'] .row::after {
-    animation: none;
-  }
 }

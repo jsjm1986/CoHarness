@@ -346,19 +346,26 @@ async function wheelUntilMounted(page: Page, selector: string, deltaY: number): 
   throw new Error(`selector did not mount during transcript wheel: ${selector}`)
 }
 
+// Wheels toward the target: a row hidden above the viewport needs an upward
+// wheel, one folded under the sticky composer seat needs a downward wheel. The
+// caller's deltaY only sets the step magnitude — a fixed sign can never
+// converge when the target sits on the other side of the fold.
 async function wheelUntilVisible(page: Page, selector: string, deltaY: number): Promise<void> {
   const target = page.locator(selector)
+  const step = Math.abs(deltaY)
   for (let attempt = 0; attempt < 32; attempt += 1) {
-    if (await target.count() > 0 && await target.evaluate((row) => {
+    const position = await target.count() === 0 ? 'unmounted' : await target.evaluate((row) => {
       const host = row.closest<HTMLElement>('[data-conversation-scroll]')
-      if (host === null) return false
+      if (host === null) return 'detached'
       const viewport = host.getBoundingClientRect()
       const composer = host.querySelector<HTMLElement>('[data-composer-seat]')
       const visibleBottom = composer?.getBoundingClientRect().top ?? viewport.bottom
       const rect = row.getBoundingClientRect()
-      return rect.bottom > viewport.top && rect.top < visibleBottom
-    })) return
-    await wheelTranscript(page, deltaY)
+      if (rect.bottom > viewport.top && rect.top < visibleBottom) return 'visible'
+      return rect.top >= visibleBottom ? 'below' : 'above'
+    })
+    if (position === 'visible') return
+    await wheelTranscript(page, position === 'below' ? step : -step)
   }
   throw new Error(`selector did not become visible during transcript wheel: ${selector}`)
 }

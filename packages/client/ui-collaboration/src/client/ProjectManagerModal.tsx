@@ -1,5 +1,5 @@
 import { useEffect, useState, type SyntheticEvent } from 'react'
-import { Button, Input, Modal, IconFolderOpenOutline16, IconPlusOutline16, IconShareOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Input, Modal, IconFolderOpenOutline16, IconPlusOutline16, IconUsersOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ProjectInvitation, UserSummary } from './collaboration-client.ts'
 import type { CollaborationKey } from './locales.ts'
 import css from './ProjectManagerModal.module.css'
@@ -203,7 +203,7 @@ export function ProjectManagerModal({
                 <option value="rw">{t('manager.readWrite')}</option>
                 <option value="ro">{t('manager.readOnly')}</option>
               </select>
-              <Button variant="primary" type="submit" disabled={busy || username.trim() === ''} icon={<IconShareOutline16 size={16} />}>
+              <Button variant="primary" type="submit" disabled={busy || username.trim() === ''} icon={<IconUsersOutline16 size={16} />}>
                 {busy ? t('manager.inviting') : t('manager.invite')}
               </Button>
             </form>

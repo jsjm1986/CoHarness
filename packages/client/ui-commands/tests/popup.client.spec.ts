@@ -301,6 +301,19 @@ describe('search / move / highlight over the filtered list', () => {
     popup.highlight(1)
     expect(popup.state.getSnapshot().active).toBe(0)
   })
+
+  it('marks pointer highlights so views skip scroll-into-view, cleared by every other active write', async () => {
+    const { popup } = await readyPopup()
+    expect(popup.state.getSnapshot().activeViaPointer).toBe(false)
+    popup.highlight(0)
+    expect(popup.state.getSnapshot().activeViaPointer).toBe(true)
+    popup.move(-1)
+    expect(popup.state.getSnapshot().activeViaPointer).toBe(false)
+    popup.highlight(1)
+    expect(popup.state.getSnapshot().activeViaPointer).toBe(true)
+    popup.setSearch('dark')
+    expect(popup.state.getSnapshot().activeViaPointer).toBe(false)
+  })
 })
 
 describe('select', () => {

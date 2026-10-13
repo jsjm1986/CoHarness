@@ -3,7 +3,8 @@
 
 .block {
   --dsl-code-block-banner-background-color: var(--dsw-alias-markdown-code-block-banner);
-  --dsl-code-block-border-radius: 12px;
+  /* beui code-block grammar (MIT): radius 16, 40px header, hairline seam. */
+  --dsl-code-block-border-radius: var(--dsw-radius-xl);
   --dsl-code-block-banner-font: var(--dsw-font-xs-13);
   --dsl-code-block-content-font: var(--dsw-font-markdown-code-block);
 
@@ -27,22 +28,29 @@
   border-top-right-radius: var(--dsl-code-block-border-radius);
 }
 
+/* 40px header: language label on the caption pair, hairline seam below. */
 .banner {
+  height: 40px;
+  box-sizing: border-box;
   background: var(--dsl-code-block-banner-background-color);
-  padding: 9px 14px;
+  padding: 0 var(--dsw-space-3);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--dsw-space-3);
   font: var(--dsl-code-block-banner-font);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
   border-top-left-radius: var(--dsl-code-block-border-radius);
   border-top-right-radius: var(--dsl-code-block-border-radius);
 }
 
 .infostring {
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-label-caption);
   font-family: var(--ds-font-family-code);
-  font-size: 12px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   line-height: 18px;
   min-width: 0;
   overflow: hidden;
@@ -57,18 +65,38 @@
 }
 
 .copyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 var(--dsw-space-2);
   background-color: rgb(255 255 255 / 0);
   border: none;
-  padding: 0;
   margin: 0;
   color: inherit;
   cursor: pointer;
   font: inherit;
+  border-radius: var(--dsw-radius-sm);
+  transition:
+    opacity var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    transform var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
+}
+
+.copyButton:hover {
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) 70%, transparent);
+}
+
+.copyButton:active {
+  transform: scale(0.88);
 }
 
 .block :where(pre) {
   font: var(--dsl-code-block-content-font);
-  padding: var(--dsw-space-4);
+  padding: var(--dsw-space-2) var(--dsw-space-4);
+  color: color-mix(in srgb, var(--dsw-alias-label-primary) 85%, transparent);
   margin: 0 !important;
   overflow-x: auto;
   white-space: pre-wrap;

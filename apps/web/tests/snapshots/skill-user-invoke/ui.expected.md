@@ -1,14 +1,10 @@
 - banner:
+  - navigation "Session hierarchy":
+    - button "/user-invoke-demo and confirm the fixtur" [disabled]
+  - text: Standard mode
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "/user-invoke-demo and confirm the fixtur" [disabled]
-  - img
-  - text: Standard mode
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - button "1 intermediate message":

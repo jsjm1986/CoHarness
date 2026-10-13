@@ -91,10 +91,11 @@ describe('conversation compact chrome', () => {
     expect(permission).toMatch(/@container\s*\(max-width:\s*480px\)\s*\{[^@]*\.triggerLabel,[^@]*\.chevron\s*\{[^}]*display:\s*none/u)
     expect(permission).toMatch(/\.triggerIcon\s*\{[^}]*width:\s*24px/u)
     expect(permission).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.triggerLabel,[^@]*display:\s*none/u)
-    // Narrow panes seat the tool buttons as bare glyphs with a small hover
-    // disc; compact phones restore the filled selector circle.
-    expect(input).toMatch(/@container\s*\(max-width:\s*480px\)\s*\{[^@]*\.add::before\s*\{[^}]*inset:\s*2px/u)
-    expect(input).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.add\s*\{[^}]*background:\s*var\(--dsw-specific-selector\)/u)
+    // The tool seats are transparent circles with a hover fill at every
+    // width; only the lane gaps close on narrow panes.
+    expect(input).toMatch(/@container\s*\(max-width:\s*480px\)\s*\{[^@]*\.tools\s*\{[^}]*gap:\s*var\(--dsw-space-2\)/u)
+    expect(input).toMatch(/\.add\s*\{[^}]*background:\s*transparent/u)
+    expect(input).toMatch(/\.add:hover:not\(:disabled\)\s*\{[^}]*background:\s*var\(--dsw-alias-interactive-bg-hover\)/u)
     // The very narrowest panes hide the context meter; compact phones keep it.
     expect(contextMeter).toMatch(/@container\s*\(max-width:\s*340px\)\s*\{[^@]*\.root\s*\{[^}]*display:\s*none/u)
     expect(contextMeter).toMatch(/:global\(\[data-viewport='compact'\]\)\s*\.root\s*\{[^}]*display:\s*inline-flex/u)

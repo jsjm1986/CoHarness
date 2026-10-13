@@ -1,5 +1,56 @@
 /* ── Security-first confirmation dialog ── */
 
+/* The header entry: the same quiet 28px ghost the utility cluster speaks —
+   monitor glyph plus one status dot that is the header's second color budget
+   item (the title's own state dot is the first). */
+.trigger {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 5px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  transition:
+    background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
+}
+
+.trigger:hover,
+.trigger:focus-visible {
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  corner-shape: round;
+}
+
+.dot[data-state='ok'] {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.dot[data-state='warn'] {
+  background: var(--dsw-alias-state-warn-primary);
+}
+
+.dot[data-state='off'] {
+  background: var(--dsw-alias-label-dimmed);
+}
+
 .iconWrap {
   width: 52px;
   height: 52px;

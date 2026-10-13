@@ -1,4 +1,4 @@
-/* Shared disclosure header: [16px leading] gap 6 [title 14/24]. */
+/* Shared disclosure header: [16px leading] gap 6 [title 13/500]. */
 
 .root {
   display: flex;
@@ -33,6 +33,8 @@
   border: none;
   background: none;
   color: var(--dsw-alias-label-tertiary);
+  transition: color var(--dsw-motion-duration-quick, 0.15s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 button.leading {
@@ -45,12 +47,17 @@ button.leading {
   transition: opacity 100ms ease;
 }
 
+/* Learn-more hover (transitions.dev 24, MIT): crossfade to the chevron and
+   shift it 2px toward the content. */
 .chevronHover {
   position: absolute;
   inset: 0;
   margin: auto;
   opacity: 0;
-  transition: opacity 100ms ease;
+  transform: translateX(-2px);
+  transition:
+    opacity 100ms ease,
+    transform var(--dsw-motion-duration-quick) var(--dsw-motion-ease-smooth-out, ease);
 }
 
 .row:hover .iconIdle {
@@ -59,20 +66,71 @@ button.leading {
 
 .row:hover .chevronHover {
   opacity: 1;
+  transform: none;
+}
+
+/* Same geometry as TextShimmer's root/content pair: an inline grid that
+   shrinks inside the flex row, then a flex line for title + summary. */
+.contentWrap {
+  display: inline-grid;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.contentLine {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .title {
   flex: none;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 24px;
+  font-weight: 500;
   color: var(--dsw-alias-label-secondary);
+  transition: color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
+.row[data-expandable]:hover .title {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Expanded content mounts under data-open (the row keeps its seat while the
+   body arrives from above, matching the disclosure direction). */
+.root[data-open] > :not(.row) {
+  animation: dsw-disclosure-enter var(--dsw-motion-duration-slow, 0.2s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
+}
+
+@keyframes dsw-disclosure-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+    filter: blur(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root[data-open] > :not(.row) {
+    animation: none;
+  }
+}
+
+/* Wrap is allowed so the row can grow on touch, but the content column keeps
+   a zero flex base: it never jumps below the icon as a block — long summaries
+   wrap their text inside the line instead. */
 :global([data-viewport='compact']) .row {
   height: auto;
   min-height: var(--dsw-touch-target);
   overflow: visible;
   flex-wrap: wrap;
+}
+
+:global([data-viewport='compact']) .contentWrap {
+  flex: 1 1 0;
 }
 
 :global([data-viewport='compact']) .chevronHover {

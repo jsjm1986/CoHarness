@@ -177,6 +177,12 @@ async function bench(
   return { ctx, slots: ctx.get('slots') as SlotRegistry, calls, moveDefault }
 }
 
+/** Call a slot entry's erased inject face; the caller asserts the declared injected type. */
+function callInject(entry: { inject?: unknown } | undefined, ...args: unknown[]): unknown {
+  if (typeof entry?.inject !== 'function') throw new Error('slot entry declares no inject face')
+  return (entry.inject as (...args: unknown[]) => unknown)(...args)
+}
+
 function declareRoot(slots: SlotRegistry): () => void {
   return slots.register({
     name: 'root',
@@ -194,7 +200,7 @@ function declareConversation(slots: SlotRegistry): () => void {
     name: 'conversation',
     children: {
       'conversation.hero.agentPreset': { kind: 'single', scope: 'root' },
-      'conversation.session.header.actions': { kind: 'list', scope: 'session' },
+      'conversation.session.header.titleMeta': { kind: 'list', scope: 'session' },
     },
   } as never, () => null)
 }
@@ -255,7 +261,7 @@ describe('ui-agent-preset apply', () => {
     } as never)
     try {
       await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
-      const label = (slots.entries('conversation.session.header.actions')[0]!.inject as unknown as (id: string) => AgentPresetLabelInjected)('s1')
+      const label = callInject(slots.entries('conversation.session.header.titleMeta')[0], 's1') as AgentPresetLabelInjected
       await label.load()
       expect(label.hooks.agentPresets.getSnapshot()).toMatchObject({ error: null, options: [{ id: 'standard' }] })
       read.mockReturnValue(response.promise)
@@ -403,12 +409,12 @@ describe('ui-agent-preset apply', () => {
 
     const chip = slots.entries('conversation.hero.agentPreset')[0]!
     expect(chip.component).toBe(AgentPresetSeat)
-    const label = slots.entries('conversation.session.header.actions')[0]!
+    const label = slots.entries('conversation.session.header.titleMeta')[0]!
     expect(label.component).toBe(AgentPresetLabel)
-    expect(label.options).toMatchObject({ id: 'agent-preset', order: -10 })
+    expect(label.options).toMatchObject({ id: 'agent-preset' })
     await fiber.dispose()
     expect(slots.entries('conversation.hero.agentPreset')).toHaveLength(0)
-    expect(slots.entries('conversation.session.header.actions')).toHaveLength(0)
+    expect(slots.entries('conversation.session.header.titleMeta')).toHaveLength(0)
     expect(slots.entries('settings.section')).toHaveLength(0)
     conversation()
   })
@@ -581,10 +587,8 @@ describe('ui-agent-preset apply', () => {
     ctx.provide('sessions', sessionsDouble({ byId: {} }) as never)
     ctx.provide('workspaces', workspacesDouble() as never)
     await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
-    const label = (slots.entries('conversation.session.header.actions')[0]!
-      .inject as unknown as () => AgentPresetLabelInjected)()
-    const row = (slots.entries('settings.general.item')[0]!
-      .inject as unknown as () => AgentPresetRowInjected)()
+    const label = callInject(slots.entries('conversation.session.header.titleMeta')[0]) as AgentPresetLabelInjected
+    const row = callInject(slots.entries('settings.general.item')[0]) as AgentPresetRowInjected
 
     await label.load()
 

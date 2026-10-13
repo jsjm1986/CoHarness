@@ -20,6 +20,12 @@
   --dsw-radius-xl: 16px;
   --dsw-radius-full: 9999px;
 
+  /* Semantic radii ported from beautifului `@theme` (MIT). */
+  --dsw-radius-chip: 6px;
+  --dsw-radius-control: 8px;
+  --dsw-radius-card: 10px;
+  --dsw-radius-window: 14px;
+
   /* 0px everywhere except notched/home-indicator devices; the env() values
      only become nonzero under viewport-fit=cover (apps/web/index.html). */
   --dsw-safe-top: env(safe-area-inset-top, 0px);

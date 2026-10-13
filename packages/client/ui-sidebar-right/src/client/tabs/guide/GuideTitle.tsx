@@ -5,7 +5,7 @@
  * hero draw, and the cube the body's icon-less capsules fall back to.
  */
 import type { ReactNode } from 'react'
-import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconBoxOutline16, IconCompassOutline16, type IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './GuideBody.module.css'
 
@@ -16,12 +16,7 @@ import css from './GuideBody.module.css'
  * @returns the compass glyph.
  */
 export function CompassGlyph({ size = 16, className }: IconProps): ReactNode {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
-      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M 10.9 5.1 L 9.1 9.1 L 5.1 10.9 L 6.9 6.9 Z" fill="currentColor" />
-    </svg>
-  )
+  return <IconCompassOutline16 size={size} className={className} aria-hidden="true" />
 }
 
 /**
@@ -33,23 +28,7 @@ export function CompassGlyph({ size = 16, className }: IconProps): ReactNode {
  * @returns the cube glyph.
  */
 export function CubeGlyph({ size = 16, className }: IconProps): ReactNode {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M 8 2.5 L 12.9 5.2 V 10.8 L 8 13.5 L 3.1 10.8 V 5.2 Z"
-        stroke="currentColor"
-        strokeWidth="1.1"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M 3.1 5.2 L 8 7.9 L 12.9 5.2 M 8 7.9 V 13.5"
-        stroke="currentColor"
-        strokeWidth="1.1"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
+  return <IconBoxOutline16 size={size} className={className} aria-hidden="true" />
 }
 
 /**

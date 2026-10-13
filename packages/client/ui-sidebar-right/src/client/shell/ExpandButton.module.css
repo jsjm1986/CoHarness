@@ -1,7 +1,7 @@
 /*
- * Sits in the conversation header's corner seat, level with the Session log
- * control. The same icon button as the panel's own strip controls: a 28px
- * circle around a 15px glyph.
+ * Sits in the conversation header's corner seat, level with the utilities'
+ * quiet ghosts: a 28px control with the header family's 8px radius around a
+ * 15px glyph.
  */
 .button {
   display: inline-flex;
@@ -14,7 +14,7 @@
   color: var(--dsw-alias-label-secondary);
   background: transparent;
   border: none;
-  border-radius: 28px;
+  border-radius: var(--dsw-radius-md);
   cursor: pointer;
 }
 

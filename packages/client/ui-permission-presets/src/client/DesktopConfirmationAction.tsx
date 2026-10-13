@@ -3,8 +3,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { clientSessionKey, parseClientSessionKey } from '@deepseek-ai/dsh-client-runtime/client'
 import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import type { DesktopConfirmation } from '@deepseek-ai/dsh-api-remotes/client'
-import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { DesktopConfirmation, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import { Button, IconFollowsystemOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { DesktopKey } from './desktop-locales.ts'
 import css from './DesktopConfirmationAction.module.css'
@@ -51,12 +51,22 @@ export function DesktopConfirmationAction({ sessionId, connection, t }: DesktopC
       if (!request.signal.aborted) setBusy(false)
     }
   }, [connection, sessionId])
+  const readFor = useRef<{ connection: ConnectionHandle; sessionId: SessionId } | undefined>(undefined)
   useLayoutEffect(() => {
     active.current?.abort()
-    setValue(undefined); setBusy(false); setError(false)
-    if (open && ready) void read()
+    if (!ready) {
+      readFor.current = undefined
+      setValue(undefined); setBusy(false); setError(false)
+      return
+    }
+    // The trigger's status dot needs the value before the first open; a
+    // changed session binding counts as unread, and every open refreshes.
+    if (open || readFor.current?.connection !== connection || readFor.current.sessionId !== sessionId) {
+      readFor.current = { connection, sessionId }
+      void read()
+    }
     return () => { active.current?.abort() }
-  }, [open, ready, read, host])
+  }, [open, ready, read, host, connection, sessionId])
   const save = async (target: DesktopConfirmation, confirmed: boolean) => {
     active.current?.abort()
     const request = new AbortController()
@@ -77,8 +87,20 @@ export function DesktopConfirmationAction({ sessionId, connection, t }: DesktopC
     }
   }
   if (host?.executionAuthorityRequired !== true && !open) return null
+  const dot = value === undefined ? undefined : value === null ? 'off' : value.confirmed ? 'ok' : 'warn'
+  const statusKey = dot === 'ok' ? 'statusConfirmed' : dot === 'warn' ? 'statusPending' : dot === 'off' ? 'statusUnavailable' : undefined
   return <>
-    <Button onClick={() => { setOpen(true) }}>{t('open')}</Button>
+    <button
+      type="button"
+      className={css.trigger}
+      aria-label={t('open')}
+      aria-description={statusKey === undefined ? undefined : t(statusKey)}
+      title={statusKey === undefined ? t('open') : `${t('open')} · ${t(statusKey)}`}
+      onClick={() => { setOpen(true) }}
+    >
+      <IconFollowsystemOutline16 />
+      {dot === undefined ? null : <i className={css.dot} data-state={dot} aria-hidden />}
+    </button>
     <Modal open={open} title={t('title')} closeLabel={t('close')} onClose={() => { setOpen(false) }}
       footer={<>
         <Button disabled={!ready || busy} onClick={() => { void read() }}>{t('refresh')}</Button>

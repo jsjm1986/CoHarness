@@ -34,6 +34,21 @@
      styles/scrollbar.css for the rebinding contract). */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  animation: dsh-dock-in var(--dsw-motion-duration-enter, 0.22s)
+    var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
+}
+
+@keyframes dsh-dock-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    animation: none;
+  }
 }
 
 .body {
@@ -139,10 +154,41 @@
 
 /* Figma strip is single-line; long items ellipsize with no inline expand. */
 .content {
+  position: relative;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Completed items strike through as the check lands: the rule draws itself
+   left→right over one quick pass. */
+.item[data-status='completed'] .content {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.item[data-status='completed'] .content::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  margin-top: -0.5px;
+  background: var(--dsw-alias-label-caption);
+  transform-origin: left center;
+  animation: todo-strike var(--dsw-motion-duration-fast, 0.25s)
+    var(--dsw-motion-ease-smooth-out, ease) backwards;
+}
+
+@keyframes todo-strike {
+  from { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item[data-status='completed'] .content::after {
+    animation: none;
+  }
 }
 
 :global([data-viewport='compact']) .header {

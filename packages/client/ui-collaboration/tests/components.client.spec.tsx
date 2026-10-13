@@ -228,7 +228,11 @@ describe('ScopeControl', () => {
     const stewardItem = screen.getByRole('menuitem', { name: /维护中枢/ })
     expect(stewardItem.textContent).toContain('维护')
     expect(stewardItem.textContent).not.toContain('可编辑')
+    // The reserved space leads with the maintenance shield, not a scope dot.
+    expect(stewardItem.querySelector('svg')).not.toBeNull()
+    expect(stewardItem.querySelector(`span.${css.scopeDot}`)).toBeNull()
     expect(screen.getByRole('menuitem', { name: /支付重构/ }).textContent).toContain('可编辑')
+    expect(screen.getByRole('menuitem', { name: /支付重构/ }).querySelector(`span.${css.scopeDot}`)).not.toBeNull()
   })
 
   it('renders a compact rail trigger and omits create visibility for read-only projects', () => {
