@@ -516,7 +516,8 @@
       "sovereignty": "tracked"
     },
     "experimental/browser-use-runtime": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "packages/session/working-directory/README.md"
     },
     "experimental/browser-use-stagehand-native": {
       "sovereignty": "tracked"
@@ -852,7 +853,7 @@
       "sovereignty": "tracked"
     },
     "session/working-directory": {
-      "sovereignty": "adapted",
+      "sovereignty": "owned",
       "note": "packages/session/working-directory/README.md"
     },
     "settings/settings": {
@@ -994,7 +995,8 @@
       "sovereignty": "adapted"
     },
     "test-support/agent-loop-testkit": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": "packages/session/working-directory/README.md"
     },
     "test-support/client-runtime": {
       "sovereignty": "adapted",
