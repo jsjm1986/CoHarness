@@ -78,7 +78,7 @@
 - Markdown/工具呈现：~~无 CodeToolbar/CodeCard（wrap 切换+复制+lang）~~ — 已修：共享 CodeToolbar/CodeCard 头部 + 按卡片换行 + 行号栏定宽 + diff 行填充铺宽（见上表 `8d2cd0cf720`+`f114233545f`）；~~markdown 图片链接无 hover/内联预览~~ — 已修：`/api/file` 鉴权路由 + 共享灯箱 + hover 预览（见上表 `7fe9c06`+`48392399545`）；~~web-fetch 折叠 URL 不可点~~；~~审批面板无 `displayReason` 投影~~；~~`developer/message` 工具更新通知不渲染~~。
 - 其他：~~队列行内编辑单行 input 吞换行~~ — 已修：QueueDock/GoalBar 换用 ui-primitives 共享 `InlineEditor` textarea（见上表 `66e101821c3`）；~~`openTarget()` 缺 fs roundtrip 验证~~ — 已修：`verifyDesktopPath` 经 fs roundtrip 证明路径映射回自身（见上表 `4283f62d01a`）；~~telemetry record 无字节界~~ — 已修：`ByteBoundedLogProcessor` 计量完整 OTLP 请求字节并贪心装包（见上表 `3dd52bfd9ba`/`9d36f9c1fc4`）。
 
-### P3 — 视觉/性能/文案（归族）— 已核销（`fc255d497df` + 早前批次）
+### P3 — 视觉/性能/文案（归族）— 已核销（`fc255d497df` + `566a6c58f45` + 早前批次）
 
 - ~~焦点环族~~ — 已修：15 个 module.css 的 `brand-primary`/扁平 2px 环统一迁 `var(--dsw-focus-ring-width)` + `var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary))` 链；Switch track/填充走同一 business-state 令牌；侧栏/头部 `overflow:hidden` 容器内控件复扫无 outline→inset 残差（既有 inset 站点已在基线内）；Menu refocus 经 `focusWithoutRing` + `selectingWithTab` 只在键盘导航选定时保留环。
 - ~~术语族~~ — 已修：zh 段 `Subagent`/`子代理` 全量归一 `子智能体`（ui-settings-plugins、ui-subagent、ui-agent-preset）；plan chip 由 warn 色系迁 business-state；anthropic provider 卡得独立 `customAnthropicBaseUrlPlaceholder`。其余 zh 文案差异属产品文案分歧（`ui-settings-plugins`/`ui-agent-preset` 整块为本地产品表述，非术语错）。
@@ -90,6 +90,7 @@
 - ~~spill 诊断误导~~ — 已修：spill 落盘失败日志仅 ENOENT 才指名临时清理器，其余错误码不再误判（上游 `c22b226b18d`）；spawn spec 双码覆盖。
 - ~~unnamed 搜索误配目录名~~ — 已修：`a57556c2139` 在案。
 - ~~Menu 子菜单折叠与首行分隔线~~ — 已修：list 级 `collapseSubmenuFrom`（指针/焦点落非子菜单行时折叠、忽略嵌套菜单后代）+ 子菜单行 focus 展开 + shortcut/`aria-keyshortcuts` + 相邻/首行分隔线抑制。
+- ~~Menu 材质面与键盘守卫残差~~ — 已修（`566a6c58f45`，上游 `fdd14a09898` 族 + rc2 加固层）：新增 `MenuSurface`（半透明 material fill + macOS 锚定衬底 + `data-menu-material-fill` 钩子），`--dsw-specific-menu` 归一共享 fill；Menu 接 `overlayTopMargin` 顶部钳制、IME composition/behind-modal/defaultPrevented/修饰键守卫、Shift+Escape 放行、repeat 抑制的捕获期 Escape、rAF 锚点追踪、`focusWithoutRing` autoFocus、`selection` check/fill 道具；input-trigger `MenuView`、commands `PopupSelectView`、模型选择器、坞站 `TabMenu` 四面同批换面并删自涂背景/圆角防双涂；本地 `header`/`footer`/`listStyle`/手机 sheet 契约保留（ui-collaboration/ui-schedule 在消费），移动端内联子菜单隐藏材质填充。
 - ~~composer model-selection 动态测量~~ — 核定为已移植：right-edge 对齐量测+视口钳制 useLayoutEffect 在本地（含 phone 变体适配）。
 
 ## P0 — 裁决项：workingDirectory 全栈（上游 0.2.1-alpha.1 新增）
