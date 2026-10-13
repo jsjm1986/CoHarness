@@ -6,3 +6,5 @@
 {"type":"step/end","data":{"turn":1,"step":1}}
 {"type":"step/start","data":{"turn":1,"step":2}}
 {"type":"assistant/attempt","data":{"turn":1,"step":2,"stream":[{"type":"chunk","time":0,"chunk":{"type":"block-start","index":0,"blockType":"text"}},{"type":"chunk","time":0,"chunk":{"type":"text-delta","index":0,"text":"SEARCH_DONE"}},{"type":"chunk","time":0,"chunk":{"type":"block-end","index":0,"block":{"type":"text","text":"SEARCH_DONE"}}},{"type":"chunk","time":0,"chunk":{"type":"usage","usage":{"inputTokens":12,"outputTokens":2}}},{"type":"chunk","time":0,"chunk":{"type":"finish","reason":{"kind":"stop"}}}]}}
+{"type":"step/end","data":{"turn":1,"step":2}}
+{"type":"turn/end","data":{"turn":1,"reason":{"kind":"completed"}}}

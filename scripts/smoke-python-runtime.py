@@ -1601,13 +1601,21 @@ def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) 
         dsh_home = root / "home"
         sessions = dsh_home / "sessions"
         patch = write_advanced_profile_patch(root, "custom.patch.yml", sessions)
+        order_patch = write_profile_patch(root, "order.patch.yml", sessions, [{"insert": [
+            {"id": "snapshot-workflow-order", "name": (
+                Path(__file__).resolve().parent / "fixtures/python-snapshot-workflow-order.mjs"
+            ).as_uri(), "config": {
+                "parentSessionId": SNAPSHOT_SESSION_ID,
+                "prompt": SNAPSHOT_WORKFLOW_CHILD_PROMPT,
+            }},
+        ]}])
         with DeepSeekHarness(
             provider="deepseek-official",
             model="smoke-model",
             cwd=str(root),
             dsh_home=str(dsh_home),
             env={"DSH_PERMISSION_MODE": "danger-full-access", "DSH_TELEMETRY_DISABLED": "1"},
-            patches=(str(patch),),
+            patches=(str(patch), str(order_patch)),
             dsh_bin=str(executable),
             api_key="sk-keyless-smoke",
             base_url=base_url,

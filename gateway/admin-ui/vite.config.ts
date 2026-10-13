@@ -17,7 +17,7 @@ export default defineConfig({
       '@deepseek-ai/dsh-client-runtime/client': resolve(__dirname, '../../packages/client/runtime/src/client/contract/store.ts'),
       '@deepseek-ai/dsh-client-ui-primitives': resolve(__dirname, 'src/model-settings-primitives.ts'),
     },
-    dedupe: ['react', 'react-dom'],
+    dedupe: ['react', 'react-dom', 'lucide-react'],
   },
   build: {
     outDir: '../public/admin',

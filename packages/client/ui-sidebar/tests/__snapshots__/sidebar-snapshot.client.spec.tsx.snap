@@ -37,11 +37,15 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
           </div>
         </span>
         <svg
-          class="panelIcon"
-          data-content="35f95b0c"
+          class="lucide lucide-panel-left lucide-sidebar panelIcon"
+          data-content="1bd2ace7"
           fill="none"
           height="18"
-          viewBox="0 0 16 16"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
           width="18"
           xmlns="http://www.w3.org/2000/svg"
         />
@@ -53,10 +57,15 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
       type="button"
     >
       <svg
-        data-content="c0ce4dcc"
+        class="lucide lucide-square-pen lucide-pen-box lucide-edit lucide-pen-square"
+        data-content="72b609e2"
         fill="none"
         height="18"
-        viewBox="0 0 16 16"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
         width="18"
         xmlns="http://www.w3.org/2000/svg"
       />
@@ -175,11 +184,15 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
         type="button"
       >
         <svg
-          class="panelIcon"
-          data-content="35f95b0c"
+          class="lucide lucide-panel-left lucide-sidebar panelIcon"
+          data-content="1bd2ace7"
           fill="none"
           height="16"
-          viewBox="0 0 16 16"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
           width="16"
           xmlns="http://www.w3.org/2000/svg"
         />
@@ -191,10 +204,15 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
       type="button"
     >
       <svg
-        data-content="c0ce4dcc"
+        class="lucide lucide-square-pen lucide-pen-box lucide-edit lucide-pen-square"
+        data-content="72b609e2"
         fill="none"
         height="14"
-        viewBox="0 0 16 16"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
         width="14"
         xmlns="http://www.w3.org/2000/svg"
       />
@@ -318,11 +336,15 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
         type="button"
       >
         <svg
-          class="panelIcon"
-          data-content="35f95b0c"
+          class="lucide lucide-panel-left lucide-sidebar panelIcon"
+          data-content="1bd2ace7"
           fill="none"
           height="16"
-          viewBox="0 0 16 16"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
           width="16"
           xmlns="http://www.w3.org/2000/svg"
         />
@@ -334,10 +356,15 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
       type="button"
     >
       <svg
-        data-content="c0ce4dcc"
+        class="lucide lucide-square-pen lucide-pen-box lucide-edit lucide-pen-square"
+        data-content="72b609e2"
         fill="none"
         height="14"
-        viewBox="0 0 16 16"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
         width="14"
         xmlns="http://www.w3.org/2000/svg"
       />

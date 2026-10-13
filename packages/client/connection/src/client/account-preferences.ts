@@ -8,6 +8,12 @@ const CHAT_CONTENT_WIDTH_MAX = 1080
 const DEFAULT_CHAT_FONT_SIZE = 14
 const CHAT_FONT_SIZE_MIN = 12
 const CHAT_FONT_SIZE_MAX = 17
+const TRANSCRIPT_VIEW_MODES = ['compact', 'standard', 'detailed', 'verbose'] as const
+const DEFAULT_TRANSCRIPT_VIEW_MODE = 'detailed'
+const PERFORMANCE_USAGE_MODES = ['compact', 'detailed'] as const
+const DEFAULT_PERFORMANCE_USAGE_MODE = 'detailed'
+const LINK_OPENINGS = ['sidebar', 'new-tab'] as const
+const DEFAULT_LINK_OPENING = 'sidebar'
 
 /** Account preference namespace accepted by the Gateway. */
 export type AccountPreferenceNamespace = 'locale' | 'ui-theme' | 'ui-conversation'
@@ -23,6 +29,9 @@ export interface AccountPreferencesView {
       chatContentWidth: number
       chatFullWidth: boolean
       chatFontSize: number
+      transcriptView: typeof TRANSCRIPT_VIEW_MODES[number]
+      performanceUsage: typeof PERFORMANCE_USAGE_MODES[number]
+      linkOpening: typeof LINK_OPENINGS[number]
     }
   }
   overrides: {
@@ -33,6 +42,9 @@ export interface AccountPreferencesView {
       chatContentWidth?: number
       chatFullWidth?: boolean
       chatFontSize?: number
+      transcriptView?: typeof TRANSCRIPT_VIEW_MODES[number]
+      performanceUsage?: typeof PERFORMANCE_USAGE_MODES[number]
+      linkOpening?: typeof LINK_OPENINGS[number]
     }
   }
   migrated: boolean
@@ -41,7 +53,9 @@ export interface AccountPreferencesView {
 /** Narrow account preference mutation sent to the Gateway. */
 export interface AccountPreferenceMutation {
   namespace: AccountPreferenceNamespace
-  field: 'preference' | 'busyEnter' | 'chatContentWidth' | 'chatFullWidth' | 'chatFontSize'
+  field:
+    | 'preference' | 'busyEnter' | 'chatContentWidth' | 'chatFullWidth' | 'chatFontSize'
+    | 'transcriptView' | 'performanceUsage' | 'linkOpening'
   operation: 'set' | 'unset'
   value?: string | number | boolean
   expectedRevision?: number
@@ -123,6 +137,22 @@ function numberPreference(value: unknown, fallback: number, min: number, max: nu
   return value
 }
 
+function enumPreference<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  if (value === undefined) return fallback
+  if (!allowed.includes(value as T)) {
+    throw new Error('invalid account preferences response')
+  }
+  return value as T
+}
+
+function optionalEnumPreference<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
+  if (value === undefined) return undefined
+  if (!allowed.includes(value as T)) {
+    throw new Error('invalid account preferences response')
+  }
+  return value as T
+}
+
 function optionalNumberPreference(value: unknown, min: number, max: number): number | undefined {
   if (value === undefined) return undefined
   return numberPreference(value, min, min, max)
@@ -133,6 +163,9 @@ function conversation(value: unknown): {
   chatContentWidth: number
   chatFullWidth: boolean
   chatFontSize: number
+  transcriptView: typeof TRANSCRIPT_VIEW_MODES[number]
+  performanceUsage: typeof PERFORMANCE_USAGE_MODES[number]
+  linkOpening: typeof LINK_OPENINGS[number]
 } {
   const row = object(value)
   const chatFullWidth = row.chatFullWidth
@@ -146,6 +179,9 @@ function conversation(value: unknown): {
     ),
     chatFullWidth: chatFullWidth ?? false,
     chatFontSize: numberPreference(row.chatFontSize, DEFAULT_CHAT_FONT_SIZE, CHAT_FONT_SIZE_MIN, CHAT_FONT_SIZE_MAX),
+    transcriptView: enumPreference(row.transcriptView, TRANSCRIPT_VIEW_MODES, DEFAULT_TRANSCRIPT_VIEW_MODE),
+    performanceUsage: enumPreference(row.performanceUsage, PERFORMANCE_USAGE_MODES, DEFAULT_PERFORMANCE_USAGE_MODE),
+    linkOpening: enumPreference(row.linkOpening, LINK_OPENINGS, DEFAULT_LINK_OPENING),
   }
 }
 
@@ -154,6 +190,9 @@ function optionalConversation(value: unknown): {
   chatContentWidth?: number
   chatFullWidth?: boolean
   chatFontSize?: number
+  transcriptView?: typeof TRANSCRIPT_VIEW_MODES[number]
+  performanceUsage?: typeof PERFORMANCE_USAGE_MODES[number]
+  linkOpening?: typeof LINK_OPENINGS[number]
 } {
   const row = object(value)
   const chatFullWidth = row.chatFullWidth
@@ -162,11 +201,17 @@ function optionalConversation(value: unknown): {
   }
   const chatContentWidth = optionalNumberPreference(row.chatContentWidth, CHAT_CONTENT_WIDTH_MIN, CHAT_CONTENT_WIDTH_MAX)
   const chatFontSize = optionalNumberPreference(row.chatFontSize, CHAT_FONT_SIZE_MIN, CHAT_FONT_SIZE_MAX)
+  const transcriptView = optionalEnumPreference(row.transcriptView, TRANSCRIPT_VIEW_MODES)
+  const performanceUsage = optionalEnumPreference(row.performanceUsage, PERFORMANCE_USAGE_MODES)
+  const linkOpening = optionalEnumPreference(row.linkOpening, LINK_OPENINGS)
   return {
     ...optionalBusyEnter(value),
     ...(chatContentWidth === undefined ? {} : { chatContentWidth }),
     ...(chatFullWidth === undefined ? {} : { chatFullWidth }),
     ...(chatFontSize === undefined ? {} : { chatFontSize }),
+    ...(transcriptView === undefined ? {} : { transcriptView }),
+    ...(performanceUsage === undefined ? {} : { performanceUsage }),
+    ...(linkOpening === undefined ? {} : { linkOpening }),
   }
 }
 

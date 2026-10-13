@@ -520,6 +520,13 @@
   "packages/client/runtime/tests/tool-call-tree.client.spec.ts": {
     "427f7efc431dec431f6707ea0e4431c54fafc97efbcc9c93865d29f2488300d9": 1
   },
+  "packages/client/ui-agent-preset/tests/apply.client.spec.ts": {
+    "b2fb53c6878d75d54e2d39be30f77cd5e08810261e513fe15f3d687e2313fbd7": 2,
+    "c2369bc12a9476816900a58b06dd52c2f53bc92658559a076cdd70ae3d15f30b": 8,
+    "c595e4648d474f3a9538ab1e2140c25255bb4675c6e7bae8043adf9158915b69": 13,
+    "dc5477e2d549645db6868af980eb29c57c5ac98cf625f8ca96e5c1007f8f4c7a": 2,
+    "ef9d9ec0964dbc3636449bf1a4a557ab1e137c4281e6b18e7ebed34885f8bb7c": 2
+  },
   "packages/client/ui-agent-preset/tests/section-store.client.spec.ts": {
     "04104bc2e25e45641f5054593427782382e6aec1a991ab989dca349bad7d3370": 1,
     "16f3132321f7851ea3ee9d41da6f4ee9e25ef197a804e70e55c61f4b8dc079bd": 1,

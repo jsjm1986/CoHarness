@@ -23,7 +23,43 @@
   overflow: visible;
 }
 
-/* Brand mark + uppercase letterspaced wordmark, gap 10, centered. */
+/* transitions.dev `18-texts-reveal` (MIT): each element enters from
+   opacity 0 + translateY(12px) + blur(3px) to identity, 500ms smooth-out,
+   children staggered 40ms (headline, workspace row, composer card). */
+@keyframes hero-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(var(--dsw-motion-blur-medium));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.headline,
+.body > .workspaceRow {
+  animation: hero-reveal var(--dsw-motion-duration-very-slow)
+    var(--dsw-motion-ease-smooth-out, var(--ds-ease-in-out)) backwards;
+}
+
+.body > .workspaceRow {
+  animation-delay: var(--dsw-motion-duration-stagger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .headline,
+  .body > .workspaceRow {
+    animation: none;
+  }
+}
+
+/* figma 34:10411: brand mark + title, gap 10, centered; 26/32 wt500. The preview
+   badge is a product addition outside that source: a mono superscript pill
+   riding the title's top-right. */
 .headline {
   display: grid;
   grid-template-columns: 40px auto;
@@ -44,8 +80,28 @@
   align-items: baseline;
 }
 
-/* Stationary grid cell: the mark's ambient bobbing moves inside it without
-   shifting the headline layout. */
+/* beautifului ValuePill (MIT): h-22 radius-full badge — accent ink on the
+   accent tint, 11.5/500. */
+.previewBadge {
+  grid-row: 1;
+  grid-column: 3;
+  align-self: start;
+  margin-top: 2px;
+  margin-left: -3px;
+  box-sizing: border-box;
+  height: 22px;
+  padding: 0 var(--dsw-space-2);
+  border: 0;
+  border-radius: var(--dsw-radius-full);
+  background: var(--dsw-alias-accent-tint);
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 11.5px;
+  line-height: 21px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Keep hover detection on a stationary box while the mark moves within it. */
 .brandHitbox {
   grid-row: 1;
   grid-column: 1;
@@ -97,13 +153,15 @@
   min-height: 28px;
   padding: 0 var(--dsw-space-2);
   border: none;
-  border-radius: var(--dsw-radius-xl);
+  border-radius: var(--dsw-radius-full);
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font-size: 13px;
   line-height: 20px;
   font-weight: 500;
   cursor: pointer;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .workspace:not(:disabled):hover,
@@ -149,6 +207,8 @@
   font-weight: 400;
   line-height: 22px;
   color: var(--dsw-alias-label-primary);
+  transition: border-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .modalInput::placeholder {

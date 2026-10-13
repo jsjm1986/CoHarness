@@ -31,12 +31,12 @@ describe('DocumentsModal.module.css', () => {
 
   it('separates filters from document actions and gives rows a stable hover rhythm', () => {
     expect(modal).toMatch(/\.filterGroup\s*,\s*\.actionGroup\s*\{[\s\S]*display:\s*flex/)
-    expect(modal).toMatch(/\.filterGroup\s*\{[\s\S]*flex:\s*1 1 420px/)
+    expect(modal).toMatch(/\.filterGroup\s*\{[\s\S]*flex:\s*1 1 300px/)
     expect(modal).toMatch(/\.actionGroup\s*\{[\s\S]*margin-left:\s*auto/)
     expect(modal).toMatch(/\.row:hover\s*\{[\s\S]*background:\s*var\(--dsw-alias-interactive-bg-hover\)/)
     expect(modal).toMatch(/@media \(pointer: coarse\)[\s\S]*\.newFolder,[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
     expect(modal).toMatch(/\.overviewActions\s*\{[\s\S]*display:\s*flex/)
-    expect(modal).toMatch(/\.scopeNotice\s*\{[\s\S]*border:\s*1px solid/)
+    expect(modal).toMatch(/\.scopeNotice\s*\{[\s\S]*border-radius:[\s\S]*background:\s*var\(--dsw-alias-bg-layer-2\)/)
     expect(modal).toMatch(/\.scopePickerOption\s*\{[\s\S]*min-height:\s*52px/)
   })
 
@@ -75,7 +75,8 @@ describe('DocumentsModal.module.css', () => {
 
   it('keeps the workbench hierarchy and skips off-screen row rendering', () => {
     expect(modal).toMatch(/\.panel\s*\{[\s\S]*border-radius:\s*14px[\s\S]*box-shadow:\s*var\(--dsw-elevation-panel\)/)
-    expect(modal).toMatch(/\.scopeItemActive\s*\{[\s\S]*box-shadow:\s*inset 3px 0 var\(--dsw-alias-brand-primary\)/)
+    expect(modal).toMatch(/\.scopeItemActive\s*\{[\s\S]*background:\s*var\(--dsw-alias-bg-raised\)/)
+    expect(modal).toMatch(/\.scopeItemActive\s*\{[\s\S]*box-shadow:\s*var\(--dsw-elevation-control\)/)
     expect(modal).toMatch(new RegExp([
       '\\.row,[\\s\\S]*\\.overviewRow,[\\s\\S]*\\.trashRow\\s*\\{',
       '[\\s\\S]*content-visibility:\\s*auto[\\s\\S]*contain-intrinsic-block-size:\\s*auto 50px',

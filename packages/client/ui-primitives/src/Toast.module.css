@@ -28,7 +28,8 @@
   box-shadow: var(--dsw-shadow-lv3);
   transform: translateX(-50%);
   animation:
-    dsh-toast-in 160ms ease-out,
+    dsh-toast-in var(--dsw-motion-duration-medium, 350ms)
+      var(--dsw-motion-ease-smooth-out, ease-out),
     dsh-toast-fade 1000ms ease var(--dsh-toast-hold, 3000ms) forwards;
 }
 
@@ -71,12 +72,14 @@
 @keyframes dsh-toast-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -6px);
+    transform: translate(-50%, -16px) scale(0.97);
+    filter: blur(var(--dsw-motion-blur-small, 2px));
   }
 
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translate(-50%, 0) scale(1);
+    filter: blur(0);
   }
 }
 

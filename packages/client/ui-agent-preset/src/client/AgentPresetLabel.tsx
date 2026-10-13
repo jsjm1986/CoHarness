@@ -11,8 +11,7 @@
 import { useEffect } from 'react'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { IconAgentPresetOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-// Type-only: pulls the ui-conversation SlotMap merge (the header actions).
+// Type-only: pulls the ui-conversation SlotMap merge (the header title meta).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { AgentPresetSettingsState } from './settings-store.ts'
 import { presetDisplayText } from './locales.ts'
@@ -30,14 +29,14 @@ export interface AgentPresetLabelInjected {
 
 /** Full component props. */
 export type AgentPresetLabelProps =
-  PropsRuntime<'conversation.session.header.actions'>
+  PropsRuntime<'conversation.session.header.titleMeta'>
   & PropsLocale<'settings.agentPreset'>
   & InjectFace<AgentPresetLabelInjected>
 
 /**
- * Render this session's agent-preset name beside its title.
+ * Render this session's agent-preset name as the title's text suffix.
  * @param props - composed slot props.
- * @returns the label, or null when the session records no preset.
+ * @returns the suffix, or null when the session records no preset.
  */
 export function AgentPresetLabel({
   sessionId, useSessions, useAgentPresets, load, t,
@@ -57,7 +56,6 @@ export function AgentPresetLabel({
   const text = option === undefined ? undefined : presetDisplayText(option, t)
   return (
     <span className={css.label} title={text?.description ?? t('headerHint')}>
-      <IconAgentPresetOutline16 size={14} className={css.icon} />
       {text?.name ?? preset}
     </span>
   )

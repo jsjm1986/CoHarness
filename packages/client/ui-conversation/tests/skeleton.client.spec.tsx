@@ -109,6 +109,10 @@ function mount(
     omitSummaryRow?: boolean
     /** Classify the selected child as a subagent instead of an ordinary fork. */
     summaryOrigin?: 'subagent'
+    /** Mark the session summary as actively running. */
+    summaryRunning?: boolean
+    /** Attach a pending human interaction to the session summary. */
+    summaryPending?: boolean
     /** A composer block another plugin raised for this session. */
     composerBlock?: { reason: string }
     /** Account scope policy driving the pane's steward placeholder. */
@@ -123,7 +127,8 @@ function mount(
   const rootRow = { id: root, displayTitle: 'Root', running: false, blank: false, updatedAt: 1 }
   const childRow = {
     id: SID, displayTitle: 'Child', parentId: root, cwd: '/projects/one',
-    running: false, blank: options.summaryBlank ?? false, updatedAt: 2,
+    running: options.summaryRunning ?? false, blank: options.summaryBlank ?? false, updatedAt: 2,
+    ...(options.summaryPending === true ? { pendingInteraction: 'approval' as const } : {}),
     ...(options.summaryWorkspaceId === undefined ? {} : { workspaceId: options.summaryWorkspaceId }),
     ...(options.summaryOrigin === undefined ? {} : { origin: options.summaryOrigin }),
   }
@@ -573,8 +578,24 @@ describe('ConversationRoot resident composer', () => {
     expect(host?.contains(header)).toBe(false)
     expect(host?.contains(seat)).toBe(true)
     expect(seat?.contains(textarea)).toBe(true)
+    expect(b.slotCalls).toContain('conversation.session.header.titleMeta')
     expect(b.slotCalls).toContain('conversation.session.header.actions')
     expect(b.slotCalls).toContain('conversation.session.header.utilities')
+  })
+
+  it('marks the title with a warning dot while a human answer is pending', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, { summaryPending: true })
+    expect(b.view.getByTitle(zh['session.status.waiting'])?.querySelector('[data-state="warning"]')).not.toBeNull()
+  })
+
+  it('marks the title with an ongoing dot while the session runs, and none while idle', () => {
+    const running = mount(conversationSnapshot(), undefined, undefined, { summaryRunning: true })
+    expect(running.view.getByTitle(zh['session.status.running'])?.querySelector('[data-state="ongoing"]')).not.toBeNull()
+    cleanup()
+
+    const idle = mount(conversationSnapshot())
+    expect(idle.view.queryByTitle(zh['session.status.running'])).toBeNull()
+    expect(idle.view.queryByTitle(zh['session.status.waiting'])).toBeNull()
   })
 
   it('blank phase: header keeps only the corner seat, no title or utility chrome', () => {

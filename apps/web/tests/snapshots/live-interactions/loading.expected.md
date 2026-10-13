@@ -1,14 +1,11 @@
 - banner:
+  - text: Running
+  - navigation "Session hierarchy":
+    - button "Reply with a one-sentence description" [disabled]
+  - text: Standard mode
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "Reply with a one-sentence description" [disabled]
-  - img
-  - text: Standard mode
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - button "Process details" [expanded]:

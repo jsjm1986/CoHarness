@@ -171,6 +171,7 @@ export const zh = {
   'access.confirm.cancel': '取消',
   'access.confirm.enable': '启用完全权限',
   'hero.headline': 'COHARNESS',
+  'hero.preview': '预览版',
   'hero.chooseWorkspace': '选择工作区',
 
   'workspace.selectFailed': '无法打开该工作区：{message}（{code}）',
@@ -180,6 +181,8 @@ export const zh = {
   'workspace.discard.cancel': '留在当前会话',
   'workspace.discard.confirm': '放弃并切换',
   'session.hierarchy': '会话层级',
+  'session.status.running': '运行中',
+  'session.status.waiting': '等待处理',
   'details.title': '详情',
   'details.close': '关闭详情',
   'details.empty': '点击消息流中的工具行查看详情',
@@ -770,6 +773,7 @@ export const en = {
   'access.confirm.cancel': 'Cancel',
   'access.confirm.enable': 'Enable Full access',
   'hero.headline': 'COHARNESS',
+  'hero.preview': 'Preview',
   'hero.chooseWorkspace': 'Choose workspace',
 
   'workspace.selectFailed': 'Could not open the workspace: {message} ({code})',
@@ -779,6 +783,8 @@ export const en = {
   'workspace.discard.cancel': 'Stay in current session',
   'workspace.discard.confirm': 'Discard and switch',
   'session.hierarchy': 'Session hierarchy',
+  'session.status.running': 'Running',
+  'session.status.waiting': 'Awaiting handling',
   'details.title': 'Details',
   'details.close': 'Close details',
   'details.empty': 'Click a tool row in the message flow to view its details',

@@ -12,7 +12,7 @@
   pointer-events: none;
   background-color: var(--dsw-alias-bg-mask-drop);
   backdrop-filter: blur(10px);
-  animation: fade-in 160ms ease-out;
+  animation: fade-in var(--dsw-motion-duration-quick) var(--dsw-motion-ease-smooth-out, ease-out);
 }
 
 @keyframes fade-in {

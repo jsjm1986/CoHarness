@@ -176,7 +176,7 @@ function renderHeaderGeometry(metrics: {
   singleLine: boolean
   titleBeforeSubagents: boolean
   subagentsBeforeSharing: boolean
-  sharingBeforePreset: boolean
+  presetBeforeSharing: boolean
   presetBeforeUtility: boolean
   participantsMenuOnly: boolean
   subagentsNoWrap: boolean
@@ -184,9 +184,9 @@ function renderHeaderGeometry(metrics: {
   return [
     '# Project session header actions',
     '',
-    '| single row | title before subagents | subagents before sharing | sharing before preset | preset before utility | participants menu-only | subagents no-wrap |',
+    '| single row | title before subagents | subagents before sharing | preset before sharing | preset before utility | participants menu-only | subagents no-wrap |',
     '| --- | --- | --- | --- | --- | --- | --- |',
-    `| ${String(metrics.singleLine)} | ${String(metrics.titleBeforeSubagents)} | ${String(metrics.subagentsBeforeSharing)} | ${String(metrics.sharingBeforePreset)} | ${String(metrics.presetBeforeUtility)} | ${String(metrics.participantsMenuOnly)} | ${String(metrics.subagentsNoWrap)} |`,
+    `| ${String(metrics.singleLine)} | ${String(metrics.titleBeforeSubagents)} | ${String(metrics.subagentsBeforeSharing)} | ${String(metrics.presetBeforeSharing)} | ${String(metrics.presetBeforeUtility)} | ${String(metrics.participantsMenuOnly)} | ${String(metrics.subagentsNoWrap)} |`,
   ].join('\n')
 }
 
@@ -337,7 +337,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
     const sharing = page.getByRole('button', { name: 'Manage conversation sharing' })
     const preset = page.getByText('PTC mode', { exact: true })
     const subagents = page.getByRole('button', { name: '6 subagents' })
-    const utility = page.getByRole('button', { name: 'Session log' })
+    const utility = page.getByRole('button', { name: 'Open right sidebar' })
     await Promise.all([
       titleRow.waitFor(), title.waitFor(), sharing.waitFor(), preset.waitFor(), subagents.waitFor(), utility.waitFor(),
     ])
@@ -359,7 +359,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       singleLine: rowBox.height <= 32 + tolerance,
       titleBeforeSubagents: titleBox.x + titleBox.width <= subagentBox.x + tolerance,
       subagentsBeforeSharing: subagentBox.x + subagentBox.width <= sharingBox.x + tolerance,
-      sharingBeforePreset: sharingBox.x + sharingBox.width <= presetBox.x + tolerance,
+      presetBeforeSharing: presetBox.x + presetBox.width <= sharingBox.x + tolerance,
       presetBeforeUtility: presetBox.x + presetBox.width <= utilityBox.x + tolerance,
       participantsMenuOnly: await page.getByText('Participants (2)', { exact: true }).count() === 0,
       subagentsNoWrap: await subagents.evaluate(element => getComputedStyle(element).whiteSpace === 'nowrap'),
@@ -368,7 +368,7 @@ describe.skipIf(MODE === 'record')('web e2e: project collaboration controls', ()
       singleLine: true,
       titleBeforeSubagents: true,
       subagentsBeforeSharing: true,
-      sharingBeforePreset: true,
+      presetBeforeSharing: true,
       presetBeforeUtility: true,
       participantsMenuOnly: true,
       subagentsNoWrap: true,

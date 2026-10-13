@@ -1,12 +1,9 @@
 - banner:
+  - navigation "Session hierarchy":
+    - 'button "Run two shell commands: wait" [disabled]'
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - 'button "Run two shell commands: wait" [disabled]'
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - button "2 tool calls · 1 intermediate message" [expanded]:
@@ -29,7 +26,9 @@
   - text: "Failed Bash Error: tool call aborted"
 - text: "IN { \"command\": \"node -e \\\"require('node:fs').writeFileSync('started.txt', 'started'); setInterval(() => {}, 1000)\\\"\", \"description\": \"Wait until cancellation\" } OUT Error: tool call aborted"
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - 'button "Failed Bash Error: tool call aborted before dispatch"':
   - img
   - text: "Failed Bash Error: tool call aborted before dispatch"

@@ -1,12 +1,9 @@
 - banner:
+  - navigation "Session hierarchy":
+    - button "Use the read tool twice" [disabled]
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "Use the read tool twice" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - navigation "Turn navigation":

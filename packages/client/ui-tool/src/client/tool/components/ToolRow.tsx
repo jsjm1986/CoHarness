@@ -261,8 +261,8 @@ export function ToolRow({
       <DisclosureRow
         rowClassName={css.row}
         leadingClassName={css.leading}
-        titleClassName={css.title}
         chevronClassName={css.chevron}
+        running={state === 'running' || state === 'preparing'}
         icon={leadingFor(state, icon)}
         title={title}
         open={open}

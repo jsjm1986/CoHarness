@@ -1,0 +1,4 @@
+/* The chip title's file glyph stays at the strip's icon size while the name shrinks. */
+.titleIcon {
+  flex: none;
+}

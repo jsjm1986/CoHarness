@@ -80,7 +80,7 @@ describe('GuideBody', () => {
     // The entry without a glyph falls back to the shipped cube, at the same size, on the quieter ink.
     const placeholder = terminal?.querySelector('svg')
     expect(placeholder?.getAttribute('width')).toBe('22')
-    expect(placeholder?.getAttribute('class')).toBe(css.placeholderInk)
+    expect(placeholder?.getAttribute('class')).toContain(css.placeholderInk)
     expect(files?.querySelector('svg')).toBeNull()
     cleanup()
   })

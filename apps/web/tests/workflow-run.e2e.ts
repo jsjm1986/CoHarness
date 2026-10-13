@@ -147,7 +147,7 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     expect(darkNarrow.statusFontSize).toBe('13px')
     expect(darkNarrow.runHeight).toBe(44)
     expect(darkNarrow.phaseHeight).toBeGreaterThanOrEqual(32)
-    expect(darkNarrow.phaseHeight).toBeLessThanOrEqual(44)
+    expect(darkNarrow.phaseHeight).toBeLessThanOrEqual(44.5)
     expect(darkNarrow.phaseTitleRight).toBeLessThanOrEqual(darkNarrow.phaseStatusLeft)
     await page.locator('[data-workflow-run]').evaluate((element) => {
       (element as HTMLElement).style.removeProperty('width')

@@ -67,8 +67,11 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
   const highlight = state.open ? state.highlight : null
   // Focus stays in the textarea (combobox pattern), so the browser never
   // scrolls the active option into view on keyboard moves — do it here.
+  // Pointer highlights already sit under the cursor: scrolling the list
+  // beneath it re-fires mousemove on the row that slides under, which
+  // highlights that row and scrolls again in a feedback loop.
   useEffect(() => {
-    if (highlight === null) return
+    if (highlight === null || highlight.viaPointer === true) return
     document.getElementById(optionId(highlight.source, highlight.index))
       ?.scrollIntoView({ block: 'nearest' })
   }, [highlight])

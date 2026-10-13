@@ -31,9 +31,23 @@ const initial: AccountPreferencesView = {
   values: {
     locale: {},
     'ui-theme': { preference: 'system' },
-    'ui-conversation': { busyEnter: 'queue', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14 },
+    'ui-conversation': {
+      busyEnter: 'queue', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14,
+      transcriptView: 'detailed', performanceUsage: 'detailed', linkOpening: 'sidebar',
+    },
   },
   overrides: { locale: {}, 'ui-theme': {}, 'ui-conversation': {} },
+}
+
+/** Product defaults each `ui-conversation` field falls back to after an unset. */
+const CONVERSATION_DEFAULTS: Record<string, unknown> = {
+  busyEnter: 'queue',
+  chatContentWidth: 748,
+  chatFullWidth: false,
+  chatFontSize: 14,
+  transcriptView: 'detailed',
+  performanceUsage: 'detailed',
+  linkOpening: 'sidebar',
 }
 
 function themeView(revision: number, preference: 'light' | 'dark'): AccountPreferencesView {
@@ -70,13 +84,9 @@ function transport(): AccountPreferencesTransport & { calls: AccountPreferenceMu
               ? { preference: mutation.operation === 'unset' ? 'system' : mutation.value as 'light' | 'dark' | 'system' }
               : {
                 ...current.values['ui-conversation'],
-                ...(mutation.field === 'busyEnter'
-                  ? { busyEnter: mutation.operation === 'unset' ? 'queue' : mutation.value as 'queue' | 'steer' }
-                  : mutation.field === 'chatContentWidth'
-                    ? { chatContentWidth: mutation.operation === 'unset' ? 748 : mutation.value as number }
-                    : mutation.field === 'chatFullWidth'
-                      ? { chatFullWidth: mutation.operation === 'unset' ? false : mutation.value as boolean }
-                      : { chatFontSize: mutation.operation === 'unset' ? 14 : mutation.value as number }),
+                [mutation.field]: mutation.operation === 'unset'
+                  ? CONVERSATION_DEFAULTS[mutation.field]
+                  : mutation.value,
               },
         },
         overrides: {
@@ -88,10 +98,8 @@ function transport(): AccountPreferencesTransport & { calls: AccountPreferenceMu
               : mutation.namespace === 'ui-theme'
                 ? { preference: mutation.value as 'light' | 'dark' | 'system' }
                 : {
-                  ...(mutation.field === 'busyEnter' ? { busyEnter: mutation.value as 'queue' | 'steer' } : {}),
-                  ...(mutation.field === 'chatContentWidth' ? { chatContentWidth: mutation.value as number } : {}),
-                  ...(mutation.field === 'chatFullWidth' ? { chatFullWidth: mutation.value as boolean } : {}),
-                  ...(mutation.field === 'chatFontSize' ? { chatFontSize: mutation.value as number } : {}),
+                  ...current.overrides['ui-conversation'],
+                  [mutation.field]: mutation.value,
                 },
         },
       }
@@ -134,7 +142,11 @@ describe('account settings scope', () => {
     expect(mirror.namespace('locale')).toMatchObject({ ns: 'locale', base: {}, user: {} })
     expect(mirror.namespace('ui-theme')).toMatchObject({ ns: 'ui-theme', base: { preference: 'system' } })
     expect(mirror.namespace('ui-conversation')).toMatchObject({
-      ns: 'ui-conversation', base: { busyEnter: 'queue', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14 },
+      ns: 'ui-conversation',
+      base: {
+        busyEnter: 'queue', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14,
+        transcriptView: 'detailed', performanceUsage: 'detailed', linkOpening: 'sidebar',
+      },
     })
     expect(mirror.namespace('other')).toBeUndefined()
 
@@ -886,7 +898,7 @@ describe('account settings scope', () => {
     retainedHostListener?.()
   })
 
-  it('routes fields outside the account whitelist to the Host scope and merges both layers', async () => {
+  it('routes account-owned fields to the endpoint and unlisted fields to the Host scope', async () => {
     const accountApi = transport()
     const mirror = new AccountPreferencesMirror(accountApi)
     const account = new AccountSettingsScopeController(accountApi, { namespace: 'ui-conversation' }, mirror)
@@ -896,12 +908,8 @@ describe('account settings scope', () => {
       status: 'ready',
       value: {
         busyEnter: 'steer',
-        chatContentWidth: 640,
-        chatFullWidth: true,
-        chatFontSize: 16,
         transcriptView: 'compact',
-        performanceUsage: 'detailed',
-        linkOpening: 'new-tab',
+        pluginNotes: 'off',
       },
       base: { transcriptView: 'detailed' },
       user: { transcriptView: 'compact', busyEnter: 'steer' },
@@ -921,27 +929,28 @@ describe('account settings scope', () => {
     }
     const composite = new AccountOrHostSettingsScopeController(account, host, mirror, 'ui-conversation')
     await mirror.ensure()
-    // Whitelisted fields carry the account layer while the Host-only fields
-    // the endpoint rejects keep their stored values and override marks.
+    // Whitelisted fields carry the account layer while keys the endpoint does
+    // not own keep their Host-stored values.
     expect(composite.getSnapshot().value).toEqual({
       busyEnter: 'queue',
       chatContentWidth: 748,
       chatFullWidth: false,
       chatFontSize: 14,
-      transcriptView: 'compact',
+      transcriptView: 'detailed',
       performanceUsage: 'detailed',
-      linkOpening: 'new-tab',
+      linkOpening: 'sidebar',
+      pluginNotes: 'off',
     })
-    expect(composite.getSnapshot().user).toEqual({ transcriptView: 'compact' })
+    expect(composite.getSnapshot().user).toEqual({})
     await composite.set('transcriptView', 'standard')
-    expect(hostSet).toHaveBeenCalledWith('transcriptView', 'standard')
-    expect(accountApi.calls).toHaveLength(0)
-    await composite.unset('performanceUsage')
-    expect(hostUnset).toHaveBeenCalledWith('performanceUsage')
-    await composite.set('busyEnter', 'steer')
     expect(accountApi.calls).toHaveLength(1)
-    expect(accountApi.calls[0]?.field).toBe('busyEnter')
-    expect(composite.getSnapshot().user).toEqual({ transcriptView: 'compact', busyEnter: 'steer' })
+    expect(accountApi.calls[0]?.field).toBe('transcriptView')
+    expect(hostSet).not.toHaveBeenCalled()
+    expect(composite.getSnapshot().user).toEqual({ transcriptView: 'standard' })
+    await composite.set('pluginNotes', 'on')
+    expect(hostSet).toHaveBeenCalledWith('pluginNotes', 'on')
+    await composite.unset('pluginNotes')
+    expect(hostUnset).toHaveBeenCalledWith('pluginNotes')
     // A Host-routed write failure still reaches the rendered write state.
     hostSnapshot.write = { status: 'error', code: 'host-write', message: 'host write failed' }
     hostListener?.()

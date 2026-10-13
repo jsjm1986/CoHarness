@@ -134,6 +134,9 @@ export class AccountPreferencesMirror {
           chatContentWidth: 748,
           chatFullWidth: false,
           chatFontSize: 14,
+          transcriptView: 'detailed',
+          performanceUsage: 'detailed',
+          linkOpening: 'sidebar',
         }
     const value = ns === 'locale'
       ? view.values.locale
@@ -389,7 +392,10 @@ export class AccountSettingsScopeController<T> implements SettingsScope<T> {
 const ACCOUNT_FIELDS: Record<string, readonly string[]> = {
   locale: ['preference'],
   'ui-theme': ['preference'],
-  'ui-conversation': ['busyEnter', 'chatContentWidth', 'chatFullWidth', 'chatFontSize'],
+  'ui-conversation': [
+    'busyEnter', 'chatContentWidth', 'chatFullWidth', 'chatFontSize',
+    'transcriptView', 'performanceUsage', 'linkOpening',
+  ],
 }
 
 /**

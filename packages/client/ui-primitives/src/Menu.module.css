@@ -15,7 +15,11 @@
   gap: 0;
   border: 0;
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
-  box-shadow: var(--dsw-elevation-prominent);
+  box-shadow: var(--dsw-elevation-raised);
+  /* Entrance: brief fade + slight settle from the anchor edge. The origin
+     follows the open side so the card appears to grow out of its trigger. */
+  animation: menu-in var(--dsw-motion-duration-pop)
+    var(--dsw-motion-ease-out-strong, var(--ds-ease-in-out)) backwards;
   /* Elevated surface: the scrollbar thumb takes the l2 elevation tokens. The
      declaration sits on the card rather than on `.scrollable .viewport`
      because the elevation is a property of this surface, and the custom
@@ -26,6 +30,13 @@
 }
 
 /* Primary card is 218 wide in the design across both hosts. */
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--dsw-motion-scale-modal));
+  }
+}
+
 .list {
   position: absolute;
   top: calc(100% + 4px);
@@ -33,6 +44,7 @@
   z-index: 100;
   min-width: 218px;
   max-width: 360px;
+  transform-origin: top left;
 }
 
 /* Portal mode: fixed in the viewport, coordinates supplied inline from the
@@ -50,11 +62,25 @@
 .sideTop {
   top: auto;
   bottom: calc(100% + 4px);
+  transform-origin: bottom left;
+  animation-name: menu-in-top;
+}
+
+@keyframes menu-in-top {
+  from {
+    opacity: 0;
+    transform: scale(var(--dsw-motion-scale-modal));
+  }
 }
 
 .alignEnd {
   left: auto;
   right: 0;
+  transform-origin: top right;
+}
+
+.alignEnd.sideTop {
+  transform-origin: bottom right;
 }
 
 /* Viewport fit: the card stops 12px short of the viewport's top/bottom edges
@@ -103,16 +129,19 @@
   align-items: center;
   gap: var(--dsw-space-2);
   width: 100%;
-  min-height: 40px;
-  padding: var(--dsw-space-2) 10px;
+  min-height: 30px;
+  padding: 0 var(--dsw-space-2);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--dsw-radius-chip);
   background: transparent;
   cursor: pointer;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
   color: var(--dsw-alias-label-primary);
   text-align: left;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .item:hover:not(:disabled) {
@@ -125,6 +154,11 @@
 .item:focus-visible:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
   outline: none;
+}
+
+.item:active:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-active);
+  transition-duration: 0s;
 }
 
 .denseList .item {
@@ -284,6 +318,15 @@
   left: calc(100% + 10px);
   z-index: 101;
   min-width: 163px;
+  transform-origin: left center;
+  animation-name: menu-in-side;
+}
+
+@keyframes menu-in-side {
+  from {
+    opacity: 0;
+    transform: translateX(-4px) scale(0.98);
+  }
 }
 
 .submenu::before {
@@ -325,7 +368,8 @@
     overflow-y: auto;
     border-radius: var(--dsw-mobile-sheet-radius);
     z-index: 1091;
-    animation: mobile-menu-sheet-in var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+    animation: mobile-menu-sheet-in var(--ds-transition-duration-slow)
+      var(--dsw-motion-ease-emphasized, var(--ds-ease-in-out));
   }
 
   /* Keep a supplied header and pinned footer outside the scrollport. Menus
@@ -379,11 +423,14 @@
 }
 
 @keyframes mobile-menu-sheet-in {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(14px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .list {
+  .list,
+  .submenu,
+  .item {
     animation: none;
+    transition: none;
   }
 }

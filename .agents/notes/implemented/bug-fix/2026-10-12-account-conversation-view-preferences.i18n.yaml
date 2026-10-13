@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-12-account-conversation-view-preferences.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-12-account-conversation-view-preferences.md
+/agent-note-account-preferences-carry-every-ui-conversation-field:
+  en: 4f794cfe04b1a23a
+  zh: bc439aefada0df8c
+/agent-note-account-preferences-carry-every-ui-conversation-field/problem:
+  en: cf2cf183be80dfca
+  zh: c4472e3ae780e698
+/agent-note-account-preferences-carry-every-ui-conversation-field/decision:
+  en: bfefb5ad8e2ca4b4
+  zh: e4081d2ac29abf97
+/agent-note-account-preferences-carry-every-ui-conversation-field/alternatives-considered:
+  en: bc2a90e3e4ed59e8
+  zh: 9dabda496b662ace
+/agent-note-account-preferences-carry-every-ui-conversation-field/consequences:
+  en: b0ab66dae3fc4c81
+  zh: 2711d979fed2fc59
+/agent-note-account-preferences-carry-every-ui-conversation-field/verification:
+  en: 6d8b9ed9c3e0e3cf
+  zh: 7f2d5d68ef389d54
+/agent-note-account-preferences-carry-every-ui-conversation-field/related:
+  en: f7b24a224d6ebadf
+  zh: 8f3ee14012606540

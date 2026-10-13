@@ -30,9 +30,21 @@
 }
 
 /* A recorded rating stays legible without hover, so the signal survives a
-   pointer leaving the row. */
+   pointer leaving the row. The filled glyph pops in with the badge-bounce
+   ease (transitions.dev like-button pop, MIT — no particles). */
 .action[data-active] {
   color: var(--dsw-alias-label-primary);
+}
+
+.action[data-active] svg {
+  animation: feedback-pop var(--dsw-motion-duration-medium) var(--dsw-motion-ease-bounce) backwards;
+}
+
+@keyframes feedback-pop {
+  from {
+    transform: scale(0.25);
+    opacity: 0;
+  }
 }
 
 .noteOpen {
@@ -202,7 +214,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .notePanel {
+  .notePanel,
+  .action[data-active] svg {
     animation: none;
   }
 }

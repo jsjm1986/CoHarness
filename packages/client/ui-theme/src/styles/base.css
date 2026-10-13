@@ -12,6 +12,40 @@
   --ds-transition-duration: 0.2s;
   --ds-transition-duration-fast: 0.1s;
   --ds-transition-duration-slow: 0.3s;
+
+  /* Shared motion scale — duration/easing/scale/blur tokens ported from the
+     transitions.dev root token sheet and the beui.dev/beautifului.dev easing
+     curves (MIT). Modules pair these with their own local @keyframes
+     (keyframes cannot be shared through CSS Modules, which scope animation
+     names per file). */
+  --dsw-motion-duration-stagger: 40ms;
+  --dsw-motion-duration-micro: 80ms;
+  --dsw-motion-duration-quick: 150ms;
+  --dsw-motion-duration-pop: 180ms; /* beautifului pop-in */
+  --dsw-motion-duration-fast: 250ms;
+  --dsw-motion-duration-medium: 350ms;
+  --dsw-motion-duration-slow: 400ms;
+  --dsw-motion-duration-very-slow: 500ms;
+  --dsw-motion-ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1); /* transitions.dev open/close, panels, tabs */
+  --dsw-motion-ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1); /* beautifului glide highlight, pop-in */
+  --dsw-motion-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1); /* beui EASE_OUT / beautifului --ease-link */
+  --dsw-motion-ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --dsw-motion-ease-bounce: cubic-bezier(0.34, 1.36, 0.64, 1); /* badge pop */
+  --dsw-motion-ease-toggle: cubic-bezier(0.34, 1.35, 0.64, 1); /* switch double bounce */
+  --dsw-motion-scale-modal: 0.96;
+  --dsw-motion-scale-dropdown: 0.97;
+  --dsw-motion-scale-tooltip: 0.98;
+  --dsw-motion-scale-dropdown-close: 0.99;
+  --dsw-motion-blur-small: 2px;
+  --dsw-motion-blur-medium: 3px;
+
+  /* Compatibility names component sheets already read: `emphasized` is the
+     decelerating entrance curve for menus, popovers, sheets, and dialogs;
+     `standard` covers hover/press color and transform replies. */
+  --dsw-motion-ease-standard: var(--ds-ease-in-out);
+  --dsw-motion-ease-emphasized: var(--dsw-motion-ease-out-expo);
+  --dsw-motion-duration-enter: var(--dsw-motion-duration-fast);
+  --dsw-motion-duration-exit: var(--dsw-motion-duration-quick);
 }
 
 /* focusWithoutRing marks automatic entry/return focus; keyboard traversal

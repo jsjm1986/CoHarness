@@ -15,7 +15,8 @@
 @media (hover: hover) {
   :global([data-actions-reveal='hover']) .actions {
     opacity: 0;
-    transition: opacity 80ms ease;
+    transition: opacity var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, ease);
   }
 
   :global([data-actions-reveal='hover']:hover) .actions,
@@ -25,18 +26,21 @@
 }
 
 /* Clock before icons (user figma 388:20051) / after (assistant 43:32997). */
+/* Meta (clock + run readings): 12px tabular with middot separators. */
 .timeStart {
   padding-right: var(--dsw-space-3);
-  font-size: 14px;
+  font-size: 12px;
   line-height: 24px;
+  font-variant-numeric: tabular-nums;
   color: var(--dsw-alias-label-tertiary);
   white-space: nowrap;
 }
 
 .timeEnd {
   padding-left: var(--dsw-space-3);
-  font-size: 14px;
+  font-size: 12px;
   line-height: 24px;
+  font-variant-numeric: tabular-nums;
   color: var(--dsw-alias-label-tertiary);
   white-space: nowrap;
 }
@@ -52,7 +56,8 @@
 @media (hover: hover) {
   [data-time-hover-root] :is(.timeStart, .timeEnd) {
     opacity: 0;
-    transition: opacity 80ms ease;
+    transition: opacity var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, ease);
   }
 
   [data-time-hover-root]:hover :is(.timeStart, .timeEnd),
@@ -73,11 +78,44 @@
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
+  transition:
+    background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    transform var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .action:hover {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
+}
+
+/* Copy → check swap (transitions.dev 09-icon-swap, MIT): the incoming glyph
+   fades in from a quarter scale with a 2px blur. The state attribute on the
+   button scopes the animation to the swap, not the row's first paint. */
+.action[data-copied] :global(svg) {
+  animation: action-icon-swap var(--dsw-motion-duration-fast)
+    var(--dsw-motion-ease-smooth-out, var(--ds-ease-in-out)) backwards;
+}
+
+@keyframes action-icon-swap {
+  from {
+    opacity: 0;
+    transform: scale(0.25);
+    filter: blur(var(--dsw-motion-blur-small));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action[data-copied] :global(svg) {
+    animation: none;
+  }
+}
+
+.action:active:not([data-unavailable]) {
+  transform: scale(0.84);
 }
 
 /* Unavailable stays focusable and hoverable so Tooltip can explain why. */

@@ -17,7 +17,15 @@ import type {
 const ACCOUNT_BASE: AccountPreferencesView['values'] = {
   locale: {},
   'ui-theme': { preference: 'system' },
-  'ui-conversation': { busyEnter: 'queue', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14 },
+  'ui-conversation': {
+    busyEnter: 'queue',
+    chatContentWidth: 748,
+    chatFullWidth: false,
+    chatFontSize: 14,
+    transcriptView: 'detailed',
+    performanceUsage: 'detailed',
+    linkOpening: 'sidebar',
+  },
 }
 
 /**

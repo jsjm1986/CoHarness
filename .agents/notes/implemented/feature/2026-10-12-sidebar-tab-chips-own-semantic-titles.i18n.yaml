@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-12-sidebar-tab-chips-own-semantic-titles.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-12-sidebar-tab-chips-own-semantic-titles.md
+/agent-note-right-sidebar-tab-chips-own-their-semantic-title-presentation:
+  en: 3ff0a3be3a38113a
+  zh: da974f3ffe21a6ea
+/agent-note-right-sidebar-tab-chips-own-their-semantic-title-presentation/problem:
+  en: e6dcd1b61e5ba076
+  zh: a1ed50d4983b20bf
+/agent-note-right-sidebar-tab-chips-own-their-semantic-title-presentation/decision:
+  en: f5fb0fd7e76e946f
+  zh: 435a4bead03591e6
+/agent-note-right-sidebar-tab-chips-own-their-semantic-title-presentation/alternatives-considered:
+  en: 69e4f86912815950
+  zh: eaf5b34637fcb429
+/agent-note-right-sidebar-tab-chips-own-their-semantic-title-presentation/consequences:
+  en: e351758fedb3ef3c
+  zh: 62a91698c7d69644

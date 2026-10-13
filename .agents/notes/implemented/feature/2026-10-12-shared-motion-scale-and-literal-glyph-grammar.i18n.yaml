@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-12-shared-motion-scale-and-literal-glyph-grammar.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-12-shared-motion-scale-and-literal-glyph-grammar.md
+/agent-note-shared-motion-scale-and-literal-glyph-grammar-across-client-surfaces:
+  en: 4cfab709120497ec
+  zh: 9565e62f16801d27
+/agent-note-shared-motion-scale-and-literal-glyph-grammar-across-client-surfaces/problem:
+  en: 9ded980f3cd3a283
+  zh: 93f42dc3ed607a16
+/agent-note-shared-motion-scale-and-literal-glyph-grammar-across-client-surfaces/decision:
+  en: a358e8d9d1bcb6d5
+  zh: 8ab532f7e40836e2
+/agent-note-shared-motion-scale-and-literal-glyph-grammar-across-client-surfaces/alternatives-considered:
+  en: 454a8c8f21dcada5
+  zh: 06b19599d22469ab
+/agent-note-shared-motion-scale-and-literal-glyph-grammar-across-client-surfaces/consequences:
+  en: a8c75d6dcfd87b8e
+  zh: bc2888949ff6f46c

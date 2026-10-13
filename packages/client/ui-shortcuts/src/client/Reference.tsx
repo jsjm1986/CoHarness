@@ -1,6 +1,6 @@
 /** Searchable editable shortcut reference and its General Settings row. */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Button, IconCloseOutline16, IconRefreshOutline16, Modal, ShortcutKeys, Tooltip, Toast, focusWithoutRing, isBehindModal, rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconCloseOutline16, IconRefreshOutline16, IconSearchOutline16, Modal, ShortcutKeys, Tooltip, Toast, focusWithoutRing, isBehindModal, rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ShortcutCatalogEntry, ShortcutPlatform, Shortcuts } from '@deepseek-ai/dsh-client-shortcuts/client'
@@ -165,10 +165,7 @@ export function ShortcutReference({
       </header>
       <div className={css.searchRow}>
         <div className={css.searchField} role="search" aria-label={t('search')}>
-          <svg className={css.searchIcon} width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path d="M10.28 5.86536C10.28 3.41381 8.29245 1.42644 5.84094 1.42627C3.38929 1.42627 1.40186 3.4137 1.40186 5.86536C1.40203 8.31686 3.38939 10.3044 5.84094 10.3044C8.29234 10.3043 10.2799 8.31676 10.28 5.86536ZM11.4174 5.86536C11.4172 8.94498 8.92057 11.4416 5.84094 11.4418C2.76117 11.4418 0.263843 8.94509 0.263672 5.86536C0.263672 2.78548 2.76106 0.288086 5.84094 0.288086C8.92067 0.288258 11.4174 2.78559 11.4174 5.86536Z" fill="currentColor" />
-            <path d="M13.7372 12.9078L12.9323 13.7127L9.9732 10.7536L10.7781 9.94867L13.7372 12.9078Z" fill="currentColor" />
-          </svg>
+          <IconSearchOutline16 size={14} className={css.searchIcon} aria-hidden="true" />
           <input ref={search} data-modal-autofocus className={css.search} type="search" aria-label={t('search')}
             placeholder={t('search')} value={query} onChange={(event) => { actions.search(event.target.value) }} />
           {query !== '' && <button type="button" className={css.clearSearch} aria-label={t('clear-search')}

@@ -1,12 +1,9 @@
 - banner:
+  - navigation "Session hierarchy":
+    - button "Use the ask_user_question tool to" [disabled]
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "Use the ask_user_question tool to" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - button "1 tool call · 1 intermediate message" [expanded]:
@@ -26,7 +23,9 @@
 - paragraph: This question set was cancelled before answers were submitted.
 - list:
   - listitem: Which color do you prefer?
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - textbox "Message the agent"
 - button "Add images or documents":
   - img

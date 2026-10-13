@@ -53,8 +53,8 @@ export function ReasoningRow({ text, running, settledReasoningPreview = true, t 
       <DisclosureRow
         rowClassName={css.row}
         leadingClassName={css.leading}
-        titleClassName={css.title}
         chevronClassName={css.chevron}
+        running={running}
         icon={<IconThinkOutline14 size={14} />}
         title={t('message.think')}
         open={expanded}

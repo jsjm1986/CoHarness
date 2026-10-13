@@ -1,7 +1,9 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
 import { useEffect, useSyncExternalStore } from 'react'
+import type { CSSProperties } from 'react'
 import clsx from 'clsx'
+import { StateDot, type StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId, SessionListState, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationSessionHeaderSlotProps, ConversationSessionSlotProps,
@@ -59,6 +61,19 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
 }
 
 /**
+ * The title's one state marker: an interaction waiting on the human is a
+ * warning, work in flight is the animated matrix, and everything quieter
+ * draws no dot at all — an idle session has nothing to announce.
+ */
+function sessionDotState(list: SessionListState, id: SessionId): StateDotState | undefined {
+  const summary = list.byId[id]
+  if (summary === undefined) return undefined
+  if (summary.pendingInteraction !== undefined) return 'warning'
+  if (summary.running) return 'ongoing'
+  return undefined
+}
+
+/**
  * Renders Session header chrome above the resident conversation scrollport.
  * The corner seat stays mounted on a blank Session so its navigation
  * occupant remains reachable; title, tabs, and utilities wait for content.
@@ -74,6 +89,7 @@ export function ConversationSessionHeader({
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
+  const dotState = useSessions(s => sessionDotState(s, sessionId))
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
   const hideChrome = blank && composerPhase === 'blank'
@@ -87,26 +103,26 @@ export function ConversationSessionHeader({
       )}
       {!hideChrome && (
         <>
-          {tabs.length > 1 && (
-            <div className={css.tabs} role="tablist">
-              {tabs.map(viewTab => (
-                <button
-                  key={viewTab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={viewTab.id === active?.id}
-                  className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-                  onClick={() => { actions.setView(viewTab.id) }}
-                >
-                  {viewTab.label}
-                </button>
-              ))}
-            </div>
-          )}
           <div className={css.titleRow}>
+            {leading}
             <div className={css.titleCluster}>
-              {leading}
-              <nav className={css.crumbs} aria-label={t('session.hierarchy')}>
+              {dotState === undefined ? null : (
+                <span className={css.sessionDot} title={t(dotState === 'warning' ? 'session.status.waiting' : 'session.status.running')}>
+                  <StateDot state={dotState} size={8} />
+                  <span className={css.srOnly}>{t(dotState === 'warning' ? 'session.status.waiting' : 'session.status.running')}</span>
+                </span>
+              )}
+              <nav
+                className={css.crumbs}
+                aria-label={t('session.hierarchy')}
+                /* The strip scrolls horizontally on overflow; map the
+                   vertical wheel onto it so a mouse wheel can reach the
+                   clipped tail without a visible scrollbar. */
+                onWheel={(e) => {
+                  const el = e.currentTarget
+                  if (el.scrollWidth > el.clientWidth) el.scrollLeft += e.deltaY
+                }}
+              >
                 {ancestry.map((summary, index) => {
                   const last = index === ancestry.length - 1
                   const title = (
@@ -148,9 +164,37 @@ export function ConversationSessionHeader({
                 })}
                 {ancestry.length === 0 && <span className={css.crumbCurrent}>{sessionId}</span>}
               </nav>
-              <div className={css.headerActions}>
-                {renderSlot('conversation.session.header.actions', { compact })}
+              <div className={css.titleMeta}>
+                {renderSlot('conversation.session.header.titleMeta', { compact })}
               </div>
+            </div>
+            {tabs.length > 1 && (
+              <div
+                className={css.tabs}
+                role="tablist"
+                /* Pill position without measuring JS: the bar divides into equal
+                   columns and slides --dsh-tab-index to the active tab. */
+                style={{
+                  '--dsh-tab-count': tabs.length,
+                  '--dsh-tab-index': Math.max(0, tabs.findIndex(t => t.id === active?.id)),
+                } as CSSProperties}
+              >
+                {tabs.map(viewTab => (
+                  <button
+                    key={viewTab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={viewTab.id === active?.id}
+                    className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
+                    onClick={() => { actions.setView(viewTab.id) }}
+                  >
+                    {viewTab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className={css.headerActions}>
+              {renderSlot('conversation.session.header.actions', { compact })}
             </div>
             <div className={css.headerUtilities}>
               {renderSlot('conversation.session.header.utilities', { compact })}

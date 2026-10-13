@@ -45,6 +45,14 @@ import type { UserRow } from '../src/auth.ts'
 import type { UsageEvent } from '../src/model-governance.ts'
 
 const DATABASE_URL = process.env.HGW_TEST_DATABASE_URL
+// The suite drops the harness schema before running, so the database must be
+// disposable by name. The npm script guards the same pattern; keeping the check
+// here also covers direct vitest invocation.
+if (DATABASE_URL !== undefined && !/(_test|_accept|_acceptance)(\?.*)?$/.test(DATABASE_URL)) {
+  throw new Error(
+    'HGW_TEST_DATABASE_URL must select a disposable test database ending in _test, _accept, or _acceptance',
+  )
+}
 const describePg = DATABASE_URL === undefined ? describe.skip : describe
 const MIGRATIONS = resolve(import.meta.dirname, '../deploy/postgres/migrations')
 
@@ -172,7 +180,7 @@ describePg('PostgreSQL baseline', () => {
         session_id,seq,event_type,occurred_at,event,payload_bytes
       ) VALUES('legacy-nul-session',0,'user/message',now(),$1::json,octet_length($1::text))`, [legacyEvent])
       const migrated = await runMigrations(pool, MIGRATIONS)
-      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54], current: 54 })
+      expect(migrated).toEqual({ applied: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55], current: 55 })
       const legacyFacts = await pool.query<{
         has_visible_content: boolean
         visible_content_seq: string | null
@@ -188,7 +196,7 @@ describePg('PostgreSQL baseline', () => {
       await rm(legacyMigrations, { recursive: true, force: true })
     }
     expect(await runMigrations(pool, MIGRATIONS))
-      .toEqual({ applied: [], current: 54 })
+      .toEqual({ applied: [], current: 55 })
     const pushTables = await pool.query<{ table_name: string }>(`SELECT table_name
       FROM information_schema.tables
       WHERE table_schema='harness' AND table_name IN ('push_devices','push_deliveries')
@@ -2081,6 +2089,7 @@ describePg('PostgreSQL baseline', () => {
         '  preference: dark',
         'ui-conversation:',
         '  busyEnter: steer',
+        '  transcriptView: normal',
       ].join('\n') + '\n')
       const migratedPreferences = await accountPreferences.describe(member)
       expect(migratedPreferences).toMatchObject({
@@ -2088,7 +2097,10 @@ describePg('PostgreSQL baseline', () => {
         migrated: true,
         values: {
           'ui-theme': { preference: 'dark' },
-          'ui-conversation': { busyEnter: 'steer', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14 },
+          'ui-conversation': {
+            busyEnter: 'steer', chatContentWidth: 748, chatFullWidth: false, chatFontSize: 14,
+            transcriptView: 'detailed', performanceUsage: 'detailed', linkOpening: 'sidebar',
+          },
         },
       })
       const changedPreferences = await accountPreferences.mutate(member, {
@@ -2111,6 +2123,15 @@ describePg('PostgreSQL baseline', () => {
       expect(widenedDisplay).toMatchObject({
         revision: 4,
         values: { 'ui-conversation': { chatFullWidth: true } },
+      })
+      const viewPreference = await accountPreferences.mutate(member, {
+        namespace: 'ui-conversation', field: 'transcriptView', operation: 'set', value: 'standard',
+        expectedRevision: widenedDisplay.revision,
+      })
+      expect(viewPreference).toMatchObject({
+        revision: 5,
+        values: { 'ui-conversation': { transcriptView: 'standard' } },
+        overrides: { 'ui-conversation': { transcriptView: 'standard' } },
       })
       await expect(accountPreferences.mutate(member, {
         namespace: 'locale', field: 'preference', operation: 'set', value: 'en',

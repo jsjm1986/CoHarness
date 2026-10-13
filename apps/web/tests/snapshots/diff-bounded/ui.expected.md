@@ -11,4 +11,6 @@
 - button "Expand 253 more diff lines": … 253 more lines
 - text: + new setting 125 + new setting 126 + new setting 127 + new setting 128 └ +130 -130 · 1 file
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect

@@ -8,32 +8,63 @@ body {
   --dsw-shadow-lv3:
     0 0 1px 0 rgba(0, 0, 0, 0.2), 0 0 4px 0 rgba(0, 0, 0, 0.02), 0 12px 32px 0 rgba(0, 0, 0, 0.08);
   /* Elevation：浮层/面板/面型按钮的描边+投影三件套。0.5px 发丝描边画在
-     box-shadow 里（组件配 border: 0，不占布局），叠两层极淡柔光；深色主题下
-     柔光几乎不可见，由描边承担分离。描边颜色经 --dsw-elevation-stroke-color
-     间接，组件可重绑（菜单面重绑最浅的 l1、输入框重绑 l2，输入框的
-     workspace-trigger 态置 transparent 只保留柔光）。soft 供输入框：更大
-     模糊、更低透明度的柔光。默认色只声明在 body 上，让表面的重绑沿继承
-     传给真正消费投影的后代。 */
+     box-shadow 里（组件配 border: 0，不占布局）。柔光堆栈移植自
+     shadow-plugin (flornkm) / beautifului shadow-unprefixed.css (MIT) 的
+     平滑多层阴影；每层 alpha 乘 --dsw-shadow-strength（亮 1，暗 6）让深色
+     主题下的柔光与发丝描边承担同样的分离度。描边颜色经
+     --dsw-elevation-stroke-color 间接，组件可重绑（卡片/输入框/inset 面板
+     重绑 l2，菜单重绑 l2，按钮重绑 l3）。默认色只声明在 body 上，让表面的
+     重绑沿继承传给真正消费投影的后代。 */
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l4);
+  --dsw-shadow-strength: 1;
   /* blur filter */
   --dsw-mask-blur: blur(2px);
   /* Blocking masks dim the page; menu backgrounds retain their blur. */
   --dsw-menu-backdrop-filter: blur(40px) saturate(150%);
 }
 
+body[data-ds-dark-theme] {
+  --dsw-shadow-strength: 6;
+}
+
 /* 派生 elevation 值逐元素声明而非从 body 继承：继承传下来的是在 body 上就
    已替换完 var() 的值，组件重绑 --dsw-elevation-stroke-color 将无法进入
    var(--dsw-elevation-*)；逐元素声明让每个元素按自己看到的描边色重新替换
-   （同 scrollbar.css 对 --dsh-scrollbar-thumb 的处理）。 */
+   （同 scrollbar.css 对 --dsh-scrollbar-thumb 的处理）。strength 同理逐元素
+   展开，主题切换后无需重算。 */
 body,
 body * {
   --dsw-elevation-stroke: 0 0 0 0.5px var(--dsw-elevation-stroke-color);
-  --dsw-elevation-panel:
-    var(--dsw-elevation-stroke), 0 3px 8px 0 rgba(0, 0, 0, 0.03), 0 0 16px 0 rgba(0, 0, 0, 0.02);
-  --dsw-elevation-prominent:
-    var(--dsw-elevation-stroke), 0 3px 8px 0 rgba(0, 0, 0, 0.04), 0 0 20px 0 rgba(0, 0, 0, 0.05);
+  --dsw-shadow-xs:
+    0 0 4px 0 rgb(0 0 0 / calc(0.04 * var(--dsw-shadow-strength)));
+  --dsw-elevation-control:
+    var(--dsw-elevation-stroke), 0 0 4px 0 rgb(0 0 0 / calc(0.04 * var(--dsw-shadow-strength)));
   --dsw-elevation-soft:
-    var(--dsw-elevation-stroke), 0 4px 16px 0 rgba(0, 0, 0, 0.03), 0 0 24px 0 rgba(0, 0, 0, 0.03);
+    var(--dsw-elevation-stroke), 0 18px 47px 0 rgb(0 0 0 / calc(0.03 * var(--dsw-shadow-strength))),
+    0 7.5px 19px 0 rgb(0 0 0 / calc(0.02 * var(--dsw-shadow-strength))),
+    0 4px 10.5px 0 rgb(0 0 0 / calc(0.02 * var(--dsw-shadow-strength))),
+    0 2.3px 5.8px 0 rgb(0 0 0 / calc(0.01 * var(--dsw-shadow-strength))),
+    0 1.2px 3.1px 0 rgb(0 0 0 / calc(0.01 * var(--dsw-shadow-strength))),
+    0 0.5px 1.3px 0 rgb(0 0 0 / calc(0.01 * var(--dsw-shadow-strength)));
+  --dsw-elevation-panel:
+    var(--dsw-elevation-stroke), 0 18px 47px 0 rgb(0 0 0 / calc(0.03 * var(--dsw-shadow-strength))),
+    0 7.5px 19px 0 rgb(0 0 0 / calc(0.02 * var(--dsw-shadow-strength))),
+    0 4px 10.5px 0 rgb(0 0 0 / calc(0.02 * var(--dsw-shadow-strength))),
+    0 2.3px 5.8px 0 rgb(0 0 0 / calc(0.01 * var(--dsw-shadow-strength))),
+    0 1.2px 3.1px 0 rgb(0 0 0 / calc(0.01 * var(--dsw-shadow-strength))),
+    0 0.5px 1.3px 0 rgb(0 0 0 / calc(0.01 * var(--dsw-shadow-strength)));
+  --dsw-elevation-raised:
+    var(--dsw-elevation-stroke), 0 17.54px 23.39px 0 rgb(0 0 0 / calc(0.04 * var(--dsw-shadow-strength))),
+    0 9.4px 12.5px 0 rgb(0 0 0 / calc(0.03 * var(--dsw-shadow-strength))),
+    0 5.25px 7px 0 rgb(0 0 0 / calc(0.02 * var(--dsw-shadow-strength))),
+    0 2.79px 3.72px -2px rgb(0 0 0 / calc(0.01 * var(--dsw-shadow-strength))),
+    0 1.16px 1.5px 0 rgb(0 0 0 / calc(0.01 * var(--dsw-shadow-strength)));
+  --dsw-elevation-prominent:
+    var(--dsw-elevation-stroke), 0 25px 50px 0 rgb(0 0 0 / calc(0.05 * var(--dsw-shadow-strength))),
+    0 12px 24px 0 rgb(0 0 0 / calc(0.04 * var(--dsw-shadow-strength))),
+    0 6px 12px 0 rgb(0 0 0 / calc(0.03 * var(--dsw-shadow-strength))),
+    0 3px 6px 0 rgb(0 0 0 / calc(0.02 * var(--dsw-shadow-strength))),
+    0 1.5px 3px 0 rgb(0 0 0 / calc(0.02 * var(--dsw-shadow-strength)));
 }
 
 body[data-ds-dark-theme] {

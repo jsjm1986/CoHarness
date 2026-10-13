@@ -56,6 +56,14 @@ describe('primitive compact chrome', () => {
     expect(modal).toContain('var(--dsw-safe-bottom)')
   })
 
+  it('scrolls modal content on every viewport while the footer stays pinned', () => {
+    const modal = load('../src/Modal.module.css')
+    const base = modal.slice(0, modal.indexOf('@media'))
+    expect(base).toContain('max-height: 100%')
+    expect(base).toContain('overflow-y: auto')
+    expect(base).toContain('min-height: 0')
+  })
+
   it('tightens markdown reading rhythm on compact viewports', () => {
     const markdown = load('../src/markdown/MarkdownText.module.css')
     expect(markdown).toContain("[data-viewport='compact']")

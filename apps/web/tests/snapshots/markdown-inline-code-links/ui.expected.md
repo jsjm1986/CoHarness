@@ -1,12 +1,9 @@
 - banner:
+  - navigation "Session hierarchy":
+    - button "Inline code links" [disabled]
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "Inline code links" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
 - button "1 intermediate message":
   - text: 1 intermediate message
   - img

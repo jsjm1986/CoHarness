@@ -200,6 +200,14 @@
   }
 }
 
+/* Non-compact layout: the frame is the sidebar-colored canvas and the center
+   column floats as an inset card — the shadcn SidebarInset recipe
+   (`m-2 ml-0 rounded-xl shadow-sm`, MIT) with the frame color carrying the
+   sidebar fill across the whole shell, including under the collapsed rail. */
+.frame:not([data-viewport='compact']) {
+  background: var(--dsw-specific-sidebar-fill);
+}
+
 .sidebarCol {
   min-width: 0;
   overflow: hidden;
@@ -207,11 +215,33 @@
   border-right: 0.5px solid var(--dsw-alias-border-l3);
 }
 
+/* On the inset layout the sidebar column is transparent over the frame's
+   sidebar fill and the hairline seam is gone — the inset card separates. */
+.frame:not([data-viewport='compact']) .sidebarCol {
+  background: transparent;
+  border-right: 0;
+}
+
 .centerCol {
   min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.frame:not([data-viewport='compact']) .centerCol {
+  /* 16px right margin = the details card's 8px frame inset + an 8px gap
+     between the two floating cards; collapsed keeps the symmetric 8. */
+  margin: var(--dsw-space-2) var(--dsw-space-4) var(--dsw-space-2) 0;
+  border: 0;
+  border-radius: var(--dsw-radius-window);
+  background: var(--dsw-alias-bg-base);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
+  box-shadow: var(--dsw-elevation-panel);
+}
+
+.frame:not([data-viewport='compact'])[data-details-collapsed] .centerCol {
+  margin-right: var(--dsw-space-2);
 }
 
 /* Home-indicator clearance for the bottom-pinned composer; zero elsewhere. */
@@ -234,6 +264,14 @@
   width: 0;
   min-width: 0;
   overflow: visible;
+}
+
+/* Non-compact: the details occupant floats as a second inset card at the
+   same margin, radius, and elevation as the center (SidebarInset). */
+.frame:not([data-viewport='compact']) .detailsCol {
+  top: var(--dsw-space-2);
+  right: var(--dsw-space-2);
+  bottom: var(--dsw-space-2);
 }
 
 /* Drag handles are frame children (columns clip overflow): an 8px hit strip

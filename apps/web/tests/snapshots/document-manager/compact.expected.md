@@ -36,7 +36,8 @@
         - text: notes.txt 30.0 KB · 2026-08-16
         - button "Add notes.txt to conversation":
           - img
-        - button "Preview notes.txt"
+        - button "Preview notes.txt":
+          - img
         - 'button "More actions: notes.txt"':
           - img
     - group "Upload date 2026-08-14":
@@ -46,6 +47,7 @@
         - text: brief.txt 21 B · 2026-08-14
         - button "Add brief.txt to conversation":
           - img
-        - button "Preview brief.txt"
+        - button "Preview brief.txt":
+          - img
         - 'button "More actions: brief.txt"':
           - img

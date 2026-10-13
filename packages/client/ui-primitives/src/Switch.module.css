@@ -19,6 +19,8 @@
   corner-shape: round;
   background: var(--dsw-alias-border-l3);
   cursor: pointer;
+  transition: background-color var(--dsw-motion-duration-micro, 0.16s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .switch[aria-checked='true'] {
@@ -35,6 +37,9 @@
   outline-offset: 2px;
 }
 
+/* The thumb travels on the bounce ease (transitions.dev 27-toggle, MIT): the
+   curve overshoots its endpoint once, reading as a spring settle. A property
+   transition (not a keyframe) keeps first paint still. */
 .thumb {
   display: block;
   width: 16px;
@@ -42,7 +47,8 @@
   border-radius: 50%;
   corner-shape: round;
   background: var(--dsw-alias-label-primary-foreground);
-  transition: transform 120ms ease;
+  transition: transform var(--dsw-motion-duration-medium, 0.35s)
+    var(--dsw-motion-ease-bounce, var(--ds-ease-in-out));
 }
 
 .switch[aria-checked='false'] .thumb {

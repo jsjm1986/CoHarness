@@ -250,12 +250,16 @@ describe('PopupSelectView', () => {
     expect(view.container.childElementCount).toBe(0)
   })
 
-  it('click selects a row; mouseenter moves the highlight', async () => {
+  it('click selects a row; mouseenter moves the highlight without scrolling it', async () => {
     const seen: SelectOption[] = []
     const { view } = await mountOpen({ onSelect: (option) => { seen.push(option) } })
     const options = screen.getAllByRole('option')
+    scrollIntoView.mockClear()
     act(() => { fireEvent.mouseEnter(options[2]!) })
     expect(screen.getAllByRole('option')[2]!.getAttribute('aria-selected')).toBe('true')
+    // A hovered row already sits under the cursor: scrolling it would shift
+    // rows beneath the pointer and loop hover→scroll→hover.
+    expect(scrollIntoView).not.toHaveBeenCalled()
     await act(async () => { fireEvent.click(options[2]!) })
     expect(seen).toEqual([OPTIONS[2]])
     expect(view.container.childElementCount).toBe(0)

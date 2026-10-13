@@ -51,10 +51,14 @@
 
 .scopeStale {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--dsw-space-2);
-  padding: 0 8px 6px;
+  align-items: flex-start;
+  gap: var(--dsw-space-1);
+  padding: 0 8px 8px;
+}
+
+.scopeStale > span {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .scopeStale button,
@@ -75,9 +79,8 @@
 
 .selectionModeNotice {
   padding: var(--dsw-space-2) var(--dsw-space-3);
-  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-1);
+  background: var(--dsw-alias-bg-layer-2);
 }
 
 .scopeItem {
@@ -100,9 +103,13 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Selected scope reads as a raised pill over the darker rail, matching the
+   shell's sidebar-row vocabulary; the elevation token draws its own 0.5px
+   ring so the border cell stays transparent. */
 .scopeItemActive {
-  border-color: var(--dsw-alias-border-l3);
-  background: var(--dsw-alias-interactive-bg-active);
+  border-color: transparent;
+  background: var(--dsw-alias-bg-raised);
+  box-shadow: var(--dsw-elevation-control);
   color: var(--dsw-alias-label-primary);
 }
 
@@ -462,8 +469,13 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* The last crumb is the current location; it carries the panel's heading
+   weight instead of reading as a disabled control. */
 .crumb:disabled {
   color: var(--dsw-alias-label-primary);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
   cursor: default;
 }
 
@@ -490,7 +502,7 @@
 }
 
 .filterGroup {
-  flex: 1 1 420px;
+  flex: 1 1 300px;
 }
 
 .actionGroup {
@@ -499,19 +511,28 @@
 }
 
 .search {
-  flex: 1 1 220px;
+  flex: 1 1 140px;
   min-width: 0;
   width: auto;
 }
 
+/* The OS arrow sits flush against the control edge; replace it with the
+   shared 12px chevron and reserve its cell in the right padding. Data-URI
+   SVGs cannot resolve CSS variables; #81858C is the caption gray shared by
+   both themes. */
 .select {
   flex: none;
   height: 32px;
-  max-width: 156px;
-  padding: 0 var(--dsw-space-5) 0 var(--dsw-space-2);
+  max-width: 120px;
+  padding: 0 var(--dsw-space-7) 0 var(--dsw-space-2);
   border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
+  appearance: none;
   background-color: var(--dsw-alias-bg-layer-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px 12px;
   color: var(--dsw-alias-label-primary);
   font: inherit;
   font-size: 13px;
@@ -551,6 +572,8 @@
   animation: documents-refresh-pulse 1.2s ease-in-out infinite;
 }
 
+/* Scope status reads as a tinted bar inside the panel, not a bordered box —
+   writable targets get a quiet brand tint instead of a second hairline. */
 .scopeNotice {
   display: flex;
   flex: none;
@@ -558,13 +581,16 @@
   gap: var(--dsw-space-2);
   min-width: 0;
   padding: var(--dsw-space-2) var(--dsw-space-3);
-  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-1);
+  background: var(--dsw-alias-bg-layer-2);
 }
 
 .scopeNoticeTarget {
-  border-color: var(--dsw-alias-border-l3);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, var(--dsw-alias-bg-layer-1));
+}
+
+.scopeNoticeTarget .scopeNoticeIcon {
+  color: var(--dsw-alias-brand-primary);
 }
 
 .scopeNoticeReadOnly {
@@ -601,15 +627,22 @@
   font: var(--dsw-mobile-font-caption);
 }
 
+/* Upload constraints read as a quiet caption under the title — the dialog
+   header already carries the card chrome, so the line needs no box. */
 .limits {
+  display: inline-flex;
   flex: none;
-  margin: 0 var(--dsw-space-4);
-  padding: var(--dsw-space-2) var(--dsw-space-3);
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-1);
-  color: var(--dsw-alias-label-secondary);
+  align-items: center;
+  gap: var(--dsw-space-1);
+  margin: 0;
+  padding: 0 var(--dsw-space-4) var(--dsw-space-2);
+  color: var(--dsw-alias-label-caption);
   font: var(--dsw-mobile-font-caption);
+}
+
+.limits svg {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .selectionBar {
@@ -758,7 +791,7 @@
   padding: var(--dsw-space-2) var(--dsw-space-1);
   border-top: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-sm);
-  transition: background-color 120ms ease;
+  transition: background-color var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease);
 }
 
 .row:hover {
@@ -893,7 +926,7 @@
   height: 100%;
   border-radius: inherit;
   background: var(--dsw-alias-state-business-primary);
-  transition: width 120ms ease;
+  transition: width var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease);
 }
 
 .confirm {
@@ -994,8 +1027,9 @@
 }
 
 .scopePickerOptionSelected {
-  border-color: var(--dsw-alias-border-l3);
-  background: var(--dsw-alias-interactive-bg-active);
+  border-color: transparent;
+  background: var(--dsw-alias-bg-raised);
+  box-shadow: var(--dsw-elevation-control);
 }
 
 .scopePickerCopy {
@@ -1293,6 +1327,20 @@
   min-height: 180px;
   color: var(--dsw-alias-label-secondary);
   text-align: center;
+}
+
+/* Empty-state hero: a 48px quiet tile so the empty copy reads as a designed
+   state instead of stray text. */
+.emptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-card);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .emptyActions {
@@ -1809,9 +1857,8 @@
 }
 
 .limits {
-  margin: 12px 20px 0;
-  border-color: color-mix(in srgb, var(--dsw-alias-border-l2) 76%, transparent);
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 72%, transparent);
+  margin: 0;
+  padding: 6px 20px 10px;
 }
 
 .scopeRail {
@@ -1833,17 +1880,17 @@
   min-height: 54px;
   padding: 10px 12px;
   border-radius: 10px;
-  transition: background-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+  transition: background-color var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease), box-shadow var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease), color var(--dsw-motion-duration-quick) var(--ds-ease-in-out, ease);
 }
 
 .scopeItemActive {
-  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 28%, var(--dsw-alias-border-l2));
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 10%, var(--dsw-alias-bg-layer-1));
-  box-shadow: inset 3px 0 var(--dsw-alias-brand-primary);
+  border-color: transparent;
+  background: var(--dsw-alias-bg-raised);
+  box-shadow: var(--dsw-elevation-control);
 }
 
 .scopeItemActive .scopeItemIcon {
-  color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-primary);
 }
 
 .workbenchContent {
@@ -1920,8 +1967,7 @@
 }
 
 .scopeNoticeTarget {
-  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 36%, var(--dsw-alias-border-l2));
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, var(--dsw-alias-bg-layer-2));
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, var(--dsw-alias-bg-layer-1));
 }
 
 .list,

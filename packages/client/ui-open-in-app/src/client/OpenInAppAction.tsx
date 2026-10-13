@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { IconChevronDownOutline14, Menu, Tooltip, type MenuItem } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconAppWindowOutline16, IconChevronDownOutline14, Menu, Tooltip, type MenuItem } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -85,18 +85,7 @@ function AppIcon({ id, url, size }: { id: string; url: string; size: number }): 
   const [failed, setFailed] = useState(failedIcons.has(id))
   if (failed) {
     return (
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.8}
-        className={css.icon}
-        aria-hidden
-      >
-        <rect x={3} y={3} width={18} height={18} rx={5} />
-      </svg>
+      <IconAppWindowOutline16 size={size} className={css.icon} aria-hidden />
     )
   }
   return (

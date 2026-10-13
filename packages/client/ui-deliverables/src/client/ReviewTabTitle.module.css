@@ -1,0 +1,5 @@
+/* The chip title's review glyph, on the quieter ink the other chips use. */
+.titleIcon {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}

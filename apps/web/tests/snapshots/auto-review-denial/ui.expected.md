@@ -1,14 +1,11 @@
 ## Collapsed
 
 - banner:
+  - navigation "Session hierarchy":
+    - button "Inspect the protected operation, but" [disabled]
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "Inspect the protected operation, but" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - button "2 tool calls · 2 intermediate messages" [expanded]:
@@ -56,14 +53,11 @@
 ## Expanded
 
 - banner:
+  - navigation "Session hierarchy":
+    - button "Inspect the protected operation, but" [disabled]
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "Inspect the protected operation, but" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - button "2 tool calls · 2 intermediate messages" [expanded]:
@@ -83,7 +77,9 @@
   - text: Tool call Rejected by Auto review
 - text: "OUT Tool was not executed. Reason: raw reason"
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - button "Code Catch an Auto-denied inner call":
   - img
   - img
@@ -94,7 +90,9 @@
   - text: Bash Rejected by Auto review
 - text: "OUT Tool was not executed. Reason: ptc raw reason"
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - textbox "Message the agent"
 - button "Add images or documents":
   - img
@@ -117,14 +115,11 @@
 ## Trajectory
 
 - banner:
+  - navigation "Session hierarchy":
+    - button "Inspect the protected operation, but" [disabled]
   - tablist:
     - tab "Chat"
     - tab "Trajectory" [selected]
-  - navigation "Session hierarchy":
-    - button "Inspect the protected operation, but" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - toolbar "Trajectory toolbar":

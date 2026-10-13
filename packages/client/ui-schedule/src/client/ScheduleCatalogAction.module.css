@@ -5,8 +5,9 @@
   margin-left: 4px;
 }
 
-/* Icon-only entry: the 28px round target used by the header's other icon
-   buttons, with the reminder count carried by the accessible name only. */
+/* Icon-only entry: the 28px quiet-ghost target used by the header's other
+   utility buttons, with the reminder count carried by the accessible name
+   only. */
 .trigger {
   display: inline-flex;
   flex: none;
@@ -16,7 +17,7 @@
   height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 28px;
+  border-radius: var(--dsw-radius-md);
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;

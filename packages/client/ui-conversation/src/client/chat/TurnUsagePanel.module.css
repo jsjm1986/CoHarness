@@ -32,6 +32,11 @@
   line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    background-color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out)),
+    color var(--dsw-motion-duration-micro, 0.14s)
+      var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 /* A narrow column trims the label to an ellipsis instead of overflowing the

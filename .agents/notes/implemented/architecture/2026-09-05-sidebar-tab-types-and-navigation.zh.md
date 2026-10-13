@@ -40,7 +40,7 @@ interface SidebarRightTabDefinition {
 
 ### 正文与标题：按定义 `id` keyed 的 Slot 坑位
 
-类型注册表说类型是什么；Slot 系统说它长什么样。类型把正文注册进 keyed、session 作用域的坑位 `sidebar.right.pane.tab`，键是自己的 `id`，并可把标题组件注册进 `sidebar.right.pane.tab.title`，键相同。画 tab 的座位经注册表把 tab 的 `kind` 解析成生效类型，再派发到该类型的 `id`，于是 extension 接管 builtin 的 kind 时两个包互不知晓也能正确渲染，且没有任何优先级数字跨过包边界。没有生效类型的 kind 渲染属主的「没有东西能查看它」提示；没注册标题的类型得到注册表在打开时捕获的 `title(address)` 文本。
+类型注册表说类型是什么；Slot 系统说它长什么样。类型把正文注册进 keyed、session 作用域的坑位 `sidebar.right.pane.tab`，键是自己的 `id`，并可把标题组件注册进 `sidebar.right.pane.tab.title`，键相同。画 tab 的座位经注册表把 tab 的 `kind` 解析成生效类型，再派发到该类型的 `id`，于是 extension 接管 builtin 的 kind 时两个包互不知晓也能正确渲染，且没有任何优先级数字跨过包边界。没有生效类型的 kind 渲染属主的「没有东西能查看它」提示；没注册标题的类型得到注册表在打开时捕获的 `title(address)` 文本。[右侧边栏标签芯片自有语义化标题呈现](../feature/2026-10-12-sidebar-tab-chips-own-semantic-titles.zh.md)负责内置标题渲染器画什么、标题如何解析实时事实。
 
 另有两个坑位扩展引导与菜单：`sidebar.right.tab.guide` 是 chain，第一个不拒绝的条目在不替换 tab 的前提下替换随包引导正文；`sidebar.right.tab.menu.item` 是 list，追加在库自身布局动作之后，放与 tab 内容有关的动作。类型自己的控件——重载、换行开关——住在自己正文里；tab 条属于面板，只放面板的控件。类型自己的状态是正文注册上普通的 Slot store 与 inject 面；框架不给组件模型添任何东西。
 

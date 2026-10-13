@@ -282,11 +282,19 @@
   background: var(--dsw-alias-state-business-primary);
 }
 
-/* Steward rows keep the amber marker in every state — the maintenance
-   identity outranks the active-scope accent. */
-.scopeDotSteward {
-  composes: scopeDot;
-  background: var(--dsw-alias-state-warn-primary);
+/* Steward rows carry the maintenance glyph instead of a selection dot: the
+   reserved space is an identity, not a state. Shares the amber warn family
+   with the trigger chrome and the dock notice. */
+.scopeIconSteward {
+  display: inline-flex;
+  flex: none;
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+/* The active steward trigger carries the same glyph in warn amber. */
+.stewardGlyph {
+  flex: none;
+  color: var(--dsw-alias-state-warn-primary);
 }
 
 .badge {

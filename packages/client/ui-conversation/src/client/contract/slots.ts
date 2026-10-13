@@ -138,6 +138,14 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       owner: ConversationHeaderLineageOwnerProps
     }
     /**
+     * Session metadata that reads as part of the title unit — the agent-preset
+     * suffix and peers — rendered inside the centered title cluster, after the
+     * breadcrumb strip and before the view tabs. Entries are text-weight by
+     * convention: the title is the header's one heavy element, and interactive
+     * controls belong to `…header.actions` or `…header.utilities`.
+     */
+    'conversation.session.header.titleMeta': { kind: 'list'; scope: 'session'; owner: ConversationHeaderActionOwnerProps }
+    /**
      * One button in the session header's action row — the additive way to put
      * a per-session control beside the title without replacing the header.
      * Entries render by ascending `order`; negative values are reserved for
@@ -864,6 +872,7 @@ export type ConversationSessionHeaderSlotProps =
   PropsRuntime<'conversation.session.header'>
   & PropsRenderSlots<
     'conversation.session.header.lineage'
+    | 'conversation.session.header.titleMeta'
     | 'conversation.session.header.actions'
     | 'conversation.session.header.utilities'
     | 'conversation.session.header.corner'

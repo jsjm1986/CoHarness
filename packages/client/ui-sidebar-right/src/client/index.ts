@@ -35,9 +35,10 @@ import type {} from './contract/slots.ts'
 import { clearSidebarLayout, readSidebarLayout, writeSidebarLayout, qualifySavedResource } from './persistence.ts'
 import { parseToolAddress, toolAddress } from './tabs/tool/address.ts'
 import { ToolBody } from './tabs/tool/ToolBody.tsx'
+import { ToolDetailsTitle } from './tabs/tool/ToolDetailsTitle.tsx'
 import { GuideBody, type GuideInjected } from './tabs/guide/GuideBody.tsx'
 import { GuideTitle } from './tabs/guide/GuideTitle.tsx'
-import { ExpandButton } from './shell/ExpandButton.tsx'
+import { ExpandButton, BlankExpandButton } from './shell/ExpandButton.tsx'
 import { AUTO_FULLSCREEN_BELOW, RightbarSeat, type SidebarRightInjected } from './shell/SidebarRight.tsx'
 import { closeWithPaneFocus, openWithPaneFocus } from './shell/close-focus.ts'
 import { RightbarRoot, type RightbarRootInjected } from './shell/RightbarRoot.tsx'
@@ -288,6 +289,12 @@ export function apply(ctx: ClientContext): void {
       name: 'sidebar.right.pane.tab', key: 'tool-details',
       children: { details: { kind: 'single', scope: 'session' } },
     }, ToolBody))
+    // The registry's captured title is the call id — a durable address, not a
+    // label. The chip shows the call's own name while its lifecycle is loaded.
+    const disposeToolTitle = ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
+      { name: 'sidebar.right.pane.tab.title', key: 'tool-details' },
+      ToolDetailsTitle,
+    ))
     const disposeSeat = ctx.slots.inject('rightbar', function* () {
       yield ctx.slots.register({
         name: 'rightbar',
@@ -329,6 +336,10 @@ export function apply(ctx: ClientContext): void {
       store,
       inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
     }, ExpandButton))
+    const disposeBlankExpand = ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
+      name: 'conversation.input.left', id: 'auxiliary-sidebar', locale: NS, store,
+      inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
+    }, BlankExpandButton))
     const disposeMobileExpand = ctx.slots.inject('shell.mobile.header.actions', () => ctx.slots.register({
       name: 'shell.mobile.header.actions', id: 'auxiliary-sidebar', locale: NS, store,
       inject: sessionId => ({ focus: () => { layout.focusRightbar(sessionId) }, hooks: { shortcuts: ctx.shortcuts.catalog } }),
@@ -360,10 +371,12 @@ export function apply(ctx: ClientContext): void {
     ))
     return () => {
       releaseOwner()
+      disposeToolTitle()
       disposeTool()
       disposeGuideTitle()
       disposeGuide()
       disposeMobileExpand()
+      disposeBlankExpand()
       disposeExpand()
       disposeSeat()
       for (const dispose of disposeTypes.reverse()) dispose()

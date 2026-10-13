@@ -78,6 +78,14 @@ export interface PopupState {
    * filtered rows.
    */
   readonly active: number
+  /**
+   * True while the latest {@link active} write came from pointer hover
+   * ({@link PopupSelectController.highlight}). Views reserve scroll-into-view
+   * for keyboard and programmatic highlights: a hovered row already sits under
+   * the cursor, and scrolling it fully into view shifts rows beneath the
+   * pointer, which re-fires hover and feeds the correction back on itself.
+   */
+  readonly activeViaPointer: boolean
   /** A select() settlement is in flight: further select/search/highlight no-op until it settles. */
   readonly submitting: boolean
   /** Option waiting for explicit risk acknowledgement; null during normal selection. */
@@ -90,7 +98,7 @@ export interface PopupState {
 
 const CLOSED: PopupState = {
   open: false, command: null, status: 'pending', options: [], search: '', searchLabels: null, searchMode: 'substring', active: 0,
-  submitting: false, confirming: null, acknowledged: false, error: null,
+  activeViaPointer: false, submitting: false, confirming: null, acknowledged: false, error: null,
 }
 
 /**
@@ -197,12 +205,12 @@ export class PopupSelectController<TCtx = unknown> {
       (options) => {
         if (this.binding !== binding) return
         const current = this.state.getSnapshot()
-        this.state.set({ ...current, status: 'ready', options, active: currentIndex(options, current.search, current.searchMode), error: null })
+        this.state.set({ ...current, status: 'ready', options, active: currentIndex(options, current.search, current.searchMode), activeViaPointer: false, error: null })
       },
       (error: unknown) => {
         if (this.binding !== binding) return
         console.error(`[ui-commands] popupSelect options failed for /${binding.command}:`, error)
-        this.state.set({ ...this.state.getSnapshot(), status: 'failed', options: [], active: 0, error: errorText(error) })
+        this.state.set({ ...this.state.getSnapshot(), status: 'failed', options: [], active: 0, activeViaPointer: false, error: errorText(error) })
       },
     )
   }
@@ -224,7 +232,7 @@ export class PopupSelectController<TCtx = unknown> {
   setSearch(search: string): void {
     const s = this.state.getSnapshot()
     if (!s.open || s.submitting || s.confirming !== null || search === s.search) return
-    this.state.set({ ...s, search, active: 0 })
+    this.state.set({ ...s, search, active: 0, activeViaPointer: false })
   }
 
   /**
@@ -240,7 +248,7 @@ export class PopupSelectController<TCtx = unknown> {
     for (let offset = 1; offset <= rows.length; offset += 1) {
       const active = (s.active + dir * offset + rows.length) % rows.length
       if (rows[active]?.disabled === true) continue
-      this.state.set({ ...s, active })
+      this.state.set({ ...s, active, activeViaPointer: false })
       return
     }
   }
@@ -255,7 +263,7 @@ export class PopupSelectController<TCtx = unknown> {
     if (!s.open || s.status !== 'ready' || s.submitting || s.confirming !== null) return
     const rows = filterOptions(s.options, s.search, s.searchMode)
     if (index < 0 || index >= rows.length || rows[index]?.disabled === true || index === s.active) return
-    this.state.set({ ...s, active: index })
+    this.state.set({ ...s, active: index, activeViaPointer: true })
   }
 
   /**

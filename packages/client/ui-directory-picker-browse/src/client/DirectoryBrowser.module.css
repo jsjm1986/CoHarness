@@ -243,6 +243,8 @@
   background: transparent;
   text-align: left;
   cursor: pointer;
+  transition: background-color var(--dsw-motion-duration-micro, 0.14s)
+    var(--dsw-motion-ease-standard, var(--ds-ease-in-out));
 }
 
 .row:hover {

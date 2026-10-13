@@ -16,7 +16,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  IconDislikeOutline16, IconLikeOutline16, MobileSheetBackdrop, Modal, Tooltip, useAnchoredPosition,
+  IconDislikeFill16, IconDislikeOutline16, IconLikeFill16, IconLikeOutline16, MobileSheetBackdrop, Modal, Tooltip, useAnchoredPosition,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageFeedbackRating } from '@deepseek-ai/dsh-message-feedback/types'
 import type { MessageFeedbackActionProps } from './slots.ts'
@@ -258,7 +258,7 @@ export function MessageFeedbackActions({ messageId, ensure, rate, toggle, clearN
           onPointerEnter={seed}
           onClick={() => { onRate('positive') }}
         >
-          <IconLikeOutline16 />
+          {rating === 'positive' ? <IconLikeFill16 /> : <IconLikeOutline16 />}
         </button>
       </Tooltip>
       <Tooltip label={dislikeLabel} side="bottom">
@@ -273,7 +273,7 @@ export function MessageFeedbackActions({ messageId, ensure, rate, toggle, clearN
           onPointerEnter={seed}
           onClick={() => { onRate('negative') }}
         >
-          <IconDislikeOutline16 />
+          {rating === 'negative' ? <IconDislikeFill16 /> : <IconDislikeOutline16 />}
         </button>
       </Tooltip>
       {rating !== undefined && (
