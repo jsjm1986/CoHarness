@@ -242,6 +242,13 @@
   display: none;
 }
 
+/* The compact header's trailing padding is space-3, not the desktop's 16px;
+   re-anchoring the negative margin keeps the corner flush to the viewport
+   edge instead of overhanging it. */
+:global([data-viewport='compact']) .headerCorner {
+  margin-right: calc(-1 * var(--dsw-space-3));
+}
+
 /* Segmented tabs (transitions `16-tabs-sliding`, MIT): the equal-column grid
    holds a raised pill that slides to the active index — position arithmetic
    lives on --dsh-tab-* vars written by the component so no measuring JS is

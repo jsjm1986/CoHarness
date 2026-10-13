@@ -38,6 +38,8 @@ Density, not re-layout. Every change is a `[data-viewport='compact']` or `pointe
 
 **Cascade-order discipline.** `DocumentsModal.module.css` carries multiple `max-width: 767px` blocks plus a second unconditional layer between them; a compact rule written in the first block loses to a later plain rule at equal specificity. Phone corrections that target rules in that second layer belong in the last compact block.
 
+**Edge-anchored header seats.** `.headerCorner`'s `margin-right: -16px` reaches into the desktop header's trailing padding, but the compact header only pads `space-3` — the corner button's right edge overhung the viewport by 4px on every phone screen. The compact rule re-anchors the reach to `calc(-1 * var(--dsw-space-3))`, keeping the button flush to the physical edge (a Fitt-friendly seat), and the corner ghost joins the compact row's 36px target family.
+
 ## Alternatives considered
 
 **Hold the 44px touch target everywhere.** Rejected: a single-line composer toolbar and a one-row message-action strip cannot hold five 44px controls at 360–390px; the 40px family is already the codified compact compromise ([composer single icon row](../bug-fix/2026-09-18-composer-single-icon-row.md)), and genuinely interactive rows (menu rows, option rows, session rows) keep the full touch target.

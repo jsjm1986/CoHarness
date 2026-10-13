@@ -24,6 +24,11 @@ describe('conversation compact chrome', () => {
     expect(root).toMatch(/\.tabs\s*\{[^}]*min-height:\s*34px/u)
     expect(root).toMatch(/\.tab\s*\{[^}]*min-height:\s*28px/u)
     expect(root).toContain('.headerUtilities')
+    // The corner seat's edge reach re-anchors to the compact header's space-3
+    // trailing padding; the desktop -16px would push its button 4px off-screen.
+    expect(root).toMatch(
+      /\[data-viewport='compact'\]\)\s*\.headerCorner\s*\{[^}]*margin-right:\s*calc\(-1 \* var\(--dsw-space-3\)\)/u,
+    )
   })
 
   it('shrinks the hero headline and grows the workspace chip on compact', () => {
