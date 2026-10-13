@@ -20,6 +20,8 @@ Status: implemented
 
 **悬停门禁。** `Tooltip` 在 `matchMedia('(hover: hover)')` 报告设备不支持悬停时不再武装 hover 触发；触屏和 jsdom 环境保留 focus/click 路径，合成 `mouseenter` 无法再把快捷键气泡钉在刚激活的控件上。
 
+**触屏隐藏快捷键提示。** 菜单 `shortcut` 键位提示在 `@media (pointer: coarse)` 下隐藏：无键盘设备上 sheet 行尾部的提示宽度换来的只是不可用信息。`aria-keyshortcuts` 声明保留给辅助技术，混合设备行为不变——仅隐藏视觉提示。
+
 ## Alternatives considered
 
 **处处保持 44px 触控目标。** 否决：360–390px 宽下一行放不下五个 44px 控件的单行输入工具条和单行消息操作条；40px 族已是成文的紧凑折中（[输入区单行图标行](../bug-fix/2026-09-18-composer-single-icon-row.zh.md)），真正可交互的行（菜单行、选项行、会话行）仍保持完整触控目标。

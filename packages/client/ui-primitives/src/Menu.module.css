@@ -217,6 +217,11 @@
   .compactList .item {
     min-height: 40px;
   }
+
+  /* Touch-primary devices carry no keyboard; accelerator hints are noise. */
+  .shortcut {
+    display: none;
+  }
 }
 
 .itemIcon {

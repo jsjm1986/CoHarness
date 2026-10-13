@@ -49,6 +49,11 @@ describe('primitive compact chrome', () => {
     expect(backdrop).toContain('@media (max-width: 767px)')
     expect(backdrop).toContain('z-index: 1090')
     expect(backdrop).toContain('animation: none')
+    // Touch-primary devices have no keyboard: accelerator hints must not crowd
+    // sheet rows.
+    const start = menu.indexOf('@media (pointer: coarse)')
+    const coarse = menu.slice(start, menu.indexOf('.itemIcon', start))
+    expect(coarse).toMatch(/\.shortcut\s*{[^}]*display:\s*none/)
   })
 
   it('keeps modal sheets scrollable, elevated, and animated consistently', () => {
