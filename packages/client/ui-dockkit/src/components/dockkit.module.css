@@ -551,9 +551,7 @@
   flex-direction: column;
   min-width: 96px;
   padding: 4px;
-  background: var(--dsw-alias-bg-layer-3);
   border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
 }
 
 .menu:not(:has([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio'])) {

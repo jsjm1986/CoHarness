@@ -10,7 +10,7 @@
  * null; the overlay slot stays mounted. The card height clamps to the space
  * above the composer.
  */
-import { MenuGroup, observeStickyMenuGroups } from '@deepseek-ai/dsh-client-ui-primitives'
+import { MenuGroup, MenuSurface, observeStickyMenuGroups } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Fragment, useEffect, useMemo, useRef } from 'react'
 import { useSyncExternalStore } from 'react'
 import clsx from 'clsx'
@@ -160,7 +160,7 @@ export function PopupSelectView({ popup, t }: PopupSelectViewProps) {
       {state.confirming === null && (
         <>
           <MobileSheetBackdrop onClose={() => { popup.dismiss() }} />
-          <div
+          <MenuSurface
             ref={cardRef}
             className={css.card}
             style={{ maxHeight }}
@@ -199,7 +199,7 @@ export function PopupSelectView({ popup, t }: PopupSelectViewProps) {
                   ))}
               </div>
             )}
-          </div>
+          </MenuSurface>
         </>
       )}
       {confirmation !== undefined && (

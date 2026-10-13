@@ -3,8 +3,8 @@
   display: inline-flex;
 }
 
-/* Dropdown card (figma MenuDropdown 122:9481 / 419:16920): menu surface,
- * r12, elevation-prominent (hairline stroke in shadow), 4px inset padding. */
+/* Compact translucent dropdown card shared by feature menus: MenuSurface
+ * paints the material and outer radius; this block keeps the layout. */
 .list,
 .submenu {
   /* min-widths below are the design's outer card widths — include the pad. */
@@ -14,8 +14,6 @@
   flex-direction: column;
   gap: 0;
   border: 0;
-  border-radius: 20px;
-  background: var(--dsw-specific-menu);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
   box-shadow: var(--dsw-elevation-prominent);
   /* Elevated surface: the scrollbar thumb takes the l2 elevation tokens. The
@@ -121,6 +119,14 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* Arrow navigation moves real focus, so the row the keyboard is on carries the
+   same fill the pointer gets: the fill is the row's focus indication, and the
+   browser's default ring would double it. */
+.item:focus-visible:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  outline: none;
+}
+
 .denseList .item {
   min-height: 34px;
   padding-block: 5px;
@@ -219,6 +225,11 @@
   background: transparent;
 }
 
+/* Fill-mode selection: the row holds the hover fill instead of a check. */
+.selectedFill {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 /* Destructive row: error text/icon, danger hover fill. */
 .danger {
   color: var(--dsw-alias-state-error-primary);
@@ -230,6 +241,11 @@
 
 .danger:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover-danger);
+}
+
+.danger:focus-visible:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+  outline: none;
 }
 
 /* Heading row: non-interactive small grey text, padding aligned with items. */
@@ -341,7 +357,7 @@
     height: auto;
   }
 
-  .submenu {
+  .list .submenu {
     position: static;
     min-width: 0;
     margin: var(--dsw-space-1) 0 var(--dsw-space-1) var(--dsw-space-6);
@@ -351,6 +367,10 @@
     border-radius: 0;
     background: transparent;
     box-shadow: none;
+  }
+
+  .submenu > [data-menu-material-fill] {
+    display: none;
   }
 
   .submenu::before {
