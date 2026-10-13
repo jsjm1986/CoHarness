@@ -463,7 +463,13 @@ export function AppFrame({
               onClick={() => { actions.collapseNarrow() }}
             />
             <div ref={drawerEl} className={css.drawer} data-open={drawerOpen || undefined}>
-              {renderSlot('sidebar', { collapsed: false, width: SIDEBAR_DEFAULT })}
+              {/* The drawer's CSS width is min(82%, 300px) of the frame;
+                  the sidebar's frozen inline width must match exactly —
+                  SIDEBAR_DEFAULT would leave a dead strip on ≥366px phones. */}
+              {renderSlot('sidebar', {
+                collapsed: false,
+                width: viewport > 0 ? Math.min(Math.round(viewport * 0.82), 300) : SIDEBAR_DEFAULT,
+              })}
             </div>
             {/* Left-edge swipe target for opening the drawer — the platform
                 back-gesture strip. Taps pass through (no click handling);

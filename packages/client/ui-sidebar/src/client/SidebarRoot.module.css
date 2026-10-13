@@ -549,7 +549,10 @@
   height: auto;
   min-height: var(--dsw-touch-target);
   padding-block: var(--dsw-space-1);
-  padding-inline: 0 calc(var(--dsw-space-1) + var(--dsw-touch-target));
+  /* Mirror the floating toggle's footprint on the left so the lockup
+     centers on the drawer's true width — the asymmetric reserve put the
+     wordmark visibly left of center. */
+  padding-inline: calc(var(--dsw-space-1) + var(--dsw-touch-target));
   margin-bottom: var(--dsw-space-1);
 }
 
