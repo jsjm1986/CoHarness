@@ -74,16 +74,26 @@
 }
 
 @media (max-width: 767px) {
-  .cubeRow {
-    flex-wrap: nowrap;
+  .group {
+    padding: var(--dsw-space-3) 0;
   }
 
+  .cubeRow {
+    flex-wrap: nowrap;
+    gap: var(--dsw-space-1);
+  }
+
+  /* Segmented options, not desktop cubes: icon+label on one line at the
+     shared compact option height. */
   .themeCube {
     flex: 1 1 0;
     min-width: 0;
-    min-height: var(--dsw-touch-target);
-    padding: var(--dsw-space-3) var(--dsw-space-2);
-    font-size: 12px;
+    flex-direction: row;
+    min-height: 40px;
+    padding: 0 var(--dsw-space-2);
+    gap: var(--dsw-space-1);
+    border-radius: var(--dsw-radius-lg);
+    font-size: 13px;
     line-height: 18px;
   }
 }

@@ -30,10 +30,10 @@ function mediaBody(query: string): string {
 }
 
 describe('AppearanceRow.module.css compact', () => {
-  it('keeps the three theme cubes on one row under 768px', () => {
+  it('keeps the three theme options as one segmented row under 768px', () => {
     const compact = mediaBody('(max-width: 767px)')
     expect(compact).toMatch(/\.cubeRow\s*\{[^}]*flex-wrap:\s*nowrap/)
     expect(compact).toContain('flex: 1 1 0')
-    expect(compact).toContain('min-height: var(--dsw-touch-target)')
+    expect(compact).toContain('min-height: 40px')
   })
 })

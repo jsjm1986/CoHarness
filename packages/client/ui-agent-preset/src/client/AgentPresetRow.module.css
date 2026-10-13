@@ -63,8 +63,7 @@
 
 @media (max-width: 767px) {
   .row {
-    flex-direction: column;
-    align-items: stretch;
+    gap: var(--dsw-space-3);
     padding: var(--dsw-space-3) 0;
   }
 
@@ -72,8 +71,21 @@
     padding-right: 0;
   }
 
+  /* Trailing value, not a stacked pill: the selector reads as an iOS-style
+     accessory (text + chevron) and keeps its touch target via min-height. */
   .selector {
-    align-self: flex-start;
-    height: var(--dsw-touch-target);
+    flex: none;
+    align-self: center;
+    height: auto;
+    min-height: var(--dsw-touch-target);
+    padding: 0 0 0 var(--dsw-space-1);
+    gap: var(--dsw-space-1);
+    border-radius: 0;
+    background: transparent;
+    color: var(--dsw-alias-label-secondary);
+  }
+
+  .selector:hover {
+    background: transparent;
   }
 }
