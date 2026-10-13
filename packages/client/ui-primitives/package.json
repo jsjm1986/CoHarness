@@ -46,6 +46,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-util-code-language": "workspace:*",
+    "@deepseek-ai/dsh-util-workspace-path": "workspace:*",
     "@types/mdast": "^4.0.4",
     "@types/react": "~19.2.7",
     "@types/react-dom": "~19.2.4",

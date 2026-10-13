@@ -59,7 +59,7 @@ export function ScopeSwitchStatus({ target, t }: { target: CollaborationScopeTar
           <CoHarnessMascot className={css.mascot} size={30} />
         </div>
         <div className={css.copy}>
-          <p className={css.wordmark} aria-hidden="true">COHARNESS</p>
+          <p className={css.wordmark} aria-hidden="true">{t('brand.product')}</p>
           <h2 className={css.title}>{t('scope.switching')}</h2>
           <p className={css.target}>{t('scope.switchingTarget', { name: targetName })}</p>
           <p className={css.stage}>{stageText}</p>

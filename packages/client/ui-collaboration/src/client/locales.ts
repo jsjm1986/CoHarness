@@ -5,6 +5,7 @@ export const NS = 'collaboration'
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'brand.product': 'COHARNESS',
   'logout.label': '退出登录',
   'logout.short': '退出',
   'scope.aria': '切换个人或项目空间',
@@ -135,6 +136,7 @@ export const zh = {
 
 /** English dictionary, key-identical to the Chinese source of truth. */
 export const en: Record<CollaborationKey, string> = {
+  'brand.product': 'COHARNESS',
   'logout.label': 'Sign out',
   'logout.short': 'Sign out',
   'scope.aria': 'Switch personal or project scope',

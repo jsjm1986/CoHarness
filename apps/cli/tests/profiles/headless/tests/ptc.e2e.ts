@@ -291,7 +291,7 @@ describe('PTC mode typed values: keyless real-process contracts', () => {
     const agent = {
       id: SessionId('ptc-cordis'),
       session: ctx.sessions.create(SessionId('ptc-cordis'), { meta: { cwd: process.cwd() } }),
-    } as unknown as Agent
+    } as Agent
 
     const value = completion(await runCode(ctx, `
       const listed = await tools.cordis_inspect_list({});
