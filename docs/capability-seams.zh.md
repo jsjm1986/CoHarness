@@ -159,6 +159,7 @@ flowchart LR
   svc_sessionProjectionCache["ctx.sessionProjectionCache<br/>Persisted projection cache"]
   pkg_working_directory["working-directory"]
   svc_workingDirectory["ctx.workingDirectory<br/>Session working directory"]
+  pkg_tool_working_directory["tool-working-directory"]
   pkg_tool_fs_search["tool-fs-search"]
   pkg_tool_lsp["tool-lsp"]
   pkg_tool_pwsh["tool-pwsh"]
@@ -277,6 +278,7 @@ flowchart LR
   svc_dynamicCordisRunner["ctx.dynamicCordisRunner<br/>Dynamic Cordis package host runner"]
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
   pkg_schedule["schedule"]
+  pkg_sdk_jsonrpc_server["sdk-jsonrpc-server"]
   svc_schedule["ctx.schedule<br/>Host scheduled messages"]
   pkg_api_remotes["api-remotes"]
   svc_sessionController["ctx.sessionController<br/>Host Session resolution surface"]
@@ -603,6 +605,8 @@ flowchart LR
   svc_workingDirectory --> pkg_hooks_claude_code
   svc_workingDirectory --> pkg_hooks_codex
   svc_workingDirectory --> pkg_host_apiproxy
+  svc_workingDirectory --> pkg_sdk_jsonrpc_server
+  svc_workingDirectory --> pkg_subagent
   svc_workingDirectory --> pkg_terminal_bash
   svc_workingDirectory --> pkg_tool_bash
   svc_workingDirectory --> pkg_tool_bash_persistent
@@ -614,6 +618,7 @@ flowchart LR
   svc_workingDirectory --> pkg_tool_pwsh_persistent
   svc_workingDirectory --> pkg_tool_skill
   svc_workingDirectory --> pkg_tool_terminal
+  svc_workingDirectory --> pkg_tool_working_directory
   svc_workingDirectory --> pkg_tools
   svc_workingDirectory --> pkg_workflow_ptc
   svc_workspaceRegistry --> pkg_apiproxy
