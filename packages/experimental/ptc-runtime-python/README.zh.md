@@ -99,7 +99,7 @@ Each call runs in a fresh Python process. Relative paths use the supplied workin
 <a id="further-exploration"></a>
 ## 进一步探索
 
-当 runtime 契约不够时阅读这些。它们从 seam 定义走向设计记录与配套后端。
+当 runtime 契约不够时阅读这些。它们从 seam 定义走向设计记录与配套后端。本后端不发布运行时 invariant 伴随物：除 runtime 契约自身的结算与字节上限保证之外，它没有可观察的可变跨组件关系。
 
 - [PTC 运行时 seam](../../ptc-runtime/ptc-runtime/README.zh.md) — 本后端实现的抽象契约。
 - [fd-3 协议 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.zh.md) — 设计理由与 wire 契约。
@@ -152,6 +152,6 @@ Each call runs in a fresh Python process. Relative paths use the supplied workin
 <details>
 <summary>维护者的工作上下文——点击展开</summary>
 
-无。
+无 `./invariant` 伴随物：本后端没有可供断言观察的可变跨组件关系。其保证是 runtime 契约的逐次运行结算与字节上限结果，经由协议镜像与 spec 套件验证，而非共享状态报告器。
 
 </details>

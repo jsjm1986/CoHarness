@@ -1127,7 +1127,8 @@
         "@deepseek-ai/dsh-core",
         "@scope/tools",
         "left-pad",
-        "my-plugin"
+        "my-plugin",
+        "private-lib"
       ],
       "ignoreUnresolved": [
         "./relative.cjs",

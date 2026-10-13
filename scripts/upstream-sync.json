@@ -231,18 +231,7 @@
     },
     "client/ui-plan": {
       "sovereignty": "adapted",
-      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md",
-      "removedUpstreamPaths": [
-        "packages/client/ui-plan/src/client/failure-line.ts",
-        "packages/client/ui-plan/src/client/plan-definition.ts",
-        "packages/client/ui-plan/src/client/plan-resource.ts",
-        "packages/client/ui-plan/src/client/plan.ts",
-        "packages/client/ui-plan/src/client/PlanCard.tsx",
-        "packages/client/ui-plan/src/client/PlanPreview.module.css",
-        "packages/client/ui-plan/src/client/PlanPreview.tsx",
-        "packages/client/ui-plan/src/client/review-preview.ts",
-        "packages/client/ui-plan/src/client/review-store.ts"
-      ]
+      "note": ".agents/notes/implemented/architecture/2026-09-20-upstream-alpha2-client-lane-audit.md"
     },
     "client/ui-plugin-manager": {
       "sovereignty": "adapted",
@@ -409,7 +398,8 @@
       "sovereignty": "adapted"
     },
     "context/agent-instructions": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/bug-fix/2026-10-12-session-reliability-fixes.md"
     },
     "context/archive-gateway": {
       "sovereignty": "owned"
@@ -722,7 +712,8 @@
       "sovereignty": "tracked"
     },
     "plan/plan-mode": {
-      "sovereignty": "tracked"
+      "sovereignty": "adapted",
+      "note": ".agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.md"
     },
     "preset/agent-presets": {
       "sovereignty": "owned",

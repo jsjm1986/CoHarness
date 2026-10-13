@@ -6,9 +6,6 @@
     "159e969df1d42e8bbf5ee64819307b44de6d8d87076e48cdc60b95d01da5cf66": 1,
     "a3157bfb514bae9f9bf2af7ac4137c38bb97515edd985e4b540baacdef16b695": 1
   },
-  "apps/cli/tests/profiles/headless/tests/ptc.e2e.ts": {
-    "25e22fc52656ecfa64043e399e125dcb91feff05049727e056a46482a3d34867": 1
-  },
   "apps/cli/tests/profiles/headless/tests/session-format-guard.expected.e2e.ts": {
     "340837865a9f6222ae46d41b594c4c079ae3935c004433c76da047df31c8008f": 1
   },
@@ -76,9 +73,6 @@
   },
   "examples/headless-agent/tests/compaction.e2e.ts": {
     "05d0801c2e1f97d507b8e1741eb034030e30b3cb0f748828151cdb56d70fbd44": 1
-  },
-  "examples/headless-agent/tests/ptc.e2e.ts": {
-    "25e22fc52656ecfa64043e399e125dcb91feff05049727e056a46482a3d34867": 1
   },
   "examples/headless-agent/tests/session-format-guard.snapshot.ts": {
     "cbce74f9980881f585b398d0cf3017b29a676e5ea7d0456516a19492fb60f3bf": 1
