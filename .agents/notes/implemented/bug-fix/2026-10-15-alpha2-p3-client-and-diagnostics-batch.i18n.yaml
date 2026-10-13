@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for 2026-10-15-alpha2-p3-client-and-diagnostics-batch.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-15-alpha2-p3-client-and-diagnostics-batch.md
+/agent-note-close-the-alpha-2-p3-residual-list-rings-menu-contextmeter-persistence-diagnostics:
+  en: 54db9d8a4c9626e3
+  zh: 9d680783b44d6e31
+/agent-note-close-the-alpha-2-p3-residual-list-rings-menu-contextmeter-persistence-diagnostics/problem:
+  en: b5e3a32385812f3c
+  zh: e2f64a1e69a5451f
+/agent-note-close-the-alpha-2-p3-residual-list-rings-menu-contextmeter-persistence-diagnostics/decision:
+  en: 80bd3f32ebacc889
+  zh: 69b1d01e094b3139
+/agent-note-close-the-alpha-2-p3-residual-list-rings-menu-contextmeter-persistence-diagnostics/alternatives-considered:
+  en: 22dabe6aa5789874
+  zh: ffcb300567362c11
+/agent-note-close-the-alpha-2-p3-residual-list-rings-menu-contextmeter-persistence-diagnostics/consequences:
+  en: eb51c602fe4e3cbf
+  zh: 092fe461c02dcc3f
+/agent-note-close-the-alpha-2-p3-residual-list-rings-menu-contextmeter-persistence-diagnostics/verification:
+  en: d341cb902402c13f
+  zh: 15ae58fa72f7bc3b
+/agent-note-close-the-alpha-2-p3-residual-list-rings-menu-contextmeter-persistence-diagnostics/related:
+  en: 44a98004cee32d48
+  zh: 3b0f9e35b861fd70
