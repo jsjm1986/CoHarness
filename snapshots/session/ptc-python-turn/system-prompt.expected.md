@@ -1,6 +1,6 @@
 You are an AI agent powered by DeepSeek Harness.
 
-You are a coding assistant powered by the deepseek-v4-flash model. Your working directory is {{cwd}}.
+You are a coding assistant powered by the deepseek-v4-flash model.
 
 Verify your work by running the code or tests. Keep answers brief and factual.
 
@@ -154,7 +154,7 @@ class ExitPlanModeArgs(TypedDict):
     # Additional keys beyond those declared are allowed.
 
 class ExitPlanModeOutput(TypedDict):
-    approved: Literal[True]
+    approved: bool
 
 class GetGoalOutput1(TypedDict):
     goal: None

@@ -326,14 +326,16 @@ export class ReactLoopAgent implements Agent {
     const claimed = this.inbox.claim(target, position.turn)
     const assembly = await this.loopCtx.systemPrompt.assemble(assembleContextFor(this, signal))
     signal.throwIfAborted()
-    const sections = renderContextSections(assembly)
-    const context = this.runtimeContext.project(joinContextSections(sections), sections)
     const decision = await this.dispatch.waterfall(
       'agent/pre-step', { messages: claimed, ...position, signal },
-      (): Promise<PreStepDecision> => Promise.resolve<PreStepDecision>({
-        kind: 'enter',
-        messages: context === undefined ? claimed : [...claimed, context],
-      }),
+      (): Promise<PreStepDecision> => {
+        const sections = renderContextSections(assembly)
+        const context = this.runtimeContext.project(joinContextSections(sections), sections)
+        return Promise.resolve<PreStepDecision>({
+          kind: 'enter',
+          messages: context === undefined ? claimed : [...claimed, context],
+        })
+      },
     )
     signal.throwIfAborted()
     if (decision.kind === 'reject') return decision
@@ -467,9 +469,15 @@ export class ReactLoopAgent implements Agent {
       this.session.append('system/message', { turn, step, message: commit.message }, commit.intent)
     }
     // The entered batch commits before request preparation: a failed or
-    // vetoed admission still leaves the accepted input durable.
-    const entered = decision.messages.map(message =>
-      this.session.append('user/message', message, { surfaceOp: 'append' }))
+    // vetoed admission still leaves the accepted input durable, all of it
+    // appends before any `agent/message-entered` dispatch, and that dispatch
+    // precedes the `agent/request` waterfall so its listeners can publish the
+    // per-turn state admission checks read. Runtime-context candidates mark
+    // the slot instead: admission refreshes registered context and commits
+    // its current snapshot inside the retry loop below.
+    const entered = decision.messages
+      .filter(message => message.source.kind !== 'runtime-context')
+      .map(message => this.session.append('user/message', message, { surfaceOp: 'append' }))
     for (const event of entered) {
       await this.dispatch.serial('agent/message-entered', { event, turn, step, signal })
       signal.throwIfAborted()
@@ -477,6 +485,10 @@ export class ReactLoopAgent implements Agent {
     let firstAttempt = true
     while (true) {
       const { config, preparedCall } = await this.prepareRequest(turn, step, signal)
+      const currentContext = this.loopCtx.systemPrompt.refreshContext(assembly, assembleContextFor(this, signal))
+      const sections = renderContextSections(currentContext)
+      const context = this.runtimeContext.project(joinContextSections(sections), sections)
+      signal.throwIfAborted()
       const startsRequestSeries = firstAttempt && decision.startsRequestSeries === true
       const commits = this.systemPrompt.project(renderedPrompt, {
         inHistory: preparedCall?.systemPromptUpdate === 'in-history',
@@ -486,6 +498,14 @@ export class ReactLoopAgent implements Agent {
       })
       for (const { message, intent } of commits) {
         this.session.append('system/message', { turn, step, message }, intent)
+      }
+      // The refreshed context snapshot enters once the step's system commits
+      // are durable and receives the same `agent/message-entered` dispatch as
+      // the claimed batch.
+      if (context !== undefined) {
+        const event = this.session.append('user/message', context, { surfaceOp: 'append' })
+        await this.dispatch.serial('agent/message-entered', { event, turn, step, signal })
+        signal.throwIfAborted()
       }
       firstAttempt = false
       const request = this.buildRequest(config, preparedCall, assembly.tools, { turn, step }, startsRequestSeries, signal)

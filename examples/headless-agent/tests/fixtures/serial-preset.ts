@@ -48,6 +48,7 @@ export async function apply(ctx: Context): Promise<void> {
   }
   ctx.sessions.registerMessageProjection(projection)
   ctx.on('agent/message-entered', ({ agent, event }) => {
+    if (event.data.source.kind !== 'user') return
     agent.session.append('fixture/project', { seq: event.seq })
     if (event.data.content[0]?.type !== 'text' || event.data.content[0].text !== 'Inspect the preset.') {
       throw new Error('projection mutated the durable input')

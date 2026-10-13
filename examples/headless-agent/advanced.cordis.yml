@@ -17,7 +17,7 @@
           tools:
             mode: both
           persona: |
-            You are headless-agent, a coding assistant powered by the {{model}} model. Your working directory is {{cwd}}.
+            You are headless-agent, a coding assistant powered by the {{model}} model.
 
             Verify your work by running the code or tests. Keep answers brief and factual.
       - id: persistence

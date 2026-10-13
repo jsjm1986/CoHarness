@@ -265,7 +265,7 @@ def write_advanced_profile_patch(root: Path, name: str, sessions: Path) -> Path:
         {
             "id": "system-prompt",
             "config": {
-                "persona": "You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.",
+                "persona": "You are a coding agent powered by the {{model}} model.",
             },
         },
         {"id": "session-log-deepseek", "config": {"enabled": True}},

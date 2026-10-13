@@ -17,7 +17,6 @@
   config:
     personaPrefix: >-
       You are a coding agent powered by the {{model}} model.
-    personaSuffix: Your working directory is {{cwd}}.
 
 # Full-text session search is opt-in (the base row's `openAt: never`). This
 # restatement keeps the Web values on one ephemeral in-memory index; a

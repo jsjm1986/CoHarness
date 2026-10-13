@@ -964,6 +964,58 @@ Types: [CreateSessionOptions](persistence.zh.md) · [PrepareSessionOptions](pers
 
 Source: [`packages/core/session/src/index.ts`](../../packages/core/session/src/index.ts)
 
+<a id="ctxworkingdirectory--workingdirectoryservice"></a>
+
+### `ctx.workingDirectory` — `WorkingDirectoryService`
+
+One owner for each Session's effective directory and its model-visible changes.
+
+```ts cordis-catalog
+/**
+ * Read the committed directory without filesystem I/O.
+ * @param session - Session whose directory is requested.
+ * @returns its effective absolute directory.
+ */
+get(session: Session): string
+
+/**
+ * Validate the current directory and restore the original project when it disappeared.
+ * @param agent - live or unpublished Agent owning the Session.
+ * @param signal - cancellation for filesystem inspection.
+ * @returns the existing directory; recovery is committed before fulfillment.
+ * A notice failure is warned without reverting the committed state. A provider
+ * transport failure returns the recorded directory without committing anything
+ * and warns once per Session until a later validation succeeds.
+ * @throws when the original project is also unavailable.
+ */
+ensure(agent: Agent, signal?: AbortSignal): Promise<string>
+
+/**
+ * Canonicalize a candidate directory under the project root without committing.
+ * @param agent - live or unpublished Agent owning the Session.
+ * @param path - absolute path or a path relative to its current directory.
+ * @param signal - cancellation for filesystem inspection.
+ * @returns the canonical absolute directory, guaranteed inside the project root.
+ * @throws when the path is not an existing directory inside the project.
+ */
+resolve(agent: Agent, path: string, signal?: AbortSignal): Promise<string>
+
+/**
+ * Change one Session's directory without changing existing processes or permissions.
+ * @param agent - live or unpublished Agent owning the Session.
+ * @param path - absolute path or a path relative to its current directory.
+ * @param signal - cancellation before the durable change.
+ * @returns the canonical absolute directory, committed before fulfillment.
+ * A notice failure is warned; the next request still receives the committed directory.
+ * @throws when the requested path is not an existing directory inside the project root.
+ */
+set(agent: Agent, path: string, signal?: AbortSignal): Promise<string>
+```
+
+Types: [Agent](core.zh.md)
+
+Source: [`packages/session/working-directory/src/index.ts`](../../packages/session/working-directory/src/index.ts)
+
 <a id="session-events"></a>
 
 ### `session/*` events

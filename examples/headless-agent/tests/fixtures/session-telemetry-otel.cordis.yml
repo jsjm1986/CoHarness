@@ -42,6 +42,12 @@
 - id: checkpoint-policy
   name: '@deepseek-ai/dsh-session-checkpoint-policy'
 
+- id: fs-local
+  name: '@deepseek-ai/dsh-fs-local'
+
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'
+
 - id: agent-spine
   name: '@deepseek-ai/dsh-agent-spine-demo'
   config:

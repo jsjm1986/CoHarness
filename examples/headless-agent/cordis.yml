@@ -84,6 +84,9 @@
     maxTokens: 8192
     compactionRetries: 1
 
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'
+
 # Projection registry: durable subagent identity (mode/label) folds through
 # its registered units; subagent catalog reads fail loud without the capability.
 - id: session-projection

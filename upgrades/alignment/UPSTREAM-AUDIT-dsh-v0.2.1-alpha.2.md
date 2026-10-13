@@ -93,23 +93,34 @@
 - ~~Menu 材质面与键盘守卫残差~~ — 已修（`566a6c58f45`，上游 `fdd14a09898` 族 + rc2 加固层）：新增 `MenuSurface`（半透明 material fill + macOS 锚定衬底 + `data-menu-material-fill` 钩子），`--dsw-specific-menu` 归一共享 fill；Menu 接 `overlayTopMargin` 顶部钳制、IME composition/behind-modal/defaultPrevented/修饰键守卫、Shift+Escape 放行、repeat 抑制的捕获期 Escape、rAF 锚点追踪、`focusWithoutRing` autoFocus、`selection` check/fill 道具；input-trigger `MenuView`、commands `PopupSelectView`、模型选择器、坞站 `TabMenu` 四面同批换面并删自涂背景/圆角防双涂；本地 `header`/`footer`/`listStyle`/手机 sheet 契约保留（ui-collaboration/ui-schedule 在消费），移动端内联子菜单隐藏材质填充。
 - ~~composer model-selection 动态测量~~ — 核定为已移植：right-edge 对齐量测+视口钳制 useLayoutEffect 在本地（含 phone 变体适配）。
 
-## P0 — 裁决项：workingDirectory 全栈（上游 0.2.1-alpha.1 新增）
+## P0 — workingDirectory 全栈（上游 0.2.1-alpha.1 新增）— 已立项，移植中
 
-上游新增 `session/working-directory` + `session/tool-working-directory` 正式包：`working-directory/change` 事件、投影、prompt 段、模型可改工作目录的工具、约 20 个消费面接线。本地全树零引用，所有执行面锁死 `header.cwd`。属"是否采纳上游新能力"的裁决项，且是上游 worktree/claude-code-mods 地基。建议独立立项，不混入缺陷修复批。
+上游新增 `session/working-directory` + `session/tool-working-directory` 正式包：`working-directory/change` 事件、投影、prompt 段、模型可改工作目录的工具、约 20 个消费面接线。本地全树零引用，所有执行面锁死 `header.cwd`。上游提交族（alpha.2 边界内）：`79bd3d8da7d`（主体）、`92713fcdbd1`（消费者补全与校验）、`0c6b1ef7bb4`（消费者与夹具移植修正）、`9c679b21f49`（请求准入刷新运行时上下文）、`549c0b5e373`（文档）。
+
+2026-10-13 裁决：立项，一次性发布（不单独发布事件词表锚点）。本地适配（上游无对应、照搬会出错）：
+
+- SSH 会话的目录校验走会话 SSH realm 的 `fs`（`environmentForAgent`），取不到即失败、不回落主机 `fs`；上游 SSH 是整进程跑在 helper 上，本地是每会话 realm（`apiproxy/src/ssh-execution.ts`）。
+- 目录切换限定在会话起始项目目录树内（产品决定，多租户下 AGENTS.md 加载、@ 文件搜索、技能发现随有效目录自动读取，不越出项目）；上游不限制。子智能体 `cwd` 同受此限。
+- `{{cwd}}` 提示变量保留，指向起始项目目录：插值器对未注册变量抛错，上游删除该变量会使含 `{{cwd}}` 的既有 preset 整轮失败；内置 bundle/示例删去 `Your working directory is {{cwd}}.` 句，有效目录由 `working-directory:current` 运行时上下文给出。
+- 有效目录校验遇文件系统传输错误（如 SSH 主机不可达）时沿用记录目录并告警，不阻断轮次；目录确实不存在时保持上游恢复/失败语义。
+- 发布注意：v7 读取器拒读未知必需事件（`session-format-v6-to-v7/src/validation.ts`），回滚到本批之前的 release 后，写入过 `working-directory/change` 的会话无法打开。
+
+不在本次范围：上游 worktree/claude-code-mods（建在本能力之上，仍属观望项 6）；Web 端不新增"当前目录"展示（上游 alpha.2 亦无）。
 
 ## 有意分歧（保留本地，非缺口）
 
 - `agentPresets.modeSelectionEnabled` 双门：`projectWritePaths` 使项目级管理员可锁定成员模式选择，上游 devtools 单门会拆掉该 org 管控（组织产品 vs 上游单人产品语义）。
-- `reuseWorkspaceBlank`/draftSessions：workspace-first 草稿会话流（apiproxy:4133-4137 自有机制）；上游回退的是其空白会话权限复制 UI，不同物。
+- `draftSessions`：workspace-first 草稿会话流，本地自有机制（apiproxy `sessions.create` 的 `draftRequested` 分支），上游无对应。
+- `reuseWorkspaceBlank` + `refreshDefaultForReuse`（空白会话复用时刷新权限默认值）：即上游 #2608（`2026-08-17-blank-permission-default-refresh`），上游 #2903（`7ce85283b5a`，"undo #2608 permission labels and blank defaults"）整体回退且未写原因；本地完整保留（client `sessions/manager.ts` 的 `create(…, reuseWorkspaceBlank)`、apiproxy `refreshDefaultAfterReuse`、`permission-presets` 的 `refreshDefaultForReuse` 与 `permission/preset.origin`）。2026-10-13 裁决保留：组织管理员收紧默认权限后，被复用的空白会话不会停留在旧的更宽松权限上。#2608 的权限文案部分本地已与上游 alpha.2 现行文案一致，无残差。
 - Agent Team 面板 RPC+手动刷新（vs 上游 session projection 推送）：云部署下按需 RPC 省连接；服务层是上游超集（quiet/wakeup/reserveUse/modelSelection/executionAuthority/mailbox 去重）。上游 master direct-inbox 反而弱化，不追。
 - `session-log-deepseek` `enabled:false` 默认：隐私立场；上游"设置开关行"单独取（UI 项）。
 - subagent external continuable 持久化绑定存储、v4→v7 会话谱系、landlock CI 加固、`.github` 中 ssh-helper/node-addon/release-publish/desktop 工作流、`resolveAccountToken` 死代码（无 account 路由）。
 
 ## 待裁决
 
-1. workingDirectory 立项与否（P0）。
-2. gateway uplink 双向流是否需要（取决于有无 Remote 消费方）。
-3. `reuseWorkspaceBlank` 保留为有意分歧 or 随上游回退。
+1. ~~workingDirectory 立项与否（P0）~~ — 2026-10-13 已立项（见 P0 节）。
+2. ~~gateway uplink 双向流是否需要~~ — 2026-10-13 不移植：uplink 是 Typert `RemoteStream<Out, In>` 的客户端→服务端半程，上游 alpha.2 仅协议/生成器/网关管线支持，无业务消费方，本地亦无。上游官方账号体系（account-controller、ui-settings-account、deepseek-account、deepseek-account-platform、llm-deepseek-account、product-analytics、product-telemetry-otel）按产品决定不引入，`scripts/upstream-sync.json` 已排除；P0 不依赖其中任何一个。
+3. ~~`reuseWorkspaceBlank` 保留为有意分歧 or 随上游回退~~ — 2026-10-13 保留（见有意分歧节）。
 4. devtools `modeSelectionEnabled` 附加门为有意产品策略（当前结论：保留）。
 5. V3→V4 迁移修复范围（本地谱系 v4→v7，旧迁移是否承载生产数据）。
 6. 上游 experimental 新包观望：session-search、session-inspector、cot-translation、worktree、claude-code-mods、skill-badge（上游仍在演进，等产品需求或转正）。

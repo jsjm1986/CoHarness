@@ -47,3 +47,6 @@
   name: '@deepseek-ai/dsh-fs-local'
   config:
     cwd: !!js process.env.DSH_CWD ?? process.cwd()
+
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'

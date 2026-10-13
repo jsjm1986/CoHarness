@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/session/working-directory/README.md
+/:
+  en: df3d506b4afe5782
+  zh: e3eb194b832e873c
+/deepseek-ai-dsh-working-directory:
+  en: 95a830627ed07991
+  zh: 91d15dd147bc21ab
+/deepseek-ai-dsh-working-directory/summary:
+  en: d92fed9750c564da
+  zh: 86665ebb669cc4cd
+/deepseek-ai-dsh-working-directory/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: bda879a892f240f0
+/deepseek-ai-dsh-working-directory/use-this-package:
+  en: d45a0e9eabc51f62
+  zh: 947a3214f1651337
+/deepseek-ai-dsh-working-directory/understand-the-implementation:
+  en: 9f1f63bd0618b956
+  zh: ddd0155a7222158c
+/deepseek-ai-dsh-working-directory/further-exploration:
+  en: d9786ae802464eaa
+  zh: 7d61ead7725b605b
+/deepseek-ai-dsh-working-directory/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-working-directory/model-experience/working-directory-context:
+  en: 6fcebaf8006123ef
+  zh: 950162891001da33
+/deepseek-ai-dsh-working-directory/model-experience/working-directory-context/what-the-model-sees:
+  en: 9a9f7113edc9f15f
+  zh: 53935035ea53a269
+/deepseek-ai-dsh-working-directory/model-experience/working-directory-context/token-effect:
+  en: a02a00deaddbccea
+  zh: f665aa4f7c28e4b9
+/deepseek-ai-dsh-working-directory/model-experience/working-directory-context/kv-cache-effect:
+  en: 88ca2770ecb9a956
+  zh: 7ea3acf25155e78b
+/deepseek-ai-dsh-working-directory/known-limitations-and-deferred-work:
+  en: f755906741fef83f
+  zh: 59d14b5a52890e16
+/deepseek-ai-dsh-working-directory/dev-note:
+  en: 5de1d6304e00c58f
+  zh: e58fc8dda0bea8d5

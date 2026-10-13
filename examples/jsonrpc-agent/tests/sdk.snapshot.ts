@@ -117,7 +117,7 @@ const SCENARIOS: SdkScenario[] = [
     expectedTools: { bash: ['command'], str_replace_editor: ['command', 'path'] },
     expectedSystem: MINIMAL_SYSTEM_PROMPT,
     expectedToolDescriptions: { bash: MINIMAL_BASH_DESCRIPTION },
-    runtimeContext: false,
+    runtimeContext: { includes: ['Current working directory:'], excludes: ['Current DSH file policy'] },
   },
 ]
 

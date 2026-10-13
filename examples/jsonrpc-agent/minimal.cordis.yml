@@ -55,6 +55,9 @@
     root: !!js process.env.DSH_SESSION_ROOT ?? './.sessions'
     compression: none
 
+- id: working-directory
+  name: '@deepseek-ai/dsh-working-directory'
+
 - id: agent-spine
   name: '@deepseek-ai/dsh-agent-spine-demo'
   config:

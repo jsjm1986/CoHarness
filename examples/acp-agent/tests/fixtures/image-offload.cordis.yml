@@ -29,7 +29,7 @@
           workspaceContext:
             maxBytes: 65536
           persona: |
-            You are a coding assistant powered by the {{model}} model. Your working directory is {{cwd}}.
+            You are a coding assistant powered by the {{model}} model.
 
             Keep answers brief and factual.
       - insert:
