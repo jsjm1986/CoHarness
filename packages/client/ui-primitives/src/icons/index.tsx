@@ -35,6 +35,7 @@ import {
   ClipboardList,
   Clock,
   CodeXml,
+  Columns2,
   Copy,
   Cpu,
   Database,
@@ -141,6 +142,8 @@ export const IconSettingsOutline14 = glyph(Settings, 14)
 export const IconSettingsOutline16 = glyph(Settings, 16)
 /** ic_ds_panel_left_outline_16 */
 export const IconPanelLeftOutline16 = glyph(PanelLeft, 16)
+/** ic_ds_split_panes_outline_16 */
+export const IconSplitPanesOutline16 = glyph(Columns2, 16)
 /** ic_ds_ellipsis_outline_16 */
 export const IconEllipsisOutline16 = glyph(Ellipsis, 16)
 /** ic_ds_plus_outline_16 */

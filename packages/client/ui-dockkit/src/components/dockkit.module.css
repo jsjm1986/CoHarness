@@ -170,12 +170,12 @@
   background: var(--dsw-alias-bg-base);
 }
 
-.tabCell[data-dockkit-host='dock'][data-dockkit-column='0'] > .tabHost {
-  border-left: 0.5px solid var(--dsw-alias-border-l4);
-}
-
+/* The header rule under the strip: the strip draws no border of its own,
+   so the hairline separating header from body lives on the host's header
+   box — and under a floating panel's header the same way. */
 .tabHostHeader {
   flex: none;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
 }
 
 .tabHostBody {
@@ -220,16 +220,15 @@
   outline: none;
 }
 
-/* A 38px row whose 28px content band sits at its bottom: chips fill the band,
-   so they end flush with the strip's bottom edge, and the 28px add control, the
-   28px split control, and the embedder's 28px chrome centre on the band's one
-   centre line, so chip text and control glyphs never sit at different heights.
-   The 10px above is the strip's own top margin, inside its box so the hit
-   area stays one element; the 10px at the start is the first chip's inset
-   from the edge, and the 6px at the end puts the last control's glyph 12px
-   from the edge. The strip draws no border: a body
-   that wants a rule under it draws its own. A floating panel's header is
-   this same row.
+/* A 38px row whose 30px content band sits at its bottom: the segmented
+   track ends flush with the strip's bottom edge, and the 28px add control,
+   the 28px split control, and the embedder's 28px chrome centre on the
+   band's one centre line, so chip text and control glyphs never sit at
+   different heights. The 8px above is the strip's own top margin, inside
+   its box so the hit area stays one element; the 10px at the start is the
+   track's inset from the edge, and the 6px at the end puts the last
+   control's glyph 12px from the edge. A floating panel's header is this
+   same row.
 
    The strip never clips: the chip box below is its one shrinking part, and
    every control after it is `flex: none`, so a narrow pane costs chips, never
@@ -239,21 +238,29 @@
   flex: none;
   gap: 4px;
   align-items: center;
-  height: 28px;
-  /* The start inset is a published variable so a host that pins the surface
+  height: 30px;
+  /* The band's insets are published variables: a host that pins the surface
      against window chrome (the right sidebar fullscreen under macOS traffic
-     lights) can widen it per pane; the fallback is the design's own 10px. */
-  padding: 10px 6px 0 var(--dsh-dockkit-strip-inline-start, 10px);
+     lights) widens the inline start per pane; a host whose neighbour owns a
+     taller header (the right sidebar beside the conversation header) raises
+     the block total and the content's top inset so the rules under both
+     bands coincide. A negative resolved end inset clamps to zero. */
+  padding: var(--dsh-dockkit-strip-block-start, 8px) 6px
+    calc(var(--dsh-dockkit-strip-block, 38px) - var(--dsh-dockkit-strip-block-start, 8px) - 30px)
+    var(--dsh-dockkit-strip-inline-start, 10px);
   touch-action: none;
 }
 
-/* The chips. Shrinks to nothing before any control after it moves; chips keep
-   their 80px floor, so what no longer fits scrolls here on the wheel, with no
-   scrollbar drawn. `touch-action: none` keeps a touch press-and-move a tab drag
-   rather than a pan the scroller would claim and cancel the pointer for.
-   `data-dockkit-strip-scroll` names the hidden sides (`start`, `end`, or
-   both); each hidden side fades the chips out over 24px into whatever ground
-   the pane draws, so the row reads as continuing under the controls. */
+/* The chips, wrapped in the segmented bar of the conversation header: a
+   hover-fill track with the card corner and 3px padding, the active chip
+   raised inside it. Shrinks to nothing before any control after it moves;
+   chips keep their 80px floor, so what no longer fits scrolls here on the
+   wheel, with no scrollbar drawn. `touch-action: none` keeps a touch
+   press-and-move a tab drag rather than a pan the scroller would claim and
+   cancel the pointer for. `data-dockkit-strip-scroll` names the hidden
+   sides (`start`, `end`, or both); each hidden side fades the box out over
+   24px into whatever ground the pane draws, so the track reads as
+   continuing under the controls. */
 .stripTabs {
   display: flex;
   flex: 0 1 auto;
@@ -261,6 +268,9 @@
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  padding: 3px;
+  border-radius: var(--dsw-radius-card);
+  background: var(--dsw-alias-interactive-bg-hover);
   /* The scroll to a newly active chip glides rather than jumps. */
   scroll-behavior: smooth;
   scrollbar-width: none;
@@ -321,43 +331,30 @@
   -webkit-app-region: no-drag;
 }
 
-/* The slot between two chips: a 10px box with a hairline down its centre.
-   Targeted by a drag, the same box draws the caret instead, so the chips
-   around it never move. */
+/* The slot between two chips: a 4px gap that doubles as the drag caret's
+   box, so the chips around a targeted slot never move. Segments draw no
+   separator — the raised pill separates the active chip from the rest. */
 .slot {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 10px;
-  height: 28px;
-}
-
-.slot::before {
-  content: '';
-  width: 0.5px;
-  height: 14px;
-  background: var(--dsw-alias-border-l4);
-}
-
-/* The active chip is a filled capsule and needs no rule against it: the two
-   slots beside it go blank, so the row reads as the capsule between bare
-   chips. A caret in either slot still draws. */
-.tabActive + .slot:not(.slotCaret)::before,
-.slot:not(.slotCaret):has(+ .tabActive)::before {
-  background: transparent;
+  width: 4px;
+  height: 24px;
 }
 
 .slotCaret::before {
+  content: '';
   width: 2px;
-  height: 20px;
+  height: 16px;
   background: var(--dsw-alias-brand-primary-new-colorprimary-new-color);
 }
 
-/* The chip: a 28px capsule whose title runs to the right inset. The close
-   control is not in the flow — it sits over the title's last 14px and shows
-   while the chip is active, hovered, or holds focus — so a chip is the same
-   width with and without it and nothing shifts on hover. */
+/* The chip: a 24px segment in the segmented bar's own type (500/-0.01em)
+   whose title runs to the right inset. The close control is not in the
+   flow — it sits over the title's last 14px and shows while the chip is
+   active, hovered, or holds focus — so a chip is the same width with and
+   without it and nothing shifts on hover. */
 .tab {
   position: relative;
   display: flex;
@@ -365,13 +362,15 @@
   align-items: center;
   min-width: 80px;
   max-width: 170px;
-  height: 28px;
+  height: 24px;
   padding: 0 10px;
   color: var(--dsw-alias-label-secondary);
   font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
   line-height: 1;
   white-space: nowrap;
-  border-radius: 12px;
+  border-radius: var(--dsw-radius-control);
   cursor: pointer;
   touch-action: none;
   user-select: none;
@@ -401,8 +400,8 @@
 }
 
 /* While the close shows, the title is gone under the close's circle and fades
-   out over the 16px before it: the circle spans the chip's last 24px and the
-   title ends 10px inside the chip, so the title's last 14px are under it.
+   out over the 16px before it: the circle spans the chip's last 21px and the
+   title ends 10px inside the chip, so the title's last 11px are under it.
    Later than the clipped mask, so a clipped chip showing its close fades
    under the close. A floating panel's header chip has no close, so it keeps
    the clipped mask alone. */
@@ -412,23 +411,23 @@
   mask-image: linear-gradient(to right, black calc(100% - 30px), transparent calc(100% - 14px));
 }
 
-/* A 20px icon button inset 4px from the chip's end, holding a 14px glyph in
+/* An 18px icon button inset 3px from the chip's end, holding a 12px glyph in
    the tertiary ink, so it sits back from the title beside it. */
 .tabClose {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 3px;
+  right: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   color: var(--dsw-alias-label-tertiary);
   line-height: 1;
   background: transparent;
   border: none;
-  border-radius: 20px;
+  border-radius: var(--dsw-radius-full);
   cursor: pointer;
   opacity: 0;
   /* Hidden means untouchable too: without this a touch press on the chip's
@@ -445,7 +444,8 @@
   pointer-events: auto;
 }
 
-/* The chip's height and corner, so it reads as one more capsule in the row. */
+/* The strip's own control shares the embedder's chrome geometry: a 28px
+   circle holding a 14px glyph. */
 .addTab {
   display: flex;
   flex: none;
@@ -458,7 +458,7 @@
   line-height: 1;
   background: transparent;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--dsw-radius-full);
   cursor: pointer;
 }
 
@@ -476,19 +476,27 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-/* The active chip is the filled capsule, in the tag fill; the rest are bare text. */
-.tabActive {
+/* The active chip is the segmented bar's selected segment: the raised fill
+   with the control elevation lifts it off the track the way the
+   conversation header's pill does, and keeps it on hover. */
+.tabActive,
+.tabActive:hover {
   color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-markdown-tag);
+  background: var(--dsw-alias-bg-raised);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
+  box-shadow: var(--dsw-elevation-control);
 }
 
-/* A pane's lone unclosable chip is a label, not a choice: no capsule, no
-   hover fill — the primary ink on the pane's own ground. Its title never
-   yields to a close control, so it keeps the clipped fade alone. */
+/* A pane's lone unclosable chip is a label, not a choice — but it names
+   the content in view, so it wears the same raised pill as a selected
+   segment; it just never takes a pointer. Its title never yields to a
+   close control, so it keeps the clipped fade alone. */
 .tab.tabQuiet,
 .tab.tabQuiet:hover {
   color: var(--dsw-alias-label-primary);
-  background: transparent;
+  background: var(--dsw-alias-bg-raised);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
+  box-shadow: var(--dsw-elevation-control);
   cursor: default;
 }
 
@@ -565,7 +573,7 @@
   text-align: left;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--dsw-radius-md);
   cursor: pointer;
 }
 

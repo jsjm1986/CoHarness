@@ -57,7 +57,7 @@
   text-align: left;
   background: var(--dsw-alias-bg-layer-1);
   border: 0.5px solid var(--dsw-alias-border-l4);
-  border-radius: 24px;
+  border-radius: var(--dsw-radius-full);
   cursor: pointer;
 }
 
@@ -111,10 +111,13 @@
   text-overflow: ellipsis;
 }
 
-/* The chip title's compass, beside the label the strip lays out; the glyph
-   draws on currentColor, so this ink is the chip rendering's own. */
+/* The chip title's compass, beside the label the strip lays out: 14px so the
+   leading glyph shares the close button's optical weight inside a 24px chip;
+   the glyph draws on currentColor, so this ink is the chip rendering's own. */
 .titleIcon {
   flex: none;
+  width: 14px;
+  height: 14px;
   color: var(--dsw-alias-label-tertiary);
 }
 

@@ -17,7 +17,7 @@ const iconNames = Object.keys(icons)
 
 describe('ic_ds_ icon set', () => {
   it('exports the full icon set (the ic_ds_* catalog plus the glyphs local packages moved here)', () => {
-    expect(iconNames.length).toBe(111)
+    expect(iconNames.length).toBe(112)
   })
 
   it.each(iconNames)('%s renders an svg with currentColor fills and no hardcoded palette', (name) => {
