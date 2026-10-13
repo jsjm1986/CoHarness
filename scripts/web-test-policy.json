@@ -27,6 +27,7 @@
     "chat-sender-attribution.e2e.ts": "conversation",
     "clickable-links-gallery.e2e.ts": "conversation",
     "client-plugin-live.e2e.ts": "lifecycle",
+    "code-card-layout.e2e.ts": "conversation",
     "cold-blank-session.e2e.ts": "lifecycle",
     "cold-inbox.snapshot.ts": "lifecycle",
     "command-image-envelope.snapshot.ts": "conversation",
