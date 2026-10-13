@@ -24,6 +24,7 @@ import type { SessionEvent, SessionId, SessionLogOffset as SessionLogOffsetType 
 import { finalAssistantOutput } from './assistant-output.ts'
 import { SubagentRunId } from './types.ts'
 import type { SubagentResult, SubagentRun, SubagentRunEndInfo, SubagentRunInfo } from './types.ts'
+import type { StructuredAttachment } from './structured.ts'
 
 /**
  * How one Activation's residency epoch ended, as both the terminal lifecycle
@@ -34,6 +35,19 @@ export interface ActivationTerminal {
   readonly stopReason: SubagentResult['stopReason']
   /** The epoch's final assistant content, absent when it produced none or failed. */
   readonly output?: readonly ContentBlock[]
+  /**
+   * The committed structured result when this epoch's child carried an
+   * `outputSchema` and its accepted call settled — matching
+   * {@link SubagentResult.structured}'s contract.
+   */
+  readonly structured?: unknown
+  /**
+   * Provider-authored, non-assistant failure detail — matching
+   * {@link SubagentResult.diagnostic}'s contract. Local continuable children
+   * are in-process Agents with no provider diagnostic producer; the field
+   * keeps the settlement surface able to carry one.
+   */
+  readonly diagnostic?: string
 }
 
 /**
@@ -53,8 +67,10 @@ export interface ActivationObserver {
    * registered, because handle disposal unregisters it and consumers resolve it
    * to read the child's own log and scope.
    * @param child - the quiescent child agent about to be released.
+   * @param structured - this epoch's structured attachment; a child that
+   *   completed without a committed capture failed its outputSchema contract.
    */
-  capture(child: Agent): void
+  capture(child: Agent, structured?: StructuredAttachment): void
   /**
    * Resolve the terminal facts {@link settle} will publish, without publishing
    * them. The manager's parent delivery must run before the ownership release
@@ -197,13 +213,21 @@ export function createActivationObserver(
       boundary = child.session.seq
       emit('subagent/start', identity, parent)
     },
-    capture: (child: Agent): void => {
+    capture: (child: Agent, structured?: StructuredAttachment): void => {
       // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       const own = child.session.snapshotEvents(boundary)
       const output = finalAssistantOutput(own)
+      let stopReason = epochStopReason(own)
+      const committed = structured?.captured()
+      // A structured child that completes without a committed capture failed
+      // its outputSchema contract; a non-completed reason still wins.
+      if (structured !== undefined && committed === undefined && stopReason === 'completed') {
+        stopReason = 'error'
+      }
       captured = {
-        stopReason: epochStopReason(own),
+        stopReason,
         ...output === undefined ? {} : { output },
+        ...committed === undefined ? {} : { structured: committed.value },
       }
     },
     terminal,

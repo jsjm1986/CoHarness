@@ -40,6 +40,7 @@ function messageOf(error: unknown): string {
  * cancelled on disposal.
  */
 export class PlanReadStore {
+  /** Published per-address plan reads for the current connection generation. */
   readonly state = createSnapshotStore<Record<string, PlanRead | undefined>>({})
   private readonly lifetime = new AbortController()
   /** The connection generation the current states belong to; a reset aborts it so no older read publishes. */

@@ -71,7 +71,12 @@ export function resolveTelemetryLimits(options: TelemetryLimitOptions): number {
 export type ResolvedTelemetryProcessorConfig = Required<Pick<TelemetryProcessorOptions,
   'maxQueueSize' | 'maxExportBatchSize' | 'scheduledDelayMillis' | 'exportTimeoutMillis'>>
 
-/** Resolve the queue knobs this processor consumes; SDK env fallbacks do not apply. */
+/**
+ * Resolve the queue knobs this processor consumes; SDK env fallbacks do not
+ * apply.
+ * @param options - caller overrides, or undefined for the SDK defaults.
+ * @returns the fully populated cadence and queue limits.
+ */
 export function resolveTelemetryProcessorConfig(options: TelemetryProcessorOptions | undefined): ResolvedTelemetryProcessorConfig {
   return {
     maxQueueSize: options?.maxQueueSize ?? 2048,
@@ -102,6 +107,10 @@ export class ByteBoundedLogProcessor implements LogRecordProcessor {
     private readonly warn: TelemetryWarn,
   ) {}
 
+  /**
+   * Accept one SDK-produced record into the batching queue.
+   * @param record - record handed over by the SDK logger after instrumentation.
+   */
   onEmit(record: SdkLogRecord): void {
     if (this.stopped) return
     if (this.queue.length >= this.config.maxQueueSize) {

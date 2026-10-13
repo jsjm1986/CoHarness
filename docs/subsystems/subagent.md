@@ -199,7 +199,7 @@ interface ContinuableStart {
 }
 ```
 
-When a resident Activation settles, the manager delivers one notice to the child's durable direct parent describing how that epoch ended and carrying its final assistant content. That delivery is unconditional for every child whose id a caller received, happens before the ownership release that would let the parent be judged settled, and reaches a resident parent through the same waking-admission accounting as an Agent message. A parent whose own lineage is already tearing down receives it without a wake, because waking a quiescent Agent starts a turn rather than queueing work. Its source kind is distinct so a transcript never presents a runtime account as something the child wrote.
+When a resident Activation settles, the manager delivers one notice to the child's durable direct parent describing how that epoch ended and carrying its final assistant content, the committed structured value when the epoch's `outputSchema` captured one as `Structured result: <JSON>`, and any provider diagnostic as its own text block. A completed structured epoch with no committed capture settles as `error`. That delivery is unconditional for every child whose id a caller received, happens before the ownership release that would let the parent be judged settled, and reaches a resident parent through the same waking-admission accounting as an Agent message. A parent whose own lineage is already tearing down receives it without a wake, because waking a quiescent Agent starts a turn rather than queueing work. Its source kind is distinct so a transcript never presents a runtime account as something the child wrote.
 
 ```ts type-equiv
 /**

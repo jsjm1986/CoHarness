@@ -6,10 +6,12 @@ import type { SubagentRuntime } from '@deepseek-ai/dsh-subagent'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import {
   deliverSubagentPrompt,
+  hasPendingDirectChildren,
   isAdjacentAgentSendMessageTool,
   markAdjacentAgentSendMessageTool,
   queueHostSubagentPrompt,
   steerHostSubagentPrompt,
+  subagentPendingDirectChildren,
 } from '../src/internal.ts'
 
 /**
@@ -31,6 +33,18 @@ describe('host prompt adapters', () => {
     await expect(call(runtime, parent, childId, content, source, signal)).resolves.toBe(accepted)
     expect(deliver).toHaveBeenCalledWith(parent, childId, content, source, signal, delivery)
     expect(deliver).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('pending direct children probe', () => {
+  it('forwards the exact live parent through the runtime symbol', () => {
+    const parent = {} as Agent
+    const probe = vi.fn((agent: Agent) => agent === parent)
+    const runtime = { [subagentPendingDirectChildren]: probe } as unknown as SubagentRuntime
+
+    expect(hasPendingDirectChildren(runtime, parent)).toBe(true)
+    expect(probe).toHaveBeenCalledWith(parent)
+    expect(hasPendingDirectChildren(runtime, {} as Agent)).toBe(false)
   })
 })
 

@@ -83,7 +83,7 @@ import type { SubagentDescendantListEntry, SubagentListEntry } from './list-chil
 import { snapshotSubagentDescriptor } from './descriptor.ts'
 import { establishCatalogChild, subagentCatalogProjectionDefinition } from './catalog.ts'
 import { subagentIdentityProjectionDefinition, subagentTimingProjectionDefinition } from './projection.ts'
-import { deliverSubagentPrompt } from './internal.ts'
+import { deliverSubagentPrompt, subagentPendingDirectChildren } from './internal.ts'
 
 export * from './out-of-process.ts'
 export { AssistantOutputFold, finalAssistantOutput } from './assistant-output.ts'
@@ -140,6 +140,12 @@ export type {} from './catalog.ts'
 export type * from './control-types.ts'
 export type { SubagentRunEndInfo, SubagentRunInfo } from './types.ts'
 export type { SubagentIdentityProjection, SubagentTimingProjection } from './projection-types.ts'
+export {
+  attachStructuredRuntime,
+  STRUCTURED_OUTPUT_INSTRUCTION,
+  STRUCTURED_OUTPUT_TOOL,
+} from './structured.ts'
+export type { StructuredAttachment } from './structured.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -331,7 +337,22 @@ export class SubagentRuntime extends TypertRemoteService {
    * @throws when continuation services are unavailable or materialization fails.
    */
   async startContinuable(spec: ContinuableStartSpec): Promise<ContinuableStart> {
-    return this.withPendingParent(spec.request.parent, () => this.requireContinuations().startContinuable(spec))
+    const continuations = this.requireContinuations()
+    this.assertCapabilities(this.expectProvider(spec.provider), spec.request)
+    if (spec.request.outputSchema !== undefined) assertObjectJsonSchema(spec.request.outputSchema)
+    return this.withPendingParent(spec.request.parent, () => continuations.startContinuable(spec))
+  }
+
+  /**
+   * Report unsettled direct continuable work for one live parent. Symbol-keyed
+   * because sibling in-process providers need the synchronous probe for
+   * structured-completion admission without another public Service operation.
+   * @param parent - exact live Agent whose direct children are observed.
+   * @returns whether direct continuable work remains unsettled.
+   * @internal
+   */
+  [subagentPendingDirectChildren](parent: Agent): boolean {
+    return this.continuations?.hasPendingDirectChildren(parent) ?? false
   }
 
   /**
@@ -850,7 +871,10 @@ export class SubagentRuntime extends TypertRemoteService {
   }
 
   /** Reject the first requested capability that the provider lacks. */
-  private assertCapabilities(provider: SubagentProvider, request: SubagentStartRequest): void {
+  private assertCapabilities(
+    provider: SubagentProvider,
+    request: Pick<SubagentStartRequest, 'agentOptions' | 'outputSchema' | 'maxDepth' | 'toolFilter' | 'persona'>,
+  ): void {
     const needs: { when: boolean; cap: keyof SubagentCapabilities }[] = [
       { when: request.agentOptions !== undefined, cap: 'agentOptions' },
       { when: request.outputSchema !== undefined, cap: 'outputSchema' },

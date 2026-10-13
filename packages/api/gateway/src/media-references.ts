@@ -8,7 +8,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isAbsolute } from 'node:path'
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context, Fiber } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { FsError, type FileSystem } from '@deepseek-ai/dsh-fs'
@@ -95,7 +95,7 @@ async function serveFile(req: IncomingMessage, res: ServerResponse, fs: FileSyst
  * @param ctx - host context carrying the connection, fs, and attachments services.
  * @returns the route fiber; it resolves once Connection, fs, and attachments are active.
  */
-export function registerMediaReferences(ctx: Context) {
+export function registerMediaReferences(ctx: Context): Fiber & PromiseLike<Fiber> {
   return ctx.inject(['connection', 'fs', 'attachments'], (routeCtx) => {
     const maxBytes = routeCtx.attachments.imageLimits.maxImageBytes
     routeCtx.effect(() => routeCtx.connection.http.handlePrefix(

@@ -20,10 +20,12 @@ import * as SubagentFork from '@deepseek-ai/dsh-subagent-fork-in-process'
 import type { ContentBlock, GenerateOptions, MessageId, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { ToolCallId, createUserMessage, LlmAdapter, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineContentToolFixture, type ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import SubagentRuntime, {
   SubagentError,
+  STRUCTURED_OUTPUT_TOOL,
   SUBAGENT_DESCRIPTOR_VERSION,
   SUBAGENT_SETTINGS_NAMESPACE,
 } from '../src/index.ts'
@@ -3918,5 +3920,231 @@ describe('SubagentRuntime.interrupt', () => {
 
     hold.resolve(undefined)
     await drained
+  })
+})
+
+describe('continuable structured output', () => {
+  const schema: ObjectJsonSchema = {
+    type: 'object',
+    properties: { answer: { type: 'number' }, note: { type: 'string' } },
+    required: ['answer'],
+  }
+
+  function structuredSpec(parent: Agent, provider = 'spawn') {
+    return {
+      provider,
+      label: 'structured child',
+      request: { prompt: [{ type: 'text' as const, text: 'child task' }], parent, outputSchema: schema },
+      signal: testSignal,
+    }
+  }
+
+  /** Tool names of one recorded model request. */
+  function toolNames(request: GenerateOptions): string[] {
+    return (request.tools ?? []).map(tool => tool.name)
+  }
+
+  it('delivers the committed structured result in the settlement notice', async () => {
+    const { ctx, parent } = await setup([
+      toolCallResponse('c1', STRUCTURED_OUTPUT_TOOL, { answer: 42 }),
+      textResponse('parent ack'),
+    ])
+    const started = await ctx.subagents.startContinuable(structuredSpec(parent))
+    await waitNoActivation(ctx, started.childId)
+
+    await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
+    expect(settlementNotices(parent)[0]!.text).toBe(
+      `Background subagent ${started.childId} finished and will do no further work unless you send it more.`
+      + '\nIt left no closing message.'
+      + '\nStructured result: {"answer":42}',
+    )
+  })
+
+  it('reports a structured child that completed without a capture as failed', async () => {
+    const { ctx, parent } = await setup([
+      textResponse('prose answer'),
+      textResponse('parent ack'),
+    ])
+    const started = await ctx.subagents.startContinuable(structuredSpec(parent))
+    await waitNoActivation(ctx, started.childId)
+
+    await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
+    expect(settlementNotices(parent)[0]!.text).toBe(
+      `Background subagent ${started.childId} failed before it finished.`
+      + '\nIts closing message:\nprose answer',
+    )
+  })
+
+  it('rejects child-bound input while its capture stages through result policy', async () => {
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    const { ctx, parent } = await setup([
+      toolCallResponse('c1', STRUCTURED_OUTPUT_TOOL, { answer: 42 }),
+      textResponse('parent ack'),
+    ])
+    ctx.on('tools/post-execute', async (exec, _result, next) => {
+      if (exec.name !== STRUCTURED_OUTPUT_TOOL) return next()
+      entered.resolve(undefined)
+      await release.promise
+      return next()
+    })
+    const started = await ctx.subagents.startContinuable(structuredSpec(parent))
+    try {
+      await entered.promise
+      await expect(ctx.subagents.sendMessage(parent, started.childId, message('too late'), {
+        signal: testSignal,
+      })).rejects.toMatchObject({ code: 'INPUT_CLOSED' })
+      release.resolve(undefined)
+
+      await waitNoActivation(ctx, started.childId)
+      await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
+      expect(settlementNotices(parent)[0]!.text).toContain('Structured result: {"answer":42}')
+    } finally {
+      release.resolve(undefined)
+      await drainManager(ctx)
+    }
+  })
+
+  it.each(['steer', 'queue'] as const)('consumes accepted %s input before committing a structured result', async (delivery) => {
+    const { ctx, parent, adapter } = await setup([
+      toolCallResponse('before-input', STRUCTURED_OUTPUT_TOOL, { answer: 1 }),
+      ...delivery === 'queue' ? [textResponse('Ready for the queued correction.')] : [],
+      toolCallResponse('after-input', STRUCTURED_OUTPUT_TOOL, { answer: 42 }),
+      textResponse('parent ack'),
+    ])
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
+    ctx.on('tools/pre-execute', async (exec, next) => {
+      if (exec.callId === ToolCallId('before-input')) {
+        entered.resolve(undefined)
+        await release.promise
+      }
+      return next()
+    })
+    const started = await ctx.subagents.startContinuable(structuredSpec(parent))
+    try {
+      await entered.promise
+      const messageId = await (delivery === 'steer'
+        ? ctx.subagents.sendMessage(parent, started.childId, message('Correction: submit answer 42 instead.'), { signal: testSignal })
+        : queuePrompt(ctx, parent, started.childId, message('Correction: submit answer 42 instead.')))
+      const child = ctx.agents.get(started.childId)!
+      const pending = delivery === 'steer' ? child.inbox.nextStep : child.inbox.nextTurn
+      expect(pending.some(item => item.id === messageId)).toBe(true)
+      release.resolve(undefined)
+
+      await waitNoActivation(ctx, started.childId)
+      await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
+      expect(settlementNotices(parent)[0]!.text).toContain('Structured result: {"answer":42}')
+      const events = child.session.snapshotEvents()
+      const first = events.find(event => event.type === 'tool/result' && event.data.message.source.callId === 'before-input')
+      expect(first?.type === 'tool/result' && first.data.message.isError).toBe(true)
+      expect(JSON.stringify(adapter.requests.map(request => request.messages))).toContain('Correction: submit answer 42 instead.')
+    } finally {
+      release.resolve(undefined)
+      await drainManager(ctx)
+    }
+  })
+
+  it('waits for owned descendants before accepting the final structured result', async () => {
+    const { ctx, parent } = await setup([
+      toolCallResponse('spawn-child', 'start_descendant', {}),
+      toolCallResponse('too-early', STRUCTURED_OUTPUT_TOOL, { answer: 1 }),
+      toolCallResponse('finish-child', 'finish_descendant', {}),
+      toolCallResponse('final-capture', STRUCTURED_OUTPUT_TOOL, { answer: 42 }),
+      textResponse('parent ack'),
+    ])
+    ctx.llm.registerAdapter(['descendant'], new MockAdapter(['hang']))
+    let descendant: { childId: SessionId } | undefined
+    ctx.tools.register(defineContentToolFixture({
+      name: 'start_descendant',
+      description: 'Start delegated work',
+      parameters: {},
+      async execute(_args, exec): Promise<ContentBlock[]> {
+        if (exec.agent === undefined) throw new Error('expected the structured parent')
+        descendant = await ctx.subagents.startContinuable({
+          provider: 'spawn',
+          label: 'Nested work',
+          request: {
+            parent: exec.agent,
+            prompt: [{ type: 'text', text: 'Work until released' }],
+            agentOptions: { provider: 'descendant', model: 'mock' },
+          },
+          signal: testSignal,
+        })
+        return [{ type: 'text', text: 'Child accepted' }]
+      },
+    }))
+    ctx.tools.register(defineContentToolFixture({
+      name: 'finish_descendant',
+      description: 'Return delegated work',
+      parameters: {},
+      async execute(_args, exec): Promise<ContentBlock[]> {
+        if (descendant === undefined || exec.agent === undefined) throw new Error('expected resident child and parent')
+        const sender = ctx.agents.get(descendant.childId)
+        if (sender === undefined) throw new Error('expected a resident descendant')
+        await ctx.subagents.sendMessage(sender, exec.agent.id, message('Descendant result reached parent'), {
+          signal: testSignal,
+        })
+        await ctx.subagents.drainContinuableChildren(exec.agent, [descendant.childId])
+        return [{ type: 'text', text: 'Child released' }]
+      },
+    }))
+    const started = await ctx.subagents.startContinuable(structuredSpec(parent))
+    try {
+      await waitNoActivation(ctx, started.childId)
+      await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
+      expect(settlementNotices(parent)[0]!.text).toContain('Structured result: {"answer":42}')
+      const child = ctx.agents.get(started.childId)
+      const events = child !== undefined
+        ? child.session.snapshotEvents()
+        : (await loadStoredSession(ctx.sessionPersistence, started.childId)).events
+      const captures = events.filter(event => event.type === 'tool/result')
+        .filter(event => event.data.message.source.callId === 'too-early' || event.data.message.source.callId === 'final-capture')
+      expect(captures).toHaveLength(2)
+      expect(captures[0]!.type === 'tool/result' && captures[0]!.data.message.isError).toBe(true)
+      expect(JSON.stringify(captures[0]!.type === 'tool/result' ? captures[0]!.data.message.content : [])).toContain('Wait for all delegated child tasks')
+      expect(captures[1]!.type === 'tool/result' && captures[1]!.data.message.isError).toBe(false)
+    } finally {
+      await drainManager(ctx)
+    }
+  })
+
+  it('rejects outputSchema for a provider without the capability', async () => {
+    const { ctx, parent } = await setup([])
+    const dispose = ctx.subagents.registerProvider({
+      name: 'no-schema',
+      capabilities: { agentOptions: false, outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      inheritsParentContext: false,
+      start: () => Promise.reject(new Error('one-shot path unused')),
+      prepareContinuable: () => Promise.resolve({}),
+    })
+    try {
+      await expect(ctx.subagents.startContinuable(structuredSpec(parent, 'no-schema')))
+        .rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    } finally {
+      dispose()
+    }
+  })
+
+  it('cold-resumes a settled structured child without its activation-scoped schema', async () => {
+    const { ctx, parent, adapter } = await setup([
+      toolCallResponse('c1', STRUCTURED_OUTPUT_TOOL, { answer: 42 }),
+      textResponse('parent ack'),
+      textResponse('ordinary resumed answer'),
+    ])
+    const started = await ctx.subagents.startContinuable(structuredSpec(parent))
+    await waitNoActivation(ctx, started.childId)
+    await vi.waitFor(() => { expect(settlementNotices(parent)).toHaveLength(1) })
+
+    await ctx.subagents.sendMessage(parent, started.childId, message('continue normally'), { signal: testSignal })
+    const resumed = await vi.waitFor(() => {
+      const found = ctx.agents.get(started.childId)
+      expect(found).toBeDefined()
+      return found!
+    })
+    await resumed.whenIdle()
+    expect(adapter.requests).toHaveLength(3)
+    expect(toolNames(adapter.requests[2]!)).not.toContain(STRUCTURED_OUTPUT_TOOL)
+    await drainManager(ctx)
   })
 })

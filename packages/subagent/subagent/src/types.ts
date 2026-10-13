@@ -32,7 +32,7 @@ export interface ContinuableStartSpec {
    * The delegation request. The manager reserves the stable child id, resolves
    * the durable descriptor, and composes the child itself.
    */
-  readonly request: Omit<SubagentStartRequest, 'label' | 'signal' | 'outputSchema'>
+  readonly request: Omit<SubagentStartRequest, 'label' | 'signal'>
   /** Caller cancellation, owning the operation only until inbox acceptance. */
   readonly signal: AbortSignal
 }

@@ -182,6 +182,7 @@ export class SubagentContinuationManager {
           },
           agentOptions,
           composition: { persona: request.persona, toolFilter: request.toolFilter },
+          ...request.outputSchema === undefined ? {} : { outputSchema: request.outputSchema },
           signal: spec.signal,
         })
         const childHeader = activation.handle.agent.session.header
@@ -406,6 +407,18 @@ export class SubagentContinuationManager {
    */
   async waitForChildren(parent: Agent): Promise<boolean> {
     return this.activations.waitForChildren(parent)
+  }
+
+  /**
+   * Report unsettled direct continuable work for one live parent without
+   * awaiting, so a child-bound model tool execution can decide whether its
+   * final structured result is acceptable.
+   * @param parent - exact live parent whose direct continuable work is probed.
+   * @returns whether a materialization lineage or resident Activation still
+   *   claims that parent.
+   */
+  hasPendingDirectChildren(parent: Agent): boolean {
+    return this.activations.hasPendingDirectChildren(parent)
   }
 
   /**

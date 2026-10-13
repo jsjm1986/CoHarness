@@ -20,10 +20,12 @@ import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionId, SessionLogOffset as SessionLogOffsetType, TurnEndReason } from '@deepseek-ai/dsh-session'
 import { createUserMessage, MessageId, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import { executionAuthorityOf, type ExecutionInheritance } from '@deepseek-ai/dsh-execution-authority'
+import { hasPendingDirectChildren } from '@deepseek-ai/dsh-subagent/internal'
 import {
   appendDelegatedPolicyOverrides,
   applyChildComposition,
   assertSubagentMaxDepth,
+  attachStructuredRuntime,
   captureDelegatedPolicyOverrides,
   childSessionMeta,
   finalAssistantOutput,
@@ -32,20 +34,17 @@ import {
 } from '@deepseek-ai/dsh-subagent'
 import type {
   ResolvedSubagentStartRequest,
+  StructuredAttachment,
   SubagentDescriptorData,
   SubagentResult,
   SubagentRun,
   SubagentStopReason,
 } from '@deepseek-ai/dsh-subagent'
-import {
-  attachStructuredRuntime,
-  type StructuredAttachment,
-} from './structured.ts'
 
 export {
   STRUCTURED_OUTPUT_TOOL,
   STRUCTURED_OUTPUT_INSTRUCTION,
-} from './structured.ts'
+} from '@deepseek-ai/dsh-subagent'
 
 /** Map a session turn outcome to the subagent seam's terminal vocabulary. */
 function toStopReason(reason: TurnEndReason | undefined): SubagentStopReason {
@@ -127,7 +126,12 @@ export async function startInProcessRun(
       toolFilter: request.toolFilter,
     })
     if (request.outputSchema !== undefined) {
-      structured = attachStructuredRuntime(childCtx, request.outputSchema)
+      const runtime = childCtx.get('subagents')
+      structured = attachStructuredRuntime(childCtx, request.outputSchema, () =>
+        child.inbox.nextStep.length === 0
+        && child.inbox.nextTurn.length === 0
+        && (runtime === undefined || !hasPendingDirectChildren(runtime, child)),
+      )
     }
     attachDescriptorAppend(childCtx, request.descriptor)
   }

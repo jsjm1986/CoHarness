@@ -42,6 +42,51 @@ describe('continuable settlement content', () => {
     ])
   })
 
+  it('includes a serialized structured result and provider diagnostic independently of closing text', () => {
+    const message = createSettlementMessage(childId, {
+      stopReason: 'completed',
+      structured: { answer: 42 },
+      diagnostic: 'safe diagnostic',
+    })
+
+    expect(message.content).toEqual([
+      summary,
+      { type: 'text', text: 'It left no closing message.' },
+      { type: 'text', text: 'Structured result: {"answer":42}' },
+      { type: 'text', text: 'safe diagnostic' },
+    ])
+  })
+
+  it('appends structured result after closing text and the diagnostic last', () => {
+    const message = createSettlementMessage(childId, {
+      stopReason: 'completed',
+      output: [{ type: 'text', text: 'answer' }],
+      structured: { ok: true },
+      diagnostic: 'provider detail',
+    })
+
+    expect(message.content).toEqual([
+      summary,
+      { type: 'text', text: 'Its closing message:' },
+      { type: 'text', text: 'answer' },
+      { type: 'text', text: 'Structured result: {"ok":true}' },
+      { type: 'text', text: 'provider detail' },
+    ])
+  })
+
+  it('delivers a diagnostic alone on a failed settlement', () => {
+    const message = createSettlementMessage(childId, {
+      stopReason: 'error',
+      diagnostic: 'backend refused the turn',
+    })
+
+    expect(message.content).toEqual([
+      { type: 'text', text: `Background subagent ${childId} failed before it finished.` },
+      { type: 'text', text: 'It left no closing message.' },
+      { type: 'text', text: 'backend refused the turn' },
+    ])
+  })
+
   it('preserves text block order and bytes around omitted reasoning and tool calls', () => {
     const first: ContentBlock = { type: 'text', text: '  first\n' }
     const second: ContentBlock = { type: 'text', text: '\n第二段  ' }

@@ -25,7 +25,9 @@ import type {
   SessionLogOffset as SessionLogOffsetType,
   UserMessage,
 } from '@deepseek-ai/dsh-session'
-import type { ToolRestriction } from '@deepseek-ai/dsh-tools'
+import type { ObjectJsonSchema, ToolRestriction } from '@deepseek-ai/dsh-tools'
+import { attachStructuredRuntime } from './structured.ts'
+import type { StructuredAttachment } from './structured.ts'
 import {
   appendDelegatedPolicyOverrides,
   applyChildComposition,
@@ -97,6 +99,13 @@ export interface Activation {
   /** The lifecycle observer that emits this epoch's start and terminal edges. */
   readonly observer: ActivationObserver
   /**
+   * Scoped structured-output attachment when this epoch's child carried an
+   * `outputSchema`; its committed value joins the terminal the observer
+   * captures, and its admission state closes child-bound input once a result
+   * stages.
+   */
+  readonly structured: StructuredAttachment | undefined
+  /**
    * Whether any delivery to this child was ever accepted. A materialization
    * rolled back before its first acceptance is a child the caller was told does
    * not exist, so its teardown owes the parent no settlement account.
@@ -128,6 +137,12 @@ export interface MaterializeInputs {
   }
   agentOptions: AgentOptions
   composition: { persona?: string | undefined; toolFilter?: ToolRestriction | undefined }
+  /**
+   * Per-activation structured-output schema a fresh creation attaches to the
+   * child; cold resume restores none — the descriptor keeps it out of durable
+   * composition because it budgets one activation's result contract.
+   */
+  outputSchema?: ObjectJsonSchema
   signal: AbortSignal
 }
 
@@ -474,6 +489,19 @@ export class ContinuableActivationRegistry {
   }
 
   /**
+   * Report whether one live parent still owns unsettled direct work: a resident
+   * child Activation naming it as parent, or an in-flight materialization whose
+   * recorded lineage contains it. The structured-completion admission needs the
+   * synchronous answer `waitForChildren` cannot give inside a tool boundary.
+   * @param parent - exact live Agent whose direct children are observed.
+   * @returns whether direct continuable work remains unsettled.
+   */
+  hasPendingDirectChildren(parent: Agent): boolean {
+    return [...this.materializations].some(item => item.lineage.includes(parent))
+      || [...this.resident.values()].some(item => item.parentSession === parent.id)
+  }
+
+  /**
    * Release selected resident direct children of one exact live parent.
    * @param parent - exact live direct parent authorizing the selected release.
    * @param childIds - durable direct-child ids to release when resident.
@@ -747,6 +775,7 @@ export class ContinuableActivationRegistry {
   ): Promise<Activation> {
     const { childId, provider, parent, create } = inputs
     inputs.signal.throwIfAborted()
+    let structured: StructuredAttachment | undefined
     const setup = (childCtx: Context, child: Agent): void => {
       // Only fresh creation appends the descriptor and delegated policy after
       // the inherited marker; a cold resume replays those persisted events.
@@ -755,6 +784,13 @@ export class ContinuableActivationRegistry {
         appendDelegatedPolicyOverrides(childCtx, child.session, create.delegatedPolicies)
       }
       applyChildComposition(childCtx, parent, inputs.composition)
+      if (inputs.outputSchema !== undefined) {
+        structured = attachStructuredRuntime(childCtx, inputs.outputSchema, () =>
+          this.resident.get(childId)?.ownedChildren.size === 0
+          && child.inbox.nextStep.length === 0
+          && child.inbox.nextTurn.length === 0,
+        )
+      }
     }
     const observer = this.observeActivation(provider, childId, parent)
     const handle: AgentHandle = create === undefined
@@ -783,10 +819,11 @@ export class ContinuableActivationRegistry {
       parentSession: parent.id,
       provider,
       handle,
-      inbox: new SubagentInbox(handle.agent),
+      inbox: new SubagentInbox(handle.agent, structured),
       ancestry: new WeakSet([handle.agent, ...parentLineage]),
       ownedChildren: new Set(),
       observer,
+      structured,
       announced: false,
       poke: Promise.withResolvers<undefined>(),
     }
@@ -936,7 +973,7 @@ export class ContinuableActivationRegistry {
     const failures: SubagentError[] = []
     if (finalStateFlushed) {
       try {
-        activation.observer.capture(activation.handle.agent)
+        activation.observer.capture(activation.handle.agent, activation.structured)
       } catch (error: unknown) {
         failures.push(new SubagentError(
           `subagent "${childId}" activation teardown failed: ${errorChain(error)}`,
@@ -969,7 +1006,7 @@ export class ContinuableActivationRegistry {
         }
         await idle
         await this.flushFinalState(activation)
-        activation.observer.capture(activation.handle.agent)
+        activation.observer.capture(activation.handle.agent, activation.structured)
       } catch (error: unknown) {
         failures.push(new SubagentError(
           `subagent "${childId}" activation teardown failed: ${errorChain(error)}`,

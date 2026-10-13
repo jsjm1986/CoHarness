@@ -20,7 +20,7 @@ import { startInProcessRun } from '../src/index.ts'
 import {
   STRUCTURED_OUTPUT_INSTRUCTION,
   STRUCTURED_OUTPUT_TOOL,
-} from '../src/structured.ts'
+} from '../src/index.ts'
 
 const testToolSignal = new AbortController().signal
 
