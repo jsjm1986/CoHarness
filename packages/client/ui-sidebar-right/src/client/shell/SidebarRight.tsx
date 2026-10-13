@@ -30,7 +30,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { CSSProperties, ReactNode, RefObject } from 'react'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
-import { IconFullscreenOutline16, IconMinimizeOutline16, IconPanelLeftOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseOutline16, IconFullscreenOutline16, IconMinimizeOutline16, IconPanelLeftOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   HostObservable, InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
@@ -272,26 +272,31 @@ function ExitFullscreenGlyph(): ReactNode {
   return <IconMinimizeOutline16 aria-hidden="true" />
 }
 
-/** The panel's two controls, placed by the kit at the top-right pane's strip end. */
-function PanelChrome({ sessionId, fullscreen, actions, t, shortcuts, toggleFullscreen }: Pick<PanelProps, 'sessionId' | 'actions' | 't' | 'fullscreen' | 'shortcuts' | 'toggleFullscreen'>): ReactNode {
+/** The panel's controls, placed by the kit at the top-right pane's strip end. */
+function PanelChrome({ sessionId, fullscreen, autoFullscreen, actions, t, shortcuts, toggleFullscreen }: Pick<PanelProps, 'sessionId' | 'actions' | 't' | 'fullscreen' | 'autoFullscreen' | 'shortcuts' | 'toggleFullscreen'>): ReactNode {
   const next: DockMode = fullscreen ? 'push' : 'fullscreen'
   const modeLabel = fullscreen ? t('chrome.exitFullscreen') : t('chrome.toFullscreen')
   const mode = shortcuts.find(entry => entry.id === 'pane.fullscreen.toggle')
   const toggle = shortcuts.find(entry => entry.id === 'sidebar.right.toggle')
   return (
     <>
-      <Tooltip label={modeLabel} shortcutKeys={mode?.keys} side="bottom" delayMs={500}>
-        <button
-          type="button"
-          className={css.iconButton}
-          aria-label={modeLabel}
-          aria-keyshortcuts={mode?.aria}
-          data-sidebar-right-mode={next}
-          onClick={toggleFullscreen}
-        >
-          {fullscreen ? <ExitFullscreenGlyph /> : <FullscreenGlyph />}
-        </button>
-      </Tooltip>
+      {/* The phone presentation is pinned fullscreen by the viewport, so the
+          mode button can only stand in as a second close that also rewrites
+          the recorded mode the desktop layout reads next. */}
+      {!autoFullscreen && (
+        <Tooltip label={modeLabel} shortcutKeys={mode?.keys} side="bottom" delayMs={500}>
+          <button
+            type="button"
+            className={css.iconButton}
+            aria-label={modeLabel}
+            aria-keyshortcuts={mode?.aria}
+            data-sidebar-right-mode={next}
+            onClick={toggleFullscreen}
+          >
+            {fullscreen ? <ExitFullscreenGlyph /> : <FullscreenGlyph />}
+          </button>
+        </Tooltip>
+      )}
       <Tooltip label={t('chrome.collapse')} shortcutKeys={toggle?.keys} side="bottom" delayMs={500}>
         <button
           type="button"
@@ -301,11 +306,138 @@ function PanelChrome({ sessionId, fullscreen, actions, t, shortcuts, toggleFulls
           data-sidebar-right-toggle
           onClick={() => { actions.toggleExpanded(sessionId) }}
         >
-          <IconPanelLeftOutline16 className={css.collapseGlyph} />
+          {/* A phone reads the panel as a pushed screen, so its dismiss
+              affordance is the plain close glyph rather than the docking
+              metaphor's mirrored rail. */}
+          {autoFullscreen ? <IconCloseOutline16 /> : <IconPanelLeftOutline16 className={css.collapseGlyph} />}
         </button>
       </Tooltip>
     </>
   )
+}
+
+/**
+ * The leading-edge swipe that dismisses the phone presentation, mirroring the
+ * shell drawer's edge gesture. The panel covers the viewport, so the gesture
+ * is the pushed-screen convention: a rightward drag that begins inside the
+ * leading 20px. Touches deeper inside belong to the panes — vertical scrolls
+ * there must never feed this gesture, so engagement stays gated on direction
+ * and a vertical drift drops the candidate before any transform is written.
+ *
+ * The listeners are native because React binds touch handlers passive, and
+ * claiming the gesture takes preventDefault against the pane's own scroller.
+ * The dragged nodes are the same docked hosts the stylesheet slides
+ * (`data-dockkit-host='dock'`, `-empty`, `-divider`), so on release the
+ * inline values hand back to the rules that own the steady state — a settled
+ * close lands on the stylesheet's own `translateX(100%)`, which the inline
+ * value already equals.
+ */
+function useLeadingEdgeDismiss(
+  panelRef: RefObject<HTMLDivElement | null>,
+  enabled: boolean,
+  close: () => void,
+): void {
+  const closeRef = useRef(close)
+  closeRef.current = close
+  useEffect(() => {
+    if (!enabled) return
+    const panel = panelRef.current
+    if (panel === null) return
+    interface Swipe {
+      readonly x0: number
+      readonly y0: number
+      readonly t0: number
+      readonly width: number
+      lastDx: number
+      engaged: boolean
+      hosts: HTMLElement[]
+    }
+    const EDGE = 20
+    let swipe: Swipe | null = null
+    const hosts = (): HTMLElement[] => [...panel.querySelectorAll<HTMLElement>(
+      "[data-dockkit-host='dock'], [data-dockkit-empty], [data-dockkit-divider]",
+    )]
+    const clearInline = (targets: readonly HTMLElement[]): void => {
+      for (const host of targets) {
+        host.style.transition = ''
+        host.style.transform = ''
+      }
+    }
+    const finish = (): void => {
+      const s = swipe
+      swipe = null
+      if (s === null || !s.engaged) return
+      const velocity = s.lastDx / Math.max(1, performance.now() - s.t0)
+      const closing = s.lastDx > s.width * 0.3 || velocity > 0.35
+      let done = false
+      const settle = (): void => {
+        if (done) return
+        done = true
+        if (closing) {
+          closeRef.current()
+          /* The stylesheet's own close slide now owns these hosts; the inline
+             values equal its end state, so clearing them paints no jump. The
+             cleanup pass on the `expanded` flip clears whatever is left. */
+          window.setTimeout(() => { clearInline(s.hosts) }, 400)
+          return
+        }
+        clearInline(s.hosts)
+      }
+      if (!closing) {
+        for (const host of s.hosts) {
+          host.style.transition = 'transform var(--ds-transition-duration-slow) var(--ds-ease-in-out)'
+          host.style.transform = 'translateX(0)'
+        }
+        s.hosts[0]?.addEventListener('transitionend', settle, { once: true })
+        window.setTimeout(settle, 400)
+        return
+      }
+      for (const host of s.hosts) {
+        host.style.transition = 'transform 160ms ease-out'
+        host.style.transform = `translateX(${s.width}px)`
+      }
+      s.hosts[0]?.addEventListener('transitionend', settle, { once: true })
+      window.setTimeout(settle, 400)
+    }
+    const onStart = (event: TouchEvent): void => {
+      const touch = event.touches[0]
+      if (touch === undefined || event.touches.length !== 1) return
+      const box = panel.getBoundingClientRect()
+      if (touch.clientX - box.left > EDGE) return
+      swipe = { x0: touch.clientX, y0: touch.clientY, t0: performance.now(), width: box.width, lastDx: 0, engaged: false, hosts: [] }
+    }
+    const onMove = (event: TouchEvent): void => {
+      const s = swipe
+      const touch = event.touches[0]
+      if (s === null || touch === undefined || event.touches.length !== 1) return
+      const dx = touch.clientX - s.x0
+      const dy = touch.clientY - s.y0
+      if (!s.engaged) {
+        if (!(dx > 12 && dx > Math.abs(dy))) {
+          if (Math.abs(dy) > 12) swipe = null
+          return
+        }
+        s.engaged = true
+        s.hosts = hosts()
+        for (const host of s.hosts) host.style.transition = 'none'
+      }
+      s.lastDx = Math.max(0, Math.min(dx, s.width))
+      event.preventDefault()
+      for (const host of s.hosts) host.style.transform = `translateX(${s.lastDx}px)`
+    }
+    panel.addEventListener('touchstart', onStart, { passive: true })
+    panel.addEventListener('touchmove', onMove, { passive: false })
+    panel.addEventListener('touchend', finish)
+    panel.addEventListener('touchcancel', finish)
+    return () => {
+      panel.removeEventListener('touchstart', onStart)
+      panel.removeEventListener('touchmove', onMove)
+      panel.removeEventListener('touchend', finish)
+      panel.removeEventListener('touchcancel', finish)
+      clearInline(hosts())
+      swipe = null
+    }
+  }, [enabled, panelRef])
 }
 
 /**
@@ -316,6 +448,7 @@ function SidebarPanel(panel: PanelProps & { width: number; panelRef: RefObject<H
   const { sessionId, surface, actions, t, renderSlot, openTab, width, reportRoom, fullscreen, panelRef } = panel
   const { expanded } = surface.layout
   const types = panel.useTabTypes(value => value)
+  useLeadingEdgeDismiss(panelRef, panel.autoFullscreen && expanded, () => { actions.setExpanded(sessionId, false) })
   return (
     <div
       ref={panelRef}
@@ -334,6 +467,14 @@ function SidebarPanel(panel: PanelProps & { width: number; panelRef: RefObject<H
         <DockLayout
           state={surface.layout}
           canSplit={canSplit(surface.layout) && dockPaneIds(surface.layout).length < 2}
+          /* The phone strip is too narrow to split under every reachable
+             layout, so its blocked control is dead chrome. The kit's own hide
+             path must carry that: a stylesheet-only display:none frees the
+             button's footprint back into the strip fill, which re-flips the
+             room verdict and re-renders the control forever (the kit measures
+             the hidden footprint when this flag is set, keeping the verdict
+             independent of visibility). */
+          hideSplitWhenBlocked={panel.autoFullscreen}
           dropZones="horizontal"
           minPaneFraction={0.2}
           canAddTab={paneId => guideIn(surface.layout, paneId) === undefined}
@@ -347,7 +488,8 @@ function SidebarPanel(panel: PanelProps & { width: number; panelRef: RefObject<H
           renderTabMenuItems={(tab, dismiss) =>
             renderSlot('sidebar.right.tab.menu.item', { tab, dismiss })}
           chrome={<PanelChrome
-            sessionId={sessionId} fullscreen={fullscreen} actions={actions} t={t}
+            sessionId={sessionId} fullscreen={fullscreen} autoFullscreen={panel.autoFullscreen}
+            actions={actions} t={t}
             shortcuts={panel.shortcuts} toggleFullscreen={panel.toggleFullscreen}
           />}
           onRoom={reportRoom}

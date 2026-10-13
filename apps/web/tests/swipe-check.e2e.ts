@@ -8,12 +8,12 @@ import { ZH_BROWSER_LOCALE } from './support.ts'
 const SEED = fileURLToPath(new URL('./snapshots/navigation-panes/seed.jsonl', import.meta.url))
 
 /** Dispatch a synthetic finger drag on the first visible match; moves are spread over real time. */
-async function drag(page: Page, pick: string, dx: number, dy: number) {
-  return page.evaluate(async ({ pick, dx, dy }) => {
+async function drag(page: Page, pick: string, dx: number, dy: number, startInset = 40) {
+  return page.evaluate(async ({ pick, dx, dy, startInset }) => {
     const el = [...document.querySelectorAll<HTMLElement>(pick)].find(e => e.getClientRects().length > 0)
     if (!el) return 'no-element'
     const box = el.getBoundingClientRect()
-    const x0 = box.left + Math.min(40, box.width / 2)
+    const x0 = box.left + Math.min(startInset, box.width / 2)
     const y0 = box.top + box.height / 2
     const mk = (type: string, x: number, y: number) => {
       const touch = new Touch({ identifier: 1, target: el, clientX: x, clientY: y })
@@ -26,7 +26,7 @@ async function drag(page: Page, pick: string, dx: number, dy: number) {
     }
     mk('touchend', x0 + dx, y0 + dy)
     return 'ok'
-  }, { pick, dx, dy })
+  }, { pick, dx, dy, startInset })
 }
 
 const drawerOpen = (page: Page) =>
@@ -89,6 +89,36 @@ it('compact gestures: edge-swipe opens drawer, swipe closes it, sheets drag-dism
     expect(await drag(page, '[role="dialog"]', 0, 260)).toBe('ok')
     await page.waitForTimeout(600)
     expect(await page.evaluate(() => document.querySelectorAll('[role="dialog"]').length)).toBe(0)
+
+    // The right sidebar presents fullscreen on a phone: its leading edge
+    // swipe is the pushed-screen dismiss, and a mid-content touch must not
+    // engage it.
+    if (await drawerOpen(page)) {
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(400)
+    }
+    await page.locator('button[class*="topbarToggle"]').first().click()
+    await page.waitForTimeout(600)
+    const sessionRow = page.locator('[role="treeitem"]', { hasText: '未命名' }).first()
+    if (await sessionRow.getAttribute('aria-expanded') === 'false') {
+      await sessionRow.click({ position: { x: 40, y: 22 } })
+      await page.waitForTimeout(400)
+    }
+    await page.locator('[role="treeitem"]', { hasText: '未命名' }).first().click()
+    await page.waitForTimeout(800)
+    const rightOpen = () => page.evaluate(() => [...document.querySelectorAll('[data-sidebar-right-panel]')].some(el => el.hasAttribute('data-sidebar-right-open')))
+    const expand = page.locator('[data-sidebar-right-expand]:visible').first()
+    await expand.click()
+    await page.waitForTimeout(800)
+    expect(await rightOpen()).toBe(true)
+    // A deep-content horizontal drag is the pane's business, not the gesture's.
+    expect(await drag(page, '[data-sidebar-right-panel]', 120, 0, 200)).toBe('ok')
+    await page.waitForTimeout(400)
+    expect(await rightOpen()).toBe(true)
+    // The leading-edge drag tracks the finger and dismisses the panel.
+    expect(await drag(page, '[data-sidebar-right-panel]', 220, 0, 8)).toBe('ok')
+    await page.waitForTimeout(800)
+    expect(await rightOpen()).toBe(false)
 
     await context.close()
   } finally {

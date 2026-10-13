@@ -328,8 +328,8 @@ class SlotErrorBoundary extends Component<
     if (error instanceof SlotAssemblyError) throw error
     return { failed: true }
   }
-  override componentDidCatch(error: unknown): void {
-    console.error(`slot entry crashed in '${this.props.slotKey}':`, error)
+  override componentDidCatch(error: unknown, info: { componentStack?: string }): void {
+    console.error(`slot entry crashed in '${this.props.slotKey}':`, error, info.componentStack ?? '')
     this.props.onEntryError(error)
   }
   override render(): ReactNode {

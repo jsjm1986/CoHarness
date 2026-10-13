@@ -197,3 +197,13 @@
   min-width: 0;
   overflow: hidden;
 }
+
+/* Phone: the strip is the pushed screen's only chrome, so its two controls
+   leave the desktop's 28px message-row geometry for the shared compact row
+   target. */
+@media (max-width: 767px) {
+  .iconButton {
+    width: 36px;
+    height: 36px;
+  }
+}

@@ -846,3 +846,54 @@
 .floatResize:hover::after {
   border-color: var(--dsw-alias-label-tertiary);
 }
+
+/*
+ * Phone: the strip is the pushed panel's whole nav bar, so its row, chips,
+ * and controls leave the desktop's 28px message-row geometry for the compact
+ * family, and the long-press tab menu's items reach the shared touch target.
+ * The strip's band total stays the host's `--dsh-dockkit-strip-block`: the
+ * taller row comes out of its bottom padding, so the band does not grow.
+ */
+@media (max-width: 767px) {
+  .tabStrip {
+    height: 40px;
+    padding-bottom: calc(var(--dsh-dockkit-strip-block, 38px) - var(--dsh-dockkit-strip-block-start, 8px) - 40px);
+  }
+
+  .tab {
+    min-width: 88px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .iconButton,
+  .addTab {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* The close circle rides the chip's taller box: 5px insets centre the 22px
+     control on the 32px chip. */
+  .tabClose {
+    top: 5px;
+    right: 5px;
+    width: 22px;
+    height: 22px;
+  }
+
+  /* A split can never fit a phone's pane, so the blocked control is dead
+     chrome. The hide must NOT happen here: dropping the button's box at the
+     stylesheet level hands its footprint to the strip's fill, which re-flips
+     the room rule's verdict and re-renders the control forever. Embedders
+     pass `hideSplitWhenBlocked` so the measure pass keeps the verdict
+     independent of the control's visibility. */
+
+  .menu {
+    min-width: 160px;
+  }
+
+  .menuItem {
+    min-height: var(--dsw-touch-target);
+    padding: var(--dsw-space-2) var(--dsw-space-4);
+  }
+}

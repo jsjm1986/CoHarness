@@ -12,10 +12,33 @@ import { describe, expect, it } from 'vitest'
 
 const sheetCss = readFileSync(fileURLToPath(new URL('../src/components/dockkit.module.css', import.meta.url)), 'utf8')
 
-/** Declarations of every rule whose selector list contains `selector`, merged in source order. */
+/** The sheet's unconditional layer: `@media` blocks removed with their balanced braces. */
+function stripMediaBlocks(css: string): string {
+  let result = ''
+  let i = 0
+  while (i < css.length) {
+    const at = css.indexOf('@media', i)
+    if (at === -1) return result + css.slice(i)
+    result += css.slice(i, at)
+    const open = css.indexOf('{', at)
+    let depth = 0
+    let end = open
+    for (; end < css.length; end += 1) {
+      if (css[end] === '{') depth += 1
+      else if (css[end] === '}') {
+        depth -= 1
+        if (depth === 0) break
+      }
+    }
+    i = end + 1
+  }
+  return result
+}
+
+/** Declarations of every unconditional rule whose selector list contains `selector`, merged in source order. */
 function declarationsFor(selector: string): Map<string, string> {
   const declarations = new Map<string, string>()
-  const withoutComments = sheetCss.replace(/\/\*[\s\S]*?\*\//g, ' ')
+  const withoutComments = stripMediaBlocks(sheetCss.replace(/\/\*[\s\S]*?\*\//g, ' '))
   for (const [, selectors = '', body = ''] of withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (!selectors.split(',').map(part => part.trim()).includes(selector)) continue
     for (const part of body.split(';')) {

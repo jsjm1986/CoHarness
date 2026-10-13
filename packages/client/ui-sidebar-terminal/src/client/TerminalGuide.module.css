@@ -6,3 +6,25 @@
 .description { overflow: hidden; color: var(--dsw-alias-label-caption); font-size: 13px; line-height: 1.4; white-space: nowrap; text-overflow: ellipsis; }
 .trigger { align-self: stretch; flex: none; height: auto; width: 44px; padding: 0; border-radius: 0 24px 24px 0; }
 .menu { display: flex; align-self: stretch; flex: none; }
+
+/* Phone: the entry joins the guide's flat-list grammar — full-width rows split
+   by hairlines — instead of a capsule card floating mid-pane. */
+@media (max-width: 767px) {
+  .entry {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+  }
+
+  .main {
+    min-height: 56px;
+    padding: var(--dsw-space-3) var(--dsw-space-4);
+    gap: var(--dsw-space-3);
+    border-radius: 0;
+  }
+
+  .trigger {
+    width: var(--dsw-touch-target);
+    border-radius: 0;
+  }
+}

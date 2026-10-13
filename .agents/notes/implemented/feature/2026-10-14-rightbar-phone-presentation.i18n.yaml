@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-14-rightbar-phone-presentation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-14-rightbar-phone-presentation.md
+/agent-note-the-rightbar-s-phone-presentation-is-a-pushed-screen-not-a-shrunken-dock:
+  en: 3473027b335f9499
+  zh: 486311fd7f1db9e9
+/agent-note-the-rightbar-s-phone-presentation-is-a-pushed-screen-not-a-shrunken-dock/problem:
+  en: 2821e1a78fa5818b
+  zh: c622eff5af3db358
+/agent-note-the-rightbar-s-phone-presentation-is-a-pushed-screen-not-a-shrunken-dock/decision:
+  en: 43e35bfcbb8396c5
+  zh: d7cba7d6c5f94c3b
+/agent-note-the-rightbar-s-phone-presentation-is-a-pushed-screen-not-a-shrunken-dock/verification:
+  en: 9e953b0e7aebb3af
+  zh: d6bcb97278c60ed9
+/agent-note-the-rightbar-s-phone-presentation-is-a-pushed-screen-not-a-shrunken-dock/alternatives-considered:
+  en: 83056fabbe454ec1
+  zh: 312f5b25af85289b
+/agent-note-the-rightbar-s-phone-presentation-is-a-pushed-screen-not-a-shrunken-dock/consequences:
+  en: 8621e8b4331a4809
+  zh: 29ae90270a20aeb1

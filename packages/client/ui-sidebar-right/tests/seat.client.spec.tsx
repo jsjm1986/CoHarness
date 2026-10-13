@@ -282,7 +282,10 @@ describe('RightbarSeat presentation', () => {
     const h = await mountSeat(500, false)
     const tab = h.open()
     const signal = h.bodies.get(tab.id)!.tab.signal
-    fireEvent.click(element(h.view.container, '[data-sidebar-right-mode]'))
+    // The phone presentation is pinned fullscreen, so the mode toggle would be
+    // a second close that also rewrites the recorded mode; it is not drawn.
+    expect(h.view.container.querySelector('[data-sidebar-right-mode]')).toBeNull()
+    fireEvent.click(element(h.view.container, '[data-sidebar-right-toggle]'))
     expect(h.layout().expanded).toBe(false)
     expect(h.layout().mode).toBe('push')
     const stored = h.instance.getSnapshot()
@@ -583,6 +586,19 @@ describe('slot-owned useTabInfo', () => {
     expect(dockPaneIds(h.layout())).toHaveLength(1)
     expect(splitButtons()).toHaveLength(1)
     expect(splitButtons()[0]?.disabled).toBe(false)
+  })
+
+  it('leaves a blocked split control out of the strip entirely on a phone', async () => {
+    const h = await mountSeat(390)
+    act(() => { h.controller.toggleExpanded() })
+    h.open()
+    const splitButtons = () => h.view.container.querySelectorAll<HTMLButtonElement>('[data-dockkit-split-button]')
+    expect(splitButtons()).toHaveLength(1)
+    act(() => { h.controller.split() })
+    // The phone presentation cannot fit a split, so a budget-blocked control
+    // unmounts rather than drawing a disabled circle — the kit's
+    // hideSplitWhenBlocked path, which keeps the room reading stable.
+    expect(splitButtons()).toHaveLength(0)
   })
 })
 

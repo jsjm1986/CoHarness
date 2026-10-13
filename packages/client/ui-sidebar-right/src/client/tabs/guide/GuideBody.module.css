@@ -123,27 +123,57 @@
 
 .entryCell { width: 380px; max-width: 100%; }
 
-/* Phone overlay: the capsule column keeps its centered stack but the entries
-   compress to the shared option-row height with a card radius instead of the
-   desktop's oversized pill. */
+/* Phone: the entries are the pushed screen's whole content, so they take the
+   flat-list grammar — top-anchored full-width rows split by hairlines — rather
+   than capsules floating in a centred column. The compass hero shrinks and
+   anchors the top instead of lifting the stack off the middle. */
 @media (max-width: 767px) {
   .guide {
-    gap: 10px;
-    padding: 0 var(--dsw-space-4);
+    gap: 0;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: var(--dsw-space-2) 0 0;
+  }
+
+  .guide::after {
+    display: none;
   }
 
   .hero {
-    margin-bottom: var(--dsw-space-2);
+    margin: var(--dsw-space-4) auto var(--dsw-space-6);
+  }
+
+  .hero svg {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* The hairline lives on the cell wrapper, not the entry: slot-provided
+     entries (the terminal's own row, for one) draw their own element inside
+     the cell, and a rule keyed on `.entry` could not reach them. */
+  .entryCell {
+    width: 100%;
+  }
+
+  .entryCell:not(:last-child) {
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
   }
 
   .entry {
-    min-height: var(--dsw-mobile-option-row-height);
-    padding: 10px var(--dsw-space-4);
+    width: 100%;
+    min-height: 56px;
+    padding: var(--dsw-space-3) var(--dsw-space-4);
     gap: var(--dsw-space-3);
-    border-radius: var(--dsw-radius-xl);
+    background: transparent;
+    border: none;
+    border-radius: 0;
+  }
+
+  .entry:active {
+    background: var(--dsw-alias-interactive-bg-active);
   }
 
   .entryTitle {
-    font-size: 14px;
+    font-size: 15px;
   }
 }

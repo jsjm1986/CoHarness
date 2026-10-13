@@ -42,4 +42,11 @@ describe('sidebar shell header contract', () => {
     expect(body.get('overflow')).toBe('clip')
     expect(body.get('border-radius')).toBe('inherit')
   })
+
+  it('lifts the strip controls to the compact row target under 768px', () => {
+    // The last `.iconButton` declaration wins: the compact block redeclares it.
+    const compact = declarationsFor('.iconButton')
+    expect(compact.get('width')).toBe('36px')
+    expect(compact.get('height')).toBe('36px')
+  })
 })
