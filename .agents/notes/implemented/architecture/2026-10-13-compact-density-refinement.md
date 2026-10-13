@@ -24,6 +24,8 @@ Density, not re-layout. Every change is a `[data-viewport='compact']` or `pointe
 
 **Secondary stats segments.** Each composer stats pill keeps only its primary figure on compact: the speed segment and the cache-hit segment hide inside a `detail` span, because two pills at 390px ellipsized mid-number sooner than they informed. Tap-open dialogs still carry every figure, and the pill `aria-label` keeps the full reading.
 
+**Drawer stack.** The phone drawer narrows to `min(82%, 300px)` so more transcript stays visible behind the scrim, and the header stack (brand row, New Session CTA, panel nav column, group header) sheds about 12px of vertical padding so the list starts sooner. Session rows keep the 44px target but regain their relative-time stamp at the caption tier — single-line "未命名" rows read as sparse placeholders without it — and an idle row's leading status slot collapses (`:has(> :only-child:empty)` over the display:contents host) so titles land near the group inset instead of floating mid-row.
+
 ## Alternatives considered
 
 **Hold the 44px touch target everywhere.** Rejected: a single-line composer toolbar and a one-row message-action strip cannot hold five 44px controls at 360–390px; the 40px family is already the codified compact compromise ([composer single icon row](../bug-fix/2026-09-18-composer-single-icon-row.md)), and genuinely interactive rows (menu rows, option rows, session rows) keep the full touch target.
