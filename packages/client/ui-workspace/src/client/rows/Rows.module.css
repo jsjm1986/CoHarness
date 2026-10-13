@@ -475,7 +475,14 @@
 }
 
 :global([data-viewport='compact']) .sessionRow .time {
-  display: none;
+  /* The relative-time stamp is the row's scanning metadata, not chrome noise —
+     keep it at the caption tier so a list of single-line rows still carries
+     recency; the title flexes down and ellipsizes ahead of it. */
+  display: inline;
+  flex: none;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-caption);
 }
 
 :global([data-viewport='compact']) .sessionRow .slotActions {
@@ -490,15 +497,15 @@
 /* Mobile Workspace cards keep the hierarchy visible: the Workspace row is a
    card header and Sessions are inset children rather than a flat desktop tree. */
 :global([data-viewport='compact']) .projectRow {
-  min-height: 48px;
+  min-height: 44px;
   height: auto;
   padding: 0 var(--dsw-space-2) 0 var(--dsw-space-3);
   border-radius: var(--dsw-radius-lg);
-  align-items: flex-start;
+  align-items: center;
 }
 
 :global([data-viewport='compact']) .projectRow .slot {
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 :global([data-viewport='compact']) .projectRow .title {
@@ -511,7 +518,8 @@
   min-height: 44px;
   height: auto;
   margin: 0;
-  padding: 0 var(--dsw-space-2) 0 var(--dsw-space-5);
+  padding: 0 var(--dsw-space-1) 0 var(--dsw-space-4);
+  gap: var(--dsw-space-2);
   border: 0;
   border-radius: var(--dsw-radius-md);
   background: transparent;

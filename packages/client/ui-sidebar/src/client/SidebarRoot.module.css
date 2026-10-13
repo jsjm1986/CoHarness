@@ -548,6 +548,7 @@
 :global([data-viewport='compact']) .logoRow {
   height: auto;
   min-height: var(--dsw-touch-target);
+  padding-block: var(--dsw-space-1);
   padding-inline: 0 calc(var(--dsw-space-1) + var(--dsw-touch-target));
   margin-bottom: var(--dsw-space-1);
 }
@@ -563,6 +564,18 @@
 
 :global([data-viewport='compact']) .newSession {
   min-height: var(--dsw-touch-target);
+  margin-inline: 0;
+  margin-bottom: var(--dsw-space-1);
+}
+
+/* The panel nav column (plugins et al.) is a secondary cluster under the
+   primary CTA: tighten its lead and let rows edge-align with the list. */
+:global([data-viewport='compact']) .panelList {
+  margin-bottom: var(--dsw-space-1);
+}
+
+:global([data-viewport='compact']) .panelRow {
+  min-height: 40px;
   margin-inline: 0;
 }
 
