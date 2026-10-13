@@ -691,7 +691,13 @@ export function SessionNodeItem({
               { hookContext: menuOpenState },
             )}
           </Menu>
-          {renderSlot('sidebar.workspaces.session.row.action', { sessionId: node.id, displayTitle: row.title })}
+          {/* Every row.action contributor also publishes the same verb as a
+              menu.item inside the ellipsis menu, so on coarse/compact — where
+              the strip is permanently visible — only the menu trigger stays;
+              the extra buttons would crowd the title for a duplicate path. */}
+          <span className={css.slotActions}>
+            {renderSlot('sidebar.workspaces.session.row.action', { sessionId: node.id, displayTitle: row.title })}
+          </span>
         </span>
       )}
     </div>

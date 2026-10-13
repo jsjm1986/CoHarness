@@ -122,3 +122,28 @@
 }
 
 .entryCell { width: 380px; max-width: 100%; }
+
+/* Phone overlay: the capsule column keeps its centered stack but the entries
+   compress to the shared option-row height with a card radius instead of the
+   desktop's oversized pill. */
+@media (max-width: 767px) {
+  .guide {
+    gap: 10px;
+    padding: 0 var(--dsw-space-4);
+  }
+
+  .hero {
+    margin-bottom: var(--dsw-space-2);
+  }
+
+  .entry {
+    min-height: var(--dsw-mobile-option-row-height);
+    padding: 10px var(--dsw-space-4);
+    gap: var(--dsw-space-3);
+    border-radius: var(--dsw-radius-xl);
+  }
+
+  .entryTitle {
+    font-size: 14px;
+  }
+}

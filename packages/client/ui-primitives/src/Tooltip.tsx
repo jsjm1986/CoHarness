@@ -229,7 +229,18 @@ export function Tooltip({ label, shortcutKeys, side = 'right', align = 'center',
         'aria-describedby': openOnClick && visible
           ? [children.props['aria-describedby'], id].filter(Boolean).join(' ')
           : children.props['aria-describedby'],
-        onMouseEnter: (e) => { children.props.onMouseEnter?.(e); triggers.current.hover = true; showAfterDelay(delayMs) },
+        onMouseEnter: (e) => {
+          children.props.onMouseEnter?.(e)
+          /* Touch taps synthesize a mouseenter before the click; on devices
+             that cannot hover that first synthetic event is the only signal,
+             and the bubble it schedules paints over the action the tap just
+             performed. Hoverless pointers get focus/click tooltips only.
+             matchMedia is absent in jsdom, where tests drive hover directly. */
+          if (typeof window.matchMedia === 'function'
+            && !window.matchMedia('(hover: hover)').matches) return
+          triggers.current.hover = true
+          showAfterDelay(delayMs)
+        },
         onMouseLeave: (e) => { children.props.onMouseLeave?.(e); triggers.current.hover = false; cancelShow(); if (!pinned) withdraw() },
         // Activating an ordinary action dismisses the bubble: it often changes
         // what the anchor now does (pin → unpin), and the click leaves the

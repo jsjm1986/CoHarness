@@ -260,8 +260,15 @@
   margin-top: calc(0px - var(--dsw-touch-target));
 }
 
+/* Compact column rhythm: 12px between rows and 16px content insets keep the
+   transcript aligned with the input card's edge family while reclaiming a
+   readable line width on 360px phones. */
+:global([data-viewport='compact']) .column {
+  gap: var(--dsw-space-3);
+}
+
 :global([data-viewport='compact']) .scroll {
-  padding-inline: calc(var(--dsh-composer-side-clearance) + 8px);
+  padding-inline: calc(var(--dsh-composer-side-clearance) + 6px);
 }
 
 /* Host open-path refusal: same dialog family as the workspace folder error. */

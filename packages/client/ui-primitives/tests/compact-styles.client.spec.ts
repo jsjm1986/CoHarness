@@ -24,7 +24,9 @@ describe('primitive compact chrome', () => {
     expect(hover).toContain('@media (prefers-reduced-motion: reduce)')
     expect(toast).toContain('@media (max-width: 767px)')
     expect(toast).toContain('--dsw-safe-top')
-    expect(load('../src/markdown/CodeBlock.module.css')).toContain('min-height: var(--dsw-touch-target)')
+    // The fenced-code banner is a 40px chrome row (the compact composer's icon
+    // family), not a full-height tap row.
+    expect(load('../src/markdown/CodeBlock.module.css')).toContain('min-height: 40px')
   })
 
   it('lets compact disclosure rows wrap and grow the leading control', () => {
@@ -79,8 +81,11 @@ describe('primitive compact chrome', () => {
     expect(shared).toContain('@media (max-width: 767px)')
     expect(shared).toContain('min-height: var(--dsw-touch-target)')
     expect(shared).toContain('padding: 0 10px')
+    const code = load('../src/markdown/CodeBlock.module.css')
+    expect(code).toContain('@media (max-width: 767px)')
+    expect(code).toContain('min-height: 40px')
+    expect(code).toContain('padding: 0 10px')
     const cards = [
-      load('../src/markdown/CodeBlock.module.css'),
       load('../src/SearchBlock.module.css'),
       load('../src/TerminalBlock.module.css'),
     ]

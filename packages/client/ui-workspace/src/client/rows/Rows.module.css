@@ -290,6 +290,11 @@
   display: none;
 }
 
+/* Slot-contributed quick buttons join .rowActions' flex as if unwrapped. */
+.slotActions {
+  display: contents;
+}
+
 /* An open row menu pins the hover affordances (figma: the row keeps its
    hover fill while its dropdown is up). */
 .projectRow.menuOpen,
@@ -449,6 +454,10 @@
     display: none;
   }
 
+  .sessionRow .slotActions {
+    display: none;
+  }
+
   .iconButton {
     width: var(--dsw-touch-target);
     height: var(--dsw-touch-target);
@@ -466,6 +475,10 @@
 }
 
 :global([data-viewport='compact']) .sessionRow .time {
+  display: none;
+}
+
+:global([data-viewport='compact']) .sessionRow .slotActions {
   display: none;
 }
 
@@ -510,7 +523,10 @@
 }
 
 :global([data-viewport='compact']) .sessionRow.selected {
-  background: var(--dsw-alias-interactive-bg-hover);
+  /* Flat active fill, not the desktop raised pill: in a full-width drawer a
+     lifted card reads as a button, not a selection marker. */
+  background: var(--dsw-alias-interactive-bg-active);
+  box-shadow: none;
 }
 
 :global([data-viewport='compact']) .flatSessionRowWithoutStatus,

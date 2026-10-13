@@ -135,3 +135,28 @@
 :global([data-viewport='compact']) .headline {
   overflow-wrap: anywhere;
 }
+
+/* Compact-viewport tightening (below the 768 medium boundary, matching the
+   question/plan-review takeover cards). */
+@media (max-width: 767px) {
+  .card {
+    border-radius: var(--dsw-radius-xl);
+  }
+
+  .strip {
+    padding: 8px var(--dsw-space-3);
+  }
+
+  .body {
+    padding: var(--dsw-space-2) var(--dsw-space-3) 0;
+  }
+
+  .headline {
+    font-size: 14px;
+    line-height: 22px;
+  }
+
+  .actionRow {
+    padding: 10px var(--dsw-space-3);
+  }
+}

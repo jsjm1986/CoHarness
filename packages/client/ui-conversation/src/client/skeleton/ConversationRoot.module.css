@@ -667,8 +667,10 @@
   flex-direction: row;
   align-items: stretch;
   box-sizing: border-box;
-  min-height: var(--dsw-mobile-tab-height);
-  padding: 0 var(--dsw-mobile-page-inset);
+  /* 36px chrome row under the 44px app topbar: the desktop 52px header
+     recipe compressed to a phone strip, not a second page title. */
+  min-height: 36px;
+  padding: 0 var(--dsw-space-3);
 }
 
 :global([data-viewport-short]) .header {
@@ -683,15 +685,15 @@
   align-self: center;
   overflow-x: auto;
   overflow-y: hidden;
-  min-height: var(--dsw-mobile-tab-height);
+  min-height: 34px;
 }
 
 :global([data-viewport='compact']) .tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(var(--dsw-mobile-tab-height) - 12px);
-  padding: var(--dsw-space-1) var(--dsw-space-3);
+  min-height: 28px;
+  padding: 3px var(--dsw-space-2);
   font: var(--dsw-mobile-font-secondary);
 }
 
@@ -737,8 +739,8 @@
 
 :global([data-viewport='compact']) .headerActions button,
 :global([data-viewport='compact']) .headerActions [role='button'] {
-  min-width: var(--dsw-touch-target);
-  min-height: var(--dsw-mobile-tab-height);
+  min-width: 40px;
+  min-height: 36px;
   flex: none;
 }
 

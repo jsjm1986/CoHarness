@@ -71,3 +71,22 @@ button.pill[aria-expanded='true'] {
   color: var(--dsw-alias-separator-primary);
   margin: 0 6px;
 }
+
+/* Phone: the two pills already sit one tap apart inside the composer seat;
+   tighten text and spacing so a session reading and a cache reading both fit
+   360px without either ellipsizing mid-number. */
+:global([data-viewport='compact']) .root {
+  gap: 6px;
+  padding: 2px calc(var(--dsh-composer-side-clearance) + 4px) 0;
+  font-size: 12px;
+}
+
+:global([data-viewport='compact']) .pill {
+  gap: var(--dsw-space-1);
+  padding: 1px 6px;
+}
+
+:global([data-viewport='compact']) .pill svg {
+  width: 12px;
+  height: 12px;
+}
