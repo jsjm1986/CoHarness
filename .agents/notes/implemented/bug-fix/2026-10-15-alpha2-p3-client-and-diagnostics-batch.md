@@ -34,7 +34,7 @@ One batch closes the whole list against upstream source, keeping intentional div
 
 ## Consequences
 
-Rings render in the accent color across sidebar, header, cards, and controls; Menu keyboard behavior matches upstream submenu and refocus semantics; the header actually adapts under 540px; ContextMeter reads and places like upstream; model switching never blocks on settings I/O; spill failures diagnose the real cause; and zh copy is consistent. Upstream's `attachment`/`file` source-block pipeline (attachment disclosure in trajectory source blocks) remains an adjacent gap under `7520fe94e14`, recorded in the audit, because it needs the data fields, not just the CSS.
+Rings render in the accent color across sidebar, header, cards, and controls; Menu keyboard behavior matches upstream submenu and refocus semantics; the header actually adapts under 540px; ContextMeter reads and places like upstream; model switching never blocks on settings I/O; spill failures diagnose the real cause; and zh copy is consistent. Upstream's `attachment`/`file` source-block pipeline (attachment disclosure in trajectory source blocks) remains an adjacent gap of the preset-creation batch, recorded in [the campaign audit](../../../../upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-alpha.2.md), because it needs the data fields, not just the CSS.
 
 ## Verification
 

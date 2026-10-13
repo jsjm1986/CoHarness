@@ -34,7 +34,7 @@ alpha.2 审计的 P3 段落列出了一批视觉、性能与文案残余：焦�
 
 ## Consequences
 
-侧栏、头部、卡片与各控件的焦点环统一渲染为强调色；Menu 的键盘行为与上游子菜单/refocus 语义一致；头部在 540px 以下真正自适应；ContextMeter 的读数与定位对齐上游；模型切换不再被设置 I/O 阻塞；spill 失败诊断真实原因；zh 文案统一。上游 `attachment`/`file` source-block 管线（trajectory 源块的附件 disclosure）仍属 `7520fe94e14` 的相邻缺口，已记入审计——它缺数据字段而非仅缺 CSS。
+侧栏、头部、卡片与各控件的焦点环统一渲染为强调色；Menu 的键盘行为与上游子菜单/refocus 语义一致；头部在 540px 以下真正自适应；ContextMeter 的读数与定位对齐上游；模型切换不再被设置 I/O 阻塞；spill 失败诊断真实原因；zh 文案统一。上游 `attachment`/`file` source-block 管线（trajectory 源块的附件 disclosure）仍属预设创作批次的相邻缺口，已记入[战役审计](../../../../upgrades/alignment/UPSTREAM-AUDIT-dsh-v0.2.1-alpha.2.md)——它缺数据字段而非仅缺 CSS。
 
 ## Verification
 
