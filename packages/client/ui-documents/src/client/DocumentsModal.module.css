@@ -1168,8 +1168,10 @@
   align-items: center;
   gap: var(--dsw-space-2);
   width: 100%;
-  min-height: 56px;
-  padding: var(--dsw-space-2) var(--dsw-space-3);
+  /* Content-box: 32px + the padding edges lands single-line options at 44px
+     and two-line copy at 52px. */
+  min-height: 32px;
+  padding: var(--dsw-space-1) var(--dsw-space-3);
   border: 1px solid transparent;
   border-radius: var(--dsw-radius-md);
   background: transparent;
@@ -1392,19 +1394,19 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--dsw-space-2);
-    padding: 0 var(--dsw-space-1);
+    padding: var(--dsw-space-1) 0;
     color: var(--dsw-alias-label-caption);
     font: var(--dsw-mobile-font-caption);
   }
 
   .scopeStaleMobile button {
-    min-height: var(--dsw-touch-target);
+    min-height: 36px;
   }
 
   .workbenchContent {
     min-height: 0;
     gap: var(--dsw-space-2);
-    padding: var(--dsw-space-3);
+    padding: var(--dsw-space-2) var(--dsw-space-3);
   }
 
   .scopeTrigger {
@@ -1413,8 +1415,10 @@
     gap: var(--dsw-space-2);
     width: 100%;
     min-width: 0;
-    min-height: var(--dsw-touch-target);
-    padding: var(--dsw-space-2) 0;
+    /* No global border-box: content-box min-height adds to padding, so the
+       trigger keeps one 44px list row at 36px content + 4px edges. */
+    min-height: 36px;
+    padding: var(--dsw-space-1) 0;
     /* A scope picker is a list row on a phone, not a bordered card — the
        hairline under it carries the separation. */
     border: none;
@@ -1528,8 +1532,11 @@
     justify-content: space-between;
   }
 
+  /* Full-width stacked actions read as app buttons in a rounded rect, not
+     the desktop capsule. */
   .overviewActions > * {
-    min-height: var(--dsw-touch-target);
+    min-height: 40px;
+    border-radius: var(--dsw-radius-lg);
   }
 
   .trashHeader {
@@ -1586,25 +1593,33 @@
     margin-left: 0;
   }
 
+  /* Toolbar controls match the shared input's 40px coarse-pointer floor so
+     the row keeps one height. */
   .mobileActionGroup .upload {
     min-width: 0;
     flex: 1 1 auto;
-    min-height: var(--dsw-touch-target);
+    min-height: 40px;
     white-space: nowrap;
   }
 
   .mobileActionGroup .mobileMore {
     display: inline-flex;
     flex: 0 0 auto;
-    min-width: var(--dsw-touch-target);
-    min-height: var(--dsw-touch-target);
+    min-width: 40px;
+    min-height: 40px;
     padding-inline: var(--dsw-space-2);
     white-space: nowrap;
   }
 
+  /* The toolbar's pills sit beside a rounded-rect input — match that corner
+     so the row reads as one control family. */
+  .mobileActionGroup > * {
+    border-radius: var(--dsw-radius-md);
+  }
+
   .limits {
-    margin-inline: var(--dsw-space-3);
-    padding: 0 var(--dsw-space-2) var(--dsw-space-1);
+    margin-inline: 0;
+    padding: 0 0 var(--dsw-space-1);
   }
 
   .scopeNotice {
@@ -1618,8 +1633,8 @@
 
   .caption {
     gap: var(--dsw-space-1);
-    min-height: 24px;
-    padding-bottom: var(--dsw-space-2);
+    min-height: 0;
+    padding-bottom: var(--dsw-space-1);
   }
 
   .desktopSelectionBar {
@@ -1632,13 +1647,14 @@
   }
 
   /* Continuous rows with an inset hairline — the same list grammar as the
-     session drawer — instead of a bordered card per document. */
+     session drawer — instead of a bordered card per document. min-height is
+     content-box, so 44px + 8px edges lands the row on the feed rhythm. */
   .row {
     position: relative;
     display: grid;
     grid-template-columns: var(--dsw-touch-target) 24px minmax(0, 1fr) var(--dsw-touch-target);
     align-items: center;
-    min-height: 56px;
+    min-height: 44px;
     padding: var(--dsw-space-1) 0;
     border: 0;
     border-radius: 0;
@@ -1791,7 +1807,8 @@
 
   .emptyActions > * {
     width: 100%;
-    min-height: var(--dsw-touch-target);
+    min-height: 40px;
+    border-radius: var(--dsw-radius-lg);
   }
 
   .overviewRow {
@@ -1835,7 +1852,8 @@
   .formActions > *,
   .inlineForm > * {
     width: 100%;
-    min-height: var(--dsw-touch-target);
+    min-height: 40px;
+    border-radius: var(--dsw-radius-lg);
   }
 
   .historyList li,
@@ -2070,9 +2088,12 @@
   }
 
   /* The catalog heading is a section label on a phone, not a page title. */
-  .overviewHeader h2 {
-    font-size: 15px;
-    line-height: 22px;
+  .overviewHeader h2,
+  .trashHeader h2 {
+    color: var(--dsw-alias-label-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
   }
 
   .overviewHeader {
@@ -2080,28 +2101,47 @@
   }
 
   .limits {
-    margin: 8px 12px 0;
+    margin: 0;
   }
 
   .workbenchContent {
-    padding: 12px;
+    padding: var(--dsw-space-2) var(--dsw-space-3);
   }
 
+  /* The sheet is already the surface; the inner panel is not a second card
+     nested inside it. */
   .panel {
-    padding: 12px;
-    border-radius: 12px;
+    gap: var(--dsw-space-2);
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
     box-shadow: none;
   }
 
+  .overview,
+  .trash {
+    gap: var(--dsw-space-2);
+  }
+
   .emptyState {
-    min-height: 200px;
-    padding: 16px;
+    min-height: 0;
+    padding: var(--dsw-space-6) 0;
+  }
+
+  /* The empty-state hero is a bare glyph on a phone — the bordered tile was
+     desktop card chrome. */
+  .emptyIcon {
+    width: auto;
+    height: auto;
+    border: none;
+    border-radius: 0;
+    background: transparent;
   }
 
   /* These rules sit after the shared 60px card grammar above so the phone
      list keeps the continuous inset-separator form instead. */
   .row {
-    min-height: 56px;
+    min-height: 44px;
     padding: var(--dsw-space-1) 0;
     border-bottom: 0;
     border-radius: 0;
@@ -2109,15 +2149,38 @@
 
   /* The unconditional catalog-card metrics above (60px, 10px 12px) also
      reach the flattened overview and trash rows; re-assert the row metrics
-     here so all three lists share the same compact rhythm. */
+     here so all three lists share the same compact rhythm. min-height is
+     content-box: 44px + the padding edges lands each row at ~52px. */
   .overviewRow {
-    min-height: 52px;
-    padding: 6px 0;
+    min-height: 44px;
+    padding: var(--dsw-space-1) 0;
   }
 
   .trashRow {
-    min-height: 52px;
-    padding: var(--dsw-space-2) 0;
+    min-height: 44px;
+    padding: var(--dsw-space-1) 0;
+  }
+
+  /* Hairline rows leave no room for a per-group gap or a fat date band. */
+  .group {
+    gap: 0;
+  }
+
+  .groupDate {
+    padding: var(--dsw-space-3) 0 var(--dsw-space-1);
+  }
+
+  /* Skeleton placeholders keep the same continuous-row form as real rows. */
+  .loadingState {
+    gap: 0;
+    padding-top: 0;
+  }
+
+  .loadingRow {
+    height: 52px;
+    border: none;
+    border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+    border-radius: 0;
   }
 
   /* The desktop toolbar's 460px search basis wraps the action pair onto a
@@ -2127,11 +2190,20 @@
     min-width: 0;
   }
 
+  /* The shared input floors at 40px/16px text on coarse pointers (below that
+     iOS Safari zooms on focus); the toolbar row matches it. */
   .search {
     width: auto;
     flex: 1 1 0;
     min-width: 0;
-    min-height: var(--dsw-touch-target);
+    min-height: 40px;
+  }
+
+  /* The dialog's own title row — 48px content + 20px edges was the desktop
+     density; the pushed sheet keeps one 44px nav row. */
+  .shell > :first-child {
+    min-height: 40px;
+    padding: var(--dsw-space-2) var(--dsw-space-4) var(--dsw-space-1);
   }
 }
 

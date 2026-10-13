@@ -54,7 +54,7 @@ describe('DocumentsModal.module.css', () => {
   })
 
   it('keeps compact navigation and operations in touch-safe sheets', () => {
-    expect(modal).toMatch(/\.scopeTrigger\s*\{[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
+    expect(modal).toMatch(/\.scopeTrigger\s*\{[\s\S]*min-height:\s*36px[\s\S]*padding:\s*var\(--dsw-space-1\) 0/)
     expect(modal).toMatch(/\.rowMore\s*\{[\s\S]*min-width:\s*var\(--dsw-touch-target\)[\s\S]*min-height:\s*var\(--dsw-touch-target\)/)
     expect(modal).toMatch(/\.mobileSelectionBar\s*\{[\s\S]*var\(--dsw-safe-bottom\)/)
     expect(modal).toMatch(/@media \(max-width: 767px\)[\s\S]*\.scopeRail\s*\{[\s\S]*display:\s*none/)
