@@ -282,6 +282,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-deliverables ProducedFiles id \'@deepseek-ai/dsh-client-ui-deliverables/produced-files\'',
       'client-ui-deliverables DeliverablesTail id \'@deepseek-ai/dsh-client-ui-deliverables\'',
+      'client-ui-plan PlanCards',
       'client-ui-schedule ScheduleTurnCard id \'schedule-created\'',
     ],
     replaceRisk: 'none',
@@ -742,7 +743,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation.pane\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-sidebar-right BlankExpandButton id \'auxiliary-sidebar\'',
       'client-ui-sidebar-terminal TerminalRecovery',
     ],
     replaceRisk: 'none',
@@ -1030,7 +1030,9 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     hookContext: '',
     slotInject: '',
     declaredBy: 'an entry in \'conversation.composer\' (client-ui-user-questions), so it exists while that entry is mounted',
-    occupants: [],
+    occupants: [
+      'client-ui-plan PlanReviewOpen',
+    ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation.plan-review.actions\', () => ctx.slots.register(\n      { name: \'conversation.plan-review.actions\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
     source: 'packages/client/ui-user-questions/src/client/contract/slots.ts:14',
@@ -2125,7 +2127,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/** Owner share of one provider-card extension occurrence. */\nexport interface ProviderCardExtrasOwnerProps {\n  /** Provider directory entry shown by the card. */\n  provider: ConfigurableProviderView\n  /** Whether any layer configures this provider. */\n  configured: boolean\n  /** Whether the joined API-key credential is configured. */\n  keyConfigured: boolean\n}',
+      '/** Owner share of one provider-card extension occurrence. */\nexport interface ProviderCardExtrasOwnerProps {\n  /** Provider directory entry shown by the card. */\n  provider: ConfigurableProviderView\n  /** Whether any layer configures this provider. */\n  configured: boolean\n  /**\n   * Whether the credential this page would use is configured: the profile\'s\n   * `apiKeyEnv`, or the page\'s derived reference while the profile names\n   * none — the same reference the row\'s own editor resolves.\n   */\n  keyConfigured: boolean\n}',
     ],
     ownerPropsReferences: [
       'ConfigurableProviderView',
@@ -2579,6 +2581,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'rightbar.session\' (client-ui-sidebar-right), so it exists while that entry is mounted',
     occupants: [
       'client-ui-deliverables ReviewTab',
+      'client-ui-plan PlanPreview',
       'client-ui-schedule ScheduleTaskTab',
       'client-ui-sidebar-browser BrowserBody',
       'client-ui-sidebar-right ToolBody key \'tool-details\'',
@@ -2621,6 +2624,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: 'SidebarRightTabInjected',
     declaredBy: 'an entry in \'rightbar.session\' (client-ui-sidebar-right), so it exists while that entry is mounted',
     occupants: [
+      'client-ui-plan PlanTitle',
       'client-ui-schedule ScheduleTaskTabTitle',
       'client-ui-sidebar-browser BrowserTitle',
       'client-ui-sidebar-right GuideTitle',

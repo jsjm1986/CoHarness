@@ -177,8 +177,8 @@
   en: e5b55405bd2b69f5
   zh: e5b55405bd2b69f5
 /session-persistence-event-catalog/events/schedule/schedule-change-log-only:
-  en: 353442ce8925614f
-  zh: 71e6ab8296c74d2a
+  en: 162584304e006c72
+  zh: d8a6bacf60777aa9
 /session-persistence-event-catalog/events/session:
   en: a1ac8f2660a4f61e
   zh: a1ac8f2660a4f61e
@@ -195,8 +195,8 @@
   en: 7b827672c80aecdd
   zh: 7b827672c80aecdd
 /session-persistence-event-catalog/events/session-log-deepseek/session-log-deepseek-delivery-accepted-log-only:
-  en: 71935a7de2407f45
-  zh: 0743a2761acc52d7
+  en: 00ef0bfb33c766fc
+  zh: 34db1de93e3721e8
 /session-persistence-event-catalog/events/step:
   en: bd0dcbbc352b771a
   zh: bd0dcbbc352b771a
@@ -1170,8 +1170,8 @@
   en: 6b9d64c802da2817
   zh: a97d1d05b360dedf
 /session-persistence-event-catalog/resolved-persistence-types/event-session-log-deepseek-delivery-accepted-data:
-  en: 4102718cd903c827
-  zh: 4a224833270c580f
+  en: db4782d59e288f14
+  zh: 3c600bc73b4568a7
 /session-persistence-event-catalog/resolved-persistence-types/event-session-end-seed:
   en: 4e8e96a00ac96482
   zh: 496f303519f124b0
@@ -1578,8 +1578,8 @@
   en: 563fa2bcf9230f5d
   zh: 2e2c507bb58bdc5e
 /session-persistence-event-catalog/resolved-persistence-types/packages-context-agent-instructions-src-state-ts-agentinstructionsource:
-  en: 366ff8946559a68b
-  zh: 5ca90df147d6b08b
+  en: 22002649e5f54770
+  zh: 0b12c715a59967e6
 /session-persistence-event-catalog/resolved-persistence-types/packages-context-collaboration-context-src-index-ts-collaborationnoticesource:
   en: 299726e36b50bf64
   zh: 2bdc77c9af0a9bff
