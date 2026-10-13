@@ -22,6 +22,8 @@ Density, not re-layout. Every change is a `[data-viewport='compact']` or `pointe
 
 **Accelerator hints on touch.** Menu `shortcut` key hints hide under `@media (pointer: coarse)`: a bottom-sheet row on a keyboardless device paid trailing-cell width for unusable information. The `aria-keyshortcuts` declaration stays for assistive tech, and hybrid devices keep full behavior — only the visual hint drops.
 
+**Secondary stats segments.** Each composer stats pill keeps only its primary figure on compact: the speed segment and the cache-hit segment hide inside a `detail` span, because two pills at 390px ellipsized mid-number sooner than they informed. Tap-open dialogs still carry every figure, and the pill `aria-label` keeps the full reading.
+
 ## Alternatives considered
 
 **Hold the 44px touch target everywhere.** Rejected: a single-line composer toolbar and a one-row message-action strip cannot hold five 44px controls at 360–390px; the 40px family is already the codified compact compromise ([composer single icon row](../bug-fix/2026-09-18-composer-single-icon-row.md)), and genuinely interactive rows (menu rows, option rows, session rows) keep the full touch target.

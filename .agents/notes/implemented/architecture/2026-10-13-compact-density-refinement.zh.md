@@ -22,6 +22,8 @@ Status: implemented
 
 **触屏隐藏快捷键提示。** 菜单 `shortcut` 键位提示在 `@media (pointer: coarse)` 下隐藏：无键盘设备上 sheet 行尾部的提示宽度换来的只是不可用信息。`aria-keyshortcuts` 声明保留给辅助技术，混合设备行为不变——仅隐藏视觉提示。
 
+**统计胶囊次要段。** 紧凑视口下每个 composer 统计胶囊只保留主数字：速度段与缓存命中段收进 `detail` span 隐藏——390px 下两个胶囊互相挤压导致数字中间截断，信息价值配不上占位。点开弹窗仍携带全部数字，胶囊 `aria-label` 保留完整读法。
+
 ## Alternatives considered
 
 **处处保持 44px 触控目标。** 否决：360–390px 宽下一行放不下五个 44px 控件的单行输入工具条和单行消息操作条；40px 族已是成文的紧凑折中（[输入区单行图标行](../bug-fix/2026-09-18-composer-single-icon-row.zh.md)），真正可交互的行（菜单行、选项行、会话行）仍保持完整触控目标。
