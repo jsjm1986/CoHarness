@@ -36,7 +36,7 @@ function mountButton() {
     actions: instance.actions,
     // Copy is the dictionary's contract; the key stands in for the translation.
     t: (key: string) => key,
-  } as unknown as ExpandButtonProps
+  } as never as ExpandButtonProps
   const view = render(<ExpandButton {...props} />)
   const control = (): HTMLElement | null => view.container.querySelector('[data-sidebar-right-expand]')
   return { instance, view, control }
@@ -71,7 +71,7 @@ it('exposes the corner control on a blank Session too', () => {
   const props = { sessionId: SESSION, focus, useStore: hookOf(instance), actions: instance.actions,
     useShortcuts: <T,>(selector: (entries: readonly { id: string }[]) => T): T => selector([]),
     t: (key: string) => key, useSession: (select: (state: { blank: boolean; composerPhase: string }) => unknown) => select({ blank: true, composerPhase: 'blank' }),
-  } as unknown as ExpandButtonProps
+  } as never as ExpandButtonProps
   const view = render(<ExpandButton {...props} />)
   fireEvent.click(view.getByRole('button'))
   expect(focus).toHaveBeenCalledOnce()

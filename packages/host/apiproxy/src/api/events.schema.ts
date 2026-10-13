@@ -80,7 +80,7 @@ export const muxFrameSchema = z.discriminatedUnion('type', [
   // the provider chunk vocabulary into the carrier schema.
   z.object({ type: z.literal('session/assistant-stream'), sessionId: sessionIdSchema, frame: z.unknown() }),
   z.object({ type: z.literal('stream/error'), error: rpcErrorSchema }),
-]) as unknown as z.ZodType<MuxFrame>
+]) as z.ZodType<MuxFrame>
 
 /** HostFrame union (payload slot of a host-stream ServerRequest). */
 export const hostFrameSchema = z.discriminatedUnion('type', [

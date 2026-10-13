@@ -233,11 +233,11 @@ describe('registerMediaReferences /api/file', () => {
     }
     // Non-FsError throws escape the handler; Connection owns the surfaced fault.
     read.mockRejectedValueOnce(new Error('provider bug'))
-    const req = new EventEmitter() as unknown as Parameters<ConnectionHttpHandler>[0]
+    const req = new EventEmitter() as Parameters<ConnectionHttpHandler>[0]
     req.method = 'GET'
     req.url = '/api/file?path=%2Fremote%2Fphoto.png'
     req.socket = new EventEmitter() as never
-    const res = { writeHead: vi.fn(), end: vi.fn() } as unknown as Parameters<ConnectionHttpHandler>[1]
+    const res = { writeHead: vi.fn(), end: vi.fn() } as never
     await expect(route.handler(req, res)).rejects.toThrow('provider bug')
   })
 
@@ -258,12 +258,12 @@ describe('registerMediaReferences /api/file', () => {
       }
       signal?.addEventListener('abort', () => { reject(new FsError('aborted', 'FS_ABORTED')) })
     }))
-    const req = new EventEmitter() as unknown as Parameters<ConnectionHttpHandler>[0]
+    const req = new EventEmitter() as Parameters<ConnectionHttpHandler>[0]
     req.method = 'GET'
     req.url = `/api/file?path=${encodeURIComponent(path)}`
     req.socket = new EventEmitter() as never
     const writeHead = vi.fn()
-    const res = { writeHead, end: vi.fn() } as unknown as Parameters<ConnectionHttpHandler>[1]
+    const res = { writeHead, end: vi.fn() } as never
     const pending = route.handler(req, res)
     req.socket.emit('close')
     await pending

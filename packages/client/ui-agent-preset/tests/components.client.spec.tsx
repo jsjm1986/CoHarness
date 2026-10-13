@@ -52,7 +52,7 @@ function renderRow(state: Partial<AgentPresetSettingsState> = {}) {
     ...actions,
     useAgentPreset: bindSnapshotSelector(store),
     t: (key: keyof typeof en) => en[key],
-  } as unknown as AgentPresetRowProps)} />)
+  } as never as AgentPresetRowProps)} />)
   return actions
 }
 
@@ -77,7 +77,7 @@ function renderSeat(state: Partial<AgentPresetSeatState> = {}, developerTools = 
     useAgentPresetSeat: bindSnapshotSelector(store),
     useDeveloperTools: bindSnapshotSelector(devTools),
     t,
-  } as unknown as AgentPresetSeatProps)} />)
+  } as Partial<AgentPresetSeatProps> as AgentPresetSeatProps)} />)
   return { ...actions, store, devTools }
 }
 
@@ -97,7 +97,7 @@ function renderLabel(
     useSessions: bindSnapshotSelector(sessions),
     useAgentPresets: bindSnapshotSelector(store),
     t: (key: keyof typeof en) => en[key],
-  } as unknown as AgentPresetLabelProps)} />)
+  } as never as AgentPresetLabelProps)} />)
   return { load, view }
 }
 
@@ -189,7 +189,7 @@ describe('the General-settings row', () => {
       useAgentPreset: bindSnapshotSelector(
         createSnapshotStore<AgentPresetSettingsState>({ ...ROW_READY, status: 'unavailable', options: [] })),
       t: (key: keyof typeof en) => en[key],
-    } as unknown as AgentPresetRowProps)} />)
+    } as never as AgentPresetRowProps)} />)
 
     expect(container.firstChild).toBeNull()
   })
@@ -201,7 +201,7 @@ describe('the General-settings row', () => {
       select: vi.fn(() => Promise.resolve()),
       useAgentPreset: bindSnapshotSelector(store),
       t: (key: keyof typeof en) => en[key],
-    } as unknown as AgentPresetRowProps)} />)
+    } as never as AgentPresetRowProps)} />)
     fireEvent.click(screen.getByRole('button'))
 
     act(() => { store.set({ ...ROW_READY, writable: false }) })

@@ -112,7 +112,7 @@ describe('ui-plan browser apply', () => {
     await fiber.await()
     const tail = b.slots.entries('conversation.chat.turnTail').find(entry => entry.component === PlanCards)
     expect(tail).toBeDefined()
-    const injected = (tail?.inject as unknown as (id: SessionId) => {
+    const injected = (tail?.inject as never as (id: SessionId) => {
       keyedHooks: { plans: (turn: string) => { getSnapshot(): readonly unknown[] } }
       openPlan: (callId: string) => void
     })(SID)
@@ -132,7 +132,7 @@ describe('ui-plan browser apply', () => {
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
     const tail = b.slots.entries('conversation.chat.turnTail').find(entry => entry.component === PlanCards)
-    expect(() => (tail?.inject as unknown as (id: SessionId) => unknown)('ghost' as SessionId)).toThrow('ui-plan: unknown session')
+    expect(() => (tail?.inject as never as (id: SessionId) => unknown)('ghost' as SessionId)).toThrow('ui-plan: unknown session')
     await fiber.dispose()
   })
 
@@ -156,7 +156,7 @@ describe('ui-plan browser apply', () => {
     await fiber.await()
     const entry = b.slots.entries('conversation.input.plan')[0]!
     expect(entry.component).toBe(PlanChip)
-    const injected = (entry.inject as unknown as (id: SessionId) => PlanChipInjected)(SID)
+    const injected = (entry.inject as never as (id: SessionId) => PlanChipInjected)(SID)
 
     await expect(injected.exitPlanMode()).resolves.toBeNull()
     expect(b.execute).toHaveBeenLastCalledWith(SID, '/plan off', [])

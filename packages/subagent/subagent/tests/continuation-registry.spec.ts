@@ -30,7 +30,7 @@ function makeRegistry(limits = { maxActivations: 8, maxActivationsPerParent: 4 }
     () => limits,
     () => 8,
   )
-  return { ctx, registry, internals: registry as unknown as RegistryInternals }
+  return { ctx, registry, internals: registry as never as RegistryInternals }
 }
 
 function makeActivation(childId: SessionId, parentSession: SessionId, agent?: Agent): Activation {
@@ -40,14 +40,14 @@ function makeActivation(childId: SessionId, parentSession: SessionId, agent?: Ag
     childId,
     parentSession,
     provider: 'test',
-    handle: { agent: agent ?? {} } as unknown as AgentHandle,
+    handle: { agent: agent ?? {} } as never as AgentHandle,
     inbox: { closing: undefined },
     ancestry: new WeakSet<Agent>(),
     ownedChildren: new Set<SessionId>(),
     observer: {} as ActivationObserver,
     announced: false,
     poke: Promise.withResolvers(),
-  } as unknown as Activation
+  } as never as Activation
 }
 
 describe('continuable activation registry internals', () => {
@@ -122,14 +122,14 @@ describe('waitForChildren', () => {
       id: childId,
       get status() { return overrides.status ?? 'idle' },
       whenIdle: () => { overrides.onWhenIdle?.(); return Promise.resolve() },
-    } as unknown as Agent
+    } as Partial<Agent> as Agent
     activation.ancestry.add(parent)
     return {
       ...activation,
-      handle: { agent } as unknown as AgentHandle,
+      handle: { agent } as Partial<AgentHandle> as AgentHandle,
       inbox: { closing: overrides.closing, hasPending: overrides.hasPending ?? false },
       ownedChildren: new Set(overrides.ownedChildren ?? []),
-    } as unknown as Activation
+    } as Activation
   }
 
   it('returns false immediately with no descendants', async () => {

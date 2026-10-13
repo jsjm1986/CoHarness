@@ -22,7 +22,7 @@ describe('host prompt adapters', () => {
   it.each(['queue', 'steer'] as const)('forwards the %s delivery mode through the runtime symbol', async (delivery) => {
     const accepted = MessageId('m-1')
     const deliver = vi.fn(async () => accepted)
-    const runtime = { [deliverSubagentPrompt]: deliver } as unknown as SubagentRuntime
+    const runtime = { [deliverSubagentPrompt]: deliver } as never as SubagentRuntime
     const parent = {} as Agent
     const childId = SessionId('child')
     const content = [{ type: 'text' as const, text: 'follow up' }]
@@ -40,7 +40,7 @@ describe('pending direct children probe', () => {
   it('forwards the exact live parent through the runtime symbol', () => {
     const parent = {} as Agent
     const probe = vi.fn((agent: Agent) => agent === parent)
-    const runtime = { [subagentPendingDirectChildren]: probe } as unknown as SubagentRuntime
+    const runtime = { [subagentPendingDirectChildren]: probe } as never
 
     expect(hasPendingDirectChildren(runtime, parent)).toBe(true)
     expect(probe).toHaveBeenCalledWith(parent)

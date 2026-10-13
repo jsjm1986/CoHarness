@@ -29,7 +29,7 @@ const t = makeTranslate(zh, commonZh) as never
 const PLAN: SubmittedPlan = { callId: 'c-1' as ToolCallId, markdown: '# Draft plan\nbody', title: 'Draft plan' }
 
 function turn(number: number): TurnLocation {
-  return { turn: number, status: 'closed' } as unknown as TurnLocation
+  return { turn: number, status: 'closed' } as Partial<TurnLocation> as TurnLocation
 }
 
 /** Keyed-hook double over a static value: `(key, selector?, equal?)` with no re-render plumbing. */

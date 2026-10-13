@@ -52,7 +52,7 @@ function fake(readCallHistory?: ReturnType<typeof vi.fn>, ready?: Promise<unknow
     release: released,
     [Symbol.dispose]: released,
   }))
-  const sessions = { retain } as unknown as ISessions
+  const sessions = { retain } as Partial<ISessions> as ISessions
   return { sessions, retain, readCallHistory: read, released, ready: ready ?? Promise.resolve() }
 }
 

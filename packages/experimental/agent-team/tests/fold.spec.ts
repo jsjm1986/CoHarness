@@ -338,7 +338,7 @@ describe('Agent Teams fold', () => {
       version: 1, teamId: TEAM, message: message({ content: [extension] }),
     }, 0)
     const state = foldTeam(ROOT, [queued])
-    const block = pending(state)[0]!.content[0]! as unknown as Record<string, unknown>
+    const block = pending(state)[0]!.content[0]!
     expect(block).toEqual(extension)
     expect(Object.hasOwn(block, '__proto__')).toBe(true)
     expect(Object.getPrototypeOf(block)).toBe(Object.prototype)

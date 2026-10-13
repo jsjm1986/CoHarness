@@ -330,7 +330,7 @@ describe('incremental DeepSeek session-log upload', () => {
         reads++
         return events[seq]
       },
-    } as unknown as Session
+    } as Partial<Session> as Session
 
     expect(SessionLogDeepSeek.acceptedThrough(session)).toBe(0)
     expect(reads).toBe(2)
@@ -356,7 +356,7 @@ describe('incremental DeepSeek session-log upload', () => {
       id: SessionId('missing-event'),
       seq: 1,
       eventAt: () => undefined,
-    } as unknown as Session
+    } as never as Session
 
     expect(() => SessionLogDeepSeek.acceptedThrough(session))
       .toThrow('session-log-deepseek: missing event 0 below captured length 1')
@@ -466,7 +466,7 @@ describe('incremental DeepSeek session-log upload', () => {
         seq: 0,
         time: 1,
         data: { sessionId: `malformed-${id}`, throughSeq, sessionFormatVersion: SESSION_FORMAT_VERSION },
-      }] as unknown as SessionEvent[]
+      }] as Partial<SessionEvent>[] as SessionEvent[]
       const session = Session.create(SessionId(`malformed-${id}`), malformed)
       expect(() => SessionLogDeepSeek.acceptedThrough(session)).toThrow(/malformed acceptance watermark/)
     }
@@ -479,13 +479,13 @@ describe('incremental DeepSeek session-log upload', () => {
       seq: SessionSeq(0),
       time: 1,
       data: { sessionId: id, throughSeq: SessionSeq(0), sessionFormatVersion },
-    }] as unknown as SessionEvent[]
+    }] as Partial<SessionEvent>[] as SessionEvent[]
     const session = {
       id,
       header: { version: SESSION_FORMAT_VERSION },
       get seq() { return SessionLogOffset(events.length) },
       eventAt: (seq: ReturnType<typeof SessionSeq>) => events[seq],
-    } as unknown as Session
+    } as Partial<Session> as Session
 
     expect(() => SessionLogDeepSeek.acceptedThrough(session)).toThrow(/malformed acceptance format version/)
   })

@@ -38,7 +38,7 @@ function mount(payload: ApprovalWait['payload'], resolveReason: ApprovalComposer
     usePanelInfo: bindSnapshotSelector(createSnapshotStore({ activePanelId: null })),
     useStore: bindSnapshotSelector(createSnapshotStore({})),
     renderSlot: () => null,
-  } as unknown as ApprovalComposerProps
+  } as never as ApprovalComposerProps
   return render(<ApprovalPanel {...props} />)
 }
 
@@ -50,18 +50,18 @@ describe('ApprovalPanel headline', () => {
       approvalId: 'ap1', toolName: 'bash',
       reason: 'Auto review denied tool "bash"',
       displayReason: { en: 'Auto review denied this call.', zh: 'Auto review 拒绝了此调用。' },
-    } as unknown as ApprovalWait['payload'])
+    } as never as ApprovalWait['payload'])
     expect(screen.getByText('Auto review 拒绝了此调用。')).toBeTruthy()
     expect(screen.queryByText('Auto review denied tool "bash"')).toBeNull()
   })
 
   it('renders the audited reason verbatim without a displayReason', () => {
-    mount({ approvalId: 'ap2', toolName: 'bash', reason: 'sandbox escalation' } as unknown as ApprovalWait['payload'])
+    mount({ approvalId: 'ap2', toolName: 'bash', reason: 'sandbox escalation' } as never as ApprovalWait['payload'])
     expect(screen.getByText('sandbox escalation')).toBeTruthy()
   })
 
   it('falls back to the escalation copy with neither reason', () => {
-    mount({ approvalId: 'ap3', toolName: 'bash' } as unknown as ApprovalWait['payload'])
+    mount({ approvalId: 'ap3', toolName: 'bash' } as never as ApprovalWait['payload'])
     expect(screen.getByText(/bash/)).toBeTruthy()
   })
 })

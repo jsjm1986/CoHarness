@@ -133,5 +133,5 @@ export interface PendingDirectChildrenProbe {
  * @returns whether direct continuable work remains unsettled.
  */
 export function hasPendingDirectChildren(runtime: SubagentRuntime, parent: Agent): boolean {
-  return (runtime as unknown as PendingDirectChildrenProbe)[subagentPendingDirectChildren](parent)
+  return (runtime as SubagentRuntime & PendingDirectChildrenProbe)[subagentPendingDirectChildren](parent)
 }

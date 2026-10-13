@@ -77,7 +77,7 @@ const NODES = [
     kind: 'assistant', seq: 4, time: 4_000, turn: 2, step: 1, blocks: [],
     timing: { stepStartTime: 3_500, firstTokenTime: 3_700, completedTime: 4_000 },
   },
-] as unknown as ConversationSnapshot['nodes']
+] as never as ConversationSnapshot['nodes']
 
 function historySnapshot(
   nodes: ConversationSnapshot['nodes'],
@@ -181,7 +181,7 @@ function standaloneProps(
     useProjection: (() => undefined) as never,
     // The locale seat the outlet would inject for the declared namespace.
     t: tZh,
-  } as unknown as ConvViewProps & { t: (key: LocaleKeysOf<'trajectory'>) => string }
+  } as never as ConvViewProps & { t: (key: LocaleKeysOf<'trajectory'>) => string }
 }
 
 /** Real-stack bench: root Context + real SlotRegistry ring + the plugin fiber. */
@@ -274,11 +274,11 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
     return (
       <View
         {...injectedProps}
-        {...({ sessionId: SID, useSession, useSessions: emptySessions(), useWorkspaces: emptyWorkspaces() } as unknown as ConvViewProps)}
+        {...({ sessionId: SID, useSession, useSessions: emptySessions(), useWorkspaces: emptyWorkspaces() } as never as ConvViewProps)}
         key={key}
       />
     )
-  }) as unknown as ConversationSessionProps['renderSlot']
+  }) as never as ConversationSessionProps['renderSlot']
   return render(
     <>
       <ConversationSessionHeader
@@ -347,7 +347,7 @@ describe('plugin registration', () => {
     const entry = b.slots.entries('conversation.view')
       .find(candidate => candidate.options.id === 'trajectory')
     expect(entry).toBeDefined()
-    const injectEntry = entry!.inject as unknown as (
+    const injectEntry = entry!.inject as never as (
       sessionId: SessionId,
     ) => TrajectoryViewInjected
     const first = injectEntry(SID)
@@ -365,7 +365,7 @@ describe('plugin registration', () => {
     const entry = b.slots.entries('conversation.view')
       .find(candidate => candidate.options.id === 'trajectory')
     expect(entry).toBeDefined()
-    const injectEntry = entry!.inject as unknown as (
+    const injectEntry = entry!.inject as never as (
       sessionId: SessionId,
     ) => TrajectoryViewInjected
     const first = injectEntry(SID)
@@ -382,7 +382,7 @@ describe('plugin registration', () => {
     const b = await bench()
     const entry = b.slots.entries('conversation.view')
       .find(candidate => candidate.options.id === 'trajectory')
-    const injectEntry = entry!.inject as unknown as (
+    const injectEntry = entry!.inject as never as (
       sessionId: SessionId,
     ) => TrajectoryViewInjected
     const injected = injectEntry(SID)
@@ -475,7 +475,7 @@ describe('tab switching in ConversationRoot', () => {
         kind: 'assistant', seq: 6, time: 6_000, turn: 2, step: 1,
         blocks: [{ kind: 'text', text: 'after' }],
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const compaction: RequestView = {
       purpose: 'compaction',
       startSeq: 3,
@@ -515,7 +515,7 @@ describe('tab switching in ConversationRoot', () => {
         kind: 'assistant', seq: 10, time: 10_000, turn: 3, step: 1,
         blocks: [{ kind: 'text', text: 'after second compaction' }],
       },
-    ] as unknown as ConversationSnapshot['nodes']
+    ] as never as ConversationSnapshot['nodes']
     const compactions: RequestView[] = [
       {
         purpose: 'compaction',
@@ -1200,7 +1200,7 @@ describe('TrajectoryView state', () => {
       kind: 'assistant', seq: 10, time: 10_000, turn: 2, step: 3,
       blocks: [{ kind: 'text', text: 'loaded response' }],
       ...(interrupted ? { interrupted: true } : {}),
-    }] as unknown as ConversationSnapshot['nodes']
+    }] as never as ConversationSnapshot['nodes']
     render(<TrajectoryView
       {...standaloneProps(nodes)}
       {...standaloneHistory(historySnapshot(nodes))}
@@ -1253,11 +1253,11 @@ describe('TrajectoryView state', () => {
     const older = {
       kind: 'user', seq: 1, time: 1_000,
       content: [{ type: 'text', text: 'older prompt' }], source: null,
-    } as unknown as ConversationSnapshot['nodes'][number]
+    } as never as ConversationSnapshot['nodes'][number]
     const current = {
       kind: 'assistant', seq: 100, time: 5_000, turn: 2, step: 1,
       blocks: [{ kind: 'text', text: 'selected current response' }],
-    } as unknown as ConversationSnapshot['nodes'][number]
+    } as never as ConversationSnapshot['nodes'][number]
     const store = createSnapshotStore(historySnapshot([current]))
     const view = render(
       <TrajectoryView

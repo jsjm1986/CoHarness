@@ -47,7 +47,7 @@ export function submittedPlan(event: { readonly type: string; readonly data: unk
   let args: unknown = data.arguments
   if (event.type === 'tool/call') {
     if (typeof args !== 'string') return undefined
-    try { args = JSON.parse(args) as unknown }
+    try { args = JSON.parse(args) }
     catch (_error) { return undefined /* Malformed model JSON remains in the generic tool row. */ }
   }
   if (!record(args) || typeof args.plan !== 'string') return undefined
