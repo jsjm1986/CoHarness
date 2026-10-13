@@ -43,6 +43,7 @@
     { "path": "./packages/api/terminal-controller/tsconfig.client.json" },
     { "path": "./packages/util/crypto" },
     { "path": "./packages/util/values" },
+    { "path": "./packages/util/workspace-path" },
     // Shared leaf: web e2e boots the real host webserver (fixture + real-host
     // smoke policy). webserver has zero workspace deps and no cordis merge,
     // so it cannot drag host-side Context augmentation into this program.
