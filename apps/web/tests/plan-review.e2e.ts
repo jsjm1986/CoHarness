@@ -309,7 +309,7 @@ describe('web e2e: dismissed plan history', () => {
       const modes = events.filter(event => event.type === 'plan/mode')
       expect(modes).toHaveLength(1)
       expect(modes[0]).toMatchObject({ data: { active: true } })
-      expect(await review.count()).toBe(0)
+      await review.waitFor({ state: 'detached' })
       const card = page.locator('[data-plan-card]')
       await card.waitFor({ state: 'visible' })
       await card.click()
