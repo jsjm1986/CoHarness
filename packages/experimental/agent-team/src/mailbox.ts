@@ -280,9 +280,15 @@ export class TeamMailbox {
         }
       }
       await queueHostSubagentPrompt(this.ctx.subagents, root, message.targetId, content, source, signal)
-      return target === undefined
-        ? true
-        : await this.checkpointDelivered(root, target.session, message.id)
+      if (target === undefined) {
+        /* Acceptance hands the durable delivery to the subagent runtime; the
+         * session receipt lands when the child consumes its inbox, later than
+         * a member-start recovery pass can observe it. Commit here so queued
+         * replay does not redeliver the same message. */
+        await this.markDelivered(root, message.id, message.targetId)
+        return true
+      }
+      return await this.checkpointDelivered(root, target.session, message.id)
     } catch (error: unknown) {
       this.ctx.logger.warn(`team message "${message.id}" remains queued: ${errorMessage(error)}`)
       return false
