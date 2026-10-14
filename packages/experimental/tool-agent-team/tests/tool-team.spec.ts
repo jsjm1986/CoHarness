@@ -48,7 +48,7 @@ afterEach(async () => {
 async function setup(script: ConstructorParameters<typeof MockAdapter>[0], legacyControl = false) {
   const ctx = new Context()
   contexts.push(ctx)
-  await mountAgentLoopTestDependencies(ctx)
+  await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
   const storageRoot = mkdtempSync(join(tmpdir(), 'dsh-tool-team-'))
   roots.push(storageRoot)
   await ctx.plugin(JsonlSessionPersistence, { root: storageRoot })
