@@ -1,6 +1,6 @@
 /** Default Agent model settings layered over a real settings provider. */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentDefaultModelConfig, { AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE } from '../src/index.ts'
 import { SettingsProvider } from '@deepseek-ai/dsh-settings'
@@ -85,6 +85,15 @@ describe('AgentDefaultModelConfig', () => {
     expect(bench.defaultModel.currentSelection()).toEqual({
       provider: 'deepseek-official', model: 'deepseek-v4-flash',
     })
+    await bench.ctx.fiber.dispose()
+  })
+
+  it('rejects a failed save without blocking later saves', async () => {
+    const bench = await boot()
+    vi.spyOn(bench.settingsFiber.ctx.settings, 'replace').mockRejectedValueOnce(new Error('disk full'))
+    await expect(bench.defaultModel.saveSelection({ provider: 'x', model: 'x' })).rejects.toThrow('disk full')
+    await bench.defaultModel.saveSelection({ provider: 'acme-gateway', model: 'acme-large' })
+    expect(bench.defaultModel.currentSelection()).toEqual({ provider: 'acme-gateway', model: 'acme-large' })
     await bench.ctx.fiber.dispose()
   })
 

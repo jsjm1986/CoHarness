@@ -3,7 +3,7 @@
  * from native `tool/call`, PTC dispatch start, and PTC settlement events;
  * saved resource addresses round-trip Session and direct-subagent identity.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type {
   ChatSnapshot, ConversationEventInput, ConversationNodeDefinition, ConversationViewDefinition,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -83,6 +83,9 @@ describe('submittedPlan', () => {
         rootCallId: 'r', parentCallId: 'r', subCallId: 's', name: 'exit_plan_mode',
         arguments: 'a string', isError: false, content: [],
       }),
+      at(10, 'tool/call', {
+        turn: 1, step: 1, callId: 'c', name: 'exit_plan_mode', arguments: { plan: '# x' },
+      }),
     ]
     for (const input of cases) expect(submittedPlan(input.event)).toBeUndefined()
   })
@@ -142,6 +145,9 @@ describe('review preview addresses', () => {
       expect(isReviewPreviewAddress(address)).toBe(false)
       expect(parseReviewPreviewAddress(address)).toBeUndefined()
     }
+    // Valid framing with un-decodable percent bytes claims the seat but resolves no Session.
+    expect(isReviewPreviewAddress('dsh-resource://plan-review/%E0%A4%A/k')).toBe(true)
+    expect(parseReviewPreviewAddress('dsh-resource://plan-review/%E0%A4%A/k')).toBeUndefined()
   })
 })
 
@@ -198,6 +204,39 @@ describe('submittedPlanDefinition', () => {
   })
 })
 
+describe('plansForTurn', () => {
+  it('collects only plan Nodes anchored inside the Turn', () => {
+    const chat = {
+      nodes: {
+        values: () => [
+          { kind: 'text', anchorSeq: 3, location: { kind: 'turn', turn: { turn: 1 } } },
+          { kind: 'submitted-plan', anchorSeq: 2, data: { callId: 'lost' }, location: { kind: 'unresolved' } },
+          { kind: 'submitted-plan', anchorSeq: 1, data: { callId: 'c-1' }, location: { kind: 'turn', turn: { turn: 1 } } },
+        ],
+      },
+    }
+    expect(plansForTurn(chat as never, 1).map(plan => plan.callId)).toEqual(['c-1'])
+  })
+})
+
+describe('submittedPlanDefinition view', () => {
+  it('builds the card from the start Match, its settled State, or nothing', () => {
+    const event = at(2, 'tool/call', {
+      turn: 1, step: 1, callId: 'c-1', name: 'exit_plan_mode', arguments: planEvent('# Match'),
+    }).event
+    const match = { event, role: 'start', location: { kind: 'turn', turn: { turn: 1 } } } as never
+    const base = { key: 'submitted-plan:c-1', kind: 'submitted-plan', id: 'c-1', current: new Map() }
+    const buildViewNode = submittedPlanDefinition.buildViewNode!
+    const settledPlan: SubmittedPlan = { callId: 'c-1' as ToolCallId, markdown: '# Settled', title: 'Settled' }
+
+    const settled = buildViewNode({ ...base, matches: [match], start: undefined, state: settledPlan })
+    expect(settled?.data).toBe(settledPlan)
+    const fromStart = buildViewNode({ ...base, matches: [match], start: match, state: undefined })
+    expect(fromStart?.data).toMatchObject({ callId: 'c-1', title: 'Match' })
+    expect(buildViewNode({ ...base, matches: [], start: undefined, state: undefined })).toBeNull()
+  })
+})
+
 describe('plansSourceFor', () => {
   it('republishes only when the Turn plan list changes', () => {
     const snapshot = assemble([
@@ -213,6 +252,18 @@ describe('plansSourceFor', () => {
     const first = source.getSnapshot()
     expect(first.map(plan => plan.callId)).toEqual(['c-1'])
     expect(source.getSnapshot()).toBe(first)
+  })
+
+  it('forwards its subscription to the owning Session', () => {
+    const unsubscribe = vi.fn()
+    const session = {
+      getSnapshot: () => ({ chat: undefined }),
+      subscribe: vi.fn((_listener: () => void) => unsubscribe),
+    }
+    const source = plansSourceFor(session as never, 1)
+    const listener = vi.fn()
+    expect(source.subscribe(listener)).toBe(unsubscribe)
+    expect(session.subscribe).toHaveBeenCalledWith(listener)
   })
 })
 

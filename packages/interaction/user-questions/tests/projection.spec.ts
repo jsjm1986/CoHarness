@@ -178,6 +178,22 @@ describe('userQuestions projection fold', () => {
     })
   })
 
+  it('ignores PTC dispatches that are not a pending ask_user_question call', () => {
+    const fold = [timedHeader, asked].reduce(applyUserQuestionEvent, { timed: false, questions: empty })
+    const base: SessionEvent<'tool/ptc-dispatch'>['data'] = {
+      rootCallId: ToolCallId('run_1'), parentCallId: ToolCallId('run_1'), subCallId: ToolCallId('run_1:ptc:1'),
+      name: 'ask_user_question', arguments: JSON.parse(toolArguments), isError: false,
+      content: [{ type: 'text', text: JSON.stringify({ pending: true, callId: 'run_1:ptc:1' }) }],
+    }
+    expect(applyUserQuestionEvent(fold, event(2, 'tool/ptc-dispatch', { ...base, name: 'bash' }))).toBe(fold)
+    expect(applyUserQuestionEvent(fold, event(2, 'tool/ptc-dispatch', { ...base, isError: true }))).toBe(fold)
+    expect(applyUserQuestionEvent(fold, event(2, 'tool/ptc-dispatch', {
+      ...base, content: [{ type: 'text', text: '{"answers":[]}' }],
+    }))).toBe(fold)
+    expect(applyUserQuestionEvent(fold, event(2, 'tool/ptc-dispatch', { ...base, arguments: { questions: 'nope' } }))).toBe(fold)
+    expect(applyUserQuestionEvent(fold, event(2, 'tool/ptc-dispatch', { ...base, arguments: {} }))).toBe(fold)
+  })
+
   it('records the answers one reply carried, exactly once across its splice and its own event', () => {
     const replied = reply('answered', answeredText)
     const settled = { active: [], settled: [{ callId, answers: answerBatch }] }

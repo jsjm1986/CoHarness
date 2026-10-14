@@ -6,7 +6,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { createServer, type Server } from 'node:http'
+import { Agent, createServer, type Server } from 'node:http'
 import { once } from 'node:events'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -410,6 +410,36 @@ describe('OpenTelemetrySessionBackend wire', () => {
     const types = allRecords(captures).flatMap(({ record }) =>
       record.attributes?.flatMap(a => a.key === 'event.type' ? [a.value.stringValue] : []) ?? [])
     expect(types).toContain('turn/start')
+  })
+
+  it('tracks transport agents across every exporter agent-option form', async () => {
+    const { url, captures } = await mockCollector()
+    const factoryAgent = new Agent({ keepAlive: false })
+    const functionFactory = vi.fn((_protocol: string) => factoryAgent)
+    const variants = [
+      // Options object alone: handed to the SDK's options factory verbatim.
+      { httpAgentOptions: { keepAlive: false } },
+      // keepAlive merges under an options object: the object's own fields win.
+      { keepAlive: false, httpAgentOptions: { keepAlive: true } },
+      // A function factory stays verbatim even beside a keepAlive setting.
+      { keepAlive: false, httpAgentOptions: functionFactory },
+    ]
+    for (const [index, extra] of variants.entries()) {
+      const ctx = new Context()
+      await ctx.plugin(SessionStore)
+      const fiber = await ctx.plugin(OpenTelemetrySessionBackend, {
+        mode: SessionTelemetryMode.FEEDBACK_ONLY,
+        exporter: { url, ...extra },
+        processor: { scheduledDelayMillis: 10 },
+      } as Config)
+      const session = ctx.sessions.create(SessionId(`agents-${index}`), { meta: {} })
+      session.append('request/header', { header: { config: { provider: 'mock', model: 'mock' } }, reason: 'initial' })
+      session.append('turn/start', { turn: 1 })
+      recordFeedback(session, { text: `report ${index}` })
+      await fiber.dispose()
+    }
+    expect(functionFactory).toHaveBeenCalledWith('http:')
+    expect(captures.length).toBeGreaterThanOrEqual(3)
   })
 
   it('maps warn severity from record policy and leaves the seam flush hint unimplemented', async () => {

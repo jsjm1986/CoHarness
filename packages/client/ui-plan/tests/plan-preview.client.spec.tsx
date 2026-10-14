@@ -87,8 +87,10 @@ describe('PlanReviewOpen', () => {
     preopened?: readonly string[]
     mounted?: SessionId | undefined
     reaches?: boolean
+    review?: PlanReview
   } = {}) {
     const { preopened = [], reaches = true } = options
+    const given = options.review ?? review
     const mounted = 'mounted' in options ? options.mounted : ('s-1' as SessionId)
     const mountedStore = createSnapshotStore<SessionId | undefined>(mounted)
     const openReview = vi.fn(() => reaches)
@@ -98,7 +100,7 @@ describe('PlanReviewOpen', () => {
     const useStore = bindSnapshotSelector(store) as never
     const view = render(<PlanReviewOpen
       {...sessionStandard()}
-      review={review} requestKey="req-1"
+      review={given} requestKey="req-1"
       openReview={openReview} useSidebarMounted={useSidebarMounted} useStore={useStore} actions={store.actions} t={t} />)
     return { openReview, store, mountedStore, view }
   }
@@ -139,6 +141,12 @@ describe('PlanReviewOpen', () => {
     expect(openReview).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: zh['preview.open'] }))
     expect(openReview).toHaveBeenCalledWith(review, 'req-1')
+  })
+
+  it('keys the opened mark by the logged call identity when one exists', async () => {
+    const logged: PlanReview = { ...review, callId: 'c-7' as ToolCallId }
+    const { store } = setup({ review: logged })
+    await waitFor(() => { expect(store.getSnapshot().opened['call:c-7']).toBe(true) })
   })
 })
 
@@ -206,16 +214,14 @@ describe('PlanPreview', () => {
 })
 
 describe('PlanTitle', () => {
-  it('replaces the registry label with the recovered plan heading', async () => {
-    const address = 'dsh-resource://plan/s-1/c-1'
-    const state = createSnapshotStore<Record<string, PlanRead | undefined>>({
-      [address]: { status: 'ready', plan: PLAN },
-    })
+  function setup(address: string, params?: { planReview: { markdown: string; title: string } }) {
+    const state = createSnapshotStore<Record<string, PlanRead | undefined>>({})
+    const loadPlan = vi.fn(async (_address: string) => {})
     const info = {
       sidebar: { expanded: true, fullscreen: false }, panel: { id: 'p1' },
       tab: {
         id: 't1', kind: 'plan', contentId: address, title: '计划', visible: true,
-        navigation: { address, params: undefined, revision: 1 },
+        navigation: { address, params, revision: 1 },
         signal: new AbortController().signal, actions: {},
       },
     }
@@ -223,7 +229,37 @@ describe('PlanTitle', () => {
       {...sessionStandard()}
       useTabInfo={(() => info) as never}
       usePlanDocument={bindSnapshotSelector(state) as never}
-      loadPlan={vi.fn(async () => {})} />)
+      loadPlan={loadPlan} />)
+    return { state, loadPlan }
+  }
+
+  it('replaces the registry label with the recovered plan heading', async () => {
+    const address = 'dsh-resource://plan/s-1/c-1'
+    const { state } = setup(address)
+    act(() => {
+      state.update((draft) => { draft[address] = { status: 'ready', plan: PLAN } })
+    })
     expect(await screen.findByText('Draft plan')).toBeTruthy()
+  })
+
+  it('requests the logged plan and falls back to the tab label while it loads', async () => {
+    const address = 'dsh-resource://plan/s-1/missing'
+    const { loadPlan } = setup(address)
+    await waitFor(() => { expect(loadPlan).toHaveBeenCalledWith(address) })
+    expect(screen.getByText('计划')).toBeTruthy()
+  })
+
+  it('reads a temporary review heading from navigation params and never loads', async () => {
+    const address = reviewPreviewAddress('s-1' as SessionId, 'w:req-1')
+    const { loadPlan } = setup(address, { planReview: { markdown: '# Pending', title: 'Pending' } })
+    expect(await screen.findByText('Pending')).toBeTruthy()
+    await Promise.resolve()
+    expect(loadPlan).not.toHaveBeenCalled()
+  })
+
+  it('keeps the tab label when a restored review lost its params', async () => {
+    const address = reviewPreviewAddress('s-1' as SessionId, 'w:req-1')
+    setup(address)
+    expect(await screen.findByText('计划')).toBeTruthy()
   })
 })

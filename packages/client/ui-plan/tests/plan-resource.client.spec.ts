@@ -138,6 +138,73 @@ describe('PlanReadStore', () => {
     await store.dispose()
   })
 
+  it('carries non-Error rejections through String() instead of a placeholder', async () => {
+    const { sessions } = fake(vi.fn(() => Promise.reject<ChatSnapshot>('socket dropped')))
+    const store = new PlanReadStore(sessions)
+    await store.load(ADDRESS)
+    expect((store.state.getSnapshot()[ADDRESS] as PlanRead & { status: 'failed' }).failure)
+      .toEqual({ code: 'plan/read-failed', message: 'socket dropped' })
+    await store.dispose()
+  })
+
+  it('reports a failure when releasing the retained Session itself throws', async () => {
+    const read = vi.fn(async () => chatWith([planNode('c-1')]))
+    const released = vi.fn(() => { throw new Error('teardown raced') })
+    const retain = vi.fn((_target: SessionTarget, _options: unknown): SessionReference => ({
+      sessionId: SID,
+      binding: { session: { readCallHistory: read } } as never as SessionReference['binding'],
+      ready: Promise.resolve() as never,
+      release: released,
+      [Symbol.dispose]: released,
+    }))
+    const store = new PlanReadStore({ retain } as Partial<ISessions> as ISessions)
+    await store.load(ADDRESS)
+    expect((store.state.getSnapshot()[ADDRESS] as PlanRead & { status: 'failed' }).failure)
+      .toEqual({ code: 'plan/read-failed', message: 'teardown raced' })
+    await store.dispose()
+  })
+
+  it('publishes nothing when a reset lands while the read tears its Session down', async () => {
+    const handle: { store?: PlanReadStore } = {}
+    const read = vi.fn(async () => chatWith([planNode('c-1')]))
+    const retain = vi.fn((_target: SessionTarget, _options: unknown): SessionReference => ({
+      sessionId: SID,
+      binding: { session: { readCallHistory: read } } as never as SessionReference['binding'],
+      ready: Promise.resolve() as never,
+      release: () => { handle.store?.reset() },
+      [Symbol.dispose]: () => {},
+    }))
+    const store = new PlanReadStore({ retain } as Partial<ISessions> as ISessions)
+    handle.store = store
+    await store.load(ADDRESS)
+    expect(read).toHaveBeenCalled()
+    expect(store.state.getSnapshot()[ADDRESS]).toBeUndefined()
+    await store.dispose()
+  })
+
+  it('publishes nothing when the retained Session rejects across a reset', async () => {
+    let rejectReady!: (error: unknown) => void
+    const ready = new Promise<never>((_resolve, reject) => { rejectReady = reject })
+    const { sessions } = fake(vi.fn(async () => chatWith([planNode('c-1')])), ready)
+    const store = new PlanReadStore(sessions)
+    const loading = store.load(ADDRESS)
+    await Promise.resolve()
+    store.reset()
+    rejectReady(new Error('session replaced'))
+    await loading
+    expect(store.state.getSnapshot()[ADDRESS]).toBeUndefined()
+    await store.dispose()
+  })
+
+  it('skips sibling Nodes of other kinds while reassembling the call', async () => {
+    const foreign = { ...planNode('other'), kind: 'command' }
+    const { sessions } = fake(vi.fn(async () => chatWith([foreign, planNode('c-1')])))
+    const store = new PlanReadStore(sessions)
+    await store.load(ADDRESS)
+    expect((store.state.getSnapshot()[ADDRESS] as PlanRead & { status: 'ready' }).plan.callId).toBe('c-1')
+    await store.dispose()
+  })
+
   it('reports unavailable for a persisted unknown-mode subagent identity', async () => {
     const { sessions, retain } = fake()
     const store = new PlanReadStore(sessions)

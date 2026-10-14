@@ -38,7 +38,7 @@ export function parseReviewPreviewAddress(address: string): { readonly sessionId
   if (match === null) return undefined
   try {
     const sessionId = decodeURIComponent(match[1] as string)
-    return sessionId === '' ? undefined : { sessionId: sessionId as SessionId }
+    return { sessionId: sessionId as SessionId }
   } catch {
     // Invalid percent encoding cannot identify a Session.
     return undefined
