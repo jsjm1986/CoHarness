@@ -52,6 +52,7 @@
         dshHome: !!js process.env.DSH_TEST_CHILD_HOME
         provider: mock
         model: mock-routed
+        initializeTimeoutMs: 30000
         env:
           DSH_TELEMETRY_DISABLED: '1'
           DSH_TEST_CHILD_FAILURE: !!js String(process.env.DSH_TEST_CHILD_FAILURE ?? '')
