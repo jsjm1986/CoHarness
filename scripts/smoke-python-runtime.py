@@ -1782,7 +1782,10 @@ def smoke_sdk_scheduler_recovery(base_url: str, executable: Path, update_snapsho
             raise AssertionError(f"scheduler recovery duplicated or lost tool outcomes: {tool_results}")
         if sum(record.get("type") == "todo/write" for record in records) != 1:
             raise AssertionError("scheduler recovery executed an unstarted todo update")
-        replacements = [(str(root), "{{cwd}}"), (RECOVERY_SESSION_ID, "{{parent}}")]
+        replacements = [
+            *snapshot_directory_replacements(root, "{{cwd}}"),
+            (RECOVERY_SESSION_ID, "{{parent}}"),
+        ]
         result_value = [{
             "session_id": result.session_id,
             "final_response": result.final_response,
@@ -2296,7 +2299,7 @@ def build_dynamic_tools_snapshot_files(
                 if block.get("type") in ("tool_addition", "tool_removal")] for request in requests]
     assert changes == [[], [{"type": "tool_addition", "tool": {"type": "tool_reference", "name": "snapshot_ping"}}], []], changes
     assert requests[1]["messages"][:len(requests[0]["messages"])] == requests[0]["messages"], "tool addition changed earlier messages"
-    replacements = [(str(cwd), "{{cwd}}"), (result.session_id, "{{session}}")]
+    replacements = snapshot_directory_replacements(cwd, "{{cwd}}") + [(result.session_id, "{{session}}")]
     evidence = {
         "finalResponse": result.final_response,
         "declarations": declarations,
@@ -2407,10 +2410,18 @@ def minimal_snapshot_message(message: object, cwd: Path) -> dict[str, object]:
     return {"role": role, "text": minimal_snapshot_text(message_text(content), cwd)}
 
 
+def snapshot_directory_replacements(directory: Path, token: str) -> list[tuple[str, str]]:
+    """Pin the allocated fixture path in plain fields and JSON-quoted context text."""
+    path = str(directory)
+    return [(json.dumps(path, ensure_ascii=False)[1:-1], token), (path, token)]
+
+
 def minimal_snapshot_text(value: object, cwd: Path) -> object:
     """Replace the scenario's temporary working directory everywhere it appears."""
     if isinstance(value, str):
-        return value.replace(str(cwd), "{{cwd}}")
+        for actual, token in snapshot_directory_replacements(cwd, "{{cwd}}"):
+            value = value.replace(actual, token)
+        return value
     if isinstance(value, list):
         return [minimal_snapshot_text(item, cwd) for item in value]
     if isinstance(value, dict):
@@ -2425,7 +2436,7 @@ def build_snapshot_files(
     cwd: Path,
 ) -> dict[str, str]:
     """Render the SDK result and three persisted logs into stable expected outputs."""
-    replacements = [(str(cwd), "{{cwd}}"), (SNAPSHOT_SESSION_ID, "{{parent}}")]
+    replacements = snapshot_directory_replacements(cwd, "{{cwd}}") + [(SNAPSHOT_SESSION_ID, "{{parent}}")]
     replacements.append((snapshot_workflow_run_id(result), "{{workflow-run}}"))
     for index, child_id in enumerate(child_ids, start=1):
         replacements.append((child_id, f"{{{{child-{index}}}}}"))
@@ -2497,8 +2508,8 @@ def build_restart_snapshot_files(
 ) -> dict[str, str]:
     """Render two SDK processes, isolated model histories, and durable logs."""
     replacements = [
-        (str(sessions), "{{sessions}}"),
-        (str(cwd), "{{cwd}}"),
+        *snapshot_directory_replacements(sessions, "{{sessions}}"),
+        *snapshot_directory_replacements(cwd, "{{cwd}}"),
         (RESTART_FIRST_SESSION_ID, "{{session-1}}"),
         (RESTART_SECOND_SESSION_ID, "{{session-2}}"),
     ]
