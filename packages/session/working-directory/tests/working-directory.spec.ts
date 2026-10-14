@@ -462,6 +462,21 @@ describe('provider transport failures', () => {
     }
   })
 
+  it('rethrows an abort that lands during the recorded-directory lookup', async () => {
+    await using f = await fixture()
+    const controller = new AbortController()
+    const resolve = vi.spyOn(f.ctx.fs, 'resolve').mockImplementation(() => {
+      controller.abort(new Error('cancelled directory lookup'))
+      return Promise.reject(new Error('transport lost'))
+    })
+    try {
+      await expect(f.ctx.workingDirectory.ensure(f.agent, controller.signal)).rejects.toThrow('transport lost')
+      expect(f.ctx.workingDirectory.get(f.agent.session)).toBe(f.root)
+    } finally {
+      resolve.mockRestore()
+    }
+  })
+
   it('still rejects aborted lookups while the provider is unreachable', async () => {
     await using f = await fixture()
     const resolve = vi.spyOn(f.ctx.fs, 'resolve').mockRejectedValue(new Error('transport lost'))
@@ -481,6 +496,63 @@ describe('provider transport failures', () => {
       await expect(f.ctx.workingDirectory.set(f.agent, 'child')).rejects.toThrow('connection reset')
       await expect(f.ctx.workingDirectory.resolve(f.agent, 'child')).rejects.toThrow('connection reset')
     } finally {
+      resolve.mockRestore()
+    }
+  })
+
+  it('keeps a recorded directory whose project-root lookup loses the provider', async () => {
+    await using f = await fixture()
+    const child = join(f.root, 'child')
+    await mkdir(child)
+    f.agent.session.append('working-directory/change', { cwd: child })
+    const warn = vi.spyOn(f.ctx.logger, 'warn').mockImplementation(() => {})
+    const realResolve = f.ctx.fs.resolve.bind(f.ctx.fs)
+    const resolve = vi.spyOn(f.ctx.fs, 'resolve').mockImplementation((path, opts) =>
+      path === f.root ? Promise.reject(new Error('transport lost')) : realResolve(path, opts))
+    try {
+      await expect(f.ctx.workingDirectory.ensure(f.agent)).resolves.toBe(child)
+      expect(warn.mock.calls[0]?.[0]).toContain('could not validate')
+      expect(f.ctx.workingDirectory.get(f.agent.session)).toBe(child)
+    } finally {
+      warn.mockRestore()
+      resolve.mockRestore()
+    }
+  })
+
+  it('rethrows an abort that lands during the project-root lookup', async () => {
+    await using f = await fixture()
+    const child = join(f.root, 'child')
+    await mkdir(child)
+    f.agent.session.append('working-directory/change', { cwd: child })
+    const controller = new AbortController()
+    const realResolve = f.ctx.fs.resolve.bind(f.ctx.fs)
+    const resolve = vi.spyOn(f.ctx.fs, 'resolve').mockImplementation((path, opts) => {
+      if (path !== f.root) return realResolve(path, opts)
+      controller.abort(new Error('cancelled root lookup'))
+      return Promise.reject(new Error('transport lost'))
+    })
+    try {
+      await expect(f.ctx.workingDirectory.ensure(f.agent, controller.signal)).rejects.toThrow('transport lost')
+      expect(f.ctx.workingDirectory.get(f.agent.session)).toBe(child)
+    } finally {
+      resolve.mockRestore()
+    }
+  })
+
+  it('keeps the recorded directory when the recovery lookup loses the provider', async () => {
+    await using f = await fixture()
+    const gone = join(f.root, 'gone')
+    f.agent.session.append('working-directory/change', { cwd: gone })
+    const warn = vi.spyOn(f.ctx.logger, 'warn').mockImplementation(() => {})
+    const realResolve = f.ctx.fs.resolve.bind(f.ctx.fs)
+    const resolve = vi.spyOn(f.ctx.fs, 'resolve').mockImplementation((path, opts) =>
+      path === f.root ? Promise.reject(new Error('transport lost')) : realResolve(path, opts))
+    try {
+      await expect(f.ctx.workingDirectory.ensure(f.agent)).resolves.toBe(gone)
+      expect(warn.mock.calls[0]?.[0]).toContain('could not validate')
+      expect(f.ctx.workingDirectory.get(f.agent.session)).toBe(gone)
+    } finally {
+      warn.mockRestore()
       resolve.mockRestore()
     }
   })
