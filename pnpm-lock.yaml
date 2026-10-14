@@ -782,6 +782,9 @@ importers:
       '@deepseek-ai/dsh-util-crypto':
         specifier: workspace:*
         version: link:../packages/util/crypto
+      '@deepseek-ai/dsh-util-workspace-path':
+        specifier: workspace:*
+        version: link:../packages/util/workspace-path
       playwright:
         specifier: ^1.49.0
         version: 1.62.1

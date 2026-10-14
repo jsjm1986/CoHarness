@@ -31,6 +31,7 @@
     "@deepseek-ai/dsh-tools": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "@deepseek-ai/dsh-util-crypto": "workspace:*",
+    "@deepseek-ai/dsh-util-workspace-path": "workspace:*",
     "playwright": "^1.49.0"
   },
   "peerDependencies": {
