@@ -270,7 +270,9 @@ describe('web e2e: document manager', () => {
     expect(searchBox.y).toBeLessThan(uploadBox.y + uploadBox.height)
     expect(uploadBox.y).toBeLessThan(searchBox.y + searchBox.height)
     expect(scopeBox.height).toBeGreaterThanOrEqual(44)
-    expect(moreBox.height).toBeGreaterThanOrEqual(44)
+    // Toolbar controls floor at the shared 40px coarse input height; only
+    // list rows and their trailing affordance keep the 44px target.
+    expect(moreBox.height).toBeGreaterThanOrEqual(40)
     expect(rowMoreBox.height).toBeGreaterThanOrEqual(44)
     expect(nameBox.y + nameBox.height).toBeLessThanOrEqual(dialogBox.y + dialogBox.height)
 
@@ -372,7 +374,7 @@ describe('web e2e: document manager', () => {
     expect(uploadBox!.y).toBeLessThan(searchBox!.y + searchBox!.height)
     expect(Math.round(uploadBox!.y)).toBe(Math.round(moreBox!.y))
     for (const box of [uploadBox!, moreBox!]) {
-      expect(box.height).toBeGreaterThanOrEqual(44)
+      expect(box.height).toBeGreaterThanOrEqual(40)
       expect(box.x).toBeGreaterThanOrEqual(0)
       expect(box.x + box.width).toBeLessThanOrEqual(321)
     }

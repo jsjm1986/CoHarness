@@ -1415,9 +1415,9 @@
     gap: var(--dsw-space-2);
     width: 100%;
     min-width: 0;
-    /* No global border-box: content-box min-height adds to padding, so the
-       trigger keeps one 44px list row at 36px content + 4px edges. */
-    min-height: 36px;
+    /* UA border-box on <button>: the 4px edges fold into the 44px total, so
+       the trigger lands as one list row beside the 40px toolbar controls. */
+    min-height: 44px;
     padding: var(--dsw-space-1) 0;
     /* A scope picker is a list row on a phone, not a bordered card — the
        hairline under it carries the separation. */
@@ -2149,8 +2149,8 @@
 
   /* The unconditional catalog-card metrics above (60px, 10px 12px) also
      reach the flattened overview and trash rows; re-assert the row metrics
-     here so all three lists share the same compact rhythm. min-height is
-     content-box: 44px + the padding edges lands each row at ~52px. */
+     here so all three lists share the same compact rhythm. These rows are
+     border-box, so 44px min-height lands each at exactly 44px. */
   .overviewRow {
     min-height: 44px;
     padding: var(--dsw-space-1) 0;
