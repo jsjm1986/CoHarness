@@ -9,7 +9,7 @@ import { getEnvironmentData } from 'node:worker_threads'
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
 import { PluginPackages } from '../src/profile-resolution/service.ts'
-import type { RuntimeResolution } from '../src/profile.ts'
+import { createRuntimeResolution, type RuntimeResolution } from '../src/profile.ts'
 
 const roots: string[] = []
 const contexts: Context[] = []
@@ -224,6 +224,39 @@ describe('profile package metadata service', () => {
     await ctx.fiber.dispose()
     contexts.pop()
     expect(getEnvironmentData(key)).toBe(previous)
+  })
+
+  it('reports interception state and republishes a computed resolution on refresh', async () => {
+    const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-package-service-refresh-')))
+    roots.push(root)
+    const installDir = join(root, 'global', 'node_modules', '@deepseek-ai', 'dsh')
+    const installAnchor = pkg(installDir, '0.0.0', '@deepseek-ai/dsh')
+    const home = join(root, 'home')
+    file(join(home, '.keep'), '')
+
+    const bare = new Context()
+    contexts.push(bare)
+    await bare.plugin(PluginPackages)
+    expect(bare.pluginPackages.installed).toBe(false)
+    await expect(bare.pluginPackages.refresh()).rejects.toThrow(/cannot be recomputed/)
+
+    const plain = new Context()
+    contexts.push(plain)
+    await plain.plugin(PluginPackages, {
+      resolution: {
+        profilesDir: join(root, 'profiles'), profileDir: undefined,
+        localPackageNames: [], linkedRoots: [], entries: [],
+      },
+    })
+    expect(plain.pluginPackages.installed).toBe(true)
+    await expect(plain.pluginPackages.refresh()).rejects.toThrow(/cannot be recomputed/)
+
+    const computed = new Context()
+    contexts.push(computed)
+    const resolution = await createRuntimeResolution({ installAnchor, home })
+    await computed.plugin(PluginPackages, { resolution })
+    expect(computed.pluginPackages.installed).toBe(true)
+    await expect(computed.pluginPackages.refresh()).resolves.toBeUndefined()
   })
 
   it('publishes additive generations to the process and future Workers', async () => {

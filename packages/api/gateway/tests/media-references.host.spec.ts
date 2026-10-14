@@ -1,5 +1,5 @@
 import { appendFile, mkdir, mkdtemp, open, realpath, rm, symlink, writeFile } from 'node:fs/promises'
-import { createServer, type Server } from 'node:http'
+import { createServer, ServerResponse, type Server } from 'node:http'
 import { EventEmitter } from 'node:events'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -185,6 +185,19 @@ describe('registerMediaReferences /api/file', () => {
     expect((await route.call(join(root, 'missing.png'))).status).toBe(404)
     await mkdir(join(root, 'frames.png'))
     expect((await route.call(join(root, 'frames.png'))).status).toBe(403)
+  })
+
+  it('rejects a request carrying no url', async () => {
+    const route = await mount()
+    const req = new EventEmitter() as Parameters<ConnectionHttpHandler>[0]
+    req.method = 'GET'
+    req.socket = new EventEmitter() as never
+    const res = new ServerResponse(req)
+    const writeHead = vi.spyOn(res, 'writeHead').mockReturnThis()
+    const end = vi.spyOn(res, 'end').mockReturnThis()
+    await route.handler(req, res)
+    expect(writeHead).toHaveBeenCalledWith(400, expect.anything())
+    expect(end).toHaveBeenCalledWith('missing path')
   })
 
   it('rejects unsupported methods', async () => {

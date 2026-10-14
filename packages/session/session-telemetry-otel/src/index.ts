@@ -58,13 +58,13 @@ type TransportAgentFactory = (protocol: string) => TransportAgent | Promise<Tran
  * merged over `keepAlive`, SDK default `keepAlive: true` — so every agent the
  * transport creates also lands in {@link track} for the shutdown deadline.
  * The transport invokes the factory once per protocol and caches the result.
- * @param config - the verbatim `exporter` config object.
+ * @param config - the verbatim `exporter` config object, guaranteed defined by the `url` validation.
  * @param track - set receiving every created agent.
  * @returns the `httpAgentOptions` factory handed to the exporter.
  */
-function trackedAgentFactory(config: OTLPExporterNodeConfigBase | undefined, track: Set<TransportAgent>): TransportAgentFactory {
-  let options = config?.httpAgentOptions
-  if (config?.keepAlive !== undefined && typeof options !== 'function') options = { keepAlive: config.keepAlive, ...options }
+function trackedAgentFactory(config: OTLPExporterNodeConfigBase, track: Set<TransportAgent>): TransportAgentFactory {
+  let options = config.httpAgentOptions
+  if (config.keepAlive !== undefined && typeof options !== 'function') options = { keepAlive: config.keepAlive, ...options }
   const delegate: TransportAgentFactory = typeof options === 'function'
     ? options
     : httpAgentFactoryFromOptions(options ?? { keepAlive: true })
@@ -223,8 +223,9 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
       return
     }
 
-    const url = config.exporter?.url
-    if (url === undefined || url.length === 0) {
+    const exporter = config.exporter
+    const url = exporter?.url
+    if (exporter === undefined || url === undefined || url.length === 0) {
       throw new Error('session-telemetry-otel: exporter.url is required (the full OTLP logs endpoint)')
     }
     let parsed: URL
@@ -254,8 +255,8 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
       // (service.name/version); the transport-level user-agent is the
       // SDK's own, per the axiom.
       new OTLPLogExporter({
-        ...config.exporter,
-        httpAgentOptions: trackedAgentFactory(config.exporter, this.transportAgents),
+        ...exporter,
+        httpAgentOptions: trackedAgentFactory(exporter, this.transportAgents),
       }),
       requestLimit,
       resolveTelemetryProcessorConfig(config.processor),
