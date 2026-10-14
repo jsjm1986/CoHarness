@@ -311,6 +311,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
         provider: 'p',
         model: 'm',
         env: { FAKE_INIT_READY: ready, FAKE_INIT_GO: go },
+        initializeTimeoutMs: DEFAULT_INITIALIZE_TIMEOUT_MS,
         shutdownTimeoutMs: 100,
         disposeEofGraceMs: 200,
         disposeGraceMs: 200,
