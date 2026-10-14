@@ -2390,7 +2390,21 @@ def minimal_snapshot_message(message: object, cwd: Path) -> dict[str, object]:
     results = latest_tool_result(message)
     if results is not None:
         return {"role": "tool", "toolCallId": results.get("tool_use_id"), "text": "{{tool-result}}"}
-    return {"role": role, "text": minimal_snapshot_text(message_text(message.get("content")), cwd)}
+    content = message.get("content")
+    if isinstance(content, list):
+        # The wire layer can fold the dynamic runtime-context snapshot into the
+        # preceding user message as an extra text block; drop it per block so the
+        # same expected output replays whether the platform emits it or not.
+        content = [
+            block for block in content
+            if not (
+                isinstance(block, dict)
+                and block.get("type") == "text"
+                and isinstance(block.get("text"), str)
+                and block["text"].startswith(RUNTIME_CONTEXT_PREFIX)
+            )
+        ]
+    return {"role": role, "text": minimal_snapshot_text(message_text(content), cwd)}
 
 
 def minimal_snapshot_text(value: object, cwd: Path) -> object:
