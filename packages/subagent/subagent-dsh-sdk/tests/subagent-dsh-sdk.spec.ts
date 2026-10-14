@@ -18,6 +18,7 @@ import * as sdk from '../src/index.ts'
 import {
   DEFAULT_DISPOSE_EOF_GRACE_MS,
   DEFAULT_DISPOSE_GRACE_MS,
+  DEFAULT_INITIALIZE_TIMEOUT_MS,
   DEFAULT_SHUTDOWN_TIMEOUT_MS,
   sdkChildOutcome,
   startSdkRun,
@@ -361,6 +362,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
           provider: 'p',
           model: 'm',
           env: {},
+          initializeTimeoutMs: DEFAULT_INITIALIZE_TIMEOUT_MS,
           shutdownTimeoutMs: DEFAULT_SHUTDOWN_TIMEOUT_MS,
           disposeEofGraceMs: DEFAULT_DISPOSE_EOF_GRACE_MS,
           disposeGraceMs: DEFAULT_DISPOSE_GRACE_MS,
@@ -394,6 +396,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
       provider: 'p',
       model: 'm',
       env: { FAKE_HANG_INIT: '1' },
+      initializeTimeoutMs: DEFAULT_INITIALIZE_TIMEOUT_MS,
       shutdownTimeoutMs: 100,
       disposeEofGraceMs: 200,
       disposeGraceMs: 200,
@@ -415,6 +418,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
       // short-lived process is simulated by killing via dispose below instead;
       // here use FAKE_MALFORMED to make the prompt reply violate the protocol.
       env: { FAKE_MALFORMED_PROMPT: '1' },
+      initializeTimeoutMs: DEFAULT_INITIALIZE_TIMEOUT_MS,
       shutdownTimeoutMs: 100,
       disposeEofGraceMs: 200,
       disposeGraceMs: 200,
@@ -471,6 +475,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     const ctx = new Context()
     await ctx.plugin(SubagentRuntime)
     const base = { providerName: 'sdk', dshBin: fakeRuntime, profile: 'sdk', patches: [], dshHome: isolatedHome(), provider: 'p', model: 'm', env: {} }
+    await expect(ctx.plugin(sdk, { ...base, initializeTimeoutMs: 0 })).rejects.toThrow('initializeTimeoutMs must be a positive finite number')
     await expect(ctx.plugin(sdk, { ...base, shutdownTimeoutMs: 0 })).rejects.toThrow('shutdownTimeoutMs must be a positive finite number')
     await expect(ctx.plugin(sdk, { ...base, disposeEofGraceMs: -1 })).rejects.toThrow('disposeEofGraceMs must be a positive finite number')
     await expect(ctx.plugin(sdk, { ...base, disposeGraceMs: Number.NaN })).rejects.toThrow('disposeGraceMs must be a positive finite number')
@@ -506,6 +511,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
         model: 'm',
         maxTokens,
         env: {},
+        initializeTimeoutMs: DEFAULT_INITIALIZE_TIMEOUT_MS,
         shutdownTimeoutMs: DEFAULT_SHUTDOWN_TIMEOUT_MS,
         disposeEofGraceMs: DEFAULT_DISPOSE_EOF_GRACE_MS,
         disposeGraceMs: DEFAULT_DISPOSE_GRACE_MS,
