@@ -3281,7 +3281,7 @@ export type CodexPermissionMode =
 
 - `inject`: `subagents`
 - `refs`: [`ReasoningEffortId`](../packages/llm/llm/src/index.ts)
-- `source`: [`packages/subagent/subagent-dsh-sdk/src/index.ts:33`](../packages/subagent/subagent-dsh-sdk/src/index.ts)
+- `source`: [`packages/subagent/subagent-dsh-sdk/src/index.ts:34`](../packages/subagent/subagent-dsh-sdk/src/index.ts)
 
 ```ts config-catalog
 /** Config: how to spawn and drive the child SDK runtime process. */
@@ -3312,6 +3312,8 @@ export interface Config {
    * not leak implicitly.
    */
   env: Record<string, string>
+  /** Bound (ms) on the child's protocol `initialize` handshake during start. */
+  initializeTimeoutMs?: number
   /** Bound (ms) on the protocol `shutdown` exchange during dispose. */
   shutdownTimeoutMs?: number
   /**
