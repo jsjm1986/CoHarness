@@ -226,7 +226,8 @@ describe('submittedPlanDefinition view', () => {
     }).event
     const match = { event, role: 'start', location: { kind: 'turn', turn: { turn: 1 } } } as never
     const base = { key: 'submitted-plan:c-1', kind: 'submitted-plan', id: 'c-1', current: new Map() }
-    const buildViewNode = submittedPlanDefinition.buildViewNode!
+    const buildViewNode = (node: Parameters<NonNullable<typeof submittedPlanDefinition.buildViewNode>>[0]) =>
+      submittedPlanDefinition.buildViewNode!(node)
     const settledPlan: SubmittedPlan = { callId: 'c-1' as ToolCallId, markdown: '# Settled', title: 'Settled' }
 
     const settled = buildViewNode({ ...base, matches: [match], start: undefined, state: settledPlan })

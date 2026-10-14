@@ -431,7 +431,7 @@ describe('OpenTelemetrySessionBackend wire', () => {
         mode: SessionTelemetryMode.FEEDBACK_ONLY,
         exporter: { url, ...extra },
         processor: { scheduledDelayMillis: 10 },
-      } as Config)
+      })
       const session = ctx.sessions.create(SessionId(`agents-${index}`), { meta: {} })
       session.append('request/header', { header: { config: { provider: 'mock', model: 'mock' } }, reason: 'initial' })
       session.append('turn/start', { turn: 1 })

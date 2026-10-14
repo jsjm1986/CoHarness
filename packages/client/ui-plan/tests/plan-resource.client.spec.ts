@@ -139,6 +139,7 @@ describe('PlanReadStore', () => {
   })
 
   it('carries non-Error rejections through String() instead of a placeholder', async () => {
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- the non-Error rejection is the scenario under test.
     const { sessions } = fake(vi.fn(() => Promise.reject<ChatSnapshot>('socket dropped')))
     const store = new PlanReadStore(sessions)
     await store.load(ADDRESS)
