@@ -8,7 +8,7 @@ import * as yaml from 'js-yaml'
 import { describe, expect, it, vi } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import LlmRuntime, { type ContentBlock } from '@deepseek-ai/dsh-llm'
-import SubagentRuntime from '@deepseek-ai/dsh-subagent'
+import SubagentRuntime, { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import type {
   SubprocessHandle,
@@ -482,6 +482,31 @@ describe('task admission and package contracts', () => {
     await expect(ctx.plugin(codex, { disposeGraceMs: MAX_TIMER_DELAY_MS + 1 }))
       .rejects.toThrow(`disposeGraceMs must be no greater than ${MAX_TIMER_DELAY_MS}`)
     await ctx.fiber.dispose()
+  })
+
+  it('start reports an abort observed while resolving the child execution', async () => {
+    const ctx = new Context()
+    provideWorkingDirectoryFixture(ctx)
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    await ctx.plugin(codex, {})
+    const provider = ctx.subagents.getProvider('codex')!
+    const controller = new AbortController()
+    const resolution = vi.spyOn(await import('@deepseek-ai/dsh-subagent'), 'resolveChildExecution')
+      .mockImplementation(async () => {
+        controller.abort()
+        throw new Error('resolver unreachable')
+      })
+    try {
+      await expect(provider.start(withExecutionContext(ctx, {
+        ...request(undefined, controller.signal),
+        cwd: process.cwd(),
+        descriptor: snapshotSubagentDescriptor({ mode: 'one-shot', provider: 'codex' }),
+      }))).rejects.toThrow('aborted before app-server startup')
+    } finally {
+      resolution.mockRestore()
+      await ctx.fiber.dispose()
+    }
   })
 
   it('keeps named instances, runs, and HMR ownership isolated', async () => {

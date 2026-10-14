@@ -101,6 +101,18 @@ describe('startInProcessRun', () => {
     expect(ctx.agents.get(run.id)).toBeUndefined()
   })
 
+  it('fails the start when the child context lacks the working-directory service', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await mountInvariants(ctx)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([textResponse('unused')]))
+    const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+    await expect(startInProcessRun(request(parent), {}))
+      .rejects.toThrow('in-process subagents require the working-directory service')
+    await ctx.fiber.dispose()
+  })
+
   it('marks the child as provider-owned before publication announces it', async () => {
     // Agent Teams and other `agent/created` observers classify children through
     // session meta before the descriptor lands at first-step admission, so the

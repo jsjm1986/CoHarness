@@ -614,6 +614,28 @@ describe('codex member plugin', () => {
       expect(hostSpawn).not.toHaveBeenCalled()
     }
   })
+
+  it('prepareContinuable resolves the request cwd when memberCwd is unset', async () => {
+    const dir = root()
+    const ctx = new Context()
+    contexts.push(ctx)
+    provideWorkingDirectoryFixture(ctx)
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(codex, { stateDir: dir })
+    const provider = ctx.subagents.getProvider('codex')!
+    const resolution = vi.spyOn(await import('@deepseek-ai/dsh-subagent'), 'resolveChildExecution')
+      .mockResolvedValue({ cwd: dir, target: 'local', remote: false, subprocess: ctx.subprocess })
+    await expect(provider.prepareContinuable!(withExecutionContext(ctx, {
+      cwd: dir,
+      sessionId: SessionId('continuable-child'),
+      parent: { session: { header: { cwd: dir } } } as unknown as Agent,
+      signal,
+    }))).resolves.toEqual({})
+    expect(resolution.mock.calls[0]![2]).toBe(dir)
+    expect(resolution.mock.calls[0]![3]).toBe(signal)
+  })
 })
 
 function withExecutionContext<T extends { parent: Agent }>(ctx: Context, request: T): T {

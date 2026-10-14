@@ -26,7 +26,7 @@ import {
 import { AgentRegistry, type Agent } from '@deepseek-ai/dsh-agent'
 import LlmRuntime, { createUserMessage, type ContentBlock, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import SubagentRuntime from '@deepseek-ai/dsh-subagent'
+import SubagentRuntime, { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import type {
   SubprocessHandle,
   SubprocessOutcome,
@@ -366,6 +366,60 @@ describe('named persistent member routes', () => {
       expect(ctx.subagents.getProvider('claude-code')!.agentRouteDefaults!.provider).toBe(firstRoute.provider)
     } finally {
       await ctx.fiber.dispose()
+    }
+  })
+
+  it('prepareContinuable resolves the request cwd when memberCwd is unset', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-claude-plugin-'))
+    const ctx = new Context()
+    try {
+      provideWorkingDirectoryFixture(ctx)
+      await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(LlmRuntime)
+      await ctx.plugin(claudeCode, { stateDir: dir })
+      const provider = ctx.subagents.getProvider('claude-code')!
+      const resolution = vi.spyOn(await import('@deepseek-ai/dsh-subagent'), 'resolveChildExecution')
+        .mockResolvedValue({ cwd: dir, target: 'local', remote: false, subprocess: ctx.subprocess })
+      const signal = new AbortController().signal
+      await expect(provider.prepareContinuable!(withExecutionContext(ctx, {
+        cwd: dir,
+        sessionId: SessionId('continuable-child'),
+        parent: fakeParent,
+        signal,
+      }))).resolves.toEqual({})
+      expect(resolution.mock.calls[0]![2]).toBe(dir)
+      expect(resolution.mock.calls[0]![3]).toBe(signal)
+    } finally {
+      await ctx.fiber.dispose()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('start reports an abort observed while resolving the child execution', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-claude-plugin-'))
+    const ctx = new Context()
+    try {
+      provideWorkingDirectoryFixture(ctx)
+      await ctx.plugin(SubagentRuntime)
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(LlmRuntime)
+      await ctx.plugin(claudeCode, { stateDir: dir })
+      const provider = ctx.subagents.getProvider('claude-code')!
+      const controller = new AbortController()
+      vi.spyOn(await import('@deepseek-ai/dsh-subagent'), 'resolveChildExecution')
+        .mockImplementation(async () => {
+          controller.abort()
+          throw new Error('resolver unreachable')
+        })
+      await expect(provider.start(withExecutionContext(ctx, {
+        ...request(undefined, controller.signal),
+        cwd: dir,
+        descriptor: snapshotSubagentDescriptor({ mode: 'one-shot', provider: 'claude-code' }),
+      }))).rejects.toThrow('aborted before SDK startup')
+    } finally {
+      await ctx.fiber.dispose()
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 

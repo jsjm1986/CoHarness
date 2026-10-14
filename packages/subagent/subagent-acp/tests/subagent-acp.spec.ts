@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import SubagentRuntime from '@deepseek-ai/dsh-subagent'
+import SubagentRuntime, { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import type { SubprocessHandle, SubprocessOutcome } from '@deepseek-ai/dsh-subprocess'
@@ -1117,6 +1117,18 @@ describe('dsh-subagent-acp', () => {
     expect(provider.capabilities).toEqual({
       outputSchema: false, depthLimit: false, toolFilter: false, persona: false, agentOptions: false,
     })
+  })
+
+  it('rejects a start request whose signal is already aborted', async () => {
+    const ctx = await setup()
+    const provider = ctx.subagents.getProvider('acp')!
+    const controller = new AbortController()
+    controller.abort()
+    await expect(provider.start(withExecutionContext(ctx, {
+      ...request('p', controller.signal),
+      cwd: process.cwd(),
+      descriptor: snapshotSubagentDescriptor({ mode: 'one-shot', provider: 'acp' }),
+    }))).rejects.toThrow('aborted before the ACP child started')
   })
 
   it('unregisters the provider when its fiber is disposed (HMR safety)', async () => {
