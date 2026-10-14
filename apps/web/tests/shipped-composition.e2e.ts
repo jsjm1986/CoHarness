@@ -60,6 +60,7 @@ const EXPECTED_TOOLS = [
   'web_fetch',
   'web_search',
   'workflow',
+  'working_directory',
   'write',
 ]
 
