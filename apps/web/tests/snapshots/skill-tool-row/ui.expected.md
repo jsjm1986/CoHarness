@@ -17,14 +17,14 @@
 - group "Message time and speed": "{{date}} {{clock}}"
 - button "Copy":
   - img
-- button "Context injection runtime-context":
-  - img
-  - img
-  - text: Context injection runtime-context
 - button "Context injection skill-catalog":
   - img
   - img
   - text: Context injection skill-catalog
+- button "Context injection runtime-context":
+  - img
+  - img
+  - text: Context injection runtime-context
 - button "Thinking Load the requested skill.":
   - img
   - img

@@ -264,7 +264,11 @@ describe('web e2e: document manager', () => {
     expect(dialogBox.y).toBeGreaterThanOrEqual(-1)
     expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(391)
     expect(dialogBox.y + dialogBox.height).toBeLessThanOrEqual(845)
-    expect(searchBox.y + searchBox.height).toBeLessThanOrEqual(uploadBox.y + 2)
+    // The phone toolbar is one track: the search field flexes beside the
+    // upload/more pair rather than stacking on its own line, so their
+    // vertical intervals overlap even though the field is shorter.
+    expect(searchBox.y).toBeLessThan(uploadBox.y + uploadBox.height)
+    expect(uploadBox.y).toBeLessThan(searchBox.y + searchBox.height)
     expect(scopeBox.height).toBeGreaterThanOrEqual(44)
     expect(moreBox.height).toBeGreaterThanOrEqual(44)
     expect(rowMoreBox.height).toBeGreaterThanOrEqual(44)
@@ -360,9 +364,12 @@ describe('web e2e: document manager', () => {
     if ([dialogBox, searchBox, uploadBox, moreBox].some(box => box === null)) {
       throw new Error('document manager narrow geometry missing')
     }
-    expect(searchBox!.width).toBeGreaterThan(200)
+    // Filters collapse into the more sheet; the search field keeps a usable
+    // touch width while sharing the single action track.
+    expect(searchBox!.width).toBeGreaterThan(44)
     expect(await dialog.locator('select').count()).toBe(0)
-    expect(searchBox!.y + searchBox!.height).toBeLessThanOrEqual(uploadBox!.y + 1)
+    expect(searchBox!.y).toBeLessThan(uploadBox!.y + uploadBox!.height)
+    expect(uploadBox!.y).toBeLessThan(searchBox!.y + searchBox!.height)
     expect(Math.round(uploadBox!.y)).toBe(Math.round(moreBox!.y))
     for (const box of [uploadBox!, moreBox!]) {
       expect(box.height).toBeGreaterThanOrEqual(44)

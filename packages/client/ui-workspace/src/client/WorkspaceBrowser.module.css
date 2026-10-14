@@ -58,6 +58,12 @@
   min-height: var(--dsw-touch-target);
 }
 
+/* Two 44px touch targets outgrow the desktop pair's 60px cap; uncapped the
+   last action overflows the container and can paint past the drawer edge. */
+:global([data-viewport='compact']) .headerActions {
+  max-width: calc(var(--dsw-touch-target) * 2 + var(--dsw-space-1));
+}
+
 /* Section header: title, an inline search control, and the two trailing
    actions. Expanding search collapses the action cluster and takes its room. */
 .sectionHeader {

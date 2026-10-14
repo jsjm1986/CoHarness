@@ -74,12 +74,18 @@ describe('Tooltip', () => {
   })
 
   it('ignores the synthetic mouseenter a touch tap emits on hoverless pointers', () => {
-    const matchMedia = vi.fn((query: string) => ({
+    const matchMedia = vi.fn((query: string): MediaQueryList => ({
       matches: false,
       media: query,
+      onchange: null,
+      // oxlint-disable-next-line typescript/no-deprecated -- MediaQueryList requires the legacy members.
+      addListener: () => {},
+      // oxlint-disable-next-line typescript/no-deprecated -- MediaQueryList requires the legacy members.
+      removeListener: () => {},
       addEventListener: () => {},
       removeEventListener: () => {},
-    }) as unknown as MediaQueryList)
+      dispatchEvent: () => false,
+    }))
     vi.stubGlobal('matchMedia', matchMedia)
     render(<Tooltip label="Pin"><button type="button">anchor</button></Tooltip>)
     fireEvent.mouseEnter(screen.getByText('anchor'))
@@ -87,12 +93,18 @@ describe('Tooltip', () => {
   })
 
   it('still shows the bubble on hover-capable pointers', () => {
-    const matchMedia = vi.fn((query: string) => ({
+    const matchMedia = vi.fn((query: string): MediaQueryList => ({
       matches: query === '(hover: hover)',
       media: query,
+      onchange: null,
+      // oxlint-disable-next-line typescript/no-deprecated -- MediaQueryList requires the legacy members.
+      addListener: () => {},
+      // oxlint-disable-next-line typescript/no-deprecated -- MediaQueryList requires the legacy members.
+      removeListener: () => {},
       addEventListener: () => {},
       removeEventListener: () => {},
-    }) as unknown as MediaQueryList)
+      dispatchEvent: () => false,
+    }))
     vi.stubGlobal('matchMedia', matchMedia)
     render(<Tooltip label="Pin"><button type="button">anchor</button></Tooltip>)
     fireEvent.mouseEnter(screen.getByText('anchor'))
