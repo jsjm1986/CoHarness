@@ -80,7 +80,7 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Custom"': Custom
-- button "6% of context used"
+- button "6% of context used": 6%
 - button "Send message" [disabled]
 - group "Session statistics":
   - "button \"2 turns · 2 steps · {{throughput}} tok/s\"":

@@ -8443,7 +8443,7 @@
         "packages/context/agent-instructions/tests/agent-instructions.e2e.ts",
         "packages/context/agent-instructions/tests/agent-instructions.spec.ts"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
         "area": "packages/context/agent-instructions",
@@ -11467,7 +11467,7 @@
         "packages/plan/plan-mode/tests/integration.spec.ts",
         "packages/plan/plan-mode/tests/plan-mode.spec.ts"
       ],
-      "localSovereignty": "tracked",
+      "localSovereignty": "adapted",
       "alpha2History": {
         "record": "upgrades/alignment/UPSTREAM-ALIGNMENT-MATRIX-dsh-v0.1.6-alpha.2.json",
         "area": "packages/plan/plan-mode",

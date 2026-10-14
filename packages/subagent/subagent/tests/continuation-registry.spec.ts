@@ -30,7 +30,7 @@ function makeRegistry(limits = { maxActivations: 8, maxActivationsPerParent: 4 }
     () => limits,
     () => 8,
   )
-  return { ctx, registry, internals: registry as never as RegistryInternals }
+  return { ctx, registry, internals: registry as never }
 }
 
 function makeActivation(childId: SessionId, parentSession: SessionId, agent?: Agent): Activation {
@@ -40,14 +40,14 @@ function makeActivation(childId: SessionId, parentSession: SessionId, agent?: Ag
     childId,
     parentSession,
     provider: 'test',
-    handle: { agent: agent ?? {} } as never as AgentHandle,
+    handle: { agent: agent ?? {} } as never,
     inbox: { closing: undefined },
     ancestry: new WeakSet<Agent>(),
     ownedChildren: new Set<SessionId>(),
     observer: {} as ActivationObserver,
     announced: false,
     poke: Promise.withResolvers(),
-  } as never as Activation
+  } as never
 }
 
 describe('continuable activation registry internals', () => {

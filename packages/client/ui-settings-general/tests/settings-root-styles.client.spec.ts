@@ -45,7 +45,7 @@ describe('SettingsRoot.module.css compact overlay', () => {
   it('uses the shared compact footer row and exposes a keyboard focus ring', () => {
     expect(block('.trigger')).toContain('height: var(--dsh-sidebar-footer-row-height, 36px)')
     expect(block('.trigger')).toContain('margin: 0 -2px')
-    expect(css).toMatch(/\.trigger:focus-visible\s*\{[\s\S]*outline:\s*2px solid var\(--dsw-alias-brand-primary\)/)
+    expect(css).toMatch(/\.trigger:focus-visible\s*\{[\s\S]*outline:[^}]*var\(--dsw-focus-ring-width\)/)
   })
 
   it('lets the options column shrink so overflow-y can scroll', () => {

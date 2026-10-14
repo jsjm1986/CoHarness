@@ -89,7 +89,7 @@
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
-- button "0% of context used"
+- button "0% of context used": 0%
 - button "Send message" [disabled]
 - group "Session statistics":
   - button "3 turns · 7 steps":

@@ -154,7 +154,7 @@ class ExitPlanModeArgs(TypedDict):
     # Additional keys beyond those declared are allowed.
 
 class ExitPlanModeOutput(TypedDict):
-    approved: Literal[True]
+    approved: bool
 
 class GetGoalOutput1(TypedDict):
     goal: None
