@@ -199,7 +199,7 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     const group = page.getByRole('treeitem', { name: /Independent sessions/ })
     await group.waitFor({ timeout: 15_000 })
     if (await group.getAttribute('aria-expanded') !== 'true') await group.click()
-    const target = page.getByRole('treeitem').filter({ hasText: /^dsh-web-e2e-ws-/ }).first()
+    const target = page.locator(`[data-row-key^="session:"][data-row-key*="${TARGET_SESSION_ID}"]`)
     await target.waitFor({ timeout: 15_000 })
     await target.click()
     await page.locator('[data-chat-flow-kind="user"]').filter({ hasText: 'Research notes' }).waitFor({ timeout: 15_000 })

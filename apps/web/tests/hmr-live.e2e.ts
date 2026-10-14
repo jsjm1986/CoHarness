@@ -90,7 +90,7 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
   const oldText = 'COHARNESS'
   const sourceNeedle = "'hero.headline': 'COHARNESS'"
   const newText = `HMR UPDATED ${'x'.repeat(80)}`
-  const updatedSource = originalSource.toString().replace(sourceNeedle, `'hero.headline': '${newText}'`)
+  const updatedSource = originalSource.toString().replaceAll(sourceNeedle, `'hero.headline': '${newText}'`)
   if (updatedSource === originalSource.toString()) throw new Error(`HMR source lacks ${JSON.stringify(sourceNeedle)}`)
 
   const subprocessCtx = new Context()
@@ -126,14 +126,14 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(String(error)))
     await page.goto(baseUrl, { waitUntil: 'load' })
-    await page.getByText(oldText, { exact: true }).waitFor({ timeout: 15_000 })
+    await page.locator('[data-phase]').getByText(oldText, { exact: true }).waitFor({ timeout: 15_000 })
     const pageIdentity = await page.evaluate((identity: string) => {
       Object.defineProperty(window, '__dshHmrPageIdentity', { value: identity })
       return identity
     }, randomUUID())
 
     await writeFile(sourcePath, updatedSource)
-    await page.getByText(newText, { exact: true }).waitFor({ timeout: 30_000 })
+    await page.locator('[data-phase]').getByText(newText, { exact: true }).waitFor({ timeout: 30_000 })
     expect(await page.evaluate(() => (window as Window & { __dshHmrPageIdentity?: string }).__dshHmrPageIdentity))
       .toBe(pageIdentity)
     expect(pageErrors).toEqual([])

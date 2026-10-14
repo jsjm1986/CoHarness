@@ -13,6 +13,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { RpcId } from '@deepseek-ai/dsh-client-connection/client'
 import type { RpcReceipt } from '@deepseek-ai/dsh-api-remotes/client'
+import type { QueuedInboxItem } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import type { PendingUserQuestion } from '@deepseek-ai/dsh-user-questions/types'
@@ -59,11 +60,12 @@ async function bench(declare = true) {
   ctx.provide('locale', locale)
 
   const projection = createSnapshotStore<{ active: readonly PendingUserQuestion[]; settled: readonly never[] }>({ active: [], settled: [] })
+  const queuedInboxProjection = createSnapshotStore<QueuedInboxItem[]>([])
   const sessionStore = createSnapshotStore<{ pending: readonly PendingWait[] }>({ pending: [] })
   const session = {
     subscribe: (listener: () => void) => sessionStore.subscribe(listener),
     getSnapshot: () => sessionStore.getSnapshot(),
-    projections: { faceOf: () => projection },
+    projections: { faceOf: (key: string) => (key === 'queuedInbox' ? queuedInboxProjection : projection) },
     publishInteraction: vi.fn((_entry: object) => () => {}),
   }
   const list = createSnapshotStore({
