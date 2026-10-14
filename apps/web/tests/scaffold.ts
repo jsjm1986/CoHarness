@@ -419,6 +419,12 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     ...mode === 'record' || options.deepSeekMissingCredential === true
       ? []
       : [{ id: 'agent-default-model', config: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } }],
+    // host.describe's canOpenPath asks the RUNNING host whether a native
+    // opener exists; on a headless runner it reports false and file-open
+    // gestures surface the "preview unavailable" refusal instead of reaching
+    // host.openPath. Pin the capability so every host replays the recorded
+    // desktop behavior; a scenario overlay can still win.
+    { id: 'api-gateway', config: { nativeOpen: true } },
     ...extraOverlayPatches,
     // The roster's `roots` is an assembly fact AppCLIEntry resolves and patches
     // in, exactly like `distIndex` on the webserver row — the shipped preset
