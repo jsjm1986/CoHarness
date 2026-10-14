@@ -55,8 +55,13 @@ describe('minimal agent preset', () => {
 
     const requestHeader = agentHandle.agent.session.requestHeader()
     if (requestHeader === undefined) throw new Error('the minimal agent issued no model request')
-    expect(agentHandle.agent.session.snapshotEvents().some(event => event.type === 'user/message'
-      && event.data.source.kind === 'runtime-context')).toBe(false)
+    const runtimeContexts = agentHandle.agent.session.snapshotEvents().flatMap(event => event.type === 'user/message'
+      && event.data.source.kind === 'runtime-context'
+      ? [event.data.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('')]
+      : [])
+    expect(runtimeContexts).toEqual([
+      `Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: ${JSON.stringify(agentHandle.agent.session.header.cwd)}.`,
+    ])
     const presetFileSystem = scaffold.ctx.agentPresets.serviceFor(agentHandle.agent, 'fs')
     expect(presetFileSystem).toBeDefined()
     expect(presetFileSystem?.sandboxMode).toBeUndefined()

@@ -28,6 +28,7 @@ try {
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(LocalFileSystem, { cwd: root })
   ctx.provide('sessionProjections', { stateOf() { return { openTurnStartSeq: 1, lastTurn: 1 } } })
+  ctx.provide('workingDirectory', { defaultDirectory: root, get: () => root, ensure: () => Promise.resolve(root) })
   await ctx.plugin(Present, { maxFiles: 2 })
   const scope = ctx.plugin(() => {})
   const session = Session.create('built-present', [], { version: SESSION_FORMAT_VERSION, id: 'built-present', createdAt: 0, cwd: root, isSeeded: false })

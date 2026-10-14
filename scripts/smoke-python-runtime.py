@@ -626,11 +626,14 @@ def minimal_tool_followup(
             raise AssertionError("persistent editor smoke request has no messages")
         editor_path = next(
             (
-                text.split(MINIMAL_EDITOR_PATH_PREFIX, 1)[1].strip()
+                # The wire may merge a runtime-context snapshot into the prompt's user
+                # message as a trailing text block; read the prefixed block's own line.
+                block["text"].split(MINIMAL_EDITOR_PATH_PREFIX, 1)[1].splitlines()[0].strip()
                 for message in messages
                 if isinstance(message, dict) and message.get("role") == "user"
-                for text in [message_text(message.get("content"))]
-                if MINIMAL_EDITOR_PATH_PREFIX in text
+                for block in message.get("content", [])
+                if isinstance(block, dict) and block.get("type") == "text"
+                and isinstance(block.get("text"), str) and MINIMAL_EDITOR_PATH_PREFIX in block["text"]
             ),
             None,
         )

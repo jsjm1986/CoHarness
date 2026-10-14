@@ -54,7 +54,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('compaction: a long session compa
       // Keep the reserved completion budget below the test's shrunken window so
       // pressure compaction has headroom to fire.
       maxTokens: 512,
-    })
+    }, { cwd: workdir })
 
     agent.followup(createUserMessage({
       content: [{

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile, realpath } from 'node:fs/promises'
 import { join, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
@@ -450,6 +450,9 @@ describe('dsh-agent-spine-demo bundle', () => {
 
   it('snapshots a created project skill through catalog refresh and progressive loading', { timeout: 15_000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-agent-spine-demo-skill-refresh-'))
+    // Tool results carry the canonical path: on macOS the tmpdir symlink
+    // resolves /var → /private/var, so normalize the real path before the raw one.
+    const canonicalRoot = await realpath(root)
     const home = await mkdtemp(join(tmpdir(), 'dsh-agent-spine-demo-skill-refresh-home-'))
     try {
       await mkdir(join(root, '.git'), { recursive: true })
@@ -532,6 +535,7 @@ describe('dsh-agent-spine-demo bundle', () => {
             callId: result.source.callId,
             isError: result.isError,
             text: result.content.map(block => block.type === 'text' ? block.text : '').join('\n')
+              .replaceAll(canonicalRoot, '{{cwd}}')
               .replaceAll(root, '{{cwd}}')
               .replaceAll(sep, '/'),
           }]
@@ -543,7 +547,7 @@ describe('dsh-agent-spine-demo bundle', () => {
           {
             "callId": "write-skill",
             "isError": false,
-            "text": "<path>/private{{cwd}}/.agents/skills/hot-skill/SKILL.md</path>
+            "text": "<path>{{cwd}}/.agents/skills/hot-skill/SKILL.md</path>
         <type>file</type>
         <content>
         Created file
