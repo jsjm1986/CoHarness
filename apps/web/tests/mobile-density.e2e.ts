@@ -32,14 +32,15 @@ describe('mobile density', () => {
       // matchMedia so the Tooltip's hover gate takes the touch path.
       await page.addInitScript(() => {
         const real = window.matchMedia.bind(window)
-        const hoverless: MediaQueryList = {
-          matches: false, media: '', onchange: null,
+        const hoverless = (query: string): MediaQueryList => ({
+          matches: false, media: query, onchange: null,
+          // oxlint-disable-next-line typescript/no-deprecated -- the MediaQueryList interface still requires the legacy listener members.
           addListener() {}, removeListener() {},
           addEventListener() {}, removeEventListener() {},
           dispatchEvent: () => false,
-        }
+        })
         window.matchMedia = (query: string) => query.includes('hover')
-          ? { ...hoverless, media: query }
+          ? hoverless(query)
           : real(query)
       })
       await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
