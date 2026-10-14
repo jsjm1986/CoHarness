@@ -618,6 +618,7 @@ describe('dsh-tool-workflow', () => {
       onTestFinished(async () => { await ctx.fiber.dispose() })
       await ctx.plugin(SystemPrompt)
       await ctx.plugin(ToolRuntime)
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SessionProjectionRegistry)
       await ctx.plugin(SubagentRuntime)
       ctx.subagents.registerProvider({
@@ -627,7 +628,6 @@ describe('dsh-tool-workflow', () => {
         start: () => Promise.reject(new Error('the parked-script fixture must not start a child')),
       })
       await mountWorkflowRuntime(ctx)
-      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(PtcWorkflowEngine, {})
       await ctx.plugin(toolWorkflow, {})
       const session = Session.create(SessionId('caller'))
@@ -654,6 +654,7 @@ describe('dsh-tool-workflow', () => {
       await ctx.plugin(AgentRegistry)
       await ctx.plugin(LocalJobRegistry)
       await ctx.plugin(ToolTasks)
+      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(SessionProjectionRegistry)
       await ctx.plugin(SubagentRuntime)
       ctx.subagents.registerProvider({
@@ -663,7 +664,6 @@ describe('dsh-tool-workflow', () => {
         start: () => Promise.reject(new Error('the scriptonly fixture must not start a child')),
       })
       await mountWorkflowRuntime(ctx)
-      provideWorkingDirectoryFixture(ctx)
       await ctx.plugin(PtcWorkflowEngine, {})
       await ctx.plugin(toolWorkflow, {})
       const session = Session.create(SessionId('caller'))

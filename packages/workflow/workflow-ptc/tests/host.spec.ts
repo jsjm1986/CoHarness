@@ -82,7 +82,9 @@ describe('workflow host callback validation', () => {
       expect(launched?.cwd).toBe(initial)
       expect(launched?.sandboxPolicy?.workspaceRoot).toBe(parent.session.header.cwd)
       expect(childStart).toHaveBeenCalledOnce()
-      expect(ensureDirectory).toHaveBeenCalledOnce()
+      // The engine resolves once at launch; startChild resolves again so the
+      // child inherits the parent's directory as moved after launch.
+      expect(ensureDirectory).toHaveBeenCalledTimes(2)
     } finally {
       release.resolve(undefined)
       await run.dispose()
