@@ -142,6 +142,13 @@ it('requires a browser mode and validates launch and attachment settings', () =>
   }
 })
 
+it('fails loud when no working-directory provider is mounted', () => {
+  const ctx = new Context()
+  contexts.push(ctx)
+  expect(() => { mountSessionMcp(ctx, { name: 'browser-fixture', exclusive: true, command: process.execPath, args: [fixture] }) })
+    .toThrow('browser-fixture: browser MCP requires a working-directory provider')
+})
+
 it('waits for SystemPrompt and ToolRuntime before reserving the provider', async () => {
   const ctx = new Context()
   contexts.push(ctx)
