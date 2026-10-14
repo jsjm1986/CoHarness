@@ -255,6 +255,12 @@ describe('PopupSelectView', () => {
     const { view } = await mountOpen({ onSelect: (option) => { seen.push(option) } })
     const options = screen.getAllByRole('option')
     scrollIntoView.mockClear()
+    // A row mounting under a resting cursor fires mouseenter without any real
+    // hover; that must not steal the parked highlight. An actual pointer move
+    // is what arms hover.
+    act(() => { fireEvent.mouseEnter(options[2]!) })
+    expect(screen.getAllByRole('option')[2]!.getAttribute('aria-selected')).toBe('false')
+    act(() => { fireEvent.pointerMove(document.body) })
     act(() => { fireEvent.mouseEnter(options[2]!) })
     expect(screen.getAllByRole('option')[2]!.getAttribute('aria-selected')).toBe('true')
     // A hovered row already sits under the cursor: scrolling it would shift
