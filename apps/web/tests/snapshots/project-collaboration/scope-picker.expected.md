@@ -1,7 +1,17 @@
 - menu:
-  - text: Switch space
+  - button "Close":
+    - img
+  - text: Switch space 2 Payments migration Can edit
+  - button "Project settings":
+    - img
+  - text: New conversation visibility
+  - radiogroup "New conversation visibility":
+    - radio "Shared with project" [checked]
+    - radio "Only me"
+  - button "Invitations and tasks":
+    - img
+    - text: Invitations and tasks
   - searchbox "Search project spaces"
-  - text: Personal
   - menuitem "Personal"
   - separator
   - text: Projects
@@ -9,21 +19,6 @@
     - text: Payments migration Can edit
     - img
   - menuitem "Audit platform Read only"
-  - separator
-  - text: New conversation visibility
-  - menuitem "Shared with project Project members can view and participate":
-    - img
-    - text: Shared with project Project members can view and participate
-    - img
-  - menuitem "Only me Only the creator can view it":
-    - img
-    - text: Only me Only the creator can view it
   - menuitem "New project space":
     - img
     - text: New project space
-  - menuitem "Invitations and tasks":
-    - img
-    - text: Invitations and tasks
-  - menuitem "Project settings":
-    - img
-    - text: Project settings

@@ -82,7 +82,7 @@ describe('web e2e: plugin configuration section', () => {
 
     // Each card belongs to a Host settings namespace served by this composition.
     const group = panel.locator('[data-plugin-group="config"]')
-    for (const name of ['终端', 'Agent 循环', 'Subagent', '模型选择', '网页搜索']) {
+    for (const name of ['终端', 'Agent 循环', '子智能体', '模型选择', '网页搜索']) {
       await expect.poll(async () => group.getByRole('button', { name: `查看 ${name}`, exact: true }).count(), { timeout: 10_000 }).toBe(1)
     }
     // The form lives on the item's own page: the card shows the one-liner only.
@@ -230,13 +230,13 @@ describe('web e2e: plugin configuration section', () => {
   })
 
   it('edits subagent depth and capacity through the real settings owner', async () => {
-    const panel = await openItem('Subagent')
+    const panel = await openItem('子智能体')
     const depth = panel.getByLabel('最大递归深度', { exact: true })
-    const capacity = panel.getByLabel('Subagent 并行数量上限', { exact: true })
+    const capacity = panel.getByLabel('子智能体并行数量上限', { exact: true })
     expect(await depth.inputValue()).toBe('1')
     expect(await capacity.inputValue()).toBe('8')
     await panel.getByRole('button', { name: '最大递归深度说明', exact: true }).click()
-    await panel.getByRole('button', { name: 'Subagent 并行数量上限说明', exact: true }).click()
+    await panel.getByRole('button', { name: '子智能体并行数量上限说明', exact: true }).click()
     const snapshot = await captureStableAria(page, '[data-plugin-item-detail="subagent"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'subagent-limits.expected.md'), snapshot, MODE)
     await depth.fill('-1')

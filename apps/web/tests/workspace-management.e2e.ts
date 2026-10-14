@@ -518,9 +518,17 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
   it('shows the session hover card after a dwell on the row', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-ws-hover'))
     // Dwell on the seeded row; the card opens after a 500ms hover delay,
-    // portaled to body.
+    // portaled to body. The seed has no stored title and unnamed rows carry
+    // no copy affordance, so a rename supplies the title this scenario copies.
     const sessionRow = await seededSessionRow()
-    const rowTitle = await sessionRow.locator('[class*="title"]').innerText()
+    await clickHoverAction(sessionRow, 'Session actions for Untitled')
+    await page.getByRole('menuitem', { name: 'Rename' }).click()
+    const renameDialog = page.getByRole('dialog', { name: 'Rename session' })
+    await renameDialog.getByLabel('Session name').fill('Hover card title')
+    await renameDialog.getByRole('button', { name: 'Rename' }).click()
+    await expect.poll(() => renameDialog.count(), { timeout: 10_000 }).toBe(0)
+    const rowTitle = 'Hover card title'
+    await expect.poll(() => sessionRow.locator('[class*="title"]').innerText(), { timeout: 10_000 }).toBe(rowTitle)
     await sessionRow.hover()
     // Card content: the full title plus the completed/idle status line (no
     // aria role — text anchors are the stable selector). Seeded fixtures may
@@ -660,8 +668,11 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await expect.poll(() => dialog.getByText('No archived sessions.', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
     await page.keyboard.press('Escape')
     // The restored row is visible again in the sidebar's Ungrouped bucket.
-    const restored = await seededSessionRow()
-    expect(await restored.locator('[class*="title"]').innerText()).toBe(rowTitle)
+    // (The archive dialog keeps the host display label while the sidebar row
+    // renders the localized label, so identity is asserted by row key.)
+    await seededSessionRow()
+    const restored = page.locator(`[data-row-key^="session:"][data-row-key*="${SEED_ID}"]`)
+    await restored.waitFor({ timeout: 10_000 })
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)
 

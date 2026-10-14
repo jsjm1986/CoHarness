@@ -1661,7 +1661,9 @@ export class Session implements SessionFace {
         // oxlint-disable-next-line typescript/no-unnecessary-condition -- a resync or baseline can request another read mid-await.
       } while (this.repairRequested)
     } catch (error) {
-      console.error('[web-runtime] gap repair failed:', error)
+      // A repair in flight when the scope disposes rejects with the lifetime
+      // abort reason — teardown, not a repair failure.
+      if (!this.lifetime.signal.aborted) console.error('[web-runtime] gap repair failed:', error)
     } finally {
       this.repairRequested = false
       this.stitching = false

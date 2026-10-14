@@ -45,6 +45,10 @@
     - img
   - text: Show coding view Shows trajectory and this turn’s code diff, and enables switching among the full Agent presets
   - switch "Show coding view" [checked]
+  - text: Open links in Choose where http(s) links in conversations open
+  - button "Built-in browser":
+    - text: Built-in browser
+    - img
   - text: Keyboard shortcuts
   - paragraph: View and edit available shortcuts and input actions
   - button "Edit shortcuts"

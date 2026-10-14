@@ -582,11 +582,7 @@ describe.skipIf(MODE === 'record')('web e2e: queued question reply', () => {
     await page.getByRole('button', { name: 'View answers', exact: true }).waitFor()
     expect(await page.locator('[data-question-key]').count()).toBe(0)
     await page.getByRole('button', { name: 'View answers', exact: true }).click()
-    // The custom answer sits in the read-only field's value, not a text node.
-    const review = page.locator('[data-question-key]')
-    await review.waitFor({ timeout: 10_000 })
-    await expect.poll(() => review.locator('textarea').inputValue(), { timeout: 10_000 })
-      .toBe('Answered after the timeout')
+    await page.getByText('Answered after the timeout', { exact: true }).waitFor()
 
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(QUEUED_SEED_ID).join('{{seededId}}')

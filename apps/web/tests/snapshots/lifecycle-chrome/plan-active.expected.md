@@ -27,7 +27,10 @@
 - button "Settings":
   - img
   - text: Settings
-- text: Into the Unknown Preview
+- banner:
+  - button "Open right sidebar":
+    - img
+- text: COHARNESS Preview
 - button "Choose workspace":
   - img
   - text: workspace
@@ -45,8 +48,6 @@
   - img
 - 'button "Access mode, current: Workspace write"': Workspace write
 - button "Plan mode on, press to turn off": Plan
-- button "Open right sidebar":
-  - img
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

@@ -31,8 +31,3 @@
 .icon {
   transform: scaleX(-1);
 }
-
-/* Mobile's persistent header already exposes the same Session control. */
-@media (max-width: 767px) {
-  .blank { display: none; }
-}

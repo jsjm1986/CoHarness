@@ -743,7 +743,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'conversation.pane\' (client-ui-conversation), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-sidebar-right BlankExpandButton id \'auxiliary-sidebar\'',
       'client-ui-sidebar-terminal TerminalRecovery',
     ],
     replaceRisk: 'none',
@@ -2366,7 +2365,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'root\' (client-ui-layout), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-sidebar-right ExpandButton id \'auxiliary-sidebar\'',
       'session-log-export SessionLogDownloadMobileHeaderAction id \'session-log-download\'',
     ],
     replaceRisk: 'none',
