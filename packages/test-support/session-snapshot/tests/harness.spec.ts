@@ -671,7 +671,10 @@ describe('runScenario', () => {
 
   it('creates the generated workspace under an explicit parent', { timeout: 20_000 }, async () => {
     const { fixtureFile } = await scenario({})
-    const workspaceParent = await mkdtemp(join(tmpdir(), 'acp-snap-parent-'))
+    // The harness canonicalizes the generated cwd (symlinked tmp roots spell
+    // it differently); parent and child must share the canonical spelling for
+    // the containment check to read the real relationship.
+    const workspaceParent = await realpath(await mkdtemp(join(tmpdir(), 'acp-snap-parent-')))
     tempDirs.push(workspaceParent)
 
     const result = await runScenario(
