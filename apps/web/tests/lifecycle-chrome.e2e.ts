@@ -95,7 +95,7 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
     await expect.poll(() => menu.count()).toBe(0)
   })
 
-  it.skipIf(MODE === 'record')('shows active Plan as the warn-state status action', async () => {
+  it.skipIf(MODE === 'record')('shows active Plan as the business-state status action', async () => {
     const activeScaffold = await launchWebScaffold()
     const activePage = await newEnglishPage(browser)
     const activeTripwire = watchConsole(activePage)
@@ -120,25 +120,36 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
       await compareOrRefreshGolden(PLAN_ACTIVE_EXPECTED, planSnapshot, MODE)
       const planStyle = await planButton.evaluate((element) => {
         const probe = document.createElement('span')
-        probe.style.color = 'var(--dsw-alias-state-warn-label)'
-        probe.style.backgroundColor = 'var(--dsw-alias-state-warn-tertiary)'
+        probe.style.color = 'var(--dsw-alias-state-business-primary)'
+        probe.style.backgroundColor = 'var(--dsw-alias-state-business-tertiary)'
         document.body.append(probe)
         const actual = getComputedStyle(element)
         const reference = getComputedStyle(probe)
+        // The sibling access-mode trigger shares the composer row's pill
+        // chrome: the chip tracks its corner curvature, whatever the theme.
+        const accessMode = document.querySelector('button[aria-label^="Access mode"]')
         const result = {
           color: actual.color,
           backgroundColor: actual.backgroundColor,
+          height: actual.height,
           borderRadius: actual.borderRadius,
+          cornerShape: actual.getPropertyValue('corner-shape'),
           fontSize: actual.fontSize,
           referenceColor: reference.color,
           referenceBackgroundColor: reference.backgroundColor,
+          siblingCornerShape: accessMode === null ? null : getComputedStyle(accessMode).getPropertyValue('corner-shape'),
         }
         probe.remove()
         return result
       })
       expect(planStyle.color).toBe(planStyle.referenceColor)
       expect(planStyle.backgroundColor).toBe(planStyle.referenceBackgroundColor)
-      expect(planStyle.borderRadius).toBe('999px')
+      expect(planStyle.height).toBe('28px')
+      // The chip is the composer row's 28px pill: radius-full chrome shared
+      // with the sibling access-mode trigger, under the theme's superellipse.
+      expect(planStyle.borderRadius).toBe('9999px')
+      expect(planStyle.siblingCornerShape).not.toBeNull()
+      expect(planStyle.cornerShape).toBe(planStyle.siblingCornerShape)
       expect(planStyle.fontSize).toBe('13px')
       await planButton.click()
       await expect.poll(() => planButton.count()).toBe(0)
@@ -160,7 +171,7 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
     }
     // The blank frame renders the hero, not the resident composer: the
     // headline plus the guidance placeholder are the empty state's anchors.
-    await expect.poll(() => page.getByText('Into the Unknown', { exact: false }).count(), { timeout: 15_000 }).toBe(1)
+    await expect.poll(() => page.locator('[data-phase]').getByText('COHARNESS', { exact: false }).count(), { timeout: 15_000 }).toBe(1)
     const input = page.locator('textarea').first()
     await input.waitFor({ timeout: 10_000 })
     if (MODE !== 'record') {

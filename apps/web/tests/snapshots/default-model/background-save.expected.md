@@ -6,8 +6,6 @@
 - button "命令":
   - img
 - button "访问模式，当前：工作区内修改": 工作区内修改
-- button "打开右侧边栏":
-  - img
 - button "选择模型，当前 Acme Large":
   - text: Acme Large
   - img

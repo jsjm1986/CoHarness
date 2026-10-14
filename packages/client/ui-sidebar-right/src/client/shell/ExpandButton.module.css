@@ -32,10 +32,7 @@
   transform: scaleX(-1);
 }
 
-/* Mobile's persistent header already exposes the same Session control. */
 @media (max-width: 767px) {
-  .blank { display: none; }
-
   /* Join the compact header row's 36px target family (a 28px ghost reads
      under-sized beside the tabs). */
   .button {

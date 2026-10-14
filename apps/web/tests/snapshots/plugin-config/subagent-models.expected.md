@@ -2,10 +2,10 @@
   - img
   - text: 插件列表
 - heading "模型选择" [level=3]
-- paragraph: 允许 Agent 为 Subagent 选择模型
-- text: 允许 Agent 为 Subagent 选择模型
-- switch "允许 Agent 为 Subagent 选择模型" [checked]
-- paragraph: 开启后，Agent 可以从下方授权模型中，为每个 Subagent 选择提供方、模型和推理强度。仅影响新会话。
+- paragraph: 允许 Agent 为子智能体选择模型
+- text: 允许 Agent 为子智能体选择模型
+- switch "允许 Agent 为子智能体选择模型" [checked]
+- paragraph: 开启后，Agent 可以从下方授权模型中，为每个子智能体选择提供方、模型和推理强度。仅影响新会话。
 - group "Agent 可选择的模型":
   - text: Agent 可选择的模型 DeepSeek
   - checkbox "DeepSeek-V4-Flash DeepSeek · deepseek-official/deepseek-v4-flash" [checked]

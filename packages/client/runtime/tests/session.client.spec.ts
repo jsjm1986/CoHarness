@@ -1550,6 +1550,28 @@ describe('remaining branches', () => {
     }
   })
 
+  it('a gap repair in flight at dispose settles quietly instead of logging teardown noise', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => histResponse(plainTurn(0, 0, 'a', 'b'))
+    await session.open()
+    const gate = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()
+    api.onHistory = () => gate.promise
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      session.handleMuxEnvelope('r1' as never, { type: 'session/event', sessionId: SID, event: ev.user(9, '洞一') })
+      session.dispose()
+      // The real transport rejects the read with the abort reason once dispose
+      // tears down; the fake settles the parked call with that same reason.
+      gate.reject(api.lastHistorySignal?.reason ?? new Error('session disposed'))
+      // The rejection propagates through the repair loop entirely in
+      // microtasks; a macrotask boundary drains it before the assertion.
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(errorSpy).not.toHaveBeenCalled()
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
   it('doOpen transport throw of a stale generation is swallowed (generation guard in catch)', async () => {
     const { api, session } = makeSession()
     const stale = deferred<Awaited<ReturnType<FakeApiClient['onHistory']>>>()

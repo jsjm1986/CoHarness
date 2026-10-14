@@ -23,6 +23,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { AskUserQuestionItem, PendingUserQuestion, UserQuestionProjectionView } from '@deepseek-ai/dsh-user-questions/types'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+// Also merges the queuedInbox key into SessionProjectionMap for the reconcile pass.
+import type { QueuedInboxItem } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { UserQuestionPanels, UserQuestionRecord } from '@deepseek-ai/dsh-client-ui-tool/client'
 // A transcript row hands its call id over as the plain string the wire carried.
 import { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
@@ -456,7 +458,8 @@ function reconcileQuestions(ctx: ClientContext, cards: QuestionCards): () => voi
       if (stopProjections.has(sessionId)) continue
       const stopSession = binding.session.subscribe(reconcile)
       const stopProjection = binding.session.projections.faceOf('userQuestions').subscribe(reconcile)
-      stopProjections.set(sessionId, () => { stopSession(); stopProjection() })
+      const stopQueuedInbox = binding.session.projections.faceOf('queuedInbox').subscribe(reconcile)
+      stopProjections.set(sessionId, () => { stopSession(); stopProjection(); stopQueuedInbox() })
     }
 
     // Re-anchor live cards whose session left and re-bound since last pass.
@@ -476,7 +479,20 @@ function reconcileQuestions(ctx: ClientContext, cards: QuestionCards): () => voi
       }
       const projected = binding.session.projections.faceOf('userQuestions').getSnapshot() as
         UserQuestionProjectionView | undefined
+      // A queued reply keeps its call listed as continued until the Agent
+      // admits it; remounting the editable card would resurrect a question the
+      // user already answered, so the reply's transcript row alone reviews it.
+      const queued = new Set<string>()
+      const queuedInbox = binding.session.projections.faceOf('queuedInbox').getSnapshot() as
+        QueuedInboxItem[] | undefined
+      for (const item of queuedInbox ?? []) {
+        const source: unknown = item.message.source
+        if (typeof source !== 'object' || source === null || Array.isArray(source)) continue
+        const record = source as Record<string, unknown>
+        if (record.kind === 'user-question-reply' && typeof record.callId === 'string') queued.add(record.callId)
+      }
       for (const row of projected?.active ?? []) {
+        if (row.state === 'continued' && queued.has(row.callId)) continue
         rows.set(PendingQuestion.keyOf(sessionId, row.callId), { sessionId, row })
       }
     }

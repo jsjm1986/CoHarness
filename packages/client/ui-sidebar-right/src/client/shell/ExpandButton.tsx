@@ -52,13 +52,3 @@ export function ExpandButton({ sessionId, useStore, actions, t, focus, useShortc
     </Tooltip>
   )
 }
-
-/**
- * Keep the same sidebar reachable before a blank Session shows its header.
- * @param props - Session state and the shared sidebar controls.
- * @returns a composer affordance only while the Session header is hidden.
- */
-export function BlankExpandButton(props: ExpandButtonProps): ReactNode {
-  const blank = props.useSession(state => state.blank && state.composerPhase === 'blank')
-  return blank ? <span className={css.blank}><ExpandButton {...props} /></span> : null
-}

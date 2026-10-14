@@ -125,7 +125,9 @@
 /* The hub renders on the footer column itself: no surface fill, shadow, or
    radius — the current-space card, roster rows, and pinned footer each carry
    their own chrome. The cap keeps the trigger and Settings rows reachable in
-   short windows; the roster viewport scrolls inside the bound. */
+   short windows; the roster viewport scrolls inside the bound. The compact
+   `.list` rule reads the shared mobile-sheet token instead of
+   --dsh-menu-max-height, so the same bound is re-published through it. */
 .scopeSheet.scopeSheet {
   order: -1;
   position: static;
@@ -137,6 +139,7 @@
   --dsw-menu-surface-fill: transparent;
   --dsw-menu-backdrop-filter: none;
   --dsh-menu-max-height: min(560px, calc(100vh - 150px));
+  --dsw-mobile-sheet-max-height: var(--dsh-menu-max-height);
 }
 
 /* Identity tiles: the letter of the project on a deterministic solid tint.

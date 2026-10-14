@@ -1,12 +1,9 @@
 - banner:
+  - navigation "Session hierarchy":
+    - button "Clickable links gallery" [disabled]
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-  - navigation "Session hierarchy":
-    - button "Clickable links gallery" [disabled]
-  - button "Session log":
-    - text: Session log
-    - img
   - button "Open right sidebar":
     - img
 - button "16 tool calls · 2 intermediate messages" [expanded]:
@@ -57,13 +54,17 @@
   - img
 - text: "src/tokens.css - --inline-code: #EBEEF2; + --inline-code: #F5F5F5; └ +1 -1 · 1 file"
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - button "Tool call str_replace_editor · create" [expanded]:
   - img
   - text: Tool call str_replace_editor · create
 - text: "IN { \"command\": \"create\", \"path\": \"docs/press.md\", \"file_text\": \"# Press kit\\n\" } OUT Created docs/press.md"
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - text: Failed
 - 'button "Write permission denied: c/broken.css"':
   - img
@@ -80,7 +81,9 @@
 - button "Expand 4 more lines": … 4 more lines
 - text: guide line 9 guide line 10 guide line 11 guide line 12
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - button "Grep linkColor" [expanded]:
   - img
   - text: Grep linkColor
@@ -92,7 +95,9 @@
 - button "src/tokens.css 3" [expanded]
 - text: "3: color: var(--linkColor); 7: color: var(--linkColor); 11: color: var(--linkColor);"
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - button "Glob **/*.css":
   - img
   - img
@@ -108,7 +113,9 @@
 - button "Copy"
 - text: "style.css: unexpected hex literal"
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - button "Web search clickable link styles, produced files ui" [expanded]:
   - img
   - text: Web search clickable link styles, produced files ui
@@ -124,7 +131,9 @@
     - text: One cursor token, one focus ring.
   - listitem: Mirror spec (non-http) A non-http source renders inert.
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - button "Web fetch https://docs.example.test/tokens" [expanded]:
   - img
   - text: Web fetch
@@ -134,13 +143,17 @@
   - /url: https://docs.example.test/tokens
 - text: HTTP 200
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - button "Tool call design_tokens_sync · design-platform.css" [expanded]:
   - img
   - text: Tool call design_tokens_sync · design-platform.css
 - text: "IN { \"source\": \"design-platform.css\", \"dryRun\": false } OUT {\"synced\":true,\"tokens\":12}"
 - button "Open details in sidebar"
-- button "Inspect"
+- button "Inspect":
+  - img
+  - text: Inspect
 - heading "Link gallery" [level=2]
 - paragraph:
   - text: "Docs:"

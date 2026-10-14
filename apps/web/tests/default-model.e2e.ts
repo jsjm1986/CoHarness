@@ -298,7 +298,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
           await expect.poll(readPinned).toEqual([true, false, false])
           await expect.poll(() => headings.first().evaluate(node =>
             node.hasAttribute('data-stuck') ? getComputedStyle(node).backgroundColor : 'clear',
-          )).toBe(dark ? 'rgba(53, 54, 56, 0.94)' : 'rgba(255, 255, 255, 0.94)')
+          )).toBe(dark ? 'rgba(48, 49, 54, 0.94)' : 'rgba(248, 249, 250, 0.94)')
           await scroller.evaluate((node, top) => { node.scrollTop = top }, secondTop)
           await expect.poll(readPinned).toEqual([false, true, false])
           await scroller.evaluate((node) => { node.scrollTop = 10 })

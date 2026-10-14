@@ -27,7 +27,7 @@ export type ClientBuildProfile = 'coharness' | 'official'
 
 const COHARNESS_CLIENT_BUILD_ENVIRONMENT = {
   DSH_CLIENT_BUILD_PROFILE: 'coharness',
-  DSH_CLIENT_TITLE: 'CoHarness',
+  DSH_CLIENT_TITLE: 'COHARNESS',
 } as const
 
 /** Public variable carrying the source commit embedded in client artifacts. */
