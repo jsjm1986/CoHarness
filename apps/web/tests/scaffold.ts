@@ -1082,6 +1082,17 @@ export async function captureStableAria(page: Page, selector: string, workspaceC
 }
 
 /**
+ * Wait until the session header's state dot unmounts. The sessions-list
+ * running bit travels as its own host frame, so it clears a frame after the
+ * turn barrier resolves; an end-state capture taken in between still draws
+ * the Running marker for a settled turn.
+ * @param page - the page under test.
+ */
+export async function waitForIdleSessionDot(page: Page): Promise<void> {
+  await page.locator('header [data-session-state]').waitFor({ state: 'detached' })
+}
+
+/**
  * Rewrite a seed fixture through its migrated event list. The fixture parses
  * through the Session format catalog, so the callback edits current-generation
  * events (`assistant/message`/`assistant/attempt` with embedded streams) and
