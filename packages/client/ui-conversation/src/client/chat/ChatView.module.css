@@ -115,6 +115,7 @@
   width: 3.5px;
   height: 3.5px;
   border-radius: 50%;
+  corner-shape: round;
   background: var(--turn-status-accent);
   animation: dsh-turn-status-dot 1.25s ease-in-out infinite;
 }
