@@ -87,8 +87,8 @@ it('hot-reloads a real client-plugin source edit without refreshing the page', a
   const distBackupPath = join(distBackup, 'dist')
   await cp(distPath, distBackupPath, { recursive: true })
   const originalSource = await readFile(sourcePath)
-  const oldText = 'Into the Unknown'
-  const sourceNeedle = "'hero.headline': 'Into the Unknown'"
+  const oldText = 'COHARNESS'
+  const sourceNeedle = "'hero.headline': 'COHARNESS'"
   const newText = `HMR UPDATED ${'x'.repeat(80)}`
   const updatedSource = originalSource.toString().replace(sourceNeedle, `'hero.headline': '${newText}'`)
   if (updatedSource === originalSource.toString()) throw new Error(`HMR source lacks ${JSON.stringify(sourceNeedle)}`)
