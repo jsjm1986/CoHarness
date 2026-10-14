@@ -95,6 +95,7 @@ describe('ui-plan browser apply', () => {
       patterns: readonly string[]
       canOpen: (address: string) => boolean
       resourceSession?: (address: string) => SessionId | undefined
+      title: (address: string) => string
     }
     expect(type.kind).toBe('plan')
     expect(type.canOpen('dsh-resource://plan/s-1/c-1')).toBe(true)
@@ -103,6 +104,7 @@ describe('ui-plan browser apply', () => {
     expect(type.resourceSession?.('dsh-resource://plan/s-1/c-1')).toBe('s-1')
     expect(type.resourceSession?.('dsh-resource://plan/subagent/p/c/one-shot/x')).toBe('c')
     expect(type.resourceSession?.('dsh-resource://plan-review/s-1/k')).toBe('s-1')
+    expect(type.title('dsh-resource://plan/s-1/c-1')).toBeTruthy()
     await fiber.dispose()
   })
 
@@ -117,12 +119,76 @@ describe('ui-plan browser apply', () => {
       openPlan: (callId: string) => void
     })(SID)
     expect(injected.keyedHooks.plans('1').getSnapshot()).toEqual([])
+    expect(injected.keyedHooks.plans('1')).toBe(injected.keyedHooks.plans('1'))
     injected.openPlan('c-1')
     expect(b.sidebarRight.openSessionResource).toHaveBeenCalledWith(SID, 'dsh-resource://plan/s-plan/c-1')
 
-    expect(b.slots.entries('conversation.plan-review.actions').some(entry => entry.component === PlanReviewOpen)).toBe(true)
-    expect(b.slots.entries('sidebar.right.pane.tab').some(entry => entry.component === PlanPreview)).toBe(true)
-    expect(b.slots.entries('sidebar.right.pane.tab.title').some(entry => entry.component === PlanTitle)).toBe(true)
+    b.sessions.subagentAddress.mockReturnValueOnce(
+      { parentSessionId: 'p', childSessionId: 'c', mode: 'continuable' } as never)
+    injected.openPlan('c-2')
+    expect(b.sidebarRight.openSessionResource).toHaveBeenCalledWith(
+      SID, 'dsh-resource://plan/subagent/p/c/continuable/c-2')
+
+    const review = b.slots.entries('conversation.plan-review.actions').find(entry => entry.component === PlanReviewOpen)
+    const preview = b.slots.entries('sidebar.right.pane.tab').find(entry => entry.component === PlanPreview)
+    const title = b.slots.entries('sidebar.right.pane.tab.title').find(entry => entry.component === PlanTitle)
+    expect(review).toBeDefined()
+    expect(preview).toBeDefined()
+    expect(title).toBeDefined()
+    await fiber.dispose()
+  })
+
+  it('opens logged calls and temporary previews from the review action', async () => {
+    const b = await bench()
+    const fiber = b.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const entry = b.slots.entries('conversation.plan-review.actions').find(e => e.component === PlanReviewOpen)
+    const injected = (entry?.inject as never as (id: SessionId) => {
+      openReview: (review: unknown, requestKey: string) => boolean
+      hooks: { sidebarMounted: unknown }
+    })(SID)
+    expect(injected.hooks.sidebarMounted).toBe(b.sidebarRight.mounted)
+
+    expect(injected.openReview(
+      { id: 'q', question: 'approve?', plan: '# Logged', callId: 'c-9', approve: { label: 'ok' } }, 'req-9',
+    )).toBe(true)
+    expect(b.sidebarRight.openSessionResource).toHaveBeenLastCalledWith(SID, 'dsh-resource://plan/s-plan/c-9')
+
+    expect(injected.openReview(
+      { id: 'q', question: 'approve?', plan: '# Pending\nbody', approve: { label: 'ok' } }, 'req-1',
+    )).toBe(true)
+    const [, previewAddress, previewOptions] = b.sidebarRight.openSessionResource.mock.calls.at(-1) as [
+      SessionId, string, { params: { planReview: { markdown: string; title: string } } },
+    ]
+    expect(previewAddress.startsWith('dsh-resource://plan-review/s-plan/')).toBe(true)
+    expect(decodeURIComponent(previewAddress.split('/').at(-1) ?? '').endsWith(':req-1')).toBe(true)
+    expect(previewOptions.params.planReview).toEqual({ markdown: '# Pending\nbody', title: 'Pending' })
+
+    ;(b.sidebarRight as { mounted?: unknown }).mounted = createSnapshotStore<SessionId | undefined>(undefined)
+    expect(injected.openReview({ id: 'q', question: '', plan: '', approve: { label: 'ok' } }, 'req-2')).toBe(false)
+    await fiber.dispose()
+  })
+
+  it('drives plan reads from both preview seats and resets them on reconnection', async () => {
+    const b = await bench()
+    const fiber = b.ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    for (const slot of ['sidebar.right.pane.tab', 'sidebar.right.pane.tab.title'] as const) {
+      const entry = b.slots.entries(slot).find(e => e.component !== undefined)
+      const injected = (entry?.inject as never as () => {
+        hooks: { planDocument: { getSnapshot(): Record<string, { status: string } | undefined> } }
+        loadPlan: (address: string) => Promise<void>
+      })()
+      await injected.loadPlan('dsh-resource://plan/s-1/c-1')
+      expect(injected.hooks.planDocument.getSnapshot()['dsh-resource://plan/s-1/c-1']).toMatchObject({
+        status: 'failed', failure: { code: 'plan/unavailable' },
+      })
+    }
+    b.ctx.emit('connection/reset')
+    const reads = (b.slots.entries('sidebar.right.pane.tab')[0]?.inject as never as () => {
+      hooks: { planDocument: { getSnapshot(): Record<string, unknown> } }
+    })().hooks.planDocument
+    expect(reads.getSnapshot()).toEqual({})
     await fiber.dispose()
   })
 

@@ -12,6 +12,7 @@ import type { ActivationObserver } from '../src/lifecycle.ts'
 interface RegistryInternals {
   readonly resident: Map<SessionId, Activation>
   readonly childOwners: Map<SessionId, Activation>
+  readonly materializations: Set<{ readonly lineage: readonly Agent[]; readonly settled: Promise<void> }>
   reserveActivation(parentSession: SessionId): { transfer(): void; release(): void }
   removeActivation(activation: Activation): void
   acquireOwnership(parent: Agent, childId: SessionId): void
@@ -165,5 +166,118 @@ describe('waitForChildren', () => {
     closing.resolve(undefined)
     internals.resident.delete(SessionId('child-1'))
     await expect(wait).resolves.toBe(true)
+  })
+
+  it('absorbs a closing descendant whose close transaction rejects', async () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    const closing = Promise.withResolvers<undefined>()
+    internals.resident.set(SessionId('child-1'), runningActivation(SessionId('child-1'), parent, { closing: closing.promise }))
+    const wait = registry.waitForChildren(parent)
+    closing.promise.catch(() => undefined)
+    closing.reject(new Error('close failed'))
+    internals.resident.delete(SessionId('child-1'))
+    await expect(wait).resolves.toBe(true)
+  })
+
+  it('joins an in-flight materialization through its settlement', async () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    const settled = Promise.withResolvers<undefined>()
+    const materialization = { lineage: [parent], settled: settled.promise }
+    internals.materializations.add(materialization)
+    const wait = registry.waitForChildren(parent)
+    settled.resolve(undefined)
+    internals.materializations.delete(materialization)
+    await expect(wait).resolves.toBe(true)
+  })
+
+  it('keeps an unrelated in-flight materialization out of the join set', async () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    const other = { id: SessionId('other-1') } as Agent
+    internals.materializations.add({ lineage: [other], settled: new Promise<void>(() => {}) })
+    await expect(registry.waitForChildren(parent)).resolves.toBe(false)
+    internals.materializations.clear()
+  })
+
+  it('joins a descendant published while the parent was idle', async () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    internals.resident.set(SessionId('child-1'), runningActivation(SessionId('child-1'), parent, {
+      hasPending: true,
+      onWhenIdle: () => {
+        internals.resident.set(SessionId('child-2'), runningActivation(SessionId('child-2'), parent, {
+          status: 'running',
+          onWhenIdle: () => { internals.resident.clear() },
+        }))
+      },
+    }))
+    await expect(registry.waitForChildren(parent)).resolves.toBe(true)
+  })
+
+  it('parks on an owned child whose publication has not landed', async () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    const child = runningActivation(SessionId('child-1'), parent, { ownedChildren: [SessionId('grand-1')] })
+    internals.resident.set(child.childId, child)
+    const wait = registry.waitForChildren(parent)
+    child.poke.resolve(undefined)
+    internals.resident.delete(child.childId)
+    await expect(wait).resolves.toBe(true)
+  })
+
+  it('joins a materialization admitted while the parent looked idle', async () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    let wakes = 0
+    internals.resident.set(SessionId('child-1'), runningActivation(SessionId('child-1'), parent, {
+      hasPending: true,
+      onWhenIdle: () => {
+        wakes += 1
+        if (wakes === 1) internals.materializations.add({ lineage: [parent], settled: Promise.resolve() })
+        else internals.materializations.clear()
+      },
+    }))
+    await expect(registry.waitForChildren(parent)).resolves.toBe(true)
+  })
+
+  it('does not park on an owned child whose publication already landed', async () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    const grand = makeActivation(SessionId('grand-1'), SessionId('child-1'))
+    internals.resident.set(grand.childId, grand)
+    const child = runningActivation(SessionId('child-1'), parent, { ownedChildren: [grand.childId] })
+    internals.resident.set(child.childId, child)
+    await expect(registry.waitForChildren(parent)).resolves.toBe(false)
+  })
+
+  it('parks on an idle descendant until its next wake', async () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    const child = runningActivation(SessionId('child-1'), parent)
+    internals.resident.set(child.childId, child)
+    const wait = registry.waitForChildren(parent)
+    child.poke.resolve(undefined)
+    internals.resident.delete(child.childId)
+    await expect(wait).resolves.toBe(true)
+  })
+})
+
+describe('hasPendingDirectChildren', () => {
+  it('reports an in-flight materialization or a resident child of the parent', () => {
+    const { registry, internals } = makeRegistry()
+    const parent = { id: SessionId('parent-1') } as Agent
+    expect(registry.hasPendingDirectChildren(parent)).toBe(false)
+
+    const materialization = { lineage: [parent], settled: new Promise<void>(() => {}) }
+    internals.materializations.add(materialization)
+    expect(registry.hasPendingDirectChildren(parent)).toBe(true)
+    internals.materializations.delete(materialization)
+
+    internals.resident.set(SessionId('child-1'), makeActivation(SessionId('child-1'), parent.id))
+    expect(registry.hasPendingDirectChildren(parent)).toBe(true)
+    internals.resident.clear()
+    expect(registry.hasPendingDirectChildren(parent)).toBe(false)
   })
 })
