@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { Context, FiberState } from '@deepseek-ai/cordis'
+import { Context, FiberState, LoggerLevel } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
@@ -92,12 +92,15 @@ describe('DeepSeek plugin package inventory', () => {
     })
   })
 
-  it('fails request preparation for an active package with malformed identity metadata', async () => {
+  it('omits the field and warns for an active package with malformed identity metadata', async () => {
     const { ctx, root } = await harness()
+    const warnings: unknown[][] = []
+    ctx.logger.exporter({ levels: { default: LoggerLevel.WARN }, export: (message) => { if (message.type === 'warn') warnings.push(message.args) } })
     const bad = await packagePlugin(root, 'bad', { name: 'bad' })
     await ctx.loader.create({ name: bad })
-    await expect(ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL }))
-      .rejects.toThrow(/must declare non-empty name and version/)
+    const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
+    expect(prepared.fields.dsh_plugin_packages).toBeUndefined()
+    expect(warnings.map(args => String(args[1]))).toEqual([expect.stringContaining('must declare non-empty name and version')])
   })
 
   it('omits a loose ESM module whose nearest manifest only marks the module type', async () => {
@@ -157,15 +160,18 @@ describe('DeepSeek plugin package inventory', () => {
     ])
   })
 
-  it('fails when a Loader-resolved bare entry has no package manifest', async () => {
+  it('omits the field and warns when a Loader-resolved bare entry has no package manifest', async () => {
     const { ctx } = await harness()
+    const warnings: unknown[][] = []
+    ctx.logger.exporter({ levels: { default: LoggerLevel.WARN }, export: (message) => { if (message.type === 'warn') warnings.push(message.args) } })
     ctx.loader.internal = {
       version: 'v2',
       import: async () => ({ default: () => {} }),
     } as unknown as NonNullable<typeof ctx.loader.internal>
     await ctx.loader.create({ name: 'missing-package' })
-    await expect(ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL }))
-      .rejects.toThrow(/cannot resolve active package/)
+    const prepared = await ctx.deepseekLlmApiExtensions.prepare({ body: { messages: [] }, signal: SIGNAL })
+    expect(prepared.fields.dsh_plugin_packages).toBeUndefined()
+    expect(warnings.map(args => String(args[1]))).toEqual([expect.stringContaining('cannot resolve active package')])
   })
 
   it('supports a direct embedding whose context has no base URL', async () => {
