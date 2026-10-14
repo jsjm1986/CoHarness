@@ -101,6 +101,19 @@
             "path"
           ]
         }
+      },
+      {
+        "name": "working_directory",
+        "description": "Read the current working directory, or change it with cd. Relative paths use the current directory. Directories must stay inside the project. Existing shells and running processes keep their own directories.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "cd": {
+              "type": "string",
+              "description": "Existing directory inside the project to enter. Omit to read the current directory."
+            }
+          }
+        }
       }
     ],
     "messages": [
@@ -215,6 +228,19 @@
             "command",
             "path"
           ]
+        }
+      },
+      {
+        "name": "working_directory",
+        "description": "Read the current working directory, or change it with cd. Relative paths use the current directory. Directories must stay inside the project. Existing shells and running processes keep their own directories.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "cd": {
+              "type": "string",
+              "description": "Existing directory inside the project to enter. Omit to read the current directory."
+            }
+          }
         }
       }
     ],
@@ -344,6 +370,19 @@
             "command",
             "path"
           ]
+        }
+      },
+      {
+        "name": "working_directory",
+        "description": "Read the current working directory, or change it with cd. Relative paths use the current directory. Directories must stay inside the project. Existing shells and running processes keep their own directories.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "cd": {
+              "type": "string",
+              "description": "Existing directory inside the project to enter. Omit to read the current directory."
+            }
+          }
         }
       }
     ],
@@ -487,6 +526,19 @@
             "command",
             "path"
           ]
+        }
+      },
+      {
+        "name": "working_directory",
+        "description": "Read the current working directory, or change it with cd. Relative paths use the current directory. Directories must stay inside the project. Existing shells and running processes keep their own directories.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "cd": {
+              "type": "string",
+              "description": "Existing directory inside the project to enter. Omit to read the current directory."
+            }
+          }
         }
       }
     ],

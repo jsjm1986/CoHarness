@@ -22,7 +22,6 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 
 const load = (path) => import(pathToFileURL(resolve(path)).href);
 const [
@@ -32,6 +31,7 @@ const [
   { default: JsonlSessionPersistence },
   { HarnessSdkJsonRpcServer },
   { SessionId },
+  { provideWorkingDirectoryFixture },
 ] = await Promise.all([
   load("vendor/cordis/lib/index.js"),
   load("packages/examples/agent-spine-demo/lib/index.js"),
@@ -39,6 +39,7 @@ const [
   load("packages/session/session-persistence-jsonl/lib/index.js"),
   load("packages/sdk/server/lib/index.js"),
   load("packages/core/session/lib/index.js"),
+  load("packages/test-support/agent-loop-testkit/lib/index.js"),
 ]);
 
 const storageRoot = await mkdtemp(join(tmpdir(), "jsonrpc-built-scope-"));
