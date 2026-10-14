@@ -20,6 +20,7 @@ import { assertPositiveFinite, assertUsableCwd, NO_START_CAPABILITIES } from '@d
 import {
   DEFAULT_DISPOSE_EOF_GRACE_MS,
   DEFAULT_DISPOSE_GRACE_MS,
+  DEFAULT_INITIALIZE_TIMEOUT_MS,
   DEFAULT_SHUTDOWN_TIMEOUT_MS,
   sdkConfigurationFailure,
   startSdkRun,
@@ -57,6 +58,8 @@ export interface Config {
    * not leak implicitly.
    */
   env: Record<string, string>
+  /** Bound (ms) on the child's protocol `initialize` handshake during start. */
+  initializeTimeoutMs?: number
   /** Bound (ms) on the protocol `shutdown` exchange during dispose. */
   shutdownTimeoutMs?: number
   /**
@@ -80,6 +83,7 @@ export const Config: z<Config> = z.object({
   reasoningEffort: z.string().min(1) as z<ReasoningEffortId>,
   maxTokens: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER),
   env: z.dict(z.string()).default({}),
+  initializeTimeoutMs: z.number().default(DEFAULT_INITIALIZE_TIMEOUT_MS),
   shutdownTimeoutMs: z.number().default(DEFAULT_SHUTDOWN_TIMEOUT_MS),
   disposeEofGraceMs: z.number().default(DEFAULT_DISPOSE_EOF_GRACE_MS),
   disposeGraceMs: z.number().default(DEFAULT_DISPOSE_GRACE_MS),
@@ -143,6 +147,7 @@ class SdkSubagentProvider implements SubagentProvider {
       originCwd: request.parent.session.header.cwd,
       ...route,
       env: this.config.env,
+      initializeTimeoutMs: this.config.initializeTimeoutMs,
       shutdownTimeoutMs: this.config.shutdownTimeoutMs,
       disposeEofGraceMs: this.config.disposeEofGraceMs,
       disposeGraceMs: this.config.disposeGraceMs,
@@ -159,6 +164,7 @@ class SdkSubagentProvider implements SubagentProvider {
 export function apply(ctx: Context, config: Config): void {
   // schemastery (Config) has already filled every defaulted field.
   const resolved = config as ResolvedConfig
+  assertPositiveFinite('subagent-dsh-sdk', 'initializeTimeoutMs', resolved.initializeTimeoutMs)
   assertPositiveFinite('subagent-dsh-sdk', 'shutdownTimeoutMs', resolved.shutdownTimeoutMs)
   assertPositiveFinite('subagent-dsh-sdk', 'disposeEofGraceMs', resolved.disposeEofGraceMs)
   assertPositiveFinite('subagent-dsh-sdk', 'disposeGraceMs', resolved.disposeGraceMs)

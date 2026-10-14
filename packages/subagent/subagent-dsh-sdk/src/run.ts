@@ -55,6 +55,8 @@ export interface SdkRunSpec {
    * current `DSH_*` fact survives while ambient namesakes never leak.
    */
   env: Record<string, string>
+  /** Bound (ms) on the protocol `initialize` handshake during start. */
+  initializeTimeoutMs: number
   /** Bound (ms) on the protocol `shutdown` exchange during dispose. */
   shutdownTimeoutMs: number
   /** Grace period (ms) for the child's EOF-driven quiesce on dispose. */
@@ -68,6 +70,9 @@ export interface SdkRunSpec {
    */
   onError?: (error: Error, stopReason: SubagentStopReason) => void
 }
+
+/** Default bound on the protocol `initialize` handshake during start. */
+export const DEFAULT_INITIALIZE_TIMEOUT_MS = 10_000
 
 /** EOF grace for child flush and nested-process teardown; wider than the signal grace below. */
 export const DEFAULT_DISPOSE_EOF_GRACE_MS = 6_000
@@ -241,6 +246,7 @@ export async function startSdkRun(request: SubagentStartRequest, spec: SdkRunSpe
     dshHome: spec.dshHome,
     processCwd: spec.cwd,
     env: { ...scrubbedParentEnv(), ...spec.env },
+    initializeTimeoutMs: spec.initializeTimeoutMs,
     shutdownTimeoutMs: spec.shutdownTimeoutMs,
     disposeEofGraceMs: spec.disposeEofGraceMs,
     disposeGraceMs: spec.disposeGraceMs,
