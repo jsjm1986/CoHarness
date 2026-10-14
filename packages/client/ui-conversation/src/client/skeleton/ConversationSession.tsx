@@ -107,7 +107,7 @@ export function ConversationSessionHeader({
             {leading}
             <div className={css.titleCluster}>
               {dotState === undefined ? null : (
-                <span className={css.sessionDot} title={t(dotState === 'warning' ? 'session.status.waiting' : 'session.status.running')}>
+                <span className={css.sessionDot} data-session-state={dotState} title={t(dotState === 'warning' ? 'session.status.waiting' : 'session.status.running')}>
                   <StateDot state={dotState} size={8} />
                   <span className={css.srOnly}>{t(dotState === 'warning' ? 'session.status.waiting' : 'session.status.running')}</span>
                 </span>
