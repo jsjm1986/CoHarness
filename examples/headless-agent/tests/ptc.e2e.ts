@@ -80,7 +80,6 @@ async function workspacePtcHarness(): Promise<Context> {
   })
   await harness.plugin(ToolFs)
   await harness.plugin(WorkspaceContext, { maxBytes: 65536 })
-  await harness.plugin(SessionProjectionRegistry)
   await harness.plugin(AgentLoop, { agents: [] })
   await harness.plugin(LlmDeepSeek, { models: [{ id: 'deepseek-flash' }] })
   await mountRuntime(harness)

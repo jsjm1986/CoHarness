@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { agentEvents } from '@deepseek-ai/dsh-agent'
+import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { TOOL_ORDER_REST } from '@deepseek-ai/dsh-system-prompt'
 import type { Message } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -23,6 +24,7 @@ import * as acpAgent from '../src/index.ts'
  */
 async function mount(config: acpAgent.Config, withBash = false): Promise<Context> {
   const ctx = new Context()
+  provideWorkingDirectoryFixture(ctx)
   if (withBash) {
     ctx.provide('shell', {
       sandboxMode: undefined,

@@ -445,8 +445,9 @@ describe('AppFrame — compact drawer and overlay details', () => {
     const toggle = frame.querySelector('[class*="topbarToggle"]') as HTMLElement
     const drawer = frame.querySelector('[class*="drawer"]')!
     expect(drawer.hasAttribute('data-open')).toBe(false)
-    // The drawer renders the sidebar expanded at the contract default even while closed.
-    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({ collapsed: false, width: SIDEBAR_DEFAULT })
+    // The drawer fills min(82%, 300px) of the 390px frame — 300 wins here —
+    // and the sidebar slot renders expanded at that exact width even while closed.
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({ collapsed: false, width: 300 })
     act(() => { toggle.click() })
     expect(drawer.hasAttribute('data-open')).toBe(true)
     expect(toggle.getAttribute('aria-label')).toBe('drawer.close')
