@@ -35,7 +35,7 @@
 - group "Session statistics":
   - "button \"1 turns · 2 steps · {{throughput}} tok/s\"":
     - img
-    - text: "1 turns · 2 steps{{throughput}} tok/s"
+    - text: 1 turns · 2 steps
   - button "16K tok · Cache hit 98%":
     - img
-    - text: 16K tokCache hit 98%
+    - text: 16K tok
