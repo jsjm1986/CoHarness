@@ -2702,6 +2702,7 @@ def normalize_snapshot_value(
                     item["updatedAt"] = 0
         scrub_snapshot_header(result)
         scrub_snapshot_system_message(result)
+        sort_snapshot_tool_manifests(result)
         return result
 
     return normalize(value)
@@ -2736,6 +2737,53 @@ def scrub_snapshot_system_message(value: dict[object, object]) -> None:
     for block in content:
         if isinstance(block, dict) and block.get("type") == "text":
             block["text"] = "{{system}}"
+
+
+def sort_snapshot_tool_manifests(value: dict[object, object]) -> None:
+    """Sort embedded `listTools` payloads so registry iteration order is not pinned.
+
+    Plugin fibers activate in inject-dependency order, so the Tool registry emits
+    schema entries in a different order across processes. The pinned contract is
+    the advertised tool set — the same order-insensitive treatment the smoke
+    applies to `requests.json` `toolNames` — while every other field stays exact.
+    """
+    data = value.get("data")
+    if not isinstance(data, dict):
+        return
+    content: object = None
+    if value.get("type") == "tool/ptc-dispatch":
+        content = data.get("content")
+    elif value.get("type") == "tool/result":
+        message = data.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, list):
+        return
+    for block in content:
+        text = block.get("text") if isinstance(block, dict) else None
+        if not isinstance(text, str) or '"tools"' not in text:
+            continue
+        try:
+            payload = json.loads(text)
+        except ValueError:
+            continue
+        if isinstance(payload, dict) and sort_snapshot_tools_field(payload):
+            block["text"] = json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def sort_snapshot_tools_field(payload: dict[object, object]) -> bool:
+    """Sort one Inspect payload's `data.tools` schema list or `tools` name list."""
+    data = payload.get("data")
+    manifest = data.get("tools") if isinstance(data, dict) else None
+    if isinstance(manifest, list) and all(
+        isinstance(tool, dict) and isinstance(tool.get("name"), str) for tool in manifest
+    ):
+        manifest.sort(key=lambda tool: tool["name"])
+        return True
+    names = payload.get("tools")
+    if isinstance(names, list) and all(isinstance(name, str) for name in names):
+        names.sort()
+        return True
+    return False
 
 
 def render_jsonl(records: list[object]) -> str:
@@ -2878,6 +2926,7 @@ def normalize_session_format_comparison(
         normalized.pop("time", None)
     if source_session_version == 1 and normalized.get("type") == "assistant/message":
         normalized.pop("sourceEventSeqs", None)
+    sort_snapshot_tool_manifests(normalized)
     return normalized
 
 
