@@ -822,12 +822,8 @@ jobs:
       - name: Build the steward tools bundle used by Gateway tests
         run: gateway/node_modules/.bin/tsc -p plugins/dsh-steward-tools/tsconfig.ci.json
       # loadConfig's source-run default resolves tsx/esm to an absolute path
-      # under the repo root (instances spawn outside it); this lane has no root
-      # install, so provide the root devDependency for the resolution test.
-      - name: Install the repo-level tsx devDependency
-        run: |
-          npm install --prefix "$RUNNER_TEMP/harness-root-deps" --no-save --no-package-lock "tsx@$(node -p "require(process.cwd() + '/package.json').devDependencies.tsx")"
-          mkdir -p node_modules && cp -R "$RUNNER_TEMP/harness-root-deps/node_modules/." node_modules/
+      # under the repo root (instances spawn outside it); the workspace
+      # install for the declaration emit already provides that devDependency.
       - name: Test Gateway
         run: npm test --prefix gateway
       - name: Test Gateway PostgreSQL authorization and invalidation
